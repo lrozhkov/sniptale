@@ -1,10 +1,13 @@
+import { CaptureMode, VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { commitPreparedOutgoingOperation, preparedOutgoingOperationKey } from './outgoing';
 import { commitOutgoingDispatchAttempt } from './outgoing-attempts';
 import { commitVerifiedOutgoingResult } from './outgoing-results';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
-import { createVideoProject } from '../projects/index.test-support';
+import { createVideoProject, createProjectExportEntry } from '../projects/index.test-support';
+import { createVideoProjectFromRecording } from '../../../features/video/project/factories/creation';
+import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { saveVideoProject, deleteVideoProject } from '../projects/index';
 import { hashCaptureText, parseSyncCaptureRecord } from './guards';
@@ -14,6 +17,7 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { installExperimentalCaptureProfile } from './profile';
 import { applyVideoProjectForCapturePrototype } from './test-support/apply-video-project';
+import type { AssetRef } from '../assets/contracts';
 import type { CapturedChange, SyncCaptureProfile } from './contracts';
 
 const nativeOwnerMocks = vi.hoisted(() => ({ initDB: vi.fn() }));
@@ -637,4 +641,117 @@ it('preserves publication identity and its causal successor across all phases', 
     generation: native.generation + 1,
     basis: [native.operationId],
   });
+});
+
+it('publishes a recording Montage export and preserves its capture through the next save', async () => {
+  const { publishProjectExportJournal, PROJECT_EXPORT_PUBLICATION_DOMAIN } =
+    await import('../projects/asset-publication');
+  const recording = {
+    id: 'export-source',
+    assetId: 'export-source-bytes',
+    filename: 'Source.webm',
+    createdAt: 1,
+    mimeType: 'video/webm',
+    size: 16,
+    recordingMetadata: {
+      captureMode: CaptureMode.TAB,
+      displaySurface: VideoDisplaySurface.BROWSER,
+      actionCount: 4,
+      hasPointer: true,
+    },
+  };
+  const sourceRef: AssetRef = {
+    assetId: recording.assetId,
+    createdAt: 1,
+    mimeType: recording.mimeType,
+    size: recording.size,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: `objects/${recording.assetId}` },
+  };
+  const sourceOwner = {
+    assetId: recording.assetId,
+    ownerId: recording.id,
+    ownerKind: 'recording',
+    role: 'body',
+  };
+  const media = buildRecordingMediaEntry(recording);
+  table('recordings').set(recording.id, recording);
+  table('media_library').set(media.id, media);
+  table('asset_refs').set(recording.assetId, sourceRef);
+  table('asset_owners').set(JSON.stringify(['recording', recording.id, 'body']), sourceOwner);
+  const project = createVideoProjectFromRecording({
+    recordingId: recording.id,
+    filename: recording.filename,
+    width: 640,
+    height: 360,
+    duration: 2,
+    mimeType: recording.mimeType,
+    size: recording.size,
+    hasAudio: true,
+    recordingSignals: [],
+  });
+  project.id = projectId;
+  const first = await saveVideoProject(project, { expectedWorkspaceRevision: null });
+  const beforePublication = captures().find((row) => row.rootKind === 'video-project')!;
+  const exported = createProjectExportEntry({
+    id: 'recording-montage-export',
+    projectId,
+    assetId: 'recording-montage-export-bytes',
+    recordingMetadata: recording.recordingMetadata,
+  });
+  const ref: AssetRef = {
+    ...sourceRef,
+    assetId: exported.assetId,
+    mimeType: exported.mimeType!,
+    size: exported.size,
+    location: { kind: 'opfs', objectKey: `objects/${exported.assetId}` },
+  };
+  const journal = {
+    journalId: 'recording-montage-export-journal',
+    domain: PROJECT_EXPORT_PUBLICATION_DOMAIN,
+    createdAt: 1,
+    assetRefs: [ref],
+    payload: { entry: exported },
+  };
+  await publishProjectExportJournal(journal);
+  const published = captures()
+    .filter((row) => row.rootKind === 'video-project')
+    .at(-1)!;
+  if (published.change.kind !== 'video-project') throw new Error('Expected parent capture');
+  expect(published.basis).toEqual([beforePublication.operationId]);
+  expect(published.change.rows.exports).toContainEqual(exported);
+  expect(published.change.rows.media).toContainEqual(
+    expect.objectContaining({
+      id: `export:${exported.id}`,
+      recordingMetadata: recording.recordingMetadata,
+    })
+  );
+  expect(published.change.rows.refs).toContainEqual(ref);
+  expect(table('project_exports').get(exported.id)).toEqual(exported);
+  expect(
+    table('asset_owners').get(JSON.stringify(['project-export', exported.id, 'body']))
+  ).toEqual({
+    assetId: exported.assetId,
+    ownerId: exported.id,
+    ownerKind: 'project-export',
+    role: 'body',
+  });
+  const afterPublication = structuredClone(fixture.rows);
+  await publishProjectExportJournal(journal);
+  expect(fixture.rows).toEqual(afterPublication);
+  await saveVideoProject(
+    { ...first.project, name: 'Saved after export' },
+    { expectedWorkspaceRevision: first.workspaceRevision ?? 0, expectedProject: first.project }
+  );
+  const saved = captures()
+    .filter((row) => row.rootKind === 'video-project')
+    .at(-1)!;
+  expect(saved.basis).toEqual([published.operationId]);
+  expect(saved).toMatchObject({ change: { rows: { exports: [exported] } } });
+  expect(currentProject().project.name).toBe('Saved after export');
+  expect(table('recordings').get(recording.id)).toEqual(recording);
+  expect(table('asset_refs').get(recording.assetId)).toEqual(sourceRef);
+  expect(table('asset_owners').get(JSON.stringify(['recording', recording.id, 'body']))).toEqual(
+    sourceOwner
+  );
 });

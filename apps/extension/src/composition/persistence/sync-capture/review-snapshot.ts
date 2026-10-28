@@ -12,8 +12,8 @@ import type { AssetRef } from '../assets/contracts';
 import { parseAssetOwner, parseAssetRef } from '../assets/guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from '../media-library/read-guards';
-import type { StoredProjectAssetEntry } from '../projects/contracts';
-import { parseProjectAssetEntry } from '../projects/read-guards';
+import type { StoredProjectAssetEntry, StoredProjectExportEntry } from '../projects/contracts';
+import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
 import type { VideoWorkspaceSnapshot } from '../review-workspaces/contracts';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from '../review-workspaces/parser';
 import { readWorkspaceStorage } from '../review-workspaces/storage';
@@ -23,6 +23,7 @@ import {
   STORE_NAME,
   RECORDING_TELEMETRY_STORE,
   PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -50,7 +51,9 @@ function parseMedia(value: unknown): Omit<MediaLibraryEntry, 'blob'> | null {
   if (!isRecord(value) || 'blob' in value) return null;
   const media = parseMediaLibraryEntry(value);
   return media &&
-    (media.source.kind === 'recording' || (!media.recordingMetadata && !media.recordingGroup)) &&
+    (media.source.kind === 'recording' ||
+      media.source.kind === 'project-export' ||
+      (!media.recordingMetadata && !media.recordingGroup)) &&
     media.lifecycle?.storageClass === 'library'
     ? media
     : null;
@@ -107,6 +110,7 @@ export function parseCapturedVideoReviewRows(value: unknown): CapturedVideoRevie
           'privateReviews',
           'thumbnail',
           'recordings',
+          'projectExports',
         ].includes(key)
     )
   )
@@ -120,6 +124,10 @@ export function parseCapturedVideoReviewRows(value: unknown): CapturedVideoRevie
       ? undefined
       : parseRows(value['recordings'], parseRecordingEntry);
   const assets = parseRows(value['assets'], parseProjectAssetEntry);
+  const projectExports =
+    value['projectExports'] === undefined
+      ? undefined
+      : parseRows(value['projectExports'], parseProjectExportEntry);
   const refs = parseRows(value['refs'], parseAssetRef);
   const published = parseRows(value['media'], parseMedia);
   const privateReviews = parseRows(value['privateReviews'], parseReview);
@@ -129,21 +137,29 @@ export function parseCapturedVideoReviewRows(value: unknown): CapturedVideoRevie
     (thumbnail && thumbnail.assetId !== review.workspace.aggregateId) ||
     !source ||
     recordings === null ||
+    projectExports === null ||
     !assets ||
     !refs ||
     !published ||
     !privateReviews ||
     !review.workspace.project ||
     source.media.lifecycle?.storageClass !== 'library' ||
-    (source.media.kind !== 'video' && source.media.kind !== 'recording') ||
+    (source.media.kind !== 'video' &&
+      source.media.kind !== 'recording' &&
+      !(source.media.kind === 'export' && source.media.source.kind === 'project-export')) ||
     (review.workspace.sourceMediaId ?? review.workspace.aggregateId) !== source.media.id ||
-    !matchesReview(review, 'recording' in source ? source.recording : source.projectAsset)
+    !matchesReview(review, {
+      assetId: source.ref.assetId,
+      size: source.ref.size,
+      mimeType: source.ref.mimeType,
+    })
   )
     return null;
   const rows = {
     review,
     source,
     ...(recordings === undefined ? {} : { recordings }),
+    ...(projectExports === undefined ? {} : { projectExports }),
     assets,
     refs,
     media: published,
@@ -206,8 +222,19 @@ function retainPublishedSource(
   neededAssets: Set<string>,
   neededRefs: Set<string>,
   recordings: Map<string, StoredRecordingEntry>,
-  neededRecordings: Set<string>
+  neededRecordings: Set<string>,
+  exports: Map<string, StoredProjectExportEntry>,
+  neededExports: Set<string>
 ): boolean {
+  if (entry.source.kind === 'project-export') {
+    const projectExport = exports.get(entry.source.exportId);
+    const ref = projectExport && refs.get(projectExport.assetId);
+    if (!projectExport || !ref || !parseCapturedMediaRows({ media: entry, projectExport, ref }))
+      return false;
+    neededExports.add(projectExport.id);
+    neededRefs.add(ref.assetId);
+    return true;
+  }
   if (entry.source.kind === 'recording') {
     const recording = recordings.get(entry.source.recordingId);
     const ref = recording && refs.get(recording.assetId);
@@ -244,6 +271,8 @@ function retainPublishedSource(
 
 function hasUniqueClosureRows(rows: CapturedVideoReviewRows): boolean {
   return (
+    new Set((rows.projectExports ?? []).map((entry) => entry.id)).size ===
+      (rows.projectExports ?? []).length &&
     new Set((rows.recordings ?? []).map((entry) => entry.id)).size ===
       (rows.recordings ?? []).length &&
     new Set(rows.assets.map((entry) => entry.id)).size === rows.assets.length &&
@@ -265,6 +294,8 @@ function completeClosure(rows: CapturedVideoReviewRows): boolean {
   const media = new Map(rows.media.map((entry) => [entry.id, entry]));
   const reviews = new Map(rows.privateReviews.map((entry) => [entry.workspace.aggregateId, entry]));
   const recordings = new Map((rows.recordings ?? []).map((entry) => [entry.id, entry]));
+  const exports = new Map((rows.projectExports ?? []).map((entry) => [entry.id, entry]));
+  const neededExports = new Set<string>();
   const neededRecordings = new Set<string>();
   const neededAssets = new Set<string>();
   const neededRefs = new Set<string>();
@@ -305,13 +336,16 @@ function completeClosure(rows: CapturedVideoReviewRows): boolean {
         neededAssets,
         neededRefs,
         recordings,
-        neededRecordings
+        neededRecordings,
+        exports,
+        neededExports
       )
     )
       return false;
   }
   return (
     neededRecordings.size === recordings.size &&
+    neededExports.size === exports.size &&
     neededAssets.size === assets.size &&
     neededRefs.size === refs.size &&
     neededMedia.size === media.size &&
@@ -376,6 +410,12 @@ async function readReviewSource(
 ): Promise<CapturedVideoReviewRows['source']> {
   const id = review.workspace.sourceMediaId ?? review.workspace.aggregateId;
   const media = parseMedia(await tx.objectStore(MEDIA_LIBRARY_STORE).get(id));
+  if (media?.source.kind === 'project-export') {
+    const resource = await readOwnedExport(tx, media.source.exportId);
+    const rows = parseCapturedMediaRows({ media, ...resource });
+    if (!rows) throw new Error('Invalid exported review source ownership.');
+    return rows;
+  }
   if (media?.source.kind === 'recording') {
     const recording = await readOwnedRecording(tx, media.source.recordingId);
     const rawTelemetry: unknown = await tx
@@ -394,6 +434,30 @@ async function readReviewSource(
     throw new Error('Unsupported review original.');
   const source = await readOwnedAsset(tx, media.source.projectAssetId);
   return { media, projectAsset: source.asset, ref: source.ref };
+}
+
+async function readOwnedExport(tx: ReadTransaction, id: string) {
+  const projectExport = parseProjectExportEntry(
+    await tx.objectStore(PROJECT_EXPORTS_STORE).get(id)
+  );
+  if (!projectExport || projectExport.id !== id)
+    throw new Error('Missing exported review original.');
+  const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(projectExport.assetId));
+  const owner = parseAssetOwner(
+    await tx.objectStore(ASSET_OWNERS_STORE).get(['project-export', id, 'body'])
+  );
+  if (
+    !ref ||
+    projectExport.size !== ref.size ||
+    (projectExport.mimeType ?? 'video/webm') !== ref.mimeType ||
+    !owner ||
+    owner.ownerKind !== 'project-export' ||
+    owner.ownerId !== id ||
+    owner.role !== 'body' ||
+    owner.assetId !== ref.assetId
+  )
+    throw new Error('Invalid exported review source ownership.');
+  return { projectExport, ref };
 }
 
 async function readOwnedRecording(tx: ReadTransaction, id: string) {
@@ -430,6 +494,7 @@ export async function freezeVideoReviewInTransaction(
   const media = new Map<string, Omit<MediaLibraryEntry, 'blob'>>();
   const privateReviews: VideoWorkspaceSnapshot[] = [];
   const recordings = new Map<string, StoredRecordingEntry>();
+  const projectExports = new Map<string, StoredProjectExportEntry>();
   const needed = new Set(collectReviewAssetReferences(review.workspace));
   const retainMedia = async (id: string) => {
     if (id === sourceId || media.has(id)) return;
@@ -443,6 +508,11 @@ export async function freezeVideoReviewInTransaction(
       const resource = await readOwnedRecording(tx, entry.source.recordingId);
       recordings.set(resource.recording.id, resource.recording);
       refs.set(resource.ref.assetId, resource.ref);
+    }
+    if (entry.source.kind === 'project-export') {
+      const exported = await readOwnedExport(tx, entry.source.exportId);
+      projectExports.set(exported.projectExport.id, exported.projectExport);
+      refs.set(exported.ref.assetId, exported.ref);
     }
     if (entry.source.kind === 'stored-asset') {
       const ref = await readPublishedSourceRef(tx, id, entry.source.assetId);
@@ -478,6 +548,7 @@ export async function freezeVideoReviewInTransaction(
     media: [...media.values()],
     privateReviews,
     ...(recordings.size === 0 ? {} : { recordings: [...recordings.values()] }),
+    ...(projectExports.size === 0 ? {} : { projectExports: [...projectExports.values()] }),
   });
   if (!rows || rows.review.workspace.aggregateId !== aggregateId)
     throw new Error('Unsupported video review snapshot.');

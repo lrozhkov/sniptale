@@ -1,3 +1,4 @@
+import { parseCapturedScenarioRows } from './scenario-snapshot';
 import { parseCapturedMediaRows } from './media-snapshot';
 export { parseCapturedMediaRows } from './media-snapshot';
 import { parseCapturedVideoReviewRows, type CapturedVideoReviewRows } from './review-snapshot';
@@ -10,6 +11,7 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseAssetRef } from '../assets/guards';
 import {
   captureRootKey,
+  captureProfileBounds,
   MAX_CAPTURE_METADATA_BYTES,
   MAX_CAPTURE_ROWS,
   type CapturedMediaDependency,
@@ -140,7 +142,8 @@ function parseCaptureRoot(
     value['generation'] === 0 ||
     (value['rootKind'] !== 'video-project' &&
       value['rootKind'] !== 'media' &&
-      value['rootKind'] !== 'video-review') ||
+      value['rootKind'] !== 'video-review' &&
+      value['rootKind'] !== 'scenario-project') ||
     !identity(value['rootId']) ||
     captureRootKey(header.spaceId, value['rootKind'], value['rootId']) !== value['rootKey'] ||
     !Array.isArray(value['basis']) ||
@@ -213,9 +216,10 @@ function captureRemoteKey(value: unknown): value is string {
 }
 /** Validate actual immutable portable object bindings without adding phase-specific fields. */
 export function parseCaptureObjectBindings(
-  value: unknown
+  value: unknown,
+  rootKind?: unknown
 ): PreparedCaptureOperation['prepared']['objects'] | null {
-  if (!Array.isArray(value) || value.length > MAX_CAPTURE_ROWS * 2) return null;
+  if (!Array.isArray(value) || value.length > captureProfileBounds(rootKind).objects) return null;
   const objects: PreparedCaptureOperation['prepared']['objects'] = [];
   for (const item of value) {
     if (!isRecord(item)) return null;
@@ -237,8 +241,28 @@ export function parseCaptureObjectBindings(
   }
   return new Set(objects.map((item) => item.objectId)).size === objects.length ? objects : null;
 }
-function parsePublishedObjects(value: unknown): PublishedCaptureOperation['objects'] | null {
-  const bindings = parseCaptureObjectBindings(value);
+/** Parse metadata-only immutable references separately from local file ownership. */
+export function parseCaptureRetainedBindings(
+  value: unknown,
+  rootKind?: unknown
+): { objectId: string; remoteKey: string }[] | null {
+  if (!Array.isArray(value) || value.length > captureProfileBounds(rootKind).objects) return null;
+  const objects: { objectId: string; remoteKey: string }[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || !identity(item['objectId']) || !captureRemoteKey(item['remoteKey']))
+      return null;
+    objects.push({ objectId: item['objectId'], remoteKey: item['remoteKey'] });
+  }
+  return new Set(objects.map((item) => item.objectId)).size === objects.length &&
+    new Set(objects.map((item) => item.remoteKey)).size === objects.length
+    ? objects
+    : null;
+}
+function parsePublishedObjects(
+  value: unknown,
+  rootKind?: unknown
+): PublishedCaptureOperation['objects'] | null {
+  const bindings = parseCaptureObjectBindings(value, rootKind);
   if (!bindings || !Array.isArray(value)) return null;
   const objects: PublishedCaptureOperation['objects'] = [];
   for (const [index, binding] of bindings.entries()) {
@@ -253,10 +277,10 @@ function parsePublishedObjects(value: unknown): PublishedCaptureOperation['objec
   }
   return new Set(objects.map((item) => item.remoteKey)).size === objects.length ? objects : null;
 }
-function parseCapturedChange(
+function parseCapturedOperationHeader(
   value: Record<string, unknown>,
   header: CaptureRecordHeader
-): CaptureOperation | null {
+): CaptureOperationHeader | null {
   const root = parseCaptureRoot(value, header);
   const source = value['source'];
   if (
@@ -273,13 +297,14 @@ function parseCapturedChange(
       source['changeKind'] !== 'media' &&
       source['changeKind'] !== 'video-project' &&
       source['changeKind'] !== 'video-review' &&
+      source['changeKind'] !== 'scenario-project' &&
       source['changeKind'] !== 'tombstone') ||
     typeof source['label'] !== 'string' ||
     source['label'].length === 0 ||
     source['label'].length > MAX_CAPTURE_METADATA_BYTES
   )
     return null;
-  const stable: CaptureOperationHeader = {
+  return {
     ...header,
     ...root,
     kind: 'sync-operation',
@@ -291,93 +316,136 @@ function parseCapturedChange(
     origin: value['origin'],
     publicationId: value['publicationId'],
   };
-  if (value['phase'] === 'native') {
-    if ('prepared' in value || 'publication' in value || 'objects' in value) return null;
-    const change = value['change'];
-    if (!isRecord(change)) return null;
-    const rows =
-      change['kind'] === 'video-project' ? parseCapturedVideoProjectRows(change['rows']) : null;
-    const mediaRows = change['kind'] === 'media' ? parseCapturedMediaRows(change['rows']) : null;
-    const imageRows = change['kind'] === 'image' ? parseCapturedImageRows(change['rows']) : null;
-    const reviewRows =
-      change['kind'] === 'video-review' ? parseCapturedVideoReviewRows(change['rows']) : null;
-    let parsedChange: CapturedChange['change'];
-    if (change['kind'] === 'tombstone') parsedChange = { kind: 'tombstone' };
-    else if (
-      reviewRows &&
-      reviewRows.review.workspace.aggregateId === root.rootId &&
-      root.rootKind === 'video-review'
-    ) {
-      const mediaDependencies = parseReviewDependencies(change['mediaDependencies'], reviewRows);
-      if (!mediaDependencies) return null;
-      parsedChange = { kind: 'video-review', rows: reviewRows, mediaDependencies };
-    } else if (rows && rows.project.id === root.rootId && root.rootKind === 'video-project')
-      parsedChange = { kind: 'video-project', rows };
-    else if (mediaRows && mediaRows.media.id === root.rootId && root.rootKind === 'media')
-      parsedChange = { kind: 'media', rows: mediaRows };
-    else if (imageRows && imageRows.media.id === root.rootId && root.rootKind === 'media')
-      parsedChange = { kind: 'image', rows: imageRows };
-    else return null;
-    const native: CapturedChange = { ...stable, phase: 'native', change: parsedChange };
-    return native.source.changeKind === parsedChange.kind &&
-      fingerprintNativeCapture(native) === native.sourceSha256
-      ? native
-      : null;
-  }
-  if (value['phase'] === 'prepared') {
-    if ('change' in value || 'publication' in value || 'objects' in value) return null;
-    const prepared = value['prepared'];
-    if (
-      !isRecord(prepared) ||
-      typeof prepared['recordText'] !== 'string' ||
-      new TextEncoder().encode(prepared['recordText']).byteLength > 4 * 1024 * 1024 ||
-      !captureDigest(prepared['recordSha256']) ||
-      hashCaptureText(prepared['recordText']) !== prepared['recordSha256'] ||
-      !Array.isArray(prepared['objects'])
-    )
-      return null;
-    const objects = parseCaptureObjectBindings(prepared['objects']);
-    if (!objects) return null;
-    return {
-      ...stable,
-      phase: 'prepared',
-      prepared: {
-        recordText: prepared['recordText'],
-        recordSha256: prepared['recordSha256'],
-        objects,
-      },
-    };
-  }
-  if (value['phase'] === 'published') {
-    if ('change' in value || 'prepared' in value) return null;
-    const fact = value['publication'];
-    const objects = parsePublishedObjects(value['objects']);
-    if (
-      !objects ||
-      !isRecord(fact) ||
-      (fact['kind'] !== 'verified' && fact['kind'] !== 'observed') ||
-      !ordinal(fact['acceptedAt']) ||
-      !captureDigest(fact['preparedSha256']) ||
-      typeof fact['attemptId'] !== 'string' ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(fact['attemptId']) ||
-      !captureRemoteKey(fact['recordKey']) ||
-      !captureDigest(fact['recordSha256'])
-    )
-      return null;
-    return {
-      ...stable,
-      phase: 'published',
-      publication: {
-        kind: fact['kind'],
-        acceptedAt: fact['acceptedAt'],
-        preparedSha256: fact['preparedSha256'],
-        attemptId: fact['attemptId'],
-        recordKey: fact['recordKey'],
-        recordSha256: fact['recordSha256'],
-      },
+}
+
+function parseNativeOperation(
+  value: Record<string, unknown>,
+  stable: CaptureOperationHeader
+): CapturedChange | null {
+  const root = stable;
+  if ('prepared' in value || 'publication' in value || 'objects' in value) return null;
+  const change = value['change'];
+  if (!isRecord(change)) return null;
+  const rows =
+    change['kind'] === 'video-project' ? parseCapturedVideoProjectRows(change['rows']) : null;
+  const mediaRows = change['kind'] === 'media' ? parseCapturedMediaRows(change['rows']) : null;
+  const imageRows = change['kind'] === 'image' ? parseCapturedImageRows(change['rows']) : null;
+  const reviewRows =
+    change['kind'] === 'video-review' ? parseCapturedVideoReviewRows(change['rows']) : null;
+  const scenarioRows =
+    change['kind'] === 'scenario-project' ? parseCapturedScenarioRows(change['rows']) : null;
+  let parsedChange: CapturedChange['change'];
+  if (change['kind'] === 'tombstone') parsedChange = { kind: 'tombstone' };
+  else if (
+    reviewRows &&
+    reviewRows.review.workspace.aggregateId === root.rootId &&
+    root.rootKind === 'video-review'
+  ) {
+    const mediaDependencies = parseReviewDependencies(change['mediaDependencies'], reviewRows);
+    if (!mediaDependencies) return null;
+    parsedChange = { kind: 'video-review', rows: reviewRows, mediaDependencies };
+  } else if (
+    scenarioRows &&
+    scenarioRows.entry.id === root.rootId &&
+    root.rootKind === 'scenario-project'
+  )
+    parsedChange = { kind: 'scenario-project', rows: scenarioRows };
+  else if (rows && rows.project.id === root.rootId && root.rootKind === 'video-project')
+    parsedChange = { kind: 'video-project', rows };
+  else if (mediaRows && mediaRows.media.id === root.rootId && root.rootKind === 'media')
+    parsedChange = { kind: 'media', rows: mediaRows };
+  else if (imageRows && imageRows.media.id === root.rootId && root.rootKind === 'media')
+    parsedChange = { kind: 'image', rows: imageRows };
+  else return null;
+  const native: CapturedChange = { ...stable, phase: 'native', change: parsedChange };
+  return native.source.changeKind === parsedChange.kind &&
+    fingerprintNativeCapture(native) === native.sourceSha256
+    ? native
+    : null;
+}
+
+function parsePreparedOperation(
+  value: Record<string, unknown>,
+  stable: CaptureOperationHeader
+): PreparedCaptureOperation | null {
+  if ('change' in value || 'publication' in value || 'objects' in value) return null;
+  const prepared = value['prepared'];
+  if (
+    !isRecord(prepared) ||
+    typeof prepared['recordText'] !== 'string' ||
+    new TextEncoder().encode(prepared['recordText']).byteLength > 4 * 1024 * 1024 ||
+    !captureDigest(prepared['recordSha256']) ||
+    hashCaptureText(prepared['recordText']) !== prepared['recordSha256'] ||
+    !Array.isArray(prepared['objects'])
+  )
+    return null;
+  const objects = parseCaptureObjectBindings(prepared['objects'], stable.rootKind);
+  const retainedObjects = Object.hasOwn(prepared, 'retainedObjects')
+    ? parseCaptureRetainedBindings(prepared['retainedObjects'], stable.rootKind)
+    : undefined;
+  if (
+    !objects ||
+    retainedObjects === null ||
+    objects.length + (retainedObjects?.length ?? 0) >
+      captureProfileBounds(stable.rootKind).objects ||
+    retainedObjects?.some((item) => objects.some((local) => local.objectId === item.objectId))
+  )
+    return null;
+  return {
+    ...stable,
+    phase: 'prepared',
+    prepared: {
+      recordText: prepared['recordText'],
+      recordSha256: prepared['recordSha256'],
       objects,
-    };
-  }
+      ...(retainedObjects === undefined ? {} : { retainedObjects }),
+    },
+  };
+}
+
+function parsePublishedOperation(
+  value: Record<string, unknown>,
+  stable: CaptureOperationHeader
+): PublishedCaptureOperation | null {
+  if ('change' in value || 'prepared' in value) return null;
+  const fact = value['publication'];
+  const objects = parsePublishedObjects(value['objects'], stable.rootKind);
+  if (
+    !objects ||
+    !isRecord(fact) ||
+    (fact['kind'] !== 'verified' && fact['kind'] !== 'observed') ||
+    !ordinal(fact['acceptedAt']) ||
+    !captureDigest(fact['preparedSha256']) ||
+    typeof fact['attemptId'] !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(fact['attemptId']) ||
+    !captureRemoteKey(fact['recordKey']) ||
+    !captureDigest(fact['recordSha256'])
+  )
+    return null;
+  return {
+    ...stable,
+    phase: 'published',
+    publication: {
+      kind: fact['kind'],
+      acceptedAt: fact['acceptedAt'],
+      preparedSha256: fact['preparedSha256'],
+      attemptId: fact['attemptId'],
+      recordKey: fact['recordKey'],
+      recordSha256: fact['recordSha256'],
+    },
+    objects,
+  };
+}
+
+function parseCapturedChange(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): CaptureOperation | null {
+  const stable = parseCapturedOperationHeader(value, header);
+  if (!stable) return null;
+  if (value['phase'] === 'native') return parseNativeOperation(value, stable);
+  if (value['phase'] === 'prepared') return parsePreparedOperation(value, stable);
+  if (value['phase'] === 'published') return parsePublishedOperation(value, stable);
   return null;
 }
 
@@ -392,7 +460,10 @@ function parseCaptureRootState(
   const nativeRevision = value['nativeRevision'];
   if (
     nativeRevision !== undefined &&
-    (!ordinal(nativeRevision) || (root.rootKind !== 'media' && root.rootKind !== 'video-review'))
+    (!ordinal(nativeRevision) ||
+      (root.rootKind !== 'media' &&
+        root.rootKind !== 'video-review' &&
+        root.rootKind !== 'scenario-project'))
   )
     return null;
   const deleted = value['deleted'];
@@ -402,7 +473,9 @@ function parseCaptureRootState(
     nativeDigest !== undefined &&
     (typeof nativeDigest !== 'string' ||
       !/^[a-f0-9]{64}$/u.test(nativeDigest) ||
-      (root.rootKind !== 'media' && root.rootKind !== 'video-review'))
+      (root.rootKind !== 'media' &&
+        root.rootKind !== 'video-review' &&
+        root.rootKind !== 'scenario-project'))
   )
     return null;
   return {

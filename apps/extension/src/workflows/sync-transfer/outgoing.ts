@@ -80,6 +80,13 @@ function preparationDraft(
       mediaId: item.mediaId,
       basis: item.basis,
     })),
+    ...(portable?.rootDependencies?.length
+      ? {
+          rootDependencies: portable.rootDependencies.map(
+            ({ rootKind, rootId, basis, childIds }) => ({ rootKind, rootId, basis, childIds })
+          ),
+        }
+      : {}),
     envelope: portable?.envelope ?? null,
     objects: objects.map((item) => ({ objectId: item.objectId, sha256: item.sha256 })),
   });
@@ -262,7 +269,13 @@ async function readDispatchSources(
 ) {
   const operation = await parseSyncOperationText(prepared.recordText);
   check(operation.spaceId === spaceId && operation.operationId === operationId);
-  check(operation.objects.length === prepared.objects.length);
+  const retained = prepared.retainedObjects ?? [];
+  check(operation.objects.length === prepared.objects.length + retained.length);
+  check(
+    retained.every((binding) =>
+      operation.objects.some((object) => object.objectId === binding.objectId)
+    )
+  );
   const files = [];
   for (const object of prepared.objects) {
     const expected = operation.envelope?.objects.find((item) => item.objectId === object.objectId);
@@ -487,6 +500,7 @@ export async function dispatchPreparedOutgoing(
     catalog?: OutgoingCatalog;
     checkReusedContents?: boolean;
     admitAttempt?: (attempt: OutgoingDispatchAttempt) => Promise<void>;
+    beforePublish?: () => Promise<void>;
   } = {}
 ) {
   signal.throwIfAborted();
@@ -507,14 +521,44 @@ export async function dispatchPreparedOutgoing(
     catalog,
     checkReusedContents
   );
+  if (prepared.retainedObjects !== undefined) {
+    const operation = await parseSyncOperationText(prepared.recordText);
+    const physical = await createSyncAttempt(prepared.recordText, crypto.randomUUID());
+    await createSyncAttempt(
+      prepared.recordText,
+      physical.attemptId,
+      physical.objects.map(
+        (binding) =>
+          prepared.retainedObjects?.find((item) => item.objectId === binding.objectId) ?? binding
+      )
+    );
+    for (const binding of prepared.retainedObjects) {
+      signal.throwIfAborted();
+      const object = operation.envelope?.objects.find((item) => item.objectId === binding.objectId);
+      const digest = operation.objects.find((item) => item.objectId === binding.objectId);
+      check(object && digest && ![...retained.values()].includes(binding.remoteKey));
+      if (
+        !(await canReuseRemoteFile(
+          remote,
+          binding.remoteKey,
+          object.size,
+          digest.sha256,
+          signal,
+          checkReusedContents
+        ))
+      )
+        throw new SyncRemoteError('missing');
+      retained.set(binding.objectId, binding.remoteKey);
+    }
+  }
   signal.throwIfAborted();
   const attempt = await reserveAttempt(prepared, retained);
   await admitAttempt?.(attempt);
   for (const binding of attempt.objects) {
     signal.throwIfAborted();
+    if (retained.get(binding.objectId) === binding.remoteKey) continue;
     const source = files.find((item) => item.objectId === binding.objectId);
     check(source);
-    if (retained.get(binding.objectId) === binding.remoteKey) continue;
     await remote.write(binding.remoteKey, source.file, signal);
     await verifyRemote(remote, binding.remoteKey, source.file.size, source.sha256, signal);
     signal.throwIfAborted();
@@ -523,6 +567,8 @@ export async function dispatchPreparedOutgoing(
   signal.throwIfAborted();
   const physical = await createSyncAttempt(prepared.recordText, attempt.attemptId, attempt.objects);
   check(physical.recordKey === attempt.recordKey && physical.recordSha256 === attempt.recordSha256);
+  await options.beforePublish?.();
+  signal.throwIfAborted();
   const manifest = new Blob([physical.recordText], { type: 'application/json' });
   await remote.write(attempt.recordKey, manifest, signal);
   await verifyRemote(remote, attempt.recordKey, manifest.size, attempt.recordSha256, signal);
@@ -546,6 +592,9 @@ export async function findObservedOutgoingPublication(
   return {
     version: 1,
     kind: 'dispatch-attempt',
+    ...(physical.operation.rootKind === 'scenario-project'
+      ? { rootKind: 'scenario-project' as const }
+      : {}),
     key: JSON.stringify([
       'dispatch-attempt',
       prepared.spaceId,

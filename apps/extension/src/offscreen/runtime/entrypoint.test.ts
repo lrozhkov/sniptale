@@ -14,6 +14,15 @@ const {
   translateMock: vi.fn((key: string) => key),
 }));
 
+const mediaEvents = vi.hoisted(() => ({
+  publishLibraryChanged: vi.fn(),
+  dispose: vi.fn(),
+  create: vi.fn(),
+}));
+vi.mock('../../features/media-hub/events', () => ({
+  createMediaHubEventPublisher: mediaEvents.create,
+}));
+
 vi.mock('./bootstrap', () => ({
   bootstrapOffscreenDocument: bootstrapOffscreenDocumentMock,
   probeOffscreenRuntimeReadiness: vi.fn(),
@@ -64,10 +73,17 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: translateMock,
 }));
 
+let documentEvents: EventTarget;
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
   vi.unstubAllGlobals();
+  documentEvents = new EventTarget();
+  vi.stubGlobal('addEventListener', vi.fn(documentEvents.addEventListener.bind(documentEvents)));
+  mediaEvents.create.mockReturnValue({
+    publishLibraryChanged: mediaEvents.publishLibraryChanged,
+    dispose: mediaEvents.dispose,
+  });
   vi.stubGlobal('location', {
     href: 'chrome-extension://extension/apps/extension/src/offscreen/offscreen.html',
   });
@@ -179,6 +195,7 @@ it('does not install a sync executor in the privacy-only document', async () => 
   vi.stubGlobal('location', { href: url.href });
   await import('../offscreen');
   expect(createSyncConnectionExecutor).not.toHaveBeenCalled();
+  expect(mediaEvents.create).not.toHaveBeenCalled();
   expect(registerOffscreenSyncMessageListener).not.toHaveBeenCalled();
   expect(bootstrapOffscreenDocumentMock).toHaveBeenCalledOnce();
 });
@@ -264,3 +281,40 @@ it.each(['catalog-refresh', 'thumbnail-read'] as const)(
     }
   }
 );
+
+it('owns one media publisher through offscreen disposal', async () => {
+  const startup = '11111111-1111-4111-8111-111111111111';
+  vi.stubGlobal('location', {
+    href: `chrome-extension://extension/offscreen.html?offscreenStartupId=${startup}`,
+  });
+  await import('../offscreen');
+  const ports = vi.mocked(createSyncConnectionExecutor).mock.calls[0]?.[0];
+  if (!ports?.createProductExecution) throw new Error('Missing product execution factory');
+  const input = {
+    scope: { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 1 },
+    authorization: { incarnation: startup, revision: 1 },
+    work: { kind: 'catalog-refresh' as const, bypassCache: false },
+    signal: new AbortController().signal,
+  };
+  ports.createProductExecution(input);
+  ports.createProductExecution(input);
+  for (const call of vi.mocked(createSyncProductExecution).mock.calls) {
+    const notify = call[2];
+    if (!notify) throw new Error('Missing library advisory');
+    notify();
+  }
+  expect(mediaEvents.create).toHaveBeenCalledOnce();
+  expect(mediaEvents.publishLibraryChanged.mock.calls).toEqual([
+    ['sync', []],
+    ['sync', []],
+  ]);
+  expect(mediaEvents.dispose).not.toHaveBeenCalled();
+  expect(globalThis.addEventListener).toHaveBeenCalledExactlyOnceWith(
+    'pagehide',
+    expect.any(Function),
+    { once: true }
+  );
+  documentEvents.dispatchEvent(new Event('pagehide'));
+  documentEvents.dispatchEvent(new Event('pagehide'));
+  expect(mediaEvents.dispose).toHaveBeenCalledOnce();
+});

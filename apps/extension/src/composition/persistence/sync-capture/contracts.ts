@@ -1,3 +1,6 @@
+import { MAX_MEDIA_ARCHIVE_ENTRIES } from '../../archive-transfer/contracts';
+import type { CapturedScenarioRows } from './scenario-snapshot';
+import type { ScenarioAssetEntry } from '../scenario/contracts';
 import type { StoredRecordingEntry, RecordingTelemetryEntry } from '../recordings/contracts';
 import type { StoredImageWorkspaceEntry } from '../image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
@@ -5,6 +8,7 @@ import type { AssetRef } from '../assets/contracts';
 import type { VideoWorkspaceSnapshot } from '../review-workspaces/contracts';
 import type { MediaThumbnailEntry } from '../media-library/contracts';
 import type { MediaLibraryEntry } from '../media-library/contracts';
+import type { StoredWebSnapshotRecord } from '../web-snapshots/contracts';
 import type {
   StoredProjectAssetEntry,
   StoredProjectExportEntry,
@@ -26,12 +30,17 @@ export interface SyncCaptureProfile {
   connectionGeneration: number;
 }
 
-export type CaptureRootKind = 'media' | 'video-project' | 'video-review';
+export type CaptureRootKind = 'media' | 'video-project' | 'video-review' | 'scenario-project';
 export type CaptureOrigin = 'local-edit' | 'local-restore';
 
 /** Native accepted rows remain distinct from the portable backup representation. */
 export interface CapturedVideoProjectRows {
   project: VideoProjectEntry;
+  scenarioAssets?: ScenarioAssetEntry[];
+  rootDependencies?: CapturedRootDependency[];
+  sourceExports?: StoredProjectExportEntry[];
+  recordings?: StoredRecordingEntry[];
+  telemetry?: RecordingTelemetryEntry[];
   assets: StoredProjectAssetEntry[];
   exports: StoredProjectExportEntry[];
   media: Omit<MediaLibraryEntry, 'blob'>[];
@@ -47,12 +56,25 @@ export interface CapturedVideoProjectRows {
 /** One immutable native screenshot aggregate, including inline source and presentation bytes. */
 export interface CapturedImageRows {
   media: MediaLibraryEntry;
+  originalRef?: AssetRef;
   workspace: StoredImageWorkspaceEntry | null;
   presentation: AggregatePresentationEntry | null;
   refs: AssetRef[];
 }
 
 export type CapturedMediaRows =
+  | { media: Omit<MediaLibraryEntry, 'blob'>; ref: AssetRef }
+  | {
+      media: Omit<MediaLibraryEntry, 'blob'>;
+      projectExport: StoredProjectExportEntry;
+      ref: AssetRef;
+    }
+  | {
+      media: Omit<MediaLibraryEntry, 'blob'>;
+      webSnapshot: StoredWebSnapshotRecord;
+      ref: AssetRef;
+      screenshotRef: AssetRef;
+    }
   | {
       media: Omit<MediaLibraryEntry, 'blob'>;
       projectAsset: StoredProjectAssetEntry;
@@ -70,6 +92,7 @@ export interface CapturedVideoReviewRows {
   review: VideoWorkspaceSnapshot;
   source: CapturedMediaRows;
   recordings?: StoredRecordingEntry[];
+  projectExports?: StoredProjectExportEntry[];
   assets: StoredProjectAssetEntry[];
   refs: AssetRef[];
   media: Omit<MediaLibraryEntry, 'blob'>[];
@@ -81,6 +104,18 @@ export interface CapturedMediaDependency {
   mediaId: string;
   generation: number;
   basis: string[];
+}
+
+/** Scenario prerequisites retain the exact authored children and their causal owner. */
+export interface CausalRootDependency {
+  rootKind: 'scenario-project';
+  rootId: string;
+  basis: string[];
+  childIds: string[];
+}
+
+export interface CapturedRootDependency extends CausalRootDependency {
+  generation: number;
 }
 
 /** A deleted native identity retains its generation and causal predecessor. */
@@ -110,7 +145,13 @@ export interface CaptureOperationHeader {
   profileCreatedAt: number;
   sourceSha256: string;
   source: {
-    changeKind: 'media' | 'image' | 'video-project' | 'video-review' | 'tombstone';
+    changeKind:
+      | 'media'
+      | 'image'
+      | 'video-project'
+      | 'video-review'
+      | 'scenario-project'
+      | 'tombstone';
     label: string;
   };
   key: string;
@@ -132,6 +173,7 @@ export interface CapturedChange extends CaptureOperationHeader {
   phase: 'native';
   change:
     | { kind: 'video-project'; rows: CapturedVideoProjectRows }
+    | { kind: 'scenario-project'; rows: CapturedScenarioRows }
     | {
         kind: 'video-review';
         rows: CapturedVideoReviewRows;
@@ -148,6 +190,8 @@ export interface PreparedCaptureOperation extends CaptureOperationHeader {
   prepared: {
     recordText: string;
     recordSha256: string;
+    /** Explicit same-space immutable references; these never authorize local byte release. */
+    retainedObjects?: { objectId: string; remoteKey: string }[];
     objects: { objectId: string; ref: AssetRef; sha256: string; filename: string }[];
   };
 }
@@ -200,4 +244,19 @@ export type SyncCaptureRecord =
 /** Tuple encoding prevents delimiter collisions in local native-store keys. */
 export function captureRootKey(spaceId: string, kind: CaptureRootKind, rootId: string): string {
   return JSON.stringify([spaceId, kind, rootId]);
+}
+
+/** Scenario uses the admitted archive profile; existing pilot families retain their original limits. */
+export function captureProfileBounds(rootKind: unknown) {
+  return rootKind === 'scenario-project'
+    ? {
+        rows: MAX_MEDIA_ARCHIVE_ENTRIES,
+        objects: MAX_MEDIA_ARCHIVE_ENTRIES,
+        metadataBytes: 4 * 1024 * 1024,
+      }
+    : {
+        rows: MAX_CAPTURE_ROWS,
+        objects: MAX_CAPTURE_ROWS * 2,
+        metadataBytes: MAX_CAPTURE_METADATA_BYTES,
+      };
 }

@@ -1,3 +1,12 @@
+import { deleteScenarioAggregateInTransaction } from '../scenario/aggregate-cleanup';
+import { createScenarioProjectStore } from '../scenario/storage';
+import { parseScenarioProjectEntry } from '../scenario/read-guards';
+import {
+  SCENARIO_CAPTURE_STORES,
+  freezeScenarioInTransaction,
+  digestCapturedScenarioRows,
+} from './scenario-snapshot';
+import { parsePreparedScenarioReplicaRoot } from './prepared-scenario';
 import { readWorkspaceStorage, createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
@@ -19,6 +28,7 @@ import {
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  WEB_SNAPSHOTS_STORE,
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
@@ -87,7 +97,7 @@ function ordinal(value: number): boolean {
 }
 function prepare(input: ApplyCatalogDeletionInput): ApplyCatalogDeletionInput {
   if (
-    !['media', 'video-project', 'video-review'].includes(input.rootKind) ||
+    !['media', 'video-project', 'video-review', 'scenario-project'].includes(input.rootKind) ||
     !input.rootId ||
     input.rootId.length > 256 ||
     !input.spaceId ||
@@ -209,6 +219,31 @@ async function deleteProjectRoot(
   await deleteVideoProjectInTransaction(tx, input.rootId, operation);
 }
 
+async function deleteScenarioRoot(
+  tx: Transaction,
+  input: ApplyCatalogDeletionInput,
+  state: SyncCaptureRootState | null,
+  operation: ReturnType<typeof buildPhysicalDeleteOperation>
+): Promise<number> {
+  const raw = await createScenarioProjectStore(tx).get(input.rootId);
+  const current = raw === undefined ? null : parseScenarioProjectEntry(raw);
+  if (
+    (raw !== undefined && !current) ||
+    (current?.workspaceRevision ?? null) !== input.expectedWorkspaceRevision ||
+    (current && (!state || state.deleted))
+  )
+    refuse();
+  if (
+    current &&
+    state?.nativeDigest !==
+      digestCapturedScenarioRows(await freezeScenarioInTransaction(tx, input.rootId))
+  )
+    refuse();
+  if (!current && state && !state.deleted) refuse();
+  await deleteScenarioAggregateInTransaction(tx, input.rootId, operation);
+  return Math.max(current?.workspaceRevision ?? 0, state?.nativeRevision ?? 0);
+}
+
 async function deleteReviewRoot(
   tx: Transaction,
   input: ApplyCatalogDeletionInput,
@@ -281,6 +316,12 @@ async function assertAbsentMediaRoot(
     ? rootId.slice('project-asset:'.length)
     : null;
   if (childId && (await tx.objectStore(PROJECT_ASSETS_STORE).get(childId)) !== undefined) refuse();
+  if (
+    rootId.startsWith('export:') &&
+    (await tx.objectStore(PROJECT_EXPORTS_STORE).get(rootId.slice('export:'.length))) !== undefined
+  )
+    refuse();
+  if ((await tx.objectStore(WEB_SNAPSHOTS_STORE).get(rootId)) !== undefined) refuse();
   if (rootId.startsWith('recording:')) {
     const id = rootId.slice('recording:'.length);
     if (
@@ -307,7 +348,11 @@ async function deleteMediaRoot(
   if (current === undefined) return assertAbsentMediaRoot(tx, input.rootId, state);
   if (!state) refuse();
   const media = parseMediaLibraryEntry(current);
-  if (media?.source.kind === 'screenshot') {
+  if (
+    media?.source.kind === 'screenshot' ||
+    (media?.source.kind === 'stored-asset' &&
+      (media.kind === 'image' || media.kind === 'screenshot'))
+  ) {
     const image = await freezeImageInTransaction(tx, input.rootId);
     if (
       state.nativeDigest !== digestCapturedImageRows(image) ||
@@ -356,6 +401,26 @@ function hasPendingPublication(
   input: ApplyCatalogDeletionInput,
   journals: AssetReadyJournal[]
 ): boolean {
+  if (input.rootKind === 'scenario-project')
+    return journals.some((journal) => {
+      if (journal.domain === 'scenario-html-exports')
+        return !isRecord(journal.payload) || journal.payload['projectId'] === input.rootId;
+      if (journal.domain === 'scenario-assets')
+        return (
+          !isRecord(journal.payload) ||
+          !isRecord(journal.payload['project']) ||
+          journal.payload['project']['id'] === input.rootId
+        );
+      if (journal.domain !== 'sync-replica') return false;
+      const payload = journal.payload;
+      if (!isRecord(payload) || !isRecord(payload['input'])) return true;
+      if (payload['kind'] !== 'scenario-project') return false;
+      try {
+        return parsePreparedScenarioReplicaRoot(payload['input']['root']).entry.id === input.rootId;
+      } catch {
+        return true;
+      }
+    });
   if (input.rootKind === 'video-review')
     return journals.some((journal) => pendingReview(journal, input.rootId));
   if (input.rootKind === 'video-project')
@@ -462,12 +527,14 @@ async function commitDeletion(
     [
       STORE_NAME,
       RECORDING_TELEMETRY_STORE,
+      ...SCENARIO_CAPTURE_STORES,
       RECORDING_RECOVERY_SESSIONS_STORE,
       RECORDING_RECOVERY_BLOCKS_STORE,
       SYNC_CAPTURE_STORE,
       MEDIA_LIBRARY_STORE,
       PROJECT_ASSETS_STORE,
       PROJECT_EXPORTS_STORE,
+      WEB_SNAPSHOTS_STORE,
       ASSET_REFS_STORE,
       ASSET_OWNERS_STORE,
       ASSET_OPERATIONS_STORE,
@@ -492,7 +559,9 @@ async function commitDeletion(
     signal?.throwIfAborted();
     let nativeRevision =
       input.rootKind === 'media' ? admission.previous?.nativeRevision : undefined;
-    if (input.rootKind === 'video-review')
+    if (input.rootKind === 'scenario-project')
+      nativeRevision = await deleteScenarioRoot(tx, input, admission.previous, operation);
+    else if (input.rootKind === 'video-review')
       nativeRevision = await deleteReviewRoot(tx, input, admission.previous, operation);
     else if (input.rootKind === 'video-project')
       await deleteProjectRoot(tx, input, admission.previous, operation);

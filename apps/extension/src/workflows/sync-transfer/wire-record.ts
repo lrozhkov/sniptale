@@ -1,3 +1,8 @@
+import { portableSyncRootDependencyIds } from './prepared-scenario';
+import {
+  captureProfileBounds,
+  type CausalRootDependency,
+} from '../../composition/persistence/sync-capture/contracts';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseBoundedJson } from '../media-hub-backup/v6/codec';
@@ -13,12 +18,13 @@ interface SyncOperation {
   version: 1;
   spaceId: string;
   operationId: string;
-  rootKind: 'media' | 'video-project' | 'video-review';
+  rootKind: 'media' | 'video-project' | 'video-review' | 'scenario-project';
   rootId: string;
   reviewSourceMediaId?: string;
   kind: 'edit' | 'restore' | 'delete';
   parents: string[];
   dependencies: { mediaId: string; basis: string[] }[];
+  rootDependencies?: CausalRootDependency[];
   envelope: MediaHubBackupRootEnvelope | null;
   objects: { objectId: string; sha256: string }[];
 }
@@ -51,8 +57,8 @@ export function hashSyncText(text: string): string {
   ).join('');
 }
 
-function parseDependencies(value: unknown): SyncOperation['dependencies'] {
-  check(Array.isArray(value) && value.length <= 32);
+function parseDependencies(value: unknown, rootKind?: unknown): SyncOperation['dependencies'] {
+  check(Array.isArray(value) && value.length <= captureProfileBounds(rootKind).rows);
   const dependencies = value.map((item) => {
     check(isRecord(item));
     fields(item, ['mediaId', 'basis']);
@@ -62,8 +68,8 @@ function parseDependencies(value: unknown): SyncOperation['dependencies'] {
   check(new Set(dependencies.map((item) => item.mediaId)).size === dependencies.length);
   return dependencies;
 }
-function parseObjects(value: unknown): SyncOperation['objects'] {
-  check(Array.isArray(value) && value.length <= 64);
+function parseObjects(value: unknown, rootKind?: unknown): SyncOperation['objects'] {
+  check(Array.isArray(value) && value.length <= captureProfileBounds(rootKind).objects);
   const objects = value.map((item) => {
     check(isRecord(item));
     fields(item, ['objectId', 'sha256']);
@@ -72,6 +78,34 @@ function parseObjects(value: unknown): SyncOperation['objects'] {
   });
   check(new Set(objects.map((item) => item.objectId)).size === objects.length);
   return objects;
+}
+
+function parseRootDependencies(value: unknown): CausalRootDependency[] {
+  check(Array.isArray(value) && value.length > 0 && value.length <= 32);
+  const dependencies = value.map((item): CausalRootDependency => {
+    check(isRecord(item));
+    fields(item, ['rootKind', 'rootId', 'basis', 'childIds']);
+    check(
+      item['rootKind'] === 'scenario-project' &&
+        identity(item['rootId']) &&
+        identities(item['basis']) &&
+        item['basis'].length === 1 &&
+        identities(item['childIds'])
+    );
+    check(JSON.stringify(item['childIds']) === JSON.stringify([...item['childIds']].sort()));
+    return {
+      rootKind: 'scenario-project',
+      rootId: item['rootId'],
+      basis: item['basis'],
+      childIds: item['childIds'],
+    };
+  });
+  check(new Set(dependencies.map((item) => item.rootId)).size === dependencies.length);
+  check(
+    JSON.stringify(dependencies.map((item) => item.rootId)) ===
+      JSON.stringify(dependencies.map((item) => item.rootId).sort())
+  );
+  return dependencies;
 }
 
 /** Parse bounded versioned logical bytes through the existing domain codec before admission. */
@@ -89,6 +123,7 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
     'kind',
     'parents',
     'dependencies',
+    ...('rootDependencies' in value ? ['rootDependencies'] : []),
     'envelope',
     'objects',
   ]);
@@ -97,7 +132,8 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   check(
     value['rootKind'] === 'media' ||
       value['rootKind'] === 'video-project' ||
-      value['rootKind'] === 'video-review'
+      value['rootKind'] === 'video-review' ||
+      value['rootKind'] === 'scenario-project'
   );
   check(value['kind'] === 'edit' || value['kind'] === 'restore' || value['kind'] === 'delete');
   const hasReviewSource = 'reviewSourceMediaId' in value;
@@ -105,14 +141,23 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   const reviewSourceMediaId = hasReviewSource ? value['reviewSourceMediaId'] : undefined;
   check(reviewSourceMediaId === undefined || identity(reviewSourceMediaId));
   check(identities(value['parents']) && !value['parents'].includes(value['operationId']));
-  const dependencies = parseDependencies(value['dependencies']);
-  const objects = parseObjects(value['objects']);
+  const dependencies = parseDependencies(value['dependencies'], value['rootKind']);
+  const rootDependencies =
+    'rootDependencies' in value ? parseRootDependencies(value['rootDependencies']) : undefined;
+  const objects = parseObjects(value['objects'], value['rootKind']);
   const portable =
     value['envelope'] === null
       ? null
       : await parsePortableSyncRoot(value['envelope'], reviewSourceMediaId);
   const envelope = portable?.envelope ?? null;
-  const needed = portable ? portableSyncDependencyIds(portable) : [];
+  const needed = portable
+    ? portableSyncDependencyIds(
+        portable,
+        dependencies.map((item) => item.mediaId)
+      )
+    : [];
+  if (portable) portableSyncRootDependencyIds(portable, rootDependencies ?? []);
+  else check(rootDependencies === undefined);
   check(JSON.stringify(needed) === JSON.stringify(dependencies.map((item) => item.mediaId).sort()));
   if (value['kind'] === 'delete')
     check(envelope === null && objects.length === 0 && dependencies.length === 0);
@@ -143,6 +188,7 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
     kind: value['kind'],
     parents: value['parents'],
     dependencies,
+    ...(rootDependencies === undefined ? {} : { rootDependencies }),
     envelope,
     objects,
   };
@@ -233,7 +279,11 @@ export async function parseSyncAttemptText(text: string) {
     typeof value['operationText'] === 'string' &&
       hashSyncText(value['operationText']) === value['operationSha256']
   );
-  check(Array.isArray(value['objects']) && value['objects'].length <= 64);
+  const operation = await parseSyncOperationText(value['operationText']);
+  check(
+    Array.isArray(value['objects']) &&
+      value['objects'].length <= captureProfileBounds(operation.rootKind).objects
+  );
   const objects = value['objects'].map((item) => {
     check(isRecord(item));
     fields(item, ['objectId', 'remoteKey']);
@@ -242,5 +292,5 @@ export async function parseSyncAttemptText(text: string) {
   });
   const expected = await createSyncAttempt(value['operationText'], value['attemptId'], objects);
   check(expected.recordText === text);
-  return { ...expected, operation: await parseSyncOperationText(value['operationText']) };
+  return { ...expected, operation };
 }

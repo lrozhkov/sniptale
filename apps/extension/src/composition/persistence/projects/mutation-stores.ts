@@ -1,7 +1,9 @@
 import type { IDBPTransaction } from 'idb';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { createScenarioProjectStore } from '../scenario/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import {
+  RECORDING_TELEMETRY_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_CAPTURE_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -32,6 +34,7 @@ type ProjectMutationDatabase = Awaited<ReturnType<typeof initDB>>;
 export function createProjectMutationStores(db: ProjectMutationDatabase) {
   const tx = db.transaction(
     [
+      ...SCENARIO_CAPTURE_STORES,
       VIDEO_PROJECT_REVISIONS_STORE,
       SYNC_CAPTURE_STORE,
       VIDEO_PROJECTS_STORE,
@@ -39,6 +42,7 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
       IMAGE_WORKSPACES_STORE,
       THUMBNAILS_STORE,
       STORE_NAME,
+      RECORDING_TELEMETRY_STORE,
       AGGREGATE_PRESENTATIONS_STORE,
       SCENARIO_ASSETS_STORE,
       SCENARIO_PROJECTS_STORE,

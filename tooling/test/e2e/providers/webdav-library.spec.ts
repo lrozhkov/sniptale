@@ -476,3 +476,263 @@ test('Settings retries a checked MKCOL 423 and completes the same workspace in o
     await browser.context.close();
   }
 });
+
+async function wakeExistingQueue(page: Page) {
+  await page.evaluate(() =>
+    chrome.alarms.create('sniptale:sync-queue-retry', { when: Date.now() })
+  );
+}
+
+async function refreshProductCatalog(page: Page) {
+  const response: unknown = await page.evaluate(() =>
+    chrome.runtime.sendMessage({
+      type: 'SYNC_PRODUCT_COMMAND',
+      requestId: crypto.randomUUID(),
+      command: { kind: 'catalog-refresh', bypassCache: true },
+      __sniptaleRuntimeFreshness: { issuedAtEpochMs: Date.now(), nonce: crypto.randomUUID() },
+    })
+  );
+  const accepted = parseSyncProductResponse(response);
+  if (!accepted?.success || accepted.result.kind !== 'accepted')
+    throw new Error('Catalog refresh refused');
+  const requestId = accepted.result.requestId;
+  await expect
+    .poll(
+      async () => {
+        const answer: unknown = await page.evaluate(
+          (id) =>
+            chrome.runtime.sendMessage({
+              type: 'SYNC_PRODUCT_COMMAND',
+              requestId: crypto.randomUUID(),
+              command: { kind: 'inspect', requestId: id },
+              __sniptaleRuntimeFreshness: {
+                issuedAtEpochMs: Date.now(),
+                nonce: crypto.randomUUID(),
+              },
+            }),
+          requestId
+        );
+        const parsed = parseSyncProductResponse(answer);
+        return parsed?.success && parsed.result.kind === 'operation'
+          ? parsed.result.job?.state
+          : null;
+      },
+      { timeout: 30_000 }
+    )
+    .toBe('ready');
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`two offline browsers preserve competing changes and resolve them through Library ${viewport.width}`, async ({
+    lab,
+  }, info) => {
+    test.setTimeout(360_000);
+    const source = await openProvider(lab, info, 'roundtrip-source', false, build, { viewport });
+    let target: Provider | null = null;
+    try {
+      await connectionPage(source, viewport);
+      const rootUrl = await connectWorkspace(source.page, {
+        mode: 'create',
+        url: lab.credentials.rootUrl,
+        ...lab.credentials,
+      });
+      const sourceProof = await harnessPage(source);
+      await sourceProof.evaluate(() => window.webdavTransferHarness.connection.restore());
+      const seeded = await sourceProof.evaluate(() =>
+        window.webdavTransferHarness.portable.source(undefined, {
+          useExistingProfile: true,
+          name: 'Shared offline project',
+        })
+      );
+      await wakeExistingQueue(sourceProof);
+      await expect
+        .poll(
+          async () => {
+            const queue = await sourceProof.evaluate(() =>
+              window.webdavTransferHarness.portable.outgoing.queueState()
+            );
+            return {
+              empty: queue.operations.length === 0,
+              unfinished: queue.operations
+                .filter((item) => item.status !== 'published')
+                .map((item) => ({
+                  operationId: item.operationId,
+                  rootKey: item.rootKey,
+                  generation: item.generation,
+                  status: item.status,
+                  stage: item.stage,
+                  failureCode: item.failureCode,
+                })),
+            };
+          },
+          { timeout: 120_000 }
+        )
+        .toEqual({ empty: false, unfinished: [] });
+      const initial = await sourceProof.evaluate(() =>
+        window.webdavTransferHarness.portable.outgoing.queueState()
+      );
+      const files = await sourceProof.evaluate(async () => {
+        const queue = await window.webdavTransferHarness.portable.outgoing.queueState();
+        return window.webdavTransferHarness.portable.outgoing.completed(
+          queue.connection.spaceId,
+          queue.connection.connectionGeneration
+        );
+      });
+      const rootKey = new URL(rootUrl).pathname.slice(
+        new URL(lab.credentials.rootUrl).pathname.length
+      );
+      for (const file of files)
+        expect(await lab.externalProof(rootKey + file.remoteKey)).toEqual({
+          size: file.ref.size,
+          sha256: file.sha256,
+        });
+      expect(files.some((file) => file.sha256 === seeded.exported.sha256)).toBe(true);
+      target = await openProvider(lab, info, 'roundtrip-target', false, build, { viewport });
+      await connectionPage(target, viewport);
+      await connectWorkspace(target.page, { mode: 'join', url: rootUrl, ...lab.credentials });
+      await openLibrary(target, viewport);
+      const card = target.page.getByRole('group', { name: 'Shared offline project', exact: true });
+      await card.focus();
+      await target.page.keyboard.press('Enter');
+      const opened = target.context.waitForEvent('page');
+      await target.page
+        .getByRole('dialog')
+        .getByRole('button', { name: 'Download and open', exact: true })
+        .click();
+      const editor = await opened;
+      await expectEditor(editor, seeded.clipId);
+      await editor.close();
+      const targetProof = await harnessPage(target);
+      await targetProof.evaluate(() => window.webdavTransferHarness.connection.restore());
+      const putsBeforeOffline = lab.proxy.counts.putBodies.filter((item) => item.complete).length;
+      lab.proxy.armFault({ method: 'PUT', key: '*', kind: 'status', status: 503, repeat: true });
+      await Promise.all([source.context.setOffline(true), target.context.setOffline(true)]);
+      const first = await sourceProof.evaluate(
+        (id) => window.webdavTransferHarness.portable.renameProject(id, 'Offline version A'),
+        seeded.projectId
+      );
+      const second = await targetProof.evaluate(
+        (id) => window.webdavTransferHarness.portable.renameProject(id, 'Offline version B'),
+        seeded.projectId
+      );
+      expect(first.operationId).not.toBe(second.operationId);
+      expect(
+        await sourceProof.evaluate(
+          (id) => window.webdavTransferHarness.portable.projectState(id),
+          seeded.projectId
+        )
+      ).toMatchObject({ name: 'Offline version A', objects: seeded.editing });
+      expect(
+        await targetProof.evaluate(
+          (id) => window.webdavTransferHarness.portable.projectState(id),
+          seeded.projectId
+        )
+      ).toMatchObject({ name: 'Offline version B', objects: seeded.editing });
+      expect(lab.proxy.counts.putBodies.filter((item) => item.complete).length).toBe(
+        putsBeforeOffline
+      );
+      lab.proxy.releaseFault();
+      await Promise.all([source.context.setOffline(false), target.context.setOffline(false)]);
+      await Promise.all([wakeExistingQueue(sourceProof), wakeExistingQueue(targetProof)]);
+      for (const [page, operationId] of [
+        [sourceProof, first.operationId],
+        [targetProof, second.operationId],
+      ] as const) {
+        await expect
+          .poll(
+            async () =>
+              (
+                await page.evaluate(() =>
+                  window.webdavTransferHarness.portable.outgoing.queueState()
+                )
+              ).operations.find((item) => item.operationId === operationId)?.status,
+            { timeout: 120_000 }
+          )
+          .toBe('published');
+      }
+      await openLibrary(source, viewport);
+      await refreshProductCatalog(source.page);
+      const conflict = source.page.getByRole('group').filter({ hasText: 'Conflicting versions' });
+      await expect(conflict).toHaveCount(1);
+      await conflict.focus();
+      await source.page.keyboard.press('Enter');
+      const dialog = source.page.getByRole('dialog');
+      await expect(
+        dialog.getByRole('button', { name: /Keep version.*Offline version A/ })
+      ).toBeEnabled();
+      await expect(
+        dialog.getByRole('button', { name: /Keep version.*Offline version B/ })
+      ).toBeEnabled();
+      await source.page.screenshot({
+        path: info.outputPath('explicit-conflict.png'),
+        fullPage: false,
+      });
+      await dialog.getByRole('button', { name: /Keep version.*Offline version A/ }).click();
+      await wakeExistingQueue(sourceProof);
+      await expect
+        .poll(
+          async () =>
+            (
+              await sourceProof.evaluate(() =>
+                window.webdavTransferHarness.portable.outgoing.queueState()
+              )
+            ).operations.some(
+              (item) =>
+                item.operationId !== first.operationId &&
+                item.operationId !== second.operationId &&
+                !initial.operations.some((old) => old.operationId === item.operationId) &&
+                item.status === 'published'
+            ),
+          { timeout: 120_000 }
+        )
+        .toBe(true);
+      await wakeExistingQueue(targetProof);
+      await expect
+        .poll(
+          async () =>
+            (
+              await targetProof.evaluate(
+                (id) => window.webdavTransferHarness.portable.projectState(id),
+                seeded.projectId
+              )
+            ).name,
+          { timeout: 120_000 }
+        )
+        .toBe('Offline version A');
+      await source.page.keyboard.press('Escape');
+      await refreshProductCatalog(source.page);
+      await expect(source.page.getByText('Conflicting versions', { exact: true })).toHaveCount(0);
+      await expect(
+        source.page.getByRole('group', { name: 'saved-export.png', exact: true })
+      ).toHaveCount(1);
+      await expect(source.page.getByText('On server', { exact: true })).toHaveCount(0);
+      await source.page.screenshot({
+        path: info.outputPath('resolved-library.png'),
+        fullPage: false,
+      });
+      for (const page of [sourceProof, targetProof])
+        expect(
+          await page.evaluate(
+            (id) => window.webdavTransferHarness.portable.projectState(id),
+            seeded.projectId
+          )
+        ).toMatchObject({ name: 'Offline version A', objects: seeded.editing });
+      await saveProof(info, {
+        viewport,
+        offlineOperations: [first.operationId, second.operationId],
+        nativeOfflineWrites: true,
+        runtimeQueuePublication: true,
+        explicitLibraryDecision: true,
+        bothBrowsersConverged: true,
+        externalOriginalsAndExports: true,
+      });
+    } finally {
+      lab.proxy.releaseFault();
+      await source.context.close();
+      await target?.context.close();
+    }
+  });
+}

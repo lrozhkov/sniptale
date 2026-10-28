@@ -1,3 +1,4 @@
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import {
   captureVideoProjectInTransaction,
   captureMediaInTransaction,
@@ -29,6 +30,7 @@ import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-bar
 import { assertStandaloneMediaSourceReplaceable } from './source-admission';
 import {
   SYNC_CAPTURE_STORE,
+  RECORDING_TELEMETRY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   IMAGE_WORKSPACES_STORE,
   THUMBNAILS_STORE,
@@ -126,10 +128,13 @@ async function publishProjectMediaAsset(args: {
     throw new Error('Project publication asset does not match its metadata.');
   }
   const physicalDelete = buildPhysicalDeleteOperation([]);
+  const publication = { publicationId: args.journal.journalId };
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        ...SCENARIO_CAPTURE_STORES,
         SYNC_CAPTURE_STORE,
+        RECORDING_TELEMETRY_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
         IMAGE_WORKSPACES_STORE,
         THUMBNAILS_STORE,
@@ -239,18 +244,13 @@ async function publishProjectMediaAsset(args: {
         const currentMedia = parseMediaLibraryEntry(await mediaStore.get(mediaEntry.id));
         if (currentMedia?.lifecycle) mediaEntry.lifecycle = currentMedia.lifecycle;
         await tx.objectStore(MEDIA_LIBRARY_STORE).put(mediaEntry);
-        if (args.storeName === PROJECT_ASSETS_STORE)
-          await captureMediaInTransaction(tx, mediaEntry.id, {
-            publicationId: args.journal.journalId,
-          });
+        await captureMediaInTransaction(tx, mediaEntry.id, publication);
       }
       if (physicalDelete.assetIds.length > 0) {
         await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
       }
       if (args.storeName === PROJECT_EXPORTS_STORE && 'projectId' in args.entry)
-        await captureVideoProjectInTransaction(tx, args.entry.projectId, {
-          publicationId: args.journal.journalId,
-        });
+        await captureVideoProjectInTransaction(tx, args.entry.projectId, publication);
       await tx.done;
     } catch (error) {
       await abortIndexedDbMutation(tx, error);

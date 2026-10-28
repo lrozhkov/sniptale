@@ -783,7 +783,10 @@ it('binds the product ingress to the existing coordinator only in the current qu
   initializeBackgroundRuntime(createModeState());
   const coordinator = syncWiring.createCoordinator.mock.results.at(-1)?.value;
   expect(coordinator).toBeDefined();
-  expect(syncWiring.configureProductRoute).toHaveBeenCalledExactlyOnceWith(coordinator);
+  expect(syncWiring.configureProductRoute).toHaveBeenCalledExactlyOnceWith(
+    coordinator,
+    expect.any(Function)
+  );
   expect(coordinatorDependencies().productExecutor).toBe(syncWiring.productExecutor);
   expect(coordinator?.planWorkspace).toBe(syncWiring.planWorkspace);
   expect(coordinator?.productCommand).toBe(syncWiring.productCommand);

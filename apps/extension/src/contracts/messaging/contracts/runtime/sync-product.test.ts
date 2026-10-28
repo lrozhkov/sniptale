@@ -352,3 +352,71 @@ it.each(['inspect', 'cancel'])(
     ).toBeNull();
   }
 );
+
+it('admits an exact conflict decision and refuses injected authority or ambiguous heads', () => {
+  const command = {
+    kind: 'conflict-resolve',
+    selection,
+    expectedHeads: ['version', 'other'],
+    resolutionId: id,
+  };
+  expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  for (const invalid of [
+    { ...command, remoteKeys: [] },
+    { ...command, expectedLocalGeneration: 1 },
+    { ...command, expectedHeads: ['version', 'version'] },
+    { ...command, expectedHeads: ['other', 'third'] },
+    { ...command, expectedHeads: ['version'] },
+    { ...command, resolutionId: 'not-a-uuid' },
+    { ...command, expectedHeads: Array.from({ length: 33 }, (_, index) => String(index)) },
+  ])
+    expect(parseSyncProductRequest({ ...envelope, command: invalid })).toBeNull();
+  expect(
+    parseSyncProductRequest({
+      ...envelope,
+      command: { ...command, selection: { ...selection, rootKind: 'scenario-project' } },
+    })
+  ).not.toBeNull();
+});
+
+it('keeps automatic work internal and bounds its completion', () => {
+  expect(parseSyncProductRequest({ ...envelope, command: { kind: 'automatic-sync' } })).toBeNull();
+  const request = {
+    type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+    requestId: id,
+    capabilityToken: 'token',
+    offscreenStartupId: id,
+    executorId: id,
+    executorRevision: 1,
+    command: {
+      kind: 'start',
+      operationRequestId: id,
+      binding: {
+        scope: { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 1 },
+        authorization: { incarnation: id, revision: 1 },
+      },
+      work: { kind: 'automatic-sync' },
+    },
+  };
+  expect(parseSyncProductExecutorRequest(request)).toEqual(request);
+  expect(
+    parseSyncProductExecutorRequest({
+      ...request,
+      command: { ...request.command, work: { kind: 'automatic-sync', roots: ['untrusted'] } },
+    })
+  ).toBeNull();
+  const completion = { kind: 'automatic', applied: 1, deferred: 1, remaining: true };
+  const response = (value: unknown) => ({
+    success: true,
+    result: { kind: 'operation', job: { ...job, kind: 'automatic-sync' }, completion: value },
+  });
+  expect(parseSyncProductResponse(response(completion))).toEqual(response(completion));
+  for (const invalid of [
+    { ...completion, applied: 2 },
+    { ...completion, deferred: -1 },
+    { ...completion, applied: 0.5 },
+    { ...completion, remaining: 'yes' },
+    { ...completion, providerResponse: 'private' },
+  ])
+    expect(parseSyncProductResponse(response(invalid))).toBeNull();
+});

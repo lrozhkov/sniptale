@@ -5,6 +5,7 @@ import {
   createSyncProductClient,
   publishSyncProductSettled,
   subscribeToWorkspaceSettled,
+  subscribeToSyncQueueSettled,
 } from './sync-product-client';
 
 const send = vi.hoisted(() => vi.fn());
@@ -177,4 +178,23 @@ it('marks thumbnail observation and cancellation as advisory without changing fo
   expect(send).toHaveBeenLastCalledWith(
     expect.objectContaining({ command: { kind: 'inspect', requestId: ids[1] } })
   );
+});
+
+it('admits bounded native queue identities while preserving product and workspace UUID rules', () => {
+  const queue = vi.fn();
+  const workspace = vi.fn();
+  const unsubscribe = subscribeToSyncQueueSettled(queue);
+  const unsubscribeWorkspace = subscribeToWorkspaceSettled(workspace);
+  publishSyncProductSettled('native-queue-operation', 'queue');
+  publishSyncProductSettled('', 'queue');
+  publishSyncProductSettled('x'.repeat(257), 'queue');
+  publishSyncProductSettled('native-queue-operation', 'workspace');
+  publishSyncProductSettled('native-queue-operation', 'product');
+  expect(queue).toHaveBeenCalledOnce();
+  expect(workspace).not.toHaveBeenCalled();
+  publishSyncProductSettled(ids[0]!, 'workspace');
+  expect(workspace).toHaveBeenCalledOnce();
+  unsubscribe();
+  unsubscribeWorkspace();
+  expect(Channel.live.size).toBe(0);
 });

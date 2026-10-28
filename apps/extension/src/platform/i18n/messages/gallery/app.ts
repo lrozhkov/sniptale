@@ -2,6 +2,16 @@ import { defineMessageSource } from '../source';
 
 export const galleryAppMessages = defineMessageSource({
   remoteOnly: { ru: 'На сервере', en: 'On server' },
+  remoteConflictHint: {
+    ru: 'Выберите версию, которую нужно сохранить. Остальные версии останутся в истории сервера.',
+    en: 'Select the version to keep. The other versions remain in the server history.',
+  },
+  remoteChooseVersion: { ru: 'Сохранить версию {number}', en: 'Keep version {number}' },
+  remoteChooseDeletion: { ru: 'Подтвердить удаление', en: 'Confirm deletion' },
+  remoteResolutionQueued: {
+    ru: 'Решение добавлено в очередь синхронизации. Локальные файлы сохранены до проверки результата.',
+    en: 'The decision is in the sync queue. Local files are retained until the result is checked.',
+  },
   remoteConflict: { ru: 'Конфликт версий', en: 'Conflicting versions' },
   remoteUnavailable: { ru: 'Удалённый проект недоступен', en: 'Remote project unavailable' },
   remoteDownloadOpen: { ru: 'Скачать и открыть', en: 'Download and open' },

@@ -153,7 +153,7 @@ export type RuntimeSyncConnectionResponseByType = {
 
 /** Exact version selected from a remote card; contains no native admission authority. */
 export interface SyncRemoteSelection {
-  rootKind: 'media' | 'video-project' | 'video-review';
+  rootKind: 'media' | 'video-project' | 'video-review' | 'scenario-project';
   rootId: string;
   operationId: string;
   sourceDigest: string;
@@ -167,20 +167,29 @@ export interface SyncRemoteCatalogCard {
   selection: SyncRemoteSelection;
   label: string;
   tags: string[];
-  kind: 'image' | 'video' | 'audio' | 'video-project' | 'video-review';
+  kind: 'image' | 'video' | 'audio' | 'video-project' | 'video-review' | 'scenario';
   mimeType: string | null;
   size: number;
   createdAt: number;
   updatedAt: number;
   conflict: boolean;
+  /** The exact competing heads visible when the user selects a retained version. */
+  versions?: { selection: SyncRemoteSelection; label: string; deleted: boolean }[];
   unavailable: boolean;
   deleted: boolean;
 }
 
 export type SyncProductWork =
+  | { kind: 'automatic-sync' }
   | { kind: 'catalog-refresh'; bypassCache: boolean }
   | { kind: 'replica-prepare'; selection: SyncRemoteSelection }
-  | { kind: 'thumbnail-read'; selection: SyncRemoteSelection };
+  | { kind: 'thumbnail-read'; selection: SyncRemoteSelection }
+  | {
+      kind: 'conflict-resolve';
+      selection: SyncRemoteSelection;
+      expectedHeads: string[];
+      resolutionId: string;
+    };
 export type SyncProductCommand =
   | {
       kind: 'workspace-create';
@@ -206,7 +215,7 @@ export type SyncProductCommand =
     }
   | { kind: 'workspace-abandon'; source: SyncWorkspaceSource }
   | { kind: 'status' }
-  | SyncProductWork
+  | Exclude<SyncProductWork, { kind: 'automatic-sync' }>
   | { kind: 'inspect'; requestId: string; advisory?: true }
   | { kind: 'cancel'; requestId: string; advisory?: true };
 export type SyncProductFailureCode =
@@ -215,6 +224,8 @@ export type SyncProductFailureCode =
   | 'unavailable'
   | 'invalid-data';
 export type SyncProductCompletion =
+  | { kind: 'automatic'; applied: number; deferred: number; remaining: boolean }
+  | { kind: 'resolution'; operationId: string }
   | { kind: 'catalog'; count: number }
   | { kind: 'replica'; selection: SyncRemoteSelection }
   | { kind: 'thumbnail'; dataUrl: string | null; width: number; height: number };

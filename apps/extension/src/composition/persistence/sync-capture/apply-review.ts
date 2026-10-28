@@ -119,6 +119,8 @@ function isApplyReviewHeader(value: unknown): value is ApplyReviewHeader {
 function isSupportedReviewDependencySource(entry: Dependency['entry']): boolean {
   const source = entry.source;
   if (source.kind === 'recording') return entry.id === `recording:${source.recordingId}`;
+  if (source.kind === 'project-export') return entry.id === `export:${source.exportId}`;
+  if (source.kind === 'stored-asset') return !entry.recordingMetadata && !entry.recordingGroup;
   return (
     source.kind === 'project-asset' &&
     entry.id === `project-asset:${source.projectAssetId}` &&
@@ -167,7 +169,9 @@ function dependenciesMatchReviewSource(
   const source = dependencies.find((dependency) => dependency.entry.id === root.sourceMediaId);
   if (
     !source ||
-    (source.entry.kind !== 'video' && source.entry.kind !== 'recording') ||
+    (source.entry.kind !== 'video' &&
+      source.entry.kind !== 'recording' &&
+      !(source.entry.kind === 'export' && source.entry.source.kind === 'project-export')) ||
     !source.ref.mimeType.startsWith('video/') ||
     source.ref.assetId !== root.review.workspace.sourceAssetId ||
     source.ref.size !== root.review.workspace.source.size ||
@@ -339,16 +343,31 @@ async function admitDependencies(tx: WriteTx, input: ApplyPreparedVideoReviewRep
     const source = await freezeMediaInTransaction(tx, dependency.entry.id, {
       allowIndependentReview: true,
     });
-    const child = 'recording' in source ? source.recording : source.projectAsset;
-    const ownerKind = 'recording' in source ? 'recording' : 'project-asset';
+    const childId =
+      'recording' in source
+        ? source.recording.id
+        : 'projectAsset' in source
+          ? source.projectAsset.id
+          : 'projectExport' in source
+            ? source.projectExport.id
+            : source.media.id;
+    const ownerKind =
+      'recording' in source
+        ? 'recording'
+        : 'projectAsset' in source
+          ? 'project-asset'
+          : 'projectExport' in source
+            ? 'project-export'
+            : 'media-library';
+    const role = ownerKind === 'media-library' ? 'source' : 'body';
     const owner = parseAssetOwner(
-      await tx.objectStore(ASSET_OWNERS_STORE).get([ownerKind, child.id, 'body'])
+      await tx.objectStore(ASSET_OWNERS_STORE).get([ownerKind, childId, role])
     );
     if (
       !owner ||
       owner.ownerKind !== ownerKind ||
-      owner.ownerId !== child.id ||
-      owner.role !== 'body' ||
+      owner.ownerId !== childId ||
+      owner.role !== role ||
       owner.assetId !== source.ref.assetId ||
       !same(source.media, dependency.entry) ||
       !same(source.ref, dependency.ref) ||

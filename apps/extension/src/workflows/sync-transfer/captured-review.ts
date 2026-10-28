@@ -9,6 +9,8 @@ import {
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  WEB_SNAPSHOTS_STORE,
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
@@ -105,15 +107,26 @@ export function frozenReviewDatabase(source: FrozenMediaRows): FrozenReviewDatab
     ...('recording' in snapshot.source ? [snapshot.source.recording] : []),
     ...(snapshot.recordings ?? []),
   ];
+  const exports = [
+    ...('projectExport' in snapshot.source ? [snapshot.source.projectExport] : []),
+    ...(snapshot.projectExports ?? []),
+  ];
+  const webSnapshots = 'webSnapshot' in snapshot.source ? [snapshot.source.webSnapshot] : [];
   const telemetry =
     'recording' in snapshot.source && snapshot.source.telemetry ? [snapshot.source.telemetry] : [];
   const media = [snapshot.source.media, ...snapshot.media];
-  const refs = [snapshot.source.ref, ...snapshot.refs];
+  const refs = [
+    snapshot.source.ref,
+    ...('screenshotRef' in snapshot.source ? [snapshot.source.screenshotRef] : []),
+    ...snapshot.refs,
+  ];
   const reviews = [...(snapshot.review ? [snapshot.review] : []), ...snapshot.privateReviews];
   const reviewIds = new Set([aggregateId, ...assets.map((asset) => `project-asset:${asset.id}`)]);
   const rows = new Map<string, unknown[]>([
     [MEDIA_LIBRARY_STORE, media],
     [PROJECT_ASSETS_STORE, assets],
+    [PROJECT_EXPORTS_STORE, exports],
+    [WEB_SNAPSHOTS_STORE, webSnapshots],
     [STORE_NAME, recordings],
     [RECORDING_TELEMETRY_STORE, telemetry],
     [ASSET_REFS_STORE, refs],
@@ -134,6 +147,8 @@ export function frozenReviewDatabase(source: FrozenMediaRows): FrozenReviewDatab
       ]),
     ],
     [PROJECT_ASSETS_STORE, new Set(assets.map((entry) => entry.id))],
+    [PROJECT_EXPORTS_STORE, new Set(exports.map((entry) => entry.id))],
+    [WEB_SNAPSHOTS_STORE, new Set(webSnapshots.map((entry) => entry.id))],
     [STORE_NAME, new Set(recordings.map((entry) => entry.id))],
     [RECORDING_TELEMETRY_STORE, new Set(recordings.map((entry) => entry.id))],
     [ASSET_REFS_STORE, new Set(refs.map((ref) => ref.assetId))],

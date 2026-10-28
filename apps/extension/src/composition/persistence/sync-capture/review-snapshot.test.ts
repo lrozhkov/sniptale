@@ -13,10 +13,15 @@ import { materializeVideoWorkspaceProject } from '../review-workspaces/project-m
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import type { VideoWorkspace } from '../review-workspaces/contracts';
 import { replaceWorkspaceStorage } from '../review-workspaces/storage';
-import { createMediaLibraryEntry, createProjectAssetEntry } from '../projects/index.test-support';
+import {
+  createMediaLibraryEntry,
+  createProjectAssetEntry,
+  createProjectExportEntry,
+} from '../projects/index.test-support';
 import type { StoredProjectAssetEntry } from '../projects/contracts';
 import type { AssetRef } from '../assets/contracts';
 import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import {
   createReviewAdvancedContentOperation,
   reviewAdvancedContentBaseline,
@@ -170,6 +175,65 @@ it('rejects missing, duplicate and extra supplementary refs', async () => {
   expect(
     parseCapturedVideoReviewRows({ ...rows, assets: [...rows.assets, rows.source.projectAsset] })
   ).toBeNull();
+});
+
+it('retains exact export origin rows for private supplementary resources without a parent project', async () => {
+  const f = fixture();
+  const resource = f.asset('supplementary-export', 'video/webm');
+  const exported = createProjectExportEntry({
+    id: 'origin-export',
+    projectId: 'absent-project',
+    assetId: resource.assetId,
+    size: resource.size,
+    mimeType: resource.mimeType,
+  });
+  f.rows.get('project_exports')!.set(exported.id, exported);
+  f.rows
+    .get('project_assets')!
+    .set(resource.id, { ...resource, originMediaId: `export:${exported.id}` });
+  f.rows.get('asset_owners')!.set(JSON.stringify(['project-export', exported.id, 'body']), {
+    ownerKind: 'project-export',
+    ownerId: exported.id,
+    role: 'body',
+    assetId: exported.assetId,
+  });
+  f.rows.get('media_library')!.set(
+    `export:${exported.id}`,
+    createMediaLibraryEntry({
+      id: `export:${exported.id}`,
+      kind: 'video',
+      source: { kind: 'project-export', exportId: exported.id, projectId: exported.projectId },
+      mimeType: resource.mimeType,
+      size: resource.size,
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    })
+  );
+  const workspace = f.workspace();
+  f.save({
+    ...workspace,
+    advanced: {
+      ...workspace.advanced,
+      webcam: createQuickEditWebcam(
+        `project-asset:${resource.id}`,
+        workspace.source,
+        workspace.source
+      ),
+    },
+  });
+  const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  expect(rows.projectExports).toEqual([exported]);
+  expect(rows.media.map((entry) => entry.id)).toContain(`export:${exported.id}`);
+  expect(parseCapturedVideoReviewRows({ ...rows, projectExports: [] })).toBeNull();
+  expect(
+    parseCapturedVideoReviewRows({ ...rows, projectExports: [exported, exported] })
+  ).toBeNull();
+  f.rows.get('asset_owners')!.set(JSON.stringify(['project-export', exported.id, 'body']), {
+    ownerKind: 'project-export',
+    ownerId: exported.id,
+    role: 'body',
+    assetId: 'foreign',
+  });
+  await expect(freezeVideoReviewInTransaction(f.tx(), f.mediaId)).rejects.toThrow('ownership');
 });
 
 it('retains disabled and redo-only resources', async () => {

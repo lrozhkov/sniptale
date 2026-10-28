@@ -4,6 +4,7 @@ import { createReviewWorkspaceStoreFixture } from '../../../../composition/persi
 import {
   createMediaLibraryEntry,
   createVideoProjectEntryWithMediaClip,
+  createProjectExportEntry,
 } from '../../../../composition/persistence/projects/index.test-support';
 import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { parseSyncCaptureRecord } from '../../../../composition/persistence/sync-capture/guards';
@@ -34,6 +35,8 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 }));
 
 import { mediaLibraryRootPublisher } from './media';
+import { isCaptureReview } from './media-review-assets';
+import { buildProjectExportMediaEntry } from '../../../../composition/persistence/media-library/entry-mapping';
 import { projectAssetReviewMetadata, portableJson } from './media.review-assets.test-support';
 import { fixtureWorkspaceValue } from '../../../../composition/persistence/review-workspaces/store.test-support';
 import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
@@ -67,6 +70,43 @@ const session = {
 } satisfies ArchiveRestoreSession;
 
 beforeEach(() => vi.clearAllMocks());
+
+it('routes native export-kind reviews through the existing restore capture owner', () => {
+  const projectExport = createProjectExportEntry();
+  const media = buildProjectExportMediaEntry(projectExport);
+  const workspace = parseVideoWorkspace({
+    ...projectAssetReviewMetadata().videoReview.workspace,
+    sourceAssetId: projectExport.assetId,
+  });
+  if (!workspace) throw new Error('Invalid export review fixture.');
+  const root = {
+    media,
+    projectExport,
+    projectAsset: null,
+    recording: null,
+    original: {
+      ref: {
+        assetId: projectExport.assetId,
+        createdAt: 1,
+        size: projectExport.size,
+        mimeType: projectExport.mimeType!,
+        sha256: null,
+        location: { kind: 'opfs' as const, objectKey: `objects/${projectExport.assetId}` },
+      },
+    },
+    videoReview: {
+      workspace: materializeVideoWorkspaceProject(workspace, 'Export review'),
+      draft: null,
+    },
+  };
+  expect(isCaptureReview(root)).toBe(true);
+  expect(
+    isCaptureReview({
+      ...root,
+      media: { ...media, source: { kind: 'recording', recordingId: projectExport.id } },
+    })
+  ).toBe(false);
+});
 
 async function restoredOriginalFixture(enabled = true, failCapture = false, workspaceRevision = 0) {
   const fixture = createReviewWorkspaceStoreFixture(
@@ -239,41 +279,49 @@ it('keeps broad restored media outside the original-only pilot without inventing
   ).toEqual([]);
 });
 
-it('captures a restored screenshot with detached original bytes and a target-local revision', async () => {
-  const { fixture, input, entry } = await restoredOriginalFixture();
-  const restored = {
-    ...entry,
-    id: 'restored-image',
-    kind: 'screenshot' as const,
-    source: { kind: 'screenshot' as const },
-    workspaceRevision: 0,
-    imageContentState: 'original' as const,
-  };
-  input.envelope.descriptor.rootId = restored.id;
-  const metadata: unknown = JSON.parse(
-    JSON.stringify({ entry: restored, originalObjectId: 'original' })
-  );
-  assertPortableJson(metadata);
-  input.envelope.metadata = metadata;
-  await mediaLibraryRootPublisher.publish(input);
-  const capture = [...fixture.rows.get('sync_capture')!.values()]
-    .map(parseSyncCaptureRecord)
-    .find((row) => row?.kind === 'sync-operation');
-  expect(capture).toMatchObject({
-    phase: 'native',
-    origin: 'local-restore',
-    change: { kind: 'image', rows: { media: { id: restored.id, workspaceRevision: 1 } } },
-  });
-  if (
-    capture?.kind !== 'sync-operation' ||
-    capture.phase !== 'native' ||
-    capture.change.kind !== 'image'
-  )
-    throw new Error('Expected restored image capture.');
-  expect(capture.change.rows.media.blob).toBeInstanceOf(Blob);
-  expect(capture.change.rows.media.blob).not.toBeInstanceOf(File);
-  expect(await capture.change.rows.media.blob?.text()).toBe('source');
-});
+it.each(['screenshot', 'stored-asset'] as const)(
+  'captures a restored %s image with a target-local revision',
+  async (sourceKind) => {
+    const { fixture, input, entry } = await restoredOriginalFixture();
+    const restored = {
+      ...entry,
+      id: 'restored-image',
+      kind: 'screenshot' as const,
+      source: { kind: sourceKind },
+      workspaceRevision: 0,
+      imageContentState: 'original' as const,
+    };
+    input.envelope.descriptor.rootId = restored.id;
+    const metadata: unknown = JSON.parse(
+      JSON.stringify({ entry: restored, originalObjectId: 'original' })
+    );
+    assertPortableJson(metadata);
+    input.envelope.metadata = metadata;
+    await mediaLibraryRootPublisher.publish(input);
+    const capture = [...fixture.rows.get('sync_capture')!.values()]
+      .map(parseSyncCaptureRecord)
+      .find((row) => row?.kind === 'sync-operation');
+    expect(capture).toMatchObject({
+      phase: 'native',
+      origin: 'local-restore',
+      change: { kind: 'image', rows: { media: { id: restored.id, workspaceRevision: 1 } } },
+    });
+    if (
+      capture?.kind !== 'sync-operation' ||
+      capture.phase !== 'native' ||
+      capture.change.kind !== 'image'
+    )
+      throw new Error('Expected restored image capture.');
+    if (sourceKind === 'screenshot') {
+      expect(capture.change.rows.media.blob).toBeInstanceOf(Blob);
+      expect(capture.change.rows.media.blob).not.toBeInstanceOf(File);
+      expect(await capture.change.rows.media.blob?.text()).toBe('source');
+    } else {
+      expect(capture.change.rows.media.blob).toBeUndefined();
+      expect(capture.change.rows.originalRef).toEqual(input.staged[0]!.ref);
+    }
+  }
+);
 
 async function restoredReviewFixture(enabled = true) {
   let failCapture = false;

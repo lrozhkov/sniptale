@@ -42,7 +42,8 @@ export function parseSyncRemoteSelection(value: unknown): SyncRemoteSelection | 
     !exact(value, ['rootKind', 'rootId', 'operationId', 'sourceDigest']) ||
     (value['rootKind'] !== 'media' &&
       value['rootKind'] !== 'video-project' &&
-      value['rootKind'] !== 'video-review') ||
+      value['rootKind'] !== 'video-review' &&
+      value['rootKind'] !== 'scenario-project') ||
     !text(value['rootId']) ||
     !text(value['operationId']) ||
     typeof value['sourceDigest'] !== 'string' ||
@@ -58,6 +59,30 @@ export function parseSyncRemoteSelection(value: unknown): SyncRemoteSelection | 
 }
 export function parseSyncProductWork(value: unknown): SyncProductWork | null {
   if (!isRecord(value)) return null;
+  if (value['kind'] === 'automatic-sync' && exact(value, ['kind']))
+    return { kind: 'automatic-sync' };
+  if (
+    value['kind'] === 'conflict-resolve' &&
+    exact(value, ['kind', 'selection', 'expectedHeads', 'resolutionId'])
+  ) {
+    const selection = parseSyncRemoteSelection(value['selection']);
+    const heads = value['expectedHeads'];
+    return selection &&
+      connectionUuid(value['resolutionId']) &&
+      Array.isArray(heads) &&
+      heads.length >= 2 &&
+      heads.length <= 32 &&
+      heads.every((head: unknown) => text(head)) &&
+      new Set(heads).size === heads.length &&
+      heads.includes(selection.operationId)
+      ? {
+          kind: 'conflict-resolve',
+          selection,
+          expectedHeads: heads,
+          resolutionId: value['resolutionId'],
+        }
+      : null;
+  }
   if (value['kind'] === 'catalog-refresh')
     return exact(value, ['kind', 'bypassCache']) && typeof value['bypassCache'] === 'boolean'
       ? { kind: value['kind'], bypassCache: value['bypassCache'] }
@@ -74,7 +99,7 @@ export function parseSyncProductWork(value: unknown): SyncProductWork | null {
 export function parseSyncProductCommand(value: unknown): SyncProductCommand | null {
   if (!isRecord(value)) return null;
   const work = parseSyncProductWork(value);
-  if (work) return work;
+  if (work && work.kind !== 'automatic-sync') return work;
   if (value['kind'] === 'status' && exact(value, ['kind'])) return { kind: 'status' };
   if (value['kind'] === 'workspace-abandon' && exact(value, ['kind', 'source'])) {
     const source = parseSyncWorkspaceSource(value['source']);
@@ -215,7 +240,9 @@ export function parseSyncProductJob(value: unknown): SyncProductJobSnapshot | nu
     !connectionUuid(value['requestId']) ||
     (value['kind'] !== 'catalog-refresh' &&
       value['kind'] !== 'replica-prepare' &&
-      value['kind'] !== 'thumbnail-read') ||
+      value['kind'] !== 'thumbnail-read' &&
+      value['kind'] !== 'conflict-resolve' &&
+      value['kind'] !== 'automatic-sync') ||
     (value['state'] !== 'running' &&
       value['state'] !== 'ready' &&
       value['state'] !== 'failed' &&
@@ -241,6 +268,26 @@ export function parseSyncProductJob(value: unknown): SyncProductJobSnapshot | nu
 }
 function completion(value: unknown): SyncProductCompletion | null {
   if (!isRecord(value)) return null;
+  if (
+    value['kind'] === 'automatic' &&
+    exact(value, ['kind', 'applied', 'deferred', 'remaining']) &&
+    ordinal(value['applied']) &&
+    ordinal(value['deferred']) &&
+    value['applied'] + value['deferred'] <= 2 &&
+    typeof value['remaining'] === 'boolean'
+  )
+    return {
+      kind: 'automatic',
+      applied: value['applied'],
+      deferred: value['deferred'],
+      remaining: value['remaining'],
+    };
+  if (
+    value['kind'] === 'resolution' &&
+    exact(value, ['kind', 'operationId']) &&
+    connectionUuid(value['operationId'])
+  )
+    return { kind: 'resolution', operationId: value['operationId'] };
   if (
     value['kind'] === 'catalog' &&
     exact(value, ['kind', 'count']) &&

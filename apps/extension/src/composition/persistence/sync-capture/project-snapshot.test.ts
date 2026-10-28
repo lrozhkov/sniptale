@@ -15,6 +15,7 @@ import type { CapturedVideoProjectRows } from './contracts';
 import {
   collectCapturedProjectEditingMediaIds,
   isSupportedCaptureProject,
+  collectCapturedProjectRecordingIds,
 } from './project-snapshot';
 
 const metadata = {
@@ -195,7 +196,7 @@ it('does not manufacture a selected child media mirror when the frozen graph con
   expect(ids.has('project-asset:shared')).toBe(false);
 });
 
-it('admits authored focus paths and refuses recording source bindings before graph capture', () => {
+it('admits authored focus paths and retains recording source bindings in the dependency set', () => {
   const project = createVideoProjectEntry().project;
   project.cursorFocusPath = {
     version: 1,
@@ -211,5 +212,6 @@ it('admits authored focus paths and refuses recording source bindings before gra
     recordingId: 'external-recording',
     sourceInstanceId: 'instance',
   };
-  expect(isSupportedCaptureProject(project)).toBe(false);
+  expect(isSupportedCaptureProject(project)).toBe(true);
+  expect([...collectCapturedProjectRecordingIds(project)]).toEqual(['external-recording']);
 });

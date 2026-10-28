@@ -4,8 +4,14 @@ import {
   sanitizeArchivePathSegment,
 } from '../../composition/archive-transfer';
 import type { AssetRef } from '../../composition/persistence/assets';
-import { buildProjectAssetMediaEntry } from '../../composition/persistence/media-library/entry-mapping';
-import { createProjectAssetEntry } from '../../composition/persistence/projects/index.test-support';
+import {
+  buildProjectAssetMediaEntry,
+  buildProjectExportMediaEntry,
+} from '../../composition/persistence/media-library/entry-mapping';
+import {
+  createProjectAssetEntry,
+  createProjectExportEntry,
+} from '../../composition/persistence/projects/index.test-support';
 import { workspace as reviewWorkspace } from '../../composition/persistence/review-workspaces/backup-restore.test-support';
 import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { materializeVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/project-metadata';
@@ -15,9 +21,24 @@ import { buildMediaRootInventory } from '../media-hub-backup/v6/inventory/media'
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
 import { encodeCapturedVideoReviewRoot } from './captured-review';
+import { preparePortableReplica, parsePortableSyncRoot } from './prepared-root';
 import { nestedMediaReviewFixture } from '../media-hub-backup/v6/root-publication/media.review-assets.test-support';
+import { createCleanupWebSnapshotRecord } from '../media-hub/cleanup.test-support';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
+import { createMediaLibraryEntry } from '../../composition/persistence/projects/index.test-support';
+import { createNativeCapture } from '../../composition/persistence/sync-capture/test-support/frozen-snapshot-database';
+import { captureRootKey } from '../../composition/persistence/sync-capture/contracts';
+import { encodeCapturedPortableRoot } from './captured-root';
 
 const io = vi.hoisted(() => ({ read: vi.fn(), liveRead: vi.fn(), files: new Map<string, File>() }));
+vi.mock('../../features/web-snapshot/provenance', async (original) => ({
+  ...(await original<typeof import('../../features/web-snapshot/provenance')>()),
+  sanitizeWebSnapshotPackageProvenance: async (packageBlob: Blob, manifest: unknown) => ({
+    packageBlob,
+    manifest,
+    changed: false,
+  }),
+}));
 vi.mock('../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/assets')>()),
   readAssetFile: io.read,
@@ -167,6 +188,172 @@ function backupDatabase(rows: CapturedVideoReviewRows) {
     }),
   };
 }
+
+it.each([false, true])(
+  'keeps independent export review editing closure without its parent (archived=%s)',
+  async (archived) => {
+    const original = reviewRows();
+    const projectExport = createProjectExportEntry({
+      id: 'saved-export',
+      projectId: 'absent-parent',
+      assetId: original.source.ref.assetId,
+      size: original.source.ref.size,
+      mimeType: original.source.ref.mimeType,
+    });
+    const media = { ...buildProjectExportMediaEntry(projectExport), workspaceRevision: 0 };
+    const aggregateId = archived ? 'export:quick-project:old' : media.id;
+    const rows: CapturedVideoReviewRows = {
+      ...original,
+      source: { media, projectExport, ref: original.source.ref },
+      review: {
+        workspace: { ...original.review.workspace, aggregateId, sourceMediaId: media.id },
+        draft: original.review.draft ? { ...original.review.draft, aggregateId } : null,
+      },
+      ...(original.thumbnail ? { thumbnail: { ...original.thumbnail, assetId: aggregateId } } : {}),
+    };
+    const encoded = await encodeCapturedVideoReviewRoot(rows);
+    expect(encoded.reviewSourceMediaId).toBe(media.id);
+    const parsed = await parsePortableSyncRoot(encoded.envelope, media.id);
+    expect(parsed.kind).toBe('video-review');
+    const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+    expect(metadata.projectExport?.projectId).toBe('absent-parent');
+    const verified = new Map(encoded.bindings.map((binding) => [binding.objectId, binding.ref]));
+    for (const object of encoded.envelope.objects)
+      if (!verified.has(object.objectId))
+        verified.set(object.objectId, {
+          ...original.source.ref,
+          assetId: object.objectId,
+          size: object.size,
+          mimeType: object.mimeType,
+          location: { kind: 'opfs', objectKey: `objects/${object.objectId}` },
+        });
+    const dependency = {
+      entry: media,
+      ref: original.source.ref,
+      expectedGeneration: 1,
+      expectedBasis: ['source-op'],
+    };
+    const supplementary = original.media.map((entry) => ({
+      entry,
+      ref: original.refs[0]!,
+      expectedGeneration: 1,
+      expectedBasis: ['camera-op'],
+    }));
+    const dependencies = [dependency, ...supplementary];
+    const prepared = await preparePortableReplica({
+      envelope: encoded.envelope,
+      reviewSourceMediaId: media.id,
+      verifiedObjects: verified,
+      senderDependencies: dependencies.map((item) => ({
+        mediaId: item.entry.id,
+        basis: item.expectedBasis,
+      })),
+      admission: {
+        spaceId: 'space',
+        profileCreatedAt: 1,
+        connectionGeneration: 1,
+        operationId: 'incoming-export-review',
+        sourceDigest: 'a'.repeat(64),
+        expectedLocalGeneration: 0,
+        expectedBasis: [],
+        expectedWorkspaceRevision: null,
+        dependencies,
+      },
+    });
+    expect(prepared.kind).toBe('video-review');
+    if (prepared.kind === 'video-review') expect(prepared.input.root.sourceMediaId).toBe(media.id);
+    expect(io.liveRead).not.toHaveBeenCalled();
+  }
+);
+
+it('round trips frozen saved snapshot metadata with both native asset bindings', async () => {
+  const webSnapshot = createCleanupWebSnapshotRecord('saved-page');
+  const ref = assetRef({
+    assetId: webSnapshot.packageAssetId,
+    size: webSnapshot.size,
+    mimeType: PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
+  });
+  const screenshotRef = assetRef({
+    assetId: webSnapshot.screenshotAssetId,
+    size: webSnapshot.screenshotSize,
+    mimeType: webSnapshot.screenshotMimeType,
+  });
+  const media = createMediaLibraryEntry({
+    id: webSnapshot.id,
+    kind: 'web-archive',
+    source: { kind: 'web-snapshot', snapshotId: webSnapshot.id },
+    size: ref.size,
+    mimeType: ref.mimeType,
+    filename: 'page.sniptale-page-package.zip',
+    originalFilename: 'page.sniptale-page-package.zip',
+    workspaceRevision: 0,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+  });
+  const captured = createNativeCapture({
+    version: 1,
+    kind: 'sync-operation',
+    key: 'snapshot-op',
+    createdAt: 1,
+    spaceId: 'space',
+    connectionGeneration: 1,
+    rootKind: 'media',
+    rootId: media.id,
+    rootKey: captureRootKey('space', 'media', media.id),
+    generation: 1,
+    operationId: 'snapshot-op',
+    basis: [],
+    origin: 'local-edit',
+    publicationId: null,
+    change: { kind: 'media', rows: { media, webSnapshot, ref, screenshotRef } },
+  });
+  const portable = await encodeCapturedPortableRoot(captured);
+  const metadata = parsePortableMediaMetadata(portable.envelope.metadata);
+  expect(portable.bindings).toEqual(
+    expect.arrayContaining([
+      { objectId: metadata.originalObjectId, ref },
+      { objectId: metadata.webSnapshot!.screenshotObjectId, ref: screenshotRef },
+    ])
+  );
+  const incoming = new Map(
+    portable.envelope.objects.map((object) => [
+      object.objectId,
+      {
+        ...ref,
+        assetId: `incoming-${object.objectId}`,
+        size: object.size,
+        mimeType: object.mimeType,
+        location: { kind: 'opfs' as const, objectKey: `objects/incoming-${object.objectId}` },
+      },
+    ])
+  );
+  const payload = await preparePortableReplica({
+    envelope: portable.envelope,
+    verifiedObjects: incoming,
+    senderDependencies: [],
+    admission: {
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 1,
+      operationId: 'snapshot-received',
+      sourceDigest: 'a'.repeat(64),
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  expect(payload.kind).toBe('media');
+  if (payload.kind !== 'media' || !('webSnapshot' in payload.input.rows))
+    throw new Error('Expected saved snapshot.');
+  expect(payload.input.rows.webSnapshot.packageAssetId).toBe(
+    incoming.get(metadata.originalObjectId)!.assetId
+  );
+  expect(payload.input.rows.webSnapshot.screenshotAssetId).toBe(
+    incoming.get(metadata.webSnapshot!.screenshotObjectId)!.assetId
+  );
+  expect(payload.input.rows.webSnapshot.manifest).toEqual(webSnapshot.manifest);
+  expect(io.liveRead).not.toHaveBeenCalled();
+});
 
 it.each([false, true])(
   'matches the actual backup carrier without native aliases (archived=%s)',

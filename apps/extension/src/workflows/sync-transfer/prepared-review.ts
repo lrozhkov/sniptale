@@ -25,16 +25,26 @@ export function validatePortableVideoReviewMetadata(
 ): void {
   const media = parseMediaLibraryEntry(metadata.entry);
   const review = metadata.videoReview;
-  const sourcePrefix = media?.source.kind === 'recording' ? 'recording:' : 'project-asset:';
+  const sourcePrefix =
+    media?.source.kind === 'recording'
+      ? 'recording:'
+      : media?.source.kind === 'project-export'
+        ? 'export:'
+        : 'project-asset:';
   const child =
-    media?.source.kind === 'recording' ? metadata.recording?.entry : metadata.projectAsset;
+    media?.source.kind === 'recording'
+      ? metadata.recording?.entry
+      : media?.source.kind === 'project-export'
+        ? metadata.projectExport
+        : metadata.projectAsset;
   if (
     !sourceMediaId.startsWith(sourcePrefix) ||
     sourceMediaId.length <= sourcePrefix.length ||
     sourceMediaId.length > 256 ||
     !media ||
-    (media.source.kind !== 'project-asset' && media.source.kind !== 'recording') ||
+    !['project-asset', 'project-export', 'recording'].includes(media.source.kind) ||
     (media.kind !== 'video' &&
+      !(media.kind === 'export' && media.source.kind === 'project-export') &&
       !(media.source.kind === 'recording' && media.kind === 'recording')) ||
     !media.mimeType.startsWith('video/') ||
     media.lifecycle?.storageClass !== 'library' ||
@@ -102,9 +112,12 @@ export async function preparePortableVideoReviewRoot(args: {
       (source.entry.source.kind === 'project-asset' &&
         source.entry.id === `project-asset:${source.entry.source.projectAssetId}`) ||
       (source.entry.source.kind === 'recording' &&
-        source.entry.id === `recording:${source.entry.source.recordingId}`)
+        source.entry.id === `recording:${source.entry.source.recordingId}`) ||
+      (source.entry.source.kind === 'project-export' &&
+        source.entry.id === `export:${source.entry.source.exportId}`)
     ) ||
     (source.entry.kind !== 'video' &&
+      !(source.entry.kind === 'export' && source.entry.source.kind === 'project-export') &&
       !(source.entry.source.kind === 'recording' && source.entry.kind === 'recording')) ||
     source.entry.mimeType !== args.metadata.entry.mimeType ||
     source.entry.size !== args.metadata.entry.size ||

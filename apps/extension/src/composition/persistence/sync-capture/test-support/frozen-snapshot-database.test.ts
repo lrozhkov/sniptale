@@ -82,7 +82,11 @@ it('returns isolated clones without accepting reads outside the captured graph',
     'key is unsupported'
   );
   await expect(frozen.get('video_projects', { toString: () => rows.project.id })).rejects.toThrow();
-  await expect(frozen.getAll('recordings')).rejects.toThrow('store is unsupported');
+  const recordings = await frozen.getAll('recordings');
+  expect(recordings).toEqual([]);
+  recordings.push({ id: 'outside-capture' });
+  expect(await frozen.getAll('recordings')).toEqual([]);
+  await expect(frozen.get('recordings', 'outside-capture')).rejects.toThrow('key is unsupported');
   await expect(frozen.getAllFromIndex('project_exports', 'createdAt', 300)).rejects.toThrow();
   await expect(
     frozen.getAllFromIndex('project_exports', 'projectId', 'another-project')

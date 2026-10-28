@@ -1,5 +1,7 @@
 import { parseMediaLibraryEntry } from '../../composition/persistence/media-library/read-guards';
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
+import { parsePortableScenarioProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
+import { parseScenarioAssetEntry } from '../../composition/persistence/scenario/read-guards';
 import type { parseSyncOperationText } from './wire-record';
 
 type SyncOperation = Awaited<ReturnType<typeof parseSyncOperationText>>;
@@ -309,6 +311,95 @@ export function resolveSyncMediaDependency(
   return reachesRequired;
 }
 
+function immutableScenarioChildren(
+  operation: SyncOperation,
+  rootId: string,
+  childIds: readonly string[]
+): string | null {
+  if (
+    operation.rootKind !== 'scenario-project' ||
+    operation.rootId !== rootId ||
+    operation.kind === 'delete' ||
+    !operation.envelope
+  )
+    return null;
+  try {
+    const metadata = parsePortableScenarioProjectMetadata(operation.envelope.metadata);
+    if (metadata.entry.id !== rootId) return null;
+    const children = childIds.map((id) => {
+      const child = metadata.assets.find((asset) => asset.entry.id === id);
+      const entry = child && parseScenarioAssetEntry({ ...child.entry, assetId: 'portable' });
+      const object = operation.envelope?.objects.find((item) => item.objectId === child?.objectId);
+      const hash = operation.objects.find((item) => item.objectId === child?.objectId);
+      if (
+        !child ||
+        !entry ||
+        entry.projectId !== rootId ||
+        !object ||
+        !hash ||
+        entry.size !== object.size ||
+        entry.mimeType !== object.mimeType
+      )
+        throw new Error('Required Scenario child is unavailable.');
+      const {
+        assetId: _physicalAssetId,
+        galleryAssetId: _galleryAssetId,
+        borrowedMediaId: _borrowedMediaId,
+        ...identity
+      } = entry;
+      return {
+        entry: identity,
+        object: { sha256: hash.sha256, size: object.size, mimeType: object.mimeType },
+      };
+    });
+    return JSON.stringify(children);
+  } catch {
+    return null;
+  }
+}
+
+/** A causal Scenario successor is compatible only while every required child's identity and bytes remain unchanged. */
+export function resolveSyncScenarioDependency(
+  operations: ReadonlyMap<string, CatalogOperation>,
+  rootId: string,
+  childIds: readonly string[],
+  requiredBasis: readonly string[],
+  admittedBasis: readonly string[]
+): boolean {
+  if (
+    requiredBasis.length !== 1 ||
+    admittedBasis.length !== 1 ||
+    new Set(childIds).size !== childIds.length
+  )
+    return false;
+  const requiredId = requiredBasis[0]!;
+  const required = operations.get(requiredId)?.operation;
+  if (!required) return false;
+  const version = immutableScenarioChildren(required, rootId, childIds);
+  if (version === null) return false;
+  const pending = [admittedBasis[0]!];
+  const visited = new Set<string>();
+  let reachesRequired = false;
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const operation = operations.get(id)?.operation;
+    if (
+      !operation ||
+      operation.spaceId !== required.spaceId ||
+      immutableScenarioChildren(operation, rootId, childIds) !== version
+    )
+      return false;
+    if (id === requiredId) reachesRequired = true;
+    else {
+      if (operation.parents.length === 0) return false;
+      pending.push(...operation.parents);
+    }
+  }
+  return reachesRequired;
+}
+
 function fillRootState(roots: Map<string, CatalogRoot>, operations: Map<string, CatalogOperation>) {
   const rootOperations = new Map<string, string[]>();
   const superseded = new Set<string>();
@@ -338,6 +429,24 @@ function fillRootState(roots: Map<string, CatalogRoot>, operations: Map<string, 
           !resolveSyncMediaDependency(operations, dependency.mediaId, dependency.basis, media.heads)
         )
           unavailable.add(dependency.mediaId);
+      }
+      for (const dependency of operations.get(head)!.operation.rootDependencies ?? []) {
+        const scenario = roots.get(syncCatalogRootKey(dependency.rootKind, dependency.rootId));
+        if (
+          !scenario ||
+          scenario.blocked ||
+          scenario.deleted ||
+          scenario.conflict ||
+          scenario.unavailableDependencies.length > 0 ||
+          !resolveSyncScenarioDependency(
+            operations,
+            dependency.rootId,
+            dependency.childIds,
+            dependency.basis,
+            scenario.heads
+          )
+        )
+          unavailable.add(`scenario-project:${dependency.rootId}`);
       }
     }
     root.unavailableDependencies = [...unavailable].sort();

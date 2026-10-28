@@ -42,6 +42,7 @@ function setup() {
   const fixture = createReviewWorkspaceStoreFixture(
     (name) => name === 'sync_capture' && fail && ++writes === 2
   );
+  fixture.rows.set('web_snapshots', new Map());
   const table = (name: string) => fixture.rows.get(name)!;
   // The general fixture keys presentations by aggregateId; adapt only its compound-key lookup.
   const database = {
@@ -151,6 +152,117 @@ function setup() {
     },
   };
 }
+
+it('publishes a stored image, captures its opening write, and replays without source staging', async () => {
+  const f = setup();
+  f.input.media = {
+    ...f.input.media,
+    kind: 'image',
+    source: { kind: 'stored-asset', assetId: f.input.originalRef.assetId },
+  };
+  let release!: () => void;
+  let entered!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  io.read.mockImplementation(async (ref: { size: number; mimeType: string }, filename: string) => {
+    if (filename === 'parallel-image.png') {
+      entered();
+      await gate;
+    }
+    return new File([new Uint8Array(ref.size)], filename, { type: ref.mimeType });
+  });
+  const parallel = applyPreparedImageReplica({
+    ...f.input,
+    operationId: 'parallel-stored',
+    media: { ...f.input.media, filename: 'parallel-image.png' },
+  });
+  await blocked;
+  await expect(applyPreparedImageReplica(f.input)).resolves.toEqual({
+    status: 'applied',
+    generation: 1,
+  });
+  const accepted = structuredClone(f.rows);
+  release();
+  await expect(parallel).rejects.toThrow();
+  expect(f.rows).toEqual(accepted);
+  expect(f.table('media_library').get(f.input.media.id)).not.toHaveProperty('blob');
+  expect(f.table('asset_refs').get(f.input.originalRef.assetId)).toEqual(f.input.originalRef);
+  expect(
+    f.table('asset_owners').get(JSON.stringify(['media-library', f.input.media.id, 'source']))
+  ).toMatchObject({ assetId: f.input.originalRef.assetId });
+  await commitImagePresentation({
+    aggregateId: f.input.media.id,
+    expectedWorkspaceRevision: 1,
+    previewBlob: new Blob(['preview'], { type: 'image/png' }),
+    thumbnailBlob: new Blob(['thumbnail'], { type: 'image/png' }),
+  });
+  expect([...f.table('sync_capture').values()].map(parseSyncCaptureRecord)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'sync-operation',
+        change: expect.objectContaining({
+          kind: 'image',
+          rows: expect.objectContaining({ originalRef: f.input.originalRef }),
+        }),
+      }),
+    ])
+  );
+  const before = structuredClone(f.rows);
+  io.read.mockRejectedValue(new Error('staging removed'));
+  await expect(applyPreparedImageReplica(f.input)).resolves.toEqual({
+    status: 'duplicate',
+    generation: 1,
+  });
+  expect(f.rows).toEqual(before);
+});
+
+it('keeps a stored image predecessor through failed publication and rejects delayed recreation', async () => {
+  const f = setup();
+  f.input.media = {
+    ...f.input.media,
+    kind: 'image',
+    source: { kind: 'stored-asset', assetId: f.input.originalRef.assetId },
+  };
+  f.fail();
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedImageReplica(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  f.allow();
+  await applyPreparedImageReplica(f.input);
+  await applyCatalogDeletionNative({
+    rootKind: 'media',
+    rootId: f.input.media.id,
+    operationId: 'stored-delete',
+    sourceDigest: 'd'.repeat(64),
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: 3,
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+    expectedWorkspaceRevision: 1,
+  });
+  await applyPreparedImageReplica({
+    ...f.input,
+    operationId: 'stored-recreated',
+    expectedLocalGeneration: 2,
+    expectedBasis: ['stored-delete'],
+  });
+  const recreated = structuredClone(f.rows);
+  await expect(
+    applyPreparedImageReplica({
+      ...f.input,
+      operationId: 'late-stored',
+      expectedLocalGeneration: 1,
+      expectedBasis: [f.input.operationId],
+      expectedNativeRevision: 1,
+    })
+  ).rejects.toThrow();
+  expect(f.rows).toEqual(recreated);
+});
 
 it('publishes original-only image bytes and current presentation without an outgoing echo', async () => {
   const f = setup();

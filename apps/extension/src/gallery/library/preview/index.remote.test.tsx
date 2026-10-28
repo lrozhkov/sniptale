@@ -9,6 +9,7 @@ import { PreviewPanel } from './index';
 import type { PreviewPanelProps } from './types';
 
 const {
+  resolveConflictMock,
   prepareReplicaMock,
   waitReplicaMock,
   cancelReplicaMock,
@@ -17,6 +18,7 @@ const {
   formatDateMock,
   translateMock,
 } = vi.hoisted(() => ({
+  resolveConflictMock: vi.fn(),
   prepareReplicaMock: vi.fn(),
   waitReplicaMock: vi.fn(),
   cancelReplicaMock: vi.fn().mockResolvedValue({ kind: 'cancelled', outcome: 'cancelled' }),
@@ -28,6 +30,7 @@ const {
 
 vi.mock('../../../platform/runtime-messaging/sync-product-client', () => ({
   createSyncProductClient: () => ({
+    resolveConflict: resolveConflictMock,
     prepareReplica: prepareReplicaMock,
     waitForOperation: waitReplicaMock,
     cancel: cancelReplicaMock,
@@ -422,3 +425,77 @@ it.each(['refused', 'already-completed', 'rejected'] as const)(
     expect(openNativeEditorMock).toHaveBeenCalledExactlyOnceWith(native);
   }
 );
+
+it('queues the selected competing version without preparing files or opening an editor', async () => {
+  const original = remoteItem();
+  const first = { ...original.remote.selection, operationId: 'first' };
+  const deleted = {
+    ...original.remote.selection,
+    operationId: 'deleted',
+    sourceDigest: 'b'.repeat(64),
+  };
+  const item = createRemoteRootGalleryItem({
+    ...original.remote,
+    conflict: true,
+    versions: [
+      { selection: first, label: 'Edited version', deleted: false },
+      { selection: deleted, label: 'Deleted version', deleted: true },
+    ],
+  });
+  resolveConflictMock.mockImplementationOnce(async (_selection, _heads, id) => {
+    waitReplicaMock.mockResolvedValueOnce({
+      kind: 'operation',
+      job: { state: 'ready' },
+      completion: { kind: 'resolution', operationId: id },
+    });
+    return { kind: 'accepted', requestId: 'decision' };
+  });
+  render(createProps({ item }));
+  expect(remoteButton('remoteDownloadOpen').disabled).toBe(true);
+  const choose = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
+    button.textContent?.includes('Edited version')
+  );
+  if (!choose) throw new Error('Missing competing version choice');
+  await act(async () => choose.click());
+  expect(resolveConflictMock).toHaveBeenCalledWith(first, ['deleted', 'first'], expect.any(String));
+  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
+    'gallery.app.remoteResolutionQueued'
+  );
+  expect(prepareReplicaMock).not.toHaveBeenCalled();
+  expect(loadNativeSnapshotMock).not.toHaveBeenCalled();
+  expect(openNativeEditorMock).not.toHaveBeenCalled();
+});
+
+it('retains the same decision identity when its first acknowledgement is lost', async () => {
+  const original = remoteItem();
+  const first = { ...original.remote.selection, operationId: 'first' };
+  const second = { ...original.remote.selection, operationId: 'second' };
+  const item = createRemoteRootGalleryItem({
+    ...original.remote,
+    conflict: true,
+    versions: [
+      { selection: first, label: 'Chosen version', deleted: false },
+      { selection: second, label: 'Other version', deleted: false },
+    ],
+  });
+  resolveConflictMock
+    .mockRejectedValueOnce(new Error('Response lost'))
+    .mockImplementationOnce(async (_selection, _heads, id) => {
+      waitReplicaMock.mockResolvedValueOnce({
+        kind: 'operation',
+        job: { state: 'ready' },
+        completion: { kind: 'resolution', operationId: id },
+      });
+      return { kind: 'accepted', requestId: 'retry' };
+    });
+  render(createProps({ item }));
+  const choose = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
+    button.textContent?.includes('Chosen version')
+  );
+  if (!choose) throw new Error('Missing version choice');
+  await act(async () => choose.click());
+  await act(async () => choose.click());
+  expect(resolveConflictMock).toHaveBeenCalledTimes(2);
+  expect(resolveConflictMock.mock.calls[0]?.[2]).toBe(resolveConflictMock.mock.calls[1]?.[2]);
+  expect(openNativeEditorMock).not.toHaveBeenCalled();
+});

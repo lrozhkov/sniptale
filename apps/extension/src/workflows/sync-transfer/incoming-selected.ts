@@ -15,7 +15,11 @@ import {
 } from '../../composition/persistence/assets/publication';
 import { runWithDurableAssetLifecycleLock } from '../../composition/persistence/infrastructure/mutation-barrier';
 import { prepareCatalogReplica } from './incoming';
-import { syncCatalogRootKey, type CatalogOperation } from './catalog-graph';
+import {
+  syncCatalogRootKey,
+  resolveSyncScenarioDependency,
+  type CatalogOperation,
+} from './catalog-graph';
 import type { scanSyncCatalog } from './catalog';
 import type { SyncRemoteStore } from './remote-store';
 import { hashSyncText } from './wire-record';
@@ -74,6 +78,29 @@ function dependencyOrder(catalog: Catalog, selected: SelectedCatalogRoot): Selec
         sourceDigest: hashSyncText(source.operationText),
       });
     }
+    for (const dependency of operation.operation.rootDependencies ?? []) {
+      const root = catalog.roots.get(syncCatalogRootKey(dependency.rootKind, dependency.rootId));
+      const operationId = root?.heads[0];
+      const source = operationId ? catalog.operations.get(operationId) : undefined;
+      if (
+        !root ||
+        !source ||
+        !resolveSyncScenarioDependency(
+          catalog.operations,
+          dependency.rootId,
+          dependency.childIds,
+          dependency.basis,
+          root.heads
+        )
+      )
+        throw new Error('Incoming Scenario dependency is unavailable.');
+      visit({
+        rootKind: dependency.rootKind,
+        rootId: dependency.rootId,
+        operationId: source.operation.operationId,
+        sourceDigest: hashSyncText(source.operationText),
+      });
+    }
     visiting.delete(key);
     visited.add(key);
     ordered.push(selection);
@@ -105,6 +132,21 @@ export async function receiveSelectedCatalogRoot(args: {
       rootKind: root.rootKind,
       rootId: root.rootId,
       dependencyMediaIds: source.operation.dependencies.map((dependency) => dependency.mediaId),
+      dependencyRoots: (source.operation.rootDependencies ?? []).map((dependency) => {
+        const root = catalog.roots.get(syncCatalogRootKey(dependency.rootKind, dependency.rootId));
+        if (
+          !root ||
+          !resolveSyncScenarioDependency(
+            catalog.operations,
+            dependency.rootId,
+            dependency.childIds,
+            dependency.basis,
+            root.heads
+          )
+        )
+          throw new Error('Incoming Scenario dependency changed.');
+        return { ...dependency, basis: [...root.heads] };
+      }),
     });
     args.signal.throwIfAborted();
     const journal = await prepareCatalogReplica({

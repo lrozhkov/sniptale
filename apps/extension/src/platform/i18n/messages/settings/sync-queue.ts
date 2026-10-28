@@ -77,6 +77,10 @@ export const settingsSyncQueueMessages = defineMessageSource({
     authentication: { ru: 'Требуется авторизация', en: 'Authentication required' },
     'access-denied': { ru: 'Нет доступа', en: 'Access denied' },
     'storage-full': { ru: 'На сервере нет места', en: 'Server storage full' },
+    'selection-changed': {
+      ru: 'Появились новые изменения. Обновите каталог и выберите версию снова.',
+      en: 'New changes are available. Refresh the catalog and select a version again.',
+    },
     source: { ru: 'Источник недоступен', en: 'Source unavailable' },
     'invalid-workspace': {
       ru: 'Не удалось проверить подключённое хранилище',

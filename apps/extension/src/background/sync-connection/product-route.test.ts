@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { SyncProductCommand } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { parseSyncProductResponse } from '../../contracts/messaging/contracts/runtime/sync-product';
-import { isSyncProductSenderAllowed, routeSyncProductCommand } from './product-route';
+import {
+  configureSyncProductRoute,
+  isSyncProductSenderAllowed,
+  routeSyncProductCommand,
+} from './product-route';
 const nativeStatus = vi.hoisted(() => ({ connection: vi.fn(), workspace: vi.fn() }));
 vi.mock('../../composition/persistence/remote-connection/store', () => ({
   loadSyncConnection: nativeStatus.connection,
@@ -412,4 +416,47 @@ it('rejects malformed or unauthorized ingress before coordinator effects', () =>
   expect(
     isSyncProductSenderAllowed({ kind: 'status' }, { ...settings, documentLifecycle: 'cached' })
   ).toBe(false);
+});
+
+it('restricts version decisions to the exact Gallery document', () => {
+  const command: SyncProductCommand = {
+    kind: 'conflict-resolve',
+    resolutionId: '11111111-1111-4111-8111-111111111111',
+    expectedHeads: ['first', 'second'],
+    selection: {
+      rootKind: 'media',
+      rootId: 'root',
+      operationId: 'first',
+      sourceDigest: 'a'.repeat(64),
+    },
+  };
+  expect(isSyncProductSenderAllowed(command, gallery)).toBe(true);
+  expect(isSyncProductSenderAllowed(command, settings)).toBe(false);
+  expect(isSyncProductSenderAllowed(command, { ...gallery, frameId: 1 })).toBe(false);
+  expect(isSyncProductSenderAllowed(command, { ...gallery, documentLifecycle: 'prerender' })).toBe(
+    false
+  );
+});
+
+it('wakes initial capture only after committed enrollment and contains a missed advisory notification', async () => {
+  const coordinator = routeCoordinator();
+  const enroll = vi.spyOn(coordinator, 'enrollWorkspace').mockResolvedValue({} as never);
+  const wake = vi.fn(() => {
+    throw new Error('Advisory transport unavailable');
+  });
+  configureSyncProductRoute(coordinator, wake);
+  const command = {
+    kind: 'workspace-enroll' as const,
+    source: routeSource,
+    authentication: routeAuthentication,
+  };
+  await expect(productAnswer(coordinator, command)).resolves.toEqual({
+    success: true,
+    result: { kind: 'enrolled' },
+  });
+  expect(enroll).toHaveBeenCalledBefore(wake);
+  expect(wake).toHaveBeenCalledOnce();
+  enroll.mockRejectedValueOnce(new Error('Native enrollment refused'));
+  await expect(productAnswer(coordinator, command)).resolves.toMatchObject({ success: false });
+  expect(wake).toHaveBeenCalledOnce();
 });

@@ -354,10 +354,9 @@ function validateProjectMedia(metadata: Partial<PortableMediaMetadata>): void {
       source.exportId !== parsed.id ||
       source.projectId !== parsed.projectId ||
       metadata.entry?.id !== `export:${parsed.id}` ||
-      !(parsed.mimeType ?? 'video/webm').startsWith('video/') ||
       metadata.entry.mimeType !== (parsed.mimeType ?? 'video/webm')
     ) {
-      throw new Error('Portable project video export association is invalid.');
+      throw new Error('Portable project export association is invalid.');
     }
     const { assetId: _localId, ...portable } = parsed;
     metadata.projectExport = portable;

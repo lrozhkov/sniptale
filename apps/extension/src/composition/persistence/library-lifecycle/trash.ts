@@ -1,6 +1,8 @@
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import {
   captureMediaInTransaction,
   captureVideoProjectInTransaction,
+  captureScenarioProjectInTransaction,
 } from '../sync-capture/capture';
 import {
   readStoredVideoWorkspaceProject,
@@ -17,6 +19,7 @@ import {
   SYNC_CAPTURE_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  WEB_SNAPSHOTS_STORE,
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   IMAGE_WORKSPACES_STORE,
@@ -133,11 +136,13 @@ async function mutateTrash(
     runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction(
         [
+          ...SCENARIO_CAPTURE_STORES,
           STORE_NAME,
           RECORDING_TELEMETRY_STORE,
           SYNC_CAPTURE_STORE,
           PROJECT_ASSETS_STORE,
           PROJECT_EXPORTS_STORE,
+          WEB_SNAPSHOTS_STORE,
           ASSET_REFS_STORE,
           ASSET_OWNERS_STORE,
           IMAGE_WORKSPACES_STORE,
@@ -213,17 +218,20 @@ async function mutateTrash(
             const media = parseMediaLibraryEntry(
               await tx.objectStore(MEDIA_LIBRARY_STORE).get(target.id)
             );
-            if (
-              media?.source.kind === 'screenshot' ||
-              media?.source.kind === 'project-asset' ||
-              media?.source.kind === 'recording'
-            )
-              await captureMediaInTransaction(tx, target.id);
+            if (media) await captureMediaInTransaction(tx, target.id);
           }
         }
         for (const target of changed) {
           if (target.kind === 'video-project')
             await captureVideoProjectInTransaction(tx, target.id);
+          if (target.kind === 'scenario-project')
+            await captureScenarioProjectInTransaction(tx, target.id);
+          if (target.kind === 'scenario-export') {
+            const child = parseScenarioExportEntry(
+              await tx.objectStore(SCENARIO_EXPORTS_STORE).get(target.id)
+            );
+            if (child) await captureScenarioProjectInTransaction(tx, child.projectId);
+          }
         }
         await tx.done;
       } catch (error) {

@@ -1,3 +1,4 @@
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { AssetOwner, AssetReadyJournal, AssetRef } from '../assets';
 import type { ScenarioExportEntry } from './contracts';
@@ -84,6 +85,7 @@ function database(parent = true, initial?: ScenarioExportEntry) {
     if (name === 'asset_refs') return refs;
     if (name === 'asset_owners') return owners;
     if (name === 'scenario_projects') return projects;
+    if (name === 'sync_capture') return { get: vi.fn(async () => undefined) };
     throw new Error('Unexpected store');
   };
   const db = {
@@ -105,10 +107,7 @@ beforeEach(() => {
 it('publishes one immutable body and its catalogue/owner graph in the same transaction', async () => {
   const d = database();
   await saveScenarioHtmlArtifact(entry, ref);
-  expect(d.db.transaction).toHaveBeenCalledWith(
-    ['scenario_exports', 'scenario_projects', 'asset_refs', 'asset_owners'],
-    'readwrite'
-  );
+  expect(d.db.transaction).toHaveBeenCalledWith([...SCENARIO_CAPTURE_STORES], 'readwrite');
   expect(d.refs.put).toHaveBeenCalledWith(ref);
   expect(d.owners.put).toHaveBeenCalledWith(owner);
   expect(d.exports.put).toHaveBeenCalledWith(entry);

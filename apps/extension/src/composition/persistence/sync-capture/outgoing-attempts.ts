@@ -5,6 +5,7 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { initDB } from '../infrastructure/indexed-db/core';
 import { SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE } from '../infrastructure/indexed-db/core.stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
+import { captureProfileBounds } from './contracts';
 import { parseSyncCaptureRecord } from './guards';
 import {
   matchesCapture,
@@ -19,6 +20,8 @@ const MAX_RECORD_BYTES = 4 * 1024 * 1024;
 export interface OutgoingDispatchAttempt {
   version: 1;
   kind: 'dispatch-attempt';
+  /** Omitted legacy attempts retain the small source profile. */
+  rootKind?: 'scenario-project';
   key: string;
   createdAt: number;
   spaceId: string;
@@ -69,8 +72,11 @@ function attemptKey(spaceId: string, operationId: string, attemptId: string): st
   return JSON.stringify(['dispatch-attempt', spaceId, operationId, attemptId]);
 }
 
-function parseObjects(value: unknown): OutgoingDispatchAttempt['objects'] | null {
-  if (!Array.isArray(value) || value.length > 64) return null;
+function parseObjects(
+  value: unknown,
+  rootKind?: unknown
+): OutgoingDispatchAttempt['objects'] | null {
+  if (!Array.isArray(value) || value.length > captureProfileBounds(rootKind).objects) return null;
   const objects: OutgoingDispatchAttempt['objects'] = [];
   for (const item of value) {
     if (!isRecord(item) || !bounded(item['objectId'], 256) || !relativeKey(item['remoteKey']))
@@ -122,11 +128,14 @@ export function parseOutgoingDispatchAttempt(value: unknown): OutgoingDispatchAt
     !digest(captureSha256)
   )
     return null;
-  const objects = parseObjects(value['objects']);
+  if (Object.hasOwn(value, 'rootKind') && value['rootKind'] !== 'scenario-project') return null;
+  const rootKind = value['rootKind'] === 'scenario-project' ? 'scenario-project' : undefined;
+  const objects = parseObjects(value['objects'], rootKind);
   if (!objects || objects.some((item) => item.remoteKey === recordKey)) return null;
   return {
     version: 1,
     kind: 'dispatch-attempt',
+    ...(rootKind ? { rootKind } : {}),
     key: value['key'],
     createdAt,
     spaceId,
@@ -147,16 +156,28 @@ export function matchesOutgoingDispatchPrepared(
   attempt: OutgoingDispatchAttempt,
   prepared: PreparedOutgoingOperation
 ): boolean {
+  let root: unknown;
+  try {
+    root = JSON.parse(prepared.rootKey);
+  } catch {
+    return false;
+  }
+  const scenario = Array.isArray(root) && root[1] === 'scenario-project';
   return (
+    (attempt.rootKind === 'scenario-project') === scenario &&
     attempt.spaceId === prepared.spaceId &&
     attempt.operationId === prepared.operationId &&
     attempt.connectionGeneration === prepared.connectionGeneration &&
     attempt.preparedSha256 === prepared.recordSha256 &&
     attempt.profileCreatedAt === prepared.profileCreatedAt &&
     attempt.captureSha256 === prepared.captureSha256 &&
-    attempt.objects.length === prepared.objects.length &&
-    attempt.objects.every((item) =>
-      prepared.objects.some((source) => source.objectId === item.objectId)
+    attempt.objects.length === prepared.objects.length + (prepared.retainedObjects?.length ?? 0) &&
+    attempt.objects.every(
+      (item) =>
+        prepared.objects.some((source) => source.objectId === item.objectId) ||
+        prepared.retainedObjects?.some(
+          (source) => source.objectId === item.objectId && source.remoteKey === item.remoteKey
+        ) === true
     )
   );
 }
@@ -221,6 +242,8 @@ export async function commitOutgoingDispatchAttempt(
 ): Promise<{ attempt: OutgoingDispatchAttempt; created: boolean }> {
   const expected = parsePrepared(structuredClone(expectedPrepared));
   const detached: unknown = structuredClone(draft);
+  const root: unknown = expected ? JSON.parse(expected.rootKey) : null;
+  const scenario = Array.isArray(root) && root[1] === 'scenario-project';
   const proposed =
     isRecord(detached) &&
     bounded(detached['spaceId'], 256) &&
@@ -228,6 +251,7 @@ export async function commitOutgoingDispatchAttempt(
     uuid(detached['attemptId'])
       ? parseOutgoingDispatchAttempt({
           ...detached,
+          ...(scenario ? { rootKind: 'scenario-project' } : {}),
           profileCreatedAt: expected?.profileCreatedAt,
           captureSha256: expected?.captureSha256,
           kind: 'dispatch-attempt',

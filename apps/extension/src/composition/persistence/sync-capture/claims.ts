@@ -23,6 +23,8 @@ export function collectSyncCaptureClaims(raw: unknown): {
     }
     if (record.change.kind === 'media') {
       assetIds.add(record.change.rows.ref.assetId);
+      if ('screenshotRef' in record.change.rows)
+        assetIds.add(record.change.rows.screenshotRef.assetId);
       continue;
     }
     if (record.change.kind === 'video-review') {
@@ -31,10 +33,11 @@ export function collectSyncCaptureClaims(raw: unknown): {
       continue;
     }
     if (record.change.kind === 'image') {
+      if (record.change.rows.originalRef) assetIds.add(record.change.rows.originalRef.assetId);
       for (const ref of record.change.rows.refs) assetIds.add(ref.assetId);
       continue;
     }
-    if (record.change.kind === 'video-project')
+    if (record.change.kind === 'video-project' || record.change.kind === 'scenario-project')
       for (const ref of record.change.rows.refs) assetIds.add(ref.assetId);
   }
   return { valid, assetIds };

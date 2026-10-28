@@ -26,7 +26,10 @@ import {
   PROJECT_ASSET_OWNER_KIND,
   PROJECT_MEDIA_ASSET_ROLE,
 } from '../../../../composition/persistence/projects/asset-publication';
-import type { ProjectAssetEntry } from '../../../../composition/persistence/projects/contracts';
+import type {
+  ProjectAssetEntry,
+  StoredProjectExportEntry,
+} from '../../../../composition/persistence/projects/contracts';
 import { parseProjectAssetEntry } from '../../../../composition/persistence/projects/read-guards';
 import {
   prepareVideoReviewRestore,
@@ -55,6 +58,7 @@ interface PreparedMediaReviewAsset {
 interface PreparedMediaReviewRoot {
   media: MediaLibraryEntry;
   projectAsset: ProjectAssetEntry | null;
+  projectExport?: StoredProjectExportEntry | null;
   recording: StoredRecordingEntry | null;
   telemetry?: RecordingTelemetryEntry;
   original: { ref: AssetRef };
@@ -251,14 +255,18 @@ export function isCaptureReview(prepared: PreparedMediaReviewRoot): boolean {
   return (
     prepared.videoReview !== null &&
     (prepared.media.kind === 'video' ||
+      (prepared.media.kind === 'export' && prepared.media.source.kind === 'project-export') ||
       (prepared.media.kind === 'recording' && prepared.media.source.kind === 'recording')) &&
     (prepared.media.source.kind === 'project-asset' ||
+      prepared.media.source.kind === 'project-export' ||
       prepared.media.source.kind === 'recording') &&
     parseCapturedMediaRows({
       media: prepared.media,
       ...(prepared.recording
         ? { recording: prepared.recording, telemetry: prepared.telemetry ?? null }
-        : { projectAsset: prepared.projectAsset }),
+        : prepared.projectExport
+          ? { projectExport: prepared.projectExport }
+          : { projectAsset: prepared.projectAsset }),
       ref: prepared.original.ref,
     }) !== null
   );

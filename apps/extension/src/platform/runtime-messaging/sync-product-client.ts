@@ -9,7 +9,7 @@ import type {
 
 const SETTLED_CHANNEL = 'sniptale-sync-product-settled';
 const RECOVERY_INTERVAL_MS = 30_000;
-type SettledKind = 'product' | 'workspace';
+type SettledKind = 'product' | 'workspace' | 'queue';
 type OperationResult = Extract<SyncProductResult, { kind: 'operation' }>;
 
 function subscribeSettled(callback: (requestId: string, kind: SettledKind) => void): () => void {
@@ -26,8 +26,12 @@ function subscribeSettled(callback: (requestId: string, kind: SettledKind) => vo
     if (!('requestId' in data) || !('kind' in data)) return;
     if (
       typeof data.requestId !== 'string' ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.requestId) ||
-      (data.kind !== 'product' && data.kind !== 'workspace')
+      (data.kind === 'queue'
+        ? data.requestId.length === 0 || data.requestId.length > 256
+        : !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            data.requestId
+          )) ||
+      (data.kind !== 'product' && data.kind !== 'workspace' && data.kind !== 'queue')
     )
       return;
     callback(data.requestId, data.kind);
@@ -57,6 +61,13 @@ export function publishSyncProductSettled(requestId: string, kind: SettledKind):
       /* Advisory delivery is best effort. */
     }
   }
+}
+
+/** Queue completion is advisory; the scheduler reloads native authorization and due work. */
+export function subscribeToSyncQueueSettled(callback: () => void): () => void {
+  return subscribeSettled((_operationId, kind) => {
+    if (kind === 'queue') callback();
+  });
 }
 
 export function subscribeToWorkspaceSettled(callback: () => void): () => void {
@@ -168,6 +179,11 @@ export function createSyncProductClient() {
       command({ kind: 'workspace-abandon', source }),
     readStatus: () => command({ kind: 'status' }),
     refreshCatalog: (bypassCache = false) => command({ kind: 'catalog-refresh', bypassCache }),
+    resolveConflict: (
+      selection: SyncRemoteSelection,
+      expectedHeads: string[],
+      resolutionId: string = crypto.randomUUID()
+    ) => command({ kind: 'conflict-resolve', selection, expectedHeads, resolutionId }),
     prepareReplica: (selection: SyncRemoteSelection) =>
       command({ kind: 'replica-prepare', selection }),
     readThumbnail: (selection: SyncRemoteSelection) =>

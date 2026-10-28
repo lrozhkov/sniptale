@@ -62,6 +62,7 @@ beforeEach(() => {
 async function setup(kind: 'media' | 'video-project' = 'media') {
   let refused = false;
   const f = createReviewWorkspaceStoreFixture((store) => refused && store === 'sync_capture');
+  f.rows.set('web_snapshots', new Map());
   const table = (name: string) => f.rows.get(name)!;
   io.database.mockResolvedValue(f.database);
   table('sync_capture').set('profile', {

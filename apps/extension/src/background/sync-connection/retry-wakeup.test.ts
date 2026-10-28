@@ -507,3 +507,179 @@ it('preserves legacy explicit queue retries without enabling automatic capture d
   expect(deps.coordinator.start).toHaveBeenCalledOnce();
   owner.dispose();
 });
+
+it('coalesces queue completions during an active pass into one trailing pass', async () => {
+  const deps = dependencies();
+  const held = deferred<SyncConnectionMetadata | null>();
+  const entered = deferred<void>();
+  deps.loadConnection.mockImplementationOnce(() => {
+    entered.resolve();
+    return held.promise;
+  });
+  const subscribeQueueSettled = vi
+    .fn<(listener: () => void) => () => void>()
+    .mockReturnValue(vi.fn());
+  const owner = createSyncQueueRetryWakeup({ ...deps, subscribeQueueSettled });
+  const first = owner.run();
+  await entered.promise;
+  const notify = subscribeQueueSettled.mock.calls[0]![0];
+  notify();
+  notify();
+  notify();
+  expect(deps.loadConnection).toHaveBeenCalledOnce();
+  held.resolve(connection());
+  await first;
+  await owner.run();
+  expect(deps.loadConnection).toHaveBeenCalledTimes(2);
+  expect(deps.discoverDue).toHaveBeenCalledTimes(2);
+  owner.dispose();
+  notify();
+  expect(deps.getAlarm).toHaveBeenCalledTimes(2);
+});
+
+it('starts the next native due work on completion and rechecks paused authority', async () => {
+  const deps = dependencies();
+  const subscribeQueueSettled = vi
+    .fn<(listener: () => void) => () => void>()
+    .mockReturnValue(vi.fn());
+  const owner = createSyncQueueRetryWakeup({ ...deps, subscribeQueueSettled });
+  await owner.run();
+  deps.discoverDue.mockResolvedValueOnce({
+    candidates: [candidate({ operationId: 'later' })],
+    progress: progress(),
+  });
+  subscribeQueueSettled.mock.calls[0]![0]();
+  await owner.run();
+  expect(deps.coordinator.start).toHaveBeenCalledExactlyOnceWith({
+    scope,
+    authorization,
+    operationId: 'later',
+    expectedRevision: 4,
+  });
+  deps.loadConnection.mockResolvedValue({ ...connection(), phase: 'paused' });
+  subscribeQueueSettled.mock.calls[0]![0]();
+  await owner.run();
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  owner.dispose();
+});
+
+it('follows successful bounded initial discovery before reconciling its captures', async () => {
+  const deps = dependencies();
+  const discoverInitialRoots = vi
+    .fn<NonNullable<SyncQueueRetryWakeupDependencies['discoverInitialRoots']>>()
+    .mockResolvedValueOnce({ captured: 2, existing: 0, refused: 0, remaining: true })
+    .mockResolvedValue({ captured: 1, existing: 0, refused: 0, remaining: false });
+  const owner = createSyncQueueRetryWakeup({ ...deps, discoverInitialRoots });
+  await owner.run();
+  await owner.run();
+  expect(discoverInitialRoots).toHaveBeenCalledTimes(2);
+  expect(discoverInitialRoots).toHaveBeenNthCalledWith(1, scope, authorization);
+  expect(discoverInitialRoots.mock.invocationCallOrder[0]).toBeLessThan(
+    deps.reconcileCaptures.mock.invocationCallOrder[0]!
+  );
+  expect(deps.reconcileCaptures).toHaveBeenCalledTimes(2);
+  owner.dispose();
+});
+
+it.each([
+  { captured: 0, existing: 0, refused: 0, remaining: true },
+  { captured: 1, existing: 0, refused: 1, remaining: true },
+])('leaves refused or stalled discovery for the alarm without a hot loop: %j', async (result) => {
+  const deps = dependencies();
+  const discoverInitialRoots = vi
+    .fn<NonNullable<SyncQueueRetryWakeupDependencies['discoverInitialRoots']>>()
+    .mockResolvedValue(result);
+  const owner = createSyncQueueRetryWakeup({ ...deps, discoverInitialRoots });
+  await owner.run();
+  expect(discoverInitialRoots).toHaveBeenCalledOnce();
+  expect(deps.reconcileCaptures).toHaveBeenCalledOnce();
+  owner.dispose();
+});
+
+it('continues four fresh queued jobs through two slots without deferring later work to the alarm', async () => {
+  const deps = dependencies();
+  const active = new Set<string>();
+  const started = new Set<string>();
+  const queued = ['first', 'second', 'third', 'fourth'];
+  deps.coordinator.inspect.mockImplementation(async () =>
+    snapshot({
+      phase: active.size ? 'running' : 'idle',
+      jobs: [...active].map((operationId) => ({
+        operationId,
+        expectedRevision: 4,
+        state: 'running',
+        stage: 'writing',
+        runId: null,
+        failureCode: null,
+      })),
+    })
+  );
+  deps.coordinator.start.mockImplementation(async ({ operationId }) => {
+    active.add(operationId);
+    started.add(operationId);
+    return { executorId: 'executor', executorRevision: 3 };
+  });
+  deps.discoverDue.mockImplementation(async () => ({
+    candidates: queued
+      .filter((id) => !started.has(id))
+      .map((operationId) => candidate({ operationId, status: 'queued' })),
+    progress: progress(),
+  }));
+  const subscribeQueueSettled = vi
+    .fn<(listener: () => void) => () => void>()
+    .mockReturnValue(vi.fn());
+  const owner = createSyncQueueRetryWakeup({ ...deps, subscribeQueueSettled });
+  await owner.run();
+  expect([...started]).toEqual(['first', 'second']);
+  const notify = subscribeQueueSettled.mock.calls[0]![0];
+  active.delete('first');
+  notify();
+  await owner.run();
+  expect([...started]).toEqual(['first', 'second', 'third']);
+  expect(deps.deferDue).not.toHaveBeenCalled();
+  active.delete('second');
+  notify();
+  await owner.run();
+  expect([...started]).toEqual(queued);
+  expect(active.size).toBe(2);
+  expect(deps.deferDue).not.toHaveBeenCalled();
+  owner.dispose();
+});
+
+it('continues an empty source family only after its durable cursor advanced', async () => {
+  const deps = dependencies();
+  const discoverInitialRoots = vi
+    .fn<NonNullable<SyncQueueRetryWakeupDependencies['discoverInitialRoots']>>()
+    .mockResolvedValueOnce({
+      captured: 0,
+      existing: 0,
+      refused: 0,
+      remaining: true,
+      advanced: true,
+    })
+    .mockResolvedValue({ captured: 0, existing: 0, refused: 0, remaining: false });
+  const owner = createSyncQueueRetryWakeup({ ...deps, discoverInitialRoots });
+  await owner.run();
+  await owner.run();
+  expect(discoverInitialRoots).toHaveBeenCalledTimes(2);
+  owner.dispose();
+});
+
+it('starts incoming after enrollment and preserves outgoing dispatch on refusal', async () => {
+  const deps = dependencies();
+  const discoverInitialRoots = vi
+    .fn<NonNullable<SyncQueueRetryWakeupDependencies['discoverInitialRoots']>>()
+    .mockResolvedValueOnce({ captured: 0, existing: 0, refused: 0, remaining: true })
+    .mockResolvedValue({ captured: 0, existing: 0, refused: 0, remaining: false });
+  const refreshIncoming = vi.fn().mockRejectedValue(new Error('Temporary incoming refusal'));
+  deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+  const owner = createSyncQueueRetryWakeup({ ...deps, discoverInitialRoots, refreshIncoming });
+  await owner.run();
+  expect(refreshIncoming).not.toHaveBeenCalled();
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  await owner.run();
+  expect(refreshIncoming).toHaveBeenCalledOnce();
+  expect(deps.coordinator.start).toHaveBeenCalledTimes(2);
+  expect(warn).toHaveBeenCalled();
+  owner.dispose();
+});

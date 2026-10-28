@@ -10,6 +10,7 @@ import { canOpenGalleryProject, type GalleryRemoteRootItem } from '../items/type
 
 /** Display state for preparation of one pinned remote selection. */
 export type RemoteProjectPhase =
+  | 'queued'
   | 'idle'
   | 'running'
   | 'failed'
@@ -22,7 +23,7 @@ type ReplicaCompletion = Extract<NonNullable<OperationResult['completion']>, { k
 interface Ports {
   client: Pick<
     ReturnType<typeof createSyncProductClient>,
-    'prepareReplica' | 'cancel' | 'waitForOperation'
+    'prepareReplica' | 'resolveConflict' | 'cancel' | 'waitForOperation'
   >;
   loadSnapshot: typeof loadGalleryLibrarySnapshot;
   openEditor: typeof openInEditor;
@@ -46,6 +47,8 @@ class RemoteProjectController {
   private cancelling = false;
   private cancelRequested = false;
   private waiter: AbortController | null = null;
+  private resolution: { choice: string; id: string } | null = null;
+  private operationKind: 'replica' | 'resolution' = 'replica';
 
   constructor(
     private readonly item: GalleryRemoteRootItem,
@@ -71,12 +74,48 @@ class RemoteProjectController {
 
   async start(): Promise<void> {
     if (!this.active || this.starting || this.request || !canOpenGalleryProject(this.item)) return;
+    return this.startWork(
+      () => this.ports.client.prepareReplica(this.item.remote.selection),
+      'replica'
+    );
+  }
+
+  async resolve(selection: SyncRemoteSelection): Promise<void> {
+    if (
+      !this.active ||
+      this.starting ||
+      this.request ||
+      !this.item.remote.conflict ||
+      this.item.remote.unavailable
+    )
+      return;
+    const versions = this.item.remote.versions ?? [];
+    if (
+      versions.length < 2 ||
+      !versions.some((version) => sameSelection(version.selection, selection))
+    )
+      return;
+    const heads = versions.map((version) => version.selection.operationId).sort();
+    const choice = JSON.stringify([selection, heads]);
+    if (this.resolution?.choice !== choice) this.resolution = { choice, id: crypto.randomUUID() };
+    const id = this.resolution.id;
+    return this.startWork(
+      () => this.ports.client.resolveConflict(selection, heads, id),
+      'resolution'
+    );
+  }
+
+  private async startWork(
+    command: () => Promise<SyncProductResult>,
+    kind: 'replica' | 'resolution'
+  ): Promise<void> {
     const generation = this.generation;
+    this.operationKind = kind;
     this.starting = true;
     this.cancelRequested = false;
     this.ports.onPhase('running');
     try {
-      const result = await this.ports.client.prepareReplica(this.item.remote.selection);
+      const result = await command();
       if (result.kind !== 'accepted') throw new Error('Replica request was not accepted.');
       if (!this.isActive(generation)) {
         void this.ports.client.cancel(result.requestId).catch(() => undefined);
@@ -154,6 +193,16 @@ class RemoteProjectController {
       }
       if (state.job.state !== 'ready') throw new Error('Replica result is not terminal.');
       terminal = true;
+      if (this.operationKind === 'resolution') {
+        if (
+          state.completion?.kind !== 'resolution' ||
+          state.completion.operationId !== this.resolution?.id
+        )
+          throw new Error('Conflict resolution completion unavailable.');
+        this.request = null;
+        this.ports.onPhase('queued');
+        return;
+      }
       if (state.completion?.kind !== 'replica') throw new Error('Replica completion unavailable.');
       await this.openCommitted(state.completion, request, generation, waiter);
     } catch {
@@ -178,6 +227,8 @@ class RemoteProjectController {
     if (!this.canReceive(request, generation, waiter)) return;
     const native = snapshot.nextItems.find((candidate) => {
       if (candidate.entityId !== completion.selection.rootId) return false;
+      if (completion.selection.rootKind === 'scenario-project')
+        return candidate.type === 'scenario';
       if (completion.selection.rootKind === 'video-project')
         return candidate.type === 'video-project';
       if (completion.selection.rootKind === 'video-review')

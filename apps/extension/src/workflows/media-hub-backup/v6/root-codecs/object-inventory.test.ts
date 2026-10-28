@@ -358,3 +358,26 @@ it('checks saved history JSON before staging and refuses an absent sidecar', asy
     )
   ).rejects.toThrow('history');
 });
+
+it('admits exact Scenario history roles without bytes only for metadata discovery', async () => {
+  const root = scenario();
+  const metadata = root.metadata;
+  if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata))
+    throw new Error('Expected Scenario metadata.');
+  root.metadata = { ...metadata, historyObjectId: 'history' };
+  root.objects.push({
+    objectId: 'history',
+    path: 'Metadata/history.json',
+    filename: 'history.json',
+    mimeType: 'application/json',
+    size: 2,
+  });
+  root.descriptor.objectCount = 2;
+  root.descriptor.totalBytes = 5;
+  await expect(assertArchiveRootObjectInventory(root, null, [])).resolves.toBeUndefined();
+  await expect(assertArchiveRootObjectInventory(root, reader, [])).rejects.toThrow(
+    'history is missing'
+  );
+  root.objects[1]!.mimeType = 'text/html';
+  await expect(assertArchiveRootObjectInventory(root, null, [])).rejects.toThrow();
+});

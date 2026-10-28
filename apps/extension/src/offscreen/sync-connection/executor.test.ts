@@ -429,3 +429,37 @@ it('publishes failed workspace accounting and waits for workspace cancellation c
   await stopped;
   expect(onSettled).toHaveBeenCalledExactlyOnceWith(base.requestId, 'workspace');
 });
+
+it('announces a published queue operation after releasing its execution slot', async () => {
+  const onSettled = vi.fn(() => {
+    expect(f.inspect().jobs[0]?.state).toBe('published');
+    expect(f.inspect().phase).toBe('idle');
+  });
+  const f = fixture(undefined, onSettled);
+  f.start('bounded-native-operation');
+  await settleWorkflow();
+  f.pending[0]!.result.resolve(published);
+  await settleWorkflow();
+  expect(onSettled).toHaveBeenCalledExactlyOnceWith('bounded-native-operation', 'queue');
+});
+
+it('does not announce failed queue work or a published result arriving after Stop', async () => {
+  const onSettled = vi.fn();
+  const f = fixture(undefined, onSettled);
+  f.start();
+  await settleWorkflow();
+  f.pending[0]!.result.resolve({
+    containment: 'contained',
+    snapshot: { state: 'failed', stage: 'writing', failureCode: 'temporary', runId: null },
+  });
+  await settleWorkflow();
+  expect(onSettled).not.toHaveBeenCalled();
+  f.start('second');
+  await settleWorkflow();
+  const stopped = f.stop();
+  f.pending[1]!.result.resolve(published);
+  f.pending[0]!.drainage.resolve();
+  f.pending[1]!.drainage.resolve();
+  await stopped;
+  expect(onSettled).not.toHaveBeenCalled();
+});

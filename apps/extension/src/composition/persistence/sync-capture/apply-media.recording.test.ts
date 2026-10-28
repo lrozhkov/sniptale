@@ -31,6 +31,7 @@ function setup() {
   const fixture = createReviewWorkspaceStoreFixture(
     (name) => name === 'sync_capture' && ++syncWrites === 2 && failReceipt
   );
+  fixture.rows.set('web_snapshots', new Map());
   const table = (name: string) => fixture.rows.get(name)!;
   io.database.mockResolvedValue(fixture.database);
   table('sync_capture').set('profile', {

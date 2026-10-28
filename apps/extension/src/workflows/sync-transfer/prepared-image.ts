@@ -17,11 +17,16 @@ export function preparePortableImageRows(
   metadata: PortableMediaMetadata,
   refFor: (objectId: string) => AssetRef
 ): NativeImageRows {
-  const media = parseMediaLibraryEntry(metadata.entry);
   const originalRef = refFor(metadata.originalObjectId);
+  const media = parseMediaLibraryEntry({
+    ...metadata.entry,
+    ...(metadata.entry.source.kind === 'stored-asset'
+      ? { source: { kind: 'stored-asset', assetId: originalRef.assetId } }
+      : {}),
+  });
   if (
     !media ||
-    media.source.kind !== 'screenshot' ||
+    (media.source.kind !== 'screenshot' && media.source.kind !== 'stored-asset') ||
     !['image', 'screenshot'].includes(media.kind) ||
     media.blob !== undefined ||
     media.lifecycle?.storageClass !== 'library' ||

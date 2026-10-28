@@ -1,3 +1,5 @@
+import { captureScenarioProjectInTransaction } from '../sync-capture/capture';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
@@ -120,10 +122,7 @@ function readPublication(journal: AssetReadyJournal) {
 async function commitHtmlJournal(journal: AssetReadyJournal): Promise<boolean> {
   const { entry, ref } = readPublication(journal);
   return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [SCENARIO_EXPORTS_STORE, SCENARIO_PROJECTS_STORE, ASSET_REFS_STORE, ASSET_OWNERS_STORE],
-      'readwrite'
-    );
+    const tx = db.transaction([...SCENARIO_CAPTURE_STORES], 'readwrite');
     const exports = tx.objectStore(SCENARIO_EXPORTS_STORE);
     try {
       const existing = parseScenarioExportEntry(await exports.get(entry.id));
@@ -145,6 +144,9 @@ async function commitHtmlJournal(journal: AssetReadyJournal): Promise<boolean> {
         role: 'body',
       });
       await exports.put(entry);
+      await captureScenarioProjectInTransaction(tx, entry.projectId, {
+        publicationId: journal.journalId,
+      });
       await tx.done;
       return true;
     } finally {

@@ -1,9 +1,12 @@
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
+import { preparedOutgoingOperationKey } from './outgoing';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { createMediaLibraryEntry } from '../projects/index.test-support';
 import { applyPreparedMediaReplica, type ApplyPreparedMediaReplicaInput } from './apply-media';
 import {
   loadCatalogReplicaAdmission,
+  loadCatalogNativeBases,
   hasCatalogReplicaReceipt,
   loadMaterializedCatalogSelections,
 } from './catalog-admission';
@@ -192,7 +195,7 @@ it('matches materialized selections by generation and receipt without reading by
   await expect(
     loadMaterializedCatalogSelections({ scope, selections: [selection] })
   ).resolves.toEqual([selection]);
-  expect(observe).toHaveBeenCalledWith(['sync_capture'], 'readonly');
+  expect(observe).toHaveBeenCalledWith(['sync_capture', 'sync_outbox'], 'readonly');
   expect(observe).toHaveBeenCalledTimes(1);
   expect(f.rows).toEqual(before);
 });
@@ -297,3 +300,235 @@ it('refuses malformed native materialization evidence and oversized selection li
   ).rejects.toThrow('admission refused');
   expect(f.rows).toEqual(before);
 });
+
+it('reads only causal metadata for materialized roots and leaves remote-only roots absent', async () => {
+  const f = setup();
+  const rootId = f.input.rows.media.id;
+  const rootKey = captureRootKey(scope.spaceId, 'media', rootId);
+  const state = {
+    version: 1,
+    kind: 'root-state',
+    key: JSON.stringify(['root-state', rootKey]),
+    createdAt: 1,
+    spaceId: scope.spaceId,
+    rootKind: 'media',
+    rootId,
+    rootKey,
+    generation: 7,
+    basis: ['retained-head'],
+  };
+  f.table('sync_capture').set(state.key, state);
+  // Metadata discovery must not depend on an admissible heavy native source or resident files.
+  f.table('media_library').set(rootId, { invalid: 'native source must not be read' });
+  f.table('asset_refs').clear();
+  f.table('asset_owners').clear();
+  const observe = vi.spyOn(f.database, 'transaction');
+  const before = structuredClone(f.rows);
+  const supplied = {
+    scope: structuredClone(scope),
+    authorization: structuredClone(authorization),
+    roots: [
+      { rootKind: 'media' as const, rootId },
+      { rootKind: 'media' as const, rootId: 'remote-only' },
+    ],
+  };
+  const pending = loadCatalogNativeBases(supplied);
+  supplied.roots[0]!.rootId = 'changed-after-call';
+  expect(await pending).toEqual([
+    { rootKind: 'media', rootId, generation: 7, basis: ['retained-head'] },
+  ]);
+  expect(observe).toHaveBeenCalledExactlyOnceWith(['sync_capture', 'sync_connection'], 'readonly');
+  expect(f.rows).toEqual(before);
+});
+
+it('reads ten thousand remote-only native keys without touching source or original stores', async () => {
+  const f = setup();
+  const roots = Array.from({ length: 10_000 }, (_, index) => ({
+    rootKind: 'media' as const,
+    rootId: `remote-${index}`,
+  }));
+  const observe = vi.spyOn(f.database, 'transaction');
+  const before = structuredClone(f.rows);
+  expect(await loadCatalogNativeBases({ scope, authorization, roots })).toEqual([]);
+  expect(observe).toHaveBeenCalledExactlyOnceWith(['sync_capture', 'sync_connection'], 'readonly');
+  expect(f.rows).toEqual(before);
+});
+
+it.each([
+  'space',
+  'profile-time',
+  'generation',
+  'disabled',
+  'missing-profile',
+  'authorization',
+  'paused',
+] as const)('refuses native causal discovery after %s authority changes', async (kind) => {
+  const f = setup();
+  const profile = parseSyncCaptureRecord(f.table('sync_capture').get('profile'));
+  if (!profile || profile.kind !== 'profile') throw new Error('Missing capture profile');
+  if (kind === 'space')
+    f.table('sync_capture').set('profile', { ...profile, spaceId: 'replacement-space' });
+  if (kind === 'profile-time') f.table('sync_capture').set('profile', { ...profile, createdAt: 2 });
+  if (kind === 'generation')
+    f.table('sync_capture').set('profile', { ...profile, connectionGeneration: 4 });
+  if (kind === 'disabled') f.table('sync_capture').set('profile', { ...profile, enabled: false });
+  if (kind === 'missing-profile') f.table('sync_capture').delete('profile');
+  if (kind === 'authorization')
+    f.table('sync_connection').set('connection', {
+      ...f.connection,
+      identity: { ...authorization, revision: 2 },
+    });
+  if (kind === 'paused')
+    f.table('sync_connection').set('connection', { ...f.connection, phase: 'paused' });
+  const before = structuredClone(f.rows);
+  await expect(
+    loadCatalogNativeBases({
+      scope,
+      authorization,
+      roots: [{ rootKind: 'media', rootId: f.input.rows.media.id }],
+    })
+  ).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses malformed retained root state rather than returning new-root ordering', async () => {
+  const f = setup();
+  const rootId = f.input.rows.media.id;
+  const rootKey = captureRootKey(scope.spaceId, 'media', rootId);
+  f.table('sync_capture').set(JSON.stringify(['root-state', rootKey]), { kind: 'broken-state' });
+  const before = structuredClone(f.rows);
+  await expect(
+    loadCatalogNativeBases({ scope, authorization, roots: [{ rootKind: 'media', rootId }] })
+  ).rejects.toThrow('admission refused');
+  expect(f.rows).toEqual(before);
+});
+
+it('rejects duplicate or excessive root discovery before opening native storage', async () => {
+  const f = setup();
+  const root = { rootKind: 'media' as const, rootId: f.input.rows.media.id };
+  await expect(
+    loadCatalogNativeBases({ scope, authorization, roots: [root, root] })
+  ).rejects.toThrow();
+  await expect(
+    loadCatalogNativeBases({
+      scope,
+      authorization,
+      roots: Array.from({ length: 10_001 }, (_, index) => ({ ...root, rootId: `root-${index}` })),
+    })
+  ).rejects.toThrow();
+  expect(io.database).not.toHaveBeenCalled();
+});
+
+it('rechecks authorization after a delayed native metadata database admission', async () => {
+  const f = setup();
+  let release!: (value: typeof f.database) => void;
+  const database = new Promise<typeof f.database>((resolve) => {
+    release = resolve;
+  });
+  io.database.mockReturnValueOnce(database);
+  const pending = loadCatalogNativeBases({
+    scope,
+    authorization,
+    roots: [{ rootKind: 'media', rootId: f.input.rows.media.id }],
+  });
+  const refused = expect(pending).rejects.toThrow();
+  f.table('sync_connection').set('connection', {
+    ...f.connection,
+    phase: 'paused',
+    identity: { ...authorization, revision: 2 },
+  });
+  const before = structuredClone(f.rows);
+  release(f.database);
+  await refused;
+  expect(f.rows).toEqual(before);
+});
+
+it.each([
+  'current',
+  'digest',
+  'generation',
+  'profile',
+  'enrollment',
+  'missing-locator',
+  'unpublished',
+] as const)(
+  'matches a locally authored head only through its exact accepted publication: %s',
+  async (change) => {
+    const f = setup();
+    const rootId = f.input.rows.media.id;
+    const rootKey = captureRootKey(scope.spaceId, 'media', rootId);
+    const native = createNativeCapture({
+      version: 1,
+      kind: 'sync-operation',
+      key: 'local-capture',
+      createdAt: 1,
+      spaceId: scope.spaceId,
+      connectionGeneration: scope.connectionGeneration,
+      rootKind: 'media',
+      rootId,
+      rootKey,
+      operationId: 'local-operation',
+      generation: 1,
+      basis: [],
+      origin: 'local-edit',
+      publicationId: null,
+      change: { kind: 'media', rows: f.input.rows },
+    });
+    const { change: _change, phase: _phase, ...header } = native;
+    const published = {
+      ...header,
+      phase: 'published',
+      publication: {
+        kind: 'verified',
+        acceptedAt: 1,
+        preparedSha256: 'a'.repeat(64),
+        attemptId: authorization.incarnation,
+        recordKey: '.sniptale/changes/accepted.json',
+        recordSha256: 'b'.repeat(64),
+      },
+      objects: [],
+    };
+    const selection = {
+      rootKind: 'media' as const,
+      rootId,
+      operationId: native.operationId,
+      sourceDigest: 'a'.repeat(64),
+    };
+    const stateKey = JSON.stringify(['root-state', rootKey]);
+    f.table('sync_capture').set(stateKey, {
+      version: 1,
+      kind: 'root-state',
+      key: stateKey,
+      createdAt: 1,
+      spaceId: scope.spaceId,
+      rootKind: 'media',
+      rootId,
+      rootKey,
+      generation: 1,
+      basis: [native.operationId],
+    });
+    if (change === 'digest') selection.sourceDigest = 'c'.repeat(64);
+    if (change === 'generation') published.generation += 1;
+    if (change === 'profile') published.profileCreatedAt += 1;
+    if (change === 'enrollment') published.connectionGeneration += 1;
+    expect(parseSyncCaptureRecord(published)?.kind).toBe('sync-operation');
+    f.table('sync_capture').set(native.key, change === 'unpublished' ? native : published);
+    const locatorKey = preparedOutgoingOperationKey(scope.spaceId, native.operationId);
+    if (change !== 'missing-locator')
+      f.table('sync_outbox').set(locatorKey, {
+        kind: 'operation-locator',
+        key: locatorKey,
+        spaceId: scope.spaceId,
+        operationId: native.operationId,
+        captureKey: native.key,
+        sourceSha256: native.sourceSha256,
+        connectionGeneration: published.connectionGeneration,
+        profileCreatedAt: published.profileCreatedAt,
+      });
+    const before = structuredClone(f.rows);
+    await expect(
+      loadMaterializedCatalogSelections({ scope, selections: [selection] })
+    ).resolves.toEqual(change === 'current' ? [selection] : []);
+    expect(f.rows).toEqual(before);
+  }
+);

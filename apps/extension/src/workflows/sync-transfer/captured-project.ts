@@ -1,6 +1,8 @@
 import type { InventoryDatabase } from '../media-hub-backup/v6/inventory/helpers';
 import type { VideoReviewBackupDatabase } from '../../composition/persistence/review-workspaces/backup-restore';
 import {
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
@@ -19,6 +21,7 @@ import {
 import type { AssetRef } from '../../composition/persistence/assets';
 import type { CapturedVideoProjectRows } from '../../composition/persistence/sync-capture/contracts';
 import { parseCapturedVideoProjectRows } from '../../composition/persistence/sync-capture/guards';
+import { collectCapturedProjectScenarioDependencies } from '../../composition/persistence/sync-capture/project-snapshot';
 import { assertPortableJson, parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { buildVideoProjectRootInventory } from '../media-hub-backup/v6/inventory/video-projects';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
@@ -29,6 +32,11 @@ export async function encodeCapturedProjectRoot(value: CapturedVideoProjectRows)
   const parsed = parseCapturedVideoProjectRows(value);
   if (!parsed || !parsed.mediaDependencies)
     throw new Error('Invalid frozen project source or dependency evidence.');
+  if (
+    collectCapturedProjectScenarioDependencies(parsed).size > 0 &&
+    !parsed.rootDependencies?.length
+  )
+    throw new Error('Frozen Scenario source has no admitted causal evidence.');
   const dependencies = structuredClone(parsed.mediaDependencies);
   const rows = structuredClone(parsed);
   const roots = await buildVideoProjectRootInventory({
@@ -79,7 +87,15 @@ export async function encodeCapturedProjectRoot(value: CapturedVideoProjectRows)
     metadata,
     objects: objects.map((object) => object.ref),
   });
-  return { envelope, objects, dependencies, bindings };
+  return {
+    envelope,
+    objects,
+    dependencies,
+    bindings,
+    ...(parsed.rootDependencies?.length
+      ? { rootDependencies: structuredClone(parsed.rootDependencies) }
+      : {}),
+  };
 }
 
 interface FrozenSnapshotDatabase extends InventoryDatabase, VideoReviewBackupDatabase {}
@@ -95,8 +111,10 @@ export function createFrozenSnapshotDatabase(
   const reviewIds = new Set([...assetMediaIds, ...exportMediaIds]);
   const rows = new Map<string, unknown[]>([
     [VIDEO_PROJECTS_STORE, [snapshot.project]],
+    [STORE_NAME, snapshot.recordings ?? []],
+    [RECORDING_TELEMETRY_STORE, snapshot.telemetry ?? []],
     [PROJECT_ASSETS_STORE, snapshot.assets],
-    [PROJECT_EXPORTS_STORE, snapshot.exports],
+    [PROJECT_EXPORTS_STORE, [...snapshot.exports, ...(snapshot.sourceExports ?? [])]],
     [MEDIA_LIBRARY_STORE, snapshot.media],
     [ASSET_REFS_STORE, snapshot.refs],
     [THUMBNAILS_STORE, snapshot.thumbnails ?? []],
@@ -110,8 +128,16 @@ export function createFrozenSnapshotDatabase(
   ]);
   const allowedKeys = new Map<string, Set<string>>([
     [VIDEO_PROJECTS_STORE, new Set([projectId])],
+    [STORE_NAME, new Set((snapshot.recordings ?? []).map((entry) => entry.id))],
+    [
+      RECORDING_TELEMETRY_STORE,
+      new Set((snapshot.telemetry ?? []).map((entry) => entry.recordingId)),
+    ],
     [PROJECT_ASSETS_STORE, new Set(snapshot.assets.map((entry) => entry.id))],
-    [PROJECT_EXPORTS_STORE, new Set(snapshot.exports.map((entry) => entry.id))],
+    [
+      PROJECT_EXPORTS_STORE,
+      new Set([...snapshot.exports, ...(snapshot.sourceExports ?? [])].map((entry) => entry.id)),
+    ],
     [MEDIA_LIBRARY_STORE, new Set([...snapshot.media.map((entry) => entry.id), ...reviewIds])],
     [ASSET_REFS_STORE, new Set(snapshot.refs.map((entry) => entry.assetId))],
     [THUMBNAILS_STORE, new Set([`video-project:${projectId}`, ...exportMediaIds])],
@@ -153,11 +179,13 @@ export function createFrozenSnapshotDatabase(
           ]) === accepted
         );
       const key =
-        store === ASSET_REFS_STORE || store === THUMBNAILS_STORE
-          ? 'assetId'
-          : store === VIDEO_WORKSPACES_STORE || store === VIDEO_WORKSPACE_DRAFTS_STORE
-            ? 'aggregateId'
-            : 'id';
+        store === RECORDING_TELEMETRY_STORE
+          ? 'recordingId'
+          : store === ASSET_REFS_STORE || store === THUMBNAILS_STORE
+            ? 'assetId'
+            : store === VIDEO_WORKSPACES_STORE || store === VIDEO_WORKSPACE_DRAFTS_STORE
+              ? 'aggregateId'
+              : 'id';
       return Reflect.get(entry, key) === accepted;
     });
   }

@@ -1,4 +1,7 @@
-import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
+import {
+  buildRecordingMediaEntry,
+  buildProjectExportMediaEntry,
+} from '../media-library/entry-mapping';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -10,7 +13,11 @@ import {
   annotation,
 } from '../review-workspaces/backup-restore.test-support';
 import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
-import { createMediaLibraryEntry, createProjectAssetEntry } from '../projects/index.test-support';
+import {
+  createMediaLibraryEntry,
+  createProjectAssetEntry,
+  createProjectExportEntry,
+} from '../projects/index.test-support';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { saveVideoWorkspaceDraft, commitVideoWorkspace } from '../review-workspaces/store';
 import { deleteVideoWorkspaceProject } from '../review-workspaces/project-commands';
@@ -188,6 +195,61 @@ it('applies default and archived reviews through native consumers without fake L
   expect(table('media_library')).toEqual(sourceBefore);
   expect(current().project?.name).toBe('Transferred review');
   expect(current(archiveId).revision).toBeGreaterThan(archive.root.review.workspace.revision);
+});
+it('applies a review of the native export media kind without requiring its parent project', async () => {
+  const exportId = 'export:original';
+  const candidate = input(exportId);
+  const dependency = candidate.dependencies[0]!;
+  const projectExport = createProjectExportEntry({
+    id: 'original',
+    projectId: 'absent-parent',
+    assetId: dependency.ref.assetId,
+    size: dependency.ref.size,
+    mimeType: dependency.ref.mimeType,
+  });
+  const media = buildProjectExportMediaEntry(projectExport);
+  table('media_library').set(exportId, media);
+  table('project_exports').set(projectExport.id, projectExport);
+  table('asset_owners').set(JSON.stringify(['project-export', projectExport.id, 'body']), {
+    assetId: dependency.ref.assetId,
+    ownerKind: 'project-export',
+    ownerId: projectExport.id,
+    role: 'body',
+  });
+  const rootKey = captureRootKey(spaceId, 'media', exportId);
+  table('sync_capture').set(JSON.stringify(['root-state', rootKey]), {
+    version: 1,
+    kind: 'root-state',
+    key: JSON.stringify(['root-state', rootKey]),
+    createdAt: 1,
+    spaceId,
+    rootKind: 'media',
+    rootId: exportId,
+    rootKey,
+    generation: 1,
+    basis: ['source-operation'],
+    nativeDigest: digestCapturedMediaRows({ media, projectExport, ref: dependency.ref }),
+  });
+  candidate.root.sourceMediaId = exportId;
+  candidate.root.review.workspace.sourceMediaId = exportId;
+  candidate.dependencies = [{ ...dependency, entry: media }];
+  expect(parseApplyPreparedVideoReviewReplicaInput(candidate)).not.toBeNull();
+  await expect(applyPreparedVideoReviewReplica(candidate)).resolves.toMatchObject({
+    status: 'applied',
+  });
+  expect(current(exportId).sourceMediaId).toBe(exportId);
+  expect(table('video_projects').has('absent-parent')).toBe(false);
+  expect(
+    parseApplyPreparedVideoReviewReplicaInput({
+      ...candidate,
+      dependencies: [
+        {
+          ...candidate.dependencies[0],
+          entry: { ...media, source: { kind: 'recording', recordingId: 'original' } },
+        },
+      ],
+    })
+  ).toBeNull();
 });
 it('rebases workspace and draft clocks and refuses a stale local writer', async () => {
   const value = input();

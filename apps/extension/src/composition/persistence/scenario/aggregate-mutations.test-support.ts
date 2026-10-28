@@ -34,7 +34,7 @@ const db = {
       done: Promise.resolve(),
       objectStore: (name: string) => {
         if (!allowed.has(name)) throw new Error(`Unexpected store ${name}`);
-        return {
+        const objectStore = {
           delete: async (id: unknown) => void getStore(name).delete(normalizeKey(id)),
           get: async (id: unknown) => getStore(name).get(normalizeKey(id)),
           getAll: async () => [...getStore(name).values()],
@@ -61,6 +61,7 @@ const db = {
               ),
           }),
           put: async (value: {
+            key?: string;
             assetId?: string;
             id?: string;
             operationId?: string;
@@ -80,6 +81,7 @@ const db = {
                       : [value.projectId, value.revision]
                   )
                 : undefined) ??
+              value.key ??
               value.id ??
               value.stepId ??
               value.operationId ??
@@ -90,6 +92,7 @@ const db = {
             getStore(name).set(key, value);
           },
         };
+        return { ...objectStore, add: objectStore.put };
       },
     };
   }),
@@ -113,6 +116,10 @@ vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
 }));
 
 vi.mock('../assets', async () => ({
+  readAssetFile: vi.fn(
+    async (ref: { size: number; mimeType: string }, filename: string) =>
+      new File([new Uint8Array(ref.size)], filename, { type: ref.mimeType })
+  ),
   parseAssetOwner: (await vi.importActual<typeof import('../assets/guards')>('../assets/guards'))
     .parseAssetOwner,
   buildPhysicalDeleteOperation: () => ({
@@ -208,6 +215,15 @@ function createDocument(projectId: string, stepId = 'step-1') {
 beforeEach(() => {
   stores.clear();
   for (const name of [
+    'sync_capture',
+    'sync_connection',
+    'recording_telemetry',
+    'project_exports',
+    'image_workspaces',
+    'video_workspaces',
+    'video_workspace_history',
+    'video_workspace_drafts',
+    'thumbnails',
     'aggregate_presentations',
     'asset_operations',
     'asset_owners',

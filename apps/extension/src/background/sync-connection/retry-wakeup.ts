@@ -1,8 +1,14 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import type { SyncConnectionMetadata } from '../../composition/persistence/remote-connection/model';
+import type {
+  SyncConnectionMetadata,
+  SyncConnectionIdentity,
+} from '../../composition/persistence/remote-connection/model';
 import type { reconcileSyncQueueCaptures } from '../../composition/persistence/sync-capture/queue-reconciliation';
-import type { SyncQueueScheduleProgress } from '../../composition/persistence/sync-capture/queue-model';
+import type {
+  SyncQueueScope,
+  SyncQueueScheduleProgress,
+} from '../../composition/persistence/sync-capture/queue-model';
 import type {
   loadSyncQueueScheduleProgress,
   initializeSyncQueueSchedulePage,
@@ -20,6 +26,17 @@ const logger = createLogger({ namespace: 'SyncQueueRetry' });
 export interface SyncQueueRetryWakeupDependencies {
   loadConnection(): Promise<SyncConnectionMetadata | null>;
   reconcileCaptures: typeof reconcileSyncQueueCaptures;
+  refreshIncoming?: () => Promise<void>;
+  discoverInitialRoots?(
+    scope: SyncQueueScope,
+    authorization: SyncConnectionIdentity
+  ): Promise<{
+    captured: number;
+    existing: number;
+    refused: number;
+    remaining: boolean;
+    advanced?: true;
+  }>;
   loadProgress: typeof loadSyncQueueScheduleProgress;
   initializePage: typeof initializeSyncQueueSchedulePage;
   discoverDue: typeof discoverDueSyncQueueOperations;
@@ -30,12 +47,14 @@ export interface SyncQueueRetryWakeupDependencies {
   createAlarm(name: string, options: { periodInMinutes: number }): Promise<void>;
   subscribeAlarm(listener: (value: unknown) => void): () => void;
   subscribeStartup(listener: () => void): () => void;
+  subscribeQueueSettled?(listener: () => void): () => void;
 }
 
 /** Register a bounded wake-up pass. Disposal preserves the alarm and native work for restart. */
 export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencies) {
   let disposed = false;
   let pending: Promise<void> | null = null;
+  let followupPending = false;
 
   async function dispatch(candidate: SyncQueueDueCandidate): Promise<boolean> {
     const snapshot = await deps.coordinator.inspect();
@@ -49,6 +68,9 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
       if (candidate.status === 'running') await deps.deferDue(candidate);
       return false;
     }
+    const slotsFull =
+      snapshot && snapshot.jobs.filter((job) => job.state === 'running').length >= 2;
+    if (snapshot?.phase === 'running' && slotsFull && candidate.status === 'queued') return false;
     if (
       snapshot &&
       (snapshot.phase === 'failed' ||
@@ -106,13 +128,38 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
     if (!connection || connection.phase !== 'active') return;
     const { spaceId, connectionGeneration, profileCreatedAt } = connection.binding;
     const scope = { spaceId, connectionGeneration, profileCreatedAt };
+    let initialRemaining = false;
     if (connection.workspace) {
+      try {
+        const initial = await deps.discoverInitialRoots?.(scope, connection.identity);
+        if (disposed) return;
+        initialRemaining = initial?.remaining ?? false;
+        if (initial && initial.refused > 0)
+          logger.warn('Sync initial discovery contains unsupported roots');
+        if (
+          initial?.remaining &&
+          initial.refused === 0 &&
+          (initial.captured + initial.existing > 0 || initial.advanced === true)
+        )
+          followupPending = true;
+      } catch {
+        logger.warn('Sync initial discovery deferred');
+      }
+      if (disposed) return;
       try {
         const result = await deps.reconcileCaptures(scope, connection.identity);
         if (result.refused > 0) logger.warn('Sync capture enqueue deferred');
       } catch {
         // Committed queued work retains independent native admission after discovery failure.
         logger.warn('Sync capture enqueue deferred');
+      }
+    }
+    if (disposed) return;
+    if (!initialRemaining && deps.refreshIncoming) {
+      try {
+        await deps.refreshIncoming();
+      } catch {
+        logger.warn('Sync incoming refresh deferred');
       }
     }
     if (disposed) return;
@@ -143,6 +190,10 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
       .catch(() => logger.warn('Sync queue retry deferred'))
       .finally(() => {
         pending = null;
+        if (followupPending && !disposed) {
+          followupPending = false;
+          void run();
+        }
       });
     return pending;
   }
@@ -152,12 +203,18 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
   const unsubscribeStartup = deps.subscribeStartup(() => {
     void run();
   });
+  const unsubscribeQueue = deps.subscribeQueueSettled?.(() => {
+    if (disposed) return;
+    if (pending) followupPending = true;
+    else void run();
+  });
   return {
     run,
     dispose(): void {
       disposed = true;
       unsubscribe();
       unsubscribeStartup();
+      unsubscribeQueue?.();
     },
   };
 }

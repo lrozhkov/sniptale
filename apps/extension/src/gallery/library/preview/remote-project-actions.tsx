@@ -27,22 +27,48 @@ export function RemoteProjectActions({ item }: { item: GalleryRemoteRootItem }) 
   }, [controller]);
   const running = phase === 'running' || phase === 'cancel-refused';
   const message =
-    phase === 'running'
-      ? 'gallery.app.remotePreparing'
-      : phase === 'failed'
-        ? 'gallery.app.remoteFailed'
-        : phase === 'cancelled'
-          ? 'gallery.app.remoteCancelled'
-          : phase === 'selection-changed'
-            ? 'gallery.app.remoteSelectionChanged'
-            : phase === 'cancel-refused'
-              ? 'gallery.app.remoteCancelRefused'
-              : null;
+    phase === 'queued'
+      ? 'gallery.app.remoteResolutionQueued'
+      : phase === 'running'
+        ? 'gallery.app.remotePreparing'
+        : phase === 'failed'
+          ? 'gallery.app.remoteFailed'
+          : phase === 'cancelled'
+            ? 'gallery.app.remoteCancelled'
+            : phase === 'selection-changed'
+              ? 'gallery.app.remoteSelectionChanged'
+              : phase === 'cancel-refused'
+                ? 'gallery.app.remoteCancelRefused'
+                : null;
   return (
     <div className="space-y-3">
       <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
         {translate('gallery.app.remoteHint')}
       </p>
+      {item.remote.conflict ? (
+        <div className="space-y-2">
+          <p className="text-xs">{translate('gallery.app.remoteConflictHint')}</p>
+          {(item.remote.versions ?? []).map((version, index) => (
+            <ProductActionButton
+              key={version.selection.operationId}
+              compact
+              tone="secondary"
+              type="button"
+              disabled={running || phase === 'queued' || item.remote.unavailable}
+              onClick={() => void controller.resolve(version.selection)}
+            >
+              {version.deleted
+                ? translate('gallery.app.remoteChooseDeletion')
+                : translate('gallery.app.remoteChooseVersion').replace(
+                    '{number}',
+                    String(index + 1)
+                  ) +
+                  ': ' +
+                  version.label}
+            </ProductActionButton>
+          ))}
+        </div>
+      ) : null}
       <ProductActionButton
         compact
         tone="secondary"

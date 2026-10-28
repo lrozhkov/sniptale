@@ -5,11 +5,16 @@ import { initDB } from '../infrastructure/indexed-db/core';
 import { SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE } from '../infrastructure/indexed-db/core.stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
+  captureProfileBounds,
   type CaptureOperation,
   type CapturedChange,
   type PreparedCaptureOperation,
 } from './contracts';
-import { parseCaptureObjectBindings, parseSyncCaptureRecord } from './guards';
+import {
+  parseCaptureObjectBindings,
+  parseCaptureRetainedBindings,
+  parseSyncCaptureRecord,
+} from './guards';
 
 const MAX_RECORD_BYTES = 4 * 1024 * 1024;
 
@@ -29,6 +34,7 @@ export interface PreparedOutgoingOperation {
   recordText: string;
   recordSha256: string;
   objects: { objectId: string; ref: AssetRef; sha256: string; filename: string }[];
+  retainedObjects?: { objectId: string; remoteKey: string }[];
 }
 
 /** The owner computes captureSha256 from the exact normalized retained source. */
@@ -54,7 +60,10 @@ function digest(value: unknown): value is string {
   return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
 }
 
-type PreparedIdentity = Omit<PreparedOutgoingOperation, 'recordText' | 'recordSha256' | 'objects'>;
+type PreparedIdentity = Omit<
+  PreparedOutgoingOperation,
+  'recordText' | 'recordSha256' | 'objects' | 'retainedObjects'
+>;
 
 function parseIdentity(value: Record<string, unknown>): PreparedIdentity | null {
   const {
@@ -119,9 +128,41 @@ export function parsePrepared(value: unknown): PreparedOutgoingOperation | null 
       recordSha256
   )
     return null;
-  const objects = parseCaptureObjectBindings(value['objects']);
-  if (!objects) return null;
-  return { ...identity, recordText, recordSha256, objects };
+  let root: unknown;
+  try {
+    root = JSON.parse(identity.rootKey);
+  } catch {
+    return null;
+  }
+  if (
+    !Array.isArray(root) ||
+    root.length !== 3 ||
+    root[0] !== identity.spaceId ||
+    typeof root[1] !== 'string' ||
+    !['media', 'video-review', 'video-project', 'scenario-project'].includes(root[1]) ||
+    !boundedString(root[2], 256) ||
+    JSON.stringify(root) !== identity.rootKey
+  )
+    return null;
+  const rootKind: unknown = root[1];
+  const objects = parseCaptureObjectBindings(value['objects'], rootKind);
+  const retainedObjects = Object.hasOwn(value, 'retainedObjects')
+    ? parseCaptureRetainedBindings(value['retainedObjects'], rootKind)
+    : undefined;
+  if (
+    !objects ||
+    retainedObjects === null ||
+    objects.length + (retainedObjects?.length ?? 0) > captureProfileBounds(rootKind).objects ||
+    retainedObjects?.some((item) => objects.some((local) => local.objectId === item.objectId))
+  )
+    return null;
+  return {
+    ...identity,
+    recordText,
+    recordSha256,
+    objects,
+    ...(retainedObjects === undefined ? {} : { retainedObjects }),
+  };
 }
 
 /** Compare prepared evidence with the complete normalized retained capture. */
@@ -140,6 +181,7 @@ export function matchesCapture(
     record.connectionGeneration !== capture.connectionGeneration
   )
     return false;
+  if (capture.phase === 'native' && record.retainedObjects !== undefined) return false;
   if (capture.phase !== 'native')
     return (
       capture.phase === 'prepared' &&
@@ -147,9 +189,11 @@ export function matchesCapture(
     );
   // The workflow verifies inline Blob copies against the authoritative native inventory.
   if (
+    (capture.change.kind === 'media' && 'webSnapshot' in capture.change.rows) ||
     capture.change.kind === 'image' ||
     capture.change.kind === 'video-project' ||
-    capture.change.kind === 'video-review'
+    capture.change.kind === 'video-review' ||
+    capture.change.kind === 'scenario-project'
   )
     return true;
   const refs = capture.change.kind === 'tombstone' ? [] : [capture.change.rows.ref];
@@ -288,21 +332,14 @@ export async function commitPreparedOutgoingOperation(
           recordText: proposed.recordText,
           recordSha256: proposed.recordSha256,
           objects: proposed.objects,
+          ...(proposed.retainedObjects === undefined
+            ? {}
+            : { retainedObjects: proposed.retainedObjects }),
         },
       };
       if (!parseSyncCaptureRecord(operation))
         throw new Error('Invalid accepted outgoing operation.');
-      await captures.put(operation);
-      await tx.objectStore(SYNC_OUTBOX_STORE).put({
-        key: proposed.key,
-        kind: 'operation-locator',
-        captureKey: operation.key,
-        spaceId: operation.spaceId,
-        operationId: operation.operationId,
-        profileCreatedAt: operation.profileCreatedAt,
-        connectionGeneration: operation.connectionGeneration,
-        sourceSha256: operation.sourceSha256,
-      });
+      await storePreparedOutgoingInTransaction(tx, operation);
       await tx.done;
       return projectPreparedOperation(operation);
     } catch (error) {
@@ -348,4 +385,26 @@ export async function loadNativeOutgoingCapture(expected: unknown): Promise<Capt
   )
     throw new Error('Native outgoing capture changed.');
   return structuredClone(current);
+}
+
+/** Persist the sole prepared payload and compact locator in the caller's admitted transaction. */
+export async function storePreparedOutgoingInTransaction(
+  tx: import('idb').IDBPTransaction<unknown, string[], 'readwrite'>,
+  operation: PreparedCaptureOperation
+): Promise<void> {
+  const checked = parseSyncCaptureRecord(operation);
+  if (!checked || checked.kind !== 'sync-operation' || checked.phase !== 'prepared')
+    throw new Error('Invalid prepared outgoing operation.');
+  const prepared = projectPreparedOperation(checked);
+  await tx.objectStore(SYNC_CAPTURE_STORE).put(checked);
+  await tx.objectStore(SYNC_OUTBOX_STORE).put({
+    key: prepared.key,
+    kind: 'operation-locator',
+    captureKey: checked.key,
+    spaceId: checked.spaceId,
+    operationId: checked.operationId,
+    profileCreatedAt: checked.profileCreatedAt,
+    connectionGeneration: checked.connectionGeneration,
+    sourceSha256: checked.sourceSha256,
+  });
 }

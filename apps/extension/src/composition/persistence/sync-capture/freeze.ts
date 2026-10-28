@@ -1,4 +1,8 @@
+import { freezeImageInTransaction } from './image-snapshot';
+import { parseScenarioAssetEntry } from '../scenario/read-guards';
+import { collectCapturedProjectRecordingIds } from './project-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
+import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 import { parseAssetOwner } from '../assets/guards';
 import { sameReviewVideoContainer } from '../../../features/video/review/validation';
@@ -36,7 +40,9 @@ import {
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  SCENARIO_ASSETS_STORE,
   THUMBNAILS_STORE,
+  WEB_SNAPSHOTS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -105,7 +111,45 @@ export async function freezeMediaInTransaction(
   const media = frozenNativeRow(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId), admitMedia);
   requireSupported(media.id === mediaId);
   let rows: CapturedMediaRows | null;
-  if (media.source.kind === 'recording') {
+  if (media.source.kind === 'stored-asset') {
+    const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(media.source.assetId));
+    await requireSourceOwner(tx, 'media-library', media.id, 'source', media.source.assetId);
+    rows = parseCapturedMediaRows({ media, ref });
+  } else if (media.source.kind === 'project-export') {
+    const projectExport = parseProjectExportEntry(
+      await tx.objectStore(PROJECT_EXPORTS_STORE).get(media.source.exportId)
+    );
+    requireSupported(projectExport !== null);
+    const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(projectExport.assetId));
+    await requireSourceOwner(tx, 'project-export', projectExport.id, 'body', projectExport.assetId);
+    rows = parseCapturedMediaRows({ media, projectExport, ref });
+  } else if (media.source.kind === 'web-snapshot') {
+    const webSnapshot = parseStoredWebSnapshotRecord(
+      await tx.objectStore(WEB_SNAPSHOTS_STORE).get(media.source.snapshotId)
+    );
+    requireSupported(webSnapshot !== null);
+    const ref = parseAssetRef(
+      await tx.objectStore(ASSET_REFS_STORE).get(webSnapshot.packageAssetId)
+    );
+    const screenshotRef = parseAssetRef(
+      await tx.objectStore(ASSET_REFS_STORE).get(webSnapshot.screenshotAssetId)
+    );
+    await requireSourceOwner(
+      tx,
+      'web-snapshot',
+      webSnapshot.id,
+      'package',
+      webSnapshot.packageAssetId
+    );
+    await requireSourceOwner(
+      tx,
+      'web-snapshot',
+      webSnapshot.id,
+      'screenshot',
+      webSnapshot.screenshotAssetId
+    );
+    rows = parseCapturedMediaRows({ media, webSnapshot, ref, screenshotRef });
+  } else if (media.source.kind === 'recording') {
     const recording = parseRecordingEntry(
       await tx.objectStore(STORE_NAME).get(media.source.recordingId)
     );
@@ -176,6 +220,27 @@ export async function freezeMediaInTransaction(
   return structuredClone(rows);
 }
 
+async function requireSourceOwner(
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
+  ownerKind: string,
+  ownerId: string,
+  role: string,
+  assetId: string
+): Promise<void> {
+  const owner = parseAssetOwner(
+    await tx.objectStore(ASSET_OWNERS_STORE).get([ownerKind, ownerId, role])
+  );
+  requireSupported(
+    Boolean(
+      owner &&
+      owner.ownerKind === ownerKind &&
+      owner.ownerId === ownerId &&
+      owner.role === role &&
+      owner.assetId === assetId
+    )
+  );
+}
+
 /** Freeze one admitted graph through the caller's native transaction, without opening another transaction. */
 export async function freezeVideoProjectInTransaction(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
@@ -196,6 +261,12 @@ class NativeProjectSnapshot {
   private readonly exports = new Map<string, StoredProjectExportEntry>();
   private readonly media = new Map<string, MediaLibraryEntry>();
   private readonly refs = new Map<string, AssetRef>();
+  private readonly sourceExports: NonNullable<CapturedVideoProjectRows['sourceExports']> = [];
+  private readonly scenarioAssets: NonNullable<CapturedVideoProjectRows['scenarioAssets']> = [];
+  private readonly independentImages = new Set<string>();
+  private readonly independentReviews = new Set<string>();
+  private readonly recordings: NonNullable<CapturedVideoProjectRows['recordings']> = [];
+  private readonly telemetry: NonNullable<CapturedVideoProjectRows['telemetry']> = [];
   private readonly mediaToRead = new Set<string>();
   private readonly reviews = new Map<string, VideoWorkspaceSnapshot>();
   private readonly thumbnails: MediaThumbnailEntry[] = [];
@@ -217,12 +288,16 @@ class NativeProjectSnapshot {
     await this.retainProjectSidecars();
     this.requireProjectAssetBindings();
     await rejectUncapturedSidecars(this.tx, this.aggregateIds, {
-      reviews: new Set(this.reviews.keys()),
+      reviews: new Set([...this.reviews.keys(), ...this.independentReviews]),
+      images: this.independentImages,
       thumbnails: new Set(this.thumbnails.map((entry) => entry.assetId)),
       presentation: this.presentation,
     });
     const rows = {
       project: this.project,
+      ...(this.scenarioAssets.length ? { scenarioAssets: this.scenarioAssets } : {}),
+      ...(this.sourceExports.length ? { sourceExports: this.sourceExports } : {}),
+      ...(this.recordings.length ? { recordings: this.recordings, telemetry: this.telemetry } : {}),
       assets: [...this.assets.values()],
       exports: [...this.exports.values()],
       media: [...this.media.values()],
@@ -269,7 +344,7 @@ class NativeProjectSnapshot {
 
   private async retainExport(entry: StoredProjectExportEntry): Promise<void> {
     requireSupported(entry.projectId === this.project.id && entry.mimeType !== undefined);
-    requireSupported(!entry.recordingMetadata && this.exports.size < MAX_CAPTURE_ROWS);
+    requireSupported(this.exports.size < MAX_CAPTURE_ROWS);
     this.exports.set(entry.id, entry);
     await this.retainRef(entry.assetId, entry.size, entry.mimeType);
     const mirrorId = `export:${entry.id}`;
@@ -347,14 +422,30 @@ class NativeProjectSnapshot {
   }
 
   private async retainProjectSources(): Promise<void> {
+    for (const id of collectCapturedProjectRecordingIds(this.project.project))
+      this.mediaToRead.add(`recording:${id}`);
     const assetIds = new Set<string>();
     for (const asset of this.project.project.assets) {
       if (asset.source.kind === 'project-asset') {
         assetIds.add(asset.source.projectAssetId);
         if (asset.source.originMediaId) this.mediaToRead.add(asset.source.originMediaId);
       } else if (asset.source.kind === 'library-asset') this.mediaToRead.add(asset.source.mediaId);
+      else if (asset.source.kind === 'scenario-asset')
+        await this.retainScenarioAsset(asset.source.scenarioAssetId);
     }
     for (const id of assetIds) await this.retainAsset(id);
+  }
+
+  private async retainScenarioAsset(childId: string): Promise<void> {
+    if (this.scenarioAssets.some((entry) => entry.id === childId)) return;
+    const child = parseScenarioAssetEntry(
+      await this.tx.objectStore(SCENARIO_ASSETS_STORE).get(childId)
+    );
+    requireSupported(child !== null && child.id === childId);
+    if (!child) throw new UnsupportedSyncCaptureGraphError();
+    await requireSourceOwner(this.tx, 'scenario-asset', child.id, 'body', child.assetId);
+    await this.retainRef(child.assetId, child.size, child.mimeType);
+    this.scenarioAssets.push(child);
   }
 
   private async retainPublishedExports(): Promise<void> {
@@ -377,21 +468,40 @@ class NativeProjectSnapshot {
       admitMedia
     );
     requireSupported(entry.id === id && this.media.size < MAX_CAPTURE_ROWS);
-    requireSupported(!entry.blob && !entry.recordingMetadata && !entry.recordingGroup);
+    requireSupported(
+      !entry.blob &&
+        (entry.source.kind === 'recording' ||
+          (!entry.recordingGroup &&
+            (entry.source.kind === 'project-export' || !entry.recordingMetadata)))
+    );
     this.media.set(id, entry);
     this.aggregateIds.add(id);
     const source = entry.source;
     switch (source.kind) {
       case 'stored-asset':
+        if (entry.kind === 'image' || entry.kind === 'screenshot') {
+          await freezeImageInTransaction(this.tx, id);
+          this.independentImages.add(id);
+        }
         await this.retainRef(source.assetId, entry.size, entry.mimeType);
         break;
       case 'project-asset':
         await this.bindProjectAsset(entry, source.projectAssetId);
         break;
       case 'project-export':
-        this.bindProjectExport(entry, source.exportId, source.projectId);
+        await this.bindProjectExport(entry, source.exportId, source.projectId);
         break;
-      case 'recording':
+      case 'recording': {
+        const rows = await freezeMediaInTransaction(this.tx, id, { allowIndependentReview: true });
+        requireSupported('recording' in rows);
+        if (!('recording' in rows)) throw new UnsupportedSyncCaptureGraphError();
+        const review = await readWorkspaceStorage(this.tx, id);
+        if (review.logical !== undefined) this.independentReviews.add(id);
+        this.recordings.push(rows.recording);
+        if (rows.telemetry) this.telemetry.push(rows.telemetry);
+        await this.retainRef(rows.ref.assetId, rows.ref.size, rows.ref.mimeType);
+        break;
+      }
       case 'screenshot':
       case 'web-snapshot':
         throw new UnsupportedSyncCaptureGraphError();
@@ -406,21 +516,48 @@ class NativeProjectSnapshot {
       requireSupported(entry.id === `project-asset:${asset.id}`);
   }
 
-  private bindProjectExport(entry: MediaLibraryEntry, exportId: string, projectId: string): void {
-    const exported = this.exports.get(exportId);
-    requireSupported(exported !== undefined && projectId === this.project.id);
-    requireSupported(entry.size === exported.size && entry.mimeType === exported.mimeType);
+  private async bindProjectExport(
+    entry: MediaLibraryEntry,
+    exportId: string,
+    projectId: string
+  ): Promise<void> {
+    let exported = this.exports.get(exportId);
+    if (!exported) {
+      exported = frozenNativeRow(
+        await this.tx.objectStore(PROJECT_EXPORTS_STORE).get(exportId),
+        admitExport
+      );
+      requireSupported(exported.projectId === projectId && exported.mimeType !== undefined);
+      this.sourceExports.push(exported);
+      await this.retainRef(exported.assetId, exported.size, exported.mimeType ?? 'video/webm');
+      const review = await readWorkspaceStorage(this.tx, entry.id);
+      if (review.logical !== undefined) {
+        await freezeMediaInTransaction(this.tx, entry.id, { allowIndependentReview: true });
+        this.independentReviews.add(entry.id);
+      }
+    }
+    requireSupported(exported.projectId === projectId);
+    requireSupported(
+      entry.size === exported.size &&
+        entry.mimeType === exported.mimeType &&
+        JSON.stringify(entry.recordingMetadata) === JSON.stringify(exported.recordingMetadata)
+    );
     if (entry.id.startsWith('export:')) requireSupported(entry.id === `export:${exported.id}`);
   }
 
   private requireProjectAssetBindings(): void {
     for (const asset of this.project.project.assets) {
+      const source = asset.source;
       const resource =
-        asset.source.kind === 'project-asset'
-          ? this.assets.get(asset.source.projectAssetId)
-          : asset.source.kind === 'library-asset'
-            ? this.media.get(asset.source.mediaId)
-            : undefined;
+        source.kind === 'project-asset'
+          ? this.assets.get(source.projectAssetId)
+          : source.kind === 'library-asset'
+            ? this.media.get(source.mediaId)
+            : source.kind === 'recording'
+              ? this.media.get(`recording:${source.recordingId}`)
+              : source.kind === 'scenario-asset'
+                ? this.scenarioAssets.find((entry) => entry.id === source.scenarioAssetId)
+                : undefined;
       requireSupported(
         resource !== undefined &&
           resource.size === asset.metadata.size &&
@@ -435,6 +572,7 @@ async function rejectUncapturedSidecars(
   aggregateIds: ReadonlySet<string>,
   admitted: {
     reviews: ReadonlySet<string>;
+    images?: ReadonlySet<string>;
     thumbnails: ReadonlySet<string>;
     presentation: AggregatePresentationEntry | null;
   } = { reviews: new Set(), thumbnails: new Set(), presentation: null }
@@ -451,6 +589,7 @@ async function rejectUncapturedSidecars(
         admitted.reviews.has(id)
       )
         continue;
+      if (store === IMAGE_WORKSPACES_STORE && admitted.images?.has(id)) continue;
       if (store === THUMBNAILS_STORE && admitted.thumbnails.has(id)) continue;
       const value: unknown = await tx.objectStore(store).get(id);
       if (store === THUMBNAILS_STORE && value !== undefined) {
@@ -468,6 +607,7 @@ async function rejectUncapturedSidecars(
     );
     for (const kind of ['image', 'video-project', 'scenario']) {
       if (kind === 'video-project' && admitted.presentation?.aggregateId === id) continue;
+      if (kind === 'image' && admitted.images?.has(id)) continue;
       requireSupported(
         (await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).get([kind, id])) === undefined
       );

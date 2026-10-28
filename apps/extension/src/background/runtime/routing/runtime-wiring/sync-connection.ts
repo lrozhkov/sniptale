@@ -1,3 +1,4 @@
+import { subscribeToSyncQueueSettled } from '../../../../platform/runtime-messaging/sync-product-client';
 import { configureSyncProductRoute } from '../../../sync-connection/product-route';
 import {
   createSyncWorkspaceAllocation,
@@ -19,6 +20,7 @@ import {
   discoverDueSyncQueueOperations,
   deferDueSyncQueueOperation,
 } from '../../../../composition/persistence/sync-capture/queue-schedule';
+import { discoverInitialSyncRoots } from '../../../../composition/persistence/sync-capture/enrollment';
 import { reconcileSyncQueueCaptures } from '../../../../composition/persistence/sync-capture/queue-reconciliation';
 import { recoverInterruptedSyncQueueOperation } from '../../../../workflows/sync-transfer/queue';
 import {
@@ -71,9 +73,22 @@ function subscribeToPermissionRemoval(sync: Coordinator): void {
 
 function registerSyncQualification(sync: Coordinator, state: BackgroundModeState): void {
   if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
-    configureSyncProductRoute(sync);
     const retryWakeup = createSyncQueueRetryWakeup({
       loadConnection: loadSyncConnection,
+      discoverInitialRoots: discoverInitialSyncRoots,
+      refreshIncoming: async () => {
+        const current = await loadSyncConnection();
+        if (!current || current.phase !== 'active' || !current.workspace) return;
+        const snapshot = await sync.inspect();
+        if (
+          snapshot?.phase === 'stopping' ||
+          snapshot?.phase === 'failed' ||
+          snapshot?.workspace?.state === 'running' ||
+          snapshot?.products?.some((job) => job.state === 'running')
+        )
+          return;
+        await sync.productCommand(crypto.randomUUID(), { kind: 'automatic-sync' });
+      },
       reconcileCaptures: reconcileSyncQueueCaptures,
       loadProgress: loadSyncQueueScheduleProgress,
       initializePage: initializeSyncQueueSchedulePage,
@@ -81,10 +96,14 @@ function registerSyncQualification(sync: Coordinator, state: BackgroundModeState
       deferDue: deferDueSyncQueueOperation,
       recoverInterrupted: recoverInterruptedSyncQueueOperation,
       coordinator: sync,
+      subscribeQueueSettled: subscribeToSyncQueueSettled,
       getAlarm: (name) => chrome.alarms.get(name),
       createAlarm: (name, options) => chrome.alarms.create(name, options),
       subscribeAlarm: (listener) => subscribeToChromeEvent(chrome.alarms?.onAlarm, listener),
       subscribeStartup: (listener) => subscribeToChromeEvent(chrome.runtime?.onStartup, listener),
+    });
+    configureSyncProductRoute(sync, () => {
+      void retryWakeup.run();
     });
     void retryWakeup.run();
     registerSecurityE2EControl({

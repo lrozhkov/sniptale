@@ -1,4 +1,7 @@
 import { expect, it } from 'vitest';
+import { createGuideProject } from '../../features/scenario/project/factories';
+import { createScenarioProjectEntry } from '../../composition/persistence/scenario/projects/entry';
+import { resolveSyncScenarioDependency } from './catalog-graph';
 import {
   createMediaLibraryEntry,
   createVideoProjectEntryWithMediaClip,
@@ -97,6 +100,156 @@ async function attempt(
   const attemptId = `00000000-0000-0000-0000-${physical.toString().padStart(12, '0')}`;
   return { ...(await createSyncAttempt(operationText, attemptId)), operationText, operation };
 }
+
+async function scenarioAttempt(
+  id: string,
+  parents: string[] = [],
+  sha256 = 'a'.repeat(64),
+  name = 'Guide',
+  borrowedMediaId?: string
+) {
+  const entry = createScenarioProjectEntry({
+    project: createGuideProject(name, 'scenario-source', 1),
+    existing: undefined,
+    updatedAt: 1,
+  });
+  const asset = {
+    id: 'scenario-child',
+    projectId: entry.id,
+    mimeType: object.mimeType,
+    size: object.size,
+    width: 10,
+    height: 10,
+    createdAt: 1,
+    galleryAssetId: borrowedMediaId ?? null,
+    ...(borrowedMediaId ? { borrowedMediaId } : {}),
+  };
+  return attempt(id, {
+    rootKind: 'scenario-project',
+    rootId: entry.id,
+    parents,
+    dependencies: borrowedMediaId ? [{ mediaId: borrowedMediaId, basis: ['library-head'] }] : [],
+    envelope: parseRootEnvelope({
+      descriptor: {
+        rootKind: 'scenario-project',
+        rootId: entry.id,
+        metadataPath: 'Metadata/sync-root.json',
+        objectCount: 1,
+        totalBytes: object.size,
+      },
+      metadata: {
+        entry,
+        assets: [{ entry: asset, objectId: object.objectId }],
+        stepDocuments: [],
+        exports: [],
+        exportThumbnails: [],
+      },
+      objects: [object],
+    }),
+    objects: [{ objectId: object.objectId, sha256 }],
+  });
+}
+
+it('admits a Scenario dependency and rename but refuses changed child bytes at each causal node', async () => {
+  const first = await scenarioAttempt('scenario-first');
+  const rename = await scenarioAttempt(
+    'scenario-rename',
+    ['scenario-first'],
+    'a'.repeat(64),
+    'Renamed'
+  );
+  const graph = projectSyncCatalog('space', [rename, first]);
+  expect(
+    resolveSyncScenarioDependency(
+      graph.operations,
+      'scenario-source',
+      ['scenario-child'],
+      ['scenario-first'],
+      ['scenario-first']
+    )
+  ).toBe(true);
+  expect(
+    resolveSyncScenarioDependency(
+      graph.operations,
+      'scenario-source',
+      ['scenario-child'],
+      ['scenario-first'],
+      ['scenario-rename']
+    )
+  ).toBe(true);
+  const adopted = await scenarioAttempt(
+    'scenario-restored-rename',
+    ['scenario-rename'],
+    'a'.repeat(64),
+    'Renamed after restore',
+    mediaId
+  );
+  const restored = projectSyncCatalog('space', [first, rename, adopted]);
+  expect(
+    resolveSyncScenarioDependency(
+      restored.operations,
+      'scenario-source',
+      ['scenario-child'],
+      ['scenario-first'],
+      ['scenario-restored-rename']
+    )
+  ).toBe(true);
+  expect(
+    resolveSyncScenarioDependency(
+      graph.operations,
+      'scenario-source',
+      ['missing-child'],
+      ['scenario-first'],
+      ['scenario-rename']
+    )
+  ).toBe(false);
+  const changed = await scenarioAttempt('scenario-changed', ['scenario-rename'], 'b'.repeat(64));
+  const changedBack = await scenarioAttempt('scenario-back', ['scenario-changed']);
+  const changedGraph = projectSyncCatalog('space', [first, rename, changed, changedBack]);
+  expect(
+    resolveSyncScenarioDependency(
+      changedGraph.operations,
+      'scenario-source',
+      ['scenario-child'],
+      ['scenario-first'],
+      ['scenario-changed']
+    )
+  ).toBe(false);
+  expect(
+    resolveSyncScenarioDependency(
+      changedGraph.operations,
+      'scenario-source',
+      ['scenario-child'],
+      ['scenario-first'],
+      ['scenario-back']
+    )
+  ).toBe(false);
+  expect(
+    resolveSyncScenarioDependency(
+      graph.operations,
+      'scenario-source',
+      ['scenario-child'],
+      ['scenario-first'],
+      ['scenario-first', 'scenario-rename']
+    )
+  ).toBe(false);
+  const deletion = await attempt('scenario-delete', {
+    rootKind: 'scenario-project',
+    rootId: 'scenario-source',
+    kind: 'delete',
+    parents: ['scenario-rename'],
+  });
+  const deleted = projectSyncCatalog('space', [first, rename, deletion]);
+  expect(
+    resolveSyncScenarioDependency(
+      deleted.operations,
+      'scenario-source',
+      ['scenario-child'],
+      ['scenario-first'],
+      ['scenario-delete']
+    )
+  ).toBe(false);
+});
 
 it('deduplicates exact logical bytes and preserves sorted distinct physical alternatives', async () => {
   const first = await attempt('a', {}, 1);

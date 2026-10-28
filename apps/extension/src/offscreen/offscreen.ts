@@ -1,3 +1,5 @@
+import { createAutomaticCatalogSync } from '../workflows/sync-transfer/automatic';
+import { createMediaHubEventPublisher } from '../features/media-hub/events';
 import { createSyncProductExecution } from './sync-connection/product-execution';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { publishSyncProductSettled } from '../platform/runtime-messaging/sync-product-client';
@@ -38,6 +40,9 @@ const offscreenUrl = new URL(globalThis.location.href);
 const offscreenStartupId = offscreenUrl.searchParams.get('offscreenStartupId');
 if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1') {
   const messaging = createRuntimeMessagingTransport();
+  const libraryEvents = createMediaHubEventPublisher();
+  const automatic = createAutomaticCatalogSync();
+  globalThis.addEventListener('pagehide', () => libraryEvents.dispose(), { once: true });
   const executor = createSyncConnectionExecutor({
     onSettled: publishSyncProductSettled,
     executorId: crypto.randomUUID(),
@@ -57,16 +62,22 @@ if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1
       });
     },
     createProductExecution: (input) =>
-      createSyncProductExecution(input, async (origin) => {
-        const response = await messaging.sendRuntimeMessage({
-          type: MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION,
-          requestId: crypto.randomUUID(),
-          authorization: input.authorization,
-          ...(input.work.kind === 'thumbnail-read' ? { advisory: true as const } : {}),
-          origin,
-        });
-        return response.success === true && response.allowed === true;
-      }),
+      createSyncProductExecution(
+        input,
+        async (origin) => {
+          const response = await messaging.sendRuntimeMessage({
+            type: MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION,
+            requestId: crypto.randomUUID(),
+            authorization: input.authorization,
+            ...(input.work.kind === 'thumbnail-read' ? { advisory: true as const } : {}),
+            origin,
+          });
+          return response.success === true && response.allowed === true;
+        },
+        () => libraryEvents.publishLibraryChanged('sync', []),
+        (operationId) => publishSyncProductSettled(operationId, 'queue'),
+        automatic
+      ),
     createExecution: (input) =>
       createSyncQueueExecution(input, async (origin) => {
         const response = await messaging.sendRuntimeMessage({

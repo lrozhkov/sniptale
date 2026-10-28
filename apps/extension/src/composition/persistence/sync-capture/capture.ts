@@ -1,5 +1,9 @@
+import { freezeScenarioInTransaction, digestCapturedScenarioRows } from './scenario-snapshot';
 import { freezeVideoReviewInTransaction, digestCapturedVideoReviewRows } from './review-snapshot';
-import { collectCapturedProjectEditingMediaIds } from './project-snapshot';
+import {
+  collectCapturedProjectEditingMediaIds,
+  collectCapturedProjectScenarioDependencies,
+} from './project-snapshot';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
@@ -62,6 +66,36 @@ export async function captureVideoProjectInTransaction(
   if (project?.lifecycle?.storageClass === 'temporary') return null;
   const rows = await freezeVideoProjectInTransaction(tx, projectId);
   rows.mediaDependencies = await captureMediaDependencies(tx, profile, rows);
+  const rootDependencies = [];
+  for (const [rootId, childIds] of collectCapturedProjectScenarioDependencies(rows)) {
+    const rootKey = captureRootKey(profile.spaceId, 'scenario-project', rootId);
+    let state = parseSyncCaptureRecord(
+      await tx.objectStore(SYNC_CAPTURE_STORE).get(JSON.stringify(['root-state', rootKey]))
+    );
+    const scenario = await freezeScenarioInTransaction(tx, rootId);
+    if (!state) {
+      await captureScenarioProjectInTransaction(tx, rootId, { dependency: true });
+      state = parseSyncCaptureRecord(
+        await tx.objectStore(SYNC_CAPTURE_STORE).get(JSON.stringify(['root-state', rootKey]))
+      );
+    }
+    if (
+      !state ||
+      state.kind !== 'root-state' ||
+      state.deleted ||
+      state.basis.length !== 1 ||
+      state.nativeDigest !== digestCapturedScenarioRows(scenario)
+    )
+      throw new UnsupportedSyncCaptureGraphError();
+    rootDependencies.push({
+      rootKind: 'scenario-project' as const,
+      rootId,
+      generation: state.generation,
+      basis: [...state.basis],
+      childIds,
+    });
+  }
+  if (rootDependencies.length) rows.rootDependencies = rootDependencies;
   return appendCapture(
     tx,
     profile,
@@ -70,6 +104,71 @@ export async function captureVideoProjectInTransaction(
     { kind: 'video-project', rows },
     options
   );
+}
+
+/** Capture one accepted Scenario after-image before its native writer commits. */
+export async function captureScenarioProjectInTransaction(
+  tx: CaptureTransaction,
+  projectId: string,
+  options: { origin?: CaptureOrigin; publicationId?: string; dependency?: boolean } = {}
+): Promise<CaptureOperation | null> {
+  const profile = await readEnabledCaptureProfile(tx);
+  if (!profile) return null;
+  const replay = await readPublicationReplay(
+    tx,
+    profile,
+    'scenario-project',
+    projectId,
+    options.publicationId
+  );
+  if (replay) return replay;
+  const rows = await freezeScenarioInTransaction(tx, projectId);
+  if (
+    !options.dependency &&
+    (rows.entry.lifecycle?.storageClass === 'temporary' ||
+      rows.entry.project.purpose === 'step-template')
+  ) {
+    const rootKey = captureRootKey(profile.spaceId, 'scenario-project', projectId);
+    if (
+      (await tx.objectStore(SYNC_CAPTURE_STORE).get(JSON.stringify(['root-state', rootKey]))) ===
+      undefined
+    )
+      return null;
+  }
+  rows.mediaDependencies = [];
+  for (const media of rows.media)
+    rows.mediaDependencies.push(await captureMediaDependency(tx, profile, media.id));
+  return appendCapture(
+    tx,
+    profile,
+    'scenario-project',
+    projectId,
+    { kind: 'scenario-project', rows },
+    options
+  );
+}
+
+/** Preserve the enrolled Scenario clock across deletion and recreation of one identity. */
+export async function readScenarioRevisionFence(
+  tx: CaptureTransaction,
+  projectId: string
+): Promise<number | null> {
+  const profile = await readEnabledCaptureProfile(tx);
+  if (!profile) return null;
+  const rootKey = captureRootKey(profile.spaceId, 'scenario-project', projectId);
+  const raw: unknown = await tx
+    .objectStore(SYNC_CAPTURE_STORE)
+    .get(JSON.stringify(['root-state', rootKey]));
+  if (raw === undefined) return null;
+  const state = parseSyncCaptureRecord(raw);
+  if (
+    !state ||
+    state.kind !== 'root-state' ||
+    state.rootKey !== rootKey ||
+    state.nativeRevision === undefined
+  )
+    throw new Error('Scenario revision fence is unavailable.');
+  return state.nativeRevision;
 }
 
 /** Capture the native Library publication before the caller commits its source transaction. */
@@ -84,7 +183,12 @@ export async function captureMediaInTransaction(
   if (replay) return replay;
   const source = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
   if (source?.lifecycle?.storageClass === 'temporary') return null;
-  if (source?.source.kind === 'screenshot') return captureImageInTransaction(tx, mediaId, options);
+  if (
+    source?.source.kind === 'screenshot' ||
+    (source?.source.kind === 'stored-asset' &&
+      (source.kind === 'image' || source.kind === 'screenshot'))
+  )
+    return captureImageInTransaction(tx, mediaId, options);
   const rows = await freezeMediaInTransaction(tx, mediaId, { allowIndependentReview: true });
   return appendCapture(tx, profile, 'media', mediaId, { kind: 'media', rows }, options);
 }
@@ -263,10 +367,7 @@ async function captureMediaDependencies(
   const dependencies: CapturedMediaDependency[] = [];
   const editingMedia = collectCapturedProjectEditingMediaIds(rows);
   for (const media of rows.media) {
-    if (media.source.kind === 'project-export') {
-      if (editingMedia.has(media.id)) throw new UnsupportedSyncCaptureGraphError();
-      continue;
-    }
+    if (media.source.kind === 'project-export' && !editingMedia.has(media.id)) continue;
     if (editingMedia.has(media.id))
       dependencies.push(await captureMediaDependency(tx, profile, media.id));
   }
@@ -283,16 +384,23 @@ async function captureMediaDependency(
   const raw: unknown = await tx
     .objectStore(SYNC_CAPTURE_STORE)
     .get(JSON.stringify(['root-state', rootKey]));
-  const frozen = await freezeMediaInTransaction(tx, mediaId);
+  const entry = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  const isImage =
+    entry?.source.kind === 'screenshot' ||
+    (entry?.source.kind === 'stored-asset' &&
+      (entry.kind === 'image' || entry.kind === 'screenshot'));
+  const change: Extract<CapturedChange['change'], { kind: 'image' | 'media' }> = isImage
+    ? { kind: 'image', rows: await freezeImageInTransaction(tx, mediaId) }
+    : {
+        kind: 'media',
+        rows: await freezeMediaInTransaction(tx, mediaId, { allowIndependentReview: true }),
+      };
+  const nativeDigest =
+    change.kind === 'image'
+      ? digestCapturedImageRows(change.rows)
+      : digestCapturedMediaRows(change.rows);
   if (raw === undefined) {
-    const captured = await appendCapture(
-      tx,
-      profile,
-      'media',
-      mediaId,
-      { kind: 'media', rows: frozen },
-      {}
-    );
+    const captured = await appendCapture(tx, profile, 'media', mediaId, change, {});
     return { mediaId, generation: captured.generation, basis: [captured.operationId] };
   }
   const state = parseSyncCaptureRecord(raw);
@@ -301,7 +409,7 @@ async function captureMediaDependency(
     state.kind !== 'root-state' ||
     state.rootKey !== rootKey ||
     state.basis.length === 0 ||
-    state.nativeDigest !== digestCapturedMediaRows(frozen)
+    state.nativeDigest !== nativeDigest
   )
     throw new UnsupportedSyncCaptureGraphError();
   return { mediaId, generation: state.generation, basis: [...state.basis] };
@@ -399,9 +507,11 @@ async function appendCapture(
           ? change.rows.media.filename
           : change.kind === 'video-project'
             ? change.rows.project.project.name
-            : change.kind === 'video-review'
-              ? (change.rows.review.workspace.project?.name ?? rootId)
-              : rootId
+            : change.kind === 'scenario-project'
+              ? change.rows.entry.project.name
+              : change.kind === 'video-review'
+                ? (change.rows.review.workspace.project?.name ?? rootId)
+                : rootId
         ).trim() || rootId,
     },
     key:
@@ -434,6 +544,15 @@ async function appendCapture(
     rootKey,
     generation,
     basis: [operationId],
+    ...(change.kind === 'scenario-project'
+      ? {
+          nativeDigest: digestCapturedScenarioRows(change.rows),
+          nativeRevision: Math.max(
+            previous?.nativeRevision ?? 0,
+            change.rows.entry.workspaceRevision
+          ),
+        }
+      : {}),
     ...(change.kind === 'media' ? { nativeDigest: digestCapturedMediaRows(change.rows) } : {}),
     ...(change.kind === 'video-review'
       ? {

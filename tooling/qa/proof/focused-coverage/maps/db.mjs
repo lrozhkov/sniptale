@@ -19,6 +19,7 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
       'apps/extension/src/workflows/sync-transfer/captured-review.test.ts',
       'apps/extension/src/workflows/sync-transfer/prepared-review.test.ts',
       'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-review.test.ts',
       'apps/extension/src/workflows/sync-transfer/incoming-review.test.ts',
     ],
   },
@@ -44,7 +45,10 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
       'The existing media, project and journal suites prove these admission boundaries.',
     testFiles: [
       'apps/extension/src/composition/persistence/sync-capture/apply-media.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.export.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.snapshot.test.ts',
       'apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.scenario.test.ts',
       'apps/extension/src/composition/persistence/sync-capture/replica-publication.test.ts',
     ],
   },

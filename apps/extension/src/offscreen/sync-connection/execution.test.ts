@@ -8,6 +8,8 @@ import type {
 import type { loadSyncQueueOperation } from '../../composition/persistence/sync-capture/queue';
 import type { createSyncConnectionRequests } from '../../workflows/sync-transfer/connection-requests';
 import type { createDiagnosticPortWriter } from '../../platform/runtime-messaging/diagnostic-capture';
+import type { releasePublishedOutgoing } from '../../workflows/sync-transfer/outgoing';
+import type { refreshPersistedSyncCatalog } from '../../workflows/sync-transfer/catalog-refresh';
 import type { runSyncQueueOperation } from '../../workflows/sync-transfer/queue';
 import type { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
 import { DIAGNOSTIC_LOG_PORT } from '../../contracts/diagnostics';
@@ -34,6 +36,8 @@ const mocks = vi.hoisted(() => ({
   request: vi.fn<ReturnType<typeof createSyncConnectionRequests>['request']>(),
   close: vi.fn<() => Promise<void>>(),
   run: vi.fn<typeof runSyncQueueOperation>(),
+  release: vi.fn<typeof releasePublishedOutgoing>(),
+  refresh: vi.fn<typeof refreshPersistedSyncCatalog>(),
   webdav: vi.fn<typeof createWebdavRemoteStore>(),
   history: vi.fn<ReturnType<typeof createDiagnosticPortWriter>['send']>(),
   writer: vi.fn<typeof createDiagnosticPortWriter>(),
@@ -51,6 +55,12 @@ vi.mock('../../composition/persistence/sync-capture/queue', () => ({
 }));
 vi.mock('../../workflows/sync-transfer/connection-requests', () => ({
   createSyncConnectionRequests: mocks.requests,
+}));
+vi.mock('../../workflows/sync-transfer/catalog-refresh', () => ({
+  refreshPersistedSyncCatalog: mocks.refresh,
+}));
+vi.mock('../../workflows/sync-transfer/outgoing', () => ({
+  releasePublishedOutgoing: mocks.release,
 }));
 vi.mock('../../workflows/sync-transfer/queue', () => ({ runSyncQueueOperation: mocks.run }));
 vi.mock('../../platform/runtime-messaging/diagnostic-capture', () => ({
@@ -160,7 +170,7 @@ beforeEach(() => {
   });
 });
 
-describe('native sync execution adapter', () => {
+describe('native queue admission and authorization', () => {
   it('binds the native capture, connection request gate, queue selection and cancellation signal', async () => {
     const selected = input();
     const hasOriginPermission = vi.fn(async () => true);
@@ -190,6 +200,7 @@ describe('native sync execution adapter', () => {
       expectedRevision: 3,
       remote,
       signal: selected.signal,
+      loadCatalog: expect.any(Function),
       authorize: expect.any(Function),
     });
     expect(mocks.close).toHaveBeenCalledOnce();
@@ -363,7 +374,9 @@ describe('native sync execution adapter', () => {
     expect(mocks.webdav).not.toHaveBeenCalled();
     expect(mocks.close).toHaveBeenCalledOnce();
   });
+});
 
+describe('native queue containment and outcomes', () => {
   it('waits for request closure after a workflow failure before reporting containment', async () => {
     const closure = deferred<void>();
     const closing = deferred<void>();
@@ -635,5 +648,83 @@ describe('workspace execution adapter', () => {
       snapshot: { state: 'interrupted', failureCode: 'interrupted' },
       containment: 'contained',
     });
+  });
+});
+
+describe('queue publication retirement and reconciliation', () => {
+  it.each(['temporary', 'reader-busy'])(
+    'retains verified publication when advisory retirement refuses: %s',
+    async (code) => {
+      mocks.release.mockRejectedValueOnce(new Error(code));
+      const selected = input();
+      await expect(
+        createSyncQueueExecution(selected, async () => true).run()
+      ).resolves.toMatchObject({
+        snapshot: { state: 'published', failureCode: null },
+        containment: 'contained',
+      });
+      expect(mocks.release).toHaveBeenCalledExactlyOnceWith(
+        selected.scope.spaceId,
+        selected.operationId,
+        selected.authorization,
+        remote,
+        selected.signal
+      );
+      expect(mocks.close).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('does not release protection after failed or busy queue execution', async () => {
+    mocks.run.mockResolvedValueOnce({ status: 'busy' });
+    await createSyncQueueExecution(input(), async () => true).run();
+    mocks.run.mockResolvedValueOnce({
+      status: 'finished',
+      operation: operation({ status: 'failed', failureCode: 'temporary' }),
+    });
+    await createSyncQueueExecution(input(), async () => true).run();
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it('does not release protection after authority is paused following publication', async () => {
+    mocks.connection
+      .mockResolvedValueOnce(connection())
+      .mockResolvedValueOnce({ ...connection(), phase: 'paused' });
+    await expect(createSyncQueueExecution(input(), async () => true).run()).resolves.toMatchObject({
+      snapshot: { state: 'published' },
+      containment: 'contained',
+    });
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it('loads the fresh catalog inside the native queue run for publication reconciliation', async () => {
+    const selected = input();
+    const catalog: Awaited<ReturnType<typeof refreshPersistedSyncCatalog>> = {
+      operations: new Map(),
+      roots: new Map(),
+      quarantined: [],
+      pending: [],
+      invalidOperations: [],
+      invalid: [],
+      metadataBytes: 0,
+      pages: 1,
+    };
+    mocks.refresh.mockResolvedValue(catalog);
+    mocks.run.mockImplementation(async (run) => {
+      expect(await run.loadCatalog?.(remote)).toBe(catalog);
+      expect(mocks.close).not.toHaveBeenCalled();
+      return {
+        status: 'finished',
+        operation: operation({ status: 'published', stage: 'published', outcome: 'verified' }),
+      };
+    });
+    expect((await createSyncQueueExecution(selected, async () => true).run()).snapshot.state).toBe(
+      'published'
+    );
+    expect(mocks.refresh).toHaveBeenCalledExactlyOnceWith(
+      remote,
+      selected.scope.spaceId,
+      selected.scope.connectionGeneration,
+      selected.signal
+    );
   });
 });

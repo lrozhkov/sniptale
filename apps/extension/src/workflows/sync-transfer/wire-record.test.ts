@@ -310,3 +310,27 @@ it.each([
   const value = JSON.parse(first.recordText);
   await expect(parseSyncAttemptText(JSON.stringify({ ...value, objects }))).rejects.toThrow();
 });
+
+it.each(['media', 'video-project', 'video-review'] as const)(
+  'retains the ordinary %s logical object bound',
+  async (rootKind) => {
+    const objects = Array.from({ length: 65 }, (_, index) => ({
+      objectId: `object-${index}`,
+      sha256: 'a'.repeat(64),
+    }));
+    await expect(
+      parseSyncOperationText(JSON.stringify({ ...operation(), rootKind, objects }))
+    ).rejects.toThrow();
+  }
+);
+
+it('refuses surplus physical mappings for an ordinary root', async () => {
+  const attempt = await createSyncAttempt(JSON.stringify(operation()), id1);
+  const physical: unknown = JSON.parse(attempt.recordText);
+  if (!isRecord(physical)) throw new Error('Invalid physical fixture.');
+  const objects = Array.from({ length: 65 }, (_, index) => ({
+    objectId: `object-${index}`,
+    remoteKey: attempt.objects[0]!.remoteKey,
+  }));
+  await expect(parseSyncAttemptText(JSON.stringify({ ...physical, objects }))).rejects.toThrow();
+});

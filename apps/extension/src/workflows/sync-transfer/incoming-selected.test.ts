@@ -1,3 +1,6 @@
+import { createGuideProject } from '../../features/scenario/project/factories';
+import { createScenarioProjectEntry } from '../../composition/persistence/scenario/projects/entry';
+import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { receiveSelectedCatalogRoot, type SelectedCatalogRoot } from './incoming-selected';
 import { syncCatalogRootKey, type CatalogOperation } from './catalog-graph';
@@ -287,4 +290,74 @@ it('preserves a committed selected root when cleanup fails after cancellation', 
     operationId: 'source-op',
   });
   expect(io.cancel).not.toHaveBeenCalled();
+});
+
+it('commits a compatible Scenario prerequisite before Montage admission using its current causal basis', async () => {
+  const f = fixture();
+  const before = operation('scenario-project', 'scenario');
+  const project = createGuideProject('Prerequisite', 'scenario', 1);
+  before.operation.envelope = parseRootEnvelope({
+    descriptor: {
+      rootKind: 'scenario-project',
+      rootId: 'scenario',
+      metadataPath: 'Metadata/sync-root.json',
+      objectCount: 0,
+      totalBytes: 0,
+    },
+    metadata: {
+      entry: createScenarioProjectEntry({ project, existing: undefined, updatedAt: 1 }),
+      assets: [],
+      stepDocuments: [],
+      exports: [],
+      exportThumbnails: [],
+    },
+    objects: [],
+  });
+  before.operationText = JSON.stringify(before.operation);
+  const renamed = structuredClone(before);
+  renamed.operation.operationId = 'scenario-renamed';
+  renamed.operation.parents = [before.operation.operationId];
+  renamed.operationText = JSON.stringify(renamed.operation);
+  for (const source of [before, renamed])
+    f.catalog.operations.set(source.operation.operationId, source);
+  f.catalog.roots.set(syncCatalogRootKey('scenario-project', 'scenario'), {
+    rootKind: 'scenario-project',
+    rootId: 'scenario',
+    heads: ['scenario-renamed'],
+    deleted: false,
+    blocked: false,
+    conflict: false,
+    unavailableDependencies: [],
+  });
+  const parent = f.catalog.operations.get('parent-op')!;
+  parent.operation.dependencies = [];
+  parent.operation.rootDependencies = [
+    { rootKind: 'scenario-project', rootId: 'scenario', basis: ['scenario-op'], childIds: [] },
+  ];
+  parent.operationText = JSON.stringify(parent.operation);
+  f.selection.sourceDigest = hashSyncText(parent.operationText);
+  await receiveSelectedCatalogRoot(f);
+  expect(io.events).toEqual([
+    'admit:scenario',
+    'prepare:scenario',
+    'commit:scenario',
+    'admit:parent',
+    'prepare:parent',
+    'commit:parent',
+  ]);
+  expect(io.admit.mock.calls[1]![0]).toMatchObject({
+    rootId: 'parent',
+    dependencyRoots: [
+      {
+        rootKind: 'scenario-project',
+        rootId: 'scenario',
+        basis: ['scenario-renamed'],
+        childIds: [],
+      },
+    ],
+  });
+  io.admit.mockClear();
+  f.catalog.roots.get(syncCatalogRootKey('scenario-project', 'scenario'))!.heads.push('missing');
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('dependency is unavailable');
+  expect(io.admit).not.toHaveBeenCalled();
 });

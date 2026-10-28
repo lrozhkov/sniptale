@@ -1,3 +1,5 @@
+import type { createAutomaticCatalogSync } from '../../workflows/sync-transfer/automatic';
+import { resolveCatalogConflict } from '../../workflows/sync-transfer/conflict-resolution';
 import { readSyncProductThumbnail } from './product-thumbnail';
 import {
   loadSyncConnection,
@@ -96,7 +98,7 @@ async function loadProductCatalog(
 
 function checkedSelectedCatalogOperation(
   catalog: Awaited<ReturnType<typeof scanSyncCatalog>>,
-  work: Exclude<SyncProductWork, { kind: 'catalog-refresh' }>
+  work: Exclude<SyncProductWork, { kind: 'catalog-refresh' | 'automatic-sync' }>
 ) {
   const selected = work.selection;
   const root = catalog.roots.get(syncCatalogRootKey(selected.rootKind, selected.rootId));
@@ -120,11 +122,21 @@ function checkedSelectedCatalogOperation(
 /** One finite catalog/replica/thumbnail operation uses the existing connection request lifetime. */
 export function createSyncProductExecution(
   input: SyncProductExecutionInput,
-  hasOriginPermission: (origin: string) => Promise<boolean>
+  hasOriginPermission: (origin: string) => Promise<boolean>,
+  onLibraryChanged: () => void = () => undefined,
+  onQueueAvailable: (operationId: string) => void = () => undefined,
+  automatic?: ReturnType<typeof createAutomaticCatalogSync>
 ) {
   const selection = structuredClone({ scope: input.scope, authorization: input.authorization });
   const work = structuredClone(input.work);
   const { signal } = input;
+  function notifyLibraryChanged(): void {
+    try {
+      onLibraryChanged();
+    } catch {
+      // Advisory UI refresh cannot change a completed native publication.
+    }
+  }
   const requests = createSyncConnectionRequests({
     identity: selection.authorization,
     hasOriginPermission,
@@ -141,6 +153,50 @@ export function createSyncProductExecution(
       throw new Error('Sync product authorization refused');
     signal.throwIfAborted();
     return connection;
+  }
+  async function executeWork(
+    remote: Awaited<ReturnType<typeof createWebdavRemoteStore>>,
+    catalog: Awaited<ReturnType<typeof scanSyncCatalog>>
+  ): Promise<SyncProductCompletion> {
+    if (work.kind === 'automatic-sync') {
+      if (!automatic) throw new Error('Automatic sync execution unavailable.');
+      const result = await automatic.run({ ...selection, remote, catalog, signal });
+      if (result.applied > 0) notifyLibraryChanged();
+      return { kind: 'automatic', ...result };
+    }
+    if (work.kind === 'catalog-refresh') return { kind: 'catalog', count: catalog.roots.size };
+    const selected = work.selection;
+    const operation = checkedSelectedCatalogOperation(catalog, work);
+    if (work.kind === 'conflict-resolve') {
+      const accepted = await resolveCatalogConflict({
+        catalog,
+        ...selection,
+        selection: selected,
+        expectedHeads: work.expectedHeads,
+        operationId: work.resolutionId,
+      });
+      try {
+        onQueueAvailable(accepted.operationId);
+      } catch {
+        /* The durable queue survives a missed wakeup. */
+      }
+      return { kind: 'resolution', operationId: accepted.operationId };
+    }
+    if (work.kind === 'replica-prepare') {
+      const committed = await receiveSelectedCatalogRoot({
+        remote,
+        catalog,
+        ...selection,
+        selection: selected,
+        signal,
+      });
+      // A committed native root wins an abort racing the final commit; the caller must not promise rollback.
+      notifyLibraryChanged();
+      return { kind: 'replica', selection: { ...selected, ...committed } };
+    }
+    const thumbnail = await readSyncProductThumbnail(remote, operation, signal);
+    await current();
+    return thumbnail;
   }
   return {
     drain() {
@@ -165,29 +221,9 @@ export function createSyncProductExecution(
           await verifySyncWorkspaceIdentity(remote, connection.workspace, signal);
         await current();
         const catalog = await loadProductCatalog(remote, selection, work, signal);
+        if (work.kind !== 'thumbnail-read') notifyLibraryChanged();
         await current();
-        let completion: SyncProductCompletion;
-        if (work.kind === 'catalog-refresh')
-          completion = { kind: 'catalog', count: catalog.roots.size };
-        else {
-          const selected = work.selection;
-          const operation = checkedSelectedCatalogOperation(catalog, work);
-          if (work.kind === 'replica-prepare') {
-            const committed = await receiveSelectedCatalogRoot({
-              remote,
-              catalog,
-              ...selection,
-              selection: selected,
-              signal,
-            });
-            // A committed native root wins an abort racing the final commit; the caller must not promise rollback.
-            completion = { kind: 'replica', selection: { ...selected, ...committed } };
-          } else {
-            const thumbnail = await readSyncProductThumbnail(remote, operation, signal);
-            await current();
-            completion = thumbnail;
-          }
-        }
+        const completion = await executeWork(remote, catalog);
         outcome = { state: 'ready', failureCode: null, completion };
       } catch (error) {
         const failureCode = failure(error, signal);

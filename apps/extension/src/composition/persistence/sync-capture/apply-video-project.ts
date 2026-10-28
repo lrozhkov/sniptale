@@ -1,7 +1,13 @@
 import {
+  parsePreparedScenarioProjectDependencies,
+  verifyScenarioProjectDependenciesInTransaction,
+  type PreparedScenarioProjectDependency,
+} from './scenario-dependencies';
+import {
   parseSyncConnectionIdentity,
   type SyncConnectionIdentity,
 } from '../remote-connection/model';
+import { SCENARIO_CAPTURE_STORES } from './scenario-snapshot';
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { initDB } from '../infrastructure/indexed-db/core';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
@@ -59,6 +65,7 @@ import {
   type SyncCaptureAppliedOperation,
   type SyncCaptureRootState,
 } from './contracts';
+import { collectCapturedProjectRecordingIds } from './project-snapshot';
 import { isSupportedCaptureProject, parseSyncCaptureRecord } from './guards';
 
 type ApplyTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
@@ -178,6 +185,7 @@ export interface ApplyPreparedVideoProjectRevisionInput {
   expectedLocalGeneration: number;
   expectedWorkspaceRevision: number | null;
   dependencies: readonly PreparedVideoProjectDependency[];
+  rootDependencies?: readonly PreparedScenarioProjectDependency[];
 }
 
 type HydratedProjectInput = Omit<ApplyPreparedVideoProjectRevisionInput, 'root'> & {
@@ -237,6 +245,8 @@ class PreparedProjectClosure {
   }
 
   assertComplete(): void {
+    for (const id of collectCapturedProjectRecordingIds(this.project))
+      this.neededMedia.add(`recording:${id}`);
     for (const asset of this.project.assets) this.admitSource(asset);
     for (const id of this.neededAssets) {
       const asset = this.assets.get(id);
@@ -257,6 +267,11 @@ class PreparedProjectClosure {
   }
 
   private sourceResource(source: VideoProjectEntry['project']['assets'][number]['source']) {
+    if (source.kind === 'recording') {
+      const id = `recording:${source.recordingId}`;
+      this.neededMedia.add(id);
+      return this.media.get(id);
+    }
     if (source.kind === 'library-asset') {
       this.neededMedia.add(source.mediaId);
       return this.media.get(source.mediaId);
@@ -266,6 +281,10 @@ class PreparedProjectClosure {
       if (source.originMediaId) this.neededMedia.add(source.originMediaId);
       return this.assets.get(source.projectAssetId)?.entry;
     }
+    if (source.kind === 'scenario-asset')
+      return this.input.rootDependencies
+        ?.flatMap((item) => item.children)
+        .find((child) => child.entry.id === source.scenarioAssetId)?.entry;
     return undefined;
   }
 
@@ -280,6 +299,24 @@ class PreparedProjectClosure {
   }
 
   private assertDeclarations(): void {
+    const scenarioChildren = new Set(
+      this.project.assets.flatMap((asset) =>
+        asset.source.kind === 'scenario-asset' ? [asset.source.scenarioAssetId] : []
+      )
+    );
+    const roots = this.input.rootDependencies ?? [];
+    const declaredChildren = roots.flatMap((item) => item.children);
+    const provenance =
+      this.project.source.kind === 'scenario' ? this.project.source.scenarioProjectId : undefined;
+    if (
+      new Set(roots.map((item) => item.rootId)).size !== roots.length ||
+      declaredChildren.length !== scenarioChildren.size ||
+      new Set(declaredChildren.map((child) => child.entry.id)).size !== declaredChildren.length ||
+      declaredChildren.some((child) => !scenarioChildren.has(child.entry.id)) ||
+      roots.some((item) => !item.children.length && item.rootId !== provenance) ||
+      (provenance && !roots.some((item) => item.rootId === provenance))
+    )
+      throw new VideoProjectApplyConflictError('unsupported-project');
     const count = this.input.dependencies.length;
     if (
       this.neededAssets.size !== this.assets.size ||
@@ -343,6 +380,7 @@ async function assertNativeDependency(
     await assertPreparedLibrarySource(
       dependency,
       {
+        recordings: tx.objectStore(STORE_NAME),
         media: tx.objectStore(MEDIA_LIBRARY_STORE),
         assets: tx.objectStore(PROJECT_ASSETS_STORE),
         exports: tx.objectStore(PROJECT_EXPORTS_STORE),
@@ -501,6 +539,14 @@ async function admitApplication(tx: ApplyTransaction, candidate: HydratedProject
     current !== null
   );
   await assertDependencies(tx, profile.spaceId, candidate.dependencies);
+  if (
+    !(await verifyScenarioProjectDependenciesInTransaction(
+      tx,
+      profile.spaceId,
+      candidate.rootDependencies ?? []
+    ))
+  )
+    throw new VideoProjectApplyConflictError('dependency-changed');
   const stores = publicationStores(tx);
   await assertPreparedProjectAssetSources(root.assets, stores);
   await assertPrivateBindings(tx, root, current);
@@ -599,6 +645,8 @@ export async function applyPreparedVideoProjectRevision(
   )
     throw new VideoProjectApplyConflictError('invalid-input');
   const staged = structuredClone(input);
+  if (staged.rootDependencies !== undefined)
+    staged.rootDependencies = parsePreparedScenarioProjectDependencies(staged.rootDependencies);
   try {
     staged.root = parsePreparedVideoProjectReplicaRoot(staged.root);
   } catch {
@@ -612,6 +660,7 @@ export async function applyPreparedVideoProjectRevision(
   const result = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        ...SCENARIO_CAPTURE_STORES,
         VIDEO_PROJECT_REVISIONS_STORE,
         STORE_NAME,
         VIDEO_PROJECTS_STORE,

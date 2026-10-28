@@ -642,6 +642,30 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
         sha256: await hash(await readAssetFile(ref, entry.filename)),
       };
     },
+    async renameProject(projectId: string, name: string) {
+      const db = await initDB();
+      const entry = parseVideoProjectEntry(await db.get('video_projects', projectId));
+      check(entry, 'Native project is missing.');
+      await saveVideoProject(
+        { ...entry.project, name },
+        {
+          expectedProject: entry.project,
+          expectedWorkspaceRevision: entry.workspaceRevision ?? null,
+        }
+      );
+      const capture = await latest(projectId);
+      return { operationId: capture.operationId, generation: capture.generation };
+    },
+    async projectState(projectId: string) {
+      const db = await initDB();
+      const entry = parseVideoProjectEntry(await db.get('video_projects', projectId));
+      check(entry, 'Native project is missing.');
+      return {
+        name: entry.project.name,
+        workspaceRevision: entry.workspaceRevision ?? 0,
+        objects: await nativeProjectObjects(entry),
+      };
+    },
     afterSaveBackup,
     outgoing: createWebdavOutgoingHarness(connected, latest),
   };

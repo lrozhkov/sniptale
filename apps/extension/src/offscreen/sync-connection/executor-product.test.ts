@@ -34,12 +34,17 @@ describe('named product execution containment', () => {
         command,
       });
     }
-    const start = () =>
+    const start = (
+      work: import('../../contracts/messaging/contracts/runtime-message/sync-connection.types').SyncProductWork = {
+        kind: 'catalog-refresh',
+        bypassCache: false,
+      }
+    ) =>
       command({
         kind: 'start',
         operationRequestId,
         binding,
-        work: { kind: 'catalog-refresh', bypassCache: false },
+        work,
       });
     return {
       ...f,
@@ -73,6 +78,43 @@ describe('named product execution containment', () => {
     expect(onSettled).toHaveBeenCalledExactlyOnceWith(f.operationRequestId, 'product');
     expect(observed).toMatchObject({ phase: 'idle', products: [{ state: 'ready' }] });
     expect(f.inspect().phase).toBe('idle');
+  });
+
+  it.each([true, false])(
+    'wakes a bounded automatic continuation only when work remains: %s',
+    async (remaining) => {
+      const onSettled = vi.fn();
+      const f = productFixture(onSettled);
+      await f.startProduct({ kind: 'automatic-sync' });
+      f.result.resolve({
+        ...ready,
+        completion: { kind: 'automatic', applied: 1, deferred: 0, remaining },
+      });
+      await settleWorkflow();
+      expect(onSettled.mock.calls).toEqual(
+        remaining
+          ? [
+              [f.operationRequestId, 'product'],
+              [f.operationRequestId, 'queue'],
+            ]
+          : [[f.operationRequestId, 'product']]
+      );
+      expect(f.inspect()).toMatchObject({ phase: 'idle', products: [{ state: 'ready' }] });
+    }
+  );
+
+  it('does not restart an automatic continuation after Stop races its completed pass', async () => {
+    const onSettled = vi.fn();
+    const f = productFixture(onSettled);
+    await f.startProduct({ kind: 'automatic-sync' });
+    const stopped = f.stop();
+    f.drainage.resolve();
+    f.result.resolve({
+      ...ready,
+      completion: { kind: 'automatic', applied: 1, deferred: 0, remaining: true },
+    });
+    await stopped;
+    expect(onSettled.mock.calls.filter((call) => call[1] === 'queue')).toEqual([]);
   });
 
   it('publishes cancellation only after the independently held containment drain', async () => {
@@ -190,68 +232,74 @@ describe('named product execution containment', () => {
   });
 });
 
-it('user preparation aborts and drains only previews before admission while outgoing remains active', async () => {
-  const thumbnail = deferred<import('./product-execution').SyncProductExecutionResult>();
-  const thumbnailDrain = deferred<void>();
-  const preparation = deferred<import('./product-execution').SyncProductExecutionResult>();
-  const thumbnailSignals: AbortSignal[] = [];
-  const create = vi.fn<NonNullable<SyncExecutorPorts['createProductExecution']>>((input) => {
-    if (input.work.kind === 'thumbnail-read') {
-      thumbnailSignals.push(input.signal);
-      return { run: () => thumbnail.promise, drain: () => thumbnailDrain.promise };
-    }
-    return { run: () => preparation.promise, drain: async () => undefined };
-  });
-  const f = fixture(create);
-  f.start('outgoing');
-  await settleWorkflow();
-  const selection = {
-    rootKind: 'video-project' as const,
-    rootId: 'project',
-    operationId: 'version',
-    sourceDigest: 'a'.repeat(64),
-  };
-  const preview = {
-    ...base,
-    type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
-    executorRevision: f.inspect().executorRevision,
-    command: {
-      kind: 'start' as const,
-      operationRequestId: '88888888-8888-4888-8888-888888888888',
-      binding,
-      work: { kind: 'thumbnail-read' as const, selection },
-    },
-  } satisfies SyncProductExecutorRequest;
-  await f.executor.productCommand(preview);
-  const selected = f.executor.productCommand({
-    ...preview,
-    command: {
-      ...preview.command,
-      operationRequestId: '99999999-9999-4999-8999-999999999999',
-      work: { kind: 'replica-prepare', selection },
-    },
-  });
-  expect(thumbnailSignals[0]?.aborted).toBe(true);
-  expect(f.pending[0]!.input.signal.aborted).toBe(false);
-  expect(create).toHaveBeenCalledTimes(1);
-  thumbnailDrain.resolve();
-  thumbnail.resolve({
-    state: 'interrupted',
-    failureCode: 'interrupted',
-    completion: null,
-    containment: 'contained',
-  });
-  await expect(selected).resolves.toMatchObject({ success: true, result: { kind: 'accepted' } });
-  expect(create).toHaveBeenCalledTimes(2);
-  preparation.resolve({
-    state: 'ready',
-    failureCode: null,
-    completion: { kind: 'replica', selection },
-    containment: 'contained',
-  });
-  f.pending[0]!.result.resolve(published);
-  await settleWorkflow();
-});
+it.each(['thumbnail-read', 'automatic-sync'] as const)(
+  'user preparation aborts and drains %s before admission while outgoing remains active',
+  async (backgroundKind) => {
+    const thumbnail = deferred<import('./product-execution').SyncProductExecutionResult>();
+    const thumbnailDrain = deferred<void>();
+    const preparation = deferred<import('./product-execution').SyncProductExecutionResult>();
+    const thumbnailSignals: AbortSignal[] = [];
+    const create = vi.fn<NonNullable<SyncExecutorPorts['createProductExecution']>>((input) => {
+      if (input.work.kind === backgroundKind) {
+        thumbnailSignals.push(input.signal);
+        return { run: () => thumbnail.promise, drain: () => thumbnailDrain.promise };
+      }
+      return { run: () => preparation.promise, drain: async () => undefined };
+    });
+    const f = fixture(create);
+    f.start('outgoing');
+    await settleWorkflow();
+    const selection = {
+      rootKind: 'video-project' as const,
+      rootId: 'project',
+      operationId: 'version',
+      sourceDigest: 'a'.repeat(64),
+    };
+    const preview = {
+      ...base,
+      type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+      executorRevision: f.inspect().executorRevision,
+      command: {
+        kind: 'start' as const,
+        operationRequestId: '88888888-8888-4888-8888-888888888888',
+        binding,
+        work:
+          backgroundKind === 'automatic-sync'
+            ? { kind: 'automatic-sync' }
+            : { kind: 'thumbnail-read', selection },
+      },
+    } satisfies SyncProductExecutorRequest;
+    await f.executor.productCommand(preview);
+    const selected = f.executor.productCommand({
+      ...preview,
+      command: {
+        ...preview.command,
+        operationRequestId: '99999999-9999-4999-8999-999999999999',
+        work: { kind: 'replica-prepare', selection },
+      },
+    });
+    expect(thumbnailSignals[0]?.aborted).toBe(true);
+    expect(f.pending[0]!.input.signal.aborted).toBe(false);
+    expect(create).toHaveBeenCalledTimes(1);
+    thumbnailDrain.resolve();
+    thumbnail.resolve({
+      state: 'interrupted',
+      failureCode: 'interrupted',
+      completion: null,
+      containment: 'contained',
+    });
+    await expect(selected).resolves.toMatchObject({ success: true, result: { kind: 'accepted' } });
+    expect(create).toHaveBeenCalledTimes(2);
+    preparation.resolve({
+      state: 'ready',
+      failureCode: null,
+      completion: { kind: 'replica', selection },
+      containment: 'contained',
+    });
+    f.pending[0]!.result.resolve(published);
+    await settleWorkflow();
+  }
+);
 
 it('bounds preview handoff strings to four MiB and releases a consumed completion', async () => {
   const dataUrl = `data:image/png;base64,${'A'.repeat(600000)}`;
@@ -346,4 +394,84 @@ it('keeps running phase when outgoing settles before an active product and Stop 
     containment: 'contained',
   });
   await expect(stopped).resolves.toMatchObject({ success: true, result: 'stopped' });
+});
+
+it('refuses automatic admission while a foreground preview is active without cancelling that preview', async () => {
+  const pending = deferred<import('./product-execution').SyncProductExecutionResult>();
+  const signals: AbortSignal[] = [];
+  const f = fixture((input) => {
+    signals.push(input.signal);
+    return { run: () => pending.promise, drain: async () => undefined };
+  });
+  const command = (
+    operationRequestId: string,
+    work: import('../../contracts/messaging/contracts/runtime-message/sync-connection.types').SyncProductWork
+  ) =>
+    f.executor.productCommand({
+      ...base,
+      type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+      executorRevision: f.inspect().executorRevision,
+      command: { kind: 'start', operationRequestId, binding, work },
+    });
+  await command('88888888-8888-4888-8888-888888888888', {
+    kind: 'thumbnail-read',
+    selection: {
+      rootKind: 'video-project',
+      rootId: 'project',
+      operationId: 'head',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  await expect(
+    command('99999999-9999-4999-8999-999999999999', { kind: 'automatic-sync' })
+  ).resolves.toMatchObject({ success: false });
+  expect(signals).toHaveLength(1);
+  expect(signals[0]?.aborted).toBe(false);
+  pending.resolve({
+    state: 'ready',
+    failureCode: null,
+    containment: 'contained',
+    completion: { kind: 'thumbnail', dataUrl: null, width: 0, height: 0 },
+  });
+  await settleWorkflow();
+});
+
+it('keeps Stop authoritative while foreground admission drains an automatic operation', async () => {
+  const pending = deferred<import('./product-execution').SyncProductExecutionResult>();
+  const drainage = deferred<void>();
+  const create = vi.fn<NonNullable<SyncExecutorPorts['createProductExecution']>>(() => ({
+    run: () => pending.promise,
+    drain: () => drainage.promise,
+  }));
+  const f = fixture(create);
+  const command = (
+    operationRequestId: string,
+    work: import('../../contracts/messaging/contracts/runtime-message/sync-connection.types').SyncProductWork
+  ) =>
+    f.executor.productCommand({
+      ...base,
+      type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+      executorRevision: f.inspect().executorRevision,
+      command: { kind: 'start', operationRequestId, binding, work },
+    });
+  await command('88888888-8888-4888-8888-888888888888', { kind: 'automatic-sync' });
+  const foreground = command('99999999-9999-4999-8999-999999999999', {
+    kind: 'catalog-refresh',
+    bypassCache: true,
+  });
+  await expect(
+    command('77777777-7777-4777-8777-777777777777', { kind: 'automatic-sync' })
+  ).resolves.toMatchObject({ success: false });
+  const stopped = f.stop();
+  drainage.resolve();
+  pending.resolve({
+    state: 'interrupted',
+    failureCode: 'interrupted',
+    containment: 'contained',
+    completion: null,
+  });
+  await expect(foreground).resolves.toMatchObject({ success: false });
+  await expect(stopped).resolves.toMatchObject({ success: true });
+  expect(create).toHaveBeenCalledOnce();
+  expect(f.inspect().phase).toBe('stopped');
 });

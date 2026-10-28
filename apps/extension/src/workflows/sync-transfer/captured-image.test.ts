@@ -190,10 +190,27 @@ it('encodes the retained image after a later native edit', async () => {
   expect(result.dependencies).toEqual([]);
   expect(io.read).toHaveBeenCalledTimes(1);
 });
-it.each([false, true])(
-  'decodes the complete image editing closure with trashed=%s',
-  async (trashed) => {
+it.each([
+  ['screenshot', false],
+  ['screenshot', true],
+  ['stored-asset', false],
+  ['stored-asset', true],
+] as const)(
+  'decodes the complete %s image editing closure with trashed=%s',
+  async (sourceKind, trashed) => {
     const rows = imageRows();
+    if (sourceKind === 'stored-asset') {
+      const { blob: _blob, ...media } = rows.media;
+      rows.originalRef = {
+        ...rows.refs[0]!,
+        assetId: 'stored-original',
+        location: { kind: 'opfs', objectKey: 'objects/stored-original' },
+      };
+      rows.media = {
+        ...media,
+        source: { kind: 'stored-asset', assetId: rows.originalRef.assetId },
+      };
+    }
     rows.media.lifecycle = {
       storageClass: 'library',
       savedAt: 1,
@@ -201,6 +218,15 @@ it.each([false, true])(
       ...(trashed ? { trashedAt: 2 } : {}),
     };
     const encoded = await encodeCapturedImageRoot(rows);
+    if (rows.originalRef)
+      expect(encoded.bindings).toEqual(
+        expect.arrayContaining([
+          {
+            objectId: parsePortableMediaMetadata(encoded.envelope.metadata).originalObjectId,
+            ref: rows.originalRef,
+          },
+        ])
+      );
     const refs = new Map(
       encoded.envelope.objects.map((object, index) => {
         const assetId = `received-${index}`;

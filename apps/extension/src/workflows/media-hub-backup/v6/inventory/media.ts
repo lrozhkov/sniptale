@@ -323,8 +323,7 @@ async function buildMediaSource(args: {
     entry.source.kind === 'project-asset'
       ? parseProjectAssetEntry(await args.db.get(PROJECT_ASSETS_STORE, entry.source.projectAssetId))
       : parseProjectExportEntry(await args.db.get(PROJECT_EXPORTS_STORE, entry.source.exportId));
-  if (!child || (entry.source.kind === 'project-export' && !entry.mimeType.startsWith('video/')))
-    throw new Error('Project video source is missing.');
+  if (!child) throw new Error('Project source is missing.');
   const file = await readRefFile(args.db, child.assetId, entry.filename);
   const storedReview = await readVideoReviewForBackup({
     db: args.db,

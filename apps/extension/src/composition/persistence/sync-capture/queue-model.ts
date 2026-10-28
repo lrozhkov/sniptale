@@ -32,6 +32,7 @@ export type SyncQueueFailureCode =
   | 'authentication'
   | 'access-denied'
   | 'storage-full'
+  | 'selection-changed'
   | 'invalid-workspace'
   | 'source'
   | 'internal'
@@ -41,6 +42,7 @@ export const SYNC_QUEUE_FAILURE_CODES: readonly SyncQueueFailureCode[] = [
   'authentication',
   'access-denied',
   'storage-full',
+  'selection-changed',
   'invalid-workspace',
   'source',
   'internal',
@@ -84,6 +86,13 @@ export interface SyncQueueCaptureProgress {
   revision: number;
   afterKey: IDBValidKey | null;
 }
+/** Native roots are visited once per enrollment. Accepted writes use the same capture owner. */
+export interface SyncQueueEnrollmentProgress {
+  authorization: SyncConnectionIdentity;
+  revision: number;
+  source: 'media' | 'video-project' | 'video-review' | 'scenario-project' | 'complete';
+  afterKey: IDBValidKey | null;
+}
 export interface SyncQueueConnection extends SyncQueueScope, QueueHistory {
   version: 1;
   kind: 'queue-connection';
@@ -92,6 +101,7 @@ export interface SyncQueueConnection extends SyncQueueScope, QueueHistory {
   paused: boolean;
   scheduleProgress: SyncQueueScheduleProgress | null;
   captureProgress?: SyncQueueCaptureProgress;
+  enrollmentProgress?: SyncQueueEnrollmentProgress;
 }
 export interface SyncQueueOperation extends SyncQueueScope, QueueHistory {
   version: 1;
@@ -297,9 +307,30 @@ function parseCaptureProgress(value: unknown): SyncQueueCaptureProgress | null {
     return null;
   return { authorization, revision: value['revision'], afterKey: value['afterKey'] };
 }
+function parseEnrollmentProgress(value: unknown): SyncQueueEnrollmentProgress | null {
+  if (!isRecord(value)) return null;
+  const authorization = parseSyncConnectionIdentity(value['authorization']);
+  const source = (
+    ['media', 'video-project', 'video-review', 'scenario-project', 'complete'] as const
+  ).find((candidate) => candidate === value['source']);
+  if (
+    !authorization ||
+    !source ||
+    !queueOrdinal(value['revision']) ||
+    value['revision'] < 1 ||
+    !(value['afterKey'] === null || queueNativeCursorKey(value['afterKey'])) ||
+    (source === 'complete' && value['afterKey'] !== null)
+  )
+    return null;
+  return { authorization, revision: value['revision'], source, afterKey: value['afterKey'] };
+}
 export function parseSyncQueueConnection(value: unknown): SyncQueueConnection | null {
   const scope = parseSyncQueueScope(value);
   if (!scope || !isRecord(value)) return null;
+  const enrollmentProgress = Object.hasOwn(value, 'enrollmentProgress')
+    ? parseEnrollmentProgress(value['enrollmentProgress'])
+    : undefined;
+  if (enrollmentProgress === null) return null;
   const captureProgress = Object.hasOwn(value, 'captureProgress')
     ? parseCaptureProgress(value['captureProgress'])
     : undefined;
@@ -334,6 +365,7 @@ export function parseSyncQueueConnection(value: unknown): SyncQueueConnection | 
     paused: value['paused'],
     scheduleProgress,
     ...(captureProgress === undefined ? {} : { captureProgress }),
+    ...(enrollmentProgress === undefined ? {} : { enrollmentProgress }),
   };
 }
 export function parseSyncQueueOperation(value: unknown): SyncQueueOperation | null {

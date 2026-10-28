@@ -1,3 +1,15 @@
+import { CaptureMode, VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
+import { parseVideoProjectEntry } from '../../composition/persistence/projects/read-guards';
+import { VideoProjectAssetType } from '../../features/video/project/types';
+import { createVideoProjectAsset } from '../../features/video/project/factories/creation';
+import { createVideoClipFromAsset } from '../../features/video/project/factories/clip';
+import { parseCapturedVideoProjectRows } from '../../composition/persistence/sync-capture/project-snapshot';
+import { createVideoProjectFromRecording } from '../../features/video/project/factories/creation';
+import { VideoProjectTrackRole } from '../../features/video/project/types';
+import {
+  buildProjectExportMediaEntry,
+  buildRecordingMediaEntry,
+} from '../../composition/persistence/media-library/entry-mapping';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   EFFECT_BUNDLE_CORPUS,
@@ -17,6 +29,7 @@ import { parsePortableSyncRoot, preparePortableReplica } from './prepared-root';
 import { workspace as reviewWorkspace } from '../../composition/persistence/review-workspaces/backup-restore.test-support';
 import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
+import { parseSyncOperationText } from './wire-record';
 
 const io = vi.hoisted(() => ({ read: vi.fn(), files: new Map<string, File>() }));
 vi.mock('../../composition/persistence/assets', async (original) => ({
@@ -69,6 +82,166 @@ function projectRows(): CapturedVideoProjectRows {
     mediaDependencies: [],
   };
 }
+
+it('preserves Scenario source kinds through frozen backup and prepared exact native child mappings', async () => {
+  const rows = projectRows();
+  const child = {
+    assetId: 'scenario-native-bytes',
+    id: 'scenario-child',
+    projectId: 'scenario-source',
+    galleryAssetId: null,
+    mimeType: 'image/png',
+    size: 3,
+    width: 10,
+    height: 10,
+    createdAt: 1,
+  };
+  const ref: AssetRef = {
+    assetId: child.assetId,
+    mimeType: child.mimeType,
+    size: child.size,
+    createdAt: 1,
+    sha256: 'a'.repeat(64),
+    location: { kind: 'opfs', objectKey: `objects/${child.assetId}` },
+  };
+  const asset = createVideoProjectAsset(
+    'Scenario image',
+    VideoProjectAssetType.IMAGE,
+    { kind: 'scenario-asset', scenarioAssetId: child.id },
+    {
+      audioPeaks: null,
+      duration: 0,
+      hasAudio: false,
+      width: child.width,
+      height: child.height,
+      mimeType: child.mimeType,
+      size: child.size,
+    }
+  );
+  rows.project.project.assets = [asset];
+  rows.project.project.clips = [
+    createVideoClipFromAsset(
+      rows.project.project.tracks[0]!.id,
+      asset,
+      rows.project.project.width,
+      rows.project.project.height
+    ),
+  ];
+  rows.project.project.source = { kind: 'scenario', scenarioProjectId: child.projectId };
+  rows.assets = [];
+  rows.exports = [];
+  rows.refs = [ref];
+  rows.scenarioAssets = [child];
+  rows.rootDependencies = [
+    {
+      rootKind: 'scenario-project',
+      rootId: child.projectId,
+      generation: 2,
+      basis: ['scenario-head'],
+      childIds: [child.id],
+    },
+  ];
+  expect(parseCapturedVideoProjectRows(rows)).not.toBeNull();
+  const portable = await encodeCapturedProjectRoot(rows);
+  expect(portable.rootDependencies).toEqual(rows.rootDependencies);
+  expect(portable.objects).toEqual([]);
+  const metadata = parsePortableVideoProjectMetadata(portable.envelope.metadata);
+  expect(metadata.projectAssets).toEqual([]);
+  expect(metadata.entry.project.source).toEqual(rows.project.project.source);
+  const wire = {
+    format: 'sniptale-sync-operation',
+    version: 1,
+    spaceId: 'space',
+    operationId: 'montage-head',
+    rootKind: 'video-project',
+    rootId: rows.project.id,
+    kind: 'edit',
+    parents: [],
+    dependencies: [],
+    rootDependencies: rows.rootDependencies.map(({ rootKind, rootId, basis, childIds }) => ({
+      rootKind,
+      rootId,
+      basis,
+      childIds,
+    })),
+    envelope: portable.envelope,
+    objects: [],
+  };
+  expect((await parseSyncOperationText(JSON.stringify(wire))).rootDependencies).toEqual(
+    wire.rootDependencies
+  );
+  const parsed = await parsePortableSyncRoot(portable.envelope);
+  expect(parsed.kind).toBe('video-project');
+  const rootDependency = {
+    rootKind: 'scenario-project' as const,
+    rootId: child.projectId,
+    expectedGeneration: 2,
+    expectedBasis: ['scenario-head'],
+    expectedWorkspaceRevision: 4,
+    nativeDigest: 'b'.repeat(64),
+    children: [{ entry: child, ref }],
+  };
+  const args = {
+    envelope: portable.envelope,
+    verifiedObjects: new Map<string, AssetRef>(),
+    senderDependencies: [],
+    senderRootDependencies: rows.rootDependencies,
+    admission: {
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 1,
+      operationId: 'montage-head',
+      sourceDigest: 'c'.repeat(64),
+      expectedBasis: [],
+      expectedLocalGeneration: 0,
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+      rootDependencies: [rootDependency],
+    },
+  };
+  const prepared = await preparePortableReplica(args);
+  expect(prepared.kind).toBe('video-project');
+  if (prepared.kind !== 'video-project') throw new Error('Expected Montage preparation.');
+  expect(prepared.input.root.entry.project.source).toEqual(rows.project.project.source);
+  expect(prepared.input.root.entry.project.assets[0]!.source).toEqual(asset.source);
+  expect(prepared.input.rootDependencies).toEqual([rootDependency]);
+  await expect(
+    preparePortableReplica({
+      ...args,
+      senderRootDependencies: [{ ...rows.rootDependencies[0]!, childIds: ['wrong-child'] }],
+    })
+  ).rejects.toThrow();
+  await expect(
+    preparePortableReplica({
+      ...args,
+      admission: {
+        ...args.admission,
+        rootDependencies: [
+          {
+            ...rootDependency,
+            children: [{ entry: { ...child, projectId: 'foreign-scenario' }, ref }],
+          },
+        ],
+      },
+    })
+  ).rejects.toThrow();
+  await expect(
+    preparePortableReplica({
+      ...args,
+      admission: {
+        ...args.admission,
+        rootDependencies: [
+          {
+            ...rootDependency,
+            children: [
+              { entry: { ...child, size: child.size + 1 }, ref: { ...ref, size: ref.size + 1 } },
+            ],
+          },
+        ],
+      },
+    })
+  ).rejects.toThrow('source metadata');
+});
 
 it('uses backup project inventory and binds exact native originals without copying their files', async () => {
   const rows = projectRows();
@@ -289,3 +462,207 @@ it.each([false, true])(
     expect(payload.input.dependencies).toEqual([]);
   }
 );
+
+it('prepares screen, camera, audio and authored anchors without copying recording originals', async () => {
+  const recordings = [
+    {
+      id: 'screen',
+      assetId: 'screen-original',
+      filename: 'Screen.webm',
+      createdAt: 1,
+      mimeType: 'video/webm',
+      size: 1024,
+    },
+    {
+      id: 'camera',
+      assetId: 'camera-original',
+      filename: 'Camera.webm',
+      createdAt: 1,
+      mimeType: 'video/webm',
+      size: 128,
+    },
+  ];
+  const screen = recordings[0]!;
+  const camera = recordings[1]!;
+  const project = createVideoProjectFromRecording({
+    recordingId: screen.id,
+    filename: screen.filename,
+    width: 640,
+    height: 360,
+    duration: 2,
+    mimeType: screen.mimeType,
+    size: screen.size,
+    hasAudio: true,
+    recordingSignals: [],
+    sourceNormalizedActionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK',
+        time: 1,
+        duration: 0.45,
+        point: { x: 0.2, y: 0.3 },
+        label: 'Click',
+        preset: 'CLICK_RIPPLE',
+        data: {},
+      },
+    ],
+    sidecarVideos: [
+      {
+        recordingId: camera.id,
+        filename: camera.filename,
+        width: 320,
+        height: 180,
+        duration: 2,
+        mimeType: camera.mimeType,
+        size: camera.size,
+        trackRole: VideoProjectTrackRole.CAMERA,
+      },
+    ],
+  });
+  const actionSource = project.actionFeedback?.[0];
+  if (!actionSource) throw new Error('Expected authored recording feedback.');
+  project.cursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    smoothing: 0.5,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'focus',
+        binding: {
+          kind: 'recording-source',
+          recordingId: screen.id,
+          sourceInstanceId: actionSource.sourceInstanceId,
+        },
+        start: 0,
+        end: 2,
+        keys: [
+          { id: 'focus-key', time: 1, x: 0.2, y: 0.3, anchor: 'manual', interpolation: 'smooth' },
+        ],
+      },
+    ],
+  };
+  const base = projectRows().project;
+  const media = recordings.map((recording) => buildRecordingMediaEntry(recording));
+  const refs: AssetRef[] = recordings.map((recording) => ({
+    assetId: recording.assetId,
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: `objects/${recording.assetId}` },
+    mimeType: recording.mimeType,
+    size: recording.size,
+    sha256: null,
+  }));
+  const dependencies = media.map((entry, index) => ({
+    mediaId: entry.id,
+    generation: index + 1,
+    basis: [`original-head-${index}`],
+  }));
+  const rows: CapturedVideoProjectRows = {
+    project: { ...base, id: project.id, project },
+    recordings,
+    telemetry: [],
+    assets: [],
+    exports: [],
+    media,
+    refs,
+    mediaDependencies: dependencies,
+  };
+  expect(parseVideoProjectEntry(rows.project)).not.toBeNull();
+  const encoded = await encodeCapturedProjectRoot(rows);
+  expect(encoded.objects).toEqual([]);
+  expect(encoded.bindings).toEqual([]);
+  expect(encoded.dependencies).toEqual(dependencies);
+  const prepared = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: new Map(),
+    senderDependencies: dependencies,
+    admission: {
+      operationId: 'recording-project-operation',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: media.map((entry, index) => ({
+        entry,
+        ref: refs[index]!,
+        expectedGeneration: dependencies[index]!.generation,
+        expectedBasis: dependencies[index]!.basis,
+      })),
+    },
+  });
+  expect(prepared.kind).toBe('video-project');
+  if (prepared.kind !== 'video-project') throw new Error('Expected native project preparation.');
+  const restored = prepared.input.root.entry.project;
+  expect(restored.source).toEqual(project.source);
+  expect(restored.baseRecordingId).toBe(screen.id);
+  expect(restored.assets.map((asset) => asset.source)).toEqual(
+    project.assets.map((asset) => asset.source)
+  );
+  expect(restored.assets.map((asset) => asset.recordingPart)).toEqual(
+    project.assets.map((asset) => asset.recordingPart)
+  );
+  expect(restored.actionFeedback).toEqual(project.actionFeedback);
+  expect(restored.actionEvents).toEqual(project.actionEvents);
+  expect(restored.cursorFocusPath).toEqual(project.cursorFocusPath);
+  expect(restored.clips.some((clip) => clip.type === 'AUDIO')).toBe(true);
+  expect(restored.tracks.some((track) => track.role === VideoProjectTrackRole.CAMERA)).toBe(true);
+  const changed = structuredClone(media);
+  changed[1]!.size++;
+  await expect(
+    preparePortableReplica({
+      envelope: encoded.envelope,
+      verifiedObjects: new Map(),
+      senderDependencies: dependencies,
+      admission: {
+        operationId: 'invalid-recording-project',
+        sourceDigest: 'b'.repeat(64),
+        connectionGeneration: 1,
+        spaceId: 'space',
+        profileCreatedAt: 1,
+        expectedLocalGeneration: 0,
+        expectedBasis: [],
+        expectedWorkspaceRevision: null,
+        dependencies: changed.map((entry, index) => ({
+          entry,
+          ref: refs[index]!,
+          expectedGeneration: dependencies[index]!.generation,
+          expectedBasis: dependencies[index]!.basis,
+        })),
+      },
+    })
+  ).rejects.toThrow('dependency');
+});
+
+it('encodes a frozen Montage export with matching acquisition metadata and exact original bindings', async () => {
+  const rows = projectRows();
+  const exported = {
+    ...rows.exports[0]!,
+    recordingMetadata: {
+      captureMode: CaptureMode.TAB,
+      displaySurface: VideoDisplaySurface.BROWSER,
+      actionCount: 4,
+      hasPointer: true,
+    },
+  };
+  rows.exports = [exported];
+  rows.media = [buildProjectExportMediaEntry(exported)];
+  const frozen = parseCapturedVideoProjectRows(JSON.parse(JSON.stringify(rows)));
+  if (!frozen) throw new Error('Expected captured recording-derived export');
+  const encoded = await encodeCapturedProjectRoot(frozen);
+  const portable = parsePortableVideoProjectMetadata(encoded.envelope.metadata);
+  expect(portable.projectExports[0]?.entry.recordingMetadata).toEqual(exported.recordingMetadata);
+  expect(encoded.bindings).toEqual([
+    { objectId: portable.projectAssets[0]!.objectId, ref: rows.refs[0] },
+    { objectId: portable.projectExports[0]!.objectId, ref: rows.refs[1] },
+  ]);
+  expect(encoded.objects).toHaveLength(2);
+  expect(io.files.get(exported.assetId)?.size).toBe(exported.size);
+  expect(encoded.dependencies).toEqual([]);
+  const changed = structuredClone(frozen);
+  changed.media[0]!.recordingMetadata = { ...exported.recordingMetadata, actionCount: 5 };
+  await expect(encodeCapturedProjectRoot(changed)).rejects.toThrow('Invalid frozen project');
+});

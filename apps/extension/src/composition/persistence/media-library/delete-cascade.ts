@@ -338,7 +338,9 @@ async function commitCascadeTransaction(
       ? parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId))
       : null;
     const imageNativeRevision =
-      currentMedia?.source.kind === 'screenshot'
+      currentMedia?.source.kind === 'screenshot' ||
+      (currentMedia?.source.kind === 'stored-asset' &&
+        (currentMedia.kind === 'image' || currentMedia.kind === 'screenshot'))
         ? (currentMedia.workspaceRevision ?? 0)
         : undefined;
     const now = Date.now();

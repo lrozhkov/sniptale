@@ -8,6 +8,8 @@ import {
 } from '../../composition/persistence/remote-connection/model';
 import { loadSyncQueueOperation } from '../../composition/persistence/sync-capture/queue';
 import { createSyncConnectionRequests } from '../../workflows/sync-transfer/connection-requests';
+import { refreshPersistedSyncCatalog } from '../../workflows/sync-transfer/catalog-refresh';
+import { releasePublishedOutgoing } from '../../workflows/sync-transfer/outgoing';
 import { runSyncQueueOperation } from '../../workflows/sync-transfer/queue';
 import { createDiagnosticPortWriter } from '../../platform/runtime-messaging/diagnostic-capture';
 import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
@@ -102,6 +104,13 @@ export function createSyncQueueExecution(
           expectedRevision,
           remote,
           signal,
+          loadCatalog: (admitted) =>
+            refreshPersistedSyncCatalog(
+              admitted,
+              selection.scope.spaceId,
+              selection.scope.connectionGeneration,
+              signal
+            ),
           authorize: async () => {
             const selected = await current();
             if (selected.workspace) {
@@ -116,6 +125,20 @@ export function createSyncQueueExecution(
           },
         });
         snapshot = terminalSnapshot(result, operation.stage);
+        if (snapshot.state === 'published') {
+          try {
+            await current();
+            await releasePublishedOutgoing(
+              selection.scope.spaceId,
+              operationId,
+              selection.authorization,
+              remote,
+              signal
+            );
+          } catch {
+            // Verified publication survives advisory retirement refusal or a protected reader.
+          }
+        }
       } catch (error) {
         snapshot = refusedSnapshot(error, signal.aborted);
       }

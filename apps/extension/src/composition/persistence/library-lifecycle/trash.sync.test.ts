@@ -117,7 +117,7 @@ it('captures Trash and restore once without releasing children', async () => {
   for (const capture of data.captures()) {
     const change = capture.change;
     if (change.kind === 'tombstone') throw new Error('Soft Trash must retain its after-image');
-    if (change.kind === 'video-review')
+    if (change.kind === 'video-review' || change.kind === 'scenario-project')
       throw new Error('Expected a source or manual project after-image.');
     const root = change.kind === 'video-project' ? change.rows.project : change.rows.media;
     expect(root.lifecycle).toMatchObject({ trashedAt: 10 });
@@ -132,7 +132,7 @@ it('captures Trash and restore once without releasing children', async () => {
     ]);
     const change = capture.change;
     if (change.kind === 'tombstone') throw new Error('Restore must retain its after-image');
-    if (change.kind === 'video-review')
+    if (change.kind === 'video-review' || change.kind === 'scenario-project')
       throw new Error('Expected a source or manual project after-image.');
     const root = change.kind === 'video-project' ? change.rows.project : change.rows.media;
     expect(root.lifecycle).toEqual({ ...data.image.lifecycle, updatedAt: 30 });

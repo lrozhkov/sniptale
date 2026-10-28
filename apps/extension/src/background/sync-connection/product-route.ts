@@ -17,9 +17,11 @@ import type { createSyncConnectionCoordinator } from './coordinator';
 
 type Coordinator = ReturnType<typeof createSyncConnectionCoordinator>;
 let productCoordinator: Coordinator | null = null;
+let enrollmentWakeup: (() => void) | undefined;
 /** Runtime wiring retains the existing sync lifecycle owner, never a second executor. */
-export function configureSyncProductRoute(coordinator: Coordinator): void {
+export function configureSyncProductRoute(coordinator: Coordinator, onEnrolled?: () => void): void {
   productCoordinator = coordinator;
+  enrollmentWakeup = onEnrolled;
 }
 /** Exact product documents receive only their finite verb set. */
 export function isSyncProductSenderAllowed(
@@ -101,6 +103,13 @@ async function execute(
   if (command.kind === 'workspace-abandon') return sync.abandonWorkspace(command.source);
   if (command.kind === 'workspace-enroll') {
     await sync.enrollWorkspace({ source: command.source, authentication: command.authentication });
+    if (sync === productCoordinator) {
+      try {
+        enrollmentWakeup?.();
+      } catch {
+        /* The committed connection survives a missed wakeup. */
+      }
+    }
     return { kind: 'enrolled' };
   }
   const response = await sync.productCommand(

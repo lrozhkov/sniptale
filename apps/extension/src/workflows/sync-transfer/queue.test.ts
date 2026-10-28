@@ -217,7 +217,9 @@ function execute(
   capture: CapturedChange,
   remote: SyncRemoteStore,
   expectedRevision = 1,
-  extra: Partial<Pick<Parameters<typeof runSyncQueueOperation>[0], 'catalog' | 'authorize'>> = {}
+  extra: Partial<
+    Pick<Parameters<typeof runSyncQueueOperation>[0], 'catalog' | 'authorize' | 'loadCatalog'>
+  > = {}
 ) {
   return runSyncQueueOperation({
     scope,
@@ -678,4 +680,27 @@ it('refuses actual marker mismatch before queue publication effects', async () =
     SYNC_WORKSPACE_MARKER_KEY,
   ]);
   expect(remote.writes()).toEqual([]);
+});
+
+it('refreshes a nonempty catalog before publication without moving the durable queue stage backwards', async () => {
+  const f = setup();
+  const remote = memoryRemote();
+  const before = f.capture('already-remote');
+  await enqueueSyncQueueOperation(before);
+  await expect(execute(before, remote.adapter)).resolves.toMatchObject({
+    operation: { status: 'published' },
+  });
+  const next = f.capture('next');
+  await enqueueSyncQueueOperation(next);
+  const result = await execute(next, remote.adapter, 1, {
+    loadCatalog: (admitted) =>
+      scanSyncCatalog(admitted, scope.spaceId, new AbortController().signal),
+  });
+  expect(result).toMatchObject({ operation: { status: 'published', failureCode: null } });
+  const row = await current('next');
+  const beforeAttempt = row.pendingTransitions.slice(
+    0,
+    row.pendingTransitions.findIndex((event) => event.attemptId !== null)
+  );
+  expect(beforeAttempt.some((event) => event.stage === 'verifying')).toBe(false);
 });

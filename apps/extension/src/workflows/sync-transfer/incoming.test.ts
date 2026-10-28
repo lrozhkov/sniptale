@@ -1,21 +1,24 @@
+import { parseScenarioAssetEntry } from '../../composition/persistence/scenario/read-guards';
+import { createGuideProject } from '../../features/scenario/project/factories';
+import { createScenarioProjectEntry } from '../../composition/persistence/scenario/projects/entry';
 import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  createMediaLibraryEntry,
-  createVideoProjectEntryWithMediaClip,
-  createProjectExportEntry,
-} from '../../composition/persistence/projects/index.test-support';
-import type { AssetRef } from '../../composition/persistence/assets';
-import { VideoProjectAssetType } from '../../features/video/project/types';
-import {
-  encodePortableVideoProjectAssetRefs,
-  parsePortableVideoProjectMetadata,
-} from '../media-hub-backup/v6/root-codecs/projects';
+
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
-import { projectSyncCatalog, type CatalogAttempt } from './catalog-graph';
+import { projectSyncCatalog } from './catalog-graph';
 import { createSyncAttempt, hashSyncText, parseSyncAttemptText } from './wire-record';
 import { prepareCatalogReplica, applyCatalogDeletion } from './incoming';
-import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
-import type { stageRootObjects } from '../media-hub-backup/v6/staging';
+
+import {
+  mediaId,
+  sha,
+  ref,
+  object,
+  mediaEnvelope,
+  projectEnvelope,
+  attempt,
+  fixture,
+  resetIncomingTestIO,
+} from './incoming.test-support';
 
 const io = vi.hoisted(() => ({
   active: false,
@@ -27,6 +30,7 @@ const io = vi.hoisted(() => ({
   deletion: vi.fn(),
   stage: vi.fn(),
   predecessor: vi.fn(),
+  scenarioPredecessor: vi.fn(),
   releaseReader: vi.fn(),
 }));
 vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
@@ -39,6 +43,9 @@ vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
       io.releaseReader();
     }
   },
+}));
+vi.mock('../../composition/persistence/sync-capture/apply-scenario', () => ({
+  loadScenarioReplicaPredecessorAssets: io.scenarioPredecessor,
 }));
 vi.mock('../../composition/persistence/sync-capture/apply-media', () => ({
   loadMediaReplicaPredecessorRef: io.predecessor,
@@ -63,218 +70,11 @@ vi.mock('../../composition/persistence/sync-capture/apply-deletion', () => ({
   applyCatalogDeletionNative: io.deletion,
 }));
 vi.mock('../media-hub-backup/v6/staging', () => ({ stageRootObjects: io.stage }));
-const mediaId = 'project-asset:source';
-const sha = hashSyncText('\0\0\0');
-const ref = (assetId: string): AssetRef => ({
-  assetId,
-  createdAt: 1,
-  location: { kind: 'opfs', objectKey: `objects/${assetId}` },
-  mimeType: 'image/png',
-  size: 3,
-  sha256: sha,
-});
-const object = (objectId: string, filename: string) => ({
-  objectId,
-  path: `_sniptale/assets/${objectId}/${filename}`,
-  filename,
-  mimeType: 'image/png',
-  size: 3,
-});
-function mediaEnvelope() {
-  const entry = createMediaLibraryEntry({
-    id: mediaId,
-    filename: 'original.png',
-    source: { kind: 'project-asset', projectAssetId: 'source' },
-    mimeType: 'image/png',
-    size: 3,
-    workspaceRevision: 0,
-    lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
-  });
-  return {
-    entry,
-    envelope: parseRootEnvelope({
-      descriptor: {
-        rootKind: 'media',
-        rootId: mediaId,
-        mediaSubtype: 'library-item',
-        metadataPath: 'Metadata/root.json',
-        objectCount: 1,
-        totalBytes: 3,
-      },
-      metadata: {
-        entry,
-        originalObjectId: 'original',
-        projectAsset: { id: 'source', mimeType: 'image/png', size: 3, createdAt: 1 },
-      },
-      objects: [object('original', 'original.png')],
-    }),
-  };
-}
-function projectEnvelope() {
-  const entry = createVideoProjectEntryWithMediaClip({ id: 'project' });
-  const asset = entry.project.assets[0]!;
-  asset.type = VideoProjectAssetType.IMAGE;
-  asset.source = { kind: 'project-asset', projectAssetId: 'private' };
-  asset.metadata = { ...asset.metadata, mimeType: 'image/png', size: 3, duration: null };
-  entry.project.assets.push({
-    ...structuredClone(asset),
-    id: 'borrowed',
-    source: { kind: 'library-asset', mediaId },
-  });
-  const { assetId: _assetId, ...exported } = createProjectExportEntry({
-    id: 'export',
-    projectId: entry.id,
-    mimeType: 'image/png',
-    size: 3,
-    filename: 'saved.png',
-  });
-  return parseRootEnvelope({
-    descriptor: {
-      rootKind: 'video-project',
-      rootId: entry.id,
-      metadataPath: 'Metadata/root.json',
-      objectCount: 2,
-      totalBytes: 6,
-    },
-    metadata: {
-      entry: { ...entry, project: encodePortableVideoProjectAssetRefs(entry.project) },
-      projectAssets: [
-        {
-          entry: { id: 'private', mimeType: 'image/png', size: 3, createdAt: 1 },
-          filename: 'private.png',
-          objectId: 'private',
-          publishToLibrary: false,
-        },
-      ],
-      projectExports: [{ entry: exported, objectId: 'export' }],
-    },
-    objects: [object('private', 'private.png'), object('export', 'saved.png')],
-  });
-}
-async function attempt(
-  envelope: ReturnType<typeof projectEnvelope>,
-  operationId: string,
-  number = 1,
-  parents: string[] = []
-): Promise<CatalogAttempt> {
-  const dependencies =
-    envelope.descriptor.rootKind === 'video-project' ? [{ mediaId, basis: ['media-op'] }] : [];
-  const operationText = JSON.stringify({
-    format: 'sniptale-sync-operation',
-    version: 1,
-    spaceId: 'space',
-    operationId,
-    rootKind: envelope.descriptor.rootKind,
-    rootId: envelope.descriptor.rootId,
-    kind: 'edit',
-    parents,
-    dependencies,
-    envelope,
-    objects: envelope.objects.map((item) => ({ objectId: item.objectId, sha256: sha })),
-  });
-  const physical = await createSyncAttempt(
-    operationText,
-    `00000000-0000-0000-0000-${String(number).padStart(12, '0')}`
-  );
-  const parsed = await parseSyncAttemptText(physical.recordText);
-  return { ...parsed, operationText };
-}
-async function fixture(project = false, duplicate = false) {
-  const media = mediaEnvelope();
-  const mediaAttempt = await attempt(media.envelope, 'media-op');
-  const selected = project ? await attempt(projectEnvelope(), 'project-op', 2) : mediaAttempt;
-  const attempts = [mediaAttempt, ...(project ? [selected] : [])];
-  if (duplicate)
-    attempts.push(
-      await attempt(
-        project ? projectEnvelope() : media.envelope,
-        project ? 'project-op' : 'media-op',
-        3
-      )
-    );
-  const reads: string[] = [];
-  const data = new Map(
-    attempts.flatMap((item) =>
-      item.objects.map((row) => [row.remoteKey, new Blob([new Uint8Array(3)])] as const)
-    )
-  );
-  const remote: SyncRemoteStore = {
-    stat: async () => {
-      throw new Error('This read workflow must not stat originals.');
-    },
-    list: async () => ({ objects: [], prefixes: [], nextCursor: null }),
-    write: async () => {
-      throw new Error('Incoming must not write remotely.');
-    },
-    read: async (key) => {
-      reads.push(key);
-      const body = data.get(key);
-      if (!body) throw new SyncRemoteError('missing');
-      return body.stream();
-    },
-  };
-  const catalog = {
-    ...projectSyncCatalog('space', attempts),
-    invalid: [],
-    metadataBytes: 0,
-    pages: 1,
-  };
-  return {
-    selected,
-    catalog,
-    remote,
-    reads,
-    data,
-    admission: {
-      connectionGeneration: 7,
-      spaceId: 'space',
-      profileCreatedAt: 1,
-      expectedBasis: [],
-      expectedLocalGeneration: 0,
-      expectedWorkspaceRevision: null,
-      dependencies: project
-        ? [
-            {
-              entry: media.entry,
-              ref: ref('borrowed'),
-              expectedGeneration: 1,
-              expectedBasis: ['media-op'],
-            },
-          ]
-        : [],
-    },
-  };
-}
 beforeEach(() => {
   vi.clearAllMocks();
-  io.staged = [];
-  io.active = false;
-  io.reading = false;
-  io.predecessor.mockImplementation(async () => {
-    expect(io.reading).toBe(true);
-    return null;
-  });
-  io.discard.mockResolvedValue(undefined);
-  io.read.mockImplementation(
-    async () => new File([new Uint8Array(3)], 'original.png', { type: 'image/png' })
-  );
-  io.journal.mockImplementation(async (payload) => {
-    expect(io.active).toBe(true);
-    return { journalId: 'ready', payload };
-  });
-  io.stage.mockImplementation(async (args: Parameters<typeof stageRootObjects>[0]) => {
-    expect(io.active).toBe(true);
-    const staged = [];
-    for (const item of args.objects) {
-      expect(args.expectedSha256?.get(item.objectId)).toBe(sha);
-      const source = await args.readObject(item);
-      await source.pipeTo(new WritableStream({ write() {} }));
-      staged.push({ objectId: item.objectId, ref: ref(`staged-${item.objectId}`) });
-      io.staged.push(item.objectId);
-    }
-    return staged;
-  });
+  resetIncomingTestIO(io);
 });
+
 it('stages a media original and uses the stable logical digest for the native journal', async () => {
   const f = await fixture();
   const journal = await prepareCatalogReplica({
@@ -413,100 +213,6 @@ it('prepares soft Trash as retained media metadata rather than a catalog tombsto
   expect(journal.payload.input.rows.ref.assetId).toBe('retained-original');
   expect(f.reads).toEqual([]);
 });
-it('prepares editing bytes and checks borrowed originals without downloading exports', async () => {
-  const f = await fixture(true);
-  const journal = await prepareCatalogReplica({
-    ...f,
-    rootKind: 'video-project',
-    rootId: 'project',
-    signal: new AbortController().signal,
-  });
-  expect(journal.payload.kind).toBe('video-project');
-  expect(io.staged).toEqual(['private']);
-  expect(io.read).toHaveBeenCalledOnce();
-  expect(f.reads).toEqual([
-    f.selected.objects.find((item) => item.objectId === 'private')!.remoteKey,
-  ]);
-});
-it('stages the project preview and thumbnail closure without downloading saved exports', async () => {
-  const f = await fixture(true);
-  const envelope = projectEnvelope();
-  const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
-  metadata.thumbnail = { objectId: 'thumbnail', createdAt: 1, updatedAt: 1, width: 1, height: 1 };
-  metadata.presentation = {
-    entry: {
-      aggregateId: 'project',
-      aggregateKind: 'video-project',
-      presentationRevision: 0,
-      updatedAt: 1,
-    },
-    thumbnailObjectId: 'presentation-thumbnail',
-    previewObjectId: 'preview',
-  };
-  envelope.metadata = JSON.parse(JSON.stringify(metadata));
-  envelope.objects.push(
-    object('thumbnail', 'thumbnail.png'),
-    object('presentation-thumbnail', 'presentation.png'),
-    object('preview', 'preview.png')
-  );
-  envelope.descriptor.objectCount = envelope.objects.length;
-  envelope.descriptor.totalBytes = 15;
-  const selected = await attempt(parseRootEnvelope(envelope), 'complete-project', 4);
-  const media = await attempt(mediaEnvelope().envelope, 'media-op');
-  for (const item of selected.objects) f.data.set(item.remoteKey, new Blob([new Uint8Array(3)]));
-  const catalog = { ...f.catalog, ...projectSyncCatalog('space', [media, selected]) };
-  const args = {
-    ...f,
-    catalog,
-    rootKind: 'video-project' as const,
-    rootId: 'project',
-    signal: new AbortController().signal,
-  };
-  const journal = await prepareCatalogReplica(args);
-  if (journal.payload.kind !== 'video-project') throw new Error('Expected project.');
-  expect(io.staged).toEqual(['private', 'thumbnail', 'presentation-thumbnail', 'preview']);
-  expect(f.reads).not.toContain(
-    selected.objects.find((item) => item.objectId === 'export')!.remoteKey
-  );
-  expect(journal.payload.input.root.thumbnail!.ref.assetId).toBe('staged-thumbnail');
-  expect(journal.payload.input.root.presentation!.previewRef!.assetId).toBe('staged-preview');
-  io.journal.mockRejectedValueOnce(new Error('Native refusal'));
-  await expect(prepareCatalogReplica(args)).rejects.toThrow('Native refusal');
-  expect(io.discard.mock.calls).toEqual([
-    ['staged-private'],
-    ['staged-thumbnail'],
-    ['staged-presentation-thumbnail'],
-    ['staged-preview'],
-  ]);
-});
-it('refuses missing borrowed bytes before staging or publication', async () => {
-  const f = await fixture(true);
-  io.read.mockRejectedValue(new Error('Missing local original'));
-  await expect(
-    prepareCatalogReplica({
-      ...f,
-      rootKind: 'video-project',
-      rootId: 'project',
-      signal: new AbortController().signal,
-    })
-  ).rejects.toThrow();
-  expect(io.stage).not.toHaveBeenCalled();
-  expect(io.journal).not.toHaveBeenCalled();
-  expect(f.reads).toEqual([]);
-});
-it('cleans new staged files when journal admission refuses and preserves the borrowed original', async () => {
-  const f = await fixture(true);
-  io.journal.mockRejectedValue(new Error('Native refusal'));
-  await expect(
-    prepareCatalogReplica({
-      ...f,
-      rootKind: 'video-project',
-      rootId: 'project',
-      signal: new AbortController().signal,
-    })
-  ).rejects.toThrow('Native refusal');
-  expect(io.discard.mock.calls).toEqual([['staged-private']]);
-});
 it('uses a second physical alternative when the first original is missing', async () => {
   const f = await fixture(false, true);
   f.data.delete(f.selected.objects[0]!.remoteKey);
@@ -602,43 +308,6 @@ it('stages reused same-space mappings through the existing native journal admiss
   expect(journal.payload.input.sourceDigest).toBe(hashSyncText(f.selected.operationText));
   expect(io.journal).toHaveBeenCalledOnce();
 });
-it('stages a mixed fresh editing and reused export mapping without downloading the export', async () => {
-  const f = await fixture(true);
-  const fresh = await createSyncAttempt(
-    f.selected.operationText,
-    '00000000-0000-0000-0000-000000000009'
-  );
-  const mixed = fresh.objects.map((item) =>
-    item.objectId === 'export'
-      ? f.selected.objects.find((candidate) => candidate.objectId === item.objectId)!
-      : item
-  );
-  const physical = await createSyncAttempt(f.selected.operationText, fresh.attemptId, mixed);
-  const selected = {
-    ...(await parseSyncAttemptText(physical.recordText)),
-    operationText: f.selected.operationText,
-  };
-  const media = await attempt(mediaEnvelope().envelope, 'media-op');
-  const catalog = {
-    ...projectSyncCatalog('space', [media, selected]),
-    invalid: [],
-    metadataBytes: 0,
-    pages: 1,
-  };
-  const privateKey = mixed.find((item) => item.objectId === 'private')!.remoteKey;
-  f.data.set(privateKey, new Blob([new Uint8Array(3)]));
-  const journal = await prepareCatalogReplica({
-    ...f,
-    catalog,
-    rootKind: 'video-project',
-    rootId: 'project',
-    signal: new AbortController().signal,
-  });
-  expect(f.reads).toEqual([privateKey]);
-  expect(io.staged).toEqual(['private']);
-  expect(journal.payload.kind).toBe('video-project');
-});
-
 it.each([false, true])(
   'checks the admitted native basis against selected remote ancestry for project=%s',
   async (project) => {
@@ -773,3 +442,82 @@ it('persists native connection authorization without using sender generation cou
   expect(journal.payload.input.authorization).toEqual(authorization);
   expect(journal.payload.input.expectedLocalGeneration).toBe(0);
 });
+
+it.each([false, true])(
+  'keeps exact predecessor Scenario bytes only after streamed verification, changed body: %s',
+  async (changed) => {
+    const project = createGuideProject('Renamed guide', 'scenario-source', 1);
+    const child = {
+      id: 'child',
+      projectId: project.id,
+      galleryAssetId: null,
+      mimeType: 'image/png',
+      size: 3,
+      width: 10,
+      height: 10,
+      createdAt: 1,
+    };
+    const envelope = parseRootEnvelope({
+      descriptor: {
+        rootKind: 'scenario-project',
+        rootId: project.id,
+        metadataPath: 'Metadata/root.json',
+        objectCount: 1,
+        totalBytes: 3,
+      },
+      metadata: {
+        entry: createScenarioProjectEntry({ project, existing: undefined, updatedAt: 2 }),
+        assets: [{ entry: child, objectId: 'body' }],
+        stepDocuments: [],
+        exports: [],
+        exportThumbnails: [],
+      },
+      objects: [object('body', 'body.png')],
+    });
+    const before = await attempt(envelope, 'before');
+    const selected = await attempt(envelope, 'after', 2, ['before']);
+    const previousRef = { ...ref('native-child'), sha256: null };
+    io.scenarioPredecessor.mockImplementationOnce(async () => {
+      expect(io.reading && io.active).toBe(true);
+      return [
+        {
+          entry: parseScenarioAssetEntry({ ...child, assetId: previousRef.assetId }),
+          ref: previousRef,
+        },
+      ];
+    });
+    io.read.mockResolvedValueOnce(
+      new File([new Uint8Array(changed ? [1, 2, 3] : [0, 0, 0])], 'body.png', { type: 'image/png' })
+    );
+    const read = vi.fn(async () => new Blob([new Uint8Array(3)]).stream());
+    const journal = await prepareCatalogReplica({
+      rootKind: 'scenario-project',
+      rootId: project.id,
+      catalog: {
+        ...projectSyncCatalog('space', [before, selected]),
+        invalid: [],
+        metadataBytes: 0,
+        pages: 1,
+      },
+      remote: { read, list: vi.fn(), stat: vi.fn(), write: vi.fn() },
+      signal: new AbortController().signal,
+      admission: {
+        spaceId: 'space',
+        connectionGeneration: 7,
+        profileCreatedAt: 1,
+        expectedBasis: ['before'],
+        expectedLocalGeneration: 1,
+        expectedWorkspaceRevision: 0,
+        dependencies: [],
+      },
+    });
+    expect(journal.payload.kind).toBe('scenario-project');
+    if (journal.payload.kind !== 'scenario-project')
+      throw new Error('Expected native Scenario publication');
+    expect(journal.payload.input.root.assets[0]?.ref.assetId).toBe(
+      changed ? 'staged-body' : 'native-child'
+    );
+    expect(read).toHaveBeenCalledTimes(changed ? 1 : 0);
+    expect(io.read).toHaveBeenCalled();
+  }
+);

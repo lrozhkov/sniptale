@@ -2838,6 +2838,28 @@
       "reviewDate": "2026-10-28",
       "astHash": "9b4d87b00be9bd55495dccad856349d9eb5ab720f57649b0ed3cd9d9b424629f",
       "signatureHash": "7a1f05d0a6c63b51f3272ac190b6997a4a91020f17d1b9c90b09f8066273df0b"
+    },
+    {
+      "file": "apps/extension/src/background/sync-connection/retry-wakeup.ts",
+      "symbol": "createSyncQueueRetryWakeup",
+      "rule": "structural-function-risk",
+      "owner": "background/sync-connection/retry-wakeup",
+      "reason": "tool-noise: This factory owns one disposable retry scheduler. Nested callbacks share its pending work, subscriptions and disposal. The body contains seven top-level statements and cyclomatic complexity one. A split would distribute the same scheduler lifetime. Independent topology planning review approved Keep.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new scheduler, state authority, durable writer or resource lifetime. Remove when the analyzer models this closure. The final architecture reviewer must inspect this classification.",
+      "reviewDate": "2026-10-28",
+      "astHash": "23f1af18e7f9016ff7bc9fc4ca89873211b24f7810f179a3ddc9cec891623c75",
+      "signatureHash": "d2607876084f31f53efb254ee0cfb706f84f11268a6e1f85a2060e4552560eb6"
+    },
+    {
+      "file": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.ts",
+      "symbol": "<file>",
+      "rule": "structural-file-risk",
+      "owner": "workflows/media-hub-backup/v6/root-publication",
+      "reason": "tool-noise: This file owns one archive media-root publication. B extends export, snapshot and stored-image admission. Preparation, conflict checks, commit and retention retain their existing authorities. Local predicates remove duplicate checks. A file split would move unchanged publication code without an independent change reason. Independent topology planning review approved Keep.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new publication authority, transaction owner or resource lifetime. Remove when the analyzer models this cohesive publication. The final architecture reviewer must inspect this classification.",
+      "reviewDate": "2026-10-28",
+      "astHash": "9b09dd5c3a7139a106bddc7c227fdd242b61b9242994b6ce79f24c029d77cc35",
+      "signatureHash": "098fb6a44f647decfcba6efc82a967f77efae77a62c2ebf187d2eb740391c7ea"
     }
   ]
 }

@@ -1,4 +1,10 @@
 import {
+  preparePortableScenarioRoot,
+  assertScenarioCausalDependencies,
+  scenarioDependencyReferenceMaps,
+} from './prepared-scenario';
+import { captureProfileBounds } from '../../composition/persistence/sync-capture/contracts';
+import {
   parseSyncConnectionIdentity,
   type SyncConnectionIdentity,
 } from '../../composition/persistence/remote-connection/model';
@@ -11,6 +17,7 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { ArchiveReader } from '../../composition/archive-transfer';
 import { parseAssetRef, type AssetRef } from '../../composition/persistence/assets';
 import { parseMediaLibraryEntry } from '../../composition/persistence/media-library/read-guards';
+import { parseStoredWebSnapshotRecord } from '../../composition/persistence/web-snapshots/guards';
 import {
   parseProjectExportEntry,
   parseVideoProjectMetadataEntry,
@@ -20,15 +27,16 @@ import { prepareVideoReviewRestore } from '../../composition/persistence/review-
 import { parsePreparedVideoProjectReplicaRoot } from '../../composition/persistence/sync-capture/prepared-project';
 import type { ApplyPreparedVideoProjectRevisionInput } from '../../composition/persistence/sync-capture/apply-video-project';
 import {
-  MAX_CAPTURE_METADATA_BYTES,
   MAX_CAPTURE_ROWS,
   type CapturedMediaDependency,
+  type CausalRootDependency,
 } from '../../composition/persistence/sync-capture/contracts';
 import {
   isSupportedCaptureProject,
   parseCapturedMediaRows,
 } from '../../composition/persistence/sync-capture/guards';
 import type { PreparedReplicaPayload } from '../../composition/persistence/sync-capture/replica-publication';
+import { collectCapturedProjectRecordingIds } from '../../composition/persistence/sync-capture/project-snapshot';
 import { transformPortableVideoProjectReferences } from '../media-hub-backup/v6/root-publication/video-project-references';
 import { verifyPreparedMediaReviewAnnotations } from '../media-hub-backup/v6/root-publication/media-review-assets';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
@@ -40,6 +48,7 @@ import { assertArchiveRootObjectInventory } from '../media-hub-backup/v6/root-co
 import {
   decodePortableVideoProjectAssetRefs,
   parsePortableVideoProjectMetadata,
+  parsePortableScenarioProjectMetadata,
   preparePortableVideoProjectAsset,
 } from '../media-hub-backup/v6/root-codecs/projects';
 
@@ -59,7 +68,7 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
   const envelope = structuredClone(parseRootEnvelope(value));
   if (
     new TextEncoder().encode(JSON.stringify(envelope.metadata)).byteLength >
-    MAX_CAPTURE_METADATA_BYTES
+    captureProfileBounds(envelope.descriptor.rootKind).metadataBytes
   )
     throw new Error('Portable sync metadata exceeds the pilot limit.');
   if (
@@ -73,6 +82,7 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       exactKeys(raw, [
         'entry',
         'projectAsset',
+        'projectExport',
         'recording',
         'originalObjectId',
         'videoReview',
@@ -109,7 +119,11 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
         sourceMediaId: reviewSourceMediaId,
       };
     }
-    if (metadata.entry.source.kind === 'screenshot') {
+    if (
+      metadata.entry.source.kind === 'screenshot' ||
+      (metadata.entry.source.kind === 'stored-asset' &&
+        (metadata.entry.kind === 'image' || metadata.entry.kind === 'screenshot'))
+    ) {
       exactKeys(metadata, ['entry', 'originalObjectId', 'workspace', 'presentation']);
       if (metadata.entry.id !== envelope.descriptor.rootId)
         throw new Error('Portable image identity differs from its root.');
@@ -117,14 +131,42 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       validatePortableImageRows(envelope, metadata);
       return { kind: 'image' as const, envelope, metadata };
     }
-    exactKeys(metadata, ['entry', 'projectAsset', 'recording', 'originalObjectId']);
+    exactKeys(metadata, [
+      'entry',
+      'projectAsset',
+      'projectExport',
+      'recording',
+      'webSnapshot',
+      'originalObjectId',
+    ]);
     if (
       metadata.entry.id !== envelope.descriptor.rootId ||
-      (!metadata.projectAsset && !metadata.recording)
+      (!metadata.projectAsset &&
+        !metadata.recording &&
+        !metadata.projectExport &&
+        !metadata.webSnapshot &&
+        metadata.entry.source.kind !== 'stored-asset')
     )
       throw new Error('Unsupported portable media root.');
     await assertArchiveRootObjectInventory(envelope, metadataOnlyReader, []);
     return { kind: 'media' as const, envelope, metadata };
+  }
+  if (envelope.descriptor.rootKind === 'scenario-project') {
+    if (reviewSourceMediaId !== undefined)
+      throw new Error('Scenario cannot carry an independent video review.');
+    const metadata = parsePortableScenarioProjectMetadata(envelope.metadata);
+    if (
+      metadata.entry.id !== envelope.descriptor.rootId ||
+      metadata.assets.length > captureProfileBounds('scenario-project').rows ||
+      metadata.stepDocuments.length > captureProfileBounds('scenario-project').rows ||
+      envelope.objects.length > captureProfileBounds('scenario-project').objects
+    )
+      throw new Error('Portable Scenario inventory is invalid.');
+    await assertArchiveRootObjectInventory(envelope, null, []);
+    const project = metadata.entry.project;
+    if (!isRecord(project) || typeof project['name'] !== 'string')
+      throw new Error('Invalid Scenario project name.');
+    return { kind: 'scenario-project' as const, envelope, metadata, name: project['name'] };
   }
   if (reviewSourceMediaId !== undefined)
     throw new Error('A portable source binding requires a video review carrier.');
@@ -153,7 +195,6 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
     exactKeys(item, ['entry', 'objectId', 'libraryMediaId', 'thumbnail', 'videoReview']);
     if (
       !parseProjectExportEntry({ ...item.entry, assetId: 'portable' }) ||
-      item.entry.recordingMetadata ||
       item.entry.projectId !== metadata.entry.id
     )
       throw new Error('Unsupported portable export metadata.');
@@ -208,6 +249,7 @@ export interface PortableReplicaAdmission {
   expectedLocalGeneration: number;
   expectedWorkspaceRevision: number | null;
   dependencies: ApplyPreparedVideoProjectRevisionInput['dependencies'];
+  rootDependencies?: ApplyPreparedVideoProjectRevisionInput['rootDependencies'];
 }
 
 type ParsedPortableRoot = Awaited<ReturnType<typeof parsePortableSyncRoot>>;
@@ -240,8 +282,14 @@ function editingProjectAssets(parsed: Extract<ParsedPortableRoot, { kind: 'video
 
 /** Editing closure includes retained private reviews and inline bytes, excluding saved exports. */
 export function portableSyncEditingObjectIds(parsed: ParsedPortableRoot): string[] {
+  if (parsed.kind === 'scenario-project')
+    return parsed.envelope.objects.map((object) => object.objectId);
   if (parsed.kind === 'image') return parsed.envelope.objects.map((object) => object.objectId);
-  if (parsed.kind === 'media') return [parsed.metadata.originalObjectId];
+  if (parsed.kind === 'media')
+    return [
+      parsed.metadata.originalObjectId,
+      ...(parsed.metadata.webSnapshot ? [parsed.metadata.webSnapshot.screenshotObjectId] : []),
+    ];
   if (parsed.kind === 'video-review')
     return [
       parsed.metadata.originalObjectId,
@@ -272,8 +320,40 @@ function prepareMediaRows(
   refFor: VerifiedObjectResolver
 ) {
   const ref = refFor(parsed.metadata.originalObjectId);
-  const media = parseMediaLibraryEntry(parsed.metadata.entry);
+  const media = parseMediaLibraryEntry({
+    ...parsed.metadata.entry,
+    ...(parsed.metadata.entry.source.kind === 'stored-asset'
+      ? { source: { kind: 'stored-asset', assetId: ref.assetId } }
+      : {}),
+  });
   if (!media) throw new Error('Invalid portable media entry.');
+  if (media.source.kind === 'stored-asset') {
+    const rows = parseCapturedMediaRows({ media, ref });
+    if (!rows) throw new Error('Unsupported portable stored original.');
+    return rows;
+  }
+  if (parsed.metadata.projectExport) {
+    const projectExport = parseProjectExportEntry({
+      ...parsed.metadata.projectExport,
+      assetId: ref.assetId,
+    });
+    const rows = parseCapturedMediaRows({ media, projectExport, ref });
+    if (!rows) throw new Error('Unsupported portable export original.');
+    return rows;
+  }
+  if (parsed.metadata.webSnapshot) {
+    const snapshot = parsed.metadata.webSnapshot;
+    const screenshotRef = refFor(snapshot.screenshotObjectId);
+    const webSnapshot = parseStoredWebSnapshotRecord({
+      ...snapshot.entry,
+      packageAssetId: ref.assetId,
+      screenshotAssetId: screenshotRef.assetId,
+    });
+    const rows = parseCapturedMediaRows({ media, webSnapshot, ref, screenshotRef });
+    if (!rows || snapshot.packageObjectId !== parsed.metadata.originalObjectId)
+      throw new Error('Unsupported portable web snapshot.');
+    return rows;
+  }
   if (parsed.metadata.recording) {
     const rows = parseCapturedMediaRows({
       media,
@@ -330,8 +410,34 @@ function assertCausalDependencies(
 }
 
 /** Shared exact dependency inventory for wire admission and native portable preparation. */
-export function portableSyncDependencyIds(parsed: ParsedPortableRoot): string[] {
+export function portableSyncDependencyIds(
+  parsed: ParsedPortableRoot,
+  declaredDependencyIds?: readonly string[]
+): string[] {
   if (parsed.kind === 'media' || parsed.kind === 'image') return [];
+  if (parsed.kind === 'scenario-project') {
+    const required = new Set(
+      parsed.metadata.assets.flatMap((asset) =>
+        asset.entry.borrowedMediaId
+          ? [asset.entry.borrowedMediaId]
+          : asset.entry.galleryAssetId
+            ? [asset.entry.galleryAssetId]
+            : []
+      )
+    );
+    const optional = new Set(
+      parsed.metadata.assets
+        .filter((asset) => !asset.entry.borrowedMediaId && !asset.entry.galleryAssetId)
+        .map((asset) => `scenario-asset:${asset.entry.id}`)
+    );
+    if (declaredDependencyIds)
+      for (const id of declaredDependencyIds) {
+        if (!required.has(id) && !optional.has(id))
+          throw new Error('Scenario dependency does not name an admitted child mirror.');
+        required.add(id);
+      }
+    return [...required].sort();
+  }
   const needed = new Set<string>();
   if (parsed.kind === 'video-review') {
     needed.add(parsed.sourceMediaId);
@@ -341,6 +447,8 @@ export function portableSyncDependencyIds(parsed: ParsedPortableRoot): string[] 
     }
     return [...needed].sort();
   }
+  for (const id of collectCapturedProjectRecordingIds(parsed.entry.project))
+    needed.add(`recording:${id}`);
   for (const asset of parsed.entry.project.assets) {
     if (asset.source.kind === 'library-asset') needed.add(asset.source.mediaId);
     if (asset.source.kind === 'project-asset' && asset.source.originMediaId)
@@ -417,7 +525,14 @@ async function prepareVideoRoot(
         ? local.dependencies.find((item) => item.entry.id === source.mediaId)?.entry
         : source.kind === 'project-asset'
           ? assets.find((item) => item.entry.id === assetIds.get(source.projectAssetId))?.entry
-          : undefined;
+          : source.kind === 'recording'
+            ? local.dependencies.find((item) => item.entry.id === `recording:${source.recordingId}`)
+                ?.entry
+            : source.kind === 'scenario-asset'
+              ? local.rootDependencies
+                  ?.flatMap((item) => item.children)
+                  .find((child) => child.entry.id === source.scenarioAssetId)?.entry
+              : undefined;
     if (
       !resource ||
       resource.mimeType !== asset.metadata.mimeType ||
@@ -425,13 +540,15 @@ async function prepareVideoRoot(
     )
       throw new Error('Portable project source metadata differs from admitted resource.');
   }
+  const scenarioMaps = scenarioDependencyReferenceMaps(local.rootDependencies ?? []);
+  const mediaRootIds = new Map<string, string>(
+    local.dependencies.map((item) => [`media:library-item:${item.entry.id}`, item.entry.id])
+  );
   const project = transformPortableVideoProjectReferences(
     parsed.entry.project,
     assetIds,
-    Object.fromEntries(
-      local.dependencies.map((item) => [`media:library-item:${item.entry.id}`, item.entry.id])
-    ),
-    {}
+    { ...Object.fromEntries(mediaRootIds), ...scenarioMaps.rootIdMap },
+    scenarioMaps.childIdMap
   );
   const snapshotRefs = (parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
     snapshot.assets.map((asset) => ({
@@ -485,15 +602,25 @@ export async function preparePortableReplica(args: {
   reviewSourceMediaId?: string;
   verifiedObjects: ReadonlyMap<string, AssetRef>;
   senderDependencies: readonly PortableCausalDependency[];
+  senderRootDependencies?: readonly CausalRootDependency[];
   admission: PortableReplicaAdmission;
+  stageNativeMetadata?: (blob: Blob) => Promise<AssetRef>;
 }): Promise<PreparedReplicaPayload> {
   // Detach all caller metadata before inventory validation yields.
   const objects = structuredClone(args.verifiedObjects);
   const sender = structuredClone(args.senderDependencies);
   const local = structuredClone(args.admission);
-  if (sender.length > MAX_CAPTURE_ROWS || local.dependencies.length > MAX_CAPTURE_ROWS)
-    throw new Error('Portable dependency inventory exceeds the pilot limit.');
   const parsed = await parsePortableSyncRoot(args.envelope, args.reviewSourceMediaId);
+  assertScenarioCausalDependencies(
+    parsed,
+    local,
+    structuredClone(args.senderRootDependencies ?? [])
+  );
+  if (
+    sender.length > captureProfileBounds(parsed.kind).rows ||
+    local.dependencies.length > captureProfileBounds(parsed.kind).rows
+  )
+    throw new Error('Portable dependency inventory exceeds its profile.');
   const refFor = (id: string) => {
     const ref = parseAssetRef(objects.get(id));
     const object = parsed.envelope.objects.find((item) => item.objectId === id);
@@ -552,7 +679,36 @@ export async function preparePortableReplica(args: {
         local.expectedWorkspaceRevision < 0)
     )
       throw new Error('Invalid local workspace revision.');
-    if (parsed.kind === 'video-review') {
+    if (parsed.kind === 'scenario-project') {
+      assertCausalDependencies(
+        new Set(
+          portableSyncDependencyIds(
+            parsed,
+            sender.map((item) => item.mediaId)
+          )
+        ),
+        local.dependencies,
+        sender
+      );
+      if (!args.stageNativeMetadata)
+        throw new Error('Scenario native metadata staging is unavailable.');
+      const root = await preparePortableScenarioRoot({
+        metadata: parsed.metadata,
+        admission: local,
+        refFor,
+        stageNativeMetadata: args.stageNativeMetadata,
+        objectIds: parsed.envelope.objects.map((object) => object.objectId),
+      });
+      payload = {
+        kind: 'scenario-project',
+        input: {
+          ...identity,
+          root,
+          expectedWorkspaceRevision: local.expectedWorkspaceRevision,
+          dependencies: local.dependencies,
+        },
+      };
+    } else if (parsed.kind === 'video-review') {
       assertCausalDependencies(
         new Set(portableSyncDependencyIds(parsed)),
         local.dependencies,
@@ -583,6 +739,7 @@ export async function preparePortableReplica(args: {
           root,
           expectedWorkspaceRevision: local.expectedWorkspaceRevision,
           dependencies: local.dependencies,
+          ...(local.rootDependencies?.length ? { rootDependencies: local.rootDependencies } : {}),
         },
       };
     }

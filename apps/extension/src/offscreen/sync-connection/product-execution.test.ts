@@ -455,3 +455,108 @@ it('rechecks a missing cached selection once and refuses absent thumbnail metada
   expect(mocks.receive).not.toHaveBeenCalled();
   await execution.drain();
 });
+
+it('invalidates Gallery after catalogue refresh and after committed native incoming publication', async () => {
+  let commit!: (value: typeof selected) => void;
+  let entered!: () => void;
+  const reached = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const committed = new Promise<typeof selected>((resolve) => {
+    commit = resolve;
+  });
+  mocks.receive.mockImplementationOnce(() => {
+    entered();
+    return committed;
+  });
+  const notify = vi.fn();
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'replica-prepare', selection: selected },
+      signal: new AbortController().signal,
+    },
+    async () => true,
+    notify
+  );
+  const running = execution.run();
+  await reached;
+  expect(notify).toHaveBeenCalledOnce();
+  commit(selected);
+  await expect(running).resolves.toMatchObject({ state: 'ready' });
+  expect(notify).toHaveBeenCalledTimes(2);
+});
+
+it('keeps successful catalogue work when its Gallery advisory fails', async () => {
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'catalog-refresh', bypassCache: false },
+      signal: new AbortController().signal,
+    },
+    async () => true,
+    () => {
+      throw new Error('advisory unavailable');
+    }
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'ready',
+    completion: { kind: 'catalog', count: 1 },
+  });
+});
+
+it('refreshes metadata and delegates automatic native work inside the checked connection lifetime', async () => {
+  const signal = new AbortController().signal;
+  const automatic = {
+    run: vi.fn().mockResolvedValue({ applied: 1, deferred: 1, remaining: true }),
+  };
+  const changed = vi.fn();
+  const execution = createSyncProductExecution(
+    { ...scopeBinding(), work: { kind: 'automatic-sync' }, signal },
+    async () => true,
+    changed,
+    undefined,
+    automatic
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'ready',
+    containment: 'contained',
+    completion: { kind: 'automatic', applied: 1, deferred: 1, remaining: true },
+  });
+  expect(mocks.refresh).toHaveBeenCalledOnce();
+  expect(automatic.run).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      scope,
+      authorization,
+      catalog: expect.objectContaining({ roots: expect.any(Map) }),
+      signal,
+    })
+  );
+  expect(mocks.receive).not.toHaveBeenCalled();
+  expect(changed).toHaveBeenCalledTimes(2);
+  expect(mocks.close).toHaveBeenCalledOnce();
+});
+
+it('does not grant automatic native work after connection authority changes during catalog refresh', async () => {
+  const automatic = { run: vi.fn() };
+  mocks.refresh.mockImplementationOnce(async () => {
+    mocks.connection.mockResolvedValue({
+      ...metadata,
+      identity: { ...authorization, revision: 2 },
+    });
+    return catalog();
+  });
+  const execution = createSyncProductExecution(
+    { ...scopeBinding(), work: { kind: 'automatic-sync' }, signal: new AbortController().signal },
+    async () => true,
+    undefined,
+    undefined,
+    automatic
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'failed',
+    containment: 'contained',
+  });
+  expect(automatic.run).not.toHaveBeenCalled();
+  expect(mocks.close).toHaveBeenCalledOnce();
+});

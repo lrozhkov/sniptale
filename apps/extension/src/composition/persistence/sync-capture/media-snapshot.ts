@@ -3,7 +3,9 @@ import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseAssetRef } from '../assets/guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { parseProjectAssetEntry } from '../projects/read-guards';
+import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
+import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
+import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { MAX_CAPTURE_METADATA_BYTES, type CapturedMediaRows } from './contracts';
 
@@ -45,10 +47,76 @@ function boundedMetadata(value: unknown): boolean {
 export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null {
   if (!isRecord(value) || !boundedMetadata(value)) return null;
   const media = parseMediaLibraryEntry(value['media']);
+  const ref = parseAssetRef(value['ref']);
+  if (!media || !ref) return null;
+  if ('screenshotRef' in value && !('webSnapshot' in value)) return null;
+  const sourceFields = ['projectAsset', 'projectExport', 'recording', 'webSnapshot'];
+  if (sourceFields.filter((field) => field in value).length > 1) return null;
+  if (media.source.kind === 'stored-asset') {
+    if (
+      sourceFields.some((field) => field in value) ||
+      'telemetry' in value ||
+      'screenshotRef' in value
+    )
+      return null;
+    return isOriginalOnlyCapturedMedia(media) &&
+      media.source.assetId === ref.assetId &&
+      media.size === ref.size &&
+      media.mimeType === ref.mimeType
+      ? { media, ref }
+      : null;
+  }
+  if ('projectExport' in value) {
+    const projectExport = parseProjectExportEntry(value['projectExport']);
+    if (
+      !projectExport ||
+      media.source.kind !== 'project-export' ||
+      media.source.exportId !== projectExport.id ||
+      media.source.projectId !== projectExport.projectId ||
+      media.id !== `export:${projectExport.id}` ||
+      projectExport.assetId !== ref.assetId ||
+      projectExport.size !== ref.size ||
+      media.size !== ref.size ||
+      (projectExport.mimeType ?? 'video/webm') !== ref.mimeType ||
+      media.mimeType !== ref.mimeType ||
+      media.blob !== undefined ||
+      media.workspaceRevision !== 0 ||
+      media.imageContentState === 'edited' ||
+      media.recordingGroup !== undefined ||
+      JSON.stringify(media.recordingMetadata) !== JSON.stringify(projectExport.recordingMetadata) ||
+      'telemetry' in value ||
+      'screenshotRef' in value
+    )
+      return null;
+    return { media, projectExport, ref };
+  }
+  if ('webSnapshot' in value) {
+    const webSnapshot = parseStoredWebSnapshotRecord(value['webSnapshot']);
+    const screenshotRef = parseAssetRef(value['screenshotRef']);
+    if (
+      !webSnapshot ||
+      !screenshotRef ||
+      !isOriginalOnlyCapturedMedia(media) ||
+      media.kind !== 'web-archive' ||
+      media.source.kind !== 'web-snapshot' ||
+      media.id !== webSnapshot.id ||
+      media.source.snapshotId !== webSnapshot.id ||
+      webSnapshot.packageAssetId !== ref.assetId ||
+      webSnapshot.size !== ref.size ||
+      media.size !== ref.size ||
+      media.mimeType !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE ||
+      ref.mimeType !== PAGE_PACKAGE_ARCHIVE_MIME_TYPE ||
+      webSnapshot.screenshotAssetId !== screenshotRef.assetId ||
+      webSnapshot.screenshotSize !== screenshotRef.size ||
+      webSnapshot.screenshotMimeType !== screenshotRef.mimeType ||
+      'telemetry' in value
+    )
+      return null;
+    return { media, webSnapshot, ref, screenshotRef };
+  }
   if ('recording' in value) {
     if ('projectAsset' in value) return null;
     const recording = parseRecordingEntry(value['recording']);
-    const ref = parseAssetRef(value['ref']);
     const telemetry =
       value['telemetry'] === null ? null : parseRecordingTelemetryEntry(value['telemetry']);
     if (!media || !recording || !ref || (value['telemetry'] !== null && !telemetry)) return null;
@@ -74,7 +142,6 @@ export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null
   }
   if ('telemetry' in value) return null;
   const projectAsset = parseProjectAssetEntry(value['projectAsset']);
-  const ref = parseAssetRef(value['ref']);
   if (!media || !projectAsset || !ref) return null;
   const rows = { media, projectAsset, ref };
   return isOriginalOnlyCapturedMedia(media) && hasExactMediaSourceBinding(rows) ? rows : null;

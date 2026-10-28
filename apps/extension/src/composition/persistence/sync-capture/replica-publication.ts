@@ -1,3 +1,11 @@
+import { parsePreparedScenarioProjectDependencies } from './scenario-dependencies';
+import {
+  applyPreparedScenarioReplica,
+  parseApplyPreparedScenarioReplicaInput,
+  type ApplyPreparedScenarioReplicaInput,
+} from './apply-scenario';
+import { collectPreparedScenarioReplicaRefs } from './prepared-scenario';
+import { isBoundedScenarioMetadata } from './scenario-snapshot';
 import { parseSyncConnectionIdentity } from '../remote-connection/model';
 import {
   applyPreparedVideoReviewReplica,
@@ -35,6 +43,7 @@ import { MAX_CAPTURE_METADATA_BYTES, MAX_CAPTURE_ROWS } from './contracts';
 import { parseCapturedMediaRows } from './guards';
 
 export type PreparedReplicaPayload =
+  | { kind: 'scenario-project'; input: ApplyPreparedScenarioReplicaInput }
   | { kind: 'video-review'; input: ApplyPreparedVideoReviewReplicaInput }
   | { kind: 'image'; input: ApplyPreparedImageReplicaInput }
   | { kind: 'media'; input: ApplyPreparedMediaReplicaInput }
@@ -166,13 +175,21 @@ function parseProjectInput(value: Record<string, unknown>): ApplyPreparedVideoPr
     expectedWorkspaceRevision,
     root: prepared,
     dependencies: dependencies.map(parseDependency),
+    ...(value['rootDependencies'] === undefined
+      ? {}
+      : { rootDependencies: parsePreparedScenarioProjectDependencies(value['rootDependencies']) }),
   };
 }
 
 function parsePayload(value: unknown): PreparedReplicaPayload {
-  assertJournalMetadata(value);
+  if (isRecord(value) && value['kind'] === 'scenario-project') {
+    if (!isBoundedScenarioMetadata(value, false))
+      throw new Error('Scenario journal metadata exceeds its profile.');
+  } else assertJournalMetadata(value);
   if (!isRecord(value) || !isRecord(value['input'])) throw new Error('Invalid replica payload.');
   const input = value['input'];
+  if (value['kind'] === 'scenario-project')
+    return { kind: 'scenario-project', input: parseApplyPreparedScenarioReplicaInput(input) };
   if (value['kind'] === 'video-review') {
     const review = parseApplyPreparedVideoReviewReplicaInput(input);
     if (!review) throw new Error('Invalid video review replica.');
@@ -193,30 +210,41 @@ function parsePayload(value: unknown): PreparedReplicaPayload {
 
 function protectedRefs(payload: PreparedReplicaPayload): AssetRef[] {
   const refs =
-    payload.kind === 'image'
+    payload.kind === 'scenario-project'
       ? [
-          payload.input.originalRef,
-          ...payload.input.documentRefs,
-          ...(payload.input.presentation
-            ? [
-                payload.input.presentation.thumbnailRef,
-                ...(payload.input.presentation.previewRef
-                  ? [payload.input.presentation.previewRef]
-                  : []),
-              ]
-            : []),
+          ...collectPreparedScenarioReplicaRefs(payload.input.root),
+          ...payload.input.dependencies.map((item) => item.ref),
         ]
-      : payload.kind === 'media'
-        ? [payload.input.rows.ref]
-        : payload.kind === 'video-review'
+      : payload.kind === 'image'
+        ? [
+            payload.input.originalRef,
+            ...payload.input.documentRefs,
+            ...(payload.input.presentation
+              ? [
+                  payload.input.presentation.thumbnailRef,
+                  ...(payload.input.presentation.previewRef
+                    ? [payload.input.presentation.previewRef]
+                    : []),
+                ]
+              : []),
+          ]
+        : payload.kind === 'media'
           ? [
-              ...collectPreparedVideoReviewReplicaRefs(payload.input.root),
-              ...payload.input.dependencies.map((dependency) => dependency.ref),
+              payload.input.rows.ref,
+              ...('screenshotRef' in payload.input.rows ? [payload.input.rows.screenshotRef] : []),
             ]
-          : [
-              ...collectPreparedProjectReplicaRefs(payload.input.root),
-              ...payload.input.dependencies.map((dependency) => dependency.ref),
-            ];
+          : payload.kind === 'video-review'
+            ? [
+                ...collectPreparedVideoReviewReplicaRefs(payload.input.root),
+                ...payload.input.dependencies.map((dependency) => dependency.ref),
+              ]
+            : [
+                ...collectPreparedProjectReplicaRefs(payload.input.root),
+                ...payload.input.dependencies.map((dependency) => dependency.ref),
+                ...(payload.input.rootDependencies ?? []).flatMap((dependency) =>
+                  dependency.children.map((child) => child.ref)
+                ),
+              ];
   const unique = new Map<string, AssetRef>();
   for (const ref of refs) {
     const previous = unique.get(ref.assetId);
@@ -265,7 +293,10 @@ export async function publishPreparedReplicaJournal(
 ): Promise<void> {
   const payload = parsePayload(journal.payload);
   assertJournalClaims(journal, protectedRefs(payload));
-  if (payload.kind === 'video-review') {
+  if (payload.kind === 'scenario-project') {
+    await applyPreparedScenarioReplica(payload.input, lifecyclePermit);
+    await cancelAssetPublication(journal, lifecyclePermit);
+  } else if (payload.kind === 'video-review') {
     await applyPreparedVideoReviewReplica(payload.input, lifecyclePermit);
     await cancelAssetPublication(journal, lifecyclePermit);
   } else if (payload.kind === 'image') {

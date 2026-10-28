@@ -7,6 +7,8 @@ import {
   IMAGE_WORKSPACES_STORE,
   SYNC_CAPTURE_STORE,
   PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  WEB_SNAPSHOTS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -145,6 +147,8 @@ async function mutateMediaLibraryEntry(
         ASSET_REFS_STORE,
         SYNC_CAPTURE_STORE,
         PROJECT_ASSETS_STORE,
+        PROJECT_EXPORTS_STORE,
+        WEB_SNAPSHOTS_STORE,
         VIDEO_WORKSPACES_STORE,
         VIDEO_WORKSPACE_HISTORY_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -159,12 +163,7 @@ async function mutateMediaLibraryEntry(
       const nextEntry = mutate(existing);
       if (nextEntry !== existing) {
         await store.put(nextEntry);
-        if (
-          nextEntry.source.kind === 'screenshot' ||
-          nextEntry.source.kind === 'project-asset' ||
-          nextEntry.source.kind === 'recording'
-        )
-          await captureMediaInTransaction(tx, assetId);
+        await captureMediaInTransaction(tx, assetId);
       }
       await tx.done;
       return nextEntry;

@@ -63,6 +63,7 @@ const IMAGE_SNAPSHOT_STORES = [
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
   SYNC_CAPTURE_STORE,
 ];
 
@@ -309,7 +310,7 @@ async function commitImageWorkspaceMutation(
         : createLibraryLifecycle('library', now),
     });
     const acceptedRoot = parseMediaLibraryEntry(await mediaStore.get(input.aggregateId));
-    if (acceptedRoot?.source.kind === 'screenshot')
+    if (acceptedRoot?.source.kind === 'screenshot' || acceptedRoot?.source.kind === 'stored-asset')
       await captureImageInTransaction(
         tx,
         input.aggregateId,
@@ -617,7 +618,7 @@ export async function commitImagePresentation(input: CommitImagePresentationInpu
         thumbnailBlob: input.thumbnailBlob,
         updatedAt: Date.now(),
       });
-      if (media.source.kind === 'screenshot')
+      if (media.source.kind === 'screenshot' || media.source.kind === 'stored-asset')
         await captureImageInTransaction(tx, input.aggregateId);
       await tx.done;
     } catch (error) {
@@ -652,7 +653,8 @@ export async function promoteImageAggregate(
           ...media,
           lifecycle: promoteLibraryLifecycle(media.lifecycle),
         });
-        if (media.source.kind === 'screenshot') await captureImageInTransaction(tx, aggregateId);
+        if (media.source.kind === 'screenshot' || media.source.kind === 'stored-asset')
+          await captureImageInTransaction(tx, aggregateId);
       }
       await tx.done;
     } catch (error) {

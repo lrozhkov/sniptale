@@ -2,6 +2,9 @@ import {
   initDB,
   SYNC_CAPTURE_STORE,
 } from '../../composition/persistence/infrastructure/indexed-db/core';
+import { assertConflictResolutionCurrent } from '../../composition/persistence/sync-capture/conflict-resolution';
+import { syncCatalogRootKey } from './catalog-graph';
+import { parseSyncOperationText } from './wire-record';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import {
   advanceSyncQueueRun,
@@ -41,6 +44,8 @@ function lockName(scope: SyncQueueScope, operationId: string): string {
   return `sniptale-sync-operation:${hashSyncText(identity)}`;
 }
 function failureCode(error: unknown): SyncQueueFailureCode {
+  if (error instanceof Error && 'code' in error && error.code === 'selection-changed')
+    return 'selection-changed';
   if (error instanceof SyncWorkspaceError) {
     if (error.code === 'unavailable') return 'temporary';
     if (error.code === 'cancelled') return 'interrupted';
@@ -109,12 +114,13 @@ export async function runSyncQueueOperation(input: {
   signal: AbortSignal;
   authorize: () => Promise<void>;
   catalog?: Catalog;
+  loadCatalog?: (remote: SyncRemoteStore) => Promise<Catalog>;
 }): Promise<QueueResult> {
   const scope = structuredClone(input.scope);
   const operationId = input.operationId;
   const expectedRevision = input.expectedRevision;
   const authorization = input.authorization ? structuredClone(input.authorization) : undefined;
-  const catalog = input.catalog ? structuredClone(input.catalog) : undefined;
+  let catalog = input.catalog ? structuredClone(input.catalog) : undefined;
   const { signal, remote, authorize } = input;
   signal.throwIfAborted();
   return navigator.locks.request(
@@ -154,6 +160,12 @@ export async function runSyncQueueOperation(input: {
             operation: await completeSyncQueueRun(run, { kind: 'verified', result: accepted }),
           };
         const prepared = await prepareCapturedOutgoing(capture);
+        if (input.loadCatalog) {
+          await advanceSyncQueueRun(run, 'checking');
+          catalog = await input.loadCatalog(
+            admitRemote(remote, run, signal, authorize, 'checking')
+          );
+        }
         const observed = await findObservedOutgoingPublication(prepared, catalog);
         if (observed)
           return {
@@ -164,10 +176,26 @@ export async function runSyncQueueOperation(input: {
               attempt: observed,
             }),
           };
+        if (prepared.retainedObjects !== undefined) {
+          const logical = await parseSyncOperationText(prepared.recordText);
+          const root = catalog?.roots.get(syncCatalogRootKey(logical.rootKind, logical.rootId));
+          if (
+            !catalog ||
+            catalog.invalid.length ||
+            !root ||
+            root.blocked ||
+            JSON.stringify([...root.heads].sort()) !== JSON.stringify([...logical.parents].sort())
+          )
+            throw Object.assign(new Error('Conflict resolution heads changed.'), {
+              code: 'selection-changed',
+            });
+          await assertConflictResolutionCurrent(prepared);
+        }
         await advanceSyncQueueRun(run, 'checking');
         const admitted = admitRemote(remote, run, signal, authorize);
         await dispatchPreparedOutgoing(scope.spaceId, operationId, admitted, signal, {
           ...(catalog ? { catalog } : {}),
+          beforePublish: () => assertConflictResolutionCurrent(prepared),
           admitAttempt: async (attempt) => {
             await advanceSyncQueueRun(run, 'checking', attempt.attemptId);
           },
@@ -193,7 +221,8 @@ function admitRemote(
   remote: SyncRemoteStore,
   run: SyncQueueRun,
   signal: AbortSignal,
-  authorize: () => Promise<void>
+  authorize: () => Promise<void>,
+  readStage?: 'checking'
 ): SyncRemoteStore {
   const admit = async (stage: SyncQueueStage) => {
     signal.throwIfAborted();
@@ -212,7 +241,7 @@ function admitRemote(
       return remote.stat(key, abort);
     },
     read: async (key, abort) => {
-      await admit(key.startsWith('.sniptale/') ? 'verifying' : 'writing');
+      await admit(readStage ?? (key.startsWith('.sniptale/') ? 'verifying' : 'writing'));
       return remote.read(key, abort);
     },
     write: async (key, body, abort) => {

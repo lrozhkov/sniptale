@@ -354,3 +354,15 @@ it('refuses a disconnected private review cycle even when every declaration is r
     })
   ).toThrow('references');
 });
+
+it('accepts a native PNG project export and rejects a contradictory source MIME', () => {
+  const { videoReview: _review, ...input } = metadata();
+  input.entry.mimeType = 'image/png';
+  input.entry.filename = 'saved.png';
+  input.entry.originalFilename = 'saved.png';
+  input.projectExport.mimeType = 'image/png';
+  input.projectExport.filename = 'saved.png';
+  expect(parsePortableMediaMetadata(input).projectExport?.mimeType).toBe('image/png');
+  input.projectExport.mimeType = 'video/webm';
+  expect(() => parsePortableMediaMetadata(input)).toThrow('association is invalid');
+});

@@ -1,4 +1,6 @@
-import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
+
 import {
   EFFECT_BUNDLE_CORPUS,
   readEffectBundleCorpusArchive,
@@ -11,15 +13,9 @@ import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import type { VideoWorkspace } from '../review-workspaces/contracts';
 import { collectCapturedProjectEditingMediaIds } from './project-snapshot';
-import { expect, it, vi } from 'vitest';
-import {
-  createMediaLibraryEntry,
-  createProjectAssetEntry,
-  createProjectExportEntry,
-  createVideoProjectEntryWithMediaClip,
-  createVideoProjectRestoreTransaction,
-} from '../projects/index.test-support';
-import type { AssetRef } from '../assets/contracts';
+import { expect, it } from 'vitest';
+import { createMediaLibraryEntry, createProjectAssetEntry } from '../projects/index.test-support';
+
 import {
   freezeVideoProjectInTransaction,
   freezeMediaInTransaction,
@@ -27,107 +23,11 @@ import {
   UnsupportedSyncCaptureGraphError,
 } from './freeze';
 
-function memoryStore() {
-  const rows = new Map<string, unknown>();
-  const key = (value: IDBValidKey) => JSON.stringify(value);
-  return {
-    rows,
-    seed(id: IDBValidKey, value: unknown) {
-      rows.set(key(id), value);
-    },
-    get: vi.fn(async (id: IDBValidKey) => rows.get(key(id))),
-    getAll: vi.fn(async () => {
-      throw new Error('Global enumeration is outside the freezer contract.');
-    }),
-    put: vi.fn(async () => undefined),
-    delete: vi.fn(async () => undefined),
-    index: vi.fn((name: string) => ({
-      getAll: vi.fn(async (id: IDBValidKey, count?: number) =>
-        [...rows.values()]
-          .filter(
-            (row) =>
-              typeof row === 'object' &&
-              row !== null &&
-              name in row &&
-              Reflect.get(row, name) === id
-          )
-          .slice(0, count)
-      ),
-      getAllKeys: vi.fn(async () => []),
-      count: vi.fn(async () => 0),
-    })),
-  };
-}
-
-function reference(assetId: string, mimeType: string, size: number): AssetRef {
-  return {
-    assetId,
-    createdAt: 10,
-    location: { kind: 'opfs', objectKey: `objects/${assetId}` },
-    mimeType,
-    size,
-    sha256: null,
-  };
-}
-
-function fixture() {
-  const stores = {
-    assets: memoryStore(),
-    exports: memoryStore(),
-    media: memoryStore(),
-    videoWorkspaces: memoryStore(),
-    videoDrafts: memoryStore(),
-    operations: memoryStore(),
-    owners: memoryStore(),
-    presentations: memoryStore(),
-    projects: memoryStore(),
-    refs: memoryStore(),
-    thumbnails: memoryStore(),
-    scenarioAssets: memoryStore(),
-  };
-  const project = createVideoProjectEntryWithMediaClip();
-  const source = project.project.assets[0]!;
-  if (source.source.kind !== 'project-asset')
-    throw new Error('Fixture source must be a project asset.');
-  const asset = createProjectAssetEntry({
-    id: source.source.projectAssetId,
-    originMediaId: 'original-1',
-    mimeType: source.metadata.mimeType,
-    size: source.metadata.size,
-  });
-  const exported = createProjectExportEntry({ projectId: project.id });
-  const mirror = createMediaLibraryEntry({
-    id: `project-asset:${asset.id}`,
-    kind: 'video',
-    source: { kind: 'project-asset', projectAssetId: asset.id },
-    mimeType: asset.mimeType,
-    size: asset.size,
-  });
-  const original = createMediaLibraryEntry({
-    id: 'original-1',
-    source: { kind: 'stored-asset', assetId: 'original-bytes' },
-    size: 7,
-  });
-  const exportMirror = createMediaLibraryEntry({
-    id: `export:${exported.id}`,
-    kind: 'export',
-    source: { kind: 'project-export', exportId: exported.id, projectId: project.id },
-    mimeType: exported.mimeType!,
-    size: exported.size,
-  });
-  stores.projects.seed(project.id, project);
-  stores.assets.seed(asset.id, asset);
-  stores.exports.seed(exported.id, exported);
-  for (const row of [mirror, original, exportMirror]) stores.media.seed(row.id, row);
-  for (const ref of [
-    reference(asset.assetId, asset.mimeType, asset.size),
-    reference(exported.assetId, exported.mimeType!, exported.size),
-    reference('original-bytes', original.mimeType, original.size),
-  ])
-    stores.refs.seed(ref.assetId, ref);
-  const tx = createVideoProjectRestoreTransaction(stores);
-  return { stores, project, asset, exported, mirror, original, exportMirror, tx };
-}
+import {
+  createProjectFreezeFixture as fixture,
+  memoryStore,
+  reference,
+} from './test-support/freeze';
 
 it('freezes exact native rows and the origin media dependency without reading another database', async () => {
   const data = fixture();
@@ -160,7 +60,7 @@ it('captures a borrowed stored media source and its physical ref once', async ()
   const source = data.project.project.assets[0]!;
   const borrowed = {
     ...source,
-    type: 'IMAGE' as const,
+    type: 'VIDEO' as const,
     id: 'borrowed-placement',
     source: { kind: 'library-asset' as const, mediaId: data.original.id },
     metadata: { ...source.metadata, mimeType: data.original.mimeType, size: data.original.size },
@@ -238,15 +138,6 @@ it('refuses orphan review history even when its workspace head is absent', async
   await expect(freezeVideoProjectInTransaction(tx, data.project.id)).rejects.toBeInstanceOf(
     UnsupportedSyncCaptureGraphError
   );
-});
-
-it('refuses a recording graph before looking up its unsupported dependency stores', async () => {
-  const data = fixture();
-  data.project.project.source = { kind: 'recording', recordingId: 'recording-1' };
-  await expect(freezeVideoProjectInTransaction(data.tx, data.project.id)).rejects.toBeInstanceOf(
-    UnsupportedSyncCaptureGraphError
-  );
-  expect(data.stores.assets.get).not.toHaveBeenCalled();
 });
 
 it('refuses a malformed saved export rather than omitting it as ordinary backup listing can', async () => {
@@ -412,6 +303,7 @@ function seedSupplementary(data: ReturnType<typeof fixture>, id: string, originM
   if (originMediaId) {
     const media = createMediaLibraryEntry({
       id: originMediaId,
+      kind: 'video',
       source: { kind: 'stored-asset', assetId: `${originMediaId}-bytes` },
       mimeType: entry.mimeType,
       size: entry.size,
@@ -561,118 +453,57 @@ it('retains export-only review assets outside editing dependencies', async () =>
   expect(editing.has('export-nested-origin')).toBe(false);
 });
 
-function recordingSourceFixture() {
+it('keeps a borrowed image original stable when its independent image workspace is edited later', async () => {
   const data = fixture();
-  const recordings = memoryStore();
-  const telemetry = memoryStore();
-  const recording = {
-    id: 'saved',
-    assetId: 'saved-bytes',
-    filename: 'Saved.webm',
-    createdAt: 1,
-    size: 6,
-    mimeType: 'video/webm',
+  const source = {
+    ...data.original,
+    kind: 'image' as const,
+    mimeType: 'image/png',
+    workspaceRevision: 0,
+    imageContentState: 'original' as const,
   };
-  const media = buildRecordingMediaEntry(recording);
-  recordings.seed(recording.id, recording);
-  data.stores.media.seed(media.id, media);
+  data.stores.media.seed(source.id, source);
   data.stores.refs.seed(
-    recording.assetId,
-    reference(recording.assetId, recording.mimeType, recording.size)
+    'original-bytes',
+    reference('original-bytes', source.mimeType, source.size)
   );
-  const owner = {
-    ownerKind: 'recording',
-    ownerId: recording.id,
-    role: 'body',
-    assetId: recording.assetId,
-  };
-  data.stores.owners.seed(['recording', recording.id, 'body'], owner);
+  data.stores.owners.seed(['media-library', source.id, 'source'], {
+    ownerKind: 'media-library',
+    ownerId: source.id,
+    role: 'source',
+    assetId: 'original-bytes',
+  });
+  const nativeImages = memoryStore();
   const tx = new Proxy(data.tx, {
     get(target, property) {
       if (property !== 'objectStore') return Reflect.get(target, property);
       return (name: string) =>
-        name === 'recordings'
-          ? recordings
-          : name === 'recording_telemetry'
-            ? telemetry
-            : target.objectStore(name);
+        name === 'image_workspaces' ? nativeImages : target.objectStore(name);
     },
   });
-  return { ...data, recording, media, recordings, telemetry, owner, tx };
-}
-
-it('freezes a canonical recording source and absent telemetry using only the caller transaction', async () => {
-  const data = recordingSourceFixture();
-  const rows = await freezeMediaInTransaction(data.tx, data.media.id);
-  expect(rows).toMatchObject({
-    media: { id: data.media.id },
-    recording: data.recording,
-    telemetry: null,
+  const pristine = await freezeVideoProjectInTransaction(tx, data.project.id);
+  data.stores.media.seed(source.id, {
+    ...source,
+    workspaceRevision: 1,
+    imageContentState: 'edited',
   });
-  data.recording.filename = 'Later.webm';
-  expect('recording' in rows && rows.recording.filename).toBe('Saved.webm');
-  expect(data.stores.assets.get).not.toHaveBeenCalled();
-  expect(data.recordings.put).not.toHaveBeenCalled();
-});
-
-it('refuses missing or foreign recording ownership and malformed telemetry before capture', async () => {
-  const data = recordingSourceFixture();
-  data.stores.owners.seed(['recording', data.recording.id, 'body'], {
-    ...data.owner,
-    ownerId: 'foreign',
-  });
-  await expect(freezeMediaInTransaction(data.tx, data.media.id)).rejects.toThrow();
-  data.stores.owners.seed(['recording', data.recording.id, 'body'], data.owner);
-  data.telemetry.seed(data.recording.id, { recordingId: data.recording.id });
-  await expect(freezeMediaInTransaction(data.tx, data.media.id)).rejects.toThrow();
-  data.telemetry.rows.clear();
-  data.recordings.seed(data.recording.id, { ...data.recording, id: 'foreign' });
-  await expect(freezeMediaInTransaction(data.tx, data.media.id)).rejects.toThrow();
-});
-
-it('retains the independent review option for a saved recording and validates its immutable source', async () => {
-  const data = recordingSourceFixture();
-  data.stores.videoWorkspaces.seed(data.media.id, {
-    ...structuredClone(reviewWorkspace),
-    aggregateId: data.media.id,
-    sourceAssetId: data.recording.assetId,
-    source: {
-      ...reviewWorkspace.source,
-      size: data.recording.size,
-      mimeType: 'video/webm; codecs="vp8"',
-    },
-    history: [],
-    cursor: 0,
-  });
-  await expect(freezeMediaInTransaction(data.tx, data.media.id)).rejects.toThrow();
-  await expect(
-    freezeMediaInTransaction(data.tx, data.media.id, { allowIndependentReview: true })
-  ).resolves.toMatchObject({ recording: data.recording });
-  data.stores.refs.seed(
-    data.recording.assetId,
-    reference(data.recording.assetId, data.recording.mimeType, 7)
-  );
-  await expect(
-    freezeMediaInTransaction(data.tx, data.media.id, { allowIndependentReview: true })
-  ).rejects.toThrow();
-});
-
-it('ignores a derived recording thumbnail before any review workspace exists', async () => {
-  const data = recordingSourceFixture();
-  data.stores.thumbnails.seed(data.media.id, {
-    assetId: data.media.id,
-    blob: new Blob(['generated-frame'], { type: 'image/webp' }),
-    createdAt: data.recording.createdAt,
-    generatorVersion: 2,
-    height: 180,
+  nativeImages.seed(source.id, {
+    aggregateId: source.id,
+    revision: 1,
+    createdAt: 1,
     updatedAt: 2,
-    width: 320,
+    sourceUrl: null,
+    sourceTitle: null,
+    document: createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'original-bytes'),
   });
-  const rows = await freezeMediaInTransaction(data.tx, data.media.id, {
-    allowIndependentReview: true,
+  const edited = await freezeVideoProjectInTransaction(tx, data.project.id);
+  expect(edited.project).toEqual(pristine.project);
+  expect(edited.refs).toEqual(pristine.refs);
+  expect(edited.assets).toEqual(pristine.assets);
+  expect(edited.media.find((entry) => entry.id === source.id)).toMatchObject({
+    source: { kind: 'stored-asset', assetId: 'original-bytes' },
+    workspaceRevision: 1,
   });
-  expect(rows).toMatchObject({ recording: data.recording, telemetry: null });
-  expect(rows).not.toHaveProperty('thumbnail');
-  expect(data.stores.videoWorkspaces.rows.size).toBe(0);
-  await expect(freezeMediaInTransaction(data.tx, data.media.id)).resolves.toEqual(rows);
+  expect(edited.reviews).toEqual([]);
+  expect(nativeImages.put).not.toHaveBeenCalled();
 });

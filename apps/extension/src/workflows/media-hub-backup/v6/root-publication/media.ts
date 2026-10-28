@@ -61,7 +61,10 @@ import {
   SYNC_CAPTURE_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
-import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
+import type {
+  MediaLibraryEntry,
+  MediaThumbnailEntry,
+} from '../../../../composition/persistence/media-library/contracts';
 import {
   parseMediaLibraryEntry,
   parseMediaThumbnailEntry,
@@ -458,21 +461,38 @@ async function prepareMediaRoot(args: {
 
 type PreparedMediaRoot = Awaited<ReturnType<typeof prepareMediaRoot>>;
 
+function isCaptureImage(media: MediaLibraryEntry): boolean {
+  return (
+    (media.source.kind === 'screenshot' || media.source.kind === 'stored-asset') &&
+    (media.kind === 'image' || media.kind === 'screenshot')
+  );
+}
+
 /** Broad archive restores can contain graphs outside the original-only capture pilot. */
 function isCaptureOriginal(prepared: PreparedMediaRoot): boolean {
+  if (
+    prepared.presentation ||
+    prepared.workspace ||
+    prepared.videoReview ||
+    prepared.reviewAssets.length
+  )
+    return false;
+  if (prepared.snapshot && prepared.media.source.kind === 'web-snapshot') return true;
   return (
     parseCapturedMediaRows({
       media: prepared.media,
       ...(prepared.recording
         ? { recording: prepared.recording, telemetry: prepared.telemetry ?? null }
-        : { projectAsset: prepared.projectAsset }),
+        : prepared.projectExport
+          ? { projectExport: prepared.projectExport }
+          : prepared.projectAsset
+            ? { projectAsset: prepared.projectAsset }
+            : {}),
       ref: prepared.original.ref,
     }) !== null &&
-    (!prepared.thumbnail || prepared.media.source.kind === 'recording') &&
-    !prepared.presentation &&
-    !prepared.workspace &&
-    !prepared.videoReview &&
-    prepared.reviewAssets.length === 0
+    (!prepared.thumbnail ||
+      prepared.media.source.kind === 'recording' ||
+      prepared.media.source.kind === 'project-export')
   );
 }
 
@@ -647,7 +667,7 @@ async function commitPreparedMediaRoot(args: {
       ) {
         throw new Error('Media restore child belongs to another root.');
       }
-      if (args.prepared.media.source.kind === 'screenshot') {
+      if (isCaptureImage(args.prepared.media)) {
         const revision = await allocateRestoredImageRevision(
           tx,
           args.prepared.media.id,
@@ -689,10 +709,7 @@ async function commitPreparedMediaRoot(args: {
           conflicted: conflict.conflict,
         }
       );
-      if (
-        args.prepared.media.source.kind === 'screenshot' &&
-        (args.prepared.media.kind === 'image' || args.prepared.media.kind === 'screenshot')
-      )
+      if (isCaptureImage(args.prepared.media))
         await captureImageInTransaction(tx, args.prepared.media.id, { origin: 'local-restore' });
       else if (isCaptureReview(args.prepared))
         await captureVideoReviewInTransaction(tx, args.prepared.media.id, {

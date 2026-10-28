@@ -303,3 +303,63 @@ it.each(['no-connection', 'no-cache', 'old-profile'] as const)(
     expect(mocks.materialized).not.toHaveBeenCalled();
   }
 );
+
+it.each(['temporary', 'step-template', 'library'])(
+  'keeps a %s Scenario prerequisite out of the Library unless saved normally',
+  async (kind) => {
+    const { roots, operations } = installDisplayCatalog();
+    roots.clear();
+    operations.clear();
+    roots.set('scenario', {
+      rootKind: 'scenario-project',
+      rootId: 'scenario',
+      heads: ['scenario-op'],
+      deleted: false,
+      blocked: false,
+      conflict: false,
+      unavailableDependencies: [],
+    });
+    operations.set('scenario-op', {
+      operationText: '{}',
+      operation: { operationId: 'scenario-op', envelope: { fixtureId: 'scenario' } },
+    });
+    mocks.portable.mockResolvedValue({
+      kind: 'scenario-project',
+      name: 'Guide',
+      metadata: {
+        entry: {
+          createdAt: 1,
+          updatedAt: 2,
+          lifecycle: { storageClass: kind === 'temporary' ? 'temporary' : 'library' },
+          project: kind === 'step-template' ? { purpose: 'step-template' } : {},
+        },
+      },
+      envelope: { descriptor: { totalBytes: 3 } },
+    });
+    const cards = await readPersistedSyncCatalogCards();
+    expect(cards).toHaveLength(kind === 'library' ? 1 : 0);
+    expect(mocks.materialized.mock.calls[0]?.[0].selections).toHaveLength(
+      kind === 'library' ? 1 : 0
+    );
+  }
+);
+
+it('keeps a conflict visible when its first catalog head is already the local published version', async () => {
+  const { roots, operations } = installDisplayCatalog();
+  const root = roots.get('project')!;
+  root.conflict = true;
+  root.heads.push('alternate-project');
+  const original = operations.get('operation-project')!;
+  operations.set('alternate-project', {
+    ...original,
+    operationText: '{"alternate":true}',
+    operation: { ...original.operation, operationId: 'alternate-project' },
+  });
+  mocks.materialized.mockImplementation(async ({ selections }) => selections);
+  const card = (await readPersistedSyncCatalogCards()).find(
+    (item) => item.selection.rootId === 'project'
+  );
+  expect(card).toMatchObject({ conflict: true });
+  expect(card?.versions).toHaveLength(2);
+  expect(card?.materialized).not.toBe(true);
+});

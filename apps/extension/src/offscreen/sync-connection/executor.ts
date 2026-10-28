@@ -82,7 +82,7 @@ interface WorkspaceJob {
 
 /** All execution authority is injected; the disposable executor never opens durable storage. */
 export interface SyncExecutorPorts {
-  onSettled?(requestId: string, kind: 'product' | 'workspace'): void;
+  onSettled?(requestId: string, kind: 'product' | 'workspace' | 'queue'): void;
   executorId: string;
   offscreenStartupId: string;
   createExecution(input: SyncExecutionInput): SyncExecutorExecution;
@@ -140,7 +140,7 @@ class SyncConnectionExecutor {
     this.#ports = ports;
   }
 
-  #settled(requestId: string | undefined, kind: 'product' | 'workspace') {
+  #settled(requestId: string | undefined, kind: 'product' | 'workspace' | 'queue') {
     if (!requestId) return;
     try {
       this.#ports.onSettled?.(requestId, kind);
@@ -217,6 +217,8 @@ class SyncConnectionExecutor {
         ![...this.#products.values()].some((item) => item.active)
       )
         this.#phase = 'idle';
+      if (!job.controller.signal.aborted && !job.unsafe && job.snapshot.state === 'published')
+        this.#settled(job.snapshot.operationId, 'queue');
     }
   }
 
@@ -593,18 +595,23 @@ class SyncConnectionExecutor {
   #canStartProduct(
     command: Extract<SyncProductExecutorRequest['command'], { kind: 'start' }>
   ): boolean {
+    const advisory =
+      command.work.kind === 'thumbnail-read' || command.work.kind === 'automatic-sync';
+    let activeProducts = false;
+    let activeThumbnails = 0;
+    for (const item of this.#products.values()) {
+      if (item.unsafe) return false;
+      if (!item.active) continue;
+      activeProducts = true;
+      if (command.work.kind === 'automatic-sync') return false;
+      if (!advisory && item.work.kind !== 'thumbnail-read' && item.work.kind !== 'automatic-sync')
+        return false;
+      if (item.work.kind === 'thumbnail-read') activeThumbnails++;
+    }
     if (
       this.#foregroundAdmission ||
       !this.#ports.createProductExecution ||
-      [...this.#products.values()].some((item) => item.unsafe) ||
-      (command.work.kind !== 'thumbnail-read' &&
-        [...this.#products.values()].some(
-          (item) => item.active && item.work.kind !== 'thumbnail-read'
-        )) ||
-      ([...this.#products.values()].filter(
-        (item) => item.active && item.work.kind === 'thumbnail-read'
-      ).length >= 16 &&
-        command.work.kind === 'thumbnail-read') ||
+      (command.work.kind === 'thumbnail-read' && activeThumbnails >= 16) ||
       this.#workspace?.active ||
       this.#workspace?.unsafe ||
       (this.#phase === 'stopped' &&
@@ -612,21 +619,18 @@ class SyncConnectionExecutor {
         sameSyncConnectionIdentity(this.#binding.authorization, command.binding.authorization))
     )
       return false;
-    if (
+    return !(
       this.#binding &&
       !sameBinding(this.#binding, command.binding) &&
-      ([...this.#jobs.values()].some((job) => job.active || job.unsafe) ||
-        [...this.#products.values()].some((item) => item.active || item.unsafe))
-    )
-      return false;
-    return true;
+      ([...this.#jobs.values()].some((job) => job.active || job.unsafe) || activeProducts)
+    );
   }
 
-  async #containPreviews(): Promise<boolean> {
+  async #containAdvisoryProducts(): Promise<boolean> {
     const thumbnails = [...this.#products.values()].filter(
-      (item) => item.active && item.work.kind === 'thumbnail-read'
+      (item) =>
+        item.active && (item.work.kind === 'thumbnail-read' || item.work.kind === 'automatic-sync')
     );
-    this.#foregroundAdmission = true;
     try {
       for (const item of thumbnails) item.controller.abort();
       await Promise.all(
@@ -634,14 +638,12 @@ class SyncConnectionExecutor {
           await item.execution.drain();
           await item.completion;
           this.#settled(item.snapshot.requestId, 'product');
-          if (item.unsafe) throw new Error('Sync thumbnail containment failed');
+          if (item.unsafe) throw new Error('Sync advisory containment failed');
         })
       );
     } catch {
       this.#phase = 'failed';
       return false;
-    } finally {
-      this.#foregroundAdmission = false;
     }
     return true;
   }
@@ -690,7 +692,16 @@ class SyncConnectionExecutor {
         ![...this.#products.values()].some((item) => item.active)
       )
         this.#phase = 'idle';
-      if (!controller.signal.aborted) this.#settled(selected.snapshot.requestId, 'product');
+      if (!controller.signal.aborted) {
+        this.#settled(selected.snapshot.requestId, 'product');
+        if (
+          !selected.unsafe &&
+          selected.snapshot.state === 'ready' &&
+          selected.result?.kind === 'automatic' &&
+          selected.result.remaining
+        )
+          this.#settled(selected.snapshot.requestId, 'queue');
+      }
     }
   }
 
@@ -757,16 +768,20 @@ class SyncConnectionExecutor {
         ? { success: true, result: { kind: 'accepted', requestId: command.operationRequestId } }
         : this.#refuseProduct();
     if (!this.#canStartProduct(command)) return this.#refuseProduct();
-    if (command.work.kind !== 'thumbnail-read') {
-      if (!(await this.#containPreviews())) return this.#refuseProduct();
-      // Stop may reserve while preview drainage or its continuation is pending.
+    if (command.work.kind === 'thumbnail-read') return this.#startProduct(command);
+    this.#foregroundAdmission = true;
+    try {
+      if (!(await this.#containAdvisoryProducts())) return this.#refuseProduct();
+      // Stop may reserve while advisory drainage or its continuation is pending.
       if (
         !matchesTarget(request, this.#ports, this.#executorRevision) ||
         this.#productAdmissionClosed()
       )
         return this.#refuseProduct();
+      return await this.#startProduct(command);
+    } finally {
+      this.#foregroundAdmission = false;
     }
-    return this.#startProduct(command);
   }
 }
 

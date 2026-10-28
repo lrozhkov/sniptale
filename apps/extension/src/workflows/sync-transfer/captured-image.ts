@@ -19,7 +19,9 @@ export async function encodeCapturedImageRoot(value: CapturedImageRows) {
   const parsed = parseCapturedImageRows(value);
   if (!parsed) throw new Error('Invalid frozen image source.');
   const rows = structuredClone(parsed);
-  const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
+  const refs = new Map(
+    [...rows.refs, ...(rows.originalRef ? [rows.originalRef] : [])].map((ref) => [ref.assetId, ref])
+  );
   const db = {
     async get(store: string, key: unknown): Promise<unknown> {
       if (store === MEDIA_LIBRARY_STORE && key === rows.media.id) return rows.media;
@@ -69,5 +71,17 @@ export async function encodeCapturedImageRoot(value: CapturedImageRows) {
     metadata,
     objects: objects.map((object) => object.ref),
   });
-  return { envelope, objects, dependencies: [], bindings: [] };
+  const bindings = [];
+  if (rows.originalRef) {
+    const metadata = loaded.metadata;
+    if (
+      typeof metadata !== 'object' ||
+      metadata === null ||
+      Array.isArray(metadata) ||
+      typeof metadata['originalObjectId'] !== 'string'
+    )
+      throw new Error('Image original object is missing.');
+    bindings.push({ objectId: metadata['originalObjectId'], ref: rows.originalRef });
+  }
+  return { envelope, objects, dependencies: [], bindings };
 }

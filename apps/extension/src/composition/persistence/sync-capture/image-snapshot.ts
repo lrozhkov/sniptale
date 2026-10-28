@@ -1,12 +1,13 @@
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { parseAssetRef } from '../assets/guards';
+import { parseAssetRef, parseAssetOwner } from '../assets/guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import {
   ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
   MEDIA_LIBRARY_STORE,
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -61,10 +62,14 @@ export function isBoundedImageMetadata(value: unknown, allowBlobs = true): boole
 export function parseCapturedImageRows(value: unknown): CapturedImageRows | null {
   if (!isRecord(value) || !isBoundedImageMetadata(value)) return null;
   if (
-    Object.keys(value).some((key) => !['media', 'workspace', 'presentation', 'refs'].includes(key))
+    Object.keys(value).some(
+      (key) => !['media', 'workspace', 'presentation', 'refs', 'originalRef'].includes(key)
+    )
   )
     return null;
   const media = parseMediaLibraryEntry(value['media']);
+  const originalRef =
+    value['originalRef'] === undefined ? undefined : parseAssetRef(value['originalRef']);
   const workspace =
     value['workspace'] === null ? null : parseImageWorkspaceEntry(value['workspace']);
   const presentation =
@@ -72,11 +77,19 @@ export function parseCapturedImageRows(value: unknown): CapturedImageRows | null
   const rawRefs = value['refs'];
   if (
     !media ||
-    media.source.kind !== 'screenshot' ||
+    (media.source.kind !== 'screenshot' && media.source.kind !== 'stored-asset') ||
     !['image', 'screenshot'].includes(media.kind) ||
-    !(media.blob instanceof Blob) ||
-    media.blob.size !== media.size ||
-    (media.blob.type && media.blob.type !== media.mimeType) ||
+    (media.source.kind === 'screenshot' &&
+      (!(media.blob instanceof Blob) ||
+        media.blob.size !== media.size ||
+        (media.blob.type && media.blob.type !== media.mimeType) ||
+        originalRef !== undefined)) ||
+    (media.source.kind === 'stored-asset' &&
+      (media.blob !== undefined ||
+        !originalRef ||
+        originalRef.assetId !== media.source.assetId ||
+        originalRef.size !== media.size ||
+        originalRef.mimeType !== media.mimeType)) ||
     !Number.isSafeInteger(media.workspaceRevision) ||
     media.recordingMetadata ||
     media.recordingGroup ||
@@ -112,7 +125,13 @@ export function parseCapturedImageRows(value: unknown): CapturedImageRows | null
       presentation.presentationRevision > (media.workspaceRevision ?? 0))
   )
     return null;
-  return { media, workspace, presentation, refs: admittedRefs };
+  return {
+    media,
+    workspace,
+    presentation,
+    refs: admittedRefs,
+    ...(originalRef ? { originalRef } : {}),
+  };
 }
 
 /** Read the accepted after-image exclusively through the writer's live transaction. */
@@ -120,7 +139,22 @@ export async function freezeImageInTransaction(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   mediaId: string
 ): Promise<CapturedImageRows> {
-  const media: unknown = await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId);
+  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  let originalRef: unknown;
+  if (media?.source.kind === 'stored-asset') {
+    originalRef = await tx.objectStore(ASSET_REFS_STORE).get(media.source.assetId);
+    const owner = parseAssetOwner(
+      await tx.objectStore(ASSET_OWNERS_STORE).get(['media-library', mediaId, 'source'])
+    );
+    if (
+      !owner ||
+      owner.ownerKind !== 'media-library' ||
+      owner.ownerId !== mediaId ||
+      owner.role !== 'source' ||
+      owner.assetId !== media.source.assetId
+    )
+      throw new Error('Invalid stored image source ownership.');
+  }
   const rawWorkspace: unknown = await tx.objectStore(IMAGE_WORKSPACES_STORE).get(mediaId);
   const workspace = parseImageWorkspaceEntry(rawWorkspace);
   const presentation: unknown = await tx
@@ -134,6 +168,7 @@ export async function freezeImageInTransaction(
     workspace: rawWorkspace ?? null,
     presentation: presentation ?? null,
     refs,
+    ...(originalRef === undefined ? {} : { originalRef }),
   });
   if (!rows || rows.media.id !== mediaId)
     throw new Error('Unsupported screenshot aggregate snapshot.');

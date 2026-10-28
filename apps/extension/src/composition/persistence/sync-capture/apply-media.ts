@@ -4,6 +4,15 @@ import {
 } from '../remote-connection/model';
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { putRecordingBackupRestore } from '../recordings/backup-restore';
+import { putWebSnapshotBackupRestore } from '../web-snapshots/backup-restore';
+import { createWebSnapshotThumbnailEntry } from '../web-snapshots/media-entry';
+import {
+  sanitizeWebSnapshotPackageProvenance,
+  readWebSnapshotPackageScreenshotBytes,
+} from '../../../features/web-snapshot/provenance';
+import { validateRetainedWebSnapshotScreenshot } from '../../../features/web-snapshot/screenshot-validation';
+import { readAssetFile } from '../assets';
+import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from '../assets/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -34,6 +43,7 @@ import {
   VIDEO_WORKSPACE_HISTORY_STORE,
   THUMBNAILS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
+  WEB_SNAPSHOTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import {
   publishPreparedMediaSourceInTransaction,
@@ -107,7 +117,7 @@ interface ReplicaIdentity {
 }
 
 async function readReceipt(
-  tx: ApplyTransaction,
+  tx: ReadTransaction,
   input: ApplyPreparedMediaReplicaInput,
   identity: ReplicaIdentity
 ): Promise<number | null> {
@@ -159,17 +169,40 @@ async function assertUnclaimedIdentity(
   identity: ReplicaIdentity,
   hasGraveyard = false
 ): Promise<void> {
-  for (const [store, key] of [
+  const childRows: [string, string][] =
+    'recording' in rows
+      ? [[STORE_NAME, rows.recording.id]]
+      : 'projectAsset' in rows
+        ? [[PROJECT_ASSETS_STORE, rows.projectAsset.id]]
+        : 'projectExport' in rows
+          ? [[PROJECT_EXPORTS_STORE, rows.projectExport.id]]
+          : 'webSnapshot' in rows
+            ? [[WEB_SNAPSHOTS_STORE, rows.webSnapshot.id]]
+            : [];
+  const identities: [string, string][] = [
     [SYNC_CAPTURE_STORE, identity.stateKey],
     [MEDIA_LIBRARY_STORE, rows.media.id],
-    'recording' in rows
-      ? [STORE_NAME, rows.recording.id]
-      : [PROJECT_ASSETS_STORE, rows.projectAsset.id],
-  ] as const) {
+    ...childRows,
+  ];
+  for (const [store, key] of identities) {
     if (store === SYNC_CAPTURE_STORE && hasGraveyard) continue;
     if ((await tx.objectStore(store).get(key)) !== undefined)
       throw new MediaReplicaConflictError('source-changed');
   }
+  const ownerKeys =
+    'projectExport' in rows
+      ? [['project-export', rows.projectExport.id, 'body']]
+      : 'webSnapshot' in rows
+        ? [
+            ['web-snapshot', rows.webSnapshot.id, 'package'],
+            ['web-snapshot', rows.webSnapshot.id, 'screenshot'],
+          ]
+        : rows.media.source.kind === 'stored-asset'
+          ? [['media-library', rows.media.id, 'source']]
+          : [];
+  for (const key of ownerKeys)
+    if ((await tx.objectStore(ASSET_OWNERS_STORE).get(key)) !== undefined)
+      throw new MediaReplicaConflictError('source-changed');
   if ('recording' in rows) {
     if (
       (await tx.objectStore(ASSET_OWNERS_STORE).get(['recording', rows.recording.id, 'body'])) !==
@@ -202,6 +235,8 @@ async function assertAbsentSource(
   const currentRef: unknown = await tx.objectStore(ASSET_REFS_STORE).get(ref.assetId);
   if (currentRef !== undefined && JSON.stringify(parseAssetRef(currentRef)) !== JSON.stringify(ref))
     throw new MediaReplicaConflictError('source-changed');
+  if ('screenshotRef' in input.rows)
+    await assertSnapshotScreenshotRef(tx, input.rows.screenshotRef);
 }
 
 async function readMediaPredecessorState(
@@ -250,7 +285,9 @@ async function assertExistingSource(
   });
   if (
     state.nativeDigest !== digestCapturedMediaRows(previous) ||
-    JSON.stringify(previous.media.source) !== JSON.stringify(input.rows.media.source)
+    previous.media.source.kind !== input.rows.media.source.kind ||
+    (previous.media.source.kind !== 'stored-asset' &&
+      JSON.stringify(previous.media.source) !== JSON.stringify(input.rows.media.source))
   )
     throw new MediaReplicaConflictError('source-changed');
   if (previous.ref.assetId !== input.rows.ref.assetId)
@@ -258,6 +295,8 @@ async function assertExistingSource(
   const ref: unknown = await tx.objectStore(ASSET_REFS_STORE).get(input.rows.ref.assetId);
   if (ref !== undefined && JSON.stringify(parseAssetRef(ref)) !== JSON.stringify(input.rows.ref))
     throw new MediaReplicaConflictError('source-changed');
+  if ('screenshotRef' in input.rows)
+    await assertSnapshotScreenshotRef(tx, input.rows.screenshotRef);
   return previous;
 }
 
@@ -276,6 +315,8 @@ export async function loadMediaReplicaPredecessorRef(input: {
       SYNC_CAPTURE_STORE,
       MEDIA_LIBRARY_STORE,
       PROJECT_ASSETS_STORE,
+      PROJECT_EXPORTS_STORE,
+      WEB_SNAPSHOTS_STORE,
       ASSET_OWNERS_STORE,
       STORE_NAME,
       RECORDING_TELEMETRY_STORE,
@@ -323,7 +364,21 @@ export async function loadMediaReplicaPredecessorRef(input: {
     await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.mediaId)
   );
   if (!media) throw new MediaReplicaConflictError('source-changed');
-  if (media.source.kind !== 'project-asset' && media.source.kind !== 'recording') {
+  if (
+    media.source.kind === 'stored-asset' &&
+    (media.kind === 'image' || media.kind === 'screenshot')
+  ) {
+    const previous = await freezeImageInTransaction(tx, input.mediaId);
+    if (state.nativeDigest !== digestCapturedImageRows(previous))
+      throw new MediaReplicaConflictError('source-changed');
+    await tx.done;
+    return structuredClone(previous.originalRef ?? null);
+  }
+  if (
+    !['project-asset', 'project-export', 'stored-asset', 'recording', 'web-snapshot'].includes(
+      media.source.kind
+    )
+  ) {
     await tx.done;
     return null;
   }
@@ -346,6 +401,7 @@ async function publishReplica(
     media: rows.media,
     original: { ref: rows.ref },
     ...('projectAsset' in rows ? { projectAsset: rows.projectAsset } : {}),
+    ...('projectExport' in rows ? { projectExport: rows.projectExport } : {}),
   };
   const stores = {
     media: tx.objectStore(MEDIA_LIBRARY_STORE),
@@ -383,6 +439,15 @@ async function publishReplica(
     throw new MediaReplicaConflictError('invalid-input');
   await publishPreparedMediaSourceInTransaction(prepared, stores);
   await publishPreparedMediaProjectChildInTransaction(prepared, stores);
+  if ('webSnapshot' in rows)
+    await putWebSnapshotBackupRestore({
+      record: rows.webSnapshot,
+      packageRef: rows.ref,
+      screenshotRef: rows.screenshotRef,
+      refStore: stores.refs,
+      ownerStore: stores.owners,
+      snapshotStore: tx.objectStore(WEB_SNAPSHOTS_STORE),
+    });
   if ('recording' in rows) {
     await putRecordingBackupRestore({
       entry: rows.recording,
@@ -405,6 +470,29 @@ export async function applyPreparedMediaReplica(
   lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<{ status: 'applied' | 'duplicate'; generation: number }> {
   const candidate = preparedInput(input);
+  if ('webSnapshot' in candidate.rows) {
+    const db = await initDB();
+    const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+    const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+    if (
+      !profile ||
+      profile.kind !== 'profile' ||
+      profile.spaceId !== candidate.spaceId ||
+      profile.createdAt !== candidate.profileCreatedAt
+    )
+      throw new MediaReplicaConflictError('profile-changed');
+    const rootKey = captureRootKey(profile.spaceId, 'media', candidate.rows.media.id);
+    const generation = await readReceipt(tx, candidate, {
+      rootKey,
+      spaceId: profile.spaceId,
+      stateKey: JSON.stringify(['root-state', rootKey]),
+      receiptKey: JSON.stringify(['applied-operation', profile.spaceId, candidate.operationId]),
+    });
+    await tx.done;
+    if (generation !== null) return { status: 'duplicate', generation };
+  }
+  const thumbnail =
+    'webSnapshot' in candidate.rows ? await prepareSnapshotThumbnail(candidate.rows) : null;
   const operation = buildPhysicalDeleteOperation([]);
   const result = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
@@ -428,6 +516,7 @@ export async function applyPreparedMediaReplica(
         VIDEO_WORKSPACE_HISTORY_STORE,
         THUMBNAILS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
+        WEB_SNAPSHOTS_STORE,
       ],
       'readwrite'
     );
@@ -462,12 +551,19 @@ export async function applyPreparedMediaReplica(
         await assertAbsentSource(tx, candidate, identity);
       else {
         const previous = await assertExistingSource(tx, candidate, identity);
-        if (previous && previous.ref.assetId !== candidate.rows.ref.assetId)
+        if (
+          previous &&
+          (previous.ref.assetId !== candidate.rows.ref.assetId ||
+            ('screenshotRef' in previous &&
+              'screenshotRef' in candidate.rows &&
+              previous.screenshotRef.assetId !== candidate.rows.screenshotRef.assetId))
+        )
           await releaseMediaSource(tx, previous.media, operation, {
             retainRecordingRecovery: true,
           });
       }
       await publishReplica(tx, candidate, identity);
+      if (thumbnail) await tx.objectStore(THUMBNAILS_STORE).put(thumbnail);
       if (operation.assetIds.length) await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
       await tx.done;
       return { status: 'applied' as const, generation: candidate.expectedLocalGeneration + 1 };
@@ -477,4 +573,39 @@ export async function applyPreparedMediaReplica(
   });
   if (operation.assetIds.length) await completePhysicalDeleteOperation(operation, lifecyclePermit);
   return result;
+}
+
+async function assertSnapshotScreenshotRef(tx: ReadTransaction, ref: AssetRef): Promise<void> {
+  const current: unknown = await tx.objectStore(ASSET_REFS_STORE).get(ref.assetId);
+  if (current !== undefined && JSON.stringify(parseAssetRef(current)) !== JSON.stringify(ref))
+    throw new MediaReplicaConflictError('source-changed');
+}
+
+async function prepareSnapshotThumbnail(
+  rows: Extract<CapturedMediaRows, { webSnapshot: unknown }>
+) {
+  const file = await readAssetFile(rows.ref, rows.media.filename);
+  const screenshot = await readAssetFile(rows.screenshotRef, `${rows.media.id}-screenshot`);
+  if (
+    file.size !== rows.ref.size ||
+    file.type !== rows.ref.mimeType ||
+    screenshot.size !== rows.screenshotRef.size ||
+    screenshot.type !== rows.screenshotRef.mimeType
+  )
+    throw new MediaReplicaConflictError('invalid-input');
+  const checked = await sanitizeWebSnapshotPackageProvenance(file, rows.webSnapshot.manifest, {
+    includeSourceMetadata: true,
+    requireManifestMatch: true,
+  });
+  if (checked.changed) throw new MediaReplicaConflictError('invalid-input');
+  await validateRetainedWebSnapshotScreenshot({
+    screenshotBlob: screenshot,
+    packageBytes: await readWebSnapshotPackageScreenshotBytes(file, rows.webSnapshot.manifest),
+  });
+  return createWebSnapshotThumbnailEntry({
+    assetId: rows.media.id,
+    createdAt: rows.webSnapshot.createdAt,
+    updatedAt: rows.webSnapshot.updatedAt,
+    screenshotBlob: screenshot,
+  });
 }

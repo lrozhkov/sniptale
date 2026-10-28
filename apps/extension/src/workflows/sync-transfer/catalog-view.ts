@@ -1,3 +1,4 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { loadMaterializedCatalogSelections } from '../../composition/persistence/sync-capture/catalog-admission';
 import { loadSyncConnection } from '../../composition/persistence/remote-connection/store';
 import { loadSyncCatalogCache } from '../../composition/persistence/sync-catalog/catalog-cache';
@@ -62,7 +63,12 @@ export async function readPersistedSyncCatalogCards(): Promise<SyncRemoteCatalog
       selection,
       label: root.rootId,
       tags: [],
-      kind: root.rootKind === 'media' ? 'video' : root.rootKind,
+      kind:
+        root.rootKind === 'media'
+          ? 'video'
+          : root.rootKind === 'scenario-project'
+            ? 'scenario'
+            : root.rootKind,
       mimeType: null,
       size: 0,
       createdAt: 0,
@@ -86,7 +92,22 @@ export async function readPersistedSyncCatalogCards(): Promise<SyncRemoteCatalog
           createdAt: parsed.entry.createdAt,
           updatedAt: parsed.entry.updatedAt,
         };
-      else {
+      else if (parsed.kind === 'scenario-project') {
+        if (
+          parsed.metadata.entry.lifecycle?.storageClass === 'temporary' ||
+          (isRecord(parsed.metadata.entry.project) &&
+            parsed.metadata.entry.project['purpose'] === 'step-template')
+        )
+          continue;
+        card = {
+          ...card,
+          label: parsed.name,
+          kind: 'scenario',
+          size: parsed.envelope.descriptor.totalBytes,
+          createdAt: parsed.metadata.entry.createdAt,
+          updatedAt: parsed.metadata.entry.updatedAt,
+        };
+      } else {
         const entry = parsed.metadata.entry;
         card = {
           ...card,
@@ -109,6 +130,37 @@ export async function readPersistedSyncCatalogCards(): Promise<SyncRemoteCatalog
         };
       }
     }
+    if (root.conflict) {
+      const versions: NonNullable<SyncRemoteCatalogCard['versions']> = [];
+      for (const id of root.heads) {
+        const version = catalog.operations.get(id);
+        if (!version) continue;
+        let label = root.rootId;
+        if (version.operation.envelope) {
+          const portable = await parsePortableSyncRoot(
+            version.operation.envelope,
+            version.operation.reviewSourceMediaId
+          );
+          label =
+            portable.kind === 'video-project'
+              ? portable.entry.project.name
+              : portable.kind === 'scenario-project'
+                ? portable.name
+                : portable.metadata.entry.filename;
+        }
+        versions.push({
+          selection: {
+            rootKind: root.rootKind,
+            rootId: root.rootId,
+            operationId: id,
+            sourceDigest: hashSyncText(version.operationText),
+          },
+          label,
+          deleted: version.operation.kind === 'delete',
+        });
+      }
+      card = { ...card, versions };
+    }
     cards.push(card);
   }
   const connection = await loadSyncConnection();
@@ -119,6 +171,8 @@ export async function readPersistedSyncCatalogCards(): Promise<SyncRemoteCatalog
   });
   const proven = new Set(materialized.map((selection) => JSON.stringify(selection)));
   return cards.map((card) =>
-    proven.has(JSON.stringify(card.selection)) ? { ...card, materialized: true } : card
+    !card.conflict && proven.has(JSON.stringify(card.selection))
+      ? { ...card, materialized: true }
+      : card
   );
 }

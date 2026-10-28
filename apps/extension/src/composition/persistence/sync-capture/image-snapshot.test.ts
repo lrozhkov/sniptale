@@ -5,7 +5,7 @@ import { createEditorDocumentFixture } from '../../../editor/document/page-sessi
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
-import { captureImageInTransaction } from './capture';
+import { captureImageInTransaction, captureMediaInTransaction } from './capture';
 import { parseSyncCaptureRecord } from './guards';
 import { parseCapturedImageRows, digestCapturedImageRows } from './image-snapshot';
 import { collectSyncCaptureClaims } from './claims';
@@ -210,4 +210,74 @@ it('serializes controlled parallel image captures into causal predecessors', asy
   const acceptedSecond = await second;
   expect(acceptedFirst).toMatchObject({ generation: 1 });
   expect(acceptedSecond).toMatchObject({ generation: 2, basis: [acceptedFirst?.operationId] });
+});
+
+it('captures stored image originals separately from authored document refs and pins both', async () => {
+  const f = setup();
+  const { blob: _blob, ...media } = f.media;
+  const originalRef = {
+    ...f.ref,
+    assetId: 'stored-original',
+    location: { kind: 'opfs' as const, objectKey: 'objects/stored-original' },
+  };
+  f.table('media_library').set(media.id, {
+    ...media,
+    kind: 'image',
+    source: { kind: 'stored-asset', assetId: originalRef.assetId },
+    workspaceRevision: 1,
+  });
+  f.table('image_workspaces').set(media.id, f.workspace);
+  f.table('asset_refs').set(originalRef.assetId, originalRef);
+  f.table('asset_refs').set(f.ref.assetId, f.ref);
+  const key = JSON.stringify(['media-library', media.id, 'source']);
+  f.table('asset_owners').set(key, {
+    ownerKind: 'media-library',
+    ownerId: media.id,
+    role: 'source',
+    assetId: originalRef.assetId,
+  });
+  const captured = await runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction(
+      [
+        'media_library',
+        'image_workspaces',
+        'aggregate_presentations',
+        'asset_refs',
+        'asset_owners',
+        'sync_capture',
+      ],
+      'readwrite'
+    );
+    const result = await captureMediaInTransaction(tx, media.id);
+    await tx.done;
+    return result;
+  });
+  expect(captured).toMatchObject({
+    change: { kind: 'image', rows: { originalRef, refs: [f.ref] } },
+  });
+  expect(collectSyncCaptureClaims([captured]).assetIds).toEqual(
+    new Set([originalRef.assetId, f.ref.assetId])
+  );
+  f.table('asset_owners').set(key, {
+    ownerKind: 'media-library',
+    ownerId: 'other',
+    role: 'source',
+    assetId: originalRef.assetId,
+  });
+  await expect(
+    runWithIndexedDbMutation(async (db) => {
+      const tx = db.transaction(
+        [
+          'media_library',
+          'image_workspaces',
+          'aggregate_presentations',
+          'asset_refs',
+          'asset_owners',
+          'sync_capture',
+        ],
+        'readwrite'
+      );
+      return captureMediaInTransaction(tx, media.id);
+    })
+  ).rejects.toThrow('ownership');
 });
