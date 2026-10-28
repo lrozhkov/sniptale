@@ -1,7 +1,7 @@
 import { useProviderCardActions } from '../controller/provider-card-actions';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { getAIProviderDefinition } from '../../../../../contracts/settings/ai-provider';
-import { formatDateTime } from '../../../../../platform/i18n';
+import { ProviderCatalogDetails } from './provider-catalog-details';
 import { providerStatus } from './provider-status';
 import { translate } from '../../../../../platform/i18n';
 import { SettingsCollection, type SettingsCollectionItem } from '../../../../section-surface';
@@ -16,14 +16,11 @@ export function AIProvidersProvidersCard(props: { state: AiProvidersSectionState
     enabled: provider.enabled !== false,
     supplement: (
       <div className="space-y-1">
-        {provider.observation && (
-          <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-            {formatDateTime(provider.observation.checkedAt, {
-              dateStyle: 'short',
-              timeStyle: 'short',
-            })}
-          </p>
-        )}
+        <ProviderCatalogDetails
+          provider={provider}
+          models={props.state.catalogModels}
+          onConfigureModel={() => props.state.modals.openModelModal(undefined, provider.id)}
+        />
         <ProductActionButton
           compact
           tone="secondary"

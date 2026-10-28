@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+import { formatDateTime } from '../../../../../platform/i18n';
 import { translate } from '../../../../../platform/i18n';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import type { AiProvidersSectionState } from '../controller/types';
@@ -492,5 +493,190 @@ it('refuses an enabled change when the mounted card has no current provider inca
   expect(setAIProviderEnabled).not.toHaveBeenCalled();
   expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
     translate('common.errors.saveFailed')
+  );
+});
+
+it('shows successful catalog freshness separately from later failed and operation checks', async () => {
+  const successfulAt = Date.UTC(2026, 0, 2, 10);
+  const checkedAt = Date.UTC(2026, 0, 3, 11);
+  for (const scope of ['catalog', 'operation'] as const) {
+    await renderUi(
+      <AIProvidersProvidersCard
+        state={createState({
+          providers: [
+            {
+              ...PROVIDER,
+              management: 'automatic',
+              catalogUpdatedAt: successfulAt,
+              observation: {
+                scope,
+                checkedAt,
+                revision: 1,
+                status: 'unavailable',
+                reason: 'network',
+              },
+            },
+          ],
+        })}
+      />
+    );
+    expect(container?.textContent).not.toMatch(/\{(?:date|count)\}/u);
+    expect(container?.textContent).toContain(
+      translate('settings.aiProviders.providerCatalogUpdated').replace(
+        '{date}',
+        formatDateTime(successfulAt, { dateStyle: 'short', timeStyle: 'short' })
+      )
+    );
+    expect(container?.textContent).toContain(
+      translate('settings.aiProviders.providerChecked').replace(
+        '{date}',
+        formatDateTime(checkedAt, { dateStyle: 'short', timeStyle: 'short' })
+      )
+    );
+  }
+});
+
+it('counts each usable model once with adapter, enabled and lifecycle admission', async () => {
+  const capabilities = {
+    operations: { text: 'supported', speech: 'supported' },
+    input: {},
+    output: {},
+    features: {},
+  } as const;
+  const catalog = {
+    capabilities,
+    displayName: 'Model',
+    lifecycle: 'active',
+    observedAt: 1,
+  } as const;
+  await renderUi(
+    <AIProvidersProvidersCard
+      state={createState({
+        providers: [{ ...PROVIDER, management: 'automatic' }],
+        models: [],
+        catalogModels: [
+          { ...MODEL, capabilities, catalog, source: 'catalog' },
+          { ...MODEL, id: 'disabled', enabled: false, capabilities, catalog },
+          { ...MODEL, id: 'retired', capabilities, catalog: { ...catalog, lifecycle: 'retired' } },
+          { ...MODEL, id: 'other', providerId: 'other', capabilities },
+          { ...MODEL, id: 'unknown', capabilities: { ...capabilities, operations: {} } },
+        ],
+      })}
+    />
+  );
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.providerEligibleModels').replace('{count}', '1')
+  );
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.providerCatalogNeverUpdated')
+  );
+});
+
+it('explains ID-only catalogs and opens manual setup for the relevant connection', async () => {
+  const capabilities = { operations: {}, input: {}, output: {}, features: {} };
+  const state = createState({
+    providers: [{ ...PROVIDER, management: 'automatic' }],
+    models: [],
+    catalogModels: [
+      {
+        ...MODEL,
+        source: 'catalog',
+        capabilities,
+        catalog: {
+          capabilities,
+          displayName: MODEL.displayName,
+          lifecycle: 'active',
+          observedAt: 1,
+        },
+      },
+    ],
+  });
+  await renderUi(<AIProvidersProvidersCard state={state} />);
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.providerCatalogMetadataMissing')
+  );
+  await act(async () =>
+    getButtons()
+      .find(
+        (button) => button.textContent === translate('settings.aiProviders.providerConfigureModel')
+      )
+      ?.click()
+  );
+  expect(state.modals.openModelModal).toHaveBeenCalledWith(undefined, PROVIDER.id);
+  await renderUi(
+    <AIProvidersProvidersCard
+      state={createState({
+        providers: [{ ...PROVIDER, management: 'automatic' }],
+        catalogModels: [],
+      })}
+    />
+  );
+  expect(container?.textContent).not.toContain(
+    translate('settings.aiProviders.providerCatalogMetadataMissing')
+  );
+});
+
+it('does not confuse retired, disabled or explicitly unsupported models with missing metadata', async () => {
+  for (const variant of ['retired', 'disabled', 'unsupported'] as const) {
+    const capabilities = {
+      operations:
+        variant === 'unsupported'
+          ? ({ text: 'unsupported', transcription: 'unsupported', speech: 'unsupported' } as const)
+          : {},
+      input: {},
+      output: {},
+      features: {},
+    };
+    await renderUi(
+      <AIProvidersProvidersCard
+        state={createState({
+          providers: [{ ...PROVIDER, management: 'automatic' }],
+          catalogModels: [
+            {
+              ...MODEL,
+              source: 'catalog',
+              enabled: variant !== 'disabled',
+              capabilities,
+              catalog: {
+                capabilities,
+                displayName: 'm',
+                lifecycle: variant === 'retired' ? 'retired' : 'active',
+                observedAt: 1,
+              },
+            },
+          ],
+        })}
+      />
+    );
+    expect(container?.textContent).not.toContain(
+      translate('settings.aiProviders.providerCatalogMetadataMissing')
+    );
+    expect(container?.textContent).toContain(
+      translate('settings.aiProviders.providerEligibleModels').replace('{count}', '0')
+    );
+  }
+});
+
+it('does not count an operation outside the admitted provider adapter', async () => {
+  await renderUi(
+    <AIProvidersProvidersCard
+      state={createState({
+        providers: [{ ...PROVIDER, connectionType: 'anthropic', management: 'automatic' }],
+        catalogModels: [
+          {
+            ...MODEL,
+            capabilities: {
+              operations: { speech: 'supported' },
+              input: {},
+              output: {},
+              features: {},
+            },
+          },
+        ],
+      })}
+    />
+  );
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.providerEligibleModels').replace('{count}', '0')
   );
 });

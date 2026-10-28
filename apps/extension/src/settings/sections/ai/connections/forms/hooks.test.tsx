@@ -47,8 +47,12 @@ function ProviderHarness(props: { provider?: AIProvider | null }) {
   return null;
 }
 
-function ModelHarness(props: { model?: AIModel | null }) {
-  latestModelState = useModelFormState(props.model);
+function ModelHarness(props: {
+  model?: AIModel | null;
+  initialProviderId?: string;
+  providers?: AIProvider[];
+}) {
+  latestModelState = useModelFormState(props.model, props.providers, [], props.initialProviderId);
   return null;
 }
 
@@ -321,4 +325,29 @@ it('selects a named provider with its endpoint and clears a credential from the 
   expect(latestProviderState?.formData).not.toHaveProperty('apiKey');
   await act(async () => latestProviderState?.handleManagementChange('manual'));
   expect(latestProviderState?.formData.management).toBe('manual');
+});
+
+it('captures the recovery provider incarnation without a model identity', async () => {
+  await renderModelHarness();
+  await act(async () =>
+    root?.render(
+      <ModelHarness
+        key="recovery"
+        providers={[{ ...PROVIDER, incarnation: 'current-provider' }]}
+        initialProviderId={PROVIDER.id}
+      />
+    )
+  );
+  expect(latestModelState?.formData.providerId).toBe(PROVIDER.id);
+  expect(latestModelState?.formData.modelCode).toBe('');
+  expect(latestModelState?.isEditing).toBe(false);
+  await act(async () =>
+    latestModelState?.handleSubmit(
+      { preventDefault: vi.fn() } as unknown as React.FormEvent,
+      vi.fn()
+    )
+  );
+  expect(saveModelFormMock).toHaveBeenCalledWith(
+    expect.objectContaining({ providerIncarnation: 'current-provider', isEditing: false })
+  );
 });

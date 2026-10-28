@@ -53,6 +53,7 @@ export function ProviderFormModal({
 }
 
 interface ModelModalProps {
+  initialProviderId?: string | undefined;
   model?: AIModel | null;
   providers: AIProvider[];
   catalogModels?: AIModel[];
@@ -62,6 +63,7 @@ interface ModelModalProps {
 }
 
 export function ModelFormModal({
+  initialProviderId,
   model,
   providers,
   catalogModels = [],
@@ -92,7 +94,7 @@ export function ModelFormModal({
     handleCapabilitiesChange,
     handleEnabledChange,
     handleRetirementOverrideChange,
-  } = useModelFormState(model, providers, catalogModels);
+  } = useModelFormState(model, providers, catalogModels, initialProviderId);
 
   return (
     <ModelFormModalContent
@@ -172,6 +174,7 @@ export function AIProvidersSectionModals(props: { state: AiProvidersSectionState
 
       {modals.model.open ? (
         <ModelFormModal
+          initialProviderId={modals.model.initialProviderId}
           providers={props.state.providers}
           catalogModels={props.state.catalogModels}
           onReloadProviders={props.state.reloadData}

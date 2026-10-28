@@ -201,25 +201,38 @@ async function submitModelForm(
   });
 }
 
+function captureInitialModelProvider(
+  model: AIModel | null | undefined,
+  providers: AIProvider[],
+  initialProviderId: string | undefined
+) {
+  const id = model?.providerId ?? initialProviderId ?? '';
+  return { id, incarnation: providers.find((provider) => provider.id === id)?.incarnation ?? '' };
+}
+
+function initialModelEntryMode(model: AIModel | null | undefined): 'catalog' | 'manual' {
+  return !model || model.propertySource === 'catalog' || model.source === 'catalog'
+    ? 'catalog'
+    : 'manual';
+}
+
 export function useModelFormState(
   model?: AIModel | null,
   providers: AIProvider[] = [],
-  models: AIModel[] = []
+  models: AIModel[] = [],
+  initialProviderId?: string
 ) {
   const [saveSession] = useState<ModelFormSaveSession>(() => ({
     modelId: model?.id ?? crypto.randomUUID(),
     pending: false,
   }));
-  const [formData, setFormData] = useState<ModelFormData>(() => createModelDraft(model));
-  const [entryMode, setEntryMode] = useState<'catalog' | 'manual'>(() =>
-    !model || model.propertySource === 'catalog' || model.source === 'catalog'
-      ? 'catalog'
-      : 'manual'
+  const [formData, setFormData] = useState<ModelFormData>(() =>
+    createModelDraft(model, initialProviderId)
   );
-  const [providerContext, setProviderContext] = useState(() => ({
-    id: model?.providerId ?? '',
-    incarnation: providers.find((provider) => provider.id === model?.providerId)?.incarnation ?? '',
-  }));
+  const [entryMode, setEntryMode] = useState(() => initialModelEntryMode(model));
+  const [providerContext, setProviderContext] = useState(() =>
+    captureInitialModelProvider(model, providers, initialProviderId)
+  );
   const identityClaims = useRef(Boolean(model));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);

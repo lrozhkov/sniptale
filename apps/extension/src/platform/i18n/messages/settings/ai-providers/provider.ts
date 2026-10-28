@@ -169,6 +169,25 @@ export const settingsAiProvidersProviderMessages = defineMessageSource({
     ru: 'Готовый адаптер для этой версии SDK недоступен.',
     en: 'No ready-made adapter is available for this SDK version.',
   },
+  providerAdvancedSettings: {
+    ru: 'Дополнительные настройки подключения',
+    en: 'Advanced connection settings',
+  },
+  providerEligibleModels: { ru: 'Подходящих моделей: {count}', en: 'Eligible models: {count}' },
+  providerCatalogUpdated: {
+    ru: 'Успешное обновление каталога: {date}',
+    en: 'Last successful catalog refresh: {date}',
+  },
+  providerCatalogNeverUpdated: {
+    ru: 'Каталог ещё не обновлялся успешно',
+    en: 'No successful catalog refresh yet',
+  },
+  providerChecked: { ru: 'Последняя проверка: {date}', en: 'Last check: {date}' },
+  providerCatalogMetadataMissing: {
+    ru: 'Для некоторых моделей каталог не сообщает поддерживаемые операции. Выберите модель и задайте её свойства вручную.',
+    en: 'The catalog does not declare supported operations for some models. Select a model and configure its properties manually.',
+  },
+  providerConfigureModel: { ru: 'Настроить модель', en: 'Configure a model' },
   providerCheckAction: { ru: 'Проверить и обновить каталог', en: 'Check and refresh catalog' },
   providerCheckPending: { ru: 'Обновление каталога…', en: 'Refreshing catalog…' },
   providerCheckFailed: {

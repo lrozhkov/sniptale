@@ -15,9 +15,12 @@ function legacyModelCapabilities(operation: AIModelOperation = 'text'): AIModelC
   };
 }
 
-export function createModelDraft(model?: AIModel | null): ModelFormData {
+export function createModelDraft(
+  model?: AIModel | null,
+  initialProviderId?: string
+): ModelFormData {
   return {
-    providerId: model?.providerId ?? '',
+    providerId: model?.providerId ?? initialProviderId ?? '',
     displayName: model?.displayName ?? '',
     modelCode: model?.modelCode ?? '',
     systemPrompt: model?.systemPrompt ?? '',

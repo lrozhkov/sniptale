@@ -4,7 +4,8 @@ import {
   type AIProviderType,
   type AIModelManagement,
 } from '../../../../../contracts/settings/ai-provider';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { InspectorDisclosureView } from '../../../../../ui/compact-inspector-controls/disclosure';
 import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import type React from 'react';
 
@@ -130,6 +131,28 @@ function ProviderApiUrlField(props: ProviderFormModalContentProps) {
   );
 }
 
+function ProviderApiUrlSettings(props: ProviderFormModalContentProps) {
+  const [open, setOpen] = useState(false);
+  const definition = getAIProviderDefinition(props.formData.connectionType);
+  const [customAddress] = useState(() => props.formData.baseUrl !== definition.baseUrl);
+  const required = definition.type === 'openai-compatible' || definition.credential === 'none';
+  if (required || customAddress) {
+    return <ProviderApiUrlField {...props} />;
+  }
+  return (
+    <InspectorDisclosureView
+      dataUi="settings.ai-provider.advanced"
+      variant="structural"
+      label={translate('settings.aiProviders.providerAdvancedSettings')}
+      open={open || Boolean(props.errors['baseUrl'])}
+      onOpenChange={setOpen}
+      bodyClassName="px-2 pt-2"
+    >
+      <ProviderApiUrlField {...props} />
+    </InspectorDisclosureView>
+  );
+}
+
 function ProviderFormModalBody(props: ProviderFormModalContentProps) {
   return (
     <AiProvidersFormModalBody
@@ -158,7 +181,7 @@ function ProviderFormModalBody(props: ProviderFormModalContentProps) {
         />
       </ProductField>
       <ProviderNameField {...props} />
-      <ProviderApiUrlField {...props} />
+      <ProviderApiUrlSettings key={props.formData.connectionType} {...props} />
       {getAIProviderDefinition(props.formData.connectionType).credential !== 'none' && (
         <ProviderApiKeyField {...props} />
       )}

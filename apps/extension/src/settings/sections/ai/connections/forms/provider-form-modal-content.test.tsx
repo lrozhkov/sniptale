@@ -282,3 +282,67 @@ it('offers provider and management controls and does not require a key for Ollam
     translate('settings.aiProviders.providerNameLabel')
   );
 });
+
+it.each(['openai', 'anthropic', 'neuraldeep'] as const)(
+  'discloses the optional %s address through advanced settings',
+  async (connectionType) => {
+    const { getAIProviderDefinition } =
+      await import('../../../../../contracts/settings/ai-provider');
+    const definition = getAIProviderDefinition(connectionType);
+    await render(
+      <ProviderFormModalContent
+        {...createProps({
+          formData: { connectionType, baseUrl: definition.baseUrl, name: definition.label },
+        })}
+      />
+    );
+    const details = container?.querySelector('details');
+    expect(details).toBeTruthy();
+    expect(details?.open).toBe(false);
+    expect(details?.querySelector('input[type="url"]')).toBeTruthy();
+    await act(async () => details?.querySelector('summary')?.click());
+    expect(details?.open).toBe(true);
+  }
+);
+
+it('exposes custom preset addresses and address errors without disclosure', async () => {
+  for (const baseUrl of ['https://custom.example/v1', 'https://api.openai.com/v1']) {
+    await render(
+      <ProviderFormModalContent
+        {...createProps({
+          formData: { connectionType: 'openai', baseUrl, name: 'OpenAI' },
+          errors: { baseUrl: 'Invalid address' },
+        })}
+      />
+    );
+    const details = container?.querySelector('details');
+    expect(details === null || details?.open).toBe(true);
+    expect(container?.querySelector('input[type="url"]')).toBeTruthy();
+    expect(container?.textContent).toContain('Invalid address');
+  }
+});
+
+it('keeps address focus and draft when advanced preset editing changes the destination', async () => {
+  const props = createProps({
+    formData: { connectionType: 'openai', baseUrl: 'https://api.openai.com/v1', name: 'OpenAI' },
+  });
+  props.onBaseUrlChange = (event) => {
+    props.formData = { ...props.formData, baseUrl: event.currentTarget.value };
+    root?.render(<ProviderFormModalContent {...props} />);
+  };
+  await render(<ProviderFormModalContent {...props} />);
+  await act(async () => container?.querySelector('summary')?.click());
+  const input = container!.querySelector<HTMLInputElement>('input[type="url"]')!;
+  input.focus();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      'https://custom.example/v1'
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(container?.querySelector('input[type="url"]')).toBe(input);
+  expect(document.activeElement).toBe(input);
+  expect(input.value).toBe('https://custom.example/v1');
+  expect(container?.querySelector('details')?.open).toBe(true);
+});
