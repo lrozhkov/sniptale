@@ -1,3 +1,4 @@
+import { sameReviewVideoContainer } from '../../../../features/video/review/validation';
 import type {
   MediaLibraryEntry,
   MediaThumbnailEntry,
@@ -34,6 +35,7 @@ interface PortableMediaReviewAsset {
   objectId: string;
   libraryMediaId?: string;
   publishToLibrary?: boolean;
+  videoReview?: PortableVideoReview;
 }
 
 export interface PortableMediaThumbnail {
@@ -209,7 +211,7 @@ function parseReviewAssets(
   if (value !== undefined && !Array.isArray(value)) {
     throw new Error('Portable media review assets are invalid.');
   }
-  const assets = (value ?? []).map((raw) => {
+  const assets: PortableMediaReviewAsset[] = (value ?? []).map((raw) => {
     if (
       !isRecord(raw) ||
       !isRecord(raw['entry']) ||
@@ -225,11 +227,25 @@ function parseReviewAssets(
       throw new Error('Portable media review asset is invalid.');
     const entry = parseProjectAssetEntry({ ...raw['entry'], assetId: 'portable' });
     if (!entry) throw new Error('Portable media review asset is invalid.');
+    const videoReview =
+      raw['videoReview'] === undefined
+        ? undefined
+        : parsePortableVideoReview(raw['videoReview'], `project-asset:${entry.id}`);
+    if (
+      videoReview &&
+      (raw['libraryMediaId'] !== undefined ||
+        raw['publishToLibrary'] !== false ||
+        !entry.mimeType.startsWith('video/') ||
+        videoReview.workspace.source.size !== entry.size ||
+        !sameReviewVideoContainer(videoReview.workspace.source.mimeType, entry.mimeType))
+    )
+      throw new Error('Portable private review source association is invalid.');
     const { assetId: _assetId, ...portable } = entry;
     return {
       entry: portable,
       filename: raw['filename'],
       objectId: raw['objectId'],
+      ...(videoReview ? { videoReview } : {}),
       ...(typeof raw['libraryMediaId'] === 'string'
         ? { libraryMediaId: raw['libraryMediaId'] }
         : {}),
@@ -243,16 +259,22 @@ function parseReviewAssets(
   if (new Set(ids).size !== ids.length || new Set(objectIds).size !== objectIds.length) {
     throw new Error('Portable media review assets contain duplicate identities.');
   }
-  const referenced = review
-    ? [...collectReviewAssetReferences(review.workspace)].map((reference) =>
-        reference.slice('project-asset:'.length)
-      )
-    : [];
-  if (
-    referenced.length !== ids.length ||
-    referenced.some((id) => !ids.includes(id)) ||
-    ids.some((id) => !referenced.includes(id))
-  ) {
+  const referenced = new Set<string>();
+  const retain = (owner: PortableVideoReview) => {
+    for (const reference of collectReviewAssetReferences(owner.workspace)) {
+      if (!reference.startsWith('project-asset:'))
+        throw new Error('Portable media review asset reference is unsupported.');
+      referenced.add(reference.slice('project-asset:'.length));
+    }
+  };
+  if (review) retain(review);
+  const declared = new Map(assets.map((asset) => [asset.entry.id, asset]));
+  for (const id of referenced) {
+    const asset = declared.get(id);
+    if (!asset) throw new Error('Portable media review assets do not match the review references.');
+    if (asset.videoReview) retain(asset.videoReview);
+  }
+  if (referenced.size !== ids.length) {
     throw new Error('Portable media review assets do not match the review references.');
   }
   return assets.length ? assets : undefined;

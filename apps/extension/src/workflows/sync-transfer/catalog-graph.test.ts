@@ -5,6 +5,7 @@ import {
 } from '../../composition/persistence/projects/index.test-support';
 import { encodePortableVideoProjectAssetRefs } from '../media-hub-backup/v6/root-codecs/projects';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
+import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
 import { createSyncAttempt, parseSyncOperationText } from './wire-record';
 import { projectSyncCatalog, syncCatalogRootKey, type CatalogAttempt } from './catalog-graph';
 
@@ -234,7 +235,7 @@ it('preserves concurrent tombstones through partial restores until a restore cov
   ).toMatchObject({ heads: ['restore'], conflict: false, deleted: false });
 });
 
-it('requires exact current live unambiguous media heads for each project dependency', async () => {
+it('requires a live unambiguous unchanged source for each project dependency', async () => {
   const project = await attempt('project-op', {
     rootKind: 'video-project',
     rootId: 'project',
@@ -251,7 +252,11 @@ it('requires exact current live unambiguous media heads for each project depende
   expect(
     projectSyncCatalog('space', [project, media]).roots.get(projectKey)?.unavailableDependencies
   ).toEqual([]);
-  for (const alternative of [updated, concurrent, missing, deleted]) {
+  expect(
+    projectSyncCatalog('space', [project, media, updated]).roots.get(projectKey)
+      ?.unavailableDependencies
+  ).toEqual([]);
+  for (const alternative of [concurrent, missing, deleted]) {
     const root = projectSyncCatalog('space', [project, media, alternative]).roots.get(projectKey);
     expect(root?.unavailableDependencies).toEqual([mediaId]);
     expect(root?.heads).toEqual(['project-op']);
@@ -285,4 +290,75 @@ it('preserves the result of a long alternating delete and restore history in eit
   expect(projectSyncCatalog('space', [...records, nextDelete]).roots.get(mediaKey)?.deleted).toBe(
     true
   );
+});
+
+it('keeps a dependent project available after an original rename or tag edit', async () => {
+  const source = await attempt('source-before');
+  const root = envelope('media', mediaId);
+  const metadata = parsePortableMediaMetadata(root.metadata);
+  metadata.entry.filename = 'Renamed.png';
+  metadata.entry.tags = ['Retained source'];
+  metadata.entry.updatedAt += 1;
+  const renamed = await attempt('source-renamed', {
+    parents: ['source-before'],
+    envelope: parseRootEnvelope({ ...root, metadata }),
+  });
+  const project = await attempt('dependent-project', {
+    rootKind: 'video-project',
+    rootId: 'project',
+    dependencies: [{ mediaId, basis: ['source-before'] }],
+  });
+  const graph = projectSyncCatalog('space', [renamed, project, source]);
+  expect(graph.roots.get(mediaKey)?.heads).toEqual(['source-renamed']);
+  expect(graph.roots.get(projectKey)?.unavailableDependencies).toEqual([]);
+});
+
+it('refuses dependency advancement through changed bytes or a deleted source lifetime', async () => {
+  const source = await attempt('source-before');
+  const project = await attempt('dependent-project', {
+    rootKind: 'video-project',
+    rootId: 'project',
+    dependencies: [{ mediaId, basis: ['source-before'] }],
+  });
+  const changed = await attempt('source-changed', {
+    parents: ['source-before'],
+    objects: [{ objectId: object.objectId, sha256: 'b'.repeat(64) }],
+  });
+  const changedBack = await attempt('source-changed-back', { parents: ['source-changed'] });
+  const deleted = await attempt('source-deleted', { kind: 'delete', parents: ['source-before'] });
+  const restored = await attempt('source-restored', {
+    kind: 'restore',
+    parents: ['source-deleted'],
+  });
+  for (const history of [[changed], [changed, changedBack], [deleted, restored]]) {
+    expect(
+      projectSyncCatalog('space', [source, project, ...history]).roots.get(projectKey)
+        ?.unavailableDependencies
+    ).toEqual([mediaId]);
+  }
+});
+
+it('checks every merged dependency branch before accepting unchanged original bytes', async () => {
+  const source = await attempt('source-before');
+  const project = await attempt('dependent-project', {
+    rootKind: 'video-project',
+    rootId: 'project',
+    dependencies: [{ mediaId, basis: ['source-before'] }],
+  });
+  const first = await attempt('source-first', { parents: ['source-before'] });
+  const second = await attempt('source-second', { parents: ['source-before'] });
+  const merged = await attempt('source-merged', { parents: ['source-first', 'source-second'] });
+  expect(
+    projectSyncCatalog('space', [source, project, first, second, merged]).roots.get(projectKey)
+      ?.unavailableDependencies
+  ).toEqual([]);
+  const changedSecond = await attempt('source-second', {
+    parents: ['source-before'],
+    objects: [{ objectId: object.objectId, sha256: 'b'.repeat(64) }],
+  });
+  expect(
+    projectSyncCatalog('space', [source, project, first, changedSecond, merged]).roots.get(
+      projectKey
+    )?.unavailableDependencies
+  ).toEqual([mediaId]);
 });

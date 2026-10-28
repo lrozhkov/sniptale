@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../../features/video/review/advanced/defaults';
 import { parsePortableMediaMetadata } from './media';
+import { nestedMediaReviewFixture } from '../root-publication/media.review-assets.test-support';
+import { encodePortableReviewAssetRefs } from '../../../../composition/persistence/review-workspaces/asset-refs';
+import { createQuickEditWebcam } from '../../../../features/video/review/advanced/webcam';
 
 function metadata() {
   return {
@@ -261,4 +264,93 @@ it('roundtrips raw phase descriptors and stable observation identities in explic
   const restored = parsePortableMediaMetadata(JSON.parse(JSON.stringify(portable)));
   expect(restored.recording?.telemetry).toEqual(telemetry);
   expect(portable.recording.telemetry.observationClock.domain).toBe('observation');
+});
+
+it.each([false, true])('admits an exact reachable private review closure (cycle=%s)', (cycle) => {
+  const input = nestedMediaReviewFixture(cycle).metadata;
+  const before = structuredClone(input);
+  const parsed = parsePortableMediaMetadata(input);
+  expect(parsed.reviewAssets?.map((asset) => asset.entry.id)).toEqual(['b', 'c']);
+  expect(parsed.reviewAssets?.[0]?.videoReview?.workspace.cursor).toBe(0);
+  expect(parsed.reviewAssets?.[0]?.videoReview?.workspace.history).toHaveLength(1);
+  expect(parsed.reviewAssets?.[1]?.videoReview?.draft?.annotation.text).toBe('Draft c');
+  expect(input).toEqual(before);
+});
+
+it('preserves legacy direct-only resources without optional private reviews', () => {
+  const input = nestedMediaReviewFixture(false).metadata;
+  const { videoReview: _nested, ...asset } = input.reviewAssets[0]!;
+  const parsed = parsePortableMediaMetadata({ ...input, reviewAssets: [asset] });
+  expect(parsed.reviewAssets).toEqual([asset]);
+});
+
+it('refuses missing, duplicate, foreign and borrowed private review declarations', () => {
+  const input = nestedMediaReviewFixture(false).metadata;
+  expect(() =>
+    parsePortableMediaMetadata({ ...input, reviewAssets: [input.reviewAssets[0]] })
+  ).toThrow('references');
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...input,
+      reviewAssets: [...input.reviewAssets, input.reviewAssets[0]],
+    })
+  ).toThrow('duplicate');
+  for (const patch of [
+    { libraryMediaId: 'project-asset:b', publishToLibrary: undefined },
+    {
+      videoReview: {
+        ...input.reviewAssets[0]!.videoReview,
+        workspace: {
+          ...input.reviewAssets[0]!.videoReview.workspace,
+          aggregateId: 'project-asset:foreign',
+        },
+      },
+    },
+    { entry: { ...input.reviewAssets[0]!.entry, mimeType: 'image/png' } },
+    { entry: { ...input.reviewAssets[0]!.entry, mimeType: 'video/mp4' } },
+    { entry: { ...input.reviewAssets[0]!.entry, size: 7 } },
+  ])
+    expect(() =>
+      parsePortableMediaMetadata({
+        ...input,
+        reviewAssets: [{ ...input.reviewAssets[0], ...patch }, input.reviewAssets[1]],
+      })
+    ).toThrow();
+});
+
+it('refuses a disconnected private review cycle even when every declaration is referenced by another orphan', () => {
+  const input = nestedMediaReviewFixture(false).metadata;
+  const orphan = (id: string, child: string) => ({
+    entry: { id, createdAt: 1, size: 6, mimeType: 'video/webm' },
+    filename: `${id}.webm`,
+    objectId: `${id}-object`,
+    publishToLibrary: false,
+    videoReview: encodePortableReviewAssetRefs({
+      workspace: {
+        aggregateId: `project-asset:${id}`,
+        formatVersion: 1,
+        source: input.videoReview.workspace.source,
+        revision: 1,
+        cursor: 0,
+        history: [],
+        advanced: {
+          ...createQuickEditAdvancedState(),
+          webcam: createQuickEditWebcam(
+            `project-asset:${child}`,
+            input.videoReview.workspace.source,
+            input.videoReview.workspace.source
+          ),
+        },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      draft: null,
+    }),
+  });
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...input,
+      reviewAssets: [...input.reviewAssets, orphan('d', 'e'), orphan('e', 'd')],
+    })
+  ).toThrow('references');
 });

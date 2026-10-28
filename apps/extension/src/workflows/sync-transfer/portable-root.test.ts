@@ -24,12 +24,17 @@ import {
 import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
 import { encodePortableReviewAssetRefs } from '../../composition/persistence/review-workspaces/asset-refs';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { workspace as reviewWorkspace } from '../../composition/persistence/review-workspaces/backup-restore.test-support';
+import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
+import { materializeVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/project-metadata';
+import type { CapturedVideoReviewRows } from '../../composition/persistence/sync-capture/review-snapshot';
 import type { PortableVideoReview } from '../../composition/persistence/review-workspaces/backup-restore';
 import {
   EFFECT_BUNDLE_CORPUS,
   readEffectBundleCorpusArchive,
 } from '../../../../../tooling/test/support/effect-v1-corpus.test-support';
 import { importEffectBundleZip } from '../../features/video/project/effect-bundle/import/zip';
+import { nestedMediaReviewFixture } from '../media-hub-backup/v6/root-publication/media.review-assets.test-support';
 
 const io = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('../../composition/persistence/assets', async (original) => ({
@@ -75,13 +80,20 @@ function mediaRows(): CapturedMediaRows {
   };
 }
 function capture(change: CapturedChange['change']): CapturedChange {
-  const rootKind = change.kind === 'media' ? 'media' : 'video-project';
+  const rootKind =
+    change.kind === 'video-review'
+      ? 'video-review'
+      : change.kind === 'media'
+        ? 'media'
+        : 'video-project';
   const rootId =
     change.kind === 'media'
       ? change.rows.media.id
-      : change.kind === 'video-project'
-        ? change.rows.project.id
-        : 'deleted';
+      : change.kind === 'video-review'
+        ? change.rows.review.workspace.aggregateId
+        : change.kind === 'video-project'
+          ? change.rows.project.id
+          : 'deleted';
   const rootKey = captureRootKey('space', rootKind, rootId);
   return createNativeCapture({
     version: 1,
@@ -163,6 +175,161 @@ function portableReview(aggregateId: string, resource: string) {
   };
   return encodePortableReviewAssetRefs(review);
 }
+
+function reviewRows(archived: boolean): CapturedVideoReviewRows {
+  const source = mediaRows();
+  source.media.kind = 'video';
+  const original = source.ref;
+  const aggregateId = archived ? 'project-asset:quick-project:previous' : source.media.id;
+  const resourceRef = { ...ref('music-bytes'), mimeType: 'audio/mpeg' };
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.music = [
+    {
+      id: 'music',
+      assetId: 'project-asset:music',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  const workspace = parseVideoWorkspace({
+    ...reviewWorkspace,
+    aggregateId,
+    ...(archived ? { sourceMediaId: source.media.id } : {}),
+    sourceAssetId: original.assetId,
+    source: { ...reviewWorkspace.source, size: original.size },
+    advanced,
+  });
+  if (!workspace) throw new Error('Invalid captured review fixture.');
+  return {
+    source,
+    review: { workspace: materializeVideoWorkspaceProject(workspace, 'Saved review'), draft: null },
+    assets: [
+      {
+        id: 'music',
+        assetId: resourceRef.assetId,
+        createdAt: 1,
+        size: resourceRef.size,
+        mimeType: resourceRef.mimeType,
+      },
+    ],
+    refs: [resourceRef],
+    media: [],
+    privateReviews: [],
+  };
+}
+
+it.each([false, true])(
+  'preserves the complete nested private closure through real encoding and replica preparation (cycle=%s)',
+  async (cycle) => {
+    const { rows } = nestedMediaReviewFixture(cycle);
+    const encoded = await encodeCapturedPortableRoot(
+      capture({
+        kind: 'video-review',
+        rows,
+        mediaDependencies: [{ mediaId: rows.source.media.id, generation: 1, basis: ['source'] }],
+      })
+    );
+    const local = admission();
+    local.dependencies = [
+      {
+        entry: rows.source.media,
+        ref: rows.source.ref,
+        expectedGeneration: 1,
+        expectedBasis: ['source'],
+      },
+    ];
+    if (!encoded.reviewSourceMediaId) throw new Error('Review source binding is missing.');
+    const payload = await preparePortableReplica({
+      envelope: encoded.envelope,
+      reviewSourceMediaId: encoded.reviewSourceMediaId,
+      verifiedObjects: new Map(encoded.bindings.map((binding) => [binding.objectId, binding.ref])),
+      senderDependencies: encoded.dependencies,
+      admission: local,
+    });
+    if (payload.kind !== 'video-review') throw new Error('Expected review replica.');
+    expect(payload.input.root.assets.map((asset) => asset.entry.id)).toEqual(['b', 'c']);
+    expect(payload.input.root.assets[0]?.videoReview).toHaveProperty(
+      'workspace.history.0.after.webcam.assetId',
+      'project-asset:c'
+    );
+    if (cycle)
+      expect(payload.input.root.assets[1]?.videoReview?.workspace.advanced.webcam?.assetId).toBe(
+        'project-asset:b'
+      );
+    expect(payload.input.root.assets[1]?.videoReview?.draft?.annotation.text).toBe('Draft c');
+  }
+);
+
+it.each([false, true])(
+  'prepares an independent review using the real source dependency (archived=%s)',
+  async (archived) => {
+    const rows = reviewRows(archived);
+    const encoded = await encodeCapturedPortableRoot(
+      capture({
+        kind: 'video-review',
+        rows,
+        mediaDependencies: [{ mediaId: rows.source.media.id, generation: 1, basis: ['source-op'] }],
+      })
+    );
+    expect(encoded.reviewSourceMediaId).toBe(rows.source.media.id);
+    const parsed = await parsePortableSyncRoot(encoded.envelope, encoded.reviewSourceMediaId);
+    if (parsed.kind !== 'video-review') throw new Error('Expected portable review.');
+    expect(portableSyncDependencyIds(parsed)).toEqual([rows.source.media.id]);
+    expect(new Set(portableSyncEditingObjectIds(parsed))).toEqual(
+      new Set(encoded.envelope.objects.map((object) => object.objectId))
+    );
+    const original = ref('target-original');
+    const verifiedObjects = new Map(
+      encoded.envelope.objects.map((object): [string, AssetRef] => [
+        object.objectId,
+        object.objectId === parsed.metadata.originalObjectId
+          ? original
+          : { ...ref('received-music'), mimeType: object.mimeType, size: object.size },
+      ])
+    );
+    const local = admission();
+    local.dependencies = [
+      {
+        entry: rows.source.media,
+        ref: original,
+        expectedGeneration: 7,
+        expectedBasis: ['source-op'],
+      },
+    ];
+    const payload = await preparePortableReplica({
+      envelope: encoded.envelope,
+      reviewSourceMediaId: parsed.sourceMediaId,
+      verifiedObjects,
+      senderDependencies: encoded.dependencies,
+      admission: local,
+    });
+    if (payload.kind !== 'video-review') throw new Error('Expected review replica.');
+    expect(payload.input.root.sourceMediaId).toBe(rows.source.media.id);
+    expect(payload.input.root.review.workspace.sourceAssetId).toBe(original.assetId);
+    expect(payload.input.root.review.workspace.sourceMediaId).toBe(
+      archived ? rows.source.media.id : undefined
+    );
+    expect(payload.input.root.assets.map((asset) => asset.entry.id)).toEqual(['music']);
+    expect(payload.input.root).not.toHaveProperty('source');
+    expect(payload.input.dependencies).toEqual(local.dependencies);
+    local.dependencies[0]!.expectedBasis = ['different-source'];
+    await expect(
+      preparePortableReplica({
+        envelope: encoded.envelope,
+        reviewSourceMediaId: parsed.sourceMediaId,
+        verifiedObjects,
+        senderDependencies: encoded.dependencies,
+        admission: local,
+      })
+    ).rejects.toThrow('causal dependency');
+    await expect(parsePortableSyncRoot(encoded.envelope)).rejects.toThrow();
+  }
+);
 
 it('publishes only the editing source-review closure and excludes export-only review dependencies', async () => {
   const encoded = await encodeCapturedPortableRoot(

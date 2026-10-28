@@ -1,3 +1,5 @@
+import { parseMediaLibraryEntry } from './read-guards';
+import { parsePreparedVideoReviewReplicaRoot } from '../sync-capture/prepared-review';
 import { parseCapturedMediaRows } from '../sync-capture/guards';
 import { deleteRecoveryInTransaction } from '../recordings/recovery/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
@@ -341,6 +343,26 @@ function syncReplicaRetainsMedia(payload: unknown, mediaId: string): boolean {
   if (payload['kind'] === 'media') {
     const rows = parseCapturedMediaRows(input['rows']);
     return !rows || rows.media.id === mediaId;
+  }
+  if (payload['kind'] === 'video-review') {
+    let root;
+    try {
+      root = parsePreparedVideoReviewReplicaRoot(input['root']);
+    } catch {
+      return true;
+    }
+    const dependencies = input['dependencies'];
+    if (!Array.isArray(dependencies)) return true;
+    if (root.sourceMediaId === mediaId) return true;
+    for (const dependency of dependencies) {
+      if (!isRecord(dependency)) return true;
+      const entry = parseMediaLibraryEntry(dependency['entry']);
+      if (!entry || entry.id === mediaId) return true;
+    }
+    return root.assets.some(
+      (asset) =>
+        asset.entry.originMediaId === mediaId || `project-asset:${asset.entry.id}` === mediaId
+    );
   }
   if (payload['kind'] !== 'video-project') return true;
   const root = input['root'];

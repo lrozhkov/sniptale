@@ -8,6 +8,7 @@ import { createObjectCollector } from '../media-hub-backup/v6/inventory/helpers'
 import { encodePortableMediaOriginal } from '../media-hub-backup/v6/root-codecs/media';
 import { encodeCapturedImageRoot } from './captured-image';
 import { encodeCapturedProjectRoot } from './captured-project';
+import { encodeCapturedVideoReviewRoot } from './captured-review';
 import { parsePortableSyncRoot } from './prepared-root';
 
 /** Encodes an admitted frozen capture without reading live native rows or creating an archive. */
@@ -16,6 +17,7 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
   objects: ArchiveRootObjectSource[];
   dependencies: CapturedMediaDependency[];
   bindings: { objectId: string; ref: AssetRef }[];
+  reviewSourceMediaId?: string;
 }> {
   const parsed = parseSyncCaptureRecord(value);
   if (
@@ -36,6 +38,11 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     const portable = await encodeCapturedProjectRoot(capture.change.rows);
     await parsePortableSyncRoot(portable.envelope);
     return portable;
+  }
+  if (capture.change.kind === 'video-review') {
+    const portable = await encodeCapturedVideoReviewRoot(capture.change.rows);
+    await parsePortableSyncRoot(portable.envelope, portable.reviewSourceMediaId);
+    return { ...portable, dependencies: capture.change.mediaDependencies };
   }
   const collector = createObjectCollector('sync', createArchivePathAllocator());
   const bindings: { objectId: string; ref: AssetRef }[] = [];

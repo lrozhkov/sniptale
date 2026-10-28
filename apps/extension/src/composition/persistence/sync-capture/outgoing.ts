@@ -146,7 +146,12 @@ export function matchesCapture(
       JSON.stringify(record) === JSON.stringify(projectPreparedOperation(capture))
     );
   // The workflow verifies inline Blob copies against the authoritative native inventory.
-  if (capture.change.kind === 'image' || capture.change.kind === 'video-project') return true;
+  if (
+    capture.change.kind === 'image' ||
+    capture.change.kind === 'video-project' ||
+    capture.change.kind === 'video-review'
+  )
+    return true;
   const refs = capture.change.kind === 'tombstone' ? [] : [capture.change.rows.ref];
   return record.objects.every((item) =>
     refs.some((ref) => JSON.stringify(ref) === JSON.stringify(item.ref))

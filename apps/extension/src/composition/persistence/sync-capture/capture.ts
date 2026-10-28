@@ -1,3 +1,4 @@
+import { freezeVideoReviewInTransaction, digestCapturedVideoReviewRows } from './review-snapshot';
 import { collectCapturedProjectEditingMediaIds } from './project-snapshot';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -84,8 +85,119 @@ export async function captureMediaInTransaction(
   const source = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
   if (source?.lifecycle?.storageClass === 'temporary') return null;
   if (source?.source.kind === 'screenshot') return captureImageInTransaction(tx, mediaId, options);
-  const rows = await freezeMediaInTransaction(tx, mediaId);
+  const rows = await freezeMediaInTransaction(tx, mediaId, { allowIndependentReview: true });
   return appendCapture(tx, profile, 'media', mediaId, { kind: 'media', rows }, options);
+}
+
+/** Capture a review and its source heads in the native writer's transaction. */
+export async function captureVideoReviewInTransaction(
+  tx: CaptureTransaction,
+  aggregateId: string,
+  options: { origin?: CaptureOrigin; publicationId?: string } = {}
+): Promise<CaptureOperation | null> {
+  const profile = await readEnabledCaptureProfile(tx);
+  if (!profile) return null;
+  const replay = await readPublicationReplay(
+    tx,
+    profile,
+    'video-review',
+    aggregateId,
+    options.publicationId
+  );
+  if (replay) return replay;
+  const rows = await freezeVideoReviewInTransaction(tx, aggregateId);
+  const state = await readVideoReviewState(tx, profile, aggregateId);
+  if (state?.deleted !== true && state?.nativeDigest === digestCapturedVideoReviewRows(rows))
+    return null;
+  const mediaDependencies: CapturedMediaDependency[] = [];
+  for (const id of new Set([rows.source.media.id, ...rows.media.map((entry) => entry.id)]))
+    mediaDependencies.push(await captureReviewMediaDependency(tx, profile, id, options.origin));
+  return appendCapture(
+    tx,
+    profile,
+    'video-review',
+    aggregateId,
+    { kind: 'video-review', rows, mediaDependencies },
+    options
+  );
+}
+
+async function readVideoReviewState(
+  tx: CaptureTransaction,
+  profile: SyncCaptureProfile,
+  id: string
+): Promise<SyncCaptureRootState | null> {
+  const rootKey = captureRootKey(profile.spaceId, 'video-review', id);
+  const key = JSON.stringify(['root-state', rootKey]);
+  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key);
+  if (raw === undefined) return null;
+  const state = parseSyncCaptureRecord(raw);
+  if (
+    !state ||
+    state.kind !== 'root-state' ||
+    state.key !== key ||
+    state.rootKey !== rootKey ||
+    state.nativeRevision === undefined
+  )
+    throw new Error('Invalid video review revision fence.');
+  return state;
+}
+
+/** Preserve native ordering when opening or restoring the same review identity. */
+export async function allocateVideoReviewRevision(
+  tx: CaptureTransaction,
+  id: string,
+  minimumRevision: number
+): Promise<number> {
+  if (!Number.isSafeInteger(minimumRevision) || minimumRevision < 1)
+    throw new Error('Invalid video review revision.');
+  const profile = await readEnabledCaptureProfile(tx);
+  if (!profile) return minimumRevision;
+  const state = await readVideoReviewState(tx, profile, id);
+  const revision = Math.max(minimumRevision, (state?.nativeRevision ?? 0) + 1);
+  if (!Number.isSafeInteger(revision)) throw new Error('Video review revision limit reached.');
+  return revision;
+}
+
+/** A purged New command cannot recreate its archive and reset newer work. */
+export async function assertUnusedVideoReviewIdentity(
+  tx: CaptureTransaction,
+  id: string
+): Promise<void> {
+  const profile = await readEnabledCaptureProfile(tx);
+  if (profile && (await readVideoReviewState(tx, profile, id)))
+    throw new Error('Video review identity has already been used.');
+}
+
+async function captureReviewMediaDependency(
+  tx: CaptureTransaction,
+  profile: SyncCaptureProfile,
+  mediaId: string,
+  origin: CaptureOrigin = 'local-edit'
+): Promise<CapturedMediaDependency> {
+  const rows = await freezeMediaInTransaction(tx, mediaId, { allowIndependentReview: true });
+  const rootKey = captureRootKey(profile.spaceId, 'media', mediaId);
+  const key = JSON.stringify(['root-state', rootKey]);
+  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key);
+  const state = raw === undefined ? null : parseSyncCaptureRecord(raw);
+  if (
+    raw !== undefined &&
+    (!state || state.kind !== 'root-state' || state.key !== key || state.rootKey !== rootKey)
+  )
+    throw new Error('Invalid review source head.');
+  if (state && state.kind !== 'root-state') throw new Error('Invalid review source head.');
+  if (!state || state.deleted === true || state.nativeDigest !== digestCapturedMediaRows(rows)) {
+    const operation = await appendCapture(
+      tx,
+      profile,
+      'media',
+      mediaId,
+      { kind: 'media', rows },
+      { origin }
+    );
+    return { mediaId, generation: operation.generation, basis: [operation.operationId] };
+  }
+  return { mediaId, generation: state.generation, basis: [...state.basis] };
 }
 
 /** Capture each saved screenshot mutation through its native writer transaction. */
@@ -287,7 +399,9 @@ async function appendCapture(
           ? change.rows.media.filename
           : change.kind === 'video-project'
             ? change.rows.project.project.name
-            : rootId
+            : change.kind === 'video-review'
+              ? (change.rows.review.workspace.project?.name ?? rootId)
+              : rootId
         ).trim() || rootId,
     },
     key:
@@ -321,6 +435,15 @@ async function appendCapture(
     generation,
     basis: [operationId],
     ...(change.kind === 'media' ? { nativeDigest: digestCapturedMediaRows(change.rows) } : {}),
+    ...(change.kind === 'video-review'
+      ? {
+          nativeDigest: digestCapturedVideoReviewRows(change.rows),
+          nativeRevision: Math.max(
+            previous?.nativeRevision ?? 0,
+            change.rows.review.workspace.revision
+          ),
+        }
+      : {}),
     ...(change.kind === 'image'
       ? {
           nativeDigest: digestCapturedImageRows(change.rows),

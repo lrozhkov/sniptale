@@ -1,3 +1,4 @@
+import type { CaptureRootKind } from '../../composition/persistence/sync-capture/contracts';
 import {
   applyCatalogDeletionNative,
   type ApplyCatalogDeletionInput,
@@ -13,7 +14,11 @@ import { loadMediaReplicaPredecessorRef } from '../../composition/persistence/sy
 import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 import { stageRootObjects, type StagedArchiveObject } from '../media-hub-backup/v6/staging';
 import { digestBackupObject } from '../media-hub-backup/v6/shared-objects';
-import { syncCatalogRootKey, type CatalogOperation } from './catalog-graph';
+import {
+  syncCatalogRootKey,
+  resolveSyncMediaDependency,
+  type CatalogOperation,
+} from './catalog-graph';
 import type { scanSyncCatalog } from './catalog';
 import {
   parsePortableSyncRoot,
@@ -30,7 +35,7 @@ function check(condition: unknown): asserts condition {
 }
 function selectedOperation(
   catalog: Catalog,
-  rootKind: 'media' | 'video-project',
+  rootKind: CaptureRootKind,
   rootId: string
 ): CatalogOperation {
   // Unreadable manifests have unknown root ownership, so they cannot authorize an import.
@@ -99,11 +104,10 @@ async function cleanup(staged: StagedArchiveObject[], error: unknown): Promise<n
   throw error;
 }
 
-/** Prepare one selected live root. The existing durable journal owns publication and recovery. */
-export async function prepareCatalogReplica(args: {
+async function selectReplicaPreparation(args: {
   remote: SyncRemoteStore;
   catalog: Catalog;
-  rootKind: 'media' | 'video-project';
+  rootKind: CaptureRootKind;
   rootId: string;
   admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>;
   signal: AbortSignal;
@@ -150,9 +154,23 @@ export async function prepareCatalogReplica(args: {
       operation.envelope &&
       operation.kind !== 'delete'
   );
-  const parsed = await parsePortableSyncRoot(operation.envelope);
+  const parsed = await parsePortableSyncRoot(operation.envelope, operation.reviewSourceMediaId);
   const selectedIds = portableSyncEditingObjectIds(parsed);
   const editing = parsed.envelope.objects.filter((object) => selectedIds.includes(object.objectId));
+  return { selected, admission, dependencySources, operation, parsed, selectedIds, editing };
+}
+
+/** Prepare one selected live root. The existing durable journal owns publication and recovery. */
+export async function prepareCatalogReplica(args: {
+  remote: SyncRemoteStore;
+  catalog: Catalog;
+  rootKind: CaptureRootKind;
+  rootId: string;
+  admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>;
+  signal: AbortSignal;
+}) {
+  const { selected, admission, dependencySources, operation, parsed, selectedIds, editing } =
+    await selectReplicaPreparation(args);
   // Use the existing backup operation/recovery boundary while staged objects lack journal claims.
   return runWithAssetResourceRead(() =>
     runWithDurableAssetOperation(async () => {
@@ -170,7 +188,23 @@ export async function prepareCatalogReplica(args: {
       for (const [mediaId, source] of dependencySources) {
         const dependency = admission.dependencies.find((item) => item.entry.id === mediaId);
         const mediaOperation = await parseSyncOperationText(source.operationText);
-        check(dependency && mediaOperation.envelope && mediaOperation.rootId === mediaId);
+        const declared = operation.dependencies.find((item) => item.mediaId === mediaId);
+        check(
+          dependency && declared && mediaOperation.envelope && mediaOperation.rootId === mediaId
+        );
+        check(
+          resolveSyncMediaDependency(
+            args.catalog.operations,
+            mediaId,
+            declared.basis,
+            dependency.expectedBasis
+          )
+        );
+        check(
+          resolveSyncMediaDependency(args.catalog.operations, mediaId, dependency.expectedBasis, [
+            mediaOperation.operationId,
+          ])
+        );
         const media = await parsePortableSyncRoot(mediaOperation.envelope);
         check(media.kind === 'media');
         const object = media.envelope.objects.find(
@@ -190,6 +224,39 @@ export async function prepareCatalogReplica(args: {
             digest.sha256
         );
         checkedDependencies.set(mediaId, { ref: dependency.ref, sha256: digest.sha256 });
+      }
+      if (parsed.kind === 'video-review') {
+        const primary = checkedDependencies.get(parsed.sourceMediaId);
+        const original = parsed.envelope.objects.find(
+          (item) => item.objectId === parsed.metadata.originalObjectId
+        );
+        const originalDigest = operation.objects.find(
+          (item) => item.objectId === parsed.metadata.originalObjectId
+        );
+        check(
+          primary &&
+            original &&
+            originalDigest &&
+            primary.ref.size === original.size &&
+            primary.ref.mimeType === original.mimeType &&
+            primary.sha256 === originalDigest.sha256
+        );
+        borrowedRefs.set(parsed.metadata.originalObjectId, primary.ref);
+        for (const asset of parsed.metadata.reviewAssets ?? []) {
+          if (!asset.libraryMediaId) continue;
+          const dependency = checkedDependencies.get(asset.libraryMediaId);
+          const digest = operation.objects.find((item) => item.objectId === asset.objectId);
+          const object = parsed.envelope.objects.find((item) => item.objectId === asset.objectId);
+          check(
+            dependency &&
+              digest &&
+              object &&
+              dependency.ref.size === object.size &&
+              dependency.ref.mimeType === object.mimeType &&
+              dependency.sha256 === digest.sha256
+          );
+          borrowedRefs.set(asset.objectId, dependency.ref);
+        }
       }
       if (parsed.kind === 'video-project') {
         for (const asset of parsed.metadata.projectAssets.filter(
@@ -250,7 +317,16 @@ export async function prepareCatalogReplica(args: {
           const payload = await preparePortableReplica({
             envelope: parsed.envelope,
             verifiedObjects: refs,
-            senderDependencies: operation.dependencies,
+            senderDependencies: operation.dependencies.map((dependency) => {
+              const actual = admission.dependencies.find(
+                (item) => item.entry.id === dependency.mediaId
+              );
+              check(actual);
+              return { mediaId: dependency.mediaId, basis: [...actual.expectedBasis] };
+            }),
+            ...(operation.reviewSourceMediaId
+              ? { reviewSourceMediaId: operation.reviewSourceMediaId }
+              : {}),
             admission: {
               ...admission,
               operationId: operation.operationId,
@@ -279,7 +355,7 @@ export async function prepareCatalogReplica(args: {
 /** Admit a selected checked tombstone without staging objects or creating a publication journal. */
 export async function applyCatalogDeletion(args: {
   catalog: Catalog;
-  rootKind: 'media' | 'video-project';
+  rootKind: CaptureRootKind;
   rootId: string;
   admission: Omit<
     ApplyCatalogDeletionInput,

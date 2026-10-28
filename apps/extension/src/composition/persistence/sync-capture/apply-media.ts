@@ -221,7 +221,9 @@ async function assertExistingSource(
     await assertAbsentSource(tx, input, identity, true);
     return null;
   }
-  const previous = await freezeMediaInTransaction(tx, input.rows.media.id);
+  const previous = await freezeMediaInTransaction(tx, input.rows.media.id, {
+    allowIndependentReview: true,
+  });
   if (
     state.nativeDigest !== digestCapturedMediaRows(previous) ||
     previous.projectAsset.id !== input.rows.projectAsset.id
@@ -298,7 +300,9 @@ export async function loadMediaReplicaPredecessorRef(input: {
     await tx.done;
     return null;
   }
-  const previous = await freezeMediaInTransaction(tx, input.mediaId);
+  const previous = await freezeMediaInTransaction(tx, input.mediaId, {
+    allowIndependentReview: true,
+  });
   if (state.nativeDigest !== digestCapturedMediaRows(previous))
     throw new MediaReplicaConflictError('source-changed');
   await tx.done;

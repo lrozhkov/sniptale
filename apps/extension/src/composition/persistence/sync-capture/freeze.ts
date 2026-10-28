@@ -1,3 +1,4 @@
+import { sameReviewVideoContainer } from '../../../features/video/review/validation';
 import { readWorkspaceStorage } from '../review-workspaces/storage';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from '../review-workspaces/parser';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
@@ -92,7 +93,8 @@ export function digestCapturedMediaRows(rows: CapturedMediaRows): string {
 /** Freeze one original-only Library source through the caller's transaction. */
 export async function freezeMediaInTransaction(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
-  mediaId: string
+  mediaId: string,
+  options: { allowIndependentReview?: boolean } = {}
 ): Promise<CapturedMediaRows> {
   const media = frozenNativeRow(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId), admitMedia);
   requireSupported(media.id === mediaId && media.source.kind === 'project-asset');
@@ -106,7 +108,36 @@ export async function freezeMediaInTransaction(
   );
   const rows = parseCapturedMediaRows({ media, projectAsset, ref });
   requireSupported(rows !== null);
-  await rejectUncapturedSidecars(tx, new Set([mediaId]));
+  const reviews = new Set<string>();
+  if (options.allowIndependentReview) {
+    const stored = await readWorkspaceStorage(tx, mediaId);
+    const rawDraft: unknown = await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(mediaId);
+    if (stored.logical !== undefined || rawDraft !== undefined) {
+      const workspace = parseVideoWorkspace(stored.logical);
+      const draft =
+        rawDraft === undefined
+          ? null
+          : parseVideoWorkspaceDraft(rawDraft, workspace?.source.duration ?? 0);
+      requireSupported(
+        Boolean(
+          workspace &&
+          workspace.aggregateId === mediaId &&
+          (workspace.sourceMediaId ?? mediaId) === mediaId &&
+          workspace.sourceAssetId === projectAsset.assetId &&
+          workspace.source.size === ref.size &&
+          sameReviewVideoContainer(workspace.source.mimeType, ref.mimeType) &&
+          ref.mimeType.startsWith('video/') &&
+          (rawDraft === undefined || draft?.aggregateId === mediaId)
+        )
+      );
+      reviews.add(mediaId);
+    }
+  }
+  await rejectUncapturedSidecars(tx, new Set([mediaId]), {
+    reviews,
+    thumbnails: reviews,
+    presentation: null,
+  });
   return structuredClone(rows);
 }
 

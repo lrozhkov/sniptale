@@ -1,3 +1,6 @@
+import { applyPreparedVideoReviewReplica } from './apply-review';
+import { workspace as reviewTemplate } from '../review-workspaces/backup-restore.test-support';
+import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
@@ -545,5 +548,98 @@ it('keeps a soft Trash original eligible and refuses a delayed metadata predeces
   await expect(applyPreparedMediaReplica({ ...next, operationId: 'delayed' })).rejects.toThrow(
     'source-changed'
   );
+  expect(f.rows).toEqual(before);
+});
+
+async function setupWithIndependentReview() {
+  const f = setup();
+  f.input.rows.media.kind = 'video';
+  f.input.rows.media.mimeType = 'video/webm';
+  f.input.rows.projectAsset.mimeType = 'video/webm';
+  f.input.rows.ref.mimeType = 'video/webm';
+  await applyPreparedMediaReplica(f.input);
+  for (const id of [f.input.rows.media.id, 'project-asset:quick-project:archive']) {
+    await applyPreparedVideoReviewReplica({
+      ...f.input,
+      operationId: `review-${id}`,
+      expectedWorkspaceRevision: null,
+      root: {
+        sourceMediaId: f.input.rows.media.id,
+        assets: [],
+        review: {
+          draft: null,
+          workspace: materializeVideoWorkspaceProject(
+            {
+              ...structuredClone(reviewTemplate),
+              aggregateId: id,
+              sourceAssetId: f.input.rows.ref.assetId,
+              history: [],
+              cursor: 0,
+              ...(id === f.input.rows.media.id ? {} : { sourceMediaId: f.input.rows.media.id }),
+            },
+            'Review'
+          ),
+        },
+      },
+      dependencies: [
+        {
+          entry: f.input.rows.media,
+          ref: f.input.rows.ref,
+          expectedGeneration: 1,
+          expectedBasis: [f.input.operationId],
+        },
+      ],
+    });
+  }
+  return f;
+}
+
+it('reuses and updates an original metadata head without changing independent reviews', async () => {
+  const f = await setupWithIndependentReview();
+  const native = [
+    'video_workspaces',
+    'video_workspace_history',
+    'video_workspace_drafts',
+    'thumbnails',
+  ];
+  const before = native.map((name) => structuredClone(f.table(name)));
+  const admission = {
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: 3,
+    mediaId: f.input.rows.media.id,
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+  };
+  expect(await loadMediaReplicaPredecessorRef(admission)).toEqual(f.input.rows.ref);
+  const next = {
+    ...structuredClone(f.input),
+    operationId: 'rename-original',
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+  };
+  next.rows.media.filename = 'Renamed.webm';
+  next.rows.media.tags = ['work'];
+  expect(await applyPreparedMediaReplica(next)).toEqual({ status: 'applied', generation: 2 });
+  expect(native.map((name) => f.table(name))).toEqual(before);
+  expect(f.table('media_library').get(f.input.rows.media.id)).toMatchObject({
+    filename: 'Renamed.webm',
+    tags: ['work'],
+  });
+});
+
+it('refuses changed original bytes while a default or archived review retains them', async () => {
+  const f = await setupWithIndependentReview();
+  const next = {
+    ...structuredClone(f.input),
+    operationId: 'replace-original',
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+  };
+  next.rows.ref.assetId = 'replacement-body';
+  next.rows.ref.location.objectKey = 'objects/replacement-body';
+  next.rows.projectAsset.assetId = next.rows.ref.assetId;
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedMediaReplica(next)).rejects.toThrow();
   expect(f.rows).toEqual(before);
 });

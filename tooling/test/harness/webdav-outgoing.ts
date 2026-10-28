@@ -1,3 +1,5 @@
+import { readVideoWorkspace } from '../../../apps/extension/src/composition/persistence/review-workspaces/store';
+import type { CaptureRootKind } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
 import { parseSyncAttemptText } from '../../../apps/extension/src/workflows/sync-transfer/wire-record';
 import { loadSyncConnection } from '../../../apps/extension/src/composition/persistence/remote-connection/store';
 import {
@@ -53,6 +55,31 @@ import {
   recoverInterruptedSyncQueueOperation,
 } from '../../../apps/extension/src/workflows/sync-transfer/queue';
 
+async function localState(spaceId: string, kind: CaptureRootKind, rootId: string) {
+  const db = await initDB();
+  const row = parseSyncCaptureRecord(
+    await db.get(
+      SYNC_CAPTURE_STORE,
+      JSON.stringify(['root-state', captureRootKey(spaceId, kind, rootId)])
+    )
+  );
+  return row?.kind === 'root-state' ? row : null;
+}
+function catalogProof(current: Awaited<ReturnType<typeof scanSyncCatalog>>) {
+  return {
+    operations: current.operations.size,
+    attempts: [...current.operations.values()].reduce(
+      (total, operation) => total + operation.attempts.length,
+      0
+    ),
+    roots: [...current.roots.values()],
+    pending: current.pending,
+    quarantined: current.quarantined,
+    invalid: current.invalid,
+    metadataBytes: current.metadataBytes,
+  };
+}
+
 /** Runs production encoding and dispatch over actual captured native sources. */
 export function createWebdavOutgoingHarness(
   connected: () => SyncRemoteStore,
@@ -67,30 +94,6 @@ export function createWebdavOutgoingHarness(
   const check = (condition: unknown) => {
     if (!condition) throw new Error('Native catalog fixture is unavailable.');
   };
-  async function localState(spaceId: string, kind: 'media' | 'video-project', rootId: string) {
-    const db = await initDB();
-    const row = parseSyncCaptureRecord(
-      await db.get(
-        SYNC_CAPTURE_STORE,
-        JSON.stringify(['root-state', captureRootKey(spaceId, kind, rootId)])
-      )
-    );
-    return row?.kind === 'root-state' ? row : null;
-  }
-  function catalogProof(current: NonNullable<typeof catalog>) {
-    return {
-      operations: current.operations.size,
-      attempts: [...current.operations.values()].reduce(
-        (total, operation) => total + operation.attempts.length,
-        0
-      ),
-      roots: [...current.roots.values()],
-      pending: current.pending,
-      quarantined: current.quarantined,
-      invalid: current.invalid,
-      metadataBytes: current.metadataBytes,
-    };
-  }
   async function queueScope(): Promise<SyncQueueScope> {
     const db = await initDB();
     const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
@@ -144,7 +147,7 @@ export function createWebdavOutgoingHarness(
       });
     },
     deleteProject: (rootId: string) => deleteVideoProject(rootId),
-    async nativeState(spaceId: string, rootKind: 'media' | 'video-project', rootId: string) {
+    async nativeState(spaceId: string, rootKind: CaptureRootKind, rootId: string) {
       const db = await initDB();
       const state = await localState(spaceId, rootKind, rootId);
       const root = await db.get(rootKind === 'media' ? 'media_library' : 'video_projects', rootId);
@@ -166,14 +169,15 @@ export function createWebdavOutgoingHarness(
         }
       );
     },
-    async sendHistory(rootId: string, duplicateLatest = false) {
+    async sendHistory(rootId: string, duplicateLatest = false, rootKind?: CaptureRootKind) {
       const db = await initDB();
       const captures = (await db.getAll(SYNC_CAPTURE_STORE))
         .flatMap((raw) => {
           const parsed = parseSyncCaptureRecord(raw);
           return parsed?.kind === 'sync-operation' &&
             parsed.phase !== 'published' &&
-            parsed.rootId === rootId
+            parsed.rootId === rootId &&
+            (rootKind === undefined || parsed.rootKind === rootKind)
             ? [parsed]
             : [];
         })
@@ -238,7 +242,7 @@ export function createWebdavOutgoingHarness(
     },
     async receive(
       spaceId: string,
-      rootKind: 'media' | 'video-project',
+      rootKind: CaptureRootKind,
       rootId: string,
       deferPublication = false
     ) {
@@ -295,11 +299,14 @@ export function createWebdavOutgoingHarness(
           : null;
       const localMedia =
         rootKind === 'media' ? parseMediaLibraryEntry(await db.get('media_library', rootId)) : null;
-      const localRevision = localProject
-        ? (localProject.workspaceRevision ?? 0)
-        : localMedia?.source.kind === 'screenshot'
-          ? (localMedia.workspaceRevision ?? 0)
-          : null;
+      const localReview = rootKind === 'video-review' ? await readVideoWorkspace(rootId) : null;
+      const localRevision = localReview
+        ? localReview.workspace.revision
+        : localProject
+          ? (localProject.workspaceRevision ?? 0)
+          : localMedia?.source.kind === 'screenshot'
+            ? (localMedia.workspaceRevision ?? 0)
+            : null;
       if (root?.deleted) {
         await applyCatalogDeletion({
           catalog,

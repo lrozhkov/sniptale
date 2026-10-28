@@ -1,3 +1,4 @@
+import { parseCapturedVideoReviewRows, type CapturedVideoReviewRows } from './review-snapshot';
 import { parseCapturedVideoProjectRows } from './project-snapshot';
 export { isSupportedCaptureProject, parseCapturedVideoProjectRows } from './project-snapshot';
 import { describeImageMetadata, parseCapturedImageRows } from './image-snapshot';
@@ -13,6 +14,7 @@ import {
   MAX_CAPTURE_METADATA_BYTES,
   MAX_CAPTURE_ROWS,
   type CapturedMediaRows,
+  type CapturedMediaDependency,
   type CapturedChange,
   type CaptureOperation,
   type CaptureOperationHeader,
@@ -34,6 +36,35 @@ function storageKey(value: unknown): value is string {
 
 function ordinal(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+/** Bind every retained published source to its accepted causal head. */
+function parseReviewDependencies(
+  value: unknown,
+  rows: CapturedVideoReviewRows
+): CapturedMediaDependency[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CAPTURE_ROWS) return null;
+  const required = new Set([rows.source.media.id, ...rows.media.map((entry) => entry.id)]);
+  const dependencies: CapturedMediaDependency[] = [];
+  for (const raw of value) {
+    if (
+      !isRecord(raw) ||
+      !identity(raw['mediaId']) ||
+      !ordinal(raw['generation']) ||
+      raw['generation'] === 0 ||
+      !Array.isArray(raw['basis']) ||
+      raw['basis'].length !== 1 ||
+      !raw['basis'].every(identity) ||
+      !required.delete(raw['mediaId'])
+    )
+      return null;
+    dependencies.push({
+      mediaId: raw['mediaId'],
+      generation: raw['generation'],
+      basis: [...raw['basis']],
+    });
+  }
+  return required.size === 0 ? dependencies : null;
 }
 
 /** Reject binary, cyclic, or excessive metadata before any JSON size calculation. */
@@ -180,7 +211,9 @@ function parseCaptureRoot(
     !storageKey(value['rootKey']) ||
     !ordinal(value['generation']) ||
     value['generation'] === 0 ||
-    (value['rootKind'] !== 'video-project' && value['rootKind'] !== 'media') ||
+    (value['rootKind'] !== 'video-project' &&
+      value['rootKind'] !== 'media' &&
+      value['rootKind'] !== 'video-review') ||
     !identity(value['rootId']) ||
     captureRootKey(header.spaceId, value['rootKind'], value['rootId']) !== value['rootKey'] ||
     !Array.isArray(value['basis']) ||
@@ -312,6 +345,7 @@ function parseCapturedChange(
     (source['changeKind'] !== 'image' &&
       source['changeKind'] !== 'media' &&
       source['changeKind'] !== 'video-project' &&
+      source['changeKind'] !== 'video-review' &&
       source['changeKind'] !== 'tombstone') ||
     typeof source['label'] !== 'string' ||
     source['label'].length === 0 ||
@@ -338,9 +372,19 @@ function parseCapturedChange(
       change['kind'] === 'video-project' ? parseCapturedVideoProjectRows(change['rows']) : null;
     const mediaRows = change['kind'] === 'media' ? parseCapturedMediaRows(change['rows']) : null;
     const imageRows = change['kind'] === 'image' ? parseCapturedImageRows(change['rows']) : null;
+    const reviewRows =
+      change['kind'] === 'video-review' ? parseCapturedVideoReviewRows(change['rows']) : null;
     let parsedChange: CapturedChange['change'];
     if (change['kind'] === 'tombstone') parsedChange = { kind: 'tombstone' };
-    else if (rows && rows.project.id === root.rootId && root.rootKind === 'video-project')
+    else if (
+      reviewRows &&
+      reviewRows.review.workspace.aggregateId === root.rootId &&
+      root.rootKind === 'video-review'
+    ) {
+      const mediaDependencies = parseReviewDependencies(change['mediaDependencies'], reviewRows);
+      if (!mediaDependencies) return null;
+      parsedChange = { kind: 'video-review', rows: reviewRows, mediaDependencies };
+    } else if (rows && rows.project.id === root.rootId && root.rootKind === 'video-project')
       parsedChange = { kind: 'video-project', rows };
     else if (mediaRows && mediaRows.media.id === root.rootId && root.rootKind === 'media')
       parsedChange = { kind: 'media', rows: mediaRows };
@@ -419,7 +463,10 @@ function parseCaptureRootState(
   if (!root) return null;
   const nativeDigest = value['nativeDigest'];
   const nativeRevision = value['nativeRevision'];
-  if (nativeRevision !== undefined && (!ordinal(nativeRevision) || root.rootKind !== 'media'))
+  if (
+    nativeRevision !== undefined &&
+    (!ordinal(nativeRevision) || (root.rootKind !== 'media' && root.rootKind !== 'video-review'))
+  )
     return null;
   const deleted = value['deleted'];
   if (deleted !== undefined && deleted !== true) return null;
@@ -428,7 +475,7 @@ function parseCaptureRootState(
     nativeDigest !== undefined &&
     (typeof nativeDigest !== 'string' ||
       !/^[a-f0-9]{64}$/u.test(nativeDigest) ||
-      root.rootKind !== 'media')
+      (root.rootKind !== 'media' && root.rootKind !== 'video-review'))
   )
     return null;
   return {

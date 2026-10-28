@@ -1,9 +1,6 @@
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { materializeWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage-format';
-import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ checkpoint: vi.fn(), runMutation: vi.fn() }));
+const mocks = vi.hoisted(() => ({ checkpoint: vi.fn(), runMutation: vi.fn(), write: vi.fn() }));
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   appendCommittedArchiveRootInTransaction: mocks.checkpoint,
@@ -31,80 +28,154 @@ const favicon =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
 import {
   annotationReviewFixture,
+  installDatabase,
+  logicalReviewValues,
   journal,
   portableJson,
   portableMetadata,
   reviewFixture,
   session,
   stagedObjects,
+  nestedMediaReviewFixture,
 } from './media.review-assets.test-support';
 
-function installDatabase(
-  metadata: Pick<ReturnType<typeof portableMetadata>, 'entry' | 'projectExport'>
-) {
-  const review = reviewFixture();
-  const tables = new Map<string, Map<string, unknown>>([
-    ['media_library', new Map([[metadata.entry.id, metadata.entry]])],
-    ['project_exports', new Map([['e', { ...metadata.projectExport, assetId: 'old-local' }]])],
-    [
-      'video_workspaces',
-      new Map([[metadata.entry.id, { ...review.workspace, sourceAssetId: 'old-local' }]]),
-    ],
-    ['video_workspace_drafts', new Map([[metadata.entry.id, review.draft]])],
-  ]);
-  const storeFor = (name: string) => {
-    const table = tables.get(name) ?? new Map<string, unknown>();
-    tables.set(name, table);
-    return {
-      get: async (key: IDBValidKey) =>
-        table.get(Array.isArray(key) ? JSON.stringify(key) : String(key)),
-      getAll: async () => [...table.values()],
-      delete: async (key: IDBValidKey) =>
-        table.delete(Array.isArray(key) ? JSON.stringify(key) : String(key)),
-      put: async (value: Record<string, unknown>) => {
-        const key =
-          name === 'video_workspace_history'
-            ? JSON.stringify([value['aggregateId'], value['ordinal']])
-            : (value['aggregateId'] ?? value['id'] ?? value['assetId'] ?? 'other');
-        table.set(String(key), structuredClone(value));
-      },
-      index: (indexName: string) => ({
-        count: async () => 0,
-        getAll: async (key: IDBValidKey) =>
-          [...table.values()].filter(isRecord).filter((row) => row[indexName] === key),
-        getAllKeys: async (key: IDBValidKey) =>
-          [...table.values()]
-            .filter(isRecord)
-            .filter((row) => row[indexName] === key)
-            .map((row) => {
-              if (typeof row['aggregateId'] !== 'string' || typeof row['ordinal'] !== 'number')
-                throw new Error('Invalid history fixture key');
-              return [row['aggregateId'], row['ordinal']];
-            }),
-      }),
-    };
-  };
-  mocks.runMutation.mockImplementation(async (callback) =>
-    callback({
-      get: async (name: string, key: IDBValidKey) => storeFor(name).get(key),
-      transaction: () => ({ objectStore: storeFor, done: Promise.resolve() }),
-    })
-  );
-  return tables;
-}
-
-function logicalReviewValues(tables: Map<string, Map<string, unknown>>) {
-  return [...(tables.get('video_workspaces')?.values() ?? [])].map((head) => {
-    const ownRows = [...(tables.get('video_workspace_history')?.values() ?? [])].filter(
-      (row) => isRecord(row) && isRecord(head) && row['aggregateId'] === head['aggregateId']
-    );
-    const workspace = parseVideoWorkspace(materializeWorkspaceStorage(head, ownRows));
-    if (!workspace) throw new Error('Invalid restored workspace fixture');
-    return workspace;
-  });
-}
-
 beforeEach(() => vi.clearAllMocks());
+
+it.each([
+  { cycle: false, sourceMime: 'video/webm' },
+  { cycle: true, sourceMime: 'video/webm' },
+  { cycle: false, sourceMime: 'video/webm; codecs="vp8, opus"' },
+  { cycle: true, sourceMime: 'video/webm; codecs="vp8, opus"' },
+])(
+  'publishes private sidecars and recovery (cycle=$cycle, MIME=$sourceMime)',
+  async ({ cycle, sourceMime }) => {
+    const f = nestedMediaReviewFixture(cycle);
+    for (const asset of f.metadata.reviewAssets)
+      asset.videoReview.workspace.source.mimeType = sourceMime;
+    const tables = installDatabase(f.metadata, mocks.runMutation, mocks.write);
+    const result = await mediaLibraryRootPublisher.publish({
+      envelope: {
+        descriptor: {
+          rootKind: 'media',
+          mediaSubtype: 'library-item',
+          rootId: f.metadata.entry.id,
+          metadataPath: '_sniptale/metadata/media/nested.json',
+          objectCount: 3,
+          totalBytes: 18,
+        },
+        metadata: portableJson(f.metadata),
+        objects: [],
+      },
+      journal,
+      session: {
+        ...session('duplicate'),
+        currentRoot: `media:library-item:${f.metadata.entry.id}`,
+      },
+      staged: f.staged,
+    });
+    expect(result.imported).toBe(true);
+    const reviews = logicalReviewValues(tables);
+    const b = reviews.find((workspace) => workspace.project?.name === 'Review b');
+    const c = reviews.find((workspace) => workspace.project?.name === 'Review c');
+    expect(b).toBeDefined();
+    expect(c).toBeDefined();
+    expect(b?.source.mimeType).toBe(sourceMime);
+    expect(c?.source.mimeType).toBe(sourceMime);
+    expect(b?.aggregateId).not.toBe('project-asset:b');
+    expect(c?.aggregateId).not.toBe('project-asset:c');
+    expect(b).toHaveProperty('history.0.after.webcam.assetId', c?.aggregateId);
+    if (cycle) expect(c?.advanced.webcam?.assetId).toBe(b?.aggregateId);
+    expect(tables.get('video_workspace_drafts')?.get(b!.aggregateId)).toHaveProperty(
+      'annotation.text',
+      'Draft b'
+    );
+    expect(tables.get('video_workspace_drafts')?.get(c!.aggregateId)).toHaveProperty(
+      'annotation.text',
+      'Draft c'
+    );
+    expect(tables.get('media_library')?.has(b!.aggregateId)).toBe(false);
+    expect(tables.get('media_library')?.has(c!.aggregateId)).toBe(false);
+    expect(result.retainedAssetIds).toEqual(
+      expect.arrayContaining(['review-original-bytes', 'b-bytes', 'c-bytes'])
+    );
+  }
+);
+
+it.each([false, true])(
+  'verifies nested redo-only annotation resources before standalone mutation (corrupt=%s)',
+  async (corrupt) => {
+    const { encodePortableReviewAssetRefs } =
+      await import('../../../../composition/persistence/review-workspaces/asset-refs');
+    const { readAssetFile } = await import('../../../../composition/persistence/assets');
+    const f = nestedMediaReviewFixture(false);
+    const effect = await annotationReviewFixture();
+    f.metadata.reviewAssets[1]!.videoReview = encodePortableReviewAssetRefs({
+      ...effect.review,
+      workspace: { ...effect.review.workspace, aggregateId: 'project-asset:c' },
+      draft: { ...effect.review.draft, aggregateId: 'project-asset:c' },
+    });
+    const metadata = {
+      ...f.metadata,
+      reviewAssets: [
+        ...f.metadata.reviewAssets,
+        {
+          entry: { id: 'mark', createdAt: 1, size: effect.blob.size, mimeType: effect.blob.type },
+          objectId: 'mark-object',
+          filename: 'mark.svg',
+          publishToLibrary: false,
+        },
+      ],
+    };
+    const tables = installDatabase(metadata, mocks.runMutation, mocks.write);
+    const previous = structuredClone(tables);
+    vi.mocked(readAssetFile).mockResolvedValue(
+      new File([corrupt ? 'bad' : effect.blob], 'mark.svg', { type: effect.blob.type })
+    );
+    const pending = mediaLibraryRootPublisher.publish({
+      envelope: {
+        descriptor: {
+          rootKind: 'media',
+          mediaSubtype: 'library-item',
+          rootId: metadata.entry.id,
+          metadataPath: '_sniptale/metadata/media/nested.json',
+          objectCount: 4,
+          totalBytes: 18 + effect.blob.size,
+        },
+        metadata: portableJson(metadata),
+        objects: [],
+      },
+      journal,
+      session: { ...session('duplicate'), currentRoot: `media:library-item:${metadata.entry.id}` },
+      staged: [
+        ...f.staged,
+        {
+          objectId: 'mark-object',
+          ref: {
+            assetId: 'mark-bytes',
+            createdAt: 1,
+            location: { kind: 'opfs', objectKey: 'objects/mark-bytes' },
+            size: effect.blob.size,
+            mimeType: effect.blob.type,
+            sha256: null,
+          },
+        },
+      ],
+    });
+    if (corrupt) {
+      await expect(pending).rejects.toMatchObject({ code: 'resource-integrity' });
+      expect(tables).toEqual(previous);
+      expect(mocks.write).not.toHaveBeenCalled();
+      expect(mocks.checkpoint).not.toHaveBeenCalled();
+    } else {
+      await expect(pending).resolves.toMatchObject({ imported: true });
+      const nested = logicalReviewValues(tables).find(
+        (workspace) => workspace.sourceAssetId === 'c-bytes'
+      );
+      expect(nested?.effectSnapshots?.[0]?.assets[0]?.assetId).not.toBe('project-asset:mark');
+      expect(nested?.cursor).toBe(0);
+    }
+  }
+);
 
 it.each(
   (['skip', 'replace', 'duplicate'] as const).flatMap((strategy) =>
@@ -114,7 +185,7 @@ it.each(
   'round-trips standalone review assets with $strategy and explicit MIME=$explicitMime',
   async ({ strategy, explicitMime }) => {
     const metadata = portableMetadata(explicitMime);
-    const tables = installDatabase(metadata);
+    const tables = installDatabase(metadata, mocks.runMutation, mocks.write);
     const result = await mediaLibraryRootPublisher.publish({
       envelope: {
         descriptor: {
@@ -215,7 +286,7 @@ it.each(['replace', 'duplicate'] as const)(
         },
       ],
     };
-    const tables = installDatabase(metadata);
+    const tables = installDatabase(metadata, mocks.runMutation, mocks.write);
     const result = await mediaLibraryRootPublisher.publish({
       envelope: {
         descriptor: {
@@ -503,7 +574,7 @@ it.each(['bookends', 'original-speech'] as const)(
       const { envelope } = await decodeBackupMetadata(reader, transport);
       expect(envelope.objects).toHaveLength(6);
       const { restoredBytes, staged } = await stageBookendArchive(reader, envelope);
-      const tables = installDatabase(base);
+      const tables = installDatabase(base, mocks.runMutation, mocks.write);
       const result = await mediaLibraryRootPublisher.publish({
         envelope,
         journal,
@@ -651,7 +722,7 @@ it.each(['source-hash', 'resource-hash', 'mime', 'signature', 'unsafe-svg', 'val
         },
       ],
     };
-    const tables = installDatabase(metadata);
+    const tables = installDatabase(metadata, mocks.runMutation, mocks.write);
     const previous = structuredClone(tables);
     vi.mocked(readAssetFile).mockImplementation(async (reference) => {
       if (reference.assetId !== 'mark-bytes') throw new Error('Unexpected staged read');

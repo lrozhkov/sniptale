@@ -314,3 +314,106 @@ it('fails closed for malformed staged effect project metadata', async () => {
   expect(() => parsePreparedVideoProjectReplicaRoot(malformed.payload.input.root)).toThrow();
   expect(mediaHasPendingPublication(malformed, { id: 'disjoint-media' })).toBe(true);
 });
+
+it('retains exact review sources and resources without blocking unrelated media', async () => {
+  const { mediaHasPendingPublication } = await import('./delete-cascade.sources');
+  const { parseApplyPreparedVideoReviewReplicaInput } =
+    await import('../sync-capture/apply-review');
+  const { workspace: template } = await import('../review-workspaces/backup-restore.test-support');
+  const { materializeVideoWorkspaceProject } =
+    await import('../review-workspaces/project-metadata');
+  const { updateQuickEditBackground } =
+    await import('../../../features/video/review/advanced/background');
+  const sourceId = 'project-asset:review-source';
+  const originId = 'project-asset:review-origin';
+  const workspace = materializeVideoWorkspaceProject(
+    {
+      ...structuredClone(template),
+      aggregateId: 'project-asset:quick-project:pending',
+      sourceMediaId: sourceId,
+      sourceAssetId: 'original-bytes',
+    },
+    'Pending review'
+  );
+  workspace.advanced.background = updateQuickEditBackground(workspace.advanced.background, {
+    enabled: true,
+    type: 'image',
+    assetId: 'project-asset:private-background',
+  });
+  const reference = (assetId: string, mimeType: string): AssetRef => ({
+    assetId,
+    createdAt: 1,
+    size: 6,
+    mimeType,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+  });
+  const source = createMediaLibraryEntry({
+    id: sourceId,
+    kind: 'video',
+    mimeType: 'video/webm',
+    size: 6,
+    source: { kind: 'project-asset', projectAssetId: 'review-source' },
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+  });
+  const origin = createMediaLibraryEntry({
+    id: originId,
+    mimeType: 'image/png',
+    size: 6,
+    source: { kind: 'project-asset', projectAssetId: 'review-origin' },
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+  });
+  const input = parseApplyPreparedVideoReviewReplicaInput({
+    operationId: 'pending-review',
+    sourceDigest: 'a'.repeat(64),
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: 1,
+    expectedBasis: [],
+    expectedLocalGeneration: 0,
+    expectedWorkspaceRevision: null,
+    root: {
+      review: { workspace, draft: null },
+      sourceMediaId: sourceId,
+      assets: [
+        {
+          entry: {
+            id: 'private-background',
+            assetId: 'private-bytes',
+            originMediaId: originId,
+            createdAt: 1,
+            mimeType: 'image/png',
+            size: 6,
+          },
+          ref: reference('private-bytes', 'image/png'),
+          filename: 'background.png',
+        },
+      ],
+    },
+    dependencies: [
+      {
+        entry: source,
+        ref: reference('original-bytes', 'video/webm'),
+        expectedGeneration: 1,
+        expectedBasis: ['source-op'],
+      },
+      {
+        entry: origin,
+        ref: reference('origin-bytes', 'image/png'),
+        expectedGeneration: 1,
+        expectedBasis: ['origin-op'],
+      },
+    ],
+  });
+  expect(input).not.toBeNull();
+  if (!input) throw new Error('Invalid prepared review fixture.');
+  const journal = { domain: 'sync-replica', payload: { kind: 'video-review', input } };
+  for (const id of [sourceId, originId, 'project-asset:private-background'])
+    expect(mediaHasPendingPublication(journal, { id })).toBe(true);
+  expect(mediaHasPendingPublication(journal, { id: 'disjoint-media' })).toBe(false);
+  const malformed = {
+    ...journal,
+    payload: { kind: 'video-review', input: { ...input, root: { ...input.root, assets: [] } } },
+  };
+  expect(mediaHasPendingPublication(malformed, { id: 'disjoint-media' })).toBe(true);
+});

@@ -68,6 +68,7 @@ function preparationDraft(
     operationId: capture.operationId,
     rootKind: capture.rootKind,
     rootId: capture.rootId,
+    ...(portable?.reviewSourceMediaId ? { reviewSourceMediaId: portable.reviewSourceMediaId } : {}),
     kind:
       capture.change.kind === 'tombstone'
         ? 'delete'

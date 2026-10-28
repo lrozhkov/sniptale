@@ -1,3 +1,4 @@
+import type { CapturedVideoReviewRows } from './review-snapshot';
 import type { StoredImageWorkspaceEntry } from '../image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import type { AssetRef } from '../assets/contracts';
@@ -25,7 +26,7 @@ export interface SyncCaptureProfile {
   connectionGeneration: number;
 }
 
-export type CaptureRootKind = 'media' | 'video-project';
+export type CaptureRootKind = 'media' | 'video-project' | 'video-review';
 export type CaptureOrigin = 'local-edit' | 'local-restore';
 
 /** Native accepted rows remain distinct from the portable backup representation. */
@@ -89,7 +90,10 @@ export interface CaptureOperationHeader {
   kind: 'sync-operation';
   profileCreatedAt: number;
   sourceSha256: string;
-  source: { changeKind: 'media' | 'image' | 'video-project' | 'tombstone'; label: string };
+  source: {
+    changeKind: 'media' | 'image' | 'video-project' | 'video-review' | 'tombstone';
+    label: string;
+  };
   key: string;
   createdAt: number;
   spaceId: string;
@@ -109,6 +113,11 @@ export interface CapturedChange extends CaptureOperationHeader {
   phase: 'native';
   change:
     | { kind: 'video-project'; rows: CapturedVideoProjectRows }
+    | {
+        kind: 'video-review';
+        rows: CapturedVideoReviewRows;
+        mediaDependencies: CapturedMediaDependency[];
+      }
     | { kind: 'media'; rows: CapturedMediaRows }
     | { kind: 'image'; rows: CapturedImageRows }
     | { kind: 'tombstone' };

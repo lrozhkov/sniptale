@@ -1,6 +1,7 @@
 import {
   captureImageInTransaction,
   captureMediaInTransaction,
+  captureVideoReviewInTransaction,
   allocateRestoredImageRevision,
 } from '../../../../composition/persistence/sync-capture/capture';
 import { parseCapturedMediaRows } from '../../../../composition/persistence/sync-capture/guards';
@@ -12,7 +13,6 @@ import {
   createLibraryLifecycle,
   promoteLibraryLifecycle,
 } from '../../../../composition/persistence/library-lifecycle/contracts';
-import { promoteReviewSourceLifecycles } from '../../../../composition/persistence/review-workspaces/new-reference-admission';
 import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import { freezeScenarioMediaRepresentations } from '../../../../composition/persistence/scenario/library-publication';
 import { sameMediaSource } from '../../../../composition/persistence/media-library/dependencies';
@@ -32,7 +32,6 @@ import {
   SCENARIO_ASSETS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import { parseProjectExportEntry } from '../../../../composition/persistence/projects/read-guards';
-import { putVideoReviewRestore } from '../../../../composition/persistence/review-workspaces/backup-restore';
 import {
   appendCommittedArchiveRootInTransaction,
   buildPhysicalDeleteOperation,
@@ -84,10 +83,13 @@ import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 import {
   hasMediaReviewAssetConflict,
+  isCaptureReview,
+  rebaseRestoredVideoReview,
   prepareMediaReviewAssets,
   prepareStandaloneMediaVideoReview,
   verifyPreparedMediaReviewAnnotations,
   publishMediaReviewAssets,
+  publishStandaloneMediaVideoReview,
 } from './media-review-assets';
 
 type MutableStore = {
@@ -522,23 +524,15 @@ async function publishPreparedMedia(args: {
   await publishPreparedMediaSourceInTransaction(args.prepared, args.stores);
   if (args.prepared.thumbnail) await args.stores.thumbnails.put(args.prepared.thumbnail);
   await publishPreparedMediaProjectChildInTransaction(args.prepared, args.stores);
-  await publishMediaReviewAssets(args.prepared.reviewAssets, args.stores);
-  if (args.prepared.videoReview) {
-    await promoteReviewSourceLifecycles(
-      args.prepared.videoReview.workspace,
-      {
-        assets: args.stores.projectAssets,
-        media: args.stores.media,
-        recordings: args.stores.recordings,
-      },
-      { assets: new Map(), libraryAudioClaims: [] }
-    );
-    await putVideoReviewRestore({
-      review: args.prepared.videoReview,
-      workspaces: args.stores.videoWorkspaces,
-      drafts: args.stores.videoDrafts,
-    });
-  }
+  await publishMediaReviewAssets(args.prepared.reviewAssets, {
+    media: args.stores.media,
+    owners: args.stores.owners,
+    projectAssets: args.stores.projectAssets,
+    refs: args.stores.refs,
+    videoWorkspaces: args.stores.videoWorkspaces,
+    videoDrafts: args.stores.videoDrafts,
+  });
+  await publishStandaloneMediaVideoReview(args.prepared.videoReview, args.stores);
   if (args.prepared.recording) {
     await putRecordingBackupRestore({
       entry: args.prepared.recording,
@@ -669,6 +663,7 @@ async function commitPreparedMediaRoot(args: {
                 : null;
         }
       }
+      await rebaseRestoredVideoReview(tx, args.prepared);
       if (conflict.current && args.session.strategy === 'replace') {
         await freezeScenarioMediaRepresentations(tx, conflict.current);
         await deleteExistingMediaRoot({
@@ -697,6 +692,10 @@ async function commitPreparedMediaRoot(args: {
         (args.prepared.media.kind === 'image' || args.prepared.media.kind === 'screenshot')
       )
         await captureImageInTransaction(tx, args.prepared.media.id, { origin: 'local-restore' });
+      else if (isCaptureReview(args.prepared))
+        await captureVideoReviewInTransaction(tx, args.prepared.media.id, {
+          origin: 'local-restore',
+        });
       else if (isCaptureOriginal(args.prepared))
         await captureMediaInTransaction(tx, args.prepared.media.id, { origin: 'local-restore' });
       await tx.done;

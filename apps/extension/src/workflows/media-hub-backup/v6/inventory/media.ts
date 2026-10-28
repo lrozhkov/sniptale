@@ -1,4 +1,8 @@
-import { readVideoWorkspace } from '../../../../composition/persistence/review-workspaces/store';
+import { readWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
+import {
+  parseVideoWorkspace,
+  parseVideoWorkspaceDraft,
+} from '../../../../composition/persistence/review-workspaces/parser';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence/review-workspaces/contracts';
 import { projectRecordingMetadataPrivacy } from '../privacy';
@@ -14,6 +18,9 @@ import {
 import {
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import {
   parseProjectAssetEntry,
@@ -359,18 +366,36 @@ async function buildReviewAssets(
   workspace: Parameters<typeof collectReviewAssetReferences>[0]
 ): Promise<NonNullable<PortableMediaMetadata['reviewAssets']>> {
   const assets: NonNullable<PortableMediaMetadata['reviewAssets']> = [];
-  for (const reference of [...collectReviewAssetReferences(workspace)].sort()) {
+  const references = new Set([...collectReviewAssetReferences(workspace)].sort());
+  const collected = new Set<string>();
+  for (const reference of references) {
+    if (!reference.startsWith('project-asset:'))
+      throw new Error('Review-referenced asset kind is unsupported.');
     const id = reference.slice('project-asset:'.length);
+    if (collected.has(id)) continue;
+    collected.add(id);
     const entry = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, id));
     if (!entry) throw new Error(`Review-referenced project asset is missing: ${reference}.`);
     const media = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, reference));
     const filename = media?.filename ?? id;
     const file = await readRefFile(db, entry.assetId, filename);
     const { assetId: _assetId, ...portable } = entry;
+    const videoReview =
+      !media && entry.mimeType.startsWith('video/')
+        ? await readVideoReviewForBackup({
+            db,
+            aggregateId: reference,
+            sourceAssetId: entry.assetId,
+          })
+        : undefined;
+    if (videoReview)
+      for (const reference of [...collectReviewAssetReferences(videoReview.workspace)].sort())
+        references.add(reference);
     assets.push({
       entry: portable,
       filename,
       ...(media ? { libraryMediaId: reference } : { publishToLibrary: false }),
+      ...(videoReview ? { videoReview: encodePortableReviewAssetRefs(videoReview) } : {}),
       objectId: collector.add(file, filename, entry.mimeType),
     });
   }
@@ -555,6 +580,33 @@ async function buildMediaRoot(args: {
   };
 }
 
+async function readArchivedReview(
+  db: MediaInventoryDatabase,
+  aggregateId: string
+): Promise<VideoWorkspaceSnapshot> {
+  const tx = db.transaction(
+    [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    'readonly'
+  );
+  const [stored, rawDraft] = await Promise.all([
+    readWorkspaceStorage(tx, aggregateId),
+    tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(aggregateId),
+  ]);
+  await tx.done;
+  const workspace = parseVideoWorkspace(stored.logical);
+  const draft =
+    rawDraft === undefined
+      ? null
+      : parseVideoWorkspaceDraft(rawDraft, workspace?.source.duration ?? 0);
+  if (
+    !workspace ||
+    workspace.aggregateId !== aggregateId ||
+    (rawDraft !== undefined && (!draft || draft.aggregateId !== aggregateId))
+  )
+    throw new Error('Quick project changed before backup.');
+  return { workspace, draft };
+}
+
 export async function buildMediaRootInventory(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   reviewWorkspaceHeads?: readonly unknown[];
@@ -583,8 +635,7 @@ export async function buildMediaRootInventory(args: {
       !args.options.selected?.mediaAssetIds.includes(head['aggregateId'])
     )
       continue;
-    const archived = await readVideoWorkspace(head['aggregateId']);
-    if (!archived) throw new Error('Quick project changed before backup.');
+    const archived = await readArchivedReview(args.db, head['aggregateId']);
     const sourceMediaId = archived.workspace.sourceMediaId;
     const source = args.items.find((item) => item.id === sourceMediaId);
     if (!source || archived.workspace.project?.lifecycle.trashedAt !== undefined) continue;

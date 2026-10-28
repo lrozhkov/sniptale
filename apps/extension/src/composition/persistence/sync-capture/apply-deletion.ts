@@ -1,3 +1,10 @@
+import { readWorkspaceStorage, createVideoWorkspaceStore } from '../review-workspaces/storage';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
+import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
+import { enqueuePrivateSourceRetirement } from '../assets/private-source-retention';
+import { freezeVideoReviewInTransaction, digestCapturedVideoReviewRows } from './review-snapshot';
+import { parsePreparedVideoReviewReplicaRoot } from './prepared-review';
+import { parsePreparedVideoProjectReplicaRoot } from './prepared-project';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
 import type { IDBPTransaction } from 'idb';
@@ -76,7 +83,7 @@ function ordinal(value: number): boolean {
 }
 function prepare(input: ApplyCatalogDeletionInput): ApplyCatalogDeletionInput {
   if (
-    !['media', 'video-project'].includes(input.rootKind) ||
+    !['media', 'video-project', 'video-review'].includes(input.rootKind) ||
     !input.rootId ||
     input.rootId.length > 256 ||
     !input.spaceId ||
@@ -101,6 +108,16 @@ function pendingProject(journal: AssetReadyJournal, id: string): boolean {
   if (journal.domain !== 'sync-replica') return false;
   const payload = journal.payload;
   if (!isRecord(payload)) return true;
+  if (payload['kind'] === 'video-review') {
+    try {
+      parsePreparedVideoReviewReplicaRoot(
+        payload['input'] && isRecord(payload['input']) ? payload['input']['root'] : null
+      );
+      return false;
+    } catch {
+      return true;
+    }
+  }
   if (payload['kind'] === 'media') return false;
   if (payload['kind'] !== 'video-project' || !isRecord(payload['input'])) return true;
   const root = payload['input']['root'];
@@ -188,6 +205,67 @@ async function deleteProjectRoot(
   await deleteVideoProjectInTransaction(tx, input.rootId, operation);
 }
 
+async function deleteReviewRoot(
+  tx: Transaction,
+  input: ApplyCatalogDeletionInput,
+  state: SyncCaptureRootState | null,
+  operation: ReturnType<typeof buildPhysicalDeleteOperation>
+): Promise<number> {
+  const stored = await readWorkspaceStorage(tx, input.rootId);
+  const workspace = stored.logical === undefined ? null : parseVideoWorkspace(stored.logical);
+  if (
+    (stored.logical !== undefined && !workspace) ||
+    (workspace?.revision ?? null) !== input.expectedWorkspaceRevision
+  )
+    refuse();
+  if (!workspace) {
+    if (
+      state?.nativeDigest ||
+      (state && state.deleted !== true) ||
+      (await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(input.rootId)) !== undefined
+    )
+      refuse();
+    return state?.nativeRevision ?? 0;
+  }
+  if (!state || state.deleted === true) refuse();
+  const frozen = await freezeVideoReviewInTransaction(tx, input.rootId);
+  if (state.nativeDigest !== digestCapturedVideoReviewRows(frozen)) refuse();
+  const nativeRevision = Math.max(state.nativeRevision ?? 0, workspace.revision);
+  await createVideoWorkspaceStore(tx).delete(input.rootId);
+  await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(input.rootId);
+  await tx.objectStore(THUMBNAILS_STORE).delete(input.rootId);
+  await enqueuePrivateSourceRetirement(
+    tx,
+    [...collectReviewAssetReferences(workspace)].map((reference) =>
+      reference.slice('project-asset:'.length)
+    ),
+    operation
+  );
+  return nativeRevision;
+}
+
+function pendingReview(journal: AssetReadyJournal, rootId: string): boolean {
+  if (journal.domain !== 'sync-replica') return false;
+  const payload = journal.payload;
+  if (!isRecord(payload) || !isRecord(payload['input'])) return true;
+  try {
+    if (payload['kind'] === 'video-review') {
+      const root = parsePreparedVideoReviewReplicaRoot(payload['input']['root']);
+      return (
+        root.review.workspace.aggregateId === rootId ||
+        root.assets.some((asset) => asset.videoReview?.workspace.aggregateId === rootId)
+      );
+    }
+    if (payload['kind'] === 'video-project')
+      return parsePreparedVideoProjectReplicaRoot(payload['input']['root']).assets.some(
+        (asset) => asset.videoReview?.workspace.aggregateId === rootId
+      );
+    return payload['kind'] !== 'media' && payload['kind'] !== 'image';
+  } catch {
+    return true;
+  }
+}
+
 async function assertAbsentMediaRoot(
   tx: Transaction,
   rootId: string,
@@ -266,6 +344,8 @@ function hasPendingPublication(
   input: ApplyCatalogDeletionInput,
   journals: AssetReadyJournal[]
 ): boolean {
+  if (input.rootKind === 'video-review')
+    return journals.some((journal) => pendingReview(journal, input.rootId));
   if (input.rootKind === 'video-project')
     return journals.some((journal) => pendingProject(journal, input.rootId));
   const target = {
@@ -387,9 +467,11 @@ async function commitDeletion(
       return admission;
     }
     signal?.throwIfAborted();
-    const nativeRevision =
+    let nativeRevision =
       input.rootKind === 'media' ? admission.previous?.nativeRevision : undefined;
-    if (input.rootKind === 'video-project')
+    if (input.rootKind === 'video-review')
+      nativeRevision = await deleteReviewRoot(tx, input, admission.previous, operation);
+    else if (input.rootKind === 'video-project')
       await deleteProjectRoot(tx, input, admission.previous, operation);
     else await deleteMediaRoot(tx, input, admission.previous, operation);
     signal?.throwIfAborted();

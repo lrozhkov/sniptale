@@ -132,7 +132,7 @@ function QueueOperationRow(props: {
           {translate(
             source?.changeKind === 'tombstone'
               ? 'settings.syncQueue.tombstone'
-              : source?.rootKind === 'video-project'
+              : source?.rootKind === 'video-project' || source?.rootKind === 'video-review'
                 ? 'settings.syncQueue.project'
                 : 'settings.syncQueue.media'
           )}

@@ -1,4 +1,9 @@
 import { preparePortableImageRows, validatePortableImageRows } from './prepared-image';
+import {
+  preparePortableVideoReviewRoot,
+  validatePortableVideoReviewMetadata,
+} from './prepared-review';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { ArchiveReader } from '../../composition/archive-transfer';
 import { parseAssetRef, type AssetRef } from '../../composition/persistence/assets';
 import { parseMediaLibraryEntry } from '../../composition/persistence/media-library/read-guards';
@@ -46,7 +51,7 @@ function exactKeys(value: object, allowed: readonly string[]): void {
 }
 
 /** Parses the supported pilot and its complete typed object table without reading object bytes. */
-export async function parsePortableSyncRoot(value: unknown) {
+export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?: string) {
   const envelope = structuredClone(parseRootEnvelope(value));
   if (
     new TextEncoder().encode(JSON.stringify(envelope.metadata)).byteLength >
@@ -58,6 +63,47 @@ export async function parsePortableSyncRoot(value: unknown) {
     envelope.descriptor.mediaSubtype === 'library-item'
   ) {
     const metadata = parsePortableMediaMetadata(envelope.metadata);
+    if (reviewSourceMediaId !== undefined) {
+      const raw = envelope.metadata;
+      if (!isRecord(raw)) throw new Error('Invalid portable video review metadata.');
+      exactKeys(raw, [
+        'entry',
+        'projectAsset',
+        'originalObjectId',
+        'videoReview',
+        'reviewAssets',
+        'thumbnail',
+      ]);
+      if (Array.isArray(raw['reviewAssets']))
+        for (const asset of raw['reviewAssets']) {
+          if (!isRecord(asset)) throw new Error('Invalid portable video review resource.');
+          exactKeys(asset, [
+            'entry',
+            'filename',
+            'objectId',
+            'publishToLibrary',
+            'libraryMediaId',
+            'videoReview',
+          ]);
+        }
+      if (metadata.entry.id !== envelope.descriptor.rootId)
+        throw new Error('Portable video review identity differs from its root.');
+      validatePortableVideoReviewMetadata(metadata, reviewSourceMediaId);
+      await assertArchiveRootObjectInventory(envelope, metadataOnlyReader, []);
+      if (
+        metadata.thumbnail &&
+        !envelope.objects
+          .find((object) => object.objectId === metadata.thumbnail?.objectId)
+          ?.mimeType.startsWith('image/')
+      )
+        throw new Error('Portable video review thumbnail requires image bytes.');
+      return {
+        kind: 'video-review' as const,
+        envelope,
+        metadata,
+        sourceMediaId: reviewSourceMediaId,
+      };
+    }
     if (metadata.entry.source.kind === 'screenshot') {
       exactKeys(metadata, ['entry', 'originalObjectId', 'workspace', 'presentation']);
       if (metadata.entry.id !== envelope.descriptor.rootId)
@@ -72,6 +118,8 @@ export async function parsePortableSyncRoot(value: unknown) {
     await assertArchiveRootObjectInventory(envelope, metadataOnlyReader, []);
     return { kind: 'media' as const, envelope, metadata };
   }
+  if (reviewSourceMediaId !== undefined)
+    throw new Error('A portable source binding requires a video review carrier.');
   if (envelope.descriptor.rootKind !== 'video-project')
     throw new Error('Unsupported portable sync root.');
   const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
@@ -185,6 +233,12 @@ function editingProjectAssets(parsed: Extract<ParsedPortableRoot, { kind: 'video
 export function portableSyncEditingObjectIds(parsed: ParsedPortableRoot): string[] {
   if (parsed.kind === 'image') return parsed.envelope.objects.map((object) => object.objectId);
   if (parsed.kind === 'media') return [parsed.metadata.originalObjectId];
+  if (parsed.kind === 'video-review')
+    return [
+      parsed.metadata.originalObjectId,
+      ...(parsed.metadata.reviewAssets ?? []).map((asset) => asset.objectId),
+      ...(parsed.metadata.thumbnail ? [parsed.metadata.thumbnail.objectId] : []),
+    ];
   return [
     ...new Set([
       ...editingProjectAssets(parsed).map((asset) => asset.objectId),
@@ -260,6 +314,14 @@ function assertCausalDependencies(
 export function portableSyncDependencyIds(parsed: ParsedPortableRoot): string[] {
   if (parsed.kind === 'media' || parsed.kind === 'image') return [];
   const needed = new Set<string>();
+  if (parsed.kind === 'video-review') {
+    needed.add(parsed.sourceMediaId);
+    for (const asset of parsed.metadata.reviewAssets ?? []) {
+      if (asset.libraryMediaId) needed.add(asset.libraryMediaId);
+      if (asset.entry.originMediaId) needed.add(asset.entry.originMediaId);
+    }
+    return [...needed].sort();
+  }
   for (const asset of parsed.entry.project.assets) {
     if (asset.source.kind === 'library-asset') needed.add(asset.source.mediaId);
     if (asset.source.kind === 'project-asset' && asset.source.originMediaId)
@@ -401,6 +463,7 @@ async function prepareVideoRoot(
  */
 export async function preparePortableReplica(args: {
   envelope: unknown;
+  reviewSourceMediaId?: string;
   verifiedObjects: ReadonlyMap<string, AssetRef>;
   senderDependencies: readonly PortableCausalDependency[];
   admission: PortableReplicaAdmission;
@@ -411,7 +474,7 @@ export async function preparePortableReplica(args: {
   const local = structuredClone(args.admission);
   if (sender.length > MAX_CAPTURE_ROWS || local.dependencies.length > MAX_CAPTURE_ROWS)
     throw new Error('Portable dependency inventory exceeds the pilot limit.');
-  const parsed = await parsePortableSyncRoot(args.envelope);
+  const parsed = await parsePortableSyncRoot(args.envelope, args.reviewSourceMediaId);
   const refFor = (id: string) => {
     const ref = parseAssetRef(objects.get(id));
     const object = parsed.envelope.objects.find((item) => item.objectId === id);
@@ -468,16 +531,40 @@ export async function preparePortableReplica(args: {
         local.expectedWorkspaceRevision < 0)
     )
       throw new Error('Invalid local workspace revision.');
-    const root = await prepareVideoRoot(parsed, local, sender, refFor);
-    payload = {
-      kind: 'video-project',
-      input: {
-        ...identity,
-        root,
-        expectedWorkspaceRevision: local.expectedWorkspaceRevision,
+    if (parsed.kind === 'video-review') {
+      assertCausalDependencies(
+        new Set(portableSyncDependencyIds(parsed)),
+        local.dependencies,
+        sender
+      );
+      const root = await preparePortableVideoReviewRoot({
+        metadata: parsed.metadata,
+        sourceMediaId: parsed.sourceMediaId,
         dependencies: local.dependencies,
-      },
-    };
+        expectedLocalGeneration: local.expectedLocalGeneration,
+        refFor,
+      });
+      payload = {
+        kind: 'video-review',
+        input: {
+          ...identity,
+          root,
+          expectedWorkspaceRevision: local.expectedWorkspaceRevision,
+          dependencies: local.dependencies,
+        },
+      };
+    } else {
+      const root = await prepareVideoRoot(parsed, local, sender, refFor);
+      payload = {
+        kind: 'video-project',
+        input: {
+          ...identity,
+          root,
+          expectedWorkspaceRevision: local.expectedWorkspaceRevision,
+          dependencies: local.dependencies,
+        },
+      };
+    }
   }
   if (
     [...objects.keys()].some(

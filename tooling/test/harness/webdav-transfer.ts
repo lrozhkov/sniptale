@@ -1,3 +1,4 @@
+import { createWebdavReviewHarness } from './webdav-review';
 import { createWebdavWorkspaceHarness } from './webdav-workspace';
 import { createWebdavConnectionHarness } from './webdav-connection';
 import { createWebdavPortableHarness } from './webdav-portable';
@@ -136,6 +137,7 @@ const webdavTransferHarness = {
     store = remote;
   }),
   portable: createWebdavPortableHarness(connected),
+  review: createWebdavReviewHarness(connected),
   nativePutCalls: () => nativePutCalls,
   prepareSource,
   uploadSource,

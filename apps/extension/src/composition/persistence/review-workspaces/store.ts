@@ -1,3 +1,8 @@
+import {
+  captureVideoReviewInTransaction,
+  allocateVideoReviewRevision,
+  assertUnusedVideoReviewIdentity,
+} from '../sync-capture/capture';
 import { materializeVideoWorkspaceProject } from './project-metadata';
 import { moveReviewWorkspaceCursor } from './history-cursor';
 import type { MediaLibraryEntry } from '../media-library/contracts';
@@ -46,6 +51,7 @@ import {
   verifyReviewAnnotationEffectSources,
 } from './new-reference-admission';
 import {
+  SYNC_CAPTURE_STORE,
   STORE_NAME,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -91,6 +97,7 @@ import {
 } from './parser';
 
 const stores = [
+  SYNC_CAPTURE_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -246,6 +253,7 @@ async function mutate<T>(
           Date.now()
         );
         const result = await operation(tx, prepared, physicalDelete, media, current);
+        await captureVideoReviewInTransaction(tx, aggregateId);
         if (physicalDelete.assetIds.length || physicalDelete.privateSources?.length)
           await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
         await tx.done;
@@ -308,7 +316,7 @@ async function newVideoWorkspace(
     formatVersion: 1,
     source,
     sourceAssetId: await readSourceAssetId(tx, aggregateId),
-    revision,
+    revision: await allocateVideoReviewRevision(tx, aggregateId, revision),
     history: [],
     cursor: 0,
     advanced: {
@@ -358,7 +366,7 @@ export async function openVideoWorkspace(
       if (existing.snapshot.workspace.project) return existing.snapshot;
       const updated = {
         ...retained,
-        revision: retained.revision + 1,
+        revision: await allocateVideoReviewRevision(tx, aggregateId, retained.revision + 1),
         updatedAt: Math.max(Date.now(), retained.updatedAt),
       };
       await replaceWorkspaceStorage(tx, updated, indexedWorkspace(updated).usageReferenceKeys);
@@ -412,6 +420,11 @@ export async function createVideoWorkspaceProject(args: {
         throw new VideoWorkspaceError('conflict');
       return current.snapshot;
     }
+    try {
+      await assertUnusedVideoReviewIdentity(tx, args.archiveId);
+    } catch {
+      throw new VideoWorkspaceError('conflict');
+    }
     if (opened.snapshot.workspace.revision !== args.expectedRevision)
       throw new VideoWorkspaceError('conflict');
     const previous = current?.snapshot ?? opened.snapshot;
@@ -421,6 +434,7 @@ export async function createVideoWorkspaceProject(args: {
       ...previous.workspace,
       aggregateId: args.archiveId,
       sourceMediaId,
+      revision: await allocateVideoReviewRevision(tx, args.archiveId, previous.workspace.revision),
     });
     if (!archive) throw new VideoWorkspaceError('invalid');
     const now = Math.max(
@@ -443,6 +457,8 @@ export async function createVideoWorkspaceProject(args: {
         .put({ ...previous.draft, aggregateId: args.archiveId });
     await replaceWorkspaceStorage(tx, workspace, indexedWorkspace(workspace).usageReferenceKeys);
     await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(sourceMediaId);
+    await captureVideoReviewInTransaction(tx, args.archiveId);
+    await captureVideoReviewInTransaction(tx, sourceMediaId);
     return { workspace, draft: null };
   });
 }
@@ -507,6 +523,7 @@ async function writePreparedWorkspace(
   if (!media) throw new VideoWorkspaceError('missing-media');
   const retained: VideoWorkspace = {
     ...encoded,
+    revision: await allocateVideoReviewRevision(tx, encoded.aggregateId, encoded.revision),
     formatVersion: encoded.formatVersion === 2 || encoded.formatVersion === 4 ? 4 : 3,
     project: materializeVideoWorkspaceProject(previous, media.filename).project,
   };

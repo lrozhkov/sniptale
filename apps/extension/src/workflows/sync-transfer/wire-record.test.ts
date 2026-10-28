@@ -2,6 +2,9 @@ import { expect, it } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { createMediaLibraryEntry } from '../../composition/persistence/projects/index.test-support';
+import { workspace as reviewWorkspace } from '../../composition/persistence/review-workspaces/backup-restore.test-support';
+import { materializeVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/project-metadata';
+import { encodePortableReviewAssetRefs } from '../../composition/persistence/review-workspaces/asset-refs';
 import {
   createSyncAttempt,
   hashSyncText,
@@ -58,6 +61,140 @@ function operation(deleted = false) {
 }
 const id1 = '00000000-0000-0000-0000-000000000001';
 const id2 = '00000000-0000-0000-0000-000000000002';
+
+function reviewOperation(archived = false) {
+  const base = operation();
+  if (!base.envelope) throw new Error('Missing review carrier.');
+  const rootId = archived ? 'project-asset:quick-project:previous' : 'project-asset:source';
+  const childId = rootId.slice('project-asset:'.length);
+  const { sourceAssetId: _localId, ...workspace } = materializeVideoWorkspaceProject(
+    {
+      ...reviewWorkspace,
+      aggregateId: rootId,
+      source: { ...reviewWorkspace.source, size: 3 },
+      history: [],
+      cursor: 0,
+    },
+    'Saved review'
+  );
+  const envelope = parseRootEnvelope({
+    ...base.envelope,
+    descriptor: { ...base.envelope.descriptor, rootId },
+    metadata: {
+      entry: createMediaLibraryEntry({
+        id: rootId,
+        source: { kind: 'project-asset', projectAssetId: childId },
+        kind: 'video',
+        mimeType: 'video/webm',
+        size: 3,
+        lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+      }),
+      projectAsset: { id: childId, createdAt: 1, mimeType: 'video/webm', size: 3 },
+      originalObjectId: 'sync-object-000001',
+      videoReview: encodePortableReviewAssetRefs({ workspace, draft: null }),
+    },
+    objects: base.envelope.objects.map((object) => ({ ...object, mimeType: 'video/webm' })),
+  });
+  const {
+    kind,
+    parents,
+    dependencies: _dependencies,
+    envelope: _envelope,
+    objects,
+    ...head
+  } = base;
+  return {
+    ...head,
+    rootKind: 'video-review',
+    rootId,
+    reviewSourceMediaId: 'project-asset:source',
+    kind,
+    parents,
+    dependencies: [{ mediaId: 'project-asset:source', basis: ['source-operation'] }],
+    envelope,
+    objects,
+  };
+}
+
+it.each([false, true])(
+  'keeps a source-dependent review separate from its media carrier (archived=%s)',
+  async (archived) => {
+    const value = reviewOperation(archived);
+    const text = JSON.stringify(value);
+    expect(await parseSyncOperationText(text)).toEqual(value);
+    const restored = { ...value, kind: 'restore' };
+    expect(await parseSyncOperationText(JSON.stringify(restored))).toEqual(restored);
+    const attempt = await createSyncAttempt(text, id1);
+    expect((await parseSyncAttemptText(attempt.recordText)).operation).toEqual(value);
+    expect(value.envelope.descriptor.rootKind).toBe('media');
+    expect(value.envelope.descriptor.rootId).toBe(value.rootId);
+  }
+);
+
+it('preserves original wire fields and accepts review deletion without source binding', async () => {
+  const original = operation();
+  const parsed = await parseSyncOperationText(JSON.stringify(original));
+  expect(JSON.stringify(parsed)).toBe(JSON.stringify(original));
+  expect(parsed).not.toHaveProperty('reviewSourceMediaId');
+  const { reviewSourceMediaId: _source, ...review } = reviewOperation(true);
+  const deleted = { ...review, kind: 'delete', dependencies: [], envelope: null, objects: [] };
+  expect(await parseSyncOperationText(JSON.stringify(deleted))).toEqual(deleted);
+});
+
+it.each([
+  [
+    'missing binding',
+    (value: ReturnType<typeof reviewOperation>) => {
+      const { reviewSourceMediaId: _source, ...rest } = value;
+      return rest;
+    },
+  ],
+  [
+    'binding on media',
+    (value: ReturnType<typeof reviewOperation>) => ({ ...value, rootKind: 'media' }),
+  ],
+  [
+    'binding on project',
+    (value: ReturnType<typeof reviewOperation>) => ({ ...value, rootKind: 'video-project' }),
+  ],
+  [
+    'binding on deletion',
+    (value: ReturnType<typeof reviewOperation>) => ({
+      ...value,
+      kind: 'delete',
+      dependencies: [],
+      envelope: null,
+      objects: [],
+    }),
+  ],
+  [
+    'missing source dependency',
+    (value: ReturnType<typeof reviewOperation>) => ({ ...value, dependencies: [] }),
+  ],
+  [
+    'unadmitted source alias',
+    (value: ReturnType<typeof reviewOperation>) => ({
+      ...value,
+      reviewSourceMediaId: 'project-asset:other',
+    }),
+  ],
+  [
+    'unsupported source family',
+    (value: ReturnType<typeof reviewOperation>) => ({
+      ...value,
+      reviewSourceMediaId: 'recording:source',
+      dependencies: [{ mediaId: 'recording:source', basis: ['source-operation'] }],
+    }),
+  ],
+  [
+    'empty binding',
+    (value: ReturnType<typeof reviewOperation>) => ({ ...value, reviewSourceMediaId: '' }),
+  ],
+])('refuses review %s', async (_label, change) => {
+  const text = JSON.stringify(change(reviewOperation(true)));
+  await expect(parseSyncOperationText(text)).rejects.toThrow();
+});
+
 it('keeps identical logical bytes under different checked physical file and manifest keys', async () => {
   const text = JSON.stringify(operation());
   const first = await createSyncAttempt(text, id1);

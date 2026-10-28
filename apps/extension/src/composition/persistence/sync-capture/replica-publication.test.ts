@@ -1,8 +1,14 @@
+import { workspace as reviewTemplate } from '../review-workspaces/backup-restore.test-support';
+import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
+import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
+import { captureRootKey } from './contracts';
+import { digestCapturedMediaRows } from './freeze';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
   createMediaLibraryEntry,
+  createProjectAssetEntry,
   createVideoProjectEntryWithMediaClip,
 } from '../projects/index.test-support';
 import { recoverStandaloneAssetPublications } from '../assets/recovery';
@@ -22,6 +28,7 @@ const io = vi.hoisted(() => ({
   remove: vi.fn(),
   release: vi.fn(),
   warn: vi.fn(),
+  cancel: vi.fn(),
 }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
@@ -38,11 +45,17 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ warn: io.warn, debug: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
 
+vi.mock('../assets', async (original) => ({
+  ...(await original<typeof import('../assets')>()),
+  cancelAssetPublication: io.cancel,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   io.write.mockResolvedValue(undefined);
   io.remove.mockResolvedValue(undefined);
   io.release.mockResolvedValue(undefined);
+  io.cancel.mockResolvedValue(undefined);
 });
 
 function setup() {
@@ -389,4 +402,138 @@ it('retains the original journal after enrollment recreation instead of admittin
   );
   expect(io.remove).not.toHaveBeenCalled();
   expect(f.table('media_library').has('project-asset:source')).toBe(false);
+});
+
+function reviewJournalFixture() {
+  const f = setup();
+  if (f.payload.kind !== 'media') throw new Error('Expected original source fixture.');
+  const rows = structuredClone(f.payload.input.rows);
+  rows.ref.mimeType = rows.projectAsset.mimeType = rows.media.mimeType = 'video/webm';
+  rows.media.kind = 'video';
+  f.table('media_library').set(rows.media.id, rows.media);
+  f.table('project_assets').set(rows.projectAsset.id, rows.projectAsset);
+  f.table('asset_refs').set(rows.ref.assetId, rows.ref);
+  f.table('asset_owners').set(JSON.stringify(['project-asset', rows.projectAsset.id, 'body']), {
+    assetId: rows.ref.assetId,
+    ownerKind: 'project-asset',
+    ownerId: rows.projectAsset.id,
+    role: 'body',
+  });
+  const rootKey = captureRootKey('space', 'media', rows.media.id);
+  const stateKey = JSON.stringify(['root-state', rootKey]);
+  f.table('sync_capture').set(stateKey, {
+    version: 1,
+    kind: 'root-state',
+    key: stateKey,
+    createdAt: 1,
+    spaceId: 'space',
+    rootKind: 'media',
+    rootId: rows.media.id,
+    rootKey,
+    generation: 1,
+    basis: ['original-operation'],
+    nativeDigest: digestCapturedMediaRows(rows),
+  });
+  const asset = createProjectAssetEntry({
+    id: 'private-background',
+    assetId: 'background-file',
+    mimeType: 'image/png',
+    size: 3,
+  });
+  const ref = {
+    ...rows.ref,
+    assetId: asset.assetId,
+    mimeType: asset.mimeType,
+    size: asset.size,
+    location: { kind: 'opfs' as const, objectKey: 'objects/background-file' },
+  };
+  const aggregateId = 'project-asset:quick-project:journal';
+  const workspace = materializeVideoWorkspaceProject(
+    {
+      ...structuredClone(reviewTemplate),
+      aggregateId,
+      sourceMediaId: rows.media.id,
+      sourceAssetId: rows.ref.assetId,
+    },
+    'Journal review'
+  );
+  workspace.advanced.background = updateQuickEditBackground(workspace.advanced.background, {
+    enabled: true,
+    type: 'image',
+    assetId: `project-asset:${asset.id}`,
+  });
+  const payload: Extract<PreparedReplicaPayload, { kind: 'video-review' }> = {
+    kind: 'video-review',
+    input: {
+      operationId: 'review-operation',
+      sourceDigest: 'c'.repeat(64),
+      connectionGeneration: 3,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedBasis: [],
+      expectedLocalGeneration: 0,
+      expectedWorkspaceRevision: null,
+      dependencies: [
+        {
+          entry: rows.media,
+          ref: rows.ref,
+          expectedGeneration: 1,
+          expectedBasis: ['original-operation'],
+        },
+      ],
+      root: {
+        review: { workspace, draft: null },
+        sourceMediaId: rows.media.id,
+        assets: [{ entry: asset, ref, filename: 'background.png' }],
+      },
+    },
+  };
+  return { ...f, payload, rows, ref, asset, aggregateId };
+}
+
+it('protects review originals and resources until native commit and replays the same journal', async () => {
+  const f = reviewJournalFixture();
+  const journal = await createPreparedReplicaJournal(f.payload);
+  expect(new Set(journal.assetRefs.map((ref) => ref.assetId))).toEqual(
+    new Set([f.rows.ref.assetId, f.ref.assetId])
+  );
+  io.cancel.mockImplementation(async () => {
+    expect(f.table('video_workspaces').has(f.aggregateId)).toBe(true);
+    expect(f.table('project_assets').get(f.asset.id)).toEqual(f.asset);
+  });
+  await publishPreparedReplicaJournal(journal);
+  const committed = structuredClone(f.rows);
+  expect(f.table('media_library').has(f.aggregateId)).toBe(false);
+  expect(f.table('project_assets').get(f.rows.projectAsset.id)).toEqual(committed.projectAsset);
+  await publishPreparedReplicaJournal(journal);
+  expect(io.cancel).toHaveBeenCalledTimes(2);
+  expect(
+    [...f.table('sync_capture').values()].filter(
+      (row) => isRecord(row) && row['kind'] === 'applied-operation'
+    )
+  ).toHaveLength(1);
+});
+
+it('keeps a refused review journal and all its exact claims available for recovery', async () => {
+  const f = reviewJournalFixture();
+  const journal = await createPreparedReplicaJournal(f.payload);
+  const profile = f.table('sync_capture').get('profile');
+  if (!isRecord(profile)) throw new Error('Missing profile.');
+  f.table('sync_capture').set('profile', { ...profile, connectionGeneration: 4 });
+  io.list.mockResolvedValue([journal]);
+  expect(await recoverStandaloneAssetPublications([syncReplicaPublicationAdapter])).toBe(0);
+  expect(io.cancel).not.toHaveBeenCalled();
+  expect(io.remove).not.toHaveBeenCalled();
+  expect(f.table('video_workspaces').has(f.aggregateId)).toBe(false);
+  expect(journal.assetRefs).toHaveLength(2);
+});
+
+it('refuses missing original protection before publishing any review state', async () => {
+  const f = reviewJournalFixture();
+  const journal = await createPreparedReplicaJournal(f.payload);
+  await expect(publishPreparedReplicaJournal({ ...journal, assetRefs: [f.ref] })).rejects.toThrow(
+    'claims'
+  );
+  expect(f.table('video_workspaces').has(f.aggregateId)).toBe(false);
+  expect(io.cancel).not.toHaveBeenCalled();
 });

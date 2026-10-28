@@ -8,6 +8,7 @@ export default defineConfig({
   testDir: '.',
   testMatch: [
     'webdav.spec.ts',
+    'webdav-review.spec.ts',
     'webdav-queue.spec.ts',
     'webdav-connection.spec.ts',
     'webdav-workspace.spec.ts',

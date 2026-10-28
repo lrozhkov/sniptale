@@ -1,4 +1,10 @@
 import {
+  applyPreparedVideoReviewReplica,
+  parseApplyPreparedVideoReviewReplicaInput,
+  type ApplyPreparedVideoReviewReplicaInput,
+} from './apply-review';
+import { collectPreparedVideoReviewReplicaRefs } from './prepared-review';
+import {
   collectPreparedProjectReplicaRefs,
   parsePreparedVideoProjectReplicaRoot,
 } from './prepared-project';
@@ -28,6 +34,7 @@ import { MAX_CAPTURE_METADATA_BYTES, MAX_CAPTURE_ROWS } from './contracts';
 import { parseCapturedMediaRows } from './guards';
 
 export type PreparedReplicaPayload =
+  | { kind: 'video-review'; input: ApplyPreparedVideoReviewReplicaInput }
   | { kind: 'image'; input: ApplyPreparedImageReplicaInput }
   | { kind: 'media'; input: ApplyPreparedMediaReplicaInput }
   | { kind: 'video-project'; input: ApplyPreparedVideoProjectRevisionInput };
@@ -159,6 +166,11 @@ function parsePayload(value: unknown): PreparedReplicaPayload {
   assertJournalMetadata(value);
   if (!isRecord(value) || !isRecord(value['input'])) throw new Error('Invalid replica payload.');
   const input = value['input'];
+  if (value['kind'] === 'video-review') {
+    const review = parseApplyPreparedVideoReviewReplicaInput(input);
+    if (!review) throw new Error('Invalid video review replica.');
+    return { kind: 'video-review', input: review };
+  }
   if (value['kind'] === 'video-project')
     return { kind: 'video-project', input: parseProjectInput(input) };
   if (value['kind'] === 'image') {
@@ -189,10 +201,15 @@ function protectedRefs(payload: PreparedReplicaPayload): AssetRef[] {
         ]
       : payload.kind === 'media'
         ? [payload.input.rows.ref]
-        : [
-            ...collectPreparedProjectReplicaRefs(payload.input.root),
-            ...payload.input.dependencies.map((dependency) => dependency.ref),
-          ];
+        : payload.kind === 'video-review'
+          ? [
+              ...collectPreparedVideoReviewReplicaRefs(payload.input.root),
+              ...payload.input.dependencies.map((dependency) => dependency.ref),
+            ]
+          : [
+              ...collectPreparedProjectReplicaRefs(payload.input.root),
+              ...payload.input.dependencies.map((dependency) => dependency.ref),
+            ];
   const unique = new Map<string, AssetRef>();
   for (const ref of refs) {
     const previous = unique.get(ref.assetId);
@@ -241,7 +258,10 @@ export async function publishPreparedReplicaJournal(
 ): Promise<void> {
   const payload = parsePayload(journal.payload);
   assertJournalClaims(journal, protectedRefs(payload));
-  if (payload.kind === 'image') {
+  if (payload.kind === 'video-review') {
+    await applyPreparedVideoReviewReplica(payload.input, lifecyclePermit);
+    await cancelAssetPublication(journal, lifecyclePermit);
+  } else if (payload.kind === 'image') {
     await applyPreparedImageReplica(payload.input, lifecyclePermit);
     await cancelAssetPublication(journal, lifecyclePermit);
   } else if (payload.kind === 'media')

@@ -1,3 +1,14 @@
+import type { PreparedVideoReviewReplicaRoot } from './prepared-review';
+import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
+import { applyPreparedVideoReviewReplica } from './apply-review';
+import {
+  workspace as reviewTemplate,
+  annotation,
+} from '../review-workspaces/backup-restore.test-support';
+import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
+import { fixtureWorkspaceValue } from '../review-workspaces/store.test-support';
+import { commitVideoWorkspace } from '../review-workspaces/store';
 import {
   isPersistenceMutationTransitionHeld,
   runWithPersistentDataErasureBarrier,
@@ -120,6 +131,7 @@ async function setup(kind: 'media' | 'video-project' = 'media') {
   const rootKey = captureRootKey('space', kind, input.rootId);
   return {
     ...f,
+    nativeRows: f.rows,
     table,
     input,
     rows,
@@ -474,4 +486,218 @@ it('keeps privacy erasure outside incoming deletion until physical cleanup finis
   await erasure;
   expect(erasureEntered).toBe(true);
   expect(isPersistenceMutationTransitionHeld()).toBe(false);
+});
+
+async function setupReview() {
+  const f = await setup();
+  const rows = structuredClone(f.rows);
+  rows.ref.assetId = 'video-body';
+  rows.ref.location.objectKey = 'objects/video-body';
+  rows.projectAsset.assetId = rows.ref.assetId;
+  rows.ref.mimeType = 'video/webm';
+  rows.projectAsset.mimeType = rows.ref.mimeType;
+  rows.media.kind = 'video';
+  rows.media.mimeType = rows.ref.mimeType;
+  await applyPreparedMediaReplica({
+    ...f.admission,
+    rows,
+    operationId: 'video-source',
+    expectedLocalGeneration: 1,
+    expectedBasis: ['original'],
+  });
+  const makeReview = (id: string) => ({
+    ...f.admission,
+    operationId: `review-${id}`,
+    expectedWorkspaceRevision: null,
+    root: {
+      review: {
+        workspace: materializeVideoWorkspaceProject(
+          {
+            ...structuredClone(reviewTemplate),
+            aggregateId: id,
+            sourceAssetId: rows.ref.assetId,
+            history: [],
+            cursor: 0,
+            ...(id === rows.media.id ? {} : { sourceMediaId: rows.media.id }),
+          },
+          'Review'
+        ),
+        draft: null,
+      },
+      sourceMediaId: rows.media.id,
+      assets: [],
+    },
+    dependencies: [
+      { entry: rows.media, ref: rows.ref, expectedGeneration: 2, expectedBasis: ['video-source'] },
+    ],
+  });
+  const value = makeReview(rows.media.id);
+  const archive = makeReview('project-asset:quick-project:archive');
+  await applyPreparedVideoReviewReplica(value);
+  await applyPreparedVideoReviewReplica(archive);
+  const current = () => {
+    const workspace = parseVideoWorkspace(fixtureWorkspaceValue(f.nativeRows, rows.media.id));
+    if (!workspace) throw new Error('Missing review');
+    return workspace;
+  };
+  const reviewStateKey = JSON.stringify([
+    'root-state',
+    captureRootKey('space', 'video-review', rows.media.id),
+  ]);
+  const deletion: ApplyCatalogDeletionInput = {
+    ...f.input,
+    rootKind: 'video-review',
+    rootId: rows.media.id,
+    expectedBasis: [value.operationId],
+    expectedWorkspaceRevision: current().revision,
+  };
+  return { ...f, value, archive, current, deletion, reviewStateKey };
+}
+
+it('deletes only the selected review and preserves its original and sibling archive', async () => {
+  const f = await setupReview();
+  const source = structuredClone(f.table('media_library'));
+  const bytes = structuredClone(f.table('asset_refs'));
+  const owners = structuredClone(f.table('asset_owners'));
+  const archive = structuredClone(
+    fixtureWorkspaceValue(f.nativeRows, f.archive.root.review.workspace.aggregateId)
+  );
+  const revision = f.current().revision;
+  io.cleanup.mockClear();
+  expect(await applyCatalogDeletionNative(f.deletion)).toEqual({
+    status: 'applied',
+    generation: 2,
+  });
+  expect(f.table('video_workspaces').has(f.deletion.rootId)).toBe(false);
+  expect(f.table('media_library')).toEqual(source);
+  expect(f.table('asset_refs')).toEqual(bytes);
+  expect(f.table('asset_owners')).toEqual(owners);
+  expect(fixtureWorkspaceValue(f.nativeRows, f.archive.root.review.workspace.aggregateId)).toEqual(
+    archive
+  );
+  expect(f.table('sync_capture').get(f.reviewStateKey)).toMatchObject({
+    deleted: true,
+    nativeRevision: revision,
+  });
+  expect(io.cleanup).not.toHaveBeenCalled();
+});
+
+it('restores a deleted review above its clock and refuses stale writers and delete replay', async () => {
+  const f = await setupReview();
+  const revision = f.current().revision;
+  await applyCatalogDeletionNative(f.deletion);
+  await applyPreparedVideoReviewReplica({
+    ...f.value,
+    operationId: 'review-restore',
+    expectedLocalGeneration: 2,
+    expectedBasis: ['delete'],
+    expectedWorkspaceRevision: null,
+  });
+  expect(f.current().revision).toBeGreaterThan(revision);
+  const before = structuredClone(f.nativeRows);
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: f.deletion.rootId,
+      expectedRevision: revision,
+      expectedSourceAssetId: f.value.root.review.workspace.sourceAssetId,
+      operation: { id: 'stale', at: 1, target: 'annotation', before: null, after: annotation },
+    })
+  ).rejects.toThrow();
+  await expect(
+    applyCatalogDeletionNative({ ...f.deletion, operationId: 'stale-delete' })
+  ).rejects.toThrow();
+  expect(await applyCatalogDeletionNative(f.deletion)).toEqual({
+    status: 'duplicate',
+    generation: 2,
+  });
+  expect(f.nativeRows).toEqual(before);
+});
+
+it('rolls back a review deletion refusal and completes an exact retry', async () => {
+  const f = await setupReview();
+  const before = structuredClone(f.nativeRows);
+  f.refuseStorage(true);
+  await expect(applyCatalogDeletionNative(f.deletion)).rejects.toThrow();
+  expect(f.nativeRows).toEqual(before);
+  f.refuseStorage(false);
+  expect(await applyCatalogDeletionNative(f.deletion)).toEqual({
+    status: 'applied',
+    generation: 2,
+  });
+});
+
+it('refuses uncaptured review drafts and an own pending publication without blocking a sibling', async () => {
+  const f = await setupReview();
+  io.journals.mockResolvedValue([
+    { domain: 'sync-replica', payload: { kind: 'video-review', input: f.value } },
+  ]);
+  await expect(applyCatalogDeletionNative(f.deletion)).rejects.toThrow();
+  io.journals.mockResolvedValue([
+    { domain: 'sync-replica', payload: { kind: 'video-review', input: f.archive } },
+  ]);
+  f.table('video_workspace_drafts').set(f.deletion.rootId, {
+    aggregateId: f.deletion.rootId,
+    revision: 1,
+    annotation,
+    before: null,
+    updatedAt: 2,
+  });
+  await expect(applyCatalogDeletionNative(f.deletion)).rejects.toThrow();
+  f.table('video_workspace_drafts').delete(f.deletion.rootId);
+  expect(await applyCatalogDeletionNative(f.deletion)).toEqual({
+    status: 'applied',
+    generation: 2,
+  });
+});
+
+it('retains a nested private review while its parent publication is pending', async () => {
+  const f = await setupReview();
+  const id = 'project-asset:private-review';
+  const root: PreparedVideoReviewReplicaRoot = structuredClone(f.archive.root);
+  const source = f.value.dependencies[0]!;
+  root.review.workspace.advanced.background = updateQuickEditBackground(
+    root.review.workspace.advanced.background,
+    { enabled: true, type: 'image', assetId: id }
+  );
+  root.assets = [
+    {
+      entry: {
+        id: 'private-review',
+        assetId: source.ref.assetId,
+        createdAt: 1,
+        size: source.ref.size,
+        mimeType: source.ref.mimeType,
+      },
+      ref: source.ref,
+      filename: 'private.webm',
+      videoReview: {
+        workspace: {
+          ...structuredClone(f.value.root.review.workspace),
+          aggregateId: id,
+        },
+        draft: null,
+      },
+    },
+  ];
+  io.journals.mockResolvedValue([
+    {
+      domain: 'sync-replica',
+      payload: {
+        kind: 'video-review',
+        input: { ...f.archive, root },
+      },
+    },
+  ]);
+  const deletion = {
+    ...f.deletion,
+    rootId: id,
+    expectedLocalGeneration: 0,
+    expectedBasis: [],
+    expectedWorkspaceRevision: null,
+  };
+  const before = structuredClone(f.nativeRows);
+  await expect(applyCatalogDeletionNative(deletion)).rejects.toThrow();
+  expect(f.nativeRows).toEqual(before);
+  io.journals.mockResolvedValue([]);
+  expect(await applyCatalogDeletionNative(deletion)).toEqual({ status: 'applied', generation: 1 });
 });

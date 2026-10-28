@@ -175,3 +175,14 @@ it('does not read another page after an admitted command finishes following unmo
   await act(async () => release({ kind: 'applied', history: 'delivered' }));
   expect(mocks.read).toHaveBeenCalledOnce();
 });
+
+it('identifies saved video review work as a project in the readable queue', async () => {
+  mocks.read.mockResolvedValue({
+    ...ready,
+    sources: [{ ...ready.sources[0], rootKind: 'video-review', changeKind: 'video-review' }],
+  });
+  const f = await render();
+  const row = f.node.querySelector('li');
+  expect(row?.textContent).toContain(translate('settings.syncQueue.project'));
+  expect(row?.textContent).not.toContain(translate('settings.syncQueue.media'));
+});

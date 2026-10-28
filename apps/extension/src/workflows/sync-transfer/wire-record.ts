@@ -13,8 +13,9 @@ interface SyncOperation {
   version: 1;
   spaceId: string;
   operationId: string;
-  rootKind: 'media' | 'video-project';
+  rootKind: 'media' | 'video-project' | 'video-review';
   rootId: string;
+  reviewSourceMediaId?: string;
   kind: 'edit' | 'restore' | 'delete';
   parents: string[];
   dependencies: { mediaId: string; basis: string[] }[];
@@ -84,6 +85,7 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
     'operationId',
     'rootKind',
     'rootId',
+    ...('reviewSourceMediaId' in value ? ['reviewSourceMediaId'] : []),
     'kind',
     'parents',
     'dependencies',
@@ -92,13 +94,23 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   ]);
   check(value['format'] === 'sniptale-sync-operation' && value['version'] === 1);
   check(identity(value['spaceId']) && identity(value['operationId']) && identity(value['rootId']));
-  check(value['rootKind'] === 'media' || value['rootKind'] === 'video-project');
+  check(
+    value['rootKind'] === 'media' ||
+      value['rootKind'] === 'video-project' ||
+      value['rootKind'] === 'video-review'
+  );
   check(value['kind'] === 'edit' || value['kind'] === 'restore' || value['kind'] === 'delete');
+  const hasReviewSource = 'reviewSourceMediaId' in value;
+  check(hasReviewSource === (value['rootKind'] === 'video-review' && value['kind'] !== 'delete'));
+  const reviewSourceMediaId = hasReviewSource ? value['reviewSourceMediaId'] : undefined;
+  check(reviewSourceMediaId === undefined || identity(reviewSourceMediaId));
   check(identities(value['parents']) && !value['parents'].includes(value['operationId']));
   const dependencies = parseDependencies(value['dependencies']);
   const objects = parseObjects(value['objects']);
   const portable =
-    value['envelope'] === null ? null : await parsePortableSyncRoot(value['envelope']);
+    value['envelope'] === null
+      ? null
+      : await parsePortableSyncRoot(value['envelope'], reviewSourceMediaId);
   const envelope = portable?.envelope ?? null;
   const needed = portable ? portableSyncDependencyIds(portable) : [];
   check(JSON.stringify(needed) === JSON.stringify(dependencies.map((item) => item.mediaId).sort()));
@@ -107,7 +119,9 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   else {
     check(
       envelope &&
-        envelope.descriptor.rootKind === value['rootKind'] &&
+        (portable?.kind === 'video-review'
+          ? value['rootKind'] === 'video-review'
+          : envelope.descriptor.rootKind === value['rootKind']) &&
         envelope.descriptor.rootId === value['rootId']
     );
     check(
@@ -125,6 +139,7 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
     operationId: value['operationId'],
     rootKind: value['rootKind'],
     rootId: value['rootId'],
+    ...(reviewSourceMediaId === undefined ? {} : { reviewSourceMediaId }),
     kind: value['kind'],
     parents: value['parents'],
     dependencies,

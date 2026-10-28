@@ -1,9 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ readFile: vi.fn(), readWorkspace: vi.fn() }));
-vi.mock('../../../../composition/persistence/review-workspaces/store', () => ({
-  readVideoWorkspace: mocks.readWorkspace,
-}));
+const mocks = vi.hoisted(() => ({ readFile: vi.fn() }));
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   readAssetFile: mocks.readFile,
@@ -20,6 +17,8 @@ import { createMediaHubBackupExportOptions } from '../options';
 import { buildMediaRootInventory } from './media';
 import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import { prepareVideoReviewRestore } from '../../../../composition/persistence/review-workspaces/backup-restore';
+import { nestedMediaReviewFixture } from '../root-publication/media.review-assets.test-support';
+import { buildProjectAssetMediaEntry } from '../../../../composition/persistence/media-library/entry-mapping';
 
 const assets = new Map([
   [
@@ -134,18 +133,20 @@ function database(entry: MediaLibraryEntry, project = false, override?: unknown,
       : {}),
   };
   return {
-    transaction: () => ({
+    transaction: vi.fn(() => ({
       objectStore: (store: string) => ({
         index: () => ({ getAll: async () => [] }),
         get: async () =>
           store === 'video_workspaces'
-            ? (override ?? workspace)
+            ? override === undefined
+              ? workspace
+              : override
             : store === 'video_workspace_drafts'
               ? draft
               : undefined,
       }),
       done: Promise.resolve(),
-    }),
+    })),
     get: vi.fn(async (store: string, key: unknown) => {
       if (store === 'media_library') return mediaRow(entry, String(key));
       if (store === 'recordings') return sourceRow('recording');
@@ -203,7 +204,6 @@ function assetRef(assetId: string) {
 }
 
 beforeEach(() => {
-  mocks.readWorkspace.mockReset();
   mocks.readFile.mockImplementation(async (ref, filename: string) => {
     const size = (ref as { size: number }).size;
     return new File(['x'.repeat(size)], filename);
@@ -312,9 +312,9 @@ it('backs up the selected archived quick project and restores its independent so
     updatedAt: 1,
   };
   const { blob: _blob, ...metadata } = entry;
-  mocks.readWorkspace.mockResolvedValue({ workspace, draft });
+  const db = database(entry, false, workspace, draft);
   const roots = await buildMediaRootInventory({
-    db: database(entry, false, workspace, draft),
+    db,
     items: [{ ...metadata, hasThumbnail: false }],
     reviewWorkspaceHeads: [workspace],
     options: createMediaHubBackupExportOptions({
@@ -347,12 +347,16 @@ it('backs up the selected archived quick project and restores its independent so
   expect(restored.workspace.history).toEqual(workspace.history);
   expect(restored.workspace).not.toHaveProperty('sourceMediaId');
   expect(restored.draft).toEqual({ ...draft, aggregateId: 'recording:restored' });
+  expect(db.get.mock.calls.filter(([store]) => store === 'media_library')).not.toContainEqual([
+    'media_library',
+    archiveId,
+  ]);
 });
 
 it('does not admit unrelated archived heads for a selected media backup', async () => {
-  mocks.readWorkspace.mockRejectedValue(new Error('Unrelated archive must not be read'));
+  const db = database(mediaEntry('recording'));
   const roots = await buildMediaRootInventory({
-    db: database(mediaEntry('recording')),
+    db,
     items: [],
     reviewWorkspaceHeads: [
       { aggregateId: 'recording:unrelated', sourceMediaId: 'recording:source' },
@@ -368,14 +372,13 @@ it('does not admit unrelated archived heads for a selected media backup', async 
     paths: createArchivePathAllocator(),
   });
   expect(roots).toEqual([]);
-  expect(mocks.readWorkspace).not.toHaveBeenCalled();
+  expect(db.transaction).not.toHaveBeenCalled();
 });
 
 it('refuses a selected archived project that disappears before source admission', async () => {
-  mocks.readWorkspace.mockResolvedValue(null);
   await expect(
     buildMediaRootInventory({
-      db: database(mediaEntry('recording')),
+      db: database(mediaEntry('recording'), false, null),
       items: [],
       reviewWorkspaceHeads: [
         { aggregateId: 'recording:quick-project:missing', sourceMediaId: 'recording:source' },
@@ -392,3 +395,85 @@ it('refuses a selected archived project that disappears before source admission'
     })
   ).rejects.toThrow('Quick project changed before backup.');
 });
+
+it.each([false, true])(
+  'inventories the reachable private video sidecars without repeated reads (cycle=%s)',
+  async (cycle) => {
+    const { rows } = nestedMediaReviewFixture(cycle);
+    const reviews = [rows.review, ...rows.privateReviews];
+    const values = new Map<string, Map<string, unknown>>([
+      ['media_library', new Map([[rows.source.media.id, rows.source.media]])],
+      [
+        'project_assets',
+        new Map([rows.source.projectAsset, ...rows.assets].map((entry) => [entry.id, entry])),
+      ],
+      ['asset_refs', new Map([rows.source.ref, ...rows.refs].map((ref) => [ref.assetId, ref]))],
+      [
+        'video_workspaces',
+        new Map(reviews.map((review) => [review.workspace.aggregateId, review.workspace])),
+      ],
+      [
+        'video_workspace_drafts',
+        new Map(reviews.map((review) => [review.workspace.aggregateId, review.draft ?? undefined])),
+      ],
+    ]);
+    const get = vi.fn(async (store: string, key: unknown) =>
+      typeof key === 'string' ? values.get(store)?.get(key) : undefined
+    );
+    const roots = await buildMediaRootInventory({
+      db: {
+        get,
+        transaction: () => ({
+          done: Promise.resolve(),
+          objectStore: (store) => ({
+            get: (key) => get(store, key),
+            index: () => ({ getAll: async () => [] }),
+          }),
+        }),
+      },
+      items: [{ ...rows.source.media, hasThumbnail: false }],
+      options: createMediaHubBackupExportOptions(),
+      paths: createArchivePathAllocator(),
+    });
+    const metadata = parsePortableMediaMetadata((await roots[0]!.load()).metadata);
+    expect(metadata.reviewAssets?.map((asset) => asset.entry.id)).toEqual(['b', 'c']);
+    expect(
+      metadata.reviewAssets?.every((asset) => asset.publishToLibrary === false && asset.videoReview)
+    ).toBe(true);
+    expect(
+      get.mock.calls.filter(([store, key]) => store === 'project_assets' && key === 'b')
+    ).toHaveLength(1);
+    expect(
+      get.mock.calls.filter(([store, key]) => store === 'project_assets' && key === 'c')
+    ).toHaveLength(1);
+    values.get('media_library')!.set('project-asset:b', {
+      ...buildProjectAssetMediaEntry(rows.assets[0]!),
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    });
+    get.mockClear();
+    const borrowed = await buildMediaRootInventory({
+      db: {
+        get,
+        transaction: () => ({
+          done: Promise.resolve(),
+          objectStore: (store) => ({
+            get: (key) => get(store, key),
+            index: () => ({ getAll: async () => [] }),
+          }),
+        }),
+      },
+      items: [{ ...rows.source.media, hasThumbnail: false }],
+      options: createMediaHubBackupExportOptions(),
+      paths: createArchivePathAllocator(),
+    });
+    const borrowedMetadata = parsePortableMediaMetadata((await borrowed[0]!.load()).metadata);
+    expect(borrowedMetadata.reviewAssets).toHaveLength(1);
+    expect(borrowedMetadata.reviewAssets?.[0]).toMatchObject({ libraryMediaId: 'project-asset:b' });
+    expect(borrowedMetadata.reviewAssets?.[0]).not.toHaveProperty('videoReview');
+    expect(
+      get.mock.calls.filter(
+        ([store, key]) => store === 'video_workspaces' && key === 'project-asset:b'
+      )
+    ).toHaveLength(0);
+  }
+);

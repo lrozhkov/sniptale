@@ -1,3 +1,5 @@
+import { parseMediaLibraryEntry } from '../../composition/persistence/media-library/read-guards';
+import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
 import type { parseSyncOperationText } from './wire-record';
 
 type SyncOperation = Awaited<ReturnType<typeof parseSyncOperationText>>;
@@ -174,6 +176,120 @@ function hasUnresolvedDeletion(
   return unresolved.size > 0;
 }
 
+function immutableMediaVersion(operation: SyncOperation): string | null {
+  if (operation.rootKind !== 'media' || operation.kind === 'delete' || !operation.envelope)
+    return null;
+  try {
+    const metadata = parsePortableMediaMetadata(operation.envelope.metadata);
+    const entry = parseMediaLibraryEntry(metadata.entry);
+    const asset = metadata.projectAsset;
+    if (
+      !entry ||
+      entry.blob ||
+      !asset ||
+      asset.originMediaId ||
+      entry.source.kind !== 'project-asset' ||
+      entry.id !== operation.rootId ||
+      entry.id !== `project-asset:${asset.id}` ||
+      entry.source.projectAssetId !== asset.id ||
+      entry.workspaceRevision !== 0 ||
+      entry.imageContentState === 'edited' ||
+      entry.lifecycle?.storageClass !== 'library' ||
+      Object.keys(metadata).some(
+        (key) => !['entry', 'projectAsset', 'originalObjectId'].includes(key)
+      )
+    )
+      return null;
+    const object = operation.envelope.objects.find(
+      (item) => item.objectId === metadata.originalObjectId
+    );
+    const digest = operation.objects.find((item) => item.objectId === metadata.originalObjectId);
+    if (
+      !object ||
+      !digest ||
+      operation.envelope.objects.length !== 1 ||
+      operation.objects.length !== 1 ||
+      object.size !== entry.size ||
+      object.mimeType !== entry.mimeType ||
+      asset.size !== entry.size ||
+      asset.mimeType !== entry.mimeType
+    )
+      return null;
+    const {
+      filename: _filename,
+      originalFilename: _originalFilename,
+      tags: _tags,
+      lifecycle: _lifecycle,
+      sourceTitle: _sourceTitle,
+      sourceUrl: _sourceUrl,
+      sourceFavicon: _sourceFavicon,
+      updatedAt: _updatedAt,
+      ...immutable
+    } = entry;
+    return JSON.stringify({
+      entry: { ...immutable, source: { kind: 'project-asset', projectAssetId: asset.id } },
+      asset: {
+        id: asset.id,
+        createdAt: asset.createdAt,
+        mimeType: asset.mimeType,
+        size: asset.size,
+      },
+      object: { sha256: digest.sha256, size: object.size, mimeType: object.mimeType },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Checked causal media heads can advance only while the original and its native lifetime remain unchanged. */
+export function resolveSyncMediaDependency(
+  operations: ReadonlyMap<string, CatalogOperation>,
+  mediaId: string,
+  requiredBasis: readonly string[],
+  admittedBasis: readonly string[]
+): boolean {
+  if (requiredBasis.length !== 1 || admittedBasis.length !== 1) return false;
+  const requiredId = requiredBasis[0]!;
+  const admittedId = admittedBasis[0]!;
+  const required = operations.get(requiredId)?.operation;
+  const admitted = operations.get(admittedId)?.operation;
+  if (
+    !required ||
+    !admitted ||
+    required.rootKind !== 'media' ||
+    admitted.rootKind !== 'media' ||
+    required.rootId !== mediaId ||
+    admitted.rootId !== mediaId ||
+    required.spaceId !== admitted.spaceId ||
+    required.kind === 'delete' ||
+    admitted.kind === 'delete'
+  )
+    return false;
+  if (requiredId === admittedId) return true;
+  const version = immutableMediaVersion(required);
+  if (version === null) return false;
+  const pending = [admittedId];
+  const visited = new Set<string>();
+  let reachesRequired = false;
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const operation = operations.get(id)?.operation;
+    if (
+      !operation ||
+      operation.rootKind !== 'media' ||
+      operation.rootId !== mediaId ||
+      operation.spaceId !== required.spaceId ||
+      immutableMediaVersion(operation) !== version
+    )
+      return false;
+    if (id === requiredId) reachesRequired = true;
+    else pending.push(...operation.parents);
+  }
+  return reachesRequired;
+}
+
 function fillRootState(roots: Map<string, CatalogRoot>, operations: Map<string, CatalogOperation>) {
   const rootOperations = new Map<string, string[]>();
   const superseded = new Set<string>();
@@ -200,7 +316,7 @@ function fillRootState(roots: Map<string, CatalogRoot>, operations: Map<string, 
           media.blocked ||
           media.deleted ||
           media.conflict ||
-          JSON.stringify(media.heads) !== JSON.stringify([...dependency.basis].sort())
+          !resolveSyncMediaDependency(operations, dependency.mediaId, dependency.basis, media.heads)
         )
           unavailable.add(dependency.mediaId);
       }

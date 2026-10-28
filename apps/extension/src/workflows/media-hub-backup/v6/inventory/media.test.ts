@@ -26,6 +26,9 @@ import { createPagePackageManifestFixture as createWebSnapshotManifest } from '.
 import { buildMediaRootInventory } from './media';
 import { createMediaHubBackupExportOptions } from '../options';
 import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
+import { workspace as reviewWorkspace } from '../../../../composition/persistence/review-workspaces/backup-restore.test-support';
+import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
+import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence/review-workspaces/contracts';
 
 function mediaEntry(overrides: Partial<MediaLibraryEntry> = {}): MediaLibraryEntry {
   return {
@@ -460,3 +463,118 @@ function emptyReviewTransaction() {
     done: Promise.resolve(),
   };
 }
+
+function archivedReviewInventoryFixture() {
+  const { blob: _blob, ...source } = mediaEntry({
+    id: 'project-asset:actual-source',
+    kind: 'video',
+    source: { kind: 'project-asset', projectAssetId: 'actual-source' },
+    filename: 'source.webm',
+    originalFilename: 'source.webm',
+    mimeType: 'video/webm',
+    size: 6,
+  });
+  const aggregateId = 'project-asset:quick-project:previous';
+  const workspace = parseVideoWorkspace({
+    ...reviewWorkspace,
+    aggregateId,
+    sourceMediaId: source.id,
+    sourceAssetId: 'source-object',
+    formatVersion: 3,
+    project: {
+      name: 'Independent saved review',
+      lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+    },
+  });
+  if (!workspace) throw new Error('Invalid archived review fixture.');
+  const snapshot: VideoWorkspaceSnapshot = { workspace, draft: null };
+  const get = vi.fn(async (store: string, key: unknown): Promise<unknown> => {
+    if (store === 'media_library' && key === source.id) return source;
+    if (store === 'project_assets' && key === 'actual-source')
+      return {
+        id: 'actual-source',
+        assetId: 'source-object',
+        createdAt: 1,
+        mimeType: 'video/webm',
+        size: 6,
+      };
+    if (store === 'asset_refs' && key === 'source-object')
+      return { ...ref('source-object'), mimeType: 'video/webm' };
+    return undefined;
+  });
+  const db = {
+    get,
+    transaction: vi.fn(() => ({
+      done: Promise.resolve(),
+      objectStore: (store: string) => ({
+        get: async () =>
+          store === 'video_workspaces' ? snapshot.workspace : (snapshot.draft ?? undefined),
+        index: () => ({ getAll: async () => [] }),
+      }),
+    })),
+  };
+  const inventory = (expectedReview: VideoWorkspaceSnapshot = snapshot) =>
+    buildMediaRootInventory({
+      db,
+      items: [item(source)],
+      reviewWorkspaceHeads: [{ aggregateId, sourceMediaId: source.id }],
+      expectedReview,
+      options: createMediaHubBackupExportOptions({
+        scope: 'selected',
+        selected: { mediaAssetIds: [aggregateId], videoProjectIds: [], scenarioProjectIds: [] },
+      }),
+      paths: createArchivePathAllocator(),
+    });
+  return { snapshot, source, aggregateId, db, inventory };
+}
+
+it('reads archived review and recovery from the supplied database without a native alias row', async () => {
+  const fixture = archivedReviewInventoryFixture();
+  fixture.snapshot.draft = {
+    aggregateId: fixture.aggregateId,
+    revision: fixture.snapshot.workspace.revision,
+    annotation: { id: 'draft', text: 'Recovery', anchor: { kind: 'point', time: 1 } },
+    before: null,
+    updatedAt: 4,
+  };
+  mocks.readFile.mockResolvedValue(new File(['video!'], 'source.webm', { type: 'video/webm' }));
+  const roots = await fixture.inventory();
+  expect(roots).toHaveLength(1);
+  const portable = parsePortableMediaMetadata((await roots[0]!.load()).metadata);
+  expect(portable.entry.id).toBe(fixture.aggregateId);
+  expect(portable.videoReview?.workspace.project?.name).toBe('Independent saved review');
+  expect(portable.videoReview?.draft).toEqual(fixture.snapshot.draft);
+  expect(fixture.db.transaction).toHaveBeenCalledWith(
+    ['video_workspaces', 'video_workspace_history', 'video_workspace_drafts'],
+    'readonly'
+  );
+  expect(fixture.db.get.mock.calls.filter(([store]) => store === 'media_library')).toEqual([
+    ['media_library', fixture.source.id],
+  ]);
+});
+
+it('refuses an archived source or recovery association that differs in the supplied database', async () => {
+  const sourceChanged = archivedReviewInventoryFixture();
+  sourceChanged.snapshot.workspace.sourceAssetId = 'replaced-source-object';
+  mocks.readFile.mockResolvedValue(new File(['video!'], 'source.webm', { type: 'video/webm' }));
+  await expect(sourceChanged.inventory()).rejects.toThrow(
+    'Video review source is missing or changed'
+  );
+  const draftChanged = archivedReviewInventoryFixture();
+  draftChanged.snapshot.draft = {
+    aggregateId: 'project-asset:another-review',
+    revision: 1,
+    annotation: { id: 'draft', text: 'Wrong owner', anchor: { kind: 'point', time: 1 } },
+    before: null,
+    updatedAt: 4,
+  };
+  await expect(draftChanged.inventory()).rejects.toThrow('Quick project changed before backup');
+});
+
+it('retains the expected archived snapshot check after supplied database admission', async () => {
+  const fixture = archivedReviewInventoryFixture();
+  const expected = structuredClone(fixture.snapshot);
+  expected.workspace.project!.name = 'Earlier project name';
+  mocks.readFile.mockResolvedValue(new File(['video!'], 'source.webm', { type: 'video/webm' }));
+  await expect(fixture.inventory(expected)).rejects.toThrow('Video review changed before backup');
+});
