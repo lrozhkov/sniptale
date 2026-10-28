@@ -56,3 +56,12 @@ it.each([
 ] as const)('uses the visible corner threshold at x=%s', (x, edge) => {
   expect(resolveToolbarDockEdge({ x, y: 20 }, { width: 1000, height: 800 })).toBe(edge);
 });
+
+it.each([0, 1, 2] as const)('activates on entry to the visible right guide at row %s', (row) => {
+  const viewport = { width: 1000, height: 800 };
+  const innerBoundary = viewport.width - 8 - 12 - 64;
+  const y = [40, 400, 760][row]!;
+  expect(resolveToolbarDockEdge({ x: innerBoundary - 1, y }, viewport)).toBeNull();
+  const edge = resolveToolbarDockEdge({ x: innerBoundary + 1, y }, viewport);
+  expect(edge).toBe(['top-right', 'right', 'bottom-right'][row]);
+});

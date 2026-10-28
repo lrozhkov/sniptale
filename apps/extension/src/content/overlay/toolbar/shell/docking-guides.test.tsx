@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import { resolveToolbarDockEdge, resolveToolbarDockViewport } from './docking';
 import { ToolbarDockingGuides } from './docking-guides';
 
 it('shows only horizontal corner targets for a collapsed-panel dock', () => {
@@ -43,5 +44,41 @@ it.each([null, 'left'] as const)(
     expect(
       root.querySelector<HTMLElement>('[data-ui="content.toolbar.dock-zone.left"]')?.style.left
     ).toBe('10px');
+  }
+);
+
+it.each([0.5, 1, 1.5])(
+  'activates both visible side guide boundaries with a scrollbar at scale %s',
+  (scale) => {
+    vi.stubGlobal('innerWidth', 1280);
+    vi.stubGlobal('innerHeight', 560);
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1263);
+    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(560);
+    try {
+      const root = document.createElement('div');
+      root.innerHTML = renderToStaticMarkup(
+        <ToolbarDockingGuides activeEdge={null} uiScale={scale} />
+      );
+      const viewport = resolveToolbarDockViewport(scale);
+      for (const side of ['left', 'right'] as const) {
+        const guide = root.querySelector<HTMLElement>(
+          `[data-ui="content.toolbar.dock-zone.${side}"]`
+        )!;
+        const boundary =
+          side === 'left'
+            ? parseFloat(guide.style.left) + parseFloat(guide.style.width)
+            : 1263 - parseFloat(guide.style.right) - parseFloat(guide.style.width);
+        const inward = side === 'left' ? -0.5 : 0.5;
+        expect(
+          resolveToolbarDockEdge({ x: (boundary + inward) / scale, y: 280 / scale }, viewport)
+        ).toBe(side);
+        expect(
+          resolveToolbarDockEdge({ x: (boundary - inward) / scale, y: 280 / scale }, viewport)
+        ).toBeNull();
+      }
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
   }
 );

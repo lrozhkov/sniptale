@@ -5,7 +5,6 @@ import {
   TOOLBAR_DOCK_INSET,
   TOOLBAR_DOCK_ZONE_SIZE,
   TOOLBAR_DOCK_SCROLLBAR_GAP,
-  resolveToolbarDockViewport,
   getToolbarDockDisplayMode,
 } from './docking';
 
@@ -15,9 +14,6 @@ export function ToolbarDockingGuides(props: {
   uiScale: number;
   cornersOnly?: boolean;
 }) {
-  const viewport = resolveToolbarDockViewport(props.uiScale);
-  const rightGutter = window.innerWidth - viewport.width * props.uiScale;
-  const bottomGutter = window.innerHeight - viewport.height * props.uiScale;
   const corners = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const;
   const zone =
     props.activeEdge === 'left-top'
@@ -44,8 +40,8 @@ export function ToolbarDockingGuides(props: {
         const active = zone === edge;
         const right = edge === 'right' || edge.endsWith('-right');
         const bottom = edge === 'bottom' || edge.startsWith('bottom-');
-        const rightInset = inset + TOOLBAR_DOCK_SCROLLBAR_GAP * props.uiScale + rightGutter;
-        const bottomInset = inset + bottomGutter;
+        const rightInset = inset + TOOLBAR_DOCK_SCROLLBAR_GAP * props.uiScale;
+        const bottomInset = inset;
         const borderColor = [
           'color-mix(in srgb,',
           `var(--sniptale-color-surface-contrast) ${active ? 40 : 65}%,`,

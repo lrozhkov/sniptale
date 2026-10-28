@@ -23,6 +23,7 @@ type LaunchExtensionBrowserOptions = {
   extensionBuildDir?: string;
   userDataDir?: string;
   fakeMediaDevices?: boolean;
+  showScrollbars?: boolean;
   autoGrantMediaPermissions?: boolean;
   windowCaptureTitle?: string;
 };
@@ -127,7 +128,10 @@ export async function launchExtensionBrowser(
       args: getChromiumLaunchArgs(options),
       channel: 'chromium',
       headless: process.env.PLAYWRIGHT_HEADLESS !== '0',
-      ignoreDefaultArgs: ['--disable-extensions'],
+      ignoreDefaultArgs: [
+        '--disable-extensions',
+        ...(options.showScrollbars ? ['--hide-scrollbars'] : []),
+      ],
     });
     const browser = context.browser();
     if (!browser) throw new Error('Persistent extension context has no browser owner');
