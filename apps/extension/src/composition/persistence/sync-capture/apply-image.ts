@@ -1,4 +1,5 @@
 import type { IDBPTransaction } from 'idb';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { assertStandaloneMediaSourceReplaceable } from '../projects/source-admission';
 import { initDB } from '../infrastructure/indexed-db/core';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
@@ -95,6 +96,7 @@ interface ImageReplicaKeys {
 interface HydratedImageReplica {
   originalBlob: Blob;
   presentation: AggregatePresentationEntry | null;
+  unchangedOriginalDigest: string | null;
 }
 type ImageDeleteOperation = ReturnType<typeof buildPhysicalDeleteOperation>;
 
@@ -145,7 +147,6 @@ function parseImageReplicaSource(value: Record<string, unknown>) {
     media.source.kind !== 'screenshot' ||
     !['image', 'screenshot'].includes(media.kind) ||
     media.lifecycle?.storageClass !== 'library' ||
-    media.lifecycle.trashedAt !== undefined ||
     media.recordingMetadata ||
     media.recordingGroup ||
     !ordinal(media.workspaceRevision) ||
@@ -332,6 +333,46 @@ async function detachedBlob(ref: AssetRef, filename: string): Promise<Blob> {
   return new Blob([await file.arrayBuffer()], { type: ref.mimeType });
 }
 
+async function hashOriginal(blob: Blob): Promise<string> {
+  const digest = sha256.create();
+  const reader = blob.stream().getReader();
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      digest.update(chunk.value);
+    }
+    return Array.from(digest.digest(), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function checkedImageOriginalDigest(
+  input: ApplyPreparedImageReplicaInput,
+  original: Blob
+): Promise<string | null> {
+  if (input.expectedNativeRevision === null) return null;
+  const db = await initDB();
+  const tx = db.transaction(
+    [MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE, AGGREGATE_PRESENTATIONS_STORE, ASSET_REFS_STORE],
+    'readonly'
+  );
+  const previous = await freezeImageInTransaction(tx, input.media.id);
+  await tx.done;
+  if (!previous.media.blob) refuseImageReplica();
+  if (
+    previous.media.workspaceRevision !== input.expectedNativeRevision ||
+    previous.media.blob.size !== original.size ||
+    previous.media.blob.type !== original.type
+  )
+    return null;
+  // Bind byte equality to the exact metadata predecessor. Commit repeats state and revision checks.
+  return (await hashOriginal(previous.media.blob)) === (await hashOriginal(original))
+    ? digestCapturedImageRows(previous)
+    : null;
+}
+
 async function hydrateImageReplica(
   input: ApplyPreparedImageReplicaInput
 ): Promise<HydratedImageReplica> {
@@ -345,7 +386,8 @@ async function hydrateImageReplica(
           : {}),
       }
     : null;
-  return { originalBlob, presentation };
+  const unchangedOriginalDigest = await checkedImageOriginalDigest(input, originalBlob);
+  return { originalBlob, presentation, unchangedOriginalDigest };
 }
 
 async function readImageReplicaPredecessorState(
@@ -398,7 +440,8 @@ async function assertImageReplicaSidecars(tx: ImageTransaction, mediaId: string)
 async function admitImageReplicaPredecessor(
   tx: ImageTransaction,
   input: ApplyPreparedImageReplicaInput,
-  state: SyncCaptureRootState | null
+  state: SyncCaptureRootState | null,
+  unchangedOriginalDigest: string | null
 ): Promise<CapturedImageRows | null> {
   await assertImageReplicaSidecars(tx, input.media.id);
   const raw: unknown = await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.media.id);
@@ -411,7 +454,8 @@ async function admitImageReplicaPredecessor(
       input.expectedNativeRevision !== previous.media.workspaceRevision
     )
       refuseImageReplica();
-    await assertStandaloneMediaSourceReplaceable(previous.media, tx);
+    if (unchangedOriginalDigest !== digestCapturedImageRows(previous))
+      await assertStandaloneMediaSourceReplaceable(previous.media, tx);
   } else {
     if (
       input.expectedNativeRevision !== null ||
@@ -569,7 +613,12 @@ async function commitImageReplica(
   if (!profile.enabled || profile.connectionGeneration !== input.connectionGeneration)
     refuseImageReplica();
   const state = await readImageReplicaPredecessorState(tx, input, keys);
-  const previous = await admitImageReplicaPredecessor(tx, input, state);
+  const previous = await admitImageReplicaPredecessor(
+    tx,
+    input,
+    state,
+    hydrated.unchangedOriginalDigest
+  );
   const revision = nextImageReplicaRevision(state, previous);
   const generation = input.expectedLocalGeneration + 1;
   if (!Number.isSafeInteger(generation)) refuseImageReplica();

@@ -311,6 +311,56 @@ it('preserves the target native predecessor when preparing a later media origina
     profileCreatedAt: local.profileCreatedAt,
   });
 });
+it.each([false, true])(
+  'preserves original-only media lifecycle metadata for trashed=%s',
+  async (trashed) => {
+    const rows = mediaRows();
+    rows.media.lifecycle = {
+      storageClass: 'library',
+      savedAt: 1,
+      updatedAt: 2,
+      ...(trashed ? { trashedAt: 2 } : {}),
+    };
+    rows.media.tags = ['retained-tag'];
+    const encoded = await encodeCapturedPortableRoot(capture({ kind: 'media', rows }));
+    const payload = await preparePortableReplica({
+      envelope: encoded.envelope,
+      verifiedObjects: new Map([[encoded.envelope.objects[0]!.objectId, ref('retained-original')]]),
+      senderDependencies: [],
+      admission: admission(),
+    });
+    if (payload.kind !== 'media') throw new Error('Expected media.');
+    expect(payload.input.rows.media.lifecycle).toEqual(rows.media.lifecycle);
+    expect(payload.input.rows.media.tags).toEqual(['retained-tag']);
+  }
+);
+it('preserves a trashed manual project and its exact known trashed dependency', async () => {
+  const rows = projectRows(true);
+  const lifecycle = { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 2 };
+  rows.project.lifecycle = lifecycle;
+  rows.media[0]!.lifecycle = lifecycle;
+  const encoded = await encodeCapturedPortableRoot(capture({ kind: 'video-project', rows }));
+  const local = ref('retained-source');
+  const context = admission();
+  context.dependencies = [
+    {
+      entry: rows.media[0]!,
+      ref: local,
+      expectedGeneration: 7,
+      expectedBasis: ['source-op'],
+    },
+  ];
+  const payload = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: new Map([[encoded.envelope.objects[0]!.objectId, local]]),
+    senderDependencies: encoded.dependencies,
+    admission: context,
+  });
+  if (payload.kind !== 'video-project') throw new Error('Expected project.');
+  expect(payload.input.root.entry.lifecycle).toEqual(lifecycle);
+  expect(payload.input.dependencies).toEqual(context.dependencies);
+  expect(payload.input.root.assets[0]!.reusePublished).toBe(true);
+});
 
 it('rebinds a later portable private source without overwriting the predecessor child identity', async () => {
   const rows = projectRows();

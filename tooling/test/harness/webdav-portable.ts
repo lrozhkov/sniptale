@@ -1,3 +1,7 @@
+import {
+  moveStoredItemsToTrash,
+  restoreStoredItemsFromTrash,
+} from '../../../apps/extension/src/composition/persistence/library-lifecycle/trash';
 import { imageHarness } from './sync-image';
 import { saveScreenshotMediaAsset } from '../../../apps/extension/src/composition/persistence/media-library/index.screenshots';
 import { restoreImageAggregateOriginal } from '../../../apps/extension/src/composition/persistence/image-aggregates';
@@ -383,6 +387,31 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
       return imageHarness.inspect(rootId);
     },
     imageProof: imageHarness.inspect,
+    imageTrash: imageHarness.trash,
+    async lifecycleRoots(mediaId: string, projectId: string, restore: boolean) {
+      const targets = [
+        { kind: 'video-project' as const, id: projectId },
+        { kind: 'media' as const, id: mediaId },
+      ];
+      if (restore) await restoreStoredItemsFromTrash(targets);
+      else await moveStoredItemsToTrash(targets);
+    },
+    async originalBinding(mediaId: string) {
+      const db = await initDB();
+      const entry = parseMediaLibraryEntry(await db.get('media_library', mediaId));
+      check(entry?.source.kind === 'project-asset', 'Original source is missing.');
+      const child = parseProjectAssetEntry(
+        await db.get('project_assets', entry.source.projectAssetId)
+      );
+      check(child, 'Original child is missing.');
+      const ref = parseAssetRef(await db.get('asset_refs', child.assetId));
+      check(ref, 'Original reference is missing.');
+      return {
+        assetId: ref.assetId,
+        lifecycle: entry.lifecycle,
+        sha256: await hash(await readAssetFile(ref, entry.filename)),
+      };
+    },
     afterSaveBackup,
     outgoing: createWebdavOutgoingHarness(connected, latest),
   };

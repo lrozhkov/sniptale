@@ -9,6 +9,8 @@ import {
   type AssetRef,
 } from '../../composition/persistence/assets';
 import { createPreparedReplicaJournal } from '../../composition/persistence/sync-capture/replica-publication';
+import { loadMediaReplicaPredecessorRef } from '../../composition/persistence/sync-capture/apply-media';
+import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 import { stageRootObjects, type StagedArchiveObject } from '../media-hub-backup/v6/staging';
 import { digestBackupObject } from '../media-hub-backup/v6/shared-objects';
 import { syncCatalogRootKey, type CatalogOperation } from './catalog-graph';
@@ -52,6 +54,37 @@ async function hashFile(file: Blob, signal: AbortSignal) {
     { size: file.size, pipeTo: (sink) => file.stream().pipeTo(sink, { signal }) },
     signal
   );
+}
+async function checkedPredecessorOriginal(
+  parsed: Extract<Awaited<ReturnType<typeof parsePortableSyncRoot>>, { kind: 'media' }>,
+  operation: Awaited<ReturnType<typeof parseSyncOperationText>>,
+  admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>,
+  signal: AbortSignal
+): Promise<[string, AssetRef] | null> {
+  if (admission.expectedLocalGeneration === 0) return null;
+  const ref = await loadMediaReplicaPredecessorRef({
+    spaceId: admission.spaceId,
+    profileCreatedAt: admission.profileCreatedAt,
+    connectionGeneration: admission.connectionGeneration,
+    mediaId: parsed.metadata.entry.id,
+    expectedLocalGeneration: admission.expectedLocalGeneration,
+    expectedBasis: admission.expectedBasis,
+  });
+  const object = parsed.envelope.objects.find(
+    (item) => item.objectId === parsed.metadata.originalObjectId
+  );
+  const digest = operation.objects.find(
+    (item) => item.objectId === parsed.metadata.originalObjectId
+  );
+  check(object && digest);
+  if (!ref || ref.size !== object.size || ref.mimeType !== object.mimeType) return null;
+  const file = await readAssetFile(ref, object.filename);
+  signal.throwIfAborted();
+  return file.size === object.size &&
+    file.type === object.mimeType &&
+    (await hashFile(file, signal)) === digest.sha256
+    ? [object.objectId, ref]
+    : null;
 }
 async function cleanup(staged: StagedArchiveObject[], error: unknown): Promise<never> {
   const results = await Promise.allSettled(
@@ -127,110 +160,124 @@ export async function prepareCatalogReplica(args: {
             .map((asset) => asset.objectId);
   const editing = parsed.envelope.objects.filter((object) => selectedIds.includes(object.objectId));
   // Use the existing backup operation/recovery boundary while staged objects lack journal claims.
-  return runWithDurableAssetOperation(async () => {
-    const borrowedRefs = new Map<string, AssetRef>();
-    const checkedDependencies = new Map<string, { ref: AssetRef; sha256: string }>();
-    for (const [mediaId, source] of dependencySources) {
-      const dependency = admission.dependencies.find((item) => item.entry.id === mediaId);
-      const mediaOperation = await parseSyncOperationText(source.operationText);
-      check(dependency && mediaOperation.envelope && mediaOperation.rootId === mediaId);
-      const media = await parsePortableSyncRoot(mediaOperation.envelope);
-      check(media.kind === 'media');
-      const object = media.envelope.objects.find(
-        (item) => item.objectId === media.metadata.originalObjectId
-      );
-      const digest = mediaOperation.objects.find(
-        (item) => item.objectId === media.metadata.originalObjectId
-      );
-      check(
-        object &&
-          digest &&
-          dependency.ref.size === object.size &&
-          dependency.ref.mimeType === object.mimeType
-      );
-      check(
-        (await hashFile(await readAssetFile(dependency.ref, object.filename), args.signal)) ===
-          digest.sha256
-      );
-      checkedDependencies.set(mediaId, { ref: dependency.ref, sha256: digest.sha256 });
-    }
-    if (parsed.kind === 'video-project') {
-      for (const asset of parsed.metadata.projectAssets.filter((item) => item.libraryMediaId)) {
-        const dependency = asset.libraryMediaId
-          ? checkedDependencies.get(asset.libraryMediaId)
-          : undefined;
-        const digest = operation.objects.find((item) => item.objectId === asset.objectId);
-        const object = parsed.envelope.objects.find((item) => item.objectId === asset.objectId);
-        check(
-          dependency &&
-            digest &&
-            object &&
-            dependency.ref.size === object.size &&
-            dependency.sha256 === digest.sha256
+  return runWithAssetResourceRead(() =>
+    runWithDurableAssetOperation(async () => {
+      const borrowedRefs = new Map<string, AssetRef>();
+      if (parsed.kind === 'media') {
+        const original = await checkedPredecessorOriginal(
+          parsed,
+          operation,
+          admission,
+          args.signal
         );
-        borrowedRefs.set(asset.objectId, dependency.ref);
+        if (original) borrowedRefs.set(...original);
       }
-    }
-    for (const [index, attempt] of selected.attempts.entries()) {
-      args.signal.throwIfAborted();
-      const physical = await createSyncAttempt(
-        selected.operationText,
-        attempt.attemptId,
-        attempt.objects
-      );
-      check(
-        physical.recordKey === attempt.recordKey &&
-          JSON.stringify(physical.objects) === JSON.stringify(attempt.objects)
-      );
-      let staged: StagedArchiveObject[] = [];
-      try {
-        staged = await stageRootObjects({
-          objects: editing,
-          expectedSha256: new Map(
-            editing.map((object) => {
-              const expected = operation.objects.find((item) => item.objectId === object.objectId);
-              check(expected);
-              return [object.objectId, expected.sha256];
-            })
-          ),
-          signal: args.signal,
-          async readObject(object) {
-            const binding = physical.objects.find((item) => item.objectId === object.objectId);
-            check(binding);
-            const stream = await args.remote.read(binding.remoteKey, args.signal);
-            return { pipeTo: (sink, signal) => stream.pipeTo(sink, signal ? { signal } : {}) };
-          },
-        });
-        const refs = new Map([
-          ...borrowedRefs,
-          ...staged.map((item): [string, AssetRef] => [item.objectId, item.ref]),
-        ]);
-        const payload = await preparePortableReplica({
-          envelope: parsed.envelope,
-          verifiedObjects: refs,
-          senderDependencies: operation.dependencies,
-          admission: {
-            ...admission,
-            operationId: operation.operationId,
-            sourceDigest: hashSyncText(selected.operationText),
-          },
-        });
-        return await createPreparedReplicaJournal(payload);
-      } catch (error) {
-        if (
-          error instanceof SyncRemoteError &&
-          error.code === 'missing' &&
-          index + 1 < selected.attempts.length
-        ) {
-          // stageRootObjects already discards a partial attempt before propagating a missing object.
-          check(staged.length === 0);
-          continue;
+      const stagedObjects = editing.filter((object) => !borrowedRefs.has(object.objectId));
+      const checkedDependencies = new Map<string, { ref: AssetRef; sha256: string }>();
+      for (const [mediaId, source] of dependencySources) {
+        const dependency = admission.dependencies.find((item) => item.entry.id === mediaId);
+        const mediaOperation = await parseSyncOperationText(source.operationText);
+        check(dependency && mediaOperation.envelope && mediaOperation.rootId === mediaId);
+        const media = await parsePortableSyncRoot(mediaOperation.envelope);
+        check(media.kind === 'media');
+        const object = media.envelope.objects.find(
+          (item) => item.objectId === media.metadata.originalObjectId
+        );
+        const digest = mediaOperation.objects.find(
+          (item) => item.objectId === media.metadata.originalObjectId
+        );
+        check(
+          object &&
+            digest &&
+            dependency.ref.size === object.size &&
+            dependency.ref.mimeType === object.mimeType
+        );
+        check(
+          (await hashFile(await readAssetFile(dependency.ref, object.filename), args.signal)) ===
+            digest.sha256
+        );
+        checkedDependencies.set(mediaId, { ref: dependency.ref, sha256: digest.sha256 });
+      }
+      if (parsed.kind === 'video-project') {
+        for (const asset of parsed.metadata.projectAssets.filter((item) => item.libraryMediaId)) {
+          const dependency = asset.libraryMediaId
+            ? checkedDependencies.get(asset.libraryMediaId)
+            : undefined;
+          const digest = operation.objects.find((item) => item.objectId === asset.objectId);
+          const object = parsed.envelope.objects.find((item) => item.objectId === asset.objectId);
+          check(
+            dependency &&
+              digest &&
+              object &&
+              dependency.ref.size === object.size &&
+              dependency.sha256 === digest.sha256
+          );
+          borrowedRefs.set(asset.objectId, dependency.ref);
         }
-        return cleanup(staged, error);
       }
-    }
-    throw new Error('No physical sync attempt is available.');
-  });
+      for (const [index, attempt] of selected.attempts.entries()) {
+        args.signal.throwIfAborted();
+        const physical = await createSyncAttempt(
+          selected.operationText,
+          attempt.attemptId,
+          attempt.objects
+        );
+        check(
+          physical.recordKey === attempt.recordKey &&
+            JSON.stringify(physical.objects) === JSON.stringify(attempt.objects)
+        );
+        let staged: StagedArchiveObject[] = [];
+        try {
+          staged = await stageRootObjects({
+            objects: stagedObjects,
+            expectedSha256: new Map(
+              stagedObjects.map((object) => {
+                const expected = operation.objects.find(
+                  (item) => item.objectId === object.objectId
+                );
+                check(expected);
+                return [object.objectId, expected.sha256];
+              })
+            ),
+            signal: args.signal,
+            async readObject(object) {
+              const binding = physical.objects.find((item) => item.objectId === object.objectId);
+              check(binding);
+              const stream = await args.remote.read(binding.remoteKey, args.signal);
+              return { pipeTo: (sink, signal) => stream.pipeTo(sink, signal ? { signal } : {}) };
+            },
+          });
+          const refs = new Map([
+            ...borrowedRefs,
+            ...staged.map((item): [string, AssetRef] => [item.objectId, item.ref]),
+          ]);
+          const payload = await preparePortableReplica({
+            envelope: parsed.envelope,
+            verifiedObjects: refs,
+            senderDependencies: operation.dependencies,
+            admission: {
+              ...admission,
+              operationId: operation.operationId,
+              sourceDigest: hashSyncText(selected.operationText),
+            },
+          });
+          return await createPreparedReplicaJournal(payload);
+        } catch (error) {
+          if (
+            error instanceof SyncRemoteError &&
+            error.code === 'missing' &&
+            index + 1 < selected.attempts.length
+          ) {
+            // stageRootObjects already discards a partial attempt before propagating a missing object.
+            check(staged.length === 0);
+            continue;
+          }
+          return cleanup(staged, error);
+        }
+      }
+      throw new Error('No physical sync attempt is available.');
+    })
+  );
 }
 
 /** Admit a selected checked tombstone without staging objects or creating a publication journal. */

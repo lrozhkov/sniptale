@@ -1,4 +1,7 @@
 import type { IDBPTransaction } from 'idb';
+import type { AssetRef } from '../assets/contracts';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { initDB } from '../infrastructure/indexed-db/core';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
 import { assertStandaloneMediaSourceReplaceable } from '../projects/source-admission';
@@ -37,6 +40,7 @@ import {
 import { parseCapturedMediaRows, parseSyncCaptureRecord } from './guards';
 import { digestCapturedMediaRows, freezeMediaInTransaction } from './freeze';
 
+type ReadTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
 type ApplyTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 export interface ApplyPreparedMediaReplicaInput {
@@ -77,7 +81,6 @@ function preparedInput(input: ApplyPreparedMediaReplicaInput): ApplyPreparedMedi
     input.expectedBasis.length !== (input.expectedLocalGeneration === 0 ? 0 : 1) ||
     input.expectedBasis.some((id) => typeof id !== 'string' || !id || id.length > 256) ||
     rows.media.lifecycle?.storageClass !== 'library' ||
-    rows.media.lifecycle.trashedAt !== undefined ||
     rows.projectAsset.originMediaId
   )
     throw new MediaReplicaConflictError('invalid-input');
@@ -177,11 +180,11 @@ async function assertAbsentSource(
     throw new MediaReplicaConflictError('source-changed');
 }
 
-async function assertExistingSource(
-  tx: ApplyTransaction,
-  input: ApplyPreparedMediaReplicaInput,
-  identity: ReplicaIdentity
-): Promise<CapturedMediaRows | null> {
+async function readMediaPredecessorState(
+  tx: ReadTransaction,
+  input: Pick<ApplyPreparedMediaReplicaInput, 'expectedLocalGeneration' | 'expectedBasis'>,
+  identity: Pick<ReplicaIdentity, 'stateKey' | 'spaceId' | 'rootKey'>
+): Promise<SyncCaptureRootState> {
   const state = parseSyncCaptureRecord(
     await tx.objectStore(SYNC_CAPTURE_STORE).get(identity.stateKey)
   );
@@ -191,6 +194,8 @@ async function assertExistingSource(
     state.key !== identity.stateKey ||
     state.spaceId !== identity.spaceId ||
     state.rootKey !== identity.rootKey ||
+    state.rootKind !== 'media' ||
+    captureRootKey(identity.spaceId, 'media', state.rootId) !== identity.rootKey ||
     state.generation !== input.expectedLocalGeneration ||
     JSON.stringify(state.basis) !== JSON.stringify(input.expectedBasis)
   )
@@ -203,6 +208,15 @@ async function assertExistingSource(
     if (!record || (record.kind === 'sync-operation' && record.phase !== 'published'))
       throw new MediaReplicaConflictError('source-changed');
   }
+  return state;
+}
+
+async function assertExistingSource(
+  tx: ApplyTransaction,
+  input: ApplyPreparedMediaReplicaInput,
+  identity: ReplicaIdentity
+): Promise<CapturedMediaRows | null> {
+  const state = await readMediaPredecessorState(tx, input, identity);
   if (state.deleted === true) {
     await assertAbsentSource(tx, input, identity, true);
     return null;
@@ -219,6 +233,76 @@ async function assertExistingSource(
   if (ref !== undefined && JSON.stringify(parseAssetRef(ref)) !== JSON.stringify(input.rows.ref))
     throw new MediaReplicaConflictError('source-changed');
   return previous;
+}
+
+/** Read a candidate immutable original. The native commit must repeat predecessor admission. */
+export async function loadMediaReplicaPredecessorRef(input: {
+  spaceId: string;
+  profileCreatedAt: number;
+  connectionGeneration: number;
+  mediaId: string;
+  expectedLocalGeneration: number;
+  expectedBasis: readonly string[];
+}): Promise<AssetRef | null> {
+  const db = await initDB();
+  const tx = db.transaction(
+    [
+      SYNC_CAPTURE_STORE,
+      MEDIA_LIBRARY_STORE,
+      PROJECT_ASSETS_STORE,
+      ASSET_REFS_STORE,
+      IMAGE_WORKSPACES_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      THUMBNAILS_STORE,
+      AGGREGATE_PRESENTATIONS_STORE,
+    ],
+    'readonly'
+  );
+  const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+  if (
+    !profile ||
+    profile.kind !== 'profile' ||
+    !profile.enabled ||
+    profile.spaceId !== input.spaceId ||
+    profile.createdAt !== input.profileCreatedAt ||
+    profile.connectionGeneration !== input.connectionGeneration
+  )
+    throw new MediaReplicaConflictError('profile-changed');
+  if (
+    !Number.isSafeInteger(input.expectedLocalGeneration) ||
+    input.expectedLocalGeneration < 0 ||
+    input.expectedBasis.length !== (input.expectedLocalGeneration === 0 ? 0 : 1)
+  )
+    throw new MediaReplicaConflictError('invalid-input');
+  if (input.expectedLocalGeneration === 0) {
+    await tx.done;
+    return null;
+  }
+  const rootKey = captureRootKey(input.spaceId, 'media', input.mediaId);
+  const state = await readMediaPredecessorState(tx, input, {
+    rootKey,
+    stateKey: JSON.stringify(['root-state', rootKey]),
+    spaceId: input.spaceId,
+  });
+  if (state.deleted) {
+    await tx.done;
+    return null;
+  }
+  const media = parseMediaLibraryEntry(
+    await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.mediaId)
+  );
+  if (!media) throw new MediaReplicaConflictError('source-changed');
+  if (media.source.kind !== 'project-asset') {
+    await tx.done;
+    return null;
+  }
+  const previous = await freezeMediaInTransaction(tx, input.mediaId);
+  if (state.nativeDigest !== digestCapturedMediaRows(previous))
+    throw new MediaReplicaConflictError('source-changed');
+  await tx.done;
+  return structuredClone(previous.ref);
 }
 
 async function publishReplica(

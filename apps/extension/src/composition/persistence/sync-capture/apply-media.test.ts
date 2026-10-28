@@ -10,7 +10,11 @@ import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { digestCapturedMediaRows } from './freeze';
 import { parseSyncCaptureRecord } from './guards';
 import { applyCatalogDeletionNative } from './apply-deletion';
-import { applyPreparedMediaReplica, type ApplyPreparedMediaReplicaInput } from './apply-media';
+import {
+  applyPreparedMediaReplica,
+  loadMediaReplicaPredecessorRef,
+  type ApplyPreparedMediaReplicaInput,
+} from './apply-media';
 
 const io = vi.hoisted(() => ({ database: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
@@ -375,6 +379,9 @@ it.each(['native', 'published'] as const)(
         status: 'applied',
       });
     else {
+      await expect(loadMediaReplicaPredecessorRef(predecessorInput(f))).rejects.toThrow(
+        'source-changed'
+      );
       await expect(applyPreparedMediaReplica(successor(f.input))).rejects.toThrow('source-changed');
       expect(f.rows).toEqual(before);
     }
@@ -472,3 +479,71 @@ it.each(['legacy', 'child', 'sidecar', 'physical-ref', 'pending'] as const)(
     expect(f.rows).toEqual(before);
   }
 );
+
+function predecessorInput(f: ReturnType<typeof setup>) {
+  return {
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: 3,
+    mediaId: f.input.rows.media.id,
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+  };
+}
+
+it('loads only the exact committed original predecessor without mutation', async () => {
+  const f = setup();
+  await applyPreparedMediaReplica(f.input);
+  const before = structuredClone(f.rows);
+  expect(await loadMediaReplicaPredecessorRef(predecessorInput(f))).toEqual(f.input.rows.ref);
+  expect(f.rows).toEqual(before);
+  await expect(
+    loadMediaReplicaPredecessorRef({ ...predecessorInput(f), expectedBasis: ['other-head'] })
+  ).rejects.toThrow('source-changed');
+  await expect(
+    loadMediaReplicaPredecessorRef({ ...predecessorInput(f), profileCreatedAt: 2 })
+  ).rejects.toThrow('profile-changed');
+  f.table('media_library').set(f.input.rows.media.id, {
+    ...f.input.rows.media,
+    filename: 'local.png',
+  });
+  await expect(loadMediaReplicaPredecessorRef(predecessorInput(f))).rejects.toThrow(
+    'source-changed'
+  );
+});
+
+it('keeps a soft Trash original eligible and refuses a delayed metadata predecessor', async () => {
+  const f = setup();
+  await applyPreparedMediaReplica(f.input);
+  const next = {
+    ...f.input,
+    operationId: 'trashed',
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+    rows: {
+      ...f.input.rows,
+      media: {
+        ...f.input.rows.media,
+        lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 2 },
+      },
+    },
+  };
+  const project = createVideoProjectEntryWithMediaClip({ id: 'dependent' });
+  project.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.input.rows.media.id };
+  f.table('video_projects').set(project.id, project);
+  await applyPreparedMediaReplica(next);
+  expect(f.table('video_projects').get(project.id)).toEqual(project);
+  expect(f.table('asset_refs').size).toBe(1);
+  expect(
+    await loadMediaReplicaPredecessorRef({
+      ...predecessorInput(f),
+      expectedLocalGeneration: 2,
+      expectedBasis: ['trashed'],
+    })
+  ).toEqual(f.input.rows.ref);
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedMediaReplica({ ...next, operationId: 'delayed' })).rejects.toThrow(
+    'source-changed'
+  );
+  expect(f.rows).toEqual(before);
+});

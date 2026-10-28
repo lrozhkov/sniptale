@@ -1059,3 +1059,14 @@ The existing asset writer creates transport copies for inline images. Prepared c
 The existing root state retains an image revision high-water mark. Local deletion and incoming deletion preserve that mark. Incoming restore and local recreation allocate a later revision. Native revisions remain separate from causal generations. An original-only image can have a nonzero native revision. Editor activation and copy admission use that revision. A stale presentation never becomes current on the receiver.
 
 This boundary covers screenshot sources with inline originals. Other image source families and native residency remain release gates. Production activation remains closed.
+
+
+## Sync lifecycle metadata and unchanged originals
+
+Soft Trash and restore remain edits to retained roots. They do not publish permanent deletion records or release children and files. Supported Library media and manual video projects capture these edits in the native lifecycle transaction. A mixed selection captures media before projects to bind the final dependency heads. Duplicate commands create no new capture. Local-only writes create no sync records. Temporary roots skip graph capture before validation.
+
+Original metadata edits use the existing capture and portable backup codecs. Incoming preparation can retain an original reference after native predecessor admission and a streaming SHA-256 comparison. Size, MIME type and a stored digest alone do not prove equality. The existing resource reader holds the file until journal protection takes over. Failure cleanup removes only newly staged files. Native publication repeats profile, generation, basis and metadata checks before commit.
+
+Screenshot publication compares the incoming original with the retained inline Blob outside its database transaction. Byte equality binds to the exact predecessor metadata digest. Unchanged original bytes permit metadata and workspace changes while projects retain that source. Different bytes still require source replacement admission. Native revision and causal checks remain authoritative after Trash, restore, deletion and recreation.
+
+A project replica can retain an exact known source in Trash after dependency state admission. Its native rows and file binding must still match. Default prepared source admission and new local project selection retain their active-source requirements. This change adds no operation kind, database store, journal format or release authority. Unsupported source families and safe unload remain separate release gates.

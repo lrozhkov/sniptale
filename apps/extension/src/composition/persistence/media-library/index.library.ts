@@ -1,8 +1,12 @@
-import { captureImageInTransaction } from '../sync-capture/capture';
+import { captureMediaInTransaction } from '../sync-capture/capture';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
   IMAGE_WORKSPACES_STORE,
   SYNC_CAPTURE_STORE,
+  PROJECT_ASSETS_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { recoverMediaSourcePublications } from './delete-cascade.recovery';
@@ -134,6 +138,11 @@ async function mutateMediaLibraryEntry(
         AGGREGATE_PRESENTATIONS_STORE,
         ASSET_REFS_STORE,
         SYNC_CAPTURE_STORE,
+        PROJECT_ASSETS_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
+        THUMBNAILS_STORE,
       ],
       'readwrite'
     );
@@ -144,7 +153,8 @@ async function mutateMediaLibraryEntry(
       const nextEntry = mutate(existing);
       if (nextEntry !== existing) {
         await store.put(nextEntry);
-        if (nextEntry.source.kind === 'screenshot') await captureImageInTransaction(tx, assetId);
+        if (nextEntry.source.kind === 'screenshot' || nextEntry.source.kind === 'project-asset')
+          await captureMediaInTransaction(tx, assetId);
       }
       await tx.done;
       return nextEntry;

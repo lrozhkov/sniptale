@@ -83,7 +83,7 @@ export function digestCapturedMediaRows(rows: CapturedMediaRows): string {
 
 /** Freeze one original-only Library source through the caller's transaction. */
 export async function freezeMediaInTransaction(
-  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   mediaId: string
 ): Promise<CapturedMediaRows> {
   const media = frozenNativeRow(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId), admitMedia);
@@ -104,7 +104,7 @@ export async function freezeMediaInTransaction(
 
 /** Freeze one admitted graph through the caller's native transaction, without opening another transaction. */
 export async function freezeVideoProjectInTransaction(
-  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   projectId: string
 ): Promise<CapturedVideoProjectRows> {
   const project = frozenNativeRow(
@@ -126,7 +126,7 @@ class NativeProjectSnapshot {
   private readonly aggregateIds;
 
   constructor(
-    private readonly tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+    private readonly tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
     private readonly project: VideoProjectEntry
   ) {
     this.aggregateIds = new Set([project.id, `video-project:${project.id}`]);
@@ -284,7 +284,7 @@ class NativeProjectSnapshot {
 }
 
 async function rejectUncapturedSidecars(
-  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   aggregateIds: ReadonlySet<string>
 ): Promise<void> {
   for (const id of aggregateIds) {

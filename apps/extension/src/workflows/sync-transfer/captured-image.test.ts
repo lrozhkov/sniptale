@@ -190,53 +190,64 @@ it('encodes the retained image after a later native edit', async () => {
   expect(result.dependencies).toEqual([]);
   expect(io.read).toHaveBeenCalledTimes(1);
 });
-it('uses the shared backup image format and decodes its complete editing object closure', async () => {
-  const encoded = await encodeCapturedImageRoot(imageRows());
-  const refs = new Map(
-    encoded.envelope.objects.map((object, index) => {
-      const assetId = `received-${index}`;
-      return [
-        object.objectId,
-        {
-          assetId,
-          createdAt: 1,
-          location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
-          mimeType: object.mimeType,
-          size: object.size,
-          sha256: null,
-        },
-      ];
-    })
-  );
-  const payload = await preparePortableReplica({
-    envelope: encoded.envelope,
-    verifiedObjects: refs,
-    senderDependencies: [],
-    admission: {
-      spaceId: 'space',
-      profileCreatedAt: 1,
-      operationId: 'remote-image',
-      sourceDigest: 'a'.repeat(64),
-      connectionGeneration: 1,
-      expectedLocalGeneration: 0,
-      expectedBasis: [],
-      expectedWorkspaceRevision: null,
-      dependencies: [],
-    },
-  });
-  if (payload.kind !== 'image') throw new Error('Expected image replica.');
-  const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
-  expect(payload.input.originalRef).toEqual(refs.get(metadata.originalObjectId));
-  expect(payload.input.workspace!.document.sourceImage.assetId).toBe(
-    payload.input.documentRefs[0]!.assetId
-  );
-  expect(payload.input.presentation!.thumbnailRef).toEqual(
-    refs.get(metadata.presentation!.thumbnailObjectId)
-  );
-  expect(JSON.stringify(payload)).not.toContain('document-source');
-  expect(payload.input.media).not.toHaveProperty('blob');
-  expect(payload.input.expectedNativeRevision).toBeNull();
-});
+it.each([false, true])(
+  'decodes the complete image editing closure with trashed=%s',
+  async (trashed) => {
+    const rows = imageRows();
+    rows.media.lifecycle = {
+      storageClass: 'library',
+      savedAt: 1,
+      updatedAt: 2,
+      ...(trashed ? { trashedAt: 2 } : {}),
+    };
+    const encoded = await encodeCapturedImageRoot(rows);
+    const refs = new Map(
+      encoded.envelope.objects.map((object, index) => {
+        const assetId = `received-${index}`;
+        return [
+          object.objectId,
+          {
+            assetId,
+            createdAt: 1,
+            location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+            mimeType: object.mimeType,
+            size: object.size,
+            sha256: null,
+          },
+        ];
+      })
+    );
+    const payload = await preparePortableReplica({
+      envelope: encoded.envelope,
+      verifiedObjects: refs,
+      senderDependencies: [],
+      admission: {
+        spaceId: 'space',
+        profileCreatedAt: 1,
+        operationId: 'remote-image',
+        sourceDigest: 'a'.repeat(64),
+        connectionGeneration: 1,
+        expectedLocalGeneration: 0,
+        expectedBasis: [],
+        expectedWorkspaceRevision: null,
+        dependencies: [],
+      },
+    });
+    if (payload.kind !== 'image') throw new Error('Expected image replica.');
+    const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+    expect(payload.input.originalRef).toEqual(refs.get(metadata.originalObjectId));
+    expect(payload.input.workspace!.document.sourceImage.assetId).toBe(
+      payload.input.documentRefs[0]!.assetId
+    );
+    expect(payload.input.presentation!.thumbnailRef).toEqual(
+      refs.get(metadata.presentation!.thumbnailObjectId)
+    );
+    expect(JSON.stringify(payload)).not.toContain('document-source');
+    expect(payload.input.media).not.toHaveProperty('blob');
+    expect(payload.input.expectedNativeRevision).toBeNull();
+    expect(payload.input.media.lifecycle).toEqual(rows.media.lifecycle);
+  }
+);
 it('preserves stale presentation status and refuses incomplete or foreign image workspace metadata', async () => {
   const rows = imageRows();
   rows.presentation!.presentationRevision = 0;

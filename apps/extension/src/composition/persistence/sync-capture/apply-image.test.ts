@@ -1,6 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
-import { createMediaLibraryEntry } from '../projects/index.test-support';
+import {
+  createMediaLibraryEntry,
+  createVideoProjectEntryWithMediaClip,
+} from '../projects/index.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import { commitImagePresentation } from '../image-aggregates/mutations';
@@ -310,4 +313,102 @@ it('validates document closure and matches pending image publication by its nati
       { id: 'unrelated' }
     )
   ).toBe(false);
+});
+
+it('updates shared image metadata only when original bytes match', async () => {
+  const f = setup();
+  await applyPreparedImageReplica(f.input);
+  const project = createVideoProjectEntryWithMediaClip({ id: 'dependent' });
+  project.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.input.media.id };
+  f.table('video_projects').set(project.id, project);
+  const next = {
+    ...f.input,
+    operationId: 'soft-trash',
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+    expectedNativeRevision: 1,
+    media: {
+      ...f.input.media,
+      filename: 'renamed.png',
+      lifecycle: {
+        storageClass: 'library' as const,
+        savedAt: 1,
+        updatedAt: 2,
+        trashedAt: 2,
+      },
+    },
+  };
+  expect(await applyPreparedImageReplica(next)).toEqual({ status: 'applied', generation: 2 });
+  expect(f.table('media_library').get(f.input.media.id)).toMatchObject({
+    filename: 'renamed.png',
+    lifecycle: { trashedAt: 2 },
+    workspaceRevision: 2,
+  });
+  expect(f.table('video_projects').get(project.id)).toEqual(project);
+  const before = structuredClone(f.rows);
+  io.read.mockImplementation(
+    async (ref: { size: number; mimeType: string }, filename: string) =>
+      new File([new Uint8Array(ref.size).fill(1)], filename, { type: ref.mimeType })
+  );
+  await expect(
+    applyPreparedImageReplica({
+      ...next,
+      operationId: 'changed-bytes',
+      expectedLocalGeneration: 2,
+      expectedBasis: ['soft-trash'],
+      expectedNativeRevision: 2,
+    })
+  ).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+});
+
+it('keeps revision fences through Trash restore and recreation', async () => {
+  const f = setup();
+  await applyPreparedImageReplica(f.input);
+  const trash = {
+    ...f.input,
+    operationId: 'trash',
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+    expectedNativeRevision: 1,
+    media: {
+      ...f.input.media,
+      lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 2 },
+    },
+  };
+  await applyPreparedImageReplica(trash);
+  const restore = {
+    ...f.input,
+    operationId: 'restore',
+    expectedLocalGeneration: 2,
+    expectedBasis: ['trash'],
+    expectedNativeRevision: 2,
+  };
+  await applyPreparedImageReplica(restore);
+  expect(f.table('media_library').get(f.input.media.id)).toMatchObject({ workspaceRevision: 3 });
+  expect(f.table('media_library').get(f.input.media.id)).not.toHaveProperty('lifecycle.trashedAt');
+  await applyCatalogDeletionNative({
+    rootKind: 'media',
+    rootId: f.input.media.id,
+    operationId: 'delete',
+    sourceDigest: 'd'.repeat(64),
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: 3,
+    expectedLocalGeneration: 3,
+    expectedBasis: ['restore'],
+    expectedWorkspaceRevision: 3,
+  });
+  await applyPreparedImageReplica({
+    ...f.input,
+    operationId: 'recreate',
+    expectedLocalGeneration: 4,
+    expectedBasis: ['delete'],
+  });
+  expect(f.table('media_library').get(f.input.media.id)).toMatchObject({ workspaceRevision: 4 });
+  const before = structuredClone(f.rows);
+  await expect(
+    applyPreparedImageReplica({ ...restore, operationId: 'delayed-restore' })
+  ).rejects.toThrow();
+  expect(f.rows).toEqual(before);
 });

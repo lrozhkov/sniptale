@@ -147,8 +147,7 @@ function isOriginalOnlyCapturedMedia(media: MediaLibraryEntry): boolean {
     media.recordingMetadata === undefined &&
     media.recordingGroup === undefined &&
     media.workspaceRevision === 0 &&
-    media.imageContentState !== 'edited' &&
-    media.lifecycle?.trashedAt === undefined
+    media.imageContentState !== 'edited'
   );
 }
 

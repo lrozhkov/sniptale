@@ -1,3 +1,8 @@
+import { updateMediaLibraryEntry } from '../../../apps/extension/src/composition/persistence/media-library/index.library';
+import {
+  moveStoredItemsToTrash,
+  restoreStoredItemsFromTrash,
+} from '../../../apps/extension/src/composition/persistence/library-lifecycle/trash';
 import { createWebdavOutgoingHarness } from './webdav-outgoing';
 import {
   initDB,
@@ -86,6 +91,8 @@ async function inspect(rootId: string) {
   });
   return {
     exists: media !== null,
+    lifecycle: media?.lifecycle ?? null,
+    filename: media?.filename ?? null,
     revision: media?.workspaceRevision ?? null,
     hash: media?.blob instanceof Blob ? await hash(media.blob) : null,
     workspace: workspace ? JSON.parse(JSON.stringify(workspace)) : null,
@@ -97,6 +104,16 @@ async function inspect(rootId: string) {
 }
 export const imageHarness = {
   inspect,
+  async rename(rootId: string, filename: string) {
+    await updateMediaLibraryEntry(rootId, { filename });
+    return inspect(rootId);
+  },
+  async trash(rootId: string, restore = false) {
+    const targets = [{ kind: 'media' as const, id: rootId }];
+    if (restore) await restoreStoredItemsFromTrash(targets);
+    else await moveStoredItemsToTrash(targets);
+    return inspect(rootId);
+  },
   async seed(rootId: string) {
     await installExperimentalCaptureProfile({
       version: 1,
@@ -125,7 +142,9 @@ export const imageHarness = {
     await saveScreenshotMediaAsset({ id: rootId, filename: 'original image 100%.png', blob });
     return inspect(rootId);
   },
-  async publish(rootId: string) {
+  async publish(rootId: string, prior: { key: string; type: string; bytes: number[] }[] = []) {
+    for (const item of prior)
+      files.set(item.key, new Blob([new Uint8Array(item.bytes)], { type: item.type }));
     const sent = await outgoing.sendHistory(rootId);
     const snapshot = await Promise.all(
       [...files].map(async ([key, body]) => ({

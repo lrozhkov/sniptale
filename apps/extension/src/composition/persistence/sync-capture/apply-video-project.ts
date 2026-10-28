@@ -277,12 +277,7 @@ class PreparedProjectClosure {
 
 function assertSupportedClosure(input: ApplyPreparedVideoProjectRevisionInput): void {
   const project = parseVideoProjectEntry(input.root.entry);
-  if (
-    !project ||
-    project.lifecycle?.trashedAt !== undefined ||
-    !isSupportedCaptureProject(project.project) ||
-    input.dependencies.length > 32
-  )
+  if (!project || !isSupportedCaptureProject(project.project) || input.dependencies.length > 32)
     throw new VideoProjectApplyConflictError('unsupported-project');
   new PreparedProjectClosure(input, project.project).assertComplete();
 }
@@ -300,6 +295,10 @@ async function assertDependencyState(
     state.kind !== 'root-state' ||
     state.key !== key ||
     state.rootKey !== rootKey ||
+    state.spaceId !== spaceId ||
+    state.rootKind !== 'media' ||
+    state.rootId !== dependency.entry.id ||
+    state.deleted === true ||
     state.generation !== dependency.expectedGeneration ||
     dependency.expectedBasis.length !== 1 ||
     state.basis.length !== 1 ||
@@ -313,12 +312,16 @@ async function assertNativeDependency(
   dependency: PreparedVideoProjectDependency
 ): Promise<void> {
   try {
-    await assertPreparedLibrarySource(dependency, {
-      media: tx.objectStore(MEDIA_LIBRARY_STORE),
-      assets: tx.objectStore(PROJECT_ASSETS_STORE),
-      exports: tx.objectStore(PROJECT_EXPORTS_STORE),
-      refs: tx.objectStore(ASSET_REFS_STORE),
-    });
+    await assertPreparedLibrarySource(
+      dependency,
+      {
+        media: tx.objectStore(MEDIA_LIBRARY_STORE),
+        assets: tx.objectStore(PROJECT_ASSETS_STORE),
+        exports: tx.objectStore(PROJECT_EXPORTS_STORE),
+        refs: tx.objectStore(ASSET_REFS_STORE),
+      },
+      { allowRetainedTrash: true }
+    );
   } catch {
     throw new VideoProjectApplyConflictError('dependency-changed');
   }
@@ -364,8 +367,7 @@ async function assertLocalPredecessor(
   if (
     (raw !== undefined && !current) ||
     (current ? (current.workspaceRevision ?? 0) : null) !== input.expectedWorkspaceRevision ||
-    (current !== null &&
-      (current.lifecycle?.trashedAt !== undefined || input.expectedLocalGeneration === 0))
+    (current !== null && input.expectedLocalGeneration === 0)
   )
     throw new VideoProjectApplyConflictError('project-changed');
   await assertNoPendingLocalCapture(tx, identity.rootKey);

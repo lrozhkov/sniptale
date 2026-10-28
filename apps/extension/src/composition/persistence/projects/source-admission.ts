@@ -209,10 +209,11 @@ async function readLibrarySourceAssetId(
   }
 }
 
-/** Recheck a prepared live source in the consumer transaction without reading its bytes. */
+/** Recheck a prepared source; retained Trash requires prior causal dependency admission. */
 export async function assertPreparedLibrarySource(
   resource: { entry: MediaLibraryEntry; ref: AssetRef },
-  stores: PreparedLibrarySourceStores
+  stores: PreparedLibrarySourceStores,
+  options: { allowRetainedTrash?: boolean } = {}
 ): Promise<void> {
   const expected = parseMediaLibraryEntry(resource.entry);
   const current = parseMediaLibraryEntry(await stores.media.get(resource.entry.id));
@@ -222,7 +223,7 @@ export async function assertPreparedLibrarySource(
     !current ||
     !expectedRef ||
     current.blob !== undefined ||
-    current.lifecycle?.trashedAt !== undefined ||
+    (current.lifecycle?.trashedAt !== undefined && !options.allowRetainedTrash) ||
     current.size !== expectedRef.size ||
     current.mimeType !== expectedRef.mimeType ||
     JSON.stringify(current) !== JSON.stringify(expected)

@@ -293,3 +293,27 @@ it.each(['trashed', 'inline', 'unsupported'] as const)(
     ).rejects.toThrow();
   }
 );
+
+it('admits exact retained Trash only for checked replica dependency', async () => {
+  const data = preparedLibraryFixture();
+  data.media.lifecycle = { storageClass: 'library', savedAt: 1, updatedAt: 1, trashedAt: 2 };
+  const resource = { entry: structuredClone(data.media), ref };
+  await expect(assertPreparedLibrarySource(resource, data.stores)).rejects.toThrow(
+    'changed after preparation'
+  );
+  await expect(
+    assertPreparedLibrarySource(resource, data.stores, { allowRetainedTrash: true })
+  ).resolves.toBeUndefined();
+  data.stores.media.get.mockResolvedValue({
+    ...data.media,
+    lifecycle: { ...data.media.lifecycle, trashedAt: 3 },
+  });
+  await expect(
+    assertPreparedLibrarySource(resource, data.stores, { allowRetainedTrash: true })
+  ).rejects.toThrow('changed after preparation');
+  data.stores.media.get.mockResolvedValue(data.media);
+  data.stores.refs.get.mockResolvedValue({ ...ref, createdAt: 3 });
+  await expect(
+    assertPreparedLibrarySource(resource, data.stores, { allowRetainedTrash: true })
+  ).rejects.toThrow('changed after preparation');
+});

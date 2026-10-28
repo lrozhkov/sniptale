@@ -1,7 +1,12 @@
+import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
 import type { IDBPTransaction } from 'idb';
-import { MEDIA_LIBRARY_STORE, SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
+import {
+  MEDIA_LIBRARY_STORE,
+  SYNC_CAPTURE_STORE,
+  VIDEO_PROJECTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import {
   captureRootKey,
   SYNC_CAPTURE_PROFILE_KEY,
@@ -51,6 +56,8 @@ export async function captureVideoProjectInTransaction(
     options.publicationId
   );
   if (replay) return replay;
+  const project = parseVideoProjectEntry(await tx.objectStore(VIDEO_PROJECTS_STORE).get(projectId));
+  if (project?.lifecycle?.storageClass === 'temporary') return null;
   const rows = await freezeVideoProjectInTransaction(tx, projectId);
   rows.mediaDependencies = await captureMediaDependencies(tx, profile, rows);
   return appendCapture(
@@ -74,6 +81,7 @@ export async function captureMediaInTransaction(
   const replay = await readPublicationReplay(tx, profile, 'media', mediaId, options.publicationId);
   if (replay) return replay;
   const source = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  if (source?.lifecycle?.storageClass === 'temporary') return null;
   if (source?.source.kind === 'screenshot') return captureImageInTransaction(tx, mediaId, options);
   const rows = await freezeMediaInTransaction(tx, mediaId);
   return appendCapture(tx, profile, 'media', mediaId, { kind: 'media', rows }, options);

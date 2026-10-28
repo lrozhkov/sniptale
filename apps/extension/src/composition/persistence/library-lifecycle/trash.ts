@@ -1,4 +1,8 @@
 import {
+  captureMediaInTransaction,
+  captureVideoProjectInTransaction,
+} from '../sync-capture/capture';
+import {
   readStoredVideoWorkspaceProject,
   writeVideoWorkspaceProject,
 } from '../review-workspaces/project-commands';
@@ -8,6 +12,14 @@ import { readWorkspaceStorage } from '../review-workspaces/storage';
 import { createScenarioProjectStore, getScenarioStoredProject } from '../scenario/storage';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
+  SYNC_CAPTURE_STORE,
+  PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  ASSET_REFS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+  THUMBNAILS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -118,6 +130,14 @@ async function mutateTrash(
     runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction(
         [
+          SYNC_CAPTURE_STORE,
+          PROJECT_ASSETS_STORE,
+          PROJECT_EXPORTS_STORE,
+          ASSET_REFS_STORE,
+          IMAGE_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+          THUMBNAILS_STORE,
+          AGGREGATE_PRESENTATIONS_STORE,
           MEDIA_LIBRARY_STORE,
           VIDEO_WORKSPACES_STORE,
           VIDEO_WORKSPACE_HISTORY_STORE,
@@ -130,6 +150,7 @@ async function mutateTrash(
         'readwrite'
       );
       try {
+        const changed: LibraryTrashTarget[] = [];
         for (const target of targets) {
           if (target.kind === 'quick-edit-project') {
             const { workspace } = await readStoredVideoWorkspaceProject(tx, target.id);
@@ -159,17 +180,18 @@ async function mutateTrash(
           const entry = parseTarget(target, await store.get(target.id));
           if (!entry) throw new StaleTrashItemError();
           const lifecycle = entry.lifecycle ?? createLibraryLifecycle('library', entry.updatedAt);
+          if (restore ? lifecycle.trashedAt === undefined : lifecycle.trashedAt !== undefined)
+            continue;
           if (restore) {
-            if (lifecycle.trashedAt === undefined) continue;
             const { trashedAt: _trashedAt, ...active } = lifecycle;
             // A restored draft receives a full retention window rather than expiring immediately.
             await store.put(
               encodeTargetLifecycle(target, entry, {
                 ...active,
-                updatedAt: Math.max(now, lifecycle.trashedAt),
+                updatedAt: Math.max(now, lifecycle.trashedAt ?? 0),
               })
             );
-          } else if (lifecycle.trashedAt === undefined) {
+          } else {
             await store.put(
               encodeTargetLifecycle(target, entry, {
                 ...lifecycle,
@@ -177,6 +199,21 @@ async function mutateTrash(
               })
             );
           }
+          changed.push(target);
+        }
+        // Dependencies must receive their heads before project after-images bind to them.
+        for (const target of changed) {
+          if (target.kind === 'media') {
+            const media = parseMediaLibraryEntry(
+              await tx.objectStore(MEDIA_LIBRARY_STORE).get(target.id)
+            );
+            if (media?.source.kind === 'screenshot' || media?.source.kind === 'project-asset')
+              await captureMediaInTransaction(tx, target.id);
+          }
+        }
+        for (const target of changed) {
+          if (target.kind === 'video-project')
+            await captureVideoProjectInTransaction(tx, target.id);
         }
         await tx.done;
       } catch (error) {

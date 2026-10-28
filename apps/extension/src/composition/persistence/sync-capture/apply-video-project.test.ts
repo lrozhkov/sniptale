@@ -1,3 +1,4 @@
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { hashCaptureText } from './guards';
 import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -51,7 +52,7 @@ function mediaState(generation = 7, basis = ['accepted-source']): SyncCaptureRoo
   };
 }
 
-function setup() {
+function setup(trashed = false) {
   let failReceipt = false;
   let captureWrites = 0;
   const fixture = createReviewWorkspaceStoreFixture((name) => {
@@ -85,11 +86,12 @@ function setup() {
     source: { kind: 'stored-asset', assetId: ref.assetId },
     mimeType: ref.mimeType,
     size: ref.size,
-    lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+    lifecycle: { ...createLibraryLifecycle('library', 1), ...(trashed ? { trashedAt: 2 } : {}) },
   });
   table('media_library').set(media.id, media);
   table('asset_refs').set(ref.assetId, ref);
   const entry = createVideoProjectEntryWithMediaClip({ id: projectId });
+  if (trashed && media.lifecycle) entry.lifecycle = media.lifecycle;
   entry.project.assets[0]!.source = { kind: 'library-asset', mediaId: sourceId };
   const input: ApplyPreparedVideoProjectRevisionInput = {
     root: { entry, assets: [] },
@@ -122,8 +124,8 @@ function setup() {
   };
 }
 
-it('applies an admitted project without rewriting its Library source or touching independent exports', async () => {
-  const fixture = setup();
+it.each([false, true])('preserves sources and exports: Trash=%s', async (trashed) => {
+  const fixture = setup(trashed);
   const independent = createProjectExportEntry({ projectId });
   fixture.table('project_exports').set(independent.id, independent);
   const beforeExports = structuredClone(fixture.table('project_exports'));
@@ -143,8 +145,8 @@ it('applies an admitted project without rewriting its Library source or touching
   expect(fixture.table('sync_capture').size).toBe(4);
 });
 
-it('refuses a changed dependency after preparation without publishing a project', async () => {
-  const fixture = setup();
+it('refuses a changed retained Trash dependency after preparation', async () => {
+  const fixture = setup(true);
   fixture.table('asset_refs').set(fixture.ref.assetId, {
     ...fixture.ref,
     location: { kind: 'opfs', objectKey: 'objects/replaced-source' },
@@ -158,7 +160,13 @@ it('refuses a changed dependency after preparation without publishing a project'
 });
 
 it('refuses deleted and recreated dependency generations even when bytes match', async () => {
-  for (const state of [undefined, mediaState(8, ['delete']), mediaState(9, ['recreated'])]) {
+  for (const state of [
+    undefined,
+    mediaState(8, ['delete']),
+    mediaState(9, ['recreated']),
+    mediaState(7, ['later-operation']),
+    { ...mediaState(), deleted: true },
+  ]) {
     const fixture = setup();
     if (state) fixture.table('sync_capture').set(state.key, state);
     else {
@@ -559,18 +567,11 @@ it.each(['entry', 'physical-ref', 'other-project'] as const)(
   }
 );
 
-it('refuses malformed prepared assets and trashed incoming projects', async () => {
+it('refuses malformed prepared assets', async () => {
   const fixture = setup();
   const invalidRef = privateCopy(fixture.input);
   invalidRef.root.assets[0]!.ref.location = { kind: 'opfs', objectKey: 'objects/mismatched-id' };
-  const trashed = structuredClone(fixture.input);
-  trashed.root.entry.lifecycle = {
-    storageClass: 'library',
-    savedAt: 1,
-    updatedAt: 1,
-    trashedAt: 2,
-  };
-  for (const input of [invalidRef, trashed]) {
+  for (const input of [invalidRef]) {
     const before = structuredClone(fixture.rows);
     await expect(applyPreparedVideoProjectRevision(input)).rejects.toMatchObject({
       code: 'unsupported-project',

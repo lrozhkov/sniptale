@@ -1056,7 +1056,32 @@ test('saved image revisions retain ordinary originals through WebDAV and browser
     const revised = await receive();
     expect(revised.revision).toBeGreaterThan(initial.revision!);
     expect(revised.hash).toBe(seed.native.hash);
-    for (const item of [...first, ...second].flatMap((item) => item.files))
+    await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.imageTrash(id),
+      seed.rootId
+    );
+    const trashFiles = await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.sendHistory(id),
+      seed.rootId
+    );
+    const trashed = await receive();
+    expect(trashed.lifecycle?.trashedAt).toBeGreaterThan(0);
+    expect(trashed.hash).toBe(seed.native.hash);
+    await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.imageTrash(id, true),
+      seed.rootId
+    );
+    const restoreFiles = await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.sendHistory(id),
+      seed.rootId
+    );
+    const restored = await receive();
+    expect(restored.lifecycle?.trashedAt).toBeUndefined();
+    expect(restored.hash).toBe(seed.native.hash);
+    expect(restored.revision).toBeGreaterThan(trashed.revision!);
+    for (const item of [...first, ...second, ...trashFiles, ...restoreFiles].flatMap(
+      (item) => item.files
+    ))
       expect(await lab.externalProof(item.key)).toEqual({ size: item.size, sha256: item.sha256 });
     await target.context.close();
     target = await openProvider(lab, info, 'image-target');
@@ -1064,16 +1089,79 @@ test('saved image revisions retain ordinary originals through WebDAV and browser
       (id) => window.webdavTransferHarness.portable.imageProof(id),
       seed.rootId
     );
-    expect(persisted.revision).toBe(revised.revision);
+    expect(persisted.revision).toBe(restored.revision);
     expect(persisted.hash).toBe(revised.hash);
     expect(persisted.journals).toBe(0);
     await saveProof(info, {
       seed,
       initial,
       revised,
+      trashed,
+      restored,
       persisted,
-      externalFiles: [...first, ...second].flatMap((item) => item.files),
+      externalFiles: [...first, ...second, ...trashFiles, ...restoreFiles].flatMap(
+        (item) => item.files
+      ),
     });
+  } finally {
+    await sender.context.close();
+    await target.context.close();
+  }
+});
+
+test('soft Trash and restore retain a shared original and its project across browsers', async ({
+  lab,
+}, info) => {
+  const sender = await openProvider(lab, info, 'retained-source');
+  let target = await openProvider(lab, info, 'retained-target');
+  try {
+    const seed = await sender.page.evaluate(() => window.webdavTransferHarness.portable.source());
+    const send = () =>
+      sender.page.evaluate(async (input) => {
+        const api = window.webdavTransferHarness.portable.outgoing;
+        const media = await api.sendHistory(input.mediaId);
+        const project = await api.sendHistory(input.projectId);
+        return [...media, ...project].flatMap((item) => item.files);
+      }, seed);
+    const receive = () =>
+      target.page.evaluate(async (input) => {
+        const api = window.webdavTransferHarness.portable;
+        await api.outgoing.scan('provider-native-portable');
+        await api.outgoing.receive('provider-native-portable', 'media', input.mediaId);
+        await api.outgoing.receive('provider-native-portable', 'video-project', input.projectId);
+        return api.originalBinding(input.mediaId);
+      }, seed);
+    const files = await send();
+    const initial = await receive();
+    for (const restore of [false, true]) {
+      await sender.page.evaluate(
+        ({ input, restore }) =>
+          window.webdavTransferHarness.portable.lifecycleRoots(
+            input.mediaId,
+            input.projectId,
+            restore
+          ),
+        { input: seed, restore }
+      );
+      files.push(...(await send()));
+      const received = await receive();
+      expect(received.assetId).toBe(initial.assetId);
+      expect(received.sha256).toBe(initial.sha256);
+      if (restore) expect(received.lifecycle?.trashedAt).toBeUndefined();
+      else expect(received.lifecycle?.trashedAt).toBeGreaterThan(0);
+    }
+    await target.context.close();
+    target = await openProvider(lab, info, 'retained-target');
+    const persisted = await target.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.originalBinding(id),
+      seed.mediaId
+    );
+    expect(persisted.assetId).toBe(initial.assetId);
+    expect(persisted.sha256).toBe(initial.sha256);
+    expect(persisted.lifecycle?.trashedAt).toBeUndefined();
+    for (const item of files)
+      expect(await lab.externalProof(item.key)).toEqual({ size: item.size, sha256: item.sha256 });
+    await saveProof(info, { initial, persisted, files });
   } finally {
     await sender.context.close();
     await target.context.close();

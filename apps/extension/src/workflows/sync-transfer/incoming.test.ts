@@ -16,12 +16,29 @@ import type { stageRootObjects } from '../media-hub-backup/v6/staging';
 
 const io = vi.hoisted(() => ({
   active: false,
+  reading: false,
   staged: [] as string[],
   discard: vi.fn(),
   read: vi.fn(),
   journal: vi.fn(),
   deletion: vi.fn(),
   stage: vi.fn(),
+  predecessor: vi.fn(),
+  releaseReader: vi.fn(),
+}));
+vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
+  runWithAssetResourceRead: async (operation: () => Promise<unknown>) => {
+    io.reading = true;
+    try {
+      return await operation();
+    } finally {
+      io.reading = false;
+      io.releaseReader();
+    }
+  },
+}));
+vi.mock('../../composition/persistence/sync-capture/apply-media', () => ({
+  loadMediaReplicaPredecessorRef: io.predecessor,
 }));
 vi.mock('../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/assets')>()),
@@ -229,6 +246,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   io.staged = [];
   io.active = false;
+  io.reading = false;
+  io.predecessor.mockImplementation(async () => {
+    expect(io.reading).toBe(true);
+    return null;
+  });
   io.discard.mockResolvedValue(undefined);
   io.read.mockImplementation(
     async () => new File([new Uint8Array(3)], 'original.png', { type: 'image/png' })
@@ -263,6 +285,130 @@ it('stages a media original and uses the stable logical digest for the native jo
   expect(f.reads).toEqual(f.selected.objects.map((item) => item.remoteKey));
   expect(io.discard).not.toHaveBeenCalled();
   expect(io.active).toBe(false);
+});
+it('reuses the checked predecessor original and preserves it on failure', async () => {
+  const f = await fixture();
+  const original = { ...ref('retained-original'), sha256: null };
+  io.predecessor.mockResolvedValue(original);
+  const args = {
+    ...f,
+    admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+    rootKind: 'media' as const,
+    rootId: mediaId,
+    signal: new AbortController().signal,
+  };
+  const journal = await prepareCatalogReplica(args);
+  expect(io.predecessor).toHaveBeenCalledWith({
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: 7,
+    mediaId,
+    expectedLocalGeneration: 1,
+    expectedBasis: ['media-op'],
+  });
+  expect(journal.payload.kind).toBe('media');
+  if (journal.payload.kind !== 'media') throw new Error('Expected media.');
+  expect(journal.payload.input.rows.ref).toEqual(original);
+  expect(io.read).toHaveBeenCalledWith(original, 'original.png');
+  expect(io.staged).toEqual([]);
+  expect(f.reads).toEqual([]);
+  io.journal.mockRejectedValue(new Error('Native refusal'));
+  await expect(prepareCatalogReplica(args)).rejects.toThrow('Native refusal');
+  expect(io.discard).not.toHaveBeenCalled();
+  expect(io.reading).toBe(false);
+});
+it('refuses same-size corrupt predecessor reuse', async () => {
+  const f = await fixture();
+  const original = ref('corrupt-original');
+  io.predecessor.mockResolvedValue(original);
+  // Even a matching ref SHA is not proof of the bytes retained in the local object.
+  io.read.mockResolvedValue(new File(['bad'], 'original.png', { type: 'image/png' }));
+  const journal = await prepareCatalogReplica({
+    ...f,
+    admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+    rootKind: 'media',
+    rootId: mediaId,
+    signal: new AbortController().signal,
+  });
+  expect(journal.payload.kind).toBe('media');
+  if (journal.payload.kind !== 'media') throw new Error('Expected media.');
+  expect(journal.payload.input.rows.ref.assetId).toBe('staged-original');
+  expect(f.reads).toEqual(f.selected.objects.map((item) => item.remoteKey));
+  expect(io.discard).not.toHaveBeenCalled();
+});
+it('holds the original until journal protection replaces the reader', async () => {
+  const f = await fixture();
+  io.predecessor.mockResolvedValue(ref('retained-original'));
+  let ready!: () => void;
+  let release!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  io.journal.mockImplementation(async (payload) => {
+    expect(io.reading).toBe(true);
+    ready();
+    await gate;
+    expect(io.reading).toBe(true);
+    return { journalId: 'ready', payload };
+  });
+  const pending = prepareCatalogReplica({
+    ...f,
+    admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+    rootKind: 'media',
+    rootId: mediaId,
+    signal: new AbortController().signal,
+  });
+  await entered;
+  expect(io.releaseReader).not.toHaveBeenCalled();
+  release();
+  await pending;
+  expect(io.releaseReader).toHaveBeenCalledOnce();
+});
+it('preserves native predecessor refusals before downloads or journal creation', async () => {
+  const f = await fixture();
+  io.predecessor.mockRejectedValue(new Error('Stale native source'));
+  await expect(
+    prepareCatalogReplica({
+      ...f,
+      admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+      rootKind: 'media',
+      rootId: mediaId,
+      signal: new AbortController().signal,
+    })
+  ).rejects.toThrow('Stale native source');
+  expect(io.stage).not.toHaveBeenCalled();
+  expect(io.journal).not.toHaveBeenCalled();
+  expect(io.reading).toBe(false);
+});
+it('prepares soft Trash as retained media metadata rather than a catalog tombstone', async () => {
+  const f = await fixture();
+  const media = mediaEnvelope();
+  media.entry.lifecycle = {
+    storageClass: 'library',
+    savedAt: 1,
+    updatedAt: 2,
+    trashedAt: 2,
+  };
+  media.envelope.metadata = { ...Object(media.envelope.metadata), entry: media.entry };
+  const selected = await attempt(media.envelope, 'trashed-media', 2, ['media-op']);
+  const catalog = { ...f.catalog, ...projectSyncCatalog('space', [f.selected, selected]) };
+  expect(catalog.roots.get(JSON.stringify(['media', mediaId]))!.deleted).toBe(false);
+  io.predecessor.mockResolvedValue(ref('retained-original'));
+  const journal = await prepareCatalogReplica({
+    ...f,
+    catalog,
+    admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+    rootKind: 'media',
+    rootId: mediaId,
+    signal: new AbortController().signal,
+  });
+  if (journal.payload.kind !== 'media') throw new Error('Expected media.');
+  expect(journal.payload.input.rows.media.lifecycle).toEqual(media.entry.lifecycle);
+  expect(journal.payload.input.rows.ref.assetId).toBe('retained-original');
+  expect(f.reads).toEqual([]);
 });
 it('prepares editing bytes and checks borrowed originals without downloading exports', async () => {
   const f = await fixture(true);

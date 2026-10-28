@@ -25,7 +25,6 @@ export function preparePortableImageRows(
     !['image', 'screenshot'].includes(media.kind) ||
     media.blob !== undefined ||
     media.lifecycle?.storageClass !== 'library' ||
-    media.lifecycle.trashedAt !== undefined ||
     media.size !== originalRef.size ||
     media.mimeType !== originalRef.mimeType
   )

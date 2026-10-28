@@ -397,3 +397,10 @@ Explicit enrollment requires native ready evidence and current origin permission
 Each checked queue execution verifies its exact retained workspace identity through bounded marker reads. It uses the current tracked provider after native claim. A mismatch or missing marker cannot cause remote initialization, overwrite, cleanup or original-file writes. Temporary refusal follows the existing delayed queue policy. Invalid identity preserves local files and requires explicit action.
 
 The verifier establishes an observed identity, not future server stability. Production Settings and public Start ingress remain closed release gates.
+
+
+## Sync metadata and retained originals
+
+Soft Trash keeps the original files and dependency ownership. Restore does not grant file replacement authority. Incoming original reuse requires native predecessor admission and comparison of the actual bytes with the selected operation digest. A matching size, MIME type or stored digest is insufficient. An existing resource reader protects reused files until the publication journal retains them. Failed preparation removes only its new staging files.
+
+Screenshot byte comparison occurs before native publication. The result binds to the predecessor metadata digest and native revision checks. A changed original still requires source replacement admission. An exact retained dependency in Trash can support a checked project replica. New local project source selection still requires restoration. These rules grant no remote deletion or local unload authority.

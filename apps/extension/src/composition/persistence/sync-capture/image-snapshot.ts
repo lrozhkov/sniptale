@@ -117,7 +117,7 @@ export function parseCapturedImageRows(value: unknown): CapturedImageRows | null
 
 /** Read the accepted after-image exclusively through the writer's live transaction. */
 export async function freezeImageInTransaction(
-  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   mediaId: string
 ): Promise<CapturedImageRows> {
   const media: unknown = await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId);
