@@ -255,6 +255,7 @@ function renderPinToTabItem(props: {
       }
       disabled={props.pinToTabLocked || !props.pinToTabAvailable}
       selected={props.pinToTab || props.pinToTabLocked}
+      checked={props.pinToTab || props.pinToTabLocked}
       onSelect={(event) => {
         stopMenuEvent(event);
         if (props.pinToTabLocked || !props.pinToTabAvailable) {

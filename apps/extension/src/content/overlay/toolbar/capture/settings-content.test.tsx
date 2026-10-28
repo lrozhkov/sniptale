@@ -413,3 +413,14 @@ it.each(['horizontal', 'vertical'] as const)(
     );
   }
 );
+
+it.each([
+  { pinToTab: false, pinToTabLocked: false, checked: false },
+  { pinToTab: true, pinToTabLocked: false, checked: true },
+  { pinToTab: false, pinToTabLocked: true, checked: true },
+])('shows the accepted pin state as a check: %j', ({ checked, ...state }) => {
+  renderSettingsDropdown(state);
+  expect(
+    findButton('content.toolbar.pinToTab')?.querySelector('.sniptale-popover-check') !== null
+  ).toBe(checked);
+});

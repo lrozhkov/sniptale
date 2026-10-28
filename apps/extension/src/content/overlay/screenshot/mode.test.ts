@@ -16,6 +16,7 @@ import {
 } from '../../selection/locker';
 import { createScreenshotControllerSession } from './session/state';
 import { installContentRuntimeMessagingMock } from '../../application/runtime-services/services.test-support';
+import { restoreVisibleUiState } from './feedback';
 import { setScreenshotSurfaceBinding } from '../viewport-selector/capability';
 
 const sendRuntimeMessageMock = vi.fn();
@@ -577,3 +578,22 @@ it('preserves the full runtime when native quick-action cleanup fails', async ()
   ).rejects.toThrow('restore refused');
   expect(releaseRuntimeMock).not.toHaveBeenCalled();
 });
+
+it.each(['visible', 'full'] as const)(
+  'restores drawing after an ordinary %s capture on success or failure',
+  (type) => {
+    const params: ScreenshotControllerParams = createScreenshotParams();
+    params.quickActionOverlayRef.current = null;
+    Object.assign(params.editingModes, {
+      drawingMode: true,
+      disableDrawingMode: vi.fn(),
+      setDrawingMode: vi.fn(),
+    });
+    const runtime = createScreenshotRuntime();
+    prepareScreenshotMode(params, runtime.session, type);
+    expect(runtime.session.editingModeBaseline).toBe('drawing');
+    restoreVisibleUiState(runtime, 1);
+    restoreVisibleUiState(runtime, 1);
+    expect(runtime.restoreEditingMode).toHaveBeenCalledExactlyOnceWith('drawing');
+  }
+);

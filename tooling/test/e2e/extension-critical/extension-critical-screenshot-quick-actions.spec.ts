@@ -22,15 +22,16 @@ async function configureToolbar(
   page: Page,
   hostOrigin: string,
   displayMode: 'horizontal' | 'vertical',
-  compactMenus = true
+  compactMenus = true,
+  captureAction: 'edit' | 'copy' = 'edit'
 ) {
   await popup.evaluate(
-    async ({ displayMode, compactMenus }) => {
+    async ({ displayMode, compactMenus, captureAction }) => {
       const current = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
       await chrome.storage.sync.set({
         sniptale_settings: {
           ...current,
-          captureAction: 'edit',
+          captureAction,
           imageFormat: 'png',
           imageQuality: 83,
           fullPageImage: { imageFormat: 'png', imageQuality: 83 },
@@ -55,7 +56,7 @@ async function configureToolbar(
         },
       });
     },
-    { displayMode, compactMenus }
+    { displayMode, compactMenus, captureAction }
   );
   await page.reload();
   await popup.evaluate(async (origin) => {
@@ -134,6 +135,21 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           await pin.click();
           await expect(pin).toHaveAttribute('aria-pressed', 'true');
           await expect.poll(readPinned).toBe(true);
+          await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+          await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+          await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+          await expect(
+            page
+              .getByRole('button', { name: /Pin toolbar to.*tab|Закрепить панель во вкладке/u })
+              .locator('.sniptale-popover-check')
+          ).toBeVisible();
+          await page.screenshot({
+            path: info.outputPath(`pin-settings-${orientation}.png`),
+            fullPage: false,
+          });
+          await page.keyboard.press('Escape');
+          await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+          await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
           await page.mouse.move(10, 100);
           await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
           await expect(pin).toHaveCSS('box-shadow', 'none');
@@ -1021,6 +1037,62 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await settingsPage.close();
       await popup.close();
       await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`toolbar Copy retains drawing mode for primary and menu captures ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: hostOrigin });
+    try {
+      await configureToolbar(popup, page, hostOrigin, 'horizontal', true, 'copy');
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+      await page.mouse.move(600, 220);
+      await page.mouse.down();
+      await page.mouse.move(700, 260, { steps: 5 });
+      await page.mouse.up();
+      const canvas = page.locator(
+        '[data-ui="content.drawing.surface"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+      );
+      const before = await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL());
+      for (const [mode, menu] of [
+        ['visible', false],
+        ['full', true],
+      ] as const) {
+        await page.evaluate(() => navigator.clipboard.writeText('before capture'));
+        if (menu) {
+          await page.locator(`[data-ui="content.toolbar.capture-${mode}-settings-button"]`).click();
+          await page.locator(`[data-ui="content.toolbar.capture-${mode}-action.copy"]`).click();
+        } else await page.locator(`[data-ui="content.toolbar.capture-${mode}-button"]`).click();
+        await expect
+          .poll(() =>
+            page.evaluate(async () => {
+              const items = await navigator.clipboard.read();
+              const image = items.find((item) => item.types.includes('image/png'));
+              return image ? (await image.getType('image/png')).size : 0;
+            })
+          )
+          .toBeGreaterThan(0);
+        await expect(page.locator('[data-ui="content.toolbar.drawing.pencil"]')).toBeVisible();
+        await expect
+          .poll(() => canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL()))
+          .toBe(before);
+        await page.screenshot({
+          path: info.outputPath(`${mode}-copy-drawing-restored.png`),
+          fullPage: false,
+        });
+      }
+    } finally {
+      await page.close();
+      await popup.close();
     }
   });
 }
