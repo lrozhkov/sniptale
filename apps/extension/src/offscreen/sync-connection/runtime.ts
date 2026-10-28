@@ -9,6 +9,7 @@ import type { createSyncConnectionExecutor } from './executor';
 function isSyncCommandCandidate(message: unknown): message is Record<string, unknown> {
   if (!isRecord(message)) return false;
   return (
+    message['type'] === MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND ||
     message['type'] === MessageType.OFFSCREEN_SYNC_START ||
     message['type'] === MessageType.OFFSCREEN_SYNC_WORKSPACE_START ||
     message['type'] === MessageType.OFFSCREEN_SYNC_INSPECT ||
@@ -32,6 +33,7 @@ export function registerOffscreenSyncMessageListener(
     const parsed = parseSyncConnectionRuntimeMessage(authorized.message);
     if (
       !parsed ||
+      parsed.type === MessageType.SYNC_PRODUCT_COMMAND ||
       parsed.type === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION ||
       parsed.type === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION
     ) {
@@ -43,6 +45,8 @@ export function registerOffscreenSyncMessageListener(
         capabilityGeneration: authorized.capabilityGeneration,
         message: parsed,
         execute: () => {
+          if (parsed.type === MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND)
+            return executor.productCommand(parsed);
           if (parsed.type === MessageType.OFFSCREEN_SYNC_START) return executor.start(parsed);
           if (parsed.type === MessageType.OFFSCREEN_SYNC_WORKSPACE_START)
             return executor.startWorkspace(parsed);

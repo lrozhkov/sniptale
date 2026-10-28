@@ -4,6 +4,7 @@ import { updateScenarioProjectRecordMetadata } from '../../../composition/persis
 import type { GallerySelectionController } from './controller-types';
 import {
   isGalleryMediaItem,
+  isGalleryRemoteItem,
   isGalleryQuickEditProjectItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
@@ -37,6 +38,7 @@ function splitSelectableTargets(targets: GalleryItem[]) {
 }
 
 function trashTarget(item: GalleryItem): LibraryTrashTarget {
+  if (isGalleryRemoteItem(item)) throw new Error('Remote roots have no local trash target.');
   if (item.type === 'quick-edit-project')
     return {
       kind: 'quick-edit-project',
@@ -271,6 +273,7 @@ export function createApplySelectionTagAction(controller: GallerySelectionContro
             return addMediaLibraryEntryTagsSafely(item.entityId ?? item.id, [normalizedTag]);
           }
 
+          if (!isGalleryScenarioItem(item)) return;
           const nextTags = [...item.tags, normalizedTag];
           return updateScenarioProjectRecordMetadata(item.entityId, {
             tags: nextTags,

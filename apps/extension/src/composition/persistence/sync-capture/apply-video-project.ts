@@ -1,3 +1,8 @@
+import {
+  parseSyncConnectionIdentity,
+  type SyncConnectionIdentity,
+} from '../remote-connection/model';
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { initDB } from '../infrastructure/indexed-db/core';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import {
@@ -23,6 +28,7 @@ import {
   STORE_NAME,
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
   THUMBNAILS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -161,6 +167,7 @@ interface PreparedVideoProjectDependency {
 }
 
 export interface ApplyPreparedVideoProjectRevisionInput {
+  authorization?: SyncConnectionIdentity;
   root: PreparedVideoProjectReplicaRoot;
   operationId: string;
   sourceDigest: string;
@@ -480,6 +487,8 @@ async function admitApplication(tx: ApplyTransaction, candidate: HydratedProject
   };
   const duplicate = await readAppliedReceipt(tx, identity);
   if (duplicate !== null) return { status: 'duplicate' as const, generation: duplicate };
+  if (candidate.authorization !== undefined)
+    await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
   if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
     throw new VideoProjectApplyConflictError('profile-changed');
   assertSupportedClosure(candidate);
@@ -570,6 +579,7 @@ export async function applyPreparedVideoProjectRevision(
   lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<{ status: 'applied' | 'duplicate'; generation: number }> {
   if (
+    (input.authorization !== undefined && !parseSyncConnectionIdentity(input.authorization)) ||
     !input.spaceId ||
     !Number.isSafeInteger(input.profileCreatedAt) ||
     input.profileCreatedAt < 0 ||
@@ -619,6 +629,7 @@ export async function applyPreparedVideoProjectRevision(
         IMAGE_WORKSPACES_STORE,
         SCENARIO_ASSETS_STORE,
         SYNC_CAPTURE_STORE,
+        SYNC_CONNECTION_STORE,
       ],
       'readwrite'
     );

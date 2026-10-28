@@ -4,6 +4,9 @@ declare module './' {
       typeof import('./').MessageType.OFFSCREEN_SYNC_WORKSPACE_START;
     type SYNC_WORKSPACE_ORIGIN_PERMISSION =
       typeof import('./').MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION;
+    type SYNC_PRODUCT_COMMAND = typeof import('./').MessageType.SYNC_PRODUCT_COMMAND;
+    type OFFSCREEN_SYNC_PRODUCT_COMMAND =
+      typeof import('./').MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND;
     type OFFSCREEN_SYNC_START = typeof import('./').MessageType.OFFSCREEN_SYNC_START;
     type OFFSCREEN_SYNC_INSPECT = typeof import('./').MessageType.OFFSCREEN_SYNC_INSPECT;
     type OFFSCREEN_SYNC_STOP = typeof import('./').MessageType.OFFSCREEN_SYNC_STOP;

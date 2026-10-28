@@ -544,3 +544,58 @@ it('refuses missing original protection before publishing any review state', asy
   expect(f.table('video_workspaces').has(f.aggregateId)).toBe(false);
   expect(io.cancel).not.toHaveBeenCalled();
 });
+
+it('retains recovery authorization, refuses revoked journals and permits legacy replay', async () => {
+  const f = setup();
+  const authorization = { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 };
+  f.payload.input.authorization = authorization;
+  const journal = await createPreparedReplicaJournal(f.payload);
+  expect(journal.payload.input.authorization).toEqual(authorization);
+  f.table('sync_connection').set('connection', {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding: {
+      provider: 'webdav',
+      rootUrl: 'https://dav.example.test/root/',
+      accountId: 'alice',
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 3,
+    },
+    identity: { ...authorization, revision: 2 },
+    phase: 'paused',
+    updateNonce: null,
+    credentialId: '10000000-0000-4000-8000-000000000002',
+  });
+  io.list.mockResolvedValue([journal]);
+  const before = structuredClone(f.rows);
+  await expect(recoverStandaloneAssetPublications([syncReplicaPublicationAdapter])).resolves.toBe(
+    0
+  );
+  expect(f.rows).toEqual(before);
+  expect(io.remove).not.toHaveBeenCalled();
+  const legacy = structuredClone(f.payload);
+  delete legacy.input.authorization;
+  const legacyJournal = await createPreparedReplicaJournal(legacy);
+  io.list.mockResolvedValue([legacyJournal]);
+  await expect(recoverStandaloneAssetPublications([syncReplicaPublicationAdapter])).resolves.toBe(
+    1
+  );
+  expect(f.table('media_library').has('project-asset:source')).toBe(true);
+});
+
+it('refuses malformed runtime authorization instead of treating it as a legacy journal', async () => {
+  const f = setup();
+  const journal = await createPreparedReplicaJournal(f.payload);
+  await expect(
+    publishPreparedReplicaJournal({
+      ...journal,
+      payload: {
+        ...f.payload,
+        input: { ...f.payload.input, authorization: { incarnation: 'invalid', revision: 1 } },
+      },
+    })
+  ).rejects.toThrow('authorization');
+  expect(f.table('media_library').has('project-asset:source')).toBe(false);
+});

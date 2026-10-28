@@ -755,3 +755,43 @@ it.each(['live', 'legacy'] as const)(
     expect(f.rows).toEqual(before);
   }
 );
+
+it('checks authorization before mutation and replays committed results after pause', async () => {
+  const f = setup();
+  const authorization = { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 };
+  f.input.authorization = authorization;
+  const connection = {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding: {
+      provider: 'webdav',
+      rootUrl: 'https://dav.example.test/root/',
+      accountId: 'alice',
+      spaceId: spaceId,
+      profileCreatedAt: 1,
+      connectionGeneration: 3,
+    },
+    identity: authorization,
+    phase: 'active',
+    updateNonce: null,
+    credentialId: '10000000-0000-4000-8000-000000000002',
+  };
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(f.input)).rejects.toThrow('admission refused');
+  expect(f.rows).toEqual(before);
+  f.table('sync_connection').set('connection', connection);
+  await expect(applyPreparedVideoProjectRevision(f.input)).resolves.toMatchObject({
+    status: 'applied',
+  });
+  f.table('sync_connection').set('connection', {
+    ...connection,
+    identity: { ...authorization, revision: 2 },
+    phase: 'paused',
+  });
+  const committed = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(f.input)).resolves.toMatchObject({
+    status: 'duplicate',
+  });
+  expect(f.rows).toEqual(committed);
+});

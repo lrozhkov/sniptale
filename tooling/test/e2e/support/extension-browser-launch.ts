@@ -59,6 +59,7 @@ function getChromiumLaunchArgs(options: LaunchExtensionBrowserOptions): string[]
     '--disable-crashpad',
     '--disable-breakpad',
     '--enable-unsafe-extension-debugging',
+    ...(options.ignoreHTTPSErrors ? ['--ignore-certificate-errors'] : []),
     ...(options.windowCaptureTitle
       ? [`--auto-select-window-capture-source-by-title=${options.windowCaptureTitle}`]
       : [

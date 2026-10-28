@@ -307,6 +307,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities.ts`
 - `apps/extension/src/background/runtime/tab-mode-router/router.ts`
 - `apps/extension/src/background/scenario/router/index.ts`
+- `apps/extension/src/background/sync-connection/product-route.ts`
 - `apps/extension/src/background/sync-connection/route.ts`
 - `apps/extension/src/background/voice-input/route.ts`
 

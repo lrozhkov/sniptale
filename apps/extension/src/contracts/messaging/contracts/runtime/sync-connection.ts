@@ -1,3 +1,9 @@
+import {
+  parseSyncProductRequest,
+  parseSyncProductExecutorRequest,
+  parseSyncProductResponse,
+  parseSyncProductJob,
+} from './sync-product';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { MessageContractError } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -22,6 +28,7 @@ import type {
   SyncExecutorBinding,
   SyncExecutorJobSnapshot,
   SyncExecutorSnapshot,
+  SyncProductJobSnapshot,
   SyncWorkspaceJobSnapshot,
 } from '../runtime-message/sync-connection.types';
 import type { PartialRuntimeRegistry } from '../runtime-message.registry';
@@ -81,6 +88,7 @@ function workspace(input: unknown): SyncWorkspaceJobSnapshot | null {
       'selectionRevision',
       'state',
       'failureCode',
+      ...(Object.hasOwn(input, 'requestId') ? ['requestId'] : []),
     ]) ||
     !member(['allocation', 'join'] as const, input['sourceKind']) ||
     !connectionUuid(input['selectionIncarnation']) ||
@@ -103,7 +111,9 @@ function workspace(input: unknown): SyncWorkspaceJobSnapshot | null {
     )
   )
     return null;
+  if (input['requestId'] !== undefined && !connectionUuid(input['requestId'])) return null;
   return {
+    ...(typeof input['requestId'] === 'string' ? { requestId: input['requestId'] } : {}),
     sourceKind: input['sourceKind'],
     selectionIncarnation: input['selectionIncarnation'],
     selectionRevision: input['selectionRevision'],
@@ -123,6 +133,7 @@ export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot 
       'binding',
       'jobs',
       'workspace',
+      ...(Object.hasOwn(input, 'products') ? ['products'] : []),
     ]) ||
     !connectionUuid(input['offscreenStartupId']) ||
     !connectionUuid(input['executorId']) ||
@@ -132,6 +143,17 @@ export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot 
     input['jobs'].length > 128
   )
     return null;
+  const products: SyncProductJobSnapshot[] = [];
+  if (Object.hasOwn(input, 'products')) {
+    if (!Array.isArray(input['products']) || input['products'].length > 128) return null;
+    const ids = new Set<string>();
+    for (const item of input['products']) {
+      const product = parseSyncProductJob(item);
+      if (!product || ids.has(product.requestId)) return null;
+      ids.add(product.requestId);
+      products.push(product);
+    }
+  }
   const parsedBinding = input['binding'] === null ? null : binding(input['binding']);
   if (input['binding'] !== null && !parsedBinding) return null;
   const parsedWorkspace = input['workspace'] === null ? null : workspace(input['workspace']);
@@ -155,6 +177,7 @@ export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot 
     binding: parsedBinding,
     jobs,
     workspace: parsedWorkspace,
+    ...(Object.hasOwn(input, 'products') ? { products } : {}),
   };
 }
 function canonicalOrigin(input: unknown): input is string {
@@ -171,6 +194,9 @@ export function parseSyncConnectionRuntimeMessage(
   input: unknown
 ): SyncConnectionRuntimeRequest | null {
   if (!isRecord(input) || !connectionUuid(input['requestId'])) return null;
+  if (input['type'] === MessageType.SYNC_PRODUCT_COMMAND) return parseSyncProductRequest(input);
+  if (input['type'] === MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND)
+    return parseSyncProductExecutorRequest(input);
   const requestId = input['requestId'];
   if (input['type'] === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION) {
     if (
@@ -191,12 +217,25 @@ export function parseSyncConnectionRuntimeMessage(
   if (input['type'] === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION) {
     const authorization = parseSyncConnectionIdentity(input['authorization']);
     if (
-      !exact(input, ['type', 'requestId', 'authorization', 'origin']) ||
+      !exact(input, [
+        'type',
+        'requestId',
+        'authorization',
+        'origin',
+        ...(Object.hasOwn(input, 'advisory') ? ['advisory'] : []),
+      ]) ||
+      (Object.hasOwn(input, 'advisory') && input['advisory'] !== true) ||
       !authorization ||
       !canonicalOrigin(input['origin'])
     )
       return null;
-    return { type: input['type'], requestId, authorization, origin: input['origin'] };
+    return {
+      type: input['type'],
+      requestId,
+      authorization,
+      origin: input['origin'],
+      ...(input['advisory'] === true ? { advisory: true } : {}),
+    };
   }
   if (!token(input['capabilityToken']) || !connectionUuid(input['offscreenStartupId'])) return null;
   const common = {
@@ -206,9 +245,22 @@ export function parseSyncConnectionRuntimeMessage(
   };
   const envelope = ['type', 'capabilityToken', 'requestId', 'offscreenStartupId'];
   if (input['type'] === MessageType.OFFSCREEN_SYNC_INSPECT) {
-    if (!exact(input, [...envelope, 'challenge']) || !connectionUuid(input['challenge']))
+    if (
+      !exact(input, [
+        ...envelope,
+        'challenge',
+        ...(Object.hasOwn(input, 'advisory') ? ['advisory'] : []),
+      ]) ||
+      (Object.hasOwn(input, 'advisory') && input['advisory'] !== true) ||
+      !connectionUuid(input['challenge'])
+    )
       return null;
-    return { type: input['type'], ...common, challenge: input['challenge'] };
+    return {
+      type: input['type'],
+      ...common,
+      challenge: input['challenge'],
+      ...(input['advisory'] === true ? { advisory: true } : {}),
+    };
   }
   if (!connectionUuid(input['executorId']) || !positive(input['executorRevision'])) return null;
   const target = { executorId: input['executorId'], executorRevision: input['executorRevision'] };
@@ -315,6 +367,14 @@ function requestFor<T extends keyof RuntimeSyncConnectionRequestByType>(
   return matches(parsed) ? parsed : invalid();
 }
 export const runtimeSyncConnectionMessageContracts = {
+  [MessageType.SYNC_PRODUCT_COMMAND]: {
+    parseRequest: (value: unknown) => parseSyncProductRequest(value) ?? invalid(),
+    parseResponse: (value: unknown) => parseSyncProductResponse(value) ?? invalid(),
+  },
+  [MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND]: {
+    parseRequest: (value: unknown) => parseSyncProductExecutorRequest(value) ?? invalid(),
+    parseResponse: (value: unknown) => parseSyncProductResponse(value) ?? invalid(),
+  },
   [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: contract(
     MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
     (value) =>

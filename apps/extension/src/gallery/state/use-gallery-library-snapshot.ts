@@ -1,3 +1,5 @@
+import { readPersistedSyncCatalogCards } from '../../workflows/sync-transfer/catalog-view';
+import { createRemoteRootGalleryItem } from '../library/items';
 import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
 import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import {
@@ -29,9 +31,22 @@ async function loadScenarioExportsByProject(projectIds: string[]) {
   return Promise.all(projectIds.map((projectId) => loadScenarioExports(projectId)));
 }
 
-export async function loadGalleryLibrarySnapshot(): Promise<{
+async function loadRemoteGalleryItems() {
+  if (typeof __SNIPTALE_SECURITY_E2E__ === 'undefined' || !__SNIPTALE_SECURITY_E2E__)
+    return { items: [], unavailable: false };
+  const cards = await readPersistedSyncCatalogCards();
+  return {
+    items: cards.filter((card) => !card.deleted).map(createRemoteRootGalleryItem),
+    unavailable: false,
+  };
+}
+
+export async function loadGalleryLibrarySnapshot(
+  options: { includeRemote?: boolean } = {}
+): Promise<{
   estimate: Promise<StorageEstimateInfo | null>;
   nextItems: GalleryItem[];
+  remoteUnavailable?: boolean;
 }> {
   const settings = await loadSettings().catch(() => null);
   const policy = settings?.localStoragePolicy ?? DEFAULT_LOCAL_STORAGE_POLICY;
@@ -42,6 +57,7 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
     videoProjects,
     presentations,
     quickEditProjects,
+    remote,
   ] = await Promise.all([
     runStorageStartupPhase('gallery-media-list', listMediaLibrary),
     runStorageStartupPhase('gallery-scenario-list', listScenarioProjectSummaries),
@@ -49,37 +65,62 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
     runStorageStartupPhase('gallery-video-project-list', listVideoProjects),
     runStorageStartupPhase('gallery-presentations', listAggregatePresentations),
     runStorageStartupPhase('gallery-quick-edit-project-list', listVideoWorkspaceSummaries),
+    options.includeRemote === false
+      ? { items: [], unavailable: false }
+      : loadRemoteGalleryItems().catch(() => ({ items: [], unavailable: true })),
   ]);
   const scenarioExportsByProject = await runStorageStartupPhase('gallery-scenario-exports', () =>
     loadScenarioExportsByProject(scenarioProjects.map((project) => project.id))
   );
 
+  const localItems = createGalleryItems({
+    mediaItems,
+    quickEditProjects,
+    presentations,
+    scenarioExportsByProjectId: new Map(scenarioExportsByProject),
+    scenarioProjects,
+    thumbnailIds: new Set(thumbnailIds),
+    videoProjects,
+  }).map((item) => {
+    if (item.lifecycle?.storageClass !== 'temporary' || item.lifecycle.trashedAt !== undefined)
+      return item;
+    const retention = getDraftRetentionMs(
+      policy,
+      (isGalleryMediaItem(item) && item.source.kind === 'recording') ||
+        (isGalleryVideoProjectItem(item) && item.project.retentionKind === 'video')
+        ? 'video'
+        : 'ordinary'
+    );
+    return {
+      ...item,
+      expiresAt: retention === null ? null : item.lifecycle.updatedAt + retention,
+    };
+  });
+  const localRoots = new Set(
+    localItems.flatMap((item) => {
+      const kind =
+        item.type === 'video-project'
+          ? 'video-project'
+          : item.type === 'quick-edit-project'
+            ? 'video-review'
+            : isGalleryMediaItem(item)
+              ? 'media'
+              : null;
+      return kind ? [JSON.stringify([kind, item.entityId ?? item.id])] : [];
+    })
+  );
+  const remoteItems = remote.items.filter(
+    (item) =>
+      !item.remote.materialized ||
+      !localRoots.has(
+        JSON.stringify([item.remote.selection.rootKind, item.remote.selection.rootId])
+      )
+  );
   return {
+    ...(remote.unavailable ? { remoteUnavailable: true } : {}),
     estimate: runStorageStartupPhase('gallery-storage-estimate', getStorageEstimateInfo).catch(
       () => null
     ),
-    nextItems: createGalleryItems({
-      mediaItems,
-      quickEditProjects,
-      presentations,
-      scenarioExportsByProjectId: new Map(scenarioExportsByProject),
-      scenarioProjects,
-      thumbnailIds: new Set(thumbnailIds),
-      videoProjects,
-    }).map((item) => {
-      if (item.lifecycle?.storageClass !== 'temporary' || item.lifecycle.trashedAt !== undefined)
-        return item;
-      const retention = getDraftRetentionMs(
-        policy,
-        (isGalleryMediaItem(item) && item.source.kind === 'recording') ||
-          (isGalleryVideoProjectItem(item) && item.project.retentionKind === 'video')
-          ? 'video'
-          : 'ordinary'
-      );
-      return {
-        ...item,
-        expiresAt: retention === null ? null : item.lifecycle.updatedAt + retention,
-      };
-    }),
+    nextItems: [...localItems, ...remoteItems],
   };
 }

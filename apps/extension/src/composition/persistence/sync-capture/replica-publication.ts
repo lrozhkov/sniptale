@@ -1,3 +1,4 @@
+import { parseSyncConnectionIdentity } from '../remote-connection/model';
 import {
   applyPreparedVideoReviewReplica,
   parseApplyPreparedVideoReviewReplicaInput,
@@ -77,6 +78,11 @@ function assertJournalMetadata(value: unknown): void {
 }
 
 function parseIdentity(value: Record<string, unknown>) {
+  const authorization =
+    value['authorization'] === undefined
+      ? undefined
+      : parseSyncConnectionIdentity(value['authorization']);
+  if (authorization === null) throw new Error('Invalid replica authorization.');
   const spaceId = value['spaceId'];
   const profileCreatedAt = value['profileCreatedAt'];
   const expectedBasis = value['expectedBasis'];
@@ -104,6 +110,7 @@ function parseIdentity(value: Record<string, unknown>) {
   )
     throw new Error('Invalid replica identity.');
   return {
+    ...(authorization ? { authorization } : {}),
     spaceId,
     profileCreatedAt,
     expectedBasis,

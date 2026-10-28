@@ -75,9 +75,30 @@ const syncWiring = vi.hoisted(() => ({
   createGateway:
     vi.fn<typeof import('../../../sync-connection/offscreen-gateway').createSyncOffscreenGateway>(),
   inspect: vi.fn().mockResolvedValue(null),
+  planWorkspace:
+    vi.fn<
+      ReturnType<
+        typeof import('../../../sync-connection/coordinator').createSyncConnectionCoordinator
+      >['planWorkspace']
+    >(),
+  productCommand:
+    vi.fn<
+      ReturnType<
+        typeof import('../../../sync-connection/coordinator').createSyncConnectionCoordinator
+      >['productCommand']
+    >(),
+  configureProductRoute:
+    vi.fn<typeof import('../../../sync-connection/product-route').configureSyncProductRoute>(),
+  productExecutor:
+    vi.fn<
+      NonNullable<
+        import('../../../sync-connection/coordinator').SyncConnectionCoordinatorDependencies['productExecutor']
+      >
+    >(),
   start: vi.fn(),
   startWorkspace: vi.fn(),
   enrollWorkspace: vi.fn(),
+  abandonWorkspace: vi.fn(),
   enrollConnection: vi.fn(),
   revokeJoin: vi.fn().mockResolvedValue(undefined),
   reserveErasure: vi.fn(),
@@ -101,6 +122,9 @@ const syncWiring = vi.hoisted(() => ({
   subscribeRemoved:
     vi.fn<(listener: (permissions: chrome.permissions.Permissions) => void) => () => void>(),
   warn: vi.fn(),
+}));
+vi.mock('../../../sync-connection/product-route', () => ({
+  configureSyncProductRoute: syncWiring.configureProductRoute,
 }));
 vi.mock('../../../sync-connection/coordinator', () => ({
   createSyncConnectionCoordinator: syncWiring.createCoordinator,
@@ -164,7 +188,7 @@ vi.mock('@sniptale/platform/observability/logger', async (original) => {
     ...actual,
     createLogger: (options: Parameters<typeof actual.createLogger>[0]) => {
       const logger = actual.createLogger(options);
-      return options.namespace === 'BackgroundRuntimeWiring'
+      return options.namespace === 'BackgroundSyncWiring'
         ? { ...logger, warn: syncWiring.warn }
         : logger;
     },
@@ -245,12 +269,16 @@ beforeEach(() => {
     startExecutor: syncWiring.startExecutor,
     startWorkspaceExecutor: syncWiring.startWorkspaceExecutor,
     stopExecutor: syncWiring.stopExecutor,
+    productExecutor: syncWiring.productExecutor,
   });
   syncWiring.createCoordinator.mockReturnValue({
     inspect: syncWiring.inspect,
+    planWorkspace: syncWiring.planWorkspace,
+    productCommand: syncWiring.productCommand,
     start: syncWiring.start,
     startWorkspace: syncWiring.startWorkspace,
     enrollWorkspace: syncWiring.enrollWorkspace,
+    abandonWorkspace: syncWiring.abandonWorkspace,
     reserveErasure: syncWiring.reserveErasure,
     permissionsRemoved: syncWiring.permissionsRemoved,
   });
@@ -345,6 +373,8 @@ it('registers the security control only in the security E2E build', () => {
         coordinator: expect.objectContaining({
           start: syncWiring.start,
           inspect: syncWiring.inspect,
+          planWorkspace: syncWiring.planWorkspace,
+          productCommand: syncWiring.productCommand,
         }),
       })
     );
@@ -743,4 +773,18 @@ it('wires JOIN revocation and enrollment through the shared coordinator', async 
   expect(syncWiring.contains).toHaveBeenCalledWith({ origins: ['https://dav.example.test/*'] });
   const control = registerSecurityE2EControl.mock.calls[0]?.[0];
   expect(control?.enrollWorkspace).toBe(syncWiring.enrollWorkspace);
+});
+
+it('binds the product ingress to the existing coordinator only in the current qualification build', () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
+  initializeBackgroundRuntime(createModeState());
+  expect(syncWiring.configureProductRoute).not.toHaveBeenCalled();
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  initializeBackgroundRuntime(createModeState());
+  const coordinator = syncWiring.createCoordinator.mock.results.at(-1)?.value;
+  expect(coordinator).toBeDefined();
+  expect(syncWiring.configureProductRoute).toHaveBeenCalledExactlyOnceWith(coordinator);
+  expect(coordinatorDependencies().productExecutor).toBe(syncWiring.productExecutor);
+  expect(coordinator?.planWorkspace).toBe(syncWiring.planWorkspace);
+  expect(coordinator?.productCommand).toBe(syncWiring.productCommand);
 });

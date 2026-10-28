@@ -176,3 +176,27 @@ it.each([
     })
   ).rejects.toThrow('Sync executor command refused');
 });
+
+it('keeps advisory classification on signed observation and product hops', async () => {
+  const { deps, gateway } = setup();
+  await gateway.inspectExecutor(startup, challenge, true);
+  const inspection = deps.send.mock.lastCall![0];
+  expect(inspection).toMatchObject({ advisory: true });
+  if (!isRecord(inspection)) throw new Error('Missing signed inspection');
+  expect(authorizeOffscreenCommandCapability(inspection).authorized).toBe(true);
+  deps.send.mockResolvedValue({
+    success: true,
+    result: { kind: 'operation', job: null, completion: null },
+  });
+  await gateway.productExecutor!({
+    offscreenStartupId: startup,
+    executorId: executor,
+    executorRevision: 1,
+    advisory: true,
+    command: { kind: 'inspect', operationRequestId: challenge },
+  });
+  expect(deps.send.mock.lastCall![0]).toMatchObject({ advisory: true });
+  const product = deps.send.mock.lastCall![0];
+  if (!isRecord(product)) throw new Error('Missing signed product command');
+  expect(authorizeOffscreenCommandCapability(product).authorized).toBe(true);
+});

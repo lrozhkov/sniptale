@@ -114,15 +114,17 @@ export async function openProvider(
   info: TestInfo,
   name: string,
   connect = true,
-  extensionBuildDir = process.env['SNIPTALE_EXTENSION_BUILD_DIR'] ?? '.tmp/e2e-builds/test'
+  extensionBuildDir = process.env['SNIPTALE_EXTENSION_BUILD_DIR'] ?? '.tmp/e2e-builds/test',
+  options: { viewport?: { width: number; height: number }; offline?: boolean } = {}
 ) {
   const loaded = await launchExtensionBrowser({
     extensionBuildDir,
     userDataDir: info.outputPath(name),
-    viewport: { width: 1280, height: 560 },
+    viewport: options.viewport ?? { width: 1280, height: 560 },
     ignoreHTTPSErrors: true,
   });
   try {
+    if (options.offline) await loaded.context.setOffline(true);
     const page = await loaded.context.newPage();
     await page.goto(
       `chrome-extension://${loaded.extensionId}/tooling/test/harness/webdav-transfer.html`

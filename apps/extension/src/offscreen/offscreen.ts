@@ -1,4 +1,6 @@
+import { createSyncProductExecution } from './sync-connection/product-execution';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { publishSyncProductSettled } from '../platform/runtime-messaging/sync-product-client';
 import { createRuntimeMessagingTransport } from '../platform/runtime-messaging';
 import { createSyncConnectionExecutor } from './sync-connection/executor';
 import {
@@ -37,6 +39,7 @@ const offscreenStartupId = offscreenUrl.searchParams.get('offscreenStartupId');
 if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1') {
   const messaging = createRuntimeMessagingTransport();
   const executor = createSyncConnectionExecutor({
+    onSettled: publishSyncProductSettled,
     executorId: crypto.randomUUID(),
     offscreenStartupId,
     createWorkspaceExecution: (input) => {
@@ -53,6 +56,17 @@ if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1
         return response.success === true && response.allowed === true;
       });
     },
+    createProductExecution: (input) =>
+      createSyncProductExecution(input, async (origin) => {
+        const response = await messaging.sendRuntimeMessage({
+          type: MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION,
+          requestId: crypto.randomUUID(),
+          authorization: input.authorization,
+          ...(input.work.kind === 'thumbnail-read' ? { advisory: true as const } : {}),
+          origin,
+        });
+        return response.success === true && response.allowed === true;
+      }),
     createExecution: (input) =>
       createSyncQueueExecution(input, async (origin) => {
         const response = await messaging.sendRuntimeMessage({

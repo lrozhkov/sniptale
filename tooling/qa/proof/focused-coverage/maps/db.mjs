@@ -1,5 +1,28 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'sync-native-media-parser-backup-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/guards.ts',
+    allowCrossOwner: true,
+    reason: 'Backup workflows consume the retained native media parser through this public owner.',
+    testFiles: [
+      'apps/extension/src/workflows/media-hub-backup/index.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/codec.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-native-review-snapshot-workflow-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/review-snapshot.ts',
+    allowCrossOwner: true,
+    reason: 'Portable review workflows consume the retained native review parser and contract.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/captured-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/prepared-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming-review.test.ts',
+    ],
+  },
+  {
     owner: 'sync-queue-native-control-and-delivery',
     productionFile: 'apps/extension/src/composition/persistence/sync-capture/queue.ts',
     reason:

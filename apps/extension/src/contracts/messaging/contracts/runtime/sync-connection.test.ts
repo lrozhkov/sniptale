@@ -476,3 +476,18 @@ describe('sync lifecycle runtime boundary', () => {
     ).toThrow();
   });
 });
+
+it.each([inspect, permission])(
+  'accepts an advisory resource marker without accepting extra authority %#',
+  (request) => {
+    expect(parseSyncConnectionRuntimeMessage({ ...request, advisory: true })).toEqual({
+      ...request,
+      advisory: true,
+    });
+    for (const advisory of [false, 'true', 1, null, undefined])
+      expect(parseSyncConnectionRuntimeMessage({ ...request, advisory })).toBeNull();
+    expect(
+      parseSyncConnectionRuntimeMessage({ ...request, advisory: true, scopeLimit: 100000 })
+    ).toBeNull();
+  }
+);

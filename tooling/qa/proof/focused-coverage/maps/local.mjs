@@ -889,6 +889,15 @@ unchanged project admission.',
     testFiles: ['apps/extension/src/background/runtime/bootstrap/index.test.ts'],
   },
   {
+    owner: 'offscreen-sync-executor-test-fixture',
+    productionFile: 'apps/extension/src/offscreen/sync-connection/test-support/executor.ts',
+    reason: 'Queue, workspace and product executor suites exercise the shared controlled fixture.',
+    testFiles: [
+      'apps/extension/src/offscreen/sync-connection/executor.test.ts',
+      'apps/extension/src/offscreen/sync-connection/executor-product.test.ts',
+    ],
+  },
+  {
     owner: 'offscreen-document-entrypoint',
     productionFile: 'apps/extension/src/offscreen/offscreen.ts',
     reason: 'The offscreen entrypoint is exercised by its bounded runtime entrypoint suite.',

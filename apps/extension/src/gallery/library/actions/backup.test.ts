@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createRemoteRootGalleryItem } from '../items/adapters';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
@@ -625,4 +626,30 @@ it('backs up a saved scenario export through its owning project and deduplicates
     scenarioProjectIds: [artifact.project.id],
     videoProjectIds: [],
   });
+});
+
+it('does not turn a remote-only selection into a full local backup', async () => {
+  const remote = createRemoteRootGalleryItem({
+    source: 'remote',
+    tags: [],
+    label: 'Remote project',
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 1024,
+    createdAt: 10,
+    updatedAt: 20,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'remote-root',
+      operationId: 'operation-1',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  const { controller } = createController({ selectedItems: [remote] });
+  await createExportBackupAction(controller, runBusyAction)();
+  expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
+  expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
 });

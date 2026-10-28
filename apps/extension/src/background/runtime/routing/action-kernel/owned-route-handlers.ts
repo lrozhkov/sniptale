@@ -1,3 +1,4 @@
+import { routeSyncProductCommand } from '../../../sync-connection/product-route';
 import { routePageLaunchPreferencesMessage } from '../../page-access/page-launch-preferences';
 import {
   routeAISecretUnlockMessage,
@@ -71,6 +72,10 @@ export const backgroundOwnedHandlerBindings = {
   'popup-export-job': routePopupExportJobAction,
   'popup-tab-route-capability-issuance': routePopupTabRouteCapabilityAction,
   'settings-transfer': routeSettingsTransferAction,
+  'sync-product': (action) =>
+    keepOpen(
+      routeSyncProductCommand(action.message, action.context.sender, action.context.sendResponse)
+    ),
   'sync-connection-origin-permission': routeSyncConnectionOriginPermissionAction,
   'voice-input-offscreen-event': routeVoiceInputOffscreenEventAction,
 } satisfies Record<BackgroundOwnedRouteHandlerId, BackgroundOwnedRouteHandler>;

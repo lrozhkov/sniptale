@@ -1,3 +1,8 @@
+import {
+  parseSyncConnectionIdentity,
+  type SyncConnectionIdentity,
+} from '../remote-connection/model';
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { assertStandaloneMediaSourceReplaceable } from '../projects/source-admission';
@@ -31,6 +36,7 @@ import {
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -59,6 +65,7 @@ import {
 export interface ApplyPreparedImageReplicaInput {
   operationId: string;
   sourceDigest: string;
+  authorization?: SyncConnectionIdentity;
   spaceId: string;
   profileCreatedAt: number;
   connectionGeneration: number;
@@ -81,6 +88,7 @@ type ImageReplicaIdentity = Pick<
   ApplyPreparedImageReplicaInput,
   | 'operationId'
   | 'sourceDigest'
+  | 'authorization'
   | 'spaceId'
   | 'profileCreatedAt'
   | 'connectionGeneration'
@@ -111,7 +119,12 @@ function refuseImageReplica(): never {
 }
 
 function parseImageReplicaIdentity(value: Record<string, unknown>): ImageReplicaIdentity | null {
+  const authorization =
+    value['authorization'] === undefined
+      ? undefined
+      : parseSyncConnectionIdentity(value['authorization']);
   if (
+    authorization === null ||
     !identity(value['operationId']) ||
     !identity(value['spaceId']) ||
     typeof value['sourceDigest'] !== 'string' ||
@@ -127,6 +140,7 @@ function parseImageReplicaIdentity(value: Record<string, unknown>): ImageReplica
   )
     return null;
   return {
+    ...(authorization !== undefined ? { authorization } : {}),
     operationId: value['operationId'],
     sourceDigest: value['sourceDigest'],
     spaceId: value['spaceId'],
@@ -242,6 +256,7 @@ export function parseApplyPreparedImageReplicaInput(
 ): ApplyPreparedImageReplicaInput | null {
   if (!isRecord(value) || !isBoundedImageMetadata(value, false)) return null;
   const allowed = [
+    'authorization',
     'operationId',
     'sourceDigest',
     'spaceId',
@@ -610,6 +625,8 @@ async function commitImageReplica(
     'Image replica predecessor changed.'
   );
   if (receipt !== null) return { status: 'duplicate', generation: receipt };
+  if (input.authorization !== undefined)
+    await checkSyncConnectionAdmission(tx, input, input.authorization);
   if (!profile.enabled || profile.connectionGeneration !== input.connectionGeneration)
     refuseImageReplica();
   const state = await readImageReplicaPredecessorState(tx, input, keys);
@@ -646,6 +663,7 @@ export async function applyPreparedImageReplica(
     const tx = db.transaction(
       [
         SYNC_CAPTURE_STORE,
+        SYNC_CONNECTION_STORE,
         MEDIA_LIBRARY_STORE,
         IMAGE_WORKSPACES_STORE,
         AGGREGATE_PRESENTATIONS_STORE,

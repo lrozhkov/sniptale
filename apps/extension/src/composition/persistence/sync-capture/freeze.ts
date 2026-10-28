@@ -452,7 +452,14 @@ async function rejectUncapturedSidecars(
       )
         continue;
       if (store === THUMBNAILS_STORE && admitted.thumbnails.has(id)) continue;
-      requireSupported((await tx.objectStore(store).get(id)) === undefined);
+      const value: unknown = await tx.objectStore(store).get(id);
+      if (store === THUMBNAILS_STORE && value !== undefined) {
+        // Library derives source previews independently of the authored project snapshot.
+        const thumbnail = parseMediaThumbnailEntry(value);
+        requireSupported(thumbnail !== null && thumbnail.assetId === id);
+      } else {
+        requireSupported(value === undefined);
+      }
     }
     requireSupported(
       admitted.reviews.has(id) ||

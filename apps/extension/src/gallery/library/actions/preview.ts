@@ -14,6 +14,7 @@ import { updateScenarioProjectRecordMetadata } from '../../../composition/persis
 import type { GalleryPreviewController } from './controller-types';
 import {
   isGalleryMediaItem,
+  isGalleryRemoteItem,
   isGalleryScenarioItem,
   isGalleryVideoProjectAvailable,
   isGalleryVideoProjectItem,
@@ -60,6 +61,7 @@ export function getPreviewMetadataValues(
 }
 
 export function openInEditor(item: GalleryItem) {
+  if (isGalleryRemoteItem(item)) return;
   if (item.type === 'quick-edit-project') {
     if (canOpenGalleryProject(item))
       void openGalleryPage({ mediaId: item.entityId, quickEdit: true });
@@ -280,7 +282,7 @@ export async function persistPreviewMetadata(
 ): Promise<boolean> {
   const previewItem = snapshot?.item ?? controller.state.preview.session.item;
   const draft = snapshot?.draft ?? controller.state.preview.draft;
-  if (!previewItem || (!snapshot && !draft.hasChanges)) {
+  if (!previewItem || isGalleryRemoteItem(previewItem) || (!snapshot && !draft.hasChanges)) {
     return false;
   }
 

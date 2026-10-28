@@ -1,5 +1,4 @@
 import type { StoredRecordingEntry, RecordingTelemetryEntry } from '../recordings/contracts';
-import type { CapturedVideoReviewRows } from './review-snapshot';
 import type { StoredImageWorkspaceEntry } from '../image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import type { AssetRef } from '../assets/contracts';
@@ -65,6 +64,18 @@ export type CapturedMediaRows =
       ref: AssetRef;
       telemetry: RecordingTelemetryEntry | null;
     };
+
+/** A review owns its authored state; its real Library original remains a separate dependency. */
+export interface CapturedVideoReviewRows {
+  review: VideoWorkspaceSnapshot;
+  source: CapturedMediaRows;
+  recordings?: StoredRecordingEntry[];
+  assets: StoredProjectAssetEntry[];
+  refs: AssetRef[];
+  media: Omit<MediaLibraryEntry, 'blob'>[];
+  privateReviews: VideoWorkspaceSnapshot[];
+  thumbnail?: MediaThumbnailEntry;
+}
 
 export interface CapturedMediaDependency {
   mediaId: string;

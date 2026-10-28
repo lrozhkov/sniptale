@@ -2,6 +2,30 @@ import type { BackgroundIngressRouteGroupData } from './background-ingress.types
 
 export const backgroundIngressBackgroundOwnedRouteGroups = [
   {
+    acceptedSenderClass:
+      'exact ordinary Settings or Gallery top-level document with per-verb admission',
+    actionKind: 'background-owned',
+    alternateAuthorizationPolicyIds: [],
+    alternateAuthorityFamilies: [],
+    authorizationPolicyId: 'background-owned',
+    boundary: 'background-runtime',
+    errorShape: 'fixed sync product command refusal',
+    freshnessReplayPolicy:
+      'canonical freshness and replay checks before exact product verb admission',
+    handlerId: 'sync-product',
+    keepChannelBehaviorSource: 'background-owned-route-handler',
+    ownerModule: 'apps/extension/src/background/sync-connection/product-route.ts',
+    policyAuthorityFamily: 'sync-product',
+    policyStateIds: ['sync-connection-erasure-exclusion'],
+    requiredAuthority: 'exact product document and native workspace or active enrollment authority',
+    responseShape: 'bounded typed product status or accepted selection',
+    routeAuthorityFamily: 'background-owned-ipc',
+    sideEffects:
+      'native workspace selection and existing coordinator start, enrollment, catalog refresh, replica preparation, thumbnail read or targeted cancellation',
+    transitiveStateOwner: 'native remote-connection, sync catalog and replica publication owners',
+    messageTypes: ['SYNC_PRODUCT_COMMAND'],
+  },
+  {
     acceptedSenderClass: 'exact extension offscreen document without a tab',
     actionKind: 'background-owned',
     alternateAuthorizationPolicyIds: [],

@@ -414,8 +414,17 @@ async function afterSaveBackup(input: {
 
 /** Disposable acceptance fixture, not a production ingress or wire protocol. */
 export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
-  async function source(fullGraph?: { effectBundleBytes: number[] }) {
-    await profile(19);
+  async function source(
+    fullGraph?: { effectBundleBytes: number[] },
+    options: { useExistingProfile?: boolean; name?: string } = {}
+  ) {
+    if (options.useExistingProfile) {
+      const db = await initDB();
+      const current = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
+      check(current?.kind === 'profile' && current.enabled, 'Enrolled profile is unavailable.');
+    } else {
+      await profile(19);
+    }
     const privateId = crypto.randomUUID();
     const borrowedId = crypto.randomUUID();
     const privateFile = await png('rgb(240,80,20)');
@@ -425,7 +434,11 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
     });
     await saveProjectAsset(borrowedId, borrowedFile, borrowedFile.type, 'borrowed 100%.png');
     const mediaId = `project-asset:${borrowedId}`;
-    let candidate = createEmptyVideoProject('WebDAV native portable project', 1280, 720);
+    let candidate = createEmptyVideoProject(
+      options.name ?? 'WebDAV native portable project',
+      1280,
+      720
+    );
     candidate.assets = [privateFile, borrowedFile].map((file, index) =>
       createVideoProjectAsset(
         index ? 'Borrowed original' : 'Private original',

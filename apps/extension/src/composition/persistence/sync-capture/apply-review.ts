@@ -1,3 +1,8 @@
+import {
+  parseSyncConnectionIdentity,
+  type SyncConnectionIdentity,
+} from '../remote-connection/model';
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { sameReviewVideoContainer } from '../../../features/video/review/validation';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -8,6 +13,7 @@ import {
   STORE_NAME,
   RECORDING_TELEMETRY_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -56,6 +62,7 @@ export interface ApplyPreparedVideoReviewReplicaInput {
   root: PreparedVideoReviewReplicaRoot;
   operationId: string;
   sourceDigest: string;
+  authorization?: SyncConnectionIdentity;
   connectionGeneration: number;
   spaceId: string;
   profileCreatedAt: number;
@@ -87,6 +94,8 @@ type ApplyReviewHeader = Omit<ApplyPreparedVideoReviewReplicaInput, 'root' | 'de
 function isApplyReviewHeader(value: unknown): value is ApplyReviewHeader {
   if (
     !isRecord(value) ||
+    (value['authorization'] !== undefined &&
+      !parseSyncConnectionIdentity(value['authorization'])) ||
     !isBoundedImageMetadata(value, false) ||
     !identity(value['operationId']) ||
     !identity(value['spaceId']) ||
@@ -192,6 +201,7 @@ export function parseApplyPreparedVideoReviewReplicaInput(
   return structuredClone({
     root,
     dependencies,
+    ...(value['authorization'] !== undefined ? { authorization: value['authorization'] } : {}),
     operationId: value['operationId'],
     sourceDigest: value['sourceDigest'],
     spaceId: value['spaceId'],
@@ -526,6 +536,7 @@ export async function applyPreparedVideoReviewReplica(
         STORE_NAME,
         RECORDING_TELEMETRY_STORE,
         SYNC_CAPTURE_STORE,
+        SYNC_CONNECTION_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
         PROJECT_EXPORTS_STORE,
@@ -547,6 +558,8 @@ export async function applyPreparedVideoReviewReplica(
         await tx.done;
         return { status: 'duplicate' as const, generation: duplicate };
       }
+      if (staged.authorization !== undefined)
+        await checkSyncConnectionAdmission(tx, staged, staged.authorization);
       await profile(tx, staged, true);
       const predecessor = await ownPredecessor(tx, staged);
       await admitDependencies(tx, staged);

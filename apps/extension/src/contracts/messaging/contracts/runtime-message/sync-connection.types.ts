@@ -39,6 +39,7 @@ export type SyncWorkspaceFailureCode =
 
 /** Safe projection of the selected workspace source; carries no authentication. */
 export interface SyncWorkspaceJobSnapshot {
+  requestId?: string;
   sourceKind: SyncWorkspaceSource['kind'];
   selectionIncarnation: string;
   selectionRevision: number;
@@ -55,6 +56,7 @@ export interface SyncExecutorSnapshot {
   binding: SyncExecutorBinding | null;
   jobs: SyncExecutorJobSnapshot[];
   workspace: SyncWorkspaceJobSnapshot | null;
+  products?: SyncProductJobSnapshot[];
 }
 
 interface SyncCommandEnvelope {
@@ -78,6 +80,8 @@ export interface SyncWorkspaceStartRequest extends SyncCommandEnvelope {
   authentication: SyncConnectionAuthentication;
 }
 export interface SyncInspectRequest extends SyncCommandEnvelope {
+  /** Advisory traffic cannot consume reserved foreground control capacity. */
+  advisory?: true;
   type: typeof MessageType.OFFSCREEN_SYNC_INSPECT;
   challenge: string;
 }
@@ -88,6 +92,7 @@ export interface SyncStopRequest extends SyncCommandEnvelope {
 }
 /** Background checks the exact durable identity and origin without a coordinator lock. */
 export interface SyncOriginPermissionRequest {
+  advisory?: true;
   type: typeof MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION;
   requestId: string;
   authorization: SyncConnectionIdentity;
@@ -117,6 +122,8 @@ export type SyncStopResponse = RuntimeMessageResponse<{
 }>;
 export type SyncOriginPermissionResponse = RuntimeMessageResponse<{ allowed: boolean }>;
 export type SyncConnectionRuntimeRequest =
+  | SyncProductRequest
+  | SyncProductExecutorRequest
   | SyncWorkspaceStartRequest
   | SyncWorkspaceOriginPermissionRequest
   | SyncStartRequest
@@ -124,6 +131,8 @@ export type SyncConnectionRuntimeRequest =
   | SyncStopRequest
   | SyncOriginPermissionRequest;
 export type RuntimeSyncConnectionRequestByType = {
+  [MessageType.SYNC_PRODUCT_COMMAND]: SyncProductRequest;
+  [MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND]: SyncProductExecutorRequest;
   [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: SyncWorkspaceStartRequest;
   [MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION]: SyncWorkspaceOriginPermissionRequest;
   [MessageType.OFFSCREEN_SYNC_START]: SyncStartRequest;
@@ -132,6 +141,8 @@ export type RuntimeSyncConnectionRequestByType = {
   [MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION]: SyncOriginPermissionRequest;
 };
 export type RuntimeSyncConnectionResponseByType = {
+  [MessageType.SYNC_PRODUCT_COMMAND]: SyncProductResponse;
+  [MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND]: SyncProductResponse;
   [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: SyncStartResponse;
   [MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION]: SyncOriginPermissionResponse;
   [MessageType.OFFSCREEN_SYNC_START]: SyncStartResponse;
@@ -139,3 +150,123 @@ export type RuntimeSyncConnectionResponseByType = {
   [MessageType.OFFSCREEN_SYNC_STOP]: SyncStopResponse;
   [MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION]: SyncOriginPermissionResponse;
 };
+
+/** Exact version selected from a remote card; contains no native admission authority. */
+export interface SyncRemoteSelection {
+  rootKind: 'media' | 'video-project' | 'video-review';
+  rootId: string;
+  operationId: string;
+  sourceDigest: string;
+}
+
+/** Display-only remote metadata. This is never a native Library entry. */
+export interface SyncRemoteCatalogCard {
+  source: 'remote';
+  /** Exact native causal receipt exists; this conveys no physical availability authority. */
+  materialized?: true;
+  selection: SyncRemoteSelection;
+  label: string;
+  tags: string[];
+  kind: 'image' | 'video' | 'audio' | 'video-project' | 'video-review';
+  mimeType: string | null;
+  size: number;
+  createdAt: number;
+  updatedAt: number;
+  conflict: boolean;
+  unavailable: boolean;
+  deleted: boolean;
+}
+
+export type SyncProductWork =
+  | { kind: 'catalog-refresh'; bypassCache: boolean }
+  | { kind: 'replica-prepare'; selection: SyncRemoteSelection }
+  | { kind: 'thumbnail-read'; selection: SyncRemoteSelection };
+export type SyncProductCommand =
+  | {
+      kind: 'workspace-create';
+      parentUrl: string;
+      accountId: string;
+      authentication: SyncConnectionAuthentication;
+    }
+  | {
+      kind: 'workspace-join';
+      rootUrl: string;
+      accountId: string;
+      authentication: SyncConnectionAuthentication;
+    }
+  | {
+      kind: 'workspace-retry';
+      source: SyncWorkspaceSource;
+      authentication: SyncConnectionAuthentication;
+    }
+  | {
+      kind: 'workspace-enroll';
+      source: SyncWorkspaceSource;
+      authentication: SyncConnectionAuthentication;
+    }
+  | { kind: 'workspace-abandon'; source: SyncWorkspaceSource }
+  | { kind: 'status' }
+  | SyncProductWork
+  | { kind: 'inspect'; requestId: string; advisory?: true }
+  | { kind: 'cancel'; requestId: string; advisory?: true };
+export type SyncProductFailureCode =
+  | SyncWorkspaceFailureCode
+  | 'selection-changed'
+  | 'unavailable'
+  | 'invalid-data';
+export type SyncProductCompletion =
+  | { kind: 'catalog'; count: number }
+  | { kind: 'replica'; selection: SyncRemoteSelection }
+  | { kind: 'thumbnail'; dataUrl: string | null; width: number; height: number };
+export interface SyncProductJobSnapshot {
+  requestId: string;
+  kind: SyncProductWork['kind'];
+  state: 'running' | 'ready' | 'failed' | 'interrupted';
+  failureCode: SyncProductFailureCode | null;
+}
+export interface SyncProductStatus {
+  connection: {
+    phase: 'active' | 'paused' | 'updating-auth';
+    rootUrl: string;
+    accountId: string;
+  } | null;
+  workspace: {
+    source: SyncWorkspaceSource;
+    phase: 'planned' | 'allocating' | 'allocated' | 'checking' | 'ready';
+    rootUrl: string;
+    accountId: string;
+  } | null;
+  workspaceJob: SyncWorkspaceJobSnapshot | null;
+}
+export type SyncProductResult =
+  | { kind: 'accepted'; requestId: string }
+  | { kind: 'status'; status: SyncProductStatus }
+  | { kind: 'enrolled' }
+  | {
+      kind: 'operation';
+      job: SyncProductJobSnapshot | null;
+      completion: SyncProductCompletion | null;
+    }
+  | { kind: 'cancelled'; outcome: 'cancelled' | 'already-completed' | 'refused' };
+export interface SyncProductRequest {
+  type: typeof MessageType.SYNC_PRODUCT_COMMAND;
+  requestId: string;
+  command: SyncProductCommand;
+}
+export type SyncProductResponse = RuntimeMessageResponse<{ result: SyncProductResult }>;
+/** Background supplies the exact native connection, never the product page. */
+export interface SyncProductExecutorRequest extends SyncCommandEnvelope {
+  advisory?: true;
+  type: typeof MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND;
+  executorId: string;
+  executorRevision: number;
+  command:
+    | {
+        kind: 'start';
+        operationRequestId: string;
+        binding: SyncExecutorBinding;
+        work: SyncProductWork;
+      }
+    | { kind: 'inspect'; operationRequestId: string }
+    | { kind: 'cancel'; operationRequestId: string };
+}

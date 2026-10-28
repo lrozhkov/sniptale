@@ -190,7 +190,8 @@ export function MediaThumb(props: MediaThumbProps) {
     props.deferUntilVisible === true &&
     (item.type === 'scenario' ||
       item.type === 'video-project' ||
-      item.type === 'quick-edit-project');
+      item.type === 'quick-edit-project' ||
+      item.type === 'remote-root');
   const visibilityRoot = useRef<HTMLDivElement>(null);
   const [visibility, setVisibility] = useState({ visible: false, epoch: 0 });
   const visible = !deferUntilVisible || visibility.visible;
@@ -249,7 +250,10 @@ function MediaThumbFallback(props: { item: GalleryItem; showProjectHint: boolean
   const { item } = props;
   const Icon = getKindIcon(item.kind);
   const isProject =
-    item.type === 'scenario' || item.type === 'video-project' || item.type === 'quick-edit-project';
+    item.type === 'scenario' ||
+    item.type === 'video-project' ||
+    item.type === 'quick-edit-project' ||
+    item.type === 'remote-root';
   const isAudio = item.kind === 'audio';
   const duration =
     isAudio && item.duration !== null && Number.isFinite(item.duration) ? item.duration : null;

@@ -2774,28 +2774,6 @@
       "signatureHash": "0ece55c51959c99f26c9a34d41fd6f591a383d1de0c56ee9ebefb3d6950ef887"
     },
     {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/offscreen/sync-connection/executor.ts",
-      "symbol": "createSyncConnectionExecutor",
-      "owner": "extension:offscreen:sync-connection",
-      "reason": "tool-noise: Queue and CREATE/JOIN slots share one disposable identity, revision, phase, admission exclusion and Stop reservation. Stop closes admission and contains both slot lifetimes. Native authority and HTTP resources retain injected owners. Independent diagnosis classified this exact candidate as Keep. Fresh final architecture review must check this classification.",
-      "removalCondition": "Remove on exact AST or signature change, a new independent authority or lifetime, or analyzer support for this cohesive boundary.",
-      "reviewDate": "2026-10-27",
-      "astHash": "0aeb25b9763832ff5ef797bf01dab9e5a24c4fa0965afd05ad387e5606ca60a8",
-      "signatureHash": "87de9e63d0bb330601835d536545f53642c845f667a8bdec466088e98dd813bf"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/background/sync-connection/coordinator.ts",
-      "symbol": "createSyncConnectionCoordinator",
-      "owner": "extension:background:sync-connection",
-      "reason": "tool-noise: One transition queue and generation exclusion own command admission, observation, containment, enrollment, revocation and erasure. Native persistence and HTTP resources retain injected owners. Inclusive factory extent counts nested methods. Independent diagnosis classified this exact candidate as Keep. Fresh final architecture review must check this classification.",
-      "removalCondition": "Remove on exact AST or signature change, a new independent authority or lifetime, or analyzer support for this cohesive boundary.",
-      "reviewDate": "2026-10-27",
-      "astHash": "65793896bb141453230f4d39f8002f9148e02994e3d3c372d021a0776e126bfb",
-      "signatureHash": "3d813b90593606052dbadfec2df1799644761332a5b444d0c29802b689307186"
-    },
-    {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/composition/persistence/remote-connection/workspace-allocation.test.ts",
       "symbol": "<file>",
@@ -2838,6 +2816,28 @@
       "reviewDate": "2026-10-27",
       "astHash": "2d66002deaabe4b0283e726ad6ee9efde92eb680a9ae190d6b2589e4d058b992",
       "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/sync-connection/executor.ts",
+      "symbol": "stop",
+      "owner": "extension:offscreen:sync-connection",
+      "reason": "tool-noise: This method owns the single Stop protocol for one executor revision. It closes admission and aborts issued work before yielding, then drains queue, workspace and product jobs and records aggregate containment. All state stays in this executor. Recovery branches preserve failed containment. The107-line method has one ordering invariant; no independent authority or effect owner was found. Main inspected this exact body and controlled-order tests passed. Fresh architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any added lifetime, state authority, admission path, recovery policy or change to abort, drain, containment or notification ordering. Remove when the analyzer accounts for this cohesive Stop protocol.",
+      "reviewDate": "2026-10-28",
+      "astHash": "c7ed30cb56ac4ec4e9ca4443ecf528947c94c006a05d3ec012b213f724ff5f65",
+      "signatureHash": "df7c768637fb55f10f42701609e1f1a440cd785b345320538a2ab2e2d3985fdc"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/settings/sections/capture/saving/sync-connection.tsx",
+      "symbol": "SyncConnectionSection",
+      "owner": "extension:settings:sections",
+      "reason": "tool-noise: This component renders one Settings snapshot with one stable controller and its activate/dispose bridge. The controller owns requests, status revisions, observers, timers, cleanup and recovery. The remaining branches select existing labels and controls. The length and display branches produce score5; no independent state, request or recovery authority was found. A new hook would only move the same single-consumer bridge. Main inspected this exact body; fresh architecture review must validate this classification.",
+      "removalCondition": "Remove when this exact body or signature changes. Reassess any new request, durable writer, status revision, resource or recovery authority, or a second receiver. Remove when the analyzer accounts for this cohesive rendering shape.",
+      "reviewDate": "2026-10-28",
+      "astHash": "9b4d87b00be9bd55495dccad856349d9eb5ab720f57649b0ed3cd9d9b424629f",
+      "signatureHash": "7a1f05d0a6c63b51f3272ac190b6997a4a91020f17d1b9c90b09f8066273df0b"
     }
   ]
 }

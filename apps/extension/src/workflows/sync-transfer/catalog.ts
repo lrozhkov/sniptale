@@ -69,7 +69,7 @@ async function readMetadata(
   }
 }
 
-async function checkedManifest(text: string, key: string, spaceId: string) {
+export async function checkedSyncCatalogManifest(text: string, key: string, spaceId: string) {
   if (!key.endsWith(`-${hashSyncText(text)}.json`)) throw new InvalidManifestError();
   try {
     const parsed = await parseSyncAttemptText(text);
@@ -146,13 +146,13 @@ export async function scanSyncCatalogSnapshot(
       }
       try {
         let text: string | undefined;
-        let parsed: Awaited<ReturnType<typeof checkedManifest>> | undefined;
+        let parsed: Awaited<ReturnType<typeof checkedSyncCatalogManifest>> | undefined;
         const entry = cached.get(item.key);
         if (entry && entry.size === item.size && entry.text.length <= MAX_MANIFEST_BYTES) {
           try {
             if (new TextEncoder().encode(entry.text).byteLength !== item.size)
               throw new InvalidManifestError();
-            parsed = await checkedManifest(entry.text, item.key, spaceId);
+            parsed = await checkedSyncCatalogManifest(entry.text, item.key, spaceId);
             text = entry.text;
             budget.bytes += item.size;
             if (budget.bytes > MAX_SCAN_BYTES) throw new SyncCatalogError('metadata-limit');
@@ -162,7 +162,7 @@ export async function scanSyncCatalogSnapshot(
         }
         if (text === undefined || parsed === undefined) {
           text = await readMetadata(remote, item.key, item.size, budget, signal);
-          parsed = await checkedManifest(text, item.key, spaceId);
+          parsed = await checkedSyncCatalogManifest(text, item.key, spaceId);
         }
         manifests.push({ manifestKey: item.key, size: item.size, text });
         attempts.push({

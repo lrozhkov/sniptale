@@ -1,6 +1,33 @@
 import { defineMessageSource } from '../source';
 
 export const galleryAppMessages = defineMessageSource({
+  remoteOnly: { ru: 'На сервере', en: 'On server' },
+  remoteConflict: { ru: 'Конфликт версий', en: 'Conflicting versions' },
+  remoteUnavailable: { ru: 'Удалённый проект недоступен', en: 'Remote project unavailable' },
+  remoteDownloadOpen: { ru: 'Скачать и открыть', en: 'Download and open' },
+  remotePreparing: { ru: 'Подготавливаем проект…', en: 'Preparing project…' },
+  remoteFailed: {
+    ru: 'Не удалось подготовить проект. Локальные файлы не изменены.',
+    en: 'Could not prepare this project. Your local files are unchanged.',
+  },
+  remoteSelectionChanged: {
+    ru: 'Версия проекта изменилась. Обновите каталог и выберите проект снова.',
+    en: 'The project version changed. Refresh the catalog and select it again.',
+  },
+  remoteCancel: { ru: 'Отменить скачивание', en: 'Cancel download' },
+  remoteCancelled: { ru: 'Скачивание отменено.', en: 'Download cancelled.' },
+  remoteCancelRefused: {
+    ru: 'Не удалось подтвердить отмену. Обновите состояние.',
+    en: 'Cancellation could not be confirmed. Refresh the status.',
+  },
+  remoteHint: {
+    ru: 'Для работы офлайн скачайте проект и необходимые ему файлы.',
+    en: 'Download this project and its required files to work offline.',
+  },
+  remoteCatalogFailed: {
+    ru: 'Не удалось загрузить удалённый каталог. Локальная библиотека доступна.',
+    en: 'Could not load the remote catalog. Your local library is available.',
+  },
   sidebarCollapse: { ru: 'Свернуть меню библиотеки', en: 'Collapse library sidebar' },
   sidebarExpand: { ru: 'Развернуть меню библиотеки', en: 'Expand library sidebar' },
   trashTitle: { ru: 'Корзина', en: 'Trash Bin' },

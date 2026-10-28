@@ -13,7 +13,12 @@ import {
 } from '../../../workflows/media-hub-backup/index';
 import type { GalleryBackupExportController, GalleryImportController } from './controller-types';
 import type { GalleryItem } from '../items';
-import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
+import {
+  isGalleryRemoteItem,
+  isGalleryMediaItem,
+  isGalleryScenarioItem,
+  isGalleryVideoProjectItem,
+} from '../items';
 import { type GalleryBusyAction } from './shared';
 
 const activeImportAbortControllers = new Map<string, AbortController>();
@@ -61,6 +66,7 @@ function hasSelectedBackupScope(
 export function createSelectedBackupExportOptions(
   items: GalleryItem[]
 ): MediaHubBackupExportOptions | null {
+  if (items.some(isGalleryRemoteItem)) return null;
   const selected = buildSelectedBackupScope(items);
   if (!hasSelectedBackupScope(selected)) return null;
 
@@ -89,6 +95,7 @@ export function createExportBackupAction(
   withBusy: GalleryBusyAction
 ) {
   return async () => {
+    if (controller.state.selection.selectedItems.some(isGalleryRemoteItem)) return;
     const activeImport = controller.state.storage.activeImport;
     if (activeImport?.status === 'running' || activeImport?.status === 'cancelling') return;
     await withBusy(

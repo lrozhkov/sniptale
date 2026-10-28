@@ -37,7 +37,11 @@ vi.mock('../sync-connection/executor', async (importOriginal) => {
     createSyncConnectionExecutor: vi.fn(original.createSyncConnectionExecutor),
   };
 });
-vi.mock('../sync-connection/execution', () => ({ createSyncQueueExecution: vi.fn() }));
+vi.mock('../sync-connection/execution', () => ({
+  createSyncQueueExecution: vi.fn(),
+  createSyncWorkspaceExecution: vi.fn(),
+}));
+vi.mock('../sync-connection/product-execution', () => ({ createSyncProductExecution: vi.fn() }));
 vi.mock('../../platform/runtime-messaging', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../platform/runtime-messaging')>();
   return {
@@ -46,7 +50,11 @@ vi.mock('../../platform/runtime-messaging', async (importOriginal) => {
   };
 });
 import { createSyncConnectionExecutor } from '../sync-connection/executor';
-import { createSyncQueueExecution } from '../sync-connection/execution';
+import {
+  createSyncQueueExecution,
+  createSyncWorkspaceExecution,
+} from '../sync-connection/execution';
+import { createSyncProductExecution } from '../sync-connection/product-execution';
 import { registerOffscreenSyncMessageListener } from '../sync-connection/runtime';
 import { createRuntimeMessagingTransport } from '../../platform/runtime-messaging';
 
@@ -174,3 +182,85 @@ it('does not install a sync executor in the privacy-only document', async () => 
   expect(registerOffscreenSyncMessageListener).not.toHaveBeenCalled();
   expect(bootstrapOffscreenDocumentMock).toHaveBeenCalledOnce();
 });
+
+it.each(['catalog-refresh', 'thumbnail-read'] as const)(
+  'binds %s and workspace permission callbacks to their native identity and fails closed',
+  async (kind) => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    vi.stubGlobal('location', {
+      href: `chrome-extension://extension/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=${id}`,
+    });
+    const send = vi.fn<(message: unknown) => Promise<unknown>>();
+    const original = await vi.importActual<typeof import('../../platform/runtime-messaging')>(
+      '../../platform/runtime-messaging'
+    );
+    vi.mocked(createRuntimeMessagingTransport).mockReturnValue(
+      original.createRuntimeMessagingTransport({
+        runtimeSendMessage: send,
+        tabSendMessage: vi.fn(),
+      })
+    );
+    await import('../offscreen');
+    const ports = vi.mocked(createSyncConnectionExecutor).mock.calls[0]?.[0];
+    if (!ports?.createProductExecution) throw new Error('Product executor was not composed.');
+    const authorization = { incarnation: id, revision: 2 };
+    const source = { kind: 'join' as const, identity: authorization };
+    ports.createProductExecution({
+      scope: { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 1 },
+      authorization,
+      work:
+        kind === 'catalog-refresh'
+          ? { kind, bypassCache: false }
+          : {
+              kind,
+              selection: {
+                rootKind: 'media',
+                rootId: 'root',
+                operationId: 'operation',
+                sourceDigest: 'a'.repeat(64),
+              },
+            },
+      signal: new AbortController().signal,
+    });
+    ports.createWorkspaceExecution({
+      source,
+      authentication: { kind: 'bearer', accessToken: 'private-token' },
+    });
+    const productQuery = vi.mocked(createSyncProductExecution).mock.calls[0]?.[1];
+    const workspaceQuery = vi.mocked(createSyncWorkspaceExecution).mock.calls[0]?.[1];
+    if (!productQuery || !workspaceQuery) throw new Error('Permission callback was not composed.');
+    for (const [query, expected] of [
+      [
+        productQuery,
+        {
+          type: 'SYNC_CONNECTION_ORIGIN_PERMISSION',
+          authorization,
+          ...(kind === 'thumbnail-read' ? { advisory: true } : {}),
+        },
+      ],
+      [
+        workspaceQuery,
+        { type: 'SYNC_WORKSPACE_ORIGIN_PERMISSION', sourceKind: 'join', selectionIncarnation: id },
+      ],
+    ] as const) {
+      for (const [response, allowed] of [
+        [{ success: true, allowed: true }, true],
+        [{ success: true, allowed: false }, false],
+        [{ success: false, error: 'Sync origin permission query refused' }, false],
+      ] as const) {
+        send.mockResolvedValue(response);
+        expect(await query('https://dav.test')).toBe(allowed);
+        expect(send).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            ...expected,
+            requestId: expect.any(String),
+            origin: 'https://dav.test',
+          })
+        );
+        expect(JSON.stringify(send.mock.lastCall?.[0])).not.toContain('private-token');
+      }
+      send.mockResolvedValue({ success: false, error: 'provider details' });
+      await expect(query('https://dav.test')).rejects.toThrow('Invalid sync runtime contract');
+    }
+  }
+);

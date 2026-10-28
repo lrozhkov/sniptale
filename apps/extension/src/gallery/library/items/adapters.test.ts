@@ -1,6 +1,10 @@
 import { createScenarioItem } from '../test-support/items';
 import { expect, it } from 'vitest';
-import { createGalleryItems, createScenarioExportGalleryItem } from './adapters';
+import {
+  createGalleryItems,
+  createRemoteRootGalleryItem,
+  createScenarioExportGalleryItem,
+} from './adapters';
 import { isGalleryMediaItem, isGallerySelectableItem, isGalleryVideoProjectItem } from './types';
 import { createLibraryLifecycle } from '../../../composition/persistence/library-lifecycle';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
@@ -412,4 +416,35 @@ it('puts quick-edit in the shared project folder with a distinct stable identity
   expect(isGallerySelectableItem(items[0]!)).toBe(true);
   expect(createGalleryItems(args)).toEqual(items);
   expect(createGalleryItems({ ...args, quickEditProjects: [] })).toHaveLength(1);
+});
+
+it('keeps remote cards separate from native identities and local batch admission', () => {
+  const item = createRemoteRootGalleryItem({
+    source: 'remote',
+    tags: ['remote-tag'],
+    label: 'Remote project',
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 1024,
+    createdAt: 10,
+    updatedAt: 20,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'remote-root',
+      operationId: 'operation-1',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  expect(item.type).toBe('remote-root');
+  expect(item.filename).toBe('Remote project');
+  expect(item.tags).toEqual(['remote-tag']);
+  expect(item.kind).toBe('image');
+  expect(item).not.toHaveProperty('entityId');
+  expect(item).not.toHaveProperty('source');
+  expect(item).not.toHaveProperty('project');
+  expect(isGalleryMediaItem(item)).toBe(false);
+  expect(isGallerySelectableItem(item)).toBe(false);
 });

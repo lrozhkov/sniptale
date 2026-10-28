@@ -1,3 +1,5 @@
+import { parseSyncProductResponse } from '../../contracts/messaging/contracts/runtime/sync-product';
+import type { SyncProductExecutorRequest } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -11,11 +13,13 @@ import type {
   SyncStopRequest,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 type GatewayMessage =
+  | SyncProductExecutorRequest
   | SyncStartRequest
   | SyncWorkspaceStartRequest
   | SyncInspectRequest
   | SyncStopRequest;
 type GatewayCommand =
+  | Omit<SyncProductExecutorRequest, 'capabilityToken'>
   | Omit<SyncStartRequest, 'capabilityToken'>
   | Omit<SyncWorkspaceStartRequest, 'capabilityToken'>
   | Omit<SyncInspectRequest, 'capabilityToken'>
@@ -36,7 +40,12 @@ export function createSyncOffscreenGateway(
   deps: GatewayDependencies
 ): Pick<
   SyncConnectionCoordinatorDependencies,
-  'ensureDocument' | 'inspectExecutor' | 'startExecutor' | 'startWorkspaceExecutor' | 'stopExecutor'
+  | 'ensureDocument'
+  | 'inspectExecutor'
+  | 'startExecutor'
+  | 'startWorkspaceExecutor'
+  | 'stopExecutor'
+  | 'productExecutor'
 > {
   async function document() {
     const urls = await deps.getDocumentUrls();
@@ -63,7 +72,7 @@ export function createSyncOffscreenGateway(
       if (!current || current.privacy || !current.startupId) return refused();
       return current.startupId;
     },
-    async inspectExecutor(startupId, challenge) {
+    async inspectExecutor(startupId, challenge, advisory) {
       const current = await document();
       if (!current || current.privacy) return { kind: 'absent' };
       if (!current.startupId || (startupId !== null && startupId !== current.startupId))
@@ -73,6 +82,7 @@ export function createSyncOffscreenGateway(
         requestId: deps.createRequestId(),
         offscreenStartupId: current.startupId,
         challenge,
+        ...(advisory ? { advisory } : {}),
       });
       const snapshot = parseSyncExecutorSnapshot(response['snapshot']);
       if (
@@ -82,6 +92,16 @@ export function createSyncOffscreenGateway(
       )
         return refused();
       return { kind: 'present', challenge, snapshot };
+    },
+    async productExecutor(input) {
+      const response = await deps.send(
+        attachOffscreenCommandCapability({
+          type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+          requestId: deps.createRequestId(),
+          ...input,
+        })
+      );
+      return parseSyncProductResponse(response) ?? refused();
     },
     async startExecutor(input) {
       const response = await send({

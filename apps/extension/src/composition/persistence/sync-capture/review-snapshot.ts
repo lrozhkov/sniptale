@@ -1,4 +1,6 @@
-import { parseCapturedMediaRows } from './guards';
+import type { CapturedVideoReviewRows } from './contracts';
+export type { CapturedVideoReviewRows } from './contracts';
+import { parseCapturedMediaRows } from './media-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 import type { StoredRecordingEntry } from '../recordings/contracts';
@@ -8,7 +10,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { AssetRef } from '../assets/contracts';
 import { parseAssetOwner, parseAssetRef } from '../assets/guards';
-import type { MediaLibraryEntry, MediaThumbnailEntry } from '../media-library/contracts';
+import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from '../media-library/read-guards';
 import type { StoredProjectAssetEntry } from '../projects/contracts';
 import { parseProjectAssetEntry } from '../projects/read-guards';
@@ -26,20 +28,8 @@ import {
   VIDEO_WORKSPACE_DRAFTS_STORE,
   THUMBNAILS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
-import { MAX_CAPTURE_ROWS, type CapturedMediaRows } from './contracts';
+import { MAX_CAPTURE_ROWS } from './contracts';
 import { describeImageMetadata, isBoundedImageMetadata } from './image-snapshot';
-
-/** A review owns its authored state; its real Library original remains a separate dependency. */
-export interface CapturedVideoReviewRows {
-  review: VideoWorkspaceSnapshot;
-  source: CapturedMediaRows;
-  recordings?: StoredRecordingEntry[];
-  assets: StoredProjectAssetEntry[];
-  refs: AssetRef[];
-  media: Omit<MediaLibraryEntry, 'blob'>[];
-  privateReviews: VideoWorkspaceSnapshot[];
-  thumbnail?: MediaThumbnailEntry;
-}
 
 type ReadTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
 

@@ -1,3 +1,7 @@
+import { isOwnedExtensionPagePath } from '../../../../platform/navigation/extension-pages/sender-url';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { isGallerySenderUrl } from '../authorization/sender-classification';
 import * as runtimeFreshness from '@sniptale/platform/security/runtime-message-freshness-authorizer';
 
 type ConsumeHandle = runtimeFreshness.RuntimeMessageFreshnessConsumeHandle;
@@ -16,8 +20,32 @@ type RuntimeMessageFreshnessConsumption =
   | { authorized: true }
   | { authorized: false; reason: string };
 
-const runtimeMessageFreshnessAuthorizer =
-  runtimeFreshness.createRuntimeMessageFreshnessAuthorizer();
+const runtimeMessageFreshnessAuthorizer = runtimeFreshness.createRuntimeMessageFreshnessAuthorizer({
+  reservedAcceptedNonces: 256,
+});
+
+function syncCapacity(message: unknown, sender: chrome.runtime.MessageSender) {
+  const mainFrame = sender.frameId === undefined || sender.frameId === 0;
+  const gallery = mainFrame && isGallerySenderUrl(sender.url);
+  const offscreen =
+    mainFrame &&
+    !sender.tab &&
+    isOwnedExtensionPagePath(sender.url, 'apps/extension/src/offscreen/offscreen.html');
+  if (!gallery && !offscreen) return { reserved: true };
+  let advisory = false;
+  if (isRecord(message)) {
+    if (gallery && message['type'] === MessageType.SYNC_PRODUCT_COMMAND) {
+      const command = message['command'];
+      advisory =
+        isRecord(command) &&
+        (command['kind'] === 'thumbnail-read' ||
+          ((command['kind'] === 'inspect' || command['kind'] === 'cancel') &&
+            command['advisory'] === true));
+    } else if (offscreen && message['type'] === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION)
+      advisory = message['advisory'] === true;
+  }
+  return { scopeLimit: 4096, reserved: !advisory };
+}
 
 function resolveSenderScope(sender: chrome.runtime.MessageSender): string {
   const tabScope = sender.tab?.id === undefined ? 'tab:none' : `tab:${sender.tab.id}`;
@@ -37,6 +65,7 @@ export function authorizeRuntimeMessageFreshness(args: {
   sender: chrome.runtime.MessageSender;
 }): RuntimeMessageFreshnessAuthorization {
   return runtimeMessageFreshnessAuthorizer.authorize({
+    capacity: syncCapacity(args.message, args.sender),
     message: args.message,
     scope: resolveSenderScope(args.sender),
     ...(args.nowEpochMs === undefined ? {} : { nowEpochMs: args.nowEpochMs }),
@@ -49,6 +78,7 @@ export function inspectRuntimeMessageFreshness(args: {
   sender: chrome.runtime.MessageSender;
 }): RuntimeMessageFreshnessInspection {
   return runtimeMessageFreshnessAuthorizer.inspect({
+    capacity: syncCapacity(args.message, args.sender),
     message: args.message,
     scope: resolveSenderScope(args.sender),
     ...(args.nowEpochMs === undefined ? {} : { nowEpochMs: args.nowEpochMs }),

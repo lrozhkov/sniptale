@@ -1,3 +1,8 @@
+import {
+  parseSyncConnectionIdentity,
+  type SyncConnectionIdentity,
+} from '../remote-connection/model';
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { putRecordingBackupRestore } from '../recordings/backup-restore';
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from '../assets/contracts';
@@ -17,6 +22,7 @@ import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -51,6 +57,7 @@ export interface ApplyPreparedMediaReplicaInput {
   rows: CapturedMediaRows;
   operationId: string;
   sourceDigest: string;
+  authorization?: SyncConnectionIdentity;
   connectionGeneration: number;
   spaceId: string;
   profileCreatedAt: number;
@@ -70,6 +77,7 @@ class MediaReplicaConflictError extends Error {
 function preparedInput(input: ApplyPreparedMediaReplicaInput): ApplyPreparedMediaReplicaInput {
   const rows = parseCapturedMediaRows(input.rows);
   if (
+    (input.authorization !== undefined && !parseSyncConnectionIdentity(input.authorization)) ||
     !rows ||
     !input.operationId ||
     input.operationId.length > 256 ||
@@ -408,6 +416,7 @@ export async function applyPreparedMediaReplica(
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
         SYNC_CAPTURE_STORE,
+        SYNC_CONNECTION_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
         PROJECT_EXPORTS_STORE,
@@ -445,6 +454,8 @@ export async function applyPreparedMediaReplica(
         await tx.done;
         return { status: 'duplicate' as const, generation: duplicate };
       }
+      if (candidate.authorization !== undefined)
+        await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
       if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
         throw new MediaReplicaConflictError('profile-changed');
       if (candidate.expectedLocalGeneration === 0)

@@ -1,3 +1,7 @@
+import {
+  parseSyncConnectionIdentity,
+  type SyncConnectionIdentity,
+} from '../../composition/persistence/remote-connection/model';
 import { preparePortableImageRows, validatePortableImageRows } from './prepared-image';
 import {
   preparePortableVideoReviewRoot,
@@ -194,6 +198,7 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
 
 /** Local admission values come from the target owner, never from a sender's generation counters. */
 export interface PortableReplicaAdmission {
+  authorization?: SyncConnectionIdentity;
   operationId: string;
   sourceDigest: string;
   connectionGeneration: number;
@@ -497,6 +502,7 @@ export async function preparePortableReplica(args: {
     return ref;
   };
   if (
+    (local.authorization !== undefined && !parseSyncConnectionIdentity(local.authorization)) ||
     !local.spaceId ||
     !Number.isSafeInteger(local.profileCreatedAt) ||
     local.profileCreatedAt < 0 ||
@@ -513,6 +519,7 @@ export async function preparePortableReplica(args: {
   )
     throw new Error('Invalid local replica admission.');
   const identity = {
+    ...(local.authorization !== undefined ? { authorization: local.authorization } : {}),
     spaceId: local.spaceId,
     profileCreatedAt: local.profileCreatedAt,
     expectedBasis: local.expectedBasis,

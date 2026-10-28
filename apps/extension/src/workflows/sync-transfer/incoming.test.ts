@@ -759,3 +759,17 @@ it.each(['basis', 'unreadable', 'cancelled', 'live'] as const)(
     expect(io.stage).not.toHaveBeenCalled();
   }
 );
+
+it('persists native connection authorization without using sender generation counters', async () => {
+  const f = await fixture();
+  const authorization = { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 };
+  const journal = await prepareCatalogReplica({
+    ...f,
+    admission: { ...f.admission, authorization },
+    rootKind: 'media',
+    rootId: mediaId,
+    signal: new AbortController().signal,
+  });
+  expect(journal.payload.input.authorization).toEqual(authorization);
+  expect(journal.payload.input.expectedLocalGeneration).toBe(0);
+});

@@ -1,5 +1,6 @@
 export {
   createGalleryItems,
+  createRemoteRootGalleryItem,
   createScenarioExportGalleryItem,
   createScenarioGalleryItem,
   createVideoProjectGalleryItem,
@@ -7,6 +8,7 @@ export {
 export { ensureGalleryItemThumbnail } from './thumbnails';
 export {
   createGalleryMediaItem,
+  isGalleryRemoteItem,
   isGalleryMediaItem,
   isGalleryQuickEditProjectItem,
   isGalleryScenarioExportItem,
@@ -17,6 +19,7 @@ export {
 } from './types';
 export type {
   GalleryItem,
+  GalleryRemoteRootItem,
   GalleryItemKind,
   GalleryMediaItem,
   GalleryQuickEditProjectItem,

@@ -109,3 +109,45 @@ it('bounds accepted runtime nonces fail-closed without permitting live replay', 
     scope: 's2',
   });
 });
+
+it('retains one nonce identity across reserved capacity and consumes raced handles fail closed', () => {
+  const authorizer = createRuntimeMessageFreshnessAuthorizer({
+    maxAcceptedNonces: 4,
+    maxAcceptedNoncesPerScope: 2,
+    reservedAcceptedNonces: 1,
+  });
+  const send = (nonce: string, reserved: boolean, scopeLimit = 4) =>
+    authorizer.authorize({
+      message: messageWithFreshness(nonce),
+      scope: 'shared',
+      nowEpochMs: 1000,
+      capacity: { reserved, scopeLimit },
+    });
+  for (const nonce of ['preview-1', 'preview-2', 'preview-3'])
+    expect(send(nonce, false).authorized).toBe(true);
+  expect(send('preview-4', false)).toMatchObject({
+    authorized: false,
+    reason: 'Runtime message freshness cache exhausted',
+  });
+  expect(send('preview-1', true)).toMatchObject({
+    authorized: false,
+    reason: 'Runtime message replay detected',
+  });
+  const handle = expectAuthorizedInspection(
+    authorizer.inspect({
+      message: messageWithFreshness('control-1'),
+      scope: 'shared',
+      nowEpochMs: 1000,
+      capacity: { reserved: true, scopeLimit: 4 },
+    })
+  );
+  expect(authorizer.consume({ handle, nowEpochMs: 1000 }).authorized).toBe(true);
+  expect(authorizer.consume({ handle, nowEpochMs: 1000 })).toMatchObject({
+    authorized: false,
+    reason: 'Runtime message replay detected',
+  });
+  expect(send('control-2', true, 100000)).toMatchObject({
+    authorized: false,
+    reason: 'Runtime message freshness cache exhausted',
+  });
+});

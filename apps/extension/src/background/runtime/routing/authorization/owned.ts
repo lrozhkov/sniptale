@@ -1,3 +1,5 @@
+import { parseSyncProductRequest } from '../../../../contracts/messaging/contracts/runtime/sync-product';
+import { isSyncProductSenderAllowed } from '../../../sync-connection/product-route';
 import type { AISecretUnlockMessage } from '../../../../contracts/messaging/ai-secret-unlock';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isOwnedSettingsPage } from '../../../../platform/navigation/extension-pages';
@@ -72,6 +74,7 @@ export const backgroundOwnedAuthorizationBindings = {
   'popup-export-job': authorizePopupExportJobRoute,
   'popup-tab-route-capability-issuance': authorizePopupTabRouteCapabilityIssuance,
   'settings-transfer': authorizeSettingsTransferRoute,
+  'sync-product': authorizeSyncProduct,
   'sync-connection-origin-permission': authorizeSyncConnectionOriginPermission,
   'voice-input-offscreen-event': authorizeVoiceInputOffscreenEvent,
 } satisfies Record<
@@ -375,4 +378,13 @@ function authorizePageLaunchPreferencesRoute(
       senderClassification: 'content-tab-runtime',
     })
   );
+}
+
+function authorizeSyncProduct(
+  request: BackgroundOwnedAuthorizationRequest
+): IpcAuthorizationResult {
+  const parsed = parseSyncProductRequest(request.message);
+  return parsed && isSyncProductSenderAllowed(parsed.command, request.sender)
+    ? AUTHORIZED
+    : reject('Sync product command refused');
 }

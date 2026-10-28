@@ -11,6 +11,10 @@ const { savePresetsSectionContentSpy, storageDraftsSectionSpy, useSavePresetsSec
     useSavePresetsSectionSpy: vi.fn(),
   }));
 
+vi.mock('./sync-connection', () => ({
+  SyncConnectionSection: () => <div data-testid="sync-connection" />,
+}));
+
 vi.mock('../storage-drafts', () => ({
   StorageDraftsSection: (props: unknown) => {
     storageDraftsSectionSpy(props);
@@ -149,4 +153,16 @@ it('forwards the editing preset only when the controller exposes it', async () =
       editingPreset: expect.objectContaining({ id: 'preset-2' }),
     })
   );
+});
+
+it('shows the connection subpage only under the existing experimental build admission', async () => {
+  useSavePresetsSectionSpy.mockReturnValue(createSectionState());
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
+  await renderSection('connection');
+  expect(container?.querySelector('[data-testid="sync-connection"]')).toBeNull();
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  await renderSection('connection');
+  expect(container?.querySelector('[data-testid="sync-connection"]')).not.toBeNull();
+  expect(container?.textContent).toContain(translate('settings.syncConnection.title'));
+  vi.unstubAllGlobals();
 });

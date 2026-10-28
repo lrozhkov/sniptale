@@ -312,6 +312,54 @@ it('hashes normalized native media facts and detects metadata or local ref chang
   ).not.toBe(digest);
 });
 
+function derivedThumbnail(assetId: string) {
+  return {
+    assetId,
+    blob: new Blob(['derived-preview'], { type: 'image/png' }),
+    createdAt: 1,
+    updatedAt: 2,
+    width: 64,
+    height: 36,
+    generatorVersion: 1,
+  };
+}
+
+it('keeps derived source thumbnails outside the authored project snapshot', async () => {
+  const data = fixture();
+  const before = await freezeVideoProjectInTransaction(data.tx, data.project.id);
+  for (const media of [data.mirror, data.original]) {
+    data.stores.thumbnails.seed(media.id, derivedThumbnail(media.id));
+  }
+  const after = await freezeVideoProjectInTransaction(data.tx, data.project.id);
+  expect(after).toEqual(before);
+  expect(await data.stores.thumbnails.get(data.mirror.id)).toEqual(
+    derivedThumbnail(data.mirror.id)
+  );
+  expect(data.stores.thumbnails.delete).not.toHaveBeenCalled();
+  expect(data.stores.thumbnails.put).not.toHaveBeenCalled();
+});
+
+it('keeps a derived media thumbnail outside the publication digest', async () => {
+  const data = originalOnlyMediaFixture();
+  const before = await freezeMediaInTransaction(data.tx, data.mirror.id);
+  data.stores.thumbnails.seed(data.mirror.id, derivedThumbnail(data.mirror.id));
+  const after = await freezeMediaInTransaction(data.tx, data.mirror.id);
+  expect(after).toEqual(before);
+  expect(digestCapturedMediaRows(after)).toBe(digestCapturedMediaRows(before));
+  expect(await data.stores.thumbnails.get(data.mirror.id)).toEqual(
+    derivedThumbnail(data.mirror.id)
+  );
+  expect(data.stores.thumbnails.delete).not.toHaveBeenCalled();
+});
+
+it('refuses a derived thumbnail stored under another media identity', async () => {
+  const data = fixture();
+  data.stores.thumbnails.seed(data.mirror.id, derivedThumbnail('another-media'));
+  await expect(freezeVideoProjectInTransaction(data.tx, data.project.id)).rejects.toBeInstanceOf(
+    UnsupportedSyncCaptureGraphError
+  );
+});
+
 it('refuses media sidecars and origin relations that have no bounded publication owner', async () => {
   const unsupported = fixture();
   await expect(

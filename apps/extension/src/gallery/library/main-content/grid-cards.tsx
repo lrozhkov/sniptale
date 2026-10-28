@@ -9,7 +9,12 @@ import {
 import { GalleryProjectDetails } from '../ui/project-presentation';
 import { GRID_GAP } from '../constants';
 import { getGalleryGridCardHeight, getGalleryGridCardWidth } from '../grid-layout';
-import { isGalleryMediaItem, isGallerySelectableItem, type GalleryItem } from '../items';
+import {
+  isGalleryMediaItem,
+  isGalleryRemoteItem,
+  isGallerySelectableItem,
+  type GalleryItem,
+} from '../items';
 import {
   getGalleryItemKindLabel,
   getKindIcon,
@@ -119,7 +124,8 @@ function GalleryGridCardMedia(
           isList &&
           (props.item.type === 'scenario' ||
             props.item.type === 'video-project' ||
-            props.item.type === 'quick-edit-project')
+            props.item.type === 'quick-edit-project' ||
+            isGalleryRemoteItem(props.item))
         }
       />
       {!isList && isGalleryPreviewUnavailable(props.item) ? (
@@ -272,7 +278,8 @@ const GalleryGridCard = memo(
             {media}
             {props.item.type !== 'scenario' &&
             props.item.type !== 'video-project' &&
-            props.item.type !== 'quick-edit-project' ? (
+            props.item.type !== 'quick-edit-project' &&
+            !isGalleryRemoteItem(props.item) ? (
               <GalleryGridDetails
                 leading={leading}
                 compact={props.viewMode === 'compact-grid'}

@@ -1,4 +1,8 @@
+import { createRuntimeMessageFreshnessAuthorizer } from '@sniptale/platform/security/runtime-message-freshness-authorizer';
+import { attachRuntimeMessageFreshness } from '@sniptale/platform/security/runtime-message-freshness';
 import { describe, expect, it, vi } from 'vitest';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { parseSyncProductExecutorRequest } from '../../contracts/messaging/contracts/runtime/sync-product';
 import type { SyncConnectionMetadata } from '../../composition/persistence/remote-connection/model';
 import type { SyncWorkspaceSelection } from '../../composition/persistence/remote-connection/workspace-selection';
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
@@ -493,4 +497,279 @@ describe('workspace enrollment handoff', () => {
     expect(f.deps.stopExecutor).not.toHaveBeenCalled();
     expect(f.deps.enrollConnection).toHaveBeenCalledTimes(2);
   });
+});
+
+describe('product admission in the existing coordinator', () => {
+  it('derives product execution binding from native enrollment after document admission', async () => {
+    const f = fixture();
+    const productExecutor = vi.fn<
+      NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>
+    >(async (input) => ({
+      success: true,
+      result: { kind: 'accepted', requestId: input.command.operationRequestId },
+    }));
+    const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+    await expect(
+      coordinator.productCommand('11111111-1111-4111-8111-111111111111', {
+        kind: 'catalog-refresh',
+        bypassCache: false,
+      })
+    ).resolves.toMatchObject({ success: true });
+    const sent = productExecutor.mock.calls[0]?.[0];
+    expect(sent).toBeDefined();
+    expect(
+      parseSyncProductExecutorRequest({
+        ...sent,
+        type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+        requestId: '21111111-1111-4111-8111-111111111111',
+        capabilityToken: 'test-capability',
+        offscreenStartupId: '31111111-1111-4111-8111-111111111111',
+        executorId: '41111111-1111-4111-8111-111111111111',
+      })
+    ).not.toBeNull();
+    expect(productExecutor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: {
+          kind: 'start',
+          operationRequestId: '11111111-1111-4111-8111-111111111111',
+          binding: { scope: f.selection.scope, authorization: f.metadata.identity },
+          work: { kind: 'catalog-refresh', bypassCache: false },
+        },
+      })
+    );
+  });
+  it('privacy reservation invalidates a product start held in document admission before dispatch', async () => {
+    const f = fixture();
+    const document = deferred<string>();
+    f.deps.ensureDocument.mockReturnValue(document.promise);
+    const productExecutor = vi.fn<
+      NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>
+    >(async () => ({
+      success: true,
+      result: { kind: 'accepted', requestId: '11111111-1111-4111-8111-111111111111' },
+    }));
+    const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+    const started = coordinator.productCommand('11111111-1111-4111-8111-111111111111', {
+      kind: 'catalog-refresh',
+      bypassCache: false,
+    });
+    const refusal = expect(started).rejects.toThrow('refused');
+    await Promise.resolve();
+    await Promise.resolve();
+    const reservation = coordinator.reserveErasure();
+    const quiescent = reservation.quiesce();
+    document.resolve('startup');
+    await refusal;
+    await quiescent;
+    reservation.release();
+    expect(productExecutor).not.toHaveBeenCalled();
+    expect(f.deps.revokeConnection).toHaveBeenCalled();
+  });
+});
+
+describe('local workspace abandonment', () => {
+  it('abandons an uncertain allocating selection after restart with positive executor absence', async () => {
+    const f = workspaceFixture();
+    f.workspace.phase = 'allocating';
+    f.deps.inspectExecutor.mockResolvedValue({ kind: 'absent' });
+    await expect(f.coordinator.abandonWorkspace(f.workspace.source)).resolves.toEqual({
+      kind: 'cancelled',
+      outcome: 'cancelled',
+    });
+    expect(f.deps.revokeWorkspace).toHaveBeenCalledExactlyOnceWith(f.workspace.source);
+    expect(f.deps.stopExecutor).not.toHaveBeenCalled();
+    expect(f.deps.ensureDocument).not.toHaveBeenCalled();
+    expect(f.deps.hasOriginPermission).not.toHaveBeenCalled();
+    expect(f.deps.startWorkspaceExecutor).not.toHaveBeenCalled();
+  });
+
+  it.each(['revision', 'incarnation', 'kind'] as const)(
+    'refuses an outdated %s selection before native revocation or containment',
+    async (field) => {
+      const f = workspaceFixture();
+      const source = structuredClone(f.workspace.source);
+      if (field === 'revision') source.identity.revision += 1;
+      else if (field === 'incarnation')
+        source.identity.incarnation = '20000000-0000-4000-8000-000000000002';
+      else source.kind = source.kind === 'allocation' ? 'join' : 'allocation';
+      await expect(f.coordinator.abandonWorkspace(source)).rejects.toThrow('refused');
+      expect(f.deps.revokeWorkspace).not.toHaveBeenCalled();
+      expect(f.deps.inspectExecutor).not.toHaveBeenCalled();
+      expect(f.deps.stopExecutor).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses abandonment after enrollment without revoking either native lifetime', async () => {
+    const f = workspaceFixture();
+    f.deps.loadConnection.mockResolvedValue(f.metadata);
+    await expect(f.coordinator.abandonWorkspace(f.workspace.source)).rejects.toThrow('refused');
+    expect(f.deps.revokeWorkspace).not.toHaveBeenCalled();
+    expect(f.deps.revokeConnection).not.toHaveBeenCalled();
+    expect(f.deps.stopExecutor).not.toHaveBeenCalled();
+  });
+
+  it('commits native revocation then waits for surviving execution containment before success', async () => {
+    const f = workspaceFixture();
+    f.workspace.phase = 'allocating';
+    const revoking = deferred<void>();
+    const revoked = deferred<void>();
+    const stopping = deferred<void>();
+    const stopped = deferred<void>();
+    f.deps.revokeWorkspace.mockImplementation(async () => {
+      revoking.resolve();
+      await revoked.promise;
+    });
+    f.deps.stopExecutor.mockImplementation(async () => {
+      stopping.resolve();
+      await stopped.promise;
+      return { executorId: 'executor', executorRevision: 5 };
+    });
+    let acknowledged = false;
+    const completion = f.coordinator.abandonWorkspace(f.workspace.source).then((result) => {
+      acknowledged = true;
+      return result;
+    });
+    await revoking.promise;
+    expect(f.deps.inspectExecutor).not.toHaveBeenCalled();
+    expect(acknowledged).toBe(false);
+    revoked.resolve();
+    await stopping.promise;
+    expect(acknowledged).toBe(false);
+    expect(f.deps.revokeWorkspace).toHaveBeenCalledBefore(f.deps.stopExecutor);
+    stopped.resolve();
+    await expect(completion).resolves.toEqual({ kind: 'cancelled', outcome: 'cancelled' });
+  });
+
+  it('does not acknowledge abandonment when surviving execution containment fails', async () => {
+    const f = workspaceFixture();
+    f.deps.stopExecutor.mockRejectedValue(new Error('Containment refused'));
+    await expect(f.coordinator.abandonWorkspace(f.workspace.source)).rejects.toThrow(
+      'Containment refused'
+    );
+    expect(f.deps.revokeWorkspace).toHaveBeenCalledExactlyOnceWith(f.workspace.source);
+    expect(f.deps.hasOriginPermission).not.toHaveBeenCalled();
+  });
+});
+
+describe('single-observation product target authority', () => {
+  it.each(['inspect', 'cancel'] as const)(
+    'restricts Settings %s to catalog jobs using its one owner observation',
+    async (kind) => {
+      const f = fixture();
+      const requestId = '11111111-1111-4111-8111-111111111111';
+      f.snapshot.products = [
+        { requestId, kind: 'thumbnail-read', state: 'running', failureCode: null },
+      ];
+      const productExecutor = vi.fn<
+        NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>
+      >(async () => ({
+        success: true,
+        result: { kind: 'operation', job: null, completion: null },
+      }));
+      const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+      await expect(coordinator.productCommand(requestId, { kind }, 'settings')).rejects.toThrow(
+        'refused'
+      );
+      expect(f.deps.inspectExecutor).toHaveBeenCalledTimes(1);
+      expect(productExecutor).not.toHaveBeenCalled();
+      f.snapshot.products[0]!.kind = 'catalog-refresh';
+      await expect(
+        coordinator.productCommand(requestId, { kind }, 'settings')
+      ).resolves.toMatchObject({ success: true });
+      expect(f.deps.inspectExecutor).toHaveBeenCalledTimes(2);
+      expect(productExecutor).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('refuses Gallery cancellation of a workspace before native revocation', async () => {
+    const f = workspaceFixture();
+    const requestId = '11111111-1111-4111-8111-111111111111';
+    f.snapshot.workspace = {
+      requestId,
+      sourceKind: f.workspace.source.kind,
+      selectionIncarnation: f.workspace.source.identity.incarnation,
+      selectionRevision: 1,
+      state: 'running',
+      failureCode: null,
+    };
+    const productExecutor = vi.fn<
+      NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>
+    >(async () => ({ success: true, result: { kind: 'cancelled', outcome: 'cancelled' } }));
+    const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+    await expect(
+      coordinator.productCommand(requestId, { kind: 'cancel' }, 'gallery')
+    ).rejects.toThrow('refused');
+    expect(f.deps.inspectExecutor).toHaveBeenCalledTimes(1);
+    expect(f.deps.revokeWorkspace).not.toHaveBeenCalled();
+    expect(productExecutor).not.toHaveBeenCalled();
+  });
+});
+
+it('keeps foreground preparation and Stop available after 100 thumbnail start/inspect turns', async () => {
+  const f = fixture();
+  let nonce = 0;
+  const now = 2_100_000_000_000;
+  const authorizer = createRuntimeMessageFreshnessAuthorizer({
+    maxAcceptedNoncesPerScope: 4096,
+    reservedAcceptedNonces: 256,
+  });
+  const admit = (type: string, advisory?: true) => {
+    const result = authorizer.authorize({
+      scope: 'background',
+      capacity: { reserved: !advisory },
+      nowEpochMs: now,
+      message: attachRuntimeMessageFreshness(
+        { type, ...(advisory ? { advisory } : {}) },
+        { issuedAtEpochMs: now, nonce: `coordinator-${++nonce}` }
+      ),
+    });
+    expect(result.authorized).toBe(true);
+  };
+  f.deps.inspectExecutor.mockImplementation(async (_startup, challenge, advisory) => {
+    admit('OFFSCREEN_SYNC_INSPECT', advisory);
+    return { kind: 'present', challenge, snapshot: f.snapshot };
+  });
+  const productExecutor = vi.fn<
+    NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>
+  >(async (input) => {
+    admit('OFFSCREEN_SYNC_PRODUCT_COMMAND', input.advisory);
+    if (input.command.kind === 'start')
+      return {
+        success: true,
+        result: { kind: 'accepted', requestId: input.command.operationRequestId },
+      };
+    return { success: true, result: { kind: 'operation', job: null, completion: null } };
+  });
+  const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+  const selection = {
+    rootKind: 'media' as const,
+    rootId: 'media',
+    operationId: 'operation',
+    sourceDigest: 'a'.repeat(64),
+  };
+  for (let index = 0; index < 100; index += 1) {
+    const requestId = `thumbnail-${index}`;
+    await coordinator.productCommand(requestId, { kind: 'thumbnail-read', selection }, 'gallery');
+    expect(productExecutor).toHaveBeenLastCalledWith(expect.objectContaining({ advisory: true }));
+    await coordinator.productCommand(requestId, { kind: 'inspect', advisory: true }, 'gallery');
+    expect(productExecutor).toHaveBeenLastCalledWith(expect.objectContaining({ advisory: true }));
+  }
+  expect(nonce).toBe(400);
+  await coordinator.productCommand('foreground', { kind: 'replica-prepare', selection }, 'gallery');
+  expect(productExecutor.mock.lastCall![0].advisory).toBeUndefined();
+  await coordinator.productCommand('foreground', { kind: 'inspect' }, 'gallery');
+  expect(productExecutor.mock.lastCall![0].advisory).toBeUndefined();
+  await coordinator.inspect();
+  expect(f.deps.inspectExecutor.mock.lastCall).toHaveLength(2);
+  f.deps.stopExecutor.mockImplementation(async () => {
+    admit('OFFSCREEN_SYNC_STOP');
+    return { executorId: 'executor', executorRevision: 5 };
+  });
+  const erasure = coordinator.reserveErasure();
+  try {
+    await erasure.quiesce();
+  } finally {
+    erasure.release();
+  }
+  expect(f.deps.stopExecutor).toHaveBeenCalledTimes(1);
 });
