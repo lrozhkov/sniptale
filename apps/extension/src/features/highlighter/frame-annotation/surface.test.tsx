@@ -158,7 +158,8 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
   ).toMatchObject({
     boxSizing: 'border-box',
     left: '100%',
-    transform: expect.stringContaining('scale(0.5)'),
+    transform: expect.stringContaining('scale(0.5) translateZ(0)'),
+    willChange: 'transform',
   });
   const cornerStyle = getStepBadgeStyle({
     borderColor: '#000',
@@ -694,7 +695,10 @@ it('recenters on font and size changes, preserves text on metric failure and rel
   const context = {
     font: '',
     letterSpacing: '',
-    measureText: vi.fn(() => ({ actualBoundingBoxLeft: -1, actualBoundingBoxRight: right })),
+    measureText: vi.fn(() => ({
+      actualBoundingBoxLeft: -100,
+      actualBoundingBoxRight: right * 100,
+    })),
   };
   const nativeComputedStyle = getComputedStyle;
   vi.stubGlobal('CanvasRenderingContext2D', class {});
@@ -736,8 +740,8 @@ it('recenters on font and size changes, preserves text on metric failure and rel
     right = 18;
     act(() => root.render(<StepBadgeValue value="12" customStyle={{ letterSpacing: '0.5px' }} />));
     expect(value.style.translate).toBe('-0.5px 0');
-    expect(context.letterSpacing).toBe('0.5px');
-    expect(context.font).toContain('16.2px');
+    expect(context.letterSpacing).toBe('50px');
+    expect(context.font).toContain('1620px');
     available = false;
     act(() => resize());
     expect(value.style.translate).toBe('0px 0');

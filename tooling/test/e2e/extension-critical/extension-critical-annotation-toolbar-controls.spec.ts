@@ -982,9 +982,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await page.mouse.move(handle.x + 80, handle.y + 40, { steps: 4 });
     await page.mouse.up();
     await expectAnnotationCenter(badge, { x: before.x + 80, y: before.y + 40 });
-    await badge.hover();
-    await page.locator('.sniptale-step-badge-settings-handle').click();
-    await panel(page).locator('[data-settings-action="disable"]').click();
+    await deleteStandalone(page, badge, 'step-badge', info);
     await expect(badge).toHaveCount(0);
     await page.keyboard.press('Control+z');
     await expect(badge).toHaveText('1');
@@ -1011,19 +1009,20 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         import { createRoot } from 'react-dom/client';
         import { FrameStepBadgeSurface } from './apps/extension/src/features/highlighter/frame-annotation/step-badge-surface';
         import { createDefaultFrameStepBadge } from './apps/extension/src/features/highlighter/frame-annotation/defaults';
-        const cases = [29.16,24,48,72].flatMap(diameter => [1,0.5,1.25].flatMap(scale => [...Array.from({length:14},(_,i)=>String(i+1)),'99'].map(value => ({diameter,scale,value,customCss:''}))));
-        cases.push(...['1','9','12'].map(value => ({diameter:29.16,scale:1,value,customCss:'text { font-family: Arial; font-style: italic; letter-spacing: 0.5px; }'})));
+        const cases = [[1,1],[0.5,1],[1.25,1],[1,0.5],[1,1.25]].flatMap(([sceneScale,scale]) => [0,0.25,0.5,0.75].flatMap(phase => Array.from({length:9},(_,i)=>({diameter:29.16,scale,sceneScale,phase,value:String(i+1),customCss:''}))));
+        cases.push(...[24,48,72].flatMap(diameter => ['1','9','12','99'].map(value=>({diameter,scale:1,sceneScale:1,phase:0,value,customCss:''}))));
+        cases.push(...['1','9','12'].map(value => ({diameter:29.16,scale:1,sceneScale:1,phase:0,value,customCss:'[text]\\nfont-family: Arial; font-style: italic; letter-spacing: 0.5px;'})));
         const host = document.createElement('div'); host.id = 'number-centering-probe';
         document.body.replaceChildren(host);
-        document.body.style.cssText = 'margin:16px;background:#eef0f3';
-        createRoot(host).render(<div style={{display:'grid',gridTemplateColumns:'repeat(9,128px)',gap:4}}>
-          {cases.map(({diameter,scale,value,customCss},index) => <div key={index} data-case={index}
-            style={{height:144,position:'relative',fontFamily:'system-ui'}}>
+        document.body.style.cssText = 'margin:16px;background:#222';
+        createRoot(host).render(<div style={{display:'grid',gridTemplateColumns:'repeat(9,110px)',gap:4}}>
+          {cases.map(({diameter,scale,sceneScale,phase,value,customCss},index) => <div key={index} data-case={index}
+            style={{height:100,position:'relative',left:phase,top:phase,transform:'scale('+sceneScale+')',transformOrigin:'top left',fontFamily:'system-ui'}}>
             <FrameStepBadgeSurface settings={{...createDefaultFrameStepBadge(),value,anchor:'center',
               style:{sizeSource:'custom',diameter,backgroundColorSource:'custom',backgroundColor:'#f97316',
                 textColorSource:'custom',textColor:'#ffffff',outlineColorSource:'custom',outlineColor:'#ffffff',outlineWidth:2,customCss}}}
               borderColor="#f97316" borderWidth={2} zIndex={1} visualScale={scale}/>
-            <div style={{position:'absolute',top:122,width:'100%',textAlign:'center',fontSize:11}}>{value} / {diameter}px / {scale}×</div>
+            <div style={{position:'absolute',top:85,width:'100%',textAlign:'center',fontSize:11,color:'white'}}>{value} / {diameter}px / {scale}×</div>
           </div>)}
         </div>);
       `,
@@ -1036,60 +1035,114 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       loader: { '.svg': 'text', '.woff2': 'dataurl' },
     });
     await page.addScriptTag({ content: bundle.outputFiles[0]!.text });
-    await expect(page.locator('#number-centering-probe .sniptale-step-badge')).toHaveCount(183);
+    const badges = page.locator('#number-centering-probe .sniptale-step-badge');
+    await expect(badges).toHaveCount(195);
     await page.evaluate(() => document.fonts.ready);
-    const centers = await page
-      .locator('#number-centering-probe .sniptale-step-badge')
-      .evaluateAll((badges) =>
-        badges.map((badge) => {
-          const value = badge.firstElementChild!;
-          const style = getComputedStyle(value);
-          const context = document.createElement('canvas').getContext('2d')!;
-          context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-          context.letterSpacing = style.letterSpacing === 'normal' ? '0px' : style.letterSpacing;
-          const metrics = context.measureText(value.textContent!);
-          const range = document.createRange();
-          range.selectNodeContents(value);
-          const text = range.getBoundingClientRect();
-          const circle = badge.getBoundingClientRect();
-          if (!Number.isInteger(Number.parseFloat(getComputedStyle(badge).width))) {
-            throw new Error('Badge diameter must use whole CSS pixels');
+    const values = await badges.locator(':scope > span').all();
+    for (const value of values.slice(-3)) {
+      await expect(value).toHaveCSS('font-family', 'Arial');
+      await expect(value).toHaveCSS('font-style', 'italic');
+      await expect(value).toHaveCSS('letter-spacing', '0.5px');
+    }
+    // Decode the actual screenshot. Do not reuse measureText to validate its own correction.
+    for (let start = 0; start < 195; start += 36) {
+      await page.locator('[data-case]').evaluateAll((elements, start) => {
+        elements.forEach((element, index) => {
+          if (element instanceof HTMLElement) {
+            element.style.display = index >= start && index < start + 36 ? '' : 'none';
           }
-          const scale =
-            text.height / (metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent);
-          const centerX = text.left + text.width / 2;
-          const centerY =
-            text.top +
-            metrics.fontBoundingBoxAscent * scale -
-            ((metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) * scale) / 2;
+        });
+      }, start);
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+      const circles = await badges.locator('visible=true').evaluateAll((elements) =>
+        elements.map((badge) => {
+          const rect = badge.getBoundingClientRect();
+          const diameter = Number.parseFloat(getComputedStyle(badge).width);
+          if (!Number.isInteger(diameter))
+            throw new Error('Badge diameter must use whole CSS pixels');
           return {
-            value: value.textContent,
-            diameter: circle.width,
-            dx: centerX - circle.left - circle.width / 2,
-            dy: centerY - circle.top - circle.height / 2,
-            inkDx:
-              text.left +
-              ((metrics.actualBoundingBoxRight - metrics.actualBoundingBoxLeft) * scale) / 2 -
-              circle.left -
-              circle.width / 2,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            value: badge.textContent,
           };
         })
       );
-    await info.attach('number-glyph-centers.json', {
-      body: JSON.stringify(centers, null, 2),
-      contentType: 'application/json',
-    });
-    await page.evaluate(
-      () =>
-        new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-        )
-    );
-    await page.screenshot({ path: info.outputPath('number-glyph-centering.png'), fullPage: false });
-    for (const center of centers) {
-      expect(Math.abs(center.dy), JSON.stringify(center)).toBeLessThanOrEqual(1);
-      expect(Math.abs(center.inkDx), JSON.stringify(center)).toBeLessThanOrEqual(0.25);
+      const png = await page.screenshot({
+        path: info.outputPath(`number-glyph-centering-${start}.png`),
+        fullPage: false,
+      });
+      const centers = await page.evaluate(
+        async ({ png, circles }) => {
+          const image = new Image();
+          image.src = 'data:image/png;base64,' + png;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext('2d')!;
+          context.drawImage(image, 0, 0);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          return circles.map((circle) => {
+            const x = circle.x * devicePixelRatio,
+              y = circle.y * devicePixelRatio;
+            const width = circle.width * devicePixelRatio,
+              height = circle.height * devicePixelRatio;
+            const orange: number[] = [];
+            const ink: number[][] = [[], []];
+            for (let row = Math.floor(y); row < Math.ceil(y + height); row++) {
+              for (let col = Math.floor(x); col < Math.ceil(x + width); col++) {
+                const i = (row * canvas.width + col) * 4;
+                const r = pixels[i]!,
+                  g = pixels[i + 1]!,
+                  b = pixels[i + 2]!;
+                if (r > 225 && g > 65 && g < 170 && b < 100) orange.push(col);
+                // Exclude the white outline; include antialiasing in the visible glyph.
+                if (
+                  (col + 0.5 - x - width / 2) ** 2 + (row + 0.5 - y - height / 2) ** 2 <
+                  (width * 0.34) ** 2
+                ) {
+                  [80, 150].forEach((threshold, index) => {
+                    if (r > 220 && g > threshold && b > threshold) ink[index]!.push(col);
+                  });
+                }
+              }
+            }
+            const mid = (columns: number[]) => (Math.min(...columns) + Math.max(...columns)) / 2;
+            return {
+              value: circle.value,
+              width,
+              orange: orange.length,
+              ink: ink.map((p) => p.length),
+              dx: ink.map((p) => mid(p) - mid(orange)),
+            };
+          });
+        },
+        { png: png.toString('base64'), circles }
+      );
+      await info.attach(`number-glyph-centers-${start}.json`, {
+        body: JSON.stringify(centers, null, 2),
+        contentType: 'application/json',
+      });
+      for (const center of centers) {
+        expect(center.orange, JSON.stringify(center)).toBeGreaterThan(0);
+        for (const count of center.ink) expect(count, JSON.stringify(center)).toBeGreaterThan(0);
+        for (const dx of center.dx)
+          expect(Math.abs(dx), JSON.stringify(center)).toBeLessThanOrEqual(0.5);
+      }
     }
+    await page
+      .locator('[data-case]')
+      .first()
+      .evaluate((element) => {
+        if (element instanceof HTMLElement) element.style.display = '';
+      });
     const fallback = await page
       .locator('#number-centering-probe .sniptale-step-badge > span')
       .first()

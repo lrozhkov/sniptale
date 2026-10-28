@@ -128,7 +128,9 @@ export function getStepBadgeStyle(props: {
       (position.translateX * badgeSize + offset.x) * visualScale + position.normalX
     }px, ${
       (position.translateY * badgeSize + offset.y) * visualScale + position.normalY
-    }px) scale(${visualScale})`,
+    }px) scale(${visualScale}) translateZ(0)`,
+    // Keep the circle and glyph in one raster layer through fractional scene scaling.
+    willChange: 'transform',
     transformOrigin: 'top left',
     zIndex: props.zIndex,
     pointerEvents: 'auto',
@@ -157,14 +159,16 @@ function useBadgeInkOffset(element: React.RefObject<HTMLSpanElement | null>) {
         setOffset(0);
         return;
       }
-      context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      context.letterSpacing = style.letterSpacing === 'normal' ? '0px' : style.letterSpacing;
+      // Small-font ink bounds are quantized. Measure enlarged text without a pixel buffer.
+      const measurementScale = 100;
+      const measuredFontSize = Number.parseFloat(style.fontSize) * measurementScale;
+      context.font = `${style.fontStyle} ${style.fontWeight} ${measuredFontSize}px ${style.fontFamily}`;
+      context.letterSpacing = `${(Number.parseFloat(style.letterSpacing) || 0) * measurementScale}px`;
       const metrics = context.measureText(value.innerText || value.textContent || '');
       // Flex centers the advance box; center the ink within that box before paint.
       const next =
         (Number.parseFloat(style.width) +
-          metrics.actualBoundingBoxLeft -
-          metrics.actualBoundingBoxRight) /
+          (metrics.actualBoundingBoxLeft - metrics.actualBoundingBoxRight) / measurementScale) /
         2;
       setOffset(Number.isFinite(next) ? next : 0);
     };
