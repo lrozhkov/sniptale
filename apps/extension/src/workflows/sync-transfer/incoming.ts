@@ -17,6 +17,7 @@ import { syncCatalogRootKey, type CatalogOperation } from './catalog-graph';
 import type { scanSyncCatalog } from './catalog';
 import {
   parsePortableSyncRoot,
+  portableSyncEditingObjectIds,
   preparePortableReplica,
   type PortableReplicaAdmission,
 } from './prepared-root';
@@ -150,14 +151,7 @@ export async function prepareCatalogReplica(args: {
       operation.kind !== 'delete'
   );
   const parsed = await parsePortableSyncRoot(operation.envelope);
-  const selectedIds =
-    parsed.kind === 'image'
-      ? parsed.envelope.objects.map((object) => object.objectId)
-      : parsed.kind === 'media'
-        ? [parsed.metadata.originalObjectId]
-        : parsed.metadata.projectAssets
-            .filter((asset) => !asset.libraryMediaId)
-            .map((asset) => asset.objectId);
+  const selectedIds = portableSyncEditingObjectIds(parsed);
   const editing = parsed.envelope.objects.filter((object) => selectedIds.includes(object.objectId));
   // Use the existing backup operation/recovery boundary while staged objects lack journal claims.
   return runWithAssetResourceRead(() =>
@@ -172,7 +166,6 @@ export async function prepareCatalogReplica(args: {
         );
         if (original) borrowedRefs.set(...original);
       }
-      const stagedObjects = editing.filter((object) => !borrowedRefs.has(object.objectId));
       const checkedDependencies = new Map<string, { ref: AssetRef; sha256: string }>();
       for (const [mediaId, source] of dependencySources) {
         const dependency = admission.dependencies.find((item) => item.entry.id === mediaId);
@@ -199,7 +192,9 @@ export async function prepareCatalogReplica(args: {
         checkedDependencies.set(mediaId, { ref: dependency.ref, sha256: digest.sha256 });
       }
       if (parsed.kind === 'video-project') {
-        for (const asset of parsed.metadata.projectAssets.filter((item) => item.libraryMediaId)) {
+        for (const asset of parsed.metadata.projectAssets.filter(
+          (item) => item.libraryMediaId && selectedIds.includes(item.objectId)
+        )) {
           const dependency = asset.libraryMediaId
             ? checkedDependencies.get(asset.libraryMediaId)
             : undefined;
@@ -215,6 +210,7 @@ export async function prepareCatalogReplica(args: {
           borrowedRefs.set(asset.objectId, dependency.ref);
         }
       }
+      const stagedObjects = editing.filter((object) => !borrowedRefs.has(object.objectId));
       for (const [index, attempt] of selected.attempts.entries()) {
         args.signal.throwIfAborted();
         const physical = await createSyncAttempt(

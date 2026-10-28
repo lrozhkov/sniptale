@@ -46,7 +46,7 @@ import {
 import { installExperimentalCaptureProfile } from '../../../apps/extension/src/composition/persistence/sync-capture/profile';
 import { parseSyncCaptureRecord } from '../../../apps/extension/src/composition/persistence/sync-capture/guards';
 import type { CapturedChange } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
-import { createFrozenSnapshotDatabase } from '../../../apps/extension/src/composition/persistence/sync-capture/test-support/frozen-snapshot-database';
+import { createFrozenSnapshotDatabase } from '../../../apps/extension/src/workflows/sync-transfer/captured-project';
 import { createArchivePathAllocator } from '../../../apps/extension/src/composition/archive-transfer';
 import { buildVideoProjectRootInventory } from '../../../apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects';
 import { createMediaHubBackupExportOptions } from '../../../apps/extension/src/workflows/media-hub-backup/v6/options';

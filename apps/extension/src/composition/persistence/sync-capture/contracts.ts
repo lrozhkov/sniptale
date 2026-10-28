@@ -1,6 +1,8 @@
 import type { StoredImageWorkspaceEntry } from '../image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import type { AssetRef } from '../assets/contracts';
+import type { VideoWorkspaceSnapshot } from '../review-workspaces/contracts';
+import type { MediaThumbnailEntry } from '../media-library/contracts';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import type {
   StoredProjectAssetEntry,
@@ -33,6 +35,10 @@ export interface CapturedVideoProjectRows {
   exports: StoredProjectExportEntry[];
   media: Omit<MediaLibraryEntry, 'blob'>[];
   refs: AssetRef[];
+  /** Private-source review state is part of the retained project graph. */
+  reviews?: VideoWorkspaceSnapshot[];
+  thumbnails?: MediaThumbnailEntry[];
+  presentation?: AggregatePresentationEntry | null;
   /** Missing on legacy records, which have no admitted dependency evidence. */
   mediaDependencies?: CapturedMediaDependency[];
 }

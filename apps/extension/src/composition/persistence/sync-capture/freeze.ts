@@ -1,3 +1,11 @@
+import { readWorkspaceStorage } from '../review-workspaces/storage';
+import { parseVideoWorkspace, parseVideoWorkspaceDraft } from '../review-workspaces/parser';
+import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
+import type { VideoWorkspaceSnapshot } from '../review-workspaces/contracts';
+import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
+import { parseMediaThumbnailEntry } from '../media-library/read-guards';
+import type { MediaThumbnailEntry } from '../media-library/contracts';
+import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { parseAssetRef } from '../assets/guards';
@@ -123,6 +131,9 @@ class NativeProjectSnapshot {
   private readonly media = new Map<string, MediaLibraryEntry>();
   private readonly refs = new Map<string, AssetRef>();
   private readonly mediaToRead = new Set<string>();
+  private readonly reviews = new Map<string, VideoWorkspaceSnapshot>();
+  private readonly thumbnails: MediaThumbnailEntry[] = [];
+  private presentation: AggregatePresentationEntry | null = null;
   private readonly aggregateIds;
 
   constructor(
@@ -137,14 +148,22 @@ class NativeProjectSnapshot {
     await this.retainPublishedExports();
     // Growing sets resolve origins and borrowed sources; maps bound cycles and deduplicate rows.
     for (const id of this.mediaToRead) await this.retainMedia(id);
+    await this.retainProjectSidecars();
     this.requireProjectAssetBindings();
-    await rejectUncapturedSidecars(this.tx, this.aggregateIds);
+    await rejectUncapturedSidecars(this.tx, this.aggregateIds, {
+      reviews: new Set(this.reviews.keys()),
+      thumbnails: new Set(this.thumbnails.map((entry) => entry.assetId)),
+      presentation: this.presentation,
+    });
     const rows = {
       project: this.project,
       assets: [...this.assets.values()],
       exports: [...this.exports.values()],
       media: [...this.media.values()],
       refs: [...this.refs.values()],
+      reviews: [...this.reviews.values()],
+      thumbnails: this.thumbnails,
+      presentation: this.presentation,
     };
     requireSupported(parseCapturedVideoProjectRows(rows) !== null);
     return rows;
@@ -177,6 +196,8 @@ class NativeProjectSnapshot {
       const entry = frozenNativeRow(mirror, admitMedia);
       requireSupported(entry.source.kind === 'project-asset' && entry.source.projectAssetId === id);
       this.mediaToRead.add(mirrorId);
+    } else {
+      await this.retainReview(mirrorId, asset.assetId, asset.mimeType);
     }
   }
 
@@ -196,7 +217,67 @@ class NativeProjectSnapshot {
           row.source.projectId === this.project.id
       );
       this.mediaToRead.add(mirrorId);
+    } else {
+      await this.retainReview(mirrorId, entry.assetId, entry.mimeType);
     }
+    await this.retainThumbnail(mirrorId);
+  }
+
+  private async retainReview(
+    aggregateId: string,
+    sourceAssetId: string,
+    mimeType: string
+  ): Promise<void> {
+    if (this.reviews.has(aggregateId)) return;
+    const stored = await readWorkspaceStorage(this.tx, aggregateId);
+    const rawDraft: unknown = await this.tx
+      .objectStore(VIDEO_WORKSPACE_DRAFTS_STORE)
+      .get(aggregateId);
+    if (stored.logical === undefined && rawDraft === undefined) return;
+    const workspace = parseVideoWorkspace(stored.logical);
+    requireSupported(
+      Boolean(
+        workspace &&
+        workspace.aggregateId === aggregateId &&
+        workspace.sourceAssetId === sourceAssetId &&
+        mimeType.startsWith('video/')
+      )
+    );
+    if (!workspace) throw new UnsupportedSyncCaptureGraphError();
+    const draft =
+      rawDraft === undefined ? null : parseVideoWorkspaceDraft(rawDraft, workspace.source.duration);
+    requireSupported(rawDraft === undefined || Boolean(draft && draft.aggregateId === aggregateId));
+    requireSupported(this.reviews.size < MAX_CAPTURE_ROWS);
+    this.reviews.set(aggregateId, structuredClone({ workspace, draft }));
+    for (const reference of collectReviewAssetReferences(workspace)) {
+      requireSupported(reference.startsWith('project-asset:'));
+      await this.retainAsset(reference.slice('project-asset:'.length));
+    }
+  }
+
+  private async retainThumbnail(assetId: string): Promise<void> {
+    const raw: unknown = await this.tx.objectStore(THUMBNAILS_STORE).get(assetId);
+    if (raw === undefined) return;
+    const entry = parseMediaThumbnailEntry(raw);
+    requireSupported(
+      entry !== null && entry.assetId === assetId && this.thumbnails.length < MAX_CAPTURE_ROWS
+    );
+    if (entry) this.thumbnails.push(structuredClone(entry));
+  }
+
+  private async retainProjectSidecars(): Promise<void> {
+    await this.retainThumbnail(`video-project:${this.project.id}`);
+    const raw: unknown = await this.tx
+      .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+      .get(['video-project', this.project.id]);
+    if (raw === undefined) return;
+    const presentation = parseAggregatePresentationEntry(raw);
+    requireSupported(
+      presentation !== null &&
+        presentation.aggregateKind === 'video-project' &&
+        presentation.aggregateId === this.project.id
+    );
+    this.presentation = presentation === null ? null : structuredClone(presentation);
   }
 
   private async retainProjectSources(): Promise<void> {
@@ -285,7 +366,12 @@ class NativeProjectSnapshot {
 
 async function rejectUncapturedSidecars(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
-  aggregateIds: ReadonlySet<string>
+  aggregateIds: ReadonlySet<string>,
+  admitted: {
+    reviews: ReadonlySet<string>;
+    thumbnails: ReadonlySet<string>;
+    presentation: AggregatePresentationEntry | null;
+  } = { reviews: new Set(), thumbnails: new Set(), presentation: null }
 ): Promise<void> {
   for (const id of aggregateIds) {
     for (const store of [
@@ -293,15 +379,25 @@ async function rejectUncapturedSidecars(
       VIDEO_WORKSPACE_DRAFTS_STORE,
       IMAGE_WORKSPACES_STORE,
       THUMBNAILS_STORE,
-    ])
+    ]) {
+      if (
+        (store === VIDEO_WORKSPACES_STORE || store === VIDEO_WORKSPACE_DRAFTS_STORE) &&
+        admitted.reviews.has(id)
+      )
+        continue;
+      if (store === THUMBNAILS_STORE && admitted.thumbnails.has(id)) continue;
       requireSupported((await tx.objectStore(store).get(id)) === undefined);
+    }
     requireSupported(
-      (await tx.objectStore(VIDEO_WORKSPACE_HISTORY_STORE).index('aggregateId').getAllKeys(id, 1))
-        .length === 0
+      admitted.reviews.has(id) ||
+        (await tx.objectStore(VIDEO_WORKSPACE_HISTORY_STORE).index('aggregateId').getAllKeys(id, 1))
+          .length === 0
     );
-    for (const kind of ['image', 'video-project', 'scenario'])
+    for (const kind of ['image', 'video-project', 'scenario']) {
+      if (kind === 'video-project' && admitted.presentation?.aggregateId === id) continue;
       requireSupported(
         (await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).get([kind, id])) === undefined
       );
+    }
   }
 }

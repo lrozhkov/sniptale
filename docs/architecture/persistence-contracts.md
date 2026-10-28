@@ -1045,7 +1045,7 @@ Capture discovery retains its own authorization, revision and native-key positio
 
 Progress commits after the item attempts and rechecks current admission. A concurrent pass cannot overwrite a newer position. A failed progress commit preserves earlier admissions and the previous committed position. Replaying that page preserves existing operation controls, history and retry deadlines. Erasure closes the captured database handle and prevents delayed reopening.
 
-This change retains immutable full snapshots, preparations, physical attempts and asset claims. It grants no settlement or byte-release authority. Terminal compaction and safe unload remain release gates. The legacy whole-queue pilot projection keeps its explicit limit. Production queue consumers use bounded pages or exact operation reads.
+Capture discovery grants no settlement or byte-release authority. The phased operation replaces native snapshots with prepared payloads and then compact publication facts. Existing claims retain required files through these phases. Safe unload remains a release gate. The legacy whole-queue pilot projection keeps its explicit limit. Production queue consumers use bounded pages or exact operation reads.
 
 
 ## Saved screenshot sync
@@ -1070,3 +1070,16 @@ Original metadata edits use the existing capture and portable backup codecs. Inc
 Screenshot publication compares the incoming original with the retained inline Blob outside its database transaction. Byte equality binds to the exact predecessor metadata digest. Unchanged original bytes permit metadata and workspace changes while projects retain that source. Different bytes still require source replacement admission. Native revision and causal checks remain authoritative after Trash, restore, deletion and recreation.
 
 A project replica can retain an exact known source in Trash after dependency state admission. Its native rows and file binding must still match. Default prepared source admission and new local project selection retain their active-source requirements. This change adds no operation kind, database store, journal format or release authority. Unsupported source families and safe unload remain separate release gates.
+
+
+## Manual project graph in experimental sync
+
+Manual project capture uses the existing backup inventory over frozen native rows. The snapshot includes private source reviews, their referenced assets, saved exports, thumbnails and presentation files. It preserves native effect snapshots and authored project metadata. Recording and scenario sources still require their own capture owners.
+
+The complete portable inventory differs from the resources required for editing. Editing dependencies start with project materials and follow their source review references. Export-only reviews and saved export bodies do not become editing dependencies. Incoming preparation selects the required objects before staging and preserves borrowed native file references.
+
+The ready journal contains JSON metadata and exact immutable file references. Effect references identify each snapshot and asset slot. Thumbnail and presentation references identify their native aggregate. No ready payload contains a Blob. Native apply hydrates detached binary values before its write transaction and verifies effect integrity with the existing project verifier.
+
+The transaction repeats profile, causal, dependency and native revision checks. It publishes project rows, private sources, sidecars and the receipt atomically. A failed transaction preserves the predecessor and permits an exact retry. A matching completed receipt permits replay without staging files or another native revision.
+
+Outgoing preparation reuses existing file references for originals and saved exports. It stages only portable objects without a native file binding. Prepared claims retain those temporary files until publication or recovery permits release. This change adds no store, queue, journal domain or transfer platform. Production activation and safe unload remain separate release gates.

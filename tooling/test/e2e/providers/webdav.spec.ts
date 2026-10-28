@@ -4,6 +4,10 @@ import { promisify } from 'node:util';
 import { expect, type Page } from '@playwright/test';
 import { test, openProvider, saveProof } from './webdav-fixtures';
 import { applyHarnessBootstrap } from '../extension-critical.helpers';
+import {
+  EFFECT_BUNDLE_CORPUS,
+  readEffectBundleCorpusArchive,
+} from '../../support/effect-v1-corpus.test-support';
 
 async function upload(page: Page, key: string) {
   return page.evaluate((key) => window.webdavTransferHarness.uploadSource(key), key);
@@ -246,24 +250,33 @@ for (const viewport of [
   }, info) => {
     test.setTimeout(180_000);
     const sender = await openProvider(lab, info, 'portable-source');
-    const sent = await sender.page.evaluate(async () => {
-      const seed = await window.webdavTransferHarness.portable.source();
-      const media = await window.webdavTransferHarness.portable.outgoing.sendHistory(seed.mediaId);
-      const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
-        seed.projectId,
-        true
-      );
-      return {
-        ...seed,
-        spaceId: projects.at(-1)!.spaceId,
-        metadataAttempts: media.length + projects.length,
-        logicalOperations: media.length + projects.length - 1,
-        objects: [
-          ...media.flatMap((item) => item.files),
-          ...projects.flatMap((item) => item.files),
-        ],
-      };
-    });
+    const specimen = EFFECT_BUNDLE_CORPUS.find(
+      (item) => item.accepted && item.artifact.includes('asset-bearing-conformance')
+    );
+    if (!specimen) throw new Error('Asset-bearing corpus is missing.');
+    const sent = await sender.page.evaluate(
+      async (effectBundleBytes) => {
+        const seed = await window.webdavTransferHarness.portable.source({ effectBundleBytes });
+        const media = await window.webdavTransferHarness.portable.outgoing.sendHistory(
+          seed.mediaId
+        );
+        const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
+          seed.projectId,
+          true
+        );
+        return {
+          ...seed,
+          spaceId: projects.at(-1)!.spaceId,
+          metadataAttempts: media.length + projects.length,
+          logicalOperations: media.length + projects.length - 1,
+          objects: [
+            ...media.flatMap((item) => item.files),
+            ...projects.flatMap((item) => item.files),
+          ],
+        };
+      },
+      Array.from(readEffectBundleCorpusArchive(specimen))
+    );
     try {
       for (const object of sent.objects)
         expect(await lab.externalProof(object.key)).toEqual({
@@ -309,11 +322,37 @@ for (const viewport of [
       );
       expect(admitted.projectId).toBe(sent.projectId);
       expect(admitted.objects).toEqual(sent.editing);
-      // Discovery manifests plus exactly two editing originals; no saved export request.
-      expect(lab.proxy.counts.gets - beforeDownload).toBe(sent.metadataAttempts + 2);
+      expect(admitted.graph).toEqual(sent.graph);
+      expect(admitted.presentation).toEqual(sent.presentation);
+      expect(admitted.graph).toMatchObject({
+        text: ['WebDAV retained text overlay'],
+        documents: ['WebDAV retained document edit'],
+        comments: ['WebDAV retained comment'],
+        rememberedBackground: true,
+        dormantMaterials: 1,
+        effectInstances: [{ enabled: false, kind: 'standalone' }],
+      });
+      expect(admitted.graph.effects).toHaveLength(1);
+      expect(admitted.graph.effects[0]!.assets).toHaveLength(1);
+      // Native admission reads the complete editing closure, including effect and presentation bytes.
+      expect(lab.proxy.counts.gets - beforeDownload).toBeGreaterThan(sent.metadataAttempts + 2);
       const editingProof = admitted.objects;
       await target.context.close();
       target = await openProvider(lab, info, 'portable-target');
+      expect(
+        await target.page.evaluate(
+          (id) => window.webdavTransferHarness.portable.proof(id),
+          sent.projectId
+        )
+      ).toEqual(admitted);
+      await target.page.evaluate(async (input) => {
+        await window.webdavTransferHarness.portable.outgoing.scan(input.spaceId);
+        await window.webdavTransferHarness.portable.outgoing.receive(
+          input.spaceId,
+          'video-project',
+          input.projectId
+        );
+      }, sent);
       expect(
         await target.page.evaluate(
           (id) => window.webdavTransferHarness.portable.proof(id),
@@ -406,6 +445,7 @@ for (const viewport of [
       expect(backup.clonedProjectId).not.toBe(sent.projectId);
       expect(backup.restoredObjects).toEqual(sent.editing);
       expect(backup.originalUnchanged).toBe(true);
+      expect(backup.graph).toEqual(sent.graph);
       await target.context.close();
       target = await openProvider(lab, info, 'portable-target');
       const persisted = await target.page.evaluate(
@@ -413,8 +453,26 @@ for (const viewport of [
         sent.projectId
       );
       expect(persisted.objects).toEqual(editingProof);
+      expect(persisted.graph).toEqual(sent.graph);
       expect(persisted.exportAbsent).toBe(true);
       expect(persisted.clipIds).toContain(sent.clipId);
+      // The editor created unpublished local changes. An older remote head must refuse admission.
+      await expect(
+        target.page.evaluate(async (input) => {
+          await window.webdavTransferHarness.portable.outgoing.scan(input.spaceId);
+          await window.webdavTransferHarness.portable.outgoing.receive(
+            input.spaceId,
+            'video-project',
+            input.projectId
+          );
+        }, sent)
+      ).rejects.toThrow('Sync root is not ready for native preparation.');
+      expect(
+        await target.page.evaluate(
+          (id) => window.webdavTransferHarness.portable.proof(id),
+          sent.projectId
+        )
+      ).toEqual(persisted);
       await writeFile(
         info.outputPath('portable-native-proof.json'),
         JSON.stringify(

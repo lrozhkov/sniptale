@@ -6,7 +6,10 @@ import {
 } from '../../composition/persistence/projects/index.test-support';
 import type { AssetRef } from '../../composition/persistence/assets';
 import { VideoProjectAssetType } from '../../features/video/project/types';
-import { encodePortableVideoProjectAssetRefs } from '../media-hub-backup/v6/root-codecs/projects';
+import {
+  encodePortableVideoProjectAssetRefs,
+  parsePortableVideoProjectMetadata,
+} from '../media-hub-backup/v6/root-codecs/projects';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { projectSyncCatalog, type CatalogAttempt } from './catalog-graph';
 import { createSyncAttempt, hashSyncText, parseSyncAttemptText } from './wire-record';
@@ -423,6 +426,57 @@ it('prepares editing bytes and checks borrowed originals without downloading exp
   expect(io.read).toHaveBeenCalledOnce();
   expect(f.reads).toEqual([
     f.selected.objects.find((item) => item.objectId === 'private')!.remoteKey,
+  ]);
+});
+it('stages the project preview and thumbnail closure without downloading saved exports', async () => {
+  const f = await fixture(true);
+  const envelope = projectEnvelope();
+  const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
+  metadata.thumbnail = { objectId: 'thumbnail', createdAt: 1, updatedAt: 1, width: 1, height: 1 };
+  metadata.presentation = {
+    entry: {
+      aggregateId: 'project',
+      aggregateKind: 'video-project',
+      presentationRevision: 0,
+      updatedAt: 1,
+    },
+    thumbnailObjectId: 'presentation-thumbnail',
+    previewObjectId: 'preview',
+  };
+  envelope.metadata = JSON.parse(JSON.stringify(metadata));
+  envelope.objects.push(
+    object('thumbnail', 'thumbnail.png'),
+    object('presentation-thumbnail', 'presentation.png'),
+    object('preview', 'preview.png')
+  );
+  envelope.descriptor.objectCount = envelope.objects.length;
+  envelope.descriptor.totalBytes = 15;
+  const selected = await attempt(parseRootEnvelope(envelope), 'complete-project', 4);
+  const media = await attempt(mediaEnvelope().envelope, 'media-op');
+  for (const item of selected.objects) f.data.set(item.remoteKey, new Blob([new Uint8Array(3)]));
+  const catalog = { ...f.catalog, ...projectSyncCatalog('space', [media, selected]) };
+  const args = {
+    ...f,
+    catalog,
+    rootKind: 'video-project' as const,
+    rootId: 'project',
+    signal: new AbortController().signal,
+  };
+  const journal = await prepareCatalogReplica(args);
+  if (journal.payload.kind !== 'video-project') throw new Error('Expected project.');
+  expect(io.staged).toEqual(['private', 'thumbnail', 'presentation-thumbnail', 'preview']);
+  expect(f.reads).not.toContain(
+    selected.objects.find((item) => item.objectId === 'export')!.remoteKey
+  );
+  expect(journal.payload.input.root.thumbnail!.ref.assetId).toBe('staged-thumbnail');
+  expect(journal.payload.input.root.presentation!.previewRef!.assetId).toBe('staged-preview');
+  io.journal.mockRejectedValueOnce(new Error('Native refusal'));
+  await expect(prepareCatalogReplica(args)).rejects.toThrow('Native refusal');
+  expect(io.discard.mock.calls).toEqual([
+    ['staged-private'],
+    ['staged-thumbnail'],
+    ['staged-presentation-thumbnail'],
+    ['staged-preview'],
   ]);
 });
 it('refuses missing borrowed bytes before staging or publication', async () => {

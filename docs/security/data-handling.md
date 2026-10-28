@@ -404,3 +404,12 @@ The verifier establishes an observed identity, not future server stability. Prod
 Soft Trash keeps the original files and dependency ownership. Restore does not grant file replacement authority. Incoming original reuse requires native predecessor admission and comparison of the actual bytes with the selected operation digest. A matching size, MIME type or stored digest is insufficient. An existing resource reader protects reused files until the publication journal retains them. Failed preparation removes only its new staging files.
 
 Screenshot byte comparison occurs before native publication. The result binds to the predecessor metadata digest and native revision checks. A changed original still requires source replacement admission. An exact retained dependency in Trash can support a checked project replica. New local project source selection still requires restoration. These rules grant no remote deletion or local unload authority.
+
+
+### Manual project binary recovery
+
+Experimental project sync uses the existing backup metadata policy. Frozen native snapshots can retain effect Blobs, project thumbnails and presentation files. Ready journals retain only JSON metadata and exact staged file references. Native publication reads and validates those files before its write transaction. Effect verification validates actual binary content before publication.
+
+Incoming project preparation downloads only resources required for editing. Export-only review resources and saved export bodies remain remote until another supported operation needs them. Originals and saved exports remain ordinary files for an independent DAV client.
+
+Completed receipt replay does not require temporary files. Cleanup follows existing claims and native ownership. A publication receipt alone grants no authority to remove local source data. No project metadata, review content, file bytes or staged references enter diagnostics through this change.

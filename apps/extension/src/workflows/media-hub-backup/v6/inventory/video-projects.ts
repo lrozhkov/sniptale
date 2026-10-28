@@ -233,25 +233,23 @@ function buildPortableEffectSnapshots(
   });
 }
 
-/**
- * Archives review-owned external assets (imported music or voiceover) that the
- * project's own asset list does not carry; stale references are skipped so a
- * missing source cannot block the whole backup.
- */
+/** Collect each review-owned resource once, including its private review dependencies. */
 async function buildReviewReferencedAssets(
   db: VideoInventoryDatabase,
   entry: VideoProjectEntry,
   collector: ReturnType<typeof createObjectCollector>,
   collectedIds: ReadonlySet<string>,
-  referencedIds: ReadonlySet<string>
+  referencedIds: Set<string>
 ) {
   const output = [];
+  const collected = new Set(collectedIds);
   let fallbackIndex = 0;
   const prefix = 'project-asset:';
   for (const reference of referencedIds) {
     if (!reference.startsWith(prefix)) continue;
     const id = reference.slice(prefix.length);
-    if (collectedIds.has(id)) continue;
+    if (collected.has(id)) continue;
+    collected.add(id);
     const raw = await db.get(PROJECT_ASSETS_STORE, id);
     const asset = raw === undefined ? null : parseProjectAssetEntry(raw);
     if (!asset) throw new Error(`Review-referenced project asset is missing: ${reference}.`);
@@ -262,11 +260,24 @@ async function buildReviewReferencedAssets(
       media?.filename ?? createReadableAssetFilename(fallbackIndex++, asset.mimeType);
     const file = await readInventoryAssetFile(db, asset.assetId, filename);
     const portable = encodePortableVideoProjectAsset(asset);
+    const videoReview =
+      !media && asset.mimeType.startsWith('video/')
+        ? await readVideoReviewForBackup({
+            db,
+            aggregateId: createProjectAssetMediaId(asset.id),
+            sourceAssetId: asset.assetId,
+          })
+        : undefined;
+    if (videoReview) {
+      for (const reference of collectReviewAssetReferences(videoReview.workspace))
+        referencedIds.add(reference);
+    }
     output.push({
       entry: portable,
       ...(media
         ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
         : { publishToLibrary: false }),
+      ...(videoReview ? { videoReview: encodePortableReviewAssetRefs(videoReview) } : {}),
       filename,
       objectId: collector.addObject(
         file,

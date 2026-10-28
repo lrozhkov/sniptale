@@ -1,3 +1,14 @@
+import {
+  EFFECT_BUNDLE_CORPUS,
+  readEffectBundleCorpusArchive,
+} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
+import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
+import { parseVideoProjectEntry, parseVideoProjectMetadataEntry } from '../projects/read-guards';
+import {
+  parsePreparedVideoProjectReplicaRoot,
+  type PreparedVideoProjectReplicaRoot,
+} from '../sync-capture/prepared-project';
+import type { AssetRef } from '../assets';
 import { expect, it } from 'vitest';
 import type { MediaAssetSource } from './contracts';
 import {
@@ -156,4 +167,150 @@ it('matches native prepared image publication and refuses an unknown target', as
       { id: 'image-two' }
     )
   ).toBe(true);
+});
+
+async function stagedEffectProjectJournal() {
+  const corpus = EFFECT_BUNDLE_CORPUS.find(
+    ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
+  );
+  if (!corpus) throw new Error('Expected asset-bearing effect corpus');
+  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
+  if (!imported.ok) throw new Error('Expected accepted effect corpus');
+  const document = imported.bundle.documents[0]!;
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'pending-effect-project' });
+  const material = entry.project.assets[0]!;
+  if (material.source.kind !== 'project-asset') throw new Error('Expected private source material');
+  const privateId = material.source.projectAssetId;
+  const libraryId = 'retained-library-source';
+  const originMediaId = 'retained-private-origin';
+  const snapshotId = `effect:${document.sha256}`;
+  const reference = (assetId: string, mimeType: string, size: number): AssetRef => ({
+    assetId,
+    mimeType,
+    size,
+    createdAt: 1,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+  });
+  const sourceRef = reference(
+    'pending-private-source',
+    material.metadata.mimeType,
+    material.metadata.size
+  );
+  const root: PreparedVideoProjectReplicaRoot = {
+    entry: {
+      ...entry,
+      project: {
+        ...entry.project,
+        assets: [
+          ...entry.project.assets,
+          {
+            ...material,
+            id: 'library-material',
+            source: { kind: 'library-asset', mediaId: libraryId },
+          },
+        ],
+        effectSnapshots: [
+          {
+            assets: document.assets.map((asset) => ({
+              id: asset.id,
+              kind: asset.kind,
+              mimeType: asset.mimeType,
+              byteLength: asset.byteLength,
+              sha256: asset.sha256,
+            })),
+            documentId: document.document.id,
+            id: snapshotId,
+            kind: document.document.kind,
+            retainedByteLength:
+              new TextEncoder().encode(document.source).byteLength +
+              document.assets.reduce((total, asset) => total + asset.byteLength, 0),
+            schemaVersion: 'sniptale.effect.v1',
+            sha256: document.sha256,
+            source: document.source,
+          },
+        ],
+      },
+    },
+    assets: [
+      {
+        entry: {
+          id: privateId,
+          assetId: sourceRef.assetId,
+          size: sourceRef.size,
+          mimeType: sourceRef.mimeType,
+          createdAt: 1,
+          originMediaId,
+        },
+        filename: 'private.webm',
+        publishToLibrary: false,
+        ref: sourceRef,
+      },
+    ],
+    snapshotRefs: document.assets.map((asset, index) => ({
+      snapshotId,
+      assetId: asset.id,
+      ref: reference(`pending-effect-${index}`, asset.mimeType, asset.byteLength),
+    })),
+  };
+  const jsonRoot: unknown = JSON.parse(JSON.stringify(root));
+  const parsed = parsePreparedVideoProjectReplicaRoot(jsonRoot);
+  expect(parseVideoProjectMetadataEntry(parsed.entry)).not.toBeNull();
+  expect(parseVideoProjectEntry(parsed.entry)).toBeNull();
+  expect(parsed.entry.project.effectSnapshots![0]!.assets.length).toBeGreaterThan(0);
+  expect(
+    parsed.entry.project.effectSnapshots![0]!.assets.every((asset) => !Object.hasOwn(asset, 'blob'))
+  ).toBe(true);
+  return {
+    libraryId,
+    originMediaId,
+    privateMediaId: `project-asset:${privateId}`,
+    journal: {
+      domain: 'sync-replica' as const,
+      payload: {
+        kind: 'video-project',
+        input: {
+          root: parsed,
+          dependencies: [],
+          operationId: 'pending-effect-operation',
+          sourceDigest: 'a'.repeat(64),
+          spaceId: 'pending-effect-space',
+          profileCreatedAt: 1,
+          connectionGeneration: 1,
+          expectedBasis: [],
+          expectedLocalGeneration: 0,
+          expectedWorkspaceRevision: null,
+        },
+      },
+    },
+  };
+}
+
+it('retains related sources without globally blocking disjoint media for valid staged effect metadata', async () => {
+  const { mediaHasPendingPublication } = await import('./delete-cascade.sources');
+  const data = await stagedEffectProjectJournal();
+  for (const id of [data.libraryId, data.privateMediaId, data.originMediaId]) {
+    expect(mediaHasPendingPublication(data.journal, { id })).toBe(true);
+  }
+  expect(mediaHasPendingPublication(data.journal, { id: 'disjoint-media' })).toBe(false);
+});
+
+it('fails closed for malformed staged effect project metadata', async () => {
+  const { mediaHasPendingPublication } = await import('./delete-cascade.sources');
+  const data = await stagedEffectProjectJournal();
+  const malformed = {
+    ...data.journal,
+    payload: {
+      ...data.journal.payload,
+      input: {
+        ...data.journal.payload.input,
+        root: {
+          ...data.journal.payload.input.root,
+          entry: { ...data.journal.payload.input.root.entry, workspaceRevision: -1 },
+        },
+      },
+    },
+  };
+  expect(() => parsePreparedVideoProjectReplicaRoot(malformed.payload.input.root)).toThrow();
+  expect(mediaHasPendingPublication(malformed, { id: 'disjoint-media' })).toBe(true);
 });

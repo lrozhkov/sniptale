@@ -98,7 +98,7 @@ function preparationDraft(
   };
 }
 
-async function discardImageTransport(
+async function discardTransportCopies(
   staged: StagedArchiveObject[],
   cause: unknown
 ): Promise<never> {
@@ -109,11 +109,11 @@ async function discardImageTransport(
     result.status === 'rejected' ? [result.reason as unknown] : []
   );
   if (failures.length)
-    throw new AggregateError([cause, ...failures], 'Image preparation cleanup failed.');
+    throw new AggregateError([cause, ...failures], 'Sync preparation cleanup failed.');
   throw cause;
 }
 
-async function settleImageTransport(
+async function settleTransportCopies(
   staged: StagedArchiveObject[],
   accepted: PreparedOutgoingOperation
 ) {
@@ -130,7 +130,7 @@ async function settleImageTransport(
     result.status === 'rejected' ? [result.reason as unknown] : []
   );
   if (failures.length)
-    throw new AggregateError(failures, 'Competing image preparation cleanup failed.');
+    throw new AggregateError(failures, 'Competing sync preparation cleanup failed.');
 }
 
 async function prepareNativeOutgoing(capture: CapturedChange): Promise<PreparedOutgoingOperation> {
@@ -142,23 +142,30 @@ async function prepareNativeOutgoing(capture: CapturedChange): Promise<PreparedO
   let staged: StagedArchiveObject[] = [];
   let accepted: PreparedOutgoingOperation;
   try {
-    if (capture.change.kind === 'image' && portable) {
+    if (portable) {
       const sources = new Map(portable.objects.map((object) => [object.ref.objectId, object.blob]));
-      staged = await stageRootObjects({
-        objects: portable.envelope.objects,
-        expectedSha256: digests,
-        readObject: async (object) => {
-          const blob = sources.get(object.objectId);
-          check(blob);
-          return { pipeTo: (sink, signal) => blob.stream().pipeTo(sink, signal ? { signal } : {}) };
-        },
-      });
+      const unbound = portable.envelope.objects.filter(
+        (object) => !portable.bindings.some((binding) => binding.objectId === object.objectId)
+      );
+      if (unbound.length)
+        staged = await stageRootObjects({
+          objects: unbound,
+          expectedSha256: new Map(
+            unbound.map((object) => [object.objectId, digests.get(object.objectId)!])
+          ),
+          readObject: async (object) => {
+            const blob = sources.get(object.objectId);
+            check(blob);
+            return {
+              pipeTo: (sink, signal) => blob.stream().pipeTo(sink, signal ? { signal } : {}),
+            };
+          },
+        });
     }
     const objects: OutgoingObjects = (portable?.objects ?? []).map((object) => {
       const ref =
-        capture.change.kind === 'image'
-          ? staged.find((item) => item.objectId === object.ref.objectId)?.ref
-          : portable?.bindings.find((item) => item.objectId === object.ref.objectId)?.ref;
+        portable?.bindings.find((item) => item.objectId === object.ref.objectId)?.ref ??
+        staged.find((item) => item.objectId === object.ref.objectId)?.ref;
       const sha256 = digests.get(object.ref.objectId);
       check(ref && sha256 && (ref.sha256 === null || ref.sha256 === sha256));
       return { objectId: object.ref.objectId, ref, sha256, filename: object.ref.filename };
@@ -168,13 +175,13 @@ async function prepareNativeOutgoing(capture: CapturedChange): Promise<PreparedO
       preparationDraft(capture, portable, objects)
     );
   } catch (error) {
-    return discardImageTransport(staged, error);
+    return discardTransportCopies(staged, error);
   }
-  if (staged.length) await settleImageTransport(staged, accepted);
+  if (staged.length) await settleTransportCopies(staged, accepted);
   return accepted;
 }
 
-/** Freeze portable bytes once; image preparation reads authoritative immutable native Blob slots. */
+/** Freeze portable bytes once from authoritative native capture and reuse existing file refs. */
 export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedOutgoingOperation> {
   const parsed = parseSyncCaptureRecord(structuredClone(value));
   check(parsed?.kind === 'sync-operation');
@@ -182,16 +189,12 @@ export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedO
   if (existing) {
     await parseSyncOperationText(existing.recordText);
     const accepted = await commitPreparedOutgoingOperation(parsed, existing);
-    if (parsed.source.changeKind === 'image')
-      await releaseAssetReadyProtection(accepted.objects.map((object) => object.ref.assetId));
+    await releaseAssetReadyProtection(accepted.objects.map((object) => object.ref.assetId));
     return accepted;
   }
   check(parsed.phase === 'native');
-  if (parsed.change.kind === 'image') {
-    const capture = await loadNativeOutgoingCapture(parsed);
-    return runWithDurableAssetOperation(() => prepareNativeOutgoing(capture));
-  }
-  return prepareNativeOutgoing(parsed);
+  const capture = await loadNativeOutgoingCapture(parsed);
+  return runWithDurableAssetOperation(() => prepareNativeOutgoing(capture));
 }
 
 async function reserveAttempt(prepared: PreparedOutgoingOperation, retained: Map<string, string>) {

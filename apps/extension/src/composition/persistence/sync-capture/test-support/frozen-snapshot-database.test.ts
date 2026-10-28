@@ -9,7 +9,7 @@ import { createArchivePathAllocator } from '../../../archive-transfer';
 import { buildVideoProjectRootInventory } from '../../../../workflows/media-hub-backup/v6/inventory/video-projects';
 import { createMediaHubBackupExportOptions } from '../../../../workflows/media-hub-backup/v6/options';
 import { readVideoReviewForBackup } from '../../review-workspaces/backup-restore';
-import { createFrozenSnapshotDatabase } from './frozen-snapshot-database';
+import { createFrozenSnapshotDatabase } from '../../../../workflows/sync-transfer/captured-project';
 
 const files = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('../../assets/opfs-store', async (importOriginal) => ({

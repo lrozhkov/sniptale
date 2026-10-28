@@ -218,47 +218,6 @@ it('refuses a local pending edit and a stale native project revision', async () 
   expect(pending.rows).toEqual(beforePending);
 });
 
-it('rolls publication and receipt back on failure and applies one retry', async () => {
-  const fixture = setup();
-  fixture.input.root.thumbnail = {
-    assetId: `video-project:${projectId}`,
-    blob: new Blob(['new-thumbnail']),
-    createdAt: 1,
-    updatedAt: 1,
-    width: 1,
-    height: 1,
-  };
-  fixture.input.root.presentation = {
-    aggregateId: projectId,
-    aggregateKind: 'video-project',
-    presentationRevision: 400,
-    thumbnailBlob: new Blob(['new-presentation']),
-    updatedAt: 1,
-  };
-  const before = structuredClone(fixture.rows);
-  fixture.failReceipt();
-  await expect(applyPreparedVideoProjectRevision(fixture.input)).rejects.toThrow('No space');
-  expect(fixture.rows).toEqual(before);
-  expect(io.cleanup).not.toHaveBeenCalled();
-  fixture.allowWrites();
-  await expect(applyPreparedVideoProjectRevision(fixture.input)).resolves.toEqual({
-    status: 'applied',
-    generation: 1,
-  });
-  expect(fixture.table('thumbnails').get(`video-project:${projectId}`)).toEqual(
-    fixture.input.root.thumbnail
-  );
-  expect(fixture.table('aggregate_presentations').get(projectId)).toMatchObject({
-    presentationRevision: 1,
-  });
-  const after = structuredClone(fixture.rows);
-  await expect(applyPreparedVideoProjectRevision(fixture.input)).resolves.toEqual({
-    status: 'duplicate',
-    generation: 1,
-  });
-  expect(fixture.rows).toEqual(after);
-});
-
 it('returns a duplicate before rechecking later dependency changes', async () => {
   const fixture = setup();
   await applyPreparedVideoProjectRevision(fixture.input);

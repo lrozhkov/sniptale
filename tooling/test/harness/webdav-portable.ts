@@ -19,6 +19,27 @@ import {
   createVideoProjectAsset,
 } from '../../../apps/extension/src/features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../apps/extension/src/features/video/project/factories/clip';
+import {
+  createTextClip,
+  createEffectHostClip,
+} from '../../../apps/extension/src/features/video/project/factories/overlay-clip';
+import {
+  addVideoProjectManualText,
+  applyVideoProjectTextEdit,
+} from '../../../apps/extension/src/features/video/project/text/authoring';
+import { editReviewTextFragment } from '../../../apps/extension/src/features/video/review/text-document';
+import { addVideoProjectCommentDocument } from '../../../apps/extension/src/features/video/project/comments/authoring';
+import { importEffectBundleZip } from '../../../apps/extension/src/features/video/project/effect-bundle/import/zip';
+import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../apps/extension/src/features/video/project/effect-instance/integrity';
+import {
+  commitProjectAggregatePresentation,
+  getAggregatePresentation,
+} from '../../../apps/extension/src/composition/persistence/aggregate-presentations';
+import {
+  saveMediaThumbnail,
+  getMediaThumbnail,
+} from '../../../apps/extension/src/composition/persistence/media-library/index.library';
+import type { VideoProject } from '../../../apps/extension/src/features/video/project/types';
 import { VideoProjectAssetType } from '../../../apps/extension/src/features/video/project/types';
 import {
   saveProjectAsset,
@@ -119,6 +140,154 @@ async function nativeProjectObjects(entry: VideoProjectEntry) {
   return objects;
 }
 
+async function presentationProof(projectId: string) {
+  const presentation = await getAggregatePresentation({ kind: 'video-project', id: projectId });
+  const thumbnail = await getMediaThumbnail(`video-project:${projectId}`);
+  return {
+    thumbnail: thumbnail ? await hash(thumbnail.blob) : null,
+    presentationThumbnail: presentation ? await hash(presentation.thumbnailBlob) : null,
+    preview: presentation?.previewBlob ? await hash(presentation.previewBlob) : null,
+  };
+}
+
+/** Compare authored native content and actual retained effect bytes across identities. */
+async function retainedGraph(project: VideoProject) {
+  await verifyVideoProjectEffectSnapshotIntegrity(project);
+  return {
+    text: project.clips.filter((clip) => clip.type === 'TEXT').map((clip) => clip.text),
+    documents: (project.textDocuments ?? []).flatMap((entry) =>
+      entry.document.fragments.map((fragment) => fragment.text)
+    ),
+    comments: (project.commentDocuments ?? []).flatMap((entry) =>
+      entry.annotations.map((note) => note.text)
+    ),
+    rememberedBackground: Boolean(project.sceneBackground?.remembered?.image),
+    dormantMaterials: project.assets.filter(
+      (asset) => !project.clips.some((clip) => 'assetId' in clip && clip.assetId === asset.id)
+    ).length,
+    effects: await Promise.all(
+      (project.effectSnapshots ?? []).map(async (snapshot) => ({
+        source: snapshot.source,
+        sha256: snapshot.sha256,
+        assets: await Promise.all(
+          snapshot.assets.map(async (asset) => ({
+            size: asset.blob.size,
+            sha256: await hash(asset.blob),
+          }))
+        ),
+      }))
+    ),
+    effectInstances: (project.effectInstances ?? []).map((instance) => ({
+      enabled: instance.enabled,
+      kind: instance.kind,
+    })),
+  };
+}
+
+async function retainFullGraph(project: VideoProject, bytes: number[]) {
+  const imported = await importEffectBundleZip(Uint8Array.from(bytes));
+  check(imported.ok, 'Asset-bearing corpus import failed.');
+  const document = imported.bundle.documents[0];
+  check(document && document.assets.length > 0, 'Corpus has no retained resources.');
+  const overlay = {
+    ...structuredClone(project.tracks[0]!),
+    id: crypto.randomUUID(),
+    isRoot: false,
+    visible: false,
+    order: -1,
+    name: 'Retained authored overlays',
+  };
+  project.tracks.push(overlay);
+  const text = createTextClip(overlay.id, project.width, project.height, 0);
+  text.text = 'WebDAV retained text overlay';
+  text.duration = 2;
+  project.clips.push(text);
+  const added = addVideoProjectManualText(project, {
+    documentId: crypto.randomUUID(),
+    fragmentId: crypto.randomUUID(),
+    start: 0,
+  });
+  check(added.ok, 'Manual text document creation failed.');
+  const fragment = added.entry.document.fragments[0];
+  check(fragment, 'Manual text fragment is missing.');
+  const edited = editReviewTextFragment(added.entry.document, fragment.id, {
+    text: 'WebDAV retained document edit',
+    end: 2,
+  });
+  check(edited.ok, 'Manual document edit failed.');
+  const changed = applyVideoProjectTextEdit(added.project, added.entry, {
+    document: edited.document,
+  });
+  check(changed.ok, 'Manual document change was refused.');
+  const noted = addVideoProjectCommentDocument(changed.project, {
+    id: crypto.randomUUID(),
+    target: { kind: 'project' },
+    note: {
+      id: crypto.randomUUID(),
+      text: 'WebDAV retained comment',
+      anchor: { kind: 'point', time: 0.5 },
+    },
+  });
+  check(noted.ok, 'Manual comment creation failed.');
+  project = noted.project;
+  const snapshotId = `effect:${document.sha256}`;
+  project.effectSnapshots = [
+    {
+      id: snapshotId,
+      documentId: document.document.id,
+      kind: document.document.kind,
+      schemaVersion: 'sniptale.effect.v1',
+      source: document.source,
+      sha256: document.sha256,
+      retainedByteLength:
+        new TextEncoder().encode(document.source).byteLength +
+        document.assets.reduce((total, asset) => total + asset.byteLength, 0),
+      assets: document.assets.map((asset) => ({
+        id: asset.id,
+        kind: asset.kind,
+        mimeType: asset.mimeType,
+        byteLength: asset.byteLength,
+        sha256: asset.sha256,
+        blob: new Blob([Uint8Array.from(asset.bytes).buffer], { type: asset.mimeType }),
+      })),
+    },
+  ];
+  const instanceId = crypto.randomUUID();
+  project.effectInstances = [
+    {
+      id: instanceId,
+      snapshotId,
+      kind: document.document.kind,
+      controls: {},
+      duration: 2,
+      startTime: 0,
+      playbackRate: 1,
+      enabled: false,
+      target: { kind: 'scene' },
+    },
+  ];
+  project.clips.push(
+    createEffectHostClip({
+      duration: 2,
+      effectInstanceId: instanceId,
+      name: 'Retained corpus effect',
+      projectHeight: project.height,
+      projectWidth: project.width,
+      startTime: 0,
+      trackId: overlay.id,
+    })
+  );
+  const remembered = project.assets.at(-1);
+  check(remembered, 'Remembered material is missing.');
+  project.sceneBackground = {
+    kind: 'solid',
+    color: '#000000',
+    remembered: { image: { kind: 'image', assetId: remembered.id, imageFit: 'contain' } },
+  };
+  await verifyVideoProjectEffectSnapshotIntegrity(project);
+  return project;
+}
+
 /** Read the editor's native after-image and verify its ordinary backup objects. */
 async function afterSaveBackup(input: {
   projectId: string;
@@ -181,7 +350,10 @@ async function afterSaveBackup(input: {
     await reader.close();
   }
   const expected = input.editing.map((item) => `${item.size}:${item.sha256}`).sort();
-  const actual = objects.map((item) => `${item.size}:${item.sha256}`).sort();
+  const actual = objects
+    .filter((item) => input.editing.some((source) => source.sha256 === item.sha256))
+    .map((item) => `${item.size}:${item.sha256}`)
+    .sort();
   check(
     JSON.stringify(actual) === JSON.stringify(expected) &&
       !objects.some((item) => item.sha256 === input.exported.sha256),
@@ -203,6 +375,11 @@ async function afterSaveBackup(input: {
   const restored = parseVideoProjectEntry(await db.get('video_projects', newIds[0]));
   check(restored, 'The restored native project is invalid.');
   const restoredObjects = await nativeProjectObjects(restored);
+  const graph = await retainedGraph(current.project);
+  check(
+    JSON.stringify(await retainedGraph(restored.project)) === JSON.stringify(graph),
+    'Backup restore changed retained authored content or effect bytes.'
+  );
   check(
     JSON.stringify(restoredObjects.map((item) => `${item.size}:${item.sha256}`).sort()) ===
       JSON.stringify(expected),
@@ -224,6 +401,7 @@ async function afterSaveBackup(input: {
     imported: imported.imported,
     clonedProjectId: restored.id,
     restoredObjects,
+    graph,
     originalUnchanged: true,
     generation: captured.generation,
     portableEncoded: true,
@@ -236,7 +414,7 @@ async function afterSaveBackup(input: {
 
 /** Disposable acceptance fixture, not a production ingress or wire protocol. */
 export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
-  async function source() {
+  async function source(fullGraph?: { effectBundleBytes: number[] }) {
     await profile(19);
     const privateId = crypto.randomUUID();
     const borrowedId = crypto.randomUUID();
@@ -247,7 +425,7 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
     });
     await saveProjectAsset(borrowedId, borrowedFile, borrowedFile.type, 'borrowed 100%.png');
     const mediaId = `project-asset:${borrowedId}`;
-    const candidate = createEmptyVideoProject('WebDAV native portable project', 1280, 720);
+    let candidate = createEmptyVideoProject('WebDAV native portable project', 1280, 720);
     candidate.assets = [privateFile, borrowedFile].map((file, index) =>
       createVideoProjectAsset(
         index ? 'Borrowed original' : 'Private original',
@@ -287,10 +465,49 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
       };
     });
     candidate.duration = 2;
+    if (fullGraph) {
+      const dormantId = crypto.randomUUID();
+      const dormantFile = await png('rgb(140,30,160)');
+      await saveProjectAsset(
+        dormantId,
+        dormantFile,
+        dormantFile.type,
+        'remembered-background.png',
+        Date.now(),
+        { publishToLibrary: false }
+      );
+      candidate.assets.push(
+        createVideoProjectAsset(
+          'Remembered background',
+          VideoProjectAssetType.IMAGE,
+          { kind: 'project-asset', projectAssetId: dormantId },
+          { ...candidate.assets[0]!.metadata, size: dormantFile.size }
+        )
+      );
+      candidate = await retainFullGraph(candidate, fullGraph.effectBundleBytes);
+    }
     let entry = await saveVideoProject(candidate, {
       expectedProject: null,
       expectedWorkspaceRevision: null,
     });
+    if (fullGraph) {
+      const thumbnail = await png('rgb(90,110,130)');
+      const preview = await png('rgb(130,110,90)');
+      await saveMediaThumbnail({
+        assetId: `video-project:${entry.id}`,
+        blob: thumbnail,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        width: 24,
+        height: 24,
+      });
+      await commitProjectAggregatePresentation({
+        expectedWorkspaceRevision: entry.workspaceRevision ?? 0,
+        ref: { kind: 'video-project', id: entry.id },
+        thumbnailBlob: thumbnail,
+        previewBlob: preview,
+      });
+    }
     const exportId = crypto.randomUUID();
     const exported = await png('rgb(20,80,240)');
     await saveProjectExport({
@@ -321,12 +538,9 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
       mediaId,
       clipId: candidate.clips[0]!.id,
       exportId,
-      editing: await Promise.all(
-        [privateFile, borrowedFile].map(async (file) => ({
-          size: file.size,
-          sha256: await hash(file),
-        }))
-      ),
+      editing: await nativeProjectObjects(entry),
+      graph: await retainedGraph(entry.project),
+      presentation: await presentationProof(entry.id),
       exported: { size: exported.size, sha256: await hash(exported) },
     };
   }
@@ -361,7 +575,10 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
     check((await db.getAll('project_exports')).length === 0, 'Saved export was resurrected.');
     return {
       projectId,
+      workspaceRevision: entry.workspaceRevision ?? 0,
       objects,
+      graph: await retainedGraph(entry.project),
+      presentation: await presentationProof(entry.id),
       clipIds: entry.project.clips.map((clip) => clip.id),
       exportAbsent: true,
     };

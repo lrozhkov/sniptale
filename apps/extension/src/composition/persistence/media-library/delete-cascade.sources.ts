@@ -38,7 +38,7 @@ import { parseRecordingEntry } from '../recordings/index.guards';
 import {
   parseProjectAssetEntry,
   parseProjectExportEntry,
-  parseVideoProjectEntry,
+  parseVideoProjectMetadataEntry,
 } from '../projects/read-guards';
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 import {
@@ -347,7 +347,7 @@ function syncReplicaRetainsMedia(payload: unknown, mediaId: string): boolean {
   const dependencies = input['dependencies'];
   if (!isRecord(root) || !Array.isArray(root['assets']) || !Array.isArray(dependencies))
     return true;
-  const project = parseVideoProjectEntry(root['entry']);
+  const project = parseVideoProjectMetadataEntry(root['entry']);
   if (!project) return true;
   for (const dependency of dependencies) {
     if (!isRecord(dependency) || !isRecord(dependency['entry'])) return true;

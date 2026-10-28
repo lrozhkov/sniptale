@@ -37,9 +37,12 @@ vi.mock('../../composition/persistence/sync-capture/outgoing-results', () => ({
 vi.mock('../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/assets')>()),
   readAssetFile: io.read,
+  runWithDurableAssetOperation: async (operation: () => Promise<unknown>) => operation(),
+  releaseAssetReadyProtection: async () => undefined,
 }));
 vi.mock('../../composition/persistence/sync-capture/outgoing', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/sync-capture/outgoing')>()),
+  loadNativeOutgoingCapture: async (capture: CapturedChange) => structuredClone(capture),
   loadPreparedOutgoingOperation: async (_space: string, operationId: string) =>
     structuredClone(io.prepared.get(operationId) ?? null),
   commitPreparedOutgoingOperation: async (

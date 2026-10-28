@@ -1,3 +1,10 @@
+import { initDB } from '../infrastructure/indexed-db/core';
+import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
+import {
+  hydratePreparedVideoProjectReplicaRoot,
+  parsePreparedVideoProjectReplicaRoot,
+  type PreparedVideoProjectReplicaRoot,
+} from './prepared-project';
 import type { IDBPTransaction } from 'idb';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
@@ -59,7 +66,7 @@ interface ApplyIdentity {
 }
 
 async function readAppliedReceipt(
-  tx: ApplyTransaction,
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   identity: ApplyIdentity
 ): Promise<number | null> {
   const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(identity.receiptKey);
@@ -154,7 +161,7 @@ interface PreparedVideoProjectDependency {
 }
 
 export interface ApplyPreparedVideoProjectRevisionInput {
-  root: PreparedVideoProjectRevision;
+  root: PreparedVideoProjectReplicaRoot;
   operationId: string;
   sourceDigest: string;
   connectionGeneration: number;
@@ -165,6 +172,10 @@ export interface ApplyPreparedVideoProjectRevisionInput {
   expectedWorkspaceRevision: number | null;
   dependencies: readonly PreparedVideoProjectDependency[];
 }
+
+type HydratedProjectInput = Omit<ApplyPreparedVideoProjectRevisionInput, 'root'> & {
+  root: PreparedVideoProjectRevision;
+};
 
 class VideoProjectApplyConflictError extends Error {
   constructor(
@@ -190,7 +201,6 @@ function preparedAssets(root: PreparedVideoProjectRevision) {
       !entry ||
       !ref ||
       assets.has(entry.id) ||
-      asset.videoReview ||
       (!asset.reusePublished && asset.publishToLibrary !== false) ||
       ref.assetId !== entry.assetId ||
       ref.mimeType !== entry.mimeType ||
@@ -210,7 +220,7 @@ class PreparedProjectClosure {
   private readonly neededMedia = new Set<string>();
 
   constructor(
-    private readonly input: ApplyPreparedVideoProjectRevisionInput,
+    private readonly input: HydratedProjectInput,
     private readonly project: VideoProjectEntry['project']
   ) {
     this.assets = preparedAssets(input.root);
@@ -221,7 +231,17 @@ class PreparedProjectClosure {
 
   assertComplete(): void {
     for (const asset of this.project.assets) this.admitSource(asset);
-    for (const asset of this.assets.values()) {
+    for (const id of this.neededAssets) {
+      const asset = this.assets.get(id);
+      if (!asset) throw new VideoProjectApplyConflictError('unsupported-project');
+      if (asset.videoReview) {
+        if (asset.reusePublished) throw new VideoProjectApplyConflictError('unsupported-project');
+        for (const reference of collectReviewAssetReferences(asset.videoReview.workspace)) {
+          if (!reference.startsWith('project-asset:'))
+            throw new VideoProjectApplyConflictError('unsupported-project');
+          this.neededAssets.add(reference.slice('project-asset:'.length));
+        }
+      }
       if (asset.entry.originMediaId) this.neededMedia.add(asset.entry.originMediaId);
       if (asset.reusePublished) this.neededMedia.add(`project-asset:${asset.entry.id}`);
     }
@@ -256,6 +276,7 @@ class PreparedProjectClosure {
     const count = this.input.dependencies.length;
     if (
       this.neededAssets.size !== this.assets.size ||
+      [...this.neededAssets].some((id) => !this.assets.has(id)) ||
       this.neededMedia.size !== count ||
       this.media.size !== count ||
       [...this.neededMedia].some((id) => !this.media.has(id))
@@ -275,7 +296,7 @@ class PreparedProjectClosure {
   }
 }
 
-function assertSupportedClosure(input: ApplyPreparedVideoProjectRevisionInput): void {
+function assertSupportedClosure(input: HydratedProjectInput): void {
   const project = parseVideoProjectEntry(input.root.entry);
   if (!project || !isSupportedCaptureProject(project.project) || input.dependencies.length > 32)
     throw new VideoProjectApplyConflictError('unsupported-project');
@@ -359,7 +380,7 @@ async function assertNoPendingLocalCapture(tx: ApplyTransaction, rootKey: string
 
 async function assertLocalPredecessor(
   tx: ApplyTransaction,
-  input: ApplyPreparedVideoProjectRevisionInput,
+  input: HydratedProjectInput,
   identity: ApplyIdentity
 ) {
   const raw: unknown = await tx.objectStore(VIDEO_PROJECTS_STORE).get(identity.rootId);
@@ -438,10 +459,7 @@ async function assertPrivateBindings(
   }
 }
 
-async function admitApplication(
-  tx: ApplyTransaction,
-  candidate: ApplyPreparedVideoProjectRevisionInput
-) {
+async function admitApplication(tx: ApplyTransaction, candidate: HydratedProjectInput) {
   const root = candidate.root;
   const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
   if (
@@ -520,6 +538,32 @@ async function publishApplication(
   await tx.objectStore(SYNC_CAPTURE_STORE).add(context.receipt);
 }
 
+async function readCompletedProjectReceipt(
+  input: ApplyPreparedVideoProjectRevisionInput
+): Promise<number | null> {
+  const db = await initDB();
+  const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+  const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+  if (
+    !profile ||
+    profile.kind !== 'profile' ||
+    profile.spaceId !== input.spaceId ||
+    profile.createdAt !== input.profileCreatedAt
+  )
+    throw new VideoProjectApplyConflictError('profile-changed');
+  const rootKey = captureRootKey(input.spaceId, 'video-project', input.root.entry.id);
+  const result = await readAppliedReceipt(tx, {
+    spaceId: input.spaceId,
+    rootId: input.root.entry.id,
+    rootKey,
+    receiptKey: JSON.stringify(['applied-operation', input.spaceId, input.operationId]),
+    operationId: input.operationId,
+    sourceDigest: input.sourceDigest,
+  });
+  await tx.done;
+  return result;
+}
+
 /** Caller retains staged bytes and verifies sourceDigest before this native command. */
 export async function applyPreparedVideoProjectRevision(
   input: ApplyPreparedVideoProjectRevisionInput,
@@ -544,8 +588,16 @@ export async function applyPreparedVideoProjectRevision(
         input.expectedWorkspaceRevision < 0))
   )
     throw new VideoProjectApplyConflictError('invalid-input');
-  const candidate = structuredClone(input);
-  const { root } = candidate;
+  const staged = structuredClone(input);
+  try {
+    staged.root = parsePreparedVideoProjectReplicaRoot(staged.root);
+  } catch {
+    throw new VideoProjectApplyConflictError('unsupported-project');
+  }
+  const duplicate = await readCompletedProjectReceipt(staged);
+  if (duplicate !== null) return { status: 'duplicate', generation: duplicate };
+  const root = await hydratePreparedVideoProjectReplicaRoot(staged.root);
+  const candidate: HydratedProjectInput = { ...staged, root };
   const operation = buildPhysicalDeleteOperation([]);
   const result = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(

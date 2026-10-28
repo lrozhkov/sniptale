@@ -4,13 +4,18 @@ import {
   type VideoExportFormat as VideoExportFormatValue,
   type VideoProject,
 } from '../../../features/video/project/types';
-import { parseHydratableVideoProject } from '../../../features/video/project/validation';
+import {
+  parseHydratableVideoProject,
+  isHydratableVideoProjectMetadata,
+  type VideoProjectMetadata,
+} from '../../../features/video/project/validation';
 import { isNumber, isRecord, isString } from '../infrastructure/indexed-db/read-primitives';
 import type {
   StoredProjectAssetEntry,
   StoredProjectExportEntry,
   UnsupportedVideoProjectMetadata,
   VideoProjectEntry,
+  VideoProjectMetadataEntry,
   VideoProjectEntryReadResult,
 } from './contracts';
 import { parseLibraryLifecycle } from '../library-lifecycle/parser';
@@ -99,7 +104,22 @@ export function parseVideoProjectEntry(value: unknown): VideoProjectEntry | null
   return result.status === 'ready' ? result.entry : null;
 }
 
+/** Admit metadata with the same entry identity, lifecycle and revision rules as native rows. */
+export function parseVideoProjectMetadataEntry(value: unknown): VideoProjectMetadataEntry | null {
+  const result = parseProjectEntryResult(value, isHydratableVideoProjectMetadata);
+  return result.status === 'ready' ? result.entry : null;
+}
+
 export function parseVideoProjectEntryResult(value: unknown): VideoProjectEntryReadResult {
+  return parseProjectEntryResult(value, isVideoProject);
+}
+
+function parseProjectEntryResult<Project extends VideoProjectMetadata>(
+  value: unknown,
+  admitProject: (project: unknown) => project is Project
+):
+  | { status: 'ready'; entry: Omit<VideoProjectEntry, 'project'> & { project: Project } }
+  | Exclude<VideoProjectEntryReadResult, { status: 'ready' }> {
   if (value === undefined) return { status: 'notFound' };
   if (!isRecord(value)) {
     return { diagnostics: ['invalid-video-project-entry'], status: 'invalid' };
@@ -118,7 +138,7 @@ export function parseVideoProjectEntryResult(value: unknown): VideoProjectEntryR
   }
   if (
     !isString(value['id']) ||
-    !isVideoProject(value['project']) ||
+    !admitProject(value['project']) ||
     value['project'].id !== value['id'] ||
     !isNumber(value['createdAt']) ||
     !isNumber(value['updatedAt'])

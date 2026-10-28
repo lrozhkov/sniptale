@@ -14,7 +14,22 @@ import {
 import type { AssetRef } from '../../composition/persistence/assets';
 import { parseCapturedVideoProjectRows } from '../../composition/persistence/sync-capture/guards';
 import { encodeCapturedPortableRoot } from './captured-root';
-import { preparePortableReplica, type PortableReplicaAdmission } from './prepared-root';
+import {
+  parsePortableSyncRoot,
+  portableSyncDependencyIds,
+  portableSyncEditingObjectIds,
+  preparePortableReplica,
+  type PortableReplicaAdmission,
+} from './prepared-root';
+import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
+import { encodePortableReviewAssetRefs } from '../../composition/persistence/review-workspaces/asset-refs';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import type { PortableVideoReview } from '../../composition/persistence/review-workspaces/backup-restore';
+import {
+  EFFECT_BUNDLE_CORPUS,
+  readEffectBundleCorpusArchive,
+} from '../../../../../tooling/test/support/effect-v1-corpus.test-support';
+import { importEffectBundleZip } from '../../features/video/project/effect-bundle/import/zip';
 
 const io = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('../../composition/persistence/assets', async (original) => ({
@@ -117,6 +132,215 @@ function projectRows(borrowed = false): CapturedVideoProjectRows {
       : [],
   };
 }
+function portableReview(aggregateId: string, resource: string) {
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.music = [
+    {
+      id: 'music',
+      assetId: `project-asset:${resource}`,
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  const review: PortableVideoReview = {
+    workspace: {
+      aggregateId,
+      formatVersion: 1,
+      revision: 1,
+      cursor: 0,
+      history: [],
+      advanced,
+      source: { duration: 2, width: 640, height: 360, size: 1024, mimeType: 'video/webm' },
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    draft: null,
+  };
+  return encodePortableReviewAssetRefs(review);
+}
+
+it('publishes only the editing source-review closure and excludes export-only review dependencies', async () => {
+  const encoded = await encodeCapturedPortableRoot(
+    capture({ kind: 'video-project', rows: projectRows() })
+  );
+  const metadata = parsePortableVideoProjectMetadata(encoded.envelope.metadata);
+  const source = metadata.projectAssets[0]!;
+  source.videoReview = portableReview(`project-asset:${source.entry.id}`, 'editing-audio');
+  const original = encoded.envelope.objects[0]!;
+  const objects = ['editing-audio', 'export-only', 'saved-export'].map((objectId) => ({
+    ...original,
+    objectId,
+    filename: 'source.webm',
+    path: `_sniptale/assets/${objectId}/source.webm`,
+  }));
+  metadata.projectAssets.push(
+    {
+      entry: { id: 'editing-audio', mimeType: 'video/webm', size: 1024, createdAt: 1 },
+      filename: 'editing.webm',
+      objectId: 'editing-audio',
+      publishToLibrary: false,
+    },
+    {
+      entry: { id: 'export-only', mimeType: 'video/webm', size: 1024, createdAt: 1 },
+      filename: 'export-only.webm',
+      objectId: 'export-only',
+      libraryMediaId: 'project-asset:export-only',
+    }
+  );
+  const { assetId: _assetId, ...exported } = createProjectExportEntry({
+    id: 'saved',
+    projectId: metadata.entry.id,
+    assetId: 'sender-export',
+    size: 1024,
+    mimeType: 'video/webm',
+    filename: 'saved.webm',
+  });
+  metadata.projectExports.push({
+    entry: exported,
+    objectId: 'saved-export',
+    videoReview: portableReview('export:saved', 'export-only'),
+  });
+  const envelope = {
+    ...encoded.envelope,
+    metadata: JSON.parse(JSON.stringify(metadata)),
+    objects: [...encoded.envelope.objects, ...objects],
+    descriptor: { ...encoded.envelope.descriptor, objectCount: 4, totalBytes: 4096 },
+  };
+  const parsed = await parsePortableSyncRoot(envelope);
+  expect(portableSyncDependencyIds(parsed)).toEqual([]);
+  expect(portableSyncEditingObjectIds(parsed)).toEqual([source.objectId, 'editing-audio']);
+  const context = { ...admission(), expectedLocalGeneration: 1, expectedBasis: ['old-project'] };
+  const verifiedObjects = new Map([
+    [source.objectId, ref('source-target')],
+    ['editing-audio', ref('audio-target')],
+  ]);
+  const payload = await preparePortableReplica({
+    envelope,
+    verifiedObjects,
+    senderDependencies: [],
+    admission: context,
+  });
+  if (payload.kind !== 'video-project') throw new Error('Expected project.');
+  expect(payload.input.root.assets).toHaveLength(2);
+  expect(payload.input.root.assets.some((asset) => asset.entry.id === 'export-only')).toBe(false);
+  const audio = payload.input.root.assets.find((asset) => asset.ref.assetId === 'audio-target')!;
+  const restored = payload.input.root.assets.find(
+    (asset) => asset.ref.assetId === 'source-target'
+  )!;
+  expect(restored.videoReview!.workspace.advanced.audio.music[0]!.assetId).toBe(
+    `project-asset:${audio.entry.id}`
+  );
+  expect(restored.videoReview!.workspace.aggregateId).toBe(`project-asset:${restored.entry.id}`);
+  expect(payload.input.dependencies).toEqual([]);
+  verifiedObjects.delete('editing-audio');
+  await expect(
+    preparePortableReplica({
+      envelope,
+      verifiedObjects,
+      senderDependencies: [],
+      admission: context,
+    })
+  ).rejects.toThrow('binding');
+});
+it('binds portable effect slots to staged refs while retaining only native JSON snapshot metadata', async () => {
+  const corpus = EFFECT_BUNDLE_CORPUS.find(
+    ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
+  );
+  if (!corpus) throw new Error('Missing asset-bearing effect fixture.');
+  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
+  if (!imported.ok) throw new Error('Invalid effect fixture.');
+  const document = imported.bundle.documents[0]!;
+  const encoded = await encodeCapturedPortableRoot(
+    capture({ kind: 'video-project', rows: projectRows() })
+  );
+  const metadata = parsePortableVideoProjectMetadata(encoded.envelope.metadata);
+  const snapshotId = `effect:${document.sha256}`;
+  metadata.entry.project.effectSnapshots = [
+    {
+      id: snapshotId,
+      documentId: document.document.id,
+      kind: document.document.kind,
+      schemaVersion: 'sniptale.effect.v1',
+      sha256: document.sha256,
+      source: document.source,
+      retainedByteLength:
+        new TextEncoder().encode(document.source).byteLength +
+        document.assets.reduce((sum, asset) => sum + asset.byteLength, 0),
+      assets: document.assets.map((asset, index) => ({
+        objectId: `effect-${index}`,
+        id: asset.id,
+        kind: asset.kind,
+        byteLength: asset.byteLength,
+        mimeType: asset.mimeType,
+        sha256: asset.sha256,
+      })),
+    },
+  ];
+  const effectObjects = document.assets.map((asset, index) => ({
+    objectId: `effect-${index}`,
+    path: `_sniptale/assets/effect-${index}/effect.bin`,
+    filename: 'effect.bin',
+    mimeType: asset.mimeType,
+    size: asset.byteLength,
+  }));
+  const envelope = {
+    ...encoded.envelope,
+    metadata: JSON.parse(JSON.stringify(metadata)),
+    objects: [...encoded.envelope.objects, ...effectObjects],
+    descriptor: {
+      ...encoded.envelope.descriptor,
+      objectCount: 1 + effectObjects.length,
+      totalBytes: 1024 + effectObjects.reduce((sum, object) => sum + object.size, 0),
+    },
+  };
+  const sourceObjectId = encoded.envelope.objects[0]!.objectId;
+  const verifiedObjects = new Map([
+    [sourceObjectId, ref('native-source')],
+    ...effectObjects.map((object): [string, AssetRef] => [
+      object.objectId,
+      {
+        ...ref(`staged-${object.objectId}`),
+        size: object.size,
+        mimeType: object.mimeType,
+        sha256: null,
+      },
+    ]),
+  ]);
+  const parsed = await parsePortableSyncRoot(envelope);
+  expect(portableSyncEditingObjectIds(parsed)).toEqual([
+    sourceObjectId,
+    ...effectObjects.map((object) => object.objectId),
+  ]);
+  const args = { envelope, verifiedObjects, senderDependencies: [], admission: admission() };
+  const payload = await preparePortableReplica(args);
+  if (payload.kind !== 'video-project') throw new Error('Expected project.');
+  expect(payload.input.root.snapshotRefs).toEqual(
+    document.assets.map((asset, index) => ({
+      snapshotId,
+      assetId: asset.id,
+      ref: verifiedObjects.get(`effect-${index}`),
+    }))
+  );
+  const slots = payload.input.root.entry.project.effectSnapshots![0]!.assets;
+  expect(slots).toEqual(
+    document.assets.map((asset) => ({
+      id: asset.id,
+      kind: asset.kind,
+      byteLength: asset.byteLength,
+      mimeType: asset.mimeType,
+      sha256: asset.sha256,
+    }))
+  );
+  expect(JSON.stringify(payload.input.root.entry)).not.toContain('"objectId"');
+  expect(slots.every((asset) => !('blob' in asset))).toBe(true);
+  verifiedObjects.delete(effectObjects[0]!.objectId);
+  await expect(preparePortableReplica(args)).rejects.toThrow('binding');
+});
 it('encodes a frozen original and binds verified target bytes through the existing native row parser', async () => {
   const original = mediaRows();
   const result = await encodeCapturedPortableRoot(capture({ kind: 'media', rows: original }));

@@ -145,14 +145,9 @@ export function matchesCapture(
       capture.phase === 'prepared' &&
       JSON.stringify(record) === JSON.stringify(projectPreparedOperation(capture))
     );
-  // Image transport copies are verified by the workflow before this native admission.
-  if (capture.change.kind === 'image') return true;
-  const refs =
-    capture.change.kind === 'tombstone'
-      ? []
-      : capture.change.kind === 'media'
-        ? [capture.change.rows.ref]
-        : capture.change.rows.refs;
+  // The workflow verifies inline Blob copies against the authoritative native inventory.
+  if (capture.change.kind === 'image' || capture.change.kind === 'video-project') return true;
+  const refs = capture.change.kind === 'tombstone' ? [] : [capture.change.rows.ref];
   return record.objects.every((item) =>
     refs.some((ref) => JSON.stringify(ref) === JSON.stringify(item.ref))
   );

@@ -1,3 +1,4 @@
+import { collectCapturedProjectEditingMediaIds } from './project-snapshot';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
@@ -148,27 +149,16 @@ async function captureMediaDependencies(
   rows: CapturedVideoProjectRows
 ): Promise<CapturedMediaDependency[]> {
   const dependencies: CapturedMediaDependency[] = [];
-  const editingMedia = collectEditingMediaIds(rows);
+  const editingMedia = collectCapturedProjectEditingMediaIds(rows);
   for (const media of rows.media) {
     if (media.source.kind === 'project-export') {
       if (editingMedia.has(media.id)) throw new UnsupportedSyncCaptureGraphError();
       continue;
     }
-    dependencies.push(await captureMediaDependency(tx, profile, media.id));
+    if (editingMedia.has(media.id))
+      dependencies.push(await captureMediaDependency(tx, profile, media.id));
   }
   return dependencies;
-}
-
-/** Independent export mirrors are outside the editing dependency set. */
-function collectEditingMediaIds(rows: CapturedVideoProjectRows): Set<string> {
-  const mediaIds = new Set<string>();
-  for (const asset of rows.project.project.assets) {
-    if (asset.source.kind === 'library-asset') mediaIds.add(asset.source.mediaId);
-    if (asset.source.kind === 'project-asset' && asset.source.originMediaId)
-      mediaIds.add(asset.source.originMediaId);
-  }
-  for (const asset of rows.assets) if (asset.originMediaId) mediaIds.add(asset.originMediaId);
-  return mediaIds;
 }
 
 /** Capture an absent dependency in this transaction. Existing heads must match the native snapshot. */

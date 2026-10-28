@@ -71,7 +71,18 @@ import {
   isString,
 } from './primitives';
 import { isVideoProjectTrack } from './tracks';
-import { hasValidEffectProjectReferences, isEffectProjectBranches } from './effect-instances';
+import {
+  hasValidEffectProjectReferences,
+  isEffectProjectBranches,
+  isEffectProjectMetadataBranches,
+} from './effect-instances';
+
+/** Project metadata before retained effect asset bytes are hydrated. */
+export type VideoProjectMetadata = Omit<VideoProject, 'effectSnapshots'> & {
+  effectSnapshots?: (Omit<NonNullable<VideoProject['effectSnapshots']>[number], 'assets'> & {
+    assets: Omit<NonNullable<VideoProject['effectSnapshots']>[number]['assets'][number], 'blob'>[];
+  })[];
+};
 
 function isProjectSource(value: unknown): boolean {
   if (!isRecord(value) || !isEnumValue(value['kind'], VideoProjectSourceKind)) {
@@ -300,7 +311,7 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   );
 }
 
-function isHydratableProjectShape(value: unknown): value is VideoProject {
+function isHydratableProjectShape(value: unknown, effectMode: 'native' | 'metadata'): boolean {
   return (
     isRecord(value) &&
     isProjectSchemaCompatible(value) &&
@@ -362,7 +373,9 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
       parseSceneBackgroundSettings(value['sceneBackground']) !== null) &&
     (value['transitions'] === undefined || isBoundedArray(value['transitions'], isTransition)) &&
     !Object.hasOwn(value, 'templateInstances') &&
-    isEffectProjectBranches(value['effectSnapshots'], value['effectInstances']) &&
+    (effectMode === 'native'
+      ? isEffectProjectBranches(value['effectSnapshots'], value['effectInstances'])
+      : isEffectProjectMetadataBranches(value['effectSnapshots'], value['effectInstances'])) &&
     (value['objectTracks'] === undefined || isBoundedArray(value['objectTracks'], isObjectTrack)) &&
     (value['utilityLanes'] === undefined || isUtilityLanes(value['utilityLanes'])) &&
     (value['motionRegions'] === undefined || isBoundedArray(value['motionRegions'], isMotionRegion))
@@ -526,7 +539,12 @@ function hasValidClipReferences(
 }
 
 export function isHydratableVideoProject(value: unknown): value is VideoProject {
-  return isHydratableProjectShape(value);
+  return isHydratableProjectShape(value, 'native');
+}
+
+/** Admit project metadata shape before byte hydration and full native reference checks. */
+export function isHydratableVideoProjectMetadata(value: unknown): value is VideoProjectMetadata {
+  return isHydratableProjectShape(value, 'metadata');
 }
 
 export function parseHydratableVideoProject(value: unknown): VideoProject | null {

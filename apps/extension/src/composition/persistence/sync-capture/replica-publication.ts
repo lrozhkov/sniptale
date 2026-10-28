@@ -1,4 +1,8 @@
 import {
+  collectPreparedProjectReplicaRefs,
+  parsePreparedVideoProjectReplicaRoot,
+} from './prepared-project';
+import {
   applyPreparedImageReplica,
   parseApplyPreparedImageReplicaInput,
   type ApplyPreparedImageReplicaInput,
@@ -15,15 +19,13 @@ import {
 } from '../assets';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { parseProjectAssetEntry, parseVideoProjectEntry } from '../projects/read-guards';
-import type { PreparedVideoProjectRevision } from '../projects/revision-publication';
 import { applyPreparedMediaReplica, type ApplyPreparedMediaReplicaInput } from './apply-media';
 import {
   applyPreparedVideoProjectRevision,
   type ApplyPreparedVideoProjectRevisionInput,
 } from './apply-video-project';
 import { MAX_CAPTURE_METADATA_BYTES, MAX_CAPTURE_ROWS } from './contracts';
-import { isSupportedCaptureProject, parseCapturedMediaRows } from './guards';
+import { parseCapturedMediaRows } from './guards';
 
 export type PreparedReplicaPayload =
   | { kind: 'image'; input: ApplyPreparedImageReplicaInput }
@@ -105,36 +107,6 @@ function parseIdentity(value: Record<string, unknown>) {
   };
 }
 
-function parsePreparedAsset(value: unknown): PreparedVideoProjectRevision['assets'][number] {
-  if (!isRecord(value)) throw new Error('Invalid prepared project asset.');
-  const entry = parseProjectAssetEntry(value['entry']);
-  const ref = parseAssetRef(value['ref']);
-  const filename = value['filename'];
-  const publishToLibrary = value['publishToLibrary'];
-  const reusePublished = value['reusePublished'];
-  if (
-    !entry ||
-    !ref ||
-    typeof filename !== 'string' ||
-    filename.length > 1024 ||
-    value['videoReview'] !== undefined ||
-    (publishToLibrary !== undefined && typeof publishToLibrary !== 'boolean') ||
-    (reusePublished !== undefined && typeof reusePublished !== 'boolean') ||
-    (!reusePublished && publishToLibrary !== false) ||
-    entry.assetId !== ref.assetId ||
-    entry.mimeType !== ref.mimeType ||
-    entry.size !== ref.size
-  )
-    throw new Error('Unsupported prepared project asset.');
-  return {
-    entry,
-    ref,
-    filename,
-    ...(publishToLibrary === undefined ? {} : { publishToLibrary }),
-    ...(reusePublished === undefined ? {} : { reusePublished }),
-  };
-}
-
 function parseDependency(
   value: unknown
 ): ApplyPreparedVideoProjectRevisionInput['dependencies'][number] {
@@ -167,8 +139,6 @@ function parseProjectInput(value: Record<string, unknown>): ApplyPreparedVideoPr
   const expectedWorkspaceRevision = value['expectedWorkspaceRevision'];
   if (
     !isRecord(root) ||
-    root['thumbnail'] !== undefined ||
-    root['presentation'] !== undefined ||
     !Array.isArray(root['assets']) ||
     root['assets'].length > MAX_CAPTURE_ROWS ||
     !Array.isArray(dependencies) ||
@@ -176,13 +146,11 @@ function parseProjectInput(value: Record<string, unknown>): ApplyPreparedVideoPr
     (expectedWorkspaceRevision !== null && !ordinal(expectedWorkspaceRevision))
   )
     throw new Error('Unsupported prepared project journal.');
-  const entry = parseVideoProjectEntry(root['entry']);
-  if (!entry || !isSupportedCaptureProject(entry.project))
-    throw new Error('Unsupported prepared project journal.');
+  const prepared = parsePreparedVideoProjectReplicaRoot(root);
   return {
     ...parseIdentity(value),
     expectedWorkspaceRevision,
-    root: { entry, assets: root['assets'].map(parsePreparedAsset) },
+    root: prepared,
     dependencies: dependencies.map(parseDependency),
   };
 }
@@ -222,7 +190,7 @@ function protectedRefs(payload: PreparedReplicaPayload): AssetRef[] {
       : payload.kind === 'media'
         ? [payload.input.rows.ref]
         : [
-            ...payload.input.root.assets.map((asset) => asset.ref),
+            ...collectPreparedProjectReplicaRefs(payload.input.root),
             ...payload.input.dependencies.map((dependency) => dependency.ref),
           ];
   const unique = new Map<string, AssetRef>();

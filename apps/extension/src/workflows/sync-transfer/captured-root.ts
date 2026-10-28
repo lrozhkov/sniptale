@@ -4,17 +4,10 @@ import type { CapturedMediaDependency } from '../../composition/persistence/sync
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import { assertPortableJson, parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import type { ArchiveRootObjectSource } from '../media-hub-backup/v6/contracts';
-import {
-  createObjectCollector,
-  createReadableAssetFilename,
-} from '../media-hub-backup/v6/inventory/helpers';
+import { createObjectCollector } from '../media-hub-backup/v6/inventory/helpers';
 import { encodePortableMediaOriginal } from '../media-hub-backup/v6/root-codecs/media';
-import {
-  encodePortableVideoProjectAsset,
-  encodePortableVideoProjectAssetRefs,
-  encodePortableVideoProjectExport,
-} from '../media-hub-backup/v6/root-codecs/projects';
 import { encodeCapturedImageRoot } from './captured-image';
+import { encodeCapturedProjectRoot } from './captured-project';
 import { parsePortableSyncRoot } from './prepared-root';
 
 /** Encodes an admitted frozen capture without reading live native rows or creating an archive. */
@@ -39,6 +32,11 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     await parsePortableSyncRoot(portable.envelope);
     return portable;
   }
+  if (capture.change.kind === 'video-project') {
+    const portable = await encodeCapturedProjectRoot(capture.change.rows);
+    await parsePortableSyncRoot(portable.envelope);
+    return portable;
+  }
   const collector = createObjectCollector('sync', createArchivePathAllocator());
   const bindings: { objectId: string; ref: AssetRef }[] = [];
   const add = async (ref: AssetRef, filename: string) => {
@@ -50,7 +48,6 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     return objectId;
   };
   let metadata: unknown;
-  let dependencies: CapturedMediaDependency[] = [];
   if (capture.change.kind === 'media') {
     const rows = capture.change.rows;
     metadata = {
@@ -59,49 +56,6 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
         projectAsset: rows.projectAsset,
         originalObjectId: await add(rows.ref, rows.media.filename),
       }),
-    };
-  } else if (capture.change.kind === 'video-project') {
-    const rows = capture.change.rows;
-    if (!rows.mediaDependencies) throw new Error('Captured dependency evidence is missing.');
-    dependencies = rows.mediaDependencies;
-    const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
-    const projectAssets = [];
-    const ids = new Set(
-      rows.project.project.assets.flatMap((asset) =>
-        asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
-      )
-    );
-    for (const [index, asset] of rows.assets.filter((asset) => ids.has(asset.id)).entries()) {
-      const media = rows.media.find((entry) => entry.id === `project-asset:${asset.id}`);
-      const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
-      const ref = refs.get(asset.assetId);
-      if (!ref) throw new Error('Captured asset reference is missing.');
-      projectAssets.push({
-        entry: encodePortableVideoProjectAsset(asset),
-        filename,
-        objectId: await add(ref, filename),
-        ...(media ? { libraryMediaId: media.id } : { publishToLibrary: false }),
-      });
-    }
-    const projectExports = [];
-    for (const entry of rows.exports) {
-      const ref = refs.get(entry.assetId);
-      if (!ref) throw new Error('Captured export reference is missing.');
-      projectExports.push({
-        entry: encodePortableVideoProjectExport(entry),
-        objectId: await add(ref, entry.filename),
-        ...(rows.media.some((media) => media.id === `export:${entry.id}`)
-          ? { libraryMediaId: `export:${entry.id}` }
-          : {}),
-      });
-    }
-    metadata = {
-      entry: {
-        ...rows.project,
-        project: encodePortableVideoProjectAssetRefs(rows.project.project),
-      },
-      projectAssets,
-      projectExports,
     };
   } else throw new Error('Unsupported portable capture.');
   // The portable boundary accepts JSON without optional native undefined properties.
@@ -120,5 +74,5 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     objects: collector.objects.map((object) => object.ref),
   });
   await parsePortableSyncRoot(envelope);
-  return { envelope, objects: collector.objects, dependencies, bindings };
+  return { envelope, objects: collector.objects, dependencies: [], bindings };
 }

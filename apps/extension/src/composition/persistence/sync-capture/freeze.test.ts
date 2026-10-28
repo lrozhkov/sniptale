@@ -1,3 +1,15 @@
+import {
+  EFFECT_BUNDLE_CORPUS,
+  readEffectBundleCorpusArchive,
+} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
+import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
+import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
+import { workspace as reviewWorkspace } from '../review-workspaces/backup-restore.test-support';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
+import { parseVideoProjectEntry } from '../projects/read-guards';
+import type { VideoWorkspace } from '../review-workspaces/contracts';
+import { collectCapturedProjectEditingMediaIds } from './project-snapshot';
 import { expect, it, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
@@ -308,4 +320,193 @@ it('refuses media sidecars and origin relations that have no bounded publication
   await expect(freezeMediaInTransaction(data.tx, data.mirror.id)).rejects.toBeInstanceOf(
     UnsupportedSyncCaptureGraphError
   );
+});
+
+function privateReview(
+  aggregateId: string,
+  sourceAssetId: string,
+  supplementaryId: string,
+  source: { size: number; mimeType: string }
+): VideoWorkspace {
+  const workspace: VideoWorkspace = {
+    ...reviewWorkspace,
+    aggregateId,
+    sourceAssetId,
+    source: { ...reviewWorkspace.source, size: source.size, mimeType: source.mimeType },
+    history: [],
+    cursor: 0,
+    advanced: {
+      ...reviewWorkspace.advanced,
+      webcam: createQuickEditWebcam(
+        `project-asset:${supplementaryId}`,
+        reviewWorkspace.source,
+        reviewWorkspace.source
+      ),
+    },
+  };
+  const parsed = parseVideoWorkspace(workspace);
+  if (!parsed) throw new Error('Expected valid native private review fixture');
+  return parsed;
+}
+
+function seedSupplementary(data: ReturnType<typeof fixture>, id: string, originMediaId?: string) {
+  const entry = createProjectAssetEntry({
+    id,
+    assetId: `${id}-bytes`,
+    mimeType: 'video/webm',
+    size: 6,
+    ...(originMediaId ? { originMediaId } : {}),
+  });
+  data.stores.assets.seed(id, entry);
+  data.stores.refs.seed(entry.assetId, reference(entry.assetId, entry.mimeType, entry.size));
+  if (originMediaId) {
+    const media = createMediaLibraryEntry({
+      id: originMediaId,
+      source: { kind: 'stored-asset', assetId: `${originMediaId}-bytes` },
+      mimeType: entry.mimeType,
+      size: entry.size,
+    });
+    data.stores.media.seed(media.id, media);
+    data.stores.refs.seed(
+      `${originMediaId}-bytes`,
+      reference(`${originMediaId}-bytes`, media.mimeType, media.size)
+    );
+  }
+  return entry;
+}
+
+it('freezes recursive private source reviews and their supplementary children without enumeration', async () => {
+  const data = fixture();
+  data.stores.media.rows.delete(JSON.stringify(data.mirror.id));
+  const child = seedSupplementary(data, 'review-camera');
+  const nested = seedSupplementary(data, 'nested-camera');
+  const sourceReview = privateReview(data.mirror.id, data.asset.assetId, child.id, data.asset);
+  const childReview = privateReview(`project-asset:${child.id}`, child.assetId, nested.id, child);
+  data.stores.videoWorkspaces.seed(sourceReview.aggregateId, sourceReview);
+  data.stores.videoWorkspaces.seed(childReview.aggregateId, childReview);
+  const rows = await freezeVideoProjectInTransaction(data.tx, data.project.id);
+  expect(new Set(rows.assets.map((asset) => asset.id))).toEqual(
+    new Set([data.asset.id, child.id, nested.id])
+  );
+  expect(rows.reviews).toEqual(
+    expect.arrayContaining([
+      { workspace: sourceReview, draft: null },
+      { workspace: childReview, draft: null },
+    ])
+  );
+  expect(rows.reviews).toHaveLength(2);
+  expect(rows.refs).toEqual(
+    expect.arrayContaining([
+      reference(child.assetId, child.mimeType, child.size),
+      reference(nested.assetId, nested.mimeType, nested.size),
+    ])
+  );
+  sourceReview.advanced.webcam!.assetId = 'project-asset:later-camera';
+  expect(rows.reviews![0]!.workspace.advanced.webcam!.assetId).toBe(`project-asset:${child.id}`);
+  for (const store of Object.values(data.stores)) {
+    expect(store.getAll).not.toHaveBeenCalled();
+    expect(store.put).not.toHaveBeenCalled();
+    expect(store.delete).not.toHaveBeenCalled();
+  }
+});
+
+it('freezes project thumbnail and presentation preview bytes as independent retained sidecars', async () => {
+  const data = fixture();
+  const thumbnail = {
+    assetId: `video-project:${data.project.id}`,
+    blob: new Blob(['project-thumbnail'], { type: 'image/png' }),
+    createdAt: 1,
+    updatedAt: 2,
+    width: 64,
+    height: 36,
+  };
+  const presentation = {
+    aggregateId: data.project.id,
+    aggregateKind: 'video-project' as const,
+    presentationRevision: data.project.workspaceRevision ?? 0,
+    updatedAt: 2,
+    thumbnailBlob: new Blob(['presentation-thumbnail'], { type: 'image/png' }),
+    previewBlob: new Blob(['presentation-preview'], { type: 'image/png' }),
+  };
+  data.stores.thumbnails.seed(thumbnail.assetId, thumbnail);
+  data.stores.presentations.seed(['video-project', data.project.id], presentation);
+  const rows = await freezeVideoProjectInTransaction(data.tx, data.project.id);
+  expect(rows.thumbnails).toEqual([thumbnail]);
+  expect(rows.presentation).toEqual(presentation);
+  thumbnail.blob = new Blob(['new-thumbnail']);
+  presentation.previewBlob = new Blob(['new-preview']);
+  data.stores.thumbnails.rows.clear();
+  data.stores.presentations.rows.clear();
+  expect(await rows.thumbnails![0]!.blob.text()).toBe('project-thumbnail');
+  expect(await rows.presentation!.thumbnailBlob.text()).toBe('presentation-thumbnail');
+  expect(await rows.presentation!.previewBlob!.text()).toBe('presentation-preview');
+});
+
+it('freezes an immutable native effect snapshot from the asset-bearing corpus', async () => {
+  const data = fixture();
+  const corpus = EFFECT_BUNDLE_CORPUS.find(
+    ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
+  );
+  if (!corpus) throw new Error('Expected asset-bearing corpus fixture');
+  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
+  if (!imported.ok) throw new Error('Expected accepted asset-bearing effect corpus');
+  const document = imported.bundle.documents[0]!;
+  const snapshot = {
+    assets: document.assets.map((asset) => ({
+      id: asset.id,
+      kind: asset.kind,
+      mimeType: asset.mimeType,
+      byteLength: asset.byteLength,
+      sha256: asset.sha256,
+      blob: new Blob([Uint8Array.from(asset.bytes).buffer], { type: asset.mimeType }),
+    })),
+    documentId: document.document.id,
+    id: `effect:${document.sha256}`,
+    kind: document.document.kind,
+    retainedByteLength:
+      new TextEncoder().encode(document.source).byteLength +
+      document.assets.reduce((sum, asset) => sum + asset.byteLength, 0),
+    schemaVersion: 'sniptale.effect.v1' as const,
+    sha256: document.sha256,
+    source: document.source,
+  };
+  data.project.project.effectSnapshots = [snapshot];
+  expect(parseVideoProjectEntry(data.project)).not.toBeNull();
+  const rows = await freezeVideoProjectInTransaction(data.tx, data.project.id);
+  expect(rows.project.project.effectSnapshots![0]!.assets.length).toBeGreaterThan(0);
+  snapshot.source = '{}';
+  snapshot.assets[0]!.blob = new Blob(['changed-after-freeze']);
+  snapshot.assets.length = 0;
+  data.stores.projects.rows.clear();
+  expect(parseVideoProjectEntry(rows.project)).not.toBeNull();
+  await expect(
+    verifyVideoProjectEffectSnapshotIntegrity(rows.project.project)
+  ).resolves.toBeUndefined();
+});
+
+it('retains export-only review assets outside editing dependencies', async () => {
+  const data = fixture();
+  data.stores.media.rows.delete(JSON.stringify(data.exportMirror.id));
+  const child = seedSupplementary(data, 'export-camera', 'export-camera-origin');
+  const nested = seedSupplementary(data, 'export-nested-camera', 'export-nested-origin');
+  const exportedReview = privateReview(data.exportMirror.id, data.exported.assetId, child.id, {
+    size: data.exported.size,
+    mimeType: data.exported.mimeType!,
+  });
+  const nestedReview = privateReview(`project-asset:${child.id}`, child.assetId, nested.id, child);
+  data.stores.videoWorkspaces.seed(exportedReview.aggregateId, exportedReview);
+  data.stores.videoWorkspaces.seed(nestedReview.aggregateId, nestedReview);
+  const rows = await freezeVideoProjectInTransaction(data.tx, data.project.id);
+  expect(rows.assets).toEqual(expect.arrayContaining([child, nested]));
+  expect(rows.media).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: 'export-camera-origin' }),
+      expect.objectContaining({ id: 'export-nested-origin' }),
+    ])
+  );
+  expect(rows.reviews).toHaveLength(2);
+  const editing = collectCapturedProjectEditingMediaIds(rows);
+  expect(editing).toEqual(new Set([data.original.id, data.mirror.id]));
+  expect(editing.has('export-camera-origin')).toBe(false);
+  expect(editing.has('export-nested-origin')).toBe(false);
 });
