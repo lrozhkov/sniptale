@@ -611,6 +611,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expect(owners).toHaveCount(1);
     const number = page.locator('.sniptale-step-badge').first();
     await expect(number).toHaveText('1');
+    await expect(number.locator(':scope > span')).toHaveCSS('font-family', /Sniptale Interface/u);
     await expectAnnotationCenter(number, point);
     await expect(page.locator('.sniptale-interactive-frame')).toHaveCount(0);
     await page.evaluate(() => window.scrollTo(0, 120));
@@ -890,8 +891,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       frame: {
         id: 'standalone-editor-number',
         annotationKind: 'step-badge',
-        x: 600,
-        y: 190,
+        x: 960,
+        y: 80,
         width: 1,
         height: 1,
         stepBadge: { ...createDefaultFrameStepBadge(), anchor: 'center', value: '1' },
@@ -953,7 +954,15 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expect(page.locator('.sniptale-callout')).toContainText('Standalone editor comment');
     await expect(page.locator('.sniptale-interactive-frame')).toHaveCount(0);
     await expect(page.locator('[data-ui="editor.page.open-loading"]')).toBeHidden();
+    await expect(badge.locator(':scope > span')).toHaveCSS('font-family', /Sniptale Interface/u);
     await capture(page, info, 'standalone-editor-loaded.png');
+    for (const zoom of [0.5, 1, 1.25]) {
+      await page.evaluate((zoom) => window.__sniptaleEditorHarness?.setZoomLevel(zoom), zoom);
+      await expect(badge).toBeInViewport();
+      await capture(page, info, `standalone-editor-number-zoom-${zoom}.png`);
+    }
+    await page.locator('[data-ui="editor.floating.view-controls.zoom"]').click();
+    await page.locator('[data-ui="editor.floating.view-controls.zoom"]').click();
     await badge.hover();
     await page.locator('.sniptale-step-badge-edit-handle').click();
     const inlineValue = page.locator('.sniptale-step-badge-value-editor');
@@ -1006,12 +1015,17 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         loader: 'tsx',
         contents: `
         import React from 'react';
+        import interfaceFont from './packages/ui/src/styles/golos-ui/golos-ui-vf.woff2';
         import { createRoot } from 'react-dom/client';
         import { FrameStepBadgeSurface } from './apps/extension/src/features/highlighter/frame-annotation/step-badge-surface';
         import { createDefaultFrameStepBadge } from './apps/extension/src/features/highlighter/frame-annotation/defaults';
         const cases = [[1,1],[0.5,1],[1.25,1],[1,0.5],[1,1.25]].flatMap(([sceneScale,scale]) => [0,0.25,0.5,0.75].flatMap(phase => Array.from({length:9},(_,i)=>({diameter:29.16,scale,sceneScale,phase,value:String(i+1),customCss:''}))));
         cases.push(...[24,48,72].flatMap(diameter => ['1','9','12','99'].map(value=>({diameter,scale:1,sceneScale:1,phase:0,value,customCss:''}))));
         cases.push(...['1','9','12'].map(value => ({diameter:29.16,scale:1,sceneScale:1,phase:0,value,customCss:'[text]\\nfont-family: Arial; font-style: italic; letter-spacing: 0.5px;'})));
+        const face = new FontFace('Sniptale Interface', 'url('+interfaceFont+')', {weight:'400 700'});
+        document.fonts.add(face);
+        face.load();
+        document.documentElement.style.setProperty('--sniptale-font-interface', '"Sniptale Interface", system-ui, sans-serif');
         const host = document.createElement('div'); host.id = 'number-centering-probe';
         document.body.replaceChildren(host);
         document.body.style.cssText = 'margin:16px;background:#222';
@@ -1080,27 +1094,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         path: info.outputPath(`number-glyph-centering-${start}.png`),
         fullPage: false,
       });
-      const values = badges.locator('visible=true').locator(':scope > span');
-      const translates = await values.evaluateAll((elements) =>
-        elements.map((element) => {
-          const previous = element.style.translate;
-          element.style.translate = 'none';
-          return previous;
-        })
-      );
-      const baselinePng = await page.screenshot({
-        path: info.outputPath(`number-glyph-vertical-baseline-${start}.png`),
-        fullPage: false,
-      });
-      await values.evaluateAll(
-        (elements, translates) =>
-          elements.forEach((element, index) => {
-            element.style.translate = translates[index]!;
-          }),
-        translates
-      );
       const centers = await page.evaluate(
-        async ({ png, baselinePng, circles }) => {
+        async ({ png, circles }) => {
           const image = new Image();
           image.src = 'data:image/png;base64,' + png;
           await image.decode();
@@ -1155,15 +1150,9 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
                 dy: ink.map((p) => mid(p) - mid(orangeY)),
               };
             });
-          const current = measure(pixels);
-          image.src = 'data:image/png;base64,' + baselinePng;
-          await image.decode();
-          context.clearRect(0, 0, canvas.width, canvas.height);
-          context.drawImage(image, 0, 0);
-          const baseline = measure(context.getImageData(0, 0, canvas.width, canvas.height).data);
-          return current.map((center, index) => ({ ...center, baselineY: baseline[index]!.dy }));
+          return measure(pixels);
         },
-        { png: png.toString('base64'), baselinePng: baselinePng.toString('base64'), circles }
+        { png: png.toString('base64'), circles }
       );
       await info.attach(`number-glyph-centers-${start}.json`, {
         body: JSON.stringify(centers, null, 2),
@@ -1173,12 +1162,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         expect(center.orange, JSON.stringify(center)).toBeGreaterThan(0);
         for (const count of center.ink) expect(count, JSON.stringify(center)).toBeGreaterThan(0);
         expect(Math.abs(center.dx), JSON.stringify(center)).toBeLessThanOrEqual(0.5);
-        // Horizontal balancing must not worsen the existing vertical raster placement.
-        center.dy.forEach((dy, index) =>
-          expect(Math.abs(dy), JSON.stringify(center)).toBeLessThanOrEqual(
-            Math.abs(center.baselineY[index]!)
-          )
-        );
+        // Measure the solid stroke edge; faint antialiasing fringes can span another row.
+        expect(Math.abs(center.dy[1]!), JSON.stringify(center)).toBeLessThanOrEqual(0.5);
       }
     }
     await page

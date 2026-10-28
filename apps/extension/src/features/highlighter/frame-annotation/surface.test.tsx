@@ -145,7 +145,9 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
   ).toBeGreaterThan(0);
   const badgeValueMarkup = renderToStaticMarkup(<StepBadgeValue value={12} />);
   expect(badgeValueMarkup).toContain('12');
-  expect(badgeValueMarkup).toContain('font-family:system-ui, -apple-system, sans-serif');
+  expect(badgeValueMarkup).toContain(
+    'font-family:var(--sniptale-font-interface, system-ui, sans-serif)'
+  );
   expect(
     getStepBadgeStyle({
       borderColor: '#000',

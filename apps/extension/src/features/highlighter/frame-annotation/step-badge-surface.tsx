@@ -120,7 +120,7 @@ export function getStepBadgeStyle(props: {
     color: visual.textColor,
     fontSize: `${fontSize}px`,
     fontWeight: 'bold',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: 'var(--sniptale-font-interface, system-ui, sans-serif)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -222,12 +222,13 @@ export function StepBadgeValue(props: {
       ref={element}
       style={{
         display: 'block',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        fontFamily: 'var(--sniptale-font-interface, system-ui, sans-serif)',
         fontSize: 'inherit',
         fontWeight: 'inherit',
         lineHeight: 1,
         textBoxTrim: 'trim-both',
         textBoxEdge: 'cap alphabetic',
+        textRendering: 'geometricPrecision',
         translate: `${inkOffset}px 0`,
         ...props.customStyle,
       }}
