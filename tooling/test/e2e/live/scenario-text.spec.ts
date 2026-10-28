@@ -8,7 +8,7 @@ import {
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { test, expect } from './live-fixture';
 import { getLiveProfile } from './configuration';
-import { setupLiveProvider, type LiveConnection } from './provider-ui';
+import { setupLiveProvider, type LiveConnection } from './provider-ui.test-support';
 
 const profile = getLiveProfile();
 const acceptedText = 'Integration text verified.';

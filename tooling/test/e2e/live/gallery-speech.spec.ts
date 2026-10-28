@@ -4,7 +4,7 @@ import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { persistedReviewContent } from '../support/voiceover-speech-fixture';
 import { test, expect } from './live-fixture';
 import { getLiveProfile } from './configuration';
-import { setupLiveProvider, type LiveConnection } from './provider-ui';
+import { setupLiveProvider, type LiveConnection } from './provider-ui.test-support';
 
 const profile = getLiveProfile();
 const sourceText = 'Проверка озвучки текста.';

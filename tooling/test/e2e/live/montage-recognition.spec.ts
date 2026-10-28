@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './live-fixture';
 import { getLiveProfile } from './configuration';
-import { setupLiveProvider, type LiveConnection } from './provider-ui';
+import { setupLiveProvider, type LiveConnection } from './provider-ui.test-support';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject as readProject } from '../support/native-video-project';
 import { chooseInspectorValue } from '../support/inspector-utilities';

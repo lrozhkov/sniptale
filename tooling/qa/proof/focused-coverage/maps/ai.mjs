@@ -1,10 +1,40 @@
 export const AI_OWNER_MAPPINGS = [
   {
+    owner: 'content-text-rewrite-prompt',
+    productionFile: 'apps/extension/src/content/overlay/ai/text-rewrite/prompt-form.tsx',
+    reason:
+      'Mounted rewrite and voice consumers cover prompt feedback, selection and request recovery.',
+    testFiles: [
+      'apps/extension/src/content/overlay/ai/text-rewrite/view.test.tsx',
+      'apps/extension/src/content/overlay/ai/text-rewrite/view.voice.test.tsx',
+    ],
+  },
+  {
+    owner: 'ai-provider-failure-copy-consumers',
+    productionFile: 'apps/extension/src/features/ai/provider-failure-copy.ts',
+    allowCrossOwner: true,
+    reason:
+      'Pure fixed provider copy retains operation-specific fallback through all nine mounted consumers.',
+    testFiles: [
+      'apps/extension/src/features/ai/provider-failure-copy.test.ts',
+      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
+      'apps/extension/src/gallery/video-review/text-rewrite-panel.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-rewrite.test.tsx',
+      'apps/extension/src/content/overlay/ai/text-rewrite/view.test.tsx',
+      'apps/extension/src/scenario-editor/page-shell/runtime/ai-request.test.ts',
+      'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.test.tsx',
+    ],
+  },
+  {
     owner: 'ai-provider-failure-consumers',
     productionFile: 'apps/extension/src/background/ai/providers.ts',
     allowCrossOwner: true,
-    reason:
-      'Fixed provider reasons are consumed by text, native and chat audio, catalog status and scoped observation publication. Existing publication suites cover ordering, deletion, restore, recreation and explicit retry.',
+    reason: `Fixed provider reasons are consumed by text, native and chat audio, catalog status and
+      scoped observation publication. Existing publication suites cover ordering, deletion,
+      restore, recreation and explicit retry.`,
     testFiles: [
       'apps/extension/src/background/ai/providers.test.ts',
       'apps/extension/src/background/ai/audio/failure.test.ts',
@@ -38,8 +68,8 @@ export const AI_OWNER_MAPPINGS = [
     owner: 'settings-connection-modal-composition',
     exclusive: true,
     productionFile: 'apps/extension/src/settings/sections/ai/connections/surface/modals.tsx',
-    reason:
-      'Current modal root, form binding and mounted audio consumers cover provider/model drafts, conditional dialogs and callback composition.',
+    reason: `Current modal root, form binding and mounted audio consumers cover provider/model drafts,
+      conditional dialogs and callback composition.`,
     testFiles: [
       'apps/extension/src/settings/sections/ai/connections/index.test.tsx',
       'apps/extension/src/settings/sections/ai/connections/surface/modals.test.tsx',
@@ -51,8 +81,8 @@ export const AI_OWNER_MAPPINGS = [
     owner: 'ai-model-lifecycle-consumers',
     productionFile: 'apps/extension/src/contracts/settings/model-operation.ts',
     allowCrossOwner: true,
-    reason:
-      'Lifecycle eligibility is consumed by configuration admission, scenario queries, transfer and model forms. These suites cover deadline boundaries and explicit manual recovery.',
+    reason: `Lifecycle eligibility is consumed by configuration admission, scenario queries, transfer
+      and model forms. These suites cover deadline boundaries and explicit manual recovery.`,
     testFiles: [
       'apps/extension/src/contracts/settings/model-operation.test.ts',
       'apps/extension/src/contracts/settings-transfer/model-metadata.test.ts',
@@ -67,8 +97,8 @@ export const AI_OWNER_MAPPINGS = [
   {
     owner: 'background-managed-catalog-receiver',
     productionFile: 'apps/extension/src/background/ai/settings/managed-catalog.ts',
-    reason:
-      'Parser, bounded reader and runtime consumers cover catalog conflicts, native metadata enrichment, credential preparation, scoped failure observations and refresh admission.',
+    reason: `Parser, bounded reader and runtime consumers cover catalog conflicts, native metadata
+      enrichment, credential preparation, scoped failure observations and refresh admission.`,
     testFiles: [
       'apps/extension/src/background/ai/settings/catalog-parser.test.ts',
       'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
@@ -79,8 +109,9 @@ export const AI_OWNER_MAPPINGS = [
     owner: 'background-audio-job-coordinator',
     productionFile: 'apps/extension/src/background/ai/audio/service.ts',
     exclusive: true,
-    reason:
-      'The coordinator owns audio job admission, execution, cancellation, erasure exclusion and safe failure publication. Its lifecycle and project transport suites cover those receiving transitions.',
+    reason: `The coordinator owns audio job admission, execution, cancellation, erasure exclusion and
+      safe failure publication. Its lifecycle and project transport suites cover those
+      receiving transitions.`,
     testFiles: [
       'apps/extension/src/background/ai/audio/service.test.ts',
       'apps/extension/src/background/ai/audio/service.lifecycle.test.ts',
@@ -89,23 +120,11 @@ export const AI_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'gallery-audio-provider-feedback',
-    productionFile: 'apps/extension/src/gallery/video-review/ai-provider-error.ts',
-    exclusive: true,
-    reason:
-      'The pure fixed-copy selector has three mounted Gallery consumers. Their tests cover distinct provider feedback and existing generic recovery without transport, source or publication effects.',
-    testFiles: [
-      'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
-      'apps/extension/src/gallery/video-review/text-voice-panel.test.tsx',
-      'apps/extension/src/gallery/video-review/text-rewrite-panel.test.tsx',
-    ],
-  },
-  {
     owner: 'ai-request-operation-observation',
     productionFile: 'apps/extension/src/background/ai/operation-observation.ts',
     allowCrossOwner: true,
-    reason:
-      'Both native request consumers and existing persistence concurrency proof cover admission, dispatch, cancellation and fail-soft publication.',
+    reason: `Both native request consumers and existing persistence concurrency proof cover admission,
+      dispatch, cancellation and fail-soft publication.`,
     testFiles: [
       'apps/extension/src/background/ai/llm/transport/request.observations.test.ts',
       'apps/extension/src/background/ai/audio/request.observations.test.ts',
@@ -115,8 +134,8 @@ export const AI_OWNER_MAPPINGS = [
   {
     owner: 'ai-catalog-boundary-contract',
     productionFile: 'apps/extension/src/contracts/settings/ai-catalog.ts',
-    reason:
-      'Catalog capabilities, lifecycle, operation observations and remembered choices share bounded metadata admission proof.',
+    reason: `Catalog capabilities, lifecycle, operation observations and remembered choices share
+      bounded metadata admission proof.`,
     testFiles: [
       'apps/extension/src/contracts/settings/ai-catalog.test.ts',
       'apps/extension/src/contracts/settings/model-operation.test.ts',
@@ -129,9 +148,11 @@ export const AI_OWNER_MAPPINGS = [
   {
     owner: 'canonical-ai-model-selector',
     productionFile: 'apps/extension/src/features/ai/model-selector/helpers.ts',
+    allowCrossOwner: true,
     reason:
-      'Search grouping and selected labels require the mounted selector consumer and exact Model ID search proof.',
+      'Canonical and legacy modal consumers cover search grouping, selected labels and exact Model IDs.',
     testFiles: [
+      'apps/extension/src/content/overlay/ai/modal/shell/selector-helpers.test.ts',
       'apps/extension/src/features/ai/model-selector/helpers.test.ts',
       'apps/extension/src/features/ai/model-selector/index.test.tsx',
     ],
@@ -152,8 +173,8 @@ export const AI_OWNER_MAPPINGS = [
       'apps/extension/src/settings/sections/ai/connections/controller/state/loader/use-loader.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted Settings consumers and catalog lifecycle proof cover cached data, form retention, stale responses, credentials, serialized writes, reset, recreation and retry.',
+    reason: `Mounted Settings consumers and catalog lifecycle proof cover cached data, form retention,
+      stale responses, credentials, serialized writes, reset, recreation and retry.`,
     testFiles: [
       'apps/extension/src/settings/sections/ai/connections/controller/state/loader/use-loader.test.tsx',
       'apps/extension/src/settings/sections/ai/connections/controller/state/loader/runtime-data.test.ts',
@@ -176,8 +197,8 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/settings/sections/ai/connections/index.tsx',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted Settings consumers and catalog lifecycle proof cover cached data, form retention, stale responses, credentials, serialized writes, reset, recreation and retry.',
+    reason: `Mounted Settings consumers and catalog lifecycle proof cover cached data, form retention,
+      stale responses, credentials, serialized writes, reset, recreation and retry.`,
     testFiles: [
       'apps/extension/src/settings/sections/ai/connections/controller/state/loader/use-loader.test.tsx',
       'apps/extension/src/settings/sections/ai/connections/controller/state/loader/runtime-data.test.ts',
@@ -202,8 +223,9 @@ export const AI_OWNER_MAPPINGS = [
       'apps/extension/src/settings/sections/system/voice-input/use-voice-model-selection.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Voice catalog and mounted preferences use canonical approvals only. Query, settings serialization, reset, stale identity, failed writes and background egress proof cover the accepted selection lifecycle.',
+    reason: `Voice catalog and mounted preferences use canonical approvals only. Query, settings
+      serialization, reset, stale identity, failed writes and background egress proof cover the
+      accepted selection lifecycle.`,
     testFiles: [
       'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
       'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
@@ -230,8 +252,9 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/settings/sections/system/voice-input/model-preferences.tsx',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Voice catalog and mounted preferences use canonical approvals only. Query, settings serialization, reset, stale identity, failed writes and background egress proof cover the accepted selection lifecycle.',
+    reason: `Voice catalog and mounted preferences use canonical approvals only. Query, settings
+      serialization, reset, stale identity, failed writes and background egress proof cover the
+      accepted selection lifecycle.`,
     testFiles: [
       'apps/extension/src/settings/sections/system/voice-input/use-voice-model-selection.test.tsx',
       'apps/extension/src/settings/sections/system/voice-input/model-preferences.test.tsx',
@@ -255,8 +278,9 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/video-editor/runtime/session/recognition.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted native recognition, canonical workflow and selector consumers cover admission and recovery. Existing persistence and background participants cover concurrent choices and approved execution before secret access.',
+    reason: `Mounted native recognition, canonical workflow and selector consumers cover admission and
+      recovery. Existing persistence and background participants cover concurrent choices and
+      approved execution before secret access.`,
     testFiles: [
       'apps/extension/src/video-editor/runtime/session/recognition.test.tsx',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
@@ -276,8 +300,9 @@ export const AI_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted native recognition, canonical workflow and selector consumers cover admission and recovery. Existing persistence and background participants cover concurrent choices and approved execution before secret access.',
+    reason: `Mounted native recognition, canonical workflow and selector consumers cover admission and
+      recovery. Existing persistence and background participants cover concurrent choices and
+      approved execution before secret access.`,
     testFiles: [
       'apps/extension/src/video-editor/runtime/session/recognition.test.tsx',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
@@ -296,8 +321,9 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/workflows/video/project-recognition.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted native recognition, canonical workflow and selector consumers cover admission and recovery. Existing persistence and background participants cover concurrent choices and approved execution before secret access.',
+    reason: `Mounted native recognition, canonical workflow and selector consumers cover admission and
+      recovery. Existing persistence and background participants cover concurrent choices and
+      approved execution before secret access.`,
     testFiles: [
       'apps/extension/src/video-editor/runtime/session/recognition.test.tsx',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.test.tsx',
@@ -316,8 +342,9 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/gallery/video-review/use-recognition.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted recognition, canonical recovery and selector consumers cover admission and retry. Existing preference and catalog participants cover parallel choices, deletion, recreation and refusal.',
+    reason: `Mounted recognition, canonical recovery and selector consumers cover admission and retry.
+      Existing preference and catalog participants cover parallel choices, deletion, recreation
+      and refusal.`,
     testFiles: [
       'apps/extension/src/gallery/video-review/use-recognition.test.tsx',
       'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
@@ -334,8 +361,9 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/gallery/video-review/speech-panel.tsx',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted recognition, canonical recovery and selector consumers cover admission and retry. Existing preference and catalog participants cover parallel choices, deletion, recreation and refusal.',
+    reason: `Mounted recognition, canonical recovery and selector consumers cover admission and retry.
+      Existing preference and catalog participants cover parallel choices, deletion, recreation
+      and refusal.`,
     testFiles: [
       'apps/extension/src/gallery/video-review/use-recognition.test.tsx',
       'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
@@ -352,8 +380,9 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/gallery/video-review/speech-profile.tsx',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted recognition, canonical recovery and selector consumers cover admission and retry. Existing preference and catalog participants cover parallel choices, deletion, recreation and refusal.',
+    reason: `Mounted recognition, canonical recovery and selector consumers cover admission and retry.
+      Existing preference and catalog participants cover parallel choices, deletion, recreation
+      and refusal.`,
     testFiles: [
       'apps/extension/src/gallery/video-review/use-recognition.test.tsx',
       'apps/extension/src/gallery/video-review/speech-panel.test.tsx',
@@ -370,8 +399,8 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/workflows/video/project-text-voice.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted voice and inspector proof cover consent, acquisition, selection and cancellation. Shared preference proof covers concurrent choices, deletion, recreation and retry.',
+    reason: `Mounted voice and inspector proof cover consent, acquisition, selection and cancellation.
+      Shared preference proof covers concurrent choices, deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/workflows/video/project-text-voice.test.ts',
       'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
@@ -392,8 +421,8 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/video-editor/runtime/session/text-voice.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted voice and inspector proof cover consent, acquisition, selection and cancellation. Shared preference proof covers concurrent choices, deletion, recreation and retry.',
+    reason: `Mounted voice and inspector proof cover consent, acquisition, selection and cancellation.
+      Shared preference proof covers concurrent choices, deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/workflows/video/project-text-voice.test.ts',
       'apps/extension/src/workflows/video/project-text-voice-queue.test.ts',
@@ -415,8 +444,8 @@ export const AI_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/text-voice.tsx',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted voice and inspector proof cover consent, acquisition, selection and cancellation. Shared preference proof covers concurrent choices, deletion, recreation and retry.',
+    reason: `Mounted voice and inspector proof cover consent, acquisition, selection and cancellation.
+      Shared preference proof covers concurrent choices, deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/video-editor/runtime/session/text-voice.test.tsx',
       'apps/extension/src/video-editor/runtime/session/text-voice-selection.test.tsx',
@@ -432,8 +461,8 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/ui/video-text/speech/profile.tsx',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Shared synthesis fields retain existing Gallery and video inspector profile behavior while Gallery authored narration delegates model choice to its scenario owner.',
+    reason: `Shared synthesis fields retain existing Gallery and video inspector profile behavior
+      while Gallery authored narration delegates model choice to its scenario owner.`,
     testFiles: [
       'apps/extension/src/ui/video-text/speech/profile.test.tsx',
       'apps/extension/src/gallery/video-review/speech-profile.test.tsx',
@@ -446,8 +475,8 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/gallery/video-review/use-text-voice.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted narration, shared selection and persistence proof cover opening, explicit use, cancellation, refusal, deletion, recreation and retry.',
+    reason: `Mounted narration, shared selection and persistence proof cover opening, explicit use,
+      cancellation, refusal, deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/workflows/video-review/text-voice.test.ts',
       'apps/extension/src/gallery/video-review/text-voice-gallery.test.tsx',
@@ -468,8 +497,8 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/workflows/video-review/text-voice.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted narration, shared selection and persistence proof cover opening, explicit use, cancellation, refusal, deletion, recreation and retry.',
+    reason: `Mounted narration, shared selection and persistence proof cover opening, explicit use,
+      cancellation, refusal, deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/workflows/video-review/text-voice.test.ts',
       'apps/extension/src/gallery/video-review/text-voice-gallery.test.tsx',
@@ -490,8 +519,8 @@ export const AI_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/gallery/video-review/text-voice-panel.tsx',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'Mounted narration, shared selection and persistence proof cover opening, explicit use, cancellation, refusal, deletion, recreation and retry.',
+    reason: `Mounted narration, shared selection and persistence proof cover opening, explicit use,
+      cancellation, refusal, deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/workflows/video-review/text-voice.test.ts',
       'apps/extension/src/gallery/video-review/text-voice-gallery.test.tsx',
@@ -512,8 +541,9 @@ export const AI_OWNER_MAPPINGS = [
     exclusive: true,
     productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx',
     allowCrossOwner: true,
-    reason:
-      'Scenario consent, deferred preparation and queued requests retain approved destination identity. Shared selection, persistence and background proof cover refusal, cancellation, deletion, recreation and retry.',
+    reason: `Scenario consent, deferred preparation and queued requests retain approved destination
+      identity. Shared selection, persistence and background proof cover refusal, cancellation,
+      deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/tour/use-narration-ai.test.tsx',
@@ -533,8 +563,9 @@ export const AI_OWNER_MAPPINGS = [
     exclusive: true,
     productionFile: 'apps/extension/src/scenario-editor/page-shell/tour/use-narration-ai.ts',
     allowCrossOwner: true,
-    reason:
-      'Scenario consent, deferred preparation and queued requests retain approved destination identity. Shared selection, persistence and background proof cover refusal, cancellation, deletion, recreation and retry.',
+    reason: `Scenario consent, deferred preparation and queued requests retain approved destination
+      identity. Shared selection, persistence and background proof cover refusal, cancellation,
+      deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/tour/use-narration-ai.test.tsx',
@@ -554,8 +585,9 @@ export const AI_OWNER_MAPPINGS = [
     exclusive: true,
     productionFile: 'apps/extension/src/workflows/scenario-narration/generation.ts',
     allowCrossOwner: true,
-    reason:
-      'Scenario consent, deferred preparation and queued requests retain approved destination identity. Shared selection, persistence and background proof cover refusal, cancellation, deletion, recreation and retry.',
+    reason: `Scenario consent, deferred preparation and queued requests retain approved destination
+      identity. Shared selection, persistence and background proof cover refusal, cancellation,
+      deletion, recreation and retry.`,
     testFiles: [
       'apps/extension/src/scenario-editor/page-shell/tour/narration-ai.test.tsx',
       'apps/extension/src/scenario-editor/page-shell/tour/use-narration-ai.test.tsx',
@@ -590,8 +622,8 @@ export const AI_OWNER_MAPPINGS = [
     owner: 'ai-scenario-selection-consumers',
     productionFile: 'apps/extension/src/workflows/ai-settings/use-scenario-model-selection.ts',
     allowCrossOwner: true,
-    reason:
-      'Mounted selection and query tests cover admission. Persistence participants cover concurrent choices, deletion, recreation, restore, and retry across IPC.',
+    reason: `Mounted selection and query tests cover admission. Persistence participants cover
+      concurrent choices, deletion, recreation, restore, and retry across IPC.`,
     testFiles: [
       'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
       'apps/extension/src/background/ai/settings/managed-catalog.test.ts',

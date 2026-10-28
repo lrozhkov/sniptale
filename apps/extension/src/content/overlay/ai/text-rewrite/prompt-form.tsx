@@ -1,3 +1,4 @@
+import { getAIProviderFailureKey } from '../../../../features/ai/provider-failure-copy';
 import { useEffect, useId, useLayoutEffect, useRef, type SyntheticEvent } from 'react';
 import { Send, Square } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -5,8 +6,7 @@ import { CONTENT_AI_PAYLOAD_LIMITS } from '@sniptale/runtime-contracts/ai/payloa
 import { usePromptTemplates } from '../../../../features/prompt-templates/hooks/use-prompt-templates';
 import { AIModalPromptTemplatePicker } from '../modal/shell/prompt-template-picker';
 import { AIModelSelector } from '../../../../features/ai/model-selector';
-import { translate, type TranslationKey } from '../../../../platform/i18n';
-import type { AIConnectionReason } from '../../../../contracts/settings/ai-catalog';
+import { translate } from '../../../../platform/i18n';
 import { isContentEventWithinElement } from '../../../platform/dom-host';
 import { ContentVoiceInputButton } from '../../../voice-input/button';
 import { useAIModalPromptVoiceInput } from '../modal/session/prompt-voice-input';
@@ -14,25 +14,11 @@ import { isTrustedDomEvent, isTrustedKeyboardEvent } from '../../../platform/tru
 import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import type { useTextRewriteSession } from './session';
 
-const PROVIDER_FAILURE_COPY: Partial<Record<AIConnectionReason, TranslationKey>> = {
-  'invalid-credential': 'settings.aiProviders.providerStatusInvalidKey',
-  'permission-denied': 'settings.aiProviders.providerStatusDenied',
-  'model-unavailable': 'settings.aiProviders.providerStatusModelUnavailable',
-  'quota-exceeded': 'settings.aiProviders.providerStatusQuota',
-  'rate-limited': 'settings.aiProviders.providerStatusRate',
-  network: 'settings.aiProviders.providerStatusNetwork',
-  timeout: 'settings.aiProviders.providerStatusTimeout',
-  'service-error': 'settings.aiProviders.providerStatusUnavailable',
-  'host-permission-required': 'settings.aiProviders.providerStatusPermission',
-  'secret-locked': 'settings.aiProviders.providerStatusLocked',
-  'provider-unavailable': 'settings.aiProviders.providerStatusUnavailable',
-};
-
 type Session = ReturnType<typeof useTextRewriteSession>;
 function TextRequestFeedback({ session }: { session: Session }) {
   const error = session.request.error;
   const providerReason = session.request.providerFailureReason;
-  const providerKey = providerReason ? PROVIDER_FAILURE_COPY[providerReason] : undefined;
+  const providerKey = getAIProviderFailureKey(providerReason);
   const errorKeys = {
     stale: 'content.toolbar.aiTextStale',
     failed: 'content.toolbar.aiTextError',

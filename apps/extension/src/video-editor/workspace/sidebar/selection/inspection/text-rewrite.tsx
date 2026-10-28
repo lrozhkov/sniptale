@@ -1,4 +1,4 @@
-import { getVideoAIProviderFailureKey } from './ai-provider-error';
+import { getAIProviderFailureKey } from '../../../../../features/ai/provider-failure-copy';
 import { useEffect } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
@@ -26,7 +26,7 @@ export function ProjectTextRewritePanel(props: {
   const target = operation.target;
   if (!target) return null;
   const context = operation.preview?.basis.context ?? operation.disclosure?.basis.context;
-  const providerFailureKey = getVideoAIProviderFailureKey(operation.providerFailureReason);
+  const providerFailureKey = getAIProviderFailureKey(operation.providerFailureReason);
   const error = operation.error ?? (operation.preview ? null : operation.disclosureError);
   return (
     <section

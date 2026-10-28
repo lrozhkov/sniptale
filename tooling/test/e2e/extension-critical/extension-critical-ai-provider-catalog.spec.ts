@@ -288,7 +288,9 @@ async function runRealScenarioText(
         'sniptale_ai_scenario_selections'
       ] ?? {}
   );
-  const projectUrl = `chrome-extension://${extensionId}/apps/extension/src/scenario-editor/index.html?projectId=${project.id}`;
+  const projectUrl =
+    `chrome-extension://${extensionId}/apps/extension/src/scenario-editor/index.html` +
+    `?projectId=${project.id}`;
   await page.goto(projectUrl);
   await expect(page.getByRole('textbox', { name: 'Scenario', exact: true })).toHaveValue(
     project.name

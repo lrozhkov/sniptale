@@ -1,3 +1,4 @@
+import { getAIProviderFailureKey } from '../../../features/ai/provider-failure-copy';
 import { useEffect, useRef, useState } from 'react';
 import { AIModelSelector } from '../../../features/ai/model-selector';
 import type { AIModelCatalogPayload } from '../../../contracts/messaging/ai-settings-runtime';
@@ -17,21 +18,8 @@ import {
   type ScenarioNarrationAccess,
 } from './use-narration-ai';
 
-const PROVIDER_FAILURE_COPY: Partial<Record<AIConnectionReason, TranslationKey>> = {
-  'invalid-credential': 'settings.aiProviders.providerStatusInvalidKey',
-  'permission-denied': 'settings.aiProviders.providerStatusDenied',
-  'model-unavailable': 'settings.aiProviders.providerStatusModelUnavailable',
-  'quota-exceeded': 'settings.aiProviders.providerStatusQuota',
-  'rate-limited': 'settings.aiProviders.providerStatusRate',
-  network: 'settings.aiProviders.providerStatusNetwork',
-  timeout: 'settings.aiProviders.providerStatusTimeout',
-  'service-error': 'settings.aiProviders.providerStatusUnavailable',
-  'host-permission-required': 'settings.aiProviders.providerStatusPermission',
-  'secret-locked': 'settings.aiProviders.providerStatusLocked',
-  'provider-unavailable': 'settings.aiProviders.providerStatusUnavailable',
-};
 function narrationFailureKey(reason?: AIConnectionReason | null): TranslationKey {
-  return (reason && PROVIDER_FAILURE_COPY[reason]) || 'scenario.editor.guideOperationFailed';
+  return getAIProviderFailureKey(reason) ?? 'scenario.editor.guideOperationFailed';
 }
 
 type Profile = AISpeechModelParameters & { modelId: string };

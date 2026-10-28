@@ -274,6 +274,23 @@ async function observeAudioRequest<Result>(
   }
 }
 
+async function fetchAudioProviderResponse(
+  args: { signal: AbortSignal; transport?: typeof globalThis.fetch },
+  input: Parameters<typeof globalThis.fetch>[0],
+  init?: Parameters<typeof globalThis.fetch>[1]
+): Promise<Response> {
+  let response: Response;
+  try {
+    response = await (args.transport ?? globalThis.fetch)(input, init);
+  } catch {
+    args.signal.throwIfAborted();
+    if (init?.signal?.aborted) throw new Error('timeout');
+    throw new Error('network-failed');
+  }
+  await assertResponseStatus(response);
+  return response;
+}
+
 async function requestSpeech(args: AudioRequest & { transport?: typeof globalThis.fetch }) {
   const params = args.config.speech;
   if (args.request.operation !== 'speech' || !params) throw new Error('invalid-request');
@@ -298,15 +315,7 @@ async function requestSpeech(args: AudioRequest & { transport?: typeof globalThi
     signal: args.signal,
     ...(args.beforeSend ? { beforeSend: args.beforeSend } : {}),
     transport: async (input, init) => {
-      let response: Response;
-      try {
-        response = await (args.transport ?? globalThis.fetch)(input, init);
-      } catch {
-        args.signal.throwIfAborted();
-        if (init?.signal?.aborted) throw new Error('timeout');
-        throw new Error('network-failed');
-      }
-      await assertResponseStatus(response);
+      const response = await fetchAudioProviderResponse(args, input, init);
       if (!response.ok) return response;
       contentType = await admitSpeechResponse(response, type, params.responseFormat);
       args.onReceiving();
@@ -426,15 +435,7 @@ function createTranscriptionSdkFetch(args: TranscriptionInput): typeof fetch {
     maxResponseBytes: 1024 * 1024,
     ...(args.beforeSend ? { beforeSend: args.beforeSend } : {}),
     transport: async (input, init) => {
-      let response: Response;
-      try {
-        response = await (args.transport ?? globalThis.fetch)(input, init);
-      } catch {
-        args.signal.throwIfAborted();
-        if (init?.signal?.aborted) throw new Error('timeout');
-        throw new Error('network-failed');
-      }
-      await assertResponseStatus(response);
+      const response = await fetchAudioProviderResponse(args, input, init);
       if (!response.ok) return response;
       if (
         response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !==

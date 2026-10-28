@@ -106,13 +106,13 @@ export function classifyAIProviderFailure(error: unknown): AIConnectionReason {
   return 'unknown';
 }
 
-const QUOTA_ERROR_CODES = new Set([
+const QUOTA_ERROR_CODES: readonly string[] = [
   'insufficient_quota',
   'credit_balance_exhausted',
   'organization_spend_limit_exceeded',
   'project_spend_limit_exceeded',
   'organization_usage_limit_exceeded',
-]);
+];
 
 function hasQuotaEvidence(data: unknown): boolean {
   if (typeof data !== 'object' || data === null || Array.isArray(data) || !('error' in data))
@@ -120,7 +120,7 @@ function hasQuotaEvidence(data: unknown): boolean {
   const error = data.error;
   if (typeof error !== 'object' || error === null || Array.isArray(error)) return false;
   return (
-    ('code' in error && typeof error.code === 'string' && QUOTA_ERROR_CODES.has(error.code)) ||
+    ('code' in error && typeof error.code === 'string' && QUOTA_ERROR_CODES.includes(error.code)) ||
     ('type' in error && error.type === 'insufficient_quota')
   );
 }

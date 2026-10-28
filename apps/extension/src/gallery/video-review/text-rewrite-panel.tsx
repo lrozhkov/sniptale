@@ -1,4 +1,4 @@
-import { getReviewAIProviderFailureKey } from './ai-provider-error';
+import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { TextRewriteSettings } from '../../ui/video-text/rewrite/settings';
@@ -28,7 +28,7 @@ export function ReviewTextRewriteForm(props: {
   const operation = useReviewTextRewrite(props);
   const { preview } = operation;
   const error = operation.error ?? operation.disclosureError;
-  const providerFailureKey = getReviewAIProviderFailureKey(operation.providerFailureReason);
+  const providerFailureKey = getAIProviderFailureKey(operation.providerFailureReason);
   const label = (key: keyof typeof errors) => translate(errors[key]);
   return (
     <section

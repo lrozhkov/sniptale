@@ -1,3 +1,4 @@
+import { getAIProviderFailureKey } from '../../../features/ai/provider-failure-copy';
 import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
 import type { TranslationKey } from '../../../platform/i18n';
 import { createScenarioAiManifest } from '@sniptale/runtime-contracts/scenario-ai-operations';
@@ -25,27 +26,13 @@ import {
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import { renderGuideImageFrame } from './image-frame';
 
-const PROVIDER_FAILURE_COPY: Partial<Record<AIConnectionReason, TranslationKey>> = {
-  'invalid-credential': 'settings.aiProviders.providerStatusInvalidKey',
-  'permission-denied': 'settings.aiProviders.providerStatusDenied',
-  'model-unavailable': 'settings.aiProviders.providerStatusModelUnavailable',
-  'quota-exceeded': 'settings.aiProviders.providerStatusQuota',
-  'rate-limited': 'settings.aiProviders.providerStatusRate',
-  network: 'settings.aiProviders.providerStatusNetwork',
-  timeout: 'settings.aiProviders.providerStatusTimeout',
-  'service-error': 'settings.aiProviders.providerStatusUnavailable',
-  'host-permission-required': 'settings.aiProviders.providerStatusPermission',
-  'secret-locked': 'settings.aiProviders.providerStatusLocked',
-  'provider-unavailable': 'settings.aiProviders.providerStatusUnavailable',
-};
-
 /** Carries an admitted failure category to local copy without displaying server error text. */
 export class GuideAiProviderError extends Error {
   readonly messageKey: TranslationKey;
   constructor(reason: AIConnectionReason) {
     super('AI provider request failed.');
     this.name = 'GuideAiProviderError';
-    this.messageKey = PROVIDER_FAILURE_COPY[reason] ?? 'scenario.editor.guideAiFailed';
+    this.messageKey = getAIProviderFailureKey(reason) ?? 'scenario.editor.guideAiFailed';
   }
 }
 

@@ -328,6 +328,24 @@
       }
     },
     {
+      "id": "1bf12ef16d9c8d7b42f60bb68a544c34017aa15547a8a13a333a22b188b5fad8",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/speech-panel.tsx",
+      "reason": "Gallery uses SelectField and its recognition command. Montage uses OptionButtonsField and inspector callbacks. Shared option literals do not unify field controls.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
+        "start": 544,
+        "end": 551
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
+        "start": 215,
+        "end": 222
+      }
+    },
+    {
       "id": "1e6bcf01ce6591cb14f7d63993ac0f1fa1820ab3a06832b30b83854bc6e38b5b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/design-system/parity/helpers.tsx",
@@ -562,6 +580,24 @@
       }
     },
     {
+      "id": "28b800992c9649204d5569e71497c1e6fd83cf26819dc564eb81c42c1fd1bc36",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/use-text-rewrite.ts",
+      "reason": "Gallery prepares a review workspace operation with its source guard and Apply receipt. Video prepares a project history operation. Equal selection assembly retains separate source authority.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/use-text-rewrite.ts",
+        "start": 175,
+        "end": 185
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/runtime/session/text-rewrite.ts",
+        "start": 329,
+        "end": 339
+      }
+    },
+    {
       "id": "2c15769854615f4ec75bbd88fe1cec5640a41a64ffc222ae6f058ec042f1146d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/scenario-editor/page-shell/print.tsx",
@@ -595,24 +631,6 @@
         "path": "apps/extension/src/content/overlay/toolbar/video-recording/media-menu.tsx",
         "start": 155,
         "end": 167
-      }
-    },
-    {
-      "id": "2d234daf0b556fe3d7e9fa7939b99260bb02a04ecede47a5d109a665396da2f9",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native recognition controls",
-      "reason": "The phrase/sentence/paragraph choices and enum validation are declarative metadata for the same recognition contract. Gallery writes recognition.setGranularity through SelectField; Native invokes onGranularityChange through OptionButtonsField. These are different consumer adapters.",
-      "removalCondition": "Remove this record if recognition grouping computation or request orchestration is duplicated.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
-        "start": 511,
-        "end": 518
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
-        "start": 215,
-        "end": 222
       }
     },
     {
@@ -886,24 +904,6 @@
       }
     },
     {
-      "id": "414d6568063b52060ca5e57cbb90323d457abce9c2ad03878f639d85561f37f0",
-      "classification": "tool-noise",
-      "owner": "contracts/ai/content-text and contracts/ai/review-text",
-      "reason": "The matched union declarations repeat cancel/keepalive envelopes; start payloads differ materially (content privacy proof versus review context/scope), and result contracts differ. Strict schemas already own their own boundaries.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/contracts/ai/content-text.ts",
-        "start": 56,
-        "end": 63
-      },
-      "secondFile": {
-        "path": "apps/extension/src/contracts/ai/review-text.ts",
-        "start": 230,
-        "end": 237
-      }
-    },
-    {
       "id": "4269fd2736131a8a79789665df8a1d9e6ac2eb0834287af250400fd51eb108d9",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera appearance controls",
@@ -1063,6 +1063,24 @@
         "path": "packages/ui/src/styles/content-popover/index.css",
         "start": 231,
         "end": 241
+      }
+    },
+    {
+      "id": "50112f3693d52df4f247678b274cbec58e3921855ea8d2d1c99ac5a87196fe7e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/contracts/ai/audio.ts",
+      "reason": "Project-clip input binds an asset and native interval. Project-text input binds document, fragment and basis hash. Equal project checks do not define one job scope.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/contracts/ai/audio.ts",
+        "start": 300,
+        "end": 307
+      },
+      "secondFile": {
+        "path": "apps/extension/src/contracts/ai/audio.ts",
+        "start": 331,
+        "end": 338
       }
     },
     {
@@ -1804,6 +1822,24 @@
       }
     },
     {
+      "id": "924aa4a1664193253fa0ac0e76657a5dc7f185f9ceb6731fbb802ec69a7ee400",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/text-voice-panel.tsx",
+      "reason": "Gallery changeProfile invalidates disposable takes. Scenario reset can refuse while it owns selected targets and previews. Equal profile reset flags retain separate operation lifetimes.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/text-voice-panel.tsx",
+        "start": 169,
+        "end": 175
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx",
+        "start": 66,
+        "end": 72
+      }
+    },
+    {
       "id": "929dfd5e208fff568e681c9d12e39ae4e75fb245a5497f317004d3091f74601d",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/glass",
@@ -2362,6 +2398,24 @@
       }
     },
     {
+      "id": "a7333f1fa6c41e8505f8dc5ea969d3cb98e8b2aeeab5aa316d4040d13118dc72",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/use-recognition.ts",
+      "reason": "Recognition owns Apply state and one accepted transcript. Speech owns multiple takes, completion and propagation. Equal controller setup does not define one publication lifetime.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/use-recognition.ts",
+        "start": 108,
+        "end": 118
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/use-text-voice.ts",
+        "start": 130,
+        "end": 140
+      }
+    },
+    {
       "id": "a7c4be7d00b0066ba82208d735cc3cddc574e367b8b45d7f37d116461b8a015e",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/toolbar-form-layout.css",
@@ -2401,7 +2455,7 @@
       "id": "aa6914db950192ac7705fe43e6d735e74c09a67144a00f8e226e9e406d75743e",
       "classification": "tool-noise",
       "owner": "features/video/audio/source-envelope",
-      "reason": "The common initial loop shape surrounds materially different accepted intent: gain allows volume\u22642, minimum0.001s, sorts and rejects overlap; attenuation allows volume\u22641, anypositive duration and retains overlapping/order intent.",
+      "reason": "The common initial loop shape surrounds materially different accepted intent: gain allows volume≤2, minimum0.001s, sorts and rejects overlap; attenuation allows volume≤1, anypositive duration and retains overlapping/order intent.",
       "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
       "reviewBy": "2027-04-15",
       "firstFile": {
@@ -3100,6 +3154,24 @@
       }
     },
     {
+      "id": "db7482661d9e46db860943d7740ee467c303623fe2e6febf84ffdb96af364253",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/contracts/ai/content-text.ts",
+      "reason": "Content requests bind privacyProof and extracted text. Review requests bind workspace context and revisioned scope. Equal approval field spelling does not unify these wire protocols.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/contracts/ai/content-text.ts",
+        "start": 57,
+        "end": 64
+      },
+      "secondFile": {
+        "path": "apps/extension/src/contracts/ai/review-text.ts",
+        "start": 231,
+        "end": 238
+      }
+    },
+    {
       "id": "dc4c4676fdbed71d9c743d74111462ca7cc5cca84418632990a869075f180a41",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
@@ -3241,24 +3313,6 @@
         "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
         "start": 42,
         "end": 46
-      }
-    },
-    {
-      "id": "f34a25f0971a81489cf6811aab9044404b3e033a4f2b2b8d2f34271612fd3245",
-      "classification": "tool-noise",
-      "owner": "contracts/ai/audio",
-      "reason": "The match checks common project reference fields, surrounded by distinct exact-key/target shapes: project audio clip target versus text document/fragment target. It does not duplicate a complete parser or state transition.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/contracts/ai/audio.ts",
-        "start": 288,
-        "end": 295
-      },
-      "secondFile": {
-        "path": "apps/extension/src/contracts/ai/audio.ts",
-        "start": 319,
-        "end": 326
       }
     },
     {

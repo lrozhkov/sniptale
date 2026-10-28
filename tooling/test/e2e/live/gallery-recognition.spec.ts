@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './live-fixture';
 import { getLiveProfile } from './configuration';
-import { setupLiveProvider, type LiveConnection } from './provider-ui';
+import { setupLiveProvider, type LiveConnection } from './provider-ui.test-support';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { persistedReviewContent } from '../support/voiceover-speech-fixture';
 import { chooseInspectorValue } from '../support/inspector-utilities';
@@ -87,7 +87,7 @@ async function recognizeSource(
   expect((await persistedReviewContent(page))?.audio).toEqual(before?.audio);
 }
 
-test('Gallery recognizes original and imported voiceover, remembers selection and preserves disabled-provider work', async ({
+test('Gallery recognition remembers selection and preserves disabled-provider work', async ({
   page,
   extensionId,
 }) => {

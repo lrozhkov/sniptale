@@ -1,4 +1,4 @@
-import { getReviewAIProviderFailureKey } from './ai-provider-error';
+import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
 import { useRef, useState, type ReactNode } from 'react';
 import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
 import { CheckboxField, SelectField, TextareaField } from '../../ui/compact-inspector-controls';
@@ -376,7 +376,7 @@ function RecognitionFeedback({ recognition }: { recognition: Recognition }) {
       {recognition.error && !modelError && (
         <p role="alert" className="text-xs">
           {translate(
-            getReviewAIProviderFailureKey(recognition.providerFailureReason) ??
+            getAIProviderFailureKey(recognition.providerFailureReason) ??
               (recognition.error === 'too-large'
                 ? 'gallery.videoReview.recognitionTooLarge'
                 : recognition.error === 'invalid-response'

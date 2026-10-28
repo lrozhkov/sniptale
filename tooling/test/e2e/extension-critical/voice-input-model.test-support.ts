@@ -216,7 +216,9 @@ async function addNativeModel(page: Page, locale: AppLocale, operation: 'text' |
       .click();
     await dialog
       .getByRole('button', {
-        name: `${label(locale, 'settings.aiProviders.modelOperationsTitle')}: ${label(locale, 'settings.aiProviders.modelOperationTranscription')}`,
+        name:
+          `${label(locale, 'settings.aiProviders.modelOperationsTitle')}: ` +
+          label(locale, 'settings.aiProviders.modelOperationTranscription'),
         exact: true,
       })
       .click();
@@ -228,7 +230,9 @@ async function addNativeModel(page: Page, locale: AppLocale, operation: 'text' |
       .click();
     await dialog
       .getByRole('button', {
-        name: `${label(locale, 'settings.aiProviders.modelOperationsTitle')}: ${label(locale, 'settings.aiProviders.modelOperationText')}`,
+        name:
+          `${label(locale, 'settings.aiProviders.modelOperationsTitle')}: ` +
+          label(locale, 'settings.aiProviders.modelOperationText'),
         exact: true,
       })
       .click();
@@ -244,7 +248,9 @@ async function addNativeModel(page: Page, locale: AppLocale, operation: 'text' |
       .click();
     await dialog
       .getByRole('button', {
-        name: `${label(locale, 'settings.aiProviders.modelInputTitle')}: ${label(locale, 'settings.aiProviders.modelModalityAudio')}`,
+        name:
+          `${label(locale, 'settings.aiProviders.modelInputTitle')}: ` +
+          label(locale, 'settings.aiProviders.modelModalityAudio'),
         exact: true,
       })
       .click();

@@ -4,8 +4,9 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/composition/persistence/voice-input-history/index.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'The private history writer owns revisioned capture, completion and cleanup. Existing storage, concurrency, processing and mounted history consumers prove optional-stage failure retention without another publication authority.',
+    reason: `The private history writer owns revisioned capture, completion and cleanup. Existing
+      storage, concurrency, processing and mounted history consumers prove optional-stage
+      failure retention without another publication authority.`,
     testFiles: [
       'apps/extension/src/composition/persistence/voice-input-history/catalog.test.ts',
       'apps/extension/src/composition/persistence/voice-input-history/concurrency.test.ts',
@@ -26,8 +27,9 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     productionFile: 'packages/runtime-contracts/src/voice-input/types.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'The fixed voice error vocabulary passes through native capture, processing, IPC, private history and mounted consumers. Existing history races prove that expanded codes retain the current publication and cancellation authority.',
+    reason: `The fixed voice error vocabulary passes through native capture, processing, IPC, private
+      history and mounted consumers. Existing history races prove that expanded codes retain
+      the current publication and cancellation authority.`,
     testFiles: [
       'apps/extension/src/background/voice-input/capture-completion.test.ts',
       'apps/extension/src/background/voice-input/consumer-policy.test.ts',
@@ -82,8 +84,9 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/composition/voice-input/provider-error-copy.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'The shared dictation presentation maps bounded runtime error codes into fixed localized copy. Mounted button, Settings alert and retained history consumers prove the presentation contract.',
+    reason: `The shared dictation presentation maps bounded runtime error codes into fixed localized
+      copy. Mounted button, Settings alert and retained history consumers prove the
+      presentation contract.`,
     testFiles: [
       'apps/extension/src/content/voice-input/button.test.tsx',
       'apps/extension/src/settings/sections/system/voice-input/content.test.tsx',
@@ -95,8 +98,9 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/workflows/audio-jobs/failure.ts',
     exclusive: true,
     allowCrossOwner: true,
-    reason:
-      'The typed local failure contract retains bounded reasons and legacy audio codes. Port, mounted feedback, speech, recognition and cancellation consumers prove its current boundary.',
+    reason: `The typed local failure contract retains bounded reasons and legacy audio codes. Port,
+      mounted feedback, speech, recognition and cancellation consumers prove its current
+      boundary.`,
     testFiles: [
       'apps/extension/src/workflows/audio-jobs/client.test.ts',
       'apps/extension/src/gallery/video-review/use-recognition.test.tsx',

@@ -2,8 +2,8 @@ export const SETTINGS_OWNER_MAPPINGS = [
   {
     owner: 'canonical-settings-persistence',
     productionFile: 'apps/extension/src/composition/persistence/settings/index.ts',
-    reason:
-      'Settings readers, queued writers, subscriptions and reset consumers retain canonical preferences and reject stale approvals.',
+    reason: `Settings readers, queued writers, subscriptions and reset consumers retain canonical
+      preferences and reject stale approvals.`,
     testFiles: [
       'apps/extension/src/composition/persistence/settings/array.guards.test.ts',
       'apps/extension/src/composition/persistence/settings/context-menu-layout-chunks.test.ts',

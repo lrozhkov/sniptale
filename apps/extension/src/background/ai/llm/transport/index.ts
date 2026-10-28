@@ -42,6 +42,18 @@ function buildUserPrompt(markdownData: string, userInstruction: string): string 
   return `${markdownData}\n\n### Instruction:\n${userInstruction}`;
 }
 
+function getTransportRequestSettings(config: ResolvedLlmModelConfig): TransportRequestSettings {
+  return {
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    modelCode: config.modelCode,
+    connectionType: config.connectionType,
+    observationBinding: config.observationBinding,
+    beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
+    ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
+  };
+}
+
 async function requestConfigChatCompletion(
   settings: TransportRequestSettings,
   systemPrompt: string,
@@ -137,15 +149,7 @@ export async function processMarkdownRequest(
 
   try {
     const content = await requestConfigChatCompletion(
-      {
-        baseUrl: config.baseUrl,
-        apiKey: config.apiKey,
-        modelCode: config.modelCode,
-        connectionType: config.connectionType,
-        observationBinding: config.observationBinding,
-        beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
-        ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
-      },
+      getTransportRequestSettings(config),
       systemPrompt,
       userPrompt,
       translate('background.runtime.llmInvalidProviderApiKey')
@@ -192,15 +196,7 @@ export async function processJsonConfigRequest(
     },
     execute: (systemPrompt, userPrompt) =>
       requestConfigChatCompletion(
-        {
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          modelCode: config.modelCode,
-          connectionType: config.connectionType,
-          observationBinding: config.observationBinding,
-          beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
-          ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
-        },
+        getTransportRequestSettings(config),
         systemPrompt,
         userPrompt,
         translate('background.runtime.llmInvalidProviderApiKey')

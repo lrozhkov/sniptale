@@ -1,4 +1,4 @@
-import { getReviewAIProviderFailureKey } from './ai-provider-error';
+import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
 import type { VoiceProviderSelection } from '@sniptale/runtime-contracts/voice-input';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
@@ -150,7 +150,7 @@ export function ReviewTextVoiceForm(props: Props) {
       {operation.error && (operation.error !== 'model' || source === 'ai') && (
         <p role="alert" className="text-xs">
           {translate(
-            getReviewAIProviderFailureKey(operation.providerFailureReason) ??
+            getAIProviderFailureKey(operation.providerFailureReason) ??
               textVoiceErrors[operation.error]
           )}
         </p>

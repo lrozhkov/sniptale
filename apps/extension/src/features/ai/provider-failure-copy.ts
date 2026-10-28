@@ -1,5 +1,5 @@
-import type { AIConnectionReason } from '../../../../../contracts/settings/ai-catalog';
-import type { TranslationKey } from '../../../../../platform/i18n';
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
+import type { TranslationKey } from '../../platform/i18n';
 
 const PROVIDER_FAILURE_COPY: Partial<Record<AIConnectionReason, TranslationKey>> = {
   'invalid-credential': 'settings.aiProviders.providerStatusInvalidKey',
@@ -15,8 +15,8 @@ const PROVIDER_FAILURE_COPY: Partial<Record<AIConnectionReason, TranslationKey>>
   'provider-unavailable': 'settings.aiProviders.providerStatusUnavailable',
 };
 
-/** The Video inspector owns fixed local copy. Missing or ambiguous evidence keeps the existing fallback. */
-export function getVideoAIProviderFailureKey(
+/** Selects fixed provider copy while callers retain their operation-specific fallback. */
+export function getAIProviderFailureKey(
   reason?: AIConnectionReason | null
 ): TranslationKey | undefined {
   return reason ? PROVIDER_FAILURE_COPY[reason] : undefined;

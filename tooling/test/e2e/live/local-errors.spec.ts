@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './live-fixture';
-import { registerLiveProvider, configureLiveModel } from './provider-ui';
+import { registerLiveProvider, configureLiveModel } from './provider-ui.test-support';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';

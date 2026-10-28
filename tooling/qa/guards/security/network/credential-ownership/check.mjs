@@ -276,7 +276,8 @@ export function collectFetchOwnershipViolations(
             file: relativePath,
             line: getNodeLine(sourceFile, node),
             message:
-              'assembles secret-bearing request headers or hands credentials to the SDK outside the approved transport owner',
+              'assembles secret-bearing request headers or hands credentials to the SDK outside the ' +
+              'approved transport owner',
           });
         }
       }

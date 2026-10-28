@@ -5,7 +5,7 @@ import {
   closeExtensionBrowser,
   dismissFirstRunPrompt,
 } from '../support/extension-browser-launch';
-import { clearLivePasswords, cleanupLiveProviders } from './provider-ui';
+import { clearLivePasswords, cleanupLiveProviders } from './provider-ui.test-support';
 
 /** Every scenario owns its temporary browser, preferences, projects, and media bytes. */
 export const test = base.extend<{

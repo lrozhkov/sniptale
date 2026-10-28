@@ -1,4 +1,4 @@
-import { getVideoAIProviderFailureKey } from './ai-provider-error';
+import { getAIProviderFailureKey } from '../../../../../features/ai/provider-failure-copy';
 import { OriginalAudioPlacementFields } from '../inputs/original-audio';
 import { useVideoEditorPlaybackPort } from '../../../../runtime/controller/store';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -475,7 +475,7 @@ function VoiceRequestStatus({ operation: op }: { operation: VideoProjectTextVoic
       {op.error ? (
         <p role="alert" className="text-sm break-words">
           {translate(
-            getVideoAIProviderFailureKey(op.providerFailureReason) ??
+            getAIProviderFailureKey(op.providerFailureReason) ??
               (op.error === 'selection'
                 ? 'videoEditor.sidebar.textVoicePlacementConflict'
                 : op.error === 'stale'
