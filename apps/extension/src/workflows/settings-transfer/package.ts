@@ -110,7 +110,20 @@ function selectPalettePayload(
             return value === undefined ? [] : ([[id, value]] as const);
           })
         );
-  return { schemaVersion: payload.schemaVersion, data: { slots: selectedSlots } };
+  const names = isJsonRecord(data['names']) ? data['names'] : {};
+  const selectedColors = new Set(Object.values(selectedSlots));
+  const selectedNames = Object.fromEntries(
+    Object.entries(names).filter(
+      ([hex]) => Object.keys(selectedSlots).length === 10 || selectedColors.has(hex)
+    )
+  );
+  return {
+    schemaVersion: payload.schemaVersion,
+    data: {
+      slots: selectedSlots,
+      ...(Object.keys(selectedNames).length ? { names: selectedNames } : {}),
+    },
+  };
 }
 
 function selectToolPresetPayload(
@@ -167,24 +180,51 @@ export function buildExactRestoreDomainsBySelection(args: {
   return Object.fromEntries(
     Object.entries(projected).map(([domainId, payload]) => {
       const current = args.current[domainId];
+      const merged = current
+        ? overlayExactSelection({
+            current: current.data,
+            projected: payload.data,
+            domainId,
+            path: [],
+            selected,
+            nodes,
+          })
+        : payload.data;
       return [
         domainId,
         {
           schemaVersion: payload.schemaVersion,
-          data: current
-            ? overlayExactSelection({
-                current: current.data,
-                projected: payload.data,
-                domainId,
-                path: [],
-                selected,
-                nodes,
-              })
-            : payload.data,
+          data:
+            domainId === 'styles.palettes'
+              ? restoreExactPaletteNames(merged, payload.data)
+              : merged,
         },
       ];
     })
   );
+}
+
+/** A full palette restores all RGB identities; a slot subset replaces only its incoming RGB names. */
+function restoreExactPaletteNames(
+  merged: SettingsTransferDomainPayload['data'],
+  projected: SettingsTransferDomainPayload['data']
+): SettingsTransferDomainPayload['data'] {
+  if (!isJsonRecord(merged) || !isJsonRecord(projected)) return merged;
+  const slots = isJsonRecord(projected['slots']) ? projected['slots'] : {};
+  const selectedColors = new Set(Object.values(slots));
+  const currentNames = isJsonRecord(merged['names']) ? merged['names'] : {};
+  const importedNames = isJsonRecord(projected['names']) ? projected['names'] : {};
+  const retainedNames =
+    Object.keys(slots).length === 10
+      ? {}
+      : Object.fromEntries(
+          Object.entries(currentNames).filter(([hex]) => !selectedColors.has(hex))
+        );
+  const names = { ...retainedNames, ...importedNames };
+  const result = { ...merged };
+  delete result['names'];
+  if (Object.keys(names).length) result['names'] = names;
+  return result;
 }
 
 function overlayExactSelection(args: {

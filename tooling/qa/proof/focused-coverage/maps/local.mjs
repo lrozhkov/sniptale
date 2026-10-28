@@ -676,6 +676,16 @@ unchanged project admission.',
     ],
   },
   {
+    owner: 'shared-paint-selector-editor',
+    productionFile: 'apps/extension/src/ui/paint-selector/editor-content.tsx',
+    reason:
+      'The selector integration tests exercise solid and gradient stop editing, preview, alpha and cancellation.',
+    testFiles: [
+      'apps/extension/src/ui/paint-selector/index.test.tsx',
+      'apps/extension/src/ui/paint-selector/popup.test.tsx',
+    ],
+  },
+  {
     owner: 'shared-paint-selector-trigger',
     productionFile: 'apps/extension/src/ui/paint-selector/trigger.tsx',
     reason:

@@ -115,6 +115,7 @@ export function CompactPaintSelector(props: CompactPaintSelectorProps) {
         onModeChange={setMode}
         open={state.open}
         ownerId={ownerId}
+        paletteNames={preferences.paletteNames}
         palette={props.palette ?? []}
         preview={history.preview}
         recentColors={props.recentColors ?? preferences.recentColors}

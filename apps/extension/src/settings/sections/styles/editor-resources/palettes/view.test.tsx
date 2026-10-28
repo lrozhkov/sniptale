@@ -161,3 +161,57 @@ it('does not describe drawing shortcuts for other palettes', () => {
   act(() => root.unmount());
   state.value.key = 'drawing';
 });
+
+it('keeps a refused name for retry and ignores its result after the color changes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  state.value.colors = ['#123456'];
+  state.value.names = {};
+  let finish!: (value: boolean) => void;
+  state.value.renameColor = vi
+    .fn()
+    .mockResolvedValueOnce(false)
+    .mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        })
+    );
+  const node = document.createElement('div');
+  document.body.append(node);
+  const root = createRoot(node);
+  const input = () => node.querySelector<HTMLInputElement>('input[maxlength="80"]')!;
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  const enter = () =>
+    input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  try {
+    await act(async () => root.render(<PalettesSettings />));
+    await act(async () => {
+      setValue.call(input(), 'My color');
+      input().dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      enter();
+    });
+    expect(input().value).toBe('My color');
+    expect(input().getAttribute('aria-invalid')).toBe('true');
+    await act(async () => {
+      enter();
+      enter();
+    });
+    expect(state.value.renameColor).toHaveBeenCalledTimes(2);
+    expect(input().disabled).toBe(true);
+    await act(async () => {
+      state.value.colors = ['#abcdef'];
+      root.render(<PalettesSettings />);
+    });
+    expect(input().value).toBe('');
+    expect(input().disabled).toBe(false);
+    await act(async () => finish(false));
+    expect(input().getAttribute('aria-invalid')).toBeNull();
+    expect(input().value).toBe('');
+  } finally {
+    await act(async () => root.unmount());
+    node.remove();
+    vi.unstubAllGlobals();
+  }
+});

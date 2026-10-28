@@ -734,3 +734,14 @@ it('exports independent full-page image and preparation defaults', async () => {
   const snapshot = await readSettingsTransferSnapshot();
   expect(snapshot.domains['capture.image']?.data).toMatchObject({ fullPageImage, fullPageCapture });
 });
+
+it('includes RGB names in the transferable palette snapshot', async () => {
+  mocks.palette.mockResolvedValue({
+    colors: Array.from({ length: 10 }, () => '#ff7f50'),
+    names: { '#ff7f50': 'Brand coral', '#663399': 'Scene violet' },
+  });
+  const snapshot = await readSettingsTransferSnapshot();
+  expect(parseSettingsTransferDomains(snapshot.domains)['styles.palettes']?.data).toMatchObject({
+    names: { '#ff7f50': 'Brand coral', '#663399': 'Scene violet' },
+  });
+});

@@ -153,6 +153,7 @@ export async function readSettingsTransferSnapshot(
     'styles.tool-presets': payload(editorPresets),
     'styles.palettes': payload({
       slots: Object.fromEntries(palette.colors.map((color, index) => [`slot-${index}`, color])),
+      ...(palette.names ? { names: palette.names } : {}),
     }),
     'styles.surfaces': payload(serializeSurfaceStylePresetCatalog(surfaces)),
     'styles.gradients': payload(gradients),

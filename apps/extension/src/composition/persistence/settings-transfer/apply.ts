@@ -1,3 +1,4 @@
+import { parseDrawingPaletteState } from '../drawing-palette/parser';
 import { parseStoredSettings } from '../settings/guards';
 import { parsePageLaunchPreferences } from '../../../contracts/page-launch';
 import { parseFilenameRules } from '../../../features/file-naming/rules';
@@ -381,10 +382,13 @@ function applyStyleWrites(context: WriteBuildContext): void {
     if (colors.some((color) => typeof color !== 'string')) {
       throw new TypeError('Invalid drawing palette transfer state');
     }
-    localWrites['sniptale_drawing_palette'] = {
+    const parsed = parseDrawingPaletteState({
       schemaVersion: 1,
       colors,
-    };
+      ...(palette['names'] === undefined ? {} : { names: palette['names'] }),
+    });
+    if (parsed.unsafeForWrite) throw new TypeError('Invalid drawing palette transfer state');
+    localWrites['sniptale_drawing_palette'] = parsed.state;
   }
   assign(syncWrites, 'sniptale_gradient_presets', data('styles.gradients'));
   const surfaces = data('styles.surfaces');

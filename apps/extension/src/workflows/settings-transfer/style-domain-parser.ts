@@ -111,8 +111,17 @@ export function parseSettingsTransferStyleDomain(
         failSettingsTransferDomain(domainId);
       return json(parsed.value);
     }
-    case 'styles.palettes':
-      return json({ slots: parsePaletteSlots(domainId, value['slots']) });
+    case 'styles.palettes': {
+      const parsed = parseDrawingPaletteState({
+        ...createDefaultDrawingPaletteState(),
+        names: value['names'],
+      });
+      if (parsed.unsafeForWrite) failSettingsTransferDomain(domainId);
+      return json({
+        slots: parsePaletteSlots(domainId, value['slots']),
+        ...(parsed.state.names ? { names: parsed.state.names } : {}),
+      });
+    }
     case 'styles.gradients': {
       const parsed = parseGradientPresetCatalog(value);
       if (parsed.unsafeForWrite) {

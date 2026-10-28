@@ -9,9 +9,7 @@ const COMPARISON_ROW_CLASS = [
 ].join(' ');
 
 const ORIGINAL_SWATCH_CLASS = [
-  'sniptale-picker-checker h-8 w-8 shrink-0 cursor-pointer rounded-[4px] p-0 hover:outline-1',
-  'hover:outline-offset-2 hover:outline-[var(--sniptale-color-text-secondary)]',
-  'focus-visible:outline-1 focus-visible:outline-offset-2',
+  'sniptale-picker-original sniptale-picker-checker h-8 w-8 shrink-0 cursor-pointer rounded-[4px] p-0',
   'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 

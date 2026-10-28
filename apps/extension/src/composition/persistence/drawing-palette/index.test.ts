@@ -1,3 +1,4 @@
+import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { browserStorage } from '../infrastructure/browser-storage';
 import {
@@ -7,6 +8,7 @@ import {
   getDrawingPaletteSnapshot,
   loadDrawingPaletteState,
   reorderDrawingPaletteColor,
+  renamePaletteColor,
   subscribeToDrawingPaletteState,
 } from './index';
 
@@ -106,5 +108,85 @@ describe('drawing palette persistence', () => {
     expect((await loadDrawingPaletteState()).colors).toEqual(stored.colors);
     expect(await changeDrawingPaletteColor(99, '#030303')).toBe('rejected');
     expect(await reorderDrawingPaletteColor(0, 99)).toBe('rejected');
+  });
+});
+
+describe('named palette persistence', () => {
+  function storage() {
+    let value = createDefaultDrawingPaletteState();
+    vi.spyOn(browserStorage.local, 'get').mockImplementation(async () => ({
+      [DRAWING_PALETTE_STORAGE_KEY]: value,
+    }));
+    const write = vi.spyOn(browserStorage.local, 'set').mockImplementation(async (record) => {
+      value = record[DRAWING_PALETTE_STORAGE_KEY] as typeof value;
+    });
+    return {
+      get: () => value,
+      restore: (next: typeof value) => {
+        value = next;
+      },
+      write,
+    };
+  }
+  it('merges parallel rename and color intents through the fresh locked state', async () => {
+    const state = storage();
+    expect(
+      await Promise.all([
+        renamePaletteColor('#112233', 'Brand'),
+        changeDrawingPaletteColor(0, '#112233'),
+      ])
+    ).toEqual(['applied', 'applied']);
+    expect(state.get().colors[0]).toBe('#112233');
+    expect(state.get().names).toEqual({ '#112233': 'Brand' });
+    expect(await reorderDrawingPaletteColor(0, 3)).toBe('applied');
+    expect(state.get().names).toEqual({ '#112233': 'Brand' });
+  });
+  it('orders pending names before restore and does not resurrect erased metadata', async () => {
+    const state = storage();
+    let entered!: () => void, release!: () => void;
+    const start = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    state.write.mockImplementationOnce(async (record) => {
+      entered();
+      await gate;
+      state.restore(record[DRAWING_PALETTE_STORAGE_KEY] as ReturnType<typeof state.get>);
+    });
+    const first = renamePaletteColor('#112233', 'Before erase');
+    await start;
+    const second = renamePaletteColor('#445566', 'Also pending');
+    const restored = {
+      schemaVersion: 1 as const,
+      colors: createDefaultDrawingPaletteState().colors.map(() => '#010101'),
+    };
+    const restore = runWithPersistentDataErasureBarrier(() => state.restore(restored));
+    release();
+    await Promise.all([first, second, restore]);
+    expect((await loadDrawingPaletteState()).names).toBeUndefined();
+    expect(state.get().colors).toEqual(restored.colors);
+    await renamePaletteColor('#010101', 'After restore');
+    expect(state.get().colors).toEqual(restored.colors);
+  });
+  it('keeps RGB names when a color is removed and later reused', async () => {
+    const state = storage();
+    await renamePaletteColor('#11223380', 'Reusable');
+    await changeDrawingPaletteColor(0, '#445566');
+    await changeDrawingPaletteColor(1, '#112233');
+    expect(state.get().names).toEqual({ '#112233': 'Reusable' });
+    await renamePaletteColor('#112233', '');
+    expect(state.get().names).toBeUndefined();
+  });
+  it('retains authoritative data on failure and permits an identical command retry', async () => {
+    const state = storage();
+    state.write.mockRejectedValueOnce(new Error('Unavailable'));
+    await expect(renamePaletteColor('#112233', 'Retry')).rejects.toThrow('Unavailable');
+    expect(state.get().names).toBeUndefined();
+    expect(await renamePaletteColor('#112233', 'Retry')).toBe('applied');
+    expect(state.get().names).toEqual({ '#112233': 'Retry' });
+    expect(await renamePaletteColor('#112233', 'x'.repeat(81))).toBe('rejected');
+    expect(state.get().names).toEqual({ '#112233': 'Retry' });
   });
 });

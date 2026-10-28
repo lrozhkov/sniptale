@@ -112,6 +112,32 @@
       "version": "3.3.5"
     },
     {
+      "archivePath": "LICENSES/dependencies/color-name-1.1.4.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/color-name/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "color-name",
+      "packagePath": "node_modules/color-name",
+      "selectedLicense": "MIT",
+      "sha256": "c064f7a3e353bc1bc977f3c897941c75ef763f44f41677e0a15370ca0853d6e2",
+      "sourceUrl": "git@github.com:colorjs/color-name.git",
+      "version": "1.1.4"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/color-name-list-14.72.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/color-name-list/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "color-name-list",
+      "packagePath": "node_modules/color-name-list",
+      "selectedLicense": "MIT",
+      "sha256": "c5bc9b96e07b83b190604b21d0e03f2f95c551986ffd05ab3c613a23d5b0c5a5",
+      "sourceUrl": "https://github.com/meodai/color-names.git",
+      "version": "14.72.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/core-util-is/LICENSE",

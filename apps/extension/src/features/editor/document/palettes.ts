@@ -61,14 +61,13 @@ export const EDITOR_TOOL_SHAPE_FILL_PALETTE = [
 ];
 
 export const EDITOR_SCENE_BACKGROUND_PALETTE = [
-  '#18181b',
-  '#27272a',
-  '#09090b',
-  '#2563eb',
-  '#0f766e',
-  '#22c55e',
-  '#8b5cf6',
-  '#f97316',
-  '#e11d48',
-  '#fafafa',
+  '#000000',
+  '#696969',
+  '#4169e1',
+  '#008080',
+  '#32cd32',
+  '#7b68ee',
+  '#ff7f50',
+  '#dc143c',
+  '#fffafa',
 ];

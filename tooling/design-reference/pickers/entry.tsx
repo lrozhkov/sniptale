@@ -1,3 +1,4 @@
+import { DEFAULT_DRAWING_COLORS } from '../../../apps/extension/src/features/drawing/public';
 import { createRoot } from 'react-dom/client';
 import { useRef, useState } from 'react';
 import { clonePaint, type Paint } from '@sniptale/foundation/paint';
@@ -27,18 +28,7 @@ import { getShowcaseGradientPaint } from '../../../apps/extension/src/features/h
 import { setLocalePreference, type AppLocale } from '../../../apps/extension/src/platform/i18n';
 import './reference.css';
 
-const palette = [
-  '#F97316',
-  '#EF4444',
-  '#FACC15',
-  '#22C55E',
-  '#14B8A6',
-  '#3B82F6',
-  '#8B5CF6',
-  '#EC4899',
-  '#FAFAFA',
-  '#18181B',
-];
+const palette = [...DEFAULT_DRAWING_COLORS];
 const createId = () => crypto.randomUUID();
 const densityKey = 'sniptale.design-reference.picker-compact';
 

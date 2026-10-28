@@ -90,7 +90,10 @@ export function PickerToolbar(props: {
   resolvedColor: string;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_72px] items-center gap-3">
+    <div
+      data-ui="shared.ui.color-selector.hue"
+      className="grid grid-cols-[minmax(0,1fr)_72px] items-center gap-3"
+    >
       <PickerRange
         label={translate('shared.ui.colorSelectorChooseColor')}
         min={0}

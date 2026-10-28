@@ -7,8 +7,8 @@ import {
 
 it('resolves drawing defaults from full, short, and empty palettes', () => {
   expect(DEFAULT_DRAWING_COLORS).toHaveLength(10);
-  expect(DEFAULT_DRAWING_COLORS).toContain('#14b8a6');
-  expect(DEFAULT_DRAWING_COLORS).toContain('#ec4899');
+  expect(DEFAULT_DRAWING_COLORS).toContain('#20b2aa');
+  expect(DEFAULT_DRAWING_COLORS).toContain('#ff1493');
   expect(createDefaultDrawingToolDefaults()).toMatchObject({
     pencil: { color: DEFAULT_DRAWING_COLORS[4], width: 4 },
     marker: { color: DEFAULT_DRAWING_COLORS[3], opacity: 0.3, width: 28 },

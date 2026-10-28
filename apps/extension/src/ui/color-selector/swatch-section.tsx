@@ -1,3 +1,4 @@
+import { colorHint } from './catalog-model';
 const SWATCH_BUTTON_CLASS = [
   'relative grid h-6 w-full max-w-6 cursor-pointer place-items-center rounded-full',
   'bg-transparent p-[3px] hover:bg-[var(--sniptale-color-surface-hover)]',
@@ -15,6 +16,7 @@ const ACTIVE_SWATCH_CLASS = [
 
 export function ColorSelectorSwatchSection(props: {
   colors: readonly string[];
+  names?: Readonly<Record<string, string>> | undefined;
   label: string;
   showLabel?: boolean;
   selectedColor: string;
@@ -34,8 +36,8 @@ export function ColorSelectorSwatchSection(props: {
           <button
             key={color}
             type="button"
-            title={`${props.title}: ${color}`}
-            aria-label={`${props.title}: ${color}`}
+            title={colorHint(color, props.names)}
+            aria-label={`${props.title}: ${colorHint(color, props.names)}`}
             aria-pressed={props.selectedColor.toLowerCase() === color.toLowerCase()}
             onClick={() => props.onSelect(color)}
             className={props.optionClassName ?? SWATCH_BUTTON_CLASS}

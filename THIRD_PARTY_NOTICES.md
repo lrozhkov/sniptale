@@ -131,6 +131,30 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2`
 - Repository/source: https://github.com/zumerlab/snapdom.git
 
+### `color-name` 1.1.4
+
+- Installed path: `node_modules/color-name`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/color-name/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/color-name-1.1.4.txt`](LICENSES/dependencies/color-name-1.1.4.txt)
+- License text SHA-256: `c064f7a3e353bc1bc977f3c897941c75ef763f44f41677e0a15370ca0853d6e2`
+- Repository/source: git@github.com:colorjs/color-name.git
+
+### `color-name-list` 14.72.0
+
+- Installed path: `node_modules/color-name-list`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/color-name-list/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/color-name-list-14.72.0.txt`](LICENSES/dependencies/color-name-list-14.72.0.txt)
+- License text SHA-256: `c5bc9b96e07b83b190604b21d0e03f2f95c551986ffd05ab3c613a23d5b0c5a5`
+- Repository/source: https://github.com/meodai/color-names.git
+
 ### `core-util-is` 1.0.3
 
 - Installed path: `node_modules/core-util-is`

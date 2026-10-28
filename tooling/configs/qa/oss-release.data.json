@@ -67,6 +67,16 @@
       "source": "LICENSES/dependencies/@zumer__snapdom-3.3.5.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/color-name-1.1.4.txt",
+      "sha256": "c064f7a3e353bc1bc977f3c897941c75ef763f44f41677e0a15370ca0853d6e2",
+      "source": "LICENSES/dependencies/color-name-1.1.4.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/color-name-list-14.72.0.txt",
+      "sha256": "c5bc9b96e07b83b190604b21d0e03f2f95c551986ffd05ab3c613a23d5b0c5a5",
+      "source": "LICENSES/dependencies/color-name-list-14.72.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",
       "sha256": "33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710",
       "source": "LICENSES/dependencies/core-util-is-1.0.3.txt"
@@ -256,12 +266,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "0abffc4c513c36cf14bf651e5b67c5027e2264044ee0d7eeef820129cade950a",
+      "sha256": "26e6eeeb81e8750d9eceeabcc03b0b9e4217e57684d1bf58560361c5877b712e",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "73fe9b568924dc2453ecd81aa82270ca9580c571a94093ddf95e04dd52e4ca42",
+      "sha256": "628eac72bdacc5d041b263f7a96bb417c6f3250ba985bcf1fcd21963f069b83c",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],

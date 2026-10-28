@@ -8,7 +8,11 @@ import { createDefaultGradientPresetCatalog } from '../../composition/persistenc
 import { createSurfaceStylePresetCatalog } from '../../composition/persistence/surface-style-presets/catalog';
 import { serializeSurfaceStylePresetCatalog } from '../../composition/persistence/surface-style-presets/parser';
 import { parseSettingsTransferDomains } from './domain-parser';
-import { buildSettingsTransferPackage } from './package';
+import {
+  buildSettingsTransferPackage,
+  buildExactRestoreDomainsBySelection,
+  filterSettingsTransferDomainsBySelection,
+} from './package';
 import { buildSettingsTransferTree } from './tree';
 import { planSettingsTransfer } from './planner';
 import { assertDurableSettingsTransferCatalogs } from './durable-catalogs';
@@ -68,7 +72,10 @@ describe('settings transfer style selection', () => {
       domains: {
         'styles.palettes': {
           schemaVersion: 1,
-          data: { slots: { 'slot-0': '#111111', 'slot-1': '#222222' } },
+          data: {
+            slots: { 'slot-0': '#111111', 'slot-1': '#222222' },
+            names: { '#111111': 'Selected', '#222222': 'Excluded' },
+          },
         },
       },
       exportKind: 'selective',
@@ -77,9 +84,11 @@ describe('settings transfer style selection', () => {
     });
     expect(built.package.domains['styles.palettes']?.data).toEqual({
       slots: { 'slot-0': '#111111' },
+      names: { '#111111': 'Selected' },
     });
     expect(parseSettingsTransferDomains(built.package.domains)['styles.palettes']?.data).toEqual({
       slots: { 'slot-0': '#111111' },
+      names: { '#111111': 'Selected' },
     });
   });
 
@@ -278,5 +287,111 @@ describe('settings transfer style catalog validation', () => {
         [domainId]: { schemaVersion: 1, data: cloneSettingsTransferJsonValue(data) },
       })
     ).toThrow();
+  });
+});
+
+it('refuses malformed optional palette names at the import boundary', () => {
+  expect(() =>
+    parseSettingsTransferDomains({
+      'styles.palettes': {
+        schemaVersion: 1,
+        data: { slots: { 'slot-0': '#111111' }, names: { '#111111': 'x'.repeat(81) } },
+      },
+    })
+  ).toThrow();
+});
+
+describe('named palette restore selection', () => {
+  const slots = Object.fromEntries(
+    Array.from({ length: 10 }, (_, index) => [`slot-${index}`, index === 0 ? '#111111' : '#222222'])
+  );
+  const tree = buildSettingsTransferTree(
+    Object.keys(slots).map((id) => ({ collectionNodeId: 'styles.palettes.items', id, label: id }))
+  );
+  const current: Record<string, SettingsTransferDomainPayload> = {
+    'styles.palettes': {
+      schemaVersion: 1,
+      data: {
+        slots,
+        names: { '#111111': 'Local selected', '#663399': 'Local scene', '#999999': 'Local extra' },
+      },
+    },
+  };
+  it.each([undefined, { '#663399': 'Imported scene', '#445566': 'Imported unused' }])(
+    'restores the complete RGB map, including deletion and scene-only metadata: %s',
+    (names) => {
+      const imported: Record<string, SettingsTransferDomainPayload> = {
+        'styles.palettes': { schemaVersion: 1, data: { slots, ...(names ? { names } : {}) } },
+      };
+      const projected = buildExactRestoreDomainsBySelection({
+        current,
+        imported,
+        selectedNodeIds: ['styles.palettes'],
+        tree,
+      });
+      const plan = planSettingsTransfer({
+        current,
+        imported: projected,
+        strategy: 'exact-restore',
+      });
+      expect(plan.domains['styles.palettes']?.data).toEqual({ slots, ...(names ? { names } : {}) });
+      expect(parseSettingsTransferDomains(plan.domains)).toEqual(plan.domains);
+      const selected = filterSettingsTransferDomainsBySelection({
+        domains: imported,
+        selectedNodeIds: ['styles.palettes'],
+        tree,
+      });
+      const merged = planSettingsTransfer({
+        current,
+        imported: selected,
+        strategy: 'overwrite-matching',
+      });
+      if (names) expect(merged.domains['styles.palettes']?.data).toMatchObject({ names });
+    }
+  );
+  it('clears an unnamed selected RGB during partial exact restore and retains deselected metadata', () => {
+    const imported: Record<string, SettingsTransferDomainPayload> = {
+      'styles.palettes': {
+        schemaVersion: 1,
+        data: { slots, names: { '#663399': 'Unselected imported scene' } },
+      },
+    };
+    const projected = buildExactRestoreDomainsBySelection({
+      current,
+      imported,
+      selectedNodeIds: ['styles.palettes.items.slot-0'],
+      tree,
+    });
+    const plan = planSettingsTransfer({ current, imported: projected, strategy: 'exact-restore' });
+    expect(plan.domains['styles.palettes']?.data).toEqual({
+      slots,
+      names: { '#663399': 'Local scene', '#999999': 'Local extra' },
+    });
+  });
+  it('restores a selected name without changing other RGB identities', () => {
+    const imported: Record<string, SettingsTransferDomainPayload> = {
+      'styles.palettes': {
+        schemaVersion: 1,
+        data: {
+          slots: { ...slots, 'slot-0': '#333333' },
+          names: { '#333333': 'New color', '#663399': 'Unselected imported scene' },
+        },
+      },
+    };
+    const projected = buildExactRestoreDomainsBySelection({
+      current,
+      imported,
+      selectedNodeIds: ['styles.palettes.items.slot-0'],
+      tree,
+    });
+    expect(projected['styles.palettes']?.data).toEqual({
+      slots: { ...slots, 'slot-0': '#333333' },
+      names: {
+        '#111111': 'Local selected',
+        '#663399': 'Local scene',
+        '#999999': 'Local extra',
+        '#333333': 'New color',
+      },
+    });
   });
 });

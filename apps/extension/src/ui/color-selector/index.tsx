@@ -64,6 +64,7 @@ function PickerLayer(props: {
         onToggleCompact={() => preferences.setCompact(!preferences.compact)}
         formatMode={state.formatMode}
         eyedropper={state.eyedropper}
+        paletteNames={preferences.paletteNames}
         palette={state.normalizedPalette}
         recentColors={
           options.recentColors ? state.normalizedRecentColors : preferences.recentColors

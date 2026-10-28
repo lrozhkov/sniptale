@@ -27,6 +27,7 @@ import {
 } from '@sniptale/ui/theme/safe-portal';
 import { translate } from '../../platform/i18n';
 import type { GradientTemplateResources } from '../../composition/gradient-preset-resources/use-gradient-preset-catalog';
+import { ColorCatalogToggle } from '../color-selector/catalog-panel';
 import { PickerFooter } from '../color-selector/picker-sections';
 import { resolvePaintSelectorLayerStyle } from './lifecycle';
 import { PaintModeSelector } from './mode-selector';
@@ -62,6 +63,7 @@ type PaintSelectorPopupProps = {
   onEyedropperStateChange: (active: boolean) => void;
   onModeChange: (mode: 'solid' | GradientType) => void;
   palette: readonly string[];
+  paletteNames?: Readonly<Record<string, string>> | undefined;
   preview: (paint: Paint) => void;
   recentColors: readonly string[];
   showGradientAdvancedControls?: boolean;
@@ -176,6 +178,8 @@ function PaintPopupFooter(props: {
   root: RefObject<HTMLDivElement | null>;
   onSaved: (id: string) => void;
   context: string;
+  catalogMode: boolean;
+  onToggleCatalog: () => void;
 }) {
   const [saving, setSaving] = useState(false);
   const saveAnchor = useRef<HTMLButtonElement>(null);
@@ -201,33 +205,36 @@ function PaintPopupFooter(props: {
           compact={props.popup.compact}
           onToggleCompact={props.popup.onToggleCompact}
           utilities={
-            props.popup.draft.kind === 'gradient' ? (
-              <>
-                <button
-                  type="button"
-                  className={utilityClass}
-                  disabled={!props.popup.history.canUndo}
-                  aria-label={translate('highlighter.paintPicker.undo')}
-                  title={translate('highlighter.paintPicker.undo')}
-                  onClick={props.popup.history.undo}
-                >
-                  <Undo2 size={16} strokeWidth={1.75} />
-                </button>
-                {props.popup.showSaveTemplate !== false && (
+            <>
+              <ColorCatalogToggle active={props.catalogMode} onToggle={props.onToggleCatalog} />
+              {props.popup.draft.kind === 'gradient' ? (
+                <>
                   <button
-                    ref={saveAnchor}
                     type="button"
                     className={utilityClass}
-                    aria-expanded={saving}
-                    aria-label={translate('highlighter.paintPicker.saveTemplate')}
-                    title={translate('highlighter.paintPicker.saveTemplate')}
-                    onClick={() => setSaving(!saving)}
+                    disabled={!props.popup.history.canUndo}
+                    aria-label={translate('highlighter.paintPicker.undo')}
+                    title={translate('highlighter.paintPicker.undo')}
+                    onClick={props.popup.history.undo}
                   >
-                    <BookmarkPlus size={16} strokeWidth={1.75} />
+                    <Undo2 size={16} strokeWidth={1.75} />
                   </button>
-                )}
-              </>
-            ) : undefined
+                  {props.popup.showSaveTemplate !== false && (
+                    <button
+                      ref={saveAnchor}
+                      type="button"
+                      className={utilityClass}
+                      aria-expanded={saving}
+                      aria-label={translate('highlighter.paintPicker.saveTemplate')}
+                      title={translate('highlighter.paintPicker.saveTemplate')}
+                      onClick={() => setSaving(!saving)}
+                    >
+                      <BookmarkPlus size={16} strokeWidth={1.75} />
+                    </button>
+                  )}
+                </>
+              ) : null}
+            </>
           }
         />
       </div>
@@ -241,6 +248,7 @@ export function PaintSelectorPopup(
     setSection: (section: PaintSelectorSection) => void;
   }
 ) {
+  const [colorCatalogMode, setColorCatalogMode] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   const catalogHeight = useRef(340);
   const popup = useRef<HTMLDivElement>(null);
@@ -290,7 +298,7 @@ export function PaintSelectorPopup(
           props.history.begin();
       }}
       onKeyDownCapture={(event) => {
-        event.currentTarget.dataset['keyboard'] = 'true';
+        if (event.key === 'Tab') event.currentTarget.dataset['keyboard'] = 'true';
         if (
           !event.repeat &&
           (event.key === 'Enter' || event.key === ' ') &&
@@ -348,6 +356,8 @@ export function PaintSelectorPopup(
           <PaintTemplateSelection popup={props} onEdit={() => props.setSection('paint')} />
         ) : (
           <PaintSelectorEditorContent
+            catalogMode={colorCatalogMode}
+            onCatalogExit={() => setColorCatalogMode(false)}
             changeColor={changeColor}
             eyedropper={eyedropper}
             popup={props}
@@ -357,6 +367,11 @@ export function PaintSelectorPopup(
         )}
       </div>
       <PaintPopupFooter
+        catalogMode={colorCatalogMode}
+        onToggleCatalog={() => {
+          props.setSection('paint');
+          setColorCatalogMode((value) => !value);
+        }}
         context={`${props.section}-${mode}`}
         popup={props}
         root={popup}

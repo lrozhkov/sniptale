@@ -1,3 +1,4 @@
+import { usePaletteNames } from './use-palette-names';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   loadPickerCompact,
@@ -12,6 +13,7 @@ import {
 
 /** Density is advisory: a refused preference write never prevents editing. */
 export function usePickerPreferences(density?: 'full' | 'compact') {
+  const paletteNames = usePaletteNames();
   const [rememberedCompact, setRememberedCompact] = useState(false);
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const generation = useRef(0);
@@ -66,6 +68,7 @@ export function usePickerPreferences(density?: 'full' | 'compact') {
       .catch(() => undefined);
   }, []);
   return {
+    paletteNames,
     compact: density === undefined ? rememberedCompact : density === 'compact',
     setCompact,
     recentColors,

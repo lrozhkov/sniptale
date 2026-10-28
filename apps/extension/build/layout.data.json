@@ -241,6 +241,8 @@
     "@webav/mp4box.js",
     "@zip.js/zip.js",
     "@zumer/snapdom",
+    "color-name",
+    "color-name-list",
     "dompurify",
     "fabric",
     "idb",

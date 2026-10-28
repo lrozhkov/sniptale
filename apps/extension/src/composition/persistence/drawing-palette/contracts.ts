@@ -3,5 +3,6 @@ export const DRAWING_PALETTE_SCHEMA_VERSION = 1;
 
 export interface DrawingPaletteStateV1 {
   readonly schemaVersion: 1;
+  readonly names?: Readonly<Record<string, string>>;
   readonly colors: readonly string[];
 }
