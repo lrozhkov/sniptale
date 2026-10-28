@@ -48,7 +48,7 @@ export function AIModalSelectionFeedback({
   return (
     <>
       {selection.selectionPending ? (
-        <p role="status" className="mt-2 text-xs">
+        <p role="status" className="sr-only">
           {translate('common.states.saving')}
         </p>
       ) : null}

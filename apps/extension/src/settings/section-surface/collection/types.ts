@@ -25,6 +25,10 @@ export type SettingsCollectionItem = {
   title: ReactNode;
   meta?: ReactNode;
   supplement?: ReactNode;
+  /** Additional owner commands in the existing trailing action row. */
+  actions?: ReactNode;
+  /** Full-width status below the identity and action row. */
+  footer?: ReactNode;
   preview?: ReactNode;
   previewVariant?: 'icon' | 'image';
   badges?: readonly {

@@ -143,6 +143,8 @@ it('locks pending choices and exposes distinct localized selection recovery mess
   await act(async () => root.render(<Settings pending />));
   expect(host.querySelector('fieldset')?.disabled).toBe(true);
   expect(host.querySelector('[role="status"]')?.textContent).toBe('common.states.saving');
+  expect(host.querySelector('[role="status"]')?.classList.contains('sr-only')).toBe(true);
+  expect(host.querySelector('fieldset')?.getAttribute('aria-busy')).toBe('true');
   await act(async () => root.render(<Settings unavailable failed />));
   expect(host.querySelector('fieldset')?.disabled).toBe(false);
   expect(host.textContent).toContain('aiModal.modelSelectionUnavailable');

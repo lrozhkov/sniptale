@@ -1,4 +1,3 @@
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import { getAIProviderOperations } from '../../../../../contracts/settings/ai-provider';
 import {
@@ -7,11 +6,7 @@ import {
 } from '../../../../../contracts/settings/model-operation';
 import { formatDateTime, formatNumber, translate } from '../../../../../platform/i18n';
 
-export function ProviderCatalogDetails(props: {
-  provider: AIProvider;
-  models: AIModel[];
-  onConfigureModel: () => void;
-}) {
+export function ProviderCatalogDetails(props: { provider: AIProvider; models: AIModel[] }) {
   const { provider } = props;
   const models = props.models.filter((model) => model.providerId === provider.id);
   const operations = getAIProviderOperations(provider.connectionType);
@@ -35,16 +30,16 @@ export function ProviderCatalogDetails(props: {
   const date = (timestamp: number) =>
     formatDateTime(timestamp, { dateStyle: 'short', timeStyle: 'short' });
   return (
-    <div className="space-y-1 text-xs text-[var(--sniptale-color-text-muted)]">
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--sniptale-color-text-muted)]">
       {provider.management === 'automatic' ? (
         <>
-          <p>
+          <p className="m-0">
             {translate('settings.aiProviders.providerEligibleModels').replace(
               '{count}',
               formatNumber(eligibleCount)
             )}
           </p>
-          <p>
+          <p className="m-0">
             {provider.catalogUpdatedAt === undefined
               ? translate('settings.aiProviders.providerCatalogNeverUpdated')
               : translate('settings.aiProviders.providerCatalogUpdated').replace(
@@ -53,17 +48,14 @@ export function ProviderCatalogDetails(props: {
                 )}
           </p>
           {incompleteMetadata ? (
-            <>
-              <p>{translate('settings.aiProviders.providerCatalogMetadataMissing')}</p>
-              <ProductActionButton compact tone="secondary" onClick={props.onConfigureModel}>
-                {translate('settings.aiProviders.providerConfigureModel')}
-              </ProductActionButton>
-            </>
+            <p className="m-0">
+              {translate('settings.aiProviders.providerCatalogMetadataMissing')}
+            </p>
           ) : null}
         </>
       ) : null}
       {provider.observation ? (
-        <p>
+        <p className="m-0">
           {translate('settings.aiProviders.providerChecked').replace(
             '{date}',
             date(provider.observation.checkedAt)

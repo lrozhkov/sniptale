@@ -20,6 +20,7 @@ function isDefaultEventWithinElement(event: MouseEvent, element: Element | null)
 
 export function useAIModelSelectorDismissState(args: {
   dropdownRef: RefObject<HTMLDivElement | null>;
+  menuRef?: RefObject<HTMLDivElement | null>;
   isEventWithinElement?: EventWithinElementResolver;
   isOpen: boolean;
   setIsOpen: SetIsOpen;
@@ -27,6 +28,7 @@ export function useAIModelSelectorDismissState(args: {
 }) {
   const {
     dropdownRef,
+    menuRef,
     isEventWithinElement = isDefaultEventWithinElement,
     isOpen,
     setIsOpen,
@@ -39,7 +41,10 @@ export function useAIModelSelectorDismissState(args: {
     }
 
     const handleMouseDown = (event: MouseEvent) => {
-      if (!isEventWithinElement(event, dropdownRef.current)) {
+      if (
+        !isEventWithinElement(event, dropdownRef.current) &&
+        !(menuRef?.current && isEventWithinElement(event, menuRef.current))
+      ) {
         setIsOpen(false);
         setSearchQuery('');
       }
@@ -47,7 +52,7 @@ export function useAIModelSelectorDismissState(args: {
 
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, [dropdownRef, isEventWithinElement, isOpen, setIsOpen, setSearchQuery]);
+  }, [dropdownRef, menuRef, isEventWithinElement, isOpen, setIsOpen, setSearchQuery]);
 }
 
 export function useAIModelSelectorSearchFocus(
@@ -61,7 +66,7 @@ export function useAIModelSelectorSearchFocus(
   }, [isOpen, searchInputRef]);
 }
 
-function modelMenuStyle(anchor: HTMLDivElement): CSSProperties | null {
+function modelMenuStyle(anchor: HTMLDivElement, portalMenu: boolean): CSSProperties | null {
   const ownerWindow = anchor.ownerDocument.defaultView!;
   const bounds = {
     left: 0,
@@ -98,7 +103,13 @@ function modelMenuStyle(anchor: HTMLDivElement): CSSProperties | null {
   ) {
     return null;
   }
-  const scale = readContentUiScaleCompensation(anchor);
+  if (portalMenu) {
+    bounds.left = 0;
+    bounds.top = 0;
+    bounds.right = ownerWindow.innerWidth;
+    bounds.bottom = ownerWindow.innerHeight;
+  }
+  const scale = portalMenu ? 1 : readContentUiScaleCompensation(anchor);
   const gap = 4 * scale;
   const above = Math.max(0, rect.top - bounds.top - gap - 8);
   const below = Math.max(0, bounds.bottom - rect.bottom - gap - 8);
@@ -109,6 +120,17 @@ function modelMenuStyle(anchor: HTMLDivElement): CSSProperties | null {
   );
   const left = Math.max(bounds.left + 8, Math.min(rect.left, bounds.right - width * scale - 8));
   const up = above >= below;
+  if (portalMenu) {
+    const maxHeight = Math.min(320, up ? above : below);
+    return {
+      position: 'fixed',
+      left,
+      top: up ? 'auto' : rect.bottom + gap,
+      bottom: up ? ownerWindow.innerHeight - rect.top + gap : 'auto',
+      width,
+      maxHeight,
+    };
+  }
   return {
     left: (left - rect.left) / scale,
     right: 'auto',
@@ -123,14 +145,15 @@ export function useAIModelSelectorMenuLayout(
   isOpen: boolean,
   anchorRef: RefObject<HTMLDivElement | null>,
   setIsOpen: SetIsOpen,
-  setSearchQuery: SetSearchQuery
+  setSearchQuery: SetSearchQuery,
+  portalMenu = false
 ) {
   const [style, setStyle] = useState<CSSProperties>({});
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
     if (!isOpen || !anchor) return;
     const update = () => {
-      const nextStyle = modelMenuStyle(anchor);
+      const nextStyle = modelMenuStyle(anchor, portalMenu);
       if (nextStyle) {
         setStyle(nextStyle);
       } else {
@@ -145,6 +168,6 @@ export function useAIModelSelectorMenuLayout(
       unbind?.();
       observer?.disconnect();
     };
-  }, [isOpen, anchorRef, setIsOpen, setSearchQuery]);
+  }, [isOpen, anchorRef, setIsOpen, setSearchQuery, portalMenu]);
   return style;
 }

@@ -99,3 +99,10 @@ it('changes and clears numeric limits while preserving capability maps', async (
   await change('');
   expect(changed.mock.calls.at(-1)?.[0].maxOutputTokens).toBeUndefined();
 });
+
+it('uses the design system structural disclosure for every capability group', async () => {
+  await act(async () => root.render(<ModelProperties capabilities={capabilities} />));
+  expect(
+    container.querySelectorAll('details.sniptale-disclosure[data-variant="structural"]')
+  ).toHaveLength(5);
+});

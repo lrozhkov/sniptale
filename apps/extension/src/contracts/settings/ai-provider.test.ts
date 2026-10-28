@@ -15,7 +15,7 @@ describe('AI connection definitions', () => {
     expect(names).toEqual(
       [...names].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }))
     );
-    expect(new Set(definitions.map((entry) => entry.type)).size).toBe(21);
+    expect(new Set(definitions.map((entry) => entry.type)).size).toBe(20);
   });
 
   it('uses the exact neuraldeep.ru label and documented service origin', () => {
@@ -25,10 +25,6 @@ describe('AI connection definitions', () => {
       catalog: 'openai',
       available: true,
     });
-  });
-
-  it('does not offer an incompatible GigaChat package as executable', () => {
-    expect(getAIProviderDefinition('gigachat').available).toBe(false);
   });
 
   it('uses allowed defaults and does not require cloud credentials for local backends', () => {
@@ -46,4 +42,11 @@ describe('AI connection definitions', () => {
     expect(isAIProviderType('../remote-package')).toBe(false);
     expect(isAIProviderType(null)).toBe(false);
   });
+});
+
+it('has no unsupported bank provider in the executable registry', () => {
+  expect(AI_PROVIDER_TYPES).not.toContain('gigachat');
+  expect(listAIProviderDefinitions().some((entry) => /Sber|GigaChat/iu.test(entry.label))).toBe(
+    false
+  );
 });

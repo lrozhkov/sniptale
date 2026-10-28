@@ -1,4 +1,6 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { InspectorDisclosureView } from '../../../../../ui/compact-inspector-controls/disclosure';
+import { SettingsSwitch } from '../../../../section-surface/panel-controls';
 import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import { ModelAudioFields } from './model-audio-fields';
 import type {
@@ -21,7 +23,6 @@ import {
   ProductInput,
   ProductSelect,
   ProductTextarea,
-  ProductToggle,
 } from '@sniptale/ui/product-form-controls';
 import { ProductModal, ProductModalBody, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { AiProvidersFormModalLayout } from './layout';
@@ -199,6 +200,7 @@ function ModelCatalogFields(props: ModelFormModalContentProps) {
       >
         {props.catalog.models.length > 0 ? (
           <AIModelSelector
+            portalMenu
             models={props.catalog.models}
             providers={props.providers}
             selectedModelId={selected?.id ?? null}
@@ -295,7 +297,7 @@ function ModelLifecycleFields(props: ModelFormModalContentProps) {
       {retired && manuallyOwned ? (
         <div className="flex items-center justify-between gap-2 text-[13px] leading-[18px]">
           <span>{translate('settings.aiProviders.modelRetirementOverride')}</span>
-          <ProductToggle
+          <SettingsSwitch
             checked={props.formData.retirementOverride === true}
             aria-label={translate('settings.aiProviders.modelRetirementOverride')}
             onClick={() =>
@@ -306,7 +308,7 @@ function ModelLifecycleFields(props: ModelFormModalContentProps) {
       ) : null}
       <div className="flex items-center justify-between gap-2 text-[13px] leading-[18px]">
         <span>{translate('settings.aiProviders.modelEnabledLabel')}</span>
-        <ProductToggle
+        <SettingsSwitch
           checked={canEnable && props.formData.enabled !== false}
           disabled={!canEnable}
           aria-label={translate('settings.aiProviders.modelEnabledLabel')}
@@ -319,6 +321,7 @@ function ModelLifecycleFields(props: ModelFormModalContentProps) {
 
 function ModelFormModalBody(props: ModelFormModalContentProps) {
   const manual = props.catalog.mode === 'manual';
+  const [parametersOpen, setParametersOpen] = useState(manual);
   const hasModel = manual || Boolean(props.catalog.selected);
   const availableOperations = props.formData.capabilities
     ? (['text', 'transcription', 'speech'] as const).filter(
@@ -374,27 +377,24 @@ function ModelFormModalBody(props: ModelFormModalContentProps) {
           <>
             {manual ? <ModelLifecycleFields {...props} /> : null}
             {availableOperations === undefined || availableOperations.length > 0 ? (
-              <details open={manual}>
-                <summary
-                  className={[
-                    'min-h-8 cursor-pointer py-2 text-[13px] leading-[18px]',
-                    'text-[var(--sniptale-color-text-muted)]',
-                  ].join(' ')}
-                >
-                  {translate('settings.aiProviders.modelAudioParameters')}
-                </summary>
-                <div className="space-y-3 pt-1">
-                  <ModelAudioFields
-                    operation={operation}
-                    audio={props.formData.audio}
-                    onOperationChange={props.onOperationChange}
-                    onAudioChange={props.onAudioChange}
-                    error={props.errors['audio']}
-                    {...(availableOperations === undefined ? {} : { availableOperations })}
-                  />
-                  {operation === 'text' ? <ModelPromptField {...props} /> : null}
-                </div>
-              </details>
+              <InspectorDisclosureView
+                dataUi="settings.ai-model.parameters"
+                variant="structural"
+                label={translate('settings.aiProviders.modelAudioParameters')}
+                open={parametersOpen}
+                onOpenChange={setParametersOpen}
+                bodyClassName="space-y-3 px-2 pt-2"
+              >
+                <ModelAudioFields
+                  operation={operation}
+                  audio={props.formData.audio}
+                  onOperationChange={props.onOperationChange}
+                  onAudioChange={props.onAudioChange}
+                  error={props.errors['audio']}
+                  {...(availableOperations === undefined ? {} : { availableOperations })}
+                />
+                {operation === 'text' ? <ModelPromptField {...props} /> : null}
+              </InspectorDisclosureView>
             ) : null}
           </>
         ) : null}
@@ -416,7 +416,7 @@ export function ModelFormModalContent(props: ModelFormModalContentProps) {
       onClose={props.onClose}
       onSubmit={props.onSubmit}
     >
-      <ModelFormModalBody {...props} />
+      <ModelFormModalBody key={props.catalog.mode} {...props} />
     </AiProvidersFormModalLayout>
   );
 }

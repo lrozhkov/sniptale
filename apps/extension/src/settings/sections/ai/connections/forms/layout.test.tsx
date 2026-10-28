@@ -147,3 +147,17 @@ function runAiProvidersFormModalLayoutSuite() {
 }
 
 describe('AiProvidersFormModalLayout', runAiProvidersFormModalLayoutSuite);
+
+it('keeps the form open when an inner choice has already handled Escape', () => {
+  const props = renderLayout({
+    children: <button onKeyDown={(event) => event.preventDefault()}>Inner choice</button>,
+  });
+  act(() => {
+    container!
+      .querySelector('button')!
+      .dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      );
+  });
+  expect(props.onClose).not.toHaveBeenCalled();
+});

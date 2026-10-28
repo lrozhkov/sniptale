@@ -410,8 +410,9 @@ it('refreshes metadata with explicit host permission recovery and retains the ca
   const checkButton = () =>
     getButtons().find(
       (button) =>
-        button.textContent === translate('settings.aiProviders.providerCheckAction') ||
-        button.textContent === translate('settings.aiProviders.providerCheckPending')
+        button.getAttribute('aria-label') ===
+          translate('settings.aiProviders.providerCheckAction') ||
+        button.getAttribute('aria-label') === translate('settings.aiProviders.providerCheckPending')
     )!;
   await act(async () => {
     checkButton().click();
@@ -475,7 +476,8 @@ it('distinguishes local credentials and disables checks for a disabled provider'
   expect(container?.textContent).toContain(translate('settings.aiProviders.providerLocalNoKey'));
   expect(
     getButtons().find(
-      (button) => button.textContent === translate('settings.aiProviders.providerCheckAction')
+      (button) =>
+        button.getAttribute('aria-label') === translate('settings.aiProviders.providerCheckAction')
     )?.disabled
   ).toBe(true);
 });
@@ -598,7 +600,9 @@ it('explains ID-only catalogs and opens manual setup for the relevant connection
   await act(async () =>
     getButtons()
       .find(
-        (button) => button.textContent === translate('settings.aiProviders.providerConfigureModel')
+        (button) =>
+          button.getAttribute('aria-label') ===
+          translate('settings.aiProviders.providerConfigureModel')
       )
       ?.click()
   );
@@ -679,4 +683,20 @@ it('does not count an operation outside the admitted provider adapter', async ()
   expect(container?.textContent).toContain(
     translate('settings.aiProviders.providerEligibleModels').replace('{count}', '0')
   );
+});
+
+it('keeps provider commands together and status in the full-width footer', async () => {
+  await renderUi(<AIProvidersProvidersCard state={createState()} />);
+  const row = container!.querySelector('[data-settings-collection-item]')!;
+  const footer = row.querySelector('[data-settings-collection-footer]')!;
+  expect(footer).not.toBeNull();
+  expect(footer.querySelector('[data-provider-status]')?.textContent).toBeTruthy();
+  expect(footer.querySelector('button')).toBeNull();
+  for (const key of ['providerCheckAction', 'providerConfigureModel'] as const) {
+    const action = row.querySelector(
+      `button[aria-label="${translate(`settings.aiProviders.${key}`)}"]`
+    )!;
+    expect(action).not.toBeNull();
+    expect(footer.contains(action)).toBe(false);
+  }
 });

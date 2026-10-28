@@ -66,7 +66,7 @@ function TextRequestFeedback({ session }: { session: Session }) {
         </p>
       ) : null}
       {session.models.pending && !session.request.busy ? (
-        <p role="status" className="mt-2 text-xs">
+        <p role="status" className="sr-only">
           {translate('common.states.saving')}
         </p>
       ) : null}

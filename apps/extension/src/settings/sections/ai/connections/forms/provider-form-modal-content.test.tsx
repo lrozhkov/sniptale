@@ -346,3 +346,17 @@ it('keeps address focus and draft when advanced preset editing changes the desti
   expect(input.value).toBe('https://custom.example/v1');
   expect(container?.querySelector('details')?.open).toBe(true);
 });
+
+it('offers supported connections without the separate browser runtime or unsupported providers', async () => {
+  await render(<ProviderFormModalContent {...createProps()} />);
+  const trigger = container!.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('settings.aiProviders.providerTypeLabel')}"]`
+  )!;
+  await act(async () => trigger.click());
+  const options = Array.from(document.querySelectorAll('[role="option"]'));
+  expect(options).toHaveLength(19);
+  expect(options[0]?.textContent).toBe('OpenAI-compatible');
+  expect(options.some((option) => /Chrome AI|Sber|GigaChat/iu.test(option.textContent ?? ''))).toBe(
+    false
+  );
+});

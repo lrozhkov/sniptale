@@ -526,6 +526,7 @@ it('locks model controls during preference admission without clearing the source
   render(props);
   expect(host.querySelector('fieldset')?.disabled).toBe(true);
   expect(host.querySelector('[role="status"]')?.textContent).toContain('common.states.saving');
+  expect(host.querySelector('[role="status"]')?.classList.contains('sr-only')).toBe(true);
   expect(
     host.querySelector<HTMLInputElement>(
       'input[aria-label="gallery.videoReview.textFragmentStart"]'

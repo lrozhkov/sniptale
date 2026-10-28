@@ -168,16 +168,9 @@ function ProviderFormModalBody(props: ProviderFormModalContentProps) {
           value={props.formData.connectionType}
           onChange={props.onConnectionTypeChange}
           disabled={props.isSaving}
-          options={listAIProviderDefinitions().map((definition) => ({
-            value: definition.type,
-            label: definition.label,
-            disabled: !definition.available || definition.type === 'chrome-built-in',
-            ...(definition.type === 'chrome-built-in'
-              ? { description: translate('settings.aiProviders.providerChromeSeparate') }
-              : !definition.available
-                ? { description: translate('settings.aiProviders.providerAdapterUnavailable') }
-                : {}),
-          }))}
+          options={listAIProviderDefinitions()
+            .filter((definition) => definition.available && definition.type !== 'chrome-built-in')
+            .map((definition) => ({ value: definition.type, label: definition.label }))}
         />
       </ProductField>
       <ProviderNameField {...props} />

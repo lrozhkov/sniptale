@@ -350,7 +350,7 @@ function TextVoiceParameters(props: {
         </p>
       )}
       {settings.selectionPending && (
-        <p role="status" className="text-xs">
+        <p role="status" className="sr-only">
           {translate('common.states.saving')}
         </p>
       )}

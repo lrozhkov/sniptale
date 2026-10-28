@@ -34,7 +34,6 @@ interface AIProviderRuntimeOptions {
 export function createAIProviderRuntime(options: AIProviderRuntimeOptions): ProviderV4 {
   if (
     options.type !== 'chrome-built-in' &&
-    options.type !== 'gigachat' &&
     !getAIProviderOperations(options.type).includes(options.operation)
   )
     throw new AIProviderRequestError('provider-unavailable');
@@ -78,7 +77,6 @@ export function createAIProviderRuntime(options: AIProviderRuntimeOptions): Prov
         ? createOpenAICompatible({ ...settings, name: options.type, ...options.compatibleChat })
         : createOpenAI(settings);
     case 'chrome-built-in':
-    case 'gigachat':
       throw new Error('provider-runtime-unavailable');
   }
 }

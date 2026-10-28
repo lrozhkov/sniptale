@@ -7,6 +7,7 @@ type EventWithinElementResolver = (event: MouseEvent, element: Element | null) =
 
 export function createDismissStateArgs(args: {
   dropdownRef: RefObject<HTMLDivElement | null>;
+  menuRef: RefObject<HTMLDivElement | null>;
   isEventWithinElement: EventWithinElementResolver | undefined;
   isOpen: boolean;
   setIsOpen: Dispatch<SetStateAction<boolean>>;
@@ -15,12 +16,14 @@ export function createDismissStateArgs(args: {
   return args.isEventWithinElement === undefined
     ? {
         dropdownRef: args.dropdownRef,
+        menuRef: args.menuRef,
         isOpen: args.isOpen,
         setIsOpen: args.setIsOpen,
         setSearchQuery: args.setSearchQuery,
       }
     : {
         dropdownRef: args.dropdownRef,
+        menuRef: args.menuRef,
         isEventWithinElement: args.isEventWithinElement,
         isOpen: args.isOpen,
         setIsOpen: args.setIsOpen,

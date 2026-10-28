@@ -211,7 +211,7 @@ function VoiceSourceControls({
         </p>
       ) : null}
       {op.selectionPending ? (
-        <p role="status" className="text-xs">
+        <p role="status" className="sr-only">
           {translate('common.states.saving')}
         </p>
       ) : null}

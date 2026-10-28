@@ -35,7 +35,11 @@ export function TextRewriteSettings(props: {
   const window = options.window ?? props.windowFallback;
   const patch = props.onOptionsChange;
   return (
-    <fieldset disabled={locked} className="min-w-0 sniptale-parameter-stack">
+    <fieldset
+      disabled={locked}
+      aria-busy={props.selectionPending || undefined}
+      className="min-w-0 sniptale-parameter-stack"
+    >
       <InspectorParameterRow stacked label={translate('gallery.videoReview.textRewriteModel')}>
         {props.catalog ? (
           <AIModelSelector
@@ -56,7 +60,7 @@ export function TextRewriteSettings(props: {
         )}
       </InspectorParameterRow>
       {props.selectionPending && (
-        <p role="status" className="text-xs">
+        <p role="status" className="sr-only">
           {translate('common.states.saving')}
         </p>
       )}

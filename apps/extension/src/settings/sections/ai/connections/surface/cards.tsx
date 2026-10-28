@@ -1,5 +1,6 @@
 import { useProviderCardActions } from '../controller/provider-card-actions';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { Plus, RefreshCw } from 'lucide-react';
 import { getAIProviderDefinition } from '../../../../../contracts/settings/ai-provider';
 import { ProviderCatalogDetails } from './provider-catalog-details';
 import { providerStatus } from './provider-status';
@@ -14,30 +15,50 @@ export function AIProvidersProvidersCard(props: { state: AiProvidersSectionState
     title: provider.name,
     meta: `${getAIProviderDefinition(provider.connectionType).label} · ${provider.baseUrl}`,
     enabled: provider.enabled !== false,
-    supplement: (
-      <div className="space-y-1">
-        <ProviderCatalogDetails
-          provider={provider}
-          models={props.state.catalogModels}
-          onConfigureModel={() => props.state.modals.openModelModal(undefined, provider.id)}
-        />
-        <ProductActionButton
-          compact
-          tone="secondary"
-          disabled={refreshing.has(provider.id) || provider.enabled === false}
-          onClick={() => void check(provider)}
-        >
-          {translate(
+    actions: (
+      <div className="flex shrink-0 items-center gap-1">
+        <ContentToolbarButton
+          tone="utility"
+          aria-label={translate(
             refreshing.has(provider.id)
               ? 'settings.aiProviders.providerCheckPending'
               : 'settings.aiProviders.providerCheckAction'
           )}
-        </ProductActionButton>
-        {errors[provider.id] && (
-          <p role="alert" className="text-xs">
+          title={translate(
+            refreshing.has(provider.id)
+              ? 'settings.aiProviders.providerCheckPending'
+              : 'settings.aiProviders.providerCheckAction'
+          )}
+          disabled={refreshing.has(provider.id) || provider.enabled === false}
+          aria-busy={refreshing.has(provider.id) || undefined}
+          onClick={() => void check(provider)}
+        >
+          <RefreshCw
+            size={14}
+            className={refreshing.has(provider.id) ? 'animate-spin motion-reduce:animate-none' : ''}
+          />
+        </ContentToolbarButton>
+        <ContentToolbarButton
+          tone="utility"
+          aria-label={translate('settings.aiProviders.providerConfigureModel')}
+          title={translate('settings.aiProviders.providerConfigureModel')}
+          onClick={() => props.state.modals.openModelModal(undefined, provider.id)}
+        >
+          <Plus size={14} />
+        </ContentToolbarButton>
+      </div>
+    ),
+    footer: (
+      <div className="space-y-1 text-[12px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+        <p className="m-0" data-provider-status>
+          {providerStatus(provider)}
+        </p>
+        <ProviderCatalogDetails provider={provider} models={props.state.catalogModels} />
+        {errors[provider.id] ? (
+          <p role="alert" className="m-0 text-[var(--sniptale-color-danger-text)]">
             {errors[provider.id]}
           </p>
-        )}
+        ) : null}
       </div>
     ),
     badges: [
@@ -49,16 +70,6 @@ export function AIProvidersProvidersCard(props: { state: AiProvidersSectionState
             : 'settings.aiProviders.providerModeAutomatic'
         ),
         tone: 'neutral',
-      },
-      {
-        id: 'status',
-        label: providerStatus(provider),
-        tone:
-          provider.observation?.status === 'available'
-            ? 'success'
-            : provider.observation?.status === 'unavailable'
-              ? 'warning'
-              : 'neutral',
       },
       {
         id: 'api-key',

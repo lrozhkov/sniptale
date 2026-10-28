@@ -163,7 +163,7 @@ export function TourNarrationAI({
         t={t}
       />
       {!catalog && !selection.configurationFailed && (
-        <p role="status" className="guide-inspector-hint">
+        <p role="status" className="sr-only">
           {t('scenario.editor.loading')}
         </p>
       )}

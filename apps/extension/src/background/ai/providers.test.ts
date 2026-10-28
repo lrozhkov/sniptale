@@ -94,8 +94,8 @@ describe('ready-made AI provider integration', () => {
     });
   });
 
-  it('leaves Chrome local and rejects the incompatible GigaChat runtime', () => {
-    for (const type of ['chrome-built-in', 'gigachat'] as const) {
+  it('keeps Chrome on its local runtime', () => {
+    for (const type of ['chrome-built-in'] as const) {
       expect(() =>
         createAIProviderRuntime({
           type,
@@ -227,7 +227,7 @@ it.each(nativeWireFixtures)(
 it('admits only operations implemented by the pinned provider packages', () => {
   const transport = vi.fn();
   for (const type of AI_PROVIDER_TYPES) {
-    if (type === 'chrome-built-in' || type === 'gigachat') continue;
+    if (type === 'chrome-built-in') continue;
     for (const operation of getAIProviderOperations(type)) {
       const runtime = createAIProviderRuntime({
         type,

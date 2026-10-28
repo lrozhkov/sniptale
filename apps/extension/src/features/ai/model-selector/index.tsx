@@ -1,3 +1,6 @@
+import { createPortal } from 'react-dom';
+import { resolvePortalTheme, resolveThemeSafePortalTarget } from '@sniptale/ui/theme/safe-portal';
+import { mergeFloatingInteractionLayerStyle } from '@sniptale/ui/floating-interactions/placement';
 import {
   useRef,
   useState,
@@ -21,6 +24,8 @@ type AIModelSelectorViewState = ReturnType<typeof resolveModelSelectorViewState>
 
 export interface AIModelSelectorProps {
   disabled?: boolean;
+  /** Detach the settings catalog from its short, scrolling form body. */
+  portalMenu?: boolean;
   isEventWithinElement?: EventWithinElementResolver;
   models: AIModel[];
   onSelect: (modelId: string | null) => void;
@@ -33,15 +38,21 @@ export interface AIModelSelectorProps {
 function renderAIModelSelectorDropdown(props: {
   isOpen: boolean;
   menuStyle: CSSProperties;
+  portalMenu: boolean;
+  anchorRef: RefObject<HTMLDivElement | null>;
+  menuRef: RefObject<HTMLDivElement | null>;
   searchInputRef: RefObject<HTMLInputElement | null>;
   searchQuery: string;
   selectedModelId: string | null;
   setSearchQuery: Dispatch<SetStateAction<string>>;
   viewState: AIModelSelectorViewState;
 }) {
-  return props.isOpen ? (
+  if (!props.isOpen) return null;
+  const dropdown = (
     <Dropdown
-      style={props.menuStyle}
+      style={
+        props.portalMenu ? mergeFloatingInteractionLayerStyle(props.menuStyle) : props.menuStyle
+      }
       filteredProviders={props.viewState.filteredProviders}
       onSelect={props.viewState.handleSelect}
       searchInputRef={props.searchInputRef}
@@ -49,7 +60,14 @@ function renderAIModelSelectorDropdown(props: {
       selectedModelId={props.selectedModelId}
       setSearchQuery={props.setSearchQuery}
     />
-  ) : null;
+  );
+  if (!props.portalMenu) return dropdown;
+  return createPortal(
+    <div ref={props.menuRef} data-theme={resolvePortalTheme(props.anchorRef.current) ?? undefined}>
+      {dropdown}
+    </div>,
+    resolveThemeSafePortalTarget(props.anchorRef.current)
+  );
 }
 
 export function AIModelSelector(props: AIModelSelectorProps) {
@@ -57,10 +75,12 @@ export function AIModelSelector(props: AIModelSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useAIModelSelectorDismissState(
     createDismissStateArgs({
       dropdownRef,
+      menuRef,
       isEventWithinElement: props.isEventWithinElement,
       isOpen,
       setIsOpen,
@@ -68,7 +88,13 @@ export function AIModelSelector(props: AIModelSelectorProps) {
     })
   );
   useAIModelSelectorSearchFocus(isOpen, searchInputRef);
-  const menuStyle = useAIModelSelectorMenuLayout(isOpen, dropdownRef, setIsOpen, setSearchQuery);
+  const menuStyle = useAIModelSelectorMenuLayout(
+    isOpen,
+    dropdownRef,
+    setIsOpen,
+    setSearchQuery,
+    props.portalMenu
+  );
 
   if (props.models.length === 0) {
     return <EmptyState />;
@@ -112,6 +138,9 @@ export function AIModelSelector(props: AIModelSelectorProps) {
       {renderAIModelSelectorDropdown({
         isOpen,
         menuStyle,
+        portalMenu: props.portalMenu ?? false,
+        anchorRef: dropdownRef,
+        menuRef,
         searchInputRef,
         searchQuery,
         selectedModelId: props.selectedModelId,

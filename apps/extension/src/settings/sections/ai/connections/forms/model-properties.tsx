@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { InspectorDisclosureView } from '../../../../../ui/compact-inspector-controls/disclosure';
 import { ProductField, ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { AIModelCapabilities, AISupport } from '../../../../../contracts/settings/ai-catalog';
 import {
@@ -35,8 +37,6 @@ const supportLabels = {
   unsupported: 'settings.aiProviders.modelSupportNo',
   unknown: 'settings.aiProviders.modelSupportUnknown',
 } as const;
-const disclosureClass = 'text-[13px] leading-[18px]';
-const summaryClass = 'min-h-8 cursor-pointer py-2 text-[var(--sniptale-color-text-muted)]';
 
 function CapabilityGroup<TKey extends string>(props: {
   title: TranslationKey;
@@ -44,9 +44,16 @@ function CapabilityGroup<TKey extends string>(props: {
   values: Partial<Record<TKey, AISupport>>;
   onChange?: ((values: Partial<Record<TKey, AISupport>>) => void) | undefined;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <details className={disclosureClass}>
-      <summary className={summaryClass}>{translate(props.title)}</summary>
+    <InspectorDisclosureView
+      dataUi={`settings.ai-model.${props.title}`}
+      variant="structural"
+      label={translate(props.title)}
+      open={open}
+      onOpenChange={setOpen}
+      bodyClassName="px-2 pt-2 text-[13px] leading-[18px]"
+    >
       {props.onChange ? (
         <div className="space-y-1 pb-2">
           {props.entries.map(([key, label]) => (
@@ -82,7 +89,7 @@ function CapabilityGroup<TKey extends string>(props: {
           ))}
         </dl>
       )}
-    </details>
+    </InspectorDisclosureView>
   );
 }
 
@@ -91,6 +98,7 @@ export function ModelProperties(props: {
   onChange?: ((capabilities: AIModelCapabilities) => void) | undefined;
 }) {
   const change = props.onChange;
+  const [limitsOpen, setLimitsOpen] = useState(false);
   return (
     <section aria-label={translate('settings.aiProviders.modelCapabilitiesTitle')}>
       <CapabilityGroup
@@ -123,10 +131,14 @@ export function ModelProperties(props: {
           change ? (values) => change({ ...props.capabilities, features: values }) : undefined
         }
       />
-      <details className={disclosureClass}>
-        <summary className={summaryClass}>
-          {translate('settings.aiProviders.modelLimitsTitle')}
-        </summary>
+      <InspectorDisclosureView
+        dataUi="settings.ai-model.limits"
+        variant="structural"
+        label={translate('settings.aiProviders.modelLimitsTitle')}
+        open={limitsOpen}
+        onOpenChange={setLimitsOpen}
+        bodyClassName="space-y-2 px-2 pt-2 text-[13px] leading-[18px]"
+      >
         {(['contextWindow', 'maxOutputTokens'] as const).map((key) => {
           const label = translate(
             key === 'contextWindow'
@@ -165,7 +177,7 @@ export function ModelProperties(props: {
             </dl>
           );
         })}
-      </details>
+      </InspectorDisclosureView>
     </section>
   );
 }

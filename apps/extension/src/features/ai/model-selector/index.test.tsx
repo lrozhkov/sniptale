@@ -418,3 +418,35 @@ it('notifies only opening and retains the open search and selection when refresh
   await act(async () => trigger.click());
   expect(onOpen).toHaveBeenCalledOnce();
 });
+
+it('keeps search and selection active in a detached settings catalog and restores trigger focus', async () => {
+  const onSelect = vi.fn();
+  await renderUi(
+    <AIModelSelector
+      portalMenu
+      models={MODELS}
+      providers={PROVIDERS}
+      selectedModelId={null}
+      onSelect={onSelect}
+    />
+  );
+  const trigger = getButtons()[0]!;
+  await act(async () => trigger.click());
+  const menu = document.querySelector<HTMLElement>('[data-testid="dropdown-menu"]')!;
+  expect(menu).not.toBeNull();
+  expect(container?.contains(menu)).toBe(false);
+  expect(menu.style.position).toBe('fixed');
+  const search = menu.querySelector('input')!;
+  await act(async () => {
+    search.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    setInputValue(search, 'llama');
+  });
+  expect(document.querySelector('[data-testid="dropdown-menu"]')).toBe(menu);
+  const option = Array.from(menu.querySelectorAll('button')).find(
+    (button) => button.title === 'Llama 3.2'
+  )!;
+  await act(async () => option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  expect(onSelect).toHaveBeenCalledWith('model-2');
+  expect(document.querySelector('[data-testid="dropdown-menu"]')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});

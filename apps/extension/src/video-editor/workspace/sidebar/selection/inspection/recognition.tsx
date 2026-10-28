@@ -305,7 +305,7 @@ function RecognitionStatus({ controller }: { controller: VideoProjectRecognition
         </p>
       ) : null}
       {controller.selectionPending && !controller.running ? (
-        <p role="status" className="text-xs">
+        <p role="status" className="sr-only">
           {translate('common.states.saving')}
         </p>
       ) : null}
