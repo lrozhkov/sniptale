@@ -163,16 +163,32 @@ async function selectArea(page: Page) {
 
 async function moveToolbar(page: Page, destination: { x: number; y: number }) {
   const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+  const handle = toolbar.locator('.sniptale-drag-handle');
+  await handle.scrollIntoViewIfNeeded();
   const box = (await toolbar.boundingBox())!;
-  const grip = (await toolbar.locator('.sniptale-drag-handle').boundingBox())!;
+  const grip = (await handle.boundingBox())!;
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
+  await expect(toolbar).toHaveClass(/sniptale-toolbar-dragging/u);
   await page.mouse.move(
     grip.x + grip.width / 2 + destination.x - box.x,
     grip.y + grip.height / 2 + destination.y - box.y,
     { steps: 8 }
   );
   await page.mouse.up();
+  await expect(toolbar).not.toHaveClass(/sniptale-toolbar-dragging/u);
+  const viewport = page.viewportSize()!;
+  const expected = {
+    x: Math.max(0, Math.min(destination.x, viewport.width - box.width)),
+    y: Math.max(0, Math.min(destination.y, viewport.height - box.height)),
+  };
+  await expect
+    .poll(async () => {
+      const placed = (await toolbar.boundingBox())!;
+      // Fractional bounds and integer offset dimensions can differ by one CSS pixel.
+      return Math.abs(placed.x - expected.x) <= 1 && Math.abs(placed.y - expected.y) <= 1;
+    })
+    .toBe(true);
 }
 
 async function chooseRegion(page: Page) {
@@ -470,6 +486,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect.poll(opacity).toBe(1);
         await screenshot(page, info, 'recording-toolbar-outside-area.png');
         await moveToolbar(page, { x: selected.x + 20, y: selected.y + 20 });
+        const overlapping = (await toolbar.boundingBox())!;
+        expect(overlapping.x).toBeLessThan(selected.x + selected.width);
+        expect(overlapping.x + overlapping.width).toBeGreaterThan(selected.x);
+        expect(overlapping.y).toBeLessThan(selected.y + selected.height);
+        expect(overlapping.y + overlapping.height).toBeGreaterThan(selected.y);
         await page.mouse.click(size.width - 4, size.height - 4);
         await expect.poll(opacity).toBeCloseTo(0.2, 2);
         await screenshot(page, info, 'recording-toolbar-overlaps-area.png');
