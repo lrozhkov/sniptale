@@ -894,3 +894,128 @@ test('another browser reuses published files without media transfer and still re
     await browser.context.close();
   }
 });
+
+test('causal revisions and deletion cross WebDAV without echo or losing independently readable originals', async ({
+  lab,
+}, info) => {
+  test.setTimeout(180_000);
+  let sender = await openProvider(lab, info, 'causal-source');
+  let target = await openProvider(lab, info, 'causal-target');
+  try {
+    const sent = await sender.page.evaluate(async () => {
+      const seed = await window.webdavTransferHarness.portable.source();
+      const media = await window.webdavTransferHarness.portable.outgoing.sendHistory(seed.mediaId);
+      const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
+        seed.projectId
+      );
+      return {
+        ...seed,
+        spaceId: projects.at(-1)!.spaceId,
+        files: [...media, ...projects].flatMap((item) => item.files),
+      };
+    });
+    await target.page.evaluate(async (input) => {
+      const api = window.webdavTransferHarness.portable.outgoing;
+      await api.scan(input.spaceId);
+      await api.receive(input.spaceId, 'media', input.mediaId);
+      await api.receive(input.spaceId, 'video-project', input.projectId);
+    }, sent);
+    const initial = await target.page.evaluate(
+      (input) =>
+        window.webdavTransferHarness.portable.outgoing.nativeState(
+          input.spaceId,
+          'video-project',
+          input.projectId
+        ),
+      sent
+    );
+    expect(initial).toMatchObject({ exists: true, captures: 0 });
+    await sender.page.evaluate(async (id) => {
+      const api = window.webdavTransferHarness.portable.outgoing;
+      await api.reviseMetadata(id);
+      await api.sendHistory(id);
+    }, sent.projectId);
+    await target.page.evaluate(async (input) => {
+      const api = window.webdavTransferHarness.portable.outgoing;
+      await api.scan(input.spaceId);
+      await api.receive(input.spaceId, 'video-project', input.projectId);
+    }, sent);
+    const revised = await target.page.evaluate(
+      (input) =>
+        window.webdavTransferHarness.portable.outgoing.nativeState(
+          input.spaceId,
+          'video-project',
+          input.projectId
+        ),
+      sent
+    );
+    expect(revised.state!.generation).toBe(initial.state!.generation + 1);
+    expect(revised).toMatchObject({ exists: true, captures: 0 });
+    await sender.page.evaluate(async (id) => {
+      const api = window.webdavTransferHarness.portable.outgoing;
+      await api.deleteProject(id);
+      await api.sendHistory(id);
+    }, sent.projectId);
+    await target.page.evaluate(async (input) => {
+      const api = window.webdavTransferHarness.portable.outgoing;
+      await api.scan(input.spaceId);
+      await api.receive(input.spaceId, 'video-project', input.projectId);
+      await api.receive(input.spaceId, 'video-project', input.projectId);
+    }, sent);
+    const deleted = await target.page.evaluate(
+      (input) =>
+        window.webdavTransferHarness.portable.outgoing.nativeState(
+          input.spaceId,
+          'video-project',
+          input.projectId
+        ),
+      sent
+    );
+    expect(deleted).toMatchObject({
+      exists: false,
+      captures: 0,
+      state: { deleted: true, generation: revised.state!.generation + 1 },
+    });
+    await target.context.close();
+    target = await openProvider(lab, info, 'causal-target');
+    await target.page.evaluate(async (input) => {
+      const api = window.webdavTransferHarness.portable.outgoing;
+      await api.scan(input.spaceId);
+      await api.receive(input.spaceId, 'video-project', input.projectId);
+    }, sent);
+    expect(
+      await target.page.evaluate(
+        (input) =>
+          window.webdavTransferHarness.portable.outgoing.nativeState(
+            input.spaceId,
+            'video-project',
+            input.projectId
+          ),
+        sent
+      )
+    ).toEqual(deleted);
+    const library = await target.page.evaluate(
+      (input) =>
+        window.webdavTransferHarness.portable.outgoing.nativeState(
+          input.spaceId,
+          'media',
+          input.mediaId
+        ),
+      sent
+    );
+    expect(library).toMatchObject({ exists: true, captures: 0 });
+    for (const file of sent.files)
+      expect(await lab.externalProof(file.key)).toEqual({ size: file.size, sha256: file.sha256 });
+    await saveProof(info, {
+      initial,
+      revised,
+      deleted,
+      independentLibrary: library,
+      externalObjects: sent.files.length,
+      fullBrowserRestart: true,
+    });
+  } finally {
+    await sender.context.close();
+    await target.context.close();
+  }
+});

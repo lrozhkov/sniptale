@@ -91,6 +91,9 @@ function admission(): PortableReplicaAdmission {
     operationId: 'remote-operation',
     sourceDigest: 'b'.repeat(64),
     connectionGeneration: 3,
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    expectedBasis: [],
     expectedLocalGeneration: 0,
     expectedWorkspaceRevision: null,
     dependencies: [],
@@ -285,4 +288,59 @@ it('rejects an unused declared object even when descriptor totals are internally
       admission: admission(),
     })
   ).rejects.toThrow('unused objects');
+});
+
+it('preserves the target native predecessor when preparing a later media original', async () => {
+  const encoded = await encodeCapturedPortableRoot(capture({ kind: 'media', rows: mediaRows() }));
+  const local = {
+    ...admission(),
+    expectedLocalGeneration: 8,
+    expectedBasis: ['admitted-original'],
+  };
+  const payload = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: new Map([[encoded.envelope.objects[0]!.objectId, ref('later-target')]]),
+    senderDependencies: [],
+    admission: local,
+  });
+  expect(payload.kind).toBe('media');
+  expect(payload.input).toMatchObject({
+    expectedLocalGeneration: 8,
+    expectedBasis: ['admitted-original'],
+    spaceId: local.spaceId,
+    profileCreatedAt: local.profileCreatedAt,
+  });
+});
+
+it('rebinds a later portable private source without overwriting the predecessor child identity', async () => {
+  const rows = projectRows();
+  const encoded = await encodeCapturedPortableRoot(capture({ kind: 'video-project', rows }));
+  const objectId = encoded.envelope.objects[0]!.objectId;
+  const first = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: new Map([[objectId, ref('first-local-body')]]),
+    senderDependencies: encoded.dependencies,
+    admission: admission(),
+  });
+  const local = admission();
+  local.operationId = 'next-revision';
+  local.expectedLocalGeneration = 1;
+  local.expectedBasis = ['op'];
+  const second = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: new Map([[objectId, ref('next-local-body')]]),
+    senderDependencies: encoded.dependencies,
+    admission: local,
+  });
+  if (first.kind !== 'video-project' || second.kind !== 'video-project')
+    throw new Error('Expected project.');
+  const firstAsset = first.input.root.assets[0]!;
+  const nextAsset = second.input.root.assets[0]!;
+  expect(nextAsset.entry.id).not.toBe(firstAsset.entry.id);
+  expect(nextAsset.ref.assetId).toBe('next-local-body');
+  expect(second.input.root.entry.project.assets[0]!.source).toEqual({
+    kind: 'project-asset',
+    projectAssetId: nextAsset.entry.id,
+  });
+  expect(second.input.root.entry.project.clips).toEqual(first.input.root.entry.project.clips);
 });

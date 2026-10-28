@@ -257,6 +257,7 @@ async function appendCapture(
     generation,
     basis: [operationId],
     ...(change.kind === 'media' ? { nativeDigest: digestCapturedMediaRows(change.rows) } : {}),
+    ...(change.kind === 'tombstone' ? { deleted: true } : {}),
   };
   await store.add(record);
   await store.put(state);

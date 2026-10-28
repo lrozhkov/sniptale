@@ -1,7 +1,14 @@
 import type { IDBPTransaction } from 'idb';
+import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
+import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
+import { assertStandaloneMediaSourceReplaceable } from '../projects/source-admission';
+import { releaseMediaSource } from '../media-library/delete-cascade.sources';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import {
+  ASSET_OPERATIONS_STORE,
+  VIDEO_PROJECTS_STORE,
+  SCENARIO_ASSETS_STORE,
   SYNC_CAPTURE_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -28,7 +35,7 @@ import {
   type SyncCaptureAppliedOperation,
 } from './contracts';
 import { parseCapturedMediaRows, parseSyncCaptureRecord } from './guards';
-import { digestCapturedMediaRows } from './freeze';
+import { digestCapturedMediaRows, freezeMediaInTransaction } from './freeze';
 
 type ApplyTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
@@ -37,6 +44,9 @@ export interface ApplyPreparedMediaReplicaInput {
   operationId: string;
   sourceDigest: string;
   connectionGeneration: number;
+  spaceId: string;
+  profileCreatedAt: number;
+  expectedBasis: readonly string[];
   expectedLocalGeneration: number;
 }
 
@@ -58,7 +68,14 @@ function preparedInput(input: ApplyPreparedMediaReplicaInput): ApplyPreparedMedi
     !/^[a-f0-9]{64}$/u.test(input.sourceDigest) ||
     !Number.isSafeInteger(input.connectionGeneration) ||
     input.connectionGeneration < 1 ||
-    input.expectedLocalGeneration !== 0 ||
+    !Number.isSafeInteger(input.expectedLocalGeneration) ||
+    input.expectedLocalGeneration < 0 ||
+    !input.spaceId ||
+    !Number.isSafeInteger(input.profileCreatedAt) ||
+    input.profileCreatedAt < 0 ||
+    !Array.isArray(input.expectedBasis) ||
+    input.expectedBasis.length !== (input.expectedLocalGeneration === 0 ? 0 : 1) ||
+    input.expectedBasis.some((id) => typeof id !== 'string' || !id || id.length > 256) ||
     rows.media.lifecycle?.storageClass !== 'library' ||
     rows.media.lifecycle.trashedAt !== undefined ||
     rows.projectAsset.originMediaId
@@ -124,13 +141,15 @@ async function assertNoSourceSidecars(tx: ApplyTransaction, mediaId: string): Pr
 async function assertUnclaimedIdentity(
   tx: ApplyTransaction,
   rows: CapturedMediaRows,
-  identity: ReplicaIdentity
+  identity: ReplicaIdentity,
+  hasGraveyard = false
 ): Promise<void> {
   for (const [store, key] of [
     [SYNC_CAPTURE_STORE, identity.stateKey],
     [MEDIA_LIBRARY_STORE, rows.media.id],
     [PROJECT_ASSETS_STORE, rows.projectAsset.id],
   ] as const) {
+    if (store === SYNC_CAPTURE_STORE && hasGraveyard) continue;
     if ((await tx.objectStore(store).get(key)) !== undefined)
       throw new MediaReplicaConflictError('source-changed');
   }
@@ -147,14 +166,59 @@ async function assertUnclaimedIdentity(
 async function assertAbsentSource(
   tx: ApplyTransaction,
   input: ApplyPreparedMediaReplicaInput,
-  identity: ReplicaIdentity
+  identity: ReplicaIdentity,
+  hasGraveyard = false
 ): Promise<void> {
-  await assertUnclaimedIdentity(tx, input.rows, identity);
+  await assertUnclaimedIdentity(tx, input.rows, identity, hasGraveyard);
   await assertNoSourceSidecars(tx, input.rows.media.id);
   const ref = input.rows.ref;
   const currentRef: unknown = await tx.objectStore(ASSET_REFS_STORE).get(ref.assetId);
   if (currentRef !== undefined && JSON.stringify(parseAssetRef(currentRef)) !== JSON.stringify(ref))
     throw new MediaReplicaConflictError('source-changed');
+}
+
+async function assertExistingSource(
+  tx: ApplyTransaction,
+  input: ApplyPreparedMediaReplicaInput,
+  identity: ReplicaIdentity
+): Promise<CapturedMediaRows | null> {
+  const state = parseSyncCaptureRecord(
+    await tx.objectStore(SYNC_CAPTURE_STORE).get(identity.stateKey)
+  );
+  if (
+    !state ||
+    state.kind !== 'root-state' ||
+    state.key !== identity.stateKey ||
+    state.spaceId !== identity.spaceId ||
+    state.rootKey !== identity.rootKey ||
+    state.generation !== input.expectedLocalGeneration ||
+    JSON.stringify(state.basis) !== JSON.stringify(input.expectedBasis)
+  )
+    throw new MediaReplicaConflictError('source-changed');
+  for (const raw of await tx
+    .objectStore(SYNC_CAPTURE_STORE)
+    .index('rootKey')
+    .getAll(identity.rootKey)) {
+    const record = parseSyncCaptureRecord(raw);
+    if (!record || (record.kind === 'sync-operation' && record.phase !== 'published'))
+      throw new MediaReplicaConflictError('source-changed');
+  }
+  if (state.deleted === true) {
+    await assertAbsentSource(tx, input, identity, true);
+    return null;
+  }
+  const previous = await freezeMediaInTransaction(tx, input.rows.media.id);
+  if (
+    state.nativeDigest !== digestCapturedMediaRows(previous) ||
+    previous.projectAsset.id !== input.rows.projectAsset.id
+  )
+    throw new MediaReplicaConflictError('source-changed');
+  if (previous.ref.assetId !== input.rows.ref.assetId)
+    await assertStandaloneMediaSourceReplaceable(previous.media, tx);
+  const ref: unknown = await tx.objectStore(ASSET_REFS_STORE).get(input.rows.ref.assetId);
+  if (ref !== undefined && JSON.stringify(parseAssetRef(ref)) !== JSON.stringify(input.rows.ref))
+    throw new MediaReplicaConflictError('source-changed');
+  return previous;
 }
 
 async function publishReplica(
@@ -185,7 +249,7 @@ async function publishReplica(
     rootKind: 'media',
     rootId: rows.media.id,
     rootKey: identity.rootKey,
-    generation: 1,
+    generation: input.expectedLocalGeneration + 1,
     basis: [input.operationId],
     nativeDigest: digestCapturedMediaRows(rows),
   };
@@ -198,24 +262,29 @@ async function publishReplica(
     rootKey: identity.rootKey,
     operationId: input.operationId,
     sourceDigest: input.sourceDigest,
-    generation: 1,
+    generation: input.expectedLocalGeneration + 1,
   };
   if (!parseSyncCaptureRecord(state) || !parseSyncCaptureRecord(receipt))
     throw new MediaReplicaConflictError('invalid-input');
   await publishPreparedMediaSourceInTransaction(prepared, stores);
   await publishPreparedMediaProjectChildInTransaction(prepared, stores);
-  await tx.objectStore(SYNC_CAPTURE_STORE).add(state);
+  await tx.objectStore(SYNC_CAPTURE_STORE).put(state);
   await tx.objectStore(SYNC_CAPTURE_STORE).add(receipt);
 }
 
-/** Admit a new verified replica; the caller retains staged bytes until this command commits. */
+/** Admit a verified original against its exact native predecessor; retain staged bytes until commit. */
 export async function applyPreparedMediaReplica(
-  input: ApplyPreparedMediaReplicaInput
+  input: ApplyPreparedMediaReplicaInput,
+  lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<{ status: 'applied' | 'duplicate'; generation: number }> {
   const candidate = preparedInput(input);
-  return runWithIndexedDbMutation(async (db) => {
+  const operation = buildPhysicalDeleteOperation([]);
+  const result = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        ASSET_OPERATIONS_STORE,
+        VIDEO_PROJECTS_STORE,
+        SCENARIO_ASSETS_STORE,
         SYNC_CAPTURE_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
@@ -235,7 +304,12 @@ export async function applyPreparedMediaReplica(
       const profile = parseSyncCaptureRecord(
         await tx.objectStore(SYNC_CAPTURE_STORE).get('profile')
       );
-      if (!profile || profile.kind !== 'profile')
+      if (
+        !profile ||
+        profile.kind !== 'profile' ||
+        profile.spaceId !== candidate.spaceId ||
+        profile.createdAt !== candidate.profileCreatedAt
+      )
         throw new MediaReplicaConflictError('profile-changed');
       const rootKey = captureRootKey(profile.spaceId, 'media', candidate.rows.media.id);
       const identity: ReplicaIdentity = {
@@ -251,12 +325,21 @@ export async function applyPreparedMediaReplica(
       }
       if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
         throw new MediaReplicaConflictError('profile-changed');
-      await assertAbsentSource(tx, candidate, identity);
+      if (candidate.expectedLocalGeneration === 0)
+        await assertAbsentSource(tx, candidate, identity);
+      else {
+        const previous = await assertExistingSource(tx, candidate, identity);
+        if (previous && previous.ref.assetId !== candidate.rows.ref.assetId)
+          await releaseMediaSource(tx, previous.media, operation);
+      }
       await publishReplica(tx, candidate, identity);
+      if (operation.assetIds.length) await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
       await tx.done;
-      return { status: 'applied' as const, generation: 1 };
+      return { status: 'applied' as const, generation: candidate.expectedLocalGeneration + 1 };
     } catch (error) {
       return abortIndexedDbMutation(tx, error);
     }
   });
+  if (operation.assetIds.length) await completePhysicalDeleteOperation(operation, lifecyclePermit);
+  return result;
 }

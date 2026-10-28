@@ -1,3 +1,4 @@
+import { parseCapturedMediaRows } from '../sync-capture/guards';
 import { deleteRecoveryInTransaction } from '../recordings/recovery/storage';
 import { createVideoWorkspaceStore } from '../review-workspaces/storage';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
@@ -34,7 +35,11 @@ import {
   type IndexedDbWriteTransaction,
 } from '../infrastructure/indexed-db/core';
 import { parseRecordingEntry } from '../recordings/index.guards';
-import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+  parseVideoProjectEntry,
+} from '../projects/read-guards';
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 import {
   WEB_SNAPSHOT_OWNER_KIND,
@@ -230,6 +235,7 @@ export function mediaHasPendingPublication(
   target: Pick<MediaDependencyTarget, 'id'> & Partial<Pick<MediaDependencyTarget, 'source'>>
 ): boolean {
   const payload = journal.payload;
+  if (journal.domain === 'sync-replica') return syncReplicaRetainsMedia(payload, target.id);
   if (!isRecord(payload)) return false;
   if (journal.domain === 'image-workspace') return payload['aggregateId'] === target.id;
   if (
@@ -321,4 +327,38 @@ async function releaseBodyRecord(args: {
     tx: args.tx,
     physicalDelete: args.physicalDelete,
   });
+}
+
+function syncReplicaRetainsMedia(payload: unknown, mediaId: string): boolean {
+  if (!isRecord(payload) || !isRecord(payload['input'])) return true;
+  const input = payload['input'];
+  if (payload['kind'] === 'media') {
+    const rows = parseCapturedMediaRows(input['rows']);
+    return !rows || rows.media.id === mediaId;
+  }
+  if (payload['kind'] !== 'video-project') return true;
+  const root = input['root'];
+  const dependencies = input['dependencies'];
+  if (!isRecord(root) || !Array.isArray(root['assets']) || !Array.isArray(dependencies))
+    return true;
+  const project = parseVideoProjectEntry(root['entry']);
+  if (!project) return true;
+  for (const dependency of dependencies) {
+    if (!isRecord(dependency) || !isRecord(dependency['entry'])) return true;
+    const id = dependency['entry']['id'];
+    if (typeof id !== 'string' || !id || id === mediaId) return true;
+  }
+  for (const asset of root['assets']) {
+    if (!isRecord(asset)) return true;
+    const entry = parseProjectAssetEntry(asset['entry']);
+    if (!entry || entry.originMediaId === mediaId || `project-asset:${entry.id}` === mediaId)
+      return true;
+  }
+  return project.project.assets.some(
+    (asset) =>
+      (asset.source.kind === 'library-asset' && asset.source.mediaId === mediaId) ||
+      (asset.source.kind === 'project-asset' &&
+        (asset.source.originMediaId === mediaId ||
+          `project-asset:${asset.source.projectAssetId}` === mediaId))
+  );
 }

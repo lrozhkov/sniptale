@@ -671,6 +671,9 @@ function parseCaptureRootState(
   const root = parseCaptureRoot(value, header);
   if (!root) return null;
   const nativeDigest = value['nativeDigest'];
+  const deleted = value['deleted'];
+  if (deleted !== undefined && deleted !== true) return null;
+  if (deleted === true && nativeDigest !== undefined) return null;
   if (
     nativeDigest !== undefined &&
     (typeof nativeDigest !== 'string' ||
@@ -683,6 +686,7 @@ function parseCaptureRootState(
     ...root,
     kind: 'root-state',
     ...(nativeDigest === undefined ? {} : { nativeDigest }),
+    ...(deleted === true ? { deleted: true } : {}),
   };
 }
 

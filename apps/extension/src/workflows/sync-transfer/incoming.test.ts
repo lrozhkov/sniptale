@@ -10,7 +10,7 @@ import { encodePortableVideoProjectAssetRefs } from '../media-hub-backup/v6/root
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { projectSyncCatalog, type CatalogAttempt } from './catalog-graph';
 import { createSyncAttempt, hashSyncText, parseSyncAttemptText } from './wire-record';
-import { prepareCatalogReplica } from './incoming';
+import { prepareCatalogReplica, applyCatalogDeletion } from './incoming';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
 import type { stageRootObjects } from '../media-hub-backup/v6/staging';
 
@@ -20,6 +20,7 @@ const io = vi.hoisted(() => ({
   discard: vi.fn(),
   read: vi.fn(),
   journal: vi.fn(),
+  deletion: vi.fn(),
   stage: vi.fn(),
 }));
 vi.mock('../../composition/persistence/assets', async (original) => ({
@@ -37,6 +38,9 @@ vi.mock('../../composition/persistence/assets', async (original) => ({
 }));
 vi.mock('../../composition/persistence/sync-capture/replica-publication', () => ({
   createPreparedReplicaJournal: io.journal,
+}));
+vi.mock('../../composition/persistence/sync-capture/apply-deletion', () => ({
+  applyCatalogDeletionNative: io.deletion,
 }));
 vi.mock('../media-hub-backup/v6/staging', () => ({ stageRootObjects: io.stage }));
 const mediaId = 'project-asset:source';
@@ -130,7 +134,8 @@ function projectEnvelope() {
 async function attempt(
   envelope: ReturnType<typeof projectEnvelope>,
   operationId: string,
-  number = 1
+  number = 1,
+  parents: string[] = []
 ): Promise<CatalogAttempt> {
   const dependencies =
     envelope.descriptor.rootKind === 'video-project' ? [{ mediaId, basis: ['media-op'] }] : [];
@@ -142,7 +147,7 @@ async function attempt(
     rootKind: envelope.descriptor.rootKind,
     rootId: envelope.descriptor.rootId,
     kind: 'edit',
-    parents: [],
+    parents,
     dependencies,
     envelope,
     objects: envelope.objects.map((item) => ({ objectId: item.objectId, sha256: sha })),
@@ -202,6 +207,9 @@ async function fixture(project = false, duplicate = false) {
     data,
     admission: {
       connectionGeneration: 7,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedBasis: [],
       expectedLocalGeneration: 0,
       expectedWorkspaceRevision: null,
       dependencies: project
@@ -430,3 +438,124 @@ it('stages a mixed fresh editing and reused export mapping without downloading t
   expect(io.staged).toEqual(['private']);
   expect(journal.payload.kind).toBe('video-project');
 });
+
+it.each([false, true])(
+  'checks the admitted native basis against selected remote ancestry for project=%s',
+  async (project) => {
+    const f = await fixture(project);
+    const envelope = project ? projectEnvelope() : mediaEnvelope().envelope;
+    const next = await attempt(envelope, 'causal-successor', 4, [f.selected.operation.operationId]);
+    const attempts = [...f.catalog.operations.values()].flatMap((item) => item.attempts);
+    const catalog = { ...f.catalog, ...projectSyncCatalog('space', [...attempts, next]) };
+    for (const row of next.objects) f.data.set(row.remoteKey, new Blob([new Uint8Array(3)]));
+    const admission = {
+      ...f.admission,
+      expectedLocalGeneration: 1,
+      expectedBasis: [f.selected.operation.operationId],
+    };
+    const journal = await prepareCatalogReplica({
+      ...f,
+      catalog,
+      admission,
+      rootKind: project ? 'video-project' : 'media',
+      rootId: project ? 'project' : mediaId,
+      signal: new AbortController().signal,
+    });
+    expect(journal.payload.input).toMatchObject({
+      expectedBasis: admission.expectedBasis,
+      expectedLocalGeneration: 1,
+      operationId: 'causal-successor',
+    });
+    io.stage.mockClear();
+    io.journal.mockClear();
+    await expect(
+      prepareCatalogReplica({
+        ...f,
+        catalog,
+        admission: { ...admission, expectedBasis: ['published-local-branch-outside-catalog'] },
+        rootKind: project ? 'video-project' : 'media',
+        rootId: project ? 'project' : mediaId,
+        signal: new AbortController().signal,
+      })
+    ).rejects.toThrow();
+    expect(io.stage).not.toHaveBeenCalled();
+    expect(io.journal).not.toHaveBeenCalled();
+  }
+);
+
+async function deletedFixture() {
+  const f = await fixture();
+  const operationText = JSON.stringify({
+    format: 'sniptale-sync-operation',
+    version: 1,
+    spaceId: 'space',
+    operationId: 'remote-delete',
+    rootKind: 'media',
+    rootId: mediaId,
+    kind: 'delete',
+    parents: ['media-op'],
+    dependencies: [],
+    envelope: null,
+    objects: [],
+  });
+  const physical = await createSyncAttempt(operationText, '00000000-0000-0000-0000-000000000008');
+  const tombstone = { ...(await parseSyncAttemptText(physical.recordText)), operationText };
+  const catalog = { ...f.catalog, ...projectSyncCatalog('space', [f.selected, tombstone]) };
+  return {
+    ...f,
+    catalog,
+    admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+  };
+}
+
+it('applies a checked catalog tombstone without downloading files or creating a ready journal', async () => {
+  const f = await deletedFixture();
+  io.deletion.mockResolvedValue({ status: 'applied', generation: 2 });
+  expect(
+    await applyCatalogDeletion({
+      ...f,
+      rootKind: 'media',
+      rootId: mediaId,
+      signal: new AbortController().signal,
+    })
+  ).toEqual({ status: 'applied', generation: 2 });
+  expect(io.deletion).toHaveBeenCalledWith(
+    expect.objectContaining({
+      operationId: 'remote-delete',
+      rootId: mediaId,
+      expectedLocalGeneration: 1,
+      expectedBasis: ['media-op'],
+      profileCreatedAt: 1,
+      spaceId: 'space',
+    }),
+    expect.anything()
+  );
+  expect(f.reads).toEqual([]);
+  expect(io.stage).not.toHaveBeenCalled();
+  expect(io.journal).not.toHaveBeenCalled();
+});
+
+it.each(['basis', 'unreadable', 'cancelled', 'live'] as const)(
+  'refuses an unchecked catalog deletion: %s',
+  async (change) => {
+    const f = await deletedFixture();
+    if (change === 'basis') f.admission.expectedBasis = ['outside-local-branch'];
+    let catalog: Parameters<typeof applyCatalogDeletion>[0]['catalog'] = f.catalog;
+    if (change === 'unreadable')
+      catalog = { ...catalog, invalid: [{ key: 'invalid', code: 'invalid-manifest' }] };
+    if (change === 'live') catalog = (await fixture()).catalog;
+    const controller = new AbortController();
+    if (change === 'cancelled') controller.abort();
+    await expect(
+      applyCatalogDeletion({
+        ...f,
+        catalog,
+        rootKind: 'media',
+        rootId: mediaId,
+        signal: controller.signal,
+      })
+    ).rejects.toThrow();
+    expect(io.deletion).not.toHaveBeenCalled();
+    expect(io.stage).not.toHaveBeenCalled();
+  }
+);

@@ -12,7 +12,10 @@ import {
   parseProjectAssetEntry,
   parseVideoProjectEntry,
 } from '../../../apps/extension/src/composition/persistence/projects/read-guards';
-import { saveVideoProject } from '../../../apps/extension/src/composition/persistence/projects';
+import {
+  deleteVideoProject,
+  saveVideoProject,
+} from '../../../apps/extension/src/composition/persistence/projects';
 import {
   parseAssetRef,
   publishReadyJournalWithRetry,
@@ -21,7 +24,10 @@ import { publishPreparedReplicaJournal } from '../../../apps/extension/src/compo
 import { scanSyncCatalog } from '../../../apps/extension/src/workflows/sync-transfer/catalog';
 import { refreshPersistedSyncCatalog } from '../../../apps/extension/src/workflows/sync-transfer/catalog-refresh';
 import { syncCatalogRootKey } from '../../../apps/extension/src/workflows/sync-transfer/catalog-graph';
-import { prepareCatalogReplica } from '../../../apps/extension/src/workflows/sync-transfer/incoming';
+import {
+  applyCatalogDeletion,
+  prepareCatalogReplica,
+} from '../../../apps/extension/src/workflows/sync-transfer/incoming';
 import type { CaptureOperation } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
 import { loadPreparedOutgoingOperation } from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing';
 import { loadVerifiedOutgoingResult } from '../../../apps/extension/src/composition/persistence/sync-capture/outgoing-results';
@@ -136,6 +142,17 @@ export function createWebdavOutgoingHarness(
         authorize: async () => {},
         ...(catalog ? { catalog } : {}),
       });
+    },
+    deleteProject: (rootId: string) => deleteVideoProject(rootId),
+    async nativeState(spaceId: string, rootKind: 'media' | 'video-project', rootId: string) {
+      const db = await initDB();
+      const state = await localState(spaceId, rootKind, rootId);
+      const root = await db.get(rootKind === 'media' ? 'media_library' : 'video_projects', rootId);
+      const captures = (await db.getAll(SYNC_CAPTURE_STORE)).flatMap((raw) => {
+        const parsed = parseSyncCaptureRecord(raw);
+        return parsed?.kind === 'sync-operation' && parsed.rootId === rootId ? [parsed] : [];
+      });
+      return { exists: root !== undefined, state, captures: captures.length };
     },
     async reviseMetadata(rootId: string) {
       const db = await initDB();
@@ -264,6 +281,30 @@ export function createWebdavOutgoingHarness(
         });
       }
       const state = await localState(spaceId, rootKind, rootId);
+      const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
+      if (!profile || profile.kind !== 'profile' || !profile.enabled)
+        throw new Error('Target capture profile is unavailable.');
+      const localProject =
+        rootKind === 'video-project'
+          ? parseVideoProjectEntry(await db.get('video_projects', rootId))
+          : null;
+      if (root?.deleted) {
+        await applyCatalogDeletion({
+          catalog,
+          rootKind,
+          rootId,
+          signal: signal(),
+          admission: {
+            spaceId,
+            profileCreatedAt: profile.createdAt,
+            connectionGeneration: profile.connectionGeneration,
+            expectedLocalGeneration: state?.generation ?? 0,
+            expectedBasis: state?.basis ?? [],
+            expectedWorkspaceRevision: localProject ? (localProject.workspaceRevision ?? 0) : null,
+          },
+        });
+        return { rootId, operationId: operation.operation.operationId };
+      }
       const journal = await prepareCatalogReplica({
         remote: connected(),
         catalog,
@@ -271,9 +312,12 @@ export function createWebdavOutgoingHarness(
         rootId,
         signal: signal(),
         admission: {
-          connectionGeneration: 3,
+          spaceId,
+          profileCreatedAt: profile.createdAt,
+          connectionGeneration: profile.connectionGeneration,
           expectedLocalGeneration: state?.generation ?? 0,
-          expectedWorkspaceRevision: null,
+          expectedBasis: state?.basis ?? [],
+          expectedWorkspaceRevision: localProject ? (localProject.workspaceRevision ?? 0) : null,
           dependencies,
         },
       });

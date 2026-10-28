@@ -96,6 +96,9 @@ function setup() {
     operationId: 'accepted-project-operation',
     sourceDigest: digest,
     connectionGeneration: 3,
+    spaceId: spaceId,
+    profileCreatedAt: 1,
+    expectedBasis: [],
     expectedLocalGeneration: 0,
     expectedWorkspaceRevision: null,
     dependencies: [
@@ -428,6 +431,17 @@ it('releases only detached private assets after publication and retains the nati
   fixture.table('video_projects').set(projectId, current);
   fixture.table('video_project_revisions').set(projectId, { version: 1, projectId, revision: 10 });
   fixture.input.expectedWorkspaceRevision = 2;
+  fixture.input.expectedLocalGeneration = 1;
+  fixture.input.expectedBasis = ['previous-project'];
+  const rootKey = captureRootKey(spaceId, 'video-project', projectId);
+  const stateKey = JSON.stringify(['root-state', rootKey]);
+  fixture.table('sync_capture').set(stateKey, {
+    ...mediaState(1, [...fixture.input.expectedBasis]),
+    key: stateKey,
+    rootKey,
+    rootKind: 'video-project',
+    rootId: projectId,
+  });
   const entry = {
     id: 'project-asset-1',
     assetId: 'detached-body',
@@ -501,6 +515,7 @@ it('applies a second incoming revision with the exact private native binding', a
   const second = structuredClone(first);
   second.operationId = 'second-private-revision';
   second.expectedLocalGeneration = 1;
+  second.expectedBasis = [first.operationId];
   second.expectedWorkspaceRevision = 1;
   second.root.entry.project.name = 'Accepted later edit';
   await expect(applyPreparedVideoProjectRevision(second)).resolves.toEqual({
@@ -525,6 +540,7 @@ it.each(['entry', 'physical-ref', 'other-project'] as const)(
     const second = structuredClone(first);
     second.operationId = 'changed-private-revision';
     second.expectedLocalGeneration = 1;
+    second.expectedBasis = [first.operationId];
     second.expectedWorkspaceRevision = 1;
     if (change === 'entry') second.root.assets[0]!.entry.createdAt = 2;
     if (change === 'physical-ref') second.root.assets[0]!.ref.sha256 = 'c'.repeat(64);
@@ -532,6 +548,7 @@ it.each(['entry', 'physical-ref', 'other-project'] as const)(
       second.root.entry.id = 'another-project';
       second.root.entry.project.id = 'another-project';
       second.expectedLocalGeneration = 0;
+      second.expectedBasis = [];
       second.expectedWorkspaceRevision = null;
     }
     const before = structuredClone(fixture.rows);
@@ -568,6 +585,7 @@ it('forwards the active lifecycle permit to detached cleanup after commit', asyn
   const replacement = structuredClone(fixture.input);
   replacement.operationId = 'replacement-with-held-lifecycle';
   replacement.expectedLocalGeneration = 1;
+  replacement.expectedBasis = [fixture.input.operationId];
   replacement.expectedWorkspaceRevision = 1;
   await runWithDurableAssetLifecycleLock(async (permit) => {
     await applyPreparedVideoProjectRevision(replacement, permit);
@@ -636,8 +654,10 @@ it.each(['native', 'prepared', 'published'] as const)(
       rootKey,
       generation: 1,
       basis: [native.operationId],
+      deleted: true,
     });
     f.input.expectedLocalGeneration = 1;
+    f.input.expectedBasis = [native.operationId];
     if (phase === 'published')
       await expect(applyPreparedVideoProjectRevision(f.input)).resolves.toMatchObject({
         status: 'applied',
@@ -650,5 +670,128 @@ it.each(['native', 'prepared', 'published'] as const)(
       });
       expect(f.rows).toEqual(before);
     }
+  }
+);
+
+it('refuses a remote revision outside the admitted local basis', async () => {
+  const f = setup();
+  await applyPreparedVideoProjectRevision(f.input);
+  const next = structuredClone(f.input);
+  next.operationId = 'incoming-other-branch';
+  next.expectedLocalGeneration = 1;
+  next.expectedWorkspaceRevision = 1;
+  next.expectedBasis = ['stale-catalog-head'];
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(next)).rejects.toMatchObject({
+    code: 'project-changed',
+  });
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses a prepared project after enrollment recreation with the same connection counter', async () => {
+  const f = setup();
+  f.input.profileCreatedAt = 2;
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(f.input)).rejects.toMatchObject({
+    code: 'profile-changed',
+  });
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses a stale catalog basis after a local branch has been published', async () => {
+  const f = setup();
+  await applyPreparedVideoProjectRevision(f.input);
+  const rootKey = captureRootKey(spaceId, 'video-project', projectId);
+  const local = createNativeCapture({
+    version: 1,
+    kind: 'sync-operation',
+    key: 'published-local-branch',
+    createdAt: 2,
+    spaceId,
+    connectionGeneration: 3,
+    rootKind: 'video-project',
+    rootId: projectId,
+    rootKey,
+    generation: 2,
+    operationId: 'published-local-branch',
+    basis: [f.input.operationId],
+    origin: 'local-edit',
+    publicationId: null,
+    change: { kind: 'tombstone' },
+  });
+  const { change: _change, phase: _phase, ...header } = local;
+  f.table('sync_capture').set(local.key, {
+    ...header,
+    phase: 'published',
+    publication: {
+      kind: 'verified',
+      acceptedAt: 3,
+      preparedSha256: hashCaptureText('{}'),
+      attemptId: '11111111-1111-4111-8111-111111111111',
+      recordKey: 'records/local-branch.json',
+      recordSha256: 'a'.repeat(64),
+    },
+    objects: [],
+  });
+  f.table('sync_capture').set(JSON.stringify(['root-state', rootKey]), {
+    version: 1,
+    kind: 'root-state',
+    key: JSON.stringify(['root-state', rootKey]),
+    createdAt: 2,
+    spaceId,
+    rootKind: 'video-project',
+    rootId: projectId,
+    rootKey,
+    generation: 2,
+    basis: [local.operationId],
+  });
+  const incoming = {
+    ...f.input,
+    operationId: 'stale-incoming-successor',
+    expectedLocalGeneration: 2,
+    expectedBasis: [f.input.operationId],
+    expectedWorkspaceRevision: null,
+  };
+  f.table('video_projects').delete(projectId);
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(incoming)).rejects.toMatchObject({
+    code: 'project-changed',
+  });
+  expect(f.rows).toEqual(before);
+});
+
+it.each(['live', 'legacy'] as const)(
+  'refuses an absent nonzero project predecessor with %s state instead of restoring it',
+  async (kind) => {
+    const f = setup();
+    await applyPreparedVideoProjectRevision(f.input);
+    const rootKey = captureRootKey(spaceId, 'video-project', projectId);
+    const stateKey = JSON.stringify(['root-state', rootKey]);
+    f.table('video_projects').delete(projectId);
+    const next = {
+      ...f.input,
+      operationId: 'unproven-restore',
+      expectedLocalGeneration: 1,
+      expectedBasis: [f.input.operationId],
+      expectedWorkspaceRevision: null,
+    };
+    if (kind === 'legacy')
+      f.table('sync_capture').set(stateKey, {
+        version: 1,
+        kind: 'root-state',
+        key: stateKey,
+        createdAt: 1,
+        spaceId,
+        rootKind: 'video-project',
+        rootId: projectId,
+        rootKey,
+        generation: 1,
+        basis: [f.input.operationId],
+      });
+    const before = structuredClone(f.rows);
+    await expect(applyPreparedVideoProjectRevision(next)).rejects.toMatchObject({
+      code: 'project-changed',
+    });
+    expect(f.rows).toEqual(before);
   }
 );

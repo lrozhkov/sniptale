@@ -8,6 +8,8 @@ import { recoverAssetPublications } from '../../../apps/extension/src/compositio
 import { listReadyJournals } from '../../../apps/extension/src/composition/persistence/assets';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { applyPreparedMediaReplica } from '../../../apps/extension/src/composition/persistence/sync-capture/apply-media';
+import { applyCatalogDeletionNative } from '../../../apps/extension/src/composition/persistence/sync-capture/apply-deletion';
+import { acquireAssetResourceSession } from '../../../apps/extension/src/composition/persistence/assets/resource-sessions';
 import { harnessReady } from './browser-mocks/browser-mocks';
 import { createVideoClipFromAsset } from '../../../apps/extension/src/features/video/project/factories/clip';
 import { applyPreparedVideoProjectRevision } from '../../../apps/extension/src/composition/persistence/sync-capture/apply-video-project';
@@ -751,6 +753,13 @@ async function coloredSource(color: string): Promise<Blob> {
   );
 }
 
+async function replicaEnrollment() {
+  const db = await initDB();
+  const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
+  check(profile?.kind === 'profile', 'Replica enrollment is missing.');
+  return { spaceId: profile.spaceId, profileCreatedAt: profile.createdAt };
+}
+
 async function applicationProof() {
   await harnessReady;
   const spaceId = 'native-application-space';
@@ -859,6 +868,8 @@ async function applicationProof() {
     operationId: crypto.randomUUID(),
     sourceDigest: await sha(new Blob([JSON.stringify(root)])),
     connectionGeneration: 1,
+    ...(await replicaEnrollment()),
+    expectedBasis: [],
     expectedLocalGeneration: 0,
     expectedWorkspaceRevision: null,
     dependencies: [
@@ -1024,6 +1035,75 @@ async function mediaSourceProof() {
   };
 }
 
+/** Save a second real revision of the source without rotating its enrollment. */
+async function mediaRevisionSourceProof(mediaId: string) {
+  const db = await initDB();
+  const entry = parseMediaLibraryEntry(await db.get('media_library', mediaId));
+  check(entry?.source.kind === 'project-asset', 'The source revision is missing.');
+  const file = await coloredSource('rgb(20,60,180)');
+  await saveProjectAsset(entry.source.projectAssetId, file, file.type, entry.filename);
+  const capture = (await changes(mediaId)).at(-1);
+  check(
+    capture?.change.kind === 'media' && capture.generation === 2,
+    'The second source revision was not captured.'
+  );
+  return {
+    capture,
+    bytes: Array.from(new Uint8Array(await file.arrayBuffer())),
+    hash: await sha(file),
+  };
+}
+
+/** Apply two revisions through native owners and check stale admission and replay. */
+async function mediaCausalRevisionsProof(initialPayload: unknown, nextPayload: unknown) {
+  const first = await prepareTransferredMediaReplica(initialPayload);
+  await refused(() =>
+    applyPreparedMediaReplica({
+      ...first.input,
+      profileCreatedAt: first.input.profileCreatedAt + 1,
+    })
+  );
+  await applyPreparedMediaReplica(first.input);
+  await releaseAssetReadyProtection([first.input.rows.ref.assetId]);
+  const next = await prepareTransferredMediaReplica(nextPayload);
+  check(
+    next.input.rows.media.id === first.input.rows.media.id &&
+      JSON.stringify(next.basis) === JSON.stringify([first.input.operationId]),
+    'The source revision does not continue the first operation.'
+  );
+  const candidate = {
+    ...next.input,
+    expectedLocalGeneration: 1,
+    expectedBasis: [first.input.operationId],
+  };
+  const result = await applyPreparedMediaReplica(candidate);
+  check(result.generation === 2, 'The successor did not advance native generation.');
+  await refused(() =>
+    applyPreparedMediaReplica({ ...candidate, operationId: crypto.randomUUID() })
+  );
+  check(
+    (await applyPreparedMediaReplica(first.input)).status === 'duplicate' &&
+      (await applyPreparedMediaReplica(candidate)).status === 'duplicate',
+    'Receipt replay changed a committed revision.'
+  );
+  await releaseAssetReadyProtection([next.input.rows.ref.assetId]);
+  const persisted = await verifyMediaReplicaPersistence(first.input.rows.media.id);
+  check(
+    persisted.hash === next.hash && persisted.generation === 2,
+    'Replay reverted the current bytes or generation.'
+  );
+  check((await changes()).length === 0, 'Incoming revisions created an upload echo.');
+  return {
+    mediaId: first.input.rows.media.id,
+    firstHash: first.hash,
+    hash: next.hash,
+    generation: result.generation,
+    staleRefused: true,
+    replay: true,
+    noEcho: true,
+  };
+}
+
 /** Verify source bytes and prepare a local binding in this disposable profile. */
 async function prepareTransferredMediaReplica(payload: unknown) {
   await harnessReady;
@@ -1048,15 +1128,28 @@ async function prepareTransferredMediaReplica(payload: unknown) {
       capture.change.kind === 'media',
     'The transferred source capture is invalid.'
   );
-  await installExperimentalCaptureProfile({
-    version: 1,
-    kind: 'profile',
-    key: 'profile',
-    createdAt: Date.now(),
-    enabled: true,
-    spaceId: capture.spaceId,
-    connectionGeneration: 1,
-  });
+  const db = await initDB();
+  const rawProfile: unknown = await db.get(SYNC_CAPTURE_STORE, 'profile');
+  if (rawProfile === undefined) {
+    await installExperimentalCaptureProfile({
+      version: 1,
+      kind: 'profile',
+      key: 'profile',
+      createdAt: Date.now(),
+      enabled: true,
+      spaceId: capture.spaceId,
+      connectionGeneration: 1,
+    });
+  } else {
+    const profile = parseSyncCaptureRecord(rawProfile);
+    check(
+      profile?.kind === 'profile' &&
+        profile.enabled &&
+        profile.spaceId === capture.spaceId &&
+        profile.connectionGeneration === 1,
+      'The existing target enrollment differs.'
+    );
+  }
   const file = new Blob(
     [Uint8Array.from(bytes.filter((value): value is number => typeof value === 'number'))],
     { type: capture.change.rows.ref.mimeType }
@@ -1074,9 +1167,11 @@ async function prepareTransferredMediaReplica(payload: unknown) {
     operationId: capture.operationId,
     sourceDigest: await sha(new Blob([JSON.stringify(capture)])),
     connectionGeneration: 1,
+    ...(await replicaEnrollment()),
+    expectedBasis: [],
     expectedLocalGeneration: 0,
   };
-  return { input, hash: payload['hash'] };
+  return { input, hash: payload['hash'], basis: capture.basis };
 }
 
 /** Exercise native ingestion without claiming provider transfer proof. */
@@ -1122,6 +1217,93 @@ async function mediaReplicaProof(payload: unknown) {
   };
 }
 
+/** Delete and restore a real native source without losing its identity or replay safety. */
+async function mediaDeleteRestoreProof(mediaId: string) {
+  const db = await initDB();
+  const media = parseMediaLibraryEntry(await db.get('media_library', mediaId));
+  check(media?.source.kind === 'project-asset', 'The source to delete is missing.');
+  const child = parseProjectAssetEntry(await db.get('project_assets', media.source.projectAssetId));
+  const ref = child ? parseAssetRef(await db.get('asset_refs', child.assetId)) : null;
+  check(child && ref, 'The source byte binding is missing.');
+  const original = await readAssetFile(ref, media.filename);
+  // This disposable fixture uses a tiny PNG, not the production transfer path.
+  const bytes = await original.arrayBuffer();
+  const hash = await sha(original);
+  const enrollment = await replicaEnrollment();
+  const rootKey = captureRootKey(enrollment.spaceId, 'media', mediaId);
+  const stateKey = JSON.stringify(['root-state', rootKey]);
+  const state = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, stateKey));
+  check(state?.kind === 'root-state', 'The source causal state is missing.');
+  const deletion = {
+    ...enrollment,
+    connectionGeneration: 1,
+    rootKind: 'media' as const,
+    rootId: mediaId,
+    operationId: crypto.randomUUID(),
+    sourceDigest: await sha(new Blob(['delete-native-proof'])),
+    expectedLocalGeneration: state.generation,
+    expectedBasis: state.basis,
+    expectedWorkspaceRevision: null,
+  };
+  const reader = await acquireAssetResourceSession();
+  try {
+    await refused(() => applyCatalogDeletionNative(deletion));
+  } finally {
+    await reader.release();
+  }
+  check(await db.get('media_library', mediaId), 'Reader refusal deleted the source.');
+  const deleted = await applyCatalogDeletionNative(deletion);
+  check(
+    (await db.get('media_library', mediaId)) === undefined,
+    'Native deletion retained the logical root.'
+  );
+  await refused(() => readAssetFile(ref, media.filename));
+  const restoredFile = await writeBlobToAsset(new Blob([bytes], { type: ref.mimeType }), {
+    mimeType: ref.mimeType,
+  });
+  const rows = {
+    media,
+    projectAsset: { ...child, assetId: restoredFile.ref.assetId },
+    ref: { ...restoredFile.ref, sha256: hash },
+  };
+  const restoreId = crypto.randomUUID();
+  await applyPreparedMediaReplica({
+    ...enrollment,
+    rows,
+    operationId: restoreId,
+    sourceDigest: await sha(new Blob(['restore-native-proof'])),
+    connectionGeneration: 1,
+    expectedLocalGeneration: deleted.generation,
+    expectedBasis: [deletion.operationId],
+  });
+  await releaseAssetReadyProtection([restoredFile.ref.assetId]);
+  check(
+    (await applyCatalogDeletionNative(deletion)).status === 'duplicate',
+    'Old delete replay was not a duplicate.'
+  );
+  await refused(() =>
+    applyCatalogDeletionNative({ ...deletion, operationId: crypto.randomUUID() })
+  );
+  const persisted = await verifyMediaReplicaPersistence(mediaId);
+  check(
+    persisted.hash === hash &&
+      persisted.generation === state.generation + 2 &&
+      JSON.stringify(persisted.basis) === JSON.stringify([restoreId]),
+    'Delete replay changed the restored source.'
+  );
+  check((await changes()).length === 0, 'Incoming deletion or restore created an upload echo.');
+  return {
+    ...persisted,
+    mediaId,
+    restoreId,
+    readerRefused: true,
+    physicalDeleted: true,
+    staleRefused: true,
+    replay: true,
+    noEcho: true,
+  };
+}
+
 async function verifyMediaReplicaPersistence(mediaId: string) {
   const db = await initDB();
   const media = parseMediaLibraryEntry(await db.get('media_library', mediaId));
@@ -1138,7 +1320,11 @@ async function verifyMediaReplicaPersistence(mediaId: string) {
     state?.kind === 'root-state' && state.nativeDigest,
     'The admitted source causal state is missing.'
   );
-  return { hash: await sha(await readAssetFile(ref, media.filename)), basis: state.basis };
+  return {
+    hash: await sha(await readAssetFile(ref, media.filename)),
+    basis: state.basis,
+    generation: state.generation,
+  };
 }
 
 /** Leave the real ready journal at a controlled restart boundary. */
@@ -1212,6 +1398,8 @@ async function replacePreparedProjectUnderJournal() {
       operationId: crypto.randomUUID(),
       sourceDigest: await sha(new Blob([JSON.stringify(root)])),
       connectionGeneration: 1,
+      ...(await replicaEnrollment()),
+      expectedBasis: [],
       expectedLocalGeneration: 0,
       expectedWorkspaceRevision: null,
       dependencies: [],
@@ -1239,6 +1427,8 @@ async function replacePreparedProjectUnderJournal() {
       operationId: crypto.randomUUID(),
       sourceDigest: await sha(new Blob([JSON.stringify(replacement)])),
       connectionGeneration: 1,
+      ...(await replicaEnrollment()),
+      expectedBasis: [first.payload.input.operationId],
       expectedLocalGeneration: 1,
       expectedWorkspaceRevision: current.workspaceRevision,
       dependencies: [],
@@ -1295,6 +1485,9 @@ const syncCaptureHarness = {
   stageMediaReplicaForRecovery,
   recoverMediaReplicaProof,
   mediaSourceProof,
+  mediaRevisionSourceProof,
+  mediaCausalRevisionsProof,
+  mediaDeleteRestoreProof,
   mediaReplicaProof,
   verifyMediaReplicaPersistence,
   verifyAppliedSourcePersistence,

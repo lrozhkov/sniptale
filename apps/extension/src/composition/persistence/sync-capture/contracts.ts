@@ -59,6 +59,8 @@ export interface SyncCaptureRootState {
   rootKey: string;
   generation: number;
   basis: string[];
+  /** Explicit logical graveyard; missing rows alone do not authorize restoration. */
+  deleted?: true;
   /** Digest of the normalized native media snapshot, including its local immutable ref. */
   nativeDigest?: string;
 }

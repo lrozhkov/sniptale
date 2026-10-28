@@ -61,11 +61,22 @@ function assertJournalMetadata(value: unknown): void {
 }
 
 function parseIdentity(value: Record<string, unknown>) {
+  const spaceId = value['spaceId'];
+  const profileCreatedAt = value['profileCreatedAt'];
+  const expectedBasis = value['expectedBasis'];
   const operationId = value['operationId'];
   const sourceDigest = value['sourceDigest'];
   const connectionGeneration = value['connectionGeneration'];
   const expectedLocalGeneration = value['expectedLocalGeneration'];
   if (
+    typeof spaceId !== 'string' ||
+    !spaceId ||
+    !ordinal(profileCreatedAt) ||
+    !Array.isArray(expectedBasis) ||
+    expectedBasis.length !== (expectedLocalGeneration === 0 ? 0 : 1) ||
+    !expectedBasis.every(
+      (id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 256
+    ) ||
     typeof operationId !== 'string' ||
     !operationId ||
     operationId.length > 256 ||
@@ -76,7 +87,15 @@ function parseIdentity(value: Record<string, unknown>) {
     !ordinal(expectedLocalGeneration)
   )
     throw new Error('Invalid replica identity.');
-  return { operationId, sourceDigest, connectionGeneration, expectedLocalGeneration };
+  return {
+    spaceId,
+    profileCreatedAt,
+    expectedBasis,
+    operationId,
+    sourceDigest,
+    connectionGeneration,
+    expectedLocalGeneration,
+  };
 }
 
 function parsePreparedAsset(value: unknown): PreparedVideoProjectRevision['assets'][number] {
@@ -169,7 +188,7 @@ function parsePayload(value: unknown): PreparedReplicaPayload {
     return { kind: 'video-project', input: parseProjectInput(input) };
   if (value['kind'] !== 'media') throw new Error('Unsupported replica kind.');
   const rows = parseCapturedMediaRows(input['rows']);
-  if (!rows || input['expectedLocalGeneration'] !== 0) throw new Error('Invalid media replica.');
+  if (!rows) throw new Error('Invalid media replica.');
   return { kind: 'media', input: { ...parseIdentity(input), rows } };
 }
 
@@ -229,7 +248,7 @@ export async function publishPreparedReplicaJournal(
 ): Promise<void> {
   const payload = parsePayload(journal.payload);
   assertJournalClaims(journal, protectedRefs(payload));
-  if (payload.kind === 'media') await applyPreparedMediaReplica(payload.input);
+  if (payload.kind === 'media') await applyPreparedMediaReplica(payload.input, lifecyclePermit);
   else await applyPreparedVideoProjectRevision(payload.input, lifecyclePermit);
 }
 

@@ -209,3 +209,27 @@ it('preserves obsolete experiment and unknown phase rows while refusing sync and
     expect(row).toEqual(before);
   }
 });
+
+it('retains only explicit graveyards and refuses deleted states with live native digests', () => {
+  for (const rootKind of ['media', 'video-project'] as const) {
+    const root = {
+      version: 1,
+      kind: 'root-state',
+      key: 'state',
+      createdAt: 1,
+      spaceId: 'space',
+      rootKind,
+      rootId: 'root',
+      rootKey: captureRootKey('space', rootKind, 'root'),
+      generation: 2,
+      basis: ['delete'],
+    };
+    expect(parseSyncCaptureRecord({ ...root, deleted: true })).toEqual({ ...root, deleted: true });
+    expect(parseSyncCaptureRecord(root)).toEqual(root);
+    for (const deleted of [false, null, 1, 'true'])
+      expect(parseSyncCaptureRecord({ ...root, deleted })).toBeNull();
+    expect(
+      parseSyncCaptureRecord({ ...root, deleted: true, nativeDigest: 'a'.repeat(64) })
+    ).toBeNull();
+  }
+});

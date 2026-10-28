@@ -146,6 +146,10 @@ it('refuses a delayed owner write after deletion without recreating the root or 
   expect(changes).toHaveLength(2);
   expect(changes[1]?.change.kind).toBe('tombstone');
   expect(changes[1]?.basis).toEqual([changes[0]!.operationId]);
+  const rootKey = changes[1]!.rootKey;
+  expect(table('sync_capture').get(JSON.stringify(['root-state', rootKey]))).toMatchObject({
+    deleted: true,
+  });
 });
 
 it('keeps native and capture generations through identical recreation with a frozen clock', async () => {
@@ -156,6 +160,8 @@ it('keeps native and capture generations through identical recreation with a fro
   const originalAuthoredState = structuredClone(first.project);
   await deleteVideoProject(projectId);
   const tombstone = captures()[1]!;
+  const stateKey = JSON.stringify(['root-state', tombstone.rootKey]);
+  expect(table('sync_capture').get(stateKey)).toMatchObject({ deleted: true });
   const recreated = await saveVideoProject(originalAuthoredState, {
     expectedWorkspaceRevision: null,
     expectedProject: null,
@@ -170,6 +176,7 @@ it('keeps native and capture generations through identical recreation with a fro
   expect(changes).toHaveLength(3);
   expect(changes[2]?.generation).toBe(3);
   expect(changes[2]?.basis).toEqual([tombstone.operationId]);
+  expect(table('sync_capture').get(stateKey)).not.toHaveProperty('deleted');
   const beforeRefusal = structuredClone(fixture.rows);
   await expect(
     saveVideoProject(originalAuthoredState, {

@@ -266,3 +266,25 @@ it('treats unknown malformed or incompatible cache storage as an empty write-fre
   }
   expect(fixture.writes).not.toHaveBeenCalled();
 });
+
+it('publishes and reloads 10000 nonempty manifest entries without changing native authority', async () => {
+  const fixture = setup();
+  const before = structuredClone(fixture.rows.get('sync_capture'));
+  const payload = JSON.stringify({ description: 'metadata'.repeat(400), version: 1 });
+  const entries = Array.from({ length: 10_000 }, (_, index) =>
+    manifest(payload, `manifests/${index}.json`)
+  );
+  expect(await replaceSyncCatalogCache('space', 3, 7, entries)).toBe(true);
+  expect(await loadSyncCatalogCache('space', 3)).toEqual({
+    profileCreatedAt: 7,
+    manifests: entries,
+  });
+  expect(fixture.rows.get('sync_capture')).toEqual(before);
+  expect(fixture.rows.get('sync_catalog_cache')!.size).toBe(1);
+  fixture.writes.mockClear();
+  expect(await replaceSyncCatalogCache('space', 3, 7, [...entries, manifest('overflow')])).toBe(
+    false
+  );
+  expect(fixture.writes).not.toHaveBeenCalled();
+  expect((await loadSyncCatalogCache('space', 3))?.manifests).toEqual(entries);
+});

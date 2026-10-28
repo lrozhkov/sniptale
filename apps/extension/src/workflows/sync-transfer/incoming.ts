@@ -1,4 +1,8 @@
 import {
+  applyCatalogDeletionNative,
+  type ApplyCatalogDeletionInput,
+} from '../../composition/persistence/sync-capture/apply-deletion';
+import {
   discardPreparedAsset,
   readAssetFile,
   runWithDurableAssetOperation,
@@ -72,6 +76,28 @@ export async function prepareCatalogReplica(args: {
 }) {
   const selected = selectedOperation(args.catalog, args.rootKind, args.rootId);
   const admission = structuredClone(args.admission);
+  check(selected.operation.spaceId === admission.spaceId);
+  const ancestors = new Set<string>();
+  const pending = [...selected.operation.parents];
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (ancestors.has(id)) continue;
+    const ancestor = args.catalog.operations.get(id)?.operation;
+    check(
+      ancestor &&
+        ancestor.spaceId === admission.spaceId &&
+        ancestor.rootKind === args.rootKind &&
+        ancestor.rootId === args.rootId
+    );
+    ancestors.add(id);
+    pending.push(...ancestor.parents);
+  }
+  check(
+    admission.expectedBasis.length === (admission.expectedLocalGeneration === 0 ? 0 : 1) &&
+      admission.expectedBasis.every(
+        (id) => ancestors.has(id) || id === selected.operation.operationId
+      )
+  );
   check(JSON.stringify(selected.operation) === selected.operationText);
   const dependencySources = new Map(
     selected.operation.dependencies.map((dependency) => [
@@ -203,4 +229,72 @@ export async function prepareCatalogReplica(args: {
     }
     throw new Error('No physical sync attempt is available.');
   });
+}
+
+/** Admit a selected checked tombstone without staging objects or creating a publication journal. */
+export async function applyCatalogDeletion(args: {
+  catalog: Catalog;
+  rootKind: 'media' | 'video-project';
+  rootId: string;
+  admission: Omit<
+    ApplyCatalogDeletionInput,
+    'rootKind' | 'rootId' | 'operationId' | 'sourceDigest'
+  >;
+  signal: AbortSignal;
+}) {
+  const admission = structuredClone(args.admission);
+  const root = args.catalog.roots.get(syncCatalogRootKey(args.rootKind, args.rootId));
+  check(
+    args.catalog.invalid.length === 0 &&
+      root &&
+      root.deleted &&
+      !root.blocked &&
+      !root.conflict &&
+      root.heads.length === 1 &&
+      root.unavailableDependencies.length === 0
+  );
+  const selected = structuredClone(args.catalog.operations.get(root.heads[0]!));
+  check(
+    selected &&
+      selected.operation.kind === 'delete' &&
+      selected.operation.spaceId === admission.spaceId &&
+      selected.operation.rootKind === args.rootKind &&
+      selected.operation.rootId === args.rootId &&
+      JSON.stringify(selected.operation) === selected.operationText
+  );
+  const ancestors = new Set<string>();
+  const pending = [...selected.operation.parents];
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (ancestors.has(id)) continue;
+    const parent = args.catalog.operations.get(id)?.operation;
+    check(
+      parent &&
+        parent.spaceId === admission.spaceId &&
+        parent.rootKind === args.rootKind &&
+        parent.rootId === args.rootId
+    );
+    ancestors.add(id);
+    pending.push(...parent.parents);
+  }
+  check(
+    admission.expectedBasis.length === (admission.expectedLocalGeneration === 0 ? 0 : 1) &&
+      admission.expectedBasis.every(
+        (id) => ancestors.has(id) || id === selected.operation.operationId
+      )
+  );
+  args.signal.throwIfAborted();
+  const operation = await parseSyncOperationText(selected.operationText);
+  check(operation.kind === 'delete');
+  args.signal.throwIfAborted();
+  return applyCatalogDeletionNative(
+    {
+      ...admission,
+      rootKind: args.rootKind,
+      rootId: args.rootId,
+      operationId: operation.operationId,
+      sourceDigest: hashSyncText(selected.operationText),
+    },
+    args.signal
+  );
 }

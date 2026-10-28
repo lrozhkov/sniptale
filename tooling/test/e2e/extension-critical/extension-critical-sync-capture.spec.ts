@@ -491,3 +491,107 @@ test('pre-profile originals join project capture atomically and survive browser 
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+test('causal media updates, deletion and restore survive isolated profiles and replay', async ({}, info) => {
+  test.setTimeout(120_000);
+  const host = await startHostServer();
+  let context: BrowserContext | undefined;
+  const targetProfile = info.outputPath('causal-target-profile');
+  const options = { viewport: { width: 1920, height: 900 }, deviceScaleFactor: 1, headless: true };
+  try {
+    context = await chromium.launchPersistentContext(
+      info.outputPath('causal-source-profile'),
+      options
+    );
+    const source = await context.newPage();
+    await applyHarnessBootstrap(source, { preserveMediaLibrary: true });
+    await source.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await source.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const first = await source.evaluate(() => window.syncCaptureHarness.mediaSourceProof());
+    const second = await source.evaluate(
+      (id) => window.syncCaptureHarness.mediaRevisionSourceProof(id),
+      first.capture.rootId
+    );
+    expect(second.capture.basis).toEqual([first.capture.operationId]);
+    expect(second.hash).not.toBe(first.hash);
+    await context.close();
+    context = await chromium.launchPersistentContext(targetProfile, options);
+    const target = await context.newPage();
+    await applyHarnessBootstrap(target, { preserveMediaLibrary: true });
+    await target.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await target.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const applied = await target.evaluate(
+      ({ first, second }) => window.syncCaptureHarness.mediaCausalRevisionsProof(first, second),
+      { first, second }
+    );
+    expect(applied).toMatchObject({
+      hash: second.hash,
+      generation: 2,
+      staleRefused: true,
+      replay: true,
+      noEcho: true,
+    });
+    await context.close();
+    context = await chromium.launchPersistentContext(targetProfile, options);
+    const restarted = await context.newPage();
+    await applyHarnessBootstrap(restarted, { preserveMediaLibrary: true });
+    await restarted.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await restarted.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const persisted = await restarted.evaluate(
+      (id) => window.syncCaptureHarness.verifyMediaReplicaPersistence(id),
+      applied.mediaId
+    );
+    expect(persisted).toMatchObject({
+      hash: second.hash,
+      generation: 2,
+      basis: [second.capture.operationId],
+    });
+    const restored = await restarted.evaluate(
+      (id) => window.syncCaptureHarness.mediaDeleteRestoreProof(id),
+      applied.mediaId
+    );
+    expect(restored).toMatchObject({
+      hash: second.hash,
+      generation: 4,
+      readerRefused: true,
+      physicalDeleted: true,
+      staleRefused: true,
+      replay: true,
+      noEcho: true,
+    });
+    await context.close();
+    context = await chromium.launchPersistentContext(targetProfile, options);
+    const finalPage = await context.newPage();
+    await applyHarnessBootstrap(finalPage, { preserveMediaLibrary: true });
+    await finalPage.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
+    await finalPage.waitForFunction(() => Boolean(window.syncCaptureHarness));
+    const afterRestoreRestart = await finalPage.evaluate(
+      (id) => window.syncCaptureHarness.verifyMediaReplicaPersistence(id),
+      applied.mediaId
+    );
+    expect(afterRestoreRestart).toMatchObject({
+      hash: second.hash,
+      generation: 4,
+      basis: [restored.restoreId],
+    });
+    await writeFile(
+      info.outputPath('causal-revisions-proof.json'),
+      JSON.stringify(
+        {
+          applied,
+          persisted,
+          restored,
+          afterRestoreRestart,
+          isolatedProfiles: true,
+          fullBrowserRestart: true,
+        },
+        null,
+        2
+      )
+    );
+  } finally {
+    await context?.close();
+    host.server.closeAllConnections();
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

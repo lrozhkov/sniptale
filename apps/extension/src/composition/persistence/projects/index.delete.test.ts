@@ -484,3 +484,18 @@ it.each(['save-failure', 'delete-failure'] as const)(
     expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
   }
 );
+
+it('exposes canonical project deletion inside a caller transaction without capture or commit', async () => {
+  const { deleteVideoProjectInTransaction } = await import('./index.delete');
+  const { createProjectDeletionStores } = await import('./mutation-stores');
+  const { buildPhysicalDeleteOperation } = await import('../assets');
+  const db = await deleteMocks.initDBMock();
+  const { tx } = createProjectDeletionStores(db);
+  deleteMocks.txGetMock.mockResolvedValue(createVideoProjectEntry({ assets: [] }));
+  const operation = buildPhysicalDeleteOperation([]);
+  await expect(deleteVideoProjectInTransaction(tx, 'project-1', operation)).resolves.toEqual([]);
+  expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
+  expect(deleteMocks.presentationDeleteMock).toHaveBeenCalledWith(['video-project', 'project-1']);
+  expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
+  expect(deleteMocks.recoverProjectMediaPublicationsMock).not.toHaveBeenCalled();
+});

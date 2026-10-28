@@ -744,6 +744,8 @@ The bounded sync command requires an enabled experimental profile and the prepar
 
 A dependency that lacks local bytes requires hydration before application. A tombstone, conflicting revision or different incarnation requires explicit resolution. Matching bytes alone do not authorize a different logical dependency. The command preserves Library relationships and refuses hidden source substitution.
 
+Incoming project admission also compares the receiver's space, enrollment creation time and exact expected basis. Matching generation and workspace revision alone do not authorize replacement.
+
 Project publication, detached private-resource release and the application receipt commit together. Failure preserves current roots and the prepared candidate. A repeated accepted operation returns its receipt before checking later dependency changes. Pending local project changes refuse incoming replacement. This bounded command adds no product network route or automatic historical binding.
 
 
@@ -753,7 +755,15 @@ The enabled experimental profile captures a published project-asset Library sour
 
 Project capture records the causal heads of its editing dependencies in the same transaction. It compares the current normalized source snapshot with the digest of the accepted media head. A metadata change without a matching media revision causes refusal. Unknown prototype records remain unchanged and prevent destructive cleanup. They do not supply admitted dependency evidence.
 
-The media replica command accepts a prepared original-only project-asset source whose native identity is absent. It publishes the Library row, child, ref, owner, causal state and receipt atomically. An exact receipt retry returns a duplicate. A retained deleted identity, existing native source, local pending change or changed connection causes refusal. This command does not replace existing roots or release staged files. The caller must verify bytes and retain durable staging protection until publication commits.
+The media replica command accepts a verified original-only project-asset source under the receiver's exact space and enrollment lifetime. First import requires an absent native identity. An update requires the expected generation, basis and native digest. Pending local changes cause refusal. Source publication, causal state, receipt and any durable delete intent commit together.
+
+Canonical source admission refuses byte replacement when a retained dependent uses that identity. The existing asset deletion owner preserves other claims and completes physical cleanup after commit. An exact receipt replay returns a duplicate without reverting later accepted state. The caller must verify bytes and retain durable staging protection until publication commits.
+
+Each accepted local or incoming tombstone marks its causal root state as deleted. Accepted live capture or application clears that fact. Restoration of an absent nonzero predecessor requires the exact graveyard. A missing root or missing digest alone cannot authorize restoration. The parser rejects a deleted state that also claims a live native digest.
+
+Incoming deletion verifies the same enrollment, generation and basis as revision application. It refuses active resource readers, pending publications and independent dependencies. Domain transaction participants delete the logical root without an outgoing capture. The graveyard, receipt and physical-delete intent commit together. No prepared publication journal is necessary because deletion stages no object bytes before commit.
+
+The existing transition and lifecycle holds protect native deletion through physical cleanup. Cancellation before commit preserves the source and provenance. Cancellation after commit preserves the applied result and durable cleanup intent. Exact receipt replay cannot delete a later restored root.
 
 The media source publication participant also serves backup restoration. Backup retains conflict policy, transaction completion, sidecars and cleanup. Its publication order remains Library source, thumbnail, project child, then other sidecars. The participant does not start transactions or transfer files.
 
@@ -785,6 +795,8 @@ Unknown outcomes preserve the single prepared payload and physical attempt ident
 The catalog scanner lists only the selected space manifest prefix. It checks bounded streamed metadata, exact physical keys, digests, canonical wire records and space identity. Discovery reads no original or export files and writes no native state. The current scanner admits at most 10000 manifest keys, 1024 pages and 64 MiB of decoded keys and manifest bytes. Each manifest has a 4 MiB bound. These limits bound the current implementation. They do not qualify full R1 capacity. A budget failure, cursor cycle or unavailable metadata fails the scan instead of publishing partial authoritative state. Invalid immutable entries retain fixed diagnostics.
 
 The pure graph groups exact logical bytes and retains physical alternatives. Contradictory logical variants quarantine the whole operation identity independently of listing order. Missing, cyclic, quarantined or foreign-root ancestry cannot authorize a root. Known affected roots remain blocked while other roots retain their state. Concurrent heads remain explicit. Deletion remains active until an explicit restore covers the unresolved deletion ancestry. Project dependency availability compares exact current media heads with causal operation IDs. Native generation counters do not become remote ordering authority.
+
+Before staging, selected preparation verifies that each expected local head belongs to the selected remote ancestry. At commit, native publication verifies the same expected basis, generation and enrollment lifetime. A stale catalog observation cannot authorize a different local branch.
 
 Selected preparation refuses deleted, blocked, conflicting or unavailable roots. Unreadable manifest ownership also prevents native admission. The workflow detaches selected metadata and target-local admission before asynchronous work. It checks actual borrowed Library files against their independently selected media revision. It stages only editing files through the existing streamed backup staging owner and creates the existing native ready journal under durable-operation protection. The native receipt uses the logical record digest across physical attempts. Missing physical copies can use another retained attempt. Failure before journal admission cleans new staged files through the existing owner. After admission, the caller publishes through the existing ready-journal retry and recovery owner. Saved exports remain discoverable metadata and ordinary remote files without forced download to open a project. The profile remains disabled until runtime, queue, catalog persistence, capacity and retention acceptance are complete.
 

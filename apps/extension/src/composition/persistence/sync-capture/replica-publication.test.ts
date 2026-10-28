@@ -72,6 +72,9 @@ function setup() {
       operationId: 'remote-op',
       sourceDigest: 'a'.repeat(64),
       connectionGeneration: 3,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedBasis: [],
       expectedLocalGeneration: 0,
       rows: {
         ref,
@@ -196,6 +199,9 @@ it('publishes a bounded manual project journal and refuses unsupported sidecars'
       operationId: 'project-op',
       sourceDigest: 'c'.repeat(64),
       connectionGeneration: 3,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedBasis: [],
       expectedLocalGeneration: 0,
       expectedWorkspaceRevision: null,
       root: { entry, assets: [] },
@@ -234,6 +240,9 @@ it('rejects conflicting protection claims before journal creation', async () => 
       operationId: 'project-op',
       sourceDigest: 'c'.repeat(64),
       connectionGeneration: 3,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedBasis: [],
       expectedLocalGeneration: 0,
       expectedWorkspaceRevision: null,
       root: { entry, assets: [] },
@@ -261,6 +270,9 @@ it('deduplicates equal working-set claims without replacing existing Library own
       operationId: 'shared-project-op',
       sourceDigest: 'c'.repeat(64),
       connectionGeneration: 3,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedBasis: [],
       expectedLocalGeneration: 0,
       expectedWorkspaceRevision: null,
       root: {
@@ -322,6 +334,9 @@ it('freezes the prepared project before asynchronous journal persistence', async
       operationId: 'frozen-project-op',
       sourceDigest: 'c'.repeat(64),
       connectionGeneration: 3,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedBasis: [],
       expectedLocalGeneration: 0,
       expectedWorkspaceRevision: null,
       root: { entry, assets: [] },
@@ -345,4 +360,33 @@ it('freezes the prepared project before asynchronous journal persistence', async
   expect(f.table('video_projects').get(entry.id)).toMatchObject({
     project: { name: 'Prepared revision' },
   });
+});
+
+it.each(['spaceId', 'profileCreatedAt', 'expectedBasis'])(
+  'refuses a journal without its exact admission fence: %s',
+  async (field) => {
+    const f = setup();
+    const journal = await createPreparedReplicaJournal(f.payload);
+    const input: Record<string, unknown> = { ...f.payload.input };
+    delete input[field];
+    const before = structuredClone(f.rows);
+    await expect(
+      publishPreparedReplicaJournal({ ...journal, payload: { kind: 'media', input } })
+    ).rejects.toThrow();
+    expect(f.rows).toEqual(before);
+  }
+);
+
+it('retains the original journal after enrollment recreation instead of admitting its source', async () => {
+  const f = setup();
+  const journal = await createPreparedReplicaJournal(f.payload);
+  const profile = f.table('sync_capture').get('profile');
+  if (!isRecord(profile)) throw new Error('Missing profile');
+  f.table('sync_capture').set('profile', { ...profile, createdAt: 2 });
+  io.list.mockResolvedValue([journal]);
+  await expect(recoverStandaloneAssetPublications([syncReplicaPublicationAdapter])).resolves.toBe(
+    0
+  );
+  expect(io.remove).not.toHaveBeenCalled();
+  expect(f.table('media_library').has('project-asset:source')).toBe(false);
 });

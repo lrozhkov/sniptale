@@ -16,6 +16,7 @@ import {
   parseCapturedMediaRows,
 } from '../../composition/persistence/sync-capture/guards';
 import type { PreparedReplicaPayload } from '../../composition/persistence/sync-capture/replica-publication';
+import { transformPortableVideoProjectReferences } from '../media-hub-backup/v6/root-publication/video-project-references';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import {
   parsePortableMediaMetadata,
@@ -97,6 +98,9 @@ export interface PortableReplicaAdmission {
   operationId: string;
   sourceDigest: string;
   connectionGeneration: number;
+  spaceId: string;
+  profileCreatedAt: number;
+  expectedBasis: readonly string[];
   expectedLocalGeneration: number;
   expectedWorkspaceRevision: number | null;
   dependencies: ApplyPreparedVideoProjectRevisionInput['dependencies'];
@@ -184,11 +188,21 @@ function prepareVideoRoot(
   refFor: VerifiedObjectResolver
 ): ApplyPreparedVideoProjectRevisionInput['root'] {
   const needed = new Set(portableSyncDependencyIds(parsed));
+  // Later staging must not replace a predecessor child that another native root can retain.
+  // The existing prepared journal persists these local private identities through recovery.
+  const assetIds = new Map(
+    parsed.metadata.projectAssets.map((asset) => [
+      asset.entry.id,
+      !asset.libraryMediaId && local.expectedLocalGeneration > 0
+        ? crypto.randomUUID()
+        : asset.entry.id,
+    ])
+  );
   const assets = parsed.metadata.projectAssets.map((asset) => {
     const ref = refFor(asset.objectId);
     const entry = preparePortableVideoProjectAsset({
       entry: asset.entry,
-      id: asset.entry.id,
+      id: assetIds.get(asset.entry.id),
       originalRef: ref,
     });
     if (asset.libraryMediaId) {
@@ -216,7 +230,7 @@ function prepareVideoRoot(
       source.kind === 'library-asset'
         ? local.dependencies.find((item) => item.entry.id === source.mediaId)?.entry
         : source.kind === 'project-asset'
-          ? assets.find((item) => item.entry.id === source.projectAssetId)?.entry
+          ? assets.find((item) => item.entry.id === assetIds.get(source.projectAssetId))?.entry
           : undefined;
     if (
       !resource ||
@@ -225,7 +239,15 @@ function prepareVideoRoot(
     )
       throw new Error('Portable project source metadata differs from admitted resource.');
   }
-  return { entry: parsed.entry, assets };
+  const project = transformPortableVideoProjectReferences(
+    parsed.entry.project,
+    assetIds,
+    Object.fromEntries(
+      local.dependencies.map((item) => [`media:library-item:${item.entry.id}`, item.entry.id])
+    ),
+    {}
+  );
+  return { entry: { ...parsed.entry, project }, assets };
 }
 
 /**
@@ -255,6 +277,12 @@ export async function preparePortableReplica(args: {
     return ref;
   };
   if (
+    !local.spaceId ||
+    !Number.isSafeInteger(local.profileCreatedAt) ||
+    local.profileCreatedAt < 0 ||
+    !Array.isArray(local.expectedBasis) ||
+    local.expectedBasis.length !== (local.expectedLocalGeneration === 0 ? 0 : 1) ||
+    local.expectedBasis.some((id) => typeof id !== 'string' || !id || id.length > 256) ||
     !local.operationId ||
     local.operationId.length > 256 ||
     !/^[a-f0-9]{64}$/u.test(local.sourceDigest) ||
@@ -265,6 +293,9 @@ export async function preparePortableReplica(args: {
   )
     throw new Error('Invalid local replica admission.');
   const identity = {
+    spaceId: local.spaceId,
+    profileCreatedAt: local.profileCreatedAt,
+    expectedBasis: local.expectedBasis,
     operationId: local.operationId,
     sourceDigest: local.sourceDigest,
     connectionGeneration: local.connectionGeneration,
@@ -272,7 +303,7 @@ export async function preparePortableReplica(args: {
   };
   let payload: PreparedReplicaPayload;
   if (parsed.kind === 'media') {
-    if (sender.length || local.dependencies.length || local.expectedLocalGeneration !== 0)
+    if (sender.length || local.dependencies.length)
       throw new Error('Unsupported media replica admission.');
     const rows = prepareMediaRows(parsed, refFor);
     payload = { kind: 'media', input: { ...identity, rows } };

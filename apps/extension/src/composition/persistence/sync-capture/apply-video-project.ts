@@ -80,11 +80,16 @@ async function readAppliedReceipt(
 
 async function readApplicationGeneration(
   tx: ApplyTransaction,
-  identity: ApplyIdentity
+  identity: ApplyIdentity,
+  expectedBasis: readonly string[],
+  hasCurrent: boolean
 ): Promise<number> {
   const key = JSON.stringify(['root-state', identity.rootKey]);
   const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key);
-  if (raw === undefined) return 0;
+  if (raw === undefined) {
+    if (expectedBasis.length) throw new VideoProjectApplyConflictError('project-changed');
+    return 0;
+  }
   const previous = parseSyncCaptureRecord(raw);
   if (
     !previous ||
@@ -94,15 +99,22 @@ async function readApplicationGeneration(
     previous.spaceId !== identity.spaceId
   )
     throw new Error('Invalid project application root state.');
+  if (
+    (hasCurrent ? previous.deleted === true : previous.deleted !== true) ||
+    JSON.stringify(previous.basis) !== JSON.stringify(expectedBasis)
+  )
+    throw new VideoProjectApplyConflictError('project-changed');
   return previous.generation;
 }
 
 async function prepareApplicationProvenance(
   tx: ApplyTransaction,
   identity: ApplyIdentity,
-  expected: number
+  expected: number,
+  expectedBasis: readonly string[],
+  hasCurrent: boolean
 ) {
-  const previous = await readApplicationGeneration(tx, identity);
+  const previous = await readApplicationGeneration(tx, identity, expectedBasis, hasCurrent);
   if (previous !== expected) throw new VideoProjectApplyConflictError('project-changed');
   const generation = previous + 1;
   const createdAt = Date.now();
@@ -146,6 +158,9 @@ export interface ApplyPreparedVideoProjectRevisionInput {
   operationId: string;
   sourceDigest: string;
   connectionGeneration: number;
+  spaceId: string;
+  profileCreatedAt: number;
+  expectedBasis: readonly string[];
   expectedLocalGeneration: number;
   expectedWorkspaceRevision: number | null;
   dependencies: readonly PreparedVideoProjectDependency[];
@@ -348,7 +363,9 @@ async function assertLocalPredecessor(
   const current = raw === undefined ? null : parseVideoProjectEntry(raw);
   if (
     (raw !== undefined && !current) ||
-    (current ? (current.workspaceRevision ?? 0) : null) !== input.expectedWorkspaceRevision
+    (current ? (current.workspaceRevision ?? 0) : null) !== input.expectedWorkspaceRevision ||
+    (current !== null &&
+      (current.lifecycle?.trashedAt !== undefined || input.expectedLocalGeneration === 0))
   )
     throw new VideoProjectApplyConflictError('project-changed');
   await assertNoPendingLocalCapture(tx, identity.rootKey);
@@ -425,7 +442,12 @@ async function admitApplication(
 ) {
   const root = candidate.root;
   const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
-  if (!profile || profile.kind !== 'profile')
+  if (
+    !profile ||
+    profile.kind !== 'profile' ||
+    profile.spaceId !== candidate.spaceId ||
+    profile.createdAt !== candidate.profileCreatedAt
+  )
     throw new VideoProjectApplyConflictError('profile-changed');
   const rootKey = captureRootKey(profile.spaceId, 'video-project', root.entry.id);
   const identity: ApplyIdentity = {
@@ -445,7 +467,9 @@ async function admitApplication(
   const { state, receipt } = await prepareApplicationProvenance(
     tx,
     identity,
-    candidate.expectedLocalGeneration
+    candidate.expectedLocalGeneration,
+    candidate.expectedBasis,
+    current !== null
   );
   await assertDependencies(tx, profile.spaceId, candidate.dependencies);
   const stores = publicationStores(tx);
@@ -500,6 +524,12 @@ export async function applyPreparedVideoProjectRevision(
   lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<{ status: 'applied' | 'duplicate'; generation: number }> {
   if (
+    !input.spaceId ||
+    !Number.isSafeInteger(input.profileCreatedAt) ||
+    input.profileCreatedAt < 0 ||
+    !Array.isArray(input.expectedBasis) ||
+    input.expectedBasis.length !== (input.expectedLocalGeneration === 0 ? 0 : 1) ||
+    input.expectedBasis.some((id) => typeof id !== 'string' || !id || id.length > 256) ||
     !input.operationId ||
     input.operationId.length > 256 ||
     !/^[a-f0-9]{64}$/u.test(input.sourceDigest) ||
