@@ -6,6 +6,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   loadCompact: vi.fn(),
+  loadCatalog: vi.fn(),
+  saveCatalog: vi.fn(),
+  subscribeCatalog: vi.fn(),
   saveCompact: vi.fn(),
   subscribeCompact: vi.fn(),
   loadRecent: vi.fn(),
@@ -14,6 +17,9 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('../persistence/picker-preferences', () => ({
   loadPickerCompact: mocks.loadCompact,
+  loadPickerCatalog: mocks.loadCatalog,
+  savePickerCatalog: mocks.saveCatalog,
+  subscribePickerCatalog: mocks.subscribeCatalog,
   savePickerCompact: mocks.saveCompact,
   subscribePickerCompact: mocks.subscribeCompact,
 }));
@@ -44,6 +50,9 @@ async function render(density?: 'full' | 'compact') {
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.loadCompact.mockResolvedValue(false);
+  mocks.loadCatalog.mockResolvedValue(false);
+  mocks.saveCatalog.mockResolvedValue(undefined);
+  mocks.subscribeCatalog.mockReturnValue(vi.fn());
   mocks.saveCompact.mockResolvedValue(undefined);
   mocks.loadRecent.mockResolvedValue([]);
   mocks.pushRecent.mockResolvedValue([]);
@@ -144,4 +153,42 @@ it('retains valid history when accepting a color fails and unsubscribes on unmou
   expect(stopCompact).toHaveBeenCalledOnce();
   expect(stopRecent).toHaveBeenCalledOnce();
   root = createRoot(host);
+});
+
+it('hydrates search mode without writes and retains a toggle after refused storage and delayed hydration', async () => {
+  const load = deferred<boolean>();
+  mocks.loadCatalog.mockReturnValue(load.promise);
+  mocks.saveCatalog.mockRejectedValue(new Error('refused'));
+  await render();
+  expect(mocks.saveCatalog).not.toHaveBeenCalled();
+  await act(async () => current.setCatalogMode(true));
+  await act(async () => load.resolve(false));
+  expect(current.catalogMode).toBe(true);
+  expect(mocks.saveCatalog).toHaveBeenCalledWith(true);
+});
+it('lets newer search storage events win over hydration and observes reset and recreation', async () => {
+  const load = deferred<boolean>();
+  mocks.loadCatalog.mockReturnValue(load.promise);
+  await render();
+  act(() => mocks.subscribeCatalog.mock.calls[0]?.[0](true));
+  await act(async () => load.resolve(false));
+  expect(current.catalogMode).toBe(true);
+  act(() => mocks.subscribeCatalog.mock.calls[0]?.[0](false));
+  expect(current.catalogMode).toBe(false);
+  await act(async () => current.setCatalogMode(true));
+  expect(current.catalogMode).toBe(true);
+});
+it('restores search preference after remount and keeps storage refusal editable', async () => {
+  mocks.loadCatalog.mockResolvedValue(true);
+  await render();
+  expect(current.catalogMode).toBe(true);
+  const stop = mocks.subscribeCatalog.mock.results[0]?.value;
+  act(() => root.unmount());
+  expect(stop).toHaveBeenCalledOnce();
+  root = createRoot(host);
+  mocks.loadCatalog.mockRejectedValue(new Error('unavailable'));
+  await render();
+  expect(current.catalogMode).toBe(false);
+  await act(async () => current.setCatalogMode(true));
+  expect(current.catalogMode).toBe(true);
 });

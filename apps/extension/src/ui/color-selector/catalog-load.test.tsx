@@ -40,3 +40,19 @@ it('keeps CSS selection and alpha usable when the optional catalog cannot load',
     vi.unstubAllGlobals();
   }
 });
+
+it('does not announce the CSS fallback count as the all-colors catalog while loading', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(<ColorCatalogPanel color="#663399" onColorChange={vi.fn()} onExit={vi.fn()} />)
+    );
+    expect(host.querySelector('.sniptale-catalog-count span')?.textContent).not.toBe('148');
+    expect(host.querySelector('.sniptale-catalog-empty strong')).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

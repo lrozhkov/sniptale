@@ -34,7 +34,15 @@ export function ColorCatalogToggle(props: { active: boolean; onToggle: () => voi
   );
 }
 
-function CatalogHeader({ state, onExit }: { state: Browsing; onExit: () => void }) {
+function CatalogHeader({
+  state,
+  loading,
+  onExit,
+}: {
+  state: Browsing;
+  loading: boolean;
+  onExit: () => void;
+}) {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     input.current?.focus();
@@ -136,7 +144,9 @@ function CatalogHeader({ state, onExit }: { state: Browsing; onExit: () => void 
             state.expanded ? 'shared.ui.colorCatalogOverview' : 'shared.ui.colorCatalogAllShades'
           )}
         >
-          <span role="status">{state.results.length.toLocaleString()}</span>
+          <span role="status" aria-label={loading ? t('shared.ui.colorCatalogLoading') : undefined}>
+            {loading ? '…' : state.results.length.toLocaleString()}
+          </span>
           {state.expanded ? <Grid2X2 size={11} /> : <List size={11} />}
         </button>
       </div>
@@ -148,8 +158,10 @@ function CatalogGrid({
   state,
   color,
   choose,
+  loading,
 }: {
   state: Browsing;
+  loading: boolean;
   color: string;
   choose: (color: CatalogColor) => void;
 }) {
@@ -157,7 +169,8 @@ function CatalogGrid({
   return (
     <div
       ref={state.grid}
-      className={`sniptale-catalog-grid ${empty ? 'is-empty' : ''}`}
+      className={`sniptale-catalog-grid ${empty || loading ? 'is-empty' : ''}`}
+      aria-busy={loading}
       role="group"
       aria-label={t('shared.ui.colorCatalogSource')}
       onPointerLeave={() => state.setHover(null)}
@@ -166,7 +179,11 @@ function CatalogGrid({
       }}
       onScroll={(event) => state.setScrollTop(event.currentTarget.scrollTop)}
     >
-      {empty ? (
+      {loading ? (
+        <div className="sniptale-catalog-empty" role="status">
+          {t('shared.ui.colorCatalogLoading')}
+        </div>
+      ) : empty ? (
         <div className="sniptale-catalog-empty">
           <strong>{t('shared.ui.colorCatalogEmpty')}</strong>
           <span>{t('shared.ui.colorCatalogEmptyHint')}</span>
@@ -230,6 +247,7 @@ export function ColorCatalogPanel(props: {
 }) {
   const catalog = useNamedCatalog();
   const state = useCatalogBrowsing(catalog.colors);
+  const loading = catalog.status === 'loading' && state.source === 'all';
   const hex = colorIdentity(props.color) ?? '#000000';
   const neighbors = useMemo(() => nearby([...state.pool], hex), [state.pool, hex]);
   const selected = state.pool.find((color) => color.hex === hex);
@@ -241,8 +259,8 @@ export function ColorCatalogPanel(props: {
   };
   return (
     <div className="sniptale-color-catalog" data-ui="shared.ui.color-selector.catalog">
-      <CatalogHeader state={state} onExit={props.onExit} />
-      <CatalogGrid state={state} color={props.color} choose={choose} />
+      <CatalogHeader state={state} loading={loading} onExit={props.onExit} />
+      <CatalogGrid state={state} loading={loading} color={props.color} choose={choose} />
       {catalog.status === 'failed' && (
         <button className="sniptale-catalog-retry" type="button" onClick={catalog.retry}>
           {t('shared.ui.colorCatalogRetry')}

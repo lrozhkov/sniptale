@@ -56,6 +56,8 @@ type PaintSelectorPopupProps = {
   draft: Paint;
   original: Paint;
   compact: boolean;
+  catalogMode?: boolean | undefined;
+  onCatalogModeChange?: ((enabled: boolean) => void) | undefined;
   onToggleCompact: () => void;
   history: ReturnType<typeof usePaintHistory>;
   formatMode: ColorSelectorFormatMode;
@@ -248,7 +250,9 @@ export function PaintSelectorPopup(
     setSection: (section: PaintSelectorSection) => void;
   }
 ) {
-  const [colorCatalogMode, setColorCatalogMode] = useState(false);
+  const [localCatalogMode, setLocalCatalogMode] = useState(false);
+  const colorCatalogMode = props.catalogMode ?? localCatalogMode;
+  const setColorCatalogMode = props.onCatalogModeChange ?? setLocalCatalogMode;
   const body = useRef<HTMLDivElement>(null);
   const catalogHeight = useRef(340);
   const popup = useRef<HTMLDivElement>(null);
@@ -370,7 +374,7 @@ export function PaintSelectorPopup(
         catalogMode={colorCatalogMode}
         onToggleCatalog={() => {
           props.setSection('paint');
-          setColorCatalogMode((value) => !value);
+          setColorCatalogMode(!colorCatalogMode);
         }}
         context={`${props.section}-${mode}`}
         popup={props}

@@ -60,6 +60,8 @@ function PickerLayer(props: {
         allowTransparent={options.allowTransparent !== false}
         color={state.draftColor}
         originalColor={options.value}
+        catalogMode={preferences.catalogMode}
+        onCatalogModeChange={preferences.setCatalogMode}
         compact={preferences.compact}
         onToggleCompact={() => preferences.setCompact(!preferences.compact)}
         formatMode={state.formatMode}

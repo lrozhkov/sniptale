@@ -132,8 +132,8 @@ function PaletteNameEditor(props: {
         'h-8 w-full min-w-0 rounded-[4px] border border-transparent bg-transparent px-2 text-[13px]',
         'text-[var(--sniptale-color-text-primary)] hover:border-[var(--sniptale-color-border-soft)]',
         'hover:bg-[var(--sniptale-color-surface-input)] focus:border-[var(--sniptale-color-border-soft)]',
-        'focus:bg-[var(--sniptale-color-surface-input)] focus-visible:outline-1',
-        'focus-visible:outline-[var(--sniptale-color-text-secondary)]',
+        'focus:bg-[var(--sniptale-color-surface-input)] focus:outline-none',
+        'focus-visible:border-[var(--sniptale-color-border-strong)]',
       ].join(' ')}
       onChange={(event) => {
         setDraft(event.currentTarget.value);

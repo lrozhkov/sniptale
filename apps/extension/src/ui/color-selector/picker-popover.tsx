@@ -17,6 +17,8 @@ const PANEL_CLASS_NAME = [
 
 type ColorSelectorPickerPopoverProps = {
   compact?: boolean | undefined;
+  catalogMode?: boolean | undefined;
+  onCatalogModeChange?: ((enabled: boolean) => void) | undefined;
   originalColor?: string | undefined;
   onToggleCompact?: (() => void) | undefined;
   utilities?: ReactNode;
@@ -37,7 +39,9 @@ type ColorSelectorPickerPopoverProps = {
 };
 
 export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProps) {
-  const [catalogMode, setCatalogMode] = useState(false);
+  const [localCatalogMode, setLocalCatalogMode] = useState(false);
+  const catalogMode = props.catalogMode ?? localCatalogMode;
+  const setCatalogMode = props.onCatalogModeChange ?? setLocalCatalogMode;
   const panelRef = useRef<HTMLDivElement>(null);
   const originalColor = useRef(props.originalColor ?? props.color);
   return (
@@ -110,7 +114,7 @@ export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProp
           <>
             <ColorCatalogToggle
               active={catalogMode}
-              onToggle={() => setCatalogMode((value) => !value)}
+              onToggle={() => setCatalogMode(!catalogMode)}
             />
             {props.utilities}
           </>

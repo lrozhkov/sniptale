@@ -55,7 +55,7 @@ export function useCatalogPlacement(editor: RefObject<HTMLDivElement | null>, ac
     observer?.observe(body);
     observer?.observe(element);
     return () => observer?.disconnect();
-  }, [active, editor]);
+  });
   return placement;
 }
 

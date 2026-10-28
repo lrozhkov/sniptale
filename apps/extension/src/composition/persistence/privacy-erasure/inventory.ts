@@ -26,7 +26,7 @@ import type {
 } from '@sniptale/runtime-contracts/privacy-erasure/types';
 import { QUICK_PREVIEW_PREFERENCES_STORAGE_KEY } from '../quick-preview-preferences';
 import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-preferences';
-import { PICKER_COMPACT_STORAGE_KEY } from '../picker-preferences';
+import { PICKER_CATALOG_STORAGE_KEY, PICKER_COMPACT_STORAGE_KEY } from '../picker-preferences';
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale-theme-preference',
@@ -49,6 +49,7 @@ const localPreferenceKeys = [
   'sniptale-locale-preference',
   'sniptale_ai_modal_spoiler_open',
   PICKER_COMPACT_STORAGE_KEY,
+  PICKER_CATALOG_STORAGE_KEY,
   'sniptale_export_json_spoiler_open',
   'sniptale_export_md_spoiler_open',
   'sniptale_editor_file_menu_save_to_folder_open',

@@ -16,6 +16,7 @@ async function configure(page: Page, extensionId: string) {
         'sniptale-locale-preference': 'ru',
         'sniptale-theme-preference': 'light',
         sniptale_picker_compact: false,
+        sniptale_picker_catalog: false,
         sniptale_drawing_palette: { schemaVersion: 1, colors },
       });
     },
@@ -30,9 +31,11 @@ async function openCatalog(picker: Locator) {
     await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
   });
   const before = (await picker.boundingBox())!.height;
-  await picker
-    .getByRole('button', { name: t('shared.ui.colorCatalogSearch'), exact: true })
-    .click();
+  const toggle = picker.getByRole('button', {
+    name: t('shared.ui.colorCatalogSearch'),
+    exact: true,
+  });
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
   const panel = picker.locator('[data-ui="shared.ui.color-selector.catalog"]');
   await expect(panel).toBeVisible();
   await expect
@@ -49,6 +52,42 @@ async function openCatalog(picker: Locator) {
   await expect(tiles.nth(8)).toBeFocused();
   await input.focus();
   return panel;
+}
+async function checkDensityFrames(picker: Locator) {
+  const query = picker.locator('.sniptale-catalog-search input');
+  await query.fill('coral');
+  for (const compact of [true, false]) {
+    const toggle = picker.getByRole('button', {
+      name: t(compact ? 'shared.ui.colorSelectorCompactMode' : 'shared.ui.colorSelectorFullMode'),
+      exact: true,
+    });
+    const errors = await toggle.evaluate(async (button) => {
+      const picker = button.closest('.sniptale-picker-root')!;
+      const errors: number[] = [];
+      const measure = () => {
+        const body = picker.querySelector('[data-color-picker-body]')!;
+        const hue = picker.querySelector('[data-ui="shared.ui.color-selector.hue"]')!;
+        const overlay = picker.querySelector('.sniptale-color-catalog-overlay')!;
+        const start = body.getBoundingClientRect().top - body.scrollTop;
+        errors.push(Math.abs(overlay.getBoundingClientRect().top - start));
+        errors.push(
+          Math.abs(overlay.getBoundingClientRect().bottom - hue.getBoundingClientRect().bottom)
+        );
+      };
+      button.click();
+      for (let frame = 0; frame < 5; frame++)
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => {
+            measure();
+            resolve();
+          })
+        );
+      return errors;
+    });
+    expect(Math.max(...errors)).toBeLessThanOrEqual(1);
+    await expect(query).toHaveValue('coral');
+  }
+  await query.fill('');
 }
 async function checkNearby(page: Page, panel: Locator) {
   const title = panel.locator('.sniptale-catalog-title strong');
@@ -84,6 +123,14 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     const nameField = page
       .getByRole('textbox', { name: new RegExp(t('shared.ui.colorCatalogName')) })
       .first();
+    await expect(nameField).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+    await nameField.click();
+    await page.screenshot({ path: info.outputPath('palette-name-focus.png'), fullPage: false });
+    await expect(nameField).toHaveCSS('outline-style', 'none');
+    await expect(nameField).toHaveCSS('box-shadow', 'none');
+    await nameField.fill('Temporary name');
+    await nameField.press('Escape');
+    await expect(nameField).toHaveValue('');
     await nameField.fill('Brand coral');
     await nameField.press('Enter');
     await expect
@@ -106,6 +153,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       .getByRole('spinbutton', { name: t('shared.ui.colorSelectorAlpha'), exact: true })
       .fill('65');
     const panel = await openCatalog(picker);
+    await checkDensityFrames(picker);
     await checkNearby(page, panel);
     await chooseRebecca(panel);
     await expect(picker.getByRole('textbox', { name: 'HEX', exact: true })).toHaveValue('#663399');
@@ -125,6 +173,20 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         )
       )
       .toBe('#663399a6');
+    await expect
+      .poll(() =>
+        page.evaluate(
+          async () =>
+            (await chrome.storage.local.get('sniptale_picker_catalog')).sniptale_picker_catalog
+        )
+      )
+      .toBe(true);
+    await page.reload();
+    await ui(page, 'shared.ui.color-selector.picker-trigger').first().click();
+    await expect(ui(page, 'shared.ui.color-selector.catalog')).toBeVisible();
+    await ui(page, 'shared.ui.color-selector.picker')
+      .getByRole('button', { name: t('shared.ui.colorSelectorCancel'), exact: true })
+      .click();
     const host = await openDesignReview(context, extensionId, hostOrigin, size);
     try {
       await ui(host.page, 'content.toolbar.mode-selector-button').click();
@@ -157,6 +219,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     const picker = ui(page, 'shared.ui.paint-selector.popup');
     const before = await picker.getByRole('textbox', { name: 'HEX', exact: true }).inputValue();
     const panel = await openCatalog(picker);
+    await checkDensityFrames(picker);
     await checkNearby(page, panel);
     await chooseRebecca(panel);
     await expect(picker.getByRole('textbox', { name: 'HEX', exact: true })).toHaveValue('#663399');
@@ -172,5 +235,18 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await page.screenshot({ path: info.outputPath('gradient-catalog.png'), fullPage: false });
     await picker.getByRole('button', { name: t('common.actions.cancel'), exact: true }).click();
     await expect(picker).toHaveCount(0);
+    const add = page.getByRole('button', { name: t('settings.editor.gradients.add'), exact: true });
+    await add.click();
+    await expect(picker.locator('[data-ui="shared.ui.color-selector.catalog"]')).toBeVisible();
+    await picker
+      .getByRole('button', { name: t('shared.ui.colorCatalogSearch'), exact: true })
+      .click();
+    await picker.getByRole('button', { name: t('common.actions.cancel'), exact: true }).click();
+    await add.click();
+    await expect(
+      picker.getByRole('button', { name: t('shared.ui.colorCatalogSearch'), exact: true })
+    ).toHaveAttribute('aria-pressed', 'false');
+    await expect(picker.locator('[data-ui="shared.ui.color-selector.catalog"]')).toHaveCount(0);
+    await picker.getByRole('button', { name: t('common.actions.cancel'), exact: true }).click();
   });
 }

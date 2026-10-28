@@ -168,6 +168,8 @@ function GradientPresetSession(props: EditorProps) {
             createId={session.createId}
             draft={session.draft}
             original={session.original}
+            catalogMode={preferences.catalogMode}
+            onCatalogModeChange={preferences.setCatalogMode}
             compact={preferences.compact}
             onToggleCompact={() => preferences.setCompact(!preferences.compact)}
             history={session.history}

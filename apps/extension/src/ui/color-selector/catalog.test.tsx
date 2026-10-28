@@ -87,12 +87,12 @@ it('measures the replacement in picker coordinates after scroll and UI scale com
   const root = createRoot(host);
   const { useCatalogPlacement } = await import('./catalog-state');
   const { useRef } = await import('react');
-  function Sample() {
+  function Sample({ compact = false }: { compact?: boolean }) {
     const ref = useRef<HTMLDivElement>(null);
     const bounds = useCatalogPlacement(ref, true);
     return (
       <div data-color-picker-body style={{ '--sniptale-content-ui-scale': '0.5' } as CSSProperties}>
-        <div ref={ref} data-editor>
+        <div ref={ref} data-editor data-compact={compact}>
           <div data-ui="shared.ui.color-selector.hue" />
           <output>{`${bounds.top}:${bounds.height}`}</output>
         </div>
@@ -105,7 +105,9 @@ it('measures the replacement in picker coordinates after scroll and UI scale com
       const top = this.hasAttribute('data-color-picker-body')
         ? 10
         : this.hasAttribute('data-editor')
-          ? 15
+          ? this.dataset['compact'] === 'true'
+            ? 5
+            : 15
           : 90;
       const height = this.getAttribute('data-ui') ? 20 : 100;
       return {
@@ -128,6 +130,8 @@ it('measures the replacement in picker coordinates after scroll and UI scale com
   try {
     await act(async () => root.render(<Sample />));
     expect(host.querySelector('output')?.textContent).toBe('-40:230');
+    await act(async () => root.render(<Sample compact />));
+    expect(host.querySelector('output')?.textContent).toBe('-20:230');
   } finally {
     await act(async () => root.unmount());
     rect.mockRestore();
