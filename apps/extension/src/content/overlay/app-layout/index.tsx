@@ -117,6 +117,7 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
       <VideoRecordingSurfaceSlot chromeHidden={isCaptureUiHidden} toolbar={props.toolbar} />
       {props.toolbar.modes.screenshotMode && props.toolbar.drawingController ? (
         <DrawingSurface
+          alignMovesToPage
           active={props.toolbar.modes.drawingMode === true}
           chromeHidden={isCaptureUiHidden}
           controller={props.toolbar.drawingController}

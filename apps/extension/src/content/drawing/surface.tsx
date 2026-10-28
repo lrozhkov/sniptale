@@ -28,6 +28,7 @@ import {
 import { TEXT_DRAG_THRESHOLD, useDrawingPointerRuntime } from './pointer-runtime';
 import { DrawingTextEditor, useDrawingTextEditor, type DrawingTextDraft } from './text-editor';
 import { DrawingVisualLayers } from './surface-visual-layers';
+import { DrawingMoveAlignmentGuides } from './move-alignment-guides';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import { toggleContentHostClass } from '../platform/dom-host';
 import { isTrustedKeyboardEvent } from '../platform/trusted-events';
@@ -348,9 +349,7 @@ function DrawingCanvasLayer(props: {
           props.pointer.hoverBendRef.current = null;
           props.pointer.changed();
         }}
-        onLostPointerCapture={(event) => {
-          if (props.pointer.draftRef.current?.kind === 'bend') props.pointer.cancelPointer(event);
-        }}
+        onLostPointerCapture={props.pointer.cancelLostPointer}
         onClick={(event) =>
           handleDrawingCanvasClick({
             controller: props.controller,
@@ -420,6 +419,7 @@ function DrawingCanvasLayer(props: {
 
 export function DrawingSurface(props: {
   active: boolean;
+  alignMovesToPage?: boolean;
   chromeHidden: boolean;
   controller: ContentDrawingController;
   escapeImmediately?: boolean;
@@ -452,6 +452,7 @@ export function DrawingSurface(props: {
   const root = controller.getScrollRoot();
   const pointer = useDrawingPointerRuntime({
     active,
+    alignMoves: props.alignMovesToPage ?? false,
     controller,
     root,
     onCancelText: cancelText,
@@ -548,6 +549,7 @@ export function DrawingSurface(props: {
       controller={controller}
       editingTextObject={editingTextObject}
       frameObjects={frameObjects}
+      alignmentVisible={active && !chromeHidden}
       pointer={pointer}
       projection={projection}
       root={root}
@@ -563,6 +565,7 @@ export function DrawingSurface(props: {
 
 function DrawingSurfaceContent(props: {
   active: boolean;
+  alignmentVisible: boolean;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   chromeCanvasRef: RefObject<HTMLCanvasElement | null>;
   controller: ContentDrawingController;
@@ -611,6 +614,13 @@ function DrawingSurfaceContent(props: {
         textEditor={props.textEditor}
         {...(props.onExit === undefined ? {} : { onExit: props.onExit })}
       />
+      {props.alignmentVisible ? (
+        <DrawingMoveAlignmentGuides
+          guides={props.pointer.alignmentGuidesRef.current}
+          projection={props.projection}
+          layer={layers.length}
+        />
+      ) : null}
       {props.active && props.textDraft ? (
         <DrawingTextEditor
           draft={props.textDraft}
