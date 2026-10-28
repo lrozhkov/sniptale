@@ -380,7 +380,48 @@ async function verifySelected(page: Page, info: TestInfo) {
   await toolbar.locator('.sniptale-annotation-effect-switch > button').click();
   await expect(panel(page)).toHaveCount(1);
   await expect(panel(page).locator('.sniptale-frame-effect-mode-section')).toHaveCount(0);
+  await panel(page).locator('.sniptale-frame-style-preset-row').first().hover();
+  await panel(page).locator('[data-frame-style-action="fork"]').first().click();
+  const borderWidth = panel(page).locator('input[aria-label="Width"]');
+  await borderWidth.fill('20');
+  await borderWidth.press('Enter');
   await panel(page).locator('[data-settings-action="close"]').click();
+  if (!page.url().includes(EDITOR_HARNESS_PATH)) {
+    const frame = (await page.locator('.sniptale-interactive-frame').first().boundingBox())!;
+    await page.mouse.move(frame.x - 3, frame.y + 10);
+    await page.locator('.sniptale-frame-toolbar-trigger').click();
+  }
+  if (before !== 'true') await numbering.click();
+  const badge = page.locator('.sniptale-step-badge').first();
+  await expect(badge).toBeVisible();
+  if (!page.url().includes(EDITOR_HARNESS_PATH)) {
+    await toolbar.locator('button:has(.lucide-move)').click();
+  }
+  const resize = page.locator('.sniptale-resize-handle[data-direction="se"]').first();
+  await expect(resize).toBeVisible();
+  await expect
+    .poll(() =>
+      badge.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const root = element.getRootNode();
+        if (!(root instanceof Document || root instanceof ShadowRoot)) return false;
+        const hit = root.elementFromPoint(
+          bounds.x + bounds.width / 2,
+          bounds.y + bounds.height / 2
+        );
+        return hit !== null && element.contains(hit);
+      })
+    )
+    .toBe(true);
+  await capture(page, info, 'number-above-resize-handle.png');
+  const handle = (await resize.boundingBox())!;
+  await resize.hover();
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2 + 16, handle.y + handle.height / 2 + 12, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await expect.poll(async () => (await resize.boundingBox())!.x).toBeGreaterThan(handle.x + 8);
 }
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {

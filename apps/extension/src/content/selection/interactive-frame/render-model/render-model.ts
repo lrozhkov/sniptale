@@ -2,7 +2,7 @@ import React from 'react';
 import type { EffectMode, FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { resolveFrameAnnotationVisualScene } from '../../../../features/highlighter/frame-annotation';
 
-const Z_INDEX_FRAMES = 2147483644;
+import { Z_INDEX_FRAME_ACTIVE } from '../layout/portal';
 
 export function useInteractiveFrameRenderRefs() {
   const popoverAnchorRef = React.useRef<HTMLButtonElement | null>(null);
@@ -52,6 +52,6 @@ export function getInteractiveFrameDisplay(params: {
     frameStyle: scene.frameStyle,
     fillStyle: scene.fillStyle,
     strokeStyle: scene.strokeStyle,
-    frameZIndex: state === 'editing' || state === 'resizing' ? Z_INDEX_FRAMES : zIndex,
+    frameZIndex: state === 'editing' || state === 'resizing' ? Z_INDEX_FRAME_ACTIVE : zIndex,
   };
 }
