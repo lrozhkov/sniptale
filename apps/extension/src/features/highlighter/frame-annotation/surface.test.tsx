@@ -692,12 +692,26 @@ it('recenters on font and size changes, preserves text on metric failure and rel
   let resize = () => {};
   let available = true;
   let right = 7;
+  let sampleWidth = 100;
   const context = {
     font: '',
     letterSpacing: '',
+    fillText: vi.fn(),
+    getImageData: (_x: number, _y: number, width: number, height: number) => {
+      const data = new Uint8ClampedArray(width * height * 4);
+      if (Number.isFinite(right)) {
+        const start = (8 * width + 8 + right * 2) * 4 + 3;
+        data[start] = 255;
+        data[start + 4] = 85;
+      }
+      return { data };
+    },
     measureText: vi.fn(() => ({
-      actualBoundingBoxLeft: -100,
-      actualBoundingBoxRight: right * 100,
+      width: sampleWidth,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: 100,
+      fontBoundingBoxAscent: 10,
+      fontBoundingBoxDescent: 4,
     })),
   };
   const nativeComputedStyle = getComputedStyle;
@@ -730,18 +744,23 @@ it('recenters on font and size changes, preserves text on metric failure and rel
   try {
     act(() => root.render(<StepBadgeValue value="1" />));
     const value = host.querySelector('span')!;
-    expect(value.style.translate).toBe('0.5px 0');
+    expect(Number.parseFloat(value.style.translate)).toBeCloseTo(0.76640625);
     right = 8;
     act(() => fonts.dispatchEvent(new Event('loadingdone')));
-    expect(value.style.translate).toBe('0px 0');
+    expect(Number.parseFloat(value.style.translate)).toBeCloseTo(0.26015625);
     right = 7;
     act(() => resize());
-    expect(value.style.translate).toBe('0.5px 0');
+    expect(Number.parseFloat(value.style.translate)).toBeCloseTo(0.76640625);
     right = 18;
     act(() => root.render(<StepBadgeValue value="12" customStyle={{ letterSpacing: '0.5px' }} />));
-    expect(value.style.translate).toBe('-0.5px 0');
-    expect(context.letterSpacing).toBe('50px');
-    expect(context.font).toContain('1620px');
+    expect(Number.parseFloat(value.style.translate)).toBeCloseTo(-0.30234375);
+    expect(Number.parseFloat(context.letterSpacing)).toBeCloseTo((0.5 * 64) / 16.2);
+    expect(context.font).toContain('64px');
+    sampleWidth = 2048;
+    act(() => resize());
+    expect(value.style.translate).toBe('0px 0');
+    expect(value.textContent).toBe('12');
+    sampleWidth = 100;
     available = false;
     act(() => resize());
     expect(value.style.translate).toBe('0px 0');

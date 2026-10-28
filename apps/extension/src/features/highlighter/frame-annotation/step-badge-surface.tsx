@@ -145,33 +145,59 @@ export function getStepBadgeStyle(props: {
   };
 }
 
+function measureBadgeInkOffset(value: HTMLSpanElement): number {
+  const style = getComputedStyle(value);
+  // A fixed-size glyph sample captures stroke balance without small-font quantization.
+  const scale = 64 / Number.parseFloat(style.fontSize);
+  if (!Number.isFinite(scale) || scale <= 0) return 0;
+  const canvas = value.ownerDocument.createElement('canvas');
+  canvas.width = canvas.height = 0;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return 0;
+  const font = `${style.fontStyle} ${style.fontWeight} 64px ${style.fontFamily}`;
+  const letterSpacing = `${(Number.parseFloat(style.letterSpacing) || 0) * scale}px`;
+  context.font = font;
+  context.letterSpacing = letterSpacing;
+  const text = value.innerText || value.textContent || '';
+  const metrics = context.measureText(text);
+  const left = Math.min(0, -metrics.actualBoundingBoxLeft);
+  const width = Math.ceil(Math.max(metrics.width, metrics.actualBoundingBoxRight) - left + 16);
+  const height = Math.ceil(metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent + 16);
+  // Custom CSS must not cause an unbounded measurement allocation.
+  if (
+    !Number.isFinite(width + height) ||
+    width <= 0 ||
+    height <= 0 ||
+    width > 1024 ||
+    height > 256
+  ) {
+    return 0;
+  }
+  canvas.width = width;
+  canvas.height = height;
+  context.font = font;
+  context.letterSpacing = letterSpacing;
+  const origin = 8 - left;
+  context.fillText(text, origin, 8 + metrics.fontBoundingBoxAscent);
+  const pixels = context.getImageData(0, 0, width, height).data;
+  let coverage = 0;
+  let moment = 0;
+  for (let index = 3; index < pixels.length; index += 4) {
+    const alpha = pixels[index]!;
+    coverage += alpha;
+    moment += ((((index - 3) / 4) % width) + 0.5 - origin) * alpha;
+  }
+  // Center the stroke coverage, rather than the bounding box of an asymmetric glyph.
+  const next = Number.parseFloat(style.width) / 2 - moment / coverage / scale;
+  return Number.isFinite(next) ? next : 0;
+}
+
 function useBadgeInkOffset(element: React.RefObject<HTMLSpanElement | null>) {
   const [offset, setOffset] = useState(0);
   useLayoutEffect(() => {
     const value = element.current;
     if (!value || typeof CanvasRenderingContext2D === 'undefined') return;
-    const measure = () => {
-      const style = getComputedStyle(value);
-      const canvas = value.ownerDocument.createElement('canvas');
-      canvas.width = canvas.height = 0;
-      const context = canvas.getContext('2d');
-      if (!context) {
-        setOffset(0);
-        return;
-      }
-      // Small-font ink bounds are quantized. Measure enlarged text without a pixel buffer.
-      const measurementScale = 100;
-      const measuredFontSize = Number.parseFloat(style.fontSize) * measurementScale;
-      context.font = `${style.fontStyle} ${style.fontWeight} ${measuredFontSize}px ${style.fontFamily}`;
-      context.letterSpacing = `${(Number.parseFloat(style.letterSpacing) || 0) * measurementScale}px`;
-      const metrics = context.measureText(value.innerText || value.textContent || '');
-      // Flex centers the advance box; center the ink within that box before paint.
-      const next =
-        (Number.parseFloat(style.width) +
-          (metrics.actualBoundingBoxLeft - metrics.actualBoundingBoxRight) / measurementScale) /
-        2;
-      setOffset(Number.isFinite(next) ? next : 0);
-    };
+    const measure = () => setOffset(measureBadgeInkOffset(value));
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(value);

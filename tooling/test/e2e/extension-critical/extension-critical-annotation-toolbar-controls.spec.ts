@@ -1071,15 +1071,36 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             width: rect.width,
             height: rect.height,
             value: badge.textContent,
+            diameter,
           };
         })
       );
+      expect(circles).toHaveLength(Math.min(36, 195 - start));
       const png = await page.screenshot({
         path: info.outputPath(`number-glyph-centering-${start}.png`),
         fullPage: false,
       });
+      const values = badges.locator('visible=true').locator(':scope > span');
+      const translates = await values.evaluateAll((elements) =>
+        elements.map((element) => {
+          const previous = element.style.translate;
+          element.style.translate = 'none';
+          return previous;
+        })
+      );
+      const baselinePng = await page.screenshot({
+        path: info.outputPath(`number-glyph-vertical-baseline-${start}.png`),
+        fullPage: false,
+      });
+      await values.evaluateAll(
+        (elements, translates) =>
+          elements.forEach((element, index) => {
+            element.style.translate = translates[index]!;
+          }),
+        translates
+      );
       const centers = await page.evaluate(
-        async ({ png, circles }) => {
+        async ({ png, baselinePng, circles }) => {
           const image = new Image();
           image.src = 'data:image/png;base64,' + png;
           await image.decode();
@@ -1089,42 +1110,60 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           const context = canvas.getContext('2d')!;
           context.drawImage(image, 0, 0);
           const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-          return circles.map((circle) => {
-            const x = circle.x * devicePixelRatio,
-              y = circle.y * devicePixelRatio;
-            const width = circle.width * devicePixelRatio,
-              height = circle.height * devicePixelRatio;
-            const orange: number[] = [];
-            const ink: number[][] = [[], []];
-            for (let row = Math.floor(y); row < Math.ceil(y + height); row++) {
-              for (let col = Math.floor(x); col < Math.ceil(x + width); col++) {
-                const i = (row * canvas.width + col) * 4;
-                const r = pixels[i]!,
-                  g = pixels[i + 1]!,
-                  b = pixels[i + 2]!;
-                if (r > 225 && g > 65 && g < 170 && b < 100) orange.push(col);
-                // Exclude the white outline; include antialiasing in the visible glyph.
-                if (
-                  (col + 0.5 - x - width / 2) ** 2 + (row + 0.5 - y - height / 2) ** 2 <
-                  (width * 0.34) ** 2
-                ) {
-                  [80, 150].forEach((threshold, index) => {
-                    if (r > 220 && g > threshold && b > threshold) ink[index]!.push(col);
-                  });
+          const measure = (pixels: Uint8ClampedArray) =>
+            circles.map((circle) => {
+              const x = circle.x * devicePixelRatio,
+                y = circle.y * devicePixelRatio;
+              const width = circle.width * devicePixelRatio,
+                height = circle.height * devicePixelRatio;
+              const orangeX: number[] = [],
+                orangeY: number[] = [];
+              const ink: number[][] = [[], []];
+              let coverage = 0,
+                moment = 0;
+              for (let row = Math.floor(y); row < Math.ceil(y + height); row++) {
+                for (let col = Math.floor(x); col < Math.ceil(x + width); col++) {
+                  const i = (row * canvas.width + col) * 4;
+                  const r = pixels[i]!,
+                    g = pixels[i + 1]!,
+                    b = pixels[i + 2]!;
+                  if (r > 225 && g > 65 && g < 170 && b < 100) {
+                    orangeX.push(col);
+                    orangeY.push(row);
+                  }
+                  // Exclude the white outline; include antialiasing in the visible glyph.
+                  if (
+                    (col + 0.5 - x - width / 2) ** 2 + (row + 0.5 - y - height / 2) ** 2 <
+                    (width * (0.5 - 2 / circle.diameter) - 1) ** 2
+                  ) {
+                    const alpha = Math.max(0, (b - 22) / 233);
+                    coverage += alpha;
+                    moment += col * alpha;
+                    [80, 150].forEach((threshold, index) => {
+                      if (r > 220 && g > threshold && b > threshold) ink[index]!.push(row);
+                    });
+                  }
                 }
               }
-            }
-            const mid = (columns: number[]) => (Math.min(...columns) + Math.max(...columns)) / 2;
-            return {
-              value: circle.value,
-              width,
-              orange: orange.length,
-              ink: ink.map((p) => p.length),
-              dx: ink.map((p) => mid(p) - mid(orange)),
-            };
-          });
+              const mid = (columns: number[]) => (Math.min(...columns) + Math.max(...columns)) / 2;
+              return {
+                value: circle.value,
+                width,
+                orange: orangeX.length,
+                ink: ink.map((p) => p.length),
+                dx: moment / coverage - mid(orangeX),
+                dy: ink.map((p) => mid(p) - mid(orangeY)),
+              };
+            });
+          const current = measure(pixels);
+          image.src = 'data:image/png;base64,' + baselinePng;
+          await image.decode();
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0);
+          const baseline = measure(context.getImageData(0, 0, canvas.width, canvas.height).data);
+          return current.map((center, index) => ({ ...center, baselineY: baseline[index]!.dy }));
         },
-        { png: png.toString('base64'), circles }
+        { png: png.toString('base64'), baselinePng: baselinePng.toString('base64'), circles }
       );
       await info.attach(`number-glyph-centers-${start}.json`, {
         body: JSON.stringify(centers, null, 2),
@@ -1133,8 +1172,13 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       for (const center of centers) {
         expect(center.orange, JSON.stringify(center)).toBeGreaterThan(0);
         for (const count of center.ink) expect(count, JSON.stringify(center)).toBeGreaterThan(0);
-        for (const dx of center.dx)
-          expect(Math.abs(dx), JSON.stringify(center)).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(center.dx), JSON.stringify(center)).toBeLessThanOrEqual(0.5);
+        // Horizontal balancing must not worsen the existing vertical raster placement.
+        center.dy.forEach((dy, index) =>
+          expect(Math.abs(dy), JSON.stringify(center)).toBeLessThanOrEqual(
+            Math.abs(center.baselineY[index]!)
+          )
+        );
       }
     }
     await page
