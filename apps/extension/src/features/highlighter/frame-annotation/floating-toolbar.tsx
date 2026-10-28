@@ -1,7 +1,7 @@
 import React from 'react';
-import { ChevronDown, Eye, EyeOff, ListOrdered, Minus, Move, Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, Minus, Move, Plus, Trash2, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { AddFrameCommentIcon, FrameCommentIcon } from './icons';
+import { AddFrameCommentIcon, FrameCommentIcon, FrameNumberIcon } from './icons';
 import {
   ProductGlassToolbar,
   ProductGlassToolbarButton,
@@ -156,7 +156,7 @@ export function FrameAnnotationToolbarStepButton(props: {
 }) {
   return (
     <FrameAnnotationToolbarMenuButton {...props} commandId="step-badge">
-      <ListOrdered size={16} />
+      <FrameNumberIcon size={16} />
     </FrameAnnotationToolbarMenuButton>
   );
 }

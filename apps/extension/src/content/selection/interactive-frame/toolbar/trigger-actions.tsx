@@ -1,8 +1,11 @@
 import React from 'react';
-import { Eye, EyeOff, ListOrdered, Move } from 'lucide-react';
+import { Eye, EyeOff, Move } from 'lucide-react';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
 import { FrameAnnotationEffectIcon } from '../../../../features/highlighter/frame-annotation/effect-icon';
-import { FrameCommentIcon } from '../../../../features/highlighter/frame-annotation/icons';
+import {
+  FrameCommentIcon,
+  FrameNumberIcon,
+} from '../../../../features/highlighter/frame-annotation/icons';
 import { translate } from '../../../../platform/i18n';
 import {
   addAdditionalFrameCallout,
@@ -109,7 +112,7 @@ export function createFrameQuickActions(
       : [
           {
             id: 'step-badge' as const,
-            icon: <ListOrdered size={16} aria-hidden="true" style={frameTriggerIconStyle} />,
+            icon: <FrameNumberIcon size={16} aria-hidden="true" style={frameTriggerIconStyle} />,
             label: translate('content.interactiveFrame.stepBadgeEnable'),
             onClick: () =>
               enableFrameStepBadge({ closePopover: props.closePopover, frameId: props.frame.id }),

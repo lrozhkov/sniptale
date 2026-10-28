@@ -42,6 +42,27 @@ const panel = (page: Page) =>
     .locator('.sniptale-content-popover--toolbar-menu:visible')
     .filter({ has: page.locator('.sniptale-settings-popover-header') });
 
+async function verifyAnnotationIcons(toolbar: Locator, size: number) {
+  for (const name of ['circle-number-1', 'message-2']) {
+    const icon = toolbar.locator(`svg.tabler-icon-${name}`);
+    await expect(icon).toHaveCount(1);
+    await expect(icon).toHaveAttribute('width', String(size));
+    await expect(icon).toHaveAttribute('height', String(size));
+    expect(
+      await icon.evaluate((svg) => {
+        const button = svg.closest('button')!;
+        const style = getComputedStyle(svg);
+        return (
+          getComputedStyle(button).color === style.color &&
+          [...svg.querySelectorAll('path')].every(
+            (path) => getComputedStyle(path).strokeWidth === style.strokeWidth
+          )
+        );
+      })
+    ).toBe(true);
+  }
+}
+
 async function verifyCompoundHover(page: Page, toolbar: Locator, info: TestInfo, name: string) {
   const effects = toolbar.locator('.sniptale-annotation-effect-switch');
   await effects.locator('button[aria-haspopup="dialog"]').hover();
@@ -253,6 +274,11 @@ async function verifyCreation(page: Page, toolbar: Locator, info: TestInfo) {
   for (const kind of ['callout', 'step-badge']) {
     const primary = toolbar.locator(`[data-ui="content.toolbar.future-frame-${kind}"]`);
     await expect(primary).toBeVisible();
+    await expect(
+      primary.locator(
+        kind === 'callout' ? '.tabler-icon-message-2' : '.tabler-icon-circle-number-1'
+      )
+    ).toHaveCount(1);
     const before = await primary.getAttribute('aria-pressed');
     await primary.click();
     await expect(primary).toHaveAttribute('aria-pressed', before === 'true' ? 'false' : 'true');
@@ -328,6 +354,7 @@ async function verifyCreation(page: Page, toolbar: Locator, info: TestInfo) {
 async function verifySelected(page: Page, info: TestInfo) {
   const toolbar = page.locator('.sniptale-action-toolbar:visible');
   await expect(toolbar).toHaveCount(1);
+  await verifyAnnotationIcons(toolbar, 16);
   await verifyCompoundHover(page, toolbar, info, 'selected');
   await expect(toolbar.locator('.lucide-move')).toHaveCount(
     page.url().includes(EDITOR_HARNESS_PATH) ? 0 : 1

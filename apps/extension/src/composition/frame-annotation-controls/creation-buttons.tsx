@@ -1,8 +1,11 @@
-import { ChevronDown, ListOrdered } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react';
 import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
-import { FrameCommentIcon } from '../../features/highlighter/frame-annotation/icons';
+import {
+  FrameCommentIcon,
+  FrameNumberIcon,
+} from '../../features/highlighter/frame-annotation/icons';
 import { FrameAnnotationToolbarEffectButton } from '../../features/highlighter/frame-annotation/floating-toolbar';
 import type { EffectMode } from '../../features/highlighter/contracts';
 import { translate } from '../../platform/i18n';
@@ -220,7 +223,7 @@ export function AnnotationCreationButtons(props: {
               onToggle={props.onToggleStepBadge}
               title={translate('content.stepBadge.settingsTitle')}
             >
-              <ListOrdered size={18} />
+              <FrameNumberIcon size={18} />
             </CreationAnnotationButton>
           )
         : null}
