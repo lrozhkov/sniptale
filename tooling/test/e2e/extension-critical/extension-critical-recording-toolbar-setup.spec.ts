@@ -543,3 +543,54 @@ test('native recording setup menus fit below the desktop width', async ({}, info
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`recording quality dropdown surface and customization ${name}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size });
+    try {
+      const { page } = await openSetup(launched, host.origin, size, 'horizontal');
+      await control(page, 'quality.menu').click();
+      await control(page, 'quality.details').click();
+      for (const field of ['quality', 'container', 'codec', 'resolution', 'frameRate']) {
+        const trigger = control(page, `output.${field}`).locator('button[aria-haspopup="listbox"]');
+        await trigger.click();
+        const list = page.getByRole('listbox');
+        await expect(list).toBeVisible();
+        const material = await list.evaluate((element) => {
+          const css = getComputedStyle(element);
+          return {
+            border: css.borderTopWidth,
+            style: css.borderTopStyle,
+            color: css.borderTopColor,
+            shadow: css.boxShadow,
+            background: css.backgroundColor,
+          };
+        });
+        await info.attach(`${field}-material`, {
+          body: JSON.stringify(material),
+          contentType: 'application/json',
+        });
+        await screenshot(page, info, `${field}-surface.png`);
+        expect(material.border).toBe('1px');
+        expect(material.style).toBe('solid');
+        expect(material.shadow).not.toBe('none');
+        await page.keyboard.press('Escape');
+        await expect(list).toHaveCount(0);
+        await expect(control(page, 'quality.dropdown')).toBeVisible();
+      }
+      await page.keyboard.press('Escape');
+      await control(page, 'customize').click();
+      await expect(control(page, 'quality.menu')).toBeDisabled();
+      await screenshot(page, info, 'quality-customizing-disabled.png');
+      await control(page, 'customize').click();
+      await expect(control(page, 'quality.menu')).toBeEnabled();
+      await control(page, 'quality.menu').click();
+      await expect(control(page, 'quality.dropdown')).toBeVisible();
+    } finally {
+      await closeExtensionBrowser(launched);
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

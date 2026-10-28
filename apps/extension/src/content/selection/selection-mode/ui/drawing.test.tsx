@@ -24,34 +24,33 @@ function checkNativeModeSwitch(harness: {
   runtime: ReturnType<typeof createSelectionDrawingRuntime>;
   onLayout: ReturnType<typeof vi.fn>;
 }) {
-  const group = harness.tooltip.root.querySelector('[data-ui="content.crop.mode-toggle"]')!;
-  const buttons = group.querySelectorAll<HTMLButtonElement>('button');
-  expect(group.getAttribute('role')).toBe('group');
-  expect(buttons).toHaveLength(2);
-  const resize = buttons[0]!;
-  const drawing = buttons[1]!;
-  for (const button of buttons) {
-    expect(button.type).toBe('button');
-    expect(button.tabIndex).toBe(0);
-    expect(button.title).toBe(button.getAttribute('aria-label'));
-    expect(button.classList.contains('sniptale-selection-mode-option')).toBe(true);
-  }
-  expect(resize.getAttribute('aria-label')).toBe(translate('content.toolbar.cropResizeMode'));
-  expect(drawing.getAttribute('aria-label')).toBe(translate('content.toolbar.cropDrawingMode'));
-  expect(resize.getAttribute('aria-pressed')).toBe('true');
-  expect(drawing.getAttribute('aria-pressed')).toBe('false');
-  harness.onLayout.mockClear();
+  const button = harness.tooltip.root.querySelector<HTMLButtonElement>(
+    '[data-ui="content.crop.mode-toggle"]'
+  )!;
+  expect(button.tagName).toBe('BUTTON');
+  expect(button.querySelectorAll('button')).toHaveLength(0);
+  expect(button.type).toBe('button');
+  expect(button.title).toBe(translate('content.toolbar.cropDrawingMode'));
+  expect(button.getAttribute('aria-label')).toBe(button.title);
+  const resize = button.querySelector<HTMLElement>('[data-ui="content.crop.mode.resize"]')!;
+  const drawing = button.querySelector<HTMLElement>('[data-ui="content.crop.mode.drawing"]')!;
+  expect(drawing.querySelector('.lucide-pencil')).not.toBeNull();
+  expect(drawing.querySelector('.lucide-pen-line')).toBeNull();
+  expect(resize.dataset['active']).toBe('true');
+  expect(drawing.dataset['active']).toBe('false');
+  button.focus();
+  expect(document.activeElement).toBe(button);
   act(() => resize.click());
-  expect(harness.onLayout).not.toHaveBeenCalled();
-  drawing.focus();
-  expect(document.activeElement).toBe(drawing);
+  expect(harness.runtime.isDrawing()).toBe(true);
+  expect(resize.dataset['active']).toBe('false');
+  expect(drawing.dataset['active']).toBe('true');
+  expect(button.title).toBe(translate('content.toolbar.cropResizeMode'));
+  act(() => drawing.click());
+  expect(harness.runtime.isDrawing()).toBe(false);
   act(() => drawing.click());
   expect(harness.runtime.isDrawing()).toBe(true);
-  expect(resize.getAttribute('aria-pressed')).toBe('false');
-  expect(drawing.getAttribute('aria-pressed')).toBe('true');
-  harness.onLayout.mockClear();
-  act(() => drawing.click());
-  expect(harness.onLayout).not.toHaveBeenCalled();
+  act(() => button.click());
+  expect(harness.runtime.isDrawing()).toBe(false);
 }
 
 const state = vi.hoisted(() => ({
@@ -359,9 +358,7 @@ function setup(initialDrawing = false) {
   const tooltip = createTooltip(container);
   act(() => runtime.attachToolbar(tooltip));
   const toggle = () => {
-    const button = tooltip.root.querySelector(
-      '[data-ui="content.crop.mode-toggle"] button[aria-pressed="false"]'
-    );
+    const button = tooltip.root.querySelector('[data-ui="content.crop.mode-toggle"]');
     expect(button).not.toBeNull();
     act(() => button!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
   };
@@ -412,21 +409,19 @@ describe('crop remembered drawing mode', () => {
     expect(onModeChange).not.toHaveBeenCalled();
   });
 
-  it('persists only explicit choices and permits repeated choice retries', () => {
+  it('persists each explicit toggle from either icon area', () => {
     const { tooltip, onModeChange } = setup();
-    const resize = tooltip.root.querySelector<HTMLButtonElement>(
-      '[data-ui="content.crop.mode.resize"]'
-    )!;
-    const drawing = tooltip.root.querySelector<HTMLButtonElement>(
+    const resize = tooltip.root.querySelector<HTMLElement>('[data-ui="content.crop.mode.resize"]')!;
+    const drawing = tooltip.root.querySelector<HTMLElement>(
       '[data-ui="content.crop.mode.drawing"]'
     )!;
     act(() => resize.click());
     act(() => drawing.click());
     act(() => drawing.click());
-    expect(onModeChange.mock.calls).toEqual([[false], [true], [true]]);
+    expect(onModeChange.mock.calls).toEqual([[true], [false], [true]]);
   });
 
-  it('shows two native, labeled mode options with explicit state and idempotent activation', () => {
+  it('toggles from either icon area through one labeled native button', () => {
     checkNativeModeSwitch(setup());
   });
 });
@@ -666,9 +661,7 @@ describe('crop drawing runtime disposal', () => {
     finalize(runtime);
     act(() => runtime.dispose());
     act(() =>
-      tooltip.root
-        .querySelector<HTMLButtonElement>('[data-ui="content.crop.mode.drawing"]')
-        ?.click()
+      tooltip.root.querySelector<HTMLElement>('[data-ui="content.crop.mode.drawing"]')?.click()
     );
     expect(onModeChange).not.toHaveBeenCalled();
   });

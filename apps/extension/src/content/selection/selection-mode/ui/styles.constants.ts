@@ -4,6 +4,8 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
     align-items: center;
     gap: 0;
     padding: 0;
+    border: 0;
+    cursor: pointer;
     border-radius: 4px;
     background: var(--sniptale-color-surface-input);
   }
@@ -23,13 +25,13 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
     cursor: pointer;
   }
 
-  .sniptale-selection-toolbar .sniptale-selection-mode-option:hover {
+  .sniptale-selection-toolbar .sniptale-selection-mode-switch:hover .sniptale-selection-mode-option[data-active='false'] {
     background: var(--sniptale-color-surface-hover);
     background-clip: content-box;
     color: var(--sniptale-color-text-primary-strong);
   }
 
-  .sniptale-selection-toolbar .sniptale-selection-mode-option[aria-pressed='true'] {
+  .sniptale-selection-toolbar .sniptale-selection-mode-option[data-active='true'] {
     background: var(--sniptale-color-surface-panel);
     background-clip: content-box;
     color: var(--sniptale-color-text-primary-strong);

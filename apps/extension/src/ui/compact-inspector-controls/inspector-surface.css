@@ -484,7 +484,9 @@
   --sniptale-color-text-primary: var(--sniptale-color-text-interface);
   --sniptale-radius-sm: 4px;
   padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--sniptale-color-border-soft) 86%, transparent);
   border-radius: 4px;
+  box-shadow: var(--sniptale-shadow-floating-strong);
   font-family: var(--sniptale-font-interface);
   background: var(--sniptale-color-surface-panel);
   backdrop-filter: blur(var(--sniptale-glass-blur));

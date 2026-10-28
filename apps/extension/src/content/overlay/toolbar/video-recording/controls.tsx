@@ -514,11 +514,13 @@ export function ToolbarVideoRecordingControls(props: {
       />
       <ContentToolbarDivider />
       {props.recording.state.phase === 'idle' || props.recording.state.phase === 'error' ? (
-        <RecordingSetupControls
-          displayMode={props.displayMode}
-          recording={props.recording}
-          toolbarMenuState={props.toolbarMenuState}
-        />
+        <fieldset disabled={visibility?.editing} className="contents">
+          <RecordingSetupControls
+            displayMode={props.displayMode}
+            recording={props.recording}
+            toolbarMenuState={props.toolbarMenuState}
+          />
+        </fieldset>
       ) : null}
       <MediaControls
         displayMode={props.displayMode}
