@@ -2,7 +2,7 @@ import {
   acquireMediaMutationPermit,
   getMediaAuthorityGeneration,
 } from '../../mutation-exclusion/media-activity';
-import type { CaptureActionType } from '../../../contracts/settings';
+import type { CaptureActionType, ScreenshotCapturePreferences } from '../../../contracts/settings';
 import { finalizeScreenshotDataUrl } from '../../../platform/media-utils/screenshot-encoding';
 import { getQuickActionAppearanceSnapshot } from '../quick-actions/flow/surface';
 import { beginPageAppearance } from '../quick-actions/appearance';
@@ -18,6 +18,7 @@ export function handleSaveScreenshotToGallery(
   payload: {
     dataUrl: string;
     filename: string;
+    capturePreferences?: ScreenshotCapturePreferences;
     quickActionTransactionId?: string;
     actionType?: CaptureActionType;
   },
@@ -58,7 +59,7 @@ export function handleSaveScreenshotToGallery(
     } else {
       const output = payload.quickActionTransactionId
         ? getQuickActionAppearanceSnapshot(resolvedTabId, payload.quickActionTransactionId)
-        : await loadSettings();
+        : (payload.capturePreferences ?? (await loadSettings()));
       assertCurrent();
       const format = payload.actionType === 'copy' ? 'png' : output.imageFormat;
       prepared = {

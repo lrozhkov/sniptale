@@ -165,3 +165,21 @@ it('retains model selection and correction when a legacy partial patch changes l
     correction: { enabled: true, model: selection },
   });
 });
+
+it('preserves independent regular and full-page choices from queued settings writers', async () => {
+  resetSettingsNestedPatchMocks();
+  let stored: unknown = createDefaultSettings();
+  browserStorageSyncGetMock.mockImplementation(async () => ({ sniptale_settings: stored }));
+  browserStorageSyncSetMock.mockImplementation(async (value: Record<string, unknown>) => {
+    stored = value['sniptale_settings'] ?? stored;
+  });
+  const [, saved] = await Promise.all([
+    patchSettings({ imageFormat: 'jpeg', imageQuality: 71 }),
+    patchSettings({ fullPageImage: { imageFormat: 'webp', imageQuality: 64 } }),
+  ]);
+  expect(saved).toMatchObject({
+    imageFormat: 'jpeg',
+    imageQuality: 71,
+    fullPageImage: { imageFormat: 'webp', imageQuality: 64 },
+  });
+});

@@ -81,6 +81,7 @@ function renderDisplayModeItem(params: {
       label={params.label}
       hint={params.hint}
       selected={params.displayMode === params.nextDisplayMode}
+      checked={params.displayMode === params.nextDisplayMode}
       onSelect={(event) => {
         stopMenuEvent(event);
         params.onDisplayModeChange(params.nextDisplayMode);
@@ -194,6 +195,7 @@ function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsPro
         label={translate('content.toolbar.compactMenus')}
         hint={translate('content.toolbar.compactMenusHint')}
         selected={props.compactMenus}
+        checked={props.compactMenus}
         onSelect={(event) => {
           stopMenuEvent(event);
           props.onCompactMenusChange(!props.compactMenus);

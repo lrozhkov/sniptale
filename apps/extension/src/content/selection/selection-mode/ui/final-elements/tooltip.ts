@@ -19,6 +19,8 @@ export function createSelectionModeFinalSizeTooltip(
   });
   enhanceSelectionModeToolbar(tooltip, {
     getCaptureAction: options.getCaptureAction,
+    getCapturePreferences: options.getCapturePreferences,
+    onImageFormatChange: options.onImageFormatChange,
     getSelection: options.getSelection,
     onAdjustPadding: options.onAdjustPadding,
     onCaptureActionChange: options.onCaptureActionChange,

@@ -1,3 +1,4 @@
+import type { SelectionModeFinalElementsOptions } from '../types';
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 import type { CaptureActionType } from '../../../../../contracts/settings';
 import { getCaptureActionDescriptors } from '../../../../../features/quick-actions-presets/catalog';
@@ -9,6 +10,8 @@ export const SELECTION_CAPTURE_MENU_ID = 'sniptale-selection-capture-action-menu
 
 export interface SelectionCaptureActionOptions {
   getCaptureAction: () => CaptureActionType;
+  getCapturePreferences: SelectionModeFinalElementsOptions['getCapturePreferences'];
+  onImageFormatChange: SelectionModeFinalElementsOptions['onImageFormatChange'];
   onCaptureActionChange: (action: CaptureActionType) => void;
   onConfirm: (event?: Event) => void;
   overlayContainer: HTMLElement;

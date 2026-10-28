@@ -44,6 +44,7 @@ describe('settings default graph', () => {
     expect(firstSettings.contextMenu).not.toBe(secondSettings.contextMenu);
     expect(firstSettings.contentToolbar).not.toBe(secondSettings.contentToolbar);
     expect(firstSettings.fullPageCapture).not.toBe(secondSettings.fullPageCapture);
+    expect(firstSettings.fullPageImage).not.toBe(secondSettings.fullPageImage);
     expect(firstSettings.voiceInput).not.toBe(secondSettings.voiceInput);
   });
 
@@ -55,6 +56,7 @@ describe('settings default graph', () => {
     expect(firstSettings.contextMenu).not.toBe(secondSettings.contextMenu);
     expect(firstSettings.contentToolbar).not.toBe(secondSettings.contentToolbar);
     expect(firstSettings.fullPageCapture).not.toBe(secondSettings.fullPageCapture);
+    expect(firstSettings.fullPageImage).not.toBe(secondSettings.fullPageImage);
     expect(firstSettings.voiceInput).not.toBe(secondSettings.voiceInput);
   });
 
@@ -149,4 +151,35 @@ describe('new material category destinations', () => {
       webSnapshotDestination: 'library',
     });
   });
+});
+
+it('inherits legacy image defaults for full-page captures without changing stored settings', async () => {
+  const stored = { imageFormat: 'webp', imageQuality: 73 };
+  browserStorageSyncGetMock.mockResolvedValue({ sniptale_settings: stored });
+  expect((await loadSettings()).fullPageImage).toEqual({ imageFormat: 'webp', imageQuality: 73 });
+  expect(stored).toEqual({ imageFormat: 'webp', imageQuality: 73 });
+});
+
+it.each([0, 200])(
+  'bounds inherited legacy full-page quality %s before later patches',
+  async (imageQuality) => {
+    browserStorageSyncGetMock.mockResolvedValue({
+      sniptale_settings: { imageFormat: 'jpeg', imageQuality },
+    });
+    expect((await loadSettings()).fullPageImage).toEqual({
+      imageFormat: 'jpeg',
+      imageQuality: 100,
+    });
+  }
+);
+
+it('keeps independent full-page image defaults when regular defaults differ', async () => {
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: {
+      imageFormat: 'jpeg',
+      imageQuality: 81,
+      fullPageImage: { imageFormat: 'webp', imageQuality: 64 },
+    },
+  });
+  expect((await loadSettings()).fullPageImage).toEqual({ imageFormat: 'webp', imageQuality: 64 });
 });

@@ -66,7 +66,8 @@ it('lets the capture label inherit quiet command weight for hover changes', () =
 function createToolbar(
   selection = { x: 20, y: 20, width: 100, height: 80 },
   mountInto: HTMLElement | ShadowRoot = document.body,
-  captureAction: 'download_default' | 'scenario' = 'download_default'
+  captureAction: 'download_default' | 'scenario' = 'download_default',
+  compactMenus = true
 ) {
   const overlayContainer = document.createElement('div');
   mountInto.appendChild(overlayContainer);
@@ -83,15 +84,28 @@ function createToolbar(
   const onAdjustPadding = vi.fn();
   const onCaptureActionChange = vi.fn();
   const onConfirm = vi.fn();
+  let imageFormat: 'png' | 'jpeg' | 'webp' = 'png';
+  const onImageFormatChange = vi.fn((format: 'png' | 'jpeg' | 'webp') => {
+    imageFormat = format;
+  });
   enhanceSelectionModeToolbar(tooltip, {
     getCaptureAction: () => captureAction,
+    getCapturePreferences: () => ({ imageFormat, imageQuality: 100, compactMenus }),
+    onImageFormatChange,
     getSelection: () => selection,
     onAdjustPadding,
     onCaptureActionChange,
     onConfirm,
     overlayContainer,
   });
-  return { onAdjustPadding, onCaptureActionChange, onConfirm, overlayContainer, tooltip };
+  return {
+    onAdjustPadding,
+    onCaptureActionChange,
+    onConfirm,
+    onImageFormatChange,
+    overlayContainer,
+    tooltip,
+  };
 }
 
 function createCaptureGuardOptions(): SelectionModeEventOptions {
@@ -530,26 +544,26 @@ describe('selection-mode capture action menu', () => {
     const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu');
     const items = Array.from(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
 
-    expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
+    expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1]);
     items[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
     expect(document.activeElement).toBe(items[1]);
     items[1]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'End' }));
-    expect(document.activeElement).toBe(items[5]);
-    items[5]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Home' }));
+    expect(document.activeElement).toBe(items[6]);
+    items[6]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Home' }));
     expect(document.activeElement).toBe(items[0]);
     items[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp' }));
-    expect(document.activeElement).toBe(items[5]);
-    items[5]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+    expect(document.activeElement).toBe(items[6]);
+    items[6]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
     expect(document.activeElement).toBe(items[0]);
     items[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
-    expect(document.activeElement).toBe(items[5]);
+    expect(document.activeElement).toBe(items[6]);
 
     const tabEvent = new KeyboardEvent('keydown', {
       bubbles: true,
       cancelable: true,
       key: 'Tab',
     });
-    items[5]?.dispatchEvent(tabEvent);
+    items[6]?.dispatchEvent(tabEvent);
     expect(tabEvent.defaultPrevented).toBe(false);
     expect(menu?.isConnected).toBe(false);
   });
@@ -614,3 +628,55 @@ describe('selection-mode capture action menu', () => {
     expect(anchorRectSpy).toHaveBeenCalledTimes(2);
   });
 });
+
+it.each([true, false])(
+  'renders crop actions for compact=%s and retains the selected session format',
+  (compact) => {
+    const { tooltip, overlayContainer, onConfirm, onImageFormatChange } = createToolbar(
+      undefined,
+      document.body,
+      'download_default',
+      compact
+    );
+    const trigger = tooltip.root.querySelector<HTMLButtonElement>(
+      '.sniptale-selection-capture-menu-trigger'
+    )!;
+    trigger.click();
+    const menu = overlayContainer.querySelector<HTMLElement>('.sniptale-selection-capture-menu')!;
+    const actions = menu.querySelectorAll('[data-ui^="content.selection.capture-action-option."]');
+    expect(actions).toHaveLength(6);
+    expect(menu.querySelectorAll('.sniptale-capture-action-icons')).toHaveLength(compact ? 1 : 0);
+    for (const action of actions)
+      expect(action.querySelector('.sniptale-toolbar-menu-item-label') !== null).toBe(!compact);
+    menu
+      .querySelector<HTMLButtonElement>('[data-ui="content.selection.capture-parameters"]')!
+      .click();
+    expect(
+      menu
+        .querySelector('[data-ui="content.selection.capture-format.png"]')
+        ?.getAttribute('aria-checked')
+    ).toBe('true');
+    menu
+      .querySelector<HTMLButtonElement>('[data-ui="content.selection.capture-format.webp"]')!
+      .click();
+    expect(onImageFormatChange).toHaveBeenCalledExactlyOnceWith('webp');
+    expect(
+      menu.querySelector(
+        '[data-ui="content.selection.capture-format.webp"] .sniptale-popover-check'
+      )
+    ).not.toBeNull();
+    expect(onConfirm).not.toHaveBeenCalled();
+    menu
+      .querySelector<HTMLButtonElement>('[data-ui="content.selection.capture-parameters.back"]')!
+      .click();
+    expect(
+      menu.querySelector('[data-ui="content.selection.capture-parameters"]')?.textContent
+    ).toBe('WEBP · 100%');
+    trigger.click();
+    trigger.click();
+    expect(
+      overlayContainer.querySelector('[data-ui="content.selection.capture-parameters"]')
+        ?.textContent
+    ).toBe('WEBP · 100%');
+  }
+);

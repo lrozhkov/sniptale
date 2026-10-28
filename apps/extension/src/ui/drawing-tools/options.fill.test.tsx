@@ -116,6 +116,9 @@ it.each([false, true])('preserves arrow direction toggle in scoped=%s consumers'
       );
       const button = host.querySelector<HTMLButtonElement>('button')!;
       expect(button.getAttribute('aria-pressed')).toBe(String(active));
+      expect(
+        button.querySelector(active ? '.lucide-arrow-down-to-dot' : '.lucide-arrow-up-from-dot')
+      ).not.toBeNull();
       expect(button.getAttribute('title')).toBe('editor.compact.arrowDrawFromTip');
       expect(button.hasAttribute('data-command-property')).toBe(scoped);
       expect(button.classList.contains('sniptale-glass-toolbar-button--active')).toBe(

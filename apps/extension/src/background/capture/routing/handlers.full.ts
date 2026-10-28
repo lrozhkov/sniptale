@@ -40,6 +40,9 @@ export function handleFullCapture(context: CaptureRouteContext): boolean {
       capture: async (losslessSource, outputProfile) => {
         const capture = await captureFullPageTransaction(context.resolvedTabId, undefined, {
           backendKind: 'native',
+          ...(context.message?.capturePreferences?.fullPageCapture
+            ? { preferences: context.message.capturePreferences.fullPageCapture }
+            : {}),
           ...(outputProfile
             ? { format: outputProfile.format, quality: outputProfile.quality / 100 }
             : {}),

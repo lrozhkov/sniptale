@@ -103,6 +103,8 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('capture.image', 'format'),
     field('capture.image', 'quality'),
     field('capture.image', 'fullPageQuality'),
+    field('capture.image', 'fullPageImage'),
+    field('capture.image', 'fullPageCapture'),
   ]),
   ...domain('capture.pages', [
     field('capture.pages', 'timing'),

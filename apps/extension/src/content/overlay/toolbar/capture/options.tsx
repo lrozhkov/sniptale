@@ -10,6 +10,10 @@ import type { ToolbarCaptureActionsProps } from '../types';
 import { getCaptureActionDescriptors } from '../../../../features/quick-actions-presets/catalog';
 import { FullPageCaptureSplitButton } from './full-page-menu';
 import { CaptureActionIcons } from './action-icons';
+import {
+  ProductToolbarMenuItem,
+  ProductToolbarMenuItemCopy,
+} from '@sniptale/ui/product-menus/toolbar';
 import { ScreenshotCaptureSplitButton } from './screenshot-menu';
 import { NumericValueField } from '../../../../ui/compact-inspector-controls';
 import { CompactSegmentedSelector } from '../../../../ui/compact-inspector-controls/control-renderers';
@@ -137,22 +141,45 @@ export function ToolbarCaptureButtons(props: {
   const handleTakeScreenshotClick = createTakeScreenshotClickHandler(props.onTakeScreenshot);
   const fullPage = useFullPageCapturePreferences();
   const image = useToolbarImagePreferences();
+  const fullImage = useToolbarImagePreferences('full');
   const disabled = props.isLoading || image.saving || fullPage.saving;
-  const quickActions = (mode: 'visible' | 'full') => (
-    <CaptureActionIcons
-      label={translate('content.toolbar.captureQuickActionsTitle')}
-      dataUiPrefix={`content.toolbar.capture-${mode}-action`}
-      options={getCaptureActionOptions()}
-      disabled={disabled}
-      onSelect={(action, event) => {
-        const source = createTrustedContentActionIntentSource(event.nativeEvent);
-        if (!source) return;
-        props.toolbarMenuState.closeMenus();
-        props.onTakeScreenshot(mode, source, { captureAction: action });
-      }}
-    />
-  );
+  const quickActions = (mode: 'visible' | 'full') => {
+    const onSelect = (action: CaptureActionType, event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const source = createTrustedContentActionIntentSource(event.nativeEvent);
+      if (!source) return;
+      props.toolbarMenuState.closeMenus();
+      props.onTakeScreenshot(mode, source, { captureAction: action });
+    };
+    return props.compactMenus ? (
+      <CaptureActionIcons
+        label={translate('content.toolbar.captureQuickActionsTitle')}
+        dataUiPrefix={`content.toolbar.capture-${mode}-action`}
+        options={getCaptureActionOptions()}
+        disabled={disabled}
+        onSelect={onSelect}
+      />
+    ) : (
+      <div data-sniptale-activation-bridge="defer">
+        {getCaptureActionOptions().map((option) => (
+          <ProductToolbarMenuItem
+            key={option.value}
+            dataUi={`content.toolbar.capture-${mode}-action.${option.value}`}
+            disabled={disabled}
+            onClick={(event) => onSelect(option.value, event)}
+          >
+            {option.icon}
+            <ProductToolbarMenuItemCopy label={option.label} hint={option.hint} />
+          </ProductToolbarMenuItem>
+        ))}
+      </div>
+    );
+  };
   const imageParameters = <CaptureImageParameters image={image} />;
+  const imageSummary =
+    image.imageFormat.toUpperCase() +
+    (image.imageFormat === 'png' ? '' : ` · ${image.imageQuality}%`);
 
   return (
     <>
@@ -168,6 +195,7 @@ export function ToolbarCaptureButtons(props: {
           onPrimaryClick={handleTakeScreenshotClick('visible')}
           toolbarMenuState={props.toolbarMenuState}
           quickActions={quickActions('visible')}
+          summary={imageSummary}
         >
           {imageParameters}
         </ScreenshotCaptureSplitButton>
@@ -181,7 +209,11 @@ export function ToolbarCaptureButtons(props: {
           onPrimaryClick={handleTakeScreenshotClick('full')}
           onUpdate={fullPage.updatePreferences}
           quickActions={quickActions('full')}
-          imageParameters={imageParameters}
+          imageParameters={<CaptureImageParameters image={fullImage} />}
+          imageSummary={
+            fullImage.imageFormat.toUpperCase() +
+            (fullImage.imageFormat === 'png' ? '' : ` · ${fullImage.imageQuality}%`)
+          }
           preferences={fullPage.preferences}
           saving={fullPage.saving}
           toolbarMenuState={props.toolbarMenuState}

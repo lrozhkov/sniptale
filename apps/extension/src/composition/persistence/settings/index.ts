@@ -111,6 +111,7 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
+  fullPageImage: { imageFormat: 'png', imageQuality: 100 },
   fullPageQuality: DEFAULT_FULL_PAGE_QUALITY_POLICY,
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: true,
@@ -174,6 +175,7 @@ function cloneExportResourceLimits(settings: ExportResourceLimits): ExportResour
 export function createDefaultSettings(): NormalizedSettings {
   return {
     ...DEFAULT_SETTINGS,
+    fullPageImage: { imageFormat: 'png', imageQuality: 100 },
     contentToolbar: cloneContentToolbarSettings(DEFAULT_CONTENT_TOOLBAR_SETTINGS),
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
     localStoragePolicy: { ...DEFAULT_LOCAL_STORAGE_POLICY },
@@ -295,6 +297,15 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSett
     ...defaultSettings,
     ...parsedValue,
     captureAction,
+    fullPageImage: parsedValue.fullPageImage ?? {
+      imageFormat: parsedValue.imageFormat ?? defaultSettings.imageFormat,
+      imageQuality:
+        parsedValue.imageQuality !== undefined &&
+        parsedValue.imageQuality >= 1 &&
+        parsedValue.imageQuality <= 100
+          ? parsedValue.imageQuality
+          : defaultSettings.imageQuality,
+    },
     localStoragePolicy,
     saveCapturesToGallery: localStoragePolicy.defaultDestination === 'library',
     contentToolbar: {
@@ -435,17 +446,6 @@ export function subscribeToSettingsChanges(
   });
 }
 
-/** Observe canonical image preferences, including reset and removal of the settings key. */
-export function subscribeToImagePreferencesChanges(
-  listener: (preferences: Pick<NormalizedSettings, 'imageFormat' | 'imageQuality'>) => void
-): () => void {
-  return subscribeToNormalizedSettingsChange((previous, next) => {
-    if (previous.imageFormat === next.imageFormat && previous.imageQuality === next.imageQuality)
-      return;
-    listener({ imageFormat: next.imageFormat, imageQuality: next.imageQuality });
-  });
-}
-
 /** Observe canonical voice preferences, including reset and removal of the settings key. */
 export function subscribeToVoiceInputPreferencesChanges(
   listener: (preferences: VoiceInputPreferences) => void
@@ -550,6 +550,12 @@ function applySettingsPatch(
     contextMenu: {
       ...currentSettings.contextMenu,
       ...settingsPatch.contextMenu,
+    },
+    fullPageImage: {
+      imageFormat: currentSettings.imageFormat,
+      imageQuality: currentSettings.imageQuality,
+      ...currentSettings.fullPageImage,
+      ...settingsPatch.fullPageImage,
     },
     fullPageCapture: {
       ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,

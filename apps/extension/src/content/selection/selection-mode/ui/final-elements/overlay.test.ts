@@ -25,6 +25,12 @@ function createOptions() {
     getMaxSelectionWidth: () => 1280,
     getMaxSelectionHeight: () => 720,
     getCaptureAction: () => 'download_default' as const,
+    getCapturePreferences: () => ({
+      imageFormat: 'png' as const,
+      imageQuality: 100,
+      compactMenus: false,
+    }),
+    onImageFormatChange: vi.fn(),
     getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
     onAdjustPadding: vi.fn(),
     onCaptureActionChange: vi.fn(),

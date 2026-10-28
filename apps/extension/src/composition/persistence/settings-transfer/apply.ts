@@ -1,3 +1,4 @@
+import { parseStoredSettings } from '../settings/guards';
 import { parsePageLaunchPreferences } from '../../../contracts/page-launch';
 import { parseFilenameRules } from '../../../features/file-naming/rules';
 import { parseStoredHighlighterSettings } from '../highlighter/guards';
@@ -236,6 +237,18 @@ function applySettingsWrites(context: WriteBuildContext): void {
     nextSettings.fullPageQuality = image[
       'fullPageQuality'
     ] as NormalizedSettings['fullPageQuality'];
+  }
+  if (image) {
+    const captureDefaults = parseStoredSettings({
+      fullPageImage: image['fullPageImage'],
+      fullPageCapture: image['fullPageCapture'],
+    });
+    if (captureDefaults.hasInvalidRoot || captureDefaults.invalidFieldCount > 0)
+      throw new Error('Imported screenshot defaults are invalid');
+    if (captureDefaults.value.fullPageImage)
+      nextSettings.fullPageImage = captureDefaults.value.fullPageImage;
+    if (captureDefaults.value.fullPageCapture)
+      nextSettings.fullPageCapture = captureDefaults.value.fullPageCapture;
   }
   const pages = data('capture.pages');
   if (pages?.['timing'] !== undefined) {

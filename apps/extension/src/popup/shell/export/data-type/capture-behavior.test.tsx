@@ -80,7 +80,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('loads and persists the shared full-page capture behavior', async () => {
+it('loads full-page defaults and keeps changes local to the export workflow', async () => {
   await act(async () => root.render(<Harness />));
   await act(async () => Promise.resolve());
   expect(container.querySelector('output')?.textContent).toBe('once:true:true');
@@ -88,40 +88,7 @@ it('loads and persists the shared full-page capture behavior', async () => {
   await act(async () => container.querySelector('button')?.click());
 
   expect(container.querySelector('output')?.textContent).toBe('hide:false:false');
-  expect(mocks.patchSettings).toHaveBeenCalledWith({
-    fullPageCapture: {
-      floatingElements: 'hide',
-      freezeMotion: false,
-      preloadLazyContent: false,
-    },
-  });
-});
-
-it('restores the canonical stored value after a failed write', async () => {
-  mocks.patchSettings.mockRejectedValueOnce(new Error('write failed'));
-  mocks.loadSettings
-    .mockResolvedValueOnce({
-      exportResourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
-      fullPageCapture: {
-        floatingElements: 'once',
-        freezeMotion: true,
-        preloadLazyContent: true,
-      },
-    })
-    .mockResolvedValueOnce({
-      exportResourceLimits: { maxFileCount: 30, maxFileSizeMiB: 30, maxTotalSizeMiB: 150 },
-      fullPageCapture: {
-        floatingElements: 'repeat',
-        freezeMotion: true,
-        preloadLazyContent: false,
-      },
-    });
-  await act(async () => root.render(<Harness />));
-  await act(async () => Promise.resolve());
-  await act(async () => container.querySelector('button')?.click());
-  await act(async () => Promise.resolve());
-
-  expect(container.querySelector('output')?.textContent).toBe('repeat:true:false');
+  expect(mocks.patchSettings).not.toHaveBeenCalled();
 });
 
 it('persists attachment limits through the canonical settings patch', async () => {

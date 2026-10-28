@@ -125,6 +125,8 @@ export async function readSettingsTransferSnapshot(
       format: settings.imageFormat,
       quality: settings.imageQuality,
       fullPageQuality: settings.fullPageQuality,
+      fullPageImage: settings.fullPageImage,
+      fullPageCapture: settings.fullPageCapture,
     }),
     'capture.pages': payload({
       resourceLimits: settings.exportResourceLimits,

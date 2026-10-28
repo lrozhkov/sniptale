@@ -19,6 +19,40 @@ import {
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
 import { isContentPrivilegedActionCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 
+/** Validates the bounded output settings accepted from one content workflow. */
+export function isScreenshotCapturePreferences(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some(
+      (key) => !['imageFormat', 'imageQuality', 'fullPageCapture'].includes(key)
+    )
+  )
+    return false;
+  const format = value['imageFormat'];
+  const quality = value['imageQuality'];
+  if (
+    (format !== 'png' && format !== 'jpeg' && format !== 'webp') ||
+    typeof quality !== 'number' ||
+    !Number.isFinite(quality) ||
+    quality < 1 ||
+    quality > 100
+  )
+    return false;
+  const full = value['fullPageCapture'];
+  return (
+    full === undefined ||
+    (isRecord(full) &&
+      Object.keys(full).every((key) =>
+        ['floatingElements', 'freezeMotion', 'preloadLazyContent'].includes(key)
+      ) &&
+      ['hide', 'once', 'repeat'].includes(
+        typeof full['floatingElements'] === 'string' ? full['floatingElements'] : ''
+      ) &&
+      typeof full['freezeMotion'] === 'boolean' &&
+      typeof full['preloadLazyContent'] === 'boolean')
+  );
+}
+
 function isScenarioRuntimeCapturePayload(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -42,6 +76,7 @@ export const runtimeActionCaptureMessageContracts = {
         type: CaptureMessageType.CAPTURE_VISIBLE,
         optional: {
           actionType: isCaptureActionType,
+          capturePreferences: isScreenshotCapturePreferences,
           quickActionTransactionId: (value) =>
             isString(value) && value.length > 0 && value.length <= 128,
           contentIntent: isContentPrivilegedActionCapability,
@@ -68,6 +103,7 @@ export const runtimeActionCaptureMessageContracts = {
         type: CaptureMessageType.CAPTURE_FULL,
         optional: {
           actionType: isCaptureActionType,
+          capturePreferences: isScreenshotCapturePreferences,
           quickActionTransactionId: (value) =>
             isString(value) && value.length > 0 && value.length <= 128,
           contentIntent: isContentPrivilegedActionCapability,

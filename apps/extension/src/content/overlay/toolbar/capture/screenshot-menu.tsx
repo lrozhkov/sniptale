@@ -1,16 +1,29 @@
 import {
   useCallback,
   useContext,
+  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type MouseEventHandler,
   type ReactNode,
 } from 'react';
-import { AppWindow, ChevronDown, UnfoldVertical } from 'lucide-react';
+import {
+  AppWindow,
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  SlidersHorizontal,
+  UnfoldVertical,
+} from 'lucide-react';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductToolbarMenu, ProductToolbarMenuDivider } from '@sniptale/ui/product-menus/toolbar';
-import { InspectorDisclosureView } from '../../../../ui/compact-inspector-controls/disclosure';
+import {
+  ProductToolbarMenu,
+  ProductToolbarMenuDivider,
+  ProductToolbarMenuItem,
+  ProductToolbarMenuItemCopy,
+} from '@sniptale/ui/product-menus/toolbar';
 import { translate } from '../../../../platform/i18n';
 import type { ToolbarMenuState } from '../state/menu';
 import {
@@ -23,8 +36,11 @@ import { useToolbarMenuDirection } from '../menu/direction';
 function resolveCaptureMenuLayout(
   displayMode: 'horizontal' | 'vertical',
   triggerRef: React.RefObject<HTMLButtonElement | null>,
-  full: boolean
+  full: boolean,
+  parametersOpen: boolean,
+  compact: boolean
 ) {
+  const menuHeight = parametersOpen ? (full ? 600 : 240) : compact ? (full ? 220 : 180) : 500;
   const { menuPlacement, style } = resolveToolbarDropdownState({
     anchorRef: triggerRef,
     displayMode,
@@ -36,7 +52,7 @@ function resolveCaptureMenuLayout(
         ? 'up'
         : 'down';
     },
-    menuHeight: full ? 440 : 210,
+    menuHeight,
     menuWidth: 300,
   });
   return {
@@ -45,7 +61,7 @@ function resolveCaptureMenuLayout(
       ? resolveToolbarDrawingMenuStyle({
           anchorEl: triggerRef.current?.parentElement ?? null,
           displayMode,
-          menuHeight: full ? 600 : 300,
+          menuHeight,
           menuWidth: 300,
           placement: menuPlacement === 'up' ? 'up' : 'down',
         })
@@ -74,6 +90,40 @@ const CAPTURE_MODES = {
   },
 } as const;
 
+function ScreenshotCaptureActions(props: {
+  mode: 'visible' | 'full';
+  quickActions: ReactNode;
+  summary: string | undefined;
+  onParameters: () => void;
+  triggerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <>
+      {props.quickActions}
+      <ProductToolbarMenuDivider />
+      <div ref={props.triggerRef} data-sniptale-activation-bridge="defer">
+        <ProductToolbarMenuItem
+          dataUi={`content.toolbar.${props.mode}-capture-parameters`}
+          onClick={props.onParameters}
+        >
+          <SlidersHorizontal size={16} aria-hidden />
+          <ProductToolbarMenuItemCopy
+            label={
+              <span
+                id={`content.toolbar.${props.mode}-capture-summary`}
+                className="whitespace-normal text-[var(--sniptale-color-text-secondary)]"
+              >
+                {props.summary ?? translate('content.toolbar.captureParameters')}
+              </span>
+            }
+          />
+          <ChevronRight size={16} aria-hidden />
+        </ProductToolbarMenuItem>
+      </div>
+    </>
+  );
+}
+
 export function ScreenshotCaptureSplitButton(props: {
   mode: 'visible' | 'full';
   compactMenus: boolean;
@@ -82,6 +132,7 @@ export function ScreenshotCaptureSplitButton(props: {
   toolbarMenuState: ToolbarMenuState;
   onPrimaryClick: MouseEventHandler<HTMLButtonElement>;
   quickActions?: ReactNode;
+  summary?: string;
   children: ReactNode;
 }) {
   const [parametersOpen, setParametersOpen] = useState(false);
@@ -90,18 +141,46 @@ export function ScreenshotCaptureSplitButton(props: {
   const { menuType, Icon } = config;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const layout = () => resolveCaptureMenuLayout(props.displayMode, triggerRef, full);
+  const parametersRef = useRef<HTMLDivElement>(null);
+  const parametersTriggerRef = useRef<HTMLDivElement>(null);
+  const restoreParametersFocus = useRef(false);
+  const layout = () =>
+    resolveCaptureMenuLayout(
+      props.displayMode,
+      triggerRef,
+      full,
+      parametersOpen,
+      props.compactMenus
+    );
   const menuSide = useToolbarMenuDirection(layout);
   const open = props.toolbarMenuState.activeMenuType === menuType;
   const closeMenu = useCallback(
     () => props.toolbarMenuState.closeMenu(menuType),
     [props.toolbarMenuState, menuType]
   );
+  const returnToActions = useCallback(() => {
+    restoreParametersFocus.current = true;
+    setParametersOpen(false);
+  }, []);
+  useEffect(() => {
+    if (!open) setParametersOpen(false);
+  }, [open]);
+  useLayoutEffect(() => {
+    if (!parametersOpen && open && restoreParametersFocus.current) {
+      restoreParametersFocus.current = false;
+      const trigger = parametersTriggerRef.current?.querySelector('button');
+      queueMicrotask(() => {
+        if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+      });
+    }
+    if (parametersOpen && open)
+      parametersRef.current
+        ?.querySelector<HTMLButtonElement>('button, input')
+        ?.focus({ preventScroll: true });
+  }, [parametersOpen, open]);
   useToolbarFloatingMenuDismissal({
-    closeOnFarPointer: true,
     menuRef,
     onClose: closeMenu,
-    onFarPointerClose: closeMenu,
     open,
     triggerRef,
   });
@@ -158,23 +237,37 @@ export function ScreenshotCaptureSplitButton(props: {
             compact={props.compactMenus}
             placement={placement}
             style={style}
-            title={label}
+            title={parametersOpen ? undefined : label}
             variant="capture"
           >
-            {props.quickActions}
-            <ProductToolbarMenuDivider />
-            <InspectorDisclosureView
-              dataUi={`content.toolbar.${props.mode}-capture-parameters`}
-              variant="structural"
-              label={translate('content.toolbar.captureParameters')}
-              collapsedChevron="right"
-              animated
-              open={parametersOpen}
-              onOpenChange={setParametersOpen}
-              bodyClassName="pt-2"
-            >
-              {props.children}
-            </InspectorDisclosureView>
+            {parametersOpen ? (
+              <>
+                <div data-sniptale-activation-bridge="defer">
+                  <ProductToolbarMenuItem
+                    dataUi={`content.toolbar.${props.mode}-capture-parameters-back`}
+                    onClick={returnToActions}
+                  >
+                    <ArrowLeft size={16} aria-hidden />
+                    <ProductToolbarMenuItemCopy label={label} />
+                  </ProductToolbarMenuItem>
+                </div>
+                <ProductToolbarMenuDivider />
+                <div
+                  ref={parametersRef}
+                  data-ui={`content.toolbar.${props.mode}-capture-parameters-panel`}
+                >
+                  {props.children}
+                </div>
+              </>
+            ) : (
+              <ScreenshotCaptureActions
+                mode={props.mode}
+                quickActions={props.quickActions}
+                summary={props.summary}
+                onParameters={() => setParametersOpen(true)}
+                triggerRef={parametersTriggerRef}
+              />
+            )}
           </ProductToolbarMenu>
         </ToolbarMenuDropdown>
       ) : null}

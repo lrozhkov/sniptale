@@ -1,3 +1,4 @@
+import { loadSettings } from '../../../composition/persistence/settings';
 import {
   acquireMediaMutationPermit,
   getMediaAuthorityGeneration,
@@ -49,14 +50,6 @@ export async function runPreparedCaptureAction(args: {
     transactionId === undefined
       ? undefined
       : getQuickActionAppearanceSnapshot(args.context.resolvedTabId, transactionId);
-  const outputProfile =
-    snapshot === undefined
-      ? undefined
-      : {
-          format:
-            args.context.message?.actionType === 'copy' ? ('png' as const) : snapshot.imageFormat,
-          quality: snapshot.imageQuality,
-        };
   const releasePermit = acquireMediaMutationPermit();
   if (!releasePermit) throw new Error('Local data erasure is in progress');
   const generation = getMediaAuthorityGeneration();
@@ -78,6 +71,15 @@ export async function runPreparedCaptureAction(args: {
     appearance.assertCurrent();
   };
   try {
+    const settings = await loadSettings();
+    assertCurrent();
+    const defaults =
+      args.captureTarget === 'full' ? (settings.fullPageImage ?? settings) : settings;
+    const output = snapshot ?? args.context.message?.capturePreferences ?? defaults;
+    const outputProfile = {
+      format: args.context.message?.actionType === 'copy' ? ('png' as const) : output.imageFormat,
+      quality: output.imageQuality ?? 100,
+    };
     const result = await runStartCaptureUseCase({
       prepareImage: appearance.prepare,
       assertCurrent,

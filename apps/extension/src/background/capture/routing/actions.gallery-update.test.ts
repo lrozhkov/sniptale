@@ -375,3 +375,24 @@ it('releases preparation admission after an encoding failure without publishing 
     erasure.release();
   }
 });
+
+it('finalizes a cropped image with the document profile instead of global defaults', async () => {
+  const sendResponse = vi.fn();
+  handleSaveScreenshotToGallery(
+    {
+      dataUrl: 'data:image/png;base64,source',
+      filename: 'selection.png',
+      capturePreferences: { imageFormat: 'jpeg', imageQuality: 64 },
+    },
+    42,
+    sendResponse
+  );
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+  expect(finalizeScreenshotDataUrlMock).toHaveBeenCalledWith('data:image/png;base64,source', {
+    format: 'jpeg',
+    quality: 64,
+  });
+  expect(sendResponse).toHaveBeenCalledWith(
+    expect.objectContaining({ filename: 'selection.jpg', dataUrl: 'data:image/jpeg;base64,final' })
+  );
+});

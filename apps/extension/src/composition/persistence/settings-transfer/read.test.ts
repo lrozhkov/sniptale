@@ -722,3 +722,15 @@ it('excludes quick-action artwork and keeps a valid projected transfer', async (
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII='
   );
 });
+
+it('exports independent full-page image and preparation defaults', async () => {
+  const fullPageImage = { imageFormat: 'webp', imageQuality: 68 };
+  const fullPageCapture = {
+    freezeMotion: false,
+    preloadLazyContent: true,
+    floatingElements: 'hide',
+  };
+  mocks.settings.mockResolvedValue({ ...settingsFixture(), fullPageImage, fullPageCapture });
+  const snapshot = await readSettingsTransferSnapshot();
+  expect(snapshot.domains['capture.image']?.data).toMatchObject({ fullPageImage, fullPageCapture });
+});

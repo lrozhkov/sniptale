@@ -771,3 +771,22 @@ it('restores settings and removes new chunks after a partially applied sync writ
   );
   expect(mocks.syncRemove).toHaveBeenCalledWith(expect.arrayContaining(newKeys), undefined);
 });
+
+it('applies full-page defaults without changing regular image defaults', async () => {
+  const fullPageImage = { imageFormat: 'webp', imageQuality: 68 };
+  const fullPageCapture = {
+    freezeMotion: false,
+    preloadLazyContent: true,
+    floatingElements: 'hide',
+  };
+  await applySettingsTransferDomains({
+    domains: parseSettingsTransferDomains({
+      'capture.image': { schemaVersion: 1, data: { fullPageImage, fullPageCapture } },
+    }),
+    summary: emptySummary(),
+  });
+  expect(mocks.syncSet).toHaveBeenCalledWith(
+    { sniptale_settings: expect.objectContaining({ fullPageImage, fullPageCapture }) },
+    undefined
+  );
+});

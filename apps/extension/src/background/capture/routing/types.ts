@@ -1,5 +1,5 @@
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { CaptureActionType } from '../../../contracts/settings';
+import type { CaptureActionType, ScreenshotCapturePreferences } from '../../../contracts/settings';
 import type { RuntimeRequestByType } from '../../../contracts/messaging/contracts/runtime-message';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
 import type { ScenarioSessionService } from '../../scenario/session-service/index';
@@ -18,6 +18,7 @@ export type CaptureRouteContext = {
   message?: Partial<RouteCaptureMessage> &
     Record<string, unknown> & {
       actionType?: CaptureActionType;
+      capturePreferences?: ScreenshotCapturePreferences;
       quickActionTransactionId?: string;
       scenarioCapture?: ScenarioRuntimeCapturePayload;
     };

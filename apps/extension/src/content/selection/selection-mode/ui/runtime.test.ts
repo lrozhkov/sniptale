@@ -117,6 +117,12 @@ function createUiRuntimeFixture(overrides?: UiRuntimeFixtureOverrides) {
 
   const runtime = createSelectionModeUiRuntime({
     getCaptureAction: overrides?.getCaptureAction ?? (() => 'download_default'),
+    getCapturePreferences: () => ({
+      imageFormat: 'png' as const,
+      imageQuality: 100,
+      compactMenus: true,
+    }),
+    onImageFormatChange: vi.fn(),
     getDom,
     getSelection: overrides?.getSelection ?? (() => ({ x: 1, y: 2, width: 300, height: 200 })),
     getVisual,
@@ -208,6 +214,8 @@ function registerFinalElementsConfigTest() {
       getMaxSelectionWidth,
       getMaxSelectionHeight,
       getCaptureAction: expect.any(Function),
+      getCapturePreferences: expect.any(Function),
+      onImageFormatChange: expect.any(Function),
       getSelection: expect.any(Function),
       onAdjustPadding,
       onCaptureActionChange,

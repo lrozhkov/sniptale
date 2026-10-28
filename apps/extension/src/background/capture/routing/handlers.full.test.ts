@@ -179,6 +179,8 @@ describe('capture-router-handlers.full', () => {
     expect(captureFullPageTransactionMock).toHaveBeenCalledWith(42, undefined, {
       backendKind: 'native',
       documentId: 'document-42',
+      format: 'jpeg',
+      quality: 1,
     });
     expect(sendTabMessageMock).toHaveBeenCalledWith(42, {
       payload: { message: expect.any(String), type: 'warning' },
@@ -218,7 +220,7 @@ async function verifiesFullCaptureFailures() {
   expect(generateFilenameMock).toHaveBeenCalledWith(
     'full',
     'png',
-    expect.objectContaining({ imageFormat: 'png' })
+    expect.objectContaining({ imageFormat: 'jpeg' })
   );
   expect(settingsFailureContext.sendResponse).toHaveBeenCalledWith({
     success: false,

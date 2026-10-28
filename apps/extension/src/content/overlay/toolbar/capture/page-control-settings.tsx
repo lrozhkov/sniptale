@@ -41,6 +41,10 @@ export function PageToolbarCustomizationSettings(props: {
         <ProductToolbarMenuItem
           dataUi="content.toolbar.settings.show-hidden-buttons"
           selected={preferences.revealed}
+          onMouseDown={(event) => {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }}
           ariaPressed={preferences.revealed}
           disabled={!preferences.ready || preferences.pending}
           onClick={() => {

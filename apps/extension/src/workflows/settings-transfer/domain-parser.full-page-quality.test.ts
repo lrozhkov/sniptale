@@ -68,3 +68,22 @@ it.each([0, -1, 129])('rejects an unsafe imported maximum file size: %s', (maxFi
     )
   ).toThrow('Invalid settings domain payload: capture.image');
 });
+
+it('transfers independent full-page output and preparation defaults', () => {
+  const data = {
+    fullPageImage: { imageFormat: 'webp', imageQuality: 68 },
+    fullPageCapture: { freezeMotion: false, preloadLazyContent: true, floatingElements: 'hide' },
+  };
+  expect(
+    parseSettingsTransferDomains({ 'capture.image': { schemaVersion: 1, data } })['capture.image']
+      ?.data
+  ).toMatchObject(data);
+  expect(() =>
+    parseSettingsTransferDomains({
+      'capture.image': {
+        schemaVersion: 1,
+        data: { fullPageImage: { imageFormat: 'gif', imageQuality: 68 } },
+      },
+    })
+  ).toThrow();
+});

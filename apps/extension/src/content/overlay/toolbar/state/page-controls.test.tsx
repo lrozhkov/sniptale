@@ -462,7 +462,15 @@ it('operates customization, temporary reveal, Done and failure retry through the
   expect(closeMenu).toHaveBeenCalledOnce();
   await act(async () => button('customize-done')?.click());
   expect(controls.editing).toBe(false);
-  await act(async () => button('settings.show-hidden-buttons')?.click());
+  const showHidden = button('settings.show-hidden-buttons')!;
+  act(() => showHidden.focus());
+  act(() =>
+    showHidden.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, detail: 1 })
+    )
+  );
+  expect(document.activeElement).not.toBe(showHidden);
+  await act(async () => showHidden.click());
   expect(controls.revealed).toBe(true);
   expect(button('settings.show-hidden-buttons')?.getAttribute('aria-pressed')).toBe('true');
   await act(async () => button('settings.customize-buttons')?.click());

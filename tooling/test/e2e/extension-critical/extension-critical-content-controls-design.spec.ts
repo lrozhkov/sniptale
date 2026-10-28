@@ -977,9 +977,7 @@ for (const width of [1280, 1920]) {
           '.sniptale-toolbar-menu'
         );
         await expect(fullPageMenu).toBeVisible();
-        await fullPageMenu
-          .locator('[data-ui="content.toolbar.full-capture-parameters"] > summary')
-          .click();
+        await fullPageMenu.locator('[data-ui="content.toolbar.full-capture-parameters"]').click();
         const retainedMenu = await fullPageMenu.elementHandle();
         for (const mode of ['hide', 'repeat', 'once']) {
           const option = ui(page, `content.toolbar.full-page-floating.${mode}`);

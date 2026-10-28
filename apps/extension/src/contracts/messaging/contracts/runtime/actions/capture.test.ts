@@ -128,3 +128,37 @@ it('admits only bounded quick-action transaction identities and prepared filenam
     expect(() => contract.parseResponse({ success: true, filename: 3 })).toThrow();
   }
 });
+
+for (const type of [CaptureMessageType.CAPTURE_VISIBLE, CaptureMessageType.CAPTURE_FULL]) {
+  it(`validates bounded session output preferences for ${type}`, () => {
+    const contract = runtimeActionCaptureMessageContracts[type];
+    const capturePreferences = {
+      imageFormat: 'webp',
+      imageQuality: 67,
+      fullPageCapture: { freezeMotion: true, preloadLazyContent: false, floatingElements: 'hide' },
+    };
+    expect(contract.parseRequest({ type, capturePreferences })).toMatchObject({
+      capturePreferences,
+    });
+    for (const invalid of [
+      null,
+      [],
+      { ...capturePreferences, imageFormat: 'gif' },
+      { ...capturePreferences, imageQuality: 0 },
+      { ...capturePreferences, imageQuality: 101 },
+      { ...capturePreferences, imageQuality: NaN },
+      { ...capturePreferences, imageQuality: '67' },
+      { ...capturePreferences, permission: true },
+      {
+        ...capturePreferences,
+        fullPageCapture: { ...capturePreferences.fullPageCapture, freezeMotion: 'yes' },
+      },
+      {
+        ...capturePreferences,
+        fullPageCapture: { ...capturePreferences.fullPageCapture, extra: true },
+      },
+    ]) {
+      expect(() => contract.parseRequest({ type, capturePreferences: invalid })).toThrow();
+    }
+  });
+}

@@ -24,6 +24,16 @@ it('makes frame surfaces passive and hides annotation chrome while Drawing is ac
     ':host(.sniptale-drawing-mode-active) .sniptale-frame-container'
   );
 
+  for (const selector of [
+    '.sniptale-frame-container *',
+    '.sniptale-callout',
+    '.sniptale-callout *',
+    '.sniptale-step-badge-layer *',
+  ])
+    expect(readRuleSelectors('  pointer-events: none !important;')).toContain(
+      `:host(.sniptale-drawing-mode-active) ${selector}`
+    );
+
   const hiddenSelectors = readRuleSelectors('  display: none !important;');
   [
     '.sniptale-action-toolbar',

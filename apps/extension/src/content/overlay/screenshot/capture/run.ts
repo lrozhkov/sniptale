@@ -1,3 +1,4 @@
+import { pageCapturePreferences } from '../../../application/capture-preferences';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import type { CaptureResponse } from '../../../../contracts/messaging/contracts/response-types';
@@ -121,6 +122,8 @@ async function requestBackgroundViewportCapture(args: {
   const useResponseTimeout = await shouldUseBackgroundResponseTimeout(args.actionType);
   assertCurrentScreenshotRun(args.runtime, args.options.runToken);
 
+  await pageCapturePreferences.load();
+  assertCurrentScreenshotRun(args.runtime, args.options.runToken);
   const captureMessage = createViewportCaptureMessage(
     args.type,
     args.actionType,

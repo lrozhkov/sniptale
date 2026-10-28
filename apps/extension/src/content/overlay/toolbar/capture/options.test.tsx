@@ -281,7 +281,7 @@ it.each(['visible', 'full'] as const)(
 );
 
 it.each(['visible', 'full'] as const)(
-  'keeps %s quick actions available beside initially collapsed parameters',
+  'keeps %s quick actions available beside a separate parameters section',
   async (mode) => {
     const onTakeScreenshot = vi.fn();
     container = document.createElement('div');
@@ -297,18 +297,21 @@ it.each(['visible', 'full'] as const)(
         )!
         .click()
     );
-    const details = container!.querySelector<HTMLDetailsElement>(
+    const parameters = container!.querySelector<HTMLButtonElement>(
       `[data-ui="content.toolbar.${mode}-capture-parameters"]`
     )!;
-    expect(details).not.toBeNull();
-    expect(details.open).toBe(false);
-    expect(details.querySelector('summary')?.textContent).toBe('content.toolbar.captureParameters');
-    expect(details.dataset['collapsedChevron']).toBe('right');
-    expect(details.dataset['animated']).toBe('true');
+    expect(
+      parameters.querySelector(`[id="content.toolbar.${mode}-capture-summary"]`)
+    ).not.toBeNull();
+    expect(parameters.textContent).not.toBe('content.toolbar.captureParameters');
+    expect(parameters.querySelector('.lucide-chevron-right')).not.toBeNull();
+    expect(
+      container!.querySelector(`[data-ui="content.toolbar.${mode}-capture-parameters-panel"]`)
+    ).toBeNull();
     const action = container!.querySelector<HTMLButtonElement>(
       `[data-ui="content.toolbar.capture-${mode}-action.download_default"]`
     )!;
-    expect(details.contains(action)).toBe(false);
+    expect(parameters.contains(action)).toBe(false);
     expect(onTakeScreenshot).not.toHaveBeenCalled();
     act(() => action.click());
     expect(onTakeScreenshot).toHaveBeenCalledExactlyOnceWith(

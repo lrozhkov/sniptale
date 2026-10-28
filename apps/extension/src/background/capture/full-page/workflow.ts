@@ -162,8 +162,11 @@ async function runFullPageCapture(args: {
   const preferences = configuredPreferences;
   const options = {
     ...args.options,
-    format: args.options.format ?? settings.imageFormat ?? 'png',
-    quality: args.options.quality ?? (settings.imageQuality ?? 100) / 100,
+    format:
+      args.options.format ?? settings.fullPageImage?.imageFormat ?? settings.imageFormat ?? 'png',
+    quality:
+      args.options.quality ??
+      (settings.fullPageImage?.imageQuality ?? settings.imageQuality ?? 100) / 100,
     qualityPolicy: settings.fullPageQuality,
   };
   const agent = createFullPagePageAgentTransport({ documentId, tabId: args.tabId });

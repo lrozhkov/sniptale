@@ -141,6 +141,8 @@ export const settingsTransferMessages = defineMessageSource({
     default: message('По умолчанию', 'Default'),
     format: message('Формат', 'Format'),
     quality: message('Качество', 'Quality'),
+    fullPageImage: message('Формат полноразмерных снимков', 'Full-page image format'),
+    fullPageCapture: message('Подготовка полноразмерных снимков', 'Full-page capture preparation'),
     fullPageQuality: message('Пределы полноразмерных снимков', 'Full-page screenshot limits'),
     timing: message('Ожидание загрузки страниц', 'Page loading waits'),
     resourceLimits: message('Пределы вложений и изображений', 'Attachment and image limits'),

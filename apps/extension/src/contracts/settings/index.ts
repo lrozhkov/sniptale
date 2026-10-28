@@ -223,6 +223,7 @@ export interface Settings {
   defaultExportPresetId?: string | null;
   imageFormat: 'png' | 'jpeg' | 'webp';
   imageQuality: number;
+  fullPageImage?: ScreenshotImagePreferences;
   fullPageQuality?: FullPageQualityPolicy;
   authenticatedSnapshotAssetsEnabled: boolean;
   anonymousCrossOriginSnapshotAssetsEnabled: boolean;
@@ -233,6 +234,11 @@ export interface Settings {
   pagePackageCaptureTiming?: PagePackageCaptureTimingPolicy;
   voiceInput?: VoiceInputPreferences;
 }
+
+export type ScreenshotImagePreferences = Pick<Settings, 'imageFormat' | 'imageQuality'>;
+export type ScreenshotCapturePreferences = ScreenshotImagePreferences & {
+  fullPageCapture?: FullPageCapturePreferences;
+};
 
 export type NormalizedSettings = Omit<
   Settings,
@@ -258,6 +264,7 @@ export type SettingsPatch = Omit<
   | 'contextMenu'
   | 'defaultViewportPresetId'
   | 'fullPageCapture'
+  | 'fullPageImage'
   | 'exportResourceLimits'
   | 'fullPageQuality'
   | 'localStoragePolicy'
@@ -269,6 +276,7 @@ export type SettingsPatch = Omit<
   pageLaunch?: Partial<PageLaunchPreferences>;
   contextMenu?: Partial<ContextMenuSettings>;
   fullPageCapture?: Partial<FullPageCapturePreferences>;
+  fullPageImage?: Partial<ScreenshotImagePreferences>;
   exportResourceLimits?: Partial<ExportResourceLimits>;
   fullPageQuality?: FullPageQualityPolicy;
   localStoragePolicy?: Partial<LocalStoragePolicy>;

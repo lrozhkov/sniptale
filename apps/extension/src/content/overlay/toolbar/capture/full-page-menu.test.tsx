@@ -107,13 +107,11 @@ it('keeps primary capture and preference-menu activation separate', () => {
 });
 
 function expandParameters(view: HTMLDivElement) {
-  const details = view.querySelector<HTMLDetailsElement>(
-    '[data-ui="content.toolbar.full-capture-parameters"]'
-  )!;
-  act(() => {
-    details.open = true;
-    details.dispatchEvent(new Event('toggle'));
-  });
+  act(() =>
+    view
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.full-capture-parameters"]')!
+      .click()
+  );
 }
 
 it('shows lazy loading and motion controls before floating-element behavior', () => {
@@ -250,7 +248,7 @@ it('closes on an outside pointer interaction', () => {
   expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).toBeNull();
 });
 
-it('stays open near the popover and closes when the pointer moves far away', () => {
+it('keeps settings available when the pointer moves between distant menu sections', () => {
   const view = render(<Harness />);
   act(() => {
     view
@@ -282,7 +280,7 @@ it('stays open near the popover and closes when the pointer moves far away', () 
       new MouseEvent('mousemove', { bubbles: true, clientX: 620, clientY: 520 })
     );
   });
-  expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).toBeNull();
+  expect(view.querySelector('[data-ui="content.toolbar.full-page-menu"]')).not.toBeNull();
 });
 
 it('keeps the preference menu available and mounted while a save is pending', async () => {
@@ -325,33 +323,42 @@ it('keeps the preference menu available and mounted while a save is pending', as
   expect(menu?.querySelectorAll('button:disabled')).toHaveLength(0);
 });
 
-it('starts parameters collapsed and preserves expansion across menu reopening without changing preferences', () => {
+it('returns to actions and resets navigation when the menu reopens without changing preferences', async () => {
   const onUpdate = vi.fn().mockResolvedValue(undefined);
   const view = render(<Harness onUpdate={onUpdate} />);
   const trigger = view.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.capture-full-settings-button"]'
   )!;
   act(() => trigger.click());
-  let details = view.querySelector<HTMLDetailsElement>(
-    '[data-ui="content.toolbar.full-capture-parameters"]'
-  )!;
-  expect(details).not.toBeNull();
-  expect(details.open).toBe(false);
-  act(() => {
-    details.open = true;
-    details.dispatchEvent(new Event('toggle'));
-  });
-  expect(details.open).toBe(true);
+  expect(
+    view.querySelector('[data-ui="content.toolbar.full-capture-parameters-panel"]')
+  ).toBeNull();
+  expect(
+    view.querySelector('.sniptale-screenshot-menu > .sniptale-toolbar-menu-title')
+  ).not.toBeNull();
+  expandParameters(view);
+  expect(view.querySelector('.sniptale-screenshot-menu > .sniptale-toolbar-menu-title')).toBeNull();
+  expect(
+    view.querySelector('[data-ui="content.toolbar.full-capture-parameters-panel"]')
+  ).not.toBeNull();
+  await act(async () =>
+    view
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.full-capture-parameters-back"]')!
+      .click()
+  );
+  expect(document.activeElement).toBe(
+    view.querySelector('[data-ui="content.toolbar.full-capture-parameters"]')
+  );
+  expandParameters(view);
   act(() => trigger.click());
   act(() => trigger.click());
-  details = view.querySelector<HTMLDetailsElement>(
-    '[data-ui="content.toolbar.full-capture-parameters"]'
-  )!;
-  expect(details.open).toBe(true);
+  expect(
+    view.querySelector('[data-ui="content.toolbar.full-capture-parameters-panel"]')
+  ).toBeNull();
   expect(onUpdate).not.toHaveBeenCalled();
 });
 
-it('keeps the full-page header concise after edits and collapse', async () => {
+it('updates the accepted full-page summary after edits and returning to actions', async () => {
   const onUpdate = vi.fn().mockResolvedValue(undefined);
   const view = render(<Harness onUpdate={onUpdate} />);
   act(() =>
@@ -359,23 +366,25 @@ it('keeps the full-page header concise after edits and collapse', async () => {
       .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.capture-full-settings-button"]')!
       .click()
   );
-  const details = view.querySelector<HTMLDetailsElement>('details')!;
-  const summary = details.querySelector('summary')!;
-  expect(summary.textContent).toBe('content.toolbar.captureParameters');
+  const summary = () =>
+    view.querySelector('[id="content.toolbar.full-capture-summary"]')!.textContent;
+  expect(summary()).toContain('Preload on, freeze on');
   expandParameters(view);
   await act(async () =>
     view
       .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.full-page-floating.hide"]')!
       .click()
   );
-  const lazy = Array.from(details.querySelectorAll('button')).find((button) =>
+  const lazy = Array.from(view.querySelectorAll('button')).find((button) =>
     button.textContent?.includes('fullPageLazyContent')
   )!;
   await act(async () => lazy.click());
-  act(() => {
-    details.open = false;
-    details.dispatchEvent(new Event('toggle'));
-  });
-  expect(summary.textContent).toBe('content.toolbar.captureParameters');
+  await act(async () =>
+    view
+      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.full-capture-parameters-back"]')!
+      .click()
+  );
+  expect(summary()).toContain('Preload off, freeze on');
+  expect(summary()).toContain('Floating: Hide');
   expect(onUpdate).toHaveBeenCalledTimes(2);
 });

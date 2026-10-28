@@ -41,18 +41,8 @@ export function usePackageCaptureBehaviorPreferences() {
     };
   }, []);
   const update = (next: FullPageCapturePreferences) => {
-    const revision = revisionRef.current + 1;
-    revisionRef.current = revision;
+    revisionRef.current += 1;
     setPreferences(next);
-    void patchSettings({ fullPageCapture: next }).catch(() => {
-      void loadSettings()
-        .then((settings) => {
-          if (mountedRef.current && revisionRef.current === revision) {
-            setPreferences(settings.fullPageCapture ?? DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES);
-          }
-        })
-        .catch(() => undefined);
-    });
   };
   const updateResourceLimits = (next: ExportResourceLimits) => {
     const revision = limitsRevisionRef.current + 1;

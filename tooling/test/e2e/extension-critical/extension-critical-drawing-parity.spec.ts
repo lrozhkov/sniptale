@@ -857,6 +857,22 @@ for (const variant of [
   });
 }
 
+async function verifyArrowDirectionToggle(page: Page) {
+  const button = page.locator('[data-ui$=".arrow.from-tip"]');
+  const initial = (await button.getAttribute('aria-pressed')) === 'true';
+  const check = async (active: boolean) => {
+    await expect(button).toHaveAttribute('aria-pressed', String(active));
+    await expect(
+      button.locator(active ? '.lucide-arrow-down-to-dot' : '.lucide-arrow-up-from-dot')
+    ).toBeVisible();
+  };
+  await check(initial);
+  await button.click();
+  await check(!initial);
+  await button.click();
+  await check(initial);
+}
+
 async function verifyDrawingParameterOrder(page: Page, editor: boolean) {
   for (const [tool, lastParameter] of [
     ['pencil', '[data-ui*=".pencil.width-"]'],
@@ -886,6 +902,7 @@ async function verifyDrawingParameterOrder(page: Page, editor: boolean) {
       );
     }, lastParameter);
     expect(ordered, `${tool} parameters precede color`).toBe(true);
+    if (tool === 'arrow') await verifyArrowDirectionToggle(page);
   }
   await page
     .locator(`[data-ui="${editor ? 'editor.floating.tool-rail' : 'content.toolbar.drawing'}.blur"]`)
@@ -1154,6 +1171,31 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await editor.close();
       await popup.close();
       await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`arrow direction button changes glyph in page and video drawing ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      for (const mode of ['drawing', 'video-recording']) {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+        await page.locator('[data-ui="content.toolbar.drawing.arrow"]').click();
+        await verifyArrowDirectionToggle(page);
+        await page.screenshot({
+          path: info.outputPath(`${mode}-arrow-direction.png`),
+          fullPage: false,
+        });
+      }
+    } finally {
+      await page.close();
+      await popup.close();
     }
   });
 }

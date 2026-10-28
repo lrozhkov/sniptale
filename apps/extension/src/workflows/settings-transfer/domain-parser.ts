@@ -380,6 +380,8 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
         imageFormat: value['format'],
         imageQuality: value['quality'],
         fullPageQuality: value['fullPageQuality'],
+        fullPageImage: value['fullPageImage'],
+        fullPageCapture: value['fullPageCapture'],
       };
     case 'capture.pages':
       return {
@@ -423,6 +425,10 @@ function coreSettingsTransferData(
       return {
         ...(source['format'] === undefined ? {} : { format: parsed.imageFormat }),
         ...(source['quality'] === undefined ? {} : { quality: parsed.imageQuality }),
+        ...(source['fullPageImage'] === undefined ? {} : { fullPageImage: parsed.fullPageImage }),
+        ...(source['fullPageCapture'] === undefined
+          ? {}
+          : { fullPageCapture: parsed.fullPageCapture }),
         ...(source['fullPageQuality'] === undefined
           ? {}
           : { fullPageQuality: parsed.fullPageQuality }),
