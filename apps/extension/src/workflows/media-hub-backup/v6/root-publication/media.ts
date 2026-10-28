@@ -146,7 +146,7 @@ async function deleteExistingMediaRoot(args: {
   const candidates = await deleteMediaSidecars(args.tx, args.mediaId, args.operation);
   if (current.source.kind === 'project-asset') candidates.delete(current.source.projectAssetId);
   await releaseUnpublishedProjectAssets(args.tx, candidates, args.operation);
-  await releaseMediaSource(args.tx, current, args.operation);
+  await releaseMediaSource(args.tx, current, args.operation, { retainRecordingRecovery: true });
   await args.stores.media.delete(args.mediaId);
 }
 
@@ -463,10 +463,12 @@ function isCaptureOriginal(prepared: PreparedMediaRoot): boolean {
   return (
     parseCapturedMediaRows({
       media: prepared.media,
-      projectAsset: prepared.projectAsset,
+      ...(prepared.recording
+        ? { recording: prepared.recording, telemetry: prepared.telemetry ?? null }
+        : { projectAsset: prepared.projectAsset }),
       ref: prepared.original.ref,
     }) !== null &&
-    !prepared.thumbnail &&
+    (!prepared.thumbnail || prepared.media.source.kind === 'recording') &&
     !prepared.presentation &&
     !prepared.workspace &&
     !prepared.videoReview &&

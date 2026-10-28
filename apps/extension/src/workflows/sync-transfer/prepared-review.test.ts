@@ -339,3 +339,69 @@ it.each([false, true])(
     expect(parsePreparedVideoReviewReplicaRoot(JSON.parse(JSON.stringify(root)))).toEqual(root);
   }
 );
+
+it.each([false, true])(
+  'prepares a recording review using the independent admitted original (archived=%s)',
+  async (archived) => {
+    const f = fixture(archived);
+    const aggregateId = archived ? 'recording:quick-project:previous' : 'recording:saved-source';
+    const recordingId = aggregateId.slice('recording:'.length);
+    const { projectAsset: _projectAsset, ...carrier } = f.metadata;
+    const metadata = parsePortableMediaMetadata({
+      ...carrier,
+      entry: {
+        ...carrier.entry,
+        kind: 'recording',
+        id: aggregateId,
+        source: { kind: 'recording', recordingId },
+      },
+      recording: {
+        entry: {
+          id: recordingId,
+          filename: 'Saved.webm',
+          createdAt: 1,
+          size: 6,
+          mimeType: 'video/webm',
+        },
+      },
+      videoReview: encodePortableReviewAssetRefs({
+        ...carrier.videoReview,
+        workspace: { ...carrier.videoReview!.workspace, aggregateId },
+        draft: carrier.videoReview!.draft ? { ...carrier.videoReview!.draft, aggregateId } : null,
+      }),
+    });
+    const dependencies = f.dependencies.map((item, index) =>
+      index === 0
+        ? {
+            ...item,
+            entry: {
+              ...item.entry,
+              kind: 'recording' as const,
+              id: 'recording:saved-source',
+              source: { kind: 'recording' as const, recordingId: 'saved-source' },
+            },
+          }
+        : item
+    );
+    const prepared = await preparePortableVideoReviewRoot({
+      metadata,
+      sourceMediaId: 'recording:saved-source',
+      dependencies,
+      expectedLocalGeneration: 0,
+      refFor: f.refFor,
+    });
+    expect(prepared.review.workspace.aggregateId).toBe(aggregateId);
+    expect(prepared.review.workspace.sourceAssetId).toBe(f.refs.get('original')!.assetId);
+    expect(prepared.sourceMediaId).toBe('recording:saved-source');
+    expect(prepared.assets).toHaveLength(2);
+    await expect(
+      preparePortableVideoReviewRoot({
+        metadata,
+        sourceMediaId: 'recording:saved-source',
+        dependencies: f.dependencies,
+        expectedLocalGeneration: 0,
+        refFor: f.refFor,
+      })
+    ).rejects.toThrow('admitted source');
+  }
+);

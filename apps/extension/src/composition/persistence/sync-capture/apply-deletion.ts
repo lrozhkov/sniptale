@@ -11,6 +11,10 @@ import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   initDB,
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
+  RECORDING_RECOVERY_BLOCKS_STORE,
   SYNC_CAPTURE_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -277,6 +281,14 @@ async function assertAbsentMediaRoot(
     ? rootId.slice('project-asset:'.length)
     : null;
   if (childId && (await tx.objectStore(PROJECT_ASSETS_STORE).get(childId)) !== undefined) refuse();
+  if (rootId.startsWith('recording:')) {
+    const id = rootId.slice('recording:'.length);
+    if (
+      (await tx.objectStore(STORE_NAME).get(id)) !== undefined ||
+      (await tx.objectStore(RECORDING_TELEMETRY_STORE).get(id)) !== undefined
+    )
+      refuse();
+  }
   await assertNoWorkspaceSidecars(tx, rootId);
   for (const kind of ['image', 'video-project', 'scenario'] as const) {
     const key = createAggregatePresentationKey({ id: rootId, kind });
@@ -350,14 +362,21 @@ function hasPendingPublication(
     return journals.some((journal) => pendingProject(journal, input.rootId));
   const target = {
     id: input.rootId,
-    ...(input.rootId.startsWith('project-asset:')
+    ...(input.rootId.startsWith('recording:')
       ? {
           source: {
-            kind: 'project-asset' as const,
-            projectAssetId: input.rootId.slice('project-asset:'.length),
+            kind: 'recording' as const,
+            recordingId: input.rootId.slice('recording:'.length),
           },
         }
-      : {}),
+      : input.rootId.startsWith('project-asset:')
+        ? {
+            source: {
+              kind: 'project-asset' as const,
+              projectAssetId: input.rootId.slice('project-asset:'.length),
+            },
+          }
+        : {}),
   };
   return journals.some((journal) => mediaHasPendingPublication(journal, target));
 }
@@ -441,6 +460,10 @@ async function commitDeletion(
   signal?.throwIfAborted();
   const tx = db.transaction(
     [
+      STORE_NAME,
+      RECORDING_TELEMETRY_STORE,
+      RECORDING_RECOVERY_SESSIONS_STORE,
+      RECORDING_RECOVERY_BLOCKS_STORE,
       SYNC_CAPTURE_STORE,
       MEDIA_LIBRARY_STORE,
       PROJECT_ASSETS_STORE,

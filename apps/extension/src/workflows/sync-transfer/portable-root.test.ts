@@ -58,7 +58,7 @@ function ref(assetId = 'sender-bytes'): AssetRef {
     sha256: 'a'.repeat(64),
   };
 }
-function mediaRows(): CapturedMediaRows {
+function mediaRows(): Extract<CapturedMediaRows, { projectAsset: unknown }> {
   const original = ref();
   return {
     ref: original,
@@ -520,6 +520,7 @@ it('encodes a frozen original and binds verified target bytes through the existi
   });
   expect(payload.kind).toBe('media');
   if (payload.kind !== 'media') throw new Error('Expected media.');
+  if (!('projectAsset' in payload.input.rows)) throw new Error('Expected project asset.');
   expect(payload.input.rows.projectAsset.assetId).toBe(local.assetId);
   expect(payload.input.connectionGeneration).toBe(3);
   expect(result.objects[0]!.blob).toBeInstanceOf(File);

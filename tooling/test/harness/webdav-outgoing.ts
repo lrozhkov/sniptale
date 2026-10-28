@@ -1,3 +1,4 @@
+import { parseRecordingEntry } from '../../../apps/extension/src/composition/persistence/recordings/index.guards';
 import { readVideoWorkspace } from '../../../apps/extension/src/composition/persistence/review-workspaces/store';
 import type { CaptureRootKind } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
 import { parseSyncAttemptText } from '../../../apps/extension/src/workflows/sync-transfer/wire-record';
@@ -80,6 +81,13 @@ function catalogProof(current: Awaited<ReturnType<typeof scanSyncCatalog>>) {
   };
 }
 
+function signal() {
+  return new AbortController().signal;
+}
+function check(condition: unknown) {
+  if (!condition) throw new Error('Native catalog fixture is unavailable.');
+}
+
 /** Runs production encoding and dispatch over actual captured native sources. */
 export function createWebdavOutgoingHarness(
   connected: () => SyncRemoteStore,
@@ -90,10 +98,6 @@ export function createWebdavOutgoingHarness(
     | null = null;
   let admissionHold: { promise: Promise<void>; release: () => void } | null = null;
   let catalog: Awaited<ReturnType<typeof scanSyncCatalog>> | null = null;
-  const signal = () => new AbortController().signal;
-  const check = (condition: unknown) => {
-    if (!condition) throw new Error('Native catalog fixture is unavailable.');
-  };
   async function queueScope(): Promise<SyncQueueScope> {
     const db = await initDB();
     const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
@@ -274,11 +278,13 @@ export function createWebdavOutgoingHarness(
       const dependencies = [];
       for (const dependency of operation.operation.dependencies) {
         const entry = parseMediaLibraryEntry(await db.get('media_library', dependency.mediaId));
-        if (!entry || entry.source.kind !== 'project-asset')
-          throw new Error('Local Library source is missing.');
-        const child = parseProjectAssetEntry(
-          await db.get('project_assets', entry.source.projectAssetId)
-        );
+        if (!entry) throw new Error('Local Library source is missing.');
+        const child =
+          entry.source.kind === 'project-asset'
+            ? parseProjectAssetEntry(await db.get('project_assets', entry.source.projectAssetId))
+            : entry.source.kind === 'recording'
+              ? parseRecordingEntry(await db.get('recordings', entry.source.recordingId))
+              : null;
         const ref = child ? parseAssetRef(await db.get('asset_refs', child.assetId)) : null;
         const state = await localState(spaceId, 'media', entry.id);
         if (!ref || !state) throw new Error('Local Library proof is missing.');

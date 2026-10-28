@@ -53,7 +53,9 @@ function assetRef(entry: { assetId: string; size: number; mimeType: string }): A
   };
 }
 
-function reviewRows(archived = false): CapturedVideoReviewRows {
+function reviewRows(archived = false): CapturedVideoReviewRows & {
+  source: Extract<CapturedVideoReviewRows['source'], { projectAsset: unknown }>;
+} {
   const original = createProjectAssetEntry({
     id: 'source',
     assetId: 'source-original',
@@ -124,7 +126,11 @@ function backupDatabase(rows: CapturedVideoReviewRows) {
     ],
     [
       'project_assets',
-      new Map([rows.source.projectAsset, ...rows.assets].map((entry) => [entry.id, entry])),
+      new Map(
+        [...('projectAsset' in rows.source ? [rows.source.projectAsset] : []), ...rows.assets].map(
+          (entry) => [entry.id, entry]
+        )
+      ),
     ],
     ['asset_refs', new Map([rows.source.ref, ...rows.refs].map((ref) => [ref.assetId, ref]))],
     [
@@ -356,3 +362,47 @@ it('detaches nested sidecar history and recovery before asynchronous file reads'
   expect(metadata.reviewAssets?.[0]?.videoReview?.workspace.history).toHaveLength(1);
   expect(metadata.reviewAssets?.[1]?.videoReview?.draft?.annotation.text).toBe('Draft c');
 });
+
+it.each([false, true])(
+  'encodes a frozen recording review through the existing backup carrier (archived=%s)',
+  async (archived) => {
+    const previous = reviewRows();
+    const recording = {
+      id: 'saved-recording',
+      assetId: previous.source.ref.assetId,
+      filename: 'Saved recording.webm',
+      createdAt: 1,
+      mimeType: previous.source.ref.mimeType,
+      size: previous.source.ref.size,
+      ...(previous.source.media.lifecycle ? { lifecycle: previous.source.media.lifecycle } : {}),
+    };
+    const media = {
+      ...previous.source.media,
+      kind: 'recording' as const,
+      id: `recording:${recording.id}`,
+      source: { kind: 'recording' as const, recordingId: recording.id },
+    };
+    const aggregateId = archived ? 'recording:quick-project:previous' : media.id;
+    const rows: CapturedVideoReviewRows = {
+      ...previous,
+      source: { media, recording, ref: previous.source.ref, telemetry: null },
+      review: {
+        ...previous.review,
+        workspace: {
+          ...previous.review.workspace,
+          aggregateId,
+          ...(archived ? { sourceMediaId: media.id } : {}),
+        },
+        draft: previous.review.draft ? { ...previous.review.draft, aggregateId } : null,
+      },
+      ...(previous.thumbnail ? { thumbnail: { ...previous.thumbnail, assetId: aggregateId } } : {}),
+    };
+    const encoded = await encodeCapturedVideoReviewRoot(rows);
+    const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+    expect(encoded.reviewSourceMediaId).toBe(media.id);
+    expect(metadata.recording?.entry.id).toBe(aggregateId.slice('recording:'.length));
+    expect(metadata.videoReview?.workspace.aggregateId).toBe(aggregateId);
+    expect(encoded.bindings[0]?.ref).toEqual(rows.source.ref);
+    expect(io.liveRead).not.toHaveBeenCalled();
+  }
+);

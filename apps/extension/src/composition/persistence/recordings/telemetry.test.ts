@@ -1,3 +1,8 @@
+import {
+  deleteRecordingTelemetry,
+  saveRecordingTelemetry,
+  getRecordingTelemetry,
+} from './telemetry';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RecordingActionEvent } from '../../../features/video/project/types';
 import type { RecordingTelemetryEntry } from './contracts';
@@ -21,10 +26,22 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 }));
 
 function createDb() {
-  return {
+  const db = {
     delete: vi.fn(),
     get: vi.fn(),
     put: vi.fn(),
+  };
+  return {
+    ...db,
+    transaction: vi.fn((_stores: string[], _mode: string) => ({
+      objectStore: (name: string) => ({
+        put: (value: unknown) => db.put(name, value),
+        delete: (key: string) => db.delete(name, key),
+        get: async () => undefined,
+      }),
+      done: Promise.resolve(),
+      abort: vi.fn(),
+    })),
   };
 }
 
@@ -36,7 +53,6 @@ describe('shared recording telemetry db', () => {
   it('persists and deletes telemetry entries through the dedicated store', async () => {
     const db = createDb();
     initDbMock.mockResolvedValue(db);
-    const { deleteRecordingTelemetry, saveRecordingTelemetry } = await import('./telemetry');
 
     const entry: RecordingTelemetryEntry = {
       actionEvents: [],
@@ -60,7 +76,6 @@ describe('shared recording telemetry db', () => {
     const db = createDb();
     db.get.mockResolvedValue({ recordingId: 5 });
     initDbMock.mockResolvedValue(db);
-    const { getRecordingTelemetry } = await import('./telemetry');
 
     await expect(getRecordingTelemetry('recording-1')).resolves.toBeUndefined();
 
@@ -85,7 +100,6 @@ describe('shared recording telemetry db', () => {
       viewport: null,
     });
     initDbMock.mockResolvedValue(db);
-    const { getRecordingTelemetry, saveRecordingTelemetry } = await import('./telemetry');
 
     await expect(
       saveRecordingTelemetry({
@@ -131,7 +145,6 @@ it('roundtrips native time provenance without changing existing event times', as
 
   const db = createDb();
   initDbMock.mockResolvedValue(db);
-  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
   const entry: RecordingTelemetryEntry = {
     recordingId: 'native',
     createdAt: 1,
@@ -177,7 +190,6 @@ it('roundtrips recording-image points, unavailable geometry and raw client point
   };
   const db = createDb();
   initDbMock.mockResolvedValue(db);
-  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
   await saveRecordingTelemetry(entry);
   db.get.mockResolvedValue(structuredClone(db.put.mock.calls.at(-1)![1]));
   expect(await getRecordingTelemetry('tab')).toEqual(entry);
@@ -212,7 +224,6 @@ it('preserves every raw typing interval on publication and read without mutating
     ],
   };
   db.get.mockResolvedValue(entry);
-  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
   await saveRecordingTelemetry(entry);
   const read = await getRecordingTelemetry('noise');
   expect(read?.signals).toEqual(entry.signals);
@@ -224,7 +235,6 @@ it('preserves every raw typing interval on publication and read without mutating
 it('preserves click target semantics through save and read without changing event identity', async () => {
   const db = createDb();
   initDbMock.mockResolvedValue(db);
-  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
   const entry: RecordingTelemetryEntry = {
     recordingId: 'semantic',
     captureMode: 'TAB',
@@ -293,7 +303,6 @@ it('stores and reloads observation descriptors and timing quality without projec
       timing: { mode: 'approximate', accuracyMs: null },
     },
   };
-  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
   await saveRecordingTelemetry(entry);
   db.get.mockResolvedValue(structuredClone(db.put.mock.calls.at(-1)?.[1]));
   expect(await getRecordingTelemetry('raw')).toEqual(entry);

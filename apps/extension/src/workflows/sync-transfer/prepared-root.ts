@@ -69,6 +69,7 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       exactKeys(raw, [
         'entry',
         'projectAsset',
+        'recording',
         'originalObjectId',
         'videoReview',
         'reviewAssets',
@@ -112,8 +113,11 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
       validatePortableImageRows(envelope, metadata);
       return { kind: 'image' as const, envelope, metadata };
     }
-    exactKeys(metadata, ['entry', 'projectAsset', 'originalObjectId']);
-    if (metadata.entry.id !== envelope.descriptor.rootId || !metadata.projectAsset)
+    exactKeys(metadata, ['entry', 'projectAsset', 'recording', 'originalObjectId']);
+    if (
+      metadata.entry.id !== envelope.descriptor.rootId ||
+      (!metadata.projectAsset && !metadata.recording)
+    )
       throw new Error('Unsupported portable media root.');
     await assertArchiveRootObjectInventory(envelope, metadataOnlyReader, []);
     return { kind: 'media' as const, envelope, metadata };
@@ -265,6 +269,16 @@ function prepareMediaRows(
   const ref = refFor(parsed.metadata.originalObjectId);
   const media = parseMediaLibraryEntry(parsed.metadata.entry);
   if (!media) throw new Error('Invalid portable media entry.');
+  if (parsed.metadata.recording) {
+    const rows = parseCapturedMediaRows({
+      media,
+      ref,
+      recording: { ...parsed.metadata.recording.entry, assetId: ref.assetId },
+      telemetry: parsed.metadata.recording.telemetry ?? null,
+    });
+    if (!rows) throw new Error('Unsupported portable recording original.');
+    return rows;
+  }
   const projectAsset = preparePortableMediaOriginal({
     metadata: parsed.metadata,
     media,

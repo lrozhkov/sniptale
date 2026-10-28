@@ -26,6 +26,22 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'shared-db-media-source-retention',
+    productionFile:
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.ts',
+    reason:
+      'Source retention includes purge, pending native publications, Scenario dependencies ' +
+      'and recording replacement through native sync and backup publication.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.pending-publication.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.scenario.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.recording.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.capture.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-canonical-media-deletion',
     productionFile: 'apps/extension/src/composition/persistence/media-library/delete-cascade.ts',
     reason:

@@ -152,7 +152,11 @@ it('captures a duplicated restored original before a project borrows its accepte
     .filter((row) => row?.kind === 'sync-operation');
   expect(captures).toHaveLength(1);
   const captured = captures[0];
-  if (captured?.phase !== 'native' || captured.change.kind !== 'media')
+  if (
+    captured?.phase !== 'native' ||
+    captured.change.kind !== 'media' ||
+    !('projectAsset' in captured.change.rows)
+  )
     throw new Error('Restored media capture is missing.');
   expect(captured).toMatchObject({ origin: 'local-restore', generation: 1, basis: [] });
   expect(captured.rootId).not.toBe(entry.id);
@@ -509,4 +513,229 @@ it('allocates restored clocks above higher sender workspace and recovery revisio
   expect(data.table('video_workspace_drafts').get(data.metadata.entry.id)).toMatchObject({
     revision: 81,
   });
+});
+
+async function restoredRecordingFixture(
+  withReview: boolean,
+  failCapture = false,
+  kind: 'recording' | 'video' = 'recording'
+) {
+  const data = await restoredOriginalFixture(true, failCapture);
+  data.fixture.rows.set('recording_telemetry', new Map());
+  const base = projectAssetReviewMetadata();
+  const id = 'recording:archived-recording';
+  const recording = {
+    id: 'archived-recording',
+    filename: 'recording.webm',
+    mimeType: 'video/webm',
+    size: 6,
+    createdAt: 1,
+    lifecycle: createLibraryLifecycle('library', 1),
+  };
+  const telemetry = {
+    recordingId: recording.id,
+    actionEvents: [],
+    signals: [],
+    cursorTrack: null,
+    viewport: null,
+    captureMode: null,
+    createdAt: 1,
+    updatedAt: 2,
+  };
+  const metadata = {
+    entry: {
+      ...base.entry,
+      id,
+      kind,
+      filename: recording.filename,
+      source: { kind: 'recording', recordingId: recording.id },
+    },
+    recording: { entry: recording, telemetry },
+    originalObjectId: 'original',
+    ...(withReview
+      ? {
+          videoReview: {
+            ...base.videoReview,
+            workspace: { ...base.videoReview.workspace, aggregateId: id },
+            draft: { ...base.videoReview.draft, aggregateId: id },
+          },
+        }
+      : {}),
+  };
+  data.input.envelope.descriptor.rootId = id;
+  data.input.envelope.metadata = portableJson(metadata);
+  data.input.staged[0]!.ref.mimeType = 'video/webm';
+  return { ...data, metadata };
+}
+
+it('captures a duplicated restored recording and telemetry as one accepted original', async () => {
+  const data = await restoredRecordingFixture(false);
+  const existingRecording = {
+    ...data.metadata.recording.entry,
+    assetId: 'existing-recording-bytes',
+  };
+  const existingRef = {
+    ...data.input.staged[0]!.ref,
+    assetId: existingRecording.assetId,
+    location: { kind: 'opfs' as const, objectKey: 'objects/existing-recording-bytes' },
+  };
+  data.fixture.rows.get('media_library')!.set(data.metadata.entry.id, data.metadata.entry);
+  data.fixture.rows.get('recordings')!.set(existingRecording.id, existingRecording);
+  data.fixture.rows.get('asset_refs')!.set(existingRef.assetId, existingRef);
+  const ownerKey = JSON.stringify(['recording', existingRecording.id, 'body']);
+  const existingOwner = {
+    assetId: existingRef.assetId,
+    ownerKind: 'recording',
+    ownerId: existingRecording.id,
+    role: 'body',
+  };
+  data.fixture.rows.get('asset_owners')!.set(ownerKey, existingOwner);
+  await mediaLibraryRootPublisher.publish(data.input);
+  const capture = [...data.fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .find((row) => row?.kind === 'sync-operation');
+  expect(capture).toMatchObject({
+    origin: 'local-restore',
+    change: {
+      kind: 'media',
+      rows: {
+        media: { source: { kind: 'recording' } },
+        recording: { filename: 'recording.webm', assetId: data.input.staged[0]!.ref.assetId },
+        telemetry: { actionEvents: [], signals: [] },
+      },
+    },
+  });
+  if (
+    capture?.kind !== 'sync-operation' ||
+    capture.phase !== 'native' ||
+    capture.change.kind !== 'media' ||
+    !('recording' in capture.change.rows)
+  )
+    throw new Error('Expected restored recording capture.');
+  expect(capture.change.rows.recording.id).not.toBe(data.metadata.recording.entry.id);
+  expect(capture.change.rows.telemetry?.recordingId).toBe(capture.change.rows.recording.id);
+  expect(data.fixture.rows.get('media_library')!.get(data.metadata.entry.id)).toEqual(
+    data.metadata.entry
+  );
+  expect(data.fixture.rows.get('recordings')!.get(existingRecording.id)).toEqual(existingRecording);
+  expect(data.fixture.rows.get('asset_refs')!.get(existingRef.assetId)).toEqual(existingRef);
+  expect(data.fixture.rows.get('asset_owners')!.get(ownerKey)).toEqual(existingOwner);
+});
+
+it.each(['recording', 'video'] as const)(
+  'captures restored %s review and original atomically with rebased revisions',
+  async (kind) => {
+    const data = await restoredRecordingFixture(true, true, kind);
+    const before = structuredClone(data.fixture.rows);
+    await expect(mediaLibraryRootPublisher.publish(data.input)).rejects.toMatchObject({
+      name: 'QuotaExceededError',
+    });
+    expect(data.fixture.rows).toEqual(before);
+    data.allowCapture();
+    await mediaLibraryRootPublisher.publish(data.input);
+    const captures = [...data.fixture.rows.get('sync_capture')!.values()]
+      .map(parseSyncCaptureRecord)
+      .filter((row) => row?.kind === 'sync-operation');
+    const original = captures.find((row) => row?.rootKind === 'media');
+    const review = captures.find((row) => row?.rootKind === 'video-review');
+    expect(captures).toHaveLength(2);
+    expect(original).toMatchObject({
+      origin: 'local-restore',
+      change: {
+        kind: 'media',
+        rows: {
+          recording: { filename: 'recording.webm' },
+          telemetry: { actionEvents: [] },
+        },
+      },
+    });
+    expect(review).toMatchObject({
+      origin: 'local-restore',
+      change: {
+        kind: 'video-review',
+        mediaDependencies: [
+          {
+            mediaId: original?.rootId,
+            generation: original?.generation,
+            basis: [original?.operationId],
+          },
+        ],
+      },
+    });
+    if (review?.phase !== 'native' || review.change.kind !== 'video-review')
+      throw new Error('Expected restored recording review capture.');
+    expect(review.change.rows.review.workspace.revision).toBeGreaterThan(
+      data.metadata.videoReview!.workspace.revision
+    );
+  }
+);
+
+it('captures a restored recording original with its disposable thumbnail', async () => {
+  const data = await restoredRecordingFixture(false);
+  data.input.envelope.metadata = portableJson({
+    ...data.metadata,
+    thumbnail: { objectId: 'thumbnail', createdAt: 1, updatedAt: 2, width: 16, height: 9 },
+  });
+  data.input.staged.push({
+    objectId: 'thumbnail',
+    ref: {
+      ...data.input.staged[0]!.ref,
+      assetId: 'restored-thumbnail',
+      mimeType: 'image/png',
+      location: { kind: 'opfs', objectKey: 'objects/restored-thumbnail' },
+    },
+  });
+  await mediaLibraryRootPublisher.publish(data.input);
+  const captures = [...data.fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .filter((row) => row?.kind === 'sync-operation');
+  expect(captures).toHaveLength(1);
+  expect(captures[0]).toMatchObject({ rootKind: 'media', origin: 'local-restore' });
+  expect(data.fixture.rows.get('thumbnails')!.get(data.metadata.entry.id)).toBeDefined();
+  expect(mocks.checkpoint).toHaveBeenCalledOnce();
+});
+
+it('replaces a restored recording atomically while retaining its original recovery blocks', async () => {
+  const data = await restoredRecordingFixture(false);
+  const replacement = {
+    ...data.input,
+    session: { ...data.input.session, strategy: 'replace' as const },
+  };
+  const id = data.metadata.recording.entry.id;
+  const previousRef = {
+    ...data.input.staged[0]!.ref,
+    assetId: 'predecessor-recording',
+    location: { kind: 'opfs' as const, objectKey: 'objects/predecessor-recording' },
+  };
+  const previous = { ...data.metadata.recording.entry, assetId: previousRef.assetId };
+  const table = (name: string) => data.fixture.rows.get(name)!;
+  table('media_library').set(data.metadata.entry.id, data.metadata.entry);
+  table('recordings').set(id, previous);
+  table('asset_refs').set(previousRef.assetId, previousRef);
+  table('asset_owners').set(JSON.stringify(['recording', id, 'body']), {
+    assetId: previousRef.assetId,
+    ownerKind: 'recording',
+    ownerId: id,
+    role: 'body',
+  });
+  const safety = { id, published: true };
+  const block = { id, index: 0, bytes: new Uint8Array([1, 2, 3]).buffer };
+  table('recording_recovery_sessions').set(id, safety);
+  table('recording_recovery_blocks').set(JSON.stringify([id, 0]), block);
+  mocks.checkpoint.mockRejectedValueOnce(new Error('Recording archive checkpoint failed'));
+  const before = structuredClone(data.fixture.rows);
+  await expect(mediaLibraryRootPublisher.publish(replacement)).rejects.toThrow(
+    'archive checkpoint'
+  );
+  expect(data.fixture.rows).toEqual(before);
+  await mediaLibraryRootPublisher.publish(replacement);
+  expect(table('recordings').get(id)).toMatchObject({ assetId: data.input.staged[0]!.ref.assetId });
+  expect(table('recording_recovery_sessions').get(id)).toEqual(safety);
+  expect(table('recording_recovery_blocks').get(JSON.stringify([id, 0]))).toEqual(block);
+  expect(table('asset_refs').has(previousRef.assetId)).toBe(false);
+  const captures = [...table('sync_capture').values()]
+    .map(parseSyncCaptureRecord)
+    .filter((row) => row?.kind === 'sync-operation');
+  expect(captures).toHaveLength(1);
+  expect(captures[0]).toMatchObject({ rootKind: 'media', origin: 'local-restore' });
 });

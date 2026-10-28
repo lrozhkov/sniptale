@@ -4,7 +4,10 @@ import {
   parseMediaLibraryEntry,
   parseMediaThumbnailEntry,
 } from '../../composition/persistence/media-library/read-guards';
-import { prepareVideoReviewRestore } from '../../composition/persistence/review-workspaces/backup-restore';
+import {
+  remapVideoReviewRecordingSource,
+  prepareVideoReviewRestore,
+} from '../../composition/persistence/review-workspaces/backup-restore';
 import type { ApplyPreparedVideoProjectRevisionInput } from '../../composition/persistence/sync-capture/apply-video-project';
 import {
   parsePreparedVideoReviewReplicaRoot,
@@ -22,20 +25,24 @@ export function validatePortableVideoReviewMetadata(
 ): void {
   const media = parseMediaLibraryEntry(metadata.entry);
   const review = metadata.videoReview;
+  const sourcePrefix = media?.source.kind === 'recording' ? 'recording:' : 'project-asset:';
+  const child =
+    media?.source.kind === 'recording' ? metadata.recording?.entry : metadata.projectAsset;
   if (
-    !sourceMediaId.startsWith('project-asset:') ||
-    sourceMediaId.length <= 'project-asset:'.length ||
+    !sourceMediaId.startsWith(sourcePrefix) ||
+    sourceMediaId.length <= sourcePrefix.length ||
     sourceMediaId.length > 256 ||
     !media ||
-    media.source.kind !== 'project-asset' ||
-    media.kind !== 'video' ||
+    (media.source.kind !== 'project-asset' && media.source.kind !== 'recording') ||
+    (media.kind !== 'video' &&
+      !(media.source.kind === 'recording' && media.kind === 'recording')) ||
     !media.mimeType.startsWith('video/') ||
     media.lifecycle?.storageClass !== 'library' ||
     media.blob !== undefined ||
-    media.recordingMetadata !== undefined ||
-    media.recordingGroup !== undefined ||
-    !metadata.projectAsset ||
-    metadata.projectAsset.size !== media.size ||
+    (media.source.kind === 'project-asset' &&
+      (media.recordingMetadata !== undefined || media.recordingGroup !== undefined)) ||
+    !child ||
+    child.size !== media.size ||
     !review?.workspace.project ||
     review.workspace.aggregateId !== media.id ||
     !sameReviewVideoContainer(review.workspace.source.mimeType, media.mimeType) ||
@@ -90,9 +97,15 @@ export async function preparePortableVideoReviewRoot(args: {
     !source ||
     !sourceRef ||
     !originalRef ||
-    source.entry.source.kind !== 'project-asset' ||
-    source.entry.id !== `project-asset:${source.entry.source.projectAssetId}` ||
-    source.entry.kind !== 'video' ||
+    source.entry.source.kind !== args.metadata.entry.source.kind ||
+    !(
+      (source.entry.source.kind === 'project-asset' &&
+        source.entry.id === `project-asset:${source.entry.source.projectAssetId}`) ||
+      (source.entry.source.kind === 'recording' &&
+        source.entry.id === `recording:${source.entry.source.recordingId}`)
+    ) ||
+    (source.entry.kind !== 'video' &&
+      !(source.entry.source.kind === 'recording' && source.entry.kind === 'recording')) ||
     source.entry.mimeType !== args.metadata.entry.mimeType ||
     source.entry.size !== args.metadata.entry.size ||
     sourceRef.size !== source.entry.size ||
@@ -156,7 +169,14 @@ export async function preparePortableVideoReviewRoot(args: {
   });
   const aggregateId = args.metadata.entry.id;
   const review = prepareVideoReviewRestore({
-    review: args.metadata.videoReview!,
+    review:
+      args.metadata.entry.source.kind === 'recording' && source.entry.source.kind === 'recording'
+        ? remapVideoReviewRecordingSource(
+            args.metadata.videoReview!,
+            args.metadata.entry.source.recordingId,
+            source.entry.source.recordingId
+          )
+        : args.metadata.videoReview!,
     sourceAggregateId: aggregateId,
     targetAggregateId: aggregateId,
     sourceAssetId: sourceRef.assetId,

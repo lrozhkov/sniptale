@@ -1,3 +1,7 @@
+import { saveRecordingsBatch } from '../../../apps/extension/src/composition/persistence/recordings/batch';
+import { parseRecordingEntry } from '../../../apps/extension/src/composition/persistence/recordings/index.guards';
+import { saveRecordingTelemetry } from '../../../apps/extension/src/composition/persistence/recordings/telemetry';
+import { saveMediaThumbnail } from '../../../apps/extension/src/composition/persistence/media-library/index.library';
 import { loadVideoReviewSource } from '../../../apps/extension/src/workflows/video-review/source';
 import { createWebdavOutgoingHarness } from './webdav-outgoing';
 import { saveProjectAsset } from '../../../apps/extension/src/composition/persistence/projects';
@@ -54,8 +58,13 @@ async function latest(rootId: string) {
 async function sourceFile(mediaId: string) {
   const db = await initDB();
   const media = parseMediaLibraryEntry(await db.get('media_library', mediaId));
-  check(media?.source.kind === 'project-asset', 'Review source is missing.');
-  const asset = parseProjectAssetEntry(await db.get('project_assets', media.source.projectAssetId));
+  check(media, 'Review source is missing.');
+  const asset =
+    media.source.kind === 'project-asset'
+      ? parseProjectAssetEntry(await db.get('project_assets', media.source.projectAssetId))
+      : media.source.kind === 'recording'
+        ? parseRecordingEntry(await db.get('recordings', media.source.recordingId))
+        : null;
   const ref = asset ? parseAssetRef(await db.get('asset_refs', asset.assetId)) : null;
   check(ref, 'Review source bytes are missing.');
   const file = await readAssetFile(ref, media.filename);
@@ -104,7 +113,10 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
         rootId !== sourceMediaId && (await db.get('media_library', rootId)) !== undefined,
     };
   }
-  async function seed(bytes: number[]) {
+  async function seed(
+    bytes: number[],
+    sourceKind: 'project-asset' | 'recording' = 'project-asset'
+  ) {
     await installExperimentalCaptureProfile({
       version: 1,
       kind: 'profile',
@@ -115,17 +127,49 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
       connectionGeneration: 3,
     });
     const sourceId = crypto.randomUUID();
-    const mediaId = `project-asset:${sourceId}`;
+    const mediaId = `${sourceKind}:${sourceId}`;
+    const createdExportId = sourceKind === 'recording' ? `recording:${crypto.randomUUID()}` : null;
     const original = new File([Uint8Array.from(bytes)], 'review-original.webm', {
       type: 'video/webm',
     });
-    await saveProjectAsset(sourceId, original, original.type, original.name);
+    if (sourceKind === 'recording') {
+      check(createdExportId, 'Created export identity is missing.');
+      await saveRecordingsBatch([
+        { id: sourceId, blob: original, filename: original.name },
+        {
+          id: createdExportId.slice('recording:'.length),
+          blob: original,
+          filename: 'Created export.webm',
+        },
+      ]);
+    } else await saveProjectAsset(sourceId, original, original.type, original.name);
     const canvas = new OffscreenCanvas(24, 24);
     const context = canvas.getContext('2d');
     check(context, 'Review background canvas is missing.');
     context.fillStyle = 'rgb(240,80,20)';
     context.fillRect(0, 0, 24, 24);
     const background = await canvas.convertToBlob({ type: 'image/png' });
+    if (sourceKind === 'recording') {
+      await saveMediaThumbnail({
+        assetId: mediaId,
+        blob: background,
+        createdAt: 1,
+        updatedAt: 1,
+        width: 24,
+        height: 24,
+      });
+      await updateMediaLibraryEntry(mediaId, { tags: ['derived-thumbnail-before-review'] });
+      await saveRecordingTelemetry({
+        recordingId: sourceId,
+        createdAt: 1,
+        updatedAt: 1,
+        captureMode: null,
+        viewport: null,
+        cursorTrack: null,
+        actionEvents: [],
+        signals: [],
+      });
+    }
     const privateId = crypto.randomUUID();
     await saveProjectAsset(
       privateId,
@@ -180,7 +224,7 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
         anchor: { kind: 'point', time: 2 },
       },
     });
-    const archiveId = `project-asset:quick-project:${crypto.randomUUID()}`;
+    const archiveId = `${sourceKind}:quick-project:${crypto.randomUUID()}`;
     await createVideoWorkspaceProject({
       aggregateId: mediaId,
       expectedRevision: current.workspace.revision,
@@ -213,9 +257,30 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
       spaceId,
       mediaId,
       archiveId,
+      createdExportId,
+      createdExport: createdExportId ? await originalProof(createdExportId) : null,
       default: await proof(mediaId),
       archive: await proof(archiveId),
     };
   }
-  return { seed, proof, outgoing };
+  async function originalProof(mediaId: string) {
+    const original = await sourceFile(mediaId);
+    return {
+      filename: original.media.filename,
+      size: original.file.size,
+      sha256: await hash(original.file),
+    };
+  }
+  async function initializeReceiver() {
+    await installExperimentalCaptureProfile({
+      version: 1,
+      kind: 'profile',
+      key: 'profile',
+      createdAt: Date.now(),
+      enabled: true,
+      spaceId,
+      connectionGeneration: 3,
+    });
+  }
+  return { seed, proof, originalProof, initializeReceiver, outgoing };
 }

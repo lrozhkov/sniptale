@@ -1,3 +1,7 @@
+import { parseCapturedMediaRows } from './guards';
+import { parseRecordingEntry } from '../recordings/index.guards';
+import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
+import type { StoredRecordingEntry } from '../recordings/contracts';
 import { sameReviewVideoContainer } from '../../../features/video/review/validation';
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -14,23 +18,22 @@ import { readWorkspaceStorage } from '../review-workspaces/storage';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import {
   MEDIA_LIBRARY_STORE,
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
   PROJECT_ASSETS_STORE,
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   THUMBNAILS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
-import { MAX_CAPTURE_ROWS } from './contracts';
+import { MAX_CAPTURE_ROWS, type CapturedMediaRows } from './contracts';
 import { describeImageMetadata, isBoundedImageMetadata } from './image-snapshot';
 
 /** A review owns its authored state; its real Library original remains a separate dependency. */
 export interface CapturedVideoReviewRows {
   review: VideoWorkspaceSnapshot;
-  source: {
-    media: Omit<MediaLibraryEntry, 'blob'>;
-    projectAsset: StoredProjectAssetEntry;
-    ref: AssetRef;
-  };
+  source: CapturedMediaRows;
+  recordings?: StoredRecordingEntry[];
   assets: StoredProjectAssetEntry[];
   refs: AssetRef[];
   media: Omit<MediaLibraryEntry, 'blob'>[];
@@ -57,8 +60,7 @@ function parseMedia(value: unknown): Omit<MediaLibraryEntry, 'blob'> | null {
   if (!isRecord(value) || 'blob' in value) return null;
   const media = parseMediaLibraryEntry(value);
   return media &&
-    !media.recordingMetadata &&
-    !media.recordingGroup &&
+    (media.source.kind === 'recording' || (!media.recordingMetadata && !media.recordingGroup)) &&
     media.lifecycle?.storageClass === 'library'
     ? media
     : null;
@@ -82,7 +84,10 @@ function matchesRef(
   );
 }
 
-function matchesReview(review: VideoWorkspaceSnapshot, asset: StoredProjectAssetEntry): boolean {
+function matchesReview(
+  review: VideoWorkspaceSnapshot,
+  asset: { assetId: string; size: number; mimeType: string }
+): boolean {
   return (
     asset.mimeType.startsWith('video/') &&
     review.workspace.sourceAssetId === asset.assetId &&
@@ -103,18 +108,27 @@ export function parseCapturedVideoReviewRows(value: unknown): CapturedVideoRevie
   if (
     Object.keys(value).some(
       (key) =>
-        !['review', 'source', 'assets', 'refs', 'media', 'privateReviews', 'thumbnail'].includes(
-          key
-        )
+        ![
+          'review',
+          'source',
+          'assets',
+          'refs',
+          'media',
+          'privateReviews',
+          'thumbnail',
+          'recordings',
+        ].includes(key)
     )
   )
     return null;
   const review = parseReview(value['review']);
   const thumbnail =
     value['thumbnail'] === undefined ? undefined : parseMediaThumbnailEntry(value['thumbnail']);
-  const media = parseMedia(value['source']['media']);
-  const projectAsset = parseProjectAssetEntry(value['source']['projectAsset']);
-  const ref = parseAssetRef(value['source']['ref']);
+  const source = parseCapturedMediaRows(value['source']);
+  const recordings =
+    value['recordings'] === undefined
+      ? undefined
+      : parseRows(value['recordings'], parseRecordingEntry);
   const assets = parseRows(value['assets'], parseProjectAssetEntry);
   const refs = parseRows(value['refs'], parseAssetRef);
   const published = parseRows(value['media'], parseMedia);
@@ -123,29 +137,23 @@ export function parseCapturedVideoReviewRows(value: unknown): CapturedVideoRevie
     !review ||
     thumbnail === null ||
     (thumbnail && thumbnail.assetId !== review.workspace.aggregateId) ||
-    !media ||
-    !projectAsset ||
-    !ref ||
+    !source ||
+    recordings === null ||
     !assets ||
     !refs ||
     !published ||
     !privateReviews ||
     !review.workspace.project ||
-    media.source.kind !== 'project-asset' ||
-    media.kind !== 'video' ||
-    media.source.projectAssetId !== projectAsset.id ||
-    media.id !== `project-asset:${projectAsset.id}` ||
-    projectAsset.originMediaId ||
-    media.size !== projectAsset.size ||
-    media.mimeType !== projectAsset.mimeType ||
-    (review.workspace.sourceMediaId ?? review.workspace.aggregateId) !== media.id ||
-    !matchesReview(review, projectAsset) ||
-    !matchesRef(projectAsset, ref)
+    source.media.lifecycle?.storageClass !== 'library' ||
+    (source.media.kind !== 'video' && source.media.kind !== 'recording') ||
+    (review.workspace.sourceMediaId ?? review.workspace.aggregateId) !== source.media.id ||
+    !matchesReview(review, 'recording' in source ? source.recording : source.projectAsset)
   )
     return null;
   const rows = {
     review,
-    source: { media, projectAsset, ref },
+    source,
+    ...(recordings === undefined ? {} : { recordings }),
     assets,
     refs,
     media: published,
@@ -206,8 +214,23 @@ function retainPublishedSource(
   assets: Map<string, StoredProjectAssetEntry>,
   refs: Map<string, AssetRef>,
   neededAssets: Set<string>,
-  neededRefs: Set<string>
+  neededRefs: Set<string>,
+  recordings: Map<string, StoredRecordingEntry>,
+  neededRecordings: Set<string>
 ): boolean {
+  if (entry.source.kind === 'recording') {
+    const recording = recordings.get(entry.source.recordingId);
+    const ref = recording && refs.get(recording.assetId);
+    if (
+      !recording ||
+      !ref ||
+      !parseCapturedMediaRows({ media: entry, recording, ref, telemetry: null })
+    )
+      return false;
+    neededRecordings.add(recording.id);
+    neededRefs.add(recording.assetId);
+    return true;
+  }
   if (entry.source.kind === 'stored-asset') {
     if (!matchesRef({ ...entry, assetId: entry.source.assetId }, refs.get(entry.source.assetId)))
       return false;
@@ -231,6 +254,8 @@ function retainPublishedSource(
 
 function hasUniqueClosureRows(rows: CapturedVideoReviewRows): boolean {
   return (
+    new Set((rows.recordings ?? []).map((entry) => entry.id)).size ===
+      (rows.recordings ?? []).length &&
     new Set(rows.assets.map((entry) => entry.id)).size === rows.assets.length &&
     new Set(rows.refs.map((entry) => entry.assetId)).size === rows.refs.length &&
     new Set(rows.media.map((entry) => entry.id)).size === rows.media.length &&
@@ -249,6 +274,8 @@ function completeClosure(rows: CapturedVideoReviewRows): boolean {
   const refs = new Map(rows.refs.map((entry) => [entry.assetId, entry]));
   const media = new Map(rows.media.map((entry) => [entry.id, entry]));
   const reviews = new Map(rows.privateReviews.map((entry) => [entry.workspace.aggregateId, entry]));
+  const recordings = new Map((rows.recordings ?? []).map((entry) => [entry.id, entry]));
+  const neededRecordings = new Set<string>();
   const neededAssets = new Set<string>();
   const neededRefs = new Set<string>();
   const neededMedia = new Set<string>();
@@ -279,10 +306,22 @@ function completeClosure(rows: CapturedVideoReviewRows): boolean {
   }
   for (const id of neededMedia) {
     const entry = media.get(id);
-    if (!entry || !retainPublishedSource(entry, assets, refs, neededAssets, neededRefs))
+    if (
+      !entry ||
+      !retainPublishedSource(
+        entry,
+        assets,
+        refs,
+        neededAssets,
+        neededRefs,
+        recordings,
+        neededRecordings
+      )
+    )
       return false;
   }
   return (
+    neededRecordings.size === recordings.size &&
     neededAssets.size === assets.size &&
     neededRefs.size === refs.size &&
     neededMedia.size === media.size &&
@@ -347,10 +386,44 @@ async function readReviewSource(
 ): Promise<CapturedVideoReviewRows['source']> {
   const id = review.workspace.sourceMediaId ?? review.workspace.aggregateId;
   const media = parseMedia(await tx.objectStore(MEDIA_LIBRARY_STORE).get(id));
+  if (media?.source.kind === 'recording') {
+    const recording = await readOwnedRecording(tx, media.source.recordingId);
+    const rawTelemetry: unknown = await tx
+      .objectStore(RECORDING_TELEMETRY_STORE)
+      .get(recording.recording.id);
+    const telemetry =
+      rawTelemetry === undefined ? null : parseRecordingTelemetryEntry(rawTelemetry);
+    const rows =
+      rawTelemetry !== undefined && !telemetry
+        ? null
+        : parseCapturedMediaRows({ media, ...recording, telemetry });
+    if (!rows) throw new Error('Invalid recording review original.');
+    return rows;
+  }
   if (!media || media.source.kind !== 'project-asset')
     throw new Error('Unsupported review original.');
   const source = await readOwnedAsset(tx, media.source.projectAssetId);
   return { media, projectAsset: source.asset, ref: source.ref };
+}
+
+async function readOwnedRecording(tx: ReadTransaction, id: string) {
+  const recording = parseRecordingEntry(await tx.objectStore(STORE_NAME).get(id));
+  if (!recording || recording.id !== id) throw new Error('Missing recording review resource.');
+  const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(recording.assetId));
+  const owner = parseAssetOwner(
+    await tx.objectStore(ASSET_OWNERS_STORE).get(['recording', id, 'body'])
+  );
+  if (
+    !ref ||
+    !matchesRef(recording, ref) ||
+    !owner ||
+    owner.ownerKind !== 'recording' ||
+    owner.ownerId !== id ||
+    owner.role !== 'body' ||
+    owner.assetId !== recording.assetId
+  )
+    throw new Error('Invalid recording review resource ownership.');
+  return { recording, ref };
 }
 
 /** Freeze through the caller's existing native transaction; never open or commit another transaction. */
@@ -366,6 +439,7 @@ export async function freezeVideoReviewInTransaction(
   const refs = new Map<string, AssetRef>();
   const media = new Map<string, Omit<MediaLibraryEntry, 'blob'>>();
   const privateReviews: VideoWorkspaceSnapshot[] = [];
+  const recordings = new Map<string, StoredRecordingEntry>();
   const needed = new Set(collectReviewAssetReferences(review.workspace));
   const retainMedia = async (id: string) => {
     if (id === sourceId || media.has(id)) return;
@@ -375,6 +449,11 @@ export async function freezeVideoReviewInTransaction(
     media.set(id, entry);
     if (entry.source.kind === 'project-asset')
       needed.add(`project-asset:${entry.source.projectAssetId}`);
+    if (entry.source.kind === 'recording') {
+      const resource = await readOwnedRecording(tx, entry.source.recordingId);
+      recordings.set(resource.recording.id, resource.recording);
+      refs.set(resource.ref.assetId, resource.ref);
+    }
     if (entry.source.kind === 'stored-asset') {
       const ref = await readPublishedSourceRef(tx, id, entry.source.assetId);
       refs.set(ref.assetId, ref);
@@ -408,6 +487,7 @@ export async function freezeVideoReviewInTransaction(
     refs: [...refs.values()],
     media: [...media.values()],
     privateReviews,
+    ...(recordings.size === 0 ? {} : { recordings: [...recordings.values()] }),
   });
   if (!rows || rows.review.workspace.aggregateId !== aggregateId)
     throw new Error('Unsupported video review snapshot.');
@@ -422,9 +502,29 @@ export function digestCapturedVideoReviewRows(rows: CapturedVideoReviewRows): st
   const authority = {
     ...accepted,
     source: {
-      ...accepted.source,
+      ...('recording' in accepted.source
+        ? {
+            recording: {
+              id: accepted.source.recording.id,
+              assetId: accepted.source.recording.assetId,
+              size: accepted.source.recording.size,
+              mimeType: accepted.source.recording.mimeType,
+            },
+            ref: accepted.source.ref,
+          }
+        : accepted.source),
       media: { id: accepted.source.media.id, source: accepted.source.media.source },
     },
+    ...(accepted.recordings === undefined
+      ? {}
+      : {
+          recordings: accepted.recordings.map(({ id, assetId, size, mimeType }) => ({
+            id,
+            assetId,
+            size,
+            mimeType,
+          })),
+        }),
     media: accepted.media.map((entry) => ({ id: entry.id, source: entry.source })),
   };
   const bytes = new TextEncoder().encode(JSON.stringify(describeImageMetadata(authority)));

@@ -79,7 +79,14 @@ function setup() {
     sha256: 'b'.repeat(64),
     size: 6,
   };
-  const payload: PreparedReplicaPayload = {
+  const payload: Extract<PreparedReplicaPayload, { kind: 'media' }> & {
+    input: {
+      rows: Extract<
+        Extract<PreparedReplicaPayload, { kind: 'media' }>['input']['rows'],
+        { projectAsset: unknown }
+      >;
+    };
+  } = {
     kind: 'media',
     input: {
       operationId: 'remote-op',

@@ -1,3 +1,4 @@
+import { parseRecordingEntry } from '../recordings/index.guards';
 import {
   readAllWorkspaceStorage,
   type WorkspaceStorageEnumerationTransaction,
@@ -152,6 +153,7 @@ async function assertSharedProjectAsset(
 }
 
 interface PreparedLibrarySourceStores {
+  recordings?: ReadStore;
   media: ReadStore;
   assets: ReadStore;
   exports: ReadStore;
@@ -202,7 +204,19 @@ async function readLibrarySourceAssetId(
       return readProjectAssetSource(media, source.projectAssetId, stores.assets);
     case 'project-export':
       return readProjectExportSource(media, source, stores.exports);
-    case 'recording':
+    case 'recording': {
+      if (!stores.recordings) return changedLibrarySource();
+      const recording = parseRecordingEntry(await stores.recordings.get(source.recordingId));
+      if (
+        !recording ||
+        recording.id !== source.recordingId ||
+        media.id !== `recording:${recording.id}` ||
+        recording.size !== media.size ||
+        recording.mimeType !== media.mimeType
+      )
+        return changedLibrarySource();
+      return recording.assetId;
+    }
     case 'screenshot':
     case 'web-snapshot':
       throw new Error('Prepared Library source kind is outside the sync apply profile.');

@@ -31,6 +31,10 @@ vi.mock('../assets', async (original) => ({
 }));
 beforeEach(() => vi.clearAllMocks());
 
+type ProjectAssetInput = ApplyPreparedMediaReplicaInput & {
+  rows: Extract<ApplyPreparedMediaReplicaInput['rows'], { projectAsset: unknown }>;
+};
+
 function setup() {
   let failReceipt = false;
   let writes = 0;
@@ -63,7 +67,7 @@ function setup() {
     size: ref.size,
     lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
   });
-  const input: ApplyPreparedMediaReplicaInput = {
+  const input: ProjectAssetInput = {
     operationId: 'source-op',
     sourceDigest: 'a'.repeat(64),
     connectionGeneration: 3,
@@ -230,7 +234,7 @@ it('refuses mismatched metadata and incomplete nonzero predecessor admission', a
   expect(f.rows).toEqual(before);
 });
 
-function successor(input: ApplyPreparedMediaReplicaInput, generation = 1) {
+function successor(input: ProjectAssetInput, generation = 1) {
   const next = structuredClone(input);
   next.expectedLocalGeneration = generation;
   next.expectedBasis = [input.operationId];

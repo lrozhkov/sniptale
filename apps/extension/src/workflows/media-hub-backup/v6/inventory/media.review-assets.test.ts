@@ -400,6 +400,7 @@ it.each([false, true])(
   'inventories the reachable private video sidecars without repeated reads (cycle=%s)',
   async (cycle) => {
     const { rows } = nestedMediaReviewFixture(cycle);
+    if (!('projectAsset' in rows.source)) throw new Error('Expected project-asset fixture.');
     const reviews = [rows.review, ...rows.privateReviews];
     const values = new Map<string, Map<string, unknown>>([
       ['media_library', new Map([[rows.source.media.id, rows.source.media]])],

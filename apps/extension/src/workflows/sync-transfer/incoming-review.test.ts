@@ -51,7 +51,7 @@ function asset(id: string, mimeType: string) {
   return createProjectAssetEntry({ id, assetId: `sender-${id}`, mimeType, size: 3 });
 }
 function sourceEnvelope(
-  entry: CapturedVideoReviewRows['source']['projectAsset'],
+  entry: Extract<CapturedVideoReviewRows['source'], { projectAsset: unknown }>['projectAsset'],
   filename: string
 ) {
   const { assetId: _assetId, ...projectAsset } = entry;

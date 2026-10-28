@@ -1,3 +1,4 @@
+import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import {
   EFFECT_BUNDLE_CORPUS,
   readEffectBundleCorpusArchive,
@@ -300,6 +301,7 @@ it('hashes normalized native media facts and detects metadata or local ref chang
   const rows = await freezeMediaInTransaction(data.tx, data.mirror.id);
   const digest = digestCapturedMediaRows(rows);
   expect(digest).toMatch(/^[a-f0-9]{64}$/u);
+  if (!('projectAsset' in rows)) throw new Error('Expected project source');
   const reordered = { ref: rows.ref, projectAsset: rows.projectAsset, media: rows.media };
   expect(digestCapturedMediaRows(reordered)).toBe(digest);
   expect(
@@ -509,4 +511,120 @@ it('retains export-only review assets outside editing dependencies', async () =>
   expect(editing).toEqual(new Set([data.original.id, data.mirror.id]));
   expect(editing.has('export-camera-origin')).toBe(false);
   expect(editing.has('export-nested-origin')).toBe(false);
+});
+
+function recordingSourceFixture() {
+  const data = fixture();
+  const recordings = memoryStore();
+  const telemetry = memoryStore();
+  const recording = {
+    id: 'saved',
+    assetId: 'saved-bytes',
+    filename: 'Saved.webm',
+    createdAt: 1,
+    size: 6,
+    mimeType: 'video/webm',
+  };
+  const media = buildRecordingMediaEntry(recording);
+  recordings.seed(recording.id, recording);
+  data.stores.media.seed(media.id, media);
+  data.stores.refs.seed(
+    recording.assetId,
+    reference(recording.assetId, recording.mimeType, recording.size)
+  );
+  const owner = {
+    ownerKind: 'recording',
+    ownerId: recording.id,
+    role: 'body',
+    assetId: recording.assetId,
+  };
+  data.stores.owners.seed(['recording', recording.id, 'body'], owner);
+  const tx = new Proxy(data.tx, {
+    get(target, property) {
+      if (property !== 'objectStore') return Reflect.get(target, property);
+      return (name: string) =>
+        name === 'recordings'
+          ? recordings
+          : name === 'recording_telemetry'
+            ? telemetry
+            : target.objectStore(name);
+    },
+  });
+  return { ...data, recording, media, recordings, telemetry, owner, tx };
+}
+
+it('freezes a canonical recording source and absent telemetry using only the caller transaction', async () => {
+  const data = recordingSourceFixture();
+  const rows = await freezeMediaInTransaction(data.tx, data.media.id);
+  expect(rows).toMatchObject({
+    media: { id: data.media.id },
+    recording: data.recording,
+    telemetry: null,
+  });
+  data.recording.filename = 'Later.webm';
+  expect('recording' in rows && rows.recording.filename).toBe('Saved.webm');
+  expect(data.stores.assets.get).not.toHaveBeenCalled();
+  expect(data.recordings.put).not.toHaveBeenCalled();
+});
+
+it('refuses missing or foreign recording ownership and malformed telemetry before capture', async () => {
+  const data = recordingSourceFixture();
+  data.stores.owners.seed(['recording', data.recording.id, 'body'], {
+    ...data.owner,
+    ownerId: 'foreign',
+  });
+  await expect(freezeMediaInTransaction(data.tx, data.media.id)).rejects.toThrow();
+  data.stores.owners.seed(['recording', data.recording.id, 'body'], data.owner);
+  data.telemetry.seed(data.recording.id, { recordingId: data.recording.id });
+  await expect(freezeMediaInTransaction(data.tx, data.media.id)).rejects.toThrow();
+  data.telemetry.rows.clear();
+  data.recordings.seed(data.recording.id, { ...data.recording, id: 'foreign' });
+  await expect(freezeMediaInTransaction(data.tx, data.media.id)).rejects.toThrow();
+});
+
+it('retains the independent review option for a saved recording and validates its immutable source', async () => {
+  const data = recordingSourceFixture();
+  data.stores.videoWorkspaces.seed(data.media.id, {
+    ...structuredClone(reviewWorkspace),
+    aggregateId: data.media.id,
+    sourceAssetId: data.recording.assetId,
+    source: {
+      ...reviewWorkspace.source,
+      size: data.recording.size,
+      mimeType: 'video/webm; codecs="vp8"',
+    },
+    history: [],
+    cursor: 0,
+  });
+  await expect(freezeMediaInTransaction(data.tx, data.media.id)).rejects.toThrow();
+  await expect(
+    freezeMediaInTransaction(data.tx, data.media.id, { allowIndependentReview: true })
+  ).resolves.toMatchObject({ recording: data.recording });
+  data.stores.refs.seed(
+    data.recording.assetId,
+    reference(data.recording.assetId, data.recording.mimeType, 7)
+  );
+  await expect(
+    freezeMediaInTransaction(data.tx, data.media.id, { allowIndependentReview: true })
+  ).rejects.toThrow();
+});
+
+it('ignores a derived recording thumbnail before any review workspace exists', async () => {
+  const data = recordingSourceFixture();
+  data.stores.thumbnails.seed(data.media.id, {
+    assetId: data.media.id,
+    blob: new Blob(['generated-frame'], { type: 'image/webp' }),
+    createdAt: data.recording.createdAt,
+    generatorVersion: 2,
+    height: 180,
+    updatedAt: 2,
+    width: 320,
+  });
+  const rows = await freezeMediaInTransaction(data.tx, data.media.id, {
+    allowIndependentReview: true,
+  });
+  expect(rows).toMatchObject({ recording: data.recording, telemetry: null });
+  expect(rows).not.toHaveProperty('thumbnail');
+  expect(data.stores.videoWorkspaces.rows.size).toBe(0);
+  await expect(freezeMediaInTransaction(data.tx, data.media.id)).resolves.toEqual(rows);
 });

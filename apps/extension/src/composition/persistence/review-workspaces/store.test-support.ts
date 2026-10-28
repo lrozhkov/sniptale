@@ -66,6 +66,9 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
     ['project_exports', new Map()],
     ...[
       'video_projects',
+      'recording_telemetry',
+      'recording_recovery_sessions',
+      'recording_recovery_blocks',
       'scenario_assets',
       'image_workspaces',
       'aggregate_presentations',
@@ -106,12 +109,14 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
                   ? value['projectId']
                   : name === 'video_workspace_history'
                     ? JSON.stringify([value['aggregateId'], value['ordinal']])
-                    : name === 'asset_owners'
-                      ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
-                      : (value['aggregateId'] ??
-                        value['id'] ??
-                        value['operationId'] ??
-                        value['assetId']);
+                    : name === 'recording_telemetry'
+                      ? value['recordingId']
+                      : name === 'asset_owners'
+                        ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
+                        : (value['aggregateId'] ??
+                          value['id'] ??
+                          value['operationId'] ??
+                          value['assetId']);
             if (typeof key !== 'string' || !key) throw new Error('Missing test row identity');
             if (add && store.has(key))
               throw new DOMException('Duplicate fixture row', 'ConstraintError');
@@ -129,7 +134,8 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
                 indexName !== 'assetId' &&
                 indexName !== 'kind' &&
                 indexName !== 'rootKey' &&
-                indexName !== 'projectId'
+                indexName !== 'projectId' &&
+                indexName !== 'id'
               )
                 throw new Error('Unexpected test index');
               return {

@@ -1,3 +1,5 @@
+import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
+import { parseRecordingEntry } from '../recordings/index.guards';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createReviewWorkspaceStoreFixture,
@@ -517,3 +519,66 @@ it('preserves decoder codec metadata without changing the original byte declarat
   await expect(applyPreparedVideoReviewReplica(invalid)).rejects.toThrow();
   expect(fixture.rows).toEqual(before);
 });
+
+it.each([false, true])(
+  'applies an independent saved recording review and replays before source reads (archive=%s)',
+  async (archived) => {
+    const candidate = input();
+    const dependency = candidate.dependencies[0]!;
+    const recording = parseRecordingEntry({
+      id: 'recording-review-source',
+      assetId: dependency.ref.assetId,
+      filename: 'Recording.webm',
+      mimeType: dependency.ref.mimeType,
+      size: dependency.ref.size,
+      createdAt: 1,
+    });
+    if (!recording) throw new Error('Invalid recording fixture.');
+    const media = buildRecordingMediaEntry(recording);
+    table('project_assets').delete('original');
+    table('asset_owners').delete(JSON.stringify(['project-asset', 'original', 'body']));
+    table('recordings').set(recording.id, recording);
+    table('media_library').set(media.id, media);
+    table('asset_owners').set(JSON.stringify(['recording', recording.id, 'body']), {
+      assetId: recording.assetId,
+      ownerKind: 'recording',
+      ownerId: recording.id,
+      role: 'body',
+    });
+    const originalKey = captureRootKey(spaceId, 'media', media.id);
+    table('sync_capture').set(JSON.stringify(['root-state', originalKey]), {
+      version: 1,
+      kind: 'root-state',
+      key: JSON.stringify(['root-state', originalKey]),
+      createdAt: 1,
+      spaceId,
+      rootKind: 'media',
+      rootId: media.id,
+      rootKey: originalKey,
+      generation: 1,
+      basis: ['source-operation'],
+      nativeDigest: digestCapturedMediaRows({
+        media,
+        recording,
+        ref: dependency.ref,
+        telemetry: null,
+      }),
+    });
+    const id = archived ? 'recording:quick-project:received' : media.id;
+    candidate.root.sourceMediaId = media.id;
+    candidate.root.review.workspace.aggregateId = id;
+    candidate.root.review.workspace.sourceMediaId = media.id;
+    candidate.dependencies = [{ ...dependency, entry: media }];
+    candidate.operationId = `incoming-${id}`;
+    await expect(applyPreparedVideoReviewReplica(candidate)).resolves.toMatchObject({
+      status: 'applied',
+    });
+    expect(current(id).sourceAssetId).toBe(recording.assetId);
+    expect(current(id).sourceMediaId).toBe(media.id);
+    expect(table('media_library').has(id)).toBe(!archived);
+    table('recordings').delete(recording.id);
+    await expect(applyPreparedVideoReviewReplica(candidate)).resolves.toMatchObject({
+      status: 'duplicate',
+    });
+  }
+);

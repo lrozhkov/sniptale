@@ -1,3 +1,4 @@
+import { putRecordingBackupRestore } from '../recordings/backup-restore';
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from '../assets/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -9,6 +10,9 @@ import { releaseMediaSource } from '../media-library/delete-cascade.sources';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import {
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
+  RECORDING_RECOVERY_SESSIONS_STORE,
   ASSET_OPERATIONS_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -81,7 +85,7 @@ function preparedInput(input: ApplyPreparedMediaReplicaInput): ApplyPreparedMedi
     input.expectedBasis.length !== (input.expectedLocalGeneration === 0 ? 0 : 1) ||
     input.expectedBasis.some((id) => typeof id !== 'string' || !id || id.length > 256) ||
     rows.media.lifecycle?.storageClass !== 'library' ||
-    rows.projectAsset.originMediaId
+    ('projectAsset' in rows && rows.projectAsset.originMediaId)
   )
     throw new MediaReplicaConflictError('invalid-input');
   return structuredClone({ ...input, rows });
@@ -150,11 +154,23 @@ async function assertUnclaimedIdentity(
   for (const [store, key] of [
     [SYNC_CAPTURE_STORE, identity.stateKey],
     [MEDIA_LIBRARY_STORE, rows.media.id],
-    [PROJECT_ASSETS_STORE, rows.projectAsset.id],
+    'recording' in rows
+      ? [STORE_NAME, rows.recording.id]
+      : [PROJECT_ASSETS_STORE, rows.projectAsset.id],
   ] as const) {
     if (store === SYNC_CAPTURE_STORE && hasGraveyard) continue;
     if ((await tx.objectStore(store).get(key)) !== undefined)
       throw new MediaReplicaConflictError('source-changed');
+  }
+  if ('recording' in rows) {
+    if (
+      (await tx.objectStore(ASSET_OWNERS_STORE).get(['recording', rows.recording.id, 'body'])) !==
+      undefined
+    )
+      throw new MediaReplicaConflictError('source-changed');
+    for (const store of [RECORDING_TELEMETRY_STORE, RECORDING_RECOVERY_SESSIONS_STORE])
+      if ((await tx.objectStore(store).get(rows.recording.id)) !== undefined)
+        throw new MediaReplicaConflictError('source-changed');
   }
   for (const raw of await tx
     .objectStore(SYNC_CAPTURE_STORE)
@@ -226,7 +242,7 @@ async function assertExistingSource(
   });
   if (
     state.nativeDigest !== digestCapturedMediaRows(previous) ||
-    previous.projectAsset.id !== input.rows.projectAsset.id
+    JSON.stringify(previous.media.source) !== JSON.stringify(input.rows.media.source)
   )
     throw new MediaReplicaConflictError('source-changed');
   if (previous.ref.assetId !== input.rows.ref.assetId)
@@ -252,6 +268,9 @@ export async function loadMediaReplicaPredecessorRef(input: {
       SYNC_CAPTURE_STORE,
       MEDIA_LIBRARY_STORE,
       PROJECT_ASSETS_STORE,
+      ASSET_OWNERS_STORE,
+      STORE_NAME,
+      RECORDING_TELEMETRY_STORE,
       ASSET_REFS_STORE,
       IMAGE_WORKSPACES_STORE,
       VIDEO_WORKSPACES_STORE,
@@ -296,7 +315,7 @@ export async function loadMediaReplicaPredecessorRef(input: {
     await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.mediaId)
   );
   if (!media) throw new MediaReplicaConflictError('source-changed');
-  if (media.source.kind !== 'project-asset') {
+  if (media.source.kind !== 'project-asset' && media.source.kind !== 'recording') {
     await tx.done;
     return null;
   }
@@ -318,7 +337,7 @@ async function publishReplica(
   const prepared = {
     media: rows.media,
     original: { ref: rows.ref },
-    projectAsset: rows.projectAsset,
+    ...('projectAsset' in rows ? { projectAsset: rows.projectAsset } : {}),
   };
   const stores = {
     media: tx.objectStore(MEDIA_LIBRARY_STORE),
@@ -356,6 +375,18 @@ async function publishReplica(
     throw new MediaReplicaConflictError('invalid-input');
   await publishPreparedMediaSourceInTransaction(prepared, stores);
   await publishPreparedMediaProjectChildInTransaction(prepared, stores);
+  if ('recording' in rows) {
+    await putRecordingBackupRestore({
+      entry: rows.recording,
+      ref: rows.ref,
+      ownerStore: stores.owners,
+      refStore: stores.refs,
+      recordingStore: tx.objectStore(STORE_NAME),
+      telemetryStore: tx.objectStore(RECORDING_TELEMETRY_STORE),
+      ...(rows.telemetry ? { telemetry: rows.telemetry } : {}),
+    });
+    if (!rows.telemetry) await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(rows.recording.id);
+  }
   await tx.objectStore(SYNC_CAPTURE_STORE).put(state);
   await tx.objectStore(SYNC_CAPTURE_STORE).add(receipt);
 }
@@ -370,6 +401,9 @@ export async function applyPreparedMediaReplica(
   const result = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        STORE_NAME,
+        RECORDING_TELEMETRY_STORE,
+        RECORDING_RECOVERY_SESSIONS_STORE,
         ASSET_OPERATIONS_STORE,
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
@@ -418,7 +452,9 @@ export async function applyPreparedMediaReplica(
       else {
         const previous = await assertExistingSource(tx, candidate, identity);
         if (previous && previous.ref.assetId !== candidate.rows.ref.assetId)
-          await releaseMediaSource(tx, previous.media, operation);
+          await releaseMediaSource(tx, previous.media, operation, {
+            retainRecordingRecovery: true,
+          });
       }
       await publishReplica(tx, candidate, identity);
       if (operation.assetIds.length) await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);

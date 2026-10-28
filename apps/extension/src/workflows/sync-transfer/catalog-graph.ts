@@ -182,21 +182,30 @@ function immutableMediaVersion(operation: SyncOperation): string | null {
   try {
     const metadata = parsePortableMediaMetadata(operation.envelope.metadata);
     const entry = parseMediaLibraryEntry(metadata.entry);
+    const recording = metadata.recording?.entry;
     const asset = metadata.projectAsset;
+    const sourceMatches =
+      entry?.source.kind === 'recording'
+        ? recording &&
+          entry.source.recordingId === recording.id &&
+          entry.id === `recording:${recording.id}`
+        : entry?.source.kind === 'project-asset' &&
+          asset &&
+          !asset.originMediaId &&
+          entry.id === `project-asset:${asset.id}` &&
+          entry.source.projectAssetId === asset.id;
+    const child = recording ?? asset;
     if (
       !entry ||
       entry.blob ||
-      !asset ||
-      asset.originMediaId ||
-      entry.source.kind !== 'project-asset' ||
+      !child ||
+      !sourceMatches ||
       entry.id !== operation.rootId ||
-      entry.id !== `project-asset:${asset.id}` ||
-      entry.source.projectAssetId !== asset.id ||
       entry.workspaceRevision !== 0 ||
       entry.imageContentState === 'edited' ||
       entry.lifecycle?.storageClass !== 'library' ||
       Object.keys(metadata).some(
-        (key) => !['entry', 'projectAsset', 'originalObjectId'].includes(key)
+        (key) => !['entry', 'projectAsset', 'recording', 'originalObjectId'].includes(key)
       )
     )
       return null;
@@ -211,8 +220,8 @@ function immutableMediaVersion(operation: SyncOperation): string | null {
       operation.objects.length !== 1 ||
       object.size !== entry.size ||
       object.mimeType !== entry.mimeType ||
-      asset.size !== entry.size ||
-      asset.mimeType !== entry.mimeType
+      child.size !== entry.size ||
+      child.mimeType !== entry.mimeType
     )
       return null;
     const {
@@ -224,15 +233,25 @@ function immutableMediaVersion(operation: SyncOperation): string | null {
       sourceUrl: _sourceUrl,
       sourceFavicon: _sourceFavicon,
       updatedAt: _updatedAt,
+      recordingMetadata: _recordingMetadata,
+      recordingGroup: _recordingGroup,
       ...immutable
     } = entry;
     return JSON.stringify({
-      entry: { ...immutable, source: { kind: 'project-asset', projectAssetId: asset.id } },
+      entry: recording
+        ? immutable
+        : {
+            ...immutable,
+            source: { kind: 'project-asset', projectAssetId: asset!.id },
+            ...(entry.recordingMetadata ? { recordingMetadata: entry.recordingMetadata } : {}),
+            ...(entry.recordingGroup ? { recordingGroup: entry.recordingGroup } : {}),
+          },
       asset: {
-        id: asset.id,
-        createdAt: asset.createdAt,
-        mimeType: asset.mimeType,
-        size: asset.size,
+        id: child.id,
+        createdAt: child.createdAt,
+        mimeType: child.mimeType,
+        size: child.size,
+        ...(recording?.mediaMetadata ? { mediaMetadata: recording.mediaMetadata } : {}),
       },
       object: { sha256: digest.sha256, size: object.size, mimeType: object.mimeType },
     });

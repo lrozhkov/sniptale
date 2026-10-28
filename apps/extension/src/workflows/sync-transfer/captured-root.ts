@@ -1,4 +1,7 @@
-import { createArchivePathAllocator } from '../../composition/archive-transfer';
+import {
+  createArchivePathAllocator,
+  sanitizeArchivePathSegment,
+} from '../../composition/archive-transfer';
 import { readAssetFile, type AssetRef } from '../../composition/persistence/assets';
 import type { CapturedMediaDependency } from '../../composition/persistence/sync-capture/contracts';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
@@ -8,7 +11,9 @@ import { createObjectCollector } from '../media-hub-backup/v6/inventory/helpers'
 import { encodePortableMediaOriginal } from '../media-hub-backup/v6/root-codecs/media';
 import { encodeCapturedImageRoot } from './captured-image';
 import { encodeCapturedProjectRoot } from './captured-project';
-import { encodeCapturedVideoReviewRoot } from './captured-review';
+import { buildMediaRootInventory } from '../media-hub-backup/v6/inventory/media';
+import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
+import { frozenReviewDatabase, encodeCapturedVideoReviewRoot } from './captured-review';
 import { parsePortableSyncRoot } from './prepared-root';
 
 /** Encodes an admitted frozen capture without reading live native rows or creating an archive. */
@@ -44,6 +49,54 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     await parsePortableSyncRoot(portable.envelope, portable.reviewSourceMediaId);
     return { ...portable, dependencies: capture.change.mediaDependencies };
   }
+  if (capture.change.kind === 'media' && 'recording' in capture.change.rows) {
+    const rows = capture.change.rows;
+    const roots = await buildMediaRootInventory({
+      db: frozenReviewDatabase({
+        source: rows,
+        assets: [],
+        refs: [],
+        media: [],
+        privateReviews: [],
+      }),
+      items: [{ ...rows.media, hasThumbnail: false }],
+      options: createMediaHubBackupExportOptions({
+        includeDrafts: false,
+        includeSourceMetadata: true,
+        includeTelemetry: true,
+        includeWebSnapshots: false,
+        scope: 'selected',
+        selected: { mediaAssetIds: [rows.media.id], videoProjectIds: [], scenarioProjectIds: [] },
+      }),
+      paths: createArchivePathAllocator(),
+    });
+    if (roots.length !== 1) throw new Error('Frozen recording inventory differs from its root.');
+    const loaded = await roots[0]!.load();
+    const objects = loaded.objects.map((object) => ({
+      ...object,
+      ref: { ...object.ref, filename: sanitizeArchivePathSegment(object.ref.filename) },
+    }));
+    const metadata: unknown = JSON.parse(JSON.stringify(loaded.metadata));
+    assertPortableJson(metadata);
+    const envelope = parseRootEnvelope({
+      descriptor: { ...roots[0]!.descriptor, metadataPath: 'Metadata/sync-root.json' },
+      metadata,
+      objects: objects.map((object) => object.ref),
+    });
+    if (
+      loaded.objects.length !== 1 ||
+      loaded.objects[0]!.blob.size !== rows.ref.size ||
+      loaded.objects[0]!.blob.type !== rows.ref.mimeType
+    )
+      throw new Error('Captured recording differs from its native reference.');
+    await parsePortableSyncRoot(envelope);
+    return {
+      envelope,
+      objects,
+      dependencies: [],
+      bindings: [{ objectId: loaded.objects[0]!.ref.objectId, ref: rows.ref }],
+    };
+  }
   const collector = createObjectCollector('sync', createArchivePathAllocator());
   const bindings: { objectId: string; ref: AssetRef }[] = [];
   const add = async (ref: AssetRef, filename: string) => {
@@ -55,7 +108,7 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     return objectId;
   };
   let metadata: unknown;
-  if (capture.change.kind === 'media') {
+  if (capture.change.kind === 'media' && !('recording' in capture.change.rows)) {
     const rows = capture.change.rows;
     metadata = {
       entry: rows.media,

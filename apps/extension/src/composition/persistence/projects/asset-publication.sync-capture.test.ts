@@ -53,7 +53,8 @@ it('captures a published Library source in the same transaction before an editor
   if (
     captured?.kind !== 'sync-operation' ||
     captured.phase !== 'native' ||
-    captured.change.kind !== 'media'
+    captured.change.kind !== 'media' ||
+    !('projectAsset' in captured.change.rows)
   )
     throw new Error('Expected native source capture');
   expect(captured).toMatchObject({

@@ -1,3 +1,5 @@
+import { parseRecordingEntry } from '../recordings/index.guards';
+import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 import { parseCapturedVideoReviewRows, type CapturedVideoReviewRows } from './review-snapshot';
 import { parseCapturedVideoProjectRows } from './project-snapshot';
 export { isSupportedCaptureProject, parseCapturedVideoProjectRows } from './project-snapshot';
@@ -105,6 +107,34 @@ function boundedMetadata(value: unknown): boolean {
 export function parseCapturedMediaRows(value: unknown): CapturedMediaRows | null {
   if (!isRecord(value) || !boundedMetadata(value)) return null;
   const media = parseMediaLibraryEntry(value['media']);
+  if ('recording' in value) {
+    if ('projectAsset' in value) return null;
+    const recording = parseRecordingEntry(value['recording']);
+    const ref = parseAssetRef(value['ref']);
+    const telemetry =
+      value['telemetry'] === null ? null : parseRecordingTelemetryEntry(value['telemetry']);
+    if (!media || !recording || !ref || (value['telemetry'] !== null && !telemetry)) return null;
+    if (
+      media.blob !== undefined ||
+      media.workspaceRevision !== 0 ||
+      media.imageContentState === 'edited' ||
+      (media.kind !== 'recording' && media.kind !== 'video' && media.kind !== 'audio') ||
+      media.source.kind !== 'recording' ||
+      media.source.recordingId !== recording.id ||
+      media.id !== `recording:${recording.id}` ||
+      recording.assetId !== ref.assetId ||
+      recording.size !== ref.size ||
+      media.size !== ref.size ||
+      recording.mimeType !== ref.mimeType ||
+      media.mimeType !== ref.mimeType ||
+      JSON.stringify(media.recordingGroup) !== JSON.stringify(recording.recordingGroup) ||
+      JSON.stringify(media.recordingMetadata) !== JSON.stringify(recording.recordingMetadata) ||
+      (telemetry !== null && telemetry.recordingId !== recording.id)
+    )
+      return null;
+    return { media, recording, ref, telemetry };
+  }
+  if ('telemetry' in value) return null;
   const projectAsset = parseProjectAssetEntry(value['projectAsset']);
   const ref = parseAssetRef(value['ref']);
   if (!media || !projectAsset || !ref) return null;
@@ -124,7 +154,11 @@ function isOriginalOnlyCapturedMedia(media: MediaLibraryEntry): boolean {
 }
 
 /** A Library mirror, its native child, and its immutable ref must describe one source. */
-function hasExactMediaSourceBinding({ media, projectAsset, ref }: CapturedMediaRows): boolean {
+function hasExactMediaSourceBinding({
+  media,
+  projectAsset,
+  ref,
+}: Extract<CapturedMediaRows, { projectAsset: unknown }>): boolean {
   return (
     projectAsset.originMediaId === undefined &&
     media.source.kind === 'project-asset' &&

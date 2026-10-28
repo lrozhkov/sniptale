@@ -512,10 +512,10 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: This owner admits and serializes native workspace transactions. Capture and monotonic revision allocation now participate in those same transactions. Archive identity admission, archive creation and default replacement retain one commit authority. Source admission, history storage, physical cleanup and sync capture retain named collaborators. Main source inspection and independent read-only topology diagnosis established this cohesive boundary. Final architecture review must inspect this exact classification.",
+      "reason": "tool-noise: This owner admits and serializes native workspace transactions. Capture and monotonic revision allocation now participate in those same transactions. Archive identity admission, archive creation and default replacement retain one commit authority. Source admission, history storage, physical cleanup and sync capture retain named collaborators. Main source inspection and independent read-only topology diagnosis established this cohesive boundary. Final architecture review must inspect this exact classification. Recording telemetry joins the existing transaction participant list so native recording review capture reads one atomic source snapshot. Independent source diagnosis confirms unchanged authority, signature and structural score.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-10-28",
-      "astHash": "5f920e4d5897a93ef1ec260ca2a5d50dc11b1537630ac5ef79f8f84d9dd8557f",
+      "astHash": "b456e6168391b5b319ab9a5fcaea9f7a1e59386e4c67c75631c4a187f961225c",
       "signatureHash": "06d04771104d223c5a23a98aae8116dfb12029f7febbe8b3685d0a321b7a71b7"
     },
     {

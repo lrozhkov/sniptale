@@ -1,3 +1,4 @@
+import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { expect, it } from 'vitest';
 import {
@@ -232,4 +233,101 @@ it('retains only explicit graveyards and refuses deleted states with live native
       parseSyncCaptureRecord({ ...root, deleted: true, nativeDigest: 'a'.repeat(64) })
     ).toBeNull();
   }
+});
+
+function recordingFixture() {
+  const recording = {
+    id: 'saved',
+    assetId: 'saved-bytes',
+    filename: 'Saved.webm',
+    createdAt: 1,
+    size: 6,
+    mimeType: 'video/webm',
+  };
+  return {
+    media: buildRecordingMediaEntry(recording),
+    recording,
+    ref: {
+      ...mediaFixture().ref,
+      assetId: recording.assetId,
+      size: recording.size,
+      mimeType: recording.mimeType,
+      location: { kind: 'opfs' as const, objectKey: `objects/${recording.assetId}` },
+    },
+    telemetry: {
+      recordingId: recording.id,
+      createdAt: 1,
+      updatedAt: 2,
+      captureMode: null,
+      viewport: null,
+      cursorTrack: null,
+      actionEvents: [],
+      signals: [],
+    },
+  };
+}
+
+it('admits saved recording metadata and canonical telemetry through their native parsers', () => {
+  const rows = recordingFixture();
+  expect(parseCapturedMediaRows(rows)).toMatchObject(rows);
+  expect(parseCapturedMediaRows({ ...rows, telemetry: null })).toMatchObject({ telemetry: null });
+  const { signals: _signals, ...legacy } = rows.telemetry;
+  expect(parseCapturedMediaRows({ ...rows, telemetry: legacy })).toMatchObject({
+    telemetry: { signals: [] },
+  });
+});
+
+it('refuses recording identity ref telemetry and hybrid source contradictions', () => {
+  const rows = recordingFixture();
+  for (const candidate of [
+    { ...rows, projectAsset: mediaFixture().projectAsset },
+    { ...rows, media: { ...rows.media, id: 'alias' } },
+    { ...rows, recording: { ...rows.recording, id: 'foreign' } },
+    { ...rows, recording: { ...rows.recording, assetId: 'foreign' } },
+    { ...rows, ref: { ...rows.ref, size: 7 } },
+    { ...rows, recording: { ...rows.recording, mimeType: 'video/mp4' } },
+    { ...rows, telemetry: { ...rows.telemetry, recordingId: 'foreign' } },
+    { ...rows, telemetry: { ...rows.telemetry, updatedAt: 0 } },
+    { ...rows, telemetry: undefined },
+    { ...rows, recording: { ...rows.recording, recordingGroup: { role: 'camera' } } },
+    { ...rows, media: { ...rows.media, recordingMetadata: { captureMode: 'unknown' } } },
+  ])
+    expect(parseCapturedMediaRows(candidate)).toBeNull();
+});
+
+it('preserves recording acquisition facts and group metadata and refuses contradictory mirrors', () => {
+  const rows = recordingFixture();
+  const recording = {
+    ...rows.recording,
+    recordingMetadata: {
+      captureMode: 'TAB' as const,
+      displaySurface: 'browser' as const,
+      actionCount: 4,
+      hasPointer: true,
+    },
+    recordingGroup: {
+      groupId: 'capture',
+      order: 0,
+      role: 'display' as const,
+      sourceLabel: 'Screen',
+      dimensions: { width: 1280, height: 720 },
+    },
+  };
+  const candidate = { ...rows, recording, media: buildRecordingMediaEntry(recording) };
+  expect(parseCapturedMediaRows(candidate)).toMatchObject({ recording });
+  expect(
+    parseCapturedMediaRows({
+      ...candidate,
+      media: { ...candidate.media, recordingMetadata: undefined },
+    })
+  ).toBeNull();
+  expect(
+    parseCapturedMediaRows({
+      ...candidate,
+      media: {
+        ...candidate.media,
+        recordingGroup: { ...recording.recordingGroup, groupId: 'foreign' },
+      },
+    })
+  ).toBeNull();
 });

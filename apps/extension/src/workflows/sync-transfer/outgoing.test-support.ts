@@ -241,7 +241,8 @@ export function nextRevision(value: CapturedChange) {
 }
 export function projectCapture(): CapturedChange {
   const base = capture();
-  if (base.change.kind !== 'media') throw new Error('Missing media fixture.');
+  if (base.change.kind !== 'media' || !('projectAsset' in base.change.rows))
+    throw new Error('Missing media fixture.');
   const ref = base.change.rows.ref;
   const project = createVideoProjectEntryWithMediaClip({ id: 'project' });
   const asset = project.project.assets[0]!;

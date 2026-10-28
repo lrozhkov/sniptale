@@ -9,6 +9,8 @@ import {
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
+  RECORDING_TELEMETRY_STORE,
+  STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -88,17 +90,32 @@ interface FrozenReviewDatabase extends VideoReviewBackupDatabase {
   get(store: string, key: unknown): Promise<unknown>;
 }
 
-function frozenReviewDatabase(source: CapturedVideoReviewRows): FrozenReviewDatabase {
+type FrozenMediaRows = Omit<CapturedVideoReviewRows, 'review' | 'thumbnail'> &
+  Partial<Pick<CapturedVideoReviewRows, 'review' | 'thumbnail'>>;
+
+/** Provides the backup inventory with frozen native rows and no live database access. */
+export function frozenReviewDatabase(source: FrozenMediaRows): FrozenReviewDatabase {
   const snapshot = structuredClone(source);
-  const aggregateId = snapshot.review.workspace.aggregateId;
-  const assets = [snapshot.source.projectAsset, ...snapshot.assets];
+  const aggregateId = snapshot.review?.workspace.aggregateId ?? snapshot.source.media.id;
+  const assets = [
+    ...('projectAsset' in snapshot.source ? [snapshot.source.projectAsset] : []),
+    ...snapshot.assets,
+  ];
+  const recordings = [
+    ...('recording' in snapshot.source ? [snapshot.source.recording] : []),
+    ...(snapshot.recordings ?? []),
+  ];
+  const telemetry =
+    'recording' in snapshot.source && snapshot.source.telemetry ? [snapshot.source.telemetry] : [];
   const media = [snapshot.source.media, ...snapshot.media];
   const refs = [snapshot.source.ref, ...snapshot.refs];
-  const reviews = [snapshot.review, ...snapshot.privateReviews];
+  const reviews = [...(snapshot.review ? [snapshot.review] : []), ...snapshot.privateReviews];
   const reviewIds = new Set([aggregateId, ...assets.map((asset) => `project-asset:${asset.id}`)]);
   const rows = new Map<string, unknown[]>([
     [MEDIA_LIBRARY_STORE, media],
     [PROJECT_ASSETS_STORE, assets],
+    [STORE_NAME, recordings],
+    [RECORDING_TELEMETRY_STORE, telemetry],
     [ASSET_REFS_STORE, refs],
     [THUMBNAILS_STORE, snapshot.thumbnail ? [snapshot.thumbnail] : []],
     [VIDEO_WORKSPACES_STORE, reviews.map((review) => review.workspace)],
@@ -117,6 +134,8 @@ function frozenReviewDatabase(source: CapturedVideoReviewRows): FrozenReviewData
       ]),
     ],
     [PROJECT_ASSETS_STORE, new Set(assets.map((entry) => entry.id))],
+    [STORE_NAME, new Set(recordings.map((entry) => entry.id))],
+    [RECORDING_TELEMETRY_STORE, new Set(recordings.map((entry) => entry.id))],
     [ASSET_REFS_STORE, new Set(refs.map((ref) => ref.assetId))],
     [THUMBNAILS_STORE, new Set([aggregateId])],
     [VIDEO_WORKSPACES_STORE, reviewIds],
@@ -131,11 +150,13 @@ function frozenReviewDatabase(source: CapturedVideoReviewRows): FrozenReviewData
   async function get(store: string, key: unknown): Promise<unknown> {
     const accepted = checkedKey(store, key);
     const field =
-      store === ASSET_REFS_STORE || store === THUMBNAILS_STORE
-        ? 'assetId'
-        : store === VIDEO_WORKSPACES_STORE || store === VIDEO_WORKSPACE_DRAFTS_STORE
-          ? 'aggregateId'
-          : 'id';
+      store === RECORDING_TELEMETRY_STORE
+        ? 'recordingId'
+        : store === ASSET_REFS_STORE || store === THUMBNAILS_STORE
+          ? 'assetId'
+          : store === VIDEO_WORKSPACES_STORE || store === VIDEO_WORKSPACE_DRAFTS_STORE
+            ? 'aggregateId'
+            : 'id';
     return structuredClone(
       rows
         .get(store)

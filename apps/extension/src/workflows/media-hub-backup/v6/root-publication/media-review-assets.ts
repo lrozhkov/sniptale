@@ -1,3 +1,7 @@
+import type {
+  StoredRecordingEntry,
+  RecordingTelemetryEntry,
+} from '../../../../composition/persistence/recordings/contracts';
 import { sameReviewVideoContainer } from '../../../../features/video/review/validation';
 import { promoteReviewSourceLifecycles } from '../../../../composition/persistence/review-workspaces/new-reference-admission';
 import {
@@ -51,6 +55,8 @@ interface PreparedMediaReviewAsset {
 interface PreparedMediaReviewRoot {
   media: MediaLibraryEntry;
   projectAsset: ProjectAssetEntry | null;
+  recording: StoredRecordingEntry | null;
+  telemetry?: RecordingTelemetryEntry;
   original: { ref: AssetRef };
   videoReview: VideoWorkspaceSnapshot | null;
 }
@@ -244,11 +250,15 @@ export async function verifyPreparedMediaReviewAnnotations(
 export function isCaptureReview(prepared: PreparedMediaReviewRoot): boolean {
   return (
     prepared.videoReview !== null &&
-    prepared.media.kind === 'video' &&
-    prepared.media.source.kind === 'project-asset' &&
+    (prepared.media.kind === 'video' ||
+      (prepared.media.kind === 'recording' && prepared.media.source.kind === 'recording')) &&
+    (prepared.media.source.kind === 'project-asset' ||
+      prepared.media.source.kind === 'recording') &&
     parseCapturedMediaRows({
       media: prepared.media,
-      projectAsset: prepared.projectAsset,
+      ...(prepared.recording
+        ? { recording: prepared.recording, telemetry: prepared.telemetry ?? null }
+        : { projectAsset: prepared.projectAsset }),
       ref: prepared.original.ref,
     }) !== null
   );

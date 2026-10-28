@@ -51,6 +51,7 @@ import {
   verifyReviewAnnotationEffectSources,
 } from './new-reference-admission';
 import {
+  RECORDING_TELEMETRY_STORE,
   SYNC_CAPTURE_STORE,
   STORE_NAME,
   PROJECT_ASSETS_STORE,
@@ -97,6 +98,7 @@ import {
 } from './parser';
 
 const stores = [
+  RECORDING_TELEMETRY_STORE,
   SYNC_CAPTURE_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_WORKSPACES_STORE,

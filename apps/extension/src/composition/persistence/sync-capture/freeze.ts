@@ -1,3 +1,6 @@
+import { parseRecordingEntry } from '../recordings/index.guards';
+import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
+import { parseAssetOwner } from '../assets/guards';
 import { sameReviewVideoContainer } from '../../../features/video/review/validation';
 import { readWorkspaceStorage } from '../review-workspaces/storage';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from '../review-workspaces/parser';
@@ -26,6 +29,9 @@ import type {
 import {
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -97,17 +103,45 @@ export async function freezeMediaInTransaction(
   options: { allowIndependentReview?: boolean } = {}
 ): Promise<CapturedMediaRows> {
   const media = frozenNativeRow(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId), admitMedia);
-  requireSupported(media.id === mediaId && media.source.kind === 'project-asset');
-  const projectAsset = frozenNativeRow(
-    await tx.objectStore(PROJECT_ASSETS_STORE).get(media.source.projectAssetId),
-    admitAsset
-  );
-  const ref = frozenNativeRow(
-    await tx.objectStore(ASSET_REFS_STORE).get(projectAsset.assetId),
-    admitRef
-  );
-  const rows = parseCapturedMediaRows({ media, projectAsset, ref });
+  requireSupported(media.id === mediaId);
+  let rows: CapturedMediaRows | null;
+  if (media.source.kind === 'recording') {
+    const recording = parseRecordingEntry(
+      await tx.objectStore(STORE_NAME).get(media.source.recordingId)
+    );
+    requireSupported(recording !== null && recording.id === media.source.recordingId);
+    const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(recording.assetId));
+    const rawTelemetry: unknown = await tx.objectStore(RECORDING_TELEMETRY_STORE).get(recording.id);
+    const telemetry =
+      rawTelemetry === undefined ? null : parseRecordingTelemetryEntry(rawTelemetry);
+    const owner = parseAssetOwner(
+      await tx.objectStore(ASSET_OWNERS_STORE).get(['recording', recording.id, 'body'])
+    );
+    requireSupported(
+      Boolean(
+        owner &&
+        owner.ownerKind === 'recording' &&
+        owner.ownerId === recording.id &&
+        owner.role === 'body' &&
+        owner.assetId === recording.assetId
+      )
+    );
+    requireSupported(rawTelemetry === undefined || telemetry !== null);
+    rows = parseCapturedMediaRows({ media, recording, ref, telemetry });
+  } else {
+    requireSupported(media.source.kind === 'project-asset');
+    const projectAsset = frozenNativeRow(
+      await tx.objectStore(PROJECT_ASSETS_STORE).get(media.source.projectAssetId),
+      admitAsset
+    );
+    const ref = frozenNativeRow(
+      await tx.objectStore(ASSET_REFS_STORE).get(projectAsset.assetId),
+      admitRef
+    );
+    rows = parseCapturedMediaRows({ media, projectAsset, ref });
+  }
   requireSupported(rows !== null);
+  const { ref } = rows;
   const reviews = new Set<string>();
   if (options.allowIndependentReview) {
     const stored = await readWorkspaceStorage(tx, mediaId);
@@ -123,7 +157,7 @@ export async function freezeMediaInTransaction(
           workspace &&
           workspace.aggregateId === mediaId &&
           (workspace.sourceMediaId ?? mediaId) === mediaId &&
-          workspace.sourceAssetId === projectAsset.assetId &&
+          workspace.sourceAssetId === ref.assetId &&
           workspace.source.size === ref.size &&
           sameReviewVideoContainer(workspace.source.mimeType, ref.mimeType) &&
           ref.mimeType.startsWith('video/') &&
@@ -135,7 +169,8 @@ export async function freezeMediaInTransaction(
   }
   await rejectUncapturedSidecars(tx, new Set([mediaId]), {
     reviews,
-    thumbnails: reviews,
+    // Library can derive a recording thumbnail before any independent review exists.
+    thumbnails: 'recording' in rows ? new Set([...reviews, mediaId]) : reviews,
     presentation: null,
   });
   return structuredClone(rows);

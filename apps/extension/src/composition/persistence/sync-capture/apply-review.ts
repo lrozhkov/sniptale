@@ -3,6 +3,10 @@ import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { initDB } from '../infrastructure/indexed-db/core';
 import {
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
   SYNC_CAPTURE_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
@@ -42,6 +46,7 @@ import {
 } from './contracts';
 import { parseSyncCaptureRecord } from './guards';
 import { freezeVideoReviewInTransaction, digestCapturedVideoReviewRows } from './review-snapshot';
+import { freezeMediaInTransaction } from './freeze';
 import { isBoundedImageMetadata } from './image-snapshot';
 import { digestCapturedMediaRows } from './freeze';
 import { allocateVideoReviewRevision } from './capture';
@@ -102,6 +107,17 @@ function isApplyReviewHeader(value: unknown): value is ApplyReviewHeader {
   return true;
 }
 
+function isSupportedReviewDependencySource(entry: Dependency['entry']): boolean {
+  const source = entry.source;
+  if (source.kind === 'recording') return entry.id === `recording:${source.recordingId}`;
+  return (
+    source.kind === 'project-asset' &&
+    entry.id === `project-asset:${source.projectAssetId}` &&
+    !entry.recordingMetadata &&
+    !entry.recordingGroup
+  );
+}
+
 function parseReviewDependency(raw: unknown): Dependency | null {
   if (!isRecord(raw)) return null;
   const entry = parseMediaLibraryEntry(raw['entry']);
@@ -111,10 +127,7 @@ function parseReviewDependency(raw: unknown): Dependency | null {
     !ref ||
     entry.blob !== undefined ||
     entry.lifecycle?.storageClass !== 'library' ||
-    entry.recordingMetadata ||
-    entry.recordingGroup ||
-    entry.source.kind !== 'project-asset' ||
-    entry.id !== `project-asset:${entry.source.projectAssetId}` ||
+    !isSupportedReviewDependencySource(entry) ||
     entry.size !== ref.size ||
     entry.mimeType !== ref.mimeType ||
     !ordinal(raw['expectedGeneration']) ||
@@ -145,7 +158,7 @@ function dependenciesMatchReviewSource(
   const source = dependencies.find((dependency) => dependency.entry.id === root.sourceMediaId);
   if (
     !source ||
-    source.entry.kind !== 'video' ||
+    (source.entry.kind !== 'video' && source.entry.kind !== 'recording') ||
     !source.ref.mimeType.startsWith('video/') ||
     source.ref.assetId !== root.review.workspace.sourceAssetId ||
     source.ref.size !== root.review.workspace.source.size ||
@@ -308,41 +321,36 @@ async function admitDependencies(tx: WriteTx, input: ApplyPreparedVideoReviewRep
         media: tx.objectStore(MEDIA_LIBRARY_STORE),
         assets: tx.objectStore(PROJECT_ASSETS_STORE),
         exports: tx.objectStore(PROJECT_EXPORTS_STORE),
+        recordings: tx.objectStore(STORE_NAME),
         refs: tx.objectStore(ASSET_REFS_STORE),
       },
       { allowRetainedTrash: true }
     );
-    if (dependency.entry.source.kind !== 'project-asset') refused();
-    const asset = parseProjectAssetEntry(
-      await tx.objectStore(PROJECT_ASSETS_STORE).get(dependency.entry.source.projectAssetId)
-    );
+    const source = await freezeMediaInTransaction(tx, dependency.entry.id, {
+      allowIndependentReview: true,
+    });
+    const child = 'recording' in source ? source.recording : source.projectAsset;
+    const ownerKind = 'recording' in source ? 'recording' : 'project-asset';
     const owner = parseAssetOwner(
-      await tx
-        .objectStore(ASSET_OWNERS_STORE)
-        .get(['project-asset', dependency.entry.source.projectAssetId, 'body'])
+      await tx.objectStore(ASSET_OWNERS_STORE).get([ownerKind, child.id, 'body'])
     );
     if (
-      !asset ||
-      asset.id !== dependency.entry.source.projectAssetId ||
-      asset.assetId !== dependency.ref.assetId ||
       !owner ||
-      owner.assetId !== dependency.ref.assetId ||
-      owner.ownerKind !== 'project-asset' ||
-      owner.ownerId !== asset.id ||
-      owner.role !== 'body'
+      owner.ownerKind !== ownerKind ||
+      owner.ownerId !== child.id ||
+      owner.role !== 'body' ||
+      owner.assetId !== source.ref.assetId ||
+      !same(source.media, dependency.entry) ||
+      !same(source.ref, dependency.ref) ||
+      parsed.nativeDigest !== digestCapturedMediaRows(source)
     )
       refused();
     if (
-      !asset ||
-      parsed.nativeDigest !==
-        digestCapturedMediaRows({
-          media: dependency.entry,
-          projectAsset: asset,
-          ref: dependency.ref,
-        })
+      dependency.entry.id === input.root.sourceMediaId &&
+      'projectAsset' in source &&
+      source.projectAsset.originMediaId
     )
       refused();
-    if (dependency.entry.id === input.root.sourceMediaId && asset.originMediaId) refused();
   }
 }
 async function admitAssets(tx: WriteTx, input: ApplyPreparedVideoReviewReplicaInput) {
@@ -513,6 +521,10 @@ export async function applyPreparedVideoReviewReplica(
   const result = await runWithIndexedDbMutation(async (database) => {
     const tx = database.transaction(
       [
+        AGGREGATE_PRESENTATIONS_STORE,
+        IMAGE_WORKSPACES_STORE,
+        STORE_NAME,
+        RECORDING_TELEMETRY_STORE,
         SYNC_CAPTURE_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,

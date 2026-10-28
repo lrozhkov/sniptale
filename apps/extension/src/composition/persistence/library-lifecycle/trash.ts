@@ -12,6 +12,8 @@ import { readWorkspaceStorage } from '../review-workspaces/storage';
 import { createScenarioProjectStore, getScenarioStoredProject } from '../scenario/storage';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
   SYNC_CAPTURE_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -131,6 +133,8 @@ async function mutateTrash(
     runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction(
         [
+          STORE_NAME,
+          RECORDING_TELEMETRY_STORE,
           SYNC_CAPTURE_STORE,
           PROJECT_ASSETS_STORE,
           PROJECT_EXPORTS_STORE,
@@ -209,7 +213,11 @@ async function mutateTrash(
             const media = parseMediaLibraryEntry(
               await tx.objectStore(MEDIA_LIBRARY_STORE).get(target.id)
             );
-            if (media?.source.kind === 'screenshot' || media?.source.kind === 'project-asset')
+            if (
+              media?.source.kind === 'screenshot' ||
+              media?.source.kind === 'project-asset' ||
+              media?.source.kind === 'recording'
+            )
               await captureMediaInTransaction(tx, target.id);
           }
         }

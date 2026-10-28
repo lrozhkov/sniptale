@@ -362,3 +362,115 @@ it('checks every merged dependency branch before accepting unchanged original by
     )?.unavailableDependencies
   ).toEqual([mediaId]);
 });
+
+it('admits recording metadata and telemetry successors but refuses byte and lifetime changes', async () => {
+  const recordingMediaId = 'recording:saved-source';
+  const original = envelope('media', mediaId);
+  const originalMetadata = parsePortableMediaMetadata(original.metadata);
+  const recordingEnvelope = parseRootEnvelope({
+    ...original,
+    descriptor: { ...original.descriptor, rootId: recordingMediaId },
+    metadata: {
+      entry: {
+        ...originalMetadata.entry,
+        id: recordingMediaId,
+        source: { kind: 'recording', recordingId: 'saved-source' },
+      },
+      originalObjectId: object.objectId,
+      recording: {
+        entry: {
+          id: 'saved-source',
+          filename: 'Original.png',
+          createdAt: 1,
+          mimeType: object.mimeType,
+          size: object.size,
+        },
+      },
+    },
+  });
+  const before = await attempt('recording-before', {
+    rootId: recordingMediaId,
+    envelope: recordingEnvelope,
+  });
+  const metadata = parsePortableMediaMetadata(recordingEnvelope.metadata);
+  metadata.entry.filename = 'Renamed.png';
+  metadata.entry.tags = ['Saved'];
+  metadata.recording!.entry.filename = 'Renamed.png';
+  metadata.recording!.telemetry = {
+    recordingId: 'saved-source',
+    createdAt: 1,
+    updatedAt: 2,
+    captureMode: null,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+  };
+  const updatedEnvelope = parseRootEnvelope({ ...recordingEnvelope, metadata });
+  const updated = await attempt('recording-updated', {
+    rootId: recordingMediaId,
+    parents: ['recording-before'],
+    envelope: updatedEnvelope,
+  });
+  const projectEntry = createVideoProjectEntryWithMediaClip({ id: 'project' });
+  projectEntry.project.assets[0]!.source = { kind: 'library-asset', mediaId: recordingMediaId };
+  const projectEnvelope = parseRootEnvelope({
+    ...envelope('video-project', 'project'),
+    metadata: {
+      entry: {
+        ...projectEntry,
+        project: encodePortableVideoProjectAssetRefs(projectEntry.project),
+      },
+      projectAssets: [],
+      projectExports: [],
+    },
+    descriptor: {
+      ...envelope('video-project', 'project').descriptor,
+      objectCount: 0,
+      totalBytes: 0,
+    },
+    objects: [],
+  });
+  const project = await attempt('recording-consumer', {
+    rootKind: 'video-project',
+    rootId: 'project',
+    envelope: projectEnvelope,
+    objects: [],
+    dependencies: [{ mediaId: recordingMediaId, basis: ['recording-before'] }],
+  });
+  expect(
+    projectSyncCatalog('space', [before, updated, project]).roots.get(projectKey)
+      ?.unavailableDependencies
+  ).toEqual([]);
+  const changed = await attempt('recording-changed', {
+    rootId: recordingMediaId,
+    parents: ['recording-updated'],
+    envelope: updatedEnvelope,
+    objects: [{ objectId: object.objectId, sha256: 'b'.repeat(64) }],
+  });
+  const changedBack = await attempt('recording-back', {
+    rootId: recordingMediaId,
+    parents: ['recording-changed'],
+    envelope: updatedEnvelope,
+  });
+  const deleted = await attempt('recording-deleted', {
+    rootId: recordingMediaId,
+    parents: ['recording-updated'],
+    kind: 'delete',
+  });
+  const restored = await attempt('recording-restored', {
+    rootId: recordingMediaId,
+    parents: ['recording-deleted'],
+    kind: 'restore',
+    envelope: updatedEnvelope,
+  });
+  const concurrent = await attempt('recording-concurrent', {
+    rootId: recordingMediaId,
+    envelope: updatedEnvelope,
+  });
+  for (const history of [[changed], [changed, changedBack], [deleted, restored], [concurrent]])
+    expect(
+      projectSyncCatalog('space', [before, updated, project, ...history]).roots.get(projectKey)
+        ?.unavailableDependencies
+    ).toEqual([recordingMediaId]);
+});

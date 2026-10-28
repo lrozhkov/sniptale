@@ -1,3 +1,5 @@
+import { parseRecordingEntry } from '../recordings/index.guards';
+import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { validateEffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
@@ -138,6 +140,7 @@ it('detaches the complete default and archived review graph', async () => {
 it('rejects a changed source binding and unresolved resources', async () => {
   const f = fixture();
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(
     parseCapturedVideoReviewRows({
       ...rows,
@@ -158,6 +161,7 @@ it('rejects missing, duplicate and extra supplementary refs', async () => {
   const image = f.asset('image');
   f.save(withImage(f.workspace(), image));
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(parseCapturedVideoReviewRows({ ...rows, refs: [] })).toBeNull();
   expect(parseCapturedVideoReviewRows({ ...rows, refs: [...rows.refs, rows.refs[0]] })).toBeNull();
   expect(
@@ -196,6 +200,7 @@ it('retains disabled and redo-only resources', async () => {
   workspace.history = [operation];
   f.save(workspace);
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(rows.assets.map((asset) => asset.id).sort()).toEqual(['disabled', 'redo']);
   expect(rows.review.workspace.cursor).toBe(0);
 });
@@ -208,6 +213,7 @@ it('retains nested private review resources and terminates resource cycles', asy
   f.save(withImage(f.workspace(`project-asset:${first.id}`, first), second));
   f.save(withImage(f.workspace(`project-asset:${second.id}`, second), first));
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(rows.assets.map((asset) => asset.id).sort()).toEqual(['first', 'second']);
   expect(rows.privateReviews).toHaveLength(2);
   expect(
@@ -234,12 +240,13 @@ it('keeps a published supplementary review independent', async () => {
     })
   );
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(rows.assets.map((asset) => asset.id)).toEqual(['published']);
   expect(rows.media.map((entry) => entry.id)).toEqual(['project-asset:published']);
   expect(rows.privateReviews).toEqual([]);
 });
 
-it('refuses recording and foreign resource ownership', async () => {
+it('refuses unsupported recording identity and foreign resource ownership', async () => {
   const f = fixture();
   const media = f.rows.get('media_library')!.get(f.mediaId);
   f.seed(
@@ -267,6 +274,7 @@ it('reads split physical history through the existing transaction', async () => 
   await replaceWorkspaceStorage(tx, f.workspace(), []);
   await tx.done;
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(rows.review.workspace.aggregateId).toBe(f.mediaId);
   expect(rows.review.workspace.project).toEqual(f.workspace().project);
 });
@@ -337,6 +345,7 @@ it('retains disabled annotation effect resources from the redo suffix', async ()
   ];
   f.save(workspace);
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(rows.assets.map((asset) => asset.id)).toEqual(['effect-resource']);
   expect(rows.review.workspace.effectSnapshots).toEqual(workspace.effectSnapshots);
   expect(parseCapturedVideoReviewRows({ ...rows, assets: [], refs: [] })).toBeNull();
@@ -366,10 +375,11 @@ it('retains only the selected workspace thumbnail and rejects a foreign thumbnai
 it('rejects metadata and resource inventories outside the existing capture limits', async () => {
   const f = fixture();
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(
     parseCapturedVideoReviewRows({
       ...rows,
-      assets: Array.from({ length: 33 }, () => rows.source.projectAsset),
+      assets: Array.from({ length: 33 }, () => f.original),
     })
   ).toBeNull();
   expect(
@@ -417,6 +427,7 @@ it('retains independently published origins and refuses a foreign mirror binding
   });
   f.save(withImage(f.workspace(), image));
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   expect(rows.media.map((entry) => entry.id)).toEqual(['published-origin']);
   expect(rows.refs.map((ref) => ref.assetId).sort()).toEqual(['bytes-acquired', 'origin-bytes']);
   f.seed(
@@ -436,6 +447,7 @@ it('retains independently published origins and refuses a foreign mirror binding
 it('rejects a noncanonical primary source identity', async () => {
   const f = fixture();
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   const alias = 'project-asset:unrelated-source';
   expect(
     parseCapturedVideoReviewRows({
@@ -449,6 +461,7 @@ it('rejects a noncanonical primary source identity', async () => {
 it('keeps the review fingerprint independent of its original metadata', async () => {
   const f = fixture();
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   const renamed = structuredClone(rows);
   renamed.source.media.filename = 'Renamed original.webm';
   renamed.source.media.tags = ['Source tag'];
@@ -461,10 +474,149 @@ it('keeps the review fingerprint independent of its original metadata', async ()
 it('retains inspected source codecs while associating the same original container', async () => {
   const f = fixture();
   const rows = await freezeVideoReviewInTransaction(f.tx(), f.mediaId);
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset original');
   rows.review.workspace.source.mimeType = 'video/webm; codecs="vp8, opus"';
   expect(parseCapturedVideoReviewRows(rows)?.review.workspace.source.mimeType).toBe(
     'video/webm; codecs="vp8, opus"'
   );
   rows.review.workspace.source.mimeType = 'video/mp4; codecs="avc1"';
   expect(parseCapturedVideoReviewRows(rows)).toBeNull();
+});
+
+function seedRecording(f: ReturnType<typeof fixture>, id = 'saved') {
+  if (!f.rows.has('recording_telemetry')) f.rows.set('recording_telemetry', new Map());
+  const recording = {
+    id,
+    assetId: `${id}-bytes`,
+    filename: 'Saved.webm',
+    createdAt: 1,
+    size: f.original.size,
+    mimeType: f.original.mimeType,
+  };
+  const media = buildRecordingMediaEntry(recording);
+  f.seed('recordings', id, recording);
+  f.seed('media_library', media.id, media);
+  f.seed('asset_refs', recording.assetId, {
+    assetId: recording.assetId,
+    createdAt: 1,
+    size: recording.size,
+    mimeType: recording.mimeType,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: `objects/${recording.assetId}` },
+  });
+  f.seed('asset_owners', JSON.stringify(['recording', id, 'body']), {
+    ownerKind: 'recording',
+    ownerId: id,
+    role: 'body',
+    assetId: recording.assetId,
+  });
+  return { recording, media };
+}
+
+function recordingTransaction(f: ReturnType<typeof fixture>) {
+  return f.database.transaction([...f.rows.keys()], 'readonly') as unknown as Parameters<
+    typeof freezeVideoReviewInTransaction
+  >[0];
+}
+
+it('captures recording reviews independently from mutable source metadata', async () => {
+  const f = fixture();
+  const { recording, media } = seedRecording(f);
+  const source = { ...f.original, assetId: recording.assetId };
+  const workspace = { ...f.workspace(media.id, source), sourceMediaId: media.id };
+  f.save(workspace);
+  const archive = { ...workspace, aggregateId: 'review-archive', sourceMediaId: media.id };
+  f.save(archive);
+  const rows = await freezeVideoReviewInTransaction(recordingTransaction(f), media.id);
+  const archived = await freezeVideoReviewInTransaction(
+    recordingTransaction(f),
+    archive.aggregateId
+  );
+  expect(archived.source).toMatchObject({ recording, telemetry: null });
+  expect(archived.review.workspace.sourceMediaId).toBe(media.id);
+  expect(f.rows.get('media_library')!.has(archive.aggregateId)).toBe(false);
+  const digest = digestCapturedVideoReviewRows(rows);
+  const renamed = structuredClone(rows);
+  if (!('recording' in renamed.source)) throw new Error('Expected recording original');
+  renamed.source.recording.filename = 'Renamed.webm';
+  renamed.source.recording.lifecycle = {
+    storageClass: 'library',
+    savedAt: 1,
+    updatedAt: 3,
+    trashedAt: 3,
+  };
+  renamed.source.media.filename = 'Renamed.webm';
+  renamed.source.telemetry = {
+    recordingId: recording.id,
+    createdAt: 1,
+    updatedAt: 3,
+    captureMode: null,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+  };
+  expect(digestCapturedVideoReviewRows(renamed)).toBe(digest);
+  renamed.source.ref.sha256 = 'a'.repeat(64);
+  expect(digestCapturedVideoReviewRows(renamed)).not.toBe(digest);
+});
+
+it('requires exact secondary recording child and ref closure while keeping its review independent', async () => {
+  const f = fixture();
+  const { recording, media } = seedRecording(f);
+  const child = f.asset('acquired', recording.mimeType, recording.size);
+  child.originMediaId = media.id;
+  f.save(withImage(f.workspace(), child));
+  const rows = await freezeVideoReviewInTransaction(recordingTransaction(f), f.mediaId);
+  expect(rows.recordings).toEqual([parseRecordingEntry(recording)]);
+  expect(rows.media.map((entry) => entry.id)).toEqual([media.id]);
+  expect(rows.privateReviews).toEqual([]);
+  expect(parseCapturedVideoReviewRows({ ...rows, recordings: [] })).toBeNull();
+  expect(parseCapturedVideoReviewRows({ ...rows, recordings: [recording, recording] })).toBeNull();
+  expect(
+    parseCapturedVideoReviewRows({ ...rows, recordings: [{ ...recording, id: 'foreign' }] })
+  ).toBeNull();
+  expect(
+    parseCapturedVideoReviewRows({
+      ...rows,
+      refs: rows.refs.filter((ref) => ref.assetId !== recording.assetId),
+    })
+  ).toBeNull();
+  const digest = digestCapturedVideoReviewRows(rows);
+  expect(
+    digestCapturedVideoReviewRows({
+      ...rows,
+      recordings: [{ ...recording, filename: 'Later.webm' }],
+    })
+  ).toBe(digest);
+});
+
+it('refuses canonical recording review sources with foreign owners and telemetry identities', async () => {
+  const f = fixture();
+  const { recording, media } = seedRecording(f);
+  f.save({
+    ...f.workspace(media.id, { ...f.original, assetId: recording.assetId }),
+    sourceMediaId: media.id,
+  });
+  f.seed('recording_telemetry', recording.id, {
+    recordingId: 'foreign',
+    createdAt: 1,
+    updatedAt: 2,
+    captureMode: null,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+  });
+  await expect(freezeVideoReviewInTransaction(recordingTransaction(f), media.id)).rejects.toThrow();
+  f.rows.get('recording_telemetry')!.clear();
+  f.seed('asset_owners', JSON.stringify(['recording', recording.id, 'body']), {
+    ownerKind: 'recording',
+    ownerId: 'foreign',
+    role: 'body',
+    assetId: recording.assetId,
+  });
+  await expect(freezeVideoReviewInTransaction(recordingTransaction(f), media.id)).rejects.toThrow(
+    'ownership'
+  );
 });

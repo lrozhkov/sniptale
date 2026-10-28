@@ -226,3 +226,91 @@ it('rolls back original metadata when capture fails and retries without changing
   await addMediaLibraryEntryTags(data.original.id, ['same']);
   expect(data.captures()).toHaveLength(prior + 1);
 });
+
+function installSavedRecording(data: ReturnType<typeof setup>) {
+  const recording = {
+    id: 'lifecycle-recording',
+    assetId: 'lifecycle-recording-bytes',
+    filename: 'original.webm',
+    mimeType: 'video/webm',
+    size: 8,
+    createdAt: 1,
+  };
+  const media = createMediaLibraryEntry({
+    id: `recording:${recording.id}`,
+    kind: 'video',
+    source: { kind: 'recording', recordingId: recording.id },
+    filename: recording.filename,
+    originalFilename: recording.filename,
+    mimeType: recording.mimeType,
+    size: recording.size,
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1 },
+  });
+  data.rows.set('recording_telemetry', new Map());
+  data.table('recordings').set(recording.id, recording);
+  data.table('media_library').set(media.id, media);
+  data.table('asset_refs').set(recording.assetId, {
+    assetId: recording.assetId,
+    createdAt: 1,
+    size: 8,
+    mimeType: recording.mimeType,
+    location: { kind: 'opfs', objectKey: `objects/${recording.assetId}` },
+    sha256: null,
+  });
+  data.table('asset_owners').set(JSON.stringify(['recording', recording.id, 'body']), {
+    ownerKind: 'recording',
+    ownerId: recording.id,
+    role: 'body',
+    assetId: recording.assetId,
+  });
+  return { recording, media };
+}
+
+it('captures saved recording filename, tags and provenance while preserving the immutable original', async () => {
+  const data = setup();
+  const { recording, media } = installSavedRecording(data);
+  const refs = structuredClone(data.table('asset_refs'));
+  await updateMediaLibraryEntry(media.id, {
+    filename: 'Renamed.webm',
+    sourceUrl: 'https://example.test/recording',
+    sourceTitle: 'Saved source',
+  });
+  await addMediaLibraryEntryTags(media.id, ['saved', 'review']);
+  expect(data.captures().at(-1)).toMatchObject({
+    generation: 2,
+    change: {
+      kind: 'media',
+      rows: {
+        recording,
+        telemetry: null,
+        media: { filename: 'Renamed.webm', tags: ['saved', 'review'], sourceTitle: 'Saved source' },
+      },
+    },
+  });
+  expect(data.table('recordings').get(recording.id)).toEqual(recording);
+  expect(data.table('asset_refs')).toEqual(refs);
+});
+
+it('captures recording Trash and restore once and retains native child and original owner', async () => {
+  const data = setup();
+  const { recording, media } = installSavedRecording(data);
+  const refs = structuredClone(data.table('asset_refs'));
+  const owners = structuredClone(data.table('asset_owners'));
+  const targets = [{ kind: 'media' as const, id: media.id }];
+  await moveStoredItemsToTrash(targets, 10);
+  await moveStoredItemsToTrash(targets, 20);
+  await restoreStoredItemsFromTrash(targets, 30);
+  await restoreStoredItemsFromTrash(targets, 40);
+  expect(data.captures()).toHaveLength(2);
+  expect(data.captures()[0]).toMatchObject({
+    change: { kind: 'media', rows: { recording, media: { lifecycle: { trashedAt: 10 } } } },
+  });
+  expect(data.captures()[1]).toMatchObject({
+    generation: 2,
+    basis: [data.captures()[0]!.operationId],
+    change: { kind: 'media', rows: { recording, media: { lifecycle: { updatedAt: 30 } } } },
+  });
+  expect(data.table('recordings').get(recording.id)).toEqual(recording);
+  expect(data.table('asset_refs')).toEqual(refs);
+  expect(data.table('asset_owners')).toEqual(owners);
+});

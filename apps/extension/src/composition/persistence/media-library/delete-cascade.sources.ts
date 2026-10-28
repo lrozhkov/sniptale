@@ -72,11 +72,12 @@ async function releaseAssetOwner(args: {
   }
 }
 
-/** Release only source-specific records and byte owners in the caller transaction. */
+/** Release source records and byte owners. Replacement retains authoritative recording recovery. */
 export async function releaseMediaSource(
   tx: CascadeTransaction,
   media: MediaDependencyTarget,
-  physicalDelete: PhysicalDelete
+  physicalDelete: PhysicalDelete,
+  options: { retainRecordingRecovery?: boolean } = {}
 ): Promise<void> {
   switch (media.source.kind) {
     case 'screenshot':
@@ -91,7 +92,8 @@ export async function releaseMediaSource(
         parse: parseRecordingEntry,
       });
       await tx.objectStore(RECORDING_TELEMETRY_STORE).delete!(media.source.recordingId);
-      await deleteRecoveryInTransaction(tx, media.source.recordingId);
+      if (!options.retainRecordingRecovery)
+        await deleteRecoveryInTransaction(tx, media.source.recordingId);
       return;
     case 'project-asset':
       return releaseBodyRecord({

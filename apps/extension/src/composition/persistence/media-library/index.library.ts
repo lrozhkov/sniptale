@@ -1,5 +1,8 @@
 import { captureMediaInTransaction } from '../sync-capture/capture';
 import {
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
+  ASSET_OWNERS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   IMAGE_WORKSPACES_STORE,
   SYNC_CAPTURE_STORE,
@@ -134,6 +137,9 @@ async function mutateMediaLibraryEntry(
     const tx = db.transaction(
       [
         MEDIA_LIBRARY_STORE,
+        STORE_NAME,
+        RECORDING_TELEMETRY_STORE,
+        ASSET_OWNERS_STORE,
         IMAGE_WORKSPACES_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
         ASSET_REFS_STORE,
@@ -153,7 +159,11 @@ async function mutateMediaLibraryEntry(
       const nextEntry = mutate(existing);
       if (nextEntry !== existing) {
         await store.put(nextEntry);
-        if (nextEntry.source.kind === 'screenshot' || nextEntry.source.kind === 'project-asset')
+        if (
+          nextEntry.source.kind === 'screenshot' ||
+          nextEntry.source.kind === 'project-asset' ||
+          nextEntry.source.kind === 'recording'
+        )
           await captureMediaInTransaction(tx, assetId);
       }
       await tx.done;

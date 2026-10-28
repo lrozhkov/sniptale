@@ -1,3 +1,4 @@
+import type { StoredRecordingEntry, RecordingTelemetryEntry } from '../recordings/contracts';
 import type { CapturedVideoReviewRows } from './review-snapshot';
 import type { StoredImageWorkspaceEntry } from '../image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
@@ -52,11 +53,18 @@ export interface CapturedImageRows {
   refs: AssetRef[];
 }
 
-export interface CapturedMediaRows {
-  media: Omit<MediaLibraryEntry, 'blob'>;
-  projectAsset: StoredProjectAssetEntry;
-  ref: AssetRef;
-}
+export type CapturedMediaRows =
+  | {
+      media: Omit<MediaLibraryEntry, 'blob'>;
+      projectAsset: StoredProjectAssetEntry;
+      ref: AssetRef;
+    }
+  | {
+      media: Omit<MediaLibraryEntry, 'blob'>;
+      recording: StoredRecordingEntry;
+      ref: AssetRef;
+      telemetry: RecordingTelemetryEntry | null;
+    };
 
 export interface CapturedMediaDependency {
   mediaId: string;
