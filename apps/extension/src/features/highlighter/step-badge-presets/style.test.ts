@@ -1,10 +1,22 @@
 import { expect, it } from 'vitest';
 import { createSystemStepBadgePresetCatalog, createStepBadgeSettingsFromTemplate } from './catalog';
+import { getStepBadgeVisualMetrics } from '../frame-annotation/step-badge-metrics';
 import { getLinkedStepBadgeDiameter, resolveStepBadgeVisualStyle } from './style';
 
-it('keeps the classic linked diameter compatible with the legacy renderer', () => {
-  expect(getLinkedStepBadgeDiameter(4)).toBeCloseTo(29.16);
-  expect(getLinkedStepBadgeDiameter(8)).toBeCloseTo(48.6);
+it('uses whole diameters for inherited, custom and legacy badges', () => {
+  expect(getLinkedStepBadgeDiameter(4)).toBe(29);
+  expect(getLinkedStepBadgeDiameter(8)).toBe(49);
+  const settings = createStepBadgeSettingsFromTemplate(
+    createSystemStepBadgePresetCatalog()[0]!.settings
+  );
+  settings.style = { ...settings.style, sizeSource: 'custom', diameter: 29.16 };
+  expect(
+    resolveStepBadgeVisualStyle(settings, { borderColor: '#000000', borderWidth: 4 }).diameter
+  ).toBe(29);
+  const { style: _style, ...legacy } = settings;
+  for (const borderWidth of [1, 4, 5.25, 8]) {
+    expect(Number.isInteger(getStepBadgeVisualMetrics(legacy, borderWidth).badgeSize)).toBe(true);
+  }
 });
 
 it('resolves semantic colors and uses fallback for transparent frame fill', () => {

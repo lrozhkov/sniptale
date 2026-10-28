@@ -79,7 +79,7 @@ it('switches from linked sizing without a visual jump and routes color source ch
   await act(async () => customSize?.click());
   const sizePatch = onChange.mock.calls[0]?.[0];
   expect(sizePatch.style.sizeSource).toBe('custom');
-  expect(sizePatch.style.diameter).toBeCloseTo(29.16);
+  expect(sizePatch.style.diameter).toBe(29);
   const backgroundSource = host.querySelector<HTMLButtonElement>(
     '[data-step-badge-color-role="background"]'
   );
@@ -107,4 +107,39 @@ it('adopts canonical parameter stacks without changing pending appearance groups
   expect(pending).toContain('grid gap-2');
   expect(migrated.match(/class="sniptale-parameter-stack"/g)).toHaveLength(2);
   expect(migrated).toContain('Цвет рамки');
+});
+
+it('commits typed fractional diameters as whole pixels', async () => {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const onChange = vi.fn();
+  const settings = createStepBadgeSettingsFromTemplate(DEFAULT_STEP_BADGE_TEMPLATE);
+  settings.style.sizeSource = 'custom';
+  await act(async () =>
+    root.render(
+      <StepBadgeAppearanceSection
+        frame={{ borderColor: '#f97316', borderWidth: 4 }}
+        onChange={onChange}
+        settings={settings}
+      />
+    )
+  );
+  const field = host.querySelector<HTMLInputElement>('input[aria-label="Диаметр"]')!;
+  expect(field).not.toBeNull();
+  await act(async () => {
+    field.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, '48.6');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () =>
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      style: expect.objectContaining({ diameter: 49 }),
+    })
+  );
+  await act(async () => root.unmount());
+  host.remove();
 });

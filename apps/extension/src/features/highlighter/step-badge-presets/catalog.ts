@@ -14,11 +14,11 @@ type SystemStepBadgePreset = StepBadgePreset & {
   systemPresetKey: SystemStepBadgePresetKey;
 };
 
-export const SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION = 6;
+export const SYSTEM_STEP_BADGE_PRESET_CATALOG_REVISION = 7;
 
 export const DEFAULT_STEP_BADGE_VISUAL_STYLE: StepBadgeVisualStyle = {
   sizeSource: 'frame-border',
-  diameter: 29.16,
+  diameter: 29,
   backgroundColorSource: 'frame-border',
   backgroundColor: '#f97316',
   textColorSource: 'custom',
@@ -249,7 +249,7 @@ export function cloneStepBadgeTemplate(
   return {
     ...settings,
     offsetDirections: [...settings.offsetDirections],
-    style: { ...settings.style },
+    style: { ...settings.style, diameter: Math.round(settings.style.diameter) },
   };
 }
 
@@ -296,10 +296,10 @@ export function createStepBadgeTemplateFromSettings(
     value: settings.value,
     auto: settings.auto !== false,
     style: settings.style
-      ? { ...settings.style }
+      ? { ...settings.style, diameter: Math.round(settings.style.diameter) }
       : {
           ...DEFAULT_STEP_BADGE_VISUAL_STYLE,
-          ...(linkedDiameter === undefined ? {} : { diameter: linkedDiameter }),
+          ...(linkedDiameter === undefined ? {} : { diameter: Math.round(linkedDiameter) }),
         },
   };
 }

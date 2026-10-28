@@ -1052,6 +1052,9 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           range.selectNodeContents(value);
           const text = range.getBoundingClientRect();
           const circle = badge.getBoundingClientRect();
+          if (!Number.isInteger(Number.parseFloat(getComputedStyle(badge).width))) {
+            throw new Error('Badge diameter must use whole CSS pixels');
+          }
           const scale =
             text.height / (metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent);
           const centerX = text.left + text.width / 2;

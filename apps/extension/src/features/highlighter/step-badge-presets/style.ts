@@ -24,14 +24,18 @@ interface ResolvedStepBadgeVisualStyle {
 const CLASSIC_SIZE_MULTIPLIER = 1.35;
 
 export function getLinkedStepBadgeDiameter(borderWidth: number): number {
-  return Math.max(12, borderWidth * 2.5) * CLASSIC_SIZE_MULTIPLIER * 1.8;
+  return Math.round(Math.max(12, borderWidth * 2.5) * CLASSIC_SIZE_MULTIPLIER * 1.8);
 }
 
 export function getEffectiveStepBadgeVisualStyle(
   settings: Pick<StepBadgeSettings, 'style'>
 ): StepBadgeVisualStyle {
   return settings.style
-    ? { ...DEFAULT_STEP_BADGE_VISUAL_STYLE, ...settings.style }
+    ? {
+        ...DEFAULT_STEP_BADGE_VISUAL_STYLE,
+        ...settings.style,
+        diameter: Math.round(settings.style.diameter),
+      }
     : { ...DEFAULT_STEP_BADGE_VISUAL_STYLE };
 }
 

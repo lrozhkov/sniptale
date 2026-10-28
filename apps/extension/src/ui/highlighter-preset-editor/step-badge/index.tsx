@@ -213,7 +213,7 @@ function PresetEditorBody(props: {
   setTagIds: (value: string[]) => void;
   tagIds: string[];
 }) {
-  const template = createStepBadgeTemplateFromSettings(props.settings, 29.16);
+  const template = createStepBadgeTemplateFromSettings(props.settings);
   const nameRef = useRef<HTMLInputElement>(null);
   const inspector = useInspectorLayout();
   const nameInput = (
@@ -277,7 +277,7 @@ export function StepBadgePresetEditor(props: StepBadgePresetEditorProps) {
   });
 
   if (!props.isOpen || !settings) return null;
-  const template = createStepBadgeTemplateFromSettings(settings, 29.16);
+  const template = createStepBadgeTemplateFromSettings(settings);
   const patch = (value: Partial<StepBadgeSettings>) =>
     setSettings((current) =>
       current

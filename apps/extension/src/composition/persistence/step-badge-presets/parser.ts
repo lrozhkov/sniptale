@@ -135,7 +135,7 @@ export function parseStepBadgeTemplateSettings(value: unknown): StepBadgeTemplat
     auto: value['auto'],
     style: {
       sizeSource: style['sizeSource'] as StepBadgeTemplateSettings['style']['sizeSource'],
-      diameter: style['diameter'],
+      diameter: Math.round(style['diameter']),
       backgroundColorSource: style[
         'backgroundColorSource'
       ] as StepBadgeTemplateSettings['style']['backgroundColorSource'],
