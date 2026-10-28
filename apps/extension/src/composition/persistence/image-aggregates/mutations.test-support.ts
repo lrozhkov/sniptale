@@ -171,6 +171,7 @@ export function installTransaction(args: ImageTransactionFixture) {
     async (value: { aggregateId: string }) => void presentationById.set(value.aggregateId, value)
   );
   const stores = {
+    sync_capture: { get: vi.fn(async () => undefined) },
     aggregate_presentations: {
       get: vi.fn(async (key: [string, string]) => {
         return presentationById.get(key[1]);

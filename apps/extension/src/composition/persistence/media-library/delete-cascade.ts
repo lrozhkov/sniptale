@@ -334,6 +334,13 @@ async function commitCascadeTransaction(
   try {
     const graph = await loadCascadeGraph(tx, mediaId, expectedSource);
     const captureProfile = await readEnabledCaptureProfile(tx);
+    const currentMedia = captureProfile
+      ? parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId))
+      : null;
+    const imageNativeRevision =
+      currentMedia?.source.kind === 'screenshot'
+        ? (currentMedia.workspaceRevision ?? 0)
+        : undefined;
     const now = Date.now();
     const scenarioChildIds = new Set(graph.scenarioChildren.map((child) => child.id));
     const detachedRepresentations = new Set([
@@ -369,7 +376,7 @@ async function commitCascadeTransaction(
       await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
     if (captureProfile) {
       for (const entry of affectedVideos) await captureVideoProjectInTransaction(tx, entry.id);
-      await captureDeletionInTransaction(tx, 'media', mediaId);
+      await captureDeletionInTransaction(tx, 'media', mediaId, 'local-edit', imageNativeRevision);
     }
     await tx.done;
   } catch (error) {

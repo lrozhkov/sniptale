@@ -1019,3 +1019,63 @@ test('causal revisions and deletion cross WebDAV without echo or losing independ
     await target.context.close();
   }
 });
+
+test('saved image revisions retain ordinary originals through WebDAV and browser restart', async ({
+  lab,
+}, info) => {
+  const sender = await openProvider(lab, info, 'image-source');
+  let target = await openProvider(lab, info, 'image-target');
+  try {
+    const seed = await sender.page.evaluate(() =>
+      window.webdavTransferHarness.portable.imageSource()
+    );
+    const first = await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.sendHistory(id),
+      seed.rootId
+    );
+    const receive = () =>
+      target.page.evaluate(async ({ rootId, spaceId }) => {
+        const api = window.webdavTransferHarness.portable;
+        await api.outgoing.scan(spaceId);
+        await api.outgoing.receive(spaceId, 'media', rootId);
+        return api.imageProof(rootId);
+      }, seed);
+    const initial = await receive();
+    expect(initial.hash).toBe(seed.native.hash);
+    expect(initial.presentationRevision).toBe(initial.revision);
+    expect(initial.journals).toBe(0);
+    expect(initial.operations).toEqual([]);
+    await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.imageRevise(id),
+      seed.rootId
+    );
+    const second = await sender.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.outgoing.sendHistory(id),
+      seed.rootId
+    );
+    const revised = await receive();
+    expect(revised.revision).toBeGreaterThan(initial.revision!);
+    expect(revised.hash).toBe(seed.native.hash);
+    for (const item of [...first, ...second].flatMap((item) => item.files))
+      expect(await lab.externalProof(item.key)).toEqual({ size: item.size, sha256: item.sha256 });
+    await target.context.close();
+    target = await openProvider(lab, info, 'image-target');
+    const persisted = await target.page.evaluate(
+      (id) => window.webdavTransferHarness.portable.imageProof(id),
+      seed.rootId
+    );
+    expect(persisted.revision).toBe(revised.revision);
+    expect(persisted.hash).toBe(revised.hash);
+    expect(persisted.journals).toBe(0);
+    await saveProof(info, {
+      seed,
+      initial,
+      revised,
+      persisted,
+      externalFiles: [...first, ...second].flatMap((item) => item.files),
+    });
+  } finally {
+    await sender.context.close();
+    await target.context.close();
+  }
+});

@@ -236,7 +236,12 @@ export function createWebdavOutgoingHarness(
       );
       return catalogProof(catalog);
     },
-    async receive(spaceId: string, rootKind: 'media' | 'video-project', rootId: string) {
+    async receive(
+      spaceId: string,
+      rootKind: 'media' | 'video-project',
+      rootId: string,
+      deferPublication = false
+    ) {
       check(catalog);
       if (!catalog) throw new Error('Scan is missing.');
       const db = await initDB();
@@ -288,6 +293,13 @@ export function createWebdavOutgoingHarness(
         rootKind === 'video-project'
           ? parseVideoProjectEntry(await db.get('video_projects', rootId))
           : null;
+      const localMedia =
+        rootKind === 'media' ? parseMediaLibraryEntry(await db.get('media_library', rootId)) : null;
+      const localRevision = localProject
+        ? (localProject.workspaceRevision ?? 0)
+        : localMedia?.source.kind === 'screenshot'
+          ? (localMedia.workspaceRevision ?? 0)
+          : null;
       if (root?.deleted) {
         await applyCatalogDeletion({
           catalog,
@@ -300,7 +312,7 @@ export function createWebdavOutgoingHarness(
             connectionGeneration: profile.connectionGeneration,
             expectedLocalGeneration: state?.generation ?? 0,
             expectedBasis: state?.basis ?? [],
-            expectedWorkspaceRevision: localProject ? (localProject.workspaceRevision ?? 0) : null,
+            expectedWorkspaceRevision: localRevision,
           },
         });
         return { rootId, operationId: operation.operation.operationId };
@@ -317,11 +329,12 @@ export function createWebdavOutgoingHarness(
           connectionGeneration: profile.connectionGeneration,
           expectedLocalGeneration: state?.generation ?? 0,
           expectedBasis: state?.basis ?? [],
-          expectedWorkspaceRevision: localProject ? (localProject.workspaceRevision ?? 0) : null,
+          expectedWorkspaceRevision: localRevision,
           dependencies,
         },
       });
-      await publishReadyJournalWithRetry(journal, publishPreparedReplicaJournal);
+      if (!deferPublication)
+        await publishReadyJournalWithRetry(journal, publishPreparedReplicaJournal);
       return { rootId, operationId: journal.payload.input.operationId };
     },
     prepare: async (rootId: string) => {

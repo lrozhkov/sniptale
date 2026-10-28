@@ -1,3 +1,6 @@
+import { imageHarness } from './sync-image';
+import { saveScreenshotMediaAsset } from '../../../apps/extension/src/composition/persistence/media-library/index.screenshots';
+import { restoreImageAggregateOriginal } from '../../../apps/extension/src/composition/persistence/image-aggregates';
 import { createWebdavOutgoingHarness } from './webdav-outgoing';
 import { importMediaHubBackup } from '../../../apps/extension/src/workflows/media-hub-backup/v6/public';
 import type { VideoProjectEntry } from '../../../apps/extension/src/composition/persistence/projects/contracts';
@@ -362,6 +365,24 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
   return {
     source,
     proof,
+    async imageSource() {
+      await profile(3);
+      const rootId = crypto.randomUUID();
+      await saveScreenshotMediaAsset({
+        id: rootId,
+        filename: 'original: image 100%?.png',
+        blob: await png('rgb(20,80,240)'),
+      });
+      await restoreImageAggregateOriginal(rootId, 0);
+      return { rootId, spaceId, native: await imageHarness.inspect(rootId) };
+    },
+    async imageRevise(rootId: string) {
+      const before = await imageHarness.inspect(rootId);
+      if (before.revision === null) throw new Error('Image revision is missing.');
+      await restoreImageAggregateOriginal(rootId, before.revision);
+      return imageHarness.inspect(rootId);
+    },
+    imageProof: imageHarness.inspect,
     afterSaveBackup,
     outgoing: createWebdavOutgoingHarness(connected, latest),
   };

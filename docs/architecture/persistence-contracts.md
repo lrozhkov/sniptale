@@ -1046,3 +1046,16 @@ Capture discovery retains its own authorization, revision and native-key positio
 Progress commits after the item attempts and rechecks current admission. A concurrent pass cannot overwrite a newer position. A failed progress commit preserves earlier admissions and the previous committed position. Replaying that page preserves existing operation controls, history and retry deadlines. Erasure closes the captured database handle and prevents delayed reopening.
 
 This change retains immutable full snapshots, preparations, physical attempts and asset claims. It grants no settlement or byte-release authority. Terminal compaction and safe unload remain release gates. The legacy whole-queue pilot projection keeps its explicit limit. Production queue consumers use bounded pages or exact operation reads.
+
+
+## Saved screenshot sync
+
+An enrolled screenshot save records one native image snapshot in the existing sync operation. The snapshot contains the media row, workspace, presentation and document asset references. Local-only writes retain their existing format and create no sync records. Temporary drafts enter sync only after promotion.
+
+The backup inventory and document codec encode the retained rows through a bounded database view. Outgoing preparation reloads the authoritative native snapshot before it reads binary slots. A metadata fingerprint does not attest Blob bytes. The existing streaming digest checks the actual bytes. Preparation replaces the native snapshot with portable metadata and file bindings. Publication retains compact facts through the existing operation lifecycle.
+
+The existing asset writer creates transport copies for inline images. Prepared claims retain those copies. A competing preparation removes only its own unused copies. Incoming journals retain native JSON metadata and staged references. The native publisher detaches original and presentation Blobs before its database transaction. The transaction commits native rows, document ownership, causal state and the receipt together. After commit, existing publication cleanup removes unowned transport copies. Document ownership retains required files. Receipt replay precedes binary reads because completed cleanup can remove staging.
+
+The existing root state retains an image revision high-water mark. Local deletion and incoming deletion preserve that mark. Incoming restore and local recreation allocate a later revision. Native revisions remain separate from causal generations. An original-only image can have a nonzero native revision. Editor activation and copy admission use that revision. A stale presentation never becomes current on the receiver.
+
+This boundary covers screenshot sources with inline originals. Other image source families and native residency remain release gates. Production activation remains closed.

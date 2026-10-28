@@ -332,6 +332,12 @@ async function releaseBodyRecord(args: {
 function syncReplicaRetainsMedia(payload: unknown, mediaId: string): boolean {
   if (!isRecord(payload) || !isRecord(payload['input'])) return true;
   const input = payload['input'];
+  if (payload['kind'] === 'image') {
+    const media = input['media'];
+    return (
+      !isRecord(media) || typeof media['id'] !== 'string' || !media['id'] || media['id'] === mediaId
+    );
+  }
   if (payload['kind'] === 'media') {
     const rows = parseCapturedMediaRows(input['rows']);
     return !rows || rows.media.id === mediaId;

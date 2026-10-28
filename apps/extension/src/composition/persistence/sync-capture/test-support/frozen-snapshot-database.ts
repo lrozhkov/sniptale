@@ -1,6 +1,7 @@
 import {
   fingerprintNativeCapture,
   parseCapturedMediaRows,
+  parseCapturedImageRows,
   parseCapturedVideoProjectRows,
 } from '../guards';
 import type { CapturedChange } from '../contracts';
@@ -132,14 +133,16 @@ export function createNativeCapture(
   const change: CapturedChange['change'] =
     input.change.kind === 'media'
       ? { kind: 'media', rows: parseCapturedMediaRows(input.change.rows) ?? input.change.rows }
-      : input.change.kind === 'video-project'
-        ? {
-            kind: 'video-project',
-            rows: parseCapturedVideoProjectRows(input.change.rows) ?? input.change.rows,
-          }
-        : input.change;
+      : input.change.kind === 'image'
+        ? { kind: 'image', rows: parseCapturedImageRows(input.change.rows) ?? input.change.rows }
+        : input.change.kind === 'video-project'
+          ? {
+              kind: 'video-project',
+              rows: parseCapturedVideoProjectRows(input.change.rows) ?? input.change.rows,
+            }
+          : input.change;
   const label =
-    input.change.kind === 'media'
+    input.change.kind === 'media' || input.change.kind === 'image'
       ? input.change.rows.media.filename
       : input.change.kind === 'video-project'
         ? input.change.rows.project.project.name

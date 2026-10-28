@@ -7,6 +7,7 @@ import { captureRootKey, type CapturedChange } from './contracts';
 import {
   commitPreparedOutgoingOperation,
   loadPreparedOutgoingOperation,
+  loadNativeOutgoingCapture,
   preparedOutgoingOperationKey,
   type PreparedOutgoingOperationDraft,
 } from './outgoing';
@@ -264,3 +265,96 @@ it.each(['locator', 'payload', 'lifetime'])(
     expect(f.rows).toEqual(before);
   }
 );
+
+function imageCapture(f: ReturnType<typeof setup>): CapturedChange {
+  const media = createMediaLibraryEntry({
+    id: 'screenshot-source',
+    kind: 'screenshot',
+    source: { kind: 'screenshot' },
+    mimeType: 'image/png',
+    size: 6,
+    blob: new Blob(['source'], { type: 'image/png' }),
+    workspaceRevision: 0,
+    imageContentState: 'original',
+    lifecycle: { savedAt: 1, updatedAt: 1, storageClass: 'library' },
+  });
+  const capture = createNativeCapture({
+    ...f.capture,
+    rootId: media.id,
+    rootKey: captureRootKey('space', 'media', media.id),
+    change: { kind: 'image', rows: { media, workspace: null, presentation: null, refs: [] } },
+  });
+  f.table('sync_capture').set(capture.key, structuredClone(capture));
+  return capture;
+}
+
+it('reloads authoritative image bytes instead of accepting a caller replacement Blob', async () => {
+  const f = setup();
+  const capture = imageCapture(f);
+  if (capture.change.kind !== 'image') throw new Error('Expected image.');
+  capture.change.rows.media.blob = new Blob(['forged'], { type: 'image/png' });
+  const accepted = await loadNativeOutgoingCapture(capture);
+  if (accepted.change.kind !== 'image') throw new Error('Expected retained image.');
+  expect(await accepted.change.rows.media.blob?.text()).toBe('source');
+  f.table('sync_capture').delete(capture.key);
+  await expect(loadNativeOutgoingCapture(capture)).rejects.toThrow('changed');
+});
+
+it('retains native image data after preparation refusal', async () => {
+  const f = setup();
+  const capture = imageCapture(f);
+  f.failWrites(true);
+  await expect(commitPreparedOutgoingOperation(capture, draft(capture))).rejects.toThrow();
+  expect(f.table('sync_capture').get(capture.key)).toMatchObject({
+    phase: 'native',
+    change: { kind: 'image' },
+  });
+  f.failWrites(false);
+  expect(await commitPreparedOutgoingOperation(capture, draft(capture))).toMatchObject({
+    operationId: capture.operationId,
+  });
+});
+
+it('keeps the first image preparation when competing immutable transport copies are proposed', async () => {
+  const f = setup();
+  const capture = imageCapture(f);
+  const firstDraft = draft(capture);
+  const ref = {
+    assetId: 'transport-copy',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'objects/transport-copy' },
+    mimeType: 'image/png',
+    size: 6,
+    sha256: null,
+  };
+  firstDraft.objects = [
+    { objectId: 'original', filename: 'original.png', ref, sha256: 'b'.repeat(64) },
+  ];
+  let release!: () => void;
+  io.database.mockResolvedValueOnce(f.database).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(f.database);
+      })
+  );
+  const first = commitPreparedOutgoingOperation(capture, firstDraft);
+  const secondDraft = {
+    ...firstDraft,
+    objects: [
+      {
+        ...firstDraft.objects[0]!,
+        ref: {
+          ...ref,
+          assetId: 'loser-copy',
+          location: { kind: 'opfs' as const, objectKey: 'objects/loser-copy' },
+        },
+      },
+    ],
+  };
+  const second = commitPreparedOutgoingOperation(capture, secondDraft);
+  const accepted = await first;
+  release();
+  expect(await second).toEqual(accepted);
+  expect(f.table('sync_capture').get(capture.key)).not.toHaveProperty('change');
+  await expect(loadNativeOutgoingCapture(capture)).rejects.toThrow('changed');
+});

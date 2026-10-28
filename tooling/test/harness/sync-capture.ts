@@ -1,3 +1,4 @@
+import { imageHarness } from './sync-image';
 import { outgoingHarness } from './sync-outgoing';
 import { publishReadyJournalWithRetry } from '../../../apps/extension/src/composition/persistence/assets';
 import {
@@ -1480,6 +1481,7 @@ async function recoverMediaReplicaProof(mediaId: string, journalId: string) {
 }
 
 const syncCaptureHarness = {
+  image: imageHarness,
   preProfileDependenciesProof,
   outgoing: outgoingHarness,
   stageMediaReplicaForRecovery,

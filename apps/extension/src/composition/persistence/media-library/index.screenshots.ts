@@ -1,3 +1,5 @@
+import { captureImageInTransaction, readImageRevisionFence } from '../sync-capture/capture';
+import { ASSET_REFS_STORE, SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import { measureImageBlob } from '@sniptale/platform/browser/media/image-dimensions';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
@@ -45,7 +47,13 @@ export async function saveScreenshotMediaAsset(
     };
 
     const tx = db.transaction(
-      [MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE, AGGREGATE_PRESENTATIONS_STORE],
+      [
+        MEDIA_LIBRARY_STORE,
+        IMAGE_WORKSPACES_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+        ASSET_REFS_STORE,
+        SYNC_CAPTURE_STORE,
+      ],
       'readwrite'
     );
     try {
@@ -62,15 +70,21 @@ export async function saveScreenshotMediaAsset(
       ) {
         throw new ImageAggregateCollisionError(assetId);
       }
+      const fence = await readImageRevisionFence(tx, assetId);
+      if (fence !== null) {
+        if (!Number.isSafeInteger(fence + 1)) throw new Error('Image revision exhausted.');
+        entry.workspaceRevision = fence + 1;
+      }
       await mediaStore.put(entry);
       await presentationStore.put({
         aggregateId: assetId,
         aggregateKind: 'image',
-        presentationRevision: 0,
+        presentationRevision: entry.workspaceRevision ?? 0,
         previewBlob: input.blob,
         thumbnailBlob,
         updatedAt: now,
       });
+      await captureImageInTransaction(tx, assetId);
       await tx.done;
     } catch (error) {
       try {

@@ -101,6 +101,7 @@ function installMixedWorkspaceTransaction() {
     updatedAt: 1,
   };
   const stores = {
+    sync_capture: { get: vi.fn(async () => undefined) },
     aggregate_presentations: { get: vi.fn(), put: vi.fn() },
     asset_operations: { put: vi.fn() },
     asset_owners: {

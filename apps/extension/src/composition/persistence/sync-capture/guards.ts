@@ -1,3 +1,5 @@
+import { describeImageMetadata, parseCapturedImageRows } from './image-snapshot';
+export { parseCapturedImageRows } from './image-snapshot';
 import { sha256 } from '@noble/hashes/sha2.js';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import type { VideoProject } from '../../../features/video/project/types';
@@ -461,6 +463,7 @@ function parseCaptureRoot(
 /** Fingerprint normalized native input independently of object property order. */
 export function fingerprintNativeCapture(value: Omit<CapturedChange, 'sourceSha256'>): string {
   const canonical = (item: unknown): unknown => {
+    if (item instanceof Blob) return describeImageMetadata(item);
     if (Array.isArray(item)) return item.map(canonical);
     if (isRecord(item))
       return Object.fromEntries(
@@ -474,9 +477,11 @@ export function fingerprintNativeCapture(value: Omit<CapturedChange, 'sourceSha2
   const normalizedChange =
     change.kind === 'media'
       ? { kind: change.kind, rows: parseCapturedMediaRows(change.rows) ?? change.rows }
-      : change.kind === 'video-project'
-        ? { kind: change.kind, rows: parseCapturedVideoProjectRows(change.rows) ?? change.rows }
-        : change;
+      : change.kind === 'image'
+        ? { kind: change.kind, rows: parseCapturedImageRows(change.rows) ?? change.rows }
+        : change.kind === 'video-project'
+          ? { kind: change.kind, rows: parseCapturedVideoProjectRows(change.rows) ?? change.rows }
+          : change;
   return hashCaptureText(
     JSON.stringify(
       canonical(
@@ -566,7 +571,8 @@ function parseCapturedChange(
     (value['origin'] !== 'local-edit' && value['origin'] !== 'local-restore') ||
     !(value['publicationId'] === null || identity(value['publicationId'])) ||
     !isRecord(source) ||
-    (source['changeKind'] !== 'media' &&
+    (source['changeKind'] !== 'image' &&
+      source['changeKind'] !== 'media' &&
       source['changeKind'] !== 'video-project' &&
       source['changeKind'] !== 'tombstone') ||
     typeof source['label'] !== 'string' ||
@@ -593,12 +599,15 @@ function parseCapturedChange(
     const rows =
       change['kind'] === 'video-project' ? parseCapturedVideoProjectRows(change['rows']) : null;
     const mediaRows = change['kind'] === 'media' ? parseCapturedMediaRows(change['rows']) : null;
+    const imageRows = change['kind'] === 'image' ? parseCapturedImageRows(change['rows']) : null;
     let parsedChange: CapturedChange['change'];
     if (change['kind'] === 'tombstone') parsedChange = { kind: 'tombstone' };
     else if (rows && rows.project.id === root.rootId && root.rootKind === 'video-project')
       parsedChange = { kind: 'video-project', rows };
     else if (mediaRows && mediaRows.media.id === root.rootId && root.rootKind === 'media')
       parsedChange = { kind: 'media', rows: mediaRows };
+    else if (imageRows && imageRows.media.id === root.rootId && root.rootKind === 'media')
+      parsedChange = { kind: 'image', rows: imageRows };
     else return null;
     const native: CapturedChange = { ...stable, phase: 'native', change: parsedChange };
     return native.source.changeKind === parsedChange.kind &&
@@ -671,6 +680,9 @@ function parseCaptureRootState(
   const root = parseCaptureRoot(value, header);
   if (!root) return null;
   const nativeDigest = value['nativeDigest'];
+  const nativeRevision = value['nativeRevision'];
+  if (nativeRevision !== undefined && (!ordinal(nativeRevision) || root.rootKind !== 'media'))
+    return null;
   const deleted = value['deleted'];
   if (deleted !== undefined && deleted !== true) return null;
   if (deleted === true && nativeDigest !== undefined) return null;
@@ -686,6 +698,7 @@ function parseCaptureRootState(
     ...root,
     kind: 'root-state',
     ...(nativeDigest === undefined ? {} : { nativeDigest }),
+    ...(nativeRevision === undefined ? {} : { nativeRevision }),
     ...(deleted === true ? { deleted: true } : {}),
   };
 }

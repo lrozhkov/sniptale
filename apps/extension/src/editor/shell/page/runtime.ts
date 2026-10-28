@@ -75,6 +75,7 @@ async function openRestoredEditorAsset(
 ) {
   services.autosaveService.updateContext({
     requireExistingRoot: true,
+    durableRevision: restoreSource.nativeRevision,
     sourceUrl: restoreSource.sourceUrl,
     sourceTitle: restoreSource.sourceTitle,
   });

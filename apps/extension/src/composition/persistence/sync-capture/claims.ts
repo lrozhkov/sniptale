@@ -25,6 +25,10 @@ export function collectSyncCaptureClaims(raw: unknown): {
       assetIds.add(record.change.rows.ref.assetId);
       continue;
     }
+    if (record.change.kind === 'image') {
+      for (const ref of record.change.rows.refs) assetIds.add(ref.assetId);
+      continue;
+    }
     if (record.change.kind === 'video-project')
       for (const ref of record.change.rows.refs) assetIds.add(ref.assetId);
   }

@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({ checkpoint: vi.fn(), runMutation: vi.fn() }));
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   appendCommittedArchiveRootInTransaction: mocks.checkpoint,
+  readAssetFile: vi.fn(
+    async (_ref, filename: string) => new File(['source'], filename, { type: 'image/png' })
+  ),
 }));
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: mocks.runMutation,
@@ -216,4 +219,40 @@ it('keeps broad restored media outside the original-only pilot without inventing
       .map(parseSyncCaptureRecord)
       .filter((row) => row?.kind === 'sync-operation')
   ).toEqual([]);
+});
+
+it('captures a restored screenshot with detached original bytes and a target-local revision', async () => {
+  const { fixture, input, entry } = await restoredOriginalFixture();
+  const restored = {
+    ...entry,
+    id: 'restored-image',
+    kind: 'screenshot' as const,
+    source: { kind: 'screenshot' as const },
+    workspaceRevision: 0,
+    imageContentState: 'original' as const,
+  };
+  input.envelope.descriptor.rootId = restored.id;
+  const metadata: unknown = JSON.parse(
+    JSON.stringify({ entry: restored, originalObjectId: 'original' })
+  );
+  assertPortableJson(metadata);
+  input.envelope.metadata = metadata;
+  await mediaLibraryRootPublisher.publish(input);
+  const capture = [...fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .find((row) => row?.kind === 'sync-operation');
+  expect(capture).toMatchObject({
+    phase: 'native',
+    origin: 'local-restore',
+    change: { kind: 'image', rows: { media: { id: restored.id, workspaceRevision: 1 } } },
+  });
+  if (
+    capture?.kind !== 'sync-operation' ||
+    capture.phase !== 'native' ||
+    capture.change.kind !== 'image'
+  )
+    throw new Error('Expected restored image capture.');
+  expect(capture.change.rows.media.blob).toBeInstanceOf(Blob);
+  expect(capture.change.rows.media.blob).not.toBeInstanceOf(File);
+  expect(await capture.change.rows.media.blob?.text()).toBe('source');
 });

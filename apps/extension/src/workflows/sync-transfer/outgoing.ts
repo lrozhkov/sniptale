@@ -5,10 +5,16 @@ import {
   SYNC_OUTBOX_STORE,
 } from '../../composition/persistence/infrastructure/indexed-db/core.stores';
 import type { SyncConnectionIdentity } from '../../composition/persistence/remote-connection/model';
-import { readAssetFile } from '../../composition/persistence/assets';
+import {
+  discardPreparedAsset,
+  releaseAssetReadyProtection,
+  runWithDurableAssetOperation,
+  readAssetFile,
+} from '../../composition/persistence/assets';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import {
   commitPreparedOutgoingOperation,
+  loadNativeOutgoingCapture,
   loadPreparedOutgoingOperation,
   readOutgoingOperation,
   preparedOutgoingOperationKey,
@@ -22,6 +28,8 @@ import {
 } from '../../composition/persistence/sync-capture/outgoing-attempts';
 import { commitVerifiedOutgoingResult } from '../../composition/persistence/sync-capture/outgoing-results';
 import { digestBackupObject } from '../media-hub-backup/v6/shared-objects';
+import type { CapturedChange } from '../../composition/persistence/sync-capture/contracts';
+import { stageRootObjects, type StagedArchiveObject } from '../media-hub-backup/v6/staging';
 import { encodeCapturedPortableRoot } from './captured-root';
 import type { scanSyncCatalog } from './catalog';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
@@ -45,32 +53,14 @@ async function hashFile(blob: Blob, signal?: AbortSignal) {
   );
 }
 
-/** Freeze the existing portable codec output and immutable source bindings before network IO. */
-export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedOutgoingOperation> {
-  const parsed = parseSyncCaptureRecord(structuredClone(value));
-  check(parsed?.kind === 'sync-operation');
-  const capture = parsed;
-  const existing = await loadPreparedOutgoingOperation(capture.spaceId, capture.operationId);
-  if (existing) {
-    await parseSyncOperationText(existing.recordText);
-    return commitPreparedOutgoingOperation(capture, existing);
-  }
-  check(capture.phase === 'native');
-  const portable =
-    capture.change.kind === 'tombstone' ? null : await encodeCapturedPortableRoot(capture);
-  const objects = [];
-  for (const object of portable?.objects ?? []) {
-    const binding = portable?.bindings.find((item) => item.objectId === object.ref.objectId);
-    check(binding);
-    const sha256 = await hashFile(object.blob);
-    check(binding.ref.sha256 === null || binding.ref.sha256 === sha256);
-    objects.push({
-      objectId: object.ref.objectId,
-      ref: binding.ref,
-      sha256,
-      filename: object.ref.filename,
-    });
-  }
+type PortableCapture = Awaited<ReturnType<typeof encodeCapturedPortableRoot>>;
+type OutgoingObjects = PreparedOutgoingOperation['objects'];
+
+function preparationDraft(
+  capture: CapturedChange,
+  portable: PortableCapture | null,
+  objects: OutgoingObjects
+) {
   const recordText = JSON.stringify({
     format: 'sniptale-sync-operation',
     version: 1,
@@ -92,7 +82,7 @@ export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedO
     envelope: portable?.envelope ?? null,
     objects: objects.map((item) => ({ objectId: item.objectId, sha256: item.sha256 })),
   });
-  const accepted = await commitPreparedOutgoingOperation(capture, {
+  return {
     version: 1,
     key: preparedOutgoingOperationKey(capture.spaceId, capture.operationId),
     createdAt: Date.now(),
@@ -105,8 +95,103 @@ export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedO
     recordText,
     recordSha256: hashSyncText(recordText),
     objects,
-  });
+  };
+}
+
+async function discardImageTransport(
+  staged: StagedArchiveObject[],
+  cause: unknown
+): Promise<never> {
+  const results = await Promise.allSettled(
+    staged.map((object) => discardPreparedAsset(object.ref.assetId))
+  );
+  const failures = results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+  if (failures.length)
+    throw new AggregateError([cause, ...failures], 'Image preparation cleanup failed.');
+  throw cause;
+}
+
+async function settleImageTransport(
+  staged: StagedArchiveObject[],
+  accepted: PreparedOutgoingOperation
+) {
+  const kept = new Set(accepted.objects.map((object) => object.ref.assetId));
+  const surplus = staged.filter((object) => !kept.has(object.ref.assetId));
+  const results = await Promise.allSettled(
+    surplus.map((object) => discardPreparedAsset(object.ref.assetId))
+  );
+  // Native prepared claims now own these bytes. Release only this preparation's writer leases.
+  await releaseAssetReadyProtection(
+    staged.filter((object) => kept.has(object.ref.assetId)).map((object) => object.ref.assetId)
+  );
+  const failures = results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+  if (failures.length)
+    throw new AggregateError(failures, 'Competing image preparation cleanup failed.');
+}
+
+async function prepareNativeOutgoing(capture: CapturedChange): Promise<PreparedOutgoingOperation> {
+  const portable =
+    capture.change.kind === 'tombstone' ? null : await encodeCapturedPortableRoot(capture);
+  const digests = new Map<string, string>();
+  for (const object of portable?.objects ?? [])
+    digests.set(object.ref.objectId, await hashFile(object.blob));
+  let staged: StagedArchiveObject[] = [];
+  let accepted: PreparedOutgoingOperation;
+  try {
+    if (capture.change.kind === 'image' && portable) {
+      const sources = new Map(portable.objects.map((object) => [object.ref.objectId, object.blob]));
+      staged = await stageRootObjects({
+        objects: portable.envelope.objects,
+        expectedSha256: digests,
+        readObject: async (object) => {
+          const blob = sources.get(object.objectId);
+          check(blob);
+          return { pipeTo: (sink, signal) => blob.stream().pipeTo(sink, signal ? { signal } : {}) };
+        },
+      });
+    }
+    const objects: OutgoingObjects = (portable?.objects ?? []).map((object) => {
+      const ref =
+        capture.change.kind === 'image'
+          ? staged.find((item) => item.objectId === object.ref.objectId)?.ref
+          : portable?.bindings.find((item) => item.objectId === object.ref.objectId)?.ref;
+      const sha256 = digests.get(object.ref.objectId);
+      check(ref && sha256 && (ref.sha256 === null || ref.sha256 === sha256));
+      return { objectId: object.ref.objectId, ref, sha256, filename: object.ref.filename };
+    });
+    accepted = await commitPreparedOutgoingOperation(
+      capture,
+      preparationDraft(capture, portable, objects)
+    );
+  } catch (error) {
+    return discardImageTransport(staged, error);
+  }
+  if (staged.length) await settleImageTransport(staged, accepted);
   return accepted;
+}
+
+/** Freeze portable bytes once; image preparation reads authoritative immutable native Blob slots. */
+export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedOutgoingOperation> {
+  const parsed = parseSyncCaptureRecord(structuredClone(value));
+  check(parsed?.kind === 'sync-operation');
+  const existing = await loadPreparedOutgoingOperation(parsed.spaceId, parsed.operationId);
+  if (existing) {
+    await parseSyncOperationText(existing.recordText);
+    const accepted = await commitPreparedOutgoingOperation(parsed, existing);
+    if (parsed.source.changeKind === 'image')
+      await releaseAssetReadyProtection(accepted.objects.map((object) => object.ref.assetId));
+    return accepted;
+  }
+  check(parsed.phase === 'native');
+  if (parsed.change.kind === 'image') {
+    const capture = await loadNativeOutgoingCapture(parsed);
+    return runWithDurableAssetOperation(() => prepareNativeOutgoing(capture));
+  }
+  return prepareNativeOutgoing(parsed);
 }
 
 async function reserveAttempt(prepared: PreparedOutgoingOperation, retained: Map<string, string>) {

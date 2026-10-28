@@ -39,7 +39,8 @@ vi.mock('@sniptale/platform/browser/media/image-dimensions', async (importOrigin
   measureImageBlob: mocks.measureImageBlobMock,
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   IMAGE_WORKSPACES_STORE: 'image_workspaces',
   MEDIA_LIBRARY_STORE: 'media_library',
@@ -224,4 +225,140 @@ describe('media-library-db.screenshots aggregate identity collisions', () => {
       expect(mocks.thumbnailPutMock).not.toHaveBeenCalled();
     }
   );
+});
+
+it('recreates an enrolled image above its retained revision fence', async () => {
+  const { createReviewWorkspaceStoreFixture } =
+    await import('../review-workspaces/store.test-support');
+  const { captureRootKey } = await import('../sync-capture/contracts');
+  const { parseSyncCaptureRecord } = await import('../sync-capture/guards');
+  const { saveScreenshotMediaAsset } = await import('./index.screenshots');
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  const captures = fixture.rows.get('sync_capture')!;
+  const rootKey = captureRootKey('space', 'media', 'recreated-image');
+  const stateKey = JSON.stringify(['root-state', rootKey]);
+  captures.set('profile', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: true,
+    spaceId: 'space',
+    connectionGeneration: 1,
+  });
+  captures.set(stateKey, {
+    version: 1,
+    kind: 'root-state',
+    key: stateKey,
+    createdAt: 1,
+    spaceId: 'space',
+    rootKind: 'media',
+    rootId: 'recreated-image',
+    rootKey,
+    generation: 2,
+    basis: ['deleted-image'],
+    deleted: true,
+    nativeRevision: 7,
+  });
+  mocks.initDBMock.mockResolvedValue({
+    transaction(stores: string[], mode: string) {
+      const tx = fixture.database.transaction(stores, mode);
+      return {
+        abort: () => tx.abort(),
+        get done() {
+          return tx.done;
+        },
+        objectStore(name: string) {
+          const store = tx.objectStore(name);
+          if (name !== 'aggregate_presentations') return store;
+          return {
+            ...store,
+            get: (key: IDBValidKey) =>
+              store.get(
+                Array.isArray(key) && key[0] === 'image' && typeof key[1] === 'string'
+                  ? key[1]
+                  : key
+              ),
+          };
+        },
+      };
+    },
+  });
+  const result = await saveScreenshotMediaAsset({
+    id: 'recreated-image',
+    blob: new Blob(['new-image'], { type: 'image/png' }),
+    filename: 'new.png',
+  });
+  expect(result.workspaceRevision).toBe(8);
+  expect(fixture.rows.get('sync_capture')!.get(stateKey)).toMatchObject({
+    nativeRevision: 8,
+    generation: 3,
+    basis: ['generated-id'],
+  });
+  const captured = [...fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .find((row) => row?.kind === 'sync-operation');
+  expect(captured).toMatchObject({
+    phase: 'native',
+    change: { kind: 'image', rows: { presentation: { presentationRevision: 8 } } },
+  });
+});
+
+it('commits a temporary screenshot above the sync metadata limit and refuses its promotion atomically', async () => {
+  const { createReviewWorkspaceStoreFixture } =
+    await import('../review-workspaces/store.test-support');
+  const { MAX_CAPTURE_METADATA_BYTES } = await import('../sync-capture/contracts');
+  const { saveScreenshotMediaAsset } = await import('./index.screenshots');
+  const { promoteImageAggregate } = await import('../image-aggregates/mutations');
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  fixture.rows.get('sync_capture')!.set('profile', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: true,
+    spaceId: 'space',
+    connectionGeneration: 1,
+  });
+  mocks.initDBMock.mockResolvedValue({
+    transaction(stores: string[], mode: string) {
+      const tx = fixture.database.transaction(stores, mode);
+      return {
+        abort: () => tx.abort(),
+        get done() {
+          return tx.done;
+        },
+        objectStore(name: string) {
+          const store = tx.objectStore(name);
+          return name !== 'aggregate_presentations'
+            ? store
+            : {
+                ...store,
+                get: (key: IDBValidKey) =>
+                  store.get(
+                    Array.isArray(key) && key[0] === 'image' && typeof key[1] === 'string'
+                      ? key[1]
+                      : key
+                  ),
+              };
+        },
+      };
+    },
+  });
+  const sourceTitle = 'x'.repeat(MAX_CAPTURE_METADATA_BYTES + 1);
+  const saved = await saveScreenshotMediaAsset({
+    id: 'temporary-large-title',
+    storageClass: 'temporary',
+    sourceTitle,
+    filename: 'temporary.png',
+    blob: new Blob(['temporary'], { type: 'image/png' }),
+  });
+  expect(saved.sourceTitle).toBe(sourceTitle);
+  expect(fixture.rows.get('media_library')!.get(saved.id)).toMatchObject({
+    lifecycle: { storageClass: 'temporary' },
+  });
+  expect(fixture.rows.get('sync_capture')!.size).toBe(1);
+  const before = structuredClone(fixture.rows);
+  await expect(promoteImageAggregate(saved.id, 0)).rejects.toThrow('snapshot');
+  expect(fixture.rows).toEqual(before);
 });

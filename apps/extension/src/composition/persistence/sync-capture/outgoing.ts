@@ -4,7 +4,11 @@ import type { AssetRef } from '../assets/contracts';
 import { initDB } from '../infrastructure/indexed-db/core';
 import { SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE } from '../infrastructure/indexed-db/core.stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { type CaptureOperation, type PreparedCaptureOperation } from './contracts';
+import {
+  type CaptureOperation,
+  type CapturedChange,
+  type PreparedCaptureOperation,
+} from './contracts';
 import { parseCaptureObjectBindings, parseSyncCaptureRecord } from './guards';
 
 const MAX_RECORD_BYTES = 4 * 1024 * 1024;
@@ -141,6 +145,8 @@ export function matchesCapture(
       capture.phase === 'prepared' &&
       JSON.stringify(record) === JSON.stringify(projectPreparedOperation(capture))
     );
+  // Image transport copies are verified by the workflow before this native admission.
+  if (capture.change.kind === 'image') return true;
   const refs =
     capture.change.kind === 'tombstone'
       ? []
@@ -309,4 +315,37 @@ export async function commitPreparedOutgoingOperation(
       throw error;
     }
   });
+}
+
+/** Reload the authoritative immutable native slots under the exact retained operation lifetime. */
+export async function loadNativeOutgoingCapture(expected: unknown): Promise<CapturedChange> {
+  const requested = parseSyncCaptureRecord(expected);
+  if (!requested || requested.kind !== 'sync-operation' || requested.phase !== 'native')
+    throw new Error('Invalid native outgoing capture.');
+  const db = await initDB();
+  const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+  const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+  const current = parseSyncCaptureRecord(
+    await tx.objectStore(SYNC_CAPTURE_STORE).get(requested.key)
+  );
+  await tx.done;
+  if (
+    !profile ||
+    profile.kind !== 'profile' ||
+    !profile.enabled ||
+    profile.spaceId !== requested.spaceId ||
+    profile.createdAt !== requested.profileCreatedAt ||
+    profile.connectionGeneration !== requested.connectionGeneration ||
+    !current ||
+    current.kind !== 'sync-operation' ||
+    current.phase !== 'native' ||
+    current.operationId !== requested.operationId ||
+    current.rootKey !== requested.rootKey ||
+    current.profileCreatedAt !== requested.profileCreatedAt ||
+    current.connectionGeneration !== requested.connectionGeneration ||
+    current.sourceSha256 !== requested.sourceSha256 ||
+    JSON.stringify(current) !== JSON.stringify(requested)
+  )
+    throw new Error('Native outgoing capture changed.');
+  return structuredClone(current);
 }

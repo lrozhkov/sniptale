@@ -1,4 +1,8 @@
-import { captureMediaInTransaction } from '../../../../composition/persistence/sync-capture/capture';
+import {
+  captureImageInTransaction,
+  captureMediaInTransaction,
+  allocateRestoredImageRevision,
+} from '../../../../composition/persistence/sync-capture/capture';
 import { parseCapturedMediaRows } from '../../../../composition/persistence/sync-capture/guards';
 import {
   publishPreparedMediaSourceInTransaction,
@@ -387,7 +391,10 @@ async function prepareMediaRoot(args: {
       : restoredEntry.source;
   const screenshotBlob =
     restoredEntry.source.kind === 'screenshot'
-      ? await readAssetFile(original.ref, restoredEntry.filename)
+      ? await (async () => {
+          const file = await readAssetFile(original.ref, restoredEntry.filename);
+          return new Blob([await file.arrayBuffer()], { type: file.type });
+        })()
       : undefined;
   const media = parseMediaLibraryEntry({
     ...restoredEntry,
@@ -644,6 +651,24 @@ async function commitPreparedMediaRoot(args: {
       ) {
         throw new Error('Media restore child belongs to another root.');
       }
+      if (args.prepared.media.source.kind === 'screenshot') {
+        const revision = await allocateRestoredImageRevision(
+          tx,
+          args.prepared.media.id,
+          conflict.current?.workspaceRevision ?? 0
+        );
+        if (revision !== null) {
+          const sourceRevision = args.prepared.media.workspaceRevision ?? 0;
+          args.prepared.media = { ...args.prepared.media, workspaceRevision: revision };
+          if (args.prepared.workspace)
+            args.prepared.workspace = { ...args.prepared.workspace, revision };
+          if (args.prepared.presentation)
+            args.prepared.presentation =
+              args.prepared.presentation.presentationRevision === sourceRevision
+                ? { ...args.prepared.presentation, presentationRevision: revision }
+                : null;
+        }
+      }
       if (conflict.current && args.session.strategy === 'replace') {
         await freezeScenarioMediaRepresentations(tx, conflict.current);
         await deleteExistingMediaRoot({
@@ -667,7 +692,12 @@ async function commitPreparedMediaRoot(args: {
           conflicted: conflict.conflict,
         }
       );
-      if (isCaptureOriginal(args.prepared))
+      if (
+        args.prepared.media.source.kind === 'screenshot' &&
+        (args.prepared.media.kind === 'image' || args.prepared.media.kind === 'screenshot')
+      )
+        await captureImageInTransaction(tx, args.prepared.media.id, { origin: 'local-restore' });
+      else if (isCaptureOriginal(args.prepared))
         await captureMediaInTransaction(tx, args.prepared.media.id, { origin: 'local-restore' });
       await tx.done;
       return { conflicted: conflict.conflict, imported: true };

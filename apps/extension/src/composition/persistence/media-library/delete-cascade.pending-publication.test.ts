@@ -141,3 +141,19 @@ it('fails closed for malformed sync replica root or dependency evidence', async 
       true
     );
 });
+
+it('matches native prepared image publication and refuses an unknown target', async () => {
+  const { mediaHasPendingPublication } = await import('./delete-cascade.sources');
+  const journal = {
+    domain: 'sync-replica',
+    payload: { kind: 'image', input: { media: { id: 'image-one' } } },
+  };
+  expect(mediaHasPendingPublication(journal, { id: 'image-one' })).toBe(true);
+  expect(mediaHasPendingPublication(journal, { id: 'image-two' })).toBe(false);
+  expect(
+    mediaHasPendingPublication(
+      { ...journal, payload: { kind: 'image', input: {} } },
+      { id: 'image-two' }
+    )
+  ).toBe(true);
+});

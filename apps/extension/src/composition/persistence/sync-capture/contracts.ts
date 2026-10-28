@@ -1,3 +1,5 @@
+import type { StoredImageWorkspaceEntry } from '../image-workspaces/contracts';
+import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import type { AssetRef } from '../assets/contracts';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import type {
@@ -35,6 +37,14 @@ export interface CapturedVideoProjectRows {
   mediaDependencies?: CapturedMediaDependency[];
 }
 
+/** One immutable native screenshot aggregate, including inline source and presentation bytes. */
+export interface CapturedImageRows {
+  media: MediaLibraryEntry;
+  workspace: StoredImageWorkspaceEntry | null;
+  presentation: AggregatePresentationEntry | null;
+  refs: AssetRef[];
+}
+
 export interface CapturedMediaRows {
   media: Omit<MediaLibraryEntry, 'blob'>;
   projectAsset: StoredProjectAssetEntry;
@@ -63,6 +73,8 @@ export interface SyncCaptureRootState {
   deleted?: true;
   /** Digest of the normalized native media snapshot, including its local immutable ref. */
   nativeDigest?: string;
+  /** Last accepted local image revision survives deletion of its native rows. */
+  nativeRevision?: number;
 }
 
 /** Stable enrollment, causal identity, fingerprint and display source survive payload replacement. */
@@ -71,7 +83,7 @@ export interface CaptureOperationHeader {
   kind: 'sync-operation';
   profileCreatedAt: number;
   sourceSha256: string;
-  source: { changeKind: 'media' | 'video-project' | 'tombstone'; label: string };
+  source: { changeKind: 'media' | 'image' | 'video-project' | 'tombstone'; label: string };
   key: string;
   createdAt: number;
   spaceId: string;
@@ -92,6 +104,7 @@ export interface CapturedChange extends CaptureOperationHeader {
   change:
     | { kind: 'video-project'; rows: CapturedVideoProjectRows }
     | { kind: 'media'; rows: CapturedMediaRows }
+    | { kind: 'image'; rows: CapturedImageRows }
     | { kind: 'tombstone' };
 }
 

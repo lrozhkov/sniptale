@@ -1,5 +1,7 @@
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
 import type { IDBPTransaction } from 'idb';
-import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
+import { MEDIA_LIBRARY_STORE, SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import {
   captureRootKey,
   SYNC_CAPTURE_PROFILE_KEY,
@@ -71,8 +73,64 @@ export async function captureMediaInTransaction(
   if (!profile) return null;
   const replay = await readPublicationReplay(tx, profile, 'media', mediaId, options.publicationId);
   if (replay) return replay;
+  const source = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  if (source?.source.kind === 'screenshot') return captureImageInTransaction(tx, mediaId, options);
   const rows = await freezeMediaInTransaction(tx, mediaId);
   return appendCapture(tx, profile, 'media', mediaId, { kind: 'media', rows }, options);
+}
+
+/** Capture each saved screenshot mutation through its native writer transaction. */
+export async function captureImageInTransaction(
+  tx: CaptureTransaction,
+  mediaId: string,
+  options: { origin?: CaptureOrigin; publicationId?: string } = {}
+): Promise<CaptureOperation | null> {
+  const profile = await readEnabledCaptureProfile(tx);
+  if (!profile) return null;
+  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  if (media?.lifecycle?.storageClass === 'temporary') return null;
+  const rows = await freezeImageInTransaction(tx, mediaId);
+  const replay = await readPublicationReplay(tx, profile, 'media', mediaId, options.publicationId);
+  if (replay) return replay;
+  return appendCapture(tx, profile, 'media', mediaId, { kind: 'image', rows }, options);
+}
+
+/** Retain the enrolled image clock when a deleted identity is recreated. */
+export async function readImageRevisionFence(
+  tx: CaptureTransaction,
+  mediaId: string,
+  allowLivePredecessor = false
+): Promise<number | null> {
+  const profile = await readEnabledCaptureProfile(tx);
+  if (!profile) return null;
+  const rootKey = captureRootKey(profile.spaceId, 'media', mediaId);
+  const raw: unknown = await tx
+    .objectStore(SYNC_CAPTURE_STORE)
+    .get(JSON.stringify(['root-state', rootKey]));
+  if (raw === undefined) return null;
+  const state = parseSyncCaptureRecord(raw);
+  if (
+    !state ||
+    state.kind !== 'root-state' ||
+    state.rootKey !== rootKey ||
+    (state.deleted !== true && !allowLivePredecessor) ||
+    (state.deleted === true && state.nativeRevision === undefined)
+  )
+    throw new Error('Image identity has no safe native revision fence.');
+  return state.nativeRevision ?? null;
+}
+
+/** Allocate the local image clock for restore without importing transport policy. */
+export async function allocateRestoredImageRevision(
+  tx: CaptureTransaction,
+  mediaId: string,
+  currentRevision: number
+): Promise<number | null> {
+  if (!(await readEnabledCaptureProfile(tx))) return null;
+  const fence = await readImageRevisionFence(tx, mediaId, true);
+  const revision = Math.max(currentRevision, fence ?? 0) + 1;
+  if (!Number.isSafeInteger(revision)) throw new Error('Restored image revision exhausted.');
+  return revision;
 }
 
 /** Native metadata must still match the independent revision that supplied its causal head. */
@@ -144,11 +202,19 @@ export async function captureDeletionInTransaction(
   tx: CaptureTransaction,
   rootKind: CaptureRootKind,
   rootId: string,
-  origin: CaptureOrigin = 'local-edit'
+  origin: CaptureOrigin = 'local-edit',
+  nativeRevision?: number
 ): Promise<CaptureOperation | null> {
   const profile = await readEnabledCaptureProfile(tx);
   return profile
-    ? appendCapture(tx, profile, rootKind, rootId, { kind: 'tombstone' }, { origin })
+    ? appendCapture(
+        tx,
+        profile,
+        rootKind,
+        rootId,
+        { kind: 'tombstone' },
+        { origin, ...(nativeRevision === undefined ? {} : { nativeRevision }) }
+      )
     : null;
 }
 
@@ -194,7 +260,7 @@ async function appendCapture(
   rootKind: CaptureRootKind,
   rootId: string,
   change: CapturedChange['change'],
-  options: { origin?: CaptureOrigin; publicationId?: string }
+  options: { origin?: CaptureOrigin; publicationId?: string; nativeRevision?: number }
 ): Promise<CapturedChange> {
   const store = tx.objectStore(SYNC_CAPTURE_STORE);
   const rootKey = captureRootKey(profile.spaceId, rootKind, rootId);
@@ -219,7 +285,7 @@ async function appendCapture(
     source: {
       changeKind: change.kind,
       label:
-        (change.kind === 'media'
+        (change.kind === 'media' || change.kind === 'image'
           ? change.rows.media.filename
           : change.kind === 'video-project'
             ? change.rows.project.project.name
@@ -257,6 +323,19 @@ async function appendCapture(
     generation,
     basis: [operationId],
     ...(change.kind === 'media' ? { nativeDigest: digestCapturedMediaRows(change.rows) } : {}),
+    ...(change.kind === 'image'
+      ? {
+          nativeDigest: digestCapturedImageRows(change.rows),
+          nativeRevision: Math.max(
+            previous?.nativeRevision ?? 0,
+            change.rows.media.workspaceRevision ?? 0
+          ),
+        }
+      : {}),
+    ...(change.kind === 'tombstone' &&
+    (options.nativeRevision !== undefined || previous?.nativeRevision !== undefined)
+      ? { nativeRevision: Math.max(options.nativeRevision ?? 0, previous?.nativeRevision ?? 0) }
+      : {}),
     ...(change.kind === 'tombstone' ? { deleted: true } : {}),
   };
   await store.add(record);

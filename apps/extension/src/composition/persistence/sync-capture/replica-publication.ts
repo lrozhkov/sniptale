@@ -1,7 +1,13 @@
+import {
+  applyPreparedImageReplica,
+  parseApplyPreparedImageReplicaInput,
+  type ApplyPreparedImageReplicaInput,
+} from './apply-image';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   createAssetPublicationJournal,
+  cancelAssetPublication,
   parseAssetRef,
   type AssetPublicationAdapter,
   type AssetReadyJournal,
@@ -20,6 +26,7 @@ import { MAX_CAPTURE_METADATA_BYTES, MAX_CAPTURE_ROWS } from './contracts';
 import { isSupportedCaptureProject, parseCapturedMediaRows } from './guards';
 
 export type PreparedReplicaPayload =
+  | { kind: 'image'; input: ApplyPreparedImageReplicaInput }
   | { kind: 'media'; input: ApplyPreparedMediaReplicaInput }
   | { kind: 'video-project'; input: ApplyPreparedVideoProjectRevisionInput };
 
@@ -186,6 +193,11 @@ function parsePayload(value: unknown): PreparedReplicaPayload {
   const input = value['input'];
   if (value['kind'] === 'video-project')
     return { kind: 'video-project', input: parseProjectInput(input) };
+  if (value['kind'] === 'image') {
+    const image = parseApplyPreparedImageReplicaInput(input);
+    if (!image) throw new Error('Invalid image replica.');
+    return { kind: 'image', input: image };
+  }
   if (value['kind'] !== 'media') throw new Error('Unsupported replica kind.');
   const rows = parseCapturedMediaRows(input['rows']);
   if (!rows) throw new Error('Invalid media replica.');
@@ -194,12 +206,25 @@ function parsePayload(value: unknown): PreparedReplicaPayload {
 
 function protectedRefs(payload: PreparedReplicaPayload): AssetRef[] {
   const refs =
-    payload.kind === 'media'
-      ? [payload.input.rows.ref]
-      : [
-          ...payload.input.root.assets.map((asset) => asset.ref),
-          ...payload.input.dependencies.map((dependency) => dependency.ref),
-        ];
+    payload.kind === 'image'
+      ? [
+          payload.input.originalRef,
+          ...payload.input.documentRefs,
+          ...(payload.input.presentation
+            ? [
+                payload.input.presentation.thumbnailRef,
+                ...(payload.input.presentation.previewRef
+                  ? [payload.input.presentation.previewRef]
+                  : []),
+              ]
+            : []),
+        ]
+      : payload.kind === 'media'
+        ? [payload.input.rows.ref]
+        : [
+            ...payload.input.root.assets.map((asset) => asset.ref),
+            ...payload.input.dependencies.map((dependency) => dependency.ref),
+          ];
   const unique = new Map<string, AssetRef>();
   for (const ref of refs) {
     const previous = unique.get(ref.assetId);
@@ -248,7 +273,11 @@ export async function publishPreparedReplicaJournal(
 ): Promise<void> {
   const payload = parsePayload(journal.payload);
   assertJournalClaims(journal, protectedRefs(payload));
-  if (payload.kind === 'media') await applyPreparedMediaReplica(payload.input, lifecyclePermit);
+  if (payload.kind === 'image') {
+    await applyPreparedImageReplica(payload.input, lifecyclePermit);
+    await cancelAssetPublication(journal, lifecyclePermit);
+  } else if (payload.kind === 'media')
+    await applyPreparedMediaReplica(payload.input, lifecyclePermit);
   else await applyPreparedVideoProjectRevision(payload.input, lifecyclePermit);
 }
 

@@ -14,6 +14,7 @@ import {
   encodePortableVideoProjectAssetRefs,
   encodePortableVideoProjectExport,
 } from '../media-hub-backup/v6/root-codecs/projects';
+import { encodeCapturedImageRoot } from './captured-image';
 import { parsePortableSyncRoot } from './prepared-root';
 
 /** Encodes an admitted frozen capture without reading live native rows or creating an archive. */
@@ -33,6 +34,11 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     throw new Error('Unsupported portable capture.');
   // Parsers can retain nested values. Detach the entire accepted snapshot before the first read.
   const capture = structuredClone(parsed);
+  if (capture.change.kind === 'image') {
+    const portable = await encodeCapturedImageRoot(capture.change.rows);
+    await parsePortableSyncRoot(portable.envelope);
+    return portable;
+  }
   const collector = createObjectCollector('sync', createArchivePathAllocator());
   const bindings: { objectId: string; ref: AssetRef }[] = [];
   const add = async (ref: AssetRef, filename: string) => {

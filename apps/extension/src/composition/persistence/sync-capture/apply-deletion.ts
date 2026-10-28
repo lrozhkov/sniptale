@@ -1,3 +1,5 @@
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -214,6 +216,19 @@ async function deleteMediaRoot(
   const current: unknown = await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.rootId);
   if (current === undefined) return assertAbsentMediaRoot(tx, input.rootId, state);
   if (!state) refuse();
+  const media = parseMediaLibraryEntry(current);
+  if (media?.source.kind === 'screenshot') {
+    const image = await freezeImageInTransaction(tx, input.rootId);
+    if (
+      state.nativeDigest !== digestCapturedImageRows(image) ||
+      media.workspaceRevision !== input.expectedWorkspaceRevision
+    )
+      refuse();
+    await assertStandaloneMediaSourceReplaceable(media, tx);
+    await deleteMediaSidecars(tx, input.rootId, operation);
+    await releaseMediaSource(tx, media, operation);
+    return;
+  }
   const rows = await freezeMediaInTransaction(tx, input.rootId);
   if (state.nativeDigest !== digestCapturedMediaRows(rows)) refuse();
   await assertStandaloneMediaSourceReplaceable(rows.media, tx);
@@ -297,7 +312,8 @@ async function writeDeletionProvenance(
   input: ApplyCatalogDeletionInput,
   identity: DeletionIdentity,
   operation: ReturnType<typeof buildPhysicalDeleteOperation>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  nativeRevision?: number
 ): Promise<number> {
   const generation = input.expectedLocalGeneration + 1;
   const createdAt = Date.now();
@@ -313,6 +329,7 @@ async function writeDeletionProvenance(
     generation,
     basis: [input.operationId],
     deleted: true,
+    ...(nativeRevision === undefined ? {} : { nativeRevision }),
   };
   const receipt: SyncCaptureAppliedOperation = {
     version: 1,
@@ -370,6 +387,8 @@ async function commitDeletion(
       return admission;
     }
     signal?.throwIfAborted();
+    const nativeRevision =
+      input.rootKind === 'media' ? admission.previous?.nativeRevision : undefined;
     if (input.rootKind === 'video-project')
       await deleteProjectRoot(tx, input, admission.previous, operation);
     else await deleteMediaRoot(tx, input, admission.previous, operation);
@@ -379,7 +398,8 @@ async function commitDeletion(
       input,
       admission.identity,
       operation,
-      signal
+      signal,
+      nativeRevision
     );
     signal?.throwIfAborted();
     await tx.done;

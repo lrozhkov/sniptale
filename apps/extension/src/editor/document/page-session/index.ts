@@ -22,6 +22,7 @@ interface EditorPageLocationState {
 interface EditorPageAssetRestoreSource {
   kind: 'asset';
   assetId: string;
+  nativeRevision: number;
   dataUrl: string;
   filename: string | null;
   sourceFaviconUrl: string | null;
@@ -162,6 +163,7 @@ async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRest
   return {
     kind: 'asset',
     assetId,
+    nativeRevision: asset?.workspaceRevision ?? 0,
     dataUrl: await blobToDataUrl(blob),
     filename: asset?.filename ?? null,
     sourceFaviconUrl: asset?.sourceFavicon ?? null,

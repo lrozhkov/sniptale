@@ -1,3 +1,4 @@
+import { preparePortableImageRows, validatePortableImageRows } from './prepared-image';
 import type { ArchiveReader } from '../../composition/archive-transfer';
 import { parseAssetRef, type AssetRef } from '../../composition/persistence/assets';
 import { parseMediaLibraryEntry } from '../../composition/persistence/media-library/read-guards';
@@ -53,6 +54,14 @@ export async function parsePortableSyncRoot(value: unknown) {
     envelope.descriptor.mediaSubtype === 'library-item'
   ) {
     const metadata = parsePortableMediaMetadata(envelope.metadata);
+    if (metadata.entry.source.kind === 'screenshot') {
+      exactKeys(metadata, ['entry', 'originalObjectId', 'workspace', 'presentation']);
+      if (metadata.entry.id !== envelope.descriptor.rootId)
+        throw new Error('Portable image identity differs from its root.');
+      await assertArchiveRootObjectInventory(envelope, metadataOnlyReader, []);
+      validatePortableImageRows(envelope, metadata);
+      return { kind: 'image' as const, envelope, metadata };
+    }
     exactKeys(metadata, ['entry', 'projectAsset', 'originalObjectId']);
     if (metadata.entry.id !== envelope.descriptor.rootId || !metadata.projectAsset)
       throw new Error('Unsupported portable media root.');
@@ -167,7 +176,7 @@ function assertCausalDependencies(
 
 /** Shared exact dependency inventory for wire admission and native portable preparation. */
 export function portableSyncDependencyIds(parsed: ParsedPortableRoot): string[] {
-  if (parsed.kind === 'media') return [];
+  if (parsed.kind === 'media' || parsed.kind === 'image') return [];
   const needed = new Set<string>();
   for (const asset of parsed.entry.project.assets) {
     if (asset.source.kind === 'library-asset') needed.add(asset.source.mediaId);
@@ -307,6 +316,17 @@ export async function preparePortableReplica(args: {
       throw new Error('Unsupported media replica admission.');
     const rows = prepareMediaRows(parsed, refFor);
     payload = { kind: 'media', input: { ...identity, rows } };
+  } else if (parsed.kind === 'image') {
+    if (sender.length || local.dependencies.length)
+      throw new Error('Unsupported image replica dependencies.');
+    payload = {
+      kind: 'image',
+      input: {
+        ...identity,
+        expectedNativeRevision: local.expectedWorkspaceRevision,
+        ...preparePortableImageRows(parsed.metadata, refFor),
+      },
+    };
   } else {
     if (
       local.expectedWorkspaceRevision !== null &&

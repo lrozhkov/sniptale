@@ -118,11 +118,13 @@ export async function prepareCatalogReplica(args: {
   );
   const parsed = await parsePortableSyncRoot(operation.envelope);
   const selectedIds =
-    parsed.kind === 'media'
-      ? [parsed.metadata.originalObjectId]
-      : parsed.metadata.projectAssets
-          .filter((asset) => !asset.libraryMediaId)
-          .map((asset) => asset.objectId);
+    parsed.kind === 'image'
+      ? parsed.envelope.objects.map((object) => object.objectId)
+      : parsed.kind === 'media'
+        ? [parsed.metadata.originalObjectId]
+        : parsed.metadata.projectAssets
+            .filter((asset) => !asset.libraryMediaId)
+            .map((asset) => asset.objectId);
   const editing = parsed.envelope.objects.filter((object) => selectedIds.includes(object.objectId));
   // Use the existing backup operation/recovery boundary while staged objects lack journal claims.
   return runWithDurableAssetOperation(async () => {
