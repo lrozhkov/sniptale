@@ -56,6 +56,7 @@
     "qa:internal:build": "node tooling/qa/wrappers/build.mjs",
     "qa:release-harness": "node tooling/qa/wrappers/release-harness.mjs",
     "qa:stats": "node tooling/qa/runtime/observability/report.mjs",
+    "qa:e2e:live": "node tooling/test/e2e/live/run-live.mjs",
     "qa:e2e": "node tooling/test/e2e/run-e2e.mjs --suite smoke",
     "qa:e2e:smoke": "node tooling/test/e2e/run-e2e.mjs --suite smoke",
     "qa:e2e:critical": "node tooling/test/e2e/run-e2e.mjs --suite critical",

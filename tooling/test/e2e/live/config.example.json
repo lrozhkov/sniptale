@@ -1,0 +1,22 @@
+{
+  "id": "custom-compatible",
+  "label": "My compatible service",
+  "connectionType": "openai-compatible",
+  "endpoint": "https://api.example.com/v1",
+  "management": "manual",
+  "models": {
+    "text": { "modelId": "replace-with-exact-model-id", "displayName": "My text model" },
+    "transcription": {
+      "modelId": "replace-with-exact-transcription-id",
+      "displayName": "My transcription model",
+      "audio": {
+        "transcription": { "responseFormat": "verbose_json", "timestampGranularity": "word" }
+      }
+    },
+    "speech": {
+      "modelId": "replace-with-exact-speech-id",
+      "displayName": "My speech model",
+      "audio": { "speech": { "voiceId": "replace-with-voice-id", "responseFormat": "wav" } }
+    }
+  }
+}

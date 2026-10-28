@@ -218,7 +218,7 @@ export async function installSpeechPortFixture(page: Page, phraseCount?: number)
                   void stage(message).catch(() =>
                     emit({ type: 'failure', requestId: message.requestId, code: 'storage-failed' })
                   );
-              } else if (start)
+              } else if (start && message.type === 'execute')
                 void execute(message).catch(() =>
                   emit({ type: 'failure', requestId: message.requestId, code: 'storage-failed' })
                 );
