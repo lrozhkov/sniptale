@@ -1011,16 +1011,17 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         import { createRoot } from 'react-dom/client';
         import { FrameStepBadgeSurface } from './apps/extension/src/features/highlighter/frame-annotation/step-badge-surface';
         import { createDefaultFrameStepBadge } from './apps/extension/src/features/highlighter/frame-annotation/defaults';
-        const cases = [24,48,72].flatMap(diameter => [0.5,1,1.25].flatMap(scale => ['1','12','99'].map(value => ({diameter,scale,value}))));
+        const cases = [29.16,24,48,72].flatMap(diameter => [1,0.5,1.25].flatMap(scale => [...Array.from({length:14},(_,i)=>String(i+1)),'99'].map(value => ({diameter,scale,value,customCss:''}))));
+        cases.push(...['1','9','12'].map(value => ({diameter:29.16,scale:1,value,customCss:'text { font-family: Arial; font-style: italic; letter-spacing: 0.5px; }'})));
         const host = document.createElement('div'); host.id = 'number-centering-probe';
         document.body.replaceChildren(host);
         document.body.style.cssText = 'margin:16px;background:#eef0f3';
         createRoot(host).render(<div style={{display:'grid',gridTemplateColumns:'repeat(9,128px)',gap:4}}>
-          {cases.map(({diameter,scale,value},index) => <div key={index} data-case={index}
+          {cases.map(({diameter,scale,value,customCss},index) => <div key={index} data-case={index}
             style={{height:144,position:'relative',fontFamily:'system-ui'}}>
             <FrameStepBadgeSurface settings={{...createDefaultFrameStepBadge(),value,anchor:'center',
               style:{sizeSource:'custom',diameter,backgroundColorSource:'custom',backgroundColor:'#f97316',
-                textColorSource:'custom',textColor:'#ffffff',outlineColorSource:'custom',outlineColor:'#ffffff',outlineWidth:2,customCss:''}}}
+                textColorSource:'custom',textColor:'#ffffff',outlineColorSource:'custom',outlineColor:'#ffffff',outlineWidth:2,customCss}}}
               borderColor="#f97316" borderWidth={2} zIndex={1} visualScale={scale}/>
             <div style={{position:'absolute',top:122,width:'100%',textAlign:'center',fontSize:11}}>{value} / {diameter}px / {scale}×</div>
           </div>)}
@@ -1035,7 +1036,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       loader: { '.svg': 'text', '.woff2': 'dataurl' },
     });
     await page.addScriptTag({ content: bundle.outputFiles[0]!.text });
-    await expect(page.locator('#number-centering-probe .sniptale-step-badge')).toHaveCount(27);
+    await expect(page.locator('#number-centering-probe .sniptale-step-badge')).toHaveCount(183);
     await page.evaluate(() => document.fonts.ready);
     const centers = await page
       .locator('#number-centering-probe .sniptale-step-badge')
@@ -1045,6 +1046,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           const style = getComputedStyle(value);
           const context = document.createElement('canvas').getContext('2d')!;
           context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+          context.letterSpacing = style.letterSpacing === 'normal' ? '0px' : style.letterSpacing;
           const metrics = context.measureText(value.textContent!);
           const range = document.createRange();
           range.selectNodeContents(value);
@@ -1083,7 +1085,27 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await page.screenshot({ path: info.outputPath('number-glyph-centering.png'), fullPage: false });
     for (const center of centers) {
       expect(Math.abs(center.dy), JSON.stringify(center)).toBeLessThanOrEqual(1);
-      expect(Math.abs(center.dx), JSON.stringify(center)).toBeLessThanOrEqual(1);
+      expect(Math.abs(center.inkDx), JSON.stringify(center)).toBeLessThanOrEqual(0.25);
     }
+    const fallback = await page
+      .locator('#number-centering-probe .sniptale-step-badge > span')
+      .first()
+      .evaluate(async (value) => {
+        const native = HTMLCanvasElement.prototype.getContext;
+        const fontSize = value.style.fontSize;
+        try {
+          HTMLCanvasElement.prototype.getContext = () => null;
+          value.style.fontSize = '21px';
+          await new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          );
+          return { translate: getComputedStyle(value).translate, text: value.textContent };
+        } finally {
+          HTMLCanvasElement.prototype.getContext = native;
+          value.style.fontSize = fontSize;
+        }
+      });
+    expect(fallback.text).toBe('1');
+    expect(fallback.translate).toMatch(/^0px(?: 0px)?$/);
   });
 }

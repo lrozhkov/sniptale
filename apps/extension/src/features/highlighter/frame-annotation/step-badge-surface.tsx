@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import type {
   StepBadgeAnchor,
   StepBadgeSettings,
@@ -143,12 +143,53 @@ export function getStepBadgeStyle(props: {
   };
 }
 
+function useBadgeInkOffset(element: React.RefObject<HTMLSpanElement | null>) {
+  const [offset, setOffset] = useState(0);
+  useLayoutEffect(() => {
+    const value = element.current;
+    if (!value || typeof CanvasRenderingContext2D === 'undefined') return;
+    const measure = () => {
+      const style = getComputedStyle(value);
+      const canvas = value.ownerDocument.createElement('canvas');
+      canvas.width = canvas.height = 0;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        setOffset(0);
+        return;
+      }
+      context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      context.letterSpacing = style.letterSpacing === 'normal' ? '0px' : style.letterSpacing;
+      const metrics = context.measureText(value.innerText || value.textContent || '');
+      // Flex centers the advance box; center the ink within that box before paint.
+      const next =
+        (Number.parseFloat(style.width) +
+          metrics.actualBoundingBoxLeft -
+          metrics.actualBoundingBoxRight) /
+        2;
+      setOffset(Number.isFinite(next) ? next : 0);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(value);
+    const fonts = value.ownerDocument.fonts;
+    fonts?.addEventListener('loadingdone', measure);
+    return () => {
+      observer?.disconnect();
+      fonts?.removeEventListener('loadingdone', measure);
+    };
+  });
+  return offset;
+}
+
 export function StepBadgeValue(props: {
   customStyle?: React.CSSProperties;
   value: string | number;
 }) {
+  const element = useRef<HTMLSpanElement>(null);
+  const inkOffset = useBadgeInkOffset(element);
   return (
     <span
+      ref={element}
       style={{
         display: 'block',
         fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -157,6 +198,7 @@ export function StepBadgeValue(props: {
         lineHeight: 1,
         textBoxTrim: 'trim-both',
         textBoxEdge: 'cap alphabetic',
+        translate: `${inkOffset}px 0`,
         ...props.customStyle,
       }}
     >
