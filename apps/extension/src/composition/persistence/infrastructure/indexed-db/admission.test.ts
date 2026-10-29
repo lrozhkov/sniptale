@@ -406,3 +406,53 @@ describe('restartable explicit recovery reset', () => {
     expect(mocks.local.has(DATABASE_RESET_JOURNAL_KEY)).toBe(true);
   });
 });
+
+it('refuses current capture databases with a missing store index or domain contract', async () => {
+  for (const omittedIndex of ['kind', 'rootKey', 'createdAt']) {
+    mocks.openDB.mockResolvedValueOnce(
+      createCurrentDatabase({
+        indexes: {
+          sync_capture: ['kind', 'rootKey', 'createdAt'].filter((name) => name !== omittedIndex),
+        },
+      })
+    );
+    await expect(inspectDatabaseAdmission()).resolves.toMatchObject({
+      reason: 'indexes',
+      status: 'corrupt',
+    });
+  }
+  for (const omittedStore of ['sync_capture', 'video_project_revisions']) {
+    mocks.openDB.mockResolvedValueOnce(
+      createCurrentDatabase({ stores: EXPECTED_STORES.filter((name) => name !== omittedStore) })
+    );
+    await expect(inspectDatabaseAdmission()).resolves.toMatchObject({
+      reason: 'stores',
+      status: 'corrupt',
+    });
+  }
+  for (const omittedDomain of ['syncCapture', 'videoProjects']) {
+    mocks.openDB.mockResolvedValueOnce(
+      createCurrentDatabase({
+        contracts: CURRENT_SCHEMA_CONTRACTS.filter(
+          (contract) => contract.domainId !== omittedDomain
+        ),
+      })
+    );
+    await expect(inspectDatabaseAdmission()).resolves.toMatchObject({
+      reason: 'domain-contracts',
+      status: 'corrupt',
+    });
+  }
+  mocks.openDB.mockResolvedValueOnce(
+    createCurrentDatabase({
+      contracts: CURRENT_SCHEMA_CONTRACTS.map((contract) =>
+        contract.domainId === 'videoProjects' ? { ...contract, schemaVersion: 8 } : contract
+      ),
+    })
+  );
+  await expect(inspectDatabaseAdmission()).resolves.toMatchObject({
+    reason: 'domain-contracts',
+    status: 'corrupt',
+  });
+  expect(mocks.eraseAssetStorage).not.toHaveBeenCalled();
+});

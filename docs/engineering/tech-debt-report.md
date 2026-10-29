@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=3, tool-noise=16.
-- Enforced source: codeql=6, gitleaks=10, license=1, scc=2.
+- Classification: accepted-architecture=3, tool-noise=14.
+- Enforced source: codeql=4, gitleaks=10, license=1, scc=2.
 
 ## Active decisions
 
@@ -22,9 +22,7 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `noise.codeql.locked-toolchain-download-write` — qa-platform: Downloaded tool bytes are written into the QA image and would be executable if their locked digest were incorrectly reviewed. Action: Retain fixed destinations and exact pre-write SHA-256 verification; any content or line drift requires renewed review. Review: 2027-08-18.
 - `noise.codeql.locked-toolchain-download-url` — qa-platform: A tool URL selected from mutable or candidate-controlled data could turn the QA image build into an unintended outbound request. Action: Keep CI build inputs trusted-control-bound and all downloads exact-digest-verified; any source drift requires renewed review. Review: 2027-08-18.
 - `noise.codeql.local-toolchain-download-write` — qa-platform: Downloaded tool bytes become executable in the local QA toolchain if the locked digest or destination policy is incorrectly reviewed. Action: Retain the trusted-origin allowlist, exact pre-write SHA-256 verification, exclusive creation, and cache-root confinement; any source drift requires renewed review. Review: 2027-08-23.
-- `noise.codeql.transform-stream-transformer-constructor` — archive-transfer: A broad suppression of argument-count findings could conceal real API misuse in archive streaming code. Action: Keep the exception exact to this source digest, location, rule, and message; any implementation drift requires renewed review. Review: 2027-08-29.
 - `accepted.license.eslint-plugin-sonarjs` — repository-owner: A copyleft development dependency could be mistaken for shipped artifact content if packaging boundaries drift. Action: Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact. Review: 2027-07-12.
 - `accepted.scc.editor-document-annotation-import` — apps/extension/src/editor: A broader owner allowance could conceal controller back-dependencies or real module/authority cycles; only these two exact composition edges are accepted. Action: Keep only the exact document import/annotation validation composition. Remove or review the record when those edges or their authority change. Review: 2027-09-01.
 - `noise.codeql.snapshot-literal-fragment-href` — web-snapshot: A broader exception could conceal executable URL or raw HTML sinks; only this exact rule, location, source and message are admitted. Action: Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification. Review: 2027-08-23.
-- `noise.codeql.presentation-retry-identity` — editor-document: Removing identity protection could duplicate presentation commits after a superseded retry completes. Action: Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification. Review: 2027-08-23.
 - `accepted.scc.content-crop-drawing-controls` — content-selection-overlay: A broad SCC allowance could conceal new controller back-dependencies or module and authority cycles. Only the exact two reviewed owner edges are accepted. Action: Keep the shared crop drawing controls and caller-owned interaction contract. Remove or review the decision when these edges or their authority change. Review: 2027-09-01.

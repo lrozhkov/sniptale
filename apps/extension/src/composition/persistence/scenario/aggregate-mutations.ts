@@ -1,3 +1,9 @@
+import type { IDBPTransaction } from 'idb';
+import {
+  captureScenarioProjectInTransaction,
+  readScenarioRevisionFence,
+} from '../sync-capture/capture';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { getScenarioStoredProject, readScenarioStorage, writeScenarioStorage } from './storage';
 import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
@@ -111,7 +117,7 @@ interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
 
 type ScenarioAggregateMutationResult = ScenarioProjectSnapshot;
 
-type ScenarioAggregateTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
+type ScenarioAggregateTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 function hasScenarioChildMutations(
   children: PreparedScenarioAggregateChildMutation | undefined
@@ -207,7 +213,7 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
       ASSET_OPERATIONS_STORE
     );
   }
-  return [...new Set(storeNames)];
+  return [...new Set([...storeNames, ...SCENARIO_CAPTURE_STORES])];
 }
 
 export async function commitScenarioAggregateMutation(
@@ -362,6 +368,7 @@ async function commitScenarioAggregateInTransaction(
         });
       }
       await promoteScenarioSourceLifecycles(tx, existing, Date.now());
+      await captureScenarioProjectInTransaction(tx, project.id);
       await tx.done;
       return {
         result: { project: existing.project, workspaceRevision: existing.workspaceRevision ?? 0 },
@@ -376,6 +383,9 @@ async function commitScenarioAggregateInTransaction(
       projectId: project.id,
     });
     entry = createScenarioAggregateEntry({ existing, options, project });
+    const fence = await readScenarioRevisionFence(tx, project.id);
+    if (fence !== null && entry.workspaceRevision <= fence)
+      entry = { ...entry, workspaceRevision: fence + 1 };
     await applyScenarioAssetMutations(tx, project.id, options.children, physicalDelete);
     await promoteScenarioSourceLifecycles(tx, entry, entry.updatedAt);
     await writeScenarioStorage(tx, { storage, existing, entry });
@@ -386,6 +396,7 @@ async function commitScenarioAggregateInTransaction(
       tx,
       updatedAt: entry.updatedAt,
     });
+    await captureScenarioProjectInTransaction(tx, project.id);
     await tx.done;
   } catch (error) {
     try {

@@ -1,3 +1,8 @@
+import {
+  captureScenarioProjectInTransaction,
+  readScenarioRevisionFence,
+} from '../../../../composition/persistence/sync-capture/capture';
+import { SCENARIO_CAPTURE_STORES } from '../../../../composition/persistence/sync-capture/scenario-snapshot';
 import { createScenarioProjectStore } from '../../../../composition/persistence/scenario/storage';
 import type { DurableAssetLifecyclePermit } from '../../../../composition/persistence/infrastructure/mutation-barrier';
 import {
@@ -69,6 +74,7 @@ export async function commitScenarioProjectPublication(
   const result = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        ...SCENARIO_CAPTURE_STORES,
         SCENARIO_PROJECTS_STORE,
         SCENARIO_PROJECT_HISTORY_STORE,
         SCENARIO_PROJECT_UNITS_STORE,
@@ -102,6 +108,9 @@ export async function commitScenarioProjectPublication(
           throw new Error('Restored borrowed scenario source changed before publication.');
         }
       }
+      const fence = await readScenarioRevisionFence(tx, prepared.root.entry.id);
+      if (fence !== null && prepared.root.entry.workspaceRevision <= fence)
+        prepared.root.entry = { ...prepared.root.entry, workspaceRevision: fence + 1 };
       const restored = await putScenarioProjectBackupRestore({
         tx,
         operation: prepared.operation,
@@ -119,6 +128,10 @@ export async function commitScenarioProjectPublication(
         },
         strategy: session.strategy,
       });
+      if (restored.imported)
+        await captureScenarioProjectInTransaction(tx, prepared.root.entry.id, {
+          origin: 'local-restore',
+        });
       const childIds = await checkpointScenarioChildren(tx, prepared, restored.imported);
       if (prepared.operation.assetIds.length > 0) {
         await tx.objectStore(ASSET_OPERATIONS_STORE).put(prepared.operation);

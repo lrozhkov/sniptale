@@ -1,3 +1,19 @@
+import { captureMediaInTransaction } from '../sync-capture/capture';
+import {
+  STORE_NAME,
+  RECORDING_TELEMETRY_STORE,
+  ASSET_OWNERS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  SYNC_CAPTURE_STORE,
+  PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  WEB_SNAPSHOTS_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { recoverMediaSourcePublications } from './delete-cascade.recovery';
 import {
   initDB,
@@ -120,14 +136,40 @@ async function mutateMediaLibraryEntry(
   mutate: (entry: MediaLibraryEntry) => MediaLibraryEntry
 ): Promise<MediaLibraryEntry> {
   return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readwrite');
-    const store = tx.objectStore(MEDIA_LIBRARY_STORE);
-    const existing = parseMediaLibraryEntry(await store.get(assetId));
-    if (!existing) throw new Error(`Asset ${assetId} не найден.`);
-    const nextEntry = mutate(existing);
-    if (nextEntry !== existing) await store.put(nextEntry);
-    await tx.done;
-    return nextEntry;
+    const tx = db.transaction(
+      [
+        MEDIA_LIBRARY_STORE,
+        STORE_NAME,
+        RECORDING_TELEMETRY_STORE,
+        ASSET_OWNERS_STORE,
+        IMAGE_WORKSPACES_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
+        ASSET_REFS_STORE,
+        SYNC_CAPTURE_STORE,
+        PROJECT_ASSETS_STORE,
+        PROJECT_EXPORTS_STORE,
+        WEB_SNAPSHOTS_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
+        THUMBNAILS_STORE,
+      ],
+      'readwrite'
+    );
+    try {
+      const store = tx.objectStore(MEDIA_LIBRARY_STORE);
+      const existing = parseMediaLibraryEntry(await store.get(assetId));
+      if (!existing) throw new Error(`Asset ${assetId} не найден.`);
+      const nextEntry = mutate(existing);
+      if (nextEntry !== existing) {
+        await store.put(nextEntry);
+        await captureMediaInTransaction(tx, assetId);
+      }
+      await tx.done;
+      return nextEntry;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
+    }
   });
 }
 

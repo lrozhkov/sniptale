@@ -11,11 +11,11 @@ import {
   type BackgroundOwnedRouteInventoryEntry,
 } from '../../../routing-contracts/owned-route-context';
 import type { BackgroundOwnedAuthorizationRequest } from './background-owned.types';
+import { classifyBackgroundOwnedSender } from './sender-classification';
 import {
-  classifyBackgroundOwnedSender,
   classifySettingsPageSenderUrl,
   isScenarioEditorSenderUrl,
-} from './sender-classification';
+} from '../../../../platform/navigation/extension-pages/sender-url';
 
 export function authorizeAiSettingsMutationRoute(
   request: BackgroundOwnedAuthorizationRequest

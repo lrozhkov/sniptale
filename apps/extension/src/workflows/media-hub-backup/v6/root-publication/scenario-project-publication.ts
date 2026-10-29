@@ -380,7 +380,7 @@ async function prepareScenarioSidecars(args: {
 export async function prepareScenarioProjectPublication(args: {
   metadata: PortableScenarioProjectMetadata;
   rootId: string;
-  session: ArchiveRestoreSession;
+  session: Pick<ArchiveRestoreSession, 'strategy' | 'rootIdMap'>;
   sourceExists: boolean;
   staged: StagedArchiveObject[];
 }): Promise<PreparedScenarioPublication> {

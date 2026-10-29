@@ -1,0 +1,2 @@
+failed to parse <worktree>/tooling/test/e2e/providers/nextcloud/compose.yaml: yaml: line 28: did not find expected ',' or ']'
+docker failed (1).

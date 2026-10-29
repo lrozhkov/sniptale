@@ -18,6 +18,11 @@ export const popupRuntimeTypes = new Set<RuntimeMessageType>([
 ]);
 
 export const offscreenRuntimeTypes = new Set<RuntimeMessageType>([
+  MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+  MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+  MessageType.OFFSCREEN_SYNC_START,
+  MessageType.OFFSCREEN_SYNC_INSPECT,
+  MessageType.OFFSCREEN_SYNC_STOP,
   MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE,
   MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
   MessageType.OFFSCREEN_QUICK_ACTION_HEADER,

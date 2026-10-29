@@ -1,0 +1,354 @@
+{
+  "version": "34.0.5",
+  "results": [
+    {
+      "check": "MKCOL isolated namespace",
+      "passed": true
+    },
+    {
+      "check": "PUT create",
+      "passed": true
+    },
+    {
+      "check": "GET exact bytes and SHA-256",
+      "passed": true
+    },
+    {
+      "check": "PROPFIND depth=1",
+      "passed": true
+    },
+    {
+      "check": "If-None-Match refuses overwrite",
+      "passed": true
+    },
+    {
+      "check": "HEAD object create",
+      "passed": true
+    },
+    {
+      "check": "Strong ETag present",
+      "passed": true
+    },
+    {
+      "check": "Conditional PUT accepted",
+      "passed": true
+    },
+    {
+      "check": "Stale If-Match rejected",
+      "passed": true
+    },
+    {
+      "check": "Concurrent CAS safety: at most one winner; refused requests preserve bytes",
+      "passed": true
+    },
+    {
+      "check": "20 concurrent rounds with accepted writes",
+      "passed": false
+    }
+  ],
+  "races": [
+    {
+      "round": 0,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 1,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 2,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 3,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 4,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 5,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 6,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 7,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 8,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 9,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 10,
+      "statuses": [423, 204],
+      "passed": true
+    },
+    {
+      "round": 11,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 12,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 13,
+      "statuses": [423, 204],
+      "passed": true
+    },
+    {
+      "round": 14,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 15,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 16,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 17,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 18,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 19,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 20,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 21,
+      "statuses": [423, 204],
+      "passed": true
+    },
+    {
+      "round": 22,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 23,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 24,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 25,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 26,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 27,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 28,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 29,
+      "statuses": [423, 204],
+      "passed": true
+    },
+    {
+      "round": 30,
+      "statuses": [204, 423],
+      "passed": true
+    },
+    {
+      "round": 31,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 32,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 33,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 34,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 35,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 36,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 37,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 38,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 39,
+      "statuses": [204, 423],
+      "passed": true
+    },
+    {
+      "round": 40,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 41,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 42,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 43,
+      "statuses": [204, 423],
+      "passed": true
+    },
+    {
+      "round": 44,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 45,
+      "statuses": [204, 423],
+      "passed": true
+    },
+    {
+      "round": 46,
+      "statuses": [423, 204],
+      "passed": true
+    },
+    {
+      "round": 47,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 48,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 49,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 50,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 51,
+      "statuses": [423, 204],
+      "passed": true
+    },
+    {
+      "round": 52,
+      "statuses": [423, 204],
+      "passed": true
+    },
+    {
+      "round": 53,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 54,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 55,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 56,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 57,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 58,
+      "statuses": [423, 423],
+      "passed": true
+    },
+    {
+      "round": 59,
+      "statuses": [423, 423],
+      "passed": true
+    }
+  ],
+  "cleanupExactFiles": [true, true],
+  "namespace": "sniptale-probe-3d7b00ec898c4dc786e3057582d20719",
+  "note": "HTTP loopback smoke only; not full TLS, MV3 or server qualification."
+}

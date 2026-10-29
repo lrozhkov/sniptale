@@ -1,3 +1,7 @@
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+} from '../../../../composition/persistence/projects/read-guards';
 import { encodePortableTour } from './scenario-tour';
 import type {
   StoredProjectAssetEntry,
@@ -67,6 +71,58 @@ export interface PortableVideoProjectMetadata {
   projectAssets: PortableProjectAsset[];
   projectExports: PortableProjectExport[];
   thumbnail?: PortableMediaThumbnail;
+}
+
+/** Removes the local byte identity from a native video project asset row. */
+export function encodePortableVideoProjectAsset(
+  entry: StoredProjectAssetEntry
+): PortableProjectAsset['entry'] {
+  const { assetId: _assetId, ...portable } = entry;
+  return portable;
+}
+
+/** Removes the local byte identity while the caller owns export privacy policy. */
+export function encodePortableVideoProjectExport(
+  entry: StoredProjectExportEntry
+): PortableProjectExport['entry'] {
+  const { assetId: _assetId, ...portable } = entry;
+  return portable;
+}
+
+/** Rebinds a portable asset row after the caller selects its restored identities. */
+export function preparePortableVideoProjectAsset(args: {
+  entry: PortableProjectAsset['entry'];
+  id: string | undefined;
+  originalRef: Pick<StoredProjectAssetEntry, 'assetId' | 'mimeType' | 'size'>;
+}): StoredProjectAssetEntry {
+  const parsed = parseProjectAssetEntry({
+    ...args.entry,
+    assetId: args.originalRef.assetId,
+    id: args.id,
+    mimeType: args.originalRef.mimeType,
+    size: args.originalRef.size,
+  });
+  if (!parsed) throw new Error('Restored video project asset metadata is invalid.');
+  return parsed;
+}
+
+/** Rebinds a portable export row after the caller selects its restored identities. */
+export function preparePortableVideoProjectExport(args: {
+  entry: PortableProjectExport['entry'];
+  id: string;
+  projectId: string;
+  originalRef: Pick<StoredProjectAssetEntry, 'assetId' | 'mimeType' | 'size'>;
+}): StoredProjectExportEntry {
+  const parsed = parseProjectExportEntry({
+    ...args.entry,
+    assetId: args.originalRef.assetId,
+    id: args.id,
+    projectId: args.projectId,
+    mimeType: args.originalRef.mimeType,
+    size: args.originalRef.size,
+  });
+  if (!parsed) throw new Error('Restored video project export metadata is invalid.');
+  return parsed;
 }
 
 interface PortableScenarioAsset {

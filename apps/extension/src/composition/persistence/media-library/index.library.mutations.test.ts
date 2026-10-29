@@ -92,9 +92,9 @@ function createDb() {
     put: dbMocks.putMock,
     transaction: vi.fn(() => ({
       done: dbMocks.txDoneMock(),
-      objectStore: vi.fn(() => ({
+      objectStore: vi.fn((name: string) => ({
         delete: dbMocks.objectStoreDeleteMock,
-        get: dbMocks.objectStoreGetMock,
+        get: name === 'sync_capture' ? async () => undefined : dbMocks.objectStoreGetMock,
         put: dbMocks.putMock,
       })),
     })),

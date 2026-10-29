@@ -1,0 +1,37 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts (71 tests | 5 failed | 66 skipped) 75ms
+   × publishes an offline metadata revision without materializing its deferred saved export: normal 44ms
+   × publishes an offline metadata revision without materializing its deferred saved export: temporary 7ms
+   × publishes an offline metadata revision without materializing its deferred saved export: copy-changed 8ms
+   × publishes an offline metadata revision without materializing its deferred saved export: connection-changed 7ms
+   × publishes an offline metadata revision without materializing its deferred saved export: ref-changed 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: normal
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: temporary
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: copy-changed
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: connection-changed
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: ref-changed
+Error: Media backup internal object path is invalid.
+ ❯ assertV6ObjectPath apps/extension/src/workflows/media-hub-backup/v6/layout.ts:72:13
+     70|       segments[3] !== sanitizeArchivePathSegment(filename)
+     71|     ) {
+     72|       throw new Error('Media backup internal object path is invalid.');
+       |             ^
+     73|     }
+     74|     return;
+ ❯ parseArchiveObjectRef apps/extension/src/workflows/media-hub-backup/v6/codec.ts:137:3
+ ❯ Module.parseRootEnvelope apps/extension/src/workflows/media-hub-backup/v6/codec.ts:200:36
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:1811:34
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 66 skipped (71)
+   Start at  10:41:19
+   Duration  4.82s (transform 64%, import 34%, tests 2%)
+

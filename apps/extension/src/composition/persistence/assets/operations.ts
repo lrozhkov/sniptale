@@ -1,3 +1,11 @@
+import { parseSyncCaptureRecord } from '../sync-capture/guards';
+import { parseSyncConnectionIdentity } from '../remote-connection/model';
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
+import {
+  SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import { runWithPersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
 import type { MaintenanceLogCode } from '../library-lifecycle/maintenance-log-model';
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
@@ -6,6 +14,7 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 import { deleteAssetObject, listReadyJournals, listWritingAssetIds } from './opfs-store';
 import {
   runWithDurableAssetLifecycleLock,
+  runWithPersistenceMutationTransition,
   type DurableAssetLifecyclePermit,
 } from '../infrastructure/mutation-barrier';
 import { parseArchiveRestoreSession, parseBackupAssetOperation } from './guards';
@@ -122,7 +131,8 @@ export async function deleteOrphanAssetObjectBatch(
   }, lifecyclePermit);
 }
 
-async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
+/** Read the current native retention authority before a caller removes physical bytes. */
+export async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
   const snapshot = await runWithIndexedDbMutation((db) =>
     runStorageStartupPhase('asset-retention-snapshot', () =>
       collectDurableAssetSnapshot(db, signal)
@@ -140,6 +150,7 @@ async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
     if (owners.has(id)) return 'adopted';
     if (projected.has(id)) return 'referenced';
     if (snapshot.protectedRollbackAssetIds.has(id)) return 'rollback';
+    if (snapshot.protectedSyncCaptureAssetIds.has(id)) return 'publication';
     if (journals.some((journal) => readyJournalClaimsAsset(journal, id))) return 'publication';
     return 'unowned';
   };
@@ -395,4 +406,101 @@ export async function abortArchiveRestoreSession(
     if (session.status !== 'pending') throw new Error('Archive restore session is not pending.');
     return { ...session, status: 'aborted', updatedAt: Date.now() };
   });
+}
+
+/**
+ * Release only checked publication pins for ownerless native bytes.
+ * Remote verification precedes the lifecycle hold. Existing delete authority rechecks every other claim.
+ */
+export async function releasePublishedOperationPins(
+  expectedValue: unknown,
+  authorizationValue: unknown,
+  verifyRemote: (
+    object: import('../sync-capture/contracts').PublishedCaptureOperation['objects'][number]
+  ) => Promise<void>,
+  signal?: AbortSignal
+): Promise<{ released: string[]; intent: PhysicalDeleteAssetOperation | null }> {
+  const expected = parseSyncCaptureRecord(structuredClone(expectedValue));
+  const authorization = parseSyncConnectionIdentity(structuredClone(authorizationValue));
+  if (
+    !expected ||
+    expected.kind !== 'sync-operation' ||
+    expected.phase !== 'published' ||
+    !authorization
+  )
+    throw new Error('Invalid publication pin release.');
+  const db = await initDB();
+  signal?.throwIfAborted();
+  const selected = expected.objects.filter((object) => object.pinned);
+  for (const object of selected) await verifyRemote(structuredClone(object));
+  return runWithPersistenceMutationTransition(() =>
+    runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+      signal?.throwIfAborted();
+      const released = await tryAssetResourceCleanup(async () => {
+        const snapshot = await collectDurableAssetSnapshot(db);
+        const journals = await listReadyJournals();
+        const writing = new Set(await listWritingAssetIds());
+        if (!snapshot.authorityValid) throw new Error('Invalid asset retention authority.');
+        const eligible = selected.filter(
+          ({ ref }) =>
+            !snapshot.refs.some((entry) => entry.assetId === ref.assetId) &&
+            !snapshot.owners.some((entry) => entry.assetId === ref.assetId) &&
+            !snapshot.expectedOwners.some((entry) => entry.assetId === ref.assetId) &&
+            !snapshot.protectedRollbackAssetIds.has(ref.assetId) &&
+            !writing.has(ref.assetId) &&
+            !journals.some((journal) => readyJournalClaimsAsset(journal, ref.assetId))
+        );
+        if (!eligible.length) return { released: [], intent: null };
+        const assetIds = [...new Set(eligible.map((object) => object.ref.assetId))];
+        const intent = buildPhysicalDeleteOperation(assetIds);
+        return runWithPersistenceMutationPermit(async () => {
+          const tx = db.transaction(
+            [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, ASSET_OPERATIONS_STORE],
+            'readwrite'
+          );
+          try {
+            const scope = {
+              spaceId: expected.spaceId,
+              connectionGeneration: expected.connectionGeneration,
+              profileCreatedAt: expected.profileCreatedAt,
+            };
+            await checkSyncConnectionAdmission(tx, scope, authorization);
+            const current = parseSyncCaptureRecord(
+              await tx.objectStore(SYNC_CAPTURE_STORE).get(expected.key)
+            );
+            if (
+              !current ||
+              current.kind !== 'sync-operation' ||
+              current.phase !== 'published' ||
+              JSON.stringify(current) !== JSON.stringify(expected)
+            )
+              throw new Error('Publication pin binding changed.');
+            // Other sync pins stay authoritative. Their later release can make this intent eligible.
+            const objects = current.objects.map((object) =>
+              eligible.some((item) => item.objectId === object.objectId)
+                ? { ...object, pinned: false }
+                : object
+            );
+            signal?.throwIfAborted();
+            await tx.objectStore(SYNC_CAPTURE_STORE).put({ ...current, objects });
+            await tx.objectStore(ASSET_OPERATIONS_STORE).add(intent);
+            signal?.throwIfAborted();
+            await tx.done;
+            return { released: assetIds, intent };
+          } catch (error) {
+            try {
+              tx.abort();
+            } catch {
+              /* Transaction can already be closed. */
+            }
+            await tx.done.catch(() => undefined);
+            throw error;
+          }
+        });
+      });
+      if (!released) return { released: [], intent: null };
+      if (released.intent) await completePhysicalDeleteOperation(released.intent, lifecyclePermit);
+      return released;
+    })
+  );
 }

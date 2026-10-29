@@ -1,8 +1,11 @@
+import { captureVideoProjectInTransaction } from '../../../../composition/persistence/sync-capture/capture';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance/integrity';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { verifyPreparedMediaReviewAnnotations } from './media-review-assets';
 import { createVideoWorkspaceStore } from '../../../../composition/persistence/review-workspaces/storage';
 import {
+  VIDEO_PROJECT_REVISIONS_STORE,
+  SYNC_CAPTURE_STORE,
   STORE_NAME,
   IMAGE_WORKSPACES_STORE,
   SCENARIO_ASSETS_STORE,
@@ -39,13 +42,11 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import { putVideoProjectBackupRestore } from '../../../../composition/persistence/projects/backup-restore';
-import {
-  parseProjectAssetEntry,
-  parseProjectExportEntry,
-  parseVideoProjectEntry,
-} from '../../../../composition/persistence/projects/read-guards';
+import { parseVideoProjectEntry } from '../../../../composition/persistence/projects/read-guards';
 import {
   decodePortableVideoProjectAssetRefs,
+  preparePortableVideoProjectAsset,
+  preparePortableVideoProjectExport,
   parsePortableVideoProjectMetadata,
 } from '../root-codecs/projects';
 import type { ArchiveRootPublisher } from '../restore';
@@ -55,6 +56,8 @@ import { preparePortableAggregatePresentation } from './presentation';
 import { transformPortableVideoProjectReferences } from './video-project-references';
 
 const VIDEO_PROJECT_RESTORE_STORES = [
+  VIDEO_PROJECT_REVISIONS_STORE,
+  SYNC_CAPTURE_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
   PROJECT_ASSETS_STORE,
@@ -193,15 +196,12 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
           };
         }
         const exportId = exportIdMap.get(item.entry.id)!;
-        const parsed = parseProjectExportEntry({
-          ...item.entry,
-          assetId: object.ref.assetId,
+        const parsed = preparePortableVideoProjectExport({
+          entry: item.entry,
+          originalRef: object.ref,
           id: exportId,
           projectId: targetProjectId,
-          mimeType: object.ref.mimeType,
-          size: object.ref.size,
         });
-        if (!parsed) throw new Error('Restored video project export metadata is invalid.');
         const thumbnail = item.thumbnail
           ? parseMediaThumbnailEntry({
               ...item.thumbnail,
@@ -296,6 +296,8 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
             conflicted: restored.conflicted,
           }
         );
+        if (restored.imported)
+          await captureVideoProjectInTransaction(tx, entry.id, { origin: 'local-restore' });
         await tx.done;
         imported = restored.imported;
         conflicted = restored.conflicted;
@@ -340,15 +342,14 @@ async function prepareProjectAssets(
           reusePublished: true as const,
         };
       }
-      const parsed = parseProjectAssetEntry({
-        ...asset.entry,
-        ...restoredOriginMediaId(asset.entry.originMediaId, rootIdMap),
-        assetId: object.ref.assetId,
+      const parsed = preparePortableVideoProjectAsset({
+        entry: {
+          ...asset.entry,
+          ...restoredOriginMediaId(asset.entry.originMediaId, rootIdMap),
+        },
+        originalRef: object.ref,
         id: assetIdMap.get(asset.entry.id),
-        mimeType: object.ref.mimeType,
-        size: object.ref.size,
       });
-      if (!parsed) throw new Error('Restored video project asset metadata is invalid.');
       const videoReview = asset.videoReview
         ? prepareVideoReviewRestore({
             review: asset.videoReview,

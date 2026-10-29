@@ -25,119 +25,7 @@ import {
   runWithPersistentDataErasureBarrier,
 } from '../infrastructure/mutation-barrier';
 
-function notFound(): Error {
-  return Object.assign(new Error('missing'), { name: 'NotFoundError' });
-}
-
-class MemoryFileHandle {
-  readonly kind = 'file' as const;
-  private bytes = new Blob();
-  abortEffect: () => Promise<void> = async () => undefined;
-  closeEffect: () => Promise<void> = async () => undefined;
-  createWritableEffect: () => Promise<void> = async () => undefined;
-  writeEffect: () => Promise<void> = async () => undefined;
-
-  async createWritable(): Promise<FileSystemWritableFileStream> {
-    await this.createWritableEffect();
-    let bytes = new Uint8Array(0);
-    let position = 0;
-    return {
-      abort: async () => this.abortEffect(),
-      close: async () => {
-        await this.closeEffect();
-        this.bytes = new Blob([bytes]);
-      },
-      seek: async (offset: number) => {
-        position = offset;
-      },
-      write: async (value: FileSystemWriteChunkType) => {
-        await this.writeEffect();
-        let data: BlobPart;
-        if (
-          typeof value === 'object' &&
-          value !== null &&
-          !(value instanceof Blob) &&
-          'type' in value
-        ) {
-          if (value.type !== 'write' || value.data == null)
-            throw new Error('Unsupported write command.');
-          position = value.position ?? position;
-          data = value.data;
-        } else data = value;
-        const chunk = new Uint8Array(await new Blob([data]).arrayBuffer());
-        const next = new Uint8Array(Math.max(bytes.length, position + chunk.length));
-        next.set(bytes);
-        next.set(chunk, position);
-        bytes = next;
-        position += chunk.length;
-      },
-    } as FileSystemWritableFileStream;
-  }
-
-  async getFile(): Promise<File> {
-    return new File([this.bytes], 'memory-file');
-  }
-}
-
-class MemoryDirectoryHandle {
-  readonly kind = 'directory' as const;
-  readonly entriesByName = new Map<string, MemoryDirectoryHandle | MemoryFileHandle>();
-  initializeCreatedFile: (file: MemoryFileHandle) => void = () => undefined;
-  removeEffect: () => Promise<void> = async () => undefined;
-
-  async getDirectoryHandle(name: string, options?: FileSystemGetDirectoryOptions) {
-    const current = this.entriesByName.get(name);
-    // Browser boundary test double: only the OPFS methods exercised below are implemented.
-    if (current instanceof MemoryDirectoryHandle)
-      return current as unknown as FileSystemDirectoryHandle;
-    if (current || !options?.create) throw notFound();
-    const directory = new MemoryDirectoryHandle();
-    // Browser boundary test double: only the OPFS methods exercised below are implemented.
-    this.entriesByName.set(name, directory);
-    return directory as unknown as FileSystemDirectoryHandle;
-  }
-
-  async getFileHandle(name: string, options?: FileSystemGetFileOptions) {
-    const current = this.entriesByName.get(name);
-    // Browser boundary test double: only the OPFS methods exercised below are implemented.
-    if (current instanceof MemoryFileHandle) return current as unknown as FileSystemFileHandle;
-    if (current || !options?.create) throw notFound();
-    const file = new MemoryFileHandle();
-    this.initializeCreatedFile(file);
-    // Browser boundary test double: only the OPFS methods exercised below are implemented.
-    this.entriesByName.set(name, file);
-    return file as unknown as FileSystemFileHandle;
-  }
-
-  async removeEntry(name: string): Promise<void> {
-    await this.removeEffect();
-    if (!this.entriesByName.delete(name)) throw notFound();
-  }
-
-  async *entries(): AsyncIterableIterator<[string, FileSystemHandle]> {
-    for (const [name, handle] of this.entriesByName) {
-      // Browser boundary test double: only the OPFS methods exercised below are implemented.
-      yield [name, handle as unknown as FileSystemHandle];
-    }
-  }
-}
-
-function createHarness() {
-  const root = new MemoryDirectoryHandle();
-  return {
-    options: {
-      createId: () => 'asset-1',
-      // Browser boundary test double: only the OPFS methods exercised below are implemented.
-      getOriginRoot: async () => root as unknown as FileSystemDirectoryHandle,
-      requestExclusiveLock: async (
-        _name: string,
-        _options: { ifAvailable: boolean },
-        callback: (acquired: boolean) => Promise<void>
-      ) => callback(true),
-    },
-    root,
-  };
-}
+import { createHarness, MemoryDirectoryHandle, MemoryFileHandle } from './opfs-store.test-support';
 
 it('keeps a closed immutable object and changes writing protection to a ready journal', async () => {
   const harness = createHarness();
@@ -793,3 +681,94 @@ it.each(['{', ' '])(
     await discardPreparedAsset(prepared.ref.assetId, harness.options);
   }
 );
+
+it('keeps an original published after writing enumeration but before cleanup lock admission', async () => {
+  const harness = createHarness();
+  const prepared = await writeBlobToAsset(new Blob(['committed-original']), {
+    ...harness.options,
+    mimeType: 'application/octet-stream',
+  });
+  const journal = {
+    assetRefs: [prepared.ref],
+    createdAt: 1,
+    domain: 'project-assets',
+    journalId: 'finished-after-enumeration',
+    payload: {},
+  };
+  const removed = await collectQuiescentWritingObjects({
+    ...harness.options,
+    requestExclusiveLock: async (_name, _options, callback) => {
+      // Enumeration has yielded the old marker; publication completes before cleanup gets the lock.
+      await writeReadyJournal(journal, harness.options);
+      await deleteReadyJournal(journal.journalId, harness.options);
+      await releaseAssetReadyProtection([prepared.ref.assetId]);
+      return callback(true);
+    },
+  });
+  expect(removed).toBe(0);
+  expect(await (await readAssetFile(prepared.ref, 'original.bin', harness.options)).text()).toBe(
+    'committed-original'
+  );
+});
+it('keeps a claimed original when publication could not remove its writing marker', async () => {
+  const harness = createHarness();
+  const prepared = await writeBlobToAsset(new Blob(['retained-original']), {
+    ...harness.options,
+    mimeType: 'application/octet-stream',
+  });
+  const root = harness.root.entriesByName.get(ASSET_ROOT_DIRECTORY_NAME) as MemoryDirectoryHandle;
+  const writing = root.entriesByName.get('writing') as MemoryDirectoryHandle;
+  vi.spyOn(writing, 'removeEntry').mockRejectedValueOnce(
+    new DOMException('Marker unlink refused', 'NoModificationAllowedError')
+  );
+  const journal = {
+    assetRefs: [prepared.ref],
+    createdAt: 1,
+    domain: 'project-assets',
+    journalId: 'retained-marker',
+    payload: {},
+  };
+  await writeReadyJournal(journal, harness.options);
+  await deleteReadyJournal(journal.journalId, harness.options);
+  await releaseAssetReadyProtection([prepared.ref.assetId]);
+  const order: string[] = [];
+  const claimed = vi.fn(async (id: string) => {
+    order.push('claim');
+    return id === prepared.ref.assetId;
+  });
+  const removed = await collectQuiescentWritingObjects(
+    {
+      ...harness.options,
+      requestExclusiveLock: async (_name, _options, callback) => {
+        order.push('lock');
+        return callback(true);
+      },
+    },
+    claimed
+  );
+  expect(removed).toBe(0);
+  expect(order).toEqual(['lock', 'claim']);
+  expect(await (await readAssetFile(prepared.ref, 'original.bin', harness.options)).text()).toBe(
+    'retained-original'
+  );
+});
+
+it('preserves abandoned bytes when the current writing marker cannot be checked', async () => {
+  const harness = createHarness();
+  const prepared = await writeBlobToAsset(new Blob(['uncertain']), {
+    ...harness.options,
+    mimeType: 'application/octet-stream',
+  });
+  const root = harness.root.entriesByName.get(ASSET_ROOT_DIRECTORY_NAME) as MemoryDirectoryHandle;
+  const writing = root.entriesByName.get('writing') as MemoryDirectoryHandle;
+  vi.spyOn(writing, 'getFileHandle').mockRejectedValueOnce(
+    new DOMException('Marker read refused', 'NotAllowedError')
+  );
+  await expect(collectQuiescentWritingObjects(harness.options)).rejects.toMatchObject({
+    name: 'NotAllowedError',
+  });
+  expect(await (await readAssetFile(prepared.ref, 'original.bin', harness.options)).text()).toBe(
+    'uncertain'
+  );
+  await discardPreparedAsset(prepared.ref.assetId, harness.options);
+});

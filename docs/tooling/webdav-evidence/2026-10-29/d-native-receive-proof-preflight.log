@@ -1,0 +1,26 @@
+QA preflight: 0 product target(s), 2 harness target(s), 2 owner(s)
+
+Primary owners:
+- tooling:test:e2e
+- tooling:test:harness
+
+Likely risk areas:
+- none detected for the selected files
+
+Advisory: introduced=0, worsened=0, existing=0
+
+Read first:
+- docs/agent-tooling/agent-tooling.zip
+- docs/engineering/implementation-rules.md
+- docs/architecture/repository-overview.md
+
+Full context is preserved in the run log printed below.
+QA preflight: all passed in 973ms
+Problems: none
+Timeline: wall=973ms; critical=0ms; active=0ms
+Wait: queue=0ms; resource=0ms
+Slow: none
+Reused: none
+Skipped: none
+Run record: .tmp/qa-observability/runs/2026-10-29/9b051921-fc75-461c-8dc9-f1a8b4bc01a0.json
+Run log: .tmp/qa-logs/2026-10-29/9b051921-fc75-461c-8dc9-f1a8b4bc01a0.log

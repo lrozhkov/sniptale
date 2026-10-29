@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createRemoteRootGalleryItem } from '../items/adapters';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -460,4 +461,40 @@ it.each([false, true])('routes quick-edit commands independently (mixed=%s)', as
   expect(restoreLibraryTrashItemsMock).toHaveBeenCalledExactlyOnceWith([
     { kind: 'quick-edit-project', id: 'source', expectedRevision: 1 },
   ]);
+});
+
+it('refuses direct local delete, restore, tag and zip commands for remote-only roots', async () => {
+  vi.clearAllMocks();
+  const remote = createRemoteRootGalleryItem({
+    source: 'remote',
+    tags: [],
+    label: 'Remote project',
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 1024,
+    createdAt: 10,
+    updatedAt: 20,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'remote-root',
+      operationId: 'operation-1',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  const { controller } = createController({
+    selectedItems: [remote],
+    selectedIds: new Set([remote.id]),
+  });
+  await createDeleteManyAction(controller)([remote], runBusyAction);
+  await createRestoreTrashAction(controller)([remote], runBusyAction);
+  await createApplySelectionTagAction(controller)(runBusyAction, 'new-tag');
+  await createSelectionZipAction(controller)(runBusyAction);
+  expect(moveLibraryItemsToTrashMock).not.toHaveBeenCalled();
+  expect(restoreLibraryTrashItemsMock).not.toHaveBeenCalled();
+  expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
+  expect(addMediaLibraryEntryTagsSafelyMock).not.toHaveBeenCalled();
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
 });

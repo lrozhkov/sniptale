@@ -25,6 +25,7 @@ type LaunchExtensionBrowserOptions = {
   fakeMediaDevices?: boolean;
   showScrollbars?: boolean;
   autoGrantMediaPermissions?: boolean;
+  ignoreHTTPSErrors?: boolean;
   windowCaptureTitle?: string;
 };
 
@@ -59,6 +60,7 @@ function getChromiumLaunchArgs(options: LaunchExtensionBrowserOptions): string[]
     '--disable-crashpad',
     '--disable-breakpad',
     '--enable-unsafe-extension-debugging',
+    ...(options.ignoreHTTPSErrors ? ['--ignore-certificate-errors'] : []),
     ...(options.windowCaptureTitle
       ? [`--auto-select-window-capture-source-by-title=${options.windowCaptureTitle}`]
       : [
@@ -125,6 +127,7 @@ export async function launchExtensionBrowser(
     context = await chromium.launchPersistentContext(userDataDir, {
       viewport,
       deviceScaleFactor: 1,
+      ...(options.ignoreHTTPSErrors ? { ignoreHTTPSErrors: true } : {}),
       args: getChromiumLaunchArgs(options),
       channel: 'chromium',
       headless: process.env.PLAYWRIGHT_HEADLESS !== '0',

@@ -100,7 +100,9 @@ beforeEach(() => {
         get:
           name === 'scenario_projects' && mode === 'readonly'
             ? (id: string) => dbGetMock(name, id)
-            : txGetMock,
+            : name === 'scenario_projects'
+              ? txGetMock
+              : async () => undefined,
         getAll: name === 'scenario_projects' ? () => dbGetAllMock(name) : vi.fn(async () => []),
         index: vi.fn(() => ({
           getAll:

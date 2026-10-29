@@ -1,5 +1,84 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'sync-connection-enrollment-and-retirement',
+    productionFile: 'apps/extension/src/composition/persistence/remote-connection/store.ts',
+    reason:
+      'Enrollment and local-only consumers prove replay, rollback, stale identities and authority retirement.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/remote-connection/enrollment.test.ts',
+      'apps/extension/src/composition/persistence/remote-connection/local-only.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-native-media-parser-backup-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/guards.ts',
+    allowCrossOwner: true,
+    reason: 'Backup workflows consume the retained native media parser through this public owner.',
+    testFiles: [
+      'apps/extension/src/workflows/media-hub-backup/index.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/codec.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-native-review-snapshot-workflow-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/review-snapshot.ts',
+    allowCrossOwner: true,
+    reason: 'Portable review workflows consume the retained native review parser and contract.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/captured-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/prepared-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming-review.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-queue-native-control-and-delivery',
+    productionFile: 'apps/extension/src/composition/persistence/sync-capture/queue.ts',
+    reason:
+      'Transaction-scoped source admission shares native queue controls and retained capture joins. ' +
+      'Queue, pagination, history and transfer suites prove commands, publication and interrupted recovery.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/queue.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/queue-pagination.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/queue-history.test.ts',
+      'apps/extension/src/workflows/sync-transfer/queue.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-replica-durable-native-admission',
+    productionFile:
+      'apps/extension/src/composition/persistence/sync-capture/replica-publication.ts',
+    reason:
+      'Delayed replica recovery must preserve native concurrency, deletion, recreation and retry guards. ' +
+      'The existing media, project and journal suites prove these admission boundaries.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.export.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.snapshot.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-video-project.scenario.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/replica-publication.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-db-media-source-retention',
+    productionFile:
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.ts',
+    reason:
+      'Source retention includes purge, pending native publications, Scenario dependencies ' +
+      'and recording replacement through native sync and backup publication.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.sources.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.pending-publication.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.scenario.test.ts',
+      'apps/extension/src/composition/persistence/media-library/delete-cascade.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-media.recording.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.capture.test.ts',
+    ],
+  },
+  {
     owner: 'shared-db-canonical-media-deletion',
     productionFile: 'apps/extension/src/composition/persistence/media-library/delete-cascade.ts',
     reason:
@@ -48,20 +127,42 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   },
   {
     owner: 'shared-db-core-upgrade-root',
+    exclusive: true,
     productionFile:
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts',
-    reason: 'DB schema upgrade dispatch is covered by core upgrade and provenance migration tests.',
+    reason:
+      'Preserve DB boundary proof and add legacy migrations, core admission, and provenance checks.',
     testFiles: [
+      'apps/extension/src/composition/persistence/diagnostics/index.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.read-guards.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/assets.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/exports.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+      'apps/extension/src/composition/persistence/effect-bundles/index.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/review-history.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/scenario-history.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/scenario-units.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.test.ts',
     ],
   },
   {
     owner: 'shared-db-core-stores-schema-version',
+    exclusive: true,
     productionFile:
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts',
-    reason: 'DB schema version changes are covered by core upgrade and migration tests.',
+    reason:
+      'Preserve DB boundary proof and add legacy migration store/index expectations for schema changes.',
     testFiles: [
+      'apps/extension/src/composition/persistence/diagnostics/index.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.read-guards.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/assets.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/exports.test.ts',
+      'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+      'apps/extension/src/composition/persistence/effect-bundles/index.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/review-history.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/scenario-history.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/scenario-units.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.test.ts',
     ],

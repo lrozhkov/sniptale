@@ -1,0 +1,33 @@
+Change risk: HIGH
+
+Detected:
+- ipc.route
+  apps/extension/src/background/runtime/routing/runtime-wiring/sync-connection.ts: runtime route or binding owner
+
+Required:
+- Architecture review
+- Route compatibility check
+- Inspect the implementation against architecture and security review triggers; run applicable reviews or record an implementation-specific reason why not required
+
+Checkpoint coverage:
+- Messaging: passed
+- Runtime topology: passed
+- Typecheck: passed (full: foundation-package, runtime-contracts-package, platform-package, ui-package, app-core, background, content, popup, settings, gallery, editor, video-editor, tour-preview-sandbox, scenario-editor, offscreen, web-snapshot-viewer, design-system, camera-recorder, media-permission, foundation-package-tests, runtime-contracts-package-tests, platform-package-tests, ui-package-tests, app-core-tests, background-tests, content-tests, popup-tests, settings-tests, gallery-tests, editor-tests, video-editor-tests, tour-preview-sandbox-tests, scenario-editor-tests, offscreen-tests, web-snapshot-viewer-tests, design-system-tests, camera-recorder-tests, media-permission-tests, test-harness, node-config, design-reference-node; typescript=7.0.2; checkers=2; lane=typecheck; queue=98023ms; wall=6837ms; budget=2cpu/5120MiB; profile=2cpu/6144MiB)
+- Unit tests: passed (profile=checkpoint-owner; direct tests=32; lane=tests; queue=39508ms; wall=58512ms; budget=1cpu/4096MiB; profile=2cpu/6144MiB)
+
+Advisory: introduced=0, worsened=4, existing=25
+Worsened:
+- apps/extension/src/workflows/sync-transfer/outgoing.ts:1 [advisory.structural-file] score=3, delta=1, delta-kind=same-path, lines=790, owners=1, effects=1, state=0, clusters=0, cohesion=0.95 Hint: Narrow cross-owner edges or the exported surface. Extract only independently changing behavior, not line-count fragments. Keep cohesive transaction and orchestration boundaries intact.
+- apps/extension/src/workflows/sync-transfer/captured-project.ts:33 [advisory.structural-function] score=4, delta=4, delta-kind=same-path, lines=119, statements=36, cyclomatic=17, cognitive=17, nesting=2, recovery=0, params=2, effects=0, state=0, owners=2, cohesion=0.93 Hint: Name cohesive decision or recovery steps without breaking the transaction boundary.
+- apps/extension/src/workflows/sync-transfer/outgoing.ts:237 [advisory.structural-function] score=4, delta=4, delta-kind=new, lines=42, statements=25, cyclomatic=11, cognitive=16, nesting=3, recovery=1, params=2, effects=0, state=0, owners=2, cohesion=0.79 Hint: Name cohesive decision or recovery steps without breaking the transaction boundary.
+- apps/extension/src/workflows/sync-transfer/wire-record.ts:200 [advisory.structural-function] score=4, delta=4, delta-kind=new, lines=30, statements=6, cyclomatic=17, cognitive=16, nesting=1, recovery=0, params=3, effects=0, state=0, owners=1, cohesion=1.00 Hint: Name cohesive decision or recovery steps without breaking the transaction boundary.
+Existing context: 25 unchanged — see run log
+QA checkpoint: all passed in 1m 59s
+Problems: none
+Timeline: wall=1m 59s; critical=1m 45s; active=1m 45s
+Wait: queue=3m 32s; resource=3m 32s
+Slow: scheduler-1.lane.tests=59s, scheduler-1.lane.light=37s, scheduler-1.lane.target-paths=31s, scheduler-1.lane.app-owners=23s, scheduler-1.lane.lint=7.6s
+Reused: none
+Skipped: none
+Run record: .tmp/qa-observability/runs/2026-10-29/e5d3889e-5f17-40aa-8a0e-545b1408d4a9.json
+Run log: .tmp/qa-logs/2026-10-29/e5d3889e-5f17-40aa-8a0e-545b1408d4a9.log

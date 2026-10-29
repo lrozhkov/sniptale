@@ -1,3 +1,7 @@
+import type {
+  RuntimeSyncConnectionRequestByType,
+  RuntimeSyncConnectionResponseByType,
+} from './sync-connection.types';
 import type { RuntimeCoreRequestByType, RuntimeCoreResponseByType } from './core';
 import type { RuntimeNativeAppRequestByType, RuntimeNativeAppResponseByType } from './native-app';
 import type {
@@ -9,10 +13,12 @@ import type { RuntimeVideoRequestByType, RuntimeVideoResponseByType } from '../.
 export type RuntimeRequestByType = RuntimeCoreRequestByType &
   RuntimeNativeAppRequestByType &
   RuntimeVideoRequestByType &
-  VoiceInputRuntimeRequestByType;
+  VoiceInputRuntimeRequestByType &
+  RuntimeSyncConnectionRequestByType;
 export type RuntimeResponseByType = RuntimeCoreResponseByType &
   RuntimeNativeAppResponseByType &
   RuntimeVideoResponseByType &
-  VoiceInputRuntimeResponseByType;
+  VoiceInputRuntimeResponseByType &
+  RuntimeSyncConnectionResponseByType;
 
 export type RuntimeMessageType = Extract<keyof RuntimeRequestByType, string>;

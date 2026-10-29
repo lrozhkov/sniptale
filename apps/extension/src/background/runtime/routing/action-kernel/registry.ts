@@ -52,6 +52,8 @@ export const actionRouteHandlerBindings = {
   'project-export-runtime': routeProjectExportRuntimeAction,
   scenario: routeTabAction,
   'settings-transfer': routeBackgroundOwnedAction,
+  'sync-product': routeBackgroundOwnedAction,
+  'sync-connection-origin-permission': routeBackgroundOwnedAction,
   'tab-mode': routeTabAction,
   unknown: routeUnknownAction,
   'video-control': routeTabAction,

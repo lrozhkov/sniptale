@@ -46,6 +46,9 @@ export function storageResult(
 
 export function createPorts(order: string[] = []): PrivacyErasurePorts {
   return {
+    sync: {
+      reserveErasureExclusion: () => ({ release() {}, async quiesce() {} }),
+    },
     audioJobs: {
       cancelActiveJob: vi.fn(async () => undefined),
       reserveErasureExclusion: () => ({ release() {}, async waitForActiveMutations() {} }),

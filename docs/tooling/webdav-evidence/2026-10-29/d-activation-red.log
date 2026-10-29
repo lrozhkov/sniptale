@@ -1,0 +1,50 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/settings/sections/capture/saving/index.test.tsx (5 tests | 1 failed | 4 skipped) 55ms
+   × shows the connection subpage in the production build 53ms
+stdout | apps/extension/src/background/runtime/routing/runtime-wiring/initialize.test.ts > binds product ingress and retry in production without security controls
+[BackgroundRuntimeWiring] Background service worker loaded
+
+ ❯ apps/extension/src/background/runtime/routing/runtime-wiring/initialize.test.ts (25 tests | 1 failed | 24 skipped) 23ms
+   × binds product ingress and retry in production without security controls 20ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/background/runtime/routing/runtime-wiring/initialize.test.ts > binds product ingress and retry in production without security controls
+AssertionError: expected "vi.fn()" to be called once with arguments: [ Promise{…}, Any<Function> ]
+
+Number of calls: 0
+
+ ❯ apps/extension/src/background/runtime/routing/runtime-wiring/initialize.test.ts:786:44
+    784|   const coordinator = syncWiring.createCoordinator.mock.results.at(-1)…
+    785|   expect(coordinator).toBeDefined();
+    786|   expect(syncWiring.configureProductRoute).toHaveBeenCalledExactlyOnce…
+       |                                            ^
+    787|     coordinator,
+    788|     expect.any(Function)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  apps/extension/src/settings/sections/capture/saving/index.test.tsx > shows the connection subpage in the production build
+AssertionError: expected null not to be null
+ ❯ apps/extension/src/settings/sections/capture/saving/index.test.tsx:162:75
+    160|   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
+    161|   await renderSection('connection');
+    162|   expect(container?.querySelector('[data-testid="sync-connection"]')).…
+       |                                                                           ^
+    163|   expect(container?.textContent).toContain(translate('settings.syncCon…
+    164|   vi.unstubAllGlobals();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 28 skipped (30)
+   Start at  10:59:04
+   Duration  9.75s (transform 56%, import 30%, environment 13%, tests 1%)
+
+     Import  1629 modules were evaluated 2533 times · 2.80s total, 30% of tracked time
+             ~998ms faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+

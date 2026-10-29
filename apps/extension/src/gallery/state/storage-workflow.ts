@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { GalleryAppState, GalleryAppStateController } from './types';
-import type { GalleryItem } from '../library/items';
+import { isGalleryRemoteItem, type GalleryItem } from '../library/items';
 import { useGalleryLibraryState } from './useGalleryLibraryState';
 import { useGallerySurfaceState } from './useGallerySurfaceState';
 
@@ -102,7 +102,9 @@ export function useGalleryStorageWorkflow({
                   item.id === previewItem.id &&
                   (item.lifecycle?.trashedAt !== undefined) ===
                     (previewItem.lifecycle?.trashedAt !== undefined)
-              ) ?? null)
+              ) ??
+              // Keep the selected version while its controller checks completion and navigates.
+              (isGalleryRemoteItem(previewItem) ? previewItem : null))
             : null,
           url: null,
         };

@@ -20,6 +20,12 @@ Write a transition marker before changing protection mode or resetting secrets. 
 
 An unlock request may persist session metadata under `AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY`. Limit the record to request identity, extension-page owner, purpose, status, timestamps, and a fixed failure reason. Route unlock through the background owner and the Settings page. Do not render an unlock prompt in a content page.
 
+## Sync connection secrets
+
+The native remote-connection owner stores metadata separately from WebDAV credentials. Credentials use the platform AES-GCM owner, unique IVs and version 2 context-bound encrypted envelopes. A non-exportable random CryptoKey remains in the dedicated native store. This transparent local encryption limits accidental disclosure. It does not protect a compromised browser profile. Remote originals and saved exports remain ordinary files. This mechanism adds no remote end-to-end encryption.
+
+Raw credentials, exported key material and derived headers must not persist. Backup, Settings transfer, remote sync, diagnostics and logs exclude connection records. Verified local-data erasure removes the store even when preferences remain. Each actual HTTP request requires current durable connection identity and origin permission. The WebDAV owner resolves credentials in memory, omits cookies and refuses redirects. Lifecycle closure first revokes durable authorization, then aborts and drains issued requests and response bodies. Failed containment must not report successful closure. Production ingress remains disabled until runtime and privacy producer integration pass their acceptance checks.
+
 ## Retention
 
 Temporary material expiry moves eligible roots to Trash without releasing bytes. Maintenance repairs retained project sources before expiry. Failure or an uncertain dependency graph retains unverified data. Automatic Trash deletion remains a separate opt-in operation with its own retention period.
@@ -249,3 +255,161 @@ Quick-action presets can retain explicitly configured static text, website addre
 Settings transfer removes embedded background and icon bytes. The projected preset disables the removed image or icon and retains its other controls. Import refuses embedded artwork before storage admission. Preset artwork and text do not enter sync, diagnostics, or automatic exports.
 
 Favicon acquisition requires the configured option and an invoked capture. It uses the existing bounded anonymous public HTTPS policy with no redirects. Opening the Settings form does not fetch a favicon. Missing page data is omitted. Desktop decoration does not read a web page. Rendering checks encoded input, dimensions, and the combined raster budget before bitmap or canvas allocation.
+
+## Experimental sync capture retention
+
+The local `sync_capture` store retains one phased operation. Native screenshot operations can retain bounded metadata and immutable inline original, preview and thumbnail Blobs. Document files remain immutable asset references. Native preparation replaces that snapshot with one portable payload and checked file references. Prepared and published operations must not contain inline media Blobs. Publication replaces its portable payload with compact facts and explicit file pins. Native domain parsers admit filenames and source metadata before capture. Do not retain credentials or authorization headers in capture records. Do not copy capture payloads or media bytes into logs or diagnostics. The project-owned `video_project_revisions` store retains only local project identifiers and admission counters.
+
+Native and prepared operations protect source bytes after domain references disappear. Unpublished cancellation preserves their payload and claims. Published pins require current remote integrity and native retention admission before release. Historical publication alone never authorizes deletion. Malformed capture records make physical retention authority invalid and prevent cleanup. Whole-local-data erasure must remove both stores with the canonical database and OPFS objects. The test harness exists only in `test-e2e` builds. It does not add a remote apply route to the release.
+
+
+## Prepared sync replica recovery
+
+Prepared replicas use the existing asset ready journal and OPFS protection. A journal retains exact local asset references until native publication commits or an explicit retention-aware cancellation removes its claim. Project dependencies can share protected references without changing their native owners.
+
+The bounded payload contains parsed native media or project metadata and the remote operation identity. It contains no credentials, authorization headers, media Blobs or binary sidecars. The caller must verify original bytes and the source digest before creating the journal. Metadata hashes alone do not establish physical integrity.
+
+The logical operation identity stays inside the replica payload. The outer journal has no backup operation identity. Canonical startup recovery uses the registered replica adapter. A refused item retains its journal and files, then defers without blocking unrelated recovery. Diagnostics contain a static event code, never payloads, filenames, addresses or raw exception text. Diagnostics do not own publication state.
+
+Native publication commits source records, ownership, causal state and receipt atomically. Recovery after commit uses the receipt to avoid another publication. The existing journal owner removes the ready journal after success. Project cleanup reuses the caller's active lifecycle permit and remains outside the native transaction. Canonical local-data erasure removes these journals and objects through the existing lifecycle authority.
+
+
+## WebDAV transport
+
+The sync transfer adapter uses the pinned tsdav client for DAV operations and authentication helpers. A native GET preserves the response stream because the library buffers generic responses. The adapter adds no upload retry or independent publication authority.
+
+An authorized lifecycle owner supplies resolved credentials and cancellation for one selected HTTPS root. That owner must check the optional host grant before use. The adapter permits explicitly selected private corporate addresses. The adapter retains credentials only in its client closure. It does not store credentials or change permission grants.
+
+Every request stays inside the selected root, omits browser cookies and rejects redirects. The final network owner adds Authorization after root and cancellation checks. DAV request operations receive no resolved credential headers. A refused response produces a fixed code and numeric status. Diagnostics exclude credentials, addresses, filenames, response bodies and raw exceptions.
+
+DAV metadata responses have an eight MiB limit before XML parsing. Exceeding this limit refuses the listing rather than returning an incomplete successful catalog. Media transfers use native Blobs and response streams. The transfer caller must check actual size and digest before native publication or capture settlement.
+
+The provider test suite requires an explicit loopback Nextcloud endpoint and a separate command. Its TLS proxy preserves server XML and authentication behavior. Only the test browser can accept its temporary self-signed certificate. Production code requires HTTPS and does not bypass certificate validation.
+
+
+## Sync runtime containment
+
+Queue runtime messages contain selected native identities and bounded status codes. Queue execution reads encrypted local credentials through the native connection owner. Pre-enrollment creation accepts bounded authentication through the authenticated background-to-offscreen channel. Credentials, Authorization headers, provider addresses and response bodies must not enter diagnostics.
+
+Every HTTP request checks current durable authorization and the optional origin grant. The permission query performs independent reads. It does not wait for the caller-held admission lock. Expected authentication, DAV and cancellation failures remain inside the sync executor. They do not mark the shared offscreen document as failed.
+
+Local-data erasure reserves sync exclusion before entering its execution queue. It revokes durable authorization and drains the observed executor before destructive cleanup. Failed or uncertain containment prevents erasure success and preserves local files and credentials. Native queue recovery requires the operation lock. Elapsed time does not authorize source release.
+
+
+## Sync queue history delivery
+
+Queue history uses the existing runtime-log tail and event-history archive. Messages contain fixed codes, stages, source digests, sequence numbers and canonical attempt UUIDs. Gap rows contain bounded counters and the exact omitted sequence boundary. Messages exclude queue source keys, capture payloads, filenames, provider URLs, credentials, headers and raw exception text.
+
+A disjoint native delivery cursor records only the source digest and acknowledged sequence. It grants no transfer, settlement, retention-release or unload authority. Acknowledgement requires the current enrollment, retained source and active mutation permit. Failed delivery retains native evidence. A repeated row keeps its safe event identity.
+
+The caller holds one mutation permit through confirmed archive publication, recent-tail publication and native acknowledgement. Privacy erasure waits for that admitted work. Missing or replaced enrollment refuses delayed acknowledgement. Offscreen submits only scope and source hints through the existing bounded diagnostic Port. Background admits exact offscreen provenance and reloads native events before publication. Content cannot request queue delivery. The receiver admits at most four pending streams and coalesces duplicates. Ordinary offscreen cancellation defers submission. The existing archive retention and local-data erasure policies remain authoritative.
+
+Automatic background discovery uses the existing alarm permission. It performs local history delivery only and grants no network authority. Its persisted position contains the enrollment identity, native continuation key and revision. Exclude this sync_outbox metadata from portable exports. Discovery skips acknowledged sources without reading capture payloads or files. Fixed warnings exclude source identities and raw exceptions.
+
+Malformed evidence remains in place. Each publication rechecks native admission and retains the existing privacy mutation barrier. Disposal stops subsequent work. A delayed cursor save refuses erased or replaced enrollment.
+
+
+
+Settings queue display includes admitted source labels, source timestamps and fixed operation states. It excludes file bodies, resolved credentials and provider addresses. Labels remain plain text and do not enter diagnostic messages. Management commands retain existing native enrollment admission, revision CAS and privacy exclusion. A delayed command cannot mutate a replacement enrollment.
+
+## Workspace allocation evidence
+
+The native remote-connection owner retains one allocation plan under workspace-allocation in sync_connection. The plan contains the selected parent URL, account, generated child URL and random workspace identities. It contains no credentials, authorization headers or media. Existing exclusions remove this store from backups, Settings transfer, remote sync, diagnostics and logs. Verified local-data erasure removes this store.
+
+Each journal command checks its exact incarnation and revision. Opening commands capture the prepared database handle synchronously before waiting for connection admission. The canonical mutation permit orders their transactions. Erasure closes the retained handle, so a delayed opening cannot recreate selected account metadata. The handle capture never initializes storage. It also refuses an installed capture profile or connection. Explicit abandonment permits a new plan without remote cleanup. Uncertain allocation never authorizes adoption or deletion of an existing folder. Provider errors contain fixed codes and numeric statuses only.
+
+The exclusive root operation uses the existing WebDAV authentication and guarded request adapter. It omits cookies and refuses redirects. Its caller must preserve the plan before dispatch and control request cancellation and drain. The shared offscreen runtime supplies this caller. The security-only test Port proves its lifecycle. Production enrollment and start ingress remain disabled.
+
+
+## Workspace marker creation boundary
+
+The remote marker contains public protocol fields and random workspace identifiers. It contains no credentials, local account names or media. Original files and saved exports remain readable through an independent WebDAV client. Marker publication adds no mandatory remote encryption.
+
+The native journal freezes marker bytes before any metadata write. Conditional creation cannot fall back to an overwrite. Unknown metadata and mismatched markers refuse creation without deletion or cleanup. A missing marker in ready state cannot authorize reinitialization. Journal completion requires the exact current native revision and checked remote identity.
+
+The provider preserves the existing HTTPS, origin, path, cookie and redirect restrictions. The explicit test caller rechecks current permission and journal identity before each HTTP dispatch. A checked marker grants no credentials or execution authority. The shared runtime supplies request cancellation, credential lifetime and privacy containment. Enrollment remains a separate release gate.
+
+
+## Creation execution containment
+
+Workspace creation uses the existing request and response-body tracker with native allocation admission. Every phase client rechecks the exact native revision, immutable allocation binding and current origin permission before dispatch. A callback cannot select a server URL from remote metadata. Root allocation and marker publication retain their constrained provider operations.
+
+The execution accepts detached authentication input and checks it against the native account. It writes no credentials to the allocation journal. One in-memory credential reference serves all phase clients and becomes unavailable after drain. Error results contain fixed codes only. This lifetime rule does not erase strings that the JavaScript engine or the caller retains.
+
+Close aborts and drains issued headers and response bodies before it reports containment. A failed cancellation cannot report successful closure. Closing after a remote write preserves native uncertainty or completed native evidence. It promises no remote rollback. The shared privacy and permission owners contain surviving offscreen producers. Production enrollment remains disabled until its separate release gates pass.
+
+
+## Pre-enrollment runtime credentials
+
+Workspace start detaches bounded authentication before command admission. The authenticated background gateway sends it to the exact offscreen document. The executor constructs the creation handle synchronously before acknowledgement. Its job retains the execution handle and safe status only.
+
+The allocation journal contains no authentication. Runtime snapshots and idempotency records contain no credentials, selected URLs, account names or raw error text. The background clears its credential reference after command settlement. The execution clears its credential reference after request drain. These rules cannot erase strings that callers or the JavaScript engine retain.
+
+Origin removal and local-data erasure revoke the exact allocation lifetime before containment. Phase advancement does not escape revocation. A failed native revocation still requires a containment attempt and prevents successful privacy completion. Missing native authority cannot authorize adoption of a surviving producer.
+
+The security-only test Port accepts workspace start for lifecycle proof. Production pages receive no workspace start authority from this change. Profile activation, enrollment and credential persistence remain separate release gates.
+
+
+## Temporary allocation refusal
+
+Workspace creation distinguishes an explicit 423 refusal from an unknown remote outcome. Only exact native refusal evidence restores the same plan for another exclusive MKCOL. The transition grants no ownership and cannot select a different root. A later collision preserves the remote folder and its files. Unknown outcomes cannot adopt an existing folder.
+
+
+## Automatic sync retry authority
+
+Retry metadata contains native identities, deadlines, counters and cursor positions. It contains no credentials, remote URLs, source names or raw exceptions. The wake-up owner reads connection metadata only. Existing admitted execution resolves credentials and checks permission before each request.
+
+Every automatic claim requires current enrollment and exact active connection authority. A different connection incarnation cannot inherit old work. Recovery preserves unknown remote outcomes and requires the native operation lock. Local erasure prevents delayed maintenance from recreating native state.
+
+An alarm or a deadline grants no permission to send data. Temporary refusal receives a bounded delayed retry. Authentication, access, storage, source and internal failures require explicit action. All retained source evidence remains under existing queue ownership.
+
+
+## Checked enrollment credentials
+
+Checked enrollment derives its endpoint and account from one exact native ready source. It prepares credential protection outside IndexedDB transactions. Its final transaction rechecks source identity and readiness under connection admission and the persistence mutation permit. Crypto or transaction failure preserves source evidence without partial credential installation.
+
+New checked connections retain the exact workspace identity. Credential additional data binds that identity with the existing endpoint, account, profile and connection lifetime. Legacy experimental credentials retain their previous context. Same-binding authentication updates preserve checked workspace identity. Repeating enrollment cannot replace the installed credential.
+
+The enrollment receipt contains native identity and binding metadata only. It contains no authentication, raw provider error, catalog payload or media. It remains in sync_connection under existing backup, Settings transfer, diagnostics and remote-export exclusions. Verified local-data erasure removes the receipt with the connection.
+
+Activation requires the owner-controlled native ready source. The browser fixture supplies explicit test-only ingress after creation requests drain. No production Settings or Start authority enters through this fixture. Production Settings and public Start ingress remain separate gates.
+
+
+## JOIN selection and credential lifetime
+
+The native JOIN intent contains only selected endpoint, account, local lifetime and bounded workspace identity. Existing sync_connection export exclusions and erasure ownership apply. Credentials remain in the read-only workflow until issued IO drains. They never enter native readiness, catalog results or fixed errors.
+
+Each request checks exact native checking authority and current origin permission before dispatch. Permission waits cannot preserve stale native authority. The workflow checks permission again after drain and before readiness completion. Active close revokes its native lifetime even if its checking revision advanced. Failed revocation does not excuse request drain or permit a clean containment result.
+
+A drained failed check retains retryable native evidence. A cancelled check cannot authorize enrollment. The common atomic installer accepts only exact native ready sources and retains the workspace-bound credential context. Structural identity supplied by a caller does not establish remote verification.
+
+No production ingress enters through the JOIN test fixture. The unified runtime owns producer containment, permission events and activation handoff. Production ingress remains a closed release gate. Native readiness records a checked observation, not a guarantee against later hostile server changes.
+
+
+## Unified workspace handoff authority
+
+Workspace runtime commands carry a strict source kind and identity. Disposable snapshots contain source kind, incarnation, revision and fixed status only. They contain no credentials, selected URL, account, marker text or catalog payload. CREATE and JOIN share the existing executor slot and request containment owner.
+
+Permission queries read one native selection and check its immutable binding around the browser permission wait. Phase advancement cannot escape kind and lifetime checks. Permission removal and erasure revoke either native source before producer containment. Failure to revoke does not excuse a containment attempt or permit successful privacy completion.
+
+Explicit enrollment requires native ready evidence and current origin permission. The coordinator refuses running or unsafe execution. It requires challenge-bound executor absence or acknowledged stop before invoking the common atomic installer. Receipt replay cannot replace installed credentials. Production pages gain no enrollment authority through the security-only test Port.
+
+Each checked queue execution verifies its exact retained workspace identity through bounded marker reads. It uses the current tracked provider after native claim. A mismatch or missing marker cannot cause remote initialization, overwrite, cleanup or original-file writes. Temporary refusal follows the existing delayed queue policy. Invalid identity preserves local files and requires explicit action.
+
+The verifier establishes an observed identity, not future server stability. Production Settings and public Start ingress remain closed release gates.
+
+
+## Sync metadata and retained originals
+
+Soft Trash keeps the original files and dependency ownership. Restore does not grant file replacement authority. Incoming original reuse requires native predecessor admission and comparison of the actual bytes with the selected operation digest. A matching size, MIME type or stored digest is insufficient. An existing resource reader protects reused files until the publication journal retains them. Failed preparation removes only its new staging files.
+
+Screenshot byte comparison occurs before native publication. The result binds to the predecessor metadata digest and native revision checks. A changed original still requires source replacement admission. An exact retained dependency in Trash can support a checked project replica. New local project source selection still requires restoration. These rules grant no remote deletion or local unload authority.
+
+
+### Manual project binary recovery
+
+Experimental project sync uses the existing backup metadata policy. Frozen native snapshots can retain effect Blobs, project thumbnails and presentation files. Ready journals retain only JSON metadata and exact staged file references. Native publication reads and validates those files before its write transaction. Effect verification validates actual binary content before publication.
+
+Incoming project preparation downloads only resources required for editing. Export-only review resources and saved export bodies remain remote until another supported operation needs them. Originals and saved exports remain ordinary files for an independent DAV client.
+
+Completed receipt replay does not require temporary files. Cleanup follows existing claims and native ownership. A publication receipt alone grants no authority to remove local source data. No project metadata, review content, file bytes or staged references enter diagnostics through this change.

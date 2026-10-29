@@ -1,3 +1,5 @@
+import { allocateVideoProjectRevisionInTransaction } from './revisions';
+import { captureVideoProjectInTransaction } from '../sync-capture/capture';
 import { publishLibraryProjectBindingInTransaction } from './known-library-source';
 import { assertVideoWorkspaceUnchanged } from '../review-workspaces/store';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
@@ -143,7 +145,11 @@ export async function saveVideoProject(
         createdAt: existing?.createdAt ?? candidate.createdAt,
         updatedAt: now,
         lifecycle: buildSavedProjectLifecycle(existing, now),
-        workspaceRevision: (existing?.workspaceRevision ?? 0) + 1,
+        workspaceRevision: await allocateVideoProjectRevisionInTransaction(
+          tx,
+          candidate.id,
+          existing?.workspaceRevision ?? 0
+        ),
       };
 
       await persistProjectReferences({
@@ -163,6 +169,7 @@ export async function saveVideoProject(
       });
       if (physicalDelete.assetIds.length > 0 || physicalDelete.privateSources?.length)
         await assetOperationStore.put(physicalDelete);
+      await captureVideoProjectInTransaction(tx, entry.id);
       await tx.done;
       publishMediaHubLibraryChanged(existing ? 'update' : 'create', [
         `video-project:${candidate.id}`,

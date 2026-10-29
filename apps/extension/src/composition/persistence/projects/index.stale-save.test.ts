@@ -61,12 +61,18 @@ function createDb() {
     get: projectsDbMocks.dbGetMock,
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({
+      objectStore: vi.fn((storeName: string) => ({
         delete: projectsDbMocks.txDeleteMock,
         index: () => ({ count: async () => 0, getAll: async () => [], getAllKeys: async () => [] }),
         getAll: projectsDbMocks.txGetAllMock,
-        get: projectsDbMocks.txGetMock,
-        put: projectsDbMocks.txPutMock,
+        get:
+          storeName === 'sync_capture' || storeName === 'video_project_revisions'
+            ? async () => undefined
+            : projectsDbMocks.txGetMock,
+        put:
+          storeName === 'video_project_revisions'
+            ? async () => undefined
+            : projectsDbMocks.txPutMock,
       })),
     })),
   };
@@ -313,7 +319,7 @@ it('preserves the actual replace restore when it commits during pending Save pre
     },
   });
   expect(head.project.name).toBe('Restored script');
-  expect(head.workspaceRevision).toBe(4);
+  expect(head.workspaceRevision).toBe(5);
   expect(head.project.updatedAt).toBe(10);
   release();
   await expect(pending).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
@@ -793,6 +799,7 @@ it.each(['active', 'remembered'] as const)(
       owners,
       operationIds: new Set<string>(),
       protectedRollbackAssetIds: new Set<string>(),
+      protectedSyncCaptureAssetIds: new Set<string>(),
       publishedProjectAssetIds: new Set<string>(),
       refs,
     };

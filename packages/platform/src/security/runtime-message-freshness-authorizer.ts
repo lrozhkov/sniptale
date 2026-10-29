@@ -8,6 +8,9 @@ const DEFAULT_RUNTIME_MESSAGE_FUTURE_SKEW_MS = 30 * 1000;
 const DEFAULT_RUNTIME_MESSAGE_NONCE_CACHE_MAX_ENTRIES = 4_096;
 const DEFAULT_RUNTIME_MESSAGE_NONCE_CACHE_MAX_ENTRIES_PER_SCOPE = 256;
 
+/** Capacity selection is receiver policy; it never changes sender-scoped nonce identity. */
+type FreshnessCapacity = { scopeLimit?: number; reserved?: boolean };
+
 type RuntimeMessageFreshnessAuthorization =
   | { authorized: true; message: Record<string, unknown> }
   | { authorized: false; reason: string };
@@ -16,6 +19,7 @@ type RuntimeMessageFreshnessConsumption =
   | { authorized: false; reason: string };
 
 export type RuntimeMessageFreshnessConsumeHandle = {
+  capacity: FreshnessCapacity;
   cacheKey: string;
   expiresAtEpochMs: number;
   scope: string;
@@ -31,6 +35,7 @@ type RuntimeMessageFreshnessInspection =
 
 type RuntimeMessageFreshnessAuthorizer = {
   authorize(args: {
+    capacity?: FreshnessCapacity;
     message: unknown;
     nowEpochMs?: number;
     scope: string;
@@ -40,6 +45,7 @@ type RuntimeMessageFreshnessAuthorizer = {
     nowEpochMs?: number;
   }): RuntimeMessageFreshnessConsumption;
   inspect(args: {
+    capacity?: FreshnessCapacity;
     message: unknown;
     nowEpochMs?: number;
     scope: string;
@@ -57,6 +63,7 @@ type RuntimeMessageFreshnessAuthorizerState = {
   futureSkewMs: number;
   maxEntries: number;
   maxEntriesPerScope: number;
+  reservedEntries: number;
   ttlMs: number;
 };
 
@@ -86,13 +93,17 @@ function countRuntimeMessageNoncesForScope(
 
 function canRecordRuntimeMessageNonce(args: {
   acceptedNonces: Map<string, AcceptedRuntimeMessageNonce>;
+  capacity: FreshnessCapacity;
+  reservedEntries: number;
   maxEntries: number;
   maxEntriesPerScope: number;
   scope: string;
 }): boolean {
+  const reserve = args.capacity.reserved ? 0 : args.reservedEntries;
+  const scopeLimit = Math.min(args.maxEntries, args.capacity.scopeLimit ?? args.maxEntriesPerScope);
   return (
-    args.acceptedNonces.size < args.maxEntries &&
-    countRuntimeMessageNoncesForScope(args.acceptedNonces, args.scope) < args.maxEntriesPerScope
+    args.acceptedNonces.size < args.maxEntries - reserve &&
+    countRuntimeMessageNoncesForScope(args.acceptedNonces, args.scope) < scopeLimit - reserve
   );
 }
 
@@ -109,6 +120,7 @@ function isFreshRuntimeMessage(
 }
 
 function inspectRuntimeMessageFreshness(args: {
+  capacity?: FreshnessCapacity;
   message: unknown;
   nowEpochMs: number;
   scope: string;
@@ -138,6 +150,7 @@ function inspectRuntimeMessageFreshness(args: {
   return {
     authorized: true,
     consumeHandle: {
+      capacity: { ...args.capacity },
       cacheKey,
       expiresAtEpochMs: split.freshness.issuedAtEpochMs + args.state.ttlMs,
       scope: args.scope,
@@ -161,6 +174,8 @@ function consumeRuntimeMessageFreshness(args: {
   if (
     !canRecordRuntimeMessageNonce({
       acceptedNonces: args.state.acceptedNonces,
+      capacity: args.handle.capacity,
+      reservedEntries: args.state.reservedEntries,
       maxEntries: args.state.maxEntries,
       maxEntriesPerScope: args.state.maxEntriesPerScope,
       scope: args.handle.scope,
@@ -181,6 +196,7 @@ export function createRuntimeMessageFreshnessAuthorizer(
     futureSkewMs?: number;
     maxAcceptedNonces?: number;
     maxAcceptedNoncesPerScope?: number;
+    reservedAcceptedNonces?: number;
     ttlMs?: number;
   } = {}
 ): RuntimeMessageFreshnessAuthorizer {
@@ -195,12 +211,13 @@ export function createRuntimeMessageFreshnessAuthorizer(
       1,
       args.maxAcceptedNoncesPerScope ?? DEFAULT_RUNTIME_MESSAGE_NONCE_CACHE_MAX_ENTRIES_PER_SCOPE
     ),
+    reservedEntries: Math.max(0, args.reservedAcceptedNonces ?? 0),
     ttlMs: args.ttlMs ?? DEFAULT_RUNTIME_MESSAGE_FRESHNESS_TTL_MS,
   };
 
   return {
-    authorize({ message, nowEpochMs = Date.now(), scope }) {
-      const inspected = this.inspect({ message, nowEpochMs, scope });
+    authorize({ capacity = {}, message, nowEpochMs = Date.now(), scope }) {
+      const inspected = this.inspect({ capacity, message, nowEpochMs, scope });
       if (!inspected.authorized) {
         return inspected;
       }
@@ -210,8 +227,8 @@ export function createRuntimeMessageFreshnessAuthorizer(
     consume({ handle, nowEpochMs = Date.now() }) {
       return consumeRuntimeMessageFreshness({ handle, nowEpochMs, state });
     },
-    inspect({ message, nowEpochMs = Date.now(), scope }) {
-      return inspectRuntimeMessageFreshness({ message, nowEpochMs, scope, state });
+    inspect({ capacity = {}, message, nowEpochMs = Date.now(), scope }) {
+      return inspectRuntimeMessageFreshness({ capacity, message, nowEpochMs, scope, state });
     },
     resetForTests() {
       state.acceptedNonces.clear();

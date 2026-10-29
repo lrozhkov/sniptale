@@ -130,3 +130,7 @@ it('exports the actual inspector document on the final video clock without chang
     await fixture.cleanup();
   }
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

@@ -52,7 +52,7 @@ function getSelectedGalleryItems(
   items: GalleryLibraryState['items'],
   selectedIds: GalleryFiltersState['state']['selectedIds']
 ) {
-  return items.filter((item) => selectedIds.has(item.id));
+  return items.filter((item) => isGallerySelectableItem(item) && selectedIds.has(item.id));
 }
 
 function getSelectedGallerySize(items: GalleryLibraryState['items']) {

@@ -3,6 +3,9 @@ import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../composition/persistence/libr
 
 const mocks = vi.hoisted(() => ({
   media: vi.fn(),
+  prepare: vi.fn(),
+  move: vi.fn(),
+  restore: vi.fn(),
   quickEdits: vi.fn(),
   deleteQuickEdit: vi.fn(),
   renameQuickEdit: vi.fn(),
@@ -19,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   deleteScenario: vi.fn(),
   publish: vi.fn(),
 }));
+vi.mock('../sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: mocks.prepare,
+}));
 vi.mock('../../composition/persistence/review-workspaces/summaries', () => ({
   listVideoWorkspaceSummaries: mocks.quickEdits,
 }));
@@ -27,8 +33,8 @@ vi.mock('../../composition/persistence/review-workspaces/project-commands', () =
   renameVideoWorkspaceProject: mocks.renameQuickEdit,
 }));
 vi.mock('../../composition/persistence/library-lifecycle/trash', () => ({
-  moveStoredItemsToTrash: vi.fn(),
-  restoreStoredItemsFromTrash: vi.fn(),
+  moveStoredItemsToTrash: mocks.move,
+  restoreStoredItemsFromTrash: mocks.restore,
   runWithTrashedStoredItem: mocks.guard,
   runWithStoredItemLifecycle: mocks.lifecycleGuard,
   StaleTrashItemError: class extends Error {},
@@ -58,12 +64,16 @@ vi.mock('../../features/media-hub/events', () => ({
 }));
 import {
   cleanupLibraryTrash,
+  moveLibraryItemsToTrash,
+  restoreLibraryTrashItems,
+  renameQuickEditProject,
   permanentlyDeleteTrashItem,
   permanentlyDeleteLibraryItem,
 } from './trash';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.prepare.mockImplementation(async (_roots, action: () => Promise<unknown>) => action());
   mocks.lifecycleGuard.mockImplementation(
     async (_target, _lifecycle, action: () => Promise<void>) => action()
   );
@@ -236,4 +246,33 @@ it('purges an expired quick-edit project through its owner before considering th
   expect(mocks.deleteMedia).not.toHaveBeenCalled();
   expect(mocks.deleteVideo).not.toHaveBeenCalled();
   expect(mocks.publish).toHaveBeenCalledWith('delete', ['source']);
+});
+
+it('prepares Trash roots before lifecycle writes and preserves them on refusal until retry', async () => {
+  const targets = [
+    { kind: 'media' as const, id: 'image' },
+    { kind: 'quick-edit-project' as const, id: 'review', expectedRevision: 2 },
+  ];
+  mocks.prepare.mockRejectedValueOnce(new Error('temporary refusal'));
+  await expect(moveLibraryItemsToTrash(targets)).rejects.toThrow('temporary refusal');
+  expect(mocks.move).not.toHaveBeenCalled();
+  expect(mocks.publish).not.toHaveBeenCalled();
+  await moveLibraryItemsToTrash(targets);
+  expect(mocks.prepare).toHaveBeenLastCalledWith(
+    [
+      { rootKind: 'media', rootId: 'image' },
+      { rootKind: 'video-review', rootId: 'review' },
+    ],
+    expect.any(Function)
+  );
+  expect(mocks.move).toHaveBeenCalledExactlyOnceWith(targets);
+  await restoreLibraryTrashItems(targets);
+  expect(mocks.restore).toHaveBeenCalledExactlyOnceWith(targets);
+});
+it('retains the revisioned Quick Edit writer behind publication admission', async () => {
+  mocks.prepare.mockRejectedValueOnce(new Error('offline'));
+  await expect(renameQuickEditProject('review', 3, 'New name')).rejects.toThrow('offline');
+  expect(mocks.renameQuickEdit).not.toHaveBeenCalled();
+  await renameQuickEditProject('review', 3, 'New name');
+  expect(mocks.renameQuickEdit).toHaveBeenCalledExactlyOnceWith('review', 3, 'New name');
 });

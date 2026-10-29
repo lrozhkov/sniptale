@@ -1,0 +1,74 @@
+{
+  "scope": "Portable Docker lab integration proof, after historical R1 commit d9e247b5b. Selected cases are not a repeat of every historical R1 test.",
+  "freshBootstrap": "passed after moving the read-only profile mount outside the initial config directory",
+  "initialPackagingFailure": "Preserved failed clean bootstrap: read-only config prevented Nextcloud installation. No product or server acceptance criteria changed.",
+  "positive": {
+    "project": "sniptale-webdav-e2e-df018ec8c5",
+    "startedAt": "2026-10-29T09:05:49.898Z",
+    "profiles": [
+      {
+        "profile": "db",
+        "groups": ["provider", "lifecycle"],
+        "status": "passed"
+      },
+      {
+        "profile": "redis",
+        "groups": ["provider", "lifecycle"],
+        "status": "passed"
+      }
+    ],
+    "status": "passed",
+    "finishedAt": "2026-10-29T09:09:07.147Z"
+  },
+  "selectedCases": {
+    "db-provider": 1,
+    "db-lifecycle": 1,
+    "redis-provider": 2,
+    "redis-lifecycle": 1
+  },
+  "negative": [
+    {
+      "case": "Invalid disposable credential causes test failure and retains failed summary",
+      "exitCode": 1,
+      "log": "e2e-portability-expected-failure.log"
+    },
+    {
+      "case": "Missing credentials with surviving volumes refuse regeneration",
+      "exitCode": 1,
+      "log": "e2e-portability-missing-credential.log"
+    },
+    {
+      "case": "Overlapping command refuses an owned state lock",
+      "exitCode": 1
+    }
+  ],
+  "expectedFailedRun": {
+    "project": "sniptale-webdav-e2e-df018ec8c5",
+    "startedAt": "2026-10-29T09:11:24.581Z",
+    "profiles": [
+      {
+        "profile": "db",
+        "groups": [],
+        "status": "running"
+      }
+    ],
+    "status": "failed",
+    "finishedAt": "2026-10-29T09:11:42.319Z"
+  },
+  "requiredCI": "Unchanged; Docker is optional",
+  "credentials": "Local ignored state only; no credentials in evidence",
+  "cleanup": "Owned services stopped; volumes and run evidence retained",
+  "appPasswordRecovery": {
+    "passed": true,
+    "davStatus": 207,
+    "mode": "0600",
+    "installationPasswordsRegenerated": false
+  },
+  "legacyFixtureAuthority": {
+    "initialFailures": 2,
+    "correctedPasses": 2,
+    "failureLog": "e2e-portability-full-group-fixture-check.log",
+    "successLog": "e2e-portability-full-group-fixtures-corrected.log",
+    "change": "Explicit native connection after media receive in the causal and Trash project fixtures. Existing assertions and product admission stay unchanged."
+  }
+}

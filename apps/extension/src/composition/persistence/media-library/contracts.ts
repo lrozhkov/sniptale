@@ -48,7 +48,7 @@ export interface MediaLibraryEntry {
   tags: string[];
   lifecycle?: LibraryLifecycle;
   recordingGroup?: RecordingGroupMember;
-  /** Monotonic editable-workspace revision. Original-only media remains at revision zero. */
+  /** Monotonic editable-workspace revision. Restored original-only images can retain a nonzero revision. */
   /** Missing only on pre-v24 persisted rows; readers normalize it to revision 0. */
   workspaceRevision?: number;
   /** Whether the current editable image content differs from its immutable source blob. */

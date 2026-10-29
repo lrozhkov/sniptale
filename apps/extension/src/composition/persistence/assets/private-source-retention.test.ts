@@ -59,6 +59,7 @@ const snapshot = (): Awaited<ReturnType<typeof collectDurableAssetSnapshot>> => 
   owners: [owner],
   operationIds: new Set(),
   protectedRollbackAssetIds: new Set(),
+  protectedSyncCaptureAssetIds: new Set(),
   publishedProjectAssetIds: new Set(),
   refs: [ref],
 });

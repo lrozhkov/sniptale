@@ -1,0 +1,50 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts (73 tests | 2 failed | 71 skipped) 318ms
+   × publishes an offline metadata revision without materializing its deferred saved export: owned-zero 270ms
+   × publishes an offline metadata revision without materializing its deferred saved export: unknown-zero 47ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: owned-zero
+Error: Asset object size mismatch: 57d821d6-4756-4c11-9353-c34971c5a085.
+ ❯ readAssetFile apps/extension/src/composition/persistence/assets/opfs-store.ts:510:39
+    508|   const handle = await objects.getFileHandle(ref.assetId);
+    509|   const source = await handle.getFile();
+    510|   if (source.size !== ref.size) throw new AssetObjectSizeMismatchError…
+       |                                       ^
+    511|   return new File([source], filename, { lastModified: source.lastModif…
+    512| }
+ ❯ selectDeferredExports apps/extension/src/workflows/sync-transfer/outgoing.ts:248:7
+ ❯ apps/extension/src/workflows/sync-transfer/outgoing.ts:373:33
+ ❯ apps/extension/src/composition/persistence/infrastructure/mutation-barrier.ts:316:16
+ ❯ runWithAssetResourceRead apps/extension/src/composition/persistence/assets/resource-sessions.ts:60:12
+ ❯ apps/extension/src/composition/persistence/infrastructure/mutation-barrier.ts:214:18
+ ❯ runWithHeldPersistenceMutationTransition apps/extension/src/composition/persistence/infrastructure/mutation-barrier.ts:131:12
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:1913:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: unknown-zero
+AssertionError: expected [Function] to throw error including 'Existing asset bytes' but got 'Asset object size mismatch: 34bb2da4-…'
+
+Expected: "Existing asset bytes"
+Received: "Asset object size mismatch: 34bb2da4-8dfc-4a95-a21f-fe3f7363ed65."
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:1907:30
+    1905|       const pending = prepareCapturedOutgoing(capture, recovery);
+    1906|       if (mode === 'unknown-zero') {
+    1907|         await expect(pending).rejects.toThrow('Existing asset bytes');
+       |                              ^
+    1908|         expect(f.table('sync_capture')).toEqual(before);
+    1909|         expect((await (await f.objects.getFileHandle(ref.assetId)).get…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 71 skipped (73)
+   Start at  11:36:39
+   Duration  2.89s (transform 55%, import 33%, tests 12%, setup 1%)
+

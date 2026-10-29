@@ -8,6 +8,7 @@ import { translate } from '../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   isGalleryMediaItem,
+  isGalleryRemoteItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
   isGallerySelectableItem,
@@ -16,7 +17,7 @@ import {
   type GalleryMediaItem,
 } from '../library/items';
 import type { GalleryTrashSize } from '../library/types';
-import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
+import { loadGalleryLibrarySnapshot } from '../library/snapshot';
 
 interface UseGalleryLibraryStateOptions {
   onBanner: (message: string) => void;
@@ -220,6 +221,16 @@ function areGalleryItemBaseFieldsEqual(left: GalleryItem, right: GalleryItem) {
 
 function areGalleryItemsUiEquivalent(left: GalleryItem, right: GalleryItem | undefined): boolean {
   if (!right || !areGalleryItemBaseFieldsEqual(left, right)) return false;
+  if (isGalleryRemoteItem(left)) {
+    return (
+      isGalleryRemoteItem(right) &&
+      left.remote.selection.operationId === right.remote.selection.operationId &&
+      left.remote.selection.sourceDigest === right.remote.selection.sourceDigest &&
+      left.remote.conflict === right.remote.conflict &&
+      left.remote.unavailable === right.remote.unavailable &&
+      left.remote.deleted === right.remote.deleted
+    );
+  }
   if (isGalleryMediaItem(left)) {
     return (
       isGalleryMediaItem(right) &&
@@ -371,11 +382,12 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
     args.setIsLoading(true);
   }
   try {
-    const { estimate, nextItems } = await loadGalleryLibrarySnapshot();
+    const { estimate, nextItems, remoteUnavailable } = await loadGalleryLibrarySnapshot();
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
       return;
     }
 
+    if (remoteUnavailable) args.onBanner(translate('gallery.app.remoteCatalogFailed'));
     applyGalleryRefreshResult({
       itemsRef: args.itemsRef,
       nextItems,

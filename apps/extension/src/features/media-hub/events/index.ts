@@ -70,6 +70,7 @@ function createMediaHubChannel(): BroadcastChannel | null {
 
 function createMediaHubPublisher() {
   let publishChannel: BroadcastChannel | null = null;
+  let disposed = false;
 
   const getPublishChannel = (): BroadcastChannel | null => {
     if (publishChannel) {
@@ -90,7 +91,12 @@ function createMediaHubPublisher() {
   };
 
   return {
+    dispose() {
+      disposed = true;
+      resetPublishChannel();
+    },
     publish(event: MediaHubEvent) {
+      if (disposed) return;
       const channel = getPublishChannel();
       if (!channel) {
         return;
@@ -107,6 +113,17 @@ function createMediaHubPublisher() {
         }
       }
     },
+  };
+}
+
+/** One explicitly owned advisory publisher for a disposable runtime. */
+export function createMediaHubEventPublisher() {
+  const publisher = createMediaHubPublisher();
+  return {
+    publishLibraryChanged(reason: MediaHubLibraryChangeReason, assetIds: string[]): void {
+      publisher.publish({ type: 'library-changed', reason, assetIds, timestamp: Date.now() });
+    },
+    dispose: publisher.dispose,
   };
 }
 

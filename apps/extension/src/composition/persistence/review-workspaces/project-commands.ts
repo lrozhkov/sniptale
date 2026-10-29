@@ -1,3 +1,8 @@
+import {
+  captureVideoReviewInTransaction,
+  captureDeletionInTransaction,
+  allocateVideoReviewRevision,
+} from '../sync-capture/capture';
 import { initDB, type IndexedDbWriteTransaction } from '../infrastructure/indexed-db/core';
 import {
   MEDIA_LIBRARY_STORE,
@@ -6,6 +11,15 @@ import {
   VIDEO_WORKSPACE_DRAFTS_STORE,
   PROJECT_ASSETS_STORE,
   ASSET_OPERATIONS_STORE,
+  RECORDING_TELEMETRY_STORE,
+  STORE_NAME,
+  SYNC_CAPTURE_STORE,
+  PROJECT_EXPORTS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  THUMBNAILS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
@@ -22,7 +36,22 @@ import type { WorkspaceStorageReadTransaction } from './storage';
 import type { VideoWorkspaceProject } from './contracts';
 import { VideoWorkspaceError } from './store';
 
-const PROJECT_STORES = [MEDIA_LIBRARY_STORE, VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE];
+const PROJECT_STORES = [
+  MEDIA_LIBRARY_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+  RECORDING_TELEMETRY_STORE,
+  STORE_NAME,
+  SYNC_CAPTURE_STORE,
+  PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  THUMBNAILS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
+];
 
 /** Admit existing project content in the caller's transaction; never create a missing project. */
 export async function readStoredVideoWorkspaceProject(
@@ -59,7 +88,7 @@ export async function writeVideoWorkspaceProject(
   const next = {
     ...workspace,
     project: admitted,
-    revision: workspace.revision + 1,
+    revision: await allocateVideoReviewRevision(tx, id, workspace.revision + 1),
     updatedAt: Math.max(now, workspace.updatedAt),
   };
   await writeWorkspaceStorage(tx, {
@@ -69,6 +98,7 @@ export async function writeVideoWorkspaceProject(
     mode: 'cursor',
     usageReferenceKeys: withReviewWorkspaceUsage(next).usageReferenceKeys,
   });
+  await captureVideoReviewInTransaction(tx, id);
 }
 
 /** Rename only the confirmed project; source metadata and authored history remain independent. */
@@ -119,16 +149,9 @@ export async function deleteVideoWorkspaceProject(
     // Live editors hold the reader through disposal; reject before removing their CAS evidence.
     const purged = await tryAssetResourceCleanup(async () => {
       await runWithIndexedDbMutation(async (db) => {
-        const tx = db.transaction(
-          [
-            ...PROJECT_STORES,
-            VIDEO_WORKSPACE_DRAFTS_STORE,
-            PROJECT_ASSETS_STORE,
-            ASSET_OPERATIONS_STORE,
-          ],
-          'readwrite',
-          { durability: 'strict' }
-        );
+        const tx = db.transaction([...PROJECT_STORES, ASSET_OPERATIONS_STORE], 'readwrite', {
+          durability: 'strict',
+        });
         try {
           const { workspace } = await readStoredVideoWorkspaceProject(tx, id);
           if (workspace.revision !== expectedRevision) throw new VideoWorkspaceError('conflict');
@@ -138,6 +161,13 @@ export async function deleteVideoWorkspaceProject(
               .filter((reference) => reference.startsWith('project-asset:'))
               .map((reference) => reference.slice('project-asset:'.length)),
             operation
+          );
+          await captureDeletionInTransaction(
+            tx,
+            'video-review',
+            id,
+            'local-edit',
+            workspace.revision
           );
           await createVideoWorkspaceStore(tx).delete(id);
           await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(id);

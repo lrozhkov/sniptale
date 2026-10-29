@@ -1,3 +1,4 @@
+import { SCENARIO_CAPTURE_STORES } from '../../sync-capture/scenario-snapshot';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
@@ -65,7 +66,10 @@ beforeEach(() => {
       objectStore: (name: string) => ({
         get: async () => undefined,
         delete: name === 'scenario_exports' ? (id: string) => dbDeleteMock(name, id) : vi.fn(),
-        put: vi.fn(),
+        put:
+          name === 'scenario_exports'
+            ? (value: ScenarioExportEntry) => dbPutMock(name, value)
+            : vi.fn(),
         index: () => ({ count: async () => 0 }),
       }),
       done: Promise.resolve(),
@@ -104,13 +108,16 @@ it('renames only the selected authoritative HTML row and retains siblings and li
     rows.set(value.id, value);
   });
   const transaction = vi.fn(() => ({
-    store: { get: vi.fn(async (id: string) => rows.get(id)), put },
+    objectStore: (name: string) =>
+      name === 'scenario_exports'
+        ? { get: vi.fn(async (id: string) => rows.get(id)), put }
+        : { get: async () => undefined },
     done: Promise.resolve(),
     abort: vi.fn(),
   }));
   initDBMock.mockResolvedValue({ transaction });
   await renameScenarioHtmlExport(entry.id, ' Renamed ');
-  expect(transaction).toHaveBeenCalledWith('scenario_exports', 'readwrite');
+  expect(transaction).toHaveBeenCalledWith([...SCENARIO_CAPTURE_STORES], 'readwrite');
   expect(rows.get(entry.id)).toEqual({ ...entry, filename: 'Renamed.html' });
   expect(rows.get(sibling.id)).toEqual(sibling);
   expect(put).toHaveBeenCalledTimes(1);
@@ -132,7 +139,10 @@ it.each(['missing', 'pdf', 'trash'])(
     const abort = vi.fn();
     initDBMock.mockResolvedValue({
       transaction: () => ({
-        store: { get: async () => entry, put },
+        objectStore: (name: string) =>
+          name === 'scenario_exports'
+            ? { get: async () => entry, put }
+            : { get: async () => undefined },
         done: Promise.resolve(),
         abort,
       }),
@@ -146,12 +156,15 @@ it.each(['missing', 'pdf', 'trash'])(
 it('propagates the authoritative write failure', async () => {
   initDBMock.mockResolvedValue({
     transaction: () => ({
-      store: {
-        get: async () => createExportRecord(),
-        put: async () => {
-          throw new Error('quota');
-        },
-      },
+      objectStore: (name: string) =>
+        name === 'scenario_exports'
+          ? {
+              get: async () => createExportRecord(),
+              put: async () => {
+                throw new Error('quota');
+              },
+            }
+          : { get: async () => undefined },
       done: Promise.reject(new Error('transaction aborted')),
       abort: vi.fn(),
     }),
@@ -175,6 +188,11 @@ it('settles publication before selected deletion and journals only its unshared 
   const refs = { delete: vi.fn() };
   const operations = { put: vi.fn() };
   const exports = {
+    get: vi.fn(async (id: string) =>
+      rows.has(id)
+        ? { ...createExportRecord(), id, html: { mode: 'guide', assetId: 'body' } }
+        : undefined
+    ),
     delete: vi.fn(async (id: string) => {
       rows.delete(id);
     }),
@@ -185,6 +203,7 @@ it('settles publication before selected deletion and journals only its unshared 
       if (store === 'asset_refs') return refs;
       if (store === 'asset_operations') return operations;
       if (store === 'scenario_exports') return exports;
+      if (store === 'sync_capture') return { get: async () => undefined };
       throw new Error('Unexpected source project access');
     },
     done: Promise.resolve(),

@@ -79,6 +79,7 @@ it('restores an archived temporary project as permanent without changing its gra
   });
   expect(target.projects.put).toHaveBeenCalledWith({
     ...entry,
+    workspaceRevision: 1,
     usageReferenceKeys: ['indexed:v2'],
     lifecycle: expect.objectContaining({ savedAt: 10, storageClass: 'library' }),
   });
@@ -1082,4 +1083,40 @@ it('restores passive source speech without scheduling replacement audio', async 
     parseHydratableVideoProject(JSON.parse(JSON.stringify(entry.project)))?.sourceAudioDocuments
   ).toEqual(before.sourceAudioDocuments);
   expect(entry.project).toEqual(before);
+});
+
+it('allocates local admission independently of the archived revision and rebinds presentation', async () => {
+  const target = stores();
+  const current = createVideoProjectEntry({ id: 'project' }, { workspaceRevision: 7 });
+  vi.spyOn(target.projects, 'get').mockResolvedValue(current);
+  const archived = createVideoProjectEntry(
+    { id: 'project', name: 'Archived authored content' },
+    { workspaceRevision: 400 }
+  );
+  const presentation: AggregatePresentationEntry = {
+    aggregateId: 'project',
+    aggregateKind: 'video-project',
+    presentationRevision: 400,
+    thumbnailBlob: new Blob(['preview']),
+    updatedAt: 10,
+  };
+  await putVideoProjectBackupRestore({
+    tx: createVideoProjectRestoreTransaction(target),
+    operation: operation(),
+    root: { entry: archived, assets: [], exports: [], presentation },
+    stores: target,
+    strategy: 'replace',
+  });
+  expect(target.projects.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: archived.project,
+      createdAt: archived.createdAt,
+      updatedAt: archived.updatedAt,
+      workspaceRevision: 8,
+    })
+  );
+  expect(target.presentations.put).toHaveBeenCalledWith({
+    ...presentation,
+    presentationRevision: 8,
+  });
 });

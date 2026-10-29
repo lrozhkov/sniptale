@@ -287,3 +287,36 @@ function action(type: MessageType): BackgroundOwnedAction {
     routeName: `background-owned:${type}`,
   };
 }
+
+it('dispatches the sync query to its exact-sender owner instead of granting page authority', () => {
+  const input = action(MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION);
+  const response = dispatchBackgroundOwnedRoute(input, null);
+  expect(response).toEqual({ handled: true, keepChannelOpen: true });
+  expect(sendResponse).toHaveBeenCalledExactlyOnceWith({
+    success: false,
+    error: 'Sync origin permission query refused',
+  });
+});
+
+it('dispatches product commands through their owner and keeps its response channel open', () => {
+  const input = action(MessageType.SYNC_PRODUCT_COMMAND);
+  const message = {
+    type: MessageType.SYNC_PRODUCT_COMMAND,
+    requestId: '11111111-1111-4111-8111-111111111111',
+    command: { kind: 'status' },
+  };
+  input.message = message;
+  const result = dispatchBackgroundOwnedRoute(input, null);
+  expect(result).toEqual({ handled: true, keepChannelOpen: true });
+  expect(sendResponse).toHaveBeenCalledExactlyOnceWith({
+    success: false,
+    error: 'Sync product command refused',
+  });
+});
+
+it('leaves malformed product ingress unhandled without invoking a response', () => {
+  expect(dispatchBackgroundOwnedRoute(action(MessageType.SYNC_PRODUCT_COMMAND), null)).toEqual({
+    handled: false,
+  });
+  expect(sendResponse).not.toHaveBeenCalled();
+});

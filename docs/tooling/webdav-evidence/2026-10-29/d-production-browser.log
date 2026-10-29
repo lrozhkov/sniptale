@@ -1,0 +1,50 @@
+
+Running 2 tests using 1 worker
+
+(node:47912) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 (18.0s)
+(node:49000) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1920 (20.4s)
+
+
+  1) tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 
+
+    Error: page.evaluate: Error: Provider fixture is not connected.
+        at Q (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/testHarnessWebdavTransfer.js:1:14739)
+        at chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/webdav-portable-EKcdboXF.js:1:4334
+        at Array.from (<anonymous>)
+        at Object.sendHistory (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/webdav-portable-EKcdboXF.js:1:4288)
+        at async eval (eval at evaluate (:370:30), <anonymous>:6:9)
+        at async <anonymous>:396:30
+        at Q (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/testHarnessWebdavTransfer.js:1:14739)
+        at chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/webdav-portable-EKcdboXF.js:1:4334
+        at Object.sendHistory (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/webdav-portable-EKcdboXF.js:1:4288)
+        at async eval (eval at evaluate (:370:30), <anonymous>:6:9)
+        at async <anonymous>:396:30
+        at <worktree>/tooling/test/e2e/providers/webdav-library.spec.ts:1489:35
+
+    Error Context: tasks/WebDAV/d-production-browser/webdav-library-production--4efbf--reopens-after-release-1280/error-context.md
+
+  2) tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1920 
+
+    Error: page.evaluate: Error: Provider fixture is not connected.
+        at Q (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/testHarnessWebdavTransfer.js:1:14739)
+        at chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/webdav-portable-EKcdboXF.js:1:4334
+        at Array.from (<anonymous>)
+        at Object.sendHistory (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/webdav-portable-EKcdboXF.js:1:4288)
+        at async eval (eval at evaluate (:370:30), <anonymous>:6:9)
+        at async <anonymous>:396:30
+        at Q (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/testHarnessWebdavTransfer.js:1:14739)
+        at chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/webdav-portable-EKcdboXF.js:1:4334
+        at Object.sendHistory (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/webdav-portable-EKcdboXF.js:1:4288)
+        at async eval (eval at evaluate (:370:30), <anonymous>:6:9)
+        at async <anonymous>:396:30
+        at <worktree>/tooling/test/e2e/providers/webdav-library.spec.ts:1489:35
+
+    Error Context: tasks/WebDAV/d-production-browser/webdav-library-production--1817b--reopens-after-release-1920/error-context.md
+
+  2 failed
+    tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 
+    tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1920 

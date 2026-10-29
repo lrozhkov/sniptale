@@ -1,0 +1,13 @@
+
+Running 3 tests using 1 worker
+
+(node:625543) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Lifecycle: grant origin
+Lifecycle: seed native source
+Lifecycle: native source ready
+  ✓  1 tooling/test/e2e/providers/webdav-lifecycle.spec.ts:456:1 › offscreen queue verifies publication after an externally delayed retry of temporary PUT 423 (13.1s)
+  ✓  2 tooling/test/e2e/providers/webdav-lifecycle.spec.ts:646:3 › temporary PUT 423 retries automatically (1.1m)
+  ✓  3 tooling/test/e2e/providers/webdav-lifecycle.spec.ts:646:3 › temporary PUT 423 retries automatically after browser restart without its alarm (1.2m)
+
+  3 passed (2.6m)

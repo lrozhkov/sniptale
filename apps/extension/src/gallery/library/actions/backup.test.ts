@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createRemoteRootGalleryItem } from '../items/adapters';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
@@ -22,6 +23,17 @@ import {
   createImportAction,
   createImportSelectedFileAction,
 } from './backup';
+
+const retained = vi.hoisted(() => ({ plan: vi.fn(), prepare: vi.fn() }));
+vi.mock('../../../workflows/sync-transfer/retained-library', () => ({
+  RetainedLibraryNotReadyError: class extends Error {
+    constructor(readonly code: string) {
+      super(code);
+    }
+  },
+  planRetainedLibrary: retained.plan,
+  prepareRetainedLibrary: retained.prepare,
+}));
 
 const {
   exportMediaHubBackupMock,
@@ -110,6 +122,9 @@ function createAllBackupOptions() {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
+  retained.plan.mockReset();
+  retained.prepare.mockReset();
   exportMediaHubBackupMock.mockReset();
   importMediaHubBackupMock.mockReset();
   inspectLocalMediaHubBackupMock.mockReset();
@@ -625,4 +640,69 @@ it('backs up a saved scenario export through its owning project and deduplicates
     scenarioProjectIds: [artifact.project.id],
     videoProjectIds: [],
   });
+});
+
+it('does not turn a remote-only selection into a full local backup', async () => {
+  const remote = createRemoteRootGalleryItem({
+    source: 'remote',
+    tags: [],
+    label: 'Remote project',
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 1024,
+    createdAt: 10,
+    updatedAt: 20,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'remote-root',
+      operationId: 'operation-1',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  const { controller } = createController({ selectedItems: [remote] });
+  await createExportBackupAction(controller, runBusyAction)();
+  expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
+  expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
+});
+
+it('defers full catalog materialization and native byte inspection until backup confirmation', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  const preparation = { missing: [{ rootId: 'remote' }], remoteBytesUpperBound: 4096 };
+  retained.plan.mockResolvedValue(preparation);
+  retained.prepare.mockResolvedValue(undefined);
+  exportMediaHubBackupMock.mockResolvedValue(undefined);
+  const { controller, getState } = createController();
+  await createExportBackupAction(controller, runBusyAction)();
+  expect(getState().storage.pendingExport).toEqual({
+    options: expect.objectContaining({ scope: 'all' }),
+    summary: null,
+    preparation,
+  });
+  expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
+  expect(retained.prepare).not.toHaveBeenCalled();
+  await createConfirmExportBackupAction(controller)(
+    getState().storage.pendingExport!.options,
+    runBusyAction
+  );
+  expect(retained.prepare).toHaveBeenCalledWith(preparation, expect.any(AbortSignal));
+  expect(exportMediaHubBackupMock).toHaveBeenCalledOnce();
+  expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
+});
+it('does not write an incomplete full archive after retained-library preparation refuses', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  retained.plan.mockResolvedValue({ missing: [] });
+  retained.prepare.mockRejectedValue(new Error('connection changed'));
+  const { controller, getState } = createController();
+  await createExportBackupAction(controller, runBusyAction)();
+  await expect(
+    createConfirmExportBackupAction(controller)(
+      getState().storage.pendingExport!.options,
+      runBusyAction
+    )
+  ).rejects.toThrow();
+  expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
+  expect(getState().storage.pendingExport).not.toBeNull();
 });

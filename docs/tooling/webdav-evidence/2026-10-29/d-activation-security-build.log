@@ -1,0 +1,635 @@
+vite v8.3.4 building client environment for security-e2e...
+transforming...
+✓ 9359 modules transformed.
+rendering chunks...
+computing gzip size...
+.tmp/e2e-builds/security/service-worker-loader.js                                  0.04 kB
+.tmp/e2e-builds/security/tooling/test/harness/webdav-transfer.html                 0.24 kB │ gzip:   0.18 kB
+.tmp/e2e-builds/security/cursors/text.svg                                          0.32 kB │ gzip:   0.19 kB
+.tmp/e2e-builds/security/apps/extension/src/tour-preview-sandbox/index.html        0.34 kB │ gzip:   0.25 kB
+.tmp/e2e-builds/security/tooling/test/harness/security-control.html                0.40 kB │ gzip:   0.26 kB
+.tmp/e2e-builds/security/apps/extension/src/effect-runtime-sandbox/index.html      0.45 kB │ gzip:   0.28 kB
+.tmp/e2e-builds/security/icons/icon-16.png                                         0.59 kB
+.tmp/e2e-builds/security/apps/extension/src/popup/index.html                       0.64 kB │ gzip:   0.31 kB
+.tmp/e2e-builds/security/apps/extension/src/camera-recorder/index.html             0.73 kB │ gzip:   0.29 kB
+.tmp/e2e-builds/security/apps/extension/src/web-snapshot-viewer/index.html         0.91 kB │ gzip:   0.31 kB
+.tmp/e2e-builds/security/apps/extension/src/design-system/index.html               1.07 kB │ gzip:   0.32 kB
+.tmp/e2e-builds/security/apps/extension/src/scenario-editor/index.html             1.18 kB │ gzip:   0.34 kB
+.tmp/e2e-builds/security/apps/extension/src/editor/index.html                      1.24 kB │ gzip:   0.34 kB
+.tmp/e2e-builds/security/apps/extension/src/gallery/index.html                     1.32 kB │ gzip:   0.35 kB
+.tmp/e2e-builds/security/apps/extension/src/settings/index.html                    1.74 kB │ gzip:   0.63 kB
+.tmp/e2e-builds/security/apps/extension/src/video-editor/index.html                1.93 kB │ gzip:   0.58 kB
+.tmp/e2e-builds/security/apps/extension/src/offscreen/offscreen.html               1.93 kB │ gzip:   0.87 kB
+.tmp/e2e-builds/security/icons/icon-48.png                                         2.08 kB
+.tmp/e2e-builds/security/apps/extension/src/media-permission/index.html            2.29 kB │ gzip:   0.93 kB
+.tmp/e2e-builds/security/manifest.json                                             4.21 kB │ gzip:   1.50 kB
+.tmp/e2e-builds/security/icons/icon-128.png                                        6.12 kB
+.tmp/e2e-builds/security/fonts/marck-script-cyrillic-400-normal.woff2             10.52 kB
+.tmp/e2e-builds/security/fonts/marck-script-latin-400-normal.woff2                13.35 kB
+.tmp/e2e-builds/security/video-effects/index.json                                 15.45 kB │ gzip:   3.29 kB
+.tmp/e2e-builds/security/assets/golos-ui-vf.woff2                                 44.06 kB
+.tmp/e2e-builds/security/assets/golos-text-vf.woff2                               83.32 kB
+.tmp/e2e-builds/security/assets/font.css                                           0.54 kB │ gzip:   0.28 kB
+.tmp/e2e-builds/security/assets/command-palette.css                                0.98 kB │ gzip:   0.37 kB
+.tmp/e2e-builds/security/assets/webSnapshotViewer.css                              1.05 kB │ gzip:   0.38 kB
+.tmp/e2e-builds/security/assets/import-files.css                                   1.40 kB │ gzip:   0.53 kB
+.tmp/e2e-builds/security/assets/designSystem.css                                   1.50 kB │ gzip:   0.53 kB
+.tmp/e2e-builds/security/assets/disclosure.css                                     1.61 kB │ gzip:   0.57 kB
+.tmp/e2e-builds/security/assets/paint-selector.css                                 1.67 kB │ gzip:   0.64 kB
+.tmp/e2e-builds/security/assets/time-estimate.css                                  2.67 kB │ gzip:   0.81 kB
+.tmp/e2e-builds/security/assets/color-selector.css                                 6.20 kB │ gzip:   1.51 kB
+.tmp/e2e-builds/security/assets/videoEditor.css                                    9.92 kB │ gzip:   2.17 kB
+.tmp/e2e-builds/security/assets/index.css                                         12.60 kB │ gzip:   2.67 kB
+.tmp/e2e-builds/security/assets/editor.css                                        15.89 kB │ gzip:   2.95 kB
+.tmp/e2e-builds/security/assets/settings.css                                      15.98 kB │ gzip:   2.97 kB
+.tmp/e2e-builds/security/assets/cameraRecorder.css                                16.42 kB │ gzip:   2.39 kB
+.tmp/e2e-builds/security/assets/inspector-surface.css                             31.39 kB │ gzip:   4.54 kB
+.tmp/e2e-builds/security/assets/overlays.css                                      33.15 kB │ gzip:   4.88 kB
+.tmp/e2e-builds/security/assets/glass.css                                         36.98 kB │ gzip:   4.69 kB
+.tmp/e2e-builds/security/assets/toolbar.css                                       37.37 kB │ gzip:   5.51 kB
+.tmp/e2e-builds/security/assets/gallery.css                                       39.98 kB │ gzip:   6.45 kB
+.tmp/e2e-builds/security/assets/ai-modal.css                                      48.19 kB │ gzip:   6.88 kB
+.tmp/e2e-builds/security/assets/scenarioEditor.css                               124.88 kB │ gzip:  18.35 kB
+.tmp/e2e-builds/security/assets/styles.css                                       377.68 kB │ gzip:  42.87 kB
+.tmp/e2e-builds/security/assets/services-CFAkPrly.js                               0.03 kB │ gzip:   0.05 kB
+.tmp/e2e-builds/security/assets/image-aggregates-CR_icwYY.js                       0.03 kB │ gzip:   0.05 kB
+.tmp/e2e-builds/security/assets/page-bootstrap-PsOhZXYq.js                         0.04 kB │ gzip:   0.06 kB
+.tmp/e2e-builds/security/assets/media-library-CME5OEW8.js                          0.07 kB │ gzip:   0.08 kB
+.tmp/e2e-builds/security/assets/digest-C8Cowsef.js                                 0.09 kB │ gzip:   0.11 kB │ map:     0.27 kB
+.tmp/e2e-builds/security/assets/contracts-CZpcbxHl.js                              0.10 kB │ gzip:   0.12 kB │ map:     1.62 kB
+.tmp/e2e-builds/security/assets/quality-CijBg1sK.js                                0.12 kB │ gzip:   0.13 kB │ map:     0.44 kB
+.tmp/e2e-builds/security/assets/preconditions-BUyEqjan.js                          0.14 kB │ gzip:   0.15 kB │ map:     0.57 kB
+.tmp/e2e-builds/security/assets/default-owner-BuZ9llu5.js                          0.14 kB │ gzip:   0.15 kB │ map:     0.62 kB
+.tmp/e2e-builds/security/assets/format-DoWYyKqv.js                                 0.15 kB │ gzip:   0.16 kB │ map:     0.70 kB
+.tmp/e2e-builds/security/assets/messaging-eZl3bjGt.js                              0.15 kB │ gzip:   0.15 kB │ map:     0.43 kB
+.tmp/e2e-builds/security/assets/video-recording-policy-BWJD0lzb.js                 0.16 kB │ gzip:   0.15 kB │ map:     1.14 kB
+.tmp/e2e-builds/security/assets/mutation-D5RR9YNU.js                               0.19 kB │ gzip:   0.17 kB │ map:     0.87 kB
+.tmp/e2e-builds/security/assets/minus-Cg-vU29q.js                                  0.20 kB │ gzip:   0.19 kB │ map:     0.86 kB
+.tmp/e2e-builds/security/assets/check-D1ksrk1l.js                                  0.20 kB │ gzip:   0.19 kB │ map:     0.87 kB
+.tmp/e2e-builds/security/assets/circle-BS93KXjM.js                                 0.21 kB │ gzip:   0.19 kB │ map:     0.91 kB
+.tmp/e2e-builds/security/assets/chevron-up-CDAugJcG.js                             0.21 kB │ gzip:   0.20 kB │ map:     0.90 kB
+.tmp/e2e-builds/security/assets/chevron-down-BcQ4M_76.js                           0.21 kB │ gzip:   0.20 kB │ map:     0.91 kB
+.tmp/e2e-builds/security/assets/chevron-left-BL15YeOF.js                           0.22 kB │ gzip:   0.20 kB │ map:     0.92 kB
+.tmp/e2e-builds/security/assets/chevron-right-Cix0oiFM.js                          0.22 kB │ gzip:   0.20 kB │ map:     0.92 kB
+.tmp/e2e-builds/security/assets/dimensions-DLcWSQIe.js                             0.22 kB │ gzip:   0.19 kB │ map:     0.92 kB
+.tmp/e2e-builds/security/assets/display-BT64pNDQ.js                                0.22 kB │ gzip:   0.19 kB │ map:     0.85 kB
+.tmp/e2e-builds/security/assets/square-Cz30250W.js                                 0.23 kB │ gzip:   0.21 kB │ map:     0.96 kB
+.tmp/e2e-builds/security/assets/x-CBDQUtPR.js                                      0.23 kB │ gzip:   0.21 kB │ map:     0.95 kB
+.tmp/e2e-builds/security/assets/plus-DoX-6t_c.js                                   0.23 kB │ gzip:   0.21 kB │ map:     0.97 kB
+.tmp/e2e-builds/security/assets/text-DkpnM6zp.js                                   0.24 kB │ gzip:   0.18 kB │ map:     1.11 kB
+.tmp/e2e-builds/security/assets/arrow-left-BjV_GnLX.js                             0.25 kB │ gzip:   0.22 kB │ map:     1.01 kB
+.tmp/e2e-builds/security/assets/image-workspaces-MHNcxf7T.js                       0.25 kB │ gzip:   0.18 kB │ map:     1.98 kB
+.tmp/e2e-builds/security/assets/runtime-services-Da0UkhF9.js                       0.25 kB │ gzip:   0.20 kB │ map:     1.45 kB
+.tmp/e2e-builds/security/assets/webcam-actual-settings-Bsv4Hclm.js                 0.25 kB │ gzip:   0.17 kB │ map:     0.95 kB
+.tmp/e2e-builds/security/assets/arrow-right-BXZwM1Hs.js                            0.25 kB │ gzip:   0.22 kB │ map:     1.02 kB
+.tmp/e2e-builds/security/assets/clock-3-Dd3zkTR5.js                                0.25 kB │ gzip:   0.23 kB │ map:     1.03 kB
+.tmp/e2e-builds/security/assets/loader-circle-C68I5gKX.js                          0.25 kB │ gzip:   0.23 kB │ map:     0.99 kB
+.tmp/e2e-builds/security/assets/search-SpL6_9mc.js                                 0.25 kB │ gzip:   0.23 kB │ map:     1.03 kB
+.tmp/e2e-builds/security/assets/arrow-up-right-D7qrfE6C.js                         0.25 kB │ gzip:   0.22 kB │ map:     1.04 kB
+.tmp/e2e-builds/security/assets/rectangle-horizontal-C3xccCsb.js                   0.25 kB │ gzip:   0.22 kB │ map:     1.05 kB
+.tmp/e2e-builds/security/assets/chevrons-down-CsgZgTKR.js                          0.26 kB │ gzip:   0.22 kB │ map:     1.04 kB
+.tmp/e2e-builds/security/assets/z-index-BIOI_V8O.js                                0.26 kB │ gzip:   0.19 kB │ map:     0.72 kB
+.tmp/e2e-builds/security/assets/crop-D5JTaaYt.js                                   0.26 kB │ gzip:   0.23 kB │ map:     1.00 kB
+.tmp/e2e-builds/security/assets/circle-dot-DudwZv25.js                             0.27 kB │ gzip:   0.22 kB │ map:     1.09 kB
+.tmp/e2e-builds/security/assets/play-mZRF8i2E.js                                   0.27 kB │ gzip:   0.24 kB │ map:     0.99 kB
+.tmp/e2e-builds/security/assets/tab-access-Cj99xZg2.js                             0.27 kB │ gzip:   0.24 kB │ map:     0.84 kB
+.tmp/e2e-builds/security/assets/panel-top-DjHWy9Eo.js                              0.27 kB │ gzip:   0.24 kB │ map:     1.08 kB
+.tmp/e2e-builds/security/assets/trusted-events-B0ZmCuIi.js                         0.27 kB │ gzip:   0.17 kB │ map:     1.16 kB
+.tmp/e2e-builds/security/assets/heading-DjHeUuRS.js                                0.27 kB │ gzip:   0.22 kB │ map:     1.09 kB
+.tmp/e2e-builds/security/assets/peaks-B77WcyVz.js                                  0.27 kB │ gzip:   0.23 kB │ map:     1.34 kB
+.tmp/e2e-builds/security/assets/corner-down-left-BSApdtIi.js                       0.27 kB │ gzip:   0.24 kB │ map:     1.07 kB
+.tmp/e2e-builds/security/assets/file-scheme-consent-Dv8ylN_p.js                    0.28 kB │ gzip:   0.23 kB │ map:     1.07 kB
+.tmp/e2e-builds/security/assets/list-filter-piQiepeH.js                            0.28 kB │ gzip:   0.23 kB │ map:     1.11 kB
+.tmp/e2e-builds/security/assets/info-CQKn9SQd.js                                   0.28 kB │ gzip:   0.24 kB │ map:     1.11 kB
+.tmp/e2e-builds/security/assets/rotate-ccw-Dgxt25hS.js                             0.28 kB │ gzip:   0.24 kB │ map:     1.05 kB
+.tmp/e2e-builds/security/assets/redo-2-BS2gaBcF.js                                 0.29 kB │ gzip:   0.24 kB │ map:     1.03 kB
+.tmp/e2e-builds/security/assets/undo-2-rGMxyjXL.js                                 0.29 kB │ gzip:   0.24 kB │ map:     1.04 kB
+.tmp/e2e-builds/security/assets/pause-BJRZGTp3.js                                  0.29 kB │ gzip:   0.23 kB │ map:     1.14 kB
+.tmp/e2e-builds/security/assets/markers-BeRtjCsf.js                                0.29 kB │ gzip:   0.23 kB │ map:     2.12 kB
+.tmp/e2e-builds/security/assets/editable-target-CWhSy-jV.js                        0.29 kB │ gzip:   0.23 kB │ map:     0.87 kB
+.tmp/e2e-builds/security/assets/circle-check-BKvI5Fuj.js                           0.30 kB │ gzip:   0.25 kB │ map:     1.13 kB
+.tmp/e2e-builds/security/assets/type-BNrQhR4a.js                                   0.30 kB │ gzip:   0.24 kB │ map:     1.10 kB
+.tmp/e2e-builds/security/assets/highlighter-mi8RCgyt.js                            0.31 kB │ gzip:   0.25 kB │ map:     1.08 kB
+.tmp/e2e-builds/security/assets/folder-AikzsbKN.js                                 0.31 kB │ gzip:   0.25 kB │ map:     1.04 kB
+.tmp/e2e-builds/security/assets/code-xml-DaT6hVJB.js                               0.31 kB │ gzip:   0.24 kB │ map:     1.16 kB
+.tmp/e2e-builds/security/assets/circle-x-C5u7yv7W.js                               0.31 kB │ gzip:   0.25 kB │ map:     1.18 kB
+.tmp/e2e-builds/security/assets/library-Dok1n9jB.js                                0.31 kB │ gzip:   0.24 kB │ map:     1.19 kB
+.tmp/e2e-builds/security/assets/mic-D7zx9miP.js                                    0.31 kB │ gzip:   0.26 kB │ map:     1.17 kB
+.tmp/e2e-builds/security/assets/copy-CO4KLm1Y.js                                   0.31 kB │ gzip:   0.27 kB │ map:     1.12 kB
+.tmp/e2e-builds/security/assets/download-CaqaUtFT.js                               0.31 kB │ gzip:   0.25 kB │ map:     1.14 kB
+.tmp/e2e-builds/security/assets/preferences-UyK-CT6E.js                            0.32 kB │ gzip:   0.25 kB │ map:     2.02 kB
+.tmp/e2e-builds/security/assets/globe-DUg7_vqg.js                                  0.32 kB │ gzip:   0.25 kB │ map:     1.16 kB
+.tmp/e2e-builds/security/assets/message-square-BtUJXKLK.js                         0.32 kB │ gzip:   0.26 kB │ map:     1.09 kB
+.tmp/e2e-builds/security/assets/text-align-start-DYP9S_N6.js                       0.32 kB │ gzip:   0.25 kB │ map:     1.21 kB
+.tmp/e2e-builds/security/assets/numbering-C8xJWz9q.js                              0.32 kB │ gzip:   0.24 kB │ map:     1.45 kB
+.tmp/e2e-builds/security/assets/video-DlNVUa7f.js                                  0.33 kB │ gzip:   0.28 kB │ map:     1.17 kB
+.tmp/e2e-builds/security/assets/eye-N1q_tA4v.js                                    0.33 kB │ gzip:   0.26 kB │ map:     1.14 kB
+.tmp/e2e-builds/security/assets/archive-BZbKDTG1.js                                0.33 kB │ gzip:   0.27 kB │ map:     1.21 kB
+.tmp/e2e-builds/security/assets/branding-JdEEWe_5.js                               0.33 kB │ gzip:   0.23 kB │ map:     1.66 kB
+.tmp/e2e-builds/security/assets/ellipsis-tqt1wZd9.js                               0.34 kB │ gzip:   0.24 kB │ map:     1.27 kB
+.tmp/e2e-builds/security/assets/panels-top-left-Ch3fqUnx.js                        0.34 kB │ gzip:   0.27 kB │ map:     1.27 kB
+.tmp/e2e-builds/security/assets/settings-2-CRIcXlgH.js                             0.34 kB │ gzip:   0.25 kB │ map:     1.28 kB
+.tmp/e2e-builds/security/assets/heart-CYHVfoY9.js                                  0.34 kB │ gzip:   0.28 kB │ map:     1.06 kB
+.tmp/e2e-builds/security/assets/arrow-left-right-DZdu-hjq.js                       0.34 kB │ gzip:   0.26 kB │ map:     1.26 kB
+.tmp/e2e-builds/security/assets/clipboard-BT0SYA2-.js                              0.34 kB │ gzip:   0.27 kB │ map:     1.22 kB
+.tmp/e2e-builds/security/assets/monitor-B1B7k1Cj.js                                0.34 kB │ gzip:   0.27 kB │ map:     1.30 kB
+.tmp/e2e-builds/security/assets/mouse-pointer-2-Boufq4eI.js                        0.34 kB │ gzip:   0.27 kB │ map:     1.11 kB
+.tmp/e2e-builds/security/assets/lock-keyhole-CVFnFfGf.js                           0.34 kB │ gzip:   0.28 kB │ map:     1.26 kB
+.tmp/e2e-builds/security/assets/app-window-YoHUYONA.js                             0.34 kB │ gzip:   0.27 kB │ map:     1.29 kB
+.tmp/e2e-builds/security/assets/image-CAY6rP6q.js                                  0.35 kB │ gzip:   0.28 kB │ map:     1.25 kB
+.tmp/e2e-builds/security/assets/zap-DTMmlpcc.js                                    0.35 kB │ gzip:   0.28 kB │ map:     1.06 kB
+.tmp/e2e-builds/security/assets/browser-storage-A9ZDGRsk.js                        0.35 kB │ gzip:   0.26 kB │ map:     1.19 kB
+.tmp/e2e-builds/security/assets/funnel-T8PQEayC.js                                 0.35 kB │ gzip:   0.29 kB │ map:     1.11 kB
+.tmp/e2e-builds/security/assets/pencil-DzMJFcwo.js                                 0.36 kB │ gzip:   0.28 kB │ map:     1.15 kB
+.tmp/e2e-builds/security/assets/circle-alert-cjUZj9qx.js                           0.36 kB │ gzip:   0.26 kB │ map:     1.34 kB
+.tmp/e2e-builds/security/assets/list-checks-BFy84LN_.js                            0.36 kB │ gzip:   0.25 kB │ map:     1.33 kB
+.tmp/e2e-builds/security/assets/sticky-note-C4M_qaO1.js                            0.36 kB │ gzip:   0.27 kB │ map:     1.18 kB
+.tmp/e2e-builds/security/assets/scan-DvKJXcXf.js                                   0.37 kB │ gzip:   0.27 kB │ map:     1.24 kB
+.tmp/e2e-builds/security/assets/message-tracer-NOVcM9ea.js                         0.37 kB │ gzip:   0.28 kB │ map:     3.73 kB
+.tmp/e2e-builds/security/assets/book-open-9tJ5kaEm.js                              0.37 kB │ gzip:   0.28 kB │ map:     1.18 kB
+.tmp/e2e-builds/security/assets/hash-CeUDoPJv.js                                   0.37 kB │ gzip:   0.25 kB │ map:     1.41 kB
+.tmp/e2e-builds/security/assets/frame-DDqPStQ8.js                                  0.37 kB │ gzip:   0.25 kB │ map:     1.41 kB
+.tmp/e2e-builds/security/assets/layout-template-DoerEctM.js                        0.37 kB │ gzip:   0.25 kB │ map:     1.40 kB
+.tmp/e2e-builds/security/assets/folder-open-BIwkjr0F.js                            0.38 kB │ gzip:   0.28 kB │ map:     1.13 kB
+.tmp/e2e-builds/security/assets/layout-panel-top-B_3bpbu9.js                       0.38 kB │ gzip:   0.25 kB │ map:     1.40 kB
+.tmp/e2e-builds/security/assets/triangle-alert-DeAHVfRf.js                         0.38 kB │ gzip:   0.29 kB │ map:     1.31 kB
+.tmp/e2e-builds/security/assets/arrow-up-B9KDSNlI.js                               0.38 kB │ gzip:   0.27 kB │ map:     1.89 kB
+.tmp/e2e-builds/security/assets/box-BImqAh1B.js                                    0.39 kB │ gzip:   0.28 kB │ map:     1.23 kB
+.tmp/e2e-builds/security/assets/monitor-up-DlAXJZ92.js                             0.39 kB │ gzip:   0.29 kB │ map:     1.40 kB
+.tmp/e2e-builds/security/assets/hotkey-format-e_w46Lfw.js                          0.39 kB │ gzip:   0.30 kB │ map:     1.45 kB
+.tmp/e2e-builds/security/assets/shapes-BgMcqh8v.js                                 0.40 kB │ gzip:   0.31 kB │ map:     1.34 kB
+.tmp/e2e-builds/security/assets/move-BACjYhQr.js                                   0.40 kB │ gzip:   0.27 kB │ map:     1.40 kB
+.tmp/e2e-builds/security/assets/message-square-plus-DK6k5Emy.js                    0.40 kB │ gzip:   0.29 kB │ map:     1.32 kB
+.tmp/e2e-builds/security/assets/bot-BFR22vkK.js                                    0.40 kB │ gzip:   0.29 kB │ map:     1.45 kB
+.tmp/e2e-builds/security/assets/refresh-cw-DPKDWwH3.js                             0.40 kB │ gzip:   0.29 kB │ map:     1.30 kB
+.tmp/e2e-builds/security/assets/shield-check-CkUB41-c.js                           0.41 kB │ gzip:   0.31 kB │ map:     1.23 kB
+.tmp/e2e-builds/security/assets/camera-CkEqLufc.js                                 0.42 kB │ gzip:   0.31 kB │ map:     1.24 kB
+.tmp/e2e-builds/security/assets/privileged-action-intent-DzRNWtef.js               0.42 kB │ gzip:   0.24 kB │ map:     2.80 kB
+.tmp/e2e-builds/security/assets/pin-CPx0JEf1.js                                    0.42 kB │ gzip:   0.30 kB │ map:     1.20 kB
+.tmp/e2e-builds/security/assets/trash-BPDj-Zgv.js                                  0.42 kB │ gzip:   0.29 kB │ map:     1.39 kB
+.tmp/e2e-builds/security/assets/quota-CVDRoQDO.js                                  0.43 kB │ gzip:   0.31 kB │ map:     1.93 kB
+.tmp/e2e-builds/security/assets/copy-plus-CL2srtQ6.js                              0.44 kB │ gzip:   0.32 kB │ map:     1.48 kB
+.tmp/e2e-builds/security/assets/message-square-text-Bj9htjcy.js                    0.44 kB │ gzip:   0.30 kB │ map:     1.42 kB
+.tmp/e2e-builds/security/assets/shield-alert-DUx-GbyZ.js                           0.44 kB │ gzip:   0.32 kB │ map:     1.32 kB
+.tmp/e2e-builds/security/assets/list-ordered-cKyQOwQQ.js                           0.44 kB │ gzip:   0.29 kB │ map:     1.47 kB
+.tmp/e2e-builds/security/assets/square-pen-Bf3xv2_w.js                             0.44 kB │ gzip:   0.32 kB │ map:     1.30 kB
+.tmp/e2e-builds/security/assets/image-plus-Br3PaNOu.js                             0.45 kB │ gzip:   0.31 kB │ map:     1.43 kB
+.tmp/e2e-builds/security/assets/target-lookup-Bxpevi7A.js                          0.45 kB │ gzip:   0.31 kB │ map:     2.30 kB
+.tmp/e2e-builds/security/assets/images-CjXmsfCp.js                                 0.45 kB │ gzip:   0.33 kB │ map:     1.43 kB
+.tmp/e2e-builds/security/assets/local-asset-reference-Da7y1HOJ.js                  0.46 kB │ gzip:   0.32 kB │ map:     1.96 kB
+.tmp/e2e-builds/security/assets/file-stack-BaqVXvHC.js                             0.46 kB │ gzip:   0.30 kB │ map:     1.33 kB
+.tmp/e2e-builds/security/assets/grip-vertical-DCFRGEwq.js                          0.46 kB │ gzip:   0.26 kB │ map:     1.66 kB
+.tmp/e2e-builds/security/assets/file-search-BjRjXNf2.js                            0.46 kB │ gzip:   0.32 kB │ map:     1.44 kB
+.tmp/e2e-builds/security/assets/loading-delay-D7hV6FyP.js                          0.46 kB │ gzip:   0.33 kB │ map:     1.53 kB
+.tmp/e2e-builds/security/assets/clipboard-copy-CJyOTrzn.js                         0.47 kB │ gzip:   0.32 kB │ map:     1.52 kB
+.tmp/e2e-builds/security/assets/file-text-3MyLhSfd.js                              0.47 kB │ gzip:   0.31 kB │ map:     1.47 kB
+.tmp/e2e-builds/security/assets/primitives-DnXHh7Rn.js                             0.47 kB │ gzip:   0.24 kB │ map:     1.98 kB
+.tmp/e2e-builds/security/assets/mic-off-CxUoJO0l.js                                0.47 kB │ gzip:   0.31 kB │ map:     1.48 kB
+.tmp/e2e-builds/security/assets/volume-2-Bn-yQrQt.js                               0.47 kB │ gzip:   0.33 kB │ map:     1.34 kB
+.tmp/e2e-builds/security/assets/swatch-book-Dao_sI1t.js                            0.47 kB │ gzip:   0.32 kB │ map:     1.42 kB
+.tmp/e2e-builds/security/assets/assets-DGwXQZBO.js                                 0.47 kB │ gzip:   0.32 kB │ map:     1.75 kB
+.tmp/e2e-builds/security/assets/jsx-runtime-DePvh3-m.js                            0.48 kB │ gzip:   0.34 kB │ map:     2.12 kB
+.tmp/e2e-builds/security/assets/film-kPuQZxld.js                                   0.48 kB │ gzip:   0.30 kB │ map:     1.66 kB
+.tmp/e2e-builds/security/assets/lock-CHJe1dcM.js                                   0.48 kB │ gzip:   0.30 kB │ map:     2.14 kB
+.tmp/e2e-builds/security/assets/picker-preferences-N0lzfEb3.js                     0.49 kB │ gzip:   0.34 kB │ map:     2.09 kB
+.tmp/e2e-builds/security/assets/unfold-vertical-CcGVc-Mp.js                        0.49 kB │ gzip:   0.30 kB │ map:     1.67 kB
+.tmp/e2e-builds/security/assets/text-cursor-input-BDGGGvDb.js                      0.49 kB │ gzip:   0.30 kB │ map:     1.49 kB
+.tmp/e2e-builds/security/assets/earth-Blfj-syK.js                                  0.49 kB │ gzip:   0.34 kB │ map:     1.49 kB
+.tmp/e2e-builds/security/assets/mouse-pointer-click-ggyOIr__.js                    0.51 kB │ gzip:   0.35 kB │ map:     1.56 kB
+.tmp/e2e-builds/security/assets/display-name-F4XQhTyM.js                           0.51 kB │ gzip:   0.29 kB │ map:     1.58 kB
+.tmp/e2e-builds/security/assets/runtime-messaging-BC130_9S.js                      0.51 kB │ gzip:   0.31 kB │ map:     2.74 kB
+.tmp/e2e-builds/security/assets/secure-random-id-D3IFlwA8.js                       0.51 kB │ gzip:   0.34 kB │ map:     1.56 kB
+.tmp/e2e-builds/security/assets/text-align-end-DkC__Dgz.js                         0.51 kB │ gzip:   0.29 kB │ map:     2.26 kB
+.tmp/e2e-builds/security/assets/digest-B3Ns-0fP.js                                 0.51 kB │ gzip:   0.35 kB │ map:     1.85 kB
+.tmp/e2e-builds/security/assets/eye-off-C-UPAoKX.js                                0.51 kB │ gzip:   0.34 kB │ map:     1.48 kB
+.tmp/e2e-builds/security/assets/user-facing-error-BmUlb935.js                      0.51 kB │ gzip:   0.34 kB │ map:     2.25 kB
+.tmp/e2e-builds/security/assets/target-B51FpC64.js                                 0.52 kB │ gzip:   0.32 kB │ map:     2.65 kB
+.tmp/e2e-builds/security/assets/layers-DFavMhUZ.js                                 0.52 kB │ gzip:   0.31 kB │ map:     1.50 kB
+.tmp/e2e-builds/security/assets/ui-state-validation-B72zM6_E.js                    0.52 kB │ gzip:   0.34 kB │ map:     2.31 kB
+.tmp/e2e-builds/security/assets/image-thumbnail-LYYBgBrQ.js                        0.53 kB │ gzip:   0.41 kB │ map:     2.01 kB
+.tmp/e2e-builds/security/assets/keyboard-BXrD-h1m.js                               0.53 kB │ gzip:   0.31 kB │ map:     1.80 kB
+.tmp/e2e-builds/security/assets/contracts-Djy95g2u.js                              0.54 kB │ gzip:   0.31 kB │ map:     4.54 kB
+.tmp/e2e-builds/security/assets/message-sync-CYE0v9ys.js                           0.56 kB │ gzip:   0.33 kB │ map:     2.48 kB
+.tmp/e2e-builds/security/assets/style-VrzypiPv.js                                  0.56 kB │ gzip:   0.35 kB │ map:     3.02 kB
+.tmp/e2e-builds/security/assets/rows-3-VB_1pO3l.js                                 0.57 kB │ gzip:   0.37 kB │ map:     2.34 kB
+.tmp/e2e-builds/security/assets/context-menu-section-title-BHptcX31.js             0.57 kB │ gzip:   0.34 kB │ map:     1.52 kB
+.tmp/e2e-builds/security/assets/cable-BqqaapR7.js                                  0.57 kB │ gzip:   0.33 kB │ map:     1.71 kB
+.tmp/e2e-builds/security/assets/appearance-B0UxVwOl.js                             0.59 kB │ gzip:   0.34 kB │ map:     2.43 kB
+.tmp/e2e-builds/security/assets/palette-Dexiri0F.js                                0.59 kB │ gzip:   0.34 kB │ map:     1.75 kB
+.tmp/e2e-builds/security/assets/navigation-DV8AH2z2.js                             0.59 kB │ gzip:   0.37 kB │ map:     2.22 kB
+.tmp/e2e-builds/security/assets/ownership-DZyUg-Uh.js                              0.59 kB │ gzip:   0.36 kB │ map:     3.18 kB
+.tmp/e2e-builds/security/assets/sparkles-BXn1GhbN.js                               0.59 kB │ gzip:   0.36 kB │ map:     1.58 kB
+.tmp/e2e-builds/security/assets/list-WmSuvHWi.js                                   0.60 kB │ gzip:   0.35 kB │ map:     2.48 kB
+.tmp/e2e-builds/security/assets/zoom-out-BR78UW0D.js                               0.60 kB │ gzip:   0.30 kB │ map:     2.55 kB
+.tmp/e2e-builds/security/assets/send-BB1ZhN0g.js                                   0.61 kB │ gzip:   0.39 kB │ map:     2.17 kB
+.tmp/e2e-builds/security/assets/text-align-justify-Bpw3uyvL.js                     0.62 kB │ gzip:   0.38 kB │ map:     2.32 kB
+.tmp/e2e-builds/security/assets/wand-sparkles-De5yPgjH.js                          0.62 kB │ gzip:   0.36 kB │ map:     1.86 kB
+.tmp/e2e-builds/security/assets/paintbrush-Bsa4VZu-.js                             0.62 kB │ gzip:   0.40 kB │ map:     1.55 kB
+.tmp/e2e-builds/security/assets/primitives-B0nX7FNn.js                             0.63 kB │ gzip:   0.38 kB │ map:     2.88 kB
+.tmp/e2e-builds/security/assets/shared-CZJSF6pI.js                                 0.63 kB │ gzip:   0.39 kB │ map:     3.61 kB
+.tmp/e2e-builds/security/assets/output-dimensions-hqsBBgy3.js                      0.64 kB │ gzip:   0.36 kB │ map:     2.80 kB
+.tmp/e2e-builds/security/assets/scan-search-B2SFxvv0.js                            0.65 kB │ gzip:   0.40 kB │ map:     2.55 kB
+.tmp/e2e-builds/security/assets/clapperboard-7mXyy4aD.js                           0.65 kB │ gzip:   0.41 kB │ map:     2.34 kB
+.tmp/e2e-builds/security/assets/flag-tPwxXb1e.js                                   0.66 kB │ gzip:   0.39 kB │ map:     2.51 kB
+.tmp/e2e-builds/security/assets/scissors-BKKK34QF.js                               0.66 kB │ gzip:   0.37 kB │ map:     2.55 kB
+.tmp/e2e-builds/security/assets/select-C97t3KAh.js                                 0.66 kB │ gzip:   0.39 kB │ map:     2.13 kB
+.tmp/e2e-builds/security/assets/card-section-2h7h2avn.js                           0.66 kB │ gzip:   0.38 kB │ map:     2.78 kB
+.tmp/e2e-builds/security/assets/file-naming-C68kHn_c.js                            0.67 kB │ gzip:   0.42 kB │ map:     3.03 kB
+.tmp/e2e-builds/security/assets/pen-line-CbuI4azK.js                               0.67 kB │ gzip:   0.42 kB │ map:     3.06 kB
+.tmp/e2e-builds/security/assets/format-bytes-C-4NOH-X.js                           0.69 kB │ gzip:   0.36 kB │ map:     2.47 kB
+.tmp/e2e-builds/security/assets/skeleton-oZeoqqTs.js                               0.70 kB │ gzip:   0.42 kB │ map:     1.99 kB
+.tmp/e2e-builds/security/assets/document-helpers-DvbCDa1f.js                       0.70 kB │ gzip:   0.34 kB │ map:     3.12 kB
+.tmp/e2e-builds/security/assets/clipboard-CoCfgvsM.js                              0.71 kB │ gzip:   0.31 kB │ map:     3.45 kB
+.tmp/e2e-builds/security/assets/save-DZvdCf2e.js                                   0.71 kB │ gzip:   0.40 kB │ map:     2.52 kB
+.tmp/e2e-builds/security/assets/react-CxA7_iQV.js                                  0.72 kB │ gzip:   0.45 kB │ map:     3.28 kB
+.tmp/e2e-builds/security/assets/errors-BLnKC9XU.js                                 0.74 kB │ gzip:   0.31 kB │ map:     1.65 kB
+.tmp/e2e-builds/security/assets/parser-DEl6b1w-.js                                 0.74 kB │ gzip:   0.40 kB │ map:     3.29 kB
+.tmp/e2e-builds/security/assets/local-only-C9H1zDfP.js                             0.76 kB │ gzip:   0.44 kB │ map:     2.66 kB
+.tmp/e2e-builds/security/assets/file-sink-WeIq1BSi.js                              0.76 kB │ gzip:   0.41 kB │ map:     2.74 kB
+.tmp/e2e-builds/security/assets/audio-amplitude-bars-4e2_cSB3.js                   0.78 kB │ gzip:   0.51 kB │ map:     2.24 kB
+.tmp/e2e-builds/security/assets/package-B46fB4cT.js                                0.80 kB │ gzip:   0.45 kB │ map:     2.66 kB
+.tmp/e2e-builds/security/assets/aggregate-promotion-CsoRfB4B.js                    0.81 kB │ gzip:   0.42 kB │ map:     3.18 kB
+.tmp/e2e-builds/security/assets/preview-contract-CeOLAPiG.js                       0.81 kB │ gzip:   0.45 kB │ map:     2.96 kB
+.tmp/e2e-builds/security/assets/retention-BgJvi-zj.js                              0.82 kB │ gzip:   0.41 kB │ map:     3.90 kB
+.tmp/e2e-builds/security/assets/paint-bucket-DogYTy6O.js                           0.82 kB │ gzip:   0.48 kB │ map:     2.54 kB
+.tmp/e2e-builds/security/assets/sun-medium-Cw2rLr1y.js                             0.83 kB │ gzip:   0.45 kB │ map:     2.94 kB
+.tmp/e2e-builds/security/assets/provenance-url-Cw_yO3J3.js                         0.84 kB │ gzip:   0.49 kB │ map:     3.38 kB
+.tmp/e2e-builds/security/assets/remote-job-port-C2t3f9ZR.js                        0.85 kB │ gzip:   0.51 kB │ map:     3.54 kB
+.tmp/e2e-builds/security/assets/popup-startup-guards-CFCPDI8y.js                   0.85 kB │ gzip:   0.45 kB │ map:     4.06 kB
+.tmp/e2e-builds/security/assets/page-recovery-O0Rh8ERO.js                          0.87 kB │ gzip:   0.50 kB │ map:     3.45 kB
+.tmp/e2e-builds/security/assets/product-glass-toolbar-DKtK60KM.js                  0.87 kB │ gzip:   0.44 kB │ map:     2.81 kB
+.tmp/e2e-builds/security/assets/tabs-Bq4BUPIx.js                                   0.87 kB │ gzip:   0.34 kB │ map:     4.23 kB
+.tmp/e2e-builds/security/assets/downloads-BF-kC1Ov.js                              0.87 kB │ gzip:   0.31 kB │ map:     3.12 kB
+.tmp/e2e-builds/security/assets/popup-startup-B2GplwXK.js                          0.88 kB │ gzip:   0.48 kB │ map:     3.02 kB
+.tmp/e2e-builds/security/assets/external-link-Dl83hQie.js                          0.88 kB │ gzip:   0.44 kB │ map:     2.90 kB
+.tmp/e2e-builds/security/assets/popup-ejOw4xkj.js                                  0.90 kB │ gzip:   0.57 kB │ map:     4.16 kB
+.tmp/e2e-builds/security/assets/jobs-CR3Kj2OU.js                                   0.91 kB │ gzip:   0.48 kB │ map:     4.02 kB
+.tmp/e2e-builds/security/assets/editor-documents-B3uUh_kb.js                       0.92 kB │ gzip:   0.51 kB │ map:     4.92 kB
+.tmp/e2e-builds/security/assets/document-autosave-labels-CV-V-7by.js               0.93 kB │ gzip:   0.50 kB │ map:     2.55 kB
+.tmp/e2e-builds/security/assets/audio-peaks-stream-emayZIPX.js                     0.94 kB │ gzip:   0.58 kB │ map:     2.60 kB
+.tmp/e2e-builds/security/assets/scale-BySNBspQ.js                                  0.97 kB │ gzip:   0.48 kB │ map:     5.25 kB
+.tmp/e2e-builds/security/assets/strikethrough-DEO6c42n.js                          0.97 kB │ gzip:   0.51 kB │ map:     4.24 kB
+.tmp/e2e-builds/security/assets/sniptale-BKraKtJn.js                               0.97 kB │ gzip:   0.48 kB │ map:     6.44 kB
+.tmp/e2e-builds/security/assets/webcam-quality-CW2W1YoN.js                         0.98 kB │ gzip:   0.51 kB │ map:     5.16 kB
+.tmp/e2e-builds/security/assets/guards-otBkSBJq.js                                 0.98 kB │ gzip:   0.42 kB │ map:     3.59 kB
+.tmp/e2e-builds/security/assets/storage-capacity--QcalQdb.js                       1.01 kB │ gzip:   0.57 kB │ map:     4.01 kB
+.tmp/e2e-builds/security/assets/actions-D5jptHKP.js                                1.01 kB │ gzip:   0.55 kB │ map:     3.37 kB
+.tmp/e2e-builds/security/assets/recording-failure-DmaC4Ar5.js                      1.01 kB │ gzip:   0.47 kB │ map:     2.13 kB
+.tmp/e2e-builds/security/assets/presentation-CgW8oNxz.js                           1.02 kB │ gzip:   0.54 kB │ map:     4.99 kB
+.tmp/e2e-builds/security/assets/ai-response-HyqW48QG.js                            1.04 kB │ gzip:   0.51 kB │ map:     4.70 kB
+.tmp/e2e-builds/security/assets/rewrite-context-BP58vMNS.js                        1.04 kB │ gzip:   0.53 kB │ map:     3.98 kB
+.tmp/e2e-builds/security/assets/map-Cz1BMJ7v.js                                    1.11 kB │ gzip:   0.58 kB │ map:     3.63 kB
+.tmp/e2e-builds/security/assets/rolldown-runtime-COiEfhsA.js                       1.11 kB │ gzip:   0.62 kB
+.tmp/e2e-builds/security/assets/sanitize-svg-VRWwgj5G.js                           1.13 kB │ gzip:   0.63 kB │ map:     3.72 kB
+.tmp/e2e-builds/security/assets/error-message-D7654G2a.js                          1.17 kB │ gzip:   0.50 kB │ map:     2.27 kB
+.tmp/e2e-builds/security/assets/policy-BY92KMgw.js                                 1.17 kB │ gzip:   0.54 kB │ map:     5.32 kB
+.tmp/e2e-builds/security/assets/private-network-host-W49pvRZ_.js                   1.18 kB │ gzip:   0.60 kB │ map:     4.99 kB
+.tmp/e2e-builds/security/assets/disclosure-KpgZMVsV.js                             1.20 kB │ gzip:   0.61 kB │ map:     5.56 kB
+.tmp/e2e-builds/security/assets/tab-message-routing-Bmv_leI1.js                    1.21 kB │ gzip:   0.66 kB │ map:     4.94 kB
+.tmp/e2e-builds/security/assets/runtime-EBmZWIag.js                                1.22 kB │ gzip:   0.54 kB │ map:     7.15 kB
+.tmp/e2e-builds/security/assets/usage-index-maintenance-BwP7MELe.js                1.22 kB │ gzip:   0.70 kB │ map:     5.08 kB
+.tmp/e2e-builds/security/assets/content-egress-pipeline-C7v27i6l.js                1.23 kB │ gzip:   0.53 kB │ map:     6.34 kB
+.tmp/e2e-builds/security/assets/project-step-queries-BHUB35cv.js                   1.27 kB │ gzip:   0.63 kB │ map:     5.12 kB
+.tmp/e2e-builds/security/assets/drawing-palette-Db-fzu8V.js                        1.28 kB │ gzip:   0.69 kB │ map:     6.50 kB
+.tmp/e2e-builds/security/assets/mode-events-D5woYhwA.js                            1.30 kB │ gzip:   0.60 kB │ map:    10.25 kB
+.tmp/e2e-builds/security/assets/telemetry-BNPFq5sB.js                              1.31 kB │ gzip:   0.73 kB │ map:     5.98 kB
+.tmp/e2e-builds/security/assets/edit-response-BTBFJBhl.js                          1.32 kB │ gzip:   0.65 kB │ map:     5.86 kB
+.tmp/e2e-builds/security/assets/safe-portal-DnYqGULA.js                            1.32 kB │ gzip:   0.66 kB │ map:     5.14 kB
+.tmp/e2e-builds/security/assets/project-assets-CdTfIqfj.js                         1.38 kB │ gzip:   0.75 kB │ map:     5.36 kB
+.tmp/e2e-builds/security/assets/llm-session-DZfGTGHX.js                            1.40 kB │ gzip:   0.68 kB │ map:     5.39 kB
+.tmp/e2e-builds/security/assets/window-header-DhsDxH0n.js                          1.40 kB │ gzip:   0.77 kB │ map:     5.50 kB
+.tmp/e2e-builds/security/assets/dom-CKCe_sgq.js                                    1.42 kB │ gzip:   0.77 kB │ map:     5.62 kB
+.tmp/e2e-builds/security/assets/recording-actions-DoyK8S58.js                      1.49 kB │ gzip:   0.67 kB │ map:     6.73 kB
+.tmp/e2e-builds/security/assets/text-request-port-SCETa-a2.js                      1.49 kB │ gzip:   0.81 kB │ map:     6.07 kB
+.tmp/e2e-builds/security/assets/permissions-DeS9AdSu.js                            1.52 kB │ gzip:   0.44 kB │ map:     4.91 kB
+.tmp/e2e-builds/security/assets/content-popover-adapter-ikb_PPbU.js                1.55 kB │ gzip:   0.75 kB │ map:     5.88 kB
+.tmp/e2e-builds/security/assets/dom-events-BpAKHjyE.js                             1.58 kB │ gzip:   0.71 kB │ map:     7.67 kB
+.tmp/e2e-builds/security/assets/actions-CGi4o75n.js                                1.59 kB │ gzip:   0.70 kB │ map:     5.34 kB
+.tmp/e2e-builds/security/assets/background-CCyC0OST.js                             1.61 kB │ gzip:   0.68 kB │ map:     6.47 kB
+.tmp/e2e-builds/security/assets/editor-presets-yNONvgfg.js                         1.62 kB │ gzip:   0.81 kB │ map:    11.31 kB
+.tmp/e2e-builds/security/assets/completion-outbox-D5nqMdMN.js                      1.62 kB │ gzip:   0.73 kB │ map:     7.62 kB
+.tmp/e2e-builds/security/assets/preload-helper-khBccGFq.js                         1.68 kB │ gzip:   0.85 kB
+.tmp/e2e-builds/security/assets/post-record-actions-BPl7Nr-h.js                    1.68 kB │ gzip:   0.90 kB │ map:     6.80 kB
+.tmp/e2e-builds/security/assets/snapshot-history-CRg1vCoO.js                       1.70 kB │ gzip:   0.76 kB │ map:     6.67 kB
+.tmp/e2e-builds/security/assets/action-builders-Cq7U5Jxb.js                        1.71 kB │ gzip:   0.54 kB │ map:     6.09 kB
+.tmp/e2e-builds/security/assets/provenance-BAY-1tFm.js                             1.72 kB │ gzip:   0.82 kB │ map:     8.98 kB
+.tmp/e2e-builds/security/assets/floating-chrome-DEfNbEQf.js                        1.72 kB │ gzip:   0.70 kB │ map:     4.54 kB
+.tmp/e2e-builds/security/assets/quick-actions-DpFc6uJc.js                          1.74 kB │ gzip:   0.87 kB │ map:     9.95 kB
+.tmp/e2e-builds/security/assets/model-operation-DvIQUKa_.js                        1.76 kB │ gzip:   0.70 kB │ map:     7.04 kB
+.tmp/e2e-builds/security/assets/css-safety-DgTPCPQw.js                             1.76 kB │ gzip:   0.80 kB │ map:     8.16 kB
+.tmp/e2e-builds/security/assets/action-audio-YXxHOlRm.js                           1.78 kB │ gzip:   0.95 kB │ map:     7.14 kB
+.tmp/e2e-builds/security/assets/recovery-Dqhi3Ckd.js                               1.78 kB │ gzip:   0.89 kB │ map:     7.31 kB
+.tmp/e2e-builds/security/assets/storage-DAbUzeSm.js                                1.78 kB │ gzip:   0.81 kB │ map:     8.22 kB
+.tmp/e2e-builds/security/assets/index.screenshots-9eRhkdtH.js                      1.79 kB │ gzip:   0.96 kB │ map:     7.04 kB
+.tmp/e2e-builds/security/assets/asset-manifest-CIbywhjB.js                         1.81 kB │ gzip:   0.86 kB │ map:     6.93 kB
+.tmp/e2e-builds/security/assets/operations-CpuA4pTm.js                             1.82 kB │ gzip:   0.79 kB │ map:     7.62 kB
+.tmp/e2e-builds/security/assets/runtime-log-BoOdwWMf.js                            1.85 kB │ gzip:   1.01 kB │ map:     9.22 kB
+.tmp/e2e-builds/security/assets/archive-CPXmBh9p.js                                1.88 kB │ gzip:   0.94 kB │ map:     7.11 kB
+.tmp/e2e-builds/security/assets/toast-service-DCgcwt-h.js                          1.90 kB │ gzip:   0.94 kB │ map:     6.90 kB
+.tmp/e2e-builds/security/assets/primitives-Dv7K3LXg.js                             1.90 kB │ gzip:   0.81 kB │ map:     5.10 kB
+.tmp/e2e-builds/security/assets/inspector-surface-BCAvKBbR.js                      1.95 kB │ gzip:   1.07 kB │ map:     6.43 kB
+.tmp/e2e-builds/security/assets/data-url-f_AFvkZw.js                               1.96 kB │ gzip:   0.92 kB │ map:     7.96 kB
+.tmp/e2e-builds/security/assets/path-DNQnkuKc.js                                   1.98 kB │ gzip:   0.92 kB │ map:     9.30 kB
+.tmp/e2e-builds/security/assets/step-badge-custom-css-G2yghyar.js                  2.04 kB │ gzip:   1.00 kB │ map:    11.66 kB
+.tmp/e2e-builds/security/assets/tour-resources-DbHDYT2N.js                         2.05 kB │ gzip:   0.84 kB │ map:     8.61 kB
+.tmp/e2e-builds/security/assets/storage-errors-BS90PfDh.js                         2.07 kB │ gzip:   0.89 kB │ map:     7.14 kB
+.tmp/e2e-builds/security/assets/action-audio-source-Bf4Y0Kbz.js                    2.13 kB │ gzip:   0.98 kB │ map:     8.84 kB
+.tmp/e2e-builds/security/assets/inspector-shell-DWAqUkfd.js                        2.21 kB │ gzip:   0.82 kB │ map:     7.38 kB
+.tmp/e2e-builds/security/assets/square-dashed-BsJr1yN5.js                          2.26 kB │ gzip:   0.87 kB │ map:     8.89 kB
+.tmp/e2e-builds/security/assets/presentation-admission-CVObMNPY.js                 2.29 kB │ gzip:   1.10 kB │ map:     8.18 kB
+.tmp/e2e-builds/security/assets/toast-CmXQgQnb.js                                  2.32 kB │ gzip:   0.96 kB │ map:     6.59 kB
+.tmp/e2e-builds/security/assets/placement-gOxQNgin.js                              2.33 kB │ gzip:   1.10 kB │ map:    10.99 kB
+.tmp/e2e-builds/security/assets/defaults-BtQDqb8l.js                               2.33 kB │ gzip:   0.97 kB │ map:     5.77 kB
+.tmp/e2e-builds/security/assets/toolbar-UAOUMGjd.js                                2.34 kB │ gzip:   0.81 kB │ map:     7.96 kB
+.tmp/e2e-builds/security/assets/dropdown-BmgdvOZU.js                               2.37 kB │ gzip:   0.94 kB │ map:     8.42 kB
+.tmp/e2e-builds/security/assets/use-surface-style-preset-catalog-DuE-g_Vi.js       2.39 kB │ gzip:   1.14 kB │ map:     9.62 kB
+.tmp/e2e-builds/security/assets/normalize-CQJCI2eW.js                              2.46 kB │ gzip:   1.14 kB │ map:     9.90 kB
+.tmp/e2e-builds/security/assets/constants-ClKiwbH6.js                              2.48 kB │ gzip:   1.18 kB │ map:     5.29 kB
+.tmp/e2e-builds/security/assets/callout-custom-css-eCw3hBex.js                     2.48 kB │ gzip:   1.03 kB │ map:     9.23 kB
+.tmp/e2e-builds/security/assets/controls-DEfIZfYT.js                               2.49 kB │ gzip:   1.04 kB │ map:     6.77 kB
+.tmp/e2e-builds/security/assets/observation-clock-Dj4pkPMm.js                      2.53 kB │ gzip:   1.06 kB │ map:     9.56 kB
+.tmp/e2e-builds/security/assets/press-heyJubXI.js                                  2.57 kB │ gzip:   0.97 kB │ map:     9.47 kB
+.tmp/e2e-builds/security/assets/display-name-BDTXUaM8.js                           2.58 kB │ gzip:   0.63 kB │ map:     5.33 kB
+.tmp/e2e-builds/security/assets/usage-index-Av7uVxlT.js                            2.58 kB │ gzip:   1.16 kB │ map:    11.33 kB
+.tmp/e2e-builds/security/assets/state-Uy7gKBmT.js                                  2.58 kB │ gzip:   1.14 kB │ map:    10.58 kB
+.tmp/e2e-builds/security/assets/popup-export-preferences-DCnhW3X8.js               2.58 kB │ gzip:   0.99 kB │ map:     9.74 kB
+.tmp/e2e-builds/security/assets/catalog-cache-DY7_ykg8.js                          2.59 kB │ gzip:   1.16 kB │ map:    11.16 kB
+.tmp/e2e-builds/security/assets/constants-C0POqtfk.js                              2.60 kB │ gzip:   1.46 kB │ map:    11.13 kB
+.tmp/e2e-builds/security/assets/favicon-v_oKQNhj.js                                2.65 kB │ gzip:   1.34 kB │ map:     9.43 kB
+.tmp/e2e-builds/security/assets/color-BNwjwZ3A.js                                  2.70 kB │ gzip:   1.12 kB │ map:    11.19 kB
+.tmp/e2e-builds/security/assets/visual-style-B5Gf54VU.js                           2.75 kB │ gzip:   1.05 kB │ map:     7.37 kB
+.tmp/e2e-builds/security/assets/speech-recognition-DGn2-jEW.js                     2.77 kB │ gzip:   1.07 kB │ map:    11.78 kB
+.tmp/e2e-builds/security/assets/local-secret-crypto-cLJ-FP23.js                    2.79 kB │ gzip:   1.11 kB │ map:    12.91 kB
+.tmp/e2e-builds/security/assets/catalog-ycEPudP5.js                                2.82 kB │ gzip:   0.91 kB │ map:     8.56 kB
+.tmp/e2e-builds/security/assets/mutations-B_ssZK5A.js                              2.83 kB │ gzip:   0.82 kB │ map:    10.41 kB
+.tmp/e2e-builds/security/assets/hotkeys-DmLXwsSQ.js                                2.87 kB │ gzip:   1.48 kB │ map:    10.85 kB
+.tmp/e2e-builds/security/assets/product-modal-iNBBJi9N.js                          2.90 kB │ gzip:   1.17 kB │ map:     9.58 kB
+.tmp/e2e-builds/security/assets/native-hints-C22PizTi.js                           2.92 kB │ gzip:   1.30 kB │ map:     9.90 kB
+.tmp/e2e-builds/security/assets/audit-CEXKFZWQ.js                                  2.93 kB │ gzip:   1.25 kB │ map:    12.13 kB
+.tmp/e2e-builds/security/assets/categorized-inspector-DIepb8Az.js                  2.95 kB │ gzip:   1.30 kB │ map:     9.62 kB
+.tmp/e2e-builds/security/assets/index.html-DeV6j3Pa.js                             2.96 kB │ gzip:   1.64 kB │ map:     8.82 kB
+.tmp/e2e-builds/security/assets/user-media-DVLMy0O1.js                             2.97 kB │ gzip:   1.23 kB │ map:    10.84 kB
+.tmp/e2e-builds/security/assets/coordinator-CXuNl7iB.js                            3.01 kB │ gzip:   1.15 kB │ map:     9.72 kB
+.tmp/e2e-builds/security/assets/recording-state-Bv2degMj.js                        3.01 kB │ gzip:   1.20 kB │ map:    11.23 kB
+.tmp/e2e-builds/security/assets/maintenance-log-BS25DXh-.js                        3.03 kB │ gzip:   1.41 kB │ map:    14.11 kB
+.tmp/e2e-builds/security/assets/capture-settings-D6NzoGGi.js                       3.09 kB │ gzip:   1.19 kB │ map:    13.10 kB
+.tmp/e2e-builds/security/assets/content-toolbar-DeA7LGBh.js                        3.11 kB │ gzip:   1.03 kB │ map:     9.81 kB
+.tmp/e2e-builds/security/assets/capabilities-ComdfkoL.js                           3.17 kB │ gzip:   1.21 kB │ map:    14.00 kB
+.tmp/e2e-builds/security/assets/createLucideIcon-rTAH2bxB.js                       3.17 kB │ gzip:   1.54 kB │ map:    17.74 kB
+.tmp/e2e-builds/security/assets/workspace-selection-DTPiKQl0.js                    3.17 kB │ gzip:   1.33 kB │ map:    13.80 kB
+.tmp/e2e-builds/security/assets/surface-style-presets-DIaThwqW.js                  3.20 kB │ gzip:   1.26 kB │ map:    13.76 kB
+.tmp/e2e-builds/security/assets/theme-DZ9__0R2.js                                  3.21 kB │ gzip:   1.37 kB │ map:    15.21 kB
+.tmp/e2e-builds/security/assets/surface-css-DZWhPRuB.js                            3.22 kB │ gzip:   1.46 kB │ map:    13.28 kB
+.tmp/e2e-builds/security/assets/sync-product-client-D11c9jNj.js                    3.27 kB │ gzip:   1.43 kB │ map:    12.89 kB
+.tmp/e2e-builds/security/assets/public-5ZzHoa-D.js                                 3.27 kB │ gzip:   1.51 kB │ map:    13.61 kB
+.tmp/e2e-builds/security/assets/resource-limits-BpjI9w-O.js                        3.31 kB │ gzip:   1.13 kB │ map:    15.34 kB
+.tmp/e2e-builds/security/assets/build-upVQYa_o.js                                  3.31 kB │ gzip:   1.36 kB │ map:    17.72 kB
+.tmp/e2e-builds/security/assets/scenario-layouts-nARPcPel.js                       3.37 kB │ gzip:   1.51 kB │ map:    10.76 kB
+.tmp/e2e-builds/security/assets/runtime-DyA6v4Wc.js                                3.45 kB │ gzip:   1.46 kB │ map:    13.51 kB
+.tmp/e2e-builds/security/assets/ai-payload-privacy-CCpiCeF4.js                     3.48 kB │ gzip:   1.50 kB │ map:    15.53 kB
+.tmp/e2e-builds/security/assets/remote-store-Cc1_IiFi.js                           3.62 kB │ gzip:   1.59 kB │ map:    13.58 kB
+.tmp/e2e-builds/security/assets/style-BeGW9-uW.js                                  3.68 kB │ gzip:   1.63 kB │ map:    18.42 kB
+.tmp/e2e-builds/security/assets/interactive-control-style-D1sT9JKv.js              3.68 kB │ gzip:   0.90 kB │ map:     8.54 kB
+.tmp/e2e-builds/security/assets/confirm-dialog-BgLpO-7r.js                         3.79 kB │ gzip:   1.55 kB │ map:    13.56 kB
+.tmp/e2e-builds/security/assets/dom-host-15sHBeCR.js                               3.82 kB │ gzip:   1.55 kB │ map:    25.97 kB
+.tmp/e2e-builds/security/assets/layout-B_wvHfkK.js                                 3.83 kB │ gzip:   1.69 kB │ map:    15.72 kB
+.tmp/e2e-builds/security/assets/opfs-residency-C4Txbqxr.js                         3.84 kB │ gzip:   1.61 kB │ map:    14.04 kB
+.tmp/e2e-builds/security/assets/react-dom-CaO2D5ST.js                              3.94 kB │ gzip:   1.45 kB │ map:    13.92 kB
+.tmp/e2e-builds/security/assets/library-lifecycle-8chPpaZK.js                      3.97 kB │ gzip:   1.52 kB │ map:    16.69 kB
+.tmp/e2e-builds/security/assets/types-DToeCBCm.js                                  3.97 kB │ gzip:   1.63 kB │ map:    30.43 kB
+.tmp/e2e-builds/security/assets/bootstrap-OZh0uJyJ.js                              3.99 kB │ gzip:   1.69 kB │ map:    20.21 kB
+.tmp/e2e-builds/security/assets/control-renderers-Bk02W_8I.js                      3.99 kB │ gzip:   1.69 kB │ map:    10.81 kB
+.tmp/e2e-builds/security/assets/audio-import-DeKIEh6P.js                           4.00 kB │ gzip:   1.65 kB │ map:    19.25 kB
+.tmp/e2e-builds/security/assets/mediaPermission.js                                 4.02 kB │ gzip:   1.54 kB │ map:    13.11 kB
+.tmp/e2e-builds/security/assets/editor-D3_msW-D.js                                 4.04 kB │ gzip:   1.56 kB │ map:    14.67 kB
+.tmp/e2e-builds/security/assets/retained-library-BQe9FtAl.js                       4.15 kB │ gzip:   1.77 kB │ map:    13.87 kB
+.tmp/e2e-builds/security/assets/font-BHRxCjDI.js                                   4.18 kB │ gzip:   1.72 kB │ map:    14.76 kB
+.tmp/e2e-builds/security/assets/query-DawBYCjV.js                                  4.19 kB │ gzip:   1.54 kB │ map:    20.68 kB
+.tmp/e2e-builds/security/assets/html-export-D-bg_C63.js                            4.23 kB │ gzip:   1.94 kB │ map:    15.73 kB
+.tmp/e2e-builds/security/assets/guards-Dg_3WG4O.js                                 4.25 kB │ gzip:   1.73 kB │ map:    18.71 kB
+.tmp/e2e-builds/security/assets/writer-Bfnxb_oA.js                                 4.28 kB │ gzip:   1.61 kB │ map:    15.92 kB
+.tmp/e2e-builds/security/assets/target-CIsxBBGV.js                                 4.30 kB │ gzip:   1.70 kB │ map:    17.75 kB
+.tmp/e2e-builds/security/assets/page-access-BVjfmcuk.js                            4.34 kB │ gzip:   1.61 kB │ map:    18.62 kB
+.tmp/e2e-builds/security/assets/video-effects-CKg4Yd5Y.js                          4.46 kB │ gzip:   1.97 kB │ map:    16.05 kB
+.tmp/e2e-builds/security/assets/text-field-977uX4Uv.js                             4.57 kB │ gzip:   1.96 kB │ map:    14.67 kB
+.tmp/e2e-builds/security/assets/store-DPjX0w3m.js                                  4.59 kB │ gzip:   1.81 kB │ map:    34.72 kB
+.tmp/e2e-builds/security/assets/control-language-DBuL3pjL.js                       4.60 kB │ gzip:   1.00 kB │ map:    11.71 kB
+.tmp/e2e-builds/security/assets/services-Dri61bpn.js                               4.66 kB │ gzip:   1.45 kB │ map:    19.09 kB
+.tmp/e2e-builds/security/assets/use-prompt-templates-DWzl38IX.js                   4.68 kB │ gzip:   1.67 kB │ map:    24.47 kB
+.tmp/e2e-builds/security/assets/preference-service-ClIz0JYP.js                     4.80 kB │ gzip:   1.41 kB │ map:    21.91 kB
+.tmp/e2e-builds/security/assets/recording-camera-controls-9svANHXH.js              4.81 kB │ gzip:   2.09 kB │ map:    18.09 kB
+.tmp/e2e-builds/security/assets/route-CDo9NE5N.js                                  4.84 kB │ gzip:   1.73 kB │ map:    10.92 kB
+.tmp/e2e-builds/security/assets/messages-BglpZpVt.js                               4.91 kB │ gzip:   1.06 kB │ map:     7.00 kB
+.tmp/e2e-builds/security/assets/storage-CffEZPGU.js                                4.91 kB │ gzip:   1.78 kB │ map:    18.33 kB
+.tmp/e2e-builds/security/assets/guide-parser-rvdzmbfY.js                           5.02 kB │ gzip:   2.14 kB │ map:    20.08 kB
+.tmp/e2e-builds/security/assets/screenshot-validation-BLlPFz1Z.js                  5.02 kB │ gzip:   2.10 kB │ map:    22.24 kB
+.tmp/e2e-builds/security/assets/gradient-presets-DSAFmIYy.js                       5.04 kB │ gzip:   1.77 kB │ map:    22.96 kB
+.tmp/e2e-builds/security/assets/editor-chrome-BQ3TyhsX.js                          5.06 kB │ gzip:   1.84 kB │ map:    14.15 kB
+.tmp/e2e-builds/security/assets/sanitize-css-5Q7RewgZ.js                           5.16 kB │ gzip:   1.98 kB │ map:    24.68 kB
+.tmp/e2e-builds/security/assets/segmented-switch-BHTKdHhU.js                       5.18 kB │ gzip:   1.56 kB │ map:    11.79 kB
+.tmp/e2e-builds/security/assets/voice-input-Czgg96_-.js                            5.24 kB │ gzip:   2.13 kB │ map:    21.70 kB
+.tmp/e2e-builds/security/assets/catalog-BfkgQxtn.js                                5.28 kB │ gzip:   1.32 kB │ map:    13.61 kB
+.tmp/e2e-builds/security/assets/authoring-Dm72aps1.js                              5.40 kB │ gzip:   2.05 kB │ map:    24.90 kB
+.tmp/e2e-builds/security/assets/cleanup-Ce9mFbRs.js                                5.41 kB │ gzip:   2.17 kB │ map:    23.77 kB
+.tmp/e2e-builds/security/assets/projection-Bg4wnmzq.js                             5.64 kB │ gzip:   2.17 kB │ map:    24.31 kB
+.tmp/e2e-builds/security/assets/action-button-DLACP_W8.js                          5.84 kB │ gzip:   1.65 kB │ map:    16.80 kB
+.tmp/e2e-builds/security/assets/content-size-tooltip-B13kyvu4.js                   5.86 kB │ gzip:   1.94 kB │ map:    21.50 kB
+.tmp/e2e-builds/security/assets/runtime-errors-edFzIUT-.js                         5.88 kB │ gzip:   2.24 kB │ map:    22.68 kB
+.tmp/e2e-builds/security/assets/scenario-ai-operations-Cp2D_zR3.js                 5.95 kB │ gzip:   2.64 kB │ map:    11.69 kB
+.tmp/e2e-builds/security/assets/render-scope-BEoScWBq.js                           5.99 kB │ gzip:   2.30 kB │ map:    25.68 kB
+.tmp/e2e-builds/security/assets/product-save-dialog-CfasonWx.js                    6.14 kB │ gzip:   1.71 kB │ map:    17.44 kB
+.tmp/e2e-builds/security/assets/trash-BFpqLYj8.js                                  6.19 kB │ gzip:   2.29 kB │ map:    30.01 kB
+.tmp/e2e-builds/security/assets/footer-DZ0w1dOx.js                                 6.20 kB │ gzip:   2.30 kB │ map:    17.96 kB
+.tmp/e2e-builds/security/assets/gallery-saved-views-Qo-m9MOV.js                    6.21 kB │ gzip:   2.27 kB │ map:    27.30 kB
+.tmp/e2e-builds/security/assets/presentation-sequence-DjGOPeQR.js                  6.22 kB │ gzip:   2.37 kB │ map:    27.41 kB
+.tmp/e2e-builds/security/assets/prompt-templates-D442vcsq.js                       6.25 kB │ gzip:   2.43 kB │ map:    22.83 kB
+.tmp/e2e-builds/security/assets/chrome-transport-DU0VDvEM.js                       6.31 kB │ gzip:   2.52 kB │ map:    30.47 kB
+.tmp/e2e-builds/security/assets/decoration-CoSiHMvK.js                             6.46 kB │ gzip:   2.55 kB │ map:    26.93 kB
+.tmp/e2e-builds/security/assets/parts-DCGE9EWM.js                                  6.63 kB │ gzip:   2.14 kB │ map:    19.21 kB
+.tmp/e2e-builds/security/assets/session-BfDMAo8U.js                                6.71 kB │ gzip:   2.46 kB │ map:    23.48 kB
+.tmp/e2e-builds/security/assets/guards-BM5R5FjP.js                                 6.75 kB │ gzip:   2.31 kB │ map:    30.80 kB
+.tmp/e2e-builds/security/assets/webdav-workspace-join-CaMt39UF.js                  6.98 kB │ gzip:   2.19 kB │ map:    30.89 kB
+.tmp/e2e-builds/security/assets/decode-DX2TjCfg.js                                 7.02 kB │ gzip:   2.95 kB │ map:    34.86 kB
+.tmp/e2e-builds/security/assets/expanding-mode-button-Cgogz_Pm.js                  7.09 kB │ gzip:   2.20 kB │ map:    18.12 kB
+.tmp/e2e-builds/security/assets/navigation-BQ_G1O6H.js                             7.26 kB │ gzip:   2.93 kB │ map:    23.80 kB
+.tmp/e2e-builds/security/assets/guards-CYK8ObGj.js                                 7.29 kB │ gzip:   2.33 kB │ map:    35.61 kB
+.tmp/e2e-builds/security/assets/parser-NQPAfHNG.js                                 7.38 kB │ gzip:   2.25 kB │ map:    32.24 kB
+.tmp/e2e-builds/security/assets/appearance-DmaN5Tr1.js                             7.39 kB │ gzip:   3.32 kB │ map:    17.92 kB
+.tmp/e2e-builds/security/assets/markdown-Dqv2q1Pa.js                               7.56 kB │ gzip:   3.31 kB │ map:    33.24 kB
+.tmp/e2e-builds/security/assets/logger-B4bXL1Y8.js                                 7.59 kB │ gzip:   3.10 kB │ map:    42.70 kB
+.tmp/e2e-builds/security/assets/types-BdVytT3f.js                                  7.60 kB │ gzip:   3.09 kB │ map:    39.90 kB
+.tmp/e2e-builds/security/assets/queue-history-Ds6epxKK.js                          7.74 kB │ gzip:   2.56 kB │ map:    31.21 kB
+.tmp/e2e-builds/security/assets/repeat-BGOJqdgo.js                                 7.75 kB │ gzip:   2.08 kB │ map:    23.12 kB
+.tmp/e2e-builds/security/assets/public-2SgiQhxY.js                                 7.86 kB │ gzip:   2.97 kB │ map:    32.00 kB
+.tmp/e2e-builds/security/assets/effect-runtime-sandbox-3SzXHhgN.js                 7.87 kB │ gzip:   2.78 kB │ map:    32.57 kB
+.tmp/e2e-builds/security/assets/select-CQZrFMcL.js                                 7.87 kB │ gzip:   2.74 kB │ map:    26.97 kB
+.tmp/e2e-builds/security/assets/react-B8SKf8RM.js                                  7.91 kB │ gzip:   3.05 kB │ map:    30.72 kB
+.tmp/e2e-builds/security/assets/asset-publication-recovery-CkpZgKLY.js             8.21 kB │ gzip:   2.89 kB │ map:    36.00 kB
+.tmp/e2e-builds/security/assets/source-Cvh5vxFc.js                                 8.57 kB │ gzip:   3.36 kB │ map:    31.97 kB
+.tmp/e2e-builds/security/assets/effect-bundles-BR9dYoWT.js                         8.63 kB │ gzip:   3.09 kB │ map:    35.02 kB
+.tmp/e2e-builds/security/assets/parser-BMOvd2u5.js                                 8.66 kB │ gzip:   2.71 kB │ map:    39.80 kB
+.tmp/e2e-builds/security/assets/integrity-6KDQxTbM.js                              8.73 kB │ gzip:   3.12 kB │ map:    38.50 kB
+.tmp/e2e-builds/security/assets/editor-resource-admission-BQEMPAh0.js              8.75 kB │ gzip:   3.52 kB │ map:    33.16 kB
+.tmp/e2e-builds/security/assets/catalog-view-COA29Ad_.js                           8.81 kB │ gzip:   2.95 kB │ map:    33.75 kB
+.tmp/e2e-builds/security/assets/video-projects-DWGmJkUD.js                         8.91 kB │ gzip:   3.27 kB │ map:    43.13 kB
+.tmp/e2e-builds/security/assets/voice-input-history-BnPjLXcv.js                    8.99 kB │ gzip:   2.95 kB │ map:    34.68 kB
+.tmp/e2e-builds/security/assets/library-publication-DAdaklnh.js                    9.02 kB │ gzip:   2.99 kB │ map:    37.61 kB
+.tmp/e2e-builds/security/assets/events-logs-3jcP5Suh.js                            9.10 kB │ gzip:   3.04 kB │ map:    27.11 kB
+.tmp/e2e-builds/security/assets/model-selector-CKfbPoNL.js                         9.20 kB │ gzip:   3.47 kB │ map:    31.89 kB
+.tmp/e2e-builds/security/assets/adaptive-frames-DyxKMoZw.js                        9.25 kB │ gzip:   4.01 kB │ map:    43.70 kB
+.tmp/e2e-builds/security/assets/editor-start-D0NBymym.js                           9.36 kB │ gzip:   3.32 kB │ map:    28.11 kB
+.tmp/e2e-builds/security/assets/settings-Cp2aohjK.js                               9.46 kB │ gzip:   3.53 kB │ map:    30.94 kB
+.tmp/e2e-builds/security/assets/registry-DEIfn6T3.js                               9.54 kB │ gzip:   3.07 kB │ map:    33.39 kB
+.tmp/e2e-builds/security/assets/editing-admission-C00h42sS.js                      9.55 kB │ gzip:   3.47 kB │ map:    38.58 kB
+.tmp/e2e-builds/security/assets/constants-B19Cf0uI.js                              9.62 kB │ gzip:   3.08 kB │ map:    40.21 kB
+.tmp/e2e-builds/security/assets/frame-Bve9V1WZ.js                                  9.78 kB │ gzip:   3.72 kB │ map:    48.77 kB
+.tmp/e2e-builds/security/assets/frame-annotation-raster-jobs-kFmv_hIp.js           9.80 kB │ gzip:   3.32 kB │ map:    38.15 kB
+.tmp/e2e-builds/security/assets/defaults-oIaHTD7R.js                               9.92 kB │ gzip:   3.14 kB │ map:    27.99 kB
+.tmp/e2e-builds/security/assets/route-DR38UhoE.js                                 10.05 kB │ gzip:   3.17 kB │ map:    26.25 kB
+.tmp/e2e-builds/security/assets/page-package-Hlnank5Z.js                          10.25 kB │ gzip:   3.65 kB │ map:    49.29 kB
+.tmp/e2e-builds/security/assets/product-glass-controls-X8-2ayTv.js                10.42 kB │ gzip:   3.10 kB │ map:    38.82 kB
+.tmp/e2e-builds/security/assets/autosave-control-S9OZxAHj.js                      10.50 kB │ gzip:   4.39 kB │ map:    39.49 kB
+.tmp/e2e-builds/security/assets/index.html-Bc7ur42G.js                            10.55 kB │ gzip:   3.79 kB │ map:    33.37 kB
+.tmp/e2e-builds/security/assets/central-directory-fX0SMogQ.js                     10.57 kB │ gzip:   3.54 kB │ map:    39.99 kB
+.tmp/e2e-builds/security/assets/searchable-project-picker-CqUDnnce.js             10.70 kB │ gzip:   2.53 kB │ map:    33.74 kB
+.tmp/e2e-builds/security/assets/page-preparation-5f4rSSSB.js                      10.70 kB │ gzip:   3.86 kB │ map:    40.87 kB
+.tmp/e2e-builds/security/assets/outgoing-ZHloWbBf.js                              10.77 kB │ gzip:   3.41 kB │ map:    42.04 kB
+.tmp/e2e-builds/security/assets/step-projections-CGxhf7wI.js                      10.98 kB │ gzip:   3.87 kB │ map:    41.81 kB
+.tmp/e2e-builds/security/assets/egress-authority-Dqw3F-Hy.js                      11.32 kB │ gzip:   4.37 kB │ map:    43.40 kB
+.tmp/e2e-builds/security/assets/native-settings-BHmI8HOX.js                       11.35 kB │ gzip:   3.47 kB │ map:    48.99 kB
+.tmp/e2e-builds/security/assets/readme-DNwQ0FeA.js                                11.59 kB │ gzip:   4.62 kB │ map:    33.42 kB
+.tmp/e2e-builds/security/assets/settings-transfer-C3HnARlp.js                     11.91 kB │ gzip:   4.24 kB │ map:    59.05 kB
+.tmp/e2e-builds/security/assets/event-history-B3MvtVuT.js                         12.24 kB │ gzip:   4.28 kB │ map:    43.68 kB
+.tmp/e2e-builds/security/assets/select-BVjpri_d.js                                12.32 kB │ gzip:   4.20 kB │ map:    47.57 kB
+.tmp/e2e-builds/security/assets/command-palette-Z5hBjcpx.js                       12.37 kB │ gzip:   4.07 kB │ map:    44.51 kB
+.tmp/e2e-builds/security/assets/screen-sizes-CqdUukiJ.js                          12.42 kB │ gzip:   3.98 kB │ map:    49.62 kB
+.tmp/e2e-builds/security/assets/settings-BA5KcOOA.js                              12.53 kB │ gzip:   4.25 kB │ map:    48.52 kB
+.tmp/e2e-builds/security/assets/runtime-CLUZhNfT.js                               12.89 kB │ gzip:   4.40 kB │ map:    59.24 kB
+.tmp/e2e-builds/security/assets/import-files-9w__RY0X.js                          13.26 kB │ gzip:   5.44 kB │ map:    49.80 kB
+.tmp/e2e-builds/security/assets/mutations-BTnchVN3.js                             13.67 kB │ gzip:   4.28 kB │ map:    53.15 kB
+.tmp/e2e-builds/security/assets/tour-parser-DK_A9JOY.js                           13.71 kB │ gzip:   4.70 kB │ map:    60.91 kB
+.tmp/e2e-builds/security/assets/provider-esdolTbj.js                              14.18 kB │ gzip:   4.69 kB │ map:    66.85 kB
+.tmp/e2e-builds/security/assets/plan-BPuqHMrY.js                                  14.22 kB │ gzip:   5.29 kB │ map:    64.01 kB
+.tmp/e2e-builds/security/assets/extension-pages-BSi6qtvU.js                       14.53 kB │ gzip:   4.44 kB │ map:    57.44 kB
+.tmp/e2e-builds/security/assets/parser-DR3M5fXs.js                                14.66 kB │ gzip:   4.81 kB │ map:    59.09 kB
+.tmp/e2e-builds/security/assets/prompts-CuP7pcw_.js                               14.72 kB │ gzip:   4.34 kB │ map:    50.60 kB
+.tmp/e2e-builds/security/assets/product-form-controls-BXVAddUs.js                 14.98 kB │ gzip:   4.44 kB │ map:    60.33 kB
+.tmp/e2e-builds/security/assets/testHarnessSecurityControl.js                     15.08 kB │ gzip:   4.86 kB │ map:    51.87 kB
+.tmp/e2e-builds/security/assets/reader-navigation-C4rgqgpo.js                     15.47 kB │ gzip:   5.75 kB │ map:    56.88 kB
+.tmp/e2e-builds/security/assets/surface-style-selector-C7a8565u.js                15.74 kB │ gzip:   4.54 kB │ map:    47.04 kB
+.tmp/e2e-builds/security/assets/editor-resources-CI8FhQF-.js                      15.91 kB │ gzip:   5.37 kB │ map:    63.81 kB
+.tmp/e2e-builds/security/assets/prepared-project-ymGkMngz.js                      16.32 kB │ gzip:   4.97 kB │ map:    66.95 kB
+.tmp/e2e-builds/security/assets/surface-compositor-XcOF8oyx.js                    16.97 kB │ gzip:   5.58 kB │ map:    64.95 kB
+.tmp/e2e-builds/security/assets/testHarnessWebdavTransfer.js                      17.38 kB │ gzip:   5.98 kB │ map:    64.65 kB
+.tmp/e2e-builds/security/assets/traversal-r8gXVjbg.js                             17.63 kB │ gzip:   6.23 kB │ map:    67.61 kB
+.tmp/e2e-builds/security/assets/voice-input-AfTy0pV0.js                           17.69 kB │ gzip:   5.61 kB │ map:    77.63 kB
+.tmp/e2e-builds/security/assets/iconify-JMXLXmKu.js                               17.84 kB │ gzip:   7.00 kB │ map:    87.09 kB
+.tmp/e2e-builds/security/assets/media-quality-CsfFP-wp.js                         18.15 kB │ gzip:   5.57 kB │ map:    61.12 kB
+.tmp/e2e-builds/security/assets/submit-Ar4Amz0r.js                                18.96 kB │ gzip:   7.00 kB │ map:    82.07 kB
+.tmp/e2e-builds/security/assets/access-data-BEqSng7k.js                           19.20 kB │ gzip:   5.06 kB │ map:    54.25 kB
+.tmp/e2e-builds/security/assets/locker-Caex_ggk.js                                19.61 kB │ gzip:   6.15 kB │ map:    84.19 kB
+.tmp/e2e-builds/security/assets/capture-CuZ_JQnY.js                               19.67 kB │ gzip:   5.53 kB │ map:    76.71 kB
+.tmp/e2e-builds/security/assets/settings-transfer-D3VapXuA.js                     19.79 kB │ gzip:   6.07 kB │ map:    71.32 kB
+.tmp/e2e-builds/security/assets/guards-CfcIAo8X.js                                21.22 kB │ gzip:   7.16 kB │ map:   107.85 kB
+.tmp/e2e-builds/security/assets/frame-BaIJS9ns.js                                 21.61 kB │ gzip:   7.56 kB │ map:   101.81 kB
+.tmp/e2e-builds/security/assets/export-ledger-CIvv2xjs.js                         21.98 kB │ gzip:   7.76 kB │ map:    89.10 kB
+.tmp/e2e-builds/security/assets/tool-preferences-CuaN3_sS.js                      22.28 kB │ gzip:   6.39 kB │ map:    75.72 kB
+.tmp/e2e-builds/security/assets/public-CTZMQLPi.js                                22.63 kB │ gzip:   7.07 kB │ map:    94.97 kB
+.tmp/e2e-builds/security/assets/queue-TkuFlyQB.js                                 23.09 kB │ gzip:   6.28 kB │ map:    87.99 kB
+.tmp/e2e-builds/security/assets/public-B_dFSxXU.js                                23.43 kB │ gzip:   7.40 kB │ map:    93.80 kB
+.tmp/e2e-builds/security/assets/video-projects-Bpw6WwD6.js                        23.89 kB │ gzip:   7.04 kB │ map:   100.83 kB
+.tmp/e2e-builds/security/assets/route-Do1jCtJ7.js                                 24.41 kB │ gzip:   7.66 kB │ map:    78.20 kB
+.tmp/e2e-builds/security/assets/webdav-portable-EKcdboXF.js                       24.47 kB │ gzip:   8.17 kB │ map:    87.27 kB
+.tmp/e2e-builds/security/assets/index.library-B2-lh8-U.js                         24.66 kB │ gzip:   8.09 kB │ map:   114.43 kB
+.tmp/e2e-builds/security/assets/remote-object-integrity-B8Mg9Vci.js               24.66 kB │ gzip:   7.50 kB │ map:    96.53 kB
+.tmp/e2e-builds/security/assets/project-action-audio-DWuIqvYZ.js                  25.96 kB │ gzip:   8.84 kB │ map:   105.92 kB
+.tmp/e2e-builds/security/assets/native-app-C6F4qZ0C.js                            25.99 kB │ gzip:   6.64 kB │ map:    85.86 kB
+.tmp/e2e-builds/security/assets/picker-YnWZTID2.js                                27.18 kB │ gzip:   9.53 kB │ map:    89.28 kB
+.tmp/e2e-builds/security/assets/compact-inspector-controls-4U5KlQoD.js            28.64 kB │ gzip:   7.45 kB │ map:    85.82 kB
+.tmp/e2e-builds/security/assets/section-surface-CFpcaGDi.js                       29.25 kB │ gzip:   8.46 kB │ map:    97.49 kB
+.tmp/e2e-builds/security/assets/html-Cp9lCGjv.js                                  29.40 kB │ gzip:  11.62 kB │ map:   135.86 kB
+.tmp/e2e-builds/security/assets/settings-transfer-k8DCOU_w.js                     31.08 kB │ gzip:   8.68 kB │ map:   119.91 kB
+.tmp/e2e-builds/security/assets/diagnostics-BOjMvPdU.js                           31.55 kB │ gzip:  11.78 kB │ map:   140.49 kB
+.tmp/e2e-builds/security/assets/sidebar-CDm1NujY.js                               31.75 kB │ gzip:   8.41 kB │ map:   104.77 kB
+.tmp/e2e-builds/security/assets/quick-actions-IzRQpcUa.js                         32.53 kB │ gzip:   9.59 kB │ map:   108.45 kB
+.tmp/e2e-builds/security/assets/read-C0SnqDOS.js                                  32.53 kB │ gzip:   9.88 kB │ map:   156.85 kB
+.tmp/e2e-builds/security/assets/queue-ZreFRx2P.js                                 35.17 kB │ gzip:  10.19 kB │ map:   139.73 kB
+.tmp/e2e-builds/security/assets/action-occurrences-BJq6kxGg.js                    36.31 kB │ gzip:  11.93 kB │ map:   152.62 kB
+.tmp/e2e-builds/security/assets/history-DCqWt5wC.js                               37.46 kB │ gzip:  11.85 kB │ map:   162.75 kB
+.tmp/e2e-builds/security/assets/feedback-C7A20ic6.js                              41.70 kB │ gzip:  12.92 kB │ map:   182.65 kB
+.tmp/e2e-builds/security/assets/rich-shape-Bo7HfPjP.js                            42.53 kB │ gzip:  12.17 kB │ map:   171.57 kB
+.tmp/e2e-builds/security/assets/cameraRecorder.js                                 42.54 kB │ gzip:  12.51 kB │ map:   140.10 kB
+.tmp/e2e-builds/security/assets/rough.esm-Beme0s18.js                             43.98 kB │ gzip:  14.99 kB │ map:   166.35 kB
+.tmp/e2e-builds/security/assets/voice-input-CLmUnG5L.js                           44.86 kB │ gzip:  11.75 kB │ map:   145.40 kB
+.tmp/e2e-builds/security/assets/shell-bTUfTGsS.js                                 45.31 kB │ gzip:  12.24 kB │ map:   183.89 kB
+.tmp/e2e-builds/security/assets/connections-B49er9PB.js                           47.61 kB │ gzip:  11.30 kB │ map:   179.47 kB
+.tmp/e2e-builds/security/assets/project-covers-C90wfGW3.js                        48.78 kB │ gzip:  16.05 kB │ map:   171.62 kB
+.tmp/e2e-builds/security/assets/projects-heOR6nue.js                              49.23 kB │ gzip:  15.00 kB │ map:   228.84 kB
+.tmp/e2e-builds/security/assets/annotations-eiIOxwMY.js                           49.63 kB │ gzip:  12.91 kB │ map:   197.50 kB
+.tmp/e2e-builds/security/assets/color-selector-HTr3I4Fx.js                        49.70 kB │ gzip:  14.17 kB │ map:   192.75 kB
+.tmp/e2e-builds/security/assets/area-adapter-B8ZoVhRD.js                          54.90 kB │ gzip:  15.76 kB │ map:   258.12 kB
+.tmp/e2e-builds/security/assets/saving-4maPfCNT.js                                58.84 kB │ gzip:  14.73 kB │ map:   199.99 kB
+.tmp/e2e-builds/security/assets/golos-ui-vf-DXX2LZUF.js                           58.84 kB │ gzip:  44.35 kB │ map:    59.01 kB
+.tmp/e2e-builds/security/assets/storage-DbK0igxC.js                               59.70 kB │ gzip:  17.10 kB │ map:   268.78 kB
+.tmp/e2e-builds/security/assets/paint-selector-BwbGF5fG.js                        62.15 kB │ gzip:  16.73 kB │ map:   194.58 kB
+.tmp/e2e-builds/security/assets/zip-reader-Czx0IbHg.js                            62.95 kB │ gzip:  23.15 kB │ map:   377.10 kB
+.tmp/e2e-builds/security/assets/replica-publication-D1fGNjPk.js                   65.48 kB │ gzip:  15.71 kB │ map:   256.57 kB
+.tmp/e2e-builds/security/assets/service-9KABD8Wj.js                               67.33 kB │ gzip:  20.52 kB │ map:   273.93 kB
+.tmp/e2e-builds/security/assets/public-D2dgfctT.js                                68.25 kB │ gzip:  19.16 kB │ map:   279.15 kB
+.tmp/e2e-builds/security/assets/core-Bf-ej7A_.js                                  72.86 kB │ gzip:  17.90 kB │ map:   261.99 kB
+.tmp/e2e-builds/security/assets/project-follow-KHHOp3P0.js                        74.05 kB │ gzip:  23.56 kB │ map:   330.72 kB
+.tmp/e2e-builds/security/assets/annotation-template-tags-BqLnJ1k3.js              74.31 kB │ gzip:  18.02 kB │ map:   315.06 kB
+.tmp/e2e-builds/security/assets/settings.js                                       76.89 kB │ gzip:  22.39 kB │ map:   255.84 kB
+.tmp/e2e-builds/security/assets/effect-instance-C62YzGaG.js                       77.33 kB │ gzip:  21.06 kB │ map:   328.02 kB
+.tmp/e2e-builds/security/assets/tempo-buffer-DtzFk4oR.js                          77.48 kB │ gzip:  26.54 kB │ map:   322.30 kB
+.tmp/e2e-builds/security/assets/linked-template-options-Cj05TU3x.js               78.69 kB │ gzip:  19.47 kB │ map:   257.99 kB
+.tmp/e2e-builds/security/assets/selection-mode-HO7SIUcR.js                        83.45 kB │ gzip:  21.35 kB │ map:   296.67 kB
+.tmp/e2e-builds/security/assets/catalog-JSnM6hey.js                               88.19 kB │ gzip:  23.19 kB │ map:   337.41 kB
+.tmp/e2e-builds/security/assets/creation-controls-D2rTFVts.js                     89.50 kB │ gzip:  22.05 kB │ map:   347.92 kB
+.tmp/e2e-builds/security/assets/lib-2X-GrscE.js                                   91.09 kB │ gzip:  28.11 kB │ map:   514.74 kB
+.tmp/e2e-builds/security/assets/snapshot-D_Hbog2t.js                              91.92 kB │ gzip:  26.28 kB │ map:   412.78 kB
+.tmp/e2e-builds/security/assets/frozen-B3lTGGJM.js                                94.14 kB │ gzip:  28.31 kB │ map:   369.67 kB
+.tmp/e2e-builds/security/assets/route-BUL8_poY.js                                 95.00 kB │ gzip:  22.11 kB │ map:   323.65 kB
+.tmp/e2e-builds/security/assets/assets-DG3_57TX.js                                96.05 kB │ gzip:  25.19 kB │ map:   409.97 kB
+.tmp/e2e-builds/security/assets/zod-jitless-DtORgaTy.js                           99.65 kB │ gzip:  28.11 kB │ map:   537.78 kB
+.tmp/e2e-builds/security/assets/route-CloH6qj1.js                                105.90 kB │ gzip:  27.04 kB │ map:   401.25 kB
+.tmp/e2e-builds/security/assets/zip.js-D8F76fKl.js                               109.04 kB │ gzip:  50.52 kB │ map:   287.30 kB
+.tmp/e2e-builds/security/assets/result-boundary-D492WOtr.js                      122.39 kB │ gzip:  37.93 kB │ map:   566.50 kB
+.tmp/e2e-builds/security/assets/interactive-surface-By8FFKnv.js                  124.59 kB │ gzip:  32.75 kB │ map:   481.69 kB
+.tmp/e2e-builds/security/assets/LICENSE-DCkviCXI.js                              128.16 kB │ gzip:  90.26 kB │ map:   111.72 kB
+.tmp/e2e-builds/security/assets/catalog-refresh-ClnfXvJe.js                      129.24 kB │ gzip:  39.11 kB │ map:   465.41 kB
+.tmp/e2e-builds/security/assets/effect-bundle-CHePOt0P.js                        139.96 kB │ gzip:  32.92 kB │ map:    76.40 kB
+.tmp/e2e-builds/security/assets/validation-Q1MCJuB-.js                           142.23 kB │ gzip:  41.42 kB │ map:   628.69 kB
+.tmp/e2e-builds/security/assets/hook-D-vZMr8I.js                                 149.59 kB │ gzip:  38.65 kB │ map:   243.85 kB
+.tmp/e2e-builds/security/assets/boundary-CzBnnJys.js                             156.95 kB │ gzip:  31.33 kB │ map:   510.12 kB
+.tmp/e2e-builds/security/assets/index.html-Dw1K0uuB.js                           169.83 kB │ gzip:  43.87 kB │ map:   102.73 kB
+.tmp/e2e-builds/security/assets/time-estimate-B19Hkeod.js                        170.28 kB │ gzip:  51.09 kB │ map:   648.47 kB
+.tmp/e2e-builds/security/assets/designSystem.js                                  189.30 kB │ gzip:  42.85 kB │ map:   457.24 kB
+.tmp/e2e-builds/security/assets/client-MZJcuE2T.js                               206.83 kB │ gzip:  64.85 kB │ map:   998.16 kB
+.tmp/e2e-builds/security/assets/document-Dz1P00vV.js                             209.50 kB │ gzip:  47.56 kB │ map:   223.46 kB
+.tmp/e2e-builds/security/assets/html-document-C9cQCGPT.js                        223.67 kB │ gzip:  67.29 kB │ map:   852.12 kB
+.tmp/e2e-builds/security/assets/source-binding-wVuhfik1.js                       348.66 kB │ gzip:  95.03 kB │ map: 1,435.96 kB
+.tmp/e2e-builds/security/assets/scenarioEditor.js                                458.77 kB │ gzip: 127.53 kB │ map: 1,564.50 kB
+.tmp/e2e-builds/security/assets/src-B5swJ64W.js                                  702.99 kB │ gzip: 177.55 kB │ map: 2,953.41 kB
+.tmp/e2e-builds/security/assets/offscreen.js                                     733.48 kB │ gzip: 210.45 kB │ map: 2,366.82 kB
+.tmp/e2e-builds/security/assets/index.ts-8BAr1MbU.js                             768.23 kB │ gzip: 208.59 kB │ map: 3,355.07 kB
+.tmp/e2e-builds/security/assets/i18n-BA-hQlVG.js                                 864.53 kB │ gzip: 228.89 kB │ map: 1,449.42 kB
+.tmp/e2e-builds/security/assets/editor.js                                      1,031.02 kB │ gzip: 281.59 kB │ map: 3,721.80 kB
+.tmp/e2e-builds/security/assets/videoEditor.js                                 1,234.72 kB │ gzip: 327.58 kB │ map: 4,839.67 kB
+.tmp/e2e-builds/security/assets/gallery.js                                     1,240.00 kB │ gzip: 336.40 kB │ map: 4,534.71 kB
+.tmp/e2e-builds/security/assets/webSnapshotViewer.js                           1,654.32 kB │ gzip: 350.02 kB │ map: 4,068.63 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[INEFFECTIVE_DYNAMIC_IMPORT] apps/extension/src/workflows/media-hub/trash.ts is dynamically imported by apps/extension/src/workflows/media-hub/maintenance.ts but also statically imported by apps/extension/src/gallery/library/actions/preview.ts, apps/extension/src/gallery/library/actions/selection.ts, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] apps/extension/src/offscreen/recording/post-record-publication.ts is dynamically imported by apps/extension/src/offscreen/runtime/data-readiness.ts but also statically imported by apps/extension/src/offscreen/recording/controller.ts, apps/extension/src/offscreen/recording/finalizer.ts, apps/extension/src/offscreen/recording/multi-source/messages.ts, apps/extension/src/offscreen/recording/start/recorder.ts, dynamic import will not move module into another chunk.
+
+[plugin @tailwindcss/vite:generate:build] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (@tailwindcss/vite:generate:build) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+[plugin sniptale:zod-runtime-fallback] [SOURCEMAP_BROKEN] Sourcemap is likely to be incorrect: a plugin (sniptale:zod-runtime-fallback) was used to transform files, but didn't generate a sourcemap for the transformation. Consult the plugin documentation for help: https://rolldown.rs/guide/troubleshooting#warning-sourcemap-is-likely-to-be-incorrect
+
+✓ built in 44.33s

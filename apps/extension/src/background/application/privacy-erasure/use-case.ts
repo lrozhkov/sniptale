@@ -30,14 +30,25 @@ export class PrivacyErasureUseCase {
   constructor(private readonly ports: PrivacyErasurePorts) {}
 
   execute(request: PrivacyErasureRequest): Promise<LocalExtensionDataErasureResult> {
-    const audioExclusion = this.ports.audioJobs.reserveErasureExclusion();
-    const mediaExclusion = this.ports.media.reserveErasureExclusion();
-    const diagnosticsExclusion = this.ports.diagnostics.reserveErasureExclusion();
-    const nativeIngestionExclusion = this.ports.nativeIngestion.reserveErasureExclusion();
-    const pageRecoveryExclusion = this.ports.pageRecovery.reserveErasureExclusion();
-    const popupExportExclusion = this.ports.popupExport.reserveErasureExclusion();
+    const exclusions = reserveErasureExclusions(this.ports);
+    const {
+      audioExclusion,
+      mediaExclusion,
+      diagnosticsExclusion,
+      nativeIngestionExclusion,
+      pageRecoveryExclusion,
+      popupExportExclusion,
+      syncExclusion,
+    } = exclusions;
     const execution = this.executionQueue.then(async () => {
       try {
+        try {
+          await syncExclusion.quiesce();
+        } catch {
+          return createShortCircuitedErasureResult([
+            createFailedCleanupParticipant('sync-runtime-state', 'sync-quiescence-failed'),
+          ]);
+        }
         try {
           await this.ports.audioJobs.cancelActiveJob();
           await this.ports.popupExport.cancelActiveJob();
@@ -59,12 +70,7 @@ export class PrivacyErasureUseCase {
         ]);
         return await this.executeWithMutationsExcluded(request);
       } finally {
-        audioExclusion.release();
-        popupExportExclusion.release();
-        pageRecoveryExclusion.release();
-        nativeIngestionExclusion.release();
-        diagnosticsExclusion.release();
-        mediaExclusion.release();
+        exclusions.release();
       }
     });
     this.executionQueue = execution.then(
@@ -94,6 +100,32 @@ export class PrivacyErasureUseCase {
         createFailedCleanupParticipant('persistent-storage', 'storage-cleanup-failed'),
       ]);
     }
+  }
+}
+
+function reserveErasureExclusions(ports: PrivacyErasurePorts) {
+  const reservations: Array<{ release(): void }> = [];
+  function reserve<T extends { release(): void }>(reservation: T): T {
+    reservations.push(reservation);
+    return reservation;
+  }
+  function release() {
+    for (const reservation of [...reservations].reverse()) reservation.release();
+  }
+  try {
+    return {
+      syncExclusion: reserve(ports.sync.reserveErasureExclusion()),
+      audioExclusion: reserve(ports.audioJobs.reserveErasureExclusion()),
+      mediaExclusion: reserve(ports.media.reserveErasureExclusion()),
+      diagnosticsExclusion: reserve(ports.diagnostics.reserveErasureExclusion()),
+      nativeIngestionExclusion: reserve(ports.nativeIngestion.reserveErasureExclusion()),
+      pageRecoveryExclusion: reserve(ports.pageRecovery.reserveErasureExclusion()),
+      popupExportExclusion: reserve(ports.popupExport.reserveErasureExclusion()),
+      release,
+    };
+  } catch (error) {
+    release();
+    throw error;
   }
 }
 

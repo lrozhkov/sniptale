@@ -1,0 +1,2024 @@
+{
+  "date": "2026-10-29",
+  "candidateCommit": "d3332abd2670e8dd72218b02f0819b462fdba890",
+  "purpose": "Preserve the single ci:proof attempt and bounded correction evidence. This is not a passed complete CI proof.",
+  "initialAttempt": {
+    "runId": "ec0625f1-3cf6-49e8-824c-f193a91fb2dd",
+    "status": "incomplete",
+    "observation": "The process no longer exists; its record and coverage control remain running without a final result. The stop cause is unknown.",
+    "rerun": false,
+    "rerunPolicy": "The user explicitly prohibited another ci:proof invocation.",
+    "completedPassingControls": [
+      "installation",
+      "project-toolchain",
+      "workflow-validation (no relevant policy change)",
+      "canvas provisioning",
+      "ast-grep provisioning",
+      "production-build",
+      "product-format",
+      "product-typecheck",
+      "ast-grep",
+      "gitleaks",
+      "knip",
+      "license-inventory",
+      "osv-scanner"
+    ],
+    "failedControls": [
+      "jscpd",
+      "fetch-ownership",
+      "architecture-guardrails",
+      "repository-readability"
+    ],
+    "skippedControl": "CodeQL is excluded by the selected proof profile.",
+    "coverage": "Started but not completed; no coverage pass is claimed."
+  },
+  "corrections": {
+    "scope": "Consolidate repeated algorithms in existing owners, remove two value-import cycles, register the optional loopback fixture, correct immutable-data authority detection, and split long source lines. No new sync capability or required Docker CI.",
+    "initialCloneFindings": [
+      {
+        "id": "047bbda93e3bcbd0ee7d9fd36041f233d446b3b910f31c492eb4fc665a6994c1",
+        "pairKey": "46c45e60fd23d4fec218a380317b937f4807f538622523ffd22be8a732d9c5bf",
+        "format": "tsx",
+        "lines": 6,
+        "tokens": 61,
+        "firstFile": {
+          "path": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+          "start": 39,
+          "end": 44,
+          "startLoc": {
+            "line": 39,
+            "column": 28,
+            "position": 1867
+          },
+          "endLoc": {
+            "line": 44,
+            "column": 7,
+            "position": 2129
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
+          "start": 19,
+          "end": 24,
+          "startLoc": {
+            "line": 19,
+            "column": 22,
+            "position": 973
+          },
+          "endLoc": {
+            "line": 24,
+            "column": 7,
+            "position": 1235
+          }
+        }
+      },
+      {
+        "id": "075208a10b5d278976ecac712822abd27fba1a253f374465cc3fbf1c0920102f",
+        "pairKey": "51126b05f19871ca1e59606ece9613296e4fd22bcad10761cbcd01373e834022",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 75,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-image.ts",
+          "start": 138,
+          "end": 147,
+          "startLoc": {
+            "line": 138,
+            "column": 27,
+            "position": 5006
+          },
+          "endLoc": {
+            "line": 147,
+            "column": 11,
+            "position": 5378
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-review.ts",
+          "start": 99,
+          "end": 108,
+          "startLoc": {
+            "line": 99,
+            "column": 42,
+            "position": 4425
+          },
+          "endLoc": {
+            "line": 108,
+            "column": 11,
+            "position": 4797
+          }
+        }
+      },
+      {
+        "id": "0c4e8cfd2947f96b8b932f4392025058852b02dd470c3e8b745d0454836f1e5a",
+        "pairKey": "6914086b9a99d372d58b64dda74a2c0fa8d316646680670db0cb901c668cfe01",
+        "format": "typescript",
+        "lines": 6,
+        "tokens": 64,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
+          "start": 223,
+          "end": 227,
+          "startLoc": {
+            "line": 223,
+            "column": 2,
+            "position": 8420
+          },
+          "endLoc": {
+            "line": 227,
+            "column": 29,
+            "position": 8643
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
+          "start": 57,
+          "end": 62,
+          "startLoc": {
+            "line": 57,
+            "column": 2,
+            "position": 2538
+          },
+          "endLoc": {
+            "line": 62,
+            "column": 14,
+            "position": 2768
+          }
+        }
+      },
+      {
+        "id": "149102285fa4ebaa5162f24e15c3a75a6d12de49e03ca030e57a8eb1f6d771f4",
+        "pairKey": "2b4d0603fa0bf8ec0f3f5ba925dac4dc74a15675f7208308ccae07f9a2080f38",
+        "format": "typescript",
+        "lines": 7,
+        "tokens": 61,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-project.ts",
+          "start": 89,
+          "end": 95,
+          "startLoc": {
+            "line": 89,
+            "column": 36,
+            "position": 4003
+          },
+          "endLoc": {
+            "line": 95,
+            "column": 18,
+            "position": 4251
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-review.ts",
+          "start": 55,
+          "end": 61,
+          "startLoc": {
+            "line": 55,
+            "column": 36,
+            "position": 2523
+          },
+          "endLoc": {
+            "line": 61,
+            "column": 18,
+            "position": 2771
+          }
+        }
+      },
+      {
+        "id": "14b37aae466f76a48a9b51e5dfdbdf43d30942c2237ecc0f1f884750378d96e9",
+        "pairKey": "2bf3054166e450653d5fe31a1adf8868506af265c46cdc6739679a967d829067",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 84,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/webdav.ts",
+          "start": 342,
+          "end": 351,
+          "startLoc": {
+            "line": 342,
+            "column": 33,
+            "position": 12016
+          },
+          "endLoc": {
+            "line": 351,
+            "column": 95,
+            "position": 12406
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/webdav.ts",
+          "start": 401,
+          "end": 409,
+          "startLoc": {
+            "line": 401,
+            "column": 63,
+            "position": 14531
+          },
+          "endLoc": {
+            "line": 409,
+            "column": 99,
+            "position": 14952
+          }
+        }
+      },
+      {
+        "id": "1a6e17c60b75bc4242cc256dcc9bb330b1e1150a70905762c99d8f025e5c51d4",
+        "pairKey": "7b559c4d98fbdaa0e4ed23d492ee9e82d02fb12cfded1667c967644500534d3a",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 100,
+        "firstFile": {
+          "path": "apps/extension/src/background/sync-connection/coordinator.ts",
+          "start": 186,
+          "end": 195,
+          "startLoc": {
+            "line": 186,
+            "column": 72,
+            "position": 6897
+          },
+          "endLoc": {
+            "line": 195,
+            "column": 68,
+            "position": 7343
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/background/sync-connection/coordinator.ts",
+          "start": 416,
+          "end": 425,
+          "startLoc": {
+            "line": 416,
+            "column": 98,
+            "position": 15390
+          },
+          "endLoc": {
+            "line": 425,
+            "column": 68,
+            "position": 15836
+          }
+        }
+      },
+      {
+        "id": "3591b925e7d3916644b15ba9d0841f04a6868406dd0563ee3b92c3b8c8e73c8b",
+        "pairKey": "10273730acff9a0fab3f6d85d2e702c02affa761b47c1565fee5604c31efebb5",
+        "format": "typescript",
+        "lines": 8,
+        "tokens": 66,
+        "firstFile": {
+          "path": "apps/extension/src/contracts/messaging/contracts/runtime/sync-product.ts",
+          "start": 149,
+          "end": 156,
+          "startLoc": {
+            "line": 149,
+            "column": 2,
+            "position": 5604
+          },
+          "endLoc": {
+            "line": 156,
+            "column": 23,
+            "position": 5902
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/contracts/messaging/contracts/runtime/sync-product.ts",
+          "start": 625,
+          "end": 632,
+          "startLoc": {
+            "line": 625,
+            "column": 2,
+            "position": 22774
+          },
+          "endLoc": {
+            "line": 632,
+            "column": 23,
+            "position": 23072
+          }
+        }
+      },
+      {
+        "id": "39c62395f8df59cbc3d0b698bc6187a38652606ebd3dc5c492cf286a10f7980c",
+        "pairKey": "43529e7562c5908e664b2a37e38cb26cecf457e30714fd59e986808bf2800436",
+        "format": "typescript",
+        "lines": 18,
+        "tokens": 125,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/remote-connection/workspace-allocation.ts",
+          "start": 45,
+          "end": 62,
+          "startLoc": {
+            "line": 45,
+            "column": 64,
+            "position": 1709
+          },
+          "endLoc": {
+            "line": 62,
+            "column": 8,
+            "position": 2186
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/remote-connection/workspace-join.ts",
+          "start": 41,
+          "end": 58,
+          "startLoc": {
+            "line": 41,
+            "column": 58,
+            "position": 1527
+          },
+          "endLoc": {
+            "line": 58,
+            "column": 8,
+            "position": 2004
+          }
+        }
+      },
+      {
+        "id": "3b04c07e3a4ccf10c41c983c2b056389fa31cb53954a76725998b7730afb7322",
+        "pairKey": "52cb7547fa417952e2ae3d29e839a4fbb1c76b5f9272e0ffd3eb7fef7d321fb7",
+        "format": "typescript",
+        "lines": 9,
+        "tokens": 69,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-deletion.ts",
+          "start": 390,
+          "end": 398,
+          "startLoc": {
+            "line": 390,
+            "column": 0,
+            "position": 14976
+          },
+          "endLoc": {
+            "line": 398,
+            "column": 23,
+            "position": 15312
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-video-project.ts",
+          "start": 98,
+          "end": 106,
+          "startLoc": {
+            "line": 98,
+            "column": 0,
+            "position": 3700
+          },
+          "endLoc": {
+            "line": 106,
+            "column": 23,
+            "position": 4036
+          }
+        }
+      },
+      {
+        "id": "3b76255b18501fc81fb2d9da029d8f28164e5ae5fa7656ef78abb14d6e81dfaf",
+        "pairKey": "8272fb295427bbb959bb337339ac688d5ff91948597fc2c24732ac4050ba8028",
+        "format": "typescript",
+        "lines": 18,
+        "tokens": 60,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+          "start": 846,
+          "end": 863,
+          "startLoc": {
+            "line": 846,
+            "column": 25,
+            "position": 26333
+          },
+          "endLoc": {
+            "line": 863,
+            "column": 17,
+            "position": 26791
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+          "start": 890,
+          "end": 907,
+          "startLoc": {
+            "line": 890,
+            "column": 25,
+            "position": 27655
+          },
+          "endLoc": {
+            "line": 907,
+            "column": 17,
+            "position": 28113
+          }
+        }
+      },
+      {
+        "id": "40a33eba8265cd20311a5b461e96b3aa5ecf5e45fb6f64eb44dfea103c075730",
+        "pairKey": "0ba6521ea6c7f15e1f1fbf8ac32c6a73cfd0b9cf918c2fa9748d5bd152b6e55b",
+        "format": "typescript",
+        "lines": 11,
+        "tokens": 72,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/catalog-graph.ts",
+          "start": 292,
+          "end": 302,
+          "startLoc": {
+            "line": 292,
+            "column": 29,
+            "position": 10266
+          },
+          "endLoc": {
+            "line": 302,
+            "column": 16,
+            "position": 10549
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/catalog-graph.ts",
+          "start": 380,
+          "end": 390,
+          "startLoc": {
+            "line": 380,
+            "column": 36,
+            "position": 13155
+          },
+          "endLoc": {
+            "line": 390,
+            "column": 16,
+            "position": 13438
+          }
+        }
+      },
+      {
+        "id": "44610325ff625deb079926c83a7617f9932e87fd2533b558b1eb05706f547611",
+        "pairKey": "72ffaa34d2a0c08c9b70b1bd3f9d7ff9db3060f7f0bb725b9ca1c9966434d7be",
+        "format": "typescript",
+        "lines": 11,
+        "tokens": 76,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/capture.ts",
+          "start": 238,
+          "end": 248,
+          "startLoc": {
+            "line": 238,
+            "column": 68,
+            "position": 8717
+          },
+          "endLoc": {
+            "line": 248,
+            "column": 10,
+            "position": 9056
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/catalog-admission.ts",
+          "start": 68,
+          "end": 78,
+          "startLoc": {
+            "line": 68,
+            "column": 58,
+            "position": 2688
+          },
+          "endLoc": {
+            "line": 78,
+            "column": 10,
+            "position": 3027
+          }
+        }
+      },
+      {
+        "id": "458e5d91323dfba7bdd88cdbb8899e289d710dddfc970721cef572ac52f46097",
+        "pairKey": "20c8be43cba4662a0aeed3ade3fce215d5b4863612374b47384ff1d04aa0a84f",
+        "format": "typescript",
+        "lines": 31,
+        "tokens": 62,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
+          "start": 5,
+          "end": 35,
+          "startLoc": {
+            "line": 5,
+            "column": 0,
+            "position": 266
+          },
+          "endLoc": {
+            "line": 35,
+            "column": 39,
+            "position": 1155
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
+          "start": 1,
+          "end": 31,
+          "startLoc": {
+            "line": 1,
+            "column": 0,
+            "position": 0
+          },
+          "endLoc": {
+            "line": 31,
+            "column": 39,
+            "position": 889
+          }
+        }
+      },
+      {
+        "id": "4983353f135f1e91787f8b7fe0c600dc85a570be5fa3f6b81fcb9402695c1bb7",
+        "pairKey": "838caa425e46d0c8d68588ef27d319d4ec6f17e1bcaa676572adf26083bde64c",
+        "format": "typescript",
+        "lines": 9,
+        "tokens": 69,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-deletion.ts",
+          "start": 390,
+          "end": 398,
+          "startLoc": {
+            "line": 390,
+            "column": 0,
+            "position": 14976
+          },
+          "endLoc": {
+            "line": 398,
+            "column": 23,
+            "position": 15312
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-media.ts",
+          "start": 127,
+          "end": 135,
+          "startLoc": {
+            "line": 127,
+            "column": 0,
+            "position": 5047
+          },
+          "endLoc": {
+            "line": 135,
+            "column": 23,
+            "position": 5383
+          }
+        }
+      },
+      {
+        "id": "4e417d31652d88b3a51dace75828f9228aed74f915befacfde7b982454ffe3f0",
+        "pairKey": "cadcdb12a5ca8246a1b075f31bf6b61b693c86c064888e5b1ba11823901e1ddf",
+        "format": "tsx",
+        "lines": 6,
+        "tokens": 63,
+        "firstFile": {
+          "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+          "start": 580,
+          "end": 585,
+          "startLoc": {
+            "line": 580,
+            "column": 29,
+            "position": 21403
+          },
+          "endLoc": {
+            "line": 585,
+            "column": 50,
+            "position": 21756
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+          "start": 656,
+          "end": 661,
+          "startLoc": {
+            "line": 656,
+            "column": 24,
+            "position": 24996
+          },
+          "endLoc": {
+            "line": 661,
+            "column": 50,
+            "position": 25349
+          }
+        }
+      },
+      {
+        "id": "5192fb5186c192e8665e62fb9bf3959e495ef41f567d3a64cde95bd139c3eb52",
+        "pairKey": "53606d0ccd115bc5ae0508228ca372544bc63e7a60cd714b33e31643708282b1",
+        "format": "typescript",
+        "lines": 11,
+        "tokens": 60,
+        "firstFile": {
+          "path": "apps/extension/src/background/sync-connection/coordinator.ts",
+          "start": 385,
+          "end": 395,
+          "startLoc": {
+            "line": 385,
+            "column": 63,
+            "position": 14217
+          },
+          "endLoc": {
+            "line": 395,
+            "column": 17,
+            "position": 14549
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/background/sync-connection/coordinator.ts",
+          "start": 426,
+          "end": 436,
+          "startLoc": {
+            "line": 426,
+            "column": 74,
+            "position": 15911
+          },
+          "endLoc": {
+            "line": 436,
+            "column": 17,
+            "position": 16243
+          }
+        }
+      },
+      {
+        "id": "540db6125bd2159e617e84df05e0b949c4ca7c68ff7cd4c4ba6dea4c52e96c10",
+        "pairKey": "30212514205a0303942cfaba4d02ba0a6805c888a825afcc55533fd7c05fcede",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 74,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-media.ts",
+          "start": 551,
+          "end": 560,
+          "startLoc": {
+            "line": 551,
+            "column": 4,
+            "position": 20849
+          },
+          "endLoc": {
+            "line": 560,
+            "column": 9,
+            "position": 21275
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-media.ts",
+          "start": 600,
+          "end": 611,
+          "startLoc": {
+            "line": 600,
+            "column": 6,
+            "position": 22609
+          },
+          "endLoc": {
+            "line": 611,
+            "column": 11,
+            "position": 23069
+          }
+        }
+      },
+      {
+        "id": "553d75d8830b6b7104ed3de8737221bb32f6da7175b9db16c7bc4df20b122da9",
+        "pairKey": "51c419d693bb526a13dab70eb13a167572941f555e256ffe51521884ea54e39e",
+        "format": "typescript",
+        "lines": 9,
+        "tokens": 65,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/assets/residency-records.ts",
+          "start": 66,
+          "end": 74,
+          "startLoc": {
+            "line": 66,
+            "column": 25,
+            "position": 1939
+          },
+          "endLoc": {
+            "line": 74,
+            "column": 1,
+            "position": 2204
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/remote-connection/model.ts",
+          "start": 56,
+          "end": 64,
+          "startLoc": {
+            "line": 56,
+            "column": 26,
+            "position": 1761
+          },
+          "endLoc": {
+            "line": 64,
+            "column": 1,
+            "position": 2026
+          }
+        }
+      },
+      {
+        "id": "57234685e48c2ac9784972c5d20c70e23a16b785935b773a1fb290d059857453",
+        "pairKey": "f4201c971011812fe1b3cf9a98a78d703331e4c508f4e1c5c8a2ee928b6de2fa",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 60,
+        "firstFile": {
+          "path": "apps/extension/src/contracts/messaging/contracts/runtime/sync-product.ts",
+          "start": 174,
+          "end": 183,
+          "startLoc": {
+            "line": 174,
+            "column": 64,
+            "position": 6709
+          },
+          "endLoc": {
+            "line": 183,
+            "column": 10,
+            "position": 6965
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/contracts/messaging/contracts/runtime/sync-product.ts",
+          "start": 607,
+          "end": 616,
+          "startLoc": {
+            "line": 607,
+            "column": 33,
+            "position": 22078
+          },
+          "endLoc": {
+            "line": 616,
+            "column": 10,
+            "position": 22334
+          }
+        }
+      },
+      {
+        "id": "58ed94175b9b9a37405717a70af604647c3a0e54eef11328c03bbf172b037aaf",
+        "pairKey": "7617ec88ca7c4faab9b0746e07ffebe93dd6d4425f0a1730df99c1f0712f357d",
+        "format": "typescript",
+        "lines": 6,
+        "tokens": 61,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-image.ts",
+          "start": 122,
+          "end": 127,
+          "startLoc": {
+            "line": 122,
+            "column": 0,
+            "position": 4362
+          },
+          "endLoc": {
+            "line": 127,
+            "column": 1,
+            "position": 4630
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-scenario.ts",
+          "start": 64,
+          "end": 69,
+          "startLoc": {
+            "line": 64,
+            "column": 0,
+            "position": 2668
+          },
+          "endLoc": {
+            "line": 69,
+            "column": 1,
+            "position": 2936
+          }
+        }
+      },
+      {
+        "id": "59dcf235dc73009a980c7fd023205974af781449e9e48cbee4f9242a8cb2c8cd",
+        "pairKey": "b8b950e37fead0270e055882ae92e089552e6e1d0b878830cff64d97ff5fe587",
+        "format": "typescript",
+        "lines": 15,
+        "tokens": 74,
+        "firstFile": {
+          "path": "apps/extension/src/contracts/messaging/contracts/runtime/sync-connection.ts",
+          "start": 379,
+          "end": 393,
+          "startLoc": {
+            "line": 379,
+            "column": 46,
+            "position": 14207
+          },
+          "endLoc": {
+            "line": 393,
+            "column": 15,
+            "position": 14650
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/contracts/messaging/contracts/runtime/sync-connection.ts",
+          "start": 393,
+          "end": 406,
+          "startLoc": {
+            "line": 393,
+            "column": 79,
+            "position": 14714
+          },
+          "endLoc": {
+            "line": 406,
+            "column": 15,
+            "position": 15131
+          }
+        }
+      },
+      {
+        "id": "6346e068ac34027799aef9083b625dc2de813f97625b7ef16c81950d43c8b5a3",
+        "pairKey": "5557964be4329f7e72472396a308958c680420293de501e8f004bd522392a2e1",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 63,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
+          "start": 276,
+          "end": 285,
+          "startLoc": {
+            "line": 276,
+            "column": 44,
+            "position": 10619
+          },
+          "endLoc": {
+            "line": 285,
+            "column": 12,
+            "position": 10875
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/prepared-scenario.ts",
+          "start": 200,
+          "end": 209,
+          "startLoc": {
+            "line": 200,
+            "column": 42,
+            "position": 7720
+          },
+          "endLoc": {
+            "line": 209,
+            "column": 12,
+            "position": 7976
+          }
+        }
+      },
+      {
+        "id": "6b9c2618b57ffe220a7dc98a2c1c89d099d9b5f5fd5a5d076c623d81001e79a4",
+        "pairKey": "0d64347842e110d4598199b9a7a23cc99e30fdfe3dc9b4c1d59897dca7d6feab",
+        "format": "typescript",
+        "lines": 20,
+        "tokens": 131,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/incoming.ts",
+          "start": 595,
+          "end": 614,
+          "startLoc": {
+            "line": 595,
+            "column": 84,
+            "position": 22583
+          },
+          "endLoc": {
+            "line": 614,
+            "column": 7,
+            "position": 23395
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/incoming.ts",
+          "start": 89,
+          "end": 108,
+          "startLoc": {
+            "line": 89,
+            "column": 15,
+            "position": 3821
+          },
+          "endLoc": {
+            "line": 108,
+            "column": 5,
+            "position": 4595
+          }
+        }
+      },
+      {
+        "id": "80927d095c3cf46b9c4d5d5e7f095d9e1c6e961c0a6a9ad0d474b8a33f0250bd",
+        "pairKey": "183655995612f0c558fc3453e9a782e7ab4c14fbacb7c00220cc7e761f494f0e",
+        "format": "typescript",
+        "lines": 14,
+        "tokens": 63,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/prepared-review.ts",
+          "start": 169,
+          "end": 182,
+          "startLoc": {
+            "line": 169,
+            "column": 61,
+            "position": 7759
+          },
+          "endLoc": {
+            "line": 182,
+            "column": 5,
+            "position": 8160
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/prepared-root.ts",
+          "start": 557,
+          "end": 570,
+          "startLoc": {
+            "line": 557,
+            "column": 81,
+            "position": 22673
+          },
+          "endLoc": {
+            "line": 570,
+            "column": 5,
+            "position": 23074
+          }
+        }
+      },
+      {
+        "id": "80c53ef358688dc95ee4f7b2867d06b492fb9634a6069c5551a4f11b9642f66f",
+        "pairKey": "95b1a431e13f122d0c8d8ffa1164064382785e6d0499db2eb3ceab16080fba10",
+        "format": "typescript",
+        "lines": 8,
+        "tokens": 63,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/media-hub-backup/v6/restore.ts",
+          "start": 101,
+          "end": 108,
+          "startLoc": {
+            "line": 101,
+            "column": 82,
+            "position": 3663
+          },
+          "endLoc": {
+            "line": 108,
+            "column": 21,
+            "position": 3925
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/outgoing.ts",
+          "start": 143,
+          "end": 150,
+          "startLoc": {
+            "line": 143,
+            "column": 16,
+            "position": 5169
+          },
+          "endLoc": {
+            "line": 150,
+            "column": 21,
+            "position": 5431
+          }
+        }
+      },
+      {
+        "id": "83e0f4144d8120ea6804d4bb6f417d8901efee7e97a40cb5033ac41544245b5f",
+        "pairKey": "5a55f5b2907a4e6169645dbf9a31ea90b999410a01b6cd211857063161cf2e29",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 83,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-image.ts",
+          "start": 57,
+          "end": 66,
+          "startLoc": {
+            "line": 57,
+            "column": 67,
+            "position": 2470
+          },
+          "endLoc": {
+            "line": 66,
+            "column": 7,
+            "position": 2891
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-review.ts",
+          "start": 53,
+          "end": 61,
+          "startLoc": {
+            "line": 53,
+            "column": 74,
+            "position": 2443
+          },
+          "endLoc": {
+            "line": 61,
+            "column": 7,
+            "position": 2760
+          }
+        }
+      },
+      {
+        "id": "8ad1f5e4b515627404d2fede88aafea218540def942f572ca22a03286dd49f8f",
+        "pairKey": "0fb7561909197db8dbf3e411d63c3f31b67f35bba001673dfb5099c9fe2e8728",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 68,
+        "firstFile": {
+          "path": "apps/extension/src/background/sync-connection/offscreen-gateway.ts",
+          "start": 113,
+          "end": 122,
+          "startLoc": {
+            "line": 113,
+            "column": 8,
+            "position": 4334
+          },
+          "endLoc": {
+            "line": 122,
+            "column": 9,
+            "position": 4756
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/background/sync-connection/offscreen-gateway.ts",
+          "start": 133,
+          "end": 142,
+          "startLoc": {
+            "line": 133,
+            "column": 8,
+            "position": 5151
+          },
+          "endLoc": {
+            "line": 142,
+            "column": 9,
+            "position": 5573
+          }
+        }
+      },
+      {
+        "id": "8bbfa475b5fdebdd7091d6656683d1cb8f814f47937018d1d3633205dbe7bdf5",
+        "pairKey": "2e9ac6e7e686a83360476c7383b87704eb4dfe4fdca0cbc5ebb9b944fa8e4d55",
+        "format": "tsx",
+        "lines": 20,
+        "tokens": 115,
+        "firstFile": {
+          "path": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+          "start": 289,
+          "end": 308,
+          "startLoc": {
+            "line": 289,
+            "column": 13,
+            "position": 10467
+          },
+          "endLoc": {
+            "line": 308,
+            "column": 1,
+            "position": 11015
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
+          "start": 262,
+          "end": 281,
+          "startLoc": {
+            "line": 262,
+            "column": 11,
+            "position": 9058
+          },
+          "endLoc": {
+            "line": 281,
+            "column": 1,
+            "position": 9606
+          }
+        }
+      },
+      {
+        "id": "8c3becaf26c3a6f15d0e3d8c548b94b54536469db51900b030b7b63da47865e0",
+        "pairKey": "feacfc41604f95d382afa8c2ef7582446f59fba465fed3b812b09c4c71860516",
+        "format": "typescript",
+        "lines": 13,
+        "tokens": 103,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-image.ts",
+          "start": 57,
+          "end": 69,
+          "startLoc": {
+            "line": 57,
+            "column": 67,
+            "position": 2470
+          },
+          "endLoc": {
+            "line": 69,
+            "column": 45,
+            "position": 3017
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-root.ts",
+          "start": 88,
+          "end": 97,
+          "startLoc": {
+            "line": 88,
+            "column": 95,
+            "position": 4030
+          },
+          "endLoc": {
+            "line": 97,
+            "column": 84,
+            "position": 4479
+          }
+        }
+      },
+      {
+        "id": "8d83d372bd947fe2bff49ba577c8ba583eb089902b6fd171c97df585a6766702",
+        "pairKey": "d3466cb81c5b4cdc4ad329d6c6b809b5c313a0eab9fd4dc7cd342fad767df917",
+        "format": "tsx",
+        "lines": 15,
+        "tokens": 88,
+        "firstFile": {
+          "path": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+          "start": 192,
+          "end": 206,
+          "startLoc": {
+            "line": 192,
+            "column": 58,
+            "position": 7202
+          },
+          "endLoc": {
+            "line": 206,
+            "column": 31,
+            "position": 7638
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
+          "start": 139,
+          "end": 153,
+          "startLoc": {
+            "line": 139,
+            "column": 58,
+            "position": 5007
+          },
+          "endLoc": {
+            "line": 153,
+            "column": 31,
+            "position": 5443
+          }
+        }
+      },
+      {
+        "id": "954a56a6a8010fdeee8d70eac5b08a15c02c1e2e1ce55dc94bf27df7a493f869",
+        "pairKey": "604e9b38eeef1a9bed877668f96a44833be4bc06e6074a8537b9d0e8309b5faa",
+        "format": "typescript",
+        "lines": 12,
+        "tokens": 86,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/image-snapshot.ts",
+          "start": 53,
+          "end": 64,
+          "startLoc": {
+            "line": 53,
+            "column": 80,
+            "position": 2414
+          },
+          "endLoc": {
+            "line": 64,
+            "column": 44,
+            "position": 2764
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/media-snapshot.ts",
+          "start": 30,
+          "end": 42,
+          "startLoc": {
+            "line": 30,
+            "column": 4,
+            "position": 1573
+          },
+          "endLoc": {
+            "line": 42,
+            "column": 44,
+            "position": 1929
+          }
+        }
+      },
+      {
+        "id": "9565151ed2038da493c93fb10e6f087de6b344fde9f01906e10460406af2ceb5",
+        "pairKey": "2fa264608f750d3b31207c3cb1b9e2045b15a858d67b935d5e94620e26347cd6",
+        "format": "typescript",
+        "lines": 8,
+        "tokens": 66,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/incoming.ts",
+          "start": 137,
+          "end": 144,
+          "startLoc": {
+            "line": 137,
+            "column": 2,
+            "position": 5534
+          },
+          "endLoc": {
+            "line": 144,
+            "column": 29,
+            "position": 5817
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/outgoing.ts",
+          "start": 345,
+          "end": 352,
+          "startLoc": {
+            "line": 345,
+            "column": 4,
+            "position": 12609
+          },
+          "endLoc": {
+            "line": 352,
+            "column": 31,
+            "position": 12906
+          }
+        }
+      },
+      {
+        "id": "9bc52f69a9f516ec88375e9e37ad234d5ca731f7769cf92951d93e2b6d88ea4d",
+        "pairKey": "b2df174d6019d4b12d32955ff91bedccdcc6f68a5fa68eb9c19a96978f449428",
+        "format": "typescript",
+        "lines": 18,
+        "tokens": 64,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+          "start": 846,
+          "end": 863,
+          "startLoc": {
+            "line": 846,
+            "column": 25,
+            "position": 26333
+          },
+          "endLoc": {
+            "line": 863,
+            "column": 39,
+            "position": 26813
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+          "start": 868,
+          "end": 885,
+          "startLoc": {
+            "line": 868,
+            "column": 25,
+            "position": 26994
+          },
+          "endLoc": {
+            "line": 885,
+            "column": 39,
+            "position": 27474
+          }
+        }
+      },
+      {
+        "id": "a1e3f6ae35fb1ce8f65f3bad5ef8585819c96f63db5acecff2862e2a49ba9efc",
+        "pairKey": "4e897577a837fb4aff7e53f85e15f7d2792f47ef7401453865f8972cf7f08a91",
+        "format": "typescript",
+        "lines": 20,
+        "tokens": 63,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+          "start": 143,
+          "end": 162,
+          "startLoc": {
+            "line": 143,
+            "column": 40,
+            "position": 5573
+          },
+          "endLoc": {
+            "line": 162,
+            "column": 14,
+            "position": 5975
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+          "start": 311,
+          "end": 329,
+          "startLoc": {
+            "line": 311,
+            "column": 39,
+            "position": 11529
+          },
+          "endLoc": {
+            "line": 329,
+            "column": 14,
+            "position": 11923
+          }
+        }
+      },
+      {
+        "id": "a57d1d5da73d4e62fce125a147c2110b7448401dd8ba5d4fe3e08f19477a7708",
+        "pairKey": "8c98b0ffbfbc90548d320fc2823e0209cb1f361a52f7786837c90150e8499c02",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 63,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/capture.ts",
+          "start": 162,
+          "end": 171,
+          "startLoc": {
+            "line": 162,
+            "column": 79,
+            "position": 5784
+          },
+          "endLoc": {
+            "line": 171,
+            "column": 32,
+            "position": 6078
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/capture.ts",
+          "start": 335,
+          "end": 344,
+          "startLoc": {
+            "line": 335,
+            "column": 66,
+            "position": 12701
+          },
+          "endLoc": {
+            "line": 344,
+            "column": 32,
+            "position": 12995
+          }
+        }
+      },
+      {
+        "id": "af21be46deee48a63e65cadd2dad5a66523a0383bb2945903438cbbbcffe9d75",
+        "pairKey": "9b97a283ae29cd1fb96cc020723599aace8c50fd00fcd9d1cefd4a5b551e683a",
+        "format": "typescript",
+        "lines": 9,
+        "tokens": 91,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/image-snapshot.ts",
+          "start": 45,
+          "end": 53,
+          "startLoc": {
+            "line": 45,
+            "column": 82,
+            "position": 1983
+          },
+          "endLoc": {
+            "line": 53,
+            "column": 80,
+            "position": 2414
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/media-snapshot.ts",
+          "start": 18,
+          "end": 28,
+          "startLoc": {
+            "line": 18,
+            "column": 53,
+            "position": 1078
+          },
+          "endLoc": {
+            "line": 28,
+            "column": 54,
+            "position": 1522
+          }
+        }
+      },
+      {
+        "id": "b61b095b73a9df0e3ae4594cf88bcf7f2b8f15a6534c74ce7d243d7fef8224ad",
+        "pairKey": "558dd0775b4a6b8b0ba859e3f2ed21f7f965e149dbe9398f246bfe60a1ad0527",
+        "format": "typescript",
+        "lines": 8,
+        "tokens": 70,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/guards.ts",
+          "start": 209,
+          "end": 216,
+          "startLoc": {
+            "line": 209,
+            "column": 20,
+            "position": 6831
+          },
+          "endLoc": {
+            "line": 216,
+            "column": 1,
+            "position": 7080
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/outgoing-attempts.ts",
+          "start": 62,
+          "end": 69,
+          "startLoc": {
+            "line": 62,
+            "column": 23,
+            "position": 2116
+          },
+          "endLoc": {
+            "line": 69,
+            "column": 1,
+            "position": 2365
+          }
+        }
+      },
+      {
+        "id": "ba7ed4ca2c0c0b71789e72350a64b43b29e881a66d7a234ede1cfeebeefc9f79",
+        "pairKey": "a34255fdd6485dfef8accaf21a96d2a10eab7b19201622defad1f13bb7af70eb",
+        "format": "typescript",
+        "lines": 9,
+        "tokens": 60,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-video-project.ts",
+          "start": 377,
+          "end": 385,
+          "startLoc": {
+            "line": 377,
+            "column": 70,
+            "position": 14091
+          },
+          "endLoc": {
+            "line": 385,
+            "column": 10,
+            "position": 14364
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/scenario-dependencies.ts",
+          "start": 119,
+          "end": 127,
+          "startLoc": {
+            "line": 119,
+            "column": 79,
+            "position": 4853
+          },
+          "endLoc": {
+            "line": 127,
+            "column": 10,
+            "position": 5126
+          }
+        }
+      },
+      {
+        "id": "caad5d3ff78ec78eacbbed967c7a5065a0a0221f8a5cf16091a22dc44bbc45a7",
+        "pairKey": "13df726eaf569080675c022ea4fb85f1fa82b902cb34994033985196d5b02e28",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 66,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/assets/residency-maintenance.ts",
+          "start": 572,
+          "end": 581,
+          "startLoc": {
+            "line": 572,
+            "column": 2,
+            "position": 21940
+          },
+          "endLoc": {
+            "line": 581,
+            "column": 20,
+            "position": 22273
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/assets/residency-maintenance.ts",
+          "start": 603,
+          "end": 612,
+          "startLoc": {
+            "line": 603,
+            "column": 4,
+            "position": 23172
+          },
+          "endLoc": {
+            "line": 612,
+            "column": 22,
+            "position": 23523
+          }
+        }
+      },
+      {
+        "id": "cd5816d592b7a05ff71d17027d8e40d743719753a6758b8357a75f59e13bce84",
+        "pairKey": "7fb5e882c7a813d68c05ccbf847235715943638493a89887388a097e31c09deb",
+        "format": "typescript",
+        "lines": 7,
+        "tokens": 75,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-media.ts",
+          "start": 102,
+          "end": 108,
+          "startLoc": {
+            "line": 102,
+            "column": 38,
+            "position": 4256
+          },
+          "endLoc": {
+            "line": 108,
+            "column": 89,
+            "position": 4584
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-video-project.ts",
+          "start": 765,
+          "end": 771,
+          "startLoc": {
+            "line": 765,
+            "column": 93,
+            "position": 28423
+          },
+          "endLoc": {
+            "line": 771,
+            "column": 89,
+            "position": 28751
+          }
+        }
+      },
+      {
+        "id": "d734f56fc06fb753be332a90595ab21156029200d86f1fc9a12962842a897af2",
+        "pairKey": "512f61231bfb3d40a7ad741c1de3a3803814f0415fdafffca9b5b1c0fbf552ac",
+        "format": "typescript",
+        "lines": 11,
+        "tokens": 79,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/freeze.ts",
+          "start": 549,
+          "end": 559,
+          "startLoc": {
+            "line": 549,
+            "column": 28,
+            "position": 23155
+          },
+          "endLoc": {
+            "line": 559,
+            "column": 23,
+            "position": 23600
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/project-snapshot.ts",
+          "start": 439,
+          "end": 449,
+          "startLoc": {
+            "line": 439,
+            "column": 33,
+            "position": 17172
+          },
+          "endLoc": {
+            "line": 449,
+            "column": 23,
+            "position": 17617
+          }
+        }
+      },
+      {
+        "id": "daca3d7a4d34173ab3949d77c9571b11384c1ffb824451330d7e69a5ef9dd5ae",
+        "pairKey": "0e7a6a1f4da0b5c3f32288f02c7728c63954fea996d6409a3f7442b170c673cc",
+        "format": "typescript",
+        "lines": 9,
+        "tokens": 64,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-review.ts",
+          "start": 141,
+          "end": 149,
+          "startLoc": {
+            "line": 141,
+            "column": 46,
+            "position": 6116
+          },
+          "endLoc": {
+            "line": 149,
+            "column": 3,
+            "position": 6399
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-scenario.ts",
+          "start": 104,
+          "end": 112,
+          "startLoc": {
+            "line": 104,
+            "column": 11,
+            "position": 4416
+          },
+          "endLoc": {
+            "line": 112,
+            "column": 5,
+            "position": 4715
+          }
+        }
+      },
+      {
+        "id": "e09b161473dfa31fb6a0152575d8cbfbc71534a8635963ee4ae21b0d3c67363b",
+        "pairKey": "81418fde75b63c57be1180a7bc94a0791c80ed6ebee47c471e145e2008c61133",
+        "format": "typescript",
+        "lines": 8,
+        "tokens": 61,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-media.ts",
+          "start": 220,
+          "end": 227,
+          "startLoc": {
+            "line": 220,
+            "column": 2,
+            "position": 8510
+          },
+          "endLoc": {
+            "line": 227,
+            "column": 3,
+            "position": 8828
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-media.ts",
+          "start": 266,
+          "end": 273,
+          "startLoc": {
+            "line": 266,
+            "column": 2,
+            "position": 10386
+          },
+          "endLoc": {
+            "line": 273,
+            "column": 3,
+            "position": 10704
+          }
+        }
+      },
+      {
+        "id": "e1ba83e628bf877f77b96576308f328ee3b0ac987c64b0e52d8933df403d163d",
+        "pairKey": "bf362dbfc514f1f4ffc3d6e0fb9842808bcf7f35ca58d4945c63b39862624ad4",
+        "format": "typescript",
+        "lines": 13,
+        "tokens": 103,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-image.ts",
+          "start": 57,
+          "end": 69,
+          "startLoc": {
+            "line": 57,
+            "column": 67,
+            "position": 2470
+          },
+          "endLoc": {
+            "line": 69,
+            "column": 45,
+            "position": 3017
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-scenario.ts",
+          "start": 100,
+          "end": 109,
+          "startLoc": {
+            "line": 100,
+            "column": 67,
+            "position": 4799
+          },
+          "endLoc": {
+            "line": 109,
+            "column": 82,
+            "position": 5230
+          }
+        }
+      },
+      {
+        "id": "edc535f68128749edf5b51cbe47748b07969d6b76fc459b094501e36e52246fd",
+        "pairKey": "01db5ddd66a9dc2e7a26ce52d9c9ab51b806e79f6d586e6772e02c7bee1dc913",
+        "format": "typescript",
+        "lines": 14,
+        "tokens": 74,
+        "firstFile": {
+          "path": "apps/extension/src/offscreen/sync-connection/execution.ts",
+          "start": 61,
+          "end": 74,
+          "startLoc": {
+            "line": 61,
+            "column": 2,
+            "position": 2992
+          },
+          "endLoc": {
+            "line": 74,
+            "column": 15,
+            "position": 3456
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/offscreen/sync-connection/product-execution.ts",
+          "start": 176,
+          "end": 189,
+          "startLoc": {
+            "line": 176,
+            "column": 2,
+            "position": 6805
+          },
+          "endLoc": {
+            "line": 189,
+            "column": 15,
+            "position": 7269
+          }
+        }
+      },
+      {
+        "id": "ee6f500b1b84da964e78623eb919cb0da7584c2463d24a1627afc730cdf4a19c",
+        "pairKey": "2ac0acaf11be2611216691882992b9ec05c31eabb9d868b7fc25cddc17adf87c",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 83,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-image.ts",
+          "start": 57,
+          "end": 66,
+          "startLoc": {
+            "line": 57,
+            "column": 67,
+            "position": 2470
+          },
+          "endLoc": {
+            "line": 66,
+            "column": 7,
+            "position": 2891
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-project.ts",
+          "start": 87,
+          "end": 95,
+          "startLoc": {
+            "line": 87,
+            "column": 69,
+            "position": 3923
+          },
+          "endLoc": {
+            "line": 95,
+            "column": 7,
+            "position": 4240
+          }
+        }
+      },
+      {
+        "id": "ef15b8a0f3807dac441a76885d55815bf3699d8ed04049b167e6a6d6e35c8834",
+        "pairKey": "0eaf16540b0f0489a18547cd358b951173d79570c0d8f3bf81c0eb487d77e0a7",
+        "format": "typescript",
+        "lines": 15,
+        "tokens": 90,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/connection-requests.ts",
+          "start": 102,
+          "end": 116,
+          "startLoc": {
+            "line": 102,
+            "column": 6,
+            "position": 3919
+          },
+          "endLoc": {
+            "line": 116,
+            "column": 1,
+            "position": 4333
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/connection-requests.ts",
+          "start": 162,
+          "end": 176,
+          "startLoc": {
+            "line": 162,
+            "column": 6,
+            "position": 6075
+          },
+          "endLoc": {
+            "line": 176,
+            "column": 1,
+            "position": 6489
+          }
+        }
+      },
+      {
+        "id": "efc362aaa73d7e9f50f7a518636121e379f8302ceb8f63a3e3d28c30b6daf82d",
+        "pairKey": "be3befd2ed9ac6806efe0811385c7216ced08d06a22b6dede607561f2a69a745",
+        "format": "typescript",
+        "lines": 9,
+        "tokens": 67,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/incoming.ts",
+          "start": 414,
+          "end": 422,
+          "startLoc": {
+            "line": 414,
+            "column": 70,
+            "position": 15430
+          },
+          "endLoc": {
+            "line": 422,
+            "column": 21,
+            "position": 15761
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/incoming.ts",
+          "start": 446,
+          "end": 454,
+          "startLoc": {
+            "line": 446,
+            "column": 19,
+            "position": 16616
+          },
+          "endLoc": {
+            "line": 454,
+            "column": 21,
+            "position": 16947
+          }
+        }
+      },
+      {
+        "id": "f3653e63867796cc58b3b4f7e71376ed5104dc22ee590275ac46dc2e62c14323",
+        "pairKey": "d636f69f60d51058042d0383b797a1310ba1d695579b35587aa5ceeb802f9d54",
+        "format": "typescript",
+        "lines": 15,
+        "tokens": 100,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/project-snapshot.ts",
+          "start": 352,
+          "end": 366,
+          "startLoc": {
+            "line": 352,
+            "column": 28,
+            "position": 14150
+          },
+          "endLoc": {
+            "line": 366,
+            "column": 8,
+            "position": 14696
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/review-snapshot.ts",
+          "start": 37,
+          "end": 50,
+          "startLoc": {
+            "line": 37,
+            "column": 20,
+            "position": 1948
+          },
+          "endLoc": {
+            "line": 50,
+            "column": 8,
+            "position": 2410
+          }
+        }
+      },
+      {
+        "id": "f7e0b011d1681bada5c1f68a30d995d826dd5c29cc2091123b11faa3edb33c77",
+        "pairKey": "684f517e43231145d8fb9c1af446516036738b526a807cbce387868f3bcfb8be",
+        "format": "typescript",
+        "lines": 9,
+        "tokens": 65,
+        "firstFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-media.ts",
+          "start": 128,
+          "end": 136,
+          "startLoc": {
+            "line": 128,
+            "column": 8,
+            "position": 5083
+          },
+          "endLoc": {
+            "line": 136,
+            "column": 12,
+            "position": 5416
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/composition/persistence/sync-capture/apply-video-project.ts",
+          "start": 99,
+          "end": 107,
+          "startLoc": {
+            "line": 99,
+            "column": 8,
+            "position": 3736
+          },
+          "endLoc": {
+            "line": 107,
+            "column": 12,
+            "position": 4069
+          }
+        }
+      },
+      {
+        "id": "fa7cc187166678716e469e4e19b6c1aa68c5f959543f18ece13f5951b81f1809",
+        "pairKey": "4c4fe2bc522d883207792bb698596283f6a862ed23be86b7d9914076a8743845",
+        "format": "typescript",
+        "lines": 11,
+        "tokens": 107,
+        "firstFile": {
+          "path": "apps/extension/src/background/sync-connection/coordinator.ts",
+          "start": 414,
+          "end": 424,
+          "startLoc": {
+            "line": 414,
+            "column": 68,
+            "position": 15212
+          },
+          "endLoc": {
+            "line": 424,
+            "column": 24,
+            "position": 15767
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/background/sync-connection/coordinator.ts",
+          "start": 465,
+          "end": 475,
+          "startLoc": {
+            "line": 465,
+            "column": 76,
+            "position": 17248
+          },
+          "endLoc": {
+            "line": 475,
+            "column": 24,
+            "position": 17803
+          }
+        }
+      },
+      {
+        "id": "fcc20f8273ad5bf412e96c48bfdaccf2cb373c625ff30c7a6d0a8c540e02753e",
+        "pairKey": "74eb8c7df2cdf36fb7e356ecc33057d9a34b97e14d383df58ddeb63c6c651dd9",
+        "format": "typescript",
+        "lines": 10,
+        "tokens": 82,
+        "firstFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-root.ts",
+          "start": 92,
+          "end": 101,
+          "startLoc": {
+            "line": 92,
+            "column": 38,
+            "position": 4185
+          },
+          "endLoc": {
+            "line": 101,
+            "column": 9,
+            "position": 4568
+          }
+        },
+        "secondFile": {
+          "path": "apps/extension/src/workflows/sync-transfer/captured-scenario.ts",
+          "start": 104,
+          "end": 113,
+          "startLoc": {
+            "line": 104,
+            "column": 36,
+            "position": 4946
+          },
+          "endLoc": {
+            "line": 113,
+            "column": 7,
+            "position": 5311
+          }
+        }
+      }
+    ],
+    "nonAlgorithmCloneRecords": "Three exact historical records refreshed. Three additional exact records cover a historical migration descriptor, distinct parser scaffolding, and destructuring the common cache feedback owner. Each record retains owner, rationale and removal condition; no detector threshold or scan-root change.",
+    "escapedQa": "Earlier closeout used its candidate and affected scope; this run scanned the complete repository. Repository-wide ownership/readability/clone findings therefore remained outside the last small portability diff.",
+    "deterministicGuard": "Existing blocking guards remain enabled. The authority heuristic has new mutable, immutable, spoofed-import and nonliteral fixtures; metadata traversal has a regression test for Blob and null-prototype policies."
+  },
+  "directCorrectionProof": {
+    "typecheck": "passed",
+    "focusedTests": {
+      "files": 104,
+      "passed": 2258,
+      "failed": 0
+    },
+    "jscpd": "passed",
+    "repository-readability": "passed",
+    "fetch-ownership": "passed",
+    "architecture-guardrails": "passed",
+    "limit": "These direct results do not replace the incomplete full CI proof. Subsequent mandatory checkpoint and review results are reported separately.",
+    "capacityUnderV8Coverage": {
+      "status": "passed",
+      "files": 1,
+      "tests": 20,
+      "durationSeconds": 10.22,
+      "testTimeoutMs": 15000,
+      "rootCount": 10000,
+      "fixtureChange": "Reuse the parsed template for deterministic identities instead of reparsing every fixture operation. Keep real JSON and record hashes; parse first and last serialized operations and compare their complete values. All original no-read/no-publication assertions remain."
+    }
+  },
+  "archivedFiles": [
+    {
+      "source": "tasks/WebDAV/ci-proof-2026-10-29.log",
+      "sourceSha256": "9ec93874364020785a9703c1e95ec86c591f2e376d21f65d88a2f25122138440",
+      "file": "CI-PROOF-INITIAL.log",
+      "sha256": "9ec93874364020785a9703c1e95ec86c591f2e376d21f65d88a2f25122138440"
+    },
+    {
+      "source": ".tmp/qa-logs/2026-10-29/ec0625f1-3cf6-49e8-824c-f193a91fb2dd.log",
+      "sourceSha256": "c6d13a88c518960677a104ef9331fdea2d4f60671053942c3b0c866dc077c580",
+      "file": "CI-PROOF-INITIAL-PRODUCT-REPORT.log",
+      "sha256": "c6d13a88c518960677a104ef9331fdea2d4f60671053942c3b0c866dc077c580"
+    },
+    {
+      "source": "tasks/WebDAV/ci-proof-corrections-focused-corrected.log",
+      "sourceSha256": "b4df9d11a7f5b2585245d6f57dbdbb848860ea0b117c05cd91601f58b6413b66",
+      "file": "CI-PROOF-FOCUSED-CORRECTION.log",
+      "sha256": "c0687df9b3298df246d84b9e8137ce9fcb2e3ae2bb69b98a725eab06d56a790c"
+    },
+    {
+      "source": "tasks/WebDAV/ci-proof-capacity-coverage-corrected.log",
+      "sourceSha256": "2902a94f86b6bd61d1560155f3c2fd338c237ba1372bca541649188b453c827f",
+      "file": "CI-PROOF-CAPACITY-CORRECTION.log",
+      "sha256": "50c49feaa1d5263b911836c06b13964a45e9ded3f7298a994e1a805a4691c3c1",
+      "selection": "Complete output"
+    },
+    {
+      "source": "tasks/WebDAV/ci-proof-corrections-checkpoint-corrected.log",
+      "sourceSha256": "bba55ba6a4a516be5f176350ef74d8dcb16e8c545fe46ed64c156132ad5b99a9",
+      "file": "CI-PROOF-CAPACITY-TIMEOUT.log",
+      "sha256": "25ba4903c32a0d21be94a6a904815da4dc701b93f85a2a1c0cfc15f34584bdaa",
+      "selection": "Unit-test failure tail and wrapper result"
+    }
+  ],
+  "normalization": "ANSI escapes removed; absolute integration path replaced by <worktree>. Outcomes preserved. No runtime profiles, credentials or volumes are included."
+}

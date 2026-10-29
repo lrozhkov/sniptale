@@ -91,7 +91,7 @@ function collectMediaRoles(
 async function collectScenarioRoles(
   metadata: PortableScenarioProjectMetadata,
   { body, pointer, document, presentation }: RoleInventory,
-  reader: ArchiveReader
+  reader: ArchiveReader | null
 ) {
   for (const asset of metadata.assets) {
     const object = body(asset.objectId, asset.entry.mimeType, asset.entry.size);
@@ -107,6 +107,7 @@ async function collectScenarioRoles(
     const object = pointer(metadata.historyObjectId);
     if (object.mimeType !== 'application/json' || object.size > MAX_PORTABLE_SCENARIO_HISTORY_BYTES)
       throw new Error('Media backup saved history exceeds its metadata profile.');
+    if (reader === null) return;
     const entry = reader.entry(object.path);
     if (!entry) throw new Error('Media backup saved history is missing.');
     decodePortableScenarioHistory(
@@ -150,10 +151,10 @@ function collectVideoRoles(
   }
 }
 
-/** Typed resource roles determine the exact object inventory; authored strings are not pointers. */
+/** Typed roles bind the exact inventory. A null reader defers history bytes to verified preparation. */
 export async function assertArchiveRootObjectInventory(
   envelope: MediaHubBackupRootEnvelope,
-  reader: ArchiveReader,
+  reader: ArchiveReader | null,
   sharedObjects: readonly MediaHubBackupSharedObject[]
 ): Promise<void> {
   const inventory = createRoleInventory(envelope, sharedObjects);

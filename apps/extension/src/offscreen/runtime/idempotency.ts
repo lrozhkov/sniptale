@@ -15,7 +15,12 @@ type VoiceInputCommandMessageType =
 
 type OffscreenIdempotencyMessageType =
   | HandledOffscreenRuntimeMessageType
-  | VoiceInputCommandMessageType;
+  | VoiceInputCommandMessageType
+  | typeof MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND
+  | typeof MessageType.OFFSCREEN_SYNC_START
+  | typeof MessageType.OFFSCREEN_SYNC_WORKSPACE_START
+  | typeof MessageType.OFFSCREEN_SYNC_INSPECT
+  | typeof MessageType.OFFSCREEN_SYNC_STOP;
 
 type IdempotencyResult =
   | { duplicate: true; completion: Promise<unknown> }
@@ -45,6 +50,27 @@ const MAX_RETAINED_KEYS = 500;
 const executedCommandKeys = new Map<string, CommandEntry>();
 
 const idempotencyPolicyByType = {
+  [MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND]: {
+    idempotent: false,
+    reason:
+      'product start identity is reserved by the executor; inspect and cancellation observe current state',
+  },
+  [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: {
+    idempotent: true,
+    reason: 'workspace admission and its acknowledgement bind one signed request',
+  },
+  [MessageType.OFFSCREEN_SYNC_START]: {
+    idempotent: true,
+    reason: 'sync admission and its acknowledgement bind one signed request',
+  },
+  [MessageType.OFFSCREEN_SYNC_INSPECT]: {
+    idempotent: false,
+    reason: 'each challenge observes current executor state without waiting for IO',
+  },
+  [MessageType.OFFSCREEN_SYNC_STOP]: {
+    idempotent: false,
+    reason: 'stop rechecks containment and permits an explicit retry after failure',
+  },
   [MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE]: {
     idempotent: false,
     reason: 'privacy erasure and verification are deliberately repeatable under the owner lock',

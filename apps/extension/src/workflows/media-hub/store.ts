@@ -1,3 +1,4 @@
+import { runWithNativePublicationResources } from '../sync-transfer/editing-admission';
 import type { ProjectAssetPublicationOptions } from '../../composition/persistence/projects/index';
 import {
   addMediaLibraryEntryTags,
@@ -161,7 +162,9 @@ export async function updateMediaLibraryEntrySafely(
 ): Promise<void> {
   assertSafeOptionalMediaFilename(patch.filename);
   await withMediaHubWriteGuard(translate('shared.mediaHub.updateMediaMetadataAction'), () =>
-    updateMediaLibraryEntry(assetId, patch)
+    runWithNativePublicationResources([{ rootKind: 'media', rootId: assetId }], () =>
+      updateMediaLibraryEntry(assetId, patch)
+    )
   );
   publishMediaHubLibraryChanged('update', [assetId]);
 }
@@ -171,7 +174,9 @@ export async function addMediaLibraryEntryTagsSafely(
   tagsToAdd: string[]
 ): Promise<void> {
   await withMediaHubWriteGuard(translate('shared.mediaHub.updateMediaMetadataAction'), () =>
-    addMediaLibraryEntryTags(assetId, tagsToAdd)
+    runWithNativePublicationResources([{ rootKind: 'media', rootId: assetId }], () =>
+      addMediaLibraryEntryTags(assetId, tagsToAdd)
+    )
   );
   publishMediaHubLibraryChanged('update', [assetId]);
 }

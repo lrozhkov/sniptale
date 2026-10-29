@@ -1,6 +1,12 @@
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
+  ASSET_RESIDENCY_STORE,
+  SYNC_CAPTURE_STORE,
+  VIDEO_PROJECT_REVISIONS_STORE,
+  SYNC_OUTBOX_STORE,
+  SYNC_CATALOG_CACHE_STORE,
+  SYNC_CONNECTION_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
@@ -15,7 +21,13 @@ it('adds only an empty indexed unit store before publishing the current scenario
   const put = vi.fn();
   const tx = {
     abort: vi.fn(),
-    objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+    objectStore: vi.fn(() => ({
+      createIndex,
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
   };
   const db = {
     objectStoreNames: { contains: (name: string) => names.has(name) },
@@ -31,13 +43,34 @@ it('adds only an empty indexed unit store before publishing the current scenario
     [RECORDING_RECOVERY_SESSIONS_STORE, { keyPath: 'id' }],
     [RECORDING_RECOVERY_BLOCKS_STORE, { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    [SYNC_CAPTURE_STORE, { keyPath: 'key' }],
+    [VIDEO_PROJECT_REVISIONS_STORE, { keyPath: 'projectId' }],
+    [SYNC_OUTBOX_STORE, { keyPath: 'key' }],
+    [SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' }],
+    [SYNC_CONNECTION_STORE, { keyPath: 'key' }],
+    [ASSET_RESIDENCY_STORE, { keyPath: 'id' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],
     ['createdAt', 'createdAt'],
     ['id', 'id'],
+    ['kind', 'kind'],
+    ['rootKey', 'rootKey'],
+    ['createdAt', 'createdAt'],
+    [
+      'syncQueueDue',
+      [
+        'spaceId',
+        'connectionGeneration',
+        'profileCreatedAt',
+        'authorization.incarnation',
+        'nextDueAt',
+        'key',
+      ],
+      { unique: false },
+    ],
   ]);
-  expect(tx.objectStore).toHaveBeenCalledExactlyOnceWith('schema_contracts');
+  expect(tx.objectStore.mock.calls).toEqual([[SYNC_OUTBOX_STORE], ['schema_contracts']]);
   expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 8 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();

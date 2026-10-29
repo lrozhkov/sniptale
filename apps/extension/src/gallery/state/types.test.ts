@@ -1,3 +1,4 @@
+import type { RetainedLibraryPlan } from '../../workflows/sync-transfer/retained-library';
 import { expectTypeOf, it } from 'vitest';
 import type {
   MediaHubBackupExportOptions,
@@ -8,7 +9,8 @@ import type { GalleryAppState, PendingExportState } from './types';
 it('keeps pending backup export state on the gallery app surface contract', () => {
   expectTypeOf<PendingExportState>().toEqualTypeOf<{
     options: MediaHubBackupExportOptions;
-    summary: MediaHubLocalBackupSummary;
+    summary: MediaHubLocalBackupSummary | null;
+    preparation?: RetainedLibraryPlan;
   }>();
   expectTypeOf<
     GalleryAppState['storage']['pendingExport']

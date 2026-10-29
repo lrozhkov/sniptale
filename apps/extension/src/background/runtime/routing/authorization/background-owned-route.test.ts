@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { SyncProductCommand } from '../../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import type { AiEgressAuthority } from '../../../../features/ai/egress-authority';
 import { resetAISecretUnlockRequestsForTests } from '../../../ai/settings/secret-unlock-route';
 import { resetLlmSessionTokensForTests } from '../../../ai/llm/session-tokens';
@@ -252,4 +253,83 @@ it('authorizes local data erasure only from the owned settings page', () => {
       sender: sender({ documentId: 'doc-1', frameId: 0, tabId: 7, url: CONTENT_URL }),
     })
   ).toEqual({ authorized: false, reason: 'Unauthorized local data erasure sender' });
+});
+
+const productRequestId = '11111111-1111-4111-8111-111111111111';
+const productGallery = 'chrome-extension://test/apps/extension/src/gallery/index.html';
+const productCreate = {
+  kind: 'workspace-create' as const,
+  parentUrl: 'https://dav.test/root/',
+  accountId: 'alice',
+  authentication: { kind: 'bearer' as const, accessToken: 'private-token' },
+};
+const productReplica = {
+  kind: 'replica-prepare' as const,
+  selection: {
+    rootKind: 'video-project' as const,
+    rootId: 'project',
+    operationId: 'operation',
+    sourceDigest: 'a'.repeat(64),
+  },
+};
+
+function authorizeProduct(
+  command: SyncProductCommand,
+  productSender: chrome.runtime.MessageSender
+) {
+  return authorizeIPCMessage({
+    kind: 'background-owned',
+    message: { type: MessageType.SYNC_PRODUCT_COMMAND, requestId: productRequestId, command },
+    sender: productSender,
+  });
+}
+
+it('authorizes product commands only for the document that owns each verb', () => {
+  expect(authorizeProduct(productCreate, sender({ url: SETTINGS_URL }))).toEqual({
+    authorized: true,
+  });
+  expect(authorizeProduct(productReplica, sender({ url: productGallery }))).toEqual({
+    authorized: true,
+  });
+  for (const productSender of [sender({ url: SETTINGS_URL }), sender({ url: productGallery })]) {
+    expect(authorizeProduct({ kind: 'status' }, productSender)).toEqual({ authorized: true });
+    expect(
+      authorizeProduct({ kind: 'catalog-refresh', bypassCache: false }, productSender)
+    ).toEqual({ authorized: true });
+  }
+  expect(authorizeProduct(productCreate, sender({ url: productGallery }))).toEqual({
+    authorized: false,
+    reason: 'Sync product command refused',
+  });
+  expect(authorizeProduct(productReplica, sender({ url: SETTINGS_URL }))).toEqual({
+    authorized: false,
+    reason: 'Sync product command refused',
+  });
+});
+
+it('rejects malformed product commands and untrusted or inactive product documents', () => {
+  const senders: chrome.runtime.MessageSender[] = [
+    sender({ url: CONTENT_URL, frameId: 0, tabId: 7 }),
+    sender({ url: productGallery, frameId: 1 }),
+    sender({ url: `${SETTINGS_URL}?aiUnlock=1` }),
+    { ...sender({ url: SETTINGS_URL }), documentLifecycle: 'cached' },
+  ];
+  for (const productSender of senders) {
+    expect(authorizeProduct({ kind: 'status' }, productSender)).toEqual({
+      authorized: false,
+      reason: 'Sync product command refused',
+    });
+  }
+  expect(
+    authorizeProduct(
+      {
+        ...productReplica,
+        selection: { ...productReplica.selection, sourceDigest: 'invalid' },
+      },
+      sender({ url: productGallery })
+    )
+  ).toEqual({
+    authorized: false,
+    reason: 'Sync product command refused',
+  });
 });

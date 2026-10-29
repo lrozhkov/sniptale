@@ -125,6 +125,34 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/remote-connection/store.ts",
+      "owner": "remote-connection",
+      "justification": "The native connection owner stores exact lifecycle metadata and context-bound encrypted WebDAV credentials.",
+      "reviewNote": "Persist only validated connection metadata, a non-exportable random AES-GCM CryptoKey and its version 2 encrypted envelope. Never persist plaintext credentials, exported key material or derived headers. Exclude all connection rows from backup, Settings transfer, sync, logs and diagnostics. Verified local-data erasure removes this store even when preferences remain. Transparent local encryption does not protect a compromised browser profile.",
+      "storageWrites": [
+        {
+          "sink": "tx.objectStore(SYNC_CONNECTION_STORE).put",
+          "keys": [
+            "SYNC_CONNECTION_STORE"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/sync-capture/queue-schedule.ts",
+      "owner": "sync-queue-native-control-and-delivery",
+      "justification": "tool-noise: authorization contains only native incarnation and revision. Its closed parser rejects extra credential fields. This owner writes scheduling metadata only.",
+      "reviewNote": "Only store.put into SYNC_OUTBOX_STORE is admitted. Credentials, HTTP headers, URLs, accounts and content remain forbidden. Reassess or remove this entry when the DTO, parser, meaning, sink, store or authority changes. Fresh security review must check this exact boundary.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": [
+            "SYNC_OUTBOX_STORE"
+          ]
+        }
+      ]
     }
   ],
   "sensitiveRetentionOwners": [
@@ -522,6 +550,34 @@
           "sink": "browserStorage.local.set",
           "keys": [
             "QUICK_ACTIONS_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/remote-connection/store.ts",
+      "owner": "remote-connection",
+      "justification": "The native connection owner stores exact lifecycle metadata and context-bound encrypted WebDAV credentials.",
+      "reviewNote": "Persist only validated connection metadata, a non-exportable random AES-GCM CryptoKey and its version 2 encrypted envelope. Never persist plaintext credentials, exported key material or derived headers. Exclude all connection rows from backup, Settings transfer, sync, logs and diagnostics. Verified local-data erasure removes this store even when preferences remain. Transparent local encryption does not protect a compromised browser profile.",
+      "storageWrites": [
+        {
+          "sink": "tx.objectStore(SYNC_CONNECTION_STORE).put",
+          "keys": [
+            "SYNC_CONNECTION_STORE"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/sync-capture/queue-schedule.ts",
+      "owner": "sync-queue-native-control-and-delivery",
+      "justification": "tool-noise: authorization contains only native incarnation and revision. Its closed parser rejects extra credential fields. This owner writes scheduling metadata only.",
+      "reviewNote": "Only store.put into SYNC_OUTBOX_STORE is admitted. Credentials, HTTP headers, URLs, accounts and content remain forbidden. Reassess or remove this entry when the DTO, parser, meaning, sink, store or authority changes. Fresh security review must check this exact boundary.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": [
+            "SYNC_OUTBOX_STORE"
           ]
         }
       ]

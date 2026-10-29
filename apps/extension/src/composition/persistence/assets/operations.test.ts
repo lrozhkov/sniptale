@@ -1,5 +1,12 @@
+import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
+import type { PublishedCaptureOperation } from '../sync-capture/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import {
+  installPersistenceLockManagerForTests,
+  isPersistenceMutationTransitionHeld,
+  runWithPersistentDataErasureBarrier,
+  runWithDurableAssetLifecycleLock,
+} from '../infrastructure/mutation-barrier';
 
 const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(),
@@ -28,6 +35,7 @@ vi.mock('./opfs-store', async (importOriginal) => ({
 }));
 
 import {
+  releasePublishedOperationPins,
   appendAssetOperationCompensation,
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
@@ -68,6 +76,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  installPersistenceLockManagerForTests(null);
   vi.unstubAllGlobals();
 });
 
@@ -382,7 +391,7 @@ it('reads retention once for an entire physical-delete operation', async () => {
   await completePhysicalDeleteOperation(
     buildPhysicalDeleteOperation(Array.from({ length: 32 }, (_, i) => `asset-${i}`))
   );
-  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(db.getAll).toHaveBeenCalledTimes(13);
   expect(mocks.deleteObject).toHaveBeenCalledTimes(32);
 });
 
@@ -402,7 +411,7 @@ it('retains the failing and unprocessed intents after a partial replay batch', a
   expect(mocks.log).toHaveBeenCalledWith(
     expect.objectContaining({ code: 'deleted', counts: { deleted: 1 } })
   );
-  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(db.getAll).toHaveBeenCalledTimes(13);
   expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-a']]);
   expect(mocks.deleteObject.mock.calls).toEqual([['a'], ['b']]);
 });
@@ -479,7 +488,7 @@ it('keeps projected targets pending while completing unrelated intents in the sa
       operationId: `delete-${id}`,
     }))
   );
-  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(db.getAll).toHaveBeenCalledTimes(13);
   expect(mocks.deleteObject.mock.calls).toEqual([['unowned']]);
   expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-unowned']]);
   expect(mocks.log).toHaveBeenCalledWith(
@@ -508,3 +517,276 @@ it.each(['complete', 'writing', 'cancel-before', 'cancel-after-intent'] as const
     expect(db.delete).toHaveBeenCalledTimes(mode === 'complete' ? 1 : 0);
   }
 );
+
+function publicationReleaseFixture() {
+  let refuseIntent = false;
+  const fixture = createReviewWorkspaceStoreFixture(
+    (name) => refuseIntent && name === 'asset_operations'
+  );
+  const table = (name: string) => fixture.rows.get(name)!;
+  const ref = {
+    assetId: 'published-file',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'objects/published-file' },
+    mimeType: 'image/png',
+    sha256: 'a'.repeat(64),
+    size: 3,
+  };
+  const publication: PublishedCaptureOperation = {
+    version: 1,
+    kind: 'sync-operation',
+    phase: 'published',
+    key: '["change","operation"]',
+    createdAt: 1,
+    spaceId: 'space',
+    connectionGeneration: 3,
+    profileCreatedAt: 1,
+    rootKind: 'media',
+    rootId: 'old',
+    rootKey: JSON.stringify(['space', 'media', 'old']),
+    generation: 1,
+    operationId: 'operation',
+    basis: [],
+    origin: 'local-edit',
+    publicationId: null,
+    sourceSha256: 'b'.repeat(64),
+    source: { changeKind: 'media', label: 'old.png' },
+    publication: {
+      kind: 'verified',
+      acceptedAt: 2,
+      preparedSha256: 'c'.repeat(64),
+      attemptId: '11111111-1111-4111-8111-111111111111',
+      recordKey: 'records/manifest.json',
+      recordSha256: 'd'.repeat(64),
+    },
+    objects: [
+      {
+        objectId: 'body',
+        ref,
+        filename: 'old.png',
+        sha256: 'a'.repeat(64),
+        remoteKey: 'Files/published/old.png',
+        pinned: true,
+      },
+    ],
+  };
+  const authorization = { incarnation: '22222222-2222-4222-8222-222222222222', revision: 1 };
+  table('sync_capture').set('profile', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: true,
+    spaceId: 'space',
+    connectionGeneration: 3,
+  });
+  table('sync_capture').set(publication.key, publication);
+  table('sync_connection').set('connection', {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding: {
+      spaceId: 'space',
+      connectionGeneration: 3,
+      profileCreatedAt: 1,
+      provider: 'webdav',
+      rootUrl: 'https://dav.example.test/root/',
+      accountId: 'user',
+    },
+    identity: authorization,
+    phase: 'active',
+    updateNonce: null,
+    credentialId: '33333333-3333-4333-8333-333333333333',
+  });
+  let intentNumber = 0;
+  vi.mocked(crypto.randomUUID).mockImplementation(
+    () => `00000000-0000-4000-8000-${String(++intentNumber).padStart(12, '0')}`
+  );
+  const database = {
+    ...fixture.database,
+    getAll: async (name: string) => structuredClone([...(fixture.rows.get(name)?.values() ?? [])]),
+    delete: async (name: string, key: string) => {
+      table(name).delete(key);
+    },
+  };
+  mocks.initDB.mockResolvedValue(database);
+  mocks.runMutation.mockImplementation(async (callback) => callback(database));
+  return {
+    ...fixture,
+    table,
+    publication,
+    authorization,
+    ref,
+    refuseIntent(value: boolean) {
+      refuseIntent = value;
+    },
+  };
+}
+
+it('verifies remote bytes before ownerless pin retirement and canonical deletion', async () => {
+  const f = publicationReleaseFixture();
+  const verify = vi.fn(async () => {
+    expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+  });
+  const released = await releasePublishedOperationPins(f.publication, f.authorization, verify);
+  expect(verify).toHaveBeenCalledExactlyOnceWith(f.publication.objects[0]);
+  expect(released.released).toEqual([f.ref.assetId]);
+  expect(f.table('sync_capture').get(f.publication.key)).toMatchObject({
+    phase: 'published',
+    objects: [{ pinned: false, ref: f.ref }],
+  });
+  expect(mocks.deleteObject).toHaveBeenCalledExactlyOnceWith(f.ref.assetId);
+});
+
+it('retires shared publication pins independently and retains bytes until the last claim leaves', async () => {
+  const f = publicationReleaseFixture();
+  const other: PublishedCaptureOperation = {
+    ...f.publication,
+    key: 'second',
+    operationId: 'second',
+    generation: 2,
+  };
+  f.table('sync_capture').set(other.key, other);
+  const first = await releasePublishedOperationPins(
+    f.publication,
+    f.authorization,
+    async () => undefined
+  );
+  expect(first.released).toEqual([f.ref.assetId]);
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+  expect(f.table('asset_operations').size).toBe(1);
+  await releasePublishedOperationPins(other, f.authorization, async () => undefined);
+  expect(mocks.deleteObject).toHaveBeenCalledExactlyOnceWith(f.ref.assetId);
+});
+
+it.each(['remote', 'native-owner', 'rollback', 'recreated', 'revoked'])(
+  'preserves pins and bytes when publication release is refused by %s',
+  async (kind) => {
+    const f = publicationReleaseFixture();
+    if (kind === 'native-owner') {
+      f.table('asset_refs').set(f.ref.assetId, f.ref);
+      f.table('asset_owners').set('native', {
+        ownerKind: 'project-asset',
+        ownerId: 'native',
+        role: 'body',
+        assetId: f.ref.assetId,
+      });
+    }
+    if (kind === 'rollback')
+      f.table('asset_operations').set('restore', {
+        ...operation,
+        operationId: 'restore',
+        obsoleteAssetIds: [f.ref.assetId],
+      });
+    const verify = async () => {
+      if (kind === 'remote') throw new Error('Remote digest mismatch.');
+      if (kind === 'recreated')
+        f.table('sync_capture').set(f.publication.key, {
+          ...f.publication,
+          sourceSha256: 'e'.repeat(64),
+        });
+      if (kind === 'revoked') f.table('sync_connection').delete('connection');
+    };
+    if (kind === 'native-owner' || kind === 'rollback')
+      expect(
+        (await releasePublishedOperationPins(f.publication, f.authorization, verify)).released
+      ).toEqual([]);
+    else
+      await expect(
+        releasePublishedOperationPins(f.publication, f.authorization, verify)
+      ).rejects.toThrow();
+    expect(f.table('sync_capture').get(f.publication.key)).toMatchObject({
+      objects: [{ pinned: true }],
+    });
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+  }
+);
+
+it('preserves publication pins when cancellation arrives after remote verification and before commit', async () => {
+  const f = publicationReleaseFixture();
+  const controller = new AbortController();
+  await expect(
+    releasePublishedOperationPins(
+      f.publication,
+      f.authorization,
+      async () => {
+        controller.abort();
+      },
+      controller.signal
+    )
+  ).rejects.toThrow();
+  expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
+  expect(f.table('asset_operations').size).toBe(0);
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+});
+
+it('rolls pin removal back when delete-intent admission fails and permits exact retry', async () => {
+  const f = publicationReleaseFixture();
+  f.refuseIntent(true);
+  await expect(
+    releasePublishedOperationPins(f.publication, f.authorization, async () => undefined)
+  ).rejects.toThrow('No space');
+  expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
+  expect(f.table('asset_operations').size).toBe(0);
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+  f.refuseIntent(false);
+  expect(
+    (await releasePublishedOperationPins(f.publication, f.authorization, async () => undefined))
+      .released
+  ).toEqual([f.ref.assetId]);
+});
+
+it('retains the durable delete intent after physical deletion fails', async () => {
+  const f = publicationReleaseFixture();
+  mocks.deleteObject.mockRejectedValueOnce(new Error('Physical deletion failed.'));
+  await expect(
+    releasePublishedOperationPins(f.publication, f.authorization, async () => undefined)
+  ).rejects.toThrow('Physical deletion failed');
+  expect(f.table('sync_capture').get(f.publication.key)).toMatchObject({
+    objects: [{ pinned: false }],
+  });
+  expect(f.table('asset_operations').size).toBe(1);
+  const intent = [...f.table('asset_operations').values()][0];
+  expect(intent).toMatchObject({ kind: 'physical-delete', assetIds: [f.ref.assetId] });
+});
+
+it('preserves pins while an editor resource reader prevents cleanup', async () => {
+  const f = publicationReleaseFixture();
+  installPersistenceLockManagerForTests({
+    request: async (_name, _options, operation) => operation({}),
+  });
+  vi.stubGlobal('navigator', {
+    locks: {
+      request: async (
+        _name: unknown,
+        _options: unknown,
+        operation: (lock: null) => Promise<unknown>
+      ) => operation(null),
+    },
+  });
+  expect(
+    (await releasePublishedOperationPins(f.publication, f.authorization, async () => undefined))
+      .released
+  ).toEqual([]);
+  expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
+  expect(f.table('asset_operations').size).toBe(0);
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+});
+
+it('keeps privacy erasure outside published pin retirement until physical cleanup finishes', async () => {
+  const f = publicationReleaseFixture();
+  let erasure: Promise<void> | undefined;
+  mocks.deleteObject.mockImplementationOnce(async () => {
+    expect(isPersistenceMutationTransitionHeld()).toBe(true);
+    erasure = runWithPersistentDataErasureBarrier(async () => {
+      expect(f.table('asset_operations').size).toBe(0);
+      f.table('sync_capture').clear();
+    });
+  });
+  await releasePublishedOperationPins(f.publication, f.authorization, async () => undefined);
+  expect(erasure).toBeDefined();
+  await erasure;
+  expect(f.table('sync_capture').size).toBe(0);
+  expect(isPersistenceMutationTransitionHeld()).toBe(false);
+});

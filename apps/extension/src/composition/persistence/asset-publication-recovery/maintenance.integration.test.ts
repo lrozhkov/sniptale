@@ -6,6 +6,7 @@ import type { PersistenceLockManager } from '../infrastructure/mutation-barrier'
 // durable intent creation and physical-delete completion are the production participants.
 const storage = vi.hoisted(() => ({
   reads: 0,
+  readStores: new Set<string>(),
   rows: new Map<string, unknown[]>(),
   intents: new Map<string, PhysicalDeleteAssetOperation>(),
   objects: new Set<string>(),
@@ -23,6 +24,7 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
       ),
     getAll: async (store: string) => {
       storage.reads += 1;
+      storage.readStores.add(store);
       return store === 'asset_operations'
         ? [...storage.intents.values(), ...(storage.rows.get(store) ?? [])]
         : (storage.rows.get(store) ?? []);
@@ -77,6 +79,7 @@ function coordinatedLocks(): PersistenceLockManager {
 let locks: PersistenceLockManager;
 beforeEach(() => {
   storage.reads = 0;
+  storage.readStores.clear();
   storage.rows.clear();
   storage.intents.clear();
   storage.objects.clear();
@@ -227,7 +230,8 @@ it('validates one graph for a batch of orphan objects instead of once per object
   for (let i = 0; i < 12; i++) storage.objects.add(`orphan-${i}`);
   await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
   expect(storage.objects.size).toBe(0);
-  expect(storage.reads).toBe(12);
+  expect(storage.readStores.has('sync_capture')).toBe(true);
+  expect(storage.reads).toBe(storage.readStores.size);
 });
 
 it('cancels during cooperative validation without committing deletion intent', async () => {

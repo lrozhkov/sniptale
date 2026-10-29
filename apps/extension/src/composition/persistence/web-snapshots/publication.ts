@@ -1,9 +1,16 @@
+import { captureMediaInTransaction } from '../sync-capture/capture';
 import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   THUMBNAILS_STORE,
   WEB_SNAPSHOTS_STORE,
+  SYNC_CAPTURE_STORE,
+  IMAGE_WORKSPACES_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -118,6 +125,12 @@ export async function publishWebSnapshotJournal(journal: AssetReadyJournal): Pro
     const tx = db.transaction(
       [
         WEB_SNAPSHOTS_STORE,
+        SYNC_CAPTURE_STORE,
+        IMAGE_WORKSPACES_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
+        VIDEO_WORKSPACE_HISTORY_STORE,
+        AGGREGATE_PRESENTATIONS_STORE,
         MEDIA_LIBRARY_STORE,
         THUMBNAILS_STORE,
         ASSET_REFS_STORE,
@@ -171,6 +184,9 @@ export async function publishWebSnapshotJournal(journal: AssetReadyJournal): Pro
       await snapshotStore.put(payload.snapshot);
       await mediaStore.put(existingMedia ?? payload.mediaEntry);
       await tx.objectStore(THUMBNAILS_STORE).put(thumbnail);
+      await captureMediaInTransaction(tx, payload.mediaEntry.id, {
+        publicationId: journal.journalId,
+      });
       await tx.done;
     } catch (error) {
       try {

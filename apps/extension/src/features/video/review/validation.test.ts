@@ -4,6 +4,7 @@ import {
   parseReviewDocumentBaseline,
   parseReviewOperation,
   parseReviewSource,
+  sameReviewVideoContainer,
 } from './validation';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import { createCanvasComment } from './comments';
@@ -380,4 +381,11 @@ it('retains baseline cut joins and refuses a malformed join without dropping val
     parseReviewDocumentBaseline({ ...baseline, edits: [...baseline.edits, malformed] }, 10)
   ).toBeNull();
   expect(baseline).toEqual(retained);
+});
+
+it('associates decoder codec parameters with the same validated video container', () => {
+  expect(sameReviewVideoContainer('video/webm; codecs="vp8, opus"', 'video/webm')).toBe(true);
+  expect(sameReviewVideoContainer('video/mp4; codecs="avc1"', 'video/webm')).toBe(false);
+  expect(sameReviewVideoContainer('image/png', 'image/png')).toBe(false);
+  expect(sameReviewVideoContainer('video/webm\r\nX: injected', 'video/webm')).toBe(false);
 });

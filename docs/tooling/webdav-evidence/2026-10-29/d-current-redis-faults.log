@@ -1,0 +1,33 @@
+
+Running 8 tests using 1 worker
+
+(node:611863) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tooling/test/e2e/providers/webdav.spec.ts:45:1 › ordinary originals and exports survive native Blob transfer and an empty browser profile (9.9s)
+  ✓  2 tooling/test/e2e/providers/webdav.spec.ts:107:1 › temporary and authentication refusals remain visible and redirects send no bytes to the sink (1.9s)
+  ✓  3 tooling/test/e2e/providers/webdav.spec.ts:135:1 › lost acknowledgements preserve exact replay bytes and cancellation preserves a fresh attempt (4.2s)
+  ✓  4 tooling/test/e2e/providers/webdav.spec.ts:203:3 › real Redis outage refuses affected writes and restart preserves completed files (8.8s)
+  ✓  5 tooling/test/e2e/providers/webdav.spec.ts:490:1 › durable dispatch keeps original and export bytes after lost response and full browser restart (12.1s)
+  ✓  6 tooling/test/e2e/providers/webdav.spec.ts:649:1 › partial dispatch reuses completed bytes after restart and isolates the lost file response (9.7s)
+  ✘  7 tooling/test/e2e/providers/webdav.spec.ts:720:1 › another browser reuses published files without media transfer and still rejects corrupt hydration (12.2s)
+(node:615231) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  8 tooling/test/e2e/providers/webdav.spec.ts:1081:1 › saved image revisions retain ordinary originals through WebDAV and browser restart (21.9s)
+
+
+  1) tooling/test/e2e/providers/webdav.spec.ts:720:1 › another browser reuses published files without media transfer and still rejects corrupt hydration 
+
+    Error: page.evaluate: VideoProjectApplyConflictError: Prepared project application refused: project-changed.
+        at ur (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/replica-publication-BSKnpZq4.js:1:56749)
+        at async chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/replica-publication-BSKnpZq4.js:1:60154
+        at async S (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/area-adapter-B8ZoVhRD.js:1:6147)
+        at ur (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/replica-publication-BSKnpZq4.js:1:56749)
+        at async chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/replica-publication-BSKnpZq4.js:1:60154
+        at async S (chrome-extension://cbccoigmglbbgalpfabjgiphgidkmngm/assets/area-adapter-B8ZoVhRD.js:1:6147)
+        at <worktree>/tooling/test/e2e/providers/webdav.spec.ts:743:24
+
+    Error Context: tasks/WebDAV/d-current-redis-faults/webdav-another-browser-reu-b079f-l-rejects-corrupt-hydration/error-context.md
+
+  1 failed
+    tooling/test/e2e/providers/webdav.spec.ts:720:1 › another browser reuses published files without media transfer and still rejects corrupt hydration 
+  7 passed (1.4m)

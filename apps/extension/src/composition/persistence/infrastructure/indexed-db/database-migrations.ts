@@ -3,7 +3,12 @@ import { estimateUsageIndexBytes } from './usage-index-migration';
 import type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
   VOICE_INPUT_HISTORY_STORE,
+  SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
+  SYNC_CATALOG_CACHE_STORE,
+  SYNC_CONNECTION_STORE,
   ASSET_OPERATIONS_STORE,
+  ASSET_RESIDENCY_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -14,6 +19,7 @@ import {
   SCENARIO_PROJECT_HISTORY_STORE,
   SCENARIO_PROJECT_UNITS_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_PROJECT_REVISIONS_STORE,
   RECORDING_TELEMETRY_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
@@ -892,6 +898,159 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         db,
         [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_PROJECTS_STORE],
         'Camera project stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'syncCapture', from: 0, to: 1 },
+      { domainId: 'videoProjects', from: 8, to: 9 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 39,
+    toDatabaseVersion: 40,
+    risk: 'additive',
+    stores: [SYNC_CAPTURE_STORE, VIDEO_PROJECT_REVISIONS_STORE],
+    migrate(db) {
+      const store = db.createObjectStore(SYNC_CAPTURE_STORE, { keyPath: 'key' });
+      for (const index of ['kind', 'rootKey', 'createdAt']) store.createIndex(index, index);
+      db.createObjectStore(VIDEO_PROJECT_REVISIONS_STORE, { keyPath: 'projectId' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CAPTURE_STORE, VIDEO_PROJECT_REVISIONS_STORE],
+        'Sync capture or project revision store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 1, to: 2 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 40,
+    toDatabaseVersion: 41,
+    risk: 'additive',
+    stores: [SYNC_OUTBOX_STORE],
+    migrate(db) {
+      db.createObjectStore(SYNC_OUTBOX_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(db, [SYNC_OUTBOX_STORE], 'Sync outbox store is unavailable.');
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 2, to: 3 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 41,
+    toDatabaseVersion: 42,
+    risk: 'additive',
+    stores: [SYNC_CATALOG_CACHE_STORE],
+    migrate(db) {
+      db.createObjectStore(SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CATALOG_CACHE_STORE],
+        'Sync catalog cache store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 3, to: 4 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 42,
+    toDatabaseVersion: 43,
+    risk: 'additive',
+    stores: [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CATALOG_CACHE_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CATALOG_CACHE_STORE],
+        'Sync queue control stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 4, to: 5 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 43,
+    toDatabaseVersion: 44,
+    risk: 'additive',
+    stores: [SYNC_CONNECTION_STORE],
+    migrate(db) {
+      db.createObjectStore(SYNC_CONNECTION_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CATALOG_CACHE_STORE, SYNC_CONNECTION_STORE],
+        'Sync connection stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 5, to: 6 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 44,
+    toDatabaseVersion: 45,
+    risk: 'additive',
+    stores: [SYNC_OUTBOX_STORE],
+    migrate(_db, transaction) {
+      const store = transaction.objectStore(SYNC_OUTBOX_STORE);
+      if (!store.createIndex) throw new Error('Sync queue due index creation unavailable.');
+      store.createIndex(
+        'syncQueueDue',
+        [
+          'spaceId',
+          'connectionGeneration',
+          'profileCreatedAt',
+          'authorization.incarnation',
+          'nextDueAt',
+          'key',
+        ],
+        { unique: false }
+      );
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_OUTBOX_STORE],
+        'Sync queue due store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'assetGraph', from: 3, to: 4 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 45,
+    toDatabaseVersion: 46,
+    risk: 'additive',
+    stores: [ASSET_RESIDENCY_STORE],
+    migrate(db) {
+      db.createObjectStore(ASSET_RESIDENCY_STORE, { keyPath: 'id' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [ASSET_RESIDENCY_STORE],
+        'Asset residency store is unavailable.'
       );
     },
   },

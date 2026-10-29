@@ -1,0 +1,27 @@
+
+Running 20 tests using 1 worker
+
+(node:589469) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tooling/test/e2e/providers/webdav-enrollment.spec.ts:4:1 › checked enrollment retains its workspace and auth through browser restart (7.4s)
+  ✓   2 tooling/test/e2e/providers/webdav-enrollment.spec.ts:95:1 › unfinished creation cannot install a profile or credential (1.4s)
+  ✓   3 tooling/test/e2e/providers/webdav-join.spec.ts:36:1 › a second browser joins populated metadata and enrolls without downloading originals (9.7s)
+  ✓   4 tooling/test/e2e/providers/webdav-join.spec.ts:138:3 › JOIN status failure retains checking for an explicit retry (7.0s)
+  ✓   5 tooling/test/e2e/providers/webdav-join.spec.ts:138:3 › JOIN lost-response failure retains checking for an explicit retry (7.2s)
+  ✓   6 tooling/test/e2e/providers/webdav-join.spec.ts:179:1 › active JOIN close revokes readiness and drains a held marker body (6.8s)
+  ✓   7 tooling/test/e2e/providers/webdav-join.spec.ts:225:1 › permission removal during JOIN prevents checked readiness (6.8s)
+  ✓   8 tooling/test/e2e/providers/webdav-join.spec.ts:298:1 › a missing marker leaves a retryable JOIN and no connection (2.6s)
+  ✓   9 tooling/test/e2e/providers/webdav-queue.spec.ts:4:1 › durable queue preserves paused edits, fences two pages and survives browser restart (10.6s)
+  ✓  10 tooling/test/e2e/providers/webdav-workspace.spec.ts:6:1 › workspace allocation journals first and refuses an occupied root without changing its files (3.5s)
+  ✓  11 tooling/test/e2e/providers/webdav-workspace.spec.ts:48:1 › concurrent browsers cannot both acquire the same new workspace root (3.9s)
+  ✓  12 tooling/test/e2e/providers/webdav-workspace.spec.ts:120:1 › lost MKCOL acknowledgement retains uncertainty after browser restart and refuses automatic adoption (4.4s)
+  ✓  13 tooling/test/e2e/providers/webdav-workspace.spec.ts:163:1 › 423 preserves the native workspace plan for an explicit retry to ready (4.0s)
+  ✓  14 tooling/test/e2e/providers/webdav-workspace.spec.ts:230:1 › a foreign folder appearing after 423 prevents retry adoption and preserves its exact sentinel (2.5s)
+  ✓  15 tooling/test/e2e/providers/webdav-workspace.spec.ts:307:1 › published workspace joins from another browser and conditional PUT preserves the original marker (5.2s)
+  ✓  16 tooling/test/e2e/providers/webdav-workspace.spec.ts:371:1 › browser restart resolves an unacknowledged marker without another PUT (5.5s)
+  ✓  17 tooling/test/e2e/providers/webdav-workspace.spec.ts:426:1 › 423 preserves frozen marker bytes for an explicit retry (4.6s)
+  ✓  18 tooling/test/e2e/providers/webdav-workspace.spec.ts:466:1 › foreign metadata prevents publication and remains independently readable (4.2s)
+  ✓  19 tooling/test/e2e/providers/webdav-workspace.spec.ts:504:1 › creation close contains held root headers and preserves uncertain allocation (2.7s)
+  ✓  20 tooling/test/e2e/providers/webdav-workspace.spec.ts:550:1 › creation close drains marker body and explicit recovery avoids another PUT (3.3s)
+
+  20 passed (1.7m)

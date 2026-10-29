@@ -46,4 +46,42 @@ export interface MaintenanceDiagnosticInput {
 }
 export type DiagnosticPortEvent =
   | DiagnosticLogEvent
+  | { kind: 'sync-queue'; input: SyncQueueDiagnosticHint }
   | { kind: 'maintenance'; input: MaintenanceDiagnosticInput };
+
+interface SyncQueueDiagnosticHint {
+  scope: { spaceId: string; connectionGeneration: number; profileCreatedAt: number };
+  source: { kind: 'connection' } | { kind: 'operation'; operationId: string };
+}
+function diagnosticOrdinal(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+function diagnosticIdentity(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 256;
+}
+/** Admit source hints only. Background reloads every event from native persistence. */
+export function parseSyncQueueDiagnosticHint(raw: unknown): SyncQueueDiagnosticHint | null {
+  if (!isRecord(raw) || !isRecord(raw['scope']) || !isRecord(raw['source'])) return null;
+  const scope = raw['scope'];
+  const source = raw['source'];
+  if (
+    !diagnosticIdentity(scope['spaceId']) ||
+    !diagnosticOrdinal(scope['connectionGeneration']) ||
+    scope['connectionGeneration'] < 1 ||
+    !diagnosticOrdinal(scope['profileCreatedAt'])
+  )
+    return null;
+  const admittedScope = {
+    spaceId: scope['spaceId'],
+    connectionGeneration: scope['connectionGeneration'],
+    profileCreatedAt: scope['profileCreatedAt'],
+  };
+  if (source['kind'] === 'connection')
+    return { scope: admittedScope, source: { kind: 'connection' } };
+  if (source['kind'] === 'operation' && diagnosticIdentity(source['operationId']))
+    return {
+      scope: admittedScope,
+      source: { kind: 'operation', operationId: source['operationId'] },
+    };
+  return null;
+}

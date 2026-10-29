@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createRemoteRootGalleryItem } from '../../library/items/adapters';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -56,6 +57,7 @@ type TestLayoutProps = {
   onPreviewInspectorToggle: () => void;
   onPreviewBackup: (item: unknown) => Promise<void>;
   onPreviewDelete: (item: unknown) => void;
+  onPreviewEdit: (item: unknown) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewOpen: (item: unknown, options?: { inspectorCollapsed?: boolean }) => void;
   onProjectOpen: (item: unknown) => void;
@@ -414,4 +416,108 @@ it('keeps the active preview open when saving it to the library', async () => {
   await act(async () => layoutProps.onPreviewPromote(item));
   expect(controller.state.preview.session.item?.id).toBe(item.id);
   expect(controller.actions.storage.refresh).toHaveBeenCalledOnce();
+});
+
+it('routes remote activation through preview navigation so a local draft is saved before selection changes', () => {
+  const remote = createRemoteRootGalleryItem({
+    source: 'remote',
+    tags: [],
+    label: 'Remote project',
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 100,
+    createdAt: 1,
+    updatedAt: 2,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'remote-root',
+      operationId: 'operation-1',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  const { actions, layoutProps } = renderBindings();
+  layoutProps.onProjectOpen(remote);
+  expect(actions.preview.navigate).toHaveBeenCalledWith(remote);
+  expect(actions.preview.openInEditor).not.toHaveBeenCalled();
+});
+
+function remotePreviewItem() {
+  return createRemoteRootGalleryItem({
+    source: 'remote',
+    tags: [],
+    label: 'Remote image',
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 100,
+    createdAt: 1,
+    updatedAt: 2,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'remote-root',
+      operationId: 'operation-1',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+}
+
+it.each(['onPreviewEdit', 'onProjectOpen'] as const)(
+  '%s opens an inactive remote preview before any editor materialization',
+  (activate) => {
+    const { actions, controller, getState, layoutProps } = renderBindings();
+    const remote = remotePreviewItem();
+    controller.actions.preview.setPreview({
+      item: null,
+      url: 'blob:old',
+      inspectorCollapsed: true,
+    });
+    act(() => layoutProps[activate](remote));
+    expect(getState().preview.session).toEqual({
+      item: remote,
+      url: null,
+      inspectorCollapsed: false,
+    });
+    act(() => layoutProps[activate](remote));
+    expect(actions.preview.navigate).not.toHaveBeenCalled();
+    expect(actions.preview.openInEditor).not.toHaveBeenCalled();
+  }
+);
+
+it('routes remote edit and both remote/local preview transitions through draft-saving navigation', () => {
+  const { actions, controller, getState, layoutProps } = renderBindings();
+  const remote = remotePreviewItem();
+  const local = createMediaItem({ id: 'local-next' });
+  const original = getState().preview.session.item;
+  act(() => {
+    layoutProps.onPreviewEdit(remote);
+    layoutProps.onPreviewOpen(remote);
+  });
+  expect(actions.preview.navigate).toHaveBeenCalledTimes(2);
+  expect(actions.preview.navigate).toHaveBeenLastCalledWith(remote);
+  expect(getState().preview.session.item).toBe(original);
+  controller.actions.preview.setPreview({ item: remote, url: null, inspectorCollapsed: false });
+  act(() => layoutProps.onPreviewOpen(local));
+  expect(actions.preview.navigate).toHaveBeenLastCalledWith(local);
+  expect(getState().preview.session.item).toBe(remote);
+  expect(actions.preview.openInEditor).not.toHaveBeenCalled();
+});
+
+it('blocks remote edit and project activation while the Library is showing Trash', () => {
+  const { actions, controller, getState, layoutProps } = renderBindings();
+  const remote = remotePreviewItem();
+  const original = getState().preview.session.item;
+  controller.state.filters.trashMode = true;
+  act(() => {
+    layoutProps.onPreviewEdit(remote);
+    layoutProps.onProjectOpen(remote);
+    layoutProps.onPreviewOpen(remote);
+  });
+  expect(getState().preview.session.item).toBe(original);
+  expect(actions.preview.navigate).not.toHaveBeenCalled();
+  expect(actions.preview.openInEditor).not.toHaveBeenCalled();
 });

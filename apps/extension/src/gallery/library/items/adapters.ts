@@ -1,3 +1,5 @@
+import type { SyncRemoteCatalogCard } from '../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import type { GalleryRemoteRootItem } from './types';
 import type { VideoWorkspaceSummary } from '../../../composition/persistence/review-workspaces/summaries';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 import type { VideoProjectListItem } from '../../../features/media-hub/video-project-list-items';
@@ -247,4 +249,33 @@ export function createGalleryItems(args: {
   ].sort((left, right) => {
     return right.createdAt - left.createdAt;
   });
+}
+
+/** Remote metadata stays a presentation object and cannot stand in for a native persistence row. */
+export function createRemoteRootGalleryItem(remote: SyncRemoteCatalogCard): GalleryRemoteRootItem {
+  return {
+    type: 'remote-root',
+    remote,
+    id: JSON.stringify([
+      'remote',
+      remote.selection.rootKind,
+      remote.selection.rootId,
+      remote.selection.operationId,
+      remote.selection.sourceDigest,
+    ]),
+    kind: remote.kind === 'video-review' ? 'video-project' : remote.kind,
+    filename: remote.label,
+    createdAt: remote.createdAt,
+    updatedAt: remote.updatedAt,
+    hasThumbnail: !remote.deleted && !remote.unavailable,
+    size: remote.size,
+    sourceFavicon: null,
+    sourceTitle: null,
+    sourceUrl: null,
+    tags: [...remote.tags],
+    duration: null,
+    width: null,
+    height: null,
+    mimeType: remote.mimeType ?? 'application/x-sniptale-project',
+  };
 }

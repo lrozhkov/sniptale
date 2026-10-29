@@ -7,6 +7,8 @@ import { betaV4Fixture } from './fixtures/beta-v4';
 import { betaV14Fixture } from './fixtures/beta-v14';
 import { betaV16Fixture } from './fixtures/beta-v16';
 import { betaV17Fixture } from './fixtures/beta-v17';
+import { betaV42Fixture } from './fixtures/beta-v42';
+import { betaV43Fixture } from './fixtures/beta-v43';
 import {
   CURRENT_SCHEMA_CONTRACTS,
   DATABASE_MIGRATIONS,
@@ -91,6 +93,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   const transaction = {
     abort: vi.fn(),
     objectStore: vi.fn((_name: string) => ({
+      createIndex: vi.fn(),
       put,
       clear: vi.fn(),
       delete: vi.fn(),
@@ -107,7 +110,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
   expect(plan?.[2]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 15, to: 16 }]);
   expect(plan?.[3]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 16, to: 17 }]);
   handleDatabaseUpgrade(db, 14, DB_VERSION, transaction);
-  expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(transaction.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(db.createObjectStore.mock.calls).toEqual([
     ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
@@ -116,6 +119,12 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['recording_recovery_sessions', { keyPath: 'id' }],
     ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
+    ['sync_outbox', { keyPath: 'key' }],
+    ['sync_catalog_cache', { keyPath: 'key' }],
+    ['sync_connection', { keyPath: 'key' }],
+    ['asset_residency', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -190,6 +199,12 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['recording_recovery_sessions', { keyPath: 'id' }],
     ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
+    ['sync_outbox', { keyPath: 'key' }],
+    ['sync_catalog_cache', { keyPath: 'key' }],
+    ['sync_connection', { keyPath: 'key' }],
+    ['asset_residency', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual([
@@ -197,6 +212,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['video_workspaces'],
     ['project_assets'],
     ['scenario_assets'],
+    ['sync_outbox'],
     [SCHEMA_CONTRACTS_STORE],
   ]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
@@ -263,6 +279,21 @@ it('upgrades each retained source contract only after all required stores valida
       ]);
     else if (migration.fromDatabaseVersion === 34)
       expect(db.createObjectStore.mock.calls).toEqual([['voice_input_history', { keyPath: 'id' }]]);
+    else if (migration.fromDatabaseVersion === 39)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['sync_capture', { keyPath: 'key' }],
+        ['video_project_revisions', { keyPath: 'projectId' }],
+      ]);
+    else if (migration.fromDatabaseVersion === 40)
+      expect(db.createObjectStore.mock.calls).toEqual([['sync_outbox', { keyPath: 'key' }]]);
+    else if (migration.fromDatabaseVersion === 41)
+      expect(db.createObjectStore.mock.calls).toEqual([['sync_catalog_cache', { keyPath: 'key' }]]);
+    else if (migration.fromDatabaseVersion === 43)
+      expect(db.createObjectStore.mock.calls).toEqual([['sync_connection', { keyPath: 'key' }]]);
+    else if (migration.fromDatabaseVersion === 45)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('asset_residency', {
+        keyPath: 'id',
+      });
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -279,7 +310,13 @@ it('admits compact source gain without workspace migration and refuses incompati
   const put = vi.fn();
   const tx = {
     abort: vi.fn(),
-    objectStore: vi.fn(() => ({ put, clear: vi.fn(), delete: vi.fn(), getAll: vi.fn() })),
+    objectStore: vi.fn(() => ({
+      createIndex: vi.fn(),
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
   };
   const names = new Set<string>(betaV16Fixture.stores);
   const db = {
@@ -293,7 +330,7 @@ it('admits compact source gain without workspace migration and refuses incompati
     deleteObjectStore: vi.fn(),
   };
   handleDatabaseUpgrade(db, 16, DB_VERSION, tx);
-  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(tx.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(db.createObjectStore.mock.calls).toEqual([
     ['video_workspace_history', { keyPath: ['aggregateId', 'ordinal'] }],
@@ -302,6 +339,12 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['recording_recovery_sessions', { keyPath: 'id' }],
     ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
+    ['sync_outbox', { keyPath: 'key' }],
+    ['sync_catalog_cache', { keyPath: 'key' }],
+    ['sync_connection', { keyPath: 'key' }],
+    ['asset_residency', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -324,6 +367,7 @@ it('annotation admission preserves rows and aborts before publishing contracts o
   const tx = {
     abort: vi.fn(),
     objectStore: vi.fn((_name: string) => ({
+      createIndex: vi.fn(),
       put,
       clear: vi.fn(),
       delete: vi.fn(),
@@ -352,9 +396,15 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['recording_recovery_sessions', { keyPath: 'id' }],
     ['recording_recovery_blocks', { keyPath: ['id', 'index'] }],
     ['voice_input_history', { keyPath: 'id' }],
+    ['sync_capture', { keyPath: 'key' }],
+    ['video_project_revisions', { keyPath: 'projectId' }],
+    ['sync_outbox', { keyPath: 'key' }],
+    ['sync_catalog_cache', { keyPath: 'key' }],
+    ['sync_connection', { keyPath: 'key' }],
+    ['asset_residency', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
-  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(tx.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   put.mockClear();
   tx.objectStore.mockClear();
@@ -452,3 +502,348 @@ it.each([
     expect(migration.validate(db, transaction)).toBeUndefined();
   }
 );
+
+it('publishes queue control contracts without reading or rewriting version 42 native data', () => {
+  const names = new Set<string>(betaV42Fixture.stores);
+  const nativeRows = new Map<string, readonly unknown[]>(Object.entries(betaV42Fixture.records));
+  nativeRows.set('sync_capture', [{ key: 'profile', retained: 'capture profile and intent' }]);
+  nativeRows.set('sync_outbox', [
+    { key: 'prepared', retained: 'preparation bytes and source claims' },
+    { key: 'attempt', retained: 'attempts and checked-file evidence' },
+  ]);
+  nativeRows.set('sync_catalog_cache', [{ key: 'catalog', retained: 'advisory evidence' }]);
+  const before = structuredClone(nativeRows);
+  const put = vi.fn();
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Released native data must remain untouched.');
+  });
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.has(name) },
+    createObjectStore: sourceAccess,
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn((name: string) => {
+      if (name !== SCHEMA_CONTRACTS_STORE) return sourceAccess();
+      return { put, getAll: sourceAccess, clear: sourceAccess, delete: sourceAccess };
+    }),
+  };
+  const plan = buildDatabaseMigrationPlan(42, 43)!;
+  expect(plan).toHaveLength(1);
+  expect(plan[0]?.domainVersions).toEqual([{ domainId: 'syncCapture', from: 3, to: 4 }]);
+  handleDatabaseUpgrade(db, 42, 43, tx);
+  expect(tx.abort).not.toHaveBeenCalled();
+  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(nativeRows).toEqual(before);
+  expect([...names]).toEqual(betaV42Fixture.stores);
+  expect(sourceAccess).not.toHaveBeenCalled();
+  expect(
+    parseStoredSchemaContracts(
+      Object.entries(betaV42Fixture.domainVersions).map(([domainId, schemaVersion]) => ({
+        domainId,
+        schemaVersion,
+      }))
+    )
+  ).toBeNull();
+  expect(buildDatabaseMigrationPlan(DB_VERSION, 42)).toBeNull();
+});
+
+it.each(['sync_capture', 'sync_outbox', 'sync_catalog_cache'])(
+  'aborts queue admission without publishing contracts when %s is missing and permits retry',
+  (missingStore) => {
+    const names = new Set<string>(betaV42Fixture.stores);
+    names.delete(missingStore);
+    const put = vi.fn();
+    const sourceAccess = vi.fn(() => {
+      throw new Error('Queue admission must not change native stores.');
+    });
+    const db = {
+      objectStoreNames: { contains: (name: string) => names.has(name) },
+      createObjectStore: sourceAccess,
+      deleteObjectStore: sourceAccess,
+    };
+    const failedTx = {
+      abort: vi.fn(),
+      objectStore: vi.fn(() => ({
+        createIndex: vi.fn(),
+        put,
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
+    };
+    expect(() => handleDatabaseUpgrade(db, 42, 43, failedTx)).toThrow(
+      'Sync queue control stores are unavailable.'
+    );
+    expect(failedTx.abort).toHaveBeenCalledOnce();
+    expect(failedTx.objectStore).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+    names.add(missingStore);
+    const retryTx = {
+      abort: vi.fn(),
+      objectStore: vi.fn(() => ({
+        createIndex: vi.fn(),
+        put,
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
+    };
+    handleDatabaseUpgrade(db, 42, 43, retryTx);
+    expect(retryTx.abort).not.toHaveBeenCalled();
+    expect(retryTx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+    expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(sourceAccess).not.toHaveBeenCalled();
+  }
+);
+
+it('creates the complete fresh schema with empty unindexed connection authority', () => {
+  const names: string[] = [];
+  const put = vi.fn();
+  const connectionIndex = vi.fn();
+  const connectionPut = vi.fn();
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.includes(name) },
+    createObjectStore: vi.fn((name: string) => {
+      names.push(name);
+      return {
+        createIndex: name === 'sync_connection' ? connectionIndex : vi.fn(),
+        put: name === 'sync_connection' ? connectionPut : put,
+      };
+    }),
+    deleteObjectStore: vi.fn(),
+  };
+  const tx = { abort: vi.fn(), objectStore: vi.fn() };
+  handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
+  expect([...names].sort()).toEqual([...EXPECTED_STORES].sort());
+  expect(names).toHaveLength(42);
+  expect(db.createObjectStore).toHaveBeenCalledWith('sync_connection', { keyPath: 'key' });
+  expect(connectionIndex).not.toHaveBeenCalled();
+  expect(connectionPut).not.toHaveBeenCalled();
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(tx.objectStore).not.toHaveBeenCalled();
+  expect(tx.abort).not.toHaveBeenCalled();
+});
+
+it('adds connection authority without reading or rewriting populated version 43 native data', () => {
+  const names = new Set<string>(betaV43Fixture.stores);
+  const nativeRows = new Map<string, readonly unknown[]>(Object.entries(betaV43Fixture.records));
+  nativeRows.set('sync_capture', [{ key: 'profile', enabled: true, connectionGeneration: 7 }]);
+  nativeRows.set('sync_outbox', [
+    { key: 'prepared', retained: 'source claims and immutable bytes' },
+    { key: 'queue', retained: 'legacy run without auth identity' },
+    { key: 'attempt', retained: 'attempt and receipt evidence' },
+  ]);
+  nativeRows.set('sync_catalog_cache', [{ key: 'catalog', retained: 'advisory evidence' }]);
+  const before = structuredClone(nativeRows);
+  const put = vi.fn();
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Released native data must remain untouched.');
+  });
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.has(name) },
+    createObjectStore: vi.fn((name: string) => {
+      names.add(name);
+      nativeRows.set(name, []);
+      return { createIndex: sourceAccess, put: sourceAccess };
+    }),
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn((name: string) => {
+      if (name !== SCHEMA_CONTRACTS_STORE) return sourceAccess();
+      return { put, getAll: sourceAccess, clear: sourceAccess, delete: sourceAccess };
+    }),
+  };
+  expect(buildDatabaseMigrationPlan(43, 44)).toHaveLength(1);
+  handleDatabaseUpgrade(db, 43, 44, tx);
+  expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('sync_connection', {
+    keyPath: 'key',
+  });
+  expect(nativeRows).toEqual(new Map([...before, ['sync_connection', []]]));
+  expect(tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(tx.abort).not.toHaveBeenCalled();
+  expect(sourceAccess).not.toHaveBeenCalled();
+  expect(
+    parseStoredSchemaContracts(
+      Object.entries(betaV43Fixture.domainVersions).map(([domainId, schemaVersion]) => ({
+        domainId,
+        schemaVersion,
+      }))
+    )
+  ).toBeNull();
+  expect(buildDatabaseMigrationPlan(DB_VERSION, 43)).toBeNull();
+});
+
+it.each(['sync_capture', 'sync_outbox', 'sync_catalog_cache', 'sync_connection'])(
+  'aborts connection admission before publishing contracts when %s is unavailable and permits retry',
+  (missingStore) => {
+    const names = new Set<string>(betaV43Fixture.stores);
+    names.delete(missingStore);
+    const put = vi.fn();
+    const sourceAccess = vi.fn(() => {
+      throw new Error('Connection admission must not access native rows.');
+    });
+    let creationInterrupted = missingStore === 'sync_connection';
+    const db = {
+      objectStoreNames: { contains: (name: string) => names.has(name) },
+      createObjectStore: vi.fn((name: string) => {
+        if (!creationInterrupted) names.add(name);
+        return { createIndex: sourceAccess, put: sourceAccess };
+      }),
+      deleteObjectStore: sourceAccess,
+    };
+    const failedTx = {
+      abort: vi.fn(),
+      objectStore: vi.fn(() => ({
+        createIndex: vi.fn(),
+        put,
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
+    };
+    expect(() => handleDatabaseUpgrade(db, 43, 44, failedTx)).toThrow(
+      'Sync connection stores are unavailable.'
+    );
+    expect(failedTx.abort).toHaveBeenCalledOnce();
+    expect(failedTx.objectStore).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+    // IndexedDB abort rolls back the new store before the next upgrade attempt.
+    names.delete('sync_connection');
+    if (missingStore !== 'sync_connection') names.add(missingStore);
+    creationInterrupted = false;
+    const retryTx = {
+      abort: vi.fn(),
+      objectStore: vi.fn(() => ({
+        createIndex: vi.fn(),
+        put,
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
+    };
+    handleDatabaseUpgrade(db, 43, 44, retryTx);
+    expect(retryTx.abort).not.toHaveBeenCalled();
+    expect(retryTx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+    expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+    expect(sourceAccess).not.toHaveBeenCalled();
+  }
+);
+
+it('adds the exact nonunique due index synchronously without reading or backfilling version 44 rows', () => {
+  const createIndex = vi.fn();
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Due indexing must not read or change source rows.');
+  });
+  const put = vi.fn();
+  const db = {
+    objectStoreNames: {
+      contains: (name: string) => EXPECTED_STORES.some((store) => store === name),
+    },
+    createObjectStore: sourceAccess,
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn((name: string) => ({
+      createIndex,
+      put: name === SCHEMA_CONTRACTS_STORE ? put : sourceAccess,
+      clear: sourceAccess,
+      delete: sourceAccess,
+      getAll: sourceAccess,
+    })),
+  };
+  expect(handleDatabaseUpgrade(db, 44, 45, tx)).toBeUndefined();
+  expect(tx.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
+  expect(createIndex).toHaveBeenCalledExactlyOnceWith(
+    'syncQueueDue',
+    [
+      'spaceId',
+      'connectionGeneration',
+      'profileCreatedAt',
+      'authorization.incarnation',
+      'nextDueAt',
+      'key',
+    ],
+    { unique: false }
+  );
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(sourceAccess).not.toHaveBeenCalled();
+  expect(tx.abort).not.toHaveBeenCalled();
+});
+
+it('aborts due index creation failure before publishing contracts and permits a fresh upgrade attempt', () => {
+  const createIndex = vi.fn(() => {
+    throw new Error('Interrupted due index creation');
+  });
+  const put = vi.fn();
+  const db = {
+    objectStoreNames: { contains: () => true },
+    createObjectStore: vi.fn(() => ({ createIndex, put })),
+    deleteObjectStore: vi.fn(),
+  };
+  const tx = {
+    abort: vi.fn(),
+    objectStore: vi.fn(() => ({
+      createIndex,
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
+  };
+  expect(() => handleDatabaseUpgrade(db, 44, 45, tx)).toThrow('Interrupted due index creation');
+  expect(tx.abort).toHaveBeenCalledOnce();
+  expect(put).not.toHaveBeenCalled();
+  expect(tx.objectStore.mock.calls).toEqual([['sync_outbox']]);
+  const retryIndex = vi.fn();
+  const retryTx = {
+    abort: vi.fn(),
+    objectStore: vi.fn(() => ({
+      createIndex: retryIndex,
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
+  };
+  handleDatabaseUpgrade(db, 44, 45, retryTx);
+  expect(retryIndex).toHaveBeenCalledOnce();
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(retryTx.abort).not.toHaveBeenCalled();
+  expect(db.createObjectStore).not.toHaveBeenCalled();
+  expect(db.deleteObjectStore).not.toHaveBeenCalled();
+});
+
+it('creates the same exact nonunique due index for a fresh database', () => {
+  const dueIndex = vi.fn();
+  const put = vi.fn();
+  const db = {
+    objectStoreNames: { contains: () => false },
+    createObjectStore: vi.fn((name: string) => ({
+      createIndex: name === 'sync_outbox' ? dueIndex : vi.fn(),
+      put,
+    })),
+    deleteObjectStore: vi.fn(),
+  };
+  const tx = { abort: vi.fn(), objectStore: vi.fn() };
+  handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
+  expect(dueIndex).toHaveBeenCalledExactlyOnceWith(
+    'syncQueueDue',
+    [
+      'spaceId',
+      'connectionGeneration',
+      'profileCreatedAt',
+      'authorization.incarnation',
+      'nextDueAt',
+      'key',
+    ],
+    { unique: false }
+  );
+  expect(tx.objectStore).not.toHaveBeenCalled();
+});

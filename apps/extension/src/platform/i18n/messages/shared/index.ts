@@ -1,3 +1,4 @@
+import { sharedSyncCacheMessages } from './sync-cache';
 import { defineMessageSource } from '../source';
 import { sharedBytesMessages } from './bytes';
 import { sharedDefaultsMessages } from './defaults';
@@ -21,6 +22,7 @@ export const sharedMessages = defineMessageSource({
   editorStart: sharedEditorStartMessages,
   bytes: sharedBytesMessages,
   storage: sharedStorageMessages,
+  syncCache: sharedSyncCacheMessages,
   mediaMetadata: sharedMediaMetadataMessages,
   projectActions: sharedProjectActionsMessages,
   ui: sharedUiMessages,

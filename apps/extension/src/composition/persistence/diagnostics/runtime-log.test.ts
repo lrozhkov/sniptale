@@ -1,6 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createRuntimeLog, RUNTIME_LOG_STORAGE_KEY as KEY } from './runtime-log';
-import { installPersistenceLockManagerForTests } from '../infrastructure/mutation-barrier';
+import {
+  installPersistenceLockManagerForTests,
+  runWithPersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 afterEach(() => {
   vi.useRealTimers();
   installPersistenceLockManagerForTests(null);
@@ -159,4 +162,102 @@ it('queues events during a slow storage write for the next admitted batch', asyn
   await log.settled();
   expect(await log.read()).toHaveLength(3);
   expect((await log.read()).every((entry) => entry.dropped === 0)).toBe(true);
+});
+
+function confirmedRow() {
+  const time = new Date().toISOString();
+  return {
+    schemaVersion: 1,
+    time,
+    lastTime: time,
+    source: 'SyncQueue',
+    context: 'sync-delivery',
+    level: 'info',
+    message: 'Sync event recorded.',
+    repeats: 1,
+    dropped: 0,
+  };
+}
+it('confirms only after archive and recent-tail publication finish in order', async () => {
+  const f = fixture();
+  const order: string[] = [];
+  const history = {
+    append: vi.fn(async () => {
+      order.push('archive');
+      return true;
+    }),
+  };
+  f.area.set.mockImplementation(async () => {
+    order.push('tail');
+  });
+  const log = createRuntimeLog({ area: f.area, withLock: f.withLock, history });
+  await runWithPersistenceMutationPermit(async (permit) => {
+    expect(await log.appendConfirmed([confirmedRow()], permit)).toBe(true);
+    expect(history.append).toHaveBeenCalledWith(
+      expect.stringContaining('Sync event recorded.'),
+      permit
+    );
+    expect(f.area.set).toHaveBeenCalledWith(expect.any(Object), permit);
+  });
+  expect(order).toEqual(['archive', 'tail']);
+});
+it.each(['archive-refused', 'archive-failed', 'tail-failed'] as const)(
+  'refuses confirmation after %s and permits an explicit retry',
+  async (failure) => {
+    const f = fixture();
+    const history = { append: vi.fn(async () => true) };
+    if (failure === 'archive-refused') history.append.mockResolvedValueOnce(false);
+    if (failure === 'archive-failed') history.append.mockRejectedValueOnce(new Error('quota'));
+    if (failure === 'tail-failed') f.area.set.mockRejectedValueOnce(new Error('quota'));
+    const log = createRuntimeLog({ area: f.area, withLock: f.withLock, history });
+    const rows = [confirmedRow()];
+    await runWithPersistenceMutationPermit(async (permit) => {
+      expect(await log.appendConfirmed(rows, permit)).toBe(false);
+      if (failure !== 'tail-failed') expect(f.area.set).not.toHaveBeenCalled();
+      expect(await log.appendConfirmed(rows, permit)).toBe(true);
+    });
+    expect(await log.read()).toHaveLength(1);
+  }
+);
+it('refuses malformed batches and an expired permit without writes', async () => {
+  const f = fixture();
+  const history = { append: vi.fn(async () => true) };
+  const log = createRuntimeLog({ area: f.area, withLock: f.withLock, history });
+  const expired = await runWithPersistenceMutationPermit((permit) => permit);
+  expect(await log.appendConfirmed([confirmedRow()], expired)).toBe(false);
+  await runWithPersistenceMutationPermit(async (permit) => {
+    for (const value of [
+      null,
+      [],
+      Array.from({ length: 66 }, confirmedRow),
+      [{ ...confirmedRow(), time: 'bad' }],
+    ])
+      expect(await log.appendConfirmed(value, permit)).toBe(false);
+  });
+  expect(f.area.set).not.toHaveBeenCalled();
+  expect(history.append).not.toHaveBeenCalled();
+});
+it('detaches a confirmed batch before waiting for the log lock', async () => {
+  const f = fixture();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const history = { append: vi.fn(async () => true) };
+  const log = createRuntimeLog({
+    area: f.area,
+    history,
+    withLock: async (work) => {
+      await gate;
+      await work();
+    },
+  });
+  const row = confirmedRow();
+  await runWithPersistenceMutationPermit(async (permit) => {
+    const pending = log.appendConfirmed([row], permit);
+    row.message = 'Changed later';
+    release();
+    expect(await pending).toBe(true);
+  });
+  expect((await log.read())[0]!.message).toBe('Sync event recorded.');
 });

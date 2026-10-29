@@ -1,3 +1,4 @@
+import { initializeSyncConnectionRuntime } from './sync-connection';
 import { registerPageRecoveryPorts } from '../../../page-recovery/ports';
 import { createAudioJobService } from '../../../ai/audio/service';
 import { registerAudioJobPorts } from '../../../ai/audio/port';
@@ -33,13 +34,13 @@ import { registerVoiceInputPorts } from '../../../voice-input/coordinator';
 import { registerVoiceInputTelemetryPorts } from '../../../voice-input/telemetry-port';
 import { registerAggregateEditorPresencePorts } from '../../../application/aggregate-promotion/ports';
 import { registerExtensionCommandListener } from '../../commands';
-import { registerSecurityE2EControl } from '../../../../platform/security-e2e-control';
 import { subscribeToLocaleChanges } from '../../../../platform/i18n';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeWiring' });
 
 export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   logger.log('Background service worker loaded');
+  initializeSyncConnectionRuntime(state);
 
   // The service worker has no localStorage paint hint, so keep its translation state hydrated.
   subscribeToLocaleChanges(() => undefined);
@@ -61,9 +62,6 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   registerAggregateEditorPresencePorts();
   registerPageRecoveryPorts();
   registerExtensionCommandListener(state);
-  if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
-    registerSecurityE2EControl();
-  }
   initializePageAccessLifecycle(logger);
   configureScreenshotPrivacyErasureCleanupPort({
     disableScreenshotMode: (tabId, runtimeState) =>

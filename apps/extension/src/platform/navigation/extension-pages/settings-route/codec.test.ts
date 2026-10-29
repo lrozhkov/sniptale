@@ -26,7 +26,7 @@ describe('settings route codec', () => {
       'interface-browser': ['interface', 'context-menu'],
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
-      saving: ['settings', 'files', 'drafts', 'storage', 'templates'],
+      saving: ['settings', 'files', 'drafts', 'storage', 'templates', 'queue', 'connection'],
       'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds'],
       'ai-connections': ['integrations', 'chrome-ai', 'security'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
@@ -185,4 +185,9 @@ it('opens scenario layouts as a canonical settings leaf', () => {
     shouldReplace: false,
     source: 'canonical',
   });
+});
+
+it('round trips the saving connection subpage through the normal Settings route', () => {
+  const route = { section: 'saving', view: 'connection' } as const;
+  expect(resolveSettingsRoute(buildSettingsRouteUrl(BASE, route)).route).toEqual(route);
 });

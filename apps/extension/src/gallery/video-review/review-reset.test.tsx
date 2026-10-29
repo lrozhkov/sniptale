@@ -143,3 +143,7 @@ it('resets the mounted editor and preserves its changes on cancellation or faile
     await fixture.cleanup();
   }
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

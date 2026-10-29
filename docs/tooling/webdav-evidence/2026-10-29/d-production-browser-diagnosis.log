@@ -1,0 +1,17 @@
+
+Running 1 test using 1 worker
+
+(node:66847) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+production-proof 1280 library-navigation
+production-proof 1280 library-visible
+production-proof 1280 download-clicked
+production-proof 1280 editor-ready
+production-proof 1280 editor-ready
+production-proof 1280 library-navigation
+production-proof 1280 library-visible
+production-proof 1280 offline-preview
+  ✘  1 tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 (2.6m)
+
+  1 interrupted
+    tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 

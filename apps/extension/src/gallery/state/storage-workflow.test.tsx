@@ -1,3 +1,4 @@
+import { createRemoteRootGalleryItem } from '../library/items/adapters';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -246,4 +247,33 @@ it('keeps edits made during save when a library refresh reconciles the selected 
     initialTagDrafts: ['saved'],
     hasChanges: true,
   });
+});
+
+it('retains the selected remote version when passive refresh replaces its card with a native identity', () => {
+  renderHook();
+  const remote = createRemoteRootGalleryItem({
+    source: 'remote',
+    label: 'Remote image',
+    tags: [],
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 3,
+    createdAt: 1,
+    updatedAt: 1,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'asset-1',
+      operationId: 'version-1',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  currentPreview = { inspectorCollapsed: false, item: remote, url: null };
+  libraryCallbacks?.onPreviewItemRefresh([createItem({ id: 'asset-1' })]);
+  expect(currentPreview.item).toEqual(remote);
+  currentPreview = { inspectorCollapsed: false, item: null, url: null };
+  libraryCallbacks?.onPreviewItemRefresh([createItem({ id: 'asset-1' })]);
+  expect(currentPreview.item).toBeNull();
 });

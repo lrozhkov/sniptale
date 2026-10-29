@@ -1,3 +1,5 @@
+import { parseAssetRef, type AssetRef } from '../../../../composition/persistence/assets';
+import type { MediaHubBackupRootPreparation } from '../contracts';
 import {
   inventoryProjectThumbnail,
   projectInventoryDescriptor,
@@ -12,7 +14,10 @@ import {
   collectReviewAssetReferences,
   encodePortableReviewAssetRefs,
 } from '../../../../composition/persistence/review-workspaces/asset-refs';
-import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
+import type {
+  ArchivePathAllocator,
+  ArchiveObjectRef,
+} from '../../../../composition/archive-transfer';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
   PROJECT_ASSETS_STORE,
@@ -31,11 +36,14 @@ import { createProjectAssetMediaId } from '../../../../features/media-hub/media-
 import {
   UnsupportedEngine1VideoProjectError,
   type VideoProjectEntry,
+  type ProjectAssetEntry,
 } from '../../../../composition/persistence/projects/contracts';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance';
 import { encodePortableThumbnail } from '../root-codecs/media';
 import {
   encodePortableVideoProjectAssetRefs,
+  encodePortableVideoProjectAsset,
+  encodePortableVideoProjectExport,
   type PortableVideoProjectMetadata,
 } from '../root-codecs/projects';
 import type { MediaHubBackupExportOptions } from '../contracts';
@@ -51,6 +59,12 @@ import { buildPortableAggregatePresentation } from './presentation';
 import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
 
 interface VideoInventoryDatabase extends InventoryDatabase, VideoReviewBackupDatabase {}
+
+/** Sync can retain admitted exports while ordinary archive inventory still reads every body. */
+interface DeferredProjectExportInventory {
+  refs: ReadonlyMap<string, AssetRef>;
+  onObject(assetId: string, object: ArchiveObjectRef): void;
+}
 
 function selected(
   id: string,
@@ -88,6 +102,38 @@ function readSelectedVideoProjects(
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
+function portableProjectAssetInventory(args: {
+  asset: ProjectAssetEntry;
+  portable: ReturnType<typeof encodePortableVideoProjectAsset>;
+  media: ReturnType<typeof parseMediaLibraryEntry>;
+  videoReview: Awaited<ReturnType<typeof readVideoReviewForBackup>> | undefined;
+  file: File;
+  filename: string;
+  entry: VideoProjectEntry;
+  collector: ReturnType<typeof createObjectCollector>;
+}) {
+  const { asset, portable, media, videoReview, file, filename, entry, collector } = args;
+  return {
+    entry: portable,
+    ...(media
+      ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
+      : { publishToLibrary: false }),
+    ...(videoReview && !media ? { videoReview: encodePortableReviewAssetRefs(videoReview) } : {}),
+    filename,
+    objectId: collector.addObject(
+      file,
+      filename,
+      asset.mimeType,
+      withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+        'Recordings',
+        'Projects',
+        entry.project.name,
+        'Assets',
+      ])
+    ),
+  };
+}
+
 async function buildProjectAssets(
   db: VideoInventoryDatabase,
   entry: VideoProjectEntry,
@@ -110,7 +156,7 @@ async function buildProjectAssets(
     );
     const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
     const file = await readInventoryAssetFile(db, asset.assetId, filename);
-    const { assetId: _assetId, ...portable } = asset;
+    const portable = encodePortableVideoProjectAsset(asset);
     const videoReview = asset.mimeType.startsWith('video/')
       ? await readVideoReviewForBackup({
           db,
@@ -121,27 +167,18 @@ async function buildProjectAssets(
     if (videoReview && !media) {
       for (const id of collectReviewAssetReferences(videoReview.workspace)) referencedIds.add(id);
     }
-    output.push({
-      entry: portable,
-      ...(media
-        ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
-        : { publishToLibrary: false }),
-      ...(videoReview && !media
-        ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
-        : {}),
-      filename,
-      objectId: collector.addObject(
+    output.push(
+      portableProjectAssetInventory({
+        asset,
+        portable,
+        media,
+        videoReview,
         file,
         filename,
-        asset.mimeType,
-        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
-          'Recordings',
-          'Projects',
-          entry.project.name,
-          'Assets',
-        ])
-      ),
-    });
+        entry,
+        collector,
+      })
+    );
   }
   return output;
 }
@@ -152,12 +189,14 @@ async function buildProjectExports({
   collector,
   referencedIds,
   options,
+  deferredExports,
 }: {
   db: VideoInventoryDatabase;
   entry: VideoProjectEntry;
   collector: ReturnType<typeof createObjectCollector>;
   referencedIds: Set<string>;
   options: MediaHubBackupExportOptions;
+  deferredExports?: DeferredProjectExportInventory;
 }) {
   const output = [];
   const exports = (await db.getAllFromIndex(PROJECT_EXPORTS_STORE, 'projectId', entry.id))
@@ -168,8 +207,34 @@ async function buildProjectExports({
     const media = parseMediaLibraryEntry(
       await db.get(MEDIA_LIBRARY_STORE, `export:${exportEntry.id}`)
     );
-    const file = await readInventoryAssetFile(db, exportEntry.assetId, exportEntry.filename);
-    const { assetId: _assetId, recordingMetadata, ...portable } = exportEntry;
+    const deferred = deferredExports?.refs.get(exportEntry.assetId);
+    const directory = withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+      'Exports',
+      entry.project.name,
+    ]);
+    let objectId: string;
+    if (deferred) {
+      const native = parseAssetRef(await db.get('asset_refs', exportEntry.assetId));
+      if (
+        !native ||
+        JSON.stringify(native) !== JSON.stringify(deferred) ||
+        native.size !== exportEntry.size ||
+        (exportEntry.mimeType !== undefined && native.mimeType !== exportEntry.mimeType)
+      )
+        throw new Error('Deferred export descriptor differs from its native reference.');
+      const object = collector.addObjectDescriptor(
+        native.size,
+        exportEntry.filename,
+        exportEntry.mimeType ?? native.mimeType,
+        directory
+      );
+      deferredExports!.onObject(exportEntry.assetId, object);
+      objectId = object.objectId;
+    } else {
+      const file = await readInventoryAssetFile(db, exportEntry.assetId, exportEntry.filename);
+      objectId = collector.addObject(file, exportEntry.filename, exportEntry.mimeType, directory);
+    }
+    const { recordingMetadata, ...portable } = encodePortableVideoProjectExport(exportEntry);
     const thumbnail = parseMediaThumbnailEntry(
       await db.get(THUMBNAILS_STORE, `export:${exportEntry.id}`)
     );
@@ -189,15 +254,7 @@ async function buildProjectExports({
       ...(videoReview && !media
         ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
         : {}),
-      objectId: collector.addObject(
-        file,
-        exportEntry.filename,
-        exportEntry.mimeType,
-        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
-          'Exports',
-          entry.project.name,
-        ])
-      ),
+      objectId,
       ...(thumbnail
         ? {
             thumbnail: encodePortableThumbnail(
@@ -231,25 +288,23 @@ function buildPortableEffectSnapshots(
   });
 }
 
-/**
- * Archives review-owned external assets (imported music or voiceover) that the
- * project's own asset list does not carry; stale references are skipped so a
- * missing source cannot block the whole backup.
- */
+/** Collect each review-owned resource once, including its private review dependencies. */
 async function buildReviewReferencedAssets(
   db: VideoInventoryDatabase,
   entry: VideoProjectEntry,
   collector: ReturnType<typeof createObjectCollector>,
   collectedIds: ReadonlySet<string>,
-  referencedIds: ReadonlySet<string>
+  referencedIds: Set<string>
 ) {
   const output = [];
+  const collected = new Set(collectedIds);
   let fallbackIndex = 0;
   const prefix = 'project-asset:';
   for (const reference of referencedIds) {
     if (!reference.startsWith(prefix)) continue;
     const id = reference.slice(prefix.length);
-    if (collectedIds.has(id)) continue;
+    if (collected.has(id)) continue;
+    collected.add(id);
     const raw = await db.get(PROJECT_ASSETS_STORE, id);
     const asset = raw === undefined ? null : parseProjectAssetEntry(raw);
     if (!asset) throw new Error(`Review-referenced project asset is missing: ${reference}.`);
@@ -259,25 +314,31 @@ async function buildReviewReferencedAssets(
     const filename =
       media?.filename ?? createReadableAssetFilename(fallbackIndex++, asset.mimeType);
     const file = await readInventoryAssetFile(db, asset.assetId, filename);
-    const { assetId: _assetId, ...portable } = asset;
-    output.push({
-      entry: portable,
-      ...(media
-        ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
-        : { publishToLibrary: false }),
-      filename,
-      objectId: collector.addObject(
+    const portable = encodePortableVideoProjectAsset(asset);
+    const videoReview =
+      !media && asset.mimeType.startsWith('video/')
+        ? await readVideoReviewForBackup({
+            db,
+            aggregateId: createProjectAssetMediaId(asset.id),
+            sourceAssetId: asset.assetId,
+          })
+        : undefined;
+    if (videoReview) {
+      for (const reference of collectReviewAssetReferences(videoReview.workspace))
+        referencedIds.add(reference);
+    }
+    output.push(
+      portableProjectAssetInventory({
+        asset,
+        portable,
+        media,
+        videoReview,
         file,
         filename,
-        asset.mimeType,
-        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
-          'Recordings',
-          'Projects',
-          entry.project.name,
-          'Assets',
-        ])
-      ),
-    });
+        entry,
+        collector,
+      })
+    );
   }
   return output;
 }
@@ -287,8 +348,11 @@ async function buildVideoProjectRoot(args: {
   entry: VideoProjectEntry;
   index: number;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
+  deferredExports?: DeferredProjectExportInventory;
   options: MediaHubBackupExportOptions;
 }): Promise<MediaHubBackupRootInventoryItem> {
+  await args.prepareRoot?.({ rootKind: 'video-project', rootId: args.entry.id });
   await verifyVideoProjectEffectSnapshotIntegrity(args.entry.project);
   const collector = createObjectCollector(
     `video-${String(args.index + 1).padStart(6, '0')}`,
@@ -302,6 +366,7 @@ async function buildVideoProjectRoot(args: {
     collector,
     referencedIds,
     options: args.options,
+    ...(args.deferredExports ? { deferredExports: args.deferredExports } : {}),
   });
   const projectAssets = [
     ...sourceAssets,
@@ -349,7 +414,7 @@ async function buildVideoProjectRoot(args: {
       'video-project',
       args.entry.id,
       `${METADATA_ROOT}/video-projects/${encodeURIComponent(args.entry.id)}.json`,
-      collector.objects
+      collector.references
     ),
     load: projectInventoryLoader(metadata, collector.objects),
     summary: {
@@ -370,6 +435,8 @@ export async function buildVideoProjectRootInventory(args: {
   db: VideoInventoryDatabase;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
+  deferredExports?: DeferredProjectExportInventory;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const entries = readSelectedVideoProjects(
     await args.db.getAll(VIDEO_PROJECTS_STORE),

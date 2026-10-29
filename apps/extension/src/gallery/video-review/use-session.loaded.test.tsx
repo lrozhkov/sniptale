@@ -118,3 +118,7 @@ it('releases a reader acquired after its loading owner unmounts without reading 
   expect(mocks.release).toHaveBeenCalledOnce();
   expect(mocks.load).not.toHaveBeenCalled();
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

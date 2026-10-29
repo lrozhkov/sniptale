@@ -1,0 +1,23 @@
+file://<worktree>/tooling/qa/runtime/process/shared-cli.mjs:116
+      throw new Error(
+            ^
+
+Error: Unknown argument for verify-oxfmt.mjs: <positional>
+Usage: verify-oxfmt.mjs
+
+Check or write the canonical Oxfmt scope.
+
+Options:
+  --write             Write formatter changes.
+  --staged            Format staged files only.
+  --files <value...>  Format exact repository files.
+  --help, -h          Show this help.
+
+    at parseStrictArguments (file://<worktree>/tooling/qa/runtime/process/shared-cli.mjs:116:13)
+    at parseFormatterCliArguments (file://<worktree>/tooling/qa/guards/quality/verify-oxfmt.mjs:153:28)
+    at file://<worktree>/tooling/qa/guards/quality/verify-oxfmt.mjs:175:58
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.21.0

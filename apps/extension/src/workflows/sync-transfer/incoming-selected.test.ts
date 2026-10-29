@@ -1,0 +1,538 @@
+import { createGuideProject } from '../../features/scenario/project/factories';
+import { createScenarioProjectEntry } from '../../composition/persistence/scenario/projects/entry';
+import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { receiveSelectedCatalogRoot, type SelectedCatalogRoot } from './incoming-selected';
+import { syncCatalogRootKey, type CatalogOperation } from './catalog-graph';
+import type { scanSyncCatalog } from './catalog';
+import type { SyncRemoteStore } from './remote-store';
+import { hashSyncText } from './wire-record';
+
+const io = vi.hoisted(() => ({
+  admit: vi.fn(),
+  materialized: vi.fn(),
+  receipt: vi.fn(),
+  prepare: vi.fn(),
+  publish: vi.fn(),
+  cancel: vi.fn(),
+  nativeReady: vi.fn(),
+  nativePrepare: vi.fn(),
+  connection: vi.fn(),
+  reading: false,
+  events: [] as string[],
+}));
+vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<
+    typeof import('../../composition/persistence/infrastructure/indexed-db/core')
+  >()),
+  initDB: vi.fn(async () => ({})),
+}));
+vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
+  runWithAssetResourceRead: async (operation: () => Promise<unknown>) => {
+    io.reading = true;
+    try {
+      return await operation();
+    } finally {
+      io.reading = false;
+    }
+  },
+}));
+vi.mock('../../composition/persistence/remote-connection/store', () => ({
+  loadSyncConnection: io.connection,
+}));
+vi.mock('./native-residency', () => ({
+  isNativeEditingRootReady: io.nativeReady,
+  prepareNativeEditingRoot: io.nativePrepare,
+}));
+vi.mock('../../composition/persistence/sync-capture/catalog-admission', () => ({
+  loadCatalogReplicaAdmission: io.admit,
+  loadMaterializedCatalogSelections: io.materialized,
+  hasCatalogReplicaReceipt: io.receipt,
+}));
+vi.mock('./incoming', () => ({ prepareCatalogReplica: io.prepare }));
+vi.mock('../../composition/persistence/sync-capture/replica-publication', () => ({
+  publishPreparedReplicaJournal: io.publish,
+}));
+vi.mock('../../composition/persistence/infrastructure/mutation-barrier', async (original) => ({
+  ...(await original<
+    typeof import('../../composition/persistence/infrastructure/mutation-barrier')
+  >()),
+  runWithDurableAssetLifecycleLock: async (work: () => Promise<unknown>) => work(),
+}));
+vi.mock('../../composition/persistence/assets/publication', async (original) => {
+  const actual =
+    await original<typeof import('../../composition/persistence/assets/publication')>();
+  return {
+    ...actual,
+    cancelAssetPublication: io.cancel,
+    publishReadyJournalWithRetry: async (
+      journal: unknown,
+      publish: (ready: unknown) => Promise<void>
+    ) => {
+      try {
+        await publish(journal);
+      } catch (error) {
+        if (error instanceof actual.SupersededAssetPublicationError) await io.cancel(journal);
+        throw error;
+      }
+    },
+  };
+});
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+function operation(
+  rootKind: SelectedCatalogRoot['rootKind'],
+  rootId: string,
+  dependencies: { mediaId: string; basis: string[] }[] = []
+): CatalogOperation {
+  const value: CatalogOperation['operation'] = {
+    format: 'sniptale-sync-operation',
+    version: 1,
+    spaceId: 'space',
+    operationId: `${rootId}-op`,
+    rootKind,
+    rootId,
+    kind: 'edit',
+    parents: [],
+    dependencies,
+    envelope: null,
+    objects: [],
+  };
+  return { operation: value, operationText: JSON.stringify(value), attempts: [] };
+}
+function fixture(project = true) {
+  const media = operation('media', 'source');
+  const parent = operation('video-project', 'parent', [
+    { mediaId: 'source', basis: ['source-op'] },
+  ]);
+  const selected = project ? parent : media;
+  const catalog: Awaited<ReturnType<typeof scanSyncCatalog>> = {
+    operations: new Map(
+      [media, ...(project ? [parent] : [])].map((source) => [source.operation.operationId, source])
+    ),
+    roots: new Map(
+      [media, ...(project ? [parent] : [])].map((source) => [
+        syncCatalogRootKey(source.operation.rootKind, source.operation.rootId),
+        {
+          rootKind: source.operation.rootKind,
+          rootId: source.operation.rootId,
+          heads: [source.operation.operationId],
+          deleted: false,
+          conflict: false,
+          blocked: false,
+          unavailableDependencies: [],
+        },
+      ])
+    ),
+    quarantined: [],
+    pending: [],
+    invalidOperations: [],
+    invalid: [],
+    metadataBytes: 0,
+    pages: 1,
+  };
+  const remote: SyncRemoteStore = {
+    stat: vi.fn(),
+    list: vi.fn(),
+    read: vi.fn(),
+    write: vi.fn(),
+  };
+  const controller = new AbortController();
+  return {
+    remote,
+    catalog,
+    scope: { spaceId: 'space', connectionGeneration: 3, profileCreatedAt: 1 },
+    authorization: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 },
+    selection: {
+      rootKind: selected.operation.rootKind,
+      rootId: selected.operation.rootId,
+      operationId: selected.operation.operationId,
+      sourceDigest: hashSyncText(selected.operationText),
+    },
+    signal: controller.signal,
+    controller,
+  };
+}
+beforeEach(() => {
+  vi.clearAllMocks();
+  io.events = [];
+  io.reading = false;
+  io.nativeReady.mockResolvedValue(true);
+  io.nativePrepare.mockResolvedValue({ downloaded: 1 });
+  const f = fixture();
+  io.connection.mockResolvedValue({
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    phase: 'active',
+    binding: {
+      ...f.scope,
+      provider: 'webdav',
+      rootUrl: 'https://dav.example.test/root/',
+      accountId: 'alice',
+    },
+    identity: f.authorization,
+    credentialId: '20000000-0000-4000-8000-000000000001',
+    updateNonce: null,
+  });
+  io.receipt.mockResolvedValue(false);
+  io.materialized.mockResolvedValue([]);
+  io.admit.mockImplementation(async ({ rootId }) => {
+    io.events.push(`admit:${rootId}`);
+    return {
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    };
+  });
+  io.prepare.mockImplementation(async ({ rootId }) => {
+    io.events.push(`prepare:${rootId}`);
+    return {
+      journalId: rootId,
+      assetRefs: [],
+      createdAt: 1,
+      domain: 'sync-replica',
+      payload: null,
+    };
+  });
+  io.publish.mockImplementation(async (journal) => {
+    io.events.push(`commit:${journal.journalId}`);
+  });
+  io.cancel.mockResolvedValue(undefined);
+});
+
+it('commits dependencies before reading parent native admission and returns the pinned native root', async () => {
+  const f = fixture();
+  await expect(receiveSelectedCatalogRoot(f)).resolves.toEqual({
+    rootKind: 'video-project',
+    rootId: 'parent',
+    operationId: 'parent-op',
+  });
+  expect(io.events).toEqual([
+    'admit:source',
+    'prepare:source',
+    'commit:source',
+    'admit:parent',
+    'prepare:parent',
+    'commit:parent',
+  ]);
+  expect(io.admit.mock.calls[1]![0]).toMatchObject({
+    scope: f.scope,
+    authorization: f.authorization,
+    rootId: 'parent',
+    dependencyMediaIds: ['source'],
+  });
+});
+
+it('refuses changed operation or digest and unavailable roots before native preparation', async () => {
+  for (const field of ['operationId', 'sourceDigest'] as const) {
+    const f = fixture();
+    f.selection[field] = 'changed';
+    await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('changed or is unavailable');
+  }
+  for (const field of ['deleted', 'conflict', 'blocked'] as const) {
+    const f = fixture();
+    f.catalog.roots.get(syncCatalogRootKey('video-project', 'parent'))![field] = true;
+    await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('changed or is unavailable');
+  }
+  expect(io.admit).not.toHaveBeenCalled();
+  expect(io.prepare).not.toHaveBeenCalled();
+});
+
+it('preserves a completed dependency when parent preparation fails', async () => {
+  const f = fixture();
+  io.prepare.mockImplementation(async ({ rootId }) => {
+    if (rootId === 'parent') throw new Error('Parent source unavailable');
+    return { journalId: rootId, assetRefs: [], payload: null };
+  });
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('Parent source unavailable');
+  expect(io.publish).toHaveBeenCalledTimes(1);
+  expect(io.events).toContain('commit:source');
+  expect(io.cancel).not.toHaveBeenCalled();
+});
+
+it('stops the parent after cancellation during an admitted dependency publication', async () => {
+  const f = fixture();
+  const admitted = deferred();
+  const committed = deferred();
+  io.publish.mockImplementation(async () => {
+    admitted.resolve();
+    await committed.promise;
+  });
+  const running = receiveSelectedCatalogRoot(f);
+  await admitted.promise;
+  f.controller.abort();
+  committed.resolve();
+  await expect(running).rejects.toThrow();
+  expect(io.publish).toHaveBeenCalledTimes(1);
+  expect(io.admit).toHaveBeenCalledTimes(1);
+  expect(io.cancel).not.toHaveBeenCalled();
+});
+
+it('durably cancels a prepared uncommitted journal before acknowledging cancellation', async () => {
+  const f = fixture(false);
+  const cancellation = deferred();
+  const cancelling = deferred();
+  io.prepare.mockImplementation(async () => {
+    f.controller.abort();
+    return { journalId: 'source', assetRefs: [], payload: null };
+  });
+  io.cancel.mockImplementation(async () => {
+    cancelling.resolve();
+    await cancellation.promise;
+  });
+  const running = receiveSelectedCatalogRoot(f);
+  let settled = false;
+  void running.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    }
+  );
+  await cancelling.promise;
+  expect(settled).toBe(false);
+  expect(io.publish).not.toHaveBeenCalled();
+  cancellation.resolve();
+  await expect(running).rejects.toThrow();
+  expect(io.cancel).toHaveBeenCalledTimes(1);
+});
+
+it('reports completed when cancellation races with an admitted selected-root commit', async () => {
+  const f = fixture(false);
+  const admitted = deferred();
+  const commit = deferred();
+  io.publish.mockImplementation(async () => {
+    admitted.resolve();
+    await commit.promise;
+  });
+  const running = receiveSelectedCatalogRoot(f);
+  await admitted.promise;
+  f.controller.abort();
+  commit.resolve();
+  await expect(running).resolves.toEqual({
+    rootKind: 'media',
+    rootId: 'source',
+    operationId: 'source-op',
+  });
+  expect(io.cancel).not.toHaveBeenCalled();
+});
+
+it('preserves a committed selected root when cleanup fails after cancellation', async () => {
+  const f = fixture(false);
+  io.publish.mockImplementation(async () => {
+    f.controller.abort();
+    throw new Error('Cleanup failed');
+  });
+  io.receipt.mockResolvedValueOnce(false).mockResolvedValue(true);
+  await expect(receiveSelectedCatalogRoot(f)).resolves.toEqual({
+    rootKind: 'media',
+    rootId: 'source',
+    operationId: 'source-op',
+  });
+  expect(io.cancel).not.toHaveBeenCalled();
+});
+
+it('commits a compatible Scenario prerequisite before Montage admission using its current causal basis', async () => {
+  const f = fixture();
+  const before = operation('scenario-project', 'scenario');
+  const project = createGuideProject('Prerequisite', 'scenario', 1);
+  before.operation.envelope = parseRootEnvelope({
+    descriptor: {
+      rootKind: 'scenario-project',
+      rootId: 'scenario',
+      metadataPath: 'Metadata/sync-root.json',
+      objectCount: 0,
+      totalBytes: 0,
+    },
+    metadata: {
+      entry: createScenarioProjectEntry({ project, existing: undefined, updatedAt: 1 }),
+      assets: [],
+      stepDocuments: [],
+      exports: [],
+      exportThumbnails: [],
+    },
+    objects: [],
+  });
+  before.operationText = JSON.stringify(before.operation);
+  const renamed = structuredClone(before);
+  renamed.operation.operationId = 'scenario-renamed';
+  renamed.operation.parents = [before.operation.operationId];
+  renamed.operationText = JSON.stringify(renamed.operation);
+  for (const source of [before, renamed])
+    f.catalog.operations.set(source.operation.operationId, source);
+  f.catalog.roots.set(syncCatalogRootKey('scenario-project', 'scenario'), {
+    rootKind: 'scenario-project',
+    rootId: 'scenario',
+    heads: ['scenario-renamed'],
+    deleted: false,
+    blocked: false,
+    conflict: false,
+    unavailableDependencies: [],
+  });
+  const parent = f.catalog.operations.get('parent-op')!;
+  parent.operation.dependencies = [];
+  parent.operation.rootDependencies = [
+    { rootKind: 'scenario-project', rootId: 'scenario', basis: ['scenario-op'], childIds: [] },
+  ];
+  parent.operationText = JSON.stringify(parent.operation);
+  f.selection.sourceDigest = hashSyncText(parent.operationText);
+  await receiveSelectedCatalogRoot(f);
+  expect(io.events).toEqual([
+    'admit:scenario',
+    'prepare:scenario',
+    'commit:scenario',
+    'admit:parent',
+    'prepare:parent',
+    'commit:parent',
+  ]);
+  expect(io.admit.mock.calls[1]![0]).toMatchObject({
+    rootId: 'parent',
+    dependencyRoots: [
+      {
+        rootKind: 'scenario-project',
+        rootId: 'scenario',
+        basis: ['scenario-renamed'],
+        childIds: [],
+      },
+    ],
+  });
+  io.admit.mockClear();
+  f.catalog.roots.get(syncCatalogRootKey('scenario-project', 'scenario'))!.heads.push('missing');
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('dependency is unavailable');
+  expect(io.admit).not.toHaveBeenCalled();
+});
+
+it('skips replica staging and native import when the selected receipt already exists', async () => {
+  const f = fixture(false);
+  io.receipt.mockResolvedValue(true);
+  expect(await receiveSelectedCatalogRoot(f)).toEqual({
+    rootKind: f.selection.rootKind,
+    rootId: f.selection.rootId,
+    operationId: f.selection.operationId,
+  });
+  expect(io.admit).not.toHaveBeenCalled();
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
+});
+
+it('passes the resident-only background policy to the preparation owner', async () => {
+  const f = fixture(false);
+  await receiveSelectedCatalogRoot({ ...f, residentOnly: true });
+  expect(io.prepare).toHaveBeenCalledWith(expect.objectContaining({ residentOnly: true }));
+});
+
+it('full backup refuses an existing dependency predecessor before staging or publishing a successor', async () => {
+  const args = fixture();
+  io.admit.mockResolvedValue({ expectedLocalGeneration: 2, expectedWorkspaceRevision: null });
+  await expect(receiveSelectedCatalogRoot({ ...args, preserveNative: true })).rejects.toThrow(
+    'preserves existing'
+  );
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
+});
+it('full backup reuses an exactly current native dependency without rewriting it', async () => {
+  const args = fixture();
+  io.materialized.mockImplementation(async ({ selections }) =>
+    selections[0].rootId === 'source' ? selections : []
+  );
+  await receiveSelectedCatalogRoot({ ...args, preserveNative: true });
+  expect(io.admit).toHaveBeenCalledTimes(1);
+  expect(io.admit).toHaveBeenCalledWith(expect.objectContaining({ rootId: 'parent' }));
+  expect(io.prepare).toHaveBeenCalledTimes(1);
+});
+
+it('prepares a received dependency under the same reader before parent admission and publication', async () => {
+  const f = fixture();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  io.nativePrepare.mockImplementation(async (input) => {
+    expect(io.reading).toBe(true);
+    expect(input.authorization).toEqual(f.authorization);
+    expect(input.root.rootId).toBe('source');
+    io.events.push('restore:source');
+  });
+  const admit = io.admit.getMockImplementation()!;
+  io.admit.mockImplementation(async (input) => {
+    expect(io.reading).toBe(true);
+    return admit(input);
+  });
+  const publish = io.publish.getMockImplementation()!;
+  io.publish.mockImplementation(async (journal) => {
+    expect(io.reading).toBe(true);
+    return publish(journal);
+  });
+  await receiveSelectedCatalogRoot(f);
+  expect(io.events).toEqual(['restore:source', 'admit:parent', 'prepare:parent', 'commit:parent']);
+  expect(io.reading).toBe(false);
+});
+
+it('keeps residentOnly receipt replay from downloading an unloaded dependency', async () => {
+  const f = fixture();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  await expect(receiveSelectedCatalogRoot({ ...f, residentOnly: true })).rejects.toThrow(
+    'resident dependencies'
+  );
+  expect(io.nativePrepare).not.toHaveBeenCalled();
+  expect(io.connection).not.toHaveBeenCalled();
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(f.remote.read).not.toHaveBeenCalled();
+  expect(io.reading).toBe(false);
+});
+
+it('preserves a dependency receipt on preparation refusal and permits exact parent retry', async () => {
+  const f = fixture();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  io.nativePrepare.mockRejectedValueOnce(new Error('Temporary source refusal'));
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('Temporary source refusal');
+  expect(io.admit).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
+  expect(io.reading).toBe(false);
+  await receiveSelectedCatalogRoot(f);
+  expect(io.nativePrepare).toHaveBeenCalledTimes(2);
+  expect(io.publish).toHaveBeenCalledOnce();
+});
+
+it('retains the reader until cancelled dependency preparation drains and prevents parent admission', async () => {
+  const f = fixture();
+  const held = deferred();
+  const started = deferred();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  io.nativePrepare.mockImplementation(async () => {
+    started.resolve();
+    await held.promise;
+  });
+  const operation = receiveSelectedCatalogRoot(f);
+  const refused = expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+  await started.promise;
+  f.controller.abort();
+  expect(io.reading).toBe(true);
+  expect(io.admit).not.toHaveBeenCalled();
+  held.resolve();
+  await refused;
+  expect(io.reading).toBe(false);
+  expect(io.publish).not.toHaveBeenCalled();
+});
+
+it('refuses changed connection identity before preparing a received dependency', async () => {
+  const f = fixture();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  const connection = await io.connection();
+  io.connection.mockResolvedValue({ ...connection, identity: { ...f.authorization, revision: 2 } });
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('authorization changed');
+  expect(io.nativePrepare).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
+  expect(io.reading).toBe(false);
+});

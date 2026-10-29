@@ -90,6 +90,15 @@ function isVideoMimeType(value: unknown): value is string {
   return /^video\/[a-z0-9.+-]+$/i.test(essence);
 }
 
+/** Associates decoder MIME facts with original bytes without discarding stored codec parameters. */
+export function sameReviewVideoContainer(inspected: string, original: string): boolean {
+  return (
+    isVideoMimeType(inspected) &&
+    isVideoMimeType(original) &&
+    inspected.split(';', 1)[0]!.toLowerCase() === original.split(';', 1)[0]!.toLowerCase()
+  );
+}
+
 /** Parses immutable media facts at the review boundary. */
 export function parseReviewSource(value: unknown): ReviewSource | null {
   if (!isRecord(value)) return null;

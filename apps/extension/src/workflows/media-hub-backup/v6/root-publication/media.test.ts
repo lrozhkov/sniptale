@@ -3,7 +3,10 @@ import { openAsBlob } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
+import {
+  parseMediaThumbnailEntry,
+  parseMediaLibraryEntry,
+} from '../../../../composition/persistence/media-library/read-guards';
 import { createReviewWorkspaceStoreFixture } from '../../../../composition/persistence/review-workspaces/store.test-support';
 import { createQuickEditAdvancedState } from '../../../../features/video/review/advanced/defaults';
 import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
@@ -126,16 +129,21 @@ describe('media v6 root publication', () => {
     );
     const stagingDirectory = await mkdtemp(join(tmpdir(), 'sniptale-thumbnail-'));
     const thumbnailPath = join(stagingDirectory, 'thumbnail.png');
+    const originalPath = join(stagingDirectory, 'original.png');
     await writeFile(thumbnailPath, 'thumbnail');
+    await writeFile(originalPath, 'image');
+    const stagedOriginal = new File(
+      [await openAsBlob(originalPath, { type: 'image/png' })],
+      'capture.png',
+      { type: 'image/png' }
+    );
     const stagedThumbnail = new File(
       [await openAsBlob(thumbnailPath, { type: 'image/png' })],
       'thumbnail.png',
       { type: 'image/png' }
     );
     mocks.readFile.mockImplementation(async (_ref, filename) =>
-      filename.endsWith('-thumbnail')
-        ? stagedThumbnail
-        : new File(['image'], 'capture.png', { type: 'image/png' })
+      filename.endsWith('-thumbnail') ? stagedThumbnail : stagedOriginal
     );
 
     try {
@@ -215,7 +223,7 @@ describe('media v6 root publication', () => {
       const result = await publication;
       expect(result).toEqual({ conflicted: false, imported: true, retainedAssetIds: [] });
       expect(storeFor('media_library').put).toHaveBeenCalledWith(
-        expect.objectContaining({ blob: expect.any(File), id: 'media-one' })
+        expect.objectContaining({ blob: expect.any(Blob), id: 'media-one' })
       );
       expect(mocks.checkpoint).toHaveBeenCalledWith(expect.anything(), 'restore-1', {
         conflicted: false,
@@ -224,6 +232,10 @@ describe('media v6 root publication', () => {
         targetRootId: 'media-one',
       });
       await rm(thumbnailPath);
+      await rm(originalPath);
+      const restored = parseMediaLibraryEntry(storeFor('media_library').put.mock.calls[0]?.[0]);
+      if (!restored?.blob) throw new Error('Restored original is missing.');
+      expect(await restored.blob.text()).toBe('image');
       const thumbnail = parseMediaThumbnailEntry(storeFor('thumbnails').put.mock.calls[0]?.[0]);
       if (!thumbnail) throw new Error('Restored thumbnail is missing.');
       expect(await thumbnail.blob.text()).toBe('thumbnail');

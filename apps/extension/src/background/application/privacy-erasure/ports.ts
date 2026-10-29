@@ -44,6 +44,14 @@ interface StorageCleanupPort {
   cleanup(options: LocalExtensionDataErasureOptions): Promise<LocalExtensionDataErasureResult>;
 }
 
+/** Reserves sync admission before queued erasure and drains producers before local cleanup. */
+export interface SyncPrivacyErasurePort {
+  reserveErasureExclusion(): {
+    release(): void;
+    quiesce(): Promise<void>;
+  };
+}
+
 export interface PrivacyErasurePorts {
   audioJobs: PopupExportExclusionPort;
   diagnostics: DiagnosticsCleanupPort;
@@ -53,4 +61,5 @@ export interface PrivacyErasurePorts {
   pageRecovery: PageRecoveryCleanupPort;
   runtime: RuntimeCleanupPort;
   storage: StorageCleanupPort;
+  sync: SyncPrivacyErasurePort;
 }

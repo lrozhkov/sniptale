@@ -1,0 +1,21 @@
+
+Running 2 tests using 1 worker
+
+(node:50822) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 (4.0m)
+(node:62719) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1920 (58.9s)
+
+
+  1) tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 
+
+    Test timeout of 240000ms exceeded.
+
+    Error Context: tasks/WebDAV/d-production-browser-corrected/webdav-library-production--4efbf--reopens-after-release-1280/error-context.md
+
+  1 failed
+    tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 
+  1 interrupted
+    tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1920 

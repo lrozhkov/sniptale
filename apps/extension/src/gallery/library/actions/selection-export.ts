@@ -7,7 +7,7 @@ import {
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import { exportMediaHubBackup } from '../../../workflows/media-hub-backup';
 import { translate } from '../../../platform/i18n';
-import { isGalleryMediaItem, type GalleryItem } from '../items';
+import { isGalleryMediaItem, isGalleryRemoteItem, type GalleryItem } from '../items';
 import type { GallerySelectionController } from './controller-types';
 import { createMissingBlobError, downloadBlob, type GalleryBusyAction } from './shared';
 import { createSelectedBackupExportOptions } from './backup';
@@ -18,6 +18,7 @@ function getSelectedMediaItems(controller: GallerySelectionController) {
 
 /** Export only the supplied library identities, through the existing backup workflow. */
 export async function exportGalleryItemsBackup(targets: GalleryItem[]) {
+  if (targets.some(isGalleryRemoteItem)) return;
   const options = createSelectedBackupExportOptions(targets);
   if (!options) return;
   await exportMediaHubBackup(options, {

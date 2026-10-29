@@ -1,4 +1,9 @@
-import { readVideoWorkspace } from '../../../../composition/persistence/review-workspaces/store';
+import type { MediaHubBackupRootPreparation } from '../contracts';
+import { readWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
+import {
+  parseVideoWorkspace,
+  parseVideoWorkspaceDraft,
+} from '../../../../composition/persistence/review-workspaces/parser';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence/review-workspaces/contracts';
 import { projectRecordingMetadataPrivacy } from '../privacy';
@@ -14,6 +19,9 @@ import {
 import {
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_HISTORY_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import {
   parseProjectAssetEntry,
@@ -43,7 +51,11 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { sanitizeWebSnapshotPackageProvenance } from '../../../../features/web-snapshot/provenance';
 import { encodePortableEditorDocument } from '../root-codecs/editor-document';
-import { encodePortableThumbnail, type PortableMediaMetadata } from '../root-codecs/media';
+import {
+  encodePortableMediaOriginal,
+  encodePortableThumbnail,
+  type PortableMediaMetadata,
+} from '../root-codecs/media';
 import {
   projectImageWorkspacePrivacy,
   projectMediaEntryPrivacy,
@@ -312,8 +324,7 @@ async function buildMediaSource(args: {
     entry.source.kind === 'project-asset'
       ? parseProjectAssetEntry(await args.db.get(PROJECT_ASSETS_STORE, entry.source.projectAssetId))
       : parseProjectExportEntry(await args.db.get(PROJECT_EXPORTS_STORE, entry.source.exportId));
-  if (!child || (entry.source.kind === 'project-export' && !entry.mimeType.startsWith('video/')))
-    throw new Error('Project video source is missing.');
+  if (!child) throw new Error('Project source is missing.');
   const file = await readRefFile(args.db, child.assetId, entry.filename);
   const storedReview = await readVideoReviewForBackup({
     db: args.db,
@@ -334,10 +345,8 @@ async function buildMediaSource(args: {
   if (entry.source.kind === 'project-asset') {
     const asset = parseProjectAssetEntry(child);
     if (!asset) throw new Error('Project video asset is invalid.');
-    const { assetId: _localId, ...projectAsset } = asset;
     return {
-      originalObjectId,
-      projectAsset,
+      ...encodePortableMediaOriginal({ projectAsset: asset, originalObjectId }),
       ...(videoReview ? { videoReview, reviewAssets } : {}),
     };
   }
@@ -357,18 +366,36 @@ async function buildReviewAssets(
   workspace: Parameters<typeof collectReviewAssetReferences>[0]
 ): Promise<NonNullable<PortableMediaMetadata['reviewAssets']>> {
   const assets: NonNullable<PortableMediaMetadata['reviewAssets']> = [];
-  for (const reference of [...collectReviewAssetReferences(workspace)].sort()) {
+  const references = new Set([...collectReviewAssetReferences(workspace)].sort());
+  const collected = new Set<string>();
+  for (const reference of references) {
+    if (!reference.startsWith('project-asset:'))
+      throw new Error('Review-referenced asset kind is unsupported.');
     const id = reference.slice('project-asset:'.length);
+    if (collected.has(id)) continue;
+    collected.add(id);
     const entry = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, id));
     if (!entry) throw new Error(`Review-referenced project asset is missing: ${reference}.`);
     const media = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, reference));
     const filename = media?.filename ?? id;
     const file = await readRefFile(db, entry.assetId, filename);
     const { assetId: _assetId, ...portable } = entry;
+    const videoReview =
+      !media && entry.mimeType.startsWith('video/')
+        ? await readVideoReviewForBackup({
+            db,
+            aggregateId: reference,
+            sourceAssetId: entry.assetId,
+          })
+        : undefined;
+    if (videoReview)
+      for (const reference of [...collectReviewAssetReferences(videoReview.workspace)].sort())
+        references.add(reference);
     assets.push({
       entry: portable,
       filename,
       ...(media ? { libraryMediaId: reference } : { publishToLibrary: false }),
+      ...(videoReview ? { videoReview: encodePortableReviewAssetRefs(videoReview) } : {}),
       objectId: collector.add(file, filename, entry.mimeType),
     });
   }
@@ -451,8 +478,13 @@ async function buildMediaRoot(args: {
   item: MediaLibraryItem;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
   rootIndex: number;
 }): Promise<MediaHubBackupRootInventoryItem> {
+  await args.prepareRoot?.({
+    rootKind: args.sourceMediaId ? 'video-review' : 'media',
+    rootId: args.item.id,
+  });
   const sourceEntry = parseMediaLibraryEntry(
     await args.db.get(MEDIA_LIBRARY_STORE, args.sourceMediaId ?? args.item.id)
   );
@@ -553,6 +585,33 @@ async function buildMediaRoot(args: {
   };
 }
 
+async function readArchivedReview(
+  db: MediaInventoryDatabase,
+  aggregateId: string
+): Promise<VideoWorkspaceSnapshot> {
+  const tx = db.transaction(
+    [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    'readonly'
+  );
+  const [stored, rawDraft] = await Promise.all([
+    readWorkspaceStorage(tx, aggregateId),
+    tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(aggregateId),
+  ]);
+  await tx.done;
+  const workspace = parseVideoWorkspace(stored.logical);
+  const draft =
+    rawDraft === undefined
+      ? null
+      : parseVideoWorkspaceDraft(rawDraft, workspace?.source.duration ?? 0);
+  if (
+    !workspace ||
+    workspace.aggregateId !== aggregateId ||
+    (rawDraft !== undefined && (!draft || draft.aggregateId !== aggregateId))
+  )
+    throw new Error('Quick project changed before backup.');
+  return { workspace, draft };
+}
+
 export async function buildMediaRootInventory(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   reviewWorkspaceHeads?: readonly unknown[];
@@ -561,6 +620,7 @@ export async function buildMediaRootInventory(args: {
   coveredProjectMediaIds?: ReadonlySet<string>;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const roots: MediaHubBackupRootInventoryItem[] = [];
   const items = args.items
@@ -581,8 +641,7 @@ export async function buildMediaRootInventory(args: {
       !args.options.selected?.mediaAssetIds.includes(head['aggregateId'])
     )
       continue;
-    const archived = await readVideoWorkspace(head['aggregateId']);
-    if (!archived) throw new Error('Quick project changed before backup.');
+    const archived = await readArchivedReview(args.db, head['aggregateId']);
     const sourceMediaId = archived.workspace.sourceMediaId;
     const source = args.items.find((item) => item.id === sourceMediaId);
     if (!source || archived.workspace.project?.lifecycle.trashedAt !== undefined) continue;

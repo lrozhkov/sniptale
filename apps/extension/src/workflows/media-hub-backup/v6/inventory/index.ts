@@ -9,7 +9,7 @@ import { createArchivePathAllocator } from '../../../../composition/archive-tran
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
 import { listGallerySavedViews } from '../../../../composition/persistence/gallery-saved-views';
 import { buildMediaHubBackupExportPlanV6 } from '../export';
-import type { MediaHubBackupExportOptions } from '../contracts';
+import type { MediaHubBackupExportOptions, MediaHubBackupRootPreparation } from '../contracts';
 import { buildEffectBundleRootInventory } from './effect-bundles';
 import { buildMediaRootInventory } from './media';
 import { buildScenarioProjectRootInventory } from './scenario-projects';
@@ -19,7 +19,11 @@ import { MEDIA_HUB_BACKUP_SHARED_LAYOUT } from '../layout';
 
 export async function buildMediaHubBackupExportPlanFromLibraryV6(
   options: MediaHubBackupExportOptions,
-  admission: { expectedReview?: VideoWorkspaceSnapshot | undefined; requireSelected?: boolean } = {}
+  admission: {
+    expectedReview?: VideoWorkspaceSnapshot | undefined;
+    requireSelected?: boolean;
+    prepareRoot?: MediaHubBackupRootPreparation;
+  } = {}
 ) {
   const db = await initDB();
   const dependencies = await resolveBackupDependencySelection(db, options);
@@ -32,6 +36,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
   const videoProjects = await buildVideoProjectRootInventory({
     db,
     options: effectiveOptions,
+    ...(admission.prepareRoot ? { prepareRoot: admission.prepareRoot } : {}),
     paths,
   });
   const coveredProjectMediaIds = await coveredProjectMedia(videoProjects);
@@ -42,6 +47,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
     db,
     items,
     options: effectiveOptions,
+    ...(admission.prepareRoot ? { prepareRoot: admission.prepareRoot } : {}),
     paths,
   });
   const exportedMediaIds = new Set(media.map((root) => root.descriptor.rootId));
@@ -61,6 +67,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
   const scenarioProjects = await buildScenarioProjectRootInventory({
     db,
     options: effectiveOptions,
+    ...(admission.prepareRoot ? { prepareRoot: admission.prepareRoot } : {}),
     paths,
   });
   const exportedScenarioIds = new Set(scenarioProjects.map((root) => root.descriptor.rootId));

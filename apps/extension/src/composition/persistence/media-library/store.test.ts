@@ -9,7 +9,10 @@ import { upsertMediaEntry } from './store';
 
 const entry = createMediaLibraryEntry();
 const store = { get: vi.fn(), put: vi.fn() };
-const tx = { objectStore: () => store, done: Promise.resolve() };
+const tx = {
+  objectStore: (name: string) => (name === 'sync_capture' ? { get: async () => undefined } : store),
+  done: Promise.resolve(),
+};
 beforeEach(() => {
   vi.clearAllMocks();
   store.get.mockResolvedValue(entry);

@@ -1,3 +1,6 @@
+import { SyncConnectionSection } from './sync-connection';
+import { SyncQueueSection } from './sync-queue';
+import { SyncCacheSection } from './sync-cache';
 import { FilenameRulesSettings } from './filename-rules';
 import { useSavePresetsSection } from './state/controller';
 import { SavePresetsSectionContent } from './surface/content';
@@ -12,6 +15,8 @@ export function SavePresetsSection(props: {
   const savePresetsSection = useSavePresetsSection();
   const { editingPreset, ...contentProps } = savePresetsSection;
   const view =
+    props.view === 'connection' ||
+    props.view === 'queue' ||
     props.view === 'templates' ||
     props.view === 'storage' ||
     props.view === 'files' ||
@@ -29,6 +34,8 @@ export function SavePresetsSection(props: {
           { id: 'files', label: translate('settings.navigation.views.files') },
           { id: 'drafts', label: translate('settings.navigation.views.drafts') },
           { id: 'storage', label: translate('settings.navigation.views.storage') },
+          { id: 'connection', label: translate('settings.syncConnection.title') },
+          { id: 'queue', label: translate('settings.syncQueue.title') },
           {
             id: 'templates',
             label: translate('settings.navigation.views.folderTemplates'),
@@ -36,7 +43,7 @@ export function SavePresetsSection(props: {
         ]}
         onChange={props.onViewChange}
       />
-      {view !== 'storage' && view !== 'drafts' ? (
+      {view !== 'storage' && view !== 'drafts' && view !== 'queue' && view !== 'connection' ? (
         <SavePresetsSectionContent
           {...contentProps}
           onMoveBefore={savePresetsSection.handleMoveBefore}
@@ -44,8 +51,11 @@ export function SavePresetsSection(props: {
           {...(editingPreset === undefined ? {} : { editingPreset })}
         />
       ) : null}
+      {view === 'connection' ? <SyncConnectionSection /> : null}
+      {view === 'queue' ? <SyncQueueSection /> : null}
       {view === 'files' ? <FilenameRulesSettings /> : null}
       {view === 'storage' ? <StorageDraftsSection view="storage" /> : null}
+      {view === 'storage' ? <SyncCacheSection /> : null}
       {view === 'drafts' ? <StorageDraftsSection view="drafts" /> : null}
     </div>
   );

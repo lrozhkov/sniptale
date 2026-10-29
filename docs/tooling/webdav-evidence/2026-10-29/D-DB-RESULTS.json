@@ -1,0 +1,44 @@
+{
+  "base": "c69623c2f",
+  "productionChanged": true,
+  "profile": "db",
+  "setupQueue": {
+    "initialLog": "d-db-setup-queue.log",
+    "passed": 19,
+    "failed": 1,
+    "cause": "Stale expectation that permission removal retains a checking intent; runtime revokes it.",
+    "correctionLog": "d-db-permission-corrected.log",
+    "correctedCasePassed": true,
+    "strongerProof": "Native intent absent and stale identity enrollment refused.",
+    "sourceBuild": "Default .tmp/e2e-builds/test was stale. Retain as historical evidence only; rerun current security build explicitly.",
+    "qualificationAccepted": false
+  },
+  "library": {
+    "log": "d-db-library.log",
+    "passed": 2,
+    "viewport": "1280x560",
+    "duration": "4.1 minutes",
+    "cases": [
+      "Complete catalog, open, unload, backup, local-only and offline restart",
+      "Two offline browsers, explicit conflict and resolution"
+    ]
+  },
+  "qualificationComplete": true,
+  "remaining": [],
+  "currentSetupQueue": {
+    "log": "d-current-db-setup-queue.log",
+    "passed": 20,
+    "build": ".tmp/e2e-builds/security",
+    "productionInputs": "Reviewed C candidate, committed as c69623c2f"
+  },
+  "deferredExportMetadata": {
+    "passed": 1,
+    "log": "d-deferred-db-current.log",
+    "offlineRevisions": 3,
+    "fullBrowserRestart": true,
+    "mediaBodyUpload": false,
+    "corruptHydrationRefused": true
+  },
+  "releaseCandidate": "D closed after independent architecture/security approval",
+  "commit": "d9e247b5b73496e8a0f69332a49ebadfb4090f8b"
+}

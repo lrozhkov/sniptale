@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  readRemoteCardsMock,
   createGalleryItemsMock,
   getStorageEstimateInfoMock,
   listMediaLibraryMock,
@@ -14,6 +15,7 @@ const {
   cleanupDraftsMock,
   repairTemporaryProjectLifecyclesMock,
 } = vi.hoisted(() => ({
+  readRemoteCardsMock: vi.fn(),
   createGalleryItemsMock: vi.fn(),
   getStorageEstimateInfoMock: vi.fn(),
   listMediaLibraryMock: vi.fn(),
@@ -27,6 +29,11 @@ const {
   cleanupDraftsMock: vi.fn().mockResolvedValue({ deletedCount: 0, deletedIds: [] }),
   repairTemporaryProjectLifecyclesMock: vi.fn().mockResolvedValue(0),
 }));
+
+vi.mock('../../workflows/sync-transfer/catalog-view', () => ({
+  readPersistedSyncCatalogCards: readRemoteCardsMock,
+}));
+afterEach(() => vi.unstubAllGlobals());
 
 vi.mock('../../composition/persistence/review-workspaces/summaries', () => ({
   listVideoWorkspaceSummaries: vi.fn().mockResolvedValue([]),
@@ -94,12 +101,12 @@ vi.mock('../../features/media-hub/storage-capacity', async (importOriginal) => (
   getStorageEstimateInfo: getStorageEstimateInfoMock,
 }));
 
-vi.mock('../library/items', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../library/items')>()),
+vi.mock('./items', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./items')>()),
   createGalleryItems: createGalleryItemsMock,
 }));
 
-import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
+import { loadGalleryLibrarySnapshot } from './snapshot';
 
 describe('loadGalleryLibrarySnapshot', () => {
   it('loads committed gallery items without global repair or cleanup', async () => {
@@ -256,4 +263,81 @@ it('returns library items while the storage estimate remains pending', async () 
   getStorageEstimateInfoMock.mockReturnValueOnce(new Promise(() => undefined));
   const snapshot = await loadGalleryLibrarySnapshot();
   expect(snapshot.nextItems).toBeDefined();
+});
+
+it('loads one remote display snapshot and preserves native items when the remote cache fails', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  createGalleryItemsMock.mockReturnValue([]);
+  listScenarioProjectSummariesMock.mockResolvedValue([]);
+  readRemoteCardsMock.mockResolvedValueOnce([
+    {
+      source: 'remote',
+      label: 'Remote',
+      tags: [],
+      kind: 'image',
+      mimeType: 'image/png',
+      size: 10,
+      createdAt: 1,
+      updatedAt: 2,
+      conflict: false,
+      unavailable: false,
+      deleted: false,
+      selection: {
+        rootKind: 'media',
+        rootId: 'remote',
+        operationId: 'operation',
+        sourceDigest: 'a'.repeat(64),
+      },
+    },
+  ]);
+  const snapshot = await loadGalleryLibrarySnapshot();
+  expect(snapshot.nextItems).toHaveLength(1);
+  expect(snapshot.nextItems[0]?.type).toBe('remote-root');
+  expect(readRemoteCardsMock).toHaveBeenCalledWith();
+  readRemoteCardsMock.mockRejectedValueOnce(new Error('cache failure'));
+  await expect(loadGalleryLibrarySnapshot()).resolves.toMatchObject({
+    nextItems: [],
+    remoteUnavailable: true,
+  });
+});
+
+it('merges only an exactly materialized remote root with its existing native Library item', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  const local = { type: 'media', id: 'local-root', entityId: 'root', filename: 'Shared title' };
+  const card = {
+    source: 'remote',
+    label: 'Shared title',
+    tags: [],
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 10,
+    createdAt: 1,
+    updatedAt: 2,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    materialized: true,
+    selection: {
+      rootKind: 'media',
+      rootId: 'root',
+      operationId: 'operation',
+      sourceDigest: 'a'.repeat(64),
+    },
+  };
+  createGalleryItemsMock.mockReturnValue([local]);
+  listScenarioProjectSummariesMock.mockResolvedValue([]);
+  readRemoteCardsMock.mockResolvedValueOnce([card]);
+  expect((await loadGalleryLibrarySnapshot()).nextItems).toEqual([local]);
+
+  readRemoteCardsMock.mockResolvedValueOnce([{ ...card, materialized: undefined }]);
+  expect((await loadGalleryLibrarySnapshot()).nextItems).toHaveLength(2);
+
+  readRemoteCardsMock.mockResolvedValueOnce([
+    { ...card, selection: { ...card.selection, rootKind: 'video-review' } },
+  ]);
+  expect((await loadGalleryLibrarySnapshot()).nextItems).toHaveLength(2);
+
+  createGalleryItemsMock.mockReturnValue([]);
+  readRemoteCardsMock.mockResolvedValueOnce([card]);
+  expect((await loadGalleryLibrarySnapshot()).nextItems).toHaveLength(1);
 });

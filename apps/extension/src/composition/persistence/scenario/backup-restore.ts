@@ -1,7 +1,10 @@
+import type { IDBPTransaction } from 'idb';
 import { promoteScenarioSourceLifecycles } from './library-publication';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import { detachScenarioVideoAssets } from './video-asset-detachment';
-import { MEDIA_LIBRARY_STORE, type initDB } from '../infrastructure/indexed-db/core';
+import { MEDIA_LIBRARY_STORE, VIDEO_PROJECTS_STORE } from '../infrastructure/indexed-db/core';
+import { parseVideoDependencyEnvelope } from '../media-library/dependencies';
+import { parseAssetOwner, parseAssetRef } from '../assets/guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import type {
@@ -35,7 +38,7 @@ interface OwnerStore extends Store<AssetOwner> {
   index(name: 'assetId'): { count(assetId: string): Promise<number> };
 }
 
-interface PreparedScenarioProjectArchiveRoot {
+export interface PreparedScenarioProjectArchiveRoot {
   assets: Array<{ entry: ScenarioAssetEntry; ref: AssetRef }>;
   entry: ScenarioProjectEntry;
   exportThumbnails: MediaThumbnailEntry[];
@@ -77,7 +80,8 @@ async function deleteExisting(args: {
   operation: PhysicalDeleteAssetOperation;
   projectId: string;
   stores: ScenarioBackupRestoreStores;
-  tx: ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>;
+  replacementAssets?: PreparedScenarioProjectArchiveRoot['assets'];
 }) {
   if ((await args.stores.projects.get(args.projectId)) === undefined) return;
   const rawAssets = await args.stores.assets.index('projectId').getAll(args.projectId);
@@ -97,15 +101,52 @@ async function deleteExisting(args: {
     })
   )
     throw new Error('Invalid scenario children cannot be replaced safely.');
-  await detachScenarioVideoAssets(
-    args.tx,
-    args.projectId,
-    new Set(assets.flatMap((asset) => (asset ? [asset.id] : []))),
-    false
-  );
+  const retained = new Set<string>();
+  if (args.replacementAssets !== undefined) {
+    const oldChildren = new Map(
+      assets.flatMap((asset) => (asset ? [[asset.id, asset] as const] : []))
+    );
+    for (const raw of await args.tx.objectStore(VIDEO_PROJECTS_STORE).getAll()) {
+      const envelope = parseVideoDependencyEnvelope(raw);
+      if (!envelope)
+        throw new Error('Scenario replacement cannot check related video project dependencies.');
+      for (const source of envelope.sources) {
+        if (source.kind !== 'scenario-asset' || !oldChildren.has(source.scenarioAssetId)) continue;
+        const current = oldChildren.get(source.scenarioAssetId)!;
+        const replacement = args.replacementAssets.find((asset) => asset.entry.id === current.id);
+        const entry = replacement && parseScenarioAssetEntry(replacement.entry);
+        const currentRef = parseAssetRef(await args.stores.refs.get(current.assetId));
+        const replacementRef = replacement && parseAssetRef(replacement.ref);
+        const owner = parseAssetOwner(
+          await args.stores.owners.get(['scenario-asset', current.id, 'body'])
+        );
+        if (
+          !entry ||
+          !currentRef ||
+          !replacementRef ||
+          JSON.stringify(current) !== JSON.stringify(entry) ||
+          JSON.stringify(currentRef) !== JSON.stringify(replacementRef) ||
+          !owner ||
+          owner.ownerKind !== 'scenario-asset' ||
+          owner.ownerId !== current.id ||
+          owner.role !== 'body' ||
+          owner.assetId !== current.assetId
+        )
+          throw new Error('Scenario replacement would change a required video project source.');
+        retained.add(current.id);
+      }
+    }
+  } else {
+    await detachScenarioVideoAssets(
+      args.tx,
+      args.projectId,
+      new Set(assets.flatMap((asset) => (asset ? [asset.id] : []))),
+      false
+    );
+  }
   for (const raw of rawAssets) {
     const asset = parseScenarioAssetEntry(raw);
-    if (!asset) continue;
+    if (!asset || retained.has(asset.id)) continue;
     await args.stores.assets.delete(asset.id);
     await unlink({
       assetId: asset.assetId,
@@ -248,7 +289,9 @@ export async function putScenarioProjectBackupRestore(args: {
   root: PreparedScenarioProjectArchiveRoot;
   strategy: ArchiveRestoreStrategy;
   stores: ScenarioBackupRestoreStores;
-  tx: ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>;
+  /** Native sync preserves existing Montage sources; archive replacement keeps its detachment policy. */
+  preserveVideoProjectSources?: true;
 }): Promise<{ conflicted: boolean; imported: boolean }> {
   for (const asset of args.root.assets) {
     // A frozen gallery representation owns its bytes; it does not publish this canonical root.
@@ -278,6 +321,7 @@ export async function putScenarioProjectBackupRestore(args: {
       projectId: args.root.entry.id,
       stores: args.stores,
       tx: args.tx,
+      ...(args.preserveVideoProjectSources ? { replacementAssets: args.root.assets } : {}),
     });
   const lifecycle =
     args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);

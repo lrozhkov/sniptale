@@ -1,3 +1,4 @@
+import { createRemoteRootGalleryItem } from './adapters';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createMediaItem,
@@ -6,6 +7,9 @@ import {
 } from '../actions/test-support/index';
 
 const {
+  readRemoteThumbnailMock,
+  waitRemoteMock,
+  cancelRemoteMock,
   createImageThumbnailBlobMock,
   createVideoThumbnailBlobMock,
   dataUrlToBlobMock,
@@ -16,6 +20,9 @@ const {
   listRecentScenarioStepsMock,
   saveMediaThumbnailMock,
 } = vi.hoisted(() => ({
+  readRemoteThumbnailMock: vi.fn(),
+  waitRemoteMock: vi.fn(),
+  cancelRemoteMock: vi.fn().mockResolvedValue(undefined),
   createImageThumbnailBlobMock: vi.fn(),
   createVideoThumbnailBlobMock: vi.fn(),
   dataUrlToBlobMock: vi.fn(),
@@ -25,6 +32,14 @@ const {
   getGalleryProjectCoverMock: vi.fn(),
   listRecentScenarioStepsMock: vi.fn(),
   saveMediaThumbnailMock: vi.fn(),
+}));
+
+vi.mock('../../../platform/runtime-messaging/sync-product-client', () => ({
+  createSyncProductClient: () => ({
+    readThumbnail: readRemoteThumbnailMock,
+    waitForOperation: waitRemoteMock,
+    cancel: cancelRemoteMock,
+  }),
 }));
 
 vi.mock('./project-covers', () => ({ getGalleryProjectCover: getGalleryProjectCoverMock }));
@@ -256,4 +271,109 @@ it('uses the existing source thumbnail for quick-edit without decoding or copyin
   expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
   expect(createVideoThumbnailBlobMock).not.toHaveBeenCalled();
   expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
+});
+
+it('loads only the selected remote thumbnail and never reads or writes native media', async () => {
+  const item = createRemoteRootGalleryItem({
+    source: 'remote',
+    tags: [],
+    label: 'Remote',
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 10,
+    createdAt: 1,
+    updatedAt: 2,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'remote',
+      operationId: 'operation',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  const blob = new Blob(['thumbnail'], { type: 'image/png' });
+  readRemoteThumbnailMock.mockResolvedValueOnce({ kind: 'accepted', requestId: 'thumbnail-job' });
+  waitRemoteMock.mockResolvedValueOnce({
+    kind: 'operation',
+    job: { state: 'ready' },
+    completion: {
+      kind: 'thumbnail',
+      dataUrl: 'data:image/png;base64,dGh1bWI=',
+      width: 320,
+      height: 180,
+    },
+  });
+  dataUrlToBlobMock.mockResolvedValueOnce(blob);
+  const result = await ensureGalleryItemThumbnail(item, new AbortController().signal);
+  expect(result?.blob).toBe(blob);
+  expect(readRemoteThumbnailMock).toHaveBeenCalledWith(item.remote.selection);
+  expect(getMediaThumbnailMock).not.toHaveBeenCalled();
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+  expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
+});
+
+it('waits for four thumbnails without polling and cancels their work on release', async () => {
+  vi.useFakeTimers();
+  const controllers = Array.from({ length: 4 }, () => new AbortController());
+  let allStarted: () => void = () => undefined;
+  const started = new Promise<void>((resolve) => {
+    allStarted = resolve;
+  });
+  let count = 0;
+  readRemoteThumbnailMock.mockImplementation((selection: { rootId: string }) => ({
+    kind: 'accepted',
+    requestId: selection.rootId,
+  }));
+  waitRemoteMock.mockImplementation((_requestId: string, signal: AbortSignal) => {
+    count += 1;
+    if (count === 4) allStarted();
+    return new Promise<never>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {
+        once: true,
+      });
+    });
+  });
+  const waits = controllers.map((controller, index) =>
+    ensureGalleryItemThumbnail(
+      createRemoteRootGalleryItem({
+        source: 'remote',
+        tags: [],
+        label: `Remote ${index}`,
+        kind: 'image',
+        mimeType: 'image/png',
+        size: 10,
+        createdAt: 1,
+        updatedAt: 2,
+        conflict: false,
+        unavailable: false,
+        deleted: false,
+        selection: {
+          rootKind: 'media',
+          rootId: `remote-${index}`,
+          operationId: `operation-${index}`,
+          sourceDigest: 'a'.repeat(64),
+        },
+      }),
+      controller.signal
+    )
+  );
+  try {
+    await started;
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(readRemoteThumbnailMock).toHaveBeenCalledTimes(4);
+    expect(waitRemoteMock).toHaveBeenCalledTimes(4);
+    controllers.forEach((controller) => controller.abort());
+    await expect(Promise.all(waits)).resolves.toEqual([undefined, undefined, undefined, undefined]);
+    expect(cancelRemoteMock).toHaveBeenCalledTimes(4);
+    for (let index = 0; index < 4; index += 1)
+      expect(cancelRemoteMock).toHaveBeenCalledWith(`remote-${index}`, true);
+    expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+    expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
+  } finally {
+    controllers.forEach((controller) => controller.abort());
+    await Promise.all(waits);
+    vi.useRealTimers();
+  }
 });

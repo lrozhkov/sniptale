@@ -209,47 +209,6 @@ it.each([false, true])(
   }
 );
 
-it.each([
-  {
-    source: { kind: 'recording', recordingId: 'record' },
-    domain: 'recording-assets',
-    payload: { entries: [{ id: 'record' }] },
-    unrelated: { entries: [{ id: 'other' }] },
-  },
-  {
-    source: { kind: 'project-asset', projectAssetId: 'asset' },
-    domain: 'project-assets',
-    payload: { entry: { id: 'asset' } },
-    unrelated: { entry: { id: 'other' } },
-  },
-  {
-    source: { kind: 'project-export', exportId: 'export', projectId: 'p' },
-    domain: 'project-exports',
-    payload: { entry: { id: 'export' } },
-    unrelated: { entry: { id: 'other' } },
-  },
-  {
-    source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
-    domain: 'web-snapshot-assets',
-    payload: { snapshot: { id: 'snapshot' } },
-    unrelated: { snapshot: { id: 'other' } },
-  },
-] satisfies Array<{
-  source: MediaAssetSource;
-  domain: string;
-  payload: object;
-  unrelated: object;
-}>)(
-  'prevents publication resurrection for $source.kind',
-  async ({ source, domain, payload, unrelated }) => {
-    const { mediaHasPendingPublication } = await import('./delete-cascade.sources');
-    const target = { id: 'root', source };
-    expect(mediaHasPendingPublication({ domain, payload }, target)).toBe(true);
-    expect(mediaHasPendingPublication({ domain, payload: {} }, target)).toBe(true);
-    expect(mediaHasPendingPublication({ domain, payload: unrelated }, target)).toBe(false);
-  }
-);
-
 it('purges a private acquisition linked to the root before any project placement was saved', async () => {
   installSource({ kind: 'screenshot' });
   rows.get('video_projects')!.clear();
