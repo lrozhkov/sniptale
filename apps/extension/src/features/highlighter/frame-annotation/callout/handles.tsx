@@ -138,6 +138,20 @@ function stopCalloutControlEvent(
   event.nativeEvent.stopImmediatePropagation();
 }
 
+const calloutActionButtonStyle: CSSProperties = {
+  width: 26,
+  height: 26,
+  padding: 0,
+  borderRadius: '50%',
+  border: '1px solid var(--sniptale-color-border-soft)',
+  background: 'var(--sniptale-color-surface-panel)',
+  color: 'var(--sniptale-color-text-primary)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+};
+
 function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
   if (props.isEditing || !props.showSettingsHandle) return null;
   const label = translate('content.interactiveFrame.calloutSettings');
@@ -152,17 +166,7 @@ function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
       title={label}
       style={mergeThemeScopedStyle(props.portalTheme, {
         ...props.settingsHandleStyle,
-        width: 26,
-        height: 26,
-        padding: 0,
-        borderRadius: '50%',
-        border: '1px solid var(--sniptale-color-border-soft)',
-        background: 'var(--sniptale-color-surface-panel)',
-        color: 'var(--sniptale-color-text-primary)',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
+        ...calloutActionButtonStyle,
         opacity: props.isHandleVisible ? 1 : 0,
         pointerEvents: props.isHandleVisible ? 'auto' : 'none',
         boxShadow:
@@ -291,17 +295,7 @@ function renderCalloutDeleteHandle(props: CalloutInteractionHandleProps) {
       title={label}
       style={mergeThemeScopedStyle(props.portalTheme, {
         ...removeFixedPlacement(props.dragHandleStyle),
-        width: 26,
-        height: 26,
-        padding: 0,
-        borderRadius: '50%',
-        border: '1px solid var(--sniptale-color-border-soft)',
-        background: 'var(--sniptale-color-surface-panel)',
-        color: 'var(--sniptale-color-text-primary)',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
+        ...calloutActionButtonStyle,
         opacity: props.isHandleVisible ? 1 : 0,
         pointerEvents: props.isHandleVisible ? 'auto' : 'none',
         boxShadow:

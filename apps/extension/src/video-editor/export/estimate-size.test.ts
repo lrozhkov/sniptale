@@ -60,7 +60,7 @@ it('samples the selected output range at final dimensions and disposes its isola
   });
   expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ sampleFps: 30 }));
   expect(project.fps).toBe(24);
-  expect(mocks.renderFrame).toHaveBeenCalledTimes(45);
+  expect(mocks.renderFrame).toHaveBeenCalledTimes(60);
   expect(mocks.renderFrame.mock.calls[0]?.[0]).toBe(3);
   expect(mocks.dispose).toHaveBeenCalledOnce();
 });

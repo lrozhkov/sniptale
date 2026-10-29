@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 322,
-  "findingDigest": "sha256:7c34737e4b9c44eb2e240d7ffa86d66a1447e5b11c47a4ae908054535db2306d",
+  "findingCount": 325,
+  "findingDigest": "sha256:15763fab163fd21a31b92dcf176877abd4ce963b25fe998a5ea014dd4b421313",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -177,6 +177,27 @@
       "owner": "apps/extension/src/settings/section-surface/classes.ts",
       "reason": "settingsPendingControlClassName is the immutable CSS string disabled:!opacity-100. The pending substring is presentation terminology and represents no queue, runtime state, or capability authority.",
       "removalCondition": "Remove if this declaration becomes mutable authority or the detector distinguishes string constants from queues.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.features.quick-actions-presets.icons",
+      "owner": "apps/extension/src/features/quick-actions-presets/icons.ts",
+      "reason": "The map contains fixed SVG definitions. Lookup selects artwork and grants no command, permission, or persistence authority.",
+      "removalCondition": "Remove when this exact syntax signal disappears or this file acquires policy-state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.platform.media-utils.png-codec",
+      "owner": "apps/extension/src/platform/media-utils/png-codec.ts",
+      "reason": "The sets contain fixed PNG chunk names. Parsing uses these names as format rules. They contain no mutable session, permission, or capability state.",
+      "removalCondition": "Remove when this exact syntax signal disappears or this file acquires policy-state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.ui.color-selector.catalog-model",
+      "owner": "apps/extension/src/ui/color-selector/catalog-model.ts",
+      "reason": "The maps cache pure color coordinates and family classifications by HEX. They do not grant commands, permissions, or persistence access. Cache loss changes calculation cost only.",
+      "removalCondition": "Remove when this exact syntax signal disappears or this file acquires policy-state authority.",
       "classification": "tool-noise"
     }
   ],
@@ -1460,6 +1481,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/features/quick-actions-presets/icons.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.features.quick-actions-presets.icons"
+    },
+    {
       "file": "apps/extension/src/features/quick-actions-presets/policy.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1706,6 +1733,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/platform/media-utils/png-codec.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.platform.media-utils.png-codec"
+    },
+    {
       "file": "apps/extension/src/platform/security-e2e-control/index.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1806,6 +1839,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: capability-path.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/ui/color-selector/catalog-model.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.ui.color-selector.catalog-model"
     },
     {
       "file": "apps/extension/src/ui/highlighter-preset-editor/callout/inspector-fields.tsx",

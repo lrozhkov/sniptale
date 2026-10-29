@@ -167,6 +167,6 @@ it('applies an alpha channel from the text background color picker', () => {
       ?.click()
   );
 
-  expect(session.getSnapshot().defaults.text.backgroundColor).toBe('#ef444466');
+  expect(session.getSnapshot().defaults.text.backgroundColor).toBe('#ff7f5066');
   act(() => root.unmount());
 });

@@ -56,7 +56,7 @@ it('keeps pencil quick options beside its icon without extending the toolbar flo
   expect(panel?.closest('.relative')).not.toBeNull();
   expect(panel?.getAttribute('role')).toBe('group');
   expect(colorGroup?.getAttribute('role')).toBe('group');
-  expect(colorGroup?.querySelector('button[title="#ef4444"]')?.getAttribute('aria-pressed')).toBe(
+  expect(colorGroup?.querySelector('button[title="#ff4500"]')?.getAttribute('aria-pressed')).toBe(
     'true'
   );
   expect(colorGroup?.querySelector('[data-ui="shared.ui.color-selector"]')).not.toBeNull();
@@ -136,7 +136,7 @@ it('toggles options on repeated active-tool clicks but keeps Selection options v
   );
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.arrow"]')).not.toBeNull();
   session.commitObject({
-    color: '#ef4444',
+    color: '#ff4500',
     dynamicWidth: true,
     end: { x: 80, y: 40 },
     id: 'selected-arrow',
@@ -242,12 +242,12 @@ it('shows persistent arrow color, size, shaft profile, and gesture direction con
   );
   expect(freehand).not.toBeNull();
   expect(fromTip?.getAttribute('aria-pressed')).toBe('false');
-  const blue = panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]');
+  const blue = panel?.querySelector<HTMLButtonElement>('button[title="#6495ed"]');
   act(() => width24?.click());
   act(() => uniform?.click());
   act(() => blue?.click());
   expect(session.getSnapshot().defaults.arrow).toEqual({
-    color: '#60a5fa',
+    color: '#6495ed',
     design: 'standard',
     drawFromTip: false,
     dynamicWidth: false,
@@ -322,9 +322,9 @@ it('shows compact two-row text and background palettes with text-size controls',
       )
       ?.click()
   );
-  act(() => textPalette?.querySelector<HTMLButtonElement>('button[title="#22c55e"]')?.click());
+  act(() => textPalette?.querySelector<HTMLButtonElement>('button[title="#32cd32"]')?.click());
   act(() =>
-    backgroundPalette?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click()
+    backgroundPalette?.querySelector<HTMLButtonElement>('button[title="#6495ed"]')?.click()
   );
   act(() =>
     panel
@@ -332,15 +332,15 @@ it('shows compact two-row text and background palettes with text-size controls',
       ?.click()
   );
   expect(session.getSnapshot().defaults.text).toEqual({
-    backgroundColor: '#60a5fa',
-    color: '#22c55e',
+    backgroundColor: '#6495ed',
+    color: '#32cd32',
     fontFamily: 'serif',
     fontSize: 36,
   });
   const selectedTextColor =
-    textPalette?.querySelector<HTMLButtonElement>('button[title="#22c55e"]');
+    textPalette?.querySelector<HTMLButtonElement>('button[title="#32cd32"]');
   expect(selectedTextColor?.getAttribute('aria-label')).toBe(
-    'content.toolbar.drawingTextColor: #22c55e'
+    'content.toolbar.drawingTextColor: #32cd32'
   );
   expect(selectedTextColor?.getAttribute('aria-pressed')).toBe('true');
   act(() => backgroundToggle?.click());
@@ -349,7 +349,7 @@ it('shows compact two-row text and background palettes with text-size controls',
     panel?.querySelector('[data-ui="content.toolbar.drawing-options.text.background-colors"]')
   ).toBeNull();
   act(() => backgroundToggle?.click());
-  expect(session.getSnapshot().defaults.text.backgroundColor).toBe('#60a5fa');
+  expect(session.getSnapshot().defaults.text.backgroundColor).toBe('#6495ed');
   act(() => root.render(<ToolbarDrawingControls controller={controller} displayMode="vertical" />));
   const verticalPalette = host.querySelector<HTMLElement>(
     '[aria-label="content.toolbar.drawingTextColor"]'
@@ -407,7 +407,7 @@ it('reuses the Shapes panel to change the kind of a selected outline object', ()
   };
   session.commitObject({
     bounds: { x: 0, y: 0, width: 100, height: 60 },
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'selected-shape',
     kind: 'rectangle',
     width: 4,
@@ -640,7 +640,7 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   const opacity30 = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.marker.opacity-30"]'
   );
-  const green = host.querySelector<HTMLButtonElement>('button[title="#22c55e"]');
+  const green = host.querySelector<HTMLButtonElement>('button[title="#32cd32"]');
   const markerWidthPreview = width44?.querySelector<HTMLElement>(
     '[data-ui="drawing-width-preview"]'
   );
@@ -651,7 +651,7 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   act(() => opacity30?.click());
   act(() => green?.click());
   expect(session.getSnapshot().defaults.marker).toMatchObject({
-    color: '#22c55e4d',
+    color: '#32cd324d',
     opacity: 1,
     width: 44,
   });

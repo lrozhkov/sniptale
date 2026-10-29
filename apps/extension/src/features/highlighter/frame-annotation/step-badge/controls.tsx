@@ -42,6 +42,12 @@ export function useStepBadgeControlPosition(args: {
   return position;
 }
 
+function stopBadgeControlEvent(event: React.SyntheticEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
+}
+
 export function FrameStepBadgeControls(props: {
   drag: Pick<
     ReturnType<typeof useStepBadgeBoundaryDrag>,
@@ -138,15 +144,9 @@ export function FrameStepBadgeControls(props: {
             aria-label={translate('content.interactiveFrame.stepBadgeSettings')}
             title={translate('content.interactiveFrame.stepBadgeSettings')}
             style={{ ...buttonStyle, cursor: 'pointer' }}
-            onPointerDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              event.nativeEvent.stopImmediatePropagation();
-            }}
+            onPointerDown={stopBadgeControlEvent}
             onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              event.nativeEvent.stopImmediatePropagation();
+              stopBadgeControlEvent(event);
               props.onSettingsClick?.();
             }}
             onFocus={props.visibility.handleFocus}
@@ -162,15 +162,9 @@ export function FrameStepBadgeControls(props: {
             aria-label={translate('common.actions.delete')}
             title={translate('common.actions.delete')}
             style={{ ...buttonStyle, cursor: 'pointer' }}
-            onPointerDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              event.nativeEvent.stopImmediatePropagation();
-            }}
+            onPointerDown={stopBadgeControlEvent}
             onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              event.nativeEvent.stopImmediatePropagation();
+              stopBadgeControlEvent(event);
               props.onDelete?.();
             }}
             onFocus={props.visibility.handleFocus}

@@ -44,7 +44,7 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
   const onDocumentCommit = vi.fn(() => true);
   const session = createDrawingSession({ onDocumentCommit });
   session.commitObject({
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'pencil',
     kind: 'pencil',
     samples: [
@@ -55,7 +55,7 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
   });
   session.commitObject({
     bounds: { x: 40, y: 0, width: 30, height: 30 },
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'shape',
     kind: 'rectangle',
     width: 8,
@@ -73,14 +73,14 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
   expect(host.querySelectorAll('.sniptale-drawing-options-popover')).toHaveLength(2);
   expect(panel?.querySelectorAll('.grid-cols-5 button[title^="#"]')).toHaveLength(5);
   expect(panel?.querySelector('.grid-cols-5')).not.toBeNull();
-  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
+  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#6495ed"]')?.click());
 
   expect(onDocumentCommit).toHaveBeenCalledTimes(1);
   expect(
     session
       .getSnapshot()
       .document.objects.map((object) => ('color' in object ? object.color : null))
-  ).toEqual(['#60a5fa', '#60a5fa']);
+  ).toEqual(['#6495ed', '#6495ed']);
   act(() => root.unmount());
 });
 
@@ -118,10 +118,10 @@ it('uses the effective alpha for a mixed legacy marker selection', () => {
     '[data-ui="shared.ui.color-selector.picker-trigger"]'
   );
   expect(picker?.title).toBe('#FFFF004D');
-  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
+  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#6495ed"]')?.click());
   expect(session.getSnapshot().document.objects).toMatchObject([
-    { color: '#60a5fa4d', kind: 'marker', opacity: 1 },
-    { color: '#60a5fa4d', kind: 'pencil' },
+    { color: '#6495ed4d', kind: 'marker', opacity: 1 },
+    { color: '#6495ed4d', kind: 'pencil' },
   ]);
   expect(onDocumentCommit).toHaveBeenCalledTimes(1);
   act(() => root.unmount());
@@ -162,14 +162,14 @@ it('shows shared shape properties and changes both selected shapes in one commit
   const session = createDrawingSession({ onDocumentCommit });
   session.commitObject({
     bounds: { x: 0, y: 0, width: 30, height: 30 },
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'rectangle',
     kind: 'rectangle',
     width: 4,
   });
   session.commitObject({
     bounds: { x: 50, y: 0, width: 30, height: 30 },
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'ellipse',
     kind: 'ellipse',
     width: 4,

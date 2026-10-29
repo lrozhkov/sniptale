@@ -124,7 +124,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   });
 }
 
-test('styles native visible, full and selection output with all captions and an overlong page address', async ({}, info) => {
+test('styles native capture with captions and an overlong address', async ({}, info) => {
   const size = { width: 1280, height: 560 };
   const browser = await launchExtensionBrowser({ viewport: size });
   const host = await startHostServer();

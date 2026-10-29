@@ -685,7 +685,8 @@ test('publication probe counts completed front changes and excludes unpublished 
   page,
 }) => {
   await page.setContent(
-    '<div data-ui="gallery.videoReview.stage"><video></video><div data-ui="gallery.videoReview.manualPreview"></div></div>'
+    '<div data-ui="gallery.videoReview.stage"><video></video>' +
+      '<div data-ui="gallery.videoReview.manualPreview"></div></div>'
   );
   await page.evaluate(() => {
     const video = document.querySelector('video')!;

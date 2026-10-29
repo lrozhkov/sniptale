@@ -7,8 +7,8 @@ import { createScaledFrameAnnotationCoordinateSpace } from '../coordinate-space'
 
 class TestPointerEvent extends MouseEvent {
   readonly pointerId: number;
-  constructor(type: string, x: number, y: number, pointerId = 7) {
-    super(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+  constructor(type: string, x: number, y: number, pointerId = 7, button = 0) {
+    super(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button });
     this.pointerId = pointerId;
   }
 }
@@ -112,4 +112,19 @@ it('supports keyboard point movement without changing frame-boundary placement',
     );
   });
   expect(commit).toHaveBeenCalledExactlyOnceWith({ x: 30, y: 30 });
+});
+
+it('ignores a right-button drag without capturing the pointer or committing movement', () => {
+  render();
+  const handle = host.querySelector('button')!;
+  handle.setPointerCapture = vi.fn();
+  const event = new TestPointerEvent('pointerdown', 100, 100, 7, 2);
+  act(() => handle.dispatchEvent(event));
+  move(500, 350);
+  finish(500, 350);
+  expect(handle.setPointerCapture).not.toHaveBeenCalled();
+  expect(event.defaultPrevented).toBe(false);
+  expect(drag.isDragging).toBe(false);
+  expect(drag.draftPoint).toBeNull();
+  expect(commit).not.toHaveBeenCalled();
 });

@@ -97,7 +97,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         editable.id = 'marker-whitespace-editable';
         editable.contentEditable = 'true';
         editable.textContent = ' ';
-        editable.style.cssText = `position:absolute;left:${left}px;top:330px;width:120px;white-space:pre;font:24px/36px Arial`;
+        editable.style.cssText =
+          `position:absolute;left:${left}px;top:330px;width:120px;` +
+          'white-space:pre;font:24px/36px Arial';
         document.body.append(editable);
       },
       viewport.name === '1280x560' ? 500 : 100

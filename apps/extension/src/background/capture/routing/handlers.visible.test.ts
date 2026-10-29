@@ -222,6 +222,8 @@ it('captures a lossless viewport before quick action appearance encoding', async
   await vi.waitFor(() => expect(captureVisibleTabForCropTransactionMock).toHaveBeenCalled());
   expect(captureVisibleTabForCropTransactionMock).toHaveBeenCalledWith(42, {
     losslessSource: true,
+    format: 'png',
+    quality: 100,
   });
 });
 

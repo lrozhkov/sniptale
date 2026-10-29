@@ -21,8 +21,8 @@ it('keeps a settings update when an older palette load finishes later', async ()
   const initial = createDefaultDrawingPaletteState();
   const updated = { ...initial, colors: ['#123456', ...initial.colors.slice(1)] };
   let finishLoad: ((state: DrawingPaletteStateV1) => void) | undefined;
-  let notify: ((state: DrawingPaletteStateV1) => void) | undefined;
-  const stop = vi.fn();
+  const listeners = new Set<(state: DrawingPaletteStateV1) => void>();
+  const stops: ReturnType<typeof vi.fn>[] = [];
   palette.load.mockImplementation(
     () =>
       new Promise((resolve) => {
@@ -30,7 +30,9 @@ it('keeps a settings update when an older palette load finishes later', async ()
       })
   );
   palette.subscribe.mockImplementation((listener) => {
-    notify = listener;
+    listeners.add(listener);
+    const stop = vi.fn(() => listeners.delete(listener));
+    stops.push(stop);
     return stop;
   });
   const host = document.createElement('div');
@@ -48,13 +50,15 @@ it('keeps a settings update when an older palette load finishes later', async ()
       />
     )
   );
-  act(() => notify?.(updated));
+  act(() => listeners.forEach((listener) => listener(updated)));
   await act(async () => finishLoad?.(initial));
   const buttons = host.querySelectorAll<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.quick-colors"] button'
   );
   expect(Array.from(buttons, (button) => button.title)).toEqual(updated.colors.slice(0, 5));
   act(() => root.unmount());
-  expect(stop).toHaveBeenCalledOnce();
+  expect(stops.length).toBeGreaterThan(0);
+  for (const stop of stops) expect(stop).toHaveBeenCalledOnce();
+  expect(listeners.size).toBe(0);
   vi.unstubAllGlobals();
 });

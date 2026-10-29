@@ -111,7 +111,6 @@
         "end": 232
       }
     },
-
     {
       "id": "07e9c86fb0e10c170f1ed23c5a5cfa9c5ef51bbe3a08aee21737a45c34503970",
       "classification": "tool-noise",
@@ -128,6 +127,24 @@
         "path": "apps/extension/src/content/selection/frame-settings-popover/state/index.ts",
         "start": 230,
         "end": 235
+      }
+    },
+    {
+      "id": "0bdbcfe1f909a651a7554bb135377eb43a9607d3cb7ff6e38ded84bac1898f8d",
+      "classification": "tool-noise",
+      "owner": "packages/ui glass and vertical content toolbar dividers",
+      "reason": "The glass divider is 1px wide with a 180deg gradient and horizontal margins. The vertical toolbar divider is 1px high, full width, with a 90deg gradient and vertical margins. Only color-stop tokens match.",
+      "removalCondition": "Remove this finding if the two axes share a parameterized divider owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
+        "start": 122,
+        "end": 129
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
+        "start": 142,
+        "end": 149
       }
     },
     {
@@ -167,21 +184,21 @@
       }
     },
     {
-      "id": "0f555468acf5ac5645a587f9637483ed52affca248d9136b312da961f77368f9",
+      "id": "0ec75348b1a6bb2e43570d22c291bb282ca4b2322ea5d226e273a37fe92b280e",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-      "reason": "Style-domain schemas explicitly allow different field sets: catalog/system revisions versus per-surface revision/maps. Repeated reject-unknown/default-projection syntax preserves domain-specific trust validation, and the subsequent validation predicates differ.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
+      "owner": "packages/ui toolbar indicator placement",
+      "reason": "Down-opening and right-opening menus share indicator corner offsets and indicator rotation 0deg. Their final chevron rotations are 0deg and -90deg. Merging the complete rules would erase menu-direction behavior.",
+      "removalCondition": "Remove this finding if indicator geometry uses one shared direction-independent declaration with a separate proven direction parameter.",
+      "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-        "start": 216,
-        "end": 221
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 206,
+        "end": 212
       },
       "secondFile": {
-        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-        "start": 274,
-        "end": 279
+        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
+        "start": 233,
+        "end": 239
       }
     },
     {
@@ -218,24 +235,6 @@
         "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
         "start": 862,
         "end": 879
-      }
-    },
-    {
-      "id": "1346d16647cf1adc05a06ed6ae212dfcbb29b63796753f8dbe1001babcee9b5a",
-      "classification": "tool-noise",
-      "owner": "frame annotation composition",
-      "reason": "Callout and frame bodies render the already shared ApplyToFutureFramesGuard and TemplateForkReturnGuard in the same priority order. The adjacent headers, template content and effect editors remain different; the state machines already belong to shared hooks.",
-      "removalCondition": "Remove this record if guard state or transition logic is copied outside the shared workflow hooks.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
-        "start": 102,
-        "end": 115
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
-        "start": 152,
-        "end": 165
       }
     },
     {
@@ -347,6 +346,24 @@
       }
     },
     {
+      "id": "1f284e07a2826cc93d7256efd36f0a2b0bbf1cb09e2180e1036906ee5edcfe39",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/overlay/toolbar/capture/action-dropdown.tsx",
+      "reason": "The match contains imports and the next type declaration boundary. Capture-action and timer menus already use the same menu and digit hooks. They expose different settings and commands.",
+      "removalCondition": "Remove when this exact finding disappears or when these contracts acquire one common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/content/overlay/toolbar/capture/action-dropdown.tsx",
+        "start": 1,
+        "end": 18
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/overlay/toolbar/capture/timer-dropdown.tsx",
+        "start": 1,
+        "end": 18
+      }
+    },
+    {
       "id": "1fe2a00ee0be0a7fafd750ff25a7ebf1206077f308184cb575a382afc977d7dc",
       "classification": "tool-noise",
       "owner": "background/media/video/runtime/handlers/state/recording-state",
@@ -401,24 +418,6 @@
       }
     },
     {
-      "id": "2220b258cb0873bdd1766ebd7879b4fd976f4be2cc4ba577e3d56e1746d07c26",
-      "classification": "tool-noise",
-      "owner": "packages/ui content toolbar split-control styling",
-      "reason": "One matching hover/open/focus predicate paints the parent split-control surface. The second paints child command buttons transparent!important. These are complementary parent/child subjects, not repeated declarations on one subject.",
-      "removalCondition": "Remove this finding when the split-control DOM no longer needs separate container and child paint.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 512,
-        "end": 519
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 520,
-        "end": 527
-      }
-    },
-    {
       "id": "222b2753c3b2f66379098ac0f951b16503f71eb9f7214ce6335994598204da18",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/input-controls.css",
@@ -452,6 +451,24 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
         "start": 414,
         "end": 433
+      }
+    },
+    {
+      "id": "229b651abcc2e706563d9fb192a816333bae6c12bf047aed34a40e5b8ae188a2",
+      "classification": "tool-noise",
+      "owner": "packages/ui glass and content toolbar surfaces",
+      "reason": "Glass toolbar active buttons and content toolbar active states use the same 72% accent hover mix. Their selector families, disabled conditions, and base active-state text rules differ. The common token values do not identify one interaction owner.",
+      "removalCondition": "Remove this finding if these control families merge under one declared active-hover presentation.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
+        "start": 98,
+        "end": 109
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 253,
+        "end": 264
       }
     },
     {
@@ -905,6 +922,42 @@
       }
     },
     {
+      "id": "4541b6b1f6cdc75b370720f206119e97a7fa64ce027cc282f475595f214071fa",
+      "classification": "tool-noise",
+      "owner": "ui/compact-inspector-controls switch presentation",
+      "reason": "Checked-state selector repetition colors the switch track pseudo-element in one rule and translates its thumb descendant 16px in the other. These rules target different boxes and properties.",
+      "removalCondition": "Remove this finding if switch markup replaces the pseudo-element/descendant split.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 633,
+        "end": 640
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 660,
+        "end": 668
+      }
+    },
+    {
+      "id": "47111a81f930caef1c62e218c759c831ce1785a5b660adb5b469e8cd000ffcf5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+      "reason": "Style-domain schemas explicitly allow different field sets: catalog/system revisions versus per-surface revision/maps. Repeated reject-unknown/default-projection syntax preserves domain-specific trust validation, and the subsequent validation predicates differ.",
+      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+        "start": 225,
+        "end": 230
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+        "start": 283,
+        "end": 288
+      }
+    },
+    {
       "id": "47d29325d2c4f87c5a5476ac2e043e0dc203de0ae6037da601093ab04c5864e6",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal/shell.css",
@@ -956,24 +1009,6 @@
         "path": "packages/ui/src/styles/overlays/countdown.css",
         "start": 43,
         "end": 48
-      }
-    },
-    {
-      "id": "4a6a5ac269559297cbfef2bd0233db96a82ba6a6810f63802665f784ba98bfaa",
-      "classification": "tool-noise",
-      "owner": "frame annotation toolbar buttons",
-      "reason": "Step and callout functions declare the same event/ref shape then instantiate FrameAnnotationToolbarMenuButton with different command IDs and icons. The menu behavior is already centralized in that base component.",
-      "removalCondition": "Remove this record if they acquire separate menu/event lifecycle implementation.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/highlighter/frame-annotation/floating-toolbar.tsx",
-        "start": 160,
-        "end": 168
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/highlighter/frame-annotation/floating-toolbar.tsx",
-        "start": 174,
-        "end": 182
       }
     },
     {
@@ -1136,24 +1171,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
         "start": 1895,
         "end": 1906
-      }
-    },
-    {
-      "id": "574c5848875e9e799e8767e2e94155ae8d1beed0252865f6d7ad1255d6a44262",
-      "classification": "tool-noise",
-      "owner": "packages/ui glass and content toolbar surfaces",
-      "reason": "Glass toolbar active buttons and content toolbar active states use the same 72% accent hover mix. Their selector families, disabled conditions, and base active-state text rules differ. The common token values do not identify one interaction owner.",
-      "removalCondition": "Remove this finding if these control families merge under one declared active-hover presentation.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
-        "start": 98,
-        "end": 109
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 244,
-        "end": 255
       }
     },
     {
@@ -1337,24 +1354,6 @@
       }
     },
     {
-      "id": "6819ff487c18be2ed6d91255aa07e406f74887ff033aaf080c8bf2bcf52bf776",
-      "classification": "tool-noise",
-      "owner": "settings/sections/capture/quick-actions/section/constants",
-      "reason": "One endpoint is the static Lucide import list; the other is the explicit icon lookup registry using those bindings. This is registration syntax rather than two implementations.",
-      "removalCondition": "Remove when exact import/registry pair disappears or icon registration changes; never extend to arbitrary repeated code in constants.ts.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/settings/sections/capture/quick-actions/section/constants.ts",
-        "start": 131,
-        "end": 168
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/capture/quick-actions/section/constants.ts",
-        "start": 2,
-        "end": 39
-      }
-    },
-    {
       "id": "6e1384ef94b9fc327263ed7a99568290be8c66bbdbacb0c09ab042527b75d23b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/video/project/factories/project-recording.ts",
@@ -1445,6 +1444,24 @@
       }
     },
     {
+      "id": "72ae2b63fae1cc078d1d728ac790d368a978f3dd6b45a8c109775b5f96f87f6d",
+      "classification": "tool-noise",
+      "owner": "frame annotation composition",
+      "reason": "Callout and frame bodies configure shared template workflow/apply-to-future hooks and compose a temporary-mode header action. Their templates, restore/fork callbacks, labels and content remain type-specific. The repeated state policy is already delegated to the existing hooks.",
+      "removalCondition": "Remove this record if template workflow transitions move out of the shared hooks into these bodies.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
+        "start": 70,
+        "end": 90
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 127,
+        "end": 148
+      }
+    },
+    {
       "id": "7372a1862282ddd4d99a4fc7dbdf5b402585d27ba0d239582d18aaffa2f33f8a",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/shell/page/start.tsx <-> apps/extension/src/video-editor/shell/app/start.tsx",
@@ -1496,24 +1513,6 @@
         "path": "tooling/web-snapshot-smoke/runtime/runner.mjs",
         "start": 189,
         "end": 202
-      }
-    },
-    {
-      "id": "77c14dc6f731293860d34ada180cdf3560436c2c2b9a40c5379fe23156a7ab84",
-      "classification": "tool-noise",
-      "owner": "editor annotation projections",
-      "reason": "Read-only and interactive projections pass the same snapshot-derived fill and shadow props into the shared badge component. The interactive version also owns settings anchors/handles; readonly deliberately does not. No annotation renderer or edit behavior is copied.",
-      "removalCondition": "Remove this record if either projection duplicates badge rendering rather than invoking the shared component.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/editor/frame-annotation/projection-read-only.tsx",
-        "start": 46,
-        "end": 54
-      },
-      "secondFile": {
-        "path": "apps/extension/src/editor/frame-annotation/projection.tsx",
-        "start": 297,
-        "end": 305
       }
     },
     {
@@ -1571,24 +1570,6 @@
       }
     },
     {
-      "id": "80a336e4fac8db47c6df830cac43fcd40f7398c7c291c50de7a713e5efd03092",
-      "classification": "tool-noise",
-      "owner": "ui/compact-inspector-controls switch presentation",
-      "reason": "Checked-state selector repetition colors the switch track pseudo-element in one rule and translates its thumb descendant 16px in the other. These rules target different boxes and properties.",
-      "removalCondition": "Remove this finding if switch markup replaces the pseudo-element/descendant split.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 631,
-        "end": 638
-      },
-      "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 658,
-        "end": 666
-      }
-    },
-    {
       "classification": "tool-noise",
       "owner": "extension:scenario-editor:tour:inspector",
       "reason": "Hotspot and annotation settings pass common context into distinct typed controls. Each callback delegates to the shared updateAction operation. The callback retains its own action discriminant and object type. No immutable update algorithm remains duplicated. Mixed-action sibling preservation is covered by the inspector unit proof.",
@@ -1604,24 +1585,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
         "start": 520,
         "end": 529
-      }
-    },
-    {
-      "id": "8726f91e8e77efcc34d5f9763b0397b03d2a18fd04199dbe760501ea6e8f512b",
-      "classification": "tool-noise",
-      "owner": "packages/ui glass popover and content toolbar active controls",
-      "reason": "Both active families consume 55% accent border tokens, but glass popover controls and content toolbar controls have different class/state contracts. The matching span also includes boundaries to subsequent hover selectors.",
-      "removalCondition": "Remove this finding if one canonical active-control contract replaces both selector families.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/glass/popover-controls.css",
-        "start": 62,
-        "end": 73
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 228,
-        "end": 239
       }
     },
     {
@@ -1694,24 +1657,6 @@
         "path": "apps/extension/src/gallery/video-review/zoom-inspector.tsx",
         "start": 333,
         "end": 344
-      }
-    },
-    {
-      "id": "8b1d3ca358b60adcb7d4d3654c6a390002c8bf1bf635a1bbeec30ffd47e252c7",
-      "classification": "tool-noise",
-      "owner": "packages/ui toolbar indicator placement",
-      "reason": "Down-opening and right-opening menus share indicator corner offsets and indicator rotation 0deg. Their final chevron rotations are 0deg and -90deg. Merging the complete rules would erase menu-direction behavior.",
-      "removalCondition": "Remove this finding if indicator geometry uses one shared direction-independent declaration with a separate proven direction parameter.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 197,
-        "end": 203
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
-        "start": 229,
-        "end": 235
       }
     },
     {
@@ -1892,24 +1837,6 @@
         "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
         "start": 58,
         "end": 69
-      }
-    },
-    {
-      "id": "94d7d217f4f2946f6c496fb52031064263d4ab554319b808cf5f4016470a6d3a",
-      "classification": "tool-noise",
-      "owner": "packages/ui glass and vertical content toolbar dividers",
-      "reason": "The glass divider is 1px wide with a 180deg gradient and horizontal margins. The vertical toolbar divider is 1px high, full width, with a 90deg gradient and vertical margins. Only color-stop tokens match.",
-      "removalCondition": "Remove this finding if the two axes share a parameterized divider owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
-        "start": 122,
-        "end": 129
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
-        "start": 138,
-        "end": 145
       }
     },
     {
@@ -2384,7 +2311,7 @@
       "id": "aa6914db950192ac7705fe43e6d735e74c09a67144a00f8e226e9e406d75743e",
       "classification": "tool-noise",
       "owner": "features/video/audio/source-envelope",
-      "reason": "The common initial loop shape surrounds materially different accepted intent: gain allows volume\u22642, minimum0.001s, sorts and rejects overlap; attenuation allows volume\u22641, anypositive duration and retains overlapping/order intent.",
+      "reason": "The common initial loop shape surrounds materially different accepted intent: gain allows volume≤2, minimum0.001s, sorts and rejects overlap; attenuation allows volume≤1, anypositive duration and retains overlapping/order intent.",
       "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
       "reviewBy": "2027-04-15",
       "firstFile": {
@@ -2435,24 +2362,6 @@
       }
     },
     {
-      "id": "ae6b83b5bedf771335ee651917b84346e89b8b5ffde9900ad1beaff6c847a9df",
-      "classification": "tool-noise",
-      "owner": "frame annotation composition",
-      "reason": "Callout and frame bodies configure shared template workflow/apply-to-future hooks and compose a temporary-mode header action. Their templates, restore/fork callbacks, labels and content remain type-specific. The repeated state policy is already delegated to the existing hooks.",
-      "removalCondition": "Remove this record if template workflow transitions move out of the shared hooks into these bodies.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
-        "start": 64,
-        "end": 84
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
-        "start": 127,
-        "end": 148
-      }
-    },
-    {
       "id": "b07219f2e5af149f429fb7410de2f9d0a3a0aad276c90a83a758646d13147236",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -2489,21 +2398,21 @@
       }
     },
     {
-      "id": "b0e8bb081ce138bd5353e2ddb2f711ed11b266eb2087f79b51019109171c6017",
+      "id": "b0a7c9e618951d31fd8da9b028704e7ec1cd3536f320529c611edf80ab4738e1",
       "classification": "tool-noise",
-      "owner": "ui/compact-inspector-controls switch accessibility",
-      "reason": "The base thumb rule positions and animates thumbs. The same thumb selector inside prefers-reduced-motion disables transition. Sharing selector tokens does not duplicate a motion policy.",
-      "removalCondition": "Remove this finding if switch animation disappears or the reduced-motion policy moves to an existing owner.",
+      "owner": "editor annotation projections",
+      "reason": "Read-only and interactive projections pass the same snapshot-derived fill and shadow props into the shared badge component. The interactive version also owns settings anchors/handles; readonly deliberately does not. No annotation renderer or edit behavior is copied.",
+      "removalCondition": "Remove this record if either projection duplicates badge rendering rather than invoking the shared component.",
       "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 641,
-        "end": 647
+        "path": "apps/extension/src/editor/frame-annotation/projection-read-only.tsx",
+        "start": 46,
+        "end": 54
       },
       "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 670,
-        "end": 676
+        "path": "apps/extension/src/editor/frame-annotation/projection.tsx",
+        "start": 319,
+        "end": 327
       }
     },
     {
@@ -2975,24 +2884,6 @@
       }
     },
     {
-      "id": "d0a1bc962e5bdaf1d623fcb5c1ba999cdd261807115fda4d2a89fea77529b66b",
-      "classification": "tool-noise",
-      "owner": "frame annotation callout and step-badge composition",
-      "reason": "Both bodies render existing apply-to-future and template-fork guards. Their template sections and settings mutation contracts are different; the guards already contain the confirmation behavior. Matching ternary composition does not create a second workflow owner.",
-      "removalCondition": "Remove this record if confirmation state or transitions are copied into either body.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
-        "start": 102,
-        "end": 116
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
-        "start": 110,
-        "end": 124
-      }
-    },
-    {
       "id": "d1f3afe5b9058c27e244806f48eb29eaaae869d1855161fbd0e1a96fc50562f3",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal-content",
@@ -3029,21 +2920,21 @@
       }
     },
     {
-      "id": "d620657b94a1fb37f4ae83b7fac761df62052d8462cf078a9e4fc2d040b25bb3",
+      "id": "d56557725388ed977e4bb43469700c17d221bf37453120cc477ccd41ed12fa22",
       "classification": "tool-noise",
-      "owner": "frame annotation callout and step-badge composition",
-      "reason": "Both call shared template/apply-to-future owners then declare the temporary-template header action. Fork defaults differ materially: callout clears sourcePresetId through handleSettingChange; step badge sends its own settings patch. Header labels and template bodies also differ.",
-      "removalCondition": "Remove this record if identical executable fork/restore logic is copied outside those owners.",
+      "owner": "packages/ui glass popover and content toolbar active controls",
+      "reason": "Both active families consume 55% accent border tokens, but glass popover controls and content toolbar controls have different class/state contracts. The matching span also includes boundaries to subsequent hover selectors.",
+      "removalCondition": "Remove this finding if one canonical active-control contract replaces both selector families.",
       "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
-        "start": 61,
-        "end": 84
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 62,
+        "end": 73
       },
       "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
-        "start": 68,
-        "end": 92
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 237,
+        "end": 248
       }
     },
     {
@@ -3062,6 +2953,24 @@
         "path": "apps/extension/src/content/overlay/toolbar/mode-controller/types.ts",
         "start": 11,
         "end": 22
+      }
+    },
+    {
+      "id": "d71f648769b5e4f611b81703e4adbf3298920e817f0c0ecfd1f2d27a0cbc2c65",
+      "classification": "tool-noise",
+      "owner": "ui/compact-inspector-controls switch accessibility",
+      "reason": "The base thumb rule positions and animates thumbs. The same thumb selector inside prefers-reduced-motion disables transition. Sharing selector tokens does not duplicate a motion policy.",
+      "removalCondition": "Remove this finding if switch animation disappears or the reduced-motion policy moves to an existing owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 643,
+        "end": 649
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 672,
+        "end": 678
       }
     },
     {
@@ -3119,24 +3028,6 @@
       }
     },
     {
-      "id": "e162eaf56f5ffe630928deae21e11ebfade84a88b8b33982f4fb010fccc8a459",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/content/selection/frame-runtime/session <-> apps/extension/src/features/highlighter/step-badge-presets",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/content/selection/frame-runtime/session/step-badge-defaults.ts",
-        "start": 35,
-        "end": 43
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/highlighter/step-badge-presets/catalog.ts",
-        "start": 290,
-        "end": 298
-      }
-    },
-    {
       "id": "e2f834666b384c5f438036ee9e1beeee796785811afda6158d573f7966ec2550",
       "classification": "tool-noise",
       "owner": "packages/ui/src/product-glass-controls/buttons.tsx",
@@ -3188,6 +3079,24 @@
         "path": "apps/extension/src/video-editor/project/state/effects.effect-instance.ts",
         "start": 140,
         "end": 148
+      }
+    },
+    {
+      "id": "e7bc5219cc853c831847fc45b6e5f180331e44d4503d631f1d06a736035349fb",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/selection/step-badge/index.tsx",
+      "reason": "The content adapter and shared surface declare compatible callback props. The adapter owns page portals and optional frame geometry. The shared surface requires explicit portal and coordinate inputs. No rendering or interaction implementation repeats here.",
+      "removalCondition": "Remove when this exact finding disappears or when these contracts acquire one common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/content/selection/step-badge/index.tsx",
+        "start": 22,
+        "end": 29
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/step-badge/interactive-surface.tsx",
+        "start": 23,
+        "end": 30
       }
     },
     {
@@ -3296,6 +3205,24 @@
         "path": "packages/ui/src/styles/ai-modal-content/fields.css",
         "start": 29,
         "end": 39
+      }
+    },
+    {
+      "id": "fa554f439de1215e8f023db733a8f86e47c50aaa9fb00ff355608f5c11337491",
+      "classification": "tool-noise",
+      "owner": "packages/ui content toolbar split-control styling",
+      "reason": "One matching hover/open/focus predicate paints the parent split-control surface. The second paints child command buttons transparent!important. These are complementary parent/child subjects, not repeated declarations on one subject.",
+      "removalCondition": "Remove this finding when the split-control DOM no longer needs separate container and child paint.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 522,
+        "end": 529
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 530,
+        "end": 537
       }
     },
     {

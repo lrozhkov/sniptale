@@ -120,9 +120,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await configure(page, extensionId);
     const base = `chrome-extension://${extensionId}/apps/extension/src/settings/index.html`;
     await page.goto(`${base}?section=editor-resources&view=palettes`);
-    const nameField = page
-      .getByRole('textbox', { name: new RegExp(t('shared.ui.colorCatalogName')) })
-      .first();
+    const nameField = page.getByRole('textbox', { name: t('shared.ui.colorCatalogName') }).first();
     await expect(nameField).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
     await nameField.click();
     await page.screenshot({ path: info.outputPath('palette-name-focus.png'), fullPage: false });

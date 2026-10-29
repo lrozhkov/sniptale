@@ -1,5 +1,5 @@
-import { ReviewBorderOverlay } from './border-overlay';
 // @vitest-environment jsdom
+import { ReviewBorderOverlay } from './border-overlay';
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,

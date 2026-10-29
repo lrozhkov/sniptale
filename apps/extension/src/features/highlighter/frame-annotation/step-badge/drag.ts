@@ -19,6 +19,19 @@ import {
   type FrameAnnotationCoordinateSpace,
 } from '../coordinate-space';
 
+function captureBadgeDrag(event: React.PointerEvent<HTMLButtonElement>): boolean {
+  if (event.button !== 0) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  } catch {
+    // The transient portal can disappear while capture is being requested.
+  }
+  return true;
+}
+
 function getKeyboardPlacement(args: {
   event: React.KeyboardEvent<HTMLButtonElement>;
   frameRect: StepBadgeFrameRect;
@@ -168,15 +181,7 @@ export function useStepBadgeBoundaryDrag(args: {
     draftPlacement,
     isDragging,
     handlePointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.nativeEvent.stopImmediatePropagation();
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      } catch {
-        // The transient portal can disappear while capture is being requested.
-      }
+      if (!captureBadgeDrag(event)) return;
       pointerIdRef.current = event.pointerId;
       const coordinateSpace = args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
       const pointer = coordinateSpace.clientPointToLogical({
@@ -266,15 +271,7 @@ export function useStepBadgePointDrag(args: {
     draftPoint,
     isDragging,
     handlePointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.nativeEvent.stopImmediatePropagation();
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      } catch {
-        // The transient portal can disappear while capture is being requested.
-      }
+      if (!captureBadgeDrag(event)) return;
       const space = args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
       const point = space.clientPointToLogical({ x: event.clientX, y: event.clientY });
       grabOffsetRef.current = { x: point.x - args.point.x, y: point.y - args.point.y };

@@ -13,6 +13,7 @@ import {
 import {
   DEFAULT_STEP_BADGE_TEMPLATE,
   cloneStepBadgeTemplate,
+  createStepBadgeTemplateFromSettings,
   createStepBadgeSettingsFromTemplate,
 } from '../../../../features/highlighter/step-badge-presets/catalog';
 import { DEFAULT_ANNOTATION_SESSION_DEFAULTS } from '@sniptale/runtime-contracts/highlighter/border-preset';
@@ -32,18 +33,6 @@ function templateKey(settings: StepBadgeTemplateSettings): string {
   return JSON.stringify(settings);
 }
 
-function settingsTemplate(settings: StepBadgeSettings): StepBadgeTemplateSettings {
-  return {
-    anchor: settings.anchor ?? settings.corner ?? 'top-left',
-    offsetDirections: [...(settings.offsetDirections ?? [])],
-    type: settings.type,
-    alphabet: settings.alphabet ?? 'cyrillic',
-    value: settings.value,
-    auto: settings.auto !== false,
-    style: { ...(settings.style ?? DEFAULT_STEP_BADGE_TEMPLATE.style) },
-  };
-}
-
 export function createStepBadgePresetSessionSync(
   sessionTemplateRef: MutableRefObject<StepBadgeSettings | null>
 ) {
@@ -59,7 +48,8 @@ export function createStepBadgePresetSessionSync(
     const current = sessionTemplateRef.current;
     const canReplace =
       current === null ||
-      (lastDefaultKey !== null && templateKey(settingsTemplate(current)) === lastDefaultKey);
+      (lastDefaultKey !== null &&
+        templateKey(createStepBadgeTemplateFromSettings(current)) === lastDefaultKey);
     if (canReplace) {
       const next = createStepBadgeSettingsFromTemplate(preset.settings, preset.id);
       const defaults = catalog.newSessionDefaults ?? DEFAULT_ANNOTATION_SESSION_DEFAULTS;

@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import {
   createDefaultFrameCallout,
   createDefaultFrameStepBadge,
 } from '../../features/highlighter/frame-annotation/defaults';
-// @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Canvas } from 'fabric';

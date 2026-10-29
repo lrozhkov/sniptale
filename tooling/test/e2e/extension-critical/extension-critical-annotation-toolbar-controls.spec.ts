@@ -1060,24 +1060,38 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         import { createRoot } from 'react-dom/client';
         import { FrameStepBadgeSurface } from './apps/extension/src/features/highlighter/frame-annotation/step-badge-surface';
         import { createDefaultFrameStepBadge } from './apps/extension/src/features/highlighter/frame-annotation/defaults';
-        const cases = [[1,1],[0.5,1],[1.25,1],[1,0.5],[1,1.25]].flatMap(([sceneScale,scale]) => [0,0.25,0.5,0.75].flatMap(phase => Array.from({length:9},(_,i)=>({diameter:29.16,scale,sceneScale,phase,value:String(i+1),customCss:''}))));
-        cases.push(...[24,48,72].flatMap(diameter => ['1','9','12','99'].map(value=>({diameter,scale:1,sceneScale:1,phase:0,value,customCss:''}))));
-        cases.push(...['1','9','12'].map(value => ({diameter:29.16,scale:1,sceneScale:1,phase:0,value,customCss:'[text]\\nfont-family: Arial; font-style: italic; letter-spacing: 0.5px;'})));
+        const cases = [[1,1],[0.5,1],[1.25,1],[1,0.5],[1,1.25]].flatMap(([sceneScale,scale]) =>
+          [0,0.25,0.5,0.75].flatMap(phase => Array.from({length:9},(_,i)=>(
+            {diameter:29.16,scale,sceneScale,phase,value:String(i+1),customCss:''}
+          )))
+        );
+        cases.push(...[24,48,72].flatMap(diameter => ['1','9','12','99'].map(value=>(
+          {diameter,scale:1,sceneScale:1,phase:0,value,customCss:''}
+        ))));
+        cases.push(...['1','9','12'].map(value => ({
+          diameter:29.16,scale:1,sceneScale:1,phase:0,value,
+          customCss:'[text]\\nfont-family: Arial; font-style: italic; letter-spacing: 0.5px;'})));
         const face = new FontFace('Sniptale Interface', 'url('+interfaceFont+')', {weight:'400 700'});
         document.fonts.add(face);
         face.load();
-        document.documentElement.style.setProperty('--sniptale-font-interface', '"Sniptale Interface", system-ui, sans-serif');
+        document.documentElement.style.setProperty(
+          '--sniptale-font-interface', '"Sniptale Interface", system-ui, sans-serif'
+        );
         const host = document.createElement('div'); host.id = 'number-centering-probe';
         document.body.replaceChildren(host);
         document.body.style.cssText = 'margin:16px;background:#222';
         createRoot(host).render(<div style={{display:'grid',gridTemplateColumns:'repeat(9,110px)',gap:4}}>
           {cases.map(({diameter,scale,sceneScale,phase,value,customCss},index) => <div key={index} data-case={index}
-            style={{height:100,position:'relative',left:phase,top:phase,transform:'scale('+sceneScale+')',transformOrigin:'top left',fontFamily:'system-ui'}}>
+            style={{height:100,position:'relative',left:phase,top:phase,
+              transform:'scale('+sceneScale+')',transformOrigin:'top left',fontFamily:'system-ui'}}>
             <FrameStepBadgeSurface settings={{...createDefaultFrameStepBadge(),value,anchor:'center',
               style:{sizeSource:'custom',diameter,backgroundColorSource:'custom',backgroundColor:'#f97316',
-                textColorSource:'custom',textColor:'#ffffff',outlineColorSource:'custom',outlineColor:'#ffffff',outlineWidth:2,customCss}}}
+                textColorSource:'custom',textColor:'#ffffff',outlineColorSource:'custom',
+                outlineColor:'#ffffff',outlineWidth:2,customCss}}}
               borderColor="#f97316" borderWidth={2} zIndex={1} visualScale={scale}/>
-            <div style={{position:'absolute',top:85,width:'100%',textAlign:'center',fontSize:11,color:'white'}}>{value} / {diameter}px / {scale}×</div>
+            <div style={{position:'absolute',top:85,width:'100%',textAlign:'center',fontSize:11,color:'white'}}>
+              {value} / {diameter}px / {scale}×
+            </div>
           </div>)}
         </div>);
       `,

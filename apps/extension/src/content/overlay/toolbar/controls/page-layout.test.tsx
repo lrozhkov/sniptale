@@ -143,7 +143,7 @@ it('commits a drop across groups once and suppresses its visibility click', asyn
   expect(preferences.layout.indexOf('capture-visible') + 1).toBe(
     preferences.layout.indexOf('mode')
   );
-  expect(preferences.controls['capture-visible']).toBeUndefined();
+  expect(preferences.controls['capture-visible']).toBe(true);
   expect(command).not.toHaveBeenCalled();
 });
 it.each(['pointercancel', 'lostpointercapture', 'Escape'])(

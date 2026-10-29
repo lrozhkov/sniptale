@@ -170,7 +170,7 @@ function expectToolbarSizeContract(): void {
     'box-shadow: 0 0 0 1px color-mix(in srgb, var(--sniptale-color-danger) 8%, transparent);'
   );
   expect(interactiveFrameToolbarSectionsSource).toContain('FrameAnnotationToolbarActionButtons');
-  expect(frameAnnotationToolbarSource).toContain('<Scaling size={16} />');
+  expect(frameAnnotationToolbarSource).toContain('<Move size={16} />');
   expect(frameAnnotationToolbarSource).toContain('<Trash2 size={16} />');
 }
 

@@ -1,5 +1,5 @@
-import { AnnotationCreationPlacement } from './creation-placement';
 // @vitest-environment jsdom
+import { AnnotationCreationPlacement } from './creation-placement';
 
 import { act, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
