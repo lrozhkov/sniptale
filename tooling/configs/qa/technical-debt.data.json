@@ -275,27 +275,6 @@
       "targetAction": "Retain the trusted-origin allowlist, exact pre-write SHA-256 verification, exclusive creation, and cache-root confinement; any source drift requires renewed review."
     },
     {
-      "id": "noise.codeql.transform-stream-transformer-constructor",
-      "classification": "tool-noise",
-      "owner": "archive-transfer",
-      "risk": "A broad suppression of argument-count findings could conceal real API misuse in archive streaming code.",
-      "reason": "The Web Streams TransformStream constructor accepts a transformer object as its first argument; CodeQL resolves the browser global to an incompatible zero-argument model and reports this standards-compliant call as superfluous.",
-      "removalCondition": "Remove this entry when CodeQL models the Web Streams TransformStream constructor correctly or the archive boundary no longer uses it.",
-      "reviewBy": "2027-08-29",
-      "source": {
-        "kind": "codeql",
-        "key": "js/superfluous-trailing-arguments:apps/extension/src/composition/archive-transfer/writer.ts:38:f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
-      },
-      "scope": {
-        "contentHash": "f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f",
-        "file": "apps/extension/src/composition/archive-transfer/writer.ts",
-        "line": 38,
-        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-        "rule": "js/superfluous-trailing-arguments"
-      },
-      "targetAction": "Keep the exception exact to this source digest, location, rule, and message; any implementation drift requires renewed review."
-    },
-    {
       "id": "accepted.license.eslint-plugin-sonarjs",
       "classification": "accepted-architecture",
       "owner": "repository-owner",
@@ -359,27 +338,6 @@
         "line": 242,
         "messageHash": "795b5007146ede83d71fcf9a64d518177e9cd0db287da3cecb6e8aaf7b565a0b",
         "rule": "js/xss-through-dom"
-      },
-      "targetAction": "Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification."
-    },
-    {
-      "id": "noise.codeql.presentation-retry-identity",
-      "classification": "tool-noise",
-      "owner": "editor-document",
-      "risk": "Removing identity protection could duplicate presentation commits after a superseded retry completes.",
-      "reason": "The retry is awaited immediately before finally. The reported comparison intentionally compares the currently registered Promise with the completed Promise by object identity so an old completion cannot clear a newer pending retry. Awaiting the operand would compare Promise with void and break cleanup. Deterministic dispose/reactivate overlap and subsequent retry tests prove deduplication and release.",
-      "removalCondition": "Remove when CodeQL distinguishes Promise identity comparison from value comparison or this exact retry cleanup changes.",
-      "reviewBy": "2027-08-23",
-      "source": {
-        "kind": "codeql",
-        "key": "js/missing-await:apps/extension/src/editor/document/session-autosave/presentation.ts:117:c3fac8359c6c1faa61427d17c599fd0f86227190056af9454085a4c8071ade3c:ab704472dfda4512f9a07fa483bf0830055e1c51afa89b60bd2f814b2babd973"
-      },
-      "scope": {
-        "contentHash": "c3fac8359c6c1faa61427d17c599fd0f86227190056af9454085a4c8071ade3c",
-        "file": "apps/extension/src/editor/document/session-autosave/presentation.ts",
-        "line": 117,
-        "messageHash": "ab704472dfda4512f9a07fa483bf0830055e1c51afa89b60bd2f814b2babd973",
-        "rule": "js/missing-await"
       },
       "targetAction": "Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification."
     },

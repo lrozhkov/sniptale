@@ -89,12 +89,7 @@ export function createSyncQueueExecution(
   return {
     drain: requests.close,
     async run(): Promise<SyncExecutionResult> {
-      let snapshot: SyncExecutionResult['snapshot'] = {
-        state: 'failed',
-        stage: 'queued',
-        failureCode: 'internal',
-        runId: null,
-      };
+      let snapshot: SyncExecutionResult['snapshot'];
       try {
         const connection = await current();
         const operation = await loadSyncQueueOperation(selection.scope, operationId);
