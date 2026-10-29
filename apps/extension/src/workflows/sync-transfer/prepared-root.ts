@@ -24,7 +24,10 @@ import {
 } from '../../composition/persistence/projects/read-guards';
 import { collectReviewAssetReferences } from '../../composition/persistence/review-workspaces/asset-refs';
 import { prepareVideoReviewRestore } from '../../composition/persistence/review-workspaces/backup-restore';
-import { parsePreparedVideoProjectReplicaRoot } from '../../composition/persistence/sync-capture/prepared-project';
+import {
+  type PreparedProjectReplicaExport,
+  parsePreparedVideoProjectReplicaRoot,
+} from '../../composition/persistence/sync-capture/prepared-project';
 import type { ApplyPreparedVideoProjectRevisionInput } from '../../composition/persistence/sync-capture/apply-video-project';
 import {
   MAX_CAPTURE_ROWS,
@@ -259,13 +262,25 @@ type PortableCausalDependency = Omit<CapturedMediaDependency, 'generation'> & {
 };
 type VerifiedObjectResolver = (id: string) => AssetRef;
 
-function editingProjectAssets(parsed: Extract<ParsedPortableRoot, { kind: 'video-project' }>) {
+function editingProjectAssets(
+  parsed: Extract<ParsedPortableRoot, { kind: 'video-project' }>,
+  retainedExportIds: ReadonlySet<string> = new Set()
+) {
   const declared = new Map(parsed.metadata.projectAssets.map((asset) => [asset.entry.id, asset]));
   const needed = new Set(
     parsed.entry.project.assets.flatMap((asset) =>
       asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
     )
   );
+  for (const item of parsed.metadata.projectExports) {
+    if (retainedExportIds.has(item.entry.id)) continue;
+    if (item.videoReview)
+      for (const reference of collectReviewAssetReferences(item.videoReview.workspace)) {
+        if (!reference.startsWith('project-asset:'))
+          throw new Error('Unsupported portable export review source.');
+        needed.add(reference.slice('project-asset:'.length));
+      }
+  }
   for (const id of needed) {
     const asset = declared.get(id);
     if (!asset) throw new Error('Portable editing source is missing.');
@@ -281,7 +296,17 @@ function editingProjectAssets(parsed: Extract<ParsedPortableRoot, { kind: 'video
 }
 
 /** Editing closure includes retained private reviews and inline bytes, excluding saved exports. */
-export function portableSyncEditingObjectIds(parsed: ParsedPortableRoot): string[] {
+export function portableSyncEditingObjectIds(
+  parsed: ParsedPortableRoot,
+  retainedExportIds?: ReadonlySet<string>
+): string[] {
+  const retained =
+    retainedExportIds ??
+    new Set(
+      parsed.kind === 'video-project'
+        ? parsed.metadata.projectExports.map((item) => item.entry.id)
+        : []
+    );
   if (parsed.kind === 'scenario-project')
     return parsed.envelope.objects.map((object) => object.objectId);
   if (parsed.kind === 'image') return parsed.envelope.objects.map((object) => object.objectId);
@@ -298,7 +323,10 @@ export function portableSyncEditingObjectIds(parsed: ParsedPortableRoot): string
     ];
   return [
     ...new Set([
-      ...editingProjectAssets(parsed).map((asset) => asset.objectId),
+      ...editingProjectAssets(parsed, retained).map((asset) => asset.objectId),
+      ...parsed.metadata.projectExports.flatMap((item) =>
+        !retained.has(item.entry.id) && item.thumbnail ? [item.thumbnail.objectId] : []
+      ),
       ...(parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
         snapshot.assets.map((asset) => asset.objectId)
       ),
@@ -454,27 +482,52 @@ export function portableSyncDependencyIds(
     if (asset.source.kind === 'project-asset' && asset.source.originMediaId)
       needed.add(asset.source.originMediaId);
   }
-  for (const asset of editingProjectAssets(parsed)) {
+  for (const asset of editingProjectAssets(
+    parsed,
+    new Set(parsed.metadata.projectExports.map((item) => item.entry.id))
+  )) {
     if (asset.entry.originMediaId) needed.add(asset.entry.originMediaId);
     if (asset.libraryMediaId) needed.add(asset.libraryMediaId);
   }
   return [...needed].sort();
 }
 
+/** Native saved-export identity and the selected immutable remote body. */
+export interface DeferredProjectExport {
+  ref: AssetRef;
+  remote: PreparedProjectReplicaExport['remote'];
+  retainedEntry?: PreparedProjectReplicaExport['entry'];
+}
+
 async function prepareVideoRoot(
   parsed: Extract<ParsedPortableRoot, { kind: 'video-project' }>,
   local: PortableReplicaAdmission,
   sender: readonly PortableCausalDependency[],
-  refFor: VerifiedObjectResolver
+  refFor: VerifiedObjectResolver,
+  deferredExports?: ReadonlyMap<string, DeferredProjectExport>
 ): Promise<ApplyPreparedVideoProjectRevisionInput['root']> {
   const needed = new Set(portableSyncDependencyIds(parsed));
   // Later staging must not replace a predecessor child that another native root can retain.
   // The existing prepared journal persists these local private identities through recovery.
-  const editingAssets = editingProjectAssets(parsed);
+  const retainedExportIds = new Set(
+    deferredExports === undefined
+      ? parsed.metadata.projectExports.map((item) => item.entry.id)
+      : [...deferredExports].flatMap(([id, item]) => (item.retainedEntry ? [id] : []))
+  );
+  const causalAssets = new Set(
+    editingProjectAssets(
+      parsed,
+      new Set(parsed.metadata.projectExports.map((item) => item.entry.id))
+    ).map((asset) => asset.entry.id)
+  );
+  const editingAssets = editingProjectAssets(parsed, retainedExportIds);
+  const borrowed = (asset: (typeof editingAssets)[number]) =>
+    causalAssets.has(asset.entry.id) && asset.libraryMediaId !== undefined;
   const assetIds = new Map(
     editingAssets.map((asset) => [
       asset.entry.id,
-      !asset.libraryMediaId && local.expectedLocalGeneration > 0
+      (!borrowed(asset) && local.expectedLocalGeneration > 0) ||
+      (!causalAssets.has(asset.entry.id) && asset.libraryMediaId !== undefined)
         ? crypto.randomUUID()
         : asset.entry.id,
     ])
@@ -486,7 +539,7 @@ async function prepareVideoRoot(
       id: assetIds.get(asset.entry.id),
       originalRef: ref,
     });
-    if (asset.libraryMediaId) {
+    if (borrowed(asset)) {
       const dependency = local.dependencies.find((item) => item.entry.id === asset.libraryMediaId);
       if (
         !dependency ||
@@ -495,13 +548,13 @@ async function prepareVideoRoot(
         JSON.stringify(parseAssetRef(dependency.ref)) !== JSON.stringify(ref)
       )
         throw new Error('Borrowed portable source differs from admitted target bytes.');
-    } else if (asset.publishToLibrary !== false)
+    } else if (causalAssets.has(asset.entry.id) && asset.publishToLibrary !== false)
       throw new Error('Portable private source must remain private.');
     return {
       entry,
       ref,
       filename: asset.filename,
-      ...(asset.libraryMediaId ? { reusePublished: true } : { publishToLibrary: false }),
+      ...(borrowed(asset) ? { reusePublished: true } : { publishToLibrary: false }),
       ...(asset.videoReview
         ? {
             videoReview: prepareVideoReviewRestore({
@@ -557,11 +610,56 @@ async function prepareVideoRoot(
       ref: refFor(asset.objectId),
     }))
   );
+  const exports =
+    deferredExports === undefined
+      ? undefined
+      : parsed.metadata.projectExports.map((item) => {
+          const deferred = deferredExports.get(item.entry.id);
+          if (!deferred) throw new Error('Retained export binding is missing.');
+          const entry =
+            deferred.retainedEntry ??
+            parseProjectExportEntry({ ...item.entry, assetId: deferred.ref.assetId });
+          if (!entry) throw new Error('Retained export metadata is invalid.');
+          const videoReview =
+            !deferred.retainedEntry && item.videoReview
+              ? prepareVideoReviewRestore({
+                  review: item.videoReview,
+                  sourceAggregateId: `export:${item.entry.id}`,
+                  targetAggregateId: `export:${entry.id}`,
+                  sourceAssetId: deferred.ref.assetId,
+                  assetIdMap: assetIds,
+                })
+              : undefined;
+          return {
+            entry,
+            ref: deferred.ref,
+            remote: deferred.remote,
+            ...(deferred.retainedEntry ? { reuseExisting: true } : {}),
+            ...(videoReview ? { videoReview } : {}),
+            ...(!deferred.retainedEntry && item.thumbnail
+              ? {
+                  thumbnail: {
+                    entry: {
+                      assetId: `export:${entry.id}`,
+                      createdAt: item.thumbnail.createdAt,
+                      updatedAt: item.thumbnail.updatedAt,
+                      width: item.thumbnail.width,
+                      height: item.thumbnail.height,
+                    },
+                    ref: refFor(item.thumbnail.objectId),
+                  },
+                }
+              : {}),
+          };
+        });
+  for (const item of exports ?? [])
+    if (item.videoReview) await verifyPreparedMediaReviewAnnotations(item.videoReview, assets);
   const thumbnail = parsed.metadata.thumbnail;
   const presentation = parsed.metadata.presentation;
   return parsePreparedVideoProjectReplicaRoot({
     entry: { ...parsed.entry, project },
     assets,
+    ...(exports === undefined ? {} : { exports }),
     ...(snapshotRefs.length ? { snapshotRefs } : {}),
     ...(thumbnail
       ? {
@@ -601,6 +699,7 @@ export async function preparePortableReplica(args: {
   envelope: unknown;
   reviewSourceMediaId?: string;
   verifiedObjects: ReadonlyMap<string, AssetRef>;
+  deferredExports?: ReadonlyMap<string, DeferredProjectExport>;
   senderDependencies: readonly PortableCausalDependency[];
   senderRootDependencies?: readonly CausalRootDependency[];
   admission: PortableReplicaAdmission;
@@ -731,7 +830,7 @@ export async function preparePortableReplica(args: {
         },
       };
     } else {
-      const root = await prepareVideoRoot(parsed, local, sender, refFor);
+      const root = await prepareVideoRoot(parsed, local, sender, refFor, args.deferredExports);
       payload = {
         kind: 'video-project',
         input: {

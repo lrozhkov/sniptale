@@ -285,3 +285,7 @@ describe('editor aggregate restore', () => {
     });
   });
 });
+
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

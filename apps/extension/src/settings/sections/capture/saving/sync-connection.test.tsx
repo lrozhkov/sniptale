@@ -3,6 +3,26 @@ import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+const local = vi.hoisted(() => ({ plan: vi.fn(), switch: vi.fn() }));
+vi.mock('../../../../workflows/sync-transfer/retained-library', () => ({
+  RetainedLibraryNotReadyError: class extends Error {
+    constructor(readonly code: string) {
+      super(code);
+    }
+  },
+  planRetainedLibrary: local.plan,
+}));
+vi.mock('../../../../workflows/sync-transfer/local-only', () => ({
+  switchLibraryToLocalOnly: local.switch,
+  LocalOnlySwitchError: class extends Error {
+    constructor(readonly code: string) {
+      super(code);
+    }
+  },
+}));
+vi.mock('../../../../platform/i18n/format-bytes', () => ({
+  formatBytes: (bytes: number) => `${bytes} B`,
+}));
 const client = vi.hoisted(() => ({
   readStatus: vi.fn(),
   createWorkspace: vi.fn(),
@@ -34,6 +54,14 @@ beforeEach(async () => {
   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.resetAllMocks();
+  local.plan.mockResolvedValue({
+    binding: {},
+    authorization: { incarnation: 'old', revision: 1 },
+    missing: [],
+    nativeRootCount: 2,
+    remoteBytesUpperBound: 0,
+  });
+  local.switch.mockResolvedValue(undefined);
   workspaceListeners.clear();
   client.subscribeToWorkspaceSettled.mockImplementation((listener: () => void) => {
     workspaceListeners.add(listener);
@@ -42,7 +70,7 @@ beforeEach(async () => {
   permissions.request.mockResolvedValue(true);
   client.readStatus.mockResolvedValue({
     kind: 'status',
-    status: { connection: null, workspace: null, workspaceJob: null },
+    status: { connection: null, workspace: null, products: [], workspaceJob: null },
   });
   container = document.createElement('div');
   document.body.append(container);
@@ -138,6 +166,7 @@ it('retains a failed JOIN draft, enrolls the verified workspace and refreshes ca
         accountId: 'account-1',
       },
       workspace: null,
+      products: [],
       workspaceJob: null,
     },
   });
@@ -334,7 +363,7 @@ const allocationSource = {
 };
 const emptyStatus = {
   kind: 'status',
-  status: { connection: null, workspace: null, workspaceJob: null },
+  status: { connection: null, workspace: null, products: [], workspaceJob: null },
 };
 function connectionButton(name: string) {
   const button = [...container.querySelectorAll('button')].find(
@@ -559,6 +588,7 @@ it('observes catalog once and aborts on unmount without polling or late updates'
         accountId: 'account-1',
       },
       workspace: null,
+      products: [],
       workspaceJob: null,
     },
   });
@@ -632,4 +662,100 @@ it('rejects a status read from before effect cleanup and setup replay', async ()
   expect(input('rootUrl').disabled).toBe(false);
   expect(connectionButton('create').disabled).toBe(false);
   expect(vi.getTimerCount()).toBe(0);
+});
+
+async function connectedForLocalOnly() {
+  client.readStatus.mockResolvedValue({
+    kind: 'status',
+    status: {
+      connection: { phase: 'active', rootUrl: 'https://dav.test/root/', accountId: 'user' },
+      workspace: null,
+      products: [],
+      workspaceJob: null,
+    },
+  });
+  await act(async () => window.dispatchEvent(new Event('focus')));
+}
+it('confirms the full local-only preparation before downloading or retiring a connection', async () => {
+  await connectedForLocalOnly();
+  await act(async () => connectionButton('localOnly').click());
+  await vi.waitFor(() => expect(container.querySelector('[role="alertdialog"]')).not.toBeNull());
+  expect(local.switch).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('settings.syncConnection.localOnlyQueueHint');
+  client.readStatus.mockResolvedValue({
+    kind: 'status',
+    status: { connection: null, workspace: null, products: [], workspaceJob: null },
+  });
+  await act(async () => connectionButton('localOnlyConfirm').click());
+  await vi.waitFor(() => expect(container.querySelector('[role="alertdialog"]')).toBeNull());
+  expect(local.switch).toHaveBeenCalledWith(
+    expect.objectContaining({ nativeRootCount: 2 }),
+    expect.any(AbortSignal)
+  );
+  expect(container.textContent).toContain('settings.syncConnection.localOnlyReady');
+  expect(connectionButton('create').disabled).toBe(false);
+});
+it('cancels confirmation without starting downloads', async () => {
+  await connectedForLocalOnly();
+  await act(async () => connectionButton('localOnly').click());
+  await vi.waitFor(() => expect(container.querySelector('[role="alertdialog"]')).not.toBeNull());
+  const cancel = [...container.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('common.actions.cancel')
+  );
+  await act(async () => cancel?.click());
+  expect(local.switch).not.toHaveBeenCalled();
+  expect(container.querySelector('[role="alertdialog"]')).toBeNull();
+});
+it('keeps preparation visible while cancellation drains and preserves connection controls', async () => {
+  let finish!: () => void;
+  local.switch.mockImplementationOnce(
+    (_plan, signal: AbortSignal) =>
+      new Promise<void>((_resolve, reject) => {
+        finish = () => reject(signal.reason);
+      })
+  );
+  await connectedForLocalOnly();
+  await act(async () => connectionButton('localOnly').click());
+  await vi.waitFor(() => expect(container.querySelector('[role="alertdialog"]')).not.toBeNull());
+  await act(async () => connectionButton('localOnlyConfirm').click());
+  await vi.waitFor(() => expect(local.switch).toHaveBeenCalledOnce());
+  const cancel = [...container.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('common.actions.cancel')
+  );
+  await act(async () => cancel?.click());
+  expect(local.switch.mock.calls[0]?.[1].aborted).toBe(true);
+  expect(container.textContent).toContain('settings.syncConnection.localOnlyCancelling');
+  expect(container.querySelector('[role="alertdialog"]')).not.toBeNull();
+  await act(async () => finish());
+  expect(container.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(container.textContent).toContain('settings.syncConnection.localOnlyCancelled');
+  expect(container.textContent).not.toContain('settings.syncConnection.localOnlyReady');
+});
+
+it('restores focus to the local-only trigger after keyboard cancellation', async () => {
+  await connectedForLocalOnly();
+  const trigger = connectionButton('localOnly');
+  await act(async () => {
+    trigger.focus();
+    trigger.click();
+  });
+  await vi.waitFor(() => expect(container.querySelector('[role="alertdialog"]')).not.toBeNull());
+  await act(async () =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(container.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  expect(local.switch).not.toHaveBeenCalled();
+});
+
+it('reports a completed local-only transition with incomplete earlier history', async () => {
+  await connectedForLocalOnly();
+  local.switch.mockResolvedValueOnce('incomplete');
+  await act(async () => connectionButton('localOnly').click());
+  await vi.waitFor(() => expect(container.querySelector('[role="alertdialog"]')).not.toBeNull());
+  await act(async () => connectionButton('localOnlyConfirm').click());
+  await vi.waitFor(() =>
+    expect(container.textContent).toContain('settings.syncConnection.localOnlyReadyHistoryGap')
+  );
+  expect(container.querySelector('[role="alertdialog"]')).toBeNull();
 });

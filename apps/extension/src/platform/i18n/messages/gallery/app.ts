@@ -420,6 +420,10 @@ export const galleryAppMessages = defineMessageSource({
     'scenario-export': { ru: 'Экспорты сценариев', en: 'Scenario exports' },
     'video-project': { ru: 'Видеопроекты', en: 'Video projects' },
   },
+  backupSyncNotReady: {
+    ru: 'Полный набор пока не готов: обновите синхронизацию и разрешите различия локальных и серверных версий перед созданием копии.',
+    en: 'The full set is not ready. Refresh synchronization and resolve local/server version differences before creating a backup.',
+  },
   exportBackup: {
     ru: 'Создать резервную копию',
     en: 'Create backup',

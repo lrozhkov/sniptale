@@ -1,7 +1,7 @@
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 45;
+export const DB_VERSION = 46;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -40,6 +40,7 @@ export const EDITOR_CUSTOM_SHAPES_STORE = 'editor_custom_shapes';
 export const STATE_MANAGER_STORE = 'state_manager';
 export const NATIVE_TRANSFER_SESSIONS_STORE = 'native_transfer_sessions';
 export const NATIVE_TRANSFER_CHUNKS_STORE = 'native_transfer_chunks';
+export const ASSET_RESIDENCY_STORE = 'asset_residency';
 export const ASSET_REFS_STORE = 'asset_refs';
 export const ASSET_OWNERS_STORE = 'asset_owners';
 export const ASSET_OPERATIONS_STORE = 'asset_operations';
@@ -90,6 +91,7 @@ export const EXPECTED_STORES = [
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
+  ASSET_RESIDENCY_STORE,
   SCHEMA_CONTRACTS_STORE,
 ] as const;
 
@@ -134,5 +136,6 @@ export const EXPECTED_INDEXES = {
   [SYNC_OUTBOX_STORE]: ['syncQueueDue'],
   [SYNC_CATALOG_CACHE_STORE]: [],
   [SYNC_CONNECTION_STORE]: [],
+  [ASSET_RESIDENCY_STORE]: [],
   [SCHEMA_CONTRACTS_STORE]: [],
 } as const satisfies Record<(typeof EXPECTED_STORES)[number], readonly string[]>;

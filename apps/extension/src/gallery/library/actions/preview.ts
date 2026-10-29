@@ -1,3 +1,4 @@
+import { runWithNativePublicationResources } from '../../../workflows/sync-transfer/editing-admission';
 import { renameQuickEditProject } from '../../../workflows/media-hub/trash';
 import { canOpenGalleryProject } from '../items/types';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
@@ -297,7 +298,10 @@ export async function persistPreviewMetadata(
 
   if (isGalleryScenarioExportItem(previewItem) && previewItem.format === 'html') {
     if (nextFilename === baseline.filename) return false;
-    await renameScenarioHtmlExportRecord(previewItem.entityId, nextFilename);
+    await runWithNativePublicationResources(
+      [{ rootKind: 'scenario-project', rootId: previewItem.exportEntry.projectId }],
+      () => renameScenarioHtmlExportRecord(previewItem.entityId, nextFilename)
+    );
     return true;
   }
 
@@ -312,10 +316,14 @@ export async function persistPreviewMetadata(
 
   if (isGalleryScenarioItem(previewItem)) {
     if (nextFilename === baseline.filename && areTagsEqual(nextTags, baseline.tags)) return false;
-    await updateScenarioProjectRecordMetadata(previewItem.entityId, {
-      name: nextFilename,
-      tags: nextTags,
-    });
+    await runWithNativePublicationResources(
+      [{ rootKind: 'scenario-project', rootId: previewItem.entityId }],
+      () =>
+        updateScenarioProjectRecordMetadata(previewItem.entityId, {
+          name: nextFilename,
+          tags: nextTags,
+        })
+    );
     return true;
   }
   return false;

@@ -75,6 +75,7 @@ const syncWiring = vi.hoisted(() => ({
   createGateway:
     vi.fn<typeof import('../../../sync-connection/offscreen-gateway').createSyncOffscreenGateway>(),
   inspect: vi.fn().mockResolvedValue(null),
+  localOnly: vi.fn().mockResolvedValue(undefined),
   planWorkspace:
     vi.fn<
       ReturnType<
@@ -273,6 +274,7 @@ beforeEach(() => {
   });
   syncWiring.createCoordinator.mockReturnValue({
     inspect: syncWiring.inspect,
+    localOnly: syncWiring.localOnly,
     planWorkspace: syncWiring.planWorkspace,
     productCommand: syncWiring.productCommand,
     start: syncWiring.start,
@@ -373,6 +375,7 @@ it('registers the security control only in the security E2E build', () => {
         coordinator: expect.objectContaining({
           start: syncWiring.start,
           inspect: syncWiring.inspect,
+          localOnly: syncWiring.localOnly,
           planWorkspace: syncWiring.planWorkspace,
           productCommand: syncWiring.productCommand,
         }),

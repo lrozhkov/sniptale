@@ -1,4 +1,10 @@
 import {
+  readAssetResidencyCopyInTransaction,
+  retireAssetResidencyCopyInTransaction,
+} from '../../../../composition/persistence/assets/residency';
+import { assetResidencyCopyId } from '../../../../composition/persistence/assets/residency-records';
+import { ASSET_RESIDENCY_STORE } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
+import {
   captureImageInTransaction,
   captureMediaInTransaction,
   captureVideoReviewInTransaction,
@@ -601,10 +607,11 @@ async function commitPreparedMediaRoot(args: {
   rootKey: string;
   session: { operationId: string; strategy: 'replace' | 'skip' | 'duplicate' };
 }) {
-  return runWithIndexedDbMutation(async (db) => {
+  return runWithIndexedDbMutation(async (db, permit) => {
     const tx = db.transaction(
       [
         MEDIA_LIBRARY_STORE,
+        ASSET_RESIDENCY_STORE,
         SYNC_CAPTURE_STORE,
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
@@ -695,6 +702,12 @@ async function commitPreparedMediaRoot(args: {
           stores,
         });
       }
+      const previousInlineCopy = await readAssetResidencyCopyInTransaction(
+        tx,
+        assetResidencyCopyId({ kind: 'inline-image', mediaId: args.prepared.media.id })
+      );
+      if (previousInlineCopy)
+        await retireAssetResidencyCopyInTransaction(tx, previousInlineCopy, permit);
       await publishPreparedMedia({ ...args, stores });
       if (args.operation.assetIds.length > 0) {
         await tx.objectStore(ASSET_OPERATIONS_STORE).put(args.operation);

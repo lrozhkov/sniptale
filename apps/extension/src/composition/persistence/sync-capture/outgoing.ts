@@ -1,8 +1,39 @@
+import type { AssetOpfsOptions } from '../assets/opfs-store';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import type { IDBPTransaction } from 'idb';
+import { parseAssetRef } from '../assets/guards';
+import { restoreMissingAssetObject } from '../assets/opfs-residency';
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+  parseAssetResidencyRecord,
+} from '../assets/residency-records';
+import {
+  readAssetResidencyCopyInTransaction,
+  finishAssetResidencyTransitionInTransaction,
+} from '../assets/residency';
+import { runWithAssetResourceRead } from '../assets/resource-sessions';
+import {
+  isActivePersistenceMutationTransitionPermit,
+  type PersistenceMutationTransitionPermit,
+  runWithPersistenceMutationTransition,
+  runWithPersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
+import {
+  type SyncConnectionIdentity,
+  parseSyncConnectionIdentity,
+} from '../remote-connection/model';
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import type { AssetRef } from '../assets/contracts';
 import { initDB } from '../infrastructure/indexed-db/core';
-import { SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE } from '../infrastructure/indexed-db/core.stores';
+import {
+  SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
+  SYNC_CONNECTION_STORE,
+  ASSET_RESIDENCY_STORE,
+  ASSET_REFS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   captureProfileBounds,
@@ -354,18 +385,16 @@ export async function commitPreparedOutgoingOperation(
   });
 }
 
-/** Reload the authoritative immutable native slots under the exact retained operation lifetime. */
-export async function loadNativeOutgoingCapture(expected: unknown): Promise<CapturedChange> {
-  const requested = parseSyncCaptureRecord(expected);
-  if (!requested || requested.kind !== 'sync-operation' || requested.phase !== 'native')
-    throw new Error('Invalid native outgoing capture.');
-  const db = await initDB();
-  const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+type CaptureReadTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
+
+async function readNativeOutgoingInTransaction(
+  tx: CaptureReadTransaction,
+  requested: CapturedChange
+): Promise<CapturedChange> {
   const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
   const current = parseSyncCaptureRecord(
     await tx.objectStore(SYNC_CAPTURE_STORE).get(requested.key)
   );
-  await tx.done;
   if (
     !profile ||
     profile.kind !== 'profile' ||
@@ -385,6 +414,193 @@ export async function loadNativeOutgoingCapture(expected: unknown): Promise<Capt
   )
     throw new Error('Native outgoing capture changed.');
   return structuredClone(current);
+}
+
+/** Reload the authoritative immutable native slots under the exact retained operation lifetime. */
+export async function loadNativeOutgoingCapture(expected: unknown): Promise<CapturedChange> {
+  const requested = parseSyncCaptureRecord(expected);
+  if (!requested || requested.kind !== 'sync-operation' || requested.phase !== 'native')
+    throw new Error('Invalid native outgoing capture.');
+  const db = await initDB();
+  const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+  const current = await readNativeOutgoingInTransaction(tx, requested);
+  await tx.done;
+  return current;
+}
+
+/** Return exact frozen OPFS identities, including claims whose native domain owner was deleted. */
+export function collectNativeOutgoingAssetRefs(capture: CapturedChange): AssetRef[] {
+  const change = capture.change;
+  const refs =
+    change.kind === 'tombstone'
+      ? []
+      : change.kind === 'media'
+        ? [change.rows.ref, ...('screenshotRef' in change.rows ? [change.rows.screenshotRef] : [])]
+        : change.kind === 'image'
+          ? [...(change.rows.originalRef ? [change.rows.originalRef] : []), ...change.rows.refs]
+          : change.kind === 'video-review'
+            ? [change.rows.source.ref, ...change.rows.refs]
+            : change.rows.refs;
+  const unique = new Map<string, AssetRef>();
+  for (const raw of refs) {
+    const ref = parseAssetRef(raw);
+    if (
+      !ref ||
+      (unique.has(ref.assetId) && JSON.stringify(unique.get(ref.assetId)) !== JSON.stringify(ref))
+    )
+      throw new Error('Native outgoing file identity is inconsistent.');
+    unique.set(ref.assetId, ref);
+  }
+  return [...unique.values()];
+}
+
+const OUTGOING_RECOVERY_STORES = [
+  SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
+  ASSET_RESIDENCY_STORE,
+  ASSET_REFS_STORE,
+];
+
+async function checkOutgoingRecoveryInTransaction(
+  tx: CaptureReadTransaction,
+  capture: CapturedChange,
+  copy: AssetResidencyCopy,
+  authorization: SyncConnectionIdentity
+) {
+  if (copy.target.kind !== 'opfs') throw new Error('Outgoing recovery requires an OPFS file.');
+  const ref = copy.target.ref;
+  if (
+    !collectNativeOutgoingAssetRefs(capture).some(
+      (claimed) => JSON.stringify(claimed) === JSON.stringify(ref)
+    )
+  )
+    throw new Error('Outgoing capture does not own this file.');
+  await readNativeOutgoingInTransaction(tx, capture);
+  const connection = await checkSyncConnectionAdmission(tx, capture, authorization);
+  const currentCopy = await readAssetResidencyCopyInTransaction(tx, copy.id);
+  const completed = { ...copy, revision: copy.revision + 1, phase: 'resident' };
+  const rawRef: unknown = await tx.objectStore(ASSET_REFS_STORE).get(ref.assetId);
+  if (
+    !connection ||
+    JSON.stringify(connection.binding) !== JSON.stringify(copy.remote.binding) ||
+    (JSON.stringify(currentCopy) !== JSON.stringify(copy) &&
+      JSON.stringify(currentCopy) !== JSON.stringify(completed)) ||
+    (rawRef !== undefined && JSON.stringify(parseAssetRef(rawRef)) !== JSON.stringify(ref))
+  )
+    throw new Error('Outgoing file recovery source changed.');
+}
+
+/** Check a missing frozen file before network IO; native installation repeats these checks. */
+export async function loadNativeOutgoingRecoveryCopy(input: {
+  capture: unknown;
+  ref: unknown;
+  authorization: unknown;
+}) {
+  const capture = parseSyncCaptureRecord(structuredClone(input.capture));
+  const ref = parseAssetRef(input.ref);
+  const authorization = parseSyncConnectionIdentity(input.authorization);
+  if (
+    !capture ||
+    capture.kind !== 'sync-operation' ||
+    capture.phase !== 'native' ||
+    !ref ||
+    !authorization
+  )
+    throw new Error('Invalid outgoing file recovery.');
+  const db = await initDB();
+  const tx = db.transaction(OUTGOING_RECOVERY_STORES, 'readonly');
+  const copy = await readAssetResidencyCopyInTransaction(
+    tx,
+    assetResidencyCopyId({ kind: 'opfs', ref })
+  );
+  if (
+    !copy ||
+    copy.target.kind !== 'opfs' ||
+    (copy.phase !== 'unloaded' && copy.phase !== 'unloading') ||
+    JSON.stringify(copy.target.ref) !== JSON.stringify(ref)
+  )
+    throw new Error('Outgoing file recovery is unavailable.');
+  await checkOutgoingRecoveryInTransaction(tx, capture, copy, authorization);
+  await tx.done;
+  return copy;
+}
+
+/** Restore only files still owned by this exact native capture; never recreate deleted domain rows. */
+export async function restoreNativeOutgoingAsset(
+  input: {
+    capture: unknown;
+    copy: unknown;
+    authorization: unknown;
+    sourceBlob: Blob;
+    signal?: AbortSignal;
+  },
+  options: AssetOpfsOptions = {}
+): Promise<'installed' | 'already-present' | 'busy'> {
+  const capture = parseSyncCaptureRecord(structuredClone(input.capture));
+  const copy = parseAssetResidencyRecord(structuredClone(input.copy));
+  const authorization = parseSyncConnectionIdentity(input.authorization);
+  if (
+    !capture ||
+    capture.kind !== 'sync-operation' ||
+    capture.phase !== 'native' ||
+    !authorization ||
+    !copy ||
+    copy.kind !== 'copy' ||
+    copy.target.kind !== 'opfs' ||
+    (copy.phase !== 'unloaded' && copy.phase !== 'unloading')
+  )
+    throw new Error('Invalid outgoing file recovery.');
+  const ref = copy.target.ref;
+  const db = await initDB();
+  const check = async (tx: CaptureReadTransaction) => {
+    input.signal?.throwIfAborted();
+    await checkOutgoingRecoveryInTransaction(tx, capture, copy, authorization);
+    input.signal?.throwIfAborted();
+  };
+  const restore = (transition: PersistenceMutationTransitionPermit) =>
+    runWithAssetResourceRead(async () => {
+      const assertCurrent = async () => {
+        const tx = db.transaction(OUTGOING_RECOVERY_STORES, 'readonly');
+        await check(tx);
+        await tx.done;
+      };
+      const installed = await restoreMissingAssetObject(
+        {
+          ref,
+          sourceBlob: input.sourceBlob,
+          sha256: copy.remote.sha256,
+          operationId: copy.operationId,
+          ...(input.signal ? { signal: input.signal } : {}),
+          assertCurrent,
+        },
+        { ...options, persistenceTransitionPermit: transition }
+      );
+      if (installed === 'busy') return installed;
+      await runWithPersistenceMutationPermit(async (permit) => {
+        const tx = db.transaction(OUTGOING_RECOVERY_STORES, 'readwrite');
+        try {
+          await check(tx);
+          await finishAssetResidencyTransitionInTransaction(tx, copy, 'resident', permit);
+          await tx.done;
+        } catch (error) {
+          try {
+            tx.abort();
+          } catch {
+            /* The transaction can already be closed. */
+          }
+          await tx.done.catch(() => undefined);
+          throw error;
+        }
+      });
+      return installed;
+    });
+  const transition = options.persistenceTransitionPermit;
+  if (transition !== undefined) {
+    if (!isActivePersistenceMutationTransitionPermit(transition))
+      throw new Error('Outgoing recovery transition is not active.');
+    return restore(transition);
+  }
+  return runWithPersistenceMutationTransition(restore);
 }
 
 /** Persist the sole prepared payload and compact locator in the caller's admitted transaction. */

@@ -1,3 +1,8 @@
+import type { SyncProductJobSnapshot } from '../../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import {
+  createSyncProductClient,
+  subscribeToSyncProductSettled,
+} from '../../../../platform/runtime-messaging/sync-product-client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -10,6 +15,9 @@ const buttonClass = getControlSecondaryButtonClassName({ density: 'compact' });
 
 function useSyncQueueInteraction() {
   const [service] = useState(() => createSyncQueueManagement());
+  const [productClient] = useState(() => createSyncProductClient());
+  const [jobs, setJobs] = useState<SyncProductJobSnapshot[]>([]);
+  const [jobsUnavailable, setJobsUnavailable] = useState(false);
   const [data, setData] = useState<QueueData | null>(null);
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading');
   const [message, setMessage] = useState<'refused' | 'applied' | 'historyPending' | null>(null);
@@ -21,17 +29,24 @@ function useSyncQueueInteraction() {
   const read = useCallback(
     async (cursor: unknown = null) => {
       setPhase('loading');
-      try {
-        const result = await service.read(cursor);
-        if (mounted.current) {
-          setData(result);
-          setPhase('ready');
-        }
-      } catch {
-        if (mounted.current) setPhase('error');
+      const [queue, runtime] = await Promise.allSettled([
+        service.read(cursor),
+        productClient.readStatus(),
+      ]);
+      if (!mounted.current) return;
+      if (queue.status === 'fulfilled') {
+        setData(queue.value);
+        setPhase('ready');
+      } else setPhase('error');
+      if (runtime.status === 'fulfilled' && runtime.value.kind === 'status') {
+        setJobs(runtime.value.status.products);
+        setJobsUnavailable(false);
+      } else {
+        setJobs([]);
+        setJobsUnavailable(true);
       }
     },
-    [service]
+    [service, productClient]
   );
   const refresh = useCallback(
     async (cursor: unknown = null) => {
@@ -53,6 +68,19 @@ function useSyncQueueInteraction() {
     void refresh();
     return () => {
       mounted.current = false;
+    };
+  }, [refresh]);
+  useEffect(() => {
+    const reload = () => {
+      void refresh();
+    };
+    const unsubscribe = subscribeToSyncProductSettled(reload);
+    const timer = window.setInterval(reload, 30_000);
+    window.addEventListener('focus', reload);
+    return () => {
+      unsubscribe();
+      window.clearInterval(timer);
+      window.removeEventListener('focus', reload);
     };
   }, [refresh]);
   useEffect(() => {
@@ -95,7 +123,41 @@ function useSyncQueueInteraction() {
       if (mounted.current) setBusy(false);
     }
   };
-  return { data, phase, message, busy, section, refresh, command };
+  const cancelJob = async (requestId: string) => {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    setMessage(null);
+    returnFocus.current = { operationId: requestId };
+    try {
+      const result = await productClient.cancel(requestId);
+      if (!mounted.current) return;
+      setMessage(
+        result.kind === 'cancelled' && result.outcome !== 'refused' ? 'applied' : 'refused'
+      );
+      await read();
+    } catch {
+      if (mounted.current) {
+        setMessage('refused');
+        await read();
+      }
+    } finally {
+      pending.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  };
+  return {
+    data,
+    phase,
+    message,
+    busy,
+    section,
+    refresh,
+    command,
+    jobs,
+    jobsUnavailable,
+    cancelJob,
+  };
 }
 
 type ReadyQueueData = Extract<QueueData, { kind: 'ready' }>;
@@ -220,7 +282,18 @@ function QueueConnectionControls(props: {
 /** Settings owns interaction only. Native revisions remain the command authority. */
 export function SyncQueueSection() {
   const locale = useAppLocale();
-  const { data, phase, message, busy, section, refresh, command } = useSyncQueueInteraction();
+  const {
+    data,
+    phase,
+    message,
+    busy,
+    section,
+    refresh,
+    command,
+    jobs,
+    jobsUnavailable,
+    cancelJob,
+  } = useSyncQueueInteraction();
   const disabled = busy || phase !== 'ready';
   return (
     <section
@@ -253,6 +326,46 @@ export function SyncQueueSection() {
           {translate(`settings.syncQueue.${message}`)}
         </p>
       ) : null}
+      <div className="space-y-2" data-ui="settings.sync-runtime-jobs">
+        <h3 className="font-medium">{translate('settings.syncQueue.runtimeTitle')}</h3>
+        <p className="max-w-prose text-sm text-[var(--sniptale-color-text-secondary)]">
+          {translate('settings.syncQueue.runtimeHint')}
+        </p>
+        {jobsUnavailable ? (
+          <p role="alert">{translate('settings.syncQueue.runtimeUnavailable')}</p>
+        ) : null}
+        {!jobsUnavailable && !jobs.length && phase !== 'loading' ? (
+          <p>{translate('settings.syncQueue.runtimeEmpty')}</p>
+        ) : null}
+        <ul className="divide-y divide-[var(--sniptale-color-border-soft)]">
+          {[...jobs].reverse().map((job) => (
+            <li
+              key={job.requestId}
+              data-operation-id={job.requestId}
+              tabIndex={-1}
+              className="space-y-2 py-3"
+            >
+              <p>{translate(`settings.syncQueue.jobKind.${job.kind}`)}</p>
+              <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
+                {translate(`settings.syncQueue.jobState.${job.state}`)}
+              </p>
+              {job.failureCode ? (
+                <p>{translate(`settings.syncQueue.failure.${job.failureCode}`)}</p>
+              ) : null}
+              {job.state === 'running' ? (
+                <ProductActionButton
+                  tone="secondary"
+                  className={buttonClass}
+                  disabled={busy || jobsUnavailable}
+                  onClick={() => void cancelJob(job.requestId)}
+                >
+                  {translate('settings.syncQueue.action.cancel')}
+                </ProductActionButton>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </div>
       {data?.kind === 'unconfigured' && phase === 'ready' ? (
         <p role="status">{translate('settings.syncQueue.unconfigured')}</p>
       ) : null}

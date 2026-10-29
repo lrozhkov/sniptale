@@ -1,3 +1,9 @@
+import { assetResidencyCopyId } from '../assets/residency-records';
+import {
+  readAssetResidencyCopyInTransaction,
+  retireAssetResidencyCopyInTransaction,
+} from '../assets/residency';
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { deleteScenarioAggregateInTransaction } from '../scenario/aggregate-cleanup';
 import { createScenarioProjectStore } from '../scenario/storage';
 import { parseScenarioProjectEntry } from '../scenario/read-guards';
@@ -15,7 +21,7 @@ import { freezeVideoReviewInTransaction, digestCapturedVideoReviewRows } from '.
 import { parsePreparedVideoReviewReplicaRoot } from './prepared-review';
 import { parsePreparedVideoProjectReplicaRoot } from './prepared-project';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
+import { readImageReplicaPredecessorInTransaction } from './image-snapshot';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -32,6 +38,7 @@ import {
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
+  ASSET_RESIDENCY_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -353,9 +360,9 @@ async function deleteMediaRoot(
     (media?.source.kind === 'stored-asset' &&
       (media.kind === 'image' || media.kind === 'screenshot'))
   ) {
-    const image = await freezeImageInTransaction(tx, input.rootId);
+    const image = await readImageReplicaPredecessorInTransaction(tx, input.rootId, state);
     if (
-      state.nativeDigest !== digestCapturedImageRows(image) ||
+      state.nativeDigest !== image.digest ||
       media.workspaceRevision !== input.expectedWorkspaceRevision
     )
       refuse();
@@ -520,6 +527,7 @@ async function commitDeletion(
   input: ApplyCatalogDeletionInput,
   journals: AssetReadyJournal[],
   operation: ReturnType<typeof buildPhysicalDeleteOperation>,
+  mutationPermit: PersistenceMutationPermit,
   signal?: AbortSignal
 ) {
   signal?.throwIfAborted();
@@ -538,6 +546,7 @@ async function commitDeletion(
       ASSET_REFS_STORE,
       ASSET_OWNERS_STORE,
       ASSET_OPERATIONS_STORE,
+      ASSET_RESIDENCY_STORE,
       VIDEO_PROJECTS_STORE,
       VIDEO_PROJECT_REVISIONS_STORE,
       SCENARIO_ASSETS_STORE,
@@ -566,6 +575,13 @@ async function commitDeletion(
     else if (input.rootKind === 'video-project')
       await deleteProjectRoot(tx, input, admission.previous, operation);
     else await deleteMediaRoot(tx, input, admission.previous, operation);
+    if (input.rootKind === 'media') {
+      const copy = await readAssetResidencyCopyInTransaction(
+        tx,
+        assetResidencyCopyId({ kind: 'inline-image', mediaId: input.rootId })
+      );
+      if (copy) await retireAssetResidencyCopyInTransaction(tx, copy, mutationPermit);
+    }
     signal?.throwIfAborted();
     const generation = await writeDeletionProvenance(
       tx,
@@ -600,8 +616,8 @@ export async function applyCatalogDeletionNative(
         signal?.throwIfAborted();
         const journals = await listReadyJournals();
         signal?.throwIfAborted();
-        return runWithPersistenceMutationPermit(() =>
-          commitDeletion(db, candidate, journals, operation, signal)
+        return runWithPersistenceMutationPermit((mutationPermit) =>
+          commitDeletion(db, candidate, journals, operation, mutationPermit, signal)
         );
       });
       if (!result) refuse();

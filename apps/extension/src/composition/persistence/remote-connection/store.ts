@@ -592,3 +592,23 @@ export async function loadSyncConnectionAuthentication(
     return refused();
   return authentication;
 }
+
+/** The contained local-only owner checks retained bytes in this same transaction before retiring authority. */
+export async function clearLocalOnlySyncConnectionInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  expected: SyncConnectionMetadata
+): Promise<void> {
+  const current = await readMetadata(tx);
+  if (
+    !current ||
+    current.phase !== 'paused' ||
+    expected.phase !== 'paused' ||
+    !sameSyncConnectionIdentity(current.identity, expected.identity) ||
+    !sameConnectionBinding(current.binding, expected.binding)
+  )
+    return refused();
+  await checkProfile(tx, current.binding);
+  await tx.objectStore(SYNC_CONNECTION_STORE).clear();
+  await tx.objectStore(SYNC_CAPTURE_STORE).clear();
+  await tx.objectStore(SYNC_OUTBOX_STORE).clear();
+}

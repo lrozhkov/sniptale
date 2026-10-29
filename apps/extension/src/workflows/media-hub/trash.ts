@@ -1,3 +1,11 @@
+import { runWithNativePublicationResources } from '../sync-transfer/editing-admission';
+import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
+import {
+  initDB,
+  SCENARIO_EXPORTS_STORE,
+} from '../../composition/persistence/infrastructure/indexed-db/core';
+import { parseScenarioExportEntry } from '../../composition/persistence/scenario/read-guards';
+import type { SyncNativeEditingRoot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
 import {
   deleteVideoWorkspaceProject,
@@ -39,8 +47,31 @@ interface TrashDeletionTarget {
   trashedAt: number;
 }
 
+async function withTrashPublicationResources(
+  targets: readonly LibraryTrashTarget[],
+  operation: () => Promise<void>
+): Promise<void> {
+  await runWithAssetResourceRead(async () => {
+    const roots: SyncNativeEditingRoot[] = [];
+    for (const target of targets) {
+      if (target.kind === 'scenario-export') {
+        const db = await initDB();
+        const entry = parseScenarioExportEntry(await db.get(SCENARIO_EXPORTS_STORE, target.id));
+        if (!entry) throw new StaleTrashItemError();
+        roots.push({ rootKind: 'scenario-project', rootId: entry.projectId });
+      } else {
+        roots.push({
+          rootKind: target.kind === 'quick-edit-project' ? 'video-review' : target.kind,
+          rootId: target.id,
+        });
+      }
+    }
+    await runWithNativePublicationResources(roots, operation);
+  });
+}
+
 export async function moveLibraryItemsToTrash(targets: LibraryTrashTarget[]): Promise<void> {
-  await moveStoredItemsToTrash(targets);
+  await withTrashPublicationResources(targets, () => moveStoredItemsToTrash(targets));
   publishMediaHubLibraryChanged(
     'update',
     targets.map((target) => target.id)
@@ -48,7 +79,7 @@ export async function moveLibraryItemsToTrash(targets: LibraryTrashTarget[]): Pr
 }
 
 export async function restoreLibraryTrashItems(targets: LibraryTrashTarget[]): Promise<void> {
-  await restoreStoredItemsFromTrash(targets);
+  await withTrashPublicationResources(targets, () => restoreStoredItemsFromTrash(targets));
   publishMediaHubLibraryChanged(
     'update',
     targets.map((target) => target.id)
@@ -184,6 +215,8 @@ export async function renameQuickEditProject(
   expectedRevision: number,
   name: string
 ): Promise<void> {
-  await renameVideoWorkspaceProject(id, expectedRevision, name);
+  await runWithNativePublicationResources([{ rootKind: 'video-review', rootId: id }], () =>
+    renameVideoWorkspaceProject(id, expectedRevision, name)
+  );
   publishMediaHubLibraryChanged('update', [id]);
 }

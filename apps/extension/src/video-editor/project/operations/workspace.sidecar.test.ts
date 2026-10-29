@@ -178,3 +178,7 @@ it('adds a saved webcam sidecar as a separate muted recording track', async () =
   expect(result.project!.assets[1]?.metadata.duration).toBe(7);
   expect(saveVideoProject).toHaveBeenCalledOnce();
 });
+
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

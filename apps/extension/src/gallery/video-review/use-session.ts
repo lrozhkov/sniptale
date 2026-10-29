@@ -17,6 +17,8 @@ import {
   type AssetResourceSession,
 } from '../../composition/persistence/assets/resource-sessions';
 
+import { ensureNativeEditingRootAvailable } from '../../workflows/sync-transfer/editing-admission';
+
 const logger = createLogger({ namespace: 'gallery:video-review' });
 
 type Session = ReturnType<typeof createVideoReviewSession>;
@@ -41,6 +43,8 @@ export function useLoadedReview(aggregateId: string) {
     let loadedSource = false;
     const loading = (async () => {
       reader = await acquireAssetResourceSession();
+      if (controller.signal.aborted) return null;
+      await ensureNativeEditingRootAvailable({ rootKind: 'video-review', rootId: aggregateId });
       if (controller.signal.aborted) return null;
       return loadVideoReviewSource(aggregateId, controller.signal);
     })();

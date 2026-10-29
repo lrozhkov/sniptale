@@ -6,7 +6,11 @@ import {
 } from './project-snapshot';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
+import {
+  freezeImageInTransaction,
+  digestCapturedImageRows,
+  readImageReplicaPredecessorInTransaction,
+} from './image-snapshot';
 import type { IDBPTransaction } from 'idb';
 import {
   MEDIA_LIBRARY_STORE,
@@ -37,7 +41,7 @@ type CaptureTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 /** Read the explicit profile in the domain transaction, before graph capture. */
 export async function readEnabledCaptureProfile(
-  tx: CaptureTransaction
+  tx: Pick<IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>, 'objectStore'>
 ): Promise<SyncCaptureProfile | null> {
   const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(SYNC_CAPTURE_PROFILE_KEY);
   if (raw === undefined) return null;
@@ -384,11 +388,30 @@ async function captureMediaDependency(
   const raw: unknown = await tx
     .objectStore(SYNC_CAPTURE_STORE)
     .get(JSON.stringify(['root-state', rootKey]));
+  const state = raw === undefined ? null : parseSyncCaptureRecord(raw);
+  if (
+    raw !== undefined &&
+    (!state ||
+      state.kind !== 'root-state' ||
+      state.rootKey !== rootKey ||
+      state.spaceId !== profile.spaceId ||
+      state.rootKind !== 'media' ||
+      state.rootId !== mediaId ||
+      state.deleted ||
+      state.basis.length === 0)
+  )
+    throw new UnsupportedSyncCaptureGraphError();
   const entry = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
   const isImage =
     entry?.source.kind === 'screenshot' ||
     (entry?.source.kind === 'stored-asset' &&
       (entry.kind === 'image' || entry.kind === 'screenshot'));
+  if (isImage && state?.kind === 'root-state') {
+    // An unchanged dependency needs its causal head, not another snapshot of unloaded bytes.
+    const predecessor = await readImageReplicaPredecessorInTransaction(tx, mediaId, state);
+    if (predecessor.digest !== state.nativeDigest) throw new UnsupportedSyncCaptureGraphError();
+    return { mediaId, generation: state.generation, basis: [...state.basis] };
+  }
   const change: Extract<CapturedChange['change'], { kind: 'image' | 'media' }> = isImage
     ? { kind: 'image', rows: await freezeImageInTransaction(tx, mediaId) }
     : {
@@ -403,14 +426,7 @@ async function captureMediaDependency(
     const captured = await appendCapture(tx, profile, 'media', mediaId, change, {});
     return { mediaId, generation: captured.generation, basis: [captured.operationId] };
   }
-  const state = parseSyncCaptureRecord(raw);
-  if (
-    !state ||
-    state.kind !== 'root-state' ||
-    state.rootKey !== rootKey ||
-    state.basis.length === 0 ||
-    state.nativeDigest !== nativeDigest
-  )
+  if (!state || state.kind !== 'root-state' || state.nativeDigest !== nativeDigest)
     throw new UnsupportedSyncCaptureGraphError();
   return { mediaId, generation: state.generation, basis: [...state.basis] };
 }

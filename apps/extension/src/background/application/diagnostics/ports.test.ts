@@ -260,3 +260,42 @@ it('starts history recovery and disposes its registration with diagnostic ingres
   f.dispose();
   expect(mocks.catchupDispose).toHaveBeenCalledOnce();
 });
+
+it('admits the actual Chrome offscreen Port sender without documentId or frameId', () => {
+  const f = setup();
+  const port = {
+    ...f.port,
+    sender: {
+      id: 'own',
+      url: 'chrome-extension://own/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=current',
+    },
+  };
+  f.accept(port);
+  expect(port.disconnect).not.toHaveBeenCalled();
+  const send = port.onMessage.addListener.mock.calls.at(-1)![0];
+  send(event);
+  expect(mocks.append).toHaveBeenCalledExactlyOnceWith(event, 'offscreen');
+  f.dispose();
+});
+it.each([
+  { id: 'foreign', url: 'chrome-extension://own/apps/extension/src/offscreen/offscreen.html' },
+  { id: 'own', url: 'chrome-extension://own/apps/extension/src/settings/index.html' },
+  { id: 'own', url: 'https://example.com/apps/extension/src/offscreen/offscreen.html' },
+  {
+    id: 'own',
+    url: 'chrome-extension://own/apps/extension/src/offscreen/offscreen.html',
+    documentId: '',
+  },
+  {
+    id: 'own',
+    url: 'chrome-extension://own/apps/extension/src/offscreen/offscreen.html',
+    tab: { id: 1 },
+  },
+])('refuses sender metadata outside the exact offscreen document: %j', (sender) => {
+  const f = setup();
+  const port = { ...f.port, sender };
+  f.accept(port);
+  expect(port.disconnect).toHaveBeenCalledOnce();
+  expect(mocks.append).not.toHaveBeenCalled();
+  f.dispose();
+});

@@ -1,3 +1,7 @@
+import {
+  runWithPersistenceMutationPermit,
+  type PersistenceMutationPermit,
+} from '../../../../composition/persistence/infrastructure/mutation-barrier';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import { createReviewWorkspaceStoreFixture } from '../../../../composition/persistence/review-workspaces/store.test-support';
@@ -786,4 +790,75 @@ it('replaces a restored recording atomically while retaining its original recove
     .filter((row) => row?.kind === 'sync-operation');
   expect(captures).toHaveLength(1);
   expect(captures[0]).toMatchObject({ rootKind: 'media', origin: 'local-restore' });
+});
+
+it('retires an unloaded inline copy atomically when archive Replace publishes new screenshot bytes', async () => {
+  const f = await restoredOriginalFixture(false);
+  const mediaId = f.entry.id;
+  const oldCopy = {
+    version: 1,
+    kind: 'copy',
+    id: JSON.stringify(['copy', 'inline-image', mediaId]),
+    revision: 2,
+    operationId: 'old-unload',
+    phase: 'unloaded',
+    target: {
+      kind: 'inline-image',
+      mediaId,
+      createdAt: 1,
+      workspaceRevision: 0,
+      rootGeneration: 1,
+      nativeDigest: 'a'.repeat(64),
+      size: 6,
+      mimeType: 'image/png',
+      blobType: 'image/png',
+    },
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'alice',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+      key: 'Files/original.png',
+      sha256: 'b'.repeat(64),
+    },
+    lastUsedAt: 1,
+  };
+  f.fixture.rows.get('asset_residency')!.set(oldCopy.id, oldCopy);
+  const entry = {
+    ...f.entry,
+    kind: 'screenshot' as const,
+    source: { kind: 'screenshot' as const },
+  };
+  f.fixture.rows.get('media_library')!.set(mediaId, entry);
+  mocks.runMutation.mockImplementation(
+    (
+      callback: (
+        db: typeof f.fixture.database,
+        permit: PersistenceMutationPermit
+      ) => Promise<unknown>
+    ) => runWithPersistenceMutationPermit((permit) => callback(f.fixture.database, permit))
+  );
+  const metadata = { entry, originalObjectId: 'original' };
+  assertPortableJson(metadata);
+  const input = {
+    ...f.input,
+    session: { ...f.input.session, strategy: 'replace' as const },
+    envelope: { ...f.input.envelope, metadata },
+  };
+  const before = structuredClone(f.fixture.rows);
+  mocks.checkpoint.mockRejectedValueOnce(new Error('Archive checkpoint refused'));
+  await expect(mediaLibraryRootPublisher.publish(input)).rejects.toThrow(
+    'Archive checkpoint refused'
+  );
+  expect(f.fixture.rows).toEqual(before);
+  await mediaLibraryRootPublisher.publish(input);
+  expect(f.fixture.rows.get('media_library')!.get(mediaId)).toMatchObject({
+    blob: expect.any(Blob),
+    source: { kind: 'screenshot' },
+  });
+  expect(f.fixture.rows.get('asset_residency')!.has(oldCopy.id)).toBe(false);
 });

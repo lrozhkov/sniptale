@@ -1,3 +1,4 @@
+import { RetainedLibraryNotReadyError } from '../../../workflows/sync-transfer/retained-library';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { StaleTrashItemError } from '../../../composition/persistence/library-lifecycle/trash';
 import {
@@ -97,6 +98,11 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
 }
 
 function describeActionFailure(error: unknown): { code: string; message: string } {
+  if (error instanceof RetainedLibraryNotReadyError)
+    return {
+      code: 'sync-retained-set-not-ready',
+      message: translate('gallery.app.backupSyncNotReady'),
+    };
   if (error instanceof MediaBackupFailure) {
     return {
       code: `backup-${error.reason}`,

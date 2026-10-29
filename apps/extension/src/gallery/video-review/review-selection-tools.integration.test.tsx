@@ -525,3 +525,7 @@ it('dismisses and repeats gain feedback without changing source selection', asyn
     await fixture.cleanup();
   }
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

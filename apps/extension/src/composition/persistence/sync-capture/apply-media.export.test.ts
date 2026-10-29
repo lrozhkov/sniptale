@@ -184,3 +184,128 @@ it('refuses a tombstone for an absent Library row while its native export still 
   ).rejects.toThrow();
   expect(f.rows).toEqual(before);
 });
+
+function retainedExport() {
+  const f = setup();
+  const input = exportInput(f.input);
+  if (!('projectExport' in input.rows)) throw new Error('Expected export.');
+  const authorization = { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 };
+  input.authorization = authorization;
+  const binding = {
+    provider: 'webdav',
+    rootUrl: 'https://dav.example.test/root/',
+    accountId: 'alice',
+    spaceId: input.spaceId,
+    profileCreatedAt: input.profileCreatedAt,
+    connectionGeneration: input.connectionGeneration,
+  };
+  f.table('sync_connection').set('connection', {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding,
+    identity: authorization,
+    phase: 'active',
+    updateNonce: null,
+    credentialId: '10000000-0000-4000-8000-000000000002',
+  });
+  f.table('project_exports').set(input.rows.projectExport.id, input.rows.projectExport);
+  f.table('asset_refs').set(input.rows.ref.assetId, input.rows.ref);
+  f.table('asset_owners').set(
+    JSON.stringify(['project-export', input.rows.projectExport.id, 'body']),
+    {
+      assetId: input.rows.ref.assetId,
+      ownerKind: 'project-export',
+      ownerId: input.rows.projectExport.id,
+      role: 'body',
+    }
+  );
+  const copyId = JSON.stringify(['copy', 'opfs', input.rows.ref.assetId]);
+  f.table('asset_residency').set(copyId, {
+    version: 1,
+    kind: 'copy',
+    id: copyId,
+    revision: 1,
+    operationId: 'parent-project-operation',
+    phase: 'unloaded',
+    target: { kind: 'opfs', ref: input.rows.ref },
+    remote: { binding, key: 'Files/project/export.webm', sha256: input.rows.ref.sha256 },
+    lastUsedAt: 1,
+  });
+  return {
+    ...f,
+    input,
+    copyId,
+    lookup: {
+      ...input,
+      mediaId: input.rows.media.id,
+      exportSource: {
+        projectId: input.rows.projectExport.projectId,
+        sha256: input.rows.ref.sha256!,
+      },
+    },
+  };
+}
+
+it('enrolls a project-retained export under the same original identity and replays its receipt', async () => {
+  const f = retainedExport();
+  expect(await loadMediaReplicaPredecessorRef(f.lookup)).toEqual(f.input.rows.ref);
+  const sidecar = { retained: true };
+  f.table('thumbnails').set(f.input.rows.media.id, sidecar);
+  f.failReceipt();
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedMediaReplica(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  f.allowWrites();
+  await expect(applyPreparedMediaReplica(f.input)).resolves.toMatchObject({
+    status: 'applied',
+    generation: 1,
+  });
+  expect(f.table('asset_refs').size).toBe(1);
+  expect(f.table('asset_refs').get(f.input.rows.ref.assetId)).toEqual(f.input.rows.ref);
+  expect(f.table('thumbnails').get(f.input.rows.media.id)).toEqual(sidecar);
+  const committed = structuredClone(f.rows);
+  await expect(applyPreparedMediaReplica(f.input)).resolves.toMatchObject({ status: 'duplicate' });
+  expect(f.rows).toEqual(committed);
+});
+
+it.each(['owner', 'ref', 'copy', 'tombstone', 'replacement-ref'] as const)(
+  'refuses changed retained-export %s between lookup and independent publication',
+  async (change) => {
+    const f = retainedExport();
+    expect(await loadMediaReplicaPredecessorRef(f.lookup)).toEqual(f.input.rows.ref);
+    if (change === 'owner' && 'projectExport' in f.input.rows)
+      f.table('asset_owners').delete(
+        JSON.stringify(['project-export', f.input.rows.projectExport.id, 'body'])
+      );
+    if (change === 'ref')
+      f.table('asset_refs').set(f.input.rows.ref.assetId, { ...f.input.rows.ref, createdAt: 2 });
+    if (change === 'copy') f.table('asset_residency').delete(f.copyId);
+    if (change === 'replacement-ref')
+      f.input.rows.ref = {
+        ...f.input.rows.ref,
+        assetId: 'replacement',
+        location: { kind: 'opfs', objectKey: 'objects/replacement' },
+      };
+    if (change === 'tombstone') {
+      const rootKey = JSON.stringify([f.input.spaceId, 'media', f.input.rows.media.id]);
+      const key = JSON.stringify(['root-state', rootKey]);
+      f.table('sync_capture').set(key, {
+        version: 1,
+        kind: 'root-state',
+        key,
+        createdAt: 1,
+        spaceId: f.input.spaceId,
+        rootKind: 'media',
+        rootId: f.input.rows.media.id,
+        rootKey,
+        generation: 1,
+        basis: ['deleted-export'],
+        deleted: true,
+      });
+    }
+    const before = structuredClone(f.rows);
+    await expect(applyPreparedMediaReplica(f.input)).rejects.toThrow();
+    expect(f.rows).toEqual(before);
+  }
+);

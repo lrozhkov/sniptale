@@ -1,4 +1,5 @@
 import { RemoteProjectActions } from './remote-project-actions';
+import { NativeCacheActions } from './native-cache-actions';
 import './preview.css';
 import { BadgeCheck, ChevronDown, Info } from 'lucide-react';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
@@ -225,40 +226,45 @@ function PreviewPanelSidebar(
       <PreviewPanelHeader {...props} />
       <div
         data-ui="gallery.preview.inspectorContent"
-        inert={props.pending}
-        aria-busy={props.pending}
         className="mt-4 min-h-0 space-y-4 overflow-y-auto"
       >
-        <PreviewFilenameField
-          filenameDraft={props.filenameDraft}
-          item={props.item}
-          onFilenameChange={props.onFilenameChange}
-          trashMode={Boolean(props.trashMode)}
-        />
-        <UnavailableProjectNotice item={props.item} />
-        <details key={`metadata:${props.item.id}`} className="gallery-preview-disclosure" open>
-          <summary>
-            <Info size={14} aria-hidden="true" />
-            <span>{translate('gallery.preview.properties')}</span>
-            <ChevronDown size={14} aria-hidden="true" />
-          </summary>
-          <div className="gallery-preview-disclosure-body">
-            <PreviewMetadataCards item={props.item} />
-            <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
-          </div>
-        </details>
-        <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
-        <PreviewTagEditor
-          {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
-          item={props.item}
-          trashMode={Boolean(props.trashMode)}
-          tagDraft={props.tagDraft}
-          tagDrafts={props.tagDrafts}
-          onTagDraftChange={props.onTagDraftChange}
-          onRemoveTag={props.onRemoveTag}
-          onAddTag={props.onAddTag}
-        />
-        <PreviewActions key={props.item.id} {...props} />
+        <div inert={props.pending} aria-busy={props.pending} className="space-y-4">
+          <PreviewFilenameField
+            filenameDraft={props.filenameDraft}
+            item={props.item}
+            onFilenameChange={props.onFilenameChange}
+            trashMode={Boolean(props.trashMode)}
+          />
+          <UnavailableProjectNotice item={props.item} />
+          <details key={`metadata:${props.item.id}`} className="gallery-preview-disclosure" open>
+            <summary>
+              <Info size={14} aria-hidden="true" />
+              <span>{translate('gallery.preview.properties')}</span>
+              <ChevronDown size={14} aria-hidden="true" />
+            </summary>
+            <div className="gallery-preview-disclosure-body">
+              <PreviewMetadataCards item={props.item} />
+              <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
+            </div>
+          </details>
+          <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
+          <PreviewTagEditor
+            {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
+            item={props.item}
+            trashMode={Boolean(props.trashMode)}
+            tagDraft={props.tagDraft}
+            tagDrafts={props.tagDrafts}
+            onTagDraftChange={props.onTagDraftChange}
+            onRemoveTag={props.onRemoveTag}
+            onAddTag={props.onAddTag}
+          />
+          <PreviewActions key={props.item.id} {...props} />
+        </div>
+        {!props.trashMode &&
+        typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' &&
+        __SNIPTALE_SECURITY_E2E__ ? (
+          <NativeCacheActions item={props.item} />
+        ) : null}
       </div>
     </aside>
   );

@@ -1,5 +1,6 @@
 import { SyncConnectionSection } from './sync-connection';
 import { SyncQueueSection } from './sync-queue';
+import { SyncCacheSection } from './sync-cache';
 import { FilenameRulesSettings } from './filename-rules';
 import { useSavePresetsSection } from './state/controller';
 import { SavePresetsSectionContent } from './surface/content';
@@ -58,6 +59,7 @@ export function SavePresetsSection(props: {
       {view === 'queue' ? <SyncQueueSection /> : null}
       {view === 'files' ? <FilenameRulesSettings /> : null}
       {view === 'storage' ? <StorageDraftsSection view="storage" /> : null}
+      {view === 'storage' && connectionAvailable ? <SyncCacheSection /> : null}
       {view === 'drafts' ? <StorageDraftsSection view="drafts" /> : null}
     </div>
   );

@@ -4,6 +4,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  ASSET_RESIDENCY_STORE,
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
@@ -165,6 +166,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   );
   createStore(db, SYNC_CATALOG_CACHE_STORE, 'key');
   createStore(db, SYNC_CONNECTION_STORE, 'key');
+  createStore(db, ASSET_RESIDENCY_STORE, 'id');
   const contracts = db.createObjectStore(SCHEMA_CONTRACTS_STORE, { keyPath: 'domainId' });
   for (const contract of CURRENT_SCHEMA_CONTRACTS) contracts.put(contract);
 }

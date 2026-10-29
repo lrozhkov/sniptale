@@ -8,6 +8,15 @@ import {
   isSyncProductSenderAllowed,
   routeSyncProductCommand,
 } from './product-route';
+const cache = vi.hoisted(() => ({ status: vi.fn(), root: vi.fn(), budget: vi.fn(), pin: vi.fn() }));
+vi.mock('../../workflows/sync-transfer/native-cache-policy', () => ({
+  readNativeCacheStatus: cache.status,
+}));
+vi.mock('../../workflows/sync-transfer/native-cache', () => ({
+  readNativeCacheRootStatus: cache.root,
+  setNativeCacheBudget: cache.budget,
+  setNativeCacheRootPinned: cache.pin,
+}));
 const nativeStatus = vi.hoisted(() => ({ connection: vi.fn(), workspace: vi.fn() }));
 vi.mock('../../composition/persistence/remote-connection/store', () => ({
   loadSyncConnection: nativeStatus.connection,
@@ -325,7 +334,7 @@ it('retries the exact selected source and enrolls without creating another works
 it('projects native status into the exact credential-free response contract', async () => {
   const coordinator = routeCoordinator();
   const inspect = vi.spyOn(coordinator, 'inspect').mockResolvedValue(null);
-  const empty = { connection: null, workspace: null, workspaceJob: null };
+  const empty = { connection: null, workspace: null, products: [], workspaceJob: null };
   await expect(productAnswer(coordinator, { kind: 'status' })).resolves.toEqual({
     success: true,
     result: { kind: 'status', status: empty },
@@ -358,7 +367,7 @@ it('projects native status into the exact credential-free response contract', as
   const response = await productAnswer(coordinator, { kind: 'status' }, gallery);
   expect(response).toEqual({
     success: true,
-    result: { kind: 'status', status: { connection, workspace, workspaceJob } },
+    result: { kind: 'status', status: { connection, workspace, workspaceJob, products: [] } },
   });
   expect(parseSyncProductResponse(response)).toEqual(response);
 });
@@ -433,9 +442,9 @@ it('restricts version decisions to the exact Gallery document', () => {
   expect(isSyncProductSenderAllowed(command, gallery)).toBe(true);
   expect(isSyncProductSenderAllowed(command, settings)).toBe(false);
   expect(isSyncProductSenderAllowed(command, { ...gallery, frameId: 1 })).toBe(false);
-  expect(isSyncProductSenderAllowed(command, { ...gallery, documentLifecycle: 'prerender' })).toBe(
-    false
-  );
+  expect(
+    isSyncProductSenderAllowed(command, { ...gallery, documentLifecycle: 'prerender' as const })
+  ).toBe(false);
 });
 
 it('wakes initial capture only after committed enrollment and contains a missed advisory notification', async () => {
@@ -459,4 +468,163 @@ it('wakes initial capture only after committed enrollment and contains a missed 
   enroll.mockRejectedValueOnce(new Error('Native enrollment refused'));
   await expect(productAnswer(coordinator, command)).resolves.toMatchObject({ success: false });
   expect(wake).toHaveBeenCalledOnce();
+});
+
+it('allows editor preparation and observation but refuses connection and remote commands', () => {
+  for (const page of ['editor', 'video-editor', 'scenario-editor']) {
+    const sender = {
+      url: `chrome-extension://test/apps/extension/src/${page}/index.html`,
+      frameId: 0,
+    };
+    expect(
+      isSyncProductSenderAllowed(
+        { kind: 'native-prepare', root: { rootKind: 'media', rootId: 'asset' } },
+        sender
+      )
+    ).toBe(true);
+    expect(isSyncProductSenderAllowed({ kind: 'inspect', requestId: 'job' }, sender)).toBe(true);
+    expect(
+      isSyncProductSenderAllowed({ kind: 'catalog-refresh', bypassCache: false }, sender)
+    ).toBe(false);
+    expect(isSyncProductSenderAllowed({ kind: 'status' }, sender)).toBe(false);
+    expect(
+      isSyncProductSenderAllowed(
+        { kind: 'native-prepare', root: { rootKind: 'media', rootId: 'asset' } },
+        { ...sender, frameId: 1 }
+      )
+    ).toBe(false);
+  }
+  expect(
+    isSyncProductSenderAllowed(
+      { kind: 'native-prepare', root: { rootKind: 'media', rootId: 'asset' } },
+      settings
+    )
+  ).toBe(false);
+});
+
+it('restricts cache effects to their exact Settings or Gallery owner', () => {
+  const root = { rootKind: 'media' as const, rootId: 'asset' };
+  const editor = {
+    url: 'chrome-extension://test/apps/extension/src/editor/index.html',
+    frameId: 0,
+  };
+  const commands: SyncProductCommand[] = [
+    { kind: 'cache-status' },
+    { kind: 'cache-budget', budgetBytes: 0, revision: 0 },
+    { kind: 'cache-trim' },
+    { kind: 'cache-root-status', root },
+    { kind: 'cache-pin', root, pinned: true },
+    { kind: 'native-release', root },
+  ];
+  for (const command of commands) {
+    expect(isSyncProductSenderAllowed(command, settings)).toBe(
+      ['cache-status', 'cache-budget', 'cache-trim'].includes(command.kind)
+    );
+    expect(isSyncProductSenderAllowed(command, gallery)).toBe(
+      ['cache-status', 'cache-root-status', 'cache-pin', 'native-release'].includes(command.kind)
+    );
+    for (const sender of [
+      editor,
+      { ...gallery, frameId: 1 },
+      { ...settings, documentLifecycle: 'prerender' as const },
+      { url: 'https://untrusted.test/' },
+    ])
+      expect(isSyncProductSenderAllowed(command, sender)).toBe(false);
+  }
+});
+it('persists a pin before preparation and performs local-ready pin/unpin without starting remote work', async () => {
+  const coordinator = routeCoordinator();
+  const product = vi
+    .spyOn(coordinator, 'productCommand')
+    .mockResolvedValue({ success: true, result: { kind: 'accepted', requestId: routeRequestId } });
+  const root = { rootKind: 'media' as const, rootId: 'asset' };
+  const status = { root, configured: true, pinned: true, ready: true, releaseAllowed: true };
+  cache.pin.mockResolvedValue(undefined);
+  cache.root.mockResolvedValue(status);
+  await expect(
+    productAnswer(coordinator, { kind: 'cache-pin', root, pinned: true }, gallery)
+  ).resolves.toEqual({ success: true, result: { kind: 'cache-root', status } });
+  expect(cache.pin).toHaveBeenLastCalledWith(root, true);
+  expect(cache.pin).toHaveBeenCalledBefore(cache.root);
+  expect(product).not.toHaveBeenCalled();
+  cache.root.mockResolvedValue({ ...status, ready: false });
+  await expect(
+    productAnswer(coordinator, { kind: 'cache-pin', root, pinned: true }, gallery)
+  ).resolves.toEqual({ success: true, result: { kind: 'accepted', requestId: routeRequestId } });
+  expect(product).toHaveBeenCalledExactlyOnceWith(
+    routeRequestId,
+    { kind: 'native-prepare', root },
+    'gallery'
+  );
+  product.mockClear();
+  cache.root.mockResolvedValue({ ...status, pinned: false, ready: false });
+  await expect(
+    productAnswer(coordinator, { kind: 'cache-pin', root, pinned: false }, gallery)
+  ).resolves.toMatchObject({
+    success: true,
+    result: { kind: 'cache-root', status: { pinned: false } },
+  });
+  expect(product).not.toHaveBeenCalled();
+});
+it('keeps pin intent when missing-byte preparation is refused and does not report offline success', async () => {
+  const coordinator = routeCoordinator();
+  const root = { rootKind: 'media' as const, rootId: 'asset' };
+  cache.pin.mockResolvedValue(undefined);
+  cache.root.mockResolvedValue({
+    root,
+    configured: true,
+    pinned: true,
+    ready: false,
+    releaseAllowed: true,
+  });
+  vi.spyOn(coordinator, 'productCommand').mockRejectedValue(new Error('Executor unavailable'));
+  await expect(
+    productAnswer(coordinator, { kind: 'cache-pin', root, pinned: true }, gallery)
+  ).resolves.toEqual({ success: false, error: 'Sync product command refused' });
+  expect(cache.pin).toHaveBeenLastCalledWith(root, true);
+});
+
+it('admits only exact owned product pages for backup byte preparation', () => {
+  const command = {
+    kind: 'backup-prepare' as const,
+    root: { rootKind: 'video-project' as const, rootId: 'project' },
+  };
+  expect(isSyncProductSenderAllowed(command, settings)).toBe(true);
+  expect(isSyncProductSenderAllowed(command, gallery)).toBe(true);
+  for (const sender of [
+    { ...settings, frameId: 1 },
+    { ...gallery, documentLifecycle: 'prerender' as const },
+    { url: 'https://untrusted.test/' },
+  ])
+    expect(isSyncProductSenderAllowed(command, sender)).toBe(false);
+});
+
+it('admits local-only retirement only from the ordinary top-level Settings document', () => {
+  const command: SyncProductCommand = {
+    kind: 'connection-local-only',
+    expected: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 },
+  };
+  expect(isSyncProductSenderAllowed(command, settings)).toBe(true);
+  for (const sender of [
+    gallery,
+    { ...settings, frameId: 1 },
+    { ...settings, documentLifecycle: 'prerender' as const },
+  ])
+    expect(isSyncProductSenderAllowed(command, sender)).toBe(false);
+});
+
+it('allows Settings to prepare an absent catalog root only with native-preservation admission', () => {
+  const selection = {
+    rootKind: 'video-project' as const,
+    rootId: 'project',
+    operationId: 'op',
+    sourceDigest: 'a'.repeat(64),
+  };
+  expect(
+    isSyncProductSenderAllowed(
+      { kind: 'replica-prepare', selection, preserveNative: true },
+      settings
+    )
+  ).toBe(true);
+  expect(isSyncProductSenderAllowed({ kind: 'replica-prepare', selection }, settings)).toBe(false);
 });

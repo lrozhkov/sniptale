@@ -8,6 +8,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  ASSET_RESIDENCY_STORE,
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
@@ -105,9 +106,10 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'assetGraph',
-    schemaVersion: 3,
+    schemaVersion: 4,
     stores: [
       { storeName: ASSET_REFS_STORE, dataClass: 'durable-authority' },
+      { storeName: ASSET_RESIDENCY_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_OWNERS_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_OPERATIONS_STORE, dataClass: 'operational-recoverable' },
     ],

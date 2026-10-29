@@ -124,6 +124,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['sync_outbox', { keyPath: 'key' }],
     ['sync_catalog_cache', { keyPath: 'key' }],
     ['sync_connection', { keyPath: 'key' }],
+    ['asset_residency', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -203,6 +204,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['sync_outbox', { keyPath: 'key' }],
     ['sync_catalog_cache', { keyPath: 'key' }],
     ['sync_connection', { keyPath: 'key' }],
+    ['asset_residency', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual([
@@ -288,6 +290,10 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore.mock.calls).toEqual([['sync_catalog_cache', { keyPath: 'key' }]]);
     else if (migration.fromDatabaseVersion === 43)
       expect(db.createObjectStore.mock.calls).toEqual([['sync_connection', { keyPath: 'key' }]]);
+    else if (migration.fromDatabaseVersion === 45)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('asset_residency', {
+        keyPath: 'id',
+      });
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -338,6 +344,7 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['sync_outbox', { keyPath: 'key' }],
     ['sync_catalog_cache', { keyPath: 'key' }],
     ['sync_connection', { keyPath: 'key' }],
+    ['asset_residency', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -394,6 +401,7 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['sync_outbox', { keyPath: 'key' }],
     ['sync_catalog_cache', { keyPath: 'key' }],
     ['sync_connection', { keyPath: 'key' }],
+    ['asset_residency', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
@@ -610,7 +618,7 @@ it('creates the complete fresh schema with empty unindexed connection authority'
   const tx = { abort: vi.fn(), objectStore: vi.fn() };
   handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
   expect([...names].sort()).toEqual([...EXPECTED_STORES].sort());
-  expect(names).toHaveLength(41);
+  expect(names).toHaveLength(42);
   expect(db.createObjectStore).toHaveBeenCalledWith('sync_connection', { keyPath: 'key' });
   expect(connectionIndex).not.toHaveBeenCalled();
   expect(connectionPut).not.toHaveBeenCalled();
@@ -750,7 +758,7 @@ it('adds the exact nonunique due index synchronously without reading or backfill
       getAll: sourceAccess,
     })),
   };
-  expect(handleDatabaseUpgrade(db, 44, DB_VERSION, tx)).toBeUndefined();
+  expect(handleDatabaseUpgrade(db, 44, 45, tx)).toBeUndefined();
   expect(tx.objectStore.mock.calls).toEqual([['sync_outbox'], [SCHEMA_CONTRACTS_STORE]]);
   expect(createIndex).toHaveBeenCalledExactlyOnceWith(
     'syncQueueDue',
@@ -789,9 +797,7 @@ it('aborts due index creation failure before publishing contracts and permits a 
       getAll: vi.fn(),
     })),
   };
-  expect(() => handleDatabaseUpgrade(db, 44, DB_VERSION, tx)).toThrow(
-    'Interrupted due index creation'
-  );
+  expect(() => handleDatabaseUpgrade(db, 44, 45, tx)).toThrow('Interrupted due index creation');
   expect(tx.abort).toHaveBeenCalledOnce();
   expect(put).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual([['sync_outbox']]);
@@ -806,7 +812,7 @@ it('aborts due index creation failure before publishing contracts and permits a 
       getAll: vi.fn(),
     })),
   };
-  handleDatabaseUpgrade(db, 44, DB_VERSION, retryTx);
+  handleDatabaseUpgrade(db, 44, 45, retryTx);
   expect(retryIndex).toHaveBeenCalledOnce();
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(retryTx.abort).not.toHaveBeenCalled();

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { SyncConnectionMetadata } from '../../../../composition/persistence/remote-connection/model';
+import type { SyncConnectionCoordinatorDependencies } from '../../../sync-connection/coordinator';
 import type { SyncQueueRetryWakeupDependencies } from '../../../sync-connection/retry-wakeup';
 import { createBackgroundRuntimeState } from '../../../application/runtime-state';
 import { initializeSyncConnectionRuntime } from './sync-connection';
@@ -8,12 +9,24 @@ const ports = vi.hoisted(() => ({
   loadConnection: vi.fn<() => Promise<SyncConnectionMetadata | null>>(),
   inspect: vi.fn<() => Promise<unknown>>(),
   productCommand: vi.fn(),
-  createCoordinator: vi.fn(),
+  createCoordinator: vi.fn<(deps: SyncConnectionCoordinatorDependencies) => unknown>(),
+  retiringHistory: vi.fn(),
+  completeLocalOnly: vi.fn(),
+  logInfo: vi.fn(),
   createGateway: vi.fn(),
   configureProductRoute:
     vi.fn<typeof import('../../../sync-connection/product-route').configureSyncProductRoute>(),
   createRetry: vi.fn<(deps: SyncQueueRetryWakeupDependencies) => unknown>(),
   runRetry: vi.fn<() => Promise<void>>(),
+}));
+vi.mock('../../../../workflows/sync-transfer/queue-history', () => ({
+  deliverRetiringSyncQueueHistory: ports.retiringHistory,
+}));
+vi.mock('../../../../composition/persistence/remote-connection/local-only', () => ({
+  completeSyncLocalOnly: ports.completeLocalOnly,
+}));
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => ({ info: ports.logInfo, warn: vi.fn() }),
 }));
 vi.mock('../../../sync-connection/coordinator', () => ({
   createSyncConnectionCoordinator: ports.createCoordinator,
@@ -110,6 +123,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
   ports.runRetry.mockResolvedValue(undefined);
+  ports.retiringHistory.mockResolvedValue(undefined);
+  ports.completeLocalOnly.mockResolvedValue('delivered');
+  ports.logInfo.mockReset();
   ports.inspect.mockResolvedValue(null);
   ports.createGateway.mockReturnValue({});
   ports.createCoordinator.mockReturnValue({
@@ -151,3 +167,55 @@ it('admits automatic incoming only for an active workspace and wakes enrollment'
   wakeEnrollment();
   expect(ports.runRetry).toHaveBeenCalledTimes(2);
 });
+
+function localOnlyCompletion() {
+  initializeSyncConnectionRuntime(createBackgroundRuntimeState());
+  const complete = ports.createCoordinator.mock.calls[0]?.[0].completeLocalOnly;
+  if (!complete) throw new Error('Missing local-only completion port');
+  return complete;
+}
+
+it('waits for retiring history before atomic detach and passes the exact connection', async () => {
+  let finish!: () => void;
+  ports.retiringHistory.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  const current = { ...connection(), phase: 'paused' as const };
+  const pending = localOnlyCompletion()(current);
+  expect(ports.retiringHistory).toHaveBeenCalledExactlyOnceWith(current.binding);
+  expect(ports.completeLocalOnly).not.toHaveBeenCalled();
+  finish();
+  await expect(pending).resolves.toBe('delivered');
+  expect(ports.completeLocalOnly).toHaveBeenCalledExactlyOnceWith(current);
+});
+
+it.each(['history', 'detach'] as const)(
+  'preserves %s failure during local-only retirement',
+  async (stage) => {
+    const error = new Error('Retirement refused');
+    (stage === 'history' ? ports.retiringHistory : ports.completeLocalOnly).mockRejectedValueOnce(
+      error
+    );
+    await expect(localOnlyCompletion()({ ...connection(), phase: 'paused' })).rejects.toBe(error);
+    if (stage === 'history') expect(ports.completeLocalOnly).not.toHaveBeenCalled();
+    expect(ports.logInfo).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['delivered', 'incomplete'] as const)(
+  'keeps committed %s retirement when logging fails',
+  async (history) => {
+    ports.completeLocalOnly.mockResolvedValueOnce(history);
+    ports.logInfo.mockImplementationOnce(() => {
+      throw new Error('Logger unavailable');
+    });
+    await expect(localOnlyCompletion()({ ...connection(), phase: 'paused' })).resolves.toBe(
+      history
+    );
+    expect(ports.logInfo).toHaveBeenCalledExactlyOnceWith(
+      `sync.connection.local-only history=${history}`
+    );
+  }
+);

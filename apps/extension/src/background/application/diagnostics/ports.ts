@@ -93,8 +93,9 @@ function resolveDiagnosticContext(
     else if (
       sender?.id === new URL(browserRuntime.getURL('')).host &&
       !sender.tab &&
-      typeof sender.documentId === 'string' &&
-      sender.documentId.length > 0 &&
+      // Chrome offscreen Ports omit documentId. The browser-owned extension URL remains required.
+      (sender.documentId === undefined ||
+        (typeof sender.documentId === 'string' && sender.documentId.length > 0)) &&
       resolveExtensionDocumentSenderUrl(sender, 'apps/extension/src/offscreen/offscreen.html')
     )
       context = 'offscreen';

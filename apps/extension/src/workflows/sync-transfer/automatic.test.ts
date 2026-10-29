@@ -21,11 +21,13 @@ const ports = vi.hoisted(() => ({
   admission: vi.fn<typeof loadCatalogReplicaAdmission>(),
   receive: vi.fn<typeof receiveSelectedCatalogRoot>(),
   deletion: vi.fn<typeof applyCatalogDeletion>(),
+  unloaded: vi.fn(),
 }));
 vi.mock('../../composition/persistence/sync-capture/catalog-admission', () => ({
   loadCatalogNativeBases: ports.bases,
   loadCatalogReplicaAdmission: ports.admission,
 }));
+vi.mock('./native-residency', () => ({ hasUnloadedNativeEditingRoot: ports.unloaded }));
 vi.mock('./incoming-selected', () => ({ receiveSelectedCatalogRoot: ports.receive }));
 vi.mock('./incoming', () => ({ applyCatalogDeletion: ports.deletion }));
 const scope = { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 3 };
@@ -173,6 +175,7 @@ function args(value: Catalog, signal = new AbortController().signal) {
 beforeEach(() => {
   vi.resetAllMocks();
   ports.bases.mockResolvedValue([]);
+  ports.unloaded.mockResolvedValue(false);
   ports.receive.mockImplementation(async ({ selection }) => selection);
   ports.deletion.mockResolvedValue({ status: 'applied', generation: 5 });
 });
@@ -245,6 +248,7 @@ it('uses existing incoming publication for one clean materialized causal success
   });
   expect(ports.receive).toHaveBeenCalledExactlyOnceWith({
     ...input,
+    residentOnly: true,
     selection: {
       rootKind: 'media',
       rootId: f.local.rootId,
@@ -468,4 +472,41 @@ it('does not admit native work from an incomplete catalogue scan', async () => {
   expect(ports.bases).not.toHaveBeenCalled();
   expect(ports.receive).not.toHaveBeenCalled();
   expect(ports.deletion).not.toHaveBeenCalled();
+});
+
+it('keeps an unloaded root remote without fetching originals or blocking a later loaded root', async () => {
+  const a = await successor('project-asset:a');
+  const b = await successor('project-asset:b');
+  ports.bases.mockResolvedValue([a.local, b.local]);
+  ports.unloaded.mockImplementation(async ({ rootId }) => rootId === a.local.rootId);
+  const input = args(catalog([a.base, a.head, b.base, b.head]));
+  expect(await createAutomaticCatalogSync().run(input)).toEqual({
+    applied: 1,
+    deferred: 1,
+    remaining: false,
+  });
+  expect(ports.receive).toHaveBeenCalledTimes(1);
+  expect(ports.receive).toHaveBeenCalledWith(
+    expect.objectContaining({
+      residentOnly: true,
+      selection: expect.objectContaining({ rootId: b.local.rootId }),
+    })
+  );
+  expect(input.remote.read).not.toHaveBeenCalled();
+});
+
+it('does not turn an unloaded metadata-only tombstone into a download', async () => {
+  const f = await successor('project-asset:a', true);
+  ports.bases.mockResolvedValue([f.local]);
+  ports.admission.mockResolvedValue(admission(f.local));
+  ports.unloaded.mockResolvedValue(true);
+  const input = args(catalog([f.base, f.head]));
+  expect(await createAutomaticCatalogSync().run(input)).toEqual({
+    applied: 1,
+    deferred: 0,
+    remaining: false,
+  });
+  expect(ports.deletion).toHaveBeenCalledTimes(1);
+  expect(ports.receive).not.toHaveBeenCalled();
+  expect(input.remote.read).not.toHaveBeenCalled();
 });

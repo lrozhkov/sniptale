@@ -1,3 +1,9 @@
+import type {
+  SyncCacheStatus,
+  SyncCacheRootStatus,
+  SyncCacheReleaseResult,
+  SyncCacheTrimResult,
+} from '../../../sync-cache';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -9,6 +15,7 @@ import {
 } from '../../../../composition/persistence/remote-connection/model';
 import { parseSyncQueueScope } from '../../../../composition/persistence/sync-capture/queue-model';
 import type {
+  SyncNativeEditingRoot,
   SyncProductCommand,
   SyncProductCompletion,
   SyncProductExecutorRequest,
@@ -57,8 +64,31 @@ export function parseSyncRemoteSelection(value: unknown): SyncRemoteSelection | 
     sourceDigest: value['sourceDigest'],
   };
 }
+function nativeRoot(value: unknown): SyncNativeEditingRoot | null {
+  if (!isRecord(value) || !exact(value, ['rootKind', 'rootId'])) return null;
+  const kind = value['rootKind'];
+  if (
+    (kind !== 'media' &&
+      kind !== 'video-project' &&
+      kind !== 'video-review' &&
+      kind !== 'scenario-project') ||
+    !text(value['rootId'])
+  )
+    return null;
+  return { rootKind: kind, rootId: value['rootId'] };
+}
 export function parseSyncProductWork(value: unknown): SyncProductWork | null {
   if (!isRecord(value)) return null;
+  if (
+    (value['kind'] === 'native-prepare' ||
+      value['kind'] === 'native-release' ||
+      value['kind'] === 'backup-prepare') &&
+    exact(value, ['kind', 'root'])
+  ) {
+    const root = nativeRoot(value['root']);
+    return root ? { kind: value['kind'], root } : null;
+  }
+  if (value['kind'] === 'cache-trim' && exact(value, ['kind'])) return { kind: 'cache-trim' };
   if (value['kind'] === 'automatic-sync' && exact(value, ['kind']))
     return { kind: 'automatic-sync' };
   if (
@@ -89,10 +119,21 @@ export function parseSyncProductWork(value: unknown): SyncProductWork | null {
       : null;
   if (
     (value['kind'] === 'replica-prepare' || value['kind'] === 'thumbnail-read') &&
-    exact(value, ['kind', 'selection'])
+    (exact(value, ['kind', 'selection']) ||
+      (value['kind'] === 'replica-prepare' &&
+        value['preserveNative'] === true &&
+        exact(value, ['kind', 'selection', 'preserveNative'])))
   ) {
     const selection = parseSyncRemoteSelection(value['selection']);
-    return selection ? { kind: value['kind'], selection } : null;
+    return selection
+      ? {
+          kind: value['kind'],
+          selection,
+          ...(value['kind'] === 'replica-prepare' && value['preserveNative'] === true
+            ? { preserveNative: true as const }
+            : {}),
+        }
+      : null;
   }
   return null;
 }
@@ -100,6 +141,30 @@ export function parseSyncProductCommand(value: unknown): SyncProductCommand | nu
   if (!isRecord(value)) return null;
   const work = parseSyncProductWork(value);
   if (work && work.kind !== 'automatic-sync') return work;
+  if (value['kind'] === 'connection-local-only' && exact(value, ['kind', 'expected'])) {
+    const expected = parseSyncConnectionIdentity(value['expected']);
+    return expected ? { kind: 'connection-local-only', expected } : null;
+  }
+  if (value['kind'] === 'cache-status' && exact(value, ['kind'])) return { kind: 'cache-status' };
+  if (
+    value['kind'] === 'cache-budget' &&
+    exact(value, ['kind', 'budgetBytes', 'revision']) &&
+    ordinal(value['budgetBytes']) &&
+    ordinal(value['revision'])
+  )
+    return { kind: 'cache-budget', budgetBytes: value['budgetBytes'], revision: value['revision'] };
+  if (value['kind'] === 'cache-root-status' && exact(value, ['kind', 'root'])) {
+    const root = nativeRoot(value['root']);
+    return root ? { kind: 'cache-root-status', root } : null;
+  }
+  if (
+    value['kind'] === 'cache-pin' &&
+    exact(value, ['kind', 'root', 'pinned']) &&
+    typeof value['pinned'] === 'boolean'
+  ) {
+    const root = nativeRoot(value['root']);
+    return root ? { kind: 'cache-pin', root, pinned: value['pinned'] } : null;
+  }
   if (value['kind'] === 'status' && exact(value, ['kind'])) return { kind: 'status' };
   if (value['kind'] === 'workspace-abandon' && exact(value, ['kind', 'source'])) {
     const source = parseSyncWorkspaceSource(value['source']);
@@ -238,7 +303,11 @@ export function parseSyncProductJob(value: unknown): SyncProductJobSnapshot | nu
     !isRecord(value) ||
     !exact(value, ['requestId', 'kind', 'state', 'failureCode']) ||
     !connectionUuid(value['requestId']) ||
-    (value['kind'] !== 'catalog-refresh' &&
+    (value['kind'] !== 'backup-prepare' &&
+      value['kind'] !== 'native-release' &&
+      value['kind'] !== 'cache-trim' &&
+      value['kind'] !== 'native-prepare' &&
+      value['kind'] !== 'catalog-refresh' &&
       value['kind'] !== 'replica-prepare' &&
       value['kind'] !== 'thumbnail-read' &&
       value['kind'] !== 'conflict-resolve' &&
@@ -266,8 +335,117 @@ export function parseSyncProductJob(value: unknown): SyncProductJobSnapshot | nu
     return null;
   return { requestId: value['requestId'], kind: value['kind'], state: value['state'], failureCode };
 }
+function cacheStatus(value: unknown): SyncCacheStatus | null {
+  if (
+    !isRecord(value) ||
+    !exact(value, [
+      'budgetBytes',
+      'budgetRevision',
+      'residentBytes',
+      'missingBytes',
+      'pinnedBytes',
+      'pinnedRoots',
+      'overBudgetBytes',
+    ]) ||
+    !ordinal(value['budgetBytes']) ||
+    !ordinal(value['budgetRevision']) ||
+    !ordinal(value['residentBytes']) ||
+    !ordinal(value['missingBytes']) ||
+    !ordinal(value['pinnedBytes']) ||
+    !ordinal(value['pinnedRoots']) ||
+    !ordinal(value['overBudgetBytes'])
+  )
+    return null;
+  return {
+    budgetBytes: value['budgetBytes'],
+    budgetRevision: value['budgetRevision'],
+    residentBytes: value['residentBytes'],
+    missingBytes: value['missingBytes'],
+    pinnedBytes: value['pinnedBytes'],
+    pinnedRoots: value['pinnedRoots'],
+    overBudgetBytes: value['overBudgetBytes'],
+  };
+}
+function cacheRootStatus(value: unknown): SyncCacheRootStatus | null {
+  if (
+    !isRecord(value) ||
+    !exact(value, ['root', 'configured', 'pinned', 'ready', 'releaseAllowed']) ||
+    typeof value['configured'] !== 'boolean' ||
+    typeof value['pinned'] !== 'boolean' ||
+    typeof value['ready'] !== 'boolean' ||
+    typeof value['releaseAllowed'] !== 'boolean'
+  )
+    return null;
+  const root = nativeRoot(value['root']);
+  return root
+    ? {
+        root,
+        configured: value['configured'],
+        pinned: value['pinned'],
+        ready: value['ready'],
+        releaseAllowed: value['releaseAllowed'],
+      }
+    : null;
+}
+function cacheRelease(value: unknown): SyncCacheReleaseResult | null {
+  if (
+    !isRecord(value) ||
+    !exact(value, ['released', 'releasedBytes', 'absent', 'unavailable', 'busy', 'protected']) ||
+    !ordinal(value['released']) ||
+    !ordinal(value['releasedBytes']) ||
+    !ordinal(value['absent']) ||
+    !ordinal(value['unavailable']) ||
+    !ordinal(value['busy']) ||
+    !ordinal(value['protected'])
+  )
+    return null;
+  return {
+    released: value['released'],
+    releasedBytes: value['releasedBytes'],
+    absent: value['absent'],
+    unavailable: value['unavailable'],
+    busy: value['busy'],
+    protected: value['protected'],
+  };
+}
+function cacheTrim(value: unknown): SyncCacheTrimResult | null {
+  if (
+    !isRecord(value) ||
+    !exact(value, ['released', 'releasedBytes', 'unavailable', 'busy', 'protected', 'status']) ||
+    !ordinal(value['released']) ||
+    !ordinal(value['releasedBytes']) ||
+    !ordinal(value['unavailable']) ||
+    !ordinal(value['busy']) ||
+    !ordinal(value['protected'])
+  )
+    return null;
+  const status = cacheStatus(value['status']);
+  return status
+    ? {
+        released: value['released'],
+        releasedBytes: value['releasedBytes'],
+        unavailable: value['unavailable'],
+        busy: value['busy'],
+        protected: value['protected'],
+        status,
+      }
+    : null;
+}
 function completion(value: unknown): SyncProductCompletion | null {
   if (!isRecord(value)) return null;
+  if (value['kind'] === 'cache-trim' && exact(value, ['kind', 'result'])) {
+    const result = cacheTrim(value['result']);
+    return result ? { kind: 'cache-trim', result } : null;
+  }
+  if (value['kind'] === 'native-release' && exact(value, ['kind', 'root', 'result'])) {
+    const root = nativeRoot(value['root']);
+    const result = cacheRelease(value['result']);
+    return root && result ? { kind: 'native-release', root, result } : null;
+  }
+  if (value['kind'] === 'native' && exact(value, ['kind', 'root'])) {
+    const root = nativeRoot(value['root']);
+    return root ? { kind: 'native', root } : null;
+  }
   if (
     value['kind'] === 'automatic' &&
     exact(value, ['kind', 'applied', 'deferred', 'remaining']) &&
@@ -367,7 +545,8 @@ function workspaceJob(value: unknown): SyncWorkspaceJobSnapshot | null {
   };
 }
 function status(value: unknown): SyncProductStatus | null {
-  if (!isRecord(value) || !exact(value, ['connection', 'workspace', 'workspaceJob'])) return null;
+  if (!isRecord(value) || !exact(value, ['connection', 'workspace', 'workspaceJob', 'products']))
+    return null;
   let connection: SyncProductStatus['connection'] = null;
   let workspace: SyncProductStatus['workspace'] = null;
   if (value['connection'] !== null) {
@@ -404,7 +583,23 @@ function status(value: unknown): SyncProductStatus | null {
   }
   const parsedJob = value['workspaceJob'] === null ? null : workspaceJob(value['workspaceJob']);
   if (value['workspaceJob'] !== null && !parsedJob) return null;
-  return { connection, workspace, workspaceJob: parsedJob };
+  const rawProducts = value['products'];
+  if (!Array.isArray(rawProducts) || rawProducts.length > 128) return null;
+  const products: SyncProductJobSnapshot[] = [];
+  const ids = new Set<string>();
+  for (const raw of rawProducts) {
+    const product = parseSyncProductJob(raw);
+    if (
+      !product ||
+      product.kind === 'thumbnail-read' ||
+      product.kind === 'automatic-sync' ||
+      ids.has(product.requestId)
+    )
+      return null;
+    ids.add(product.requestId);
+    products.push(product);
+  }
+  return { connection, workspace, workspaceJob: parsedJob, products };
 }
 export function parseSyncProductResult(value: unknown): SyncProductResult | null {
   if (!isRecord(value)) return null;
@@ -419,6 +614,36 @@ export function parseSyncProductResult(value: unknown): SyncProductResult | null
     connectionUuid(value['requestId'])
   )
     return { kind: 'accepted', requestId: value['requestId'] };
+  if (value['kind'] === 'cache-status' && exact(value, ['kind', 'status'])) {
+    const status = cacheStatus(value['status']);
+    return status ? { kind: 'cache-status', status } : null;
+  }
+  if (value['kind'] === 'cache-root' && exact(value, ['kind', 'status'])) {
+    const status = cacheRootStatus(value['status']);
+    return status ? { kind: 'cache-root', status } : null;
+  }
+  if (
+    value['kind'] === 'cache-budget' &&
+    exact(value, ['kind', 'budgetBytes', 'revision']) &&
+    ordinal(value['budgetBytes']) &&
+    ordinal(value['revision'])
+  )
+    return { kind: 'cache-budget', budgetBytes: value['budgetBytes'], revision: value['revision'] };
+  if (value['kind'] === 'local-only-refused' && exact(value, ['kind', 'code'])) {
+    const code = value['code'];
+    return code === 'missing-bytes' ||
+      code === 'local-changed' ||
+      code === 'pending-outgoing' ||
+      code === 'invalid-data'
+      ? { kind: 'local-only-refused', code }
+      : null;
+  }
+  if (
+    value['kind'] === 'local-only' &&
+    exact(value, ['kind', 'history']) &&
+    (value['history'] === 'delivered' || value['history'] === 'incomplete')
+  )
+    return { kind: 'local-only', history: value['history'] };
   if (value['kind'] === 'enrolled' && exact(value, ['kind'])) return { kind: 'enrolled' };
   if (value['kind'] === 'status' && exact(value, ['kind', 'status'])) {
     const parsed = status(value['status']);

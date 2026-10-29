@@ -2,6 +2,39 @@ import { defineMessageSource } from '../source';
 
 export const settingsSyncQueueMessages = defineMessageSource({
   title: { ru: 'Очередь синхронизации', en: 'Sync queue' },
+  runtimeTitle: {
+    ru: 'Скачивание и работа с локальными файлами',
+    en: 'Downloads and local file operations',
+  },
+  runtimeHint: {
+    ru: 'Текущие и последние операции этого сеанса. Отмена сохраняет завершённую работу. После ошибки или перезапуска повторите исходное действие в библиотеке или настройках.',
+    en: 'Current and recent operations in this session. Cancellation keeps completed work. After a failure or restart, repeat the original action in Library or Settings.',
+  },
+  runtimeEmpty: {
+    ru: 'В этом сеансе пока нет операций.',
+    en: 'No operations in this session yet.',
+  },
+  runtimeUnavailable: {
+    ru: 'Не удалось прочитать текущие операции. Обновите очередь перед отменой.',
+    en: 'Current operations could not be read. Refresh the queue before cancellation.',
+  },
+  jobKind: {
+    'replica-prepare': { ru: 'Получение проекта с сервера', en: 'Download server project' },
+    'native-prepare': { ru: 'Получение файлов для работы', en: 'Download files for editing' },
+    'backup-prepare': { ru: 'Получение файлов для копии', en: 'Download files for backup' },
+    'native-release': { ru: 'Освобождение локального места', en: 'Free local space' },
+    'cache-trim': { ru: 'Освобождение места по бюджету', en: 'Apply local storage budget' },
+    'catalog-refresh': { ru: 'Обновление каталога', en: 'Refresh catalog' },
+    'conflict-resolve': { ru: 'Разрешение конфликта версий', en: 'Resolve version conflict' },
+    'thumbnail-read': { ru: 'Получение превью', en: 'Download preview' },
+    'automatic-sync': { ru: 'Фоновая синхронизация', en: 'Background synchronization' },
+  },
+  jobState: {
+    running: { ru: 'Выполняется', en: 'Running' },
+    ready: { ru: 'Завершено', en: 'Complete' },
+    failed: { ru: 'Ошибка', en: 'Failed' },
+    interrupted: { ru: 'Прервано', en: 'Interrupted' },
+  },
   refresh: { ru: 'Обновить с начала', en: 'Refresh from start' },
   next: { ru: 'Следующая страница', en: 'Next page' },
   loading: { ru: 'Загрузка очереди…', en: 'Loading queue…' },
@@ -73,6 +106,14 @@ export const settingsSyncQueueMessages = defineMessageSource({
     cancel: { ru: 'Отменить операцию', en: 'Cancel operation' },
   },
   failure: {
+    unavailable: {
+      ru: 'Необходимые данные недоступны. Проверьте подключение и повторите исходное действие.',
+      en: 'Required data is unavailable. Check the connection and repeat the original action.',
+    },
+    'invalid-data': {
+      ru: 'Данные не прошли проверку. Исходные файлы сохранены.',
+      en: 'Data validation failed. Source files are preserved.',
+    },
     temporary: { ru: 'Временная ошибка', en: 'Temporary failure' },
     authentication: { ru: 'Требуется авторизация', en: 'Authentication required' },
     'access-denied': { ru: 'Нет доступа', en: 'Access denied' },

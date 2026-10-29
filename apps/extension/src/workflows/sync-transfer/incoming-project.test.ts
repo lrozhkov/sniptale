@@ -1,3 +1,9 @@
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { encodePortableReviewAssetRefs } from '../../composition/persistence/review-workspaces/asset-refs';
+import { loadProjectReplicaExport } from '../../composition/persistence/sync-capture/apply-video-project';
+vi.mock('../../composition/persistence/sync-capture/apply-video-project', () => ({
+  loadProjectReplicaExport: vi.fn(async () => null),
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
@@ -8,6 +14,7 @@ import { prepareCatalogReplica } from './incoming';
 
 import {
   object,
+  ref,
   mediaEnvelope,
   projectEnvelope,
   attempt,
@@ -68,6 +75,7 @@ vi.mock('../media-hub-backup/v6/staging', () => ({ stageRootObjects: io.stage })
 beforeEach(() => {
   vi.clearAllMocks();
   resetIncomingTestIO(io);
+  vi.mocked(loadProjectReplicaExport).mockResolvedValue(null);
 });
 
 it('prepares editing bytes and checks borrowed originals without downloading exports', async () => {
@@ -79,6 +87,15 @@ it('prepares editing bytes and checks borrowed originals without downloading exp
     signal: new AbortController().signal,
   });
   expect(journal.payload.kind).toBe('video-project');
+  if (journal.payload.kind !== 'video-project') throw new Error('Expected project.');
+  expect(journal.payload.input.root.exports).toEqual([
+    expect.objectContaining({
+      entry: expect.objectContaining({ projectId: 'project' }),
+      remote: expect.objectContaining({
+        key: f.selected.objects.find((item) => item.objectId === 'export')!.remoteKey,
+      }),
+    }),
+  ]);
   expect(io.staged).toEqual(['private']);
   expect(io.read).toHaveBeenCalledOnce();
   expect(f.reads).toEqual([
@@ -200,3 +217,116 @@ it('stages a mixed fresh editing and reused export mapping without downloading t
   expect(io.staged).toEqual(['private']);
   expect(journal.payload.kind).toBe('video-project');
 });
+
+it.each([
+  'new',
+  'new-library-mirror',
+  'reused',
+  'removed-during-download',
+  'created-during-download',
+] as const)(
+  'retains only the Review closure actually admitted when export reuse is %s',
+  async (mode) => {
+    let reuse = mode === 'reused' || mode === 'removed-during-download';
+    const f = await fixture(true);
+    const envelope = projectEnvelope();
+    const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
+    const exported = metadata.projectExports[0]!;
+    exported.entry.mimeType = 'video/webm';
+    exported.entry.filename = 'saved.webm';
+    const exportObject = envelope.objects.find((item) => item.objectId === 'export')!;
+    exportObject.mimeType = 'video/webm';
+    exportObject.filename = 'saved.webm';
+    exportObject.path = '_sniptale/assets/export/saved.webm';
+    const advanced = createQuickEditAdvancedState();
+    advanced.background = {
+      enabled: false,
+      rememberedImage: { assetId: 'project-asset:export-review-image', imageFit: 'cover' },
+    };
+    exported.videoReview = encodePortableReviewAssetRefs({
+      workspace: {
+        aggregateId: 'export:export',
+        formatVersion: 1,
+        revision: 1,
+        cursor: 0,
+        history: [],
+        advanced,
+        source: { duration: 2, width: 640, height: 360, size: 3, mimeType: 'video/webm' },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      draft: null,
+    });
+    metadata.projectAssets.push({
+      entry: { id: 'export-review-image', mimeType: 'image/png', size: 3, createdAt: 1 },
+      filename: 'export-review.png',
+      objectId: 'export-review-image',
+      ...(mode === 'new-library-mirror'
+        ? { libraryMediaId: 'project-asset:export-review-image' }
+        : { publishToLibrary: false }),
+    });
+    envelope.objects.push(object('export-review-image', 'export-review.png'));
+    envelope.metadata = JSON.parse(JSON.stringify(metadata));
+    envelope.descriptor.objectCount = 3;
+    envelope.descriptor.totalBytes = 9;
+    const selected = await attempt(parseRootEnvelope(envelope), 'project-op', 2);
+    const media = await attempt(mediaEnvelope().envelope, 'media-op');
+    const catalog = {
+      ...projectSyncCatalog('space', [media, selected]),
+      invalid: [],
+      metadataBytes: 0,
+      pages: 1,
+    };
+    for (const item of selected.objects) f.data.set(item.remoteKey, new Blob([new Uint8Array(3)]));
+    const retained = {
+      entry: { ...exported.entry, assetId: 'existing-export-body' },
+      ref: { ...ref('existing-export-body'), mimeType: 'video/webm' },
+      copy: null,
+    };
+    if (reuse) vi.mocked(loadProjectReplicaExport).mockResolvedValue(retained);
+    const prepare = () =>
+      prepareCatalogReplica({
+        ...f,
+        catalog,
+        rootKind: 'video-project',
+        rootId: 'project',
+        signal: new AbortController().signal,
+      });
+    if (mode === 'removed-during-download' || mode === 'created-during-download') {
+      vi.mocked(loadProjectReplicaExport)
+        .mockResolvedValueOnce(reuse ? retained : null)
+        .mockResolvedValue(reuse ? null : retained);
+      await expect(prepare()).rejects.toThrow('not ready');
+      expect(io.discard.mock.calls.map(([id]) => id)).toEqual(
+        reuse ? ['staged-private'] : ['staged-private', 'staged-export-review-image']
+      );
+      expect(io.journal).not.toHaveBeenCalled();
+      io.staged.length = 0;
+      f.reads.length = 0;
+      reuse = !reuse;
+    }
+    const journal = await prepare();
+    if (journal.payload.kind !== 'video-project') throw new Error('Expected project.');
+    expect(io.staged).toEqual(reuse ? ['private'] : ['private', 'export-review-image']);
+    if (mode === 'new-library-mirror') {
+      const resource = journal.payload.input.root.assets.find(
+        (asset) => asset.ref.assetId === 'staged-export-review-image'
+      );
+      expect(resource).toMatchObject({ publishToLibrary: false });
+      expect(resource?.entry.id).not.toBe('export-review-image');
+      expect(resource?.reusePublished).toBeUndefined();
+      expect(journal.payload.input.dependencies.map((item) => item.entry.id)).toEqual([
+        'project-asset:source',
+      ]);
+    } else
+      expect(journal.payload.input.root.assets.map((asset) => asset.entry.id)).toEqual(
+        reuse ? ['private'] : ['private', 'export-review-image']
+      );
+    const admittedExport = journal.payload.input.root.exports![0]!;
+    expect(admittedExport.reuseExisting).toBe(reuse ? true : undefined);
+    expect(Boolean(admittedExport.videoReview)).toBe(!reuse);
+    expect(f.reads).not.toContain(
+      selected.objects.find((item) => item.objectId === 'export')!.remoteKey
+    );
+  }
+);

@@ -7,7 +7,10 @@ import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { assertStandaloneMediaSourceReplaceable } from '../projects/source-admission';
 import { initDB } from '../infrastructure/indexed-db/core';
-import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
+import type {
+  DurableAssetLifecyclePermit,
+  PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { AssetRef } from '../assets/contracts';
 import {
@@ -15,6 +18,11 @@ import {
   completePhysicalDeleteOperation,
   readAssetFile,
 } from '../assets';
+import { assetResidencyCopyId } from '../assets/residency-records';
+import {
+  readAssetResidencyCopyInTransaction,
+  retireAssetResidencyCopyInTransaction,
+} from '../assets/residency';
 import { parseAssetRef } from '../assets/guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -31,6 +39,7 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import {
   ASSET_OPERATIONS_STORE,
+  ASSET_RESIDENCY_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
@@ -60,6 +69,7 @@ import {
   freezeImageInTransaction,
   digestCapturedImageRows,
   isBoundedImageMetadata,
+  readImageReplicaPredecessorInTransaction,
 } from './image-snapshot';
 
 /** Native JSON plus staged immutable refs; portable codecs remain in the workflow owner. */
@@ -378,11 +388,37 @@ async function checkedImageOriginalDigest(
       AGGREGATE_PRESENTATIONS_STORE,
       ASSET_REFS_STORE,
       ASSET_OWNERS_STORE,
+      ASSET_RESIDENCY_STORE,
+      SYNC_CAPTURE_STORE,
     ],
     'readonly'
   );
-  const previous = await freezeImageInTransaction(tx, input.media.id);
+  const rootKey = captureRootKey(input.spaceId, 'media', input.media.id);
+  const state = parseSyncCaptureRecord(
+    await tx.objectStore(SYNC_CAPTURE_STORE).get(JSON.stringify(['root-state', rootKey]))
+  );
+  if (
+    !state ||
+    state.kind !== 'root-state' ||
+    state.rootKey !== rootKey ||
+    state.generation !== input.expectedLocalGeneration ||
+    JSON.stringify(state.basis) !== JSON.stringify(input.expectedBasis)
+  )
+    refuseImageReplica();
+  const predecessor = await readImageReplicaPredecessorInTransaction(tx, input.media.id, state);
+  const previous = predecessor.rows;
   await tx.done;
+  if (predecessor.unloadedCopy) {
+    if (
+      previous.media.workspaceRevision !== input.expectedNativeRevision ||
+      previous.media.size !== original.size ||
+      previous.media.mimeType !== input.media.mimeType
+    )
+      return null;
+    return (await hashOriginal(original)) === predecessor.unloadedCopy.remote.sha256
+      ? predecessor.digest
+      : null;
+  }
   const previousBlob =
     previous.media.blob ??
     (previous.originalRef
@@ -473,18 +509,25 @@ async function admitImageReplicaPredecessor(
 ): Promise<CapturedImageRows | null> {
   await assertImageReplicaSidecars(tx, input.media.id);
   const raw: unknown = await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.media.id);
-  const previous = raw === undefined ? null : await freezeImageInTransaction(tx, input.media.id);
+  const predecessor =
+    raw === undefined
+      ? null
+      : state
+        ? await readImageReplicaPredecessorInTransaction(tx, input.media.id, state)
+        : null;
+  if (raw !== undefined && !predecessor) refuseImageReplica();
+  const previous = predecessor?.rows ?? null;
   if (previous) {
     if (
       !state ||
       state.deleted ||
-      state.nativeDigest !== digestCapturedImageRows(previous) ||
+      state.nativeDigest !== predecessor?.digest ||
       previous.media.source.kind !== input.media.source.kind ||
       input.expectedNativeRevision !== previous.media.workspaceRevision
     )
       refuseImageReplica();
     if (
-      unchangedOriginalDigest !== digestCapturedImageRows(previous) ||
+      unchangedOriginalDigest !== predecessor?.digest ||
       (previous.originalRef && previous.originalRef.assetId !== input.originalRef.assetId)
     )
       await assertStandaloneMediaSourceReplaceable(previous.media, tx);
@@ -638,7 +681,8 @@ async function commitImageReplica(
   tx: ImageTransaction,
   input: ApplyPreparedImageReplicaInput,
   hydrated: HydratedImageReplica,
-  operation: ImageDeleteOperation
+  operation: ImageDeleteOperation,
+  permit: PersistenceMutationPermit
 ): Promise<{ status: 'applied' | 'duplicate'; generation: number }> {
   const keys = imageReplicaKeys(input);
   const profile = requireImageReplicaProfile(
@@ -672,7 +716,12 @@ async function commitImageReplica(
     ...input.documentRefs,
     ...(input.media.source.kind === 'stored-asset' ? [input.originalRef] : []),
   ]);
+  const previousResidency = await readAssetResidencyCopyInTransaction(
+    tx,
+    assetResidencyCopyId({ kind: 'inline-image', mediaId: input.media.id })
+  );
   await publishImageReplicaNative(tx, input, hydrated, { previous, revision }, operation);
+  if (previousResidency) await retireAssetResidencyCopyInTransaction(tx, previousResidency, permit);
   await writeImageReplicaProvenance(tx, input, keys, revision, generation);
   if (operation.assetIds.length) await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
   return { status: 'applied', generation };
@@ -691,7 +740,7 @@ export async function applyPreparedImageReplica(
   if (receipt !== null) return { status: 'duplicate', generation: receipt };
   const hydrated = await hydrateImageReplica(candidate);
   const operation = buildPhysicalDeleteOperation([]);
-  const result = await runWithIndexedDbMutation(async (db) => {
+  const result = await runWithIndexedDbMutation(async (db, permit) => {
     const tx = db.transaction(
       [
         SYNC_CAPTURE_STORE,
@@ -702,6 +751,7 @@ export async function applyPreparedImageReplica(
         ASSET_OWNERS_STORE,
         ASSET_REFS_STORE,
         ASSET_OPERATIONS_STORE,
+        ASSET_RESIDENCY_STORE,
         PROJECT_ASSETS_STORE,
         PROJECT_EXPORTS_STORE,
         VIDEO_WORKSPACES_STORE,
@@ -714,7 +764,7 @@ export async function applyPreparedImageReplica(
       'readwrite'
     );
     try {
-      const accepted = await commitImageReplica(tx, candidate, hydrated, operation);
+      const accepted = await commitImageReplica(tx, candidate, hydrated, operation, permit);
       await tx.done;
       return accepted;
     } catch (error) {

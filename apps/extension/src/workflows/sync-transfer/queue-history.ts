@@ -1,3 +1,8 @@
+import {
+  loadSyncQueueHistoryScanState,
+  loadSyncQueueHistoryScanPage,
+  saveSyncQueueHistoryScanState,
+} from '../../composition/persistence/sync-capture/queue-history-scan';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import { tryRunWithPersistenceMutationPermit } from '../../composition/persistence/infrastructure/mutation-barrier';
 import { createRuntimeLog } from '../../composition/persistence/diagnostics/runtime-log';
@@ -65,5 +70,24 @@ export async function deliverSyncQueueHistory(
     return result === true;
   } catch {
     return false;
+  }
+}
+
+/** Best-effort final delivery. Native retirement independently checks exact final event cursors. */
+export async function deliverRetiringSyncQueueHistory(scope: SyncQueueScope): Promise<void> {
+  try {
+    if (!(await deliverSyncQueueHistory(scope, { kind: 'connection' }))) return;
+    let state = await loadSyncQueueHistoryScanState(scope);
+    if (state.afterKey !== null) state = await saveSyncQueueHistoryScanState(state, null);
+    for (;;) {
+      const page = await loadSyncQueueHistoryScanPage(state, 64);
+      if (page.invalidSources > 0) return;
+      for (const source of page.sources)
+        if (!(await deliverSyncQueueHistory(scope, source))) return;
+      state = await saveSyncQueueHistoryScanState(state, page.nextAfterKey);
+      if (!page.more) return;
+    }
+  } catch {
+    // A concurrent scan or unavailable log cannot discard native files or block retirement.
   }
 }

@@ -1,3 +1,4 @@
+import type { RetainedLibraryPlan } from '../../workflows/sync-transfer/retained-library';
 import type {
   GallerySelectionRange,
   GalleryToggleSelectionOptions,
@@ -54,7 +55,8 @@ export interface PendingImportState {
 
 export interface PendingExportState {
   options: MediaHubBackupExportOptions;
-  summary: MediaHubLocalBackupSummary;
+  summary: MediaHubLocalBackupSummary | null;
+  preparation?: RetainedLibraryPlan;
 }
 
 export type { ActiveImportState } from '../library/import-types';

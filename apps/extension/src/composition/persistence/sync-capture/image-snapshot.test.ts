@@ -6,14 +6,37 @@ import { createPersistedEditorDocumentFixture } from '../document-assets/test-su
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { captureImageInTransaction, captureMediaInTransaction } from './capture';
+import { SCENARIO_CAPTURE_STORES } from './scenario-snapshot';
+import {
+  createGuideProject,
+  createGuideStep,
+  createGuideImageBlock,
+} from '../../../features/scenario/project/factories';
+import { createScenarioProjectEntry } from '../scenario/projects/entry';
+import { deleteScenarioExport } from '../scenario/projects/exports';
 import { parseSyncCaptureRecord } from './guards';
-import { parseCapturedImageRows, digestCapturedImageRows } from './image-snapshot';
+import { assetResidencyCopyId } from '../assets/residency-records';
+import { captureRootKey } from './contracts';
+import {
+  parseCapturedImageRows,
+  digestCapturedImageRows,
+  readImageReplicaPredecessorInTransaction,
+  freezeImageInTransaction,
+} from './image-snapshot';
 import { collectSyncCaptureClaims } from './claims';
 
 const io = vi.hoisted(() => ({ database: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: io.database,
+}));
+vi.mock('../scenario/export-artifacts', async (original) => ({
+  ...(await original<typeof import('../scenario/export-artifacts')>()),
+  recoverScenarioHtmlPublications: vi.fn(async () => 0),
+}));
+vi.mock('../assets', async (original) => ({
+  ...(await original<typeof import('../assets')>()),
+  completePhysicalDeleteOperation: vi.fn(async () => undefined),
 }));
 beforeEach(() => vi.clearAllMocks());
 
@@ -280,4 +303,287 @@ it('captures stored image originals separately from authored document refs and p
       return captureMediaInTransaction(tx, media.id);
     })
   ).rejects.toThrow('ownership');
+});
+
+async function unloadedImage(duplicate = false, blobType = 'image/png') {
+  const f = setup();
+  f.rows.set('asset_residency', new Map());
+  const originalMedia = { ...f.media, blob: new Blob(['original'], { type: blobType }) };
+  f.table('media_library').set(f.media.id, originalMedia);
+  if (duplicate)
+    f.table('aggregate_presentations').set(JSON.stringify(['image', f.media.id]), {
+      aggregateId: f.media.id,
+      aggregateKind: 'image',
+      presentationRevision: 0,
+      previewBlob: f.media.blob,
+      thumbnailBlob: new Blob(['thumb'], { type: 'image/png' }),
+      updatedAt: 1,
+    });
+  const captured = await f.capture();
+  if (!captured || captured.phase !== 'native' || captured.change.kind !== 'image')
+    throw new Error('Expected image');
+  const rootKey = captureRootKey('space', 'media', f.media.id);
+  const state = parseSyncCaptureRecord(
+    f.table('sync_capture').get(JSON.stringify(['root-state', rootKey]))
+  );
+  if (!state || state.kind !== 'root-state') throw new Error('Expected current state');
+  const id = assetResidencyCopyId({ kind: 'inline-image', mediaId: f.media.id });
+  const copy = {
+    version: 1,
+    kind: 'copy',
+    id,
+    revision: 2,
+    operationId: 'unload',
+    phase: 'unloaded',
+    lastUsedAt: 1,
+    target: {
+      kind: 'inline-image',
+      mediaId: f.media.id,
+      createdAt: f.media.createdAt,
+      workspaceRevision: 0,
+      rootGeneration: state.generation,
+      nativeDigest: state.nativeDigest,
+      size: f.media.size,
+      mimeType: f.media.mimeType,
+      blobType,
+      ...(duplicate
+        ? { duplicatePreview: { presentationRevision: 0, blobType: 'image/png' } }
+        : {}),
+    },
+    remote: {
+      key: 'Originals/original.png',
+      sha256: 'a'.repeat(64),
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.example.test/root/',
+        accountId: 'alice',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+    },
+  };
+  f.table('asset_residency').set(id, copy);
+  const { blob: _blob, ...media } = originalMedia;
+  f.table('media_library').set(media.id, media);
+  if (duplicate)
+    f.table('aggregate_presentations').set(JSON.stringify(['image', media.id]), {
+      aggregateId: media.id,
+      aggregateKind: 'image',
+      presentationRevision: 0,
+      thumbnailBlob: new Blob(['thumb'], { type: 'image/png' }),
+      updatedAt: 1,
+    });
+  const tx = () =>
+    f.database.transaction(
+      [
+        'asset_residency',
+        'sync_capture',
+        'media_library',
+        'image_workspaces',
+        'aggregate_presentations',
+        'asset_refs',
+        'asset_owners',
+      ],
+      'readonly'
+    ) as unknown as Parameters<typeof readImageReplicaPredecessorInTransaction>[0];
+  return {
+    ...f,
+    copy,
+    state,
+    media,
+    tx,
+    read: () => readImageReplicaPredecessorInTransaction(tx(), media.id, state),
+  };
+}
+
+it.each([
+  [false, 'image/png'],
+  [true, 'image/png'],
+  [false, ''],
+  [true, ''],
+] as const)(
+  'projects the exact accepted metadata digest without fabricating or reading missing Blob slots (preview=%s, type=%s)',
+  async (duplicate, blobType) => {
+    const f = await unloadedImage(duplicate, blobType);
+    const readBytes = vi.spyOn(Blob.prototype, 'arrayBuffer');
+    try {
+      const previous = await f.read();
+      expect(previous.digest).toBe(f.state.nativeDigest);
+      expect(previous.rows.media.blob).toBeUndefined();
+      expect(previous.unloadedCopy).toEqual(f.copy);
+      expect(parseCapturedImageRows(previous.rows)).toBeNull();
+      await expect(freezeImageInTransaction(f.tx(), f.media.id)).rejects.toThrow(
+        'Unsupported screenshot'
+      );
+      expect(readBytes).not.toHaveBeenCalled();
+    } finally {
+      readBytes.mockRestore();
+    }
+  }
+);
+
+it.each([
+  'missing-copy',
+  'wrong-phase',
+  'epoch',
+  'space',
+  'descriptor',
+  'metadata',
+  'malformed',
+] as const)('refuses an unloaded predecessor with changed %s evidence', async (change) => {
+  const f = await unloadedImage();
+  if (change === 'missing-copy') f.table('asset_residency').clear();
+  if (change === 'wrong-phase')
+    f.table('asset_residency').set(f.copy.id, { ...f.copy, phase: 'resident' });
+  if (change === 'epoch')
+    f.table('asset_residency').set(f.copy.id, {
+      ...f.copy,
+      target: { ...f.copy.target, rootGeneration: 2 },
+    });
+  if (change === 'space')
+    f.table('asset_residency').set(f.copy.id, {
+      ...f.copy,
+      remote: { ...f.copy.remote, binding: { ...f.copy.remote.binding, spaceId: 'foreign' } },
+    });
+  if (change === 'descriptor')
+    f.table('asset_residency').set(f.copy.id, {
+      ...f.copy,
+      target: { ...f.copy.target, blobType: '' },
+    });
+  if (change === 'metadata')
+    f.table('media_library').set(f.media.id, { ...f.media, tags: ['changed'] });
+  if (change === 'malformed')
+    f.table('asset_residency').set(f.copy.id, { ...f.copy, unexpected: true });
+  await expect(f.read()).rejects.toThrow();
+});
+
+it('refuses a returned preview under an unloaded duplicate descriptor', async () => {
+  const f = await unloadedImage(true);
+  f.table('aggregate_presentations').set(JSON.stringify(['image', f.media.id]), {
+    aggregateId: f.media.id,
+    aggregateKind: 'image',
+    presentationRevision: 0,
+    previewBlob: new Blob(['original'], { type: 'image/png' }),
+    thumbnailBlob: new Blob(['thumb'], { type: 'image/png' }),
+    updatedAt: 1,
+  });
+  await expect(f.read()).rejects.toThrow('preview changed');
+});
+
+async function guideWithUnloadedScreenshot() {
+  const f = await unloadedImage();
+  for (const name of SCENARIO_CAPTURE_STORES) if (!f.rows.has(name)) f.rows.set(name, new Map());
+  const project = createGuideProject('Copied screenshot', 'guide', 1);
+  const step = createGuideStep('Image', 'step');
+  step.blocks.push(
+    createGuideImageBlock({
+      id: 'image-block',
+      assetId: 'scenario-image',
+      width: 10,
+      height: 10,
+      source: { kind: 'import', filename: 'image.png' },
+    })
+  );
+  project.items.push(step);
+  const entry = createScenarioProjectEntry({ project, existing: undefined, updatedAt: 1 });
+  f.table('scenario_projects').set(entry.id, entry);
+  f.table('scenario_assets').set('scenario-image', {
+    id: 'scenario-image',
+    projectId: entry.id,
+    assetId: f.ref.assetId,
+    galleryAssetId: f.media.id,
+    mimeType: 'image/png',
+    width: 10,
+    height: 10,
+    createdAt: 1,
+    size: 8,
+  });
+  f.table('asset_refs').set(f.ref.assetId, f.ref);
+  f.table('asset_owners').set(JSON.stringify(['scenario-asset', 'scenario-image', 'body']), {
+    ownerKind: 'scenario-asset',
+    ownerId: 'scenario-image',
+    role: 'body',
+    assetId: f.ref.assetId,
+  });
+  const body = {
+    ...f.ref,
+    assetId: 'html-body',
+    location: { kind: 'opfs', objectKey: 'objects/html-body' },
+  };
+  const ownerKey = JSON.stringify(['scenario-export', 'html-export', 'body']);
+  f.table('asset_refs').set(body.assetId, body);
+  f.table('asset_owners').set(ownerKey, {
+    ownerKind: 'scenario-export',
+    ownerId: 'html-export',
+    role: 'body',
+    assetId: body.assetId,
+  });
+  f.table('scenario_exports').set('html-export', {
+    id: 'html-export',
+    projectId: entry.id,
+    format: 'html',
+    filename: 'guide.html',
+    createdAt: 2,
+    size: 8,
+    html: { mode: 'guide', assetId: body.assetId },
+    trashState: { updatedAt: 3, trashedAt: 3 },
+  });
+  return { ...f, entry, body, ownerKey };
+}
+
+it('purges a Guide export with an exact unloaded screenshot dependency without new image bytes', async () => {
+  const f = await guideWithUnloadedScreenshot();
+  await deleteScenarioExport('html-export');
+  expect(f.table('scenario_exports').has('html-export')).toBe(false);
+  expect(f.table('asset_refs').has(f.body.assetId)).toBe(false);
+  expect(f.table('asset_owners').has(f.ownerKey)).toBe(false);
+  expect(f.table('media_library').get(f.media.id)).not.toHaveProperty('blob');
+  const captures = [...f.table('sync_capture').values()].map(parseSyncCaptureRecord);
+  const parents = captures.filter(
+    (row) =>
+      row?.kind === 'sync-operation' &&
+      row.phase === 'native' &&
+      row.change.kind === 'scenario-project'
+  );
+  expect(parents).toHaveLength(1);
+  expect(parents[0]).toMatchObject({
+    change: {
+      rows: {
+        exports: [],
+        mediaDependencies: [
+          {
+            mediaId: f.media.id,
+            generation: f.state.generation,
+            basis: f.state.basis,
+          },
+        ],
+      },
+    },
+  });
+  expect(
+    captures.filter((row) => row?.kind === 'sync-operation' && row.rootKind === 'media')
+  ).toHaveLength(1);
+});
+
+it('preserves a refused export purge and permits exact retry after dependency metadata is restored', async () => {
+  const f = await guideWithUnloadedScreenshot();
+  const original = f.table('media_library').get(f.media.id);
+  f.table('media_library').set(f.media.id, { ...f.media, createdAt: f.media.createdAt + 1 });
+  const before = structuredClone(f.rows);
+  const transactions: ReturnType<typeof f.database.transaction>[] = [];
+  io.database.mockResolvedValue({
+    transaction: (stores: string[], mode: string) => {
+      const tx = f.database.transaction(stores, mode);
+      transactions.push(tx);
+      return tx;
+    },
+  });
+  await expect(deleteScenarioExport('html-export')).rejects.toThrow();
+  // Settle the queued native writes, as IndexedDB does after a JavaScript refusal.
+  await Promise.allSettled(transactions.map((tx) => tx.done));
+  expect(f.rows).toEqual(before);
+  f.table('media_library').set(f.media.id, original);
+  await deleteScenarioExport('html-export');
+  expect(f.table('scenario_exports').has('html-export')).toBe(false);
 });

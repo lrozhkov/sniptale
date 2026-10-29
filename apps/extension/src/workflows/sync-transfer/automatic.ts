@@ -1,3 +1,4 @@
+import { hasUnloadedNativeEditingRoot } from './native-residency';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
   SyncConnectionIdentity,
@@ -110,10 +111,18 @@ export function createAutomaticCatalogSync() {
               signal: args.signal,
             });
           } else {
+            if (
+              await hasUnloadedNativeEditingRoot({ rootKind: root.rootKind, rootId: root.rootId })
+            ) {
+              result.deferred++;
+              afterRootKey = key;
+              continue;
+            }
             await receiveSelectedCatalogRoot({
               ...selected,
               remote: args.remote,
               catalog,
+              residentOnly: true,
               selection: {
                 rootKind: root.rootKind,
                 rootId: root.rootId,

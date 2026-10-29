@@ -714,3 +714,123 @@ it('checks authorization before mutation and replays committed results after pau
   });
   expect(f.rows).toEqual(committed);
 });
+
+function retainedExportFixture() {
+  const f = setup();
+  const authorization = { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 };
+  f.input.authorization = authorization;
+  const binding = {
+    provider: 'webdav' as const,
+    rootUrl: 'https://dav.example.test/root/',
+    accountId: 'alice',
+    spaceId,
+    profileCreatedAt: 1,
+    connectionGeneration: 3,
+  };
+  f.table('sync_connection').set('connection', {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding,
+    identity: authorization,
+    phase: 'active',
+    updateNonce: null,
+    credentialId: '10000000-0000-4000-8000-000000000002',
+  });
+  const ref: AssetRef = {
+    ...f.ref,
+    assetId: 'retained-export-body',
+    location: { kind: 'opfs', objectKey: 'objects/retained-export-body' },
+  };
+  const entry = createProjectExportEntry({
+    id: 'saved-export',
+    projectId,
+    assetId: ref.assetId,
+    size: ref.size,
+    mimeType: ref.mimeType,
+  });
+  const item = { entry, ref, remote: { key: 'Files/project/export.webm', sha256: ref.sha256! } };
+  f.input.root.exports = [item];
+  return { ...f, item, binding };
+}
+
+it('retains a remote saved export atomically, retries a failed receipt and replays without its bytes', async () => {
+  const f = retainedExportFixture();
+  const before = structuredClone(f.rows);
+  f.failReceipt();
+  await expect(applyPreparedVideoProjectRevision(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  f.allowWrites();
+  await expect(applyPreparedVideoProjectRevision(f.input)).resolves.toMatchObject({
+    status: 'applied',
+  });
+  expect(f.table('project_exports').get(f.item.entry.id)).toEqual(f.item.entry);
+  expect(f.table('asset_refs').get(f.item.ref.assetId)).toEqual(f.item.ref);
+  expect(f.table('media_library').has(`export:${f.item.entry.id}`)).toBe(false);
+  expect([...f.table('asset_residency').values()]).toEqual([
+    expect.objectContaining({
+      phase: 'unloaded',
+      revision: 1,
+      target: { kind: 'opfs', ref: f.item.ref },
+      remote: { ...f.item.remote, binding: f.binding },
+    }),
+  ]);
+  const committed = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(f.input)).resolves.toMatchObject({
+    status: 'duplicate',
+  });
+  expect(f.rows).toEqual(committed);
+});
+
+it.each(['export', 'ref', 'owner'] as const)(
+  'does not take a pre-existing %s identity for a remote export',
+  async (collision) => {
+    const f = retainedExportFixture();
+    if (collision === 'export')
+      f.table('project_exports').set(f.item.entry.id, { ...f.item.entry, projectId: 'foreign' });
+    if (collision === 'ref') f.table('asset_refs').set(f.item.ref.assetId, f.item.ref);
+    if (collision === 'owner')
+      f.table('asset_owners').set(JSON.stringify(['project-export', f.item.entry.id, 'body']), {
+        assetId: 'foreign',
+        ownerKind: 'project-export',
+        ownerId: f.item.entry.id,
+        role: 'body',
+      });
+    const before = structuredClone(f.rows);
+    await expect(applyPreparedVideoProjectRevision(f.input)).rejects.toThrow();
+    expect(f.rows).toEqual(before);
+  }
+);
+
+it('retains an existing export through a successor and refuses a changed owner after preparation', async () => {
+  const f = retainedExportFixture();
+  await applyPreparedVideoProjectRevision(f.input);
+  const next = {
+    ...f.input,
+    operationId: 'project-successor',
+    expectedLocalGeneration: 1,
+    expectedWorkspaceRevision: 1,
+    expectedBasis: [f.input.operationId],
+    root: { ...f.input.root, exports: [{ ...f.item, reuseExisting: true }] },
+  };
+  const beforeExports = structuredClone(f.table('project_exports'));
+  await applyPreparedVideoProjectRevision(next);
+  expect(f.table('project_exports')).toEqual(beforeExports);
+  f.table('asset_owners').set(JSON.stringify(['project-export', f.item.entry.id, 'body']), {
+    assetId: 'replaced',
+    ownerKind: 'project-export',
+    ownerId: f.item.entry.id,
+    role: 'body',
+  });
+  const before = structuredClone(f.rows);
+  await expect(
+    applyPreparedVideoProjectRevision({
+      ...next,
+      operationId: 'delayed-project',
+      expectedLocalGeneration: 2,
+      expectedWorkspaceRevision: 2,
+      expectedBasis: [next.operationId],
+    })
+  ).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+});

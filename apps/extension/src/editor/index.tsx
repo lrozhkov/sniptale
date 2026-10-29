@@ -20,12 +20,15 @@ import { initTracer } from '@sniptale/platform/observability/message-tracer';
 // Инициализация трассировщика (только в dev/build режимах)
 initTracer('editor');
 
+const initialAssetId = new URLSearchParams(window.location.search).get('assetId');
 renderPageShell({
   element: (
     <CommandPressScope value={true}>
       <InspectorLayout>
         <div className="sniptale-compact-workspace sniptale-image-workspace sniptale-image-page">
-          <EditorResourceAdmission>
+          <EditorResourceAdmission
+            root={initialAssetId ? { rootKind: 'media', rootId: initialAssetId } : undefined}
+          >
             <EditorPage />
           </EditorResourceAdmission>
         </div>

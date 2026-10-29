@@ -1,3 +1,4 @@
+import type { MediaHubBackupRootPreparation } from '../contracts';
 import {
   inventoryProjectThumbnail,
   projectInventoryDescriptor,
@@ -300,8 +301,10 @@ async function buildVideoProjectRoot(args: {
   entry: VideoProjectEntry;
   index: number;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
   options: MediaHubBackupExportOptions;
 }): Promise<MediaHubBackupRootInventoryItem> {
+  await args.prepareRoot?.({ rootKind: 'video-project', rootId: args.entry.id });
   await verifyVideoProjectEffectSnapshotIntegrity(args.entry.project);
   const collector = createObjectCollector(
     `video-${String(args.index + 1).padStart(6, '0')}`,
@@ -383,6 +386,7 @@ export async function buildVideoProjectRootInventory(args: {
   db: VideoInventoryDatabase;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const entries = readSelectedVideoProjects(
     await args.db.getAll(VIDEO_PROJECTS_STORE),

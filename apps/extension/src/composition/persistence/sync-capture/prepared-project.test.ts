@@ -5,6 +5,7 @@ import {
 } from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
 import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { createProjectExportEntry } from '../projects/index.test-support';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { annotation, workspace } from '../review-workspaces/backup-restore.test-support';
 import type { AssetRef } from '../assets';
@@ -297,4 +298,32 @@ it('refuses prepared child rows that disagree with their immutable ref', async (
     },
   ];
   expect(() => parsePreparedVideoProjectReplicaRoot(root)).toThrow('invalid');
+});
+
+it('keeps a deferred saved export out of physical staging claims and hydration reads', async () => {
+  const f = await setup();
+  const ref: AssetRef = {
+    assetId: 'deferred-export',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/deferred-export' },
+    size: 100,
+    mimeType: 'video/webm',
+    sha256: 'b'.repeat(64),
+  };
+  const entry = createProjectExportEntry({
+    id: 'deferred-export',
+    projectId: f.root.entry.id,
+    assetId: ref.assetId,
+    size: ref.size,
+    mimeType: ref.mimeType,
+  });
+  f.root.exports = [
+    { entry, ref, remote: { key: 'Files/project/export.webm', sha256: ref.sha256! } },
+  ];
+  expect(collectPreparedProjectReplicaRefs(f.root).map((item) => item.assetId)).not.toContain(
+    ref.assetId
+  );
+  const hydrated = await hydratePreparedVideoProjectReplicaRoot(f.root);
+  expect(hydrated.exports?.[0]?.ref).toEqual(ref);
+  expect(io.read.mock.calls.some(([read]) => read.assetId === ref.assetId)).toBe(false);
 });

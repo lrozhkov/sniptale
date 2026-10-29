@@ -13,6 +13,26 @@ export const galleryBackupExportModalMessages = defineMessageSource({
     ru: 'Выберите, какие данные из Библиотеки сохранить в резервной копии.',
     en: 'Choose which Library data to include in the backup.',
   },
+  downloadAndExport: {
+    ru: 'Скачать и создать копию',
+    en: 'Download and create backup',
+  },
+  remotePreparation: {
+    ru: 'Копия включает локальную библиотеку и материалы из текущего каталога сервера. Недостающие файлы будут скачаны после подтверждения.',
+    en: 'The backup includes the local library and items in the current server catalog. Missing files will download after confirmation.',
+  },
+  remoteRoots: {
+    ru: 'Материалы только на сервере',
+    en: 'Server-only items',
+  },
+  remoteSize: {
+    ru: 'Их размер, не более',
+    en: 'Their size, at most',
+  },
+  nativePreparation: {
+    ru: 'Освобождённые ранее локальные файлы тоже будут скачаны. Их объём не включён в оценку. Текущие локальные правки сохранятся. Отмена сохранит уже скачанные данные.',
+    en: 'Previously released local files will also download. Their size is not included above. Current local edits are preserved. Cancellation keeps completed downloads.',
+  },
   assets: {
     ru: 'Медиафайлы',
     en: 'Media files',

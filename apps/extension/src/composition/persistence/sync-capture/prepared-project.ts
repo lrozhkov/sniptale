@@ -5,9 +5,11 @@ import type { AggregatePresentationEntry } from '../aggregate-presentations/cont
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import type { MediaThumbnailEntry } from '../media-library/contracts';
 import { parseMediaThumbnailEntry } from '../media-library/read-guards';
-import type { VideoProjectMetadataEntry } from '../projects/contracts';
+import type { StoredProjectExportEntry, VideoProjectMetadataEntry } from '../projects/contracts';
+import type { VideoWorkspaceSnapshot } from '../review-workspaces/contracts';
 import {
   parseProjectAssetEntry,
+  parseProjectExportEntry,
   parseVideoProjectEntry,
   parseVideoProjectMetadataEntry,
 } from '../projects/read-guards';
@@ -16,9 +18,19 @@ import { parseVideoWorkspace, parseVideoWorkspaceDraft } from '../review-workspa
 import { isBoundedImageMetadata } from './image-snapshot';
 import { MAX_CAPTURE_ROWS } from './contracts';
 
+export interface PreparedProjectReplicaExport {
+  entry: StoredProjectExportEntry;
+  ref: AssetRef;
+  remote: { key: string; sha256: string };
+  reuseExisting?: boolean;
+  thumbnail?: { entry: Omit<MediaThumbnailEntry, 'blob'>; ref: AssetRef };
+  videoReview?: VideoWorkspaceSnapshot;
+}
+
 /** JSON-stage project metadata and exact immutable binary bindings; the caller owns read leases. */
 export interface PreparedVideoProjectReplicaRoot {
   assets: PreparedVideoProjectRevision['assets'];
+  exports?: PreparedProjectReplicaExport[];
   entry: VideoProjectMetadataEntry;
   snapshotRefs?: { snapshotId: string; assetId: string; ref: AssetRef }[];
   thumbnail?: { entry: Omit<MediaThumbnailEntry, 'blob'>; ref: AssetRef };
@@ -83,7 +95,7 @@ function parseAssets(value: unknown): PreparedVideoProjectRevision['assets'] {
   });
 }
 
-function parseReview(value: unknown, childId: string, ref: AssetRef) {
+function parseReview(value: unknown, childId: string, ref: AssetRef, kind = 'project-asset') {
   if (value === undefined) return undefined;
   if (!isRecord(value)) return invalid();
   assertKeys(value, ['workspace', 'draft']);
@@ -92,7 +104,7 @@ function parseReview(value: unknown, childId: string, ref: AssetRef) {
     value['draft'] === null
       ? null
       : parseVideoWorkspaceDraft(value['draft'], workspace?.source.duration ?? 0);
-  const aggregateId = `project-asset:${childId}`;
+  const aggregateId = `${kind}:${childId}`;
   if (
     !workspace ||
     workspace.aggregateId !== aggregateId ||
@@ -139,14 +151,18 @@ function parseSnapshots(value: unknown, entry: VideoProjectMetadataEntry) {
   });
 }
 
-function parseThumbnail(value: unknown, id: string): PreparedVideoProjectReplicaRoot['thumbnail'] {
+function parseThumbnail(
+  value: unknown,
+  id: string,
+  kind = 'video-project'
+): PreparedVideoProjectReplicaRoot['thumbnail'] {
   if (value === undefined) return undefined;
   if (!isRecord(value) || !isRecord(value['entry'])) return invalid();
   assertKeys(value, ['entry', 'ref']);
   const entry = value['entry'];
   assertKeys(entry, ['assetId', 'createdAt', 'generatorVersion', 'updatedAt', 'width', 'height']);
   if (
-    entry['assetId'] !== `video-project:${id}` ||
+    entry['assetId'] !== `${kind}:${id}` ||
     typeof entry['createdAt'] !== 'number' ||
     typeof entry['updatedAt'] !== 'number' ||
     typeof entry['width'] !== 'number' ||
@@ -199,9 +215,63 @@ function parsePresentation(
   };
 }
 
+function parseExports(
+  value: unknown,
+  projectId: string
+): PreparedProjectReplicaExport[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > MAX_CAPTURE_ROWS) return invalid();
+  const ids = new Set<string>();
+  return value.map((raw: unknown) => {
+    if (!isRecord(raw)) return invalid();
+    assertKeys(raw, ['entry', 'ref', 'remote', 'reuseExisting', 'thumbnail', 'videoReview']);
+    const entry = parseProjectExportEntry(raw['entry']);
+    const ref = requiredRef(raw['ref']);
+    const remote = raw['remote'];
+    if (
+      !entry ||
+      entry.projectId !== projectId ||
+      ids.has(entry.id) ||
+      entry.assetId !== ref.assetId ||
+      entry.size !== ref.size ||
+      entry.mimeType !== ref.mimeType ||
+      (raw['reuseExisting'] !== undefined && typeof raw['reuseExisting'] !== 'boolean') ||
+      !isRecord(remote)
+    )
+      return invalid();
+    assertKeys(remote, ['key', 'sha256']);
+    if (
+      typeof remote['key'] !== 'string' ||
+      !remote['key'] ||
+      remote['key'].length > 2048 ||
+      /[\\?#:]/u.test(remote['key']) ||
+      Array.from(remote['key']).some(
+        (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127
+      ) ||
+      !remote['key'].split('/').every((part) => part && part !== '.' && part !== '..') ||
+      typeof remote['sha256'] !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(remote['sha256']) ||
+      (ref.sha256 !== null && ref.sha256 !== remote['sha256'])
+    )
+      return invalid();
+    ids.add(entry.id);
+    const thumbnail = parseThumbnail(raw['thumbnail'], entry.id, 'export');
+    const videoReview = parseReview(raw['videoReview'], entry.id, ref, 'export');
+    return {
+      entry,
+      ref,
+      remote: { key: remote['key'], sha256: remote['sha256'] },
+      ...(raw['reuseExisting'] === undefined ? {} : { reuseExisting: raw['reuseExisting'] }),
+      ...(thumbnail ? { thumbnail } : {}),
+      ...(videoReview ? { videoReview } : {}),
+    };
+  });
+}
+
 function boundRefs(root: PreparedVideoProjectReplicaRoot): AssetRef[] {
   const refs = [
     ...root.assets.map((asset) => asset.ref),
+    ...(root.exports ?? []).flatMap((item) => (item.thumbnail ? [item.thumbnail.ref] : [])),
     ...(root.snapshotRefs ?? []).map((binding) => binding.ref),
     ...(root.thumbnail ? [root.thumbnail.ref] : []),
     ...(root.presentation
@@ -225,16 +295,18 @@ export function parsePreparedVideoProjectReplicaRoot(
   value: unknown
 ): PreparedVideoProjectReplicaRoot {
   if (!isRecord(value) || !isBoundedImageMetadata(value, false)) return invalid();
-  assertKeys(value, ['assets', 'entry', 'snapshotRefs', 'thumbnail', 'presentation']);
+  assertKeys(value, ['assets', 'exports', 'entry', 'snapshotRefs', 'thumbnail', 'presentation']);
   const entry = parseVideoProjectMetadataEntry(value['entry']);
   if (!entry) return invalid();
   const assets = parseAssets(value['assets']);
+  const exports = parseExports(value['exports'], entry.id);
   const snapshotRefs = parseSnapshots(value['snapshotRefs'], entry);
   const thumbnail = parseThumbnail(value['thumbnail'], entry.id);
   const presentation = parsePresentation(value['presentation'], entry.id);
   const root = {
     entry,
     assets,
+    ...(exports === undefined ? {} : { exports }),
     ...(snapshotRefs === undefined ? {} : { snapshotRefs }),
     ...(thumbnail ? { thumbnail } : {}),
     ...(presentation ? { presentation } : {}),
@@ -259,7 +331,13 @@ async function detachedBlob(ref: AssetRef, filename: string): Promise<Blob> {
 /** Detach retained bytes and validate the complete native effect entry before any caller transaction. */
 export async function hydratePreparedVideoProjectReplicaRoot(
   input: PreparedVideoProjectReplicaRoot
-): Promise<PreparedVideoProjectRevision> {
+): Promise<
+  PreparedVideoProjectRevision & {
+    exports?: (Omit<PreparedProjectReplicaExport, 'thumbnail'> & {
+      thumbnail?: MediaThumbnailEntry;
+    })[];
+  }
+> {
   const root = structuredClone(parsePreparedVideoProjectReplicaRoot(input));
   const bindings = new Map(
     (root.snapshotRefs ?? []).map((binding) => [
@@ -311,9 +389,26 @@ export async function hydratePreparedVideoProjectReplicaRoot(
       })
     : undefined;
   if (thumbnail === null || presentation === null) return invalid();
+  const exports =
+    root.exports === undefined
+      ? undefined
+      : await Promise.all(
+          root.exports.map(async (item) => {
+            const thumbnail = item.thumbnail
+              ? parseMediaThumbnailEntry({
+                  ...item.thumbnail.entry,
+                  blob: await detachedBlob(item.thumbnail.ref, 'export-thumbnail'),
+                })
+              : undefined;
+            if (thumbnail === null) return invalid();
+            const { thumbnail: _staged, ...retained } = item;
+            return { ...retained, ...(thumbnail ? { thumbnail } : {}) };
+          })
+        );
   return {
     entry,
     assets: root.assets,
+    ...(exports === undefined ? {} : { exports }),
     ...(thumbnail ? { thumbnail } : {}),
     ...(presentation ? { presentation } : {}),
   };

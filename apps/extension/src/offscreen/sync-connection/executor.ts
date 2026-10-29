@@ -299,6 +299,7 @@ class SyncConnectionExecutor {
     };
     this.#binding = null;
     this.#jobs.clear();
+    this.#products.clear();
     this.#workspace = job;
     this.#executorRevision += 1;
     this.#phase = 'running';
@@ -348,6 +349,7 @@ class SyncConnectionExecutor {
       this.#binding = structuredClone(selected);
       this.#executorRevision += 1;
       this.#jobs.clear();
+      this.#products.clear();
       this.#phase = 'idle';
     }
     return selected;
@@ -720,6 +722,7 @@ class SyncConnectionExecutor {
     } catch {
       return this.#refuseProduct();
     }
+    if (this.#binding && !sameBinding(this.#binding, command.binding)) this.#products.clear();
     this.#binding = structuredClone(command.binding);
     const selected: ProductJob = {
       snapshot: {

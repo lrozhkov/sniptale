@@ -8,6 +8,7 @@ import {
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
   ASSET_OPERATIONS_STORE,
+  ASSET_RESIDENCY_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -1030,6 +1031,26 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         db,
         [SYNC_OUTBOX_STORE],
         'Sync queue due store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'assetGraph', from: 3, to: 4 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 45,
+    toDatabaseVersion: 46,
+    risk: 'additive',
+    stores: [ASSET_RESIDENCY_STORE],
+    migrate(db) {
+      db.createObjectStore(ASSET_RESIDENCY_STORE, { keyPath: 'id' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [ASSET_RESIDENCY_STORE],
+        'Asset residency store is unavailable.'
       );
     },
   },

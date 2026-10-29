@@ -380,6 +380,12 @@ export function createWebdavOutgoingHarness(
       if (parsed.recordKey !== key) throw new Error('Remote manifest path differs from its bytes.');
       return text;
     },
+    manifestProof: async (key: string) => {
+      const text = await new Response(await connected().read(key, signal())).text();
+      const parsed = await parseSyncAttemptText(text);
+      if (parsed.recordKey !== key) throw new Error('Remote manifest path differs from its bytes.');
+      return parsed;
+    },
     completed: loadCompletedOutgoingFiles,
     prepared: loadPreparedOutgoingOperation,
     published: loadVerifiedOutgoingResult,

@@ -3,7 +3,12 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useLoadedReview } from './use-session';
-const harness = vi.hoisted(() => ({ acquire: vi.fn(), load: vi.fn(), dispose: vi.fn() }));
+const harness = vi.hoisted(() => ({
+  acquire: vi.fn(),
+  load: vi.fn(),
+  dispose: vi.fn(),
+  prepare: vi.fn(async (): Promise<void> => undefined),
+}));
 vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
   acquireAssetResourceSession: harness.acquire,
 }));
@@ -54,5 +59,38 @@ it('acquires before loading and retains the lease until ordered session disposal
     finishDispose();
     await disposed;
   });
+  expect(release).toHaveBeenCalledOnce();
+});
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: harness.prepare,
+}));
+
+it('holds the preparation reader and discards a cancelled opening', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  harness.load.mockClear();
+  let finish!: () => void;
+  const prepared = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const release = vi.fn(async () => undefined);
+  harness.acquire.mockResolvedValue({ release });
+  harness.prepare.mockReturnValueOnce(prepared);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  function Harness() {
+    useLoadedReview('recording:r');
+    return null;
+  }
+  await act(async () => root.render(<Harness />));
+  expect(harness.prepare).toHaveBeenCalledWith({ rootKind: 'video-review', rootId: 'recording:r' });
+  expect(harness.load).not.toHaveBeenCalled();
+  await act(async () => root.unmount());
+  expect(release).not.toHaveBeenCalled();
+  await act(async () => {
+    finish();
+    await prepared;
+  });
+  expect(harness.load).not.toHaveBeenCalled();
   expect(release).toHaveBeenCalledOnce();
 });

@@ -1,3 +1,5 @@
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
+import { formatBytes } from '../../../../platform/i18n/format-bytes';
 import { useEffect, useId, useState } from 'react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -200,6 +202,57 @@ function getWorkspaceFailure({
   return job.failureCode === 'temporary' ? 'workspaceTemporary' : 'failed';
 }
 
+function LocalOnlyConfirmation({
+  state,
+  controller,
+}: {
+  state: NonNullable<SyncConnectionViewState['localOnly']>;
+  controller: ReturnType<typeof createSyncConnectionController>;
+}) {
+  const running = state.phase !== 'confirm';
+  return (
+    <ProductConfirmDialog
+      title={translate('settings.syncConnection.localOnly')}
+      confirmText={translate('settings.syncConnection.localOnlyConfirm')}
+      cancelText={translate('common.actions.cancel')}
+      confirmDisabled={running}
+      isLoading={false}
+      onCancel={() => controller.cancelLocalOnly()}
+      onConfirm={() => {
+        void controller.confirmLocalOnly();
+      }}
+      dialogClassName="sniptale-compact-workspace"
+      message={
+        <>
+          <span className="block">{translate('settings.syncConnection.localOnlyDescription')}</span>
+          <span className="mt-3 block">
+            {translate('settings.syncConnection.remoteItems')}: {state.plan.missing.length}
+          </span>
+          <span className="block">
+            {translate('settings.syncConnection.remoteSize')}:{' '}
+            {formatBytes(state.plan.remoteBytesUpperBound, 1)}
+          </span>
+          <span className="mt-3 block">
+            {translate('settings.syncConnection.localOnlySizeHint')}
+          </span>
+          <span className="mt-3 block">
+            {translate('settings.syncConnection.localOnlyQueueHint')}
+          </span>
+          {running ? (
+            <span role="status" className="mt-3 block">
+              {translate(
+                state.phase === 'cancelling'
+                  ? 'settings.syncConnection.localOnlyCancelling'
+                  : 'settings.syncConnection.localOnlyPreparing'
+              )}
+            </span>
+          ) : null}
+        </>
+      }
+    />
+  );
+}
+
 /** Transient credentials stay in the form; the runtime owns connection readiness and enrollment. */
 export function SyncConnectionSection() {
   useAppLocale();
@@ -208,6 +261,7 @@ export function SyncConnectionSection() {
     busy: false,
     message: null,
     catalogJob: null,
+    localOnly: null,
   });
   const [controller] = useState(() =>
     createSyncConnectionController({
@@ -227,6 +281,23 @@ export function SyncConnectionSection() {
   const ready = status?.workspace?.phase === 'ready';
   const connected = Boolean(status?.connection);
 
+  const localOnlyFeedback = Boolean(message?.startsWith('localOnly'));
+  const feedback = message ? (
+    <p
+      role={
+        message === 'refreshing' ||
+        message === 'refreshed' ||
+        message === 'localOnlyReady' ||
+        message === 'localOnlyCancelled'
+          ? 'status'
+          : 'alert'
+      }
+      className="text-sm"
+    >
+      {translate(`settings.syncConnection.${message}`)}
+    </p>
+  ) : null;
+
   return (
     <section
       aria-label={translate('settings.syncConnection.title')}
@@ -241,6 +312,7 @@ export function SyncConnectionSection() {
       {status?.workspace && !connected ? (
         <p className="break-all text-xs">{status.workspace.rootUrl}</p>
       ) : null}
+      {localOnlyFeedback ? feedback : null}
       {!connected ? (
         <SyncConnectionForm
           controller={controller}
@@ -250,15 +322,26 @@ export function SyncConnectionSection() {
           ready={ready}
         />
       ) : (
-        <ProductActionButton
-          compact
-          tone="secondary"
-          type="button"
-          disabled={disabled || status?.connection?.phase !== 'active'}
-          onClick={() => void controller.refresh()}
-        >
-          {translate('settings.syncConnection.refresh')}
-        </ProductActionButton>
+        <div className="flex flex-wrap gap-2">
+          <ProductActionButton
+            compact
+            tone="secondary"
+            type="button"
+            disabled={disabled || status?.connection?.phase !== 'active'}
+            onClick={() => void controller.refresh()}
+          >
+            {translate('settings.syncConnection.refresh')}
+          </ProductActionButton>
+          <ProductActionButton
+            compact
+            tone="secondary"
+            type="button"
+            disabled={disabled || status?.connection?.phase === 'updating-auth'}
+            onClick={() => void controller.prepareLocalOnly()}
+          >
+            {translate('settings.syncConnection.localOnly')}
+          </ProductActionButton>
+        </div>
       )}
       {workspaceRunning ? (
         <p role="status" className="text-sm">
@@ -277,13 +360,9 @@ export function SyncConnectionSection() {
           {translate(`settings.syncConnection.${workspaceFailure}`)}
         </p>
       ) : null}
-      {message ? (
-        <p
-          role={message === 'refreshing' || message === 'refreshed' ? 'status' : 'alert'}
-          className="text-sm"
-        >
-          {translate(`settings.syncConnection.${message}`)}
-        </p>
+      {!localOnlyFeedback ? feedback : null}
+      {state.localOnly ? (
+        <LocalOnlyConfirmation state={state.localOnly} controller={controller} />
       ) : null}
     </section>
   );

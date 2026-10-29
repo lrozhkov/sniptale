@@ -1,5 +1,9 @@
+vi.mock('../../sync-transfer/editing-admission', () => ({
+  ensureNativeBackupRootAvailable: io.prepare,
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 const io = vi.hoisted(() => ({
+  prepare: vi.fn(),
   active: false,
   inventory: vi.fn(),
   write: vi.fn(),
@@ -85,4 +89,40 @@ it('holds source protection while the file picker waits and through sink abort',
   io.pick.mockRejectedValueOnce(new DOMException('cancelled', 'AbortError'));
   await expect(exportMediaHubBackup()).rejects.toMatchObject({ name: 'AbortError' });
   expect(io.active).toBe(false);
+});
+
+it('supplies root preparation under the existing archive reader only in the admitted sync build', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  const signal = new AbortController().signal;
+  const root = { rootKind: 'video-project', rootId: 'selected' };
+  io.prepare.mockImplementation(async () => {
+    expect(io.active).toBe(true);
+  });
+  io.inventory.mockImplementationOnce(async (_options, admission) => {
+    expect(io.active).toBe(true);
+    await admission.prepareRoot(root);
+    return {};
+  });
+  try {
+    await exportMediaHubBackup({}, { signal });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  expect(io.prepare).toHaveBeenCalledExactlyOnceWith(root, signal);
+  expect(io.write).toHaveBeenCalledOnce();
+});
+it('aborts the archive without writing when selected native preparation fails', async () => {
+  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
+  io.prepare.mockRejectedValueOnce(new Error('Native dependency unavailable'));
+  io.inventory.mockImplementationOnce(async (_options, admission) => {
+    await admission.prepareRoot({ rootKind: 'media', rootId: 'selected' });
+    return {};
+  });
+  try {
+    await expect(exportMediaHubBackup()).rejects.toThrow('Native dependency unavailable');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.abort).toHaveBeenCalledOnce();
 });

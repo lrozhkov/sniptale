@@ -1,3 +1,4 @@
+import type { MediaHubBackupRootPreparation } from '../contracts';
 import { readWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
 import {
   parseVideoWorkspace,
@@ -477,8 +478,13 @@ async function buildMediaRoot(args: {
   item: MediaLibraryItem;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
   rootIndex: number;
 }): Promise<MediaHubBackupRootInventoryItem> {
+  await args.prepareRoot?.({
+    rootKind: args.sourceMediaId ? 'video-review' : 'media',
+    rootId: args.item.id,
+  });
   const sourceEntry = parseMediaLibraryEntry(
     await args.db.get(MEDIA_LIBRARY_STORE, args.sourceMediaId ?? args.item.id)
   );
@@ -614,6 +620,7 @@ export async function buildMediaRootInventory(args: {
   coveredProjectMediaIds?: ReadonlySet<string>;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const roots: MediaHubBackupRootInventoryItem[] = [];
   const items = args.items

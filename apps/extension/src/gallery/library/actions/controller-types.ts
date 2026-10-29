@@ -1,3 +1,4 @@
+import type { RetainedLibraryPlan } from '../../../workflows/sync-transfer/retained-library';
 import type { GalleryDeletionRequest } from '../deletion/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type {
@@ -21,7 +22,8 @@ interface PendingImportState {
 
 interface PendingExportState {
   options: MediaHubBackupExportOptions;
-  summary: MediaHubLocalBackupSummary;
+  summary: MediaHubLocalBackupSummary | null;
+  preparation?: RetainedLibraryPlan;
 }
 
 interface GalleryConfirmDialogState {
@@ -75,6 +77,7 @@ interface GalleryBackupExportActionState {
   };
   storage: {
     activeImport: ActiveImportState | null;
+    pendingExport: PendingExportState | null;
   };
 }
 

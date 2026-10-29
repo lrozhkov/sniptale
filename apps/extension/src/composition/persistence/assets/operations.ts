@@ -131,7 +131,8 @@ export async function deleteOrphanAssetObjectBatch(
   }, lifecyclePermit);
 }
 
-async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
+/** Read the current native retention authority before a caller removes physical bytes. */
+export async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
   const snapshot = await runWithIndexedDbMutation((db) =>
     runStorageStartupPhase('asset-retention-snapshot', () =>
       collectDurableAssetSnapshot(db, signal)

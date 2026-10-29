@@ -1,6 +1,10 @@
 import { MAX_MEDIA_ARCHIVE_ENTRIES } from '../../archive-transfer/contracts';
-import type { CapturedScenarioRows } from './scenario-snapshot';
-import type { ScenarioAssetEntry } from '../scenario/contracts';
+import type {
+  ScenarioAssetEntry,
+  ScenarioProjectEntry,
+  ScenarioExportEntry,
+  StoredScenarioStepEditorDocumentEntry,
+} from '../scenario/contracts';
 import type { StoredRecordingEntry, RecordingTelemetryEntry } from '../recordings/contracts';
 import type { StoredImageWorkspaceEntry } from '../image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
@@ -14,6 +18,20 @@ import type {
   StoredProjectExportEntry,
   VideoProjectEntry,
 } from '../projects/contracts';
+
+/** One native writer snapshot; large retained versions remain immutable inline bytes until preparation. */
+export interface CapturedScenarioRows {
+  entry: Omit<ScenarioProjectEntry, 'history'>;
+  history?: { blob: Blob; sha256: string };
+  assets: ScenarioAssetEntry[];
+  documents: StoredScenarioStepEditorDocumentEntry[];
+  exports: ScenarioExportEntry[];
+  refs: AssetRef[];
+  media: MediaLibraryEntry[];
+  thumbnails: MediaThumbnailEntry[];
+  presentation: AggregatePresentationEntry | null;
+  mediaDependencies?: CapturedMediaDependency[];
+}
 
 export const SYNC_CAPTURE_PROFILE_KEY = 'profile';
 export const MAX_CAPTURE_ROWS = 32;

@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One chronological migration registry adds only the synchronous DB44-to-45 due index. Existing upgrade execution owns ordering, abort and contract publication. Score2, delta0 and cohesion1.00 retain the same owner. Independent wrapper diagnosis confirms Keep. A line-count split would distribute that contract. Fresh complete-candidate architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent writer, recovery authority, public contract or fixture lifetime. Remove when the analyzer models this cohesive contract.",
-      "reviewDate": "2026-10-27",
-      "astHash": "5f66b5d376d493683f947fb149ecdff08f733a5da4e90bbac532277b48941efd",
+      "reason": "tool-noise: The chronological migration registry adds DB45-to-46 creation and validation of asset_residency. Existing upgrade execution owns ordering, abort and contract publication. The added descriptor creates no independent runtime owner. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "5a833df6db3a5043b0194426e2e32a85ff1d2d89ae304e1a4d015c6583f990a5",
       "signatureHash": "07c774e9a0b3f74167f16d2ba52e7b0fa3c0fe23d1d97eda8352dd7c8c08b5a4"
     },
     {
@@ -1920,10 +1920,10 @@
       "file": "apps/extension/src/video-editor/project/operations/workspace.review-transfer.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:project",
-      "reason": "tool-noise: This suite proves one location-driven Gallery transfer with one source snapshot and destination publication observation. Reset mocks hold test observations, not product authority. Added cases prove shared audio endpoints and pending binding propagation. No new test runtime or independent lifetime exists. Main and independent structural diagnosis inspected this exact implementation. Final architecture review must assess this classification.",
+      "reason": "tool-noise: One location-driven Gallery-to-Native transfer fixture proves source preservation, destination publication, refusal and reload. C adds an editing-admission mock and verifies the saved native project identity on reload. No new fixture, writer or recovery lifetime appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent owner, state authority, writer, resource lifetime, recovery operation, or public contract. Remove when the analyzer models this cohesive operation or its test observations.",
-      "reviewDate": "2026-10-23",
-      "astHash": "c95b54726f78905ce9d552bf1ca7c8dadc4b1ce3e60b6e1d4942391541353074",
+      "reviewDate": "2026-10-29",
+      "astHash": "133c5789c833b08410a4a01ed0b23a46ad80445c834195340ea71ca1515627cb",
       "signatureHash": "3945c9c609bb72de6c6661c873250ad62b091a9b5afd6e0ef927f1b774b2c43a"
     },
     {
@@ -2767,10 +2767,10 @@
       "file": "apps/extension/src/composition/persistence/asset-publication-recovery/index.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: This existing recovery fixture adds one deferred replica case at the same recovery seam. The case retains the failed journal while normal recording recovery completes. It uses the existing database harness and mock receiver. No new fixture implementation, production authority or shared test lifetime appears. File score2/delta0 and owners1/effects1/state1/cohesion1 remain unchanged. Splitting by length would separate proof of the same recovery owner. Fresh final architecture review must independently verify this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess a new fixture lifetime, independent mutation receiver, transaction owner or unrelated recovery responsibility. Remove when the analyzer recognizes this cohesive recovery proof boundary. Fresh final architecture review must verify the classification before closeout.",
-      "reviewDate": "2026-10-27",
-      "astHash": "4cc609ad5b5acb78c71603f765c8efa95faba302d67e7dedd69c51875704b429",
+      "reason": "tool-noise: One recovery entrypoint fixture adds writing-marker cleanup proof and one native retention projection per batch. Existing reset and mock lifetimes remain shared. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "ab80e457742e543d48665a727404889d313d281c0f3e092b5f29474085b46202",
       "signatureHash": "0ece55c51959c99f26c9a34d41fd6f591a383d1de0c56ee9ebefb3d6950ef887"
     },
     {
@@ -2800,10 +2800,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One schema admission suite proves synchronous index creation, abort and retry, preservation, and fresh-database parity. Each case retains its local fixture lifetime. Score2, delta0 and cohesion1.00 retain the same owner. Independent wrapper diagnosis confirms Keep. A line-count split would distribute that contract. Fresh complete-candidate architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent writer, recovery authority, public contract or fixture lifetime. Remove when the analyzer models this cohesive contract.",
-      "reviewDate": "2026-10-27",
-      "astHash": "03a4e1c96caa3b3ddf28f6278da45fb7a3d22a64cbdd48dd74985616ac8a4d5a",
+      "reason": "tool-noise: One schema fixture proves migration admission, validation, interruption and fresh-schema parity. C adds the residency store to exact expectations and keeps the previous due-index migration isolated. No second fixture authority appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "f34fef95f268d619dfa6203c3cff2f24894502a8f6d82780328b9b4f25cb7c8b",
       "signatureHash": "2f7df5c56a3f68284b51613fbf87463eb059de5185d079f2749d29b4e57c2cef"
     },
     {
@@ -2851,15 +2851,246 @@
       "signatureHash": "d2607876084f31f53efb254ee0cfb706f84f11268a6e1f85a2060e4552560eb6"
     },
     {
+      "rule": "structural-file-risk",
       "file": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.ts",
       "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: Residency lookup and retirement run inside the existing prepared-media commit transaction before native publication. Preparation, mutation permit, conflict checks and commit or abort retain their existing owners. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "91212673bc491fab8c7ebcdbe84fa63af009765a09106897a3b3d258386ab868",
+      "signatureHash": "1cfbeb54c7cfcea8820d3d37e7d556ffa23e0336a433f4364081644cdc5a2315"
+    },
+    {
       "rule": "structural-file-risk",
-      "owner": "workflows/media-hub-backup/v6/root-publication",
-      "reason": "tool-noise: This file owns one archive media-root publication. B extends export, snapshot and stored-image admission. Preparation, conflict checks, commit and retention retain their existing authorities. Local predicates remove duplicate checks. A file split would move unchanged publication code without an independent change reason. Independent topology planning review approved Keep.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess a new publication authority, transaction owner or resource lifetime. Remove when the analyzer models this cohesive publication. The final architecture reviewer must inspect this classification.",
-      "reviewDate": "2026-10-28",
-      "astHash": "9b09dd5c3a7139a106bddc7c227fdd242b61b9242994b6ce79f24c029d77cc35",
-      "signatureHash": "098fb6a44f647decfcba6efc82a967f77efae77a62c2ebf187d2eb740391c7ea"
+      "file": "apps/extension/src/background/sync-connection/coordinator.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:background:sync-connection",
+      "reason": "tool-noise: One coordinator fixture proves revoke, containment, local-only completion and refusal retry. Added tests share its executor receiver. No second harness or production authority appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "32da83a27f6f529e259369daaf5186125ebc3494d5e32063a5008943270db0ba",
+      "signatureHash": "d07ad3ddc9448dc9805d23117a2ea839a6f0db417195d6b05e9821aee32a8e3c"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/assets/opfs-residency.ts",
+      "symbol": "restoreMissingAssetObject",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One immutable-object installation owns transition lease, cancellation, object lock and result. Marker admission and byte verification share that installation lifetime. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "074fb4cab4c8febc3567b1c8def90d703553a80911304c39c9c97b964f5d89b6",
+      "signatureHash": "72cf4b89df0feca3567008d912fc06e4fad9f8b159662158378b5810fb168a87"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/assets/opfs-residency.ts",
+      "symbol": "restoreMissingAssetObject.runWithAssetObjectLockIfAvailable callback",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One object lock protects marker, target and close state. Marker persistence precedes streaming. A rejected close preserves recovery evidence. Only verified success removes the marker. These branches enforce one crash-recovery ordering. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "02b6ceec6b2ef979f0d07ff2ef01a49f1e6b624856ce0dbfa096569035d980fb",
+      "signatureHash": "903a907fdb03f5b9ce59788ccbcb4d56ae16e08566785211cc64c3aedccd6bf1"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/assets/residency-maintenance.ts",
+      "symbol": "commitIntent",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One readwrite transaction validates connection, capture protection and pinned closures before recording unload intent. Published transport pins and inline bytes change under the same commit or abort. No second mutation owner appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "d6946bdc1a85f354766aa026cb85b4d16d2193793d2e047346d0ff32ba78be9a",
+      "signatureHash": "0ff3045b61b2a6607d42848b7ad09fe98e5a4d8e351a82bd6d595b8a9fa13626"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/assets/residency-records.ts",
+      "symbol": "parseAssetResidencyRecord",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One discriminated durable-record parser admits exact settings, root and copy variants. Target and remote parsing already have local helpers. Schema branches introduce no IO, repairs or competing authority. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "7819a9641fc5cf532188a9e96757dec6c72c3aaa0e52994bdd78cacbff73c247",
+      "signatureHash": "756905f0bcd197bc017c759e25d489d9c19fa5618e4d0c1f708945baf45f7340"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/sync-capture/apply-video-project.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One replica fixture proves retained export identity, owner collisions, atomic refusal, retry and duplicate replay. Connection and export rows extend that same apply transaction invariant. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "ec25462508b858076a681114858b23c0d716e2ec9cd2378ab7c4738daf7aea5b",
+      "signatureHash": "8ffc509f527a958b180bd5e6b3548c768af0ab1a33f68936a8f7e4b3bcc175d1"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/sync-capture/apply-video-project.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One apply transaction owns prepared closure admission, native publication, retained exports and receipt. Read-only export preparation is rechecked before mutation. It does not introduce another commit owner. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "4c38fa4de677aff809e26f23c643f0899da81a25e8ac43eb4264d57e586db0dc",
+      "signatureHash": "692c7b97ae3d9d9fd3b29428372300fefed074397a70c4b32c7b3c4990751d50"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/sync-capture/image-snapshot.ts",
+      "symbol": "parseImageRows",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One image aggregate parser validates source representation, workspace, presentation and exact resource closure. Unloaded predecessor admission requires exact residency metadata. Public capture still requires real bytes. Branch count reflects this single admission contract. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "d04aa90f2571fd76e5f9b79d07b57d69b166e465f9bdd2ac0dc8cfa99ca4bbfa",
+      "signatureHash": "e2f933856c47fb44a36c7db0f9b4a22ccfd5697fa56d235e73945e864c460aa0"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+      "symbol": "NativeRootCacheActions",
+      "owner": "extension:gallery:library",
+      "reason": "tool-noise: One keyed native-root control owns command acceptance, status, observation, cancellation and completion display. Effects invalidate that same projection. Client calls confer no persistence or provider authority on the component. Stable read and cleanup callbacks retain the same request and mount lifetime. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "783d903d5f6e9a7ebb171f199151a998ddbf470606eda0c77ae5a7ff93879e4f",
+      "signatureHash": "48c0ef487bb2c8a1c7ab8102a5a77c03e390f18684f28c8d73b3cc5702b03197"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+      "symbol": "NativeRootCacheActions.observe",
+      "owner": "extension:gallery:library",
+      "reason": "tool-noise: One operation waiter is fenced by mount, abort and exact request identity. Completion, refresh and pending release settle the same operation. Recovery creates no second request lifetime. Stable read and cleanup callbacks retain the same request and mount lifetime. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "c4240a8e999f16df25ef42b12b4f35d1553073eae4969714ab8aada53a9f945b",
+      "signatureHash": "02223e05928719d7f65ddb98df9d56b7f8253a1f260c5db6739d943604619266"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+      "symbol": "NativeRootCacheActions.command",
+      "owner": "extension:gallery:library",
+      "reason": "tool-noise: Pin, download and release share one pending admission gate and one request observer. Refusal and completion refresh the same native-root projection. These variants do not own eviction or transfers. Stable read and cleanup callbacks retain the same request and mount lifetime. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "2eea1c196f3295c58650f2921b27bfe540f68a13d261e03a7f88f1ffd302bb95",
+      "signatureHash": "b980e2dcece66d25b95a5a785453a716dd78737fc47bbf1e5971ef37a58b1e30"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/offscreen/sync-connection/executor.ts",
+      "symbol": "<file>",
+      "owner": "extension:offscreen:sync-connection",
+      "reason": "tool-noise: C clears finite product observations at three existing workspace or binding transitions. The executor retains its existing stop, drain and binding lifecycle. No new durable queue, scheduler or state owner appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "12f23340d2603868b69208b8bb3d9e59deca0930bcd7540df1496744144c607c",
+      "signatureHash": "4287486cce2887b6c15496c23c23ee8124a01946e61f0b270a64e8845d356bfb"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/offscreen/sync-connection/product-execution.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:offscreen:sync-connection",
+      "reason": "tool-noise: One reset execution fixture tests authorization, request containment and completion for work variants. Native preparation, release and trim extend the same executor adapter contract. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "a6bc435b44948e737e73615d464ed88ccec1e71784810301156d4d5ef3591b72",
+      "signatureHash": "57db7b9edc3bbf3520593874871c20b552c22adc0fbdaa6c16720e87b3974e8e"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/sync-connection/product-execution.ts",
+      "symbol": "createSyncProductExecution",
+      "owner": "extension:offscreen:sync-connection",
+      "reason": "tool-noise: One factory captures authorization, work and signal and returns run and drain for one request owner. Nested dispatch and callbacks share that lifetime. Inclusive extent does not introduce independent work authority. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "d29eb6967d7d0b3dabf6c0baaefe9ce57e711b126899281d0ce462415d0d4b83",
+      "signatureHash": "b1f2b80737d39f356d249dc639b3147fb48b4cbeafbc1664a74f7bab5f64824d"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/sync-connection/product-execution.ts",
+      "symbol": "createSyncProductExecution.executeWork",
+      "owner": "extension:offscreen:sync-connection",
+      "reason": "tool-noise: Work-kind dispatch delegates to existing native, cache, incoming and conflict owners. Every branch uses the same captured authorization and signal and returns one completion. Outer containment and currentness stay centralized. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "6ba6f7e1e62a8adcd9b37b864aee8e8d11eca059e495c4d0fba5d0b1c920acc6",
+      "signatureHash": "fe0e188f2dbce34a4b54880988fe9ff9749b28a191f64103d64ab22ea21cbc40"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
+      "symbol": "SyncCacheSection",
+      "owner": "extension:settings:capture",
+      "reason": "tool-noise: Budget draft, save, trim, observation and cancellation share one Settings control and pending gate. One mount and waiter own cleanup. Runtime results remain availability authority. UI state cannot authorize physical eviction. Stable read and cleanup callbacks retain the same request and mount lifetime. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "4ed33c6e221edc29661964c9b17c83301789d4fdc2ce4367bee40e33a37ec6b0",
+      "signatureHash": "7e65840934775d5880b915ec9e48382e08f5e4abbd57cecb012f490bca926909"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.capture.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One publication fixture proves archive Replace and inline residency retirement commit atomically and preserve data on refusal. The added proof extends the existing media-root publication invariant. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "9918d655819950ef5a75fc0e0a1bdecafee8bef88a3f70af8fb1eab2c3e33fab",
+      "signatureHash": "877c11bc9725e514d462f115d2cc2d849aeb34ddc4f5ec327c6facd1f8272fa2"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/sync-transfer/incoming.ts",
+      "symbol": "prepareStagedReplica",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One replica assembly binds staged references and deferred exports to the checked preparation. Export observations revalidate reuse decisions and byte or unloaded-copy evidence before replica construction. No second staging or commit lifetime appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "5de5849894f43656b82c2328f93284489f7125005924b9e07b33f34d1f33a61c",
+      "signatureHash": "044b3f8fbad4490f146b26b31f9d16ec37e66969a890f3e41721e9a0de03caf9"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/sync-transfer/native-cache.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: Usage, pin and budget commands, status and release form one originals-cache workflow. Release verifies the remote copy and delegates durable unload to residency maintenance. Existing mutation owners retain native transaction authority. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "d1275b31eda29d1cd92c6e3790e4ace899be3cd77595e4ad8a77d617e4c58127",
+      "signatureHash": "f16ed37478e6e9cf5e303205766cbed98c871e5c8afc7df4653360fa24267a42"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/sync-transfer/native-residency.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One DB, OPFS and remote fixture proves prepare, release and prepare again, including capture, Trash, exports, pin and budget interactions. New receive cases use the same fixture to prove admission after actual unload, temporary refusal and exact retry while preserving shared original identity. Test-local project rows and assertions are not independent production state authorities. Splitting by called API would separate proof of the same originals-residency invariant. Main source inspection supports Keep. Correction architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "b39689724a8cae03fb545fdd709017cd3905375e8efd23065a1462a730e9fdde",
+      "signatureHash": "d669dc84e9ef364412940ab36e57c5a6b6fe9fc3f8fe4bff7a3eb18f89d5fa28"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/sync-transfer/prepared-root.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: Parsing, object selection and preparation transform one portable envelope into one admitted replica. Deferred exports reuse its identity maps. Actual reverse type cycles were corrected separately. No second state or effect authority appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "0157717748e85c779dc9a9f3f8f2a0bc04f8eb398e6a9379e622a5320feab042",
+      "signatureHash": "59ec0a356585ff7b695c32d0a26e403055a19d31ca22c91e80448ef70ecf3fa3"
     }
   ]
 }

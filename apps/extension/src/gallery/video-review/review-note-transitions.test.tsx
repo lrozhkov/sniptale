@@ -545,3 +545,7 @@ it('retains the requested playhead while admission finishes the previous draft',
     await fixture.cleanup();
   }
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

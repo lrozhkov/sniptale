@@ -33,6 +33,17 @@ describe('closed product sync contracts', () => {
       })
     ).toBeNull();
   });
+  it('accepts only the explicit native-preservation restriction on replica jobs', () => {
+    const command = { kind: 'replica-prepare', selection, preserveNative: true };
+    expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+    for (const preserveNative of [false, 'true', 1, null])
+      expect(
+        parseSyncProductRequest({ ...envelope, command: { ...command, preserveNative } })
+      ).toBeNull();
+    expect(
+      parseSyncProductRequest({ ...envelope, command: { ...command, kind: 'thumbnail-read' } })
+    ).toBeNull();
+  });
   it('binds workspace authentication to its selected account and refuses unsafe endpoints', () => {
     const command = {
       kind: 'workspace-create',
@@ -172,6 +183,7 @@ const productStatus = {
   connection: { phase: 'active', rootUrl: 'https://dav.test/root/', accountId: 'alice' },
   workspace: { source, phase: 'checking', rootUrl: 'https://dav.test/root/', accountId: 'alice' },
   workspaceJob,
+  products: [],
 };
 const job = {
   requestId: id,
@@ -202,7 +214,10 @@ it.each([
   { kind: 'cancelled', outcome: 'already-completed' },
   { kind: 'cancelled', outcome: 'refused' },
   { kind: 'status', status: productStatus },
-  { kind: 'status', status: { connection: null, workspace: null, workspaceJob: null } },
+  {
+    kind: 'status',
+    status: { connection: null, workspace: null, products: [], workspaceJob: null },
+  },
   { kind: 'operation', job, completion: null },
   { kind: 'operation', job: null, completion: { kind: 'catalog', count: 10000 } },
   { kind: 'operation', job: null, completion: { kind: 'replica', selection } },
@@ -419,4 +434,183 @@ it('keeps automatic work internal and bounds its completion', () => {
     { ...completion, providerResponse: 'private' },
   ])
     expect(parseSyncProductResponse(response(invalid))).toBeNull();
+});
+
+it('parses native preparation as a root-only action and rejects caller-supplied recovery authority', () => {
+  const command = { kind: 'native-prepare', root: { rootKind: 'media', rootId: 'asset' } };
+  expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  for (const extra of [
+    { remoteKey: 'file' },
+    { authorization: id },
+    { verified: true },
+    { rootGeneration: 1 },
+  ]) {
+    expect(parseSyncProductRequest({ ...envelope, command: { ...command, ...extra } })).toBeNull();
+    expect(
+      parseSyncProductRequest({
+        ...envelope,
+        command: { ...command, root: { ...command.root, ...extra } },
+      })
+    ).toBeNull();
+  }
+  for (const root of [
+    { rootKind: 'other', rootId: 'asset' },
+    { rootKind: 'media', rootId: '' },
+  ])
+    expect(parseSyncProductRequest({ ...envelope, command: { ...command, root } })).toBeNull();
+});
+
+it('round trips a native preparation completion without a remote selection', () => {
+  const response = {
+    success: true,
+    result: {
+      kind: 'operation',
+      job: { requestId: id, kind: 'native-prepare', state: 'ready', failureCode: null },
+      completion: { kind: 'native', root: { rootKind: 'video-project', rootId: 'project' } },
+    },
+  };
+  expect(parseSyncProductResponse(response)).toEqual(response);
+});
+
+it('keeps cache commands root-only and rejects physical authority and malformed budgets', () => {
+  const root = { rootKind: 'media', rootId: 'native' };
+  for (const command of [
+    { kind: 'cache-status' },
+    { kind: 'cache-trim' },
+    { kind: 'cache-budget', budgetBytes: 0, revision: 0 },
+    { kind: 'cache-root-status', root },
+    { kind: 'cache-pin', root, pinned: true },
+    { kind: 'native-release', root },
+  ]) {
+    expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+    for (const extra of [
+      { remoteKey: 'Files/other' },
+      { verified: true },
+      { targetIds: ['foreign'] },
+      { authorization: id },
+    ])
+      expect(
+        parseSyncProductRequest({ ...envelope, command: { ...command, ...extra } })
+      ).toBeNull();
+  }
+  for (const budgetBytes of [-1, 0.5, Infinity, Number.MAX_SAFE_INTEGER + 1, '0'])
+    expect(
+      parseSyncProductRequest({
+        ...envelope,
+        command: { kind: 'cache-budget', budgetBytes, revision: 0 },
+      })
+    ).toBeNull();
+  expect(
+    parseSyncProductRequest({
+      ...envelope,
+      command: { kind: 'cache-pin', root: { ...root, ref: {} }, pinned: true },
+    })
+  ).toBeNull();
+});
+
+it('accepts count-only cache completion and rejects retained file bodies or unknown status fields', () => {
+  const status = {
+    budgetBytes: 0,
+    budgetRevision: 1,
+    residentBytes: 24,
+    missingBytes: 12,
+    pinnedBytes: 24,
+    pinnedRoots: 1,
+    overBudgetBytes: 24,
+  };
+  const result = { released: 1, releasedBytes: 12, unavailable: 0, busy: 0, protected: 1, status };
+  const response = {
+    success: true,
+    result: { kind: 'operation', job: null, completion: { kind: 'cache-trim', result } },
+  };
+  expect(parseSyncProductResponse(response)).toEqual(response);
+  expect(
+    parseSyncProductResponse({
+      ...response,
+      result: {
+        ...response.result,
+        completion: { kind: 'cache-trim', result: { ...result, blob: new Blob(['secret']) } },
+      },
+    })
+  ).toBeNull();
+  expect(
+    parseSyncProductResponse({
+      success: true,
+      result: { kind: 'cache-status', status: { ...status, authentication: 'private' } },
+    })
+  ).toBeNull();
+  expect(
+    parseSyncProductResponse({
+      success: true,
+      result: { kind: 'cache-status', status: { ...status, residentBytes: -1 } },
+    })
+  ).toBeNull();
+});
+
+it('keeps backup preparation root-only without accepting selected native file references', () => {
+  const command = {
+    kind: 'backup-prepare',
+    root: { rootKind: 'video-project', rootId: 'selected' },
+  };
+  expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  expect(parseSyncProductRequest({ ...envelope, command: { ...command, refs: [] } })).toBeNull();
+  expect(
+    parseSyncProductRequest({
+      ...envelope,
+      command: { ...command, root: { ...command.root, remoteKey: 'Files/foreign' } },
+    })
+  ).toBeNull();
+});
+
+it('accepts only an exact expected identity restriction for Settings local-only retirement', () => {
+  const expected = { incarnation: id, revision: 2 };
+  const command = { kind: 'connection-local-only', expected };
+  expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  for (const extra of [{ rootUrl: 'https://foreign.test/' }, { binding: {} }, { prepared: true }])
+    expect(parseSyncProductRequest({ ...envelope, command: { ...command, ...extra } })).toBeNull();
+  expect(
+    parseSyncProductRequest({
+      ...envelope,
+      command: { ...command, expected: { ...expected, revision: -1 } },
+    })
+  ).toBeNull();
+  expect(
+    parseSyncProductResponse({
+      success: true,
+      result: { kind: 'local-only', history: 'delivered' },
+    })
+  ).toEqual({
+    success: true,
+    result: { kind: 'local-only', history: 'delivered' },
+  });
+});
+
+it('accepts only bounded unique safe runtime job observations in public status', () => {
+  const status = { connection: null, workspace: null, workspaceJob: null, products: [job] };
+  const response = { success: true, result: { kind: 'status', status } };
+  expect(parseSyncProductResponse(response)).toEqual(response);
+  for (const products of [
+    [job, job],
+    Array.from({ length: 129 }, () => job),
+    [{ ...job, kind: 'thumbnail-read' }],
+    [{ ...job, kind: 'automatic-sync' }],
+    [{ ...job, filename: 'private.png' }],
+    [{ ...job, failureCode: 'raw provider response' }],
+  ]) {
+    expect(
+      parseSyncProductResponse({
+        success: true,
+        result: { kind: 'status', status: { ...status, products } },
+      })
+    ).toBeNull();
+  }
+});
+
+it('keeps completed detach distinct from incomplete diagnostic history', () => {
+  const result = { kind: 'local-only', history: 'incomplete' };
+  expect(parseSyncProductResponse({ success: true, result })).toEqual({ success: true, result });
+  expect(parseSyncProductResponse({ success: true, result: { kind: 'local-only' } })).toBeNull();
+  expect(
+    parseSyncProductResponse({ success: true, result: { kind: 'local-only', history: 'unknown' } })
+  ).toBeNull();
 });

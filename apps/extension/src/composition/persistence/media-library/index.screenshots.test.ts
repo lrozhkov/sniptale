@@ -233,7 +233,44 @@ it('recreates an enrolled image above its retained revision fence', async () => 
   const { captureRootKey } = await import('../sync-capture/contracts');
   const { parseSyncCaptureRecord } = await import('../sync-capture/guards');
   const { saveScreenshotMediaAsset } = await import('./index.screenshots');
-  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  let refuseCapture = false;
+  const fixture = createReviewWorkspaceStoreFixture(
+    (name) => refuseCapture && name === 'sync_capture'
+  );
+  const mediaId = 'recreated-image';
+  const oldCopy = {
+    version: 1,
+    kind: 'copy',
+    id: JSON.stringify(['copy', 'inline-image', mediaId]),
+    revision: 2,
+    operationId: 'old-unload',
+    phase: 'unloaded',
+    target: {
+      kind: 'inline-image',
+      mediaId,
+      createdAt: 1,
+      workspaceRevision: 0,
+      rootGeneration: 1,
+      nativeDigest: 'a'.repeat(64),
+      size: 6,
+      mimeType: 'image/png',
+      blobType: 'image/png',
+    },
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'alice',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+      key: 'Files/original.png',
+      sha256: 'b'.repeat(64),
+    },
+    lastUsedAt: 1,
+  };
+  fixture.rows.get('asset_residency')!.set(oldCopy.id, oldCopy);
   const captures = fixture.rows.get('sync_capture')!;
   const rootKey = captureRootKey('space', 'media', 'recreated-image');
   const stateKey = JSON.stringify(['root-state', rootKey]);
@@ -284,12 +321,24 @@ it('recreates an enrolled image above its retained revision fence', async () => 
       };
     },
   });
+  const before = structuredClone(fixture.rows);
+  refuseCapture = true;
+  await expect(
+    saveScreenshotMediaAsset({
+      id: 'recreated-image',
+      blob: new Blob(['new-image'], { type: 'image/png' }),
+      filename: 'new.png',
+    })
+  ).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  expect(fixture.rows).toEqual(before);
+  refuseCapture = false;
   const result = await saveScreenshotMediaAsset({
     id: 'recreated-image',
     blob: new Blob(['new-image'], { type: 'image/png' }),
     filename: 'new.png',
   });
   expect(result.workspaceRevision).toBe(8);
+  expect(fixture.rows.get('asset_residency')!.has(oldCopy.id)).toBe(false);
   expect(fixture.rows.get('sync_capture')!.get(stateKey)).toMatchObject({
     nativeRevision: 8,
     generation: 3,

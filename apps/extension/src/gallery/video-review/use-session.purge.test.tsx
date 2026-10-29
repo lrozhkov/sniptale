@@ -131,3 +131,7 @@ it('a cancelled opening cannot recreate a purged project: drain the writer befor
     });
   }
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

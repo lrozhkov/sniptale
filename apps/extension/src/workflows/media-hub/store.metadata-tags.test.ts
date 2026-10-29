@@ -2,8 +2,13 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mediaHubStoreMocks = vi.hoisted(() => ({
   addMediaLibraryEntryTagsMock: vi.fn(),
+  prepare: vi.fn(),
   publishMediaHubLibraryChangedMock: vi.fn(),
   withMediaHubWriteGuardMock: vi.fn(),
+}));
+
+vi.mock('../sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: mediaHubStoreMocks.prepare,
 }));
 
 vi.mock('../../composition/persistence/media-library/index', async (importOriginal) => ({
@@ -77,6 +82,9 @@ vi.mock('../../features/media-hub/storage-errors', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mediaHubStoreMocks.prepare.mockImplementation(async (_roots, action: () => Promise<unknown>) =>
+    action()
+  );
   mediaHubStoreMocks.withMediaHubWriteGuardMock.mockImplementation(
     async (_operation: string, callback: () => Promise<unknown>) => callback()
   );
@@ -95,4 +103,19 @@ it('merges media tags through the guarded media-hub owner and publishes an updat
   expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
     'asset-1',
   ]);
+});
+
+it('does not change tags or publish an event when original preparation is refused', async () => {
+  const { addMediaLibraryEntryTagsSafely } = await import('./store');
+  mediaHubStoreMocks.prepare.mockRejectedValueOnce(new Error('temporary refusal'));
+  await expect(addMediaLibraryEntryTagsSafely('asset-1', ['demo'])).rejects.toThrow(
+    'temporary refusal'
+  );
+  expect(mediaHubStoreMocks.addMediaLibraryEntryTagsMock).not.toHaveBeenCalled();
+  expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+  await addMediaLibraryEntryTagsSafely('asset-1', ['demo']);
+  expect(mediaHubStoreMocks.addMediaLibraryEntryTagsMock).toHaveBeenCalledExactlyOnceWith(
+    'asset-1',
+    ['demo']
+  );
 });

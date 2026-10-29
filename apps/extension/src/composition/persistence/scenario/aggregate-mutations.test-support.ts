@@ -216,6 +216,7 @@ beforeEach(() => {
   stores.clear();
   for (const name of [
     'sync_capture',
+    'asset_residency',
     'sync_connection',
     'recording_telemetry',
     'project_exports',

@@ -1,3 +1,4 @@
+import type { RetainedLibraryPlan } from '../../../../workflows/sync-transfer/retained-library';
 import type { createSyncProductClient } from '../../../../platform/runtime-messaging/sync-product-client';
 import type {
   SyncProductResult,
@@ -11,7 +12,13 @@ type Message =
   | 'refreshed'
   | 'invalidUrl'
   | 'permissionDenied'
-  | 'abandonFailed';
+  | 'abandonFailed'
+  | 'localOnlyReady'
+  | 'localOnlyFailed'
+  | 'localOnlyPending'
+  | 'localOnlyCancelled'
+  | 'localOnlySyncNotReady'
+  | 'localOnlyReadyHistoryGap';
 
 /** Safe display state; transient authentication is never retained by the controller. */
 export interface SyncConnectionViewState {
@@ -19,6 +26,7 @@ export interface SyncConnectionViewState {
   busy: boolean;
   message: Message | null;
   catalogJob: string | null;
+  localOnly: { plan: RetainedLibraryPlan; phase: 'confirm' | 'preparing' | 'cancelling' } | null;
 }
 
 interface Ports {
@@ -60,8 +68,10 @@ class SyncConnectionController {
     busy: false,
     message: null,
     catalogJob: null,
+    localOnly: null,
   };
   private active = false;
+  private localOnlyAbort: AbortController | null = null;
   private statusRevision = 0;
   private workspaceAccepted = false;
   private fallback: ReturnType<typeof setInterval> | undefined;
@@ -94,6 +104,7 @@ class SyncConnectionController {
     document.removeEventListener('visibilitychange', this.onVisible);
     clearInterval(this.fallback);
     this.fallback = undefined;
+    this.localOnlyAbort?.abort();
     this.catalogWaiter?.abort();
     this.catalogWaiter = null;
   }
@@ -139,6 +150,75 @@ class SyncConnectionController {
           : await this.ports.client.retryWorkspace({ source: workspace.source, authentication });
       await this.receiveWorkspaceResult(result, onEnrolled);
     });
+  }
+
+  prepareLocalOnly(): Promise<void> {
+    return this.execute(async () => {
+      const { planRetainedLibrary, RetainedLibraryNotReadyError } =
+        await import('../../../../workflows/sync-transfer/retained-library');
+      let plan: RetainedLibraryPlan | null;
+      try {
+        plan = await planRetainedLibrary();
+      } catch (error) {
+        if (error instanceof RetainedLibraryNotReadyError) {
+          this.publish({ message: 'localOnlySyncNotReady' });
+          return;
+        }
+        throw error;
+      }
+      if (!this.active) return;
+      if (!plan) {
+        await this.readStatus();
+        return;
+      }
+      this.publish({ localOnly: { plan, phase: 'confirm' } });
+    }, 'localOnlyFailed');
+  }
+
+  confirmLocalOnly(): Promise<void> {
+    const selected = this.state.localOnly;
+    if (!selected || selected.phase !== 'confirm') return Promise.resolve();
+    return this.execute(async () => {
+      const abort = new AbortController();
+      this.localOnlyAbort = abort;
+      this.publish({ localOnly: { plan: selected.plan, phase: 'preparing' } });
+      try {
+        const { switchLibraryToLocalOnly, LocalOnlySwitchError } =
+          await import('../../../../workflows/sync-transfer/local-only');
+        try {
+          const history = await switchLibraryToLocalOnly(selected.plan, abort.signal);
+          if (this.active)
+            this.publish({
+              localOnly: null,
+              message: history === 'incomplete' ? 'localOnlyReadyHistoryGap' : 'localOnlyReady',
+            });
+        } catch (error) {
+          if (this.active)
+            this.publish({
+              localOnly: null,
+              message:
+                error instanceof Error && error.name === 'AbortError'
+                  ? 'localOnlyCancelled'
+                  : error instanceof LocalOnlySwitchError && error.code === 'pending-outgoing'
+                    ? 'localOnlyPending'
+                    : 'localOnlyFailed',
+            });
+        }
+        if (this.active) await this.readStatus();
+      } finally {
+        if (this.localOnlyAbort === abort) this.localOnlyAbort = null;
+      }
+    }, 'localOnlyFailed');
+  }
+
+  cancelLocalOnly(): void {
+    const selected = this.state.localOnly;
+    if (!selected) return;
+    if (selected.phase === 'confirm') this.publish({ localOnly: null });
+    else {
+      this.localOnlyAbort?.abort();
+      this.publish({ localOnly: { ...selected, phase: 'cancelling' } });
+    }
   }
 
   refresh(): Promise<void> {

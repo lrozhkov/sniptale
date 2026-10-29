@@ -1,3 +1,10 @@
+import { SyncLocalOnlyError } from '../../composition/persistence/remote-connection/local-only';
+import { readNativeCacheStatus } from '../../workflows/sync-transfer/native-cache-policy';
+import {
+  readNativeCacheRootStatus,
+  setNativeCacheBudget,
+  setNativeCacheRootPinned,
+} from '../../workflows/sync-transfer/native-cache';
 import {
   MessageType,
   type ResponseSender,
@@ -12,7 +19,10 @@ import { loadSyncWorkspaceSelection } from '../../composition/persistence/remote
 import {
   classifySettingsPageSenderUrl,
   isGallerySenderUrl,
+  isImageEditorSenderUrl,
+  isScenarioEditorSenderUrl,
 } from '../runtime/routing/authorization/sender-classification';
+import { isOwnedExtensionPagePath } from '../../platform/navigation/extension-pages/sender-url';
 import type { createSyncConnectionCoordinator } from './coordinator';
 
 type Coordinator = ReturnType<typeof createSyncConnectionCoordinator>;
@@ -32,6 +42,24 @@ export function isSyncProductSenderAllowed(
   if (sender.documentLifecycle !== undefined && sender.documentLifecycle !== 'active') return false;
   const settings = classifySettingsPageSenderUrl(sender.url) === 'ordinary-settings-page';
   const gallery = isGallerySenderUrl(sender.url);
+  const editor =
+    isImageEditorSenderUrl(sender.url) ||
+    isScenarioEditorSenderUrl(sender.url) ||
+    isOwnedExtensionPagePath(sender.url, 'apps/extension/src/video-editor/index.html');
+  if (command.kind === 'connection-local-only') return settings;
+  if (command.kind === 'replica-prepare')
+    return gallery || (settings && command.preserveNative === true);
+  if (command.kind === 'cache-status') return settings || gallery;
+  if (command.kind === 'cache-budget' || command.kind === 'cache-trim') return settings;
+  if (
+    command.kind === 'cache-root-status' ||
+    command.kind === 'cache-pin' ||
+    command.kind === 'native-release'
+  )
+    return gallery;
+  if (command.kind === 'backup-prepare') return settings || gallery || editor;
+  if (command.kind === 'native-prepare') return gallery || editor;
+  if (editor) return command.kind === 'inspect' || command.kind === 'cancel';
   if (
     command.kind === 'status' ||
     command.kind === 'inspect' ||
@@ -55,6 +83,36 @@ async function execute(
   sync: Coordinator,
   sender: chrome.runtime.MessageSender
 ): Promise<SyncProductResult> {
+  if (command.kind === 'connection-local-only') {
+    try {
+      const history = await sync.localOnly(command.expected);
+      return { kind: 'local-only', history };
+    } catch (error) {
+      if (error instanceof SyncLocalOnlyError)
+        return { kind: 'local-only-refused', code: error.code };
+      throw error;
+    }
+  }
+  if (command.kind === 'cache-status')
+    return { kind: 'cache-status', status: await readNativeCacheStatus() };
+  if (command.kind === 'cache-budget') {
+    const settings = await setNativeCacheBudget(command.budgetBytes, command.revision);
+    return { kind: 'cache-budget', budgetBytes: settings.budgetBytes, revision: settings.revision };
+  }
+  if (command.kind === 'cache-root-status')
+    return { kind: 'cache-root', status: await readNativeCacheRootStatus(command.root) };
+  if (command.kind === 'cache-pin') {
+    await setNativeCacheRootPinned(command.root, command.pinned);
+    const status = await readNativeCacheRootStatus(command.root);
+    if (!command.pinned || status.ready) return { kind: 'cache-root', status };
+    const response = await sync.productCommand(
+      requestId,
+      { kind: 'native-prepare', root: command.root },
+      'gallery'
+    );
+    if (!response.success) throw new Error('Sync product command refused');
+    return response.result;
+  }
   if (command.kind === 'status') {
     const [connection, workspace, snapshot] = await Promise.all([
       loadSyncConnection(),
@@ -80,6 +138,11 @@ async function execute(
             }
           : null,
         workspaceJob: snapshot?.workspace ?? null,
+        products: connection
+          ? (snapshot?.products ?? []).filter(
+              (job) => job.kind !== 'thumbnail-read' && job.kind !== 'automatic-sync'
+            )
+          : [],
       },
     };
   }
@@ -115,7 +178,7 @@ async function execute(
   const response = await sync.productCommand(
     command.kind === 'inspect' || command.kind === 'cancel' ? command.requestId : requestId,
     command,
-    isGallerySenderUrl(sender.url) ? 'gallery' : 'settings'
+    classifySettingsPageSenderUrl(sender.url) === 'ordinary-settings-page' ? 'settings' : 'gallery'
   );
   if (!response.success) throw new Error('Sync product command refused');
   return response.result;

@@ -571,3 +571,7 @@ it('adds a note from the centered toolbar group and focuses the notes composer',
     await fixture.cleanup();
   }
 }, 30000);
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

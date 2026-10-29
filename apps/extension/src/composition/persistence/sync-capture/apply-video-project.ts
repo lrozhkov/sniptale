@@ -8,6 +8,12 @@ import {
   type SyncConnectionIdentity,
 } from '../remote-connection/model';
 import { SCENARIO_CAPTURE_STORES } from './scenario-snapshot';
+import {
+  admitRemoteAssetResidencyInTransaction,
+  readAssetResidencyCopyInTransaction,
+} from '../assets/residency';
+import { assetResidencyCopyId } from '../assets/residency-records';
+import { putVideoReviewRestore } from '../review-workspaces/backup-restore';
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { initDB } from '../infrastructure/indexed-db/core';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
@@ -17,12 +23,16 @@ import {
   type PreparedVideoProjectReplicaRoot,
 } from './prepared-project';
 import type { IDBPTransaction } from 'idb';
-import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
+import type {
+  PersistenceMutationPermit,
+  DurableAssetLifecyclePermit,
+} from '../infrastructure/mutation-barrier';
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_RESIDENCY_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
@@ -46,11 +56,15 @@ import {
   publishPreparedVideoProjectSidecarsInTransaction,
   type PreparedVideoProjectRevision,
 } from '../projects/revision-publication';
-import { parseAssetRef, type AssetRef } from '../assets';
+import { parseAssetRef, parseAssetOwner, type AssetRef } from '../assets';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
-import { parseVideoProjectEntry, parseProjectAssetEntry } from '../projects/read-guards';
+import {
+  parseVideoProjectEntry,
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+} from '../projects/read-guards';
 import type { VideoProjectEntry } from '../projects/contracts';
 import { promoteProjectSourceLifecycles } from '../projects/new-reference-admission';
 import { allocateVideoProjectRevisionInTransaction } from '../projects/revisions';
@@ -189,7 +203,7 @@ export interface ApplyPreparedVideoProjectRevisionInput {
 }
 
 type HydratedProjectInput = Omit<ApplyPreparedVideoProjectRevisionInput, 'root'> & {
-  root: PreparedVideoProjectRevision;
+  root: Awaited<ReturnType<typeof hydratePreparedVideoProjectReplicaRoot>>;
 };
 
 class VideoProjectApplyConflictError extends Error {
@@ -248,6 +262,14 @@ class PreparedProjectClosure {
     for (const id of collectCapturedProjectRecordingIds(this.project))
       this.neededMedia.add(`recording:${id}`);
     for (const asset of this.project.assets) this.admitSource(asset);
+    for (const item of this.input.root.exports ?? []) {
+      if (item.videoReview)
+        for (const reference of collectReviewAssetReferences(item.videoReview.workspace)) {
+          if (!reference.startsWith('project-asset:'))
+            throw new VideoProjectApplyConflictError('unsupported-project');
+          this.neededAssets.add(reference.slice('project-asset:'.length));
+        }
+    }
     for (const id of this.neededAssets) {
       const asset = this.assets.get(id);
       if (!asset) throw new VideoProjectApplyConflictError('unsupported-project');
@@ -525,8 +547,10 @@ async function admitApplication(tx: ApplyTransaction, candidate: HydratedProject
   };
   const duplicate = await readAppliedReceipt(tx, identity);
   if (duplicate !== null) return { status: 'duplicate' as const, generation: duplicate };
-  if (candidate.authorization !== undefined)
-    await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
+  const connection =
+    candidate.authorization === undefined
+      ? null
+      : await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
   if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
     throw new VideoProjectApplyConflictError('profile-changed');
   assertSupportedClosure(candidate);
@@ -550,14 +574,15 @@ async function admitApplication(tx: ApplyTransaction, candidate: HydratedProject
   const stores = publicationStores(tx);
   await assertPreparedProjectAssetSources(root.assets, stores);
   await assertPrivateBindings(tx, root, current);
-  return { status: 'ready' as const, current, state, receipt, stores };
+  return { status: 'ready' as const, current, state, receipt, stores, connection };
 }
 
 async function publishApplication(
   tx: ApplyTransaction,
-  root: PreparedVideoProjectRevision,
+  root: HydratedProjectInput['root'],
   context: Extract<Awaited<ReturnType<typeof admitApplication>>, { status: 'ready' }>,
-  operation: ReturnType<typeof buildPhysicalDeleteOperation>
+  operation: ReturnType<typeof buildPhysicalDeleteOperation>,
+  permit: PersistenceMutationPermit
 ): Promise<void> {
   const stores = context.stores;
   const workspaceRevision = await allocateVideoProjectRevisionInTransaction(
@@ -571,6 +596,57 @@ async function publishApplication(
   );
   await publishPreparedVideoProjectRevisionInTransaction({ root, stores, workspaceRevision });
   await publishPreparedVideoProjectSidecarsInTransaction({ root, stores, workspaceRevision });
+  for (const item of root.exports ?? []) {
+    const raw: unknown = await tx.objectStore(PROJECT_EXPORTS_STORE).get(item.entry.id);
+    if (item.reuseExisting) {
+      const ref: unknown = await tx.objectStore(ASSET_REFS_STORE).get(item.ref.assetId);
+      const owner = parseAssetOwner(
+        await tx.objectStore(ASSET_OWNERS_STORE).get(['project-export', item.entry.id, 'body'])
+      );
+      if (
+        JSON.stringify(parseProjectExportEntry(raw)) !== JSON.stringify(item.entry) ||
+        JSON.stringify(parseAssetRef(ref)) !== JSON.stringify(item.ref) ||
+        !owner ||
+        owner.assetId !== item.ref.assetId
+      )
+        throw new VideoProjectApplyConflictError('project-changed');
+      continue;
+    }
+    if (
+      raw !== undefined ||
+      !context.connection ||
+      (await tx.objectStore(ASSET_REFS_STORE).get(item.ref.assetId)) !== undefined ||
+      (await tx.objectStore(ASSET_OWNERS_STORE).get(['project-export', item.entry.id, 'body'])) !==
+        undefined ||
+      (await tx.objectStore(MEDIA_LIBRARY_STORE).get(`export:${item.entry.id}`)) !== undefined
+    )
+      throw new VideoProjectApplyConflictError('project-changed');
+    await admitRemoteAssetResidencyInTransaction(
+      tx,
+      {
+        operationId: context.receipt.operationId,
+        target: { kind: 'opfs', ref: item.ref },
+        remote: { ...item.remote, binding: context.connection.binding },
+        lastUsedAt: Date.now(),
+      },
+      permit
+    );
+    await stores.refs.put(item.ref);
+    await stores.owners.put({
+      assetId: item.ref.assetId,
+      ownerKind: 'project-export',
+      ownerId: item.entry.id,
+      role: 'body',
+    });
+    await tx.objectStore(PROJECT_EXPORTS_STORE).put(item.entry);
+    if (item.videoReview)
+      await putVideoReviewRestore({
+        review: item.videoReview,
+        workspaces: stores.videoWorkspaces,
+        drafts: stores.videoDrafts,
+      });
+    if (item.thumbnail) await stores.thumbnails.put(item.thumbnail);
+  }
   await promoteProjectSourceLifecycles(
     root.entry.project,
     {
@@ -619,6 +695,67 @@ async function readCompletedProjectReceipt(
   return result;
 }
 
+/** Read a retained export without granting publication or replacement authority. */
+export async function loadProjectReplicaExport(input: {
+  spaceId: string;
+  profileCreatedAt: number;
+  connectionGeneration: number;
+  authorization?: SyncConnectionIdentity;
+  projectId: string;
+  exportId: string;
+}) {
+  const db = await initDB();
+  const tx = db.transaction(
+    [
+      SYNC_CAPTURE_STORE,
+      SYNC_CONNECTION_STORE,
+      PROJECT_EXPORTS_STORE,
+      ASSET_REFS_STORE,
+      ASSET_OWNERS_STORE,
+      ASSET_RESIDENCY_STORE,
+    ],
+    'readonly'
+  );
+  const connection = await checkSyncConnectionAdmission(tx, input, input.authorization ?? null);
+  const raw: unknown = await tx.objectStore(PROJECT_EXPORTS_STORE).get(input.exportId);
+  if (raw === undefined) {
+    await tx.done;
+    return null;
+  }
+  const entry = parseProjectExportEntry(raw);
+  if (!entry || entry.id !== input.exportId || entry.projectId !== input.projectId)
+    throw new VideoProjectApplyConflictError('project-changed');
+  const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(entry.assetId));
+  const owner = parseAssetOwner(
+    await tx.objectStore(ASSET_OWNERS_STORE).get(['project-export', entry.id, 'body'])
+  );
+  if (
+    !ref ||
+    ref.size !== entry.size ||
+    ref.mimeType !== entry.mimeType ||
+    !owner ||
+    owner.assetId !== ref.assetId ||
+    owner.ownerKind !== 'project-export' ||
+    owner.ownerId !== entry.id ||
+    owner.role !== 'body'
+  )
+    throw new VideoProjectApplyConflictError('project-changed');
+  const copy = await readAssetResidencyCopyInTransaction(
+    tx,
+    assetResidencyCopyId({ kind: 'opfs', ref })
+  );
+  if (
+    copy &&
+    (!connection ||
+      JSON.stringify(copy.remote.binding) !== JSON.stringify(connection.binding) ||
+      copy.target.kind !== 'opfs' ||
+      JSON.stringify(copy.target.ref) !== JSON.stringify(ref))
+  )
+    throw new VideoProjectApplyConflictError('project-changed');
+  await tx.done;
+  return { entry, ref, copy };
+}
+
 /** Caller retains staged bytes and verifies sourceDigest before this native command. */
 export async function applyPreparedVideoProjectRevision(
   input: ApplyPreparedVideoProjectRevisionInput,
@@ -657,10 +794,11 @@ export async function applyPreparedVideoProjectRevision(
   const root = await hydratePreparedVideoProjectReplicaRoot(staged.root);
   const candidate: HydratedProjectInput = { ...staged, root };
   const operation = buildPhysicalDeleteOperation([]);
-  const result = await runWithIndexedDbMutation(async (db) => {
+  const result = await runWithIndexedDbMutation(async (db, permit) => {
     const tx = db.transaction(
       [
         ...SCENARIO_CAPTURE_STORES,
+        ASSET_RESIDENCY_STORE,
         VIDEO_PROJECT_REVISIONS_STORE,
         STORE_NAME,
         VIDEO_PROJECTS_STORE,
@@ -688,7 +826,7 @@ export async function applyPreparedVideoProjectRevision(
         await tx.done;
         return context;
       }
-      await publishApplication(tx, root, context, operation);
+      await publishApplication(tx, root, context, operation, permit);
       await tx.done;
       return { status: 'applied' as const, generation: context.state.generation };
     } catch (error) {

@@ -1,10 +1,14 @@
-import type { SyncWorkspaceSource } from '../../composition/persistence/remote-connection/model';
+import type {
+  SyncConnectionIdentity,
+  SyncWorkspaceSource,
+} from '../../composition/persistence/remote-connection/model';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createRuntimeMessagingTransport } from './chrome-transport';
 import type {
   SyncProductCommand,
   SyncProductResult,
   SyncRemoteSelection,
+  SyncNativeEditingRoot,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 
 const SETTLED_CHANNEL = 'sniptale-sync-product-settled';
@@ -73,6 +77,13 @@ export function subscribeToSyncQueueSettled(callback: () => void): () => void {
 export function subscribeToWorkspaceSettled(callback: () => void): () => void {
   return subscribeSettled((_requestId, kind) => {
     if (kind === 'workspace') callback();
+  });
+}
+
+/** Advisory completion requires a fresh status read; it conveys no operation authority. */
+export function subscribeToSyncProductSettled(callback: () => void): () => void {
+  return subscribeSettled((_requestId, kind) => {
+    if (kind === 'product') callback();
   });
 }
 
@@ -157,6 +168,8 @@ export function createSyncProductClient() {
   }
   return {
     waitForOperation,
+    switchToLocalOnly: (expected: SyncConnectionIdentity) =>
+      command({ kind: 'connection-local-only', expected }),
     subscribeToWorkspaceSettled,
     createWorkspace: (
       input: Omit<Extract<SyncProductCommand, { kind: 'workspace-create' }>, 'kind'>
@@ -177,6 +190,15 @@ export function createSyncProductClient() {
     ) => command({ kind: 'workspace-enroll', ...input }),
     abandonWorkspace: (source: SyncWorkspaceSource) =>
       command({ kind: 'workspace-abandon', source }),
+    readCacheStatus: () => command({ kind: 'cache-status' }),
+    setCacheBudget: (budgetBytes: number, revision: number) =>
+      command({ kind: 'cache-budget', budgetBytes, revision }),
+    trimCache: () => command({ kind: 'cache-trim' }),
+    readNativeCacheRoot: (root: SyncNativeEditingRoot) =>
+      command({ kind: 'cache-root-status', root }),
+    pinNative: (root: SyncNativeEditingRoot, pinned: boolean) =>
+      command({ kind: 'cache-pin', root, pinned }),
+    releaseNative: (root: SyncNativeEditingRoot) => command({ kind: 'native-release', root }),
     readStatus: () => command({ kind: 'status' }),
     refreshCatalog: (bypassCache = false) => command({ kind: 'catalog-refresh', bypassCache }),
     resolveConflict: (
@@ -184,8 +206,14 @@ export function createSyncProductClient() {
       expectedHeads: string[],
       resolutionId: string = crypto.randomUUID()
     ) => command({ kind: 'conflict-resolve', selection, expectedHeads, resolutionId }),
-    prepareReplica: (selection: SyncRemoteSelection) =>
-      command({ kind: 'replica-prepare', selection }),
+    prepareNativeBackup: (root: SyncNativeEditingRoot) => command({ kind: 'backup-prepare', root }),
+    prepareNative: (root: SyncNativeEditingRoot) => command({ kind: 'native-prepare', root }),
+    prepareReplica: (selection: SyncRemoteSelection, preserveNative?: true) =>
+      command({
+        kind: 'replica-prepare',
+        selection,
+        ...(preserveNative ? { preserveNative } : {}),
+      }),
     readThumbnail: (selection: SyncRemoteSelection) =>
       command({ kind: 'thumbnail-read', selection }),
     inspect: (requestId: string) => command({ kind: 'inspect', requestId }),

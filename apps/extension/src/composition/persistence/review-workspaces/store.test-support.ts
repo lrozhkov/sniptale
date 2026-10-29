@@ -76,6 +76,7 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
       'asset_owners',
       'asset_refs',
       'asset_operations',
+      'asset_residency',
       'sync_capture',
       'sync_outbox',
       'sync_connection',
@@ -107,16 +108,20 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
                 ? value['key']
                 : name === 'video_project_revisions'
                   ? value['projectId']
-                  : name === 'video_workspace_history'
-                    ? JSON.stringify([value['aggregateId'], value['ordinal']])
-                    : name === 'recording_telemetry'
-                      ? value['recordingId']
-                      : name === 'asset_owners'
-                        ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
-                        : (value['aggregateId'] ??
-                          value['id'] ??
-                          value['operationId'] ??
-                          value['assetId']);
+                  : name === 'scenario_project_history'
+                    ? JSON.stringify([value['projectId'], value['revision']])
+                    : name === 'scenario_project_units'
+                      ? JSON.stringify([value['projectId'], value['unitId'], value['revision']])
+                      : name === 'video_workspace_history'
+                        ? JSON.stringify([value['aggregateId'], value['ordinal']])
+                        : name === 'recording_telemetry'
+                          ? value['recordingId']
+                          : name === 'asset_owners'
+                            ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
+                            : (value['aggregateId'] ??
+                              value['id'] ??
+                              value['operationId'] ??
+                              value['assetId']);
             if (typeof key !== 'string' || !key) throw new Error('Missing test row identity');
             if (add && store.has(key))
               throw new DOMException('Duplicate fixture row', 'ConstraintError');

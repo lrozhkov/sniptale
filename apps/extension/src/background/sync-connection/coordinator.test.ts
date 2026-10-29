@@ -53,6 +53,7 @@ function fixture() {
   };
   const deps = {
     loadConnection: vi.fn(async (): Promise<SyncConnectionMetadata | null> => metadata),
+    completeLocalOnly: vi.fn(async (): Promise<'delivered' | 'incomplete'> => 'delivered'),
     loadWorkspace: vi.fn(async (): Promise<SyncWorkspaceSelection | null> => null),
     revokeWorkspace: vi.fn(async () => undefined),
     hasOriginPermission: vi.fn(async () => true),
@@ -653,7 +654,7 @@ describe('local workspace abandonment', () => {
 
 describe('single-observation product target authority', () => {
   it.each(['inspect', 'cancel'] as const)(
-    'restricts Settings %s to catalog jobs using its one owner observation',
+    'restricts Settings %s to supported preparation jobs using its one owner observation',
     async (kind) => {
       const f = fixture();
       const requestId = '11111111-1111-4111-8111-111111111111';
@@ -678,6 +679,28 @@ describe('single-observation product target authority', () => {
       ).resolves.toMatchObject({ success: true });
       expect(f.deps.inspectExecutor).toHaveBeenCalledTimes(2);
       expect(productExecutor).toHaveBeenCalledTimes(1);
+      f.snapshot.products[0]!.kind = 'cache-trim';
+      await expect(
+        coordinator.productCommand(requestId, { kind }, 'settings')
+      ).resolves.toMatchObject({ success: true });
+      expect(productExecutor).toHaveBeenCalledTimes(2);
+      f.snapshot.products[0]!.kind = 'backup-prepare';
+      await expect(
+        coordinator.productCommand(requestId, { kind }, 'settings')
+      ).resolves.toMatchObject({ success: true });
+      expect(productExecutor).toHaveBeenCalledTimes(3);
+      for (const jobKind of ['replica-prepare', 'native-prepare', 'native-release'] as const) {
+        f.snapshot.products[0]!.kind = jobKind;
+        await expect(
+          coordinator.productCommand(requestId, { kind }, 'settings')
+        ).resolves.toMatchObject({ success: true });
+      }
+      expect(productExecutor).toHaveBeenCalledTimes(6);
+      f.snapshot.products[0]!.kind = 'thumbnail-read';
+      await expect(coordinator.productCommand(requestId, { kind }, 'settings')).rejects.toThrow(
+        'refused'
+      );
+      expect(productExecutor).toHaveBeenCalledTimes(6);
     }
   );
 
@@ -772,4 +795,72 @@ it('keeps foreground preparation and Stop available after 100 thumbnail start/in
     erasure.release();
   }
   expect(f.deps.stopExecutor).toHaveBeenCalledTimes(1);
+});
+
+describe('complete local-only retirement', () => {
+  it('revokes and drains before clearing authority and excludes new work while stop is pending', async () => {
+    const f = fixture();
+    f.deps.revokeConnection.mockImplementation(async () => {
+      f.metadata.phase = 'paused';
+      f.metadata.identity = { ...f.metadata.identity, revision: f.metadata.identity.revision + 1 };
+    });
+    const stop = deferred<{ executorId: string; executorRevision: number }>();
+    f.deps.stopExecutor.mockReturnValueOnce(stop.promise);
+    const expected = structuredClone(f.metadata.identity);
+    const operation = f.coordinator.localOnly(expected);
+    await vi.waitFor(() => expect(f.deps.stopExecutor).toHaveBeenCalledOnce());
+    expect(f.deps.revokeConnection).toHaveBeenCalledWith(expected);
+    expect(f.metadata.phase).toBe('paused');
+    expect(f.deps.completeLocalOnly).not.toHaveBeenCalled();
+    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    stop.resolve({ executorId: 'executor', executorRevision: 5 });
+    await operation;
+    expect(f.deps.completeLocalOnly).toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'paused' })
+    );
+  });
+  it('preserves paused authority after a failed stop and permits a fresh retry', async () => {
+    const f = fixture();
+    f.deps.revokeConnection.mockImplementation(async () => {
+      f.metadata.phase = 'paused';
+      f.metadata.identity = { ...f.metadata.identity, revision: f.metadata.identity.revision + 1 };
+    });
+    f.deps.stopExecutor.mockRejectedValueOnce(new Error('unavailable'));
+    await expect(f.coordinator.localOnly(structuredClone(f.metadata.identity))).rejects.toThrow(
+      'unavailable'
+    );
+    expect(f.deps.completeLocalOnly).not.toHaveBeenCalled();
+    expect(f.metadata.phase).toBe('paused');
+    await f.coordinator.localOnly(structuredClone(f.metadata.identity));
+    expect(f.deps.completeLocalOnly).toHaveBeenCalledOnce();
+  });
+  it('refuses stale or replaced connection identities before clearing any namespace', async () => {
+    const f = fixture();
+    f.deps.revokeConnection.mockImplementation(async () => {
+      f.metadata.phase = 'paused';
+      f.metadata.identity = { ...f.metadata.identity, revision: f.metadata.identity.revision + 1 };
+    });
+    await expect(f.coordinator.localOnly({ ...f.metadata.identity, revision: 99 })).rejects.toThrow(
+      'refused'
+    );
+    expect(f.deps.revokeConnection).not.toHaveBeenCalled();
+    const stop = deferred<{ executorId: string; executorRevision: number }>();
+    f.deps.stopExecutor.mockReturnValueOnce(stop.promise);
+    const operation = f.coordinator.localOnly(structuredClone(f.metadata.identity));
+    const observed = expect(operation).rejects.toThrow('refused');
+    await vi.waitFor(() => expect(f.deps.stopExecutor).toHaveBeenCalledOnce());
+    f.metadata.identity = { incarnation: '20000000-0000-4000-8000-000000000001', revision: 1 };
+    stop.resolve({ executorId: 'executor', executorRevision: 5 });
+    await observed;
+    expect(f.deps.completeLocalOnly).not.toHaveBeenCalled();
+  });
+});
+
+it('reads a fully stopped executor after local-only retirement without admitting its old authorization', async () => {
+  const f = fixture();
+  f.snapshot.phase = 'stopped';
+  f.deps.loadConnection.mockResolvedValue(null);
+  await expect(f.coordinator.inspect()).resolves.toEqual(f.snapshot);
+  await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+  expect(f.deps.startExecutor).not.toHaveBeenCalled();
 });

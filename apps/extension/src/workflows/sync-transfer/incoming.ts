@@ -1,3 +1,8 @@
+import {
+  runWithPersistenceMutationTransition,
+  type PersistenceMutationTransitionPermit,
+} from '../../composition/persistence/infrastructure/mutation-barrier';
+import { hasUnloadedNativeEditingRoot, restoreStagedNativeOriginal } from './native-residency';
 import { parseScenarioAssetEntry } from '../../composition/persistence/scenario/read-guards';
 import { loadScenarioReplicaPredecessorAssets } from '../../composition/persistence/sync-capture/apply-scenario';
 import { collectPreparedScenarioReplicaRefs } from '../../composition/persistence/sync-capture/prepared-scenario';
@@ -8,12 +13,14 @@ import {
 } from '../../composition/persistence/sync-capture/apply-deletion';
 import {
   discardPreparedAsset,
+  MissingAssetObjectError,
   readAssetFile,
   writeBlobToAsset,
   runWithDurableAssetOperation,
   type AssetRef,
 } from '../../composition/persistence/assets';
 import { createPreparedReplicaJournal } from '../../composition/persistence/sync-capture/replica-publication';
+import { loadProjectReplicaExport } from '../../composition/persistence/sync-capture/apply-video-project';
 import { loadMediaReplicaPredecessorRef } from '../../composition/persistence/sync-capture/apply-media';
 import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 import { stageRootObjects, type StagedArchiveObject } from '../media-hub-backup/v6/staging';
@@ -28,8 +35,10 @@ import type { scanSyncCatalog } from './catalog';
 import {
   parsePortableSyncRoot,
   portableSyncEditingObjectIds,
+  portableSyncDependencyIds,
   preparePortableReplica,
   type PortableReplicaAdmission,
+  type DeferredProjectExport,
 } from './prepared-root';
 import { portableSyncRootDependencyIds } from './prepared-scenario';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
@@ -73,7 +82,11 @@ async function checkedPredecessorOriginal(
   admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>,
   signal: AbortSignal
 ): Promise<[string, AssetRef] | null> {
-  if (admission.expectedLocalGeneration === 0) return null;
+  if (
+    admission.expectedLocalGeneration === 0 &&
+    (parsed.kind !== 'media' || !parsed.metadata.projectExport)
+  )
+    return null;
   const ref = await loadMediaReplicaPredecessorRef({
     spaceId: admission.spaceId,
     profileCreatedAt: admission.profileCreatedAt,
@@ -81,6 +94,17 @@ async function checkedPredecessorOriginal(
     mediaId: parsed.metadata.entry.id,
     expectedLocalGeneration: admission.expectedLocalGeneration,
     expectedBasis: admission.expectedBasis,
+    ...(admission.authorization ? { authorization: admission.authorization } : {}),
+    ...(parsed.kind === 'media' && parsed.metadata.projectExport
+      ? {
+          exportSource: {
+            projectId: parsed.metadata.projectExport.projectId,
+            sha256: operation.objects.find(
+              (item) => item.objectId === parsed.metadata.originalObjectId
+            )!.sha256,
+          },
+        }
+      : {}),
   });
   const object = parsed.envelope.objects.find(
     (item) => item.objectId === parsed.metadata.originalObjectId
@@ -90,7 +114,18 @@ async function checkedPredecessorOriginal(
   );
   check(object && digest);
   if (!ref || ref.size !== object.size || ref.mimeType !== object.mimeType) return null;
-  const file = await readAssetFile(ref, object.filename);
+  let file: File;
+  try {
+    file = await readAssetFile(ref, object.filename);
+  } catch (error) {
+    signal.throwIfAborted();
+    if (
+      error instanceof MissingAssetObjectError ||
+      (error instanceof DOMException && error.name === 'NotFoundError')
+    )
+      return null;
+    throw error;
+  }
   signal.throwIfAborted();
   return file.size === object.size &&
     file.type === object.mimeType &&
@@ -117,6 +152,7 @@ async function selectReplicaPreparation(args: {
   rootId: string;
   admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>;
   signal: AbortSignal;
+  residentOnly?: true;
 }) {
   const selected = selectedOperation(args.catalog, args.rootKind, args.rootId);
   const admission = structuredClone(args.admission);
@@ -192,19 +228,45 @@ async function selectReplicaPreparation(args: {
       )
     );
   }
-  const selectedIds = portableSyncEditingObjectIds(parsed);
+  const retainedExportIds = new Set<string>();
+  if (parsed.kind === 'video-project')
+    for (const item of parsed.metadata.projectExports) {
+      args.signal.throwIfAborted();
+      if (
+        await loadProjectReplicaExport({
+          ...admission,
+          projectId: parsed.entry.id,
+          exportId: item.entry.id,
+        })
+      )
+        retainedExportIds.add(item.entry.id);
+    }
+  const selectedIds = portableSyncEditingObjectIds(parsed, retainedExportIds);
   const editing = parsed.envelope.objects.filter((object) => selectedIds.includes(object.objectId));
-  return { selected, admission, dependencySources, operation, parsed, selectedIds, editing };
+  return {
+    selected,
+    admission,
+    dependencySources,
+    operation,
+    parsed,
+    selectedIds,
+    editing,
+    retainedExportIds,
+  };
 }
 
 type ReplicaPreparation = Awaited<ReturnType<typeof selectReplicaPreparation>>;
 type ReplicaPreparationInput = Parameters<typeof selectReplicaPreparation>[0];
 
-async function retainScenarioPredecessors(
+async function scenarioPredecessorOriginals(
   args: ReplicaPreparationInput,
-  preparation: ReplicaPreparation,
-  borrowedRefs: Map<string, AssetRef>
+  preparation: ReplicaPreparation
 ) {
+  const matches: {
+    object: ReplicaPreparation['parsed']['envelope']['objects'][number];
+    ref: AssetRef;
+    sha256: string;
+  }[] = [];
   const { parsed, operation, admission } = preparation;
   if (parsed.kind === 'scenario-project' && admission.expectedLocalGeneration > 0) {
     const previous = await loadScenarioReplicaPredecessorAssets({
@@ -243,15 +305,37 @@ async function retainScenarioPredecessors(
         predecessor.ref.mimeType !== object.mimeType
       )
         continue;
-      const file = await readAssetFile(predecessor.ref, object.filename);
+      matches.push({ object, ref: predecessor.ref, sha256: digest.sha256 });
+    }
+  }
+  return matches;
+}
+
+async function retainScenarioPredecessors(
+  args: ReplicaPreparationInput,
+  preparation: ReplicaPreparation,
+  borrowedRefs: Map<string, AssetRef>
+) {
+  for (const { object, ref, sha256 } of await scenarioPredecessorOriginals(args, preparation)) {
+    let file: File;
+    try {
+      file = await readAssetFile(ref, object.filename);
+    } catch (error) {
       args.signal.throwIfAborted();
       if (
-        file.size === object.size &&
-        file.type === object.mimeType &&
-        (await hashFile(file, args.signal)) === digest.sha256
+        error instanceof MissingAssetObjectError ||
+        (error instanceof DOMException && error.name === 'NotFoundError')
       )
-        borrowedRefs.set(asset.objectId, predecessor.ref);
+        continue;
+      throw error;
     }
+    args.signal.throwIfAborted();
+    if (
+      file.size === object.size &&
+      file.type === object.mimeType &&
+      (await hashFile(file, args.signal)) === sha256
+    )
+      borrowedRefs.set(object.objectId, ref);
   }
 }
 
@@ -350,8 +434,12 @@ function retainProjectDependencyObjects(
 ) {
   const { parsed, operation, selectedIds } = preparation;
   if (parsed.kind === 'video-project') {
+    const causalMedia = new Set(portableSyncDependencyIds(parsed));
     for (const asset of parsed.metadata.projectAssets.filter(
-      (item) => item.libraryMediaId && selectedIds.includes(item.objectId)
+      (item) =>
+        item.libraryMediaId &&
+        causalMedia.has(item.libraryMediaId) &&
+        selectedIds.includes(item.objectId)
     )) {
       const dependency = asset.libraryMediaId
         ? checkedDependencies.get(asset.libraryMediaId)
@@ -393,14 +481,68 @@ async function collectReplicaOriginalRefs(
 async function prepareStagedReplica(
   preparation: ReplicaPreparation,
   borrowedRefs: ReadonlyMap<string, AssetRef>,
-  staged: StagedArchiveObject[]
+  staged: StagedArchiveObject[],
+  physicalObjects: readonly { objectId: string; remoteKey: string }[],
+  signal: AbortSignal
 ) {
   const { parsed, operation, admission, selected } = preparation;
   const refs = new Map([
     ...borrowedRefs,
     ...staged.map((item): [string, AssetRef] => [item.objectId, item.ref]),
   ]);
+  const deferredExports = new Map<string, DeferredProjectExport>();
+  if (parsed.kind === 'video-project')
+    for (const item of parsed.metadata.projectExports) {
+      const object = parsed.envelope.objects.find((object) => object.objectId === item.objectId);
+      const digest = operation.objects.find((object) => object.objectId === item.objectId);
+      const physical = physicalObjects.find((object) => object.objectId === item.objectId);
+      check(object && digest && physical);
+      const retained = await loadProjectReplicaExport({
+        ...admission,
+        projectId: parsed.entry.id,
+        exportId: item.entry.id,
+      });
+      signal.throwIfAborted();
+      // A changed reuse decision needs a fresh closure, never extra or missing staged resources.
+      check(Boolean(retained) === preparation.retainedExportIds.has(item.entry.id));
+      if (retained) {
+        check(retained.ref.size === object.size && retained.ref.mimeType === object.mimeType);
+        try {
+          const file = await readAssetFile(retained.ref, object.filename);
+          check(file.size === object.size && (await hashFile(file, signal)) === digest.sha256);
+        } catch (error) {
+          signal.throwIfAborted();
+          if (
+            !(
+              error instanceof MissingAssetObjectError ||
+              (error instanceof DOMException && error.name === 'NotFoundError')
+            )
+          )
+            throw error;
+          check(
+            retained.copy &&
+              retained.copy.phase !== 'resident' &&
+              retained.copy.remote.sha256 === digest.sha256
+          );
+        }
+      }
+      const assetId = retained?.ref.assetId ?? crypto.randomUUID();
+      const ref = retained?.ref ?? {
+        assetId,
+        createdAt: Date.now(),
+        location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+        size: object.size,
+        mimeType: object.mimeType,
+        sha256: digest.sha256,
+      };
+      deferredExports.set(item.entry.id, {
+        ref,
+        remote: { key: physical.remoteKey, sha256: digest.sha256 },
+        ...(retained ? { retainedEntry: retained.entry } : {}),
+      });
+    }
   return preparePortableReplica({
+    deferredExports,
     envelope: parsed.envelope,
     verifiedObjects: refs,
     senderDependencies: operation.dependencies.map((dependency) => {
@@ -429,10 +571,75 @@ async function prepareStagedReplica(
   });
 }
 
+async function retainRestoredOriginal(
+  args: ReplicaPreparationInput,
+  preparation: ReplicaPreparation,
+  staged: StagedArchiveObject[],
+  refs: Map<string, AssetRef>,
+  transitionPermit: PersistenceMutationTransitionPermit
+): Promise<void> {
+  const { parsed, operation, admission } = preparation;
+  const originals = await scenarioPredecessorOriginals(args, preparation);
+  if (
+    (admission.expectedLocalGeneration > 0 ||
+      (parsed.kind === 'media' && parsed.metadata.projectExport)) &&
+    (parsed.kind === 'media' ||
+      (parsed.kind === 'image' && parsed.metadata.entry.source.kind === 'stored-asset'))
+  ) {
+    const object = parsed.envelope.objects.find(
+      (item) => item.objectId === parsed.metadata.originalObjectId
+    );
+    const digest = operation.objects.find(
+      (item) => item.objectId === parsed.metadata.originalObjectId
+    );
+    if (!object || !digest) throw new Error('Incoming original binding is missing.');
+    const ref = await loadMediaReplicaPredecessorRef({
+      spaceId: admission.spaceId,
+      profileCreatedAt: admission.profileCreatedAt,
+      connectionGeneration: admission.connectionGeneration,
+      mediaId: parsed.metadata.entry.id,
+      expectedLocalGeneration: admission.expectedLocalGeneration,
+      expectedBasis: admission.expectedBasis,
+      ...(admission.authorization ? { authorization: admission.authorization } : {}),
+      ...(parsed.kind === 'media' && parsed.metadata.projectExport
+        ? {
+            exportSource: {
+              projectId: parsed.metadata.projectExport.projectId,
+              sha256: operation.objects.find(
+                (item) => item.objectId === parsed.metadata.originalObjectId
+              )!.sha256,
+            },
+          }
+        : {}),
+    });
+    if (ref) originals.push({ object, ref, sha256: digest.sha256 });
+  }
+  for (const { object, ref, sha256 } of originals) {
+    const item = staged.find((item) => item.objectId === object.objectId);
+    if (
+      !item ||
+      !(await restoreStagedNativeOriginal({
+        ref,
+        sourceRef: item.ref,
+        sha256,
+        scope: admission,
+        transitionPermit,
+        signal: args.signal,
+      }))
+    )
+      continue;
+    // Dispose only the staging identity after exact native restoration succeeds.
+    await discardPreparedAsset(item.ref.assetId);
+    refs.set(item.objectId, ref);
+    staged.splice(staged.indexOf(item), 1);
+  }
+}
+
 async function stageReplicaAttempts(
   args: ReplicaPreparationInput,
   preparation: ReplicaPreparation,
-  borrowedRefs: ReadonlyMap<string, AssetRef>
+  borrowedRefs: ReadonlyMap<string, AssetRef>,
+  transitionPermit: PersistenceMutationTransitionPermit
 ) {
   const { editing, selected, operation } = preparation;
   const stagedObjects = editing.filter((object) => !borrowedRefs.has(object.objectId));
@@ -451,6 +658,7 @@ async function stageReplicaAttempts(
     try {
       staged = await stageRootObjects({
         objects: stagedObjects,
+        transitionPermit,
         expectedSha256: new Map(
           stagedObjects.map((object) => {
             const expected = operation.objects.find((item) => item.objectId === object.objectId);
@@ -466,7 +674,15 @@ async function stageReplicaAttempts(
           return { pipeTo: (sink, signal) => stream.pipeTo(sink, signal ? { signal } : {}) };
         },
       });
-      const payload = await prepareStagedReplica(preparation, borrowedRefs, staged);
+      const retainedRefs = new Map(borrowedRefs);
+      await retainRestoredOriginal(args, preparation, staged, retainedRefs, transitionPermit);
+      const payload = await prepareStagedReplica(
+        preparation,
+        retainedRefs,
+        staged,
+        physical.objects,
+        args.signal
+      );
       if (payload.kind === 'scenario-project') {
         const retained = new Set(
           collectPreparedScenarioReplicaRefs(payload.input.root).map((ref) => ref.assetId)
@@ -498,11 +714,18 @@ async function stageReplicaAttempts(
 export async function prepareCatalogReplica(args: ReplicaPreparationInput) {
   const preparation = await selectReplicaPreparation(args);
   // Keep the reader and recovery leases until every staged object belongs to its journal.
-  return runWithAssetResourceRead(() =>
-    runWithDurableAssetOperation(async () => {
-      const refs = await collectReplicaOriginalRefs(args, preparation);
-      return stageReplicaAttempts(args, preparation, refs);
-    })
+  return runWithPersistenceMutationTransition((transition) =>
+    runWithAssetResourceRead(() =>
+      runWithDurableAssetOperation(async () => {
+        if (
+          args.residentOnly &&
+          (await hasUnloadedNativeEditingRoot({ rootKind: args.rootKind, rootId: args.rootId }))
+        )
+          throw new Error('Background incoming requires resident editing resources.');
+        const refs = await collectReplicaOriginalRefs(args, preparation);
+        return stageReplicaAttempts(args, preparation, refs, transition);
+      })
+    )
   );
 }
 

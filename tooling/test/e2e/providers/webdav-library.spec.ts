@@ -1,3 +1,6 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import JSZip from 'jszip';
+import { createHash } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
 import { test, openProvider, saveProof } from './webdav-fixtures';
 import { parseSyncProductResponse } from '../../../../apps/extension/src/contracts/messaging/contracts/runtime/sync-product';
@@ -127,6 +130,112 @@ for (const viewport of [
   { width: 1280, height: 560 },
   { width: 1920, height: 900 },
 ]) {
+  test(`Settings runtime jobs remain manageable after navigation ${viewport.width}`, async ({
+    lab,
+  }, info) => {
+    test.setTimeout(120_000);
+    const browser = await openProvider(lab, info, 'runtime-jobs', false, build, { viewport });
+    try {
+      await connectionPage(browser, viewport);
+      const worker = browser.context.serviceWorkers()[0];
+      if (!worker) throw new Error('Runtime worker is unavailable.');
+      await worker.evaluate(() => {
+        Reflect.set(globalThis, '__syncDiagnosticSenders', []);
+        chrome.runtime.onConnect.addListener((port) => {
+          if (port.name !== 'sniptale:diagnostic-summary:v1') return;
+          const rows = Reflect.get(globalThis, '__syncDiagnosticSenders');
+          if (Array.isArray(rows))
+            rows.push({
+              id: port.sender?.id,
+              url: port.sender?.url,
+              documentId: port.sender?.documentId,
+              frameId: port.sender?.frameId,
+              hasTab: Boolean(port.sender?.tab),
+            });
+        });
+      });
+
+      await connectWorkspace(browser.page, {
+        mode: 'create',
+        url: lab.credentials.rootUrl,
+        ...lab.credentials,
+      });
+      lab.proxy.armFault({ method: 'PROPFIND', key: '*', kind: 'hold-response-headers' });
+      await browser.page.getByRole('button', { name: 'Refresh catalog', exact: true }).click();
+      await lab.proxy.waitForFault();
+      await browser.page.goto(
+        `chrome-extension://${browser.extensionId}/apps/extension/src/settings/index.html?section=saving&view=queue`
+      );
+      const runtime = browser.page.locator('[data-ui="settings.sync-runtime-jobs"]');
+      const running = runtime
+        .locator('li')
+        .filter({ has: browser.page.getByText('Running', { exact: true }) });
+      await expect(running)
+        .toHaveCount(1)
+        .catch(async (error) => {
+          const observation = await browser.page.evaluate(() =>
+            chrome.runtime.sendMessage({
+              type: 'SYNC_PRODUCT_COMMAND',
+              requestId: crypto.randomUUID(),
+              command: { kind: 'status' },
+              __sniptaleRuntimeFreshness: {
+                issuedAtEpochMs: Date.now(),
+                nonce: crypto.randomUUID(),
+              },
+            })
+          );
+          await saveProof(info, {
+            phase: 'runtime-list-failure',
+            observation,
+            view: await browser.page.locator('body').innerText(),
+          });
+          await browser.page.screenshot({
+            path: info.outputPath('runtime-list-failure.png'),
+            fullPage: false,
+          });
+          throw error;
+        });
+      await expect(running).toContainText('Refresh catalog');
+      const requestId = await running.getAttribute('data-operation-id');
+      if (!requestId) throw new Error('Runtime job identity is missing.');
+      await browser.page.screenshot({
+        path: info.outputPath('runtime-job-running.png'),
+        fullPage: false,
+        animations: 'disabled',
+      });
+      await running.getByRole('button', { name: 'Cancel operation', exact: true }).click();
+      const retired = runtime.locator(`[data-operation-id="${requestId}"]`);
+      await expect(retired).toContainText('Interrupted');
+      await expect(retired.getByRole('button')).toHaveCount(0);
+      lab.proxy.releaseFault();
+      await expect
+        .poll(async () =>
+          browser.page.evaluate(async () => {
+            const result = await chrome.storage.local.get('sniptale_runtime_diagnostic_log');
+            const value = result['sniptale_runtime_diagnostic_log'];
+            return JSON.stringify(value);
+          })
+        )
+        .toContain('sync.product.interrupted')
+        .catch(async (error) => {
+          await saveProof(info, {
+            phase: 'runtime-log-delivery',
+            senders: await worker.evaluate(() =>
+              Reflect.get(globalThis, '__syncDiagnosticSenders')
+            ),
+          });
+          throw error;
+        });
+      await browser.page.screenshot({
+        path: info.outputPath('runtime-job-cancelled.png'),
+        fullPage: false,
+        animations: 'disabled',
+      });
+    } finally {
+      lab.proxy.releaseFault();
+      await browser.context.close();
+    }
+  });
   test(`Settings and Library open only the selected remote project and reopen offline ${viewport.width}`, async ({
     lab,
   }, info) => {
@@ -219,6 +328,8 @@ for (const viewport of [
         [
           ...seeded.first.editing,
           ...seeded.second.editing,
+          ...seeded.first.graph.effects.flatMap((effect) => effect.assets),
+          ...seeded.second.graph.effects.flatMap((effect) => effect.assets),
           seeded.first.exported,
           seeded.second.exported,
         ].map((file) => file.sha256)
@@ -265,7 +376,10 @@ for (const viewport of [
       );
       expect(admitted.objects).toEqual(seeded.first.editing);
       expect(admitted.graph).toEqual(seeded.first.graph);
-      expect(admitted.exportAbsent).toBe(true);
+      expect(admitted.exportAbsent).toBe(false);
+      expect(admitted.exports).toEqual([
+        expect.objectContaining({ id: seeded.first.exportId, size: seeded.first.exported.size }),
+      ]);
       const untouched = await nativeProof.evaluate(
         ({ spaceId, rootId }) =>
           window.webdavTransferHarness.portable.outgoing.nativeState(
@@ -288,6 +402,377 @@ for (const viewport of [
       expect(
         lab.proxy.counts.getKeys.slice(beforeCatalog).filter((key) => exportKeys.has(key))
       ).toEqual([]);
+      await editor.close();
+      const cacheSettings = await target.context.newPage();
+      await cacheSettings.setViewportSize(viewport);
+      await cacheSettings.goto(
+        `chrome-extension://${target.extensionId}/apps/extension/src/settings/index.html?section=saving&view=storage`
+      );
+      const cache = cacheSettings.getByRole('region', {
+        name: 'Files on this device',
+        exact: true,
+      });
+      await expect(cache.getByLabel('Budget, MiB', { exact: true })).toBeVisible();
+      const cacheStatus = async () => {
+        const response: unknown = await cacheSettings.evaluate(() =>
+          chrome.runtime.sendMessage({
+            type: 'SYNC_PRODUCT_COMMAND',
+            requestId: crypto.randomUUID(),
+            command: { kind: 'cache-status' },
+            __sniptaleRuntimeFreshness: { issuedAtEpochMs: Date.now(), nonce: crypto.randomUUID() },
+          })
+        );
+        const parsed = parseSyncProductResponse(response);
+        if (!parsed?.success || parsed.result.kind !== 'cache-status')
+          throw new Error('Cache status unavailable.');
+        return parsed.result.status;
+      };
+      const nativeIds = () =>
+        nativeProof.evaluate(async () => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open('sniptale-db');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          try {
+            return await new Promise<IDBValidKey[]>((resolve, reject) => {
+              const request = db
+                .transaction(['asset_refs'], 'readonly')
+                .objectStore('asset_refs')
+                .getAllKeys();
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+            });
+          } finally {
+            db.close();
+          }
+        });
+      const idsBefore = await nativeIds();
+      const residentBefore = await cacheStatus();
+      expect(residentBefore.residentBytes).toBeGreaterThan(0);
+      await cacheSettings.screenshot({
+        path: info.outputPath('cache-settings.png'),
+        fullPage: false,
+      });
+      await openLibrary(target, viewport);
+      const nativeCard = target.page.getByRole('group', { name: firstTitle, exact: true });
+      await nativeCard.focus();
+      await target.page.keyboard.press('Enter');
+      const nativeDialog = target.page.getByRole('dialog', { name: firstTitle, exact: true });
+      const nativeCache = nativeDialog.getByRole('region', {
+        name: 'Files on this device',
+        exact: true,
+      });
+      await nativeCache.getByRole('button', { name: 'Keep offline', exact: true }).click();
+      await expect(nativeCache.getByRole('button', { name: 'Unpin', exact: true })).toBeEnabled();
+      await nativeCache
+        .getByRole('button', { name: 'Free space on this device', exact: true })
+        .click();
+      await expect(nativeCache.getByText('Freed: 0 B.', { exact: true })).toBeVisible();
+      expect((await cacheStatus()).residentBytes).toBe(residentBefore.residentBytes);
+      await nativeCache.getByRole('button', { name: 'Unpin', exact: true }).click();
+      await expect(
+        nativeCache.getByRole('button', { name: 'Keep offline', exact: true })
+      ).toBeEnabled();
+      await nativeCache
+        .getByRole('button', { name: 'Free space on this device', exact: true })
+        .click();
+      await expect(
+        nativeCache.getByText('Download files before opening', { exact: true })
+      ).toBeVisible();
+      const afterRelease = await cacheStatus();
+      expect(afterRelease.residentBytes).toBeLessThan(residentBefore.residentBytes);
+      expect(afterRelease.missingBytes).toBeGreaterThan(residentBefore.missingBytes);
+      expect(await nativeIds()).toEqual(idsBefore);
+      await target.page.screenshot({
+        path: info.outputPath('cache-released-card-retained.png'),
+        fullPage: false,
+      });
+      // The real backup UI must prepare missing native bytes before inventory and stream an ordinary archive.
+      await target.page.evaluate(() => {
+        Object.defineProperty(window, 'showSaveFilePicker', {
+          configurable: true,
+          value: async () =>
+            (await navigator.storage.getDirectory()).getFileHandle('webdav-backup-proof.zip', {
+              create: true,
+            }),
+        });
+      });
+      const backup = nativeDialog.getByRole('button', { name: 'Backup', exact: true });
+      await backup.click();
+      await expect(backup).toHaveAttribute('aria-busy', 'false', { timeout: 30_000 });
+      await expect(nativeDialog.getByRole('alert')).toHaveCount(0);
+      await expect(
+        nativeCache.getByText('Files are on this device', { exact: true })
+      ).toBeVisible();
+      expect(await nativeIds()).toEqual(idsBefore);
+      expect((await cacheStatus()).residentBytes).toBe(
+        residentBefore.residentBytes + seeded.first.exported.size
+      );
+      const archiveBytes = await target.page.evaluate(async () => {
+        const handle = await (
+          await navigator.storage.getDirectory()
+        ).getFileHandle('webdav-backup-proof.zip');
+        return Array.from(new Uint8Array(await (await handle.getFile()).arrayBuffer()));
+      });
+      const archive = await JSZip.loadAsync(Uint8Array.from(archiveBytes));
+      const archiveOriginals = await Promise.all(
+        Object.values(archive.files)
+          .filter((file) => !file.dir && file.name.endsWith('.png'))
+          .map(async (file) => {
+            const bytes = await file.async('uint8array');
+            return {
+              size: bytes.byteLength,
+              sha256: createHash('sha256').update(bytes).digest('hex'),
+            };
+          })
+      );
+      expect(archiveOriginals).toEqual(expect.arrayContaining(admitted.objects));
+      expect(archiveOriginals).toEqual(expect.arrayContaining([seeded.first.exported]));
+      await target.page.screenshot({
+        path: info.outputPath('backup-after-unload.png'),
+        fullPage: false,
+      });
+      await openLibrary(target, viewport);
+      await nativeCard.focus();
+      await target.page.keyboard.press('Enter');
+      await nativeCache
+        .getByRole('button', { name: 'Free space on this device', exact: true })
+        .click();
+      await expect(
+        nativeCache.getByText('Download files before opening', { exact: true })
+      ).toBeVisible();
+      await target.page.keyboard.press('Escape');
+      await expect(nativeCard).toBeVisible();
+      const restoredPage = target.context.waitForEvent('page');
+      await nativeCard.getByRole('button', { name: 'Open in editor', exact: true }).click();
+      const restoredEditor = await restoredPage;
+      await restoredEditor.setViewportSize(viewport);
+      await expectEditor(restoredEditor, seeded.first.clipId);
+      expect(await nativeIds()).toEqual(idsBefore);
+      const restored = await nativeProof.evaluate(
+        (id) => window.webdavTransferHarness.portable.proof(id),
+        seeded.first.projectId
+      );
+      expect(restored.objects).toEqual(admitted.objects);
+      expect(restored.graph).toEqual(admitted.graph);
+      expect((await cacheStatus()).residentBytes).toBe(residentBefore.residentBytes);
+      await restoredEditor.screenshot({
+        path: info.outputPath('cache-ordinary-reopen.png'),
+        fullPage: false,
+      });
+      await restoredEditor.close();
+      await openLibrary(target, viewport);
+      // Navigation replaces the Window and its disposable test file-picker override.
+      await target.page.evaluate(() =>
+        Object.defineProperty(window, 'showSaveFilePicker', {
+          configurable: true,
+          value: async () =>
+            (await navigator.storage.getDirectory()).getFileHandle('webdav-backup-proof.zip', {
+              create: true,
+            }),
+        })
+      );
+      await target.page.keyboard.press('Escape');
+      await target.page.locator('[data-ui="gallery.header.storage"] > button').click();
+      await target.page.getByRole('menuitem', { name: 'Create backup', exact: true }).click();
+      const fullBackup = target.page
+        .getByRole('dialog')
+        .filter({ hasText: 'The backup includes the local library' });
+      await expect(fullBackup.getByText('Server-only items', { exact: true })).toBeVisible();
+      const beforeFullConfirmation = lab.proxy.counts.getKeys.length;
+      await fullBackup.getByRole('checkbox').first().check();
+      await expect(fullBackup.getByRole('checkbox').first()).toBeChecked();
+      await expect(
+        fullBackup.getByRole('button', { name: 'Download and create backup', exact: true })
+      ).toBeEnabled();
+      await target.page.screenshot({
+        path: info.outputPath('full-library-backup-confirmation.png'),
+        fullPage: false,
+        animations: 'disabled',
+      });
+      const confirmationReads = lab.proxy.counts.getKeys.slice(beforeFullConfirmation);
+      await saveProof(info, {
+        phase: 'full-backup-confirmation',
+        reads: confirmationReads,
+        originalReads: confirmationReads.filter((key) => originalKeys.has(key)),
+      });
+      expect(confirmationReads.filter((key) => originalKeys.has(key))).toEqual([]);
+      await fullBackup
+        .getByRole('button', { name: 'Download and create backup', exact: true })
+        .click();
+      await expect(fullBackup).toHaveCount(0, { timeout: 60_000 });
+      const fullArchiveBytes = await target.page.evaluate(async () => {
+        const handle = await (
+          await navigator.storage.getDirectory()
+        ).getFileHandle('webdav-backup-proof.zip');
+        return Array.from(new Uint8Array(await (await handle.getFile()).arrayBuffer()));
+      });
+      const fullArchive = await JSZip.loadAsync(Uint8Array.from(fullArchiveBytes));
+      const fullFiles = await Promise.all(
+        Object.values(fullArchive.files)
+          .filter((file) => !file.dir)
+          .map(async (file) => {
+            const bytes = await file.async('uint8array');
+            return {
+              size: bytes.byteLength,
+              sha256: createHash('sha256').update(bytes).digest('hex'),
+            };
+          })
+      );
+      expect(fullFiles).toEqual(
+        expect.arrayContaining([seeded.first.exported, seeded.second.exported])
+      );
+      const fullMetadata = await Promise.all(
+        Object.values(fullArchive.files)
+          .filter((file) => !file.dir && file.name.endsWith('.json'))
+          .map((file) => file.async('string'))
+      );
+      expect(fullMetadata.join('\n')).toContain('Secondary WebDAV project');
+      for (const item of [seeded.first, seeded.second]) {
+        expect(fullMetadata.join('\n')).toContain(item.projectId);
+        expect(fullMetadata.join('\n')).toContain(item.exportId);
+      }
+      await target.page.screenshot({
+        path: info.outputPath('full-library-backup-complete.png'),
+        fullPage: false,
+      });
+      const lateSource = await openProvider(lab, info, 'library-source', false, build, {
+        viewport,
+      });
+      const late = await (async () => {
+        try {
+          const proof = await harnessPage(lateSource);
+          return await proof.evaluate(async () => {
+            let stage = 'restore';
+            try {
+              await window.webdavTransferHarness.connection.restore();
+              stage = 'create';
+              const item = await window.webdavTransferHarness.portable.source(undefined, {
+                useExistingProfile: true,
+                name: 'Late WebDAV project',
+              });
+              stage = 'publish-media';
+              const media = await window.webdavTransferHarness.portable.outgoing.sendHistory(
+                item.mediaId
+              );
+              stage = 'publish-project';
+              const project = await window.webdavTransferHarness.portable.outgoing.sendHistory(
+                item.projectId,
+                true
+              );
+              return {
+                ...item,
+                objects: [...media, ...project].flatMap((operation) => operation.files),
+              };
+            } catch (error) {
+              throw new Error(
+                `Late source ${stage}: ${error instanceof Error ? error.message : 'unknown'}`,
+                { cause: error }
+              );
+            }
+          });
+        } finally {
+          await lateSource.context.close();
+        }
+      })();
+      const beforeDetachIds = await nativeIds();
+      await openLibrary(target, viewport);
+      const secondNative = target.page.getByRole('group', { name: secondTitle, exact: true });
+      await secondNative.focus();
+      await target.page.keyboard.press('Enter');
+      const secondPreview = target.page.getByRole('dialog');
+      await secondPreview
+        .getByRole('button', { name: 'Free space on this device', exact: true })
+        .click();
+      await expect(
+        secondPreview.getByText('Download files before opening', { exact: true })
+      ).toBeVisible();
+      await target.page.keyboard.press('Escape');
+      await target.page.goto(
+        `chrome-extension://${target.extensionId}/apps/extension/src/settings/index.html?section=saving&view=connection`
+      );
+      await target.page.getByRole('button', { name: 'Refresh catalog', exact: true }).click();
+      await expect(target.page.getByText('Catalog refreshed', { exact: true })).toBeVisible();
+      const localOnly = target.page.getByRole('button', { name: 'Local only', exact: true });
+      await localOnly.click();
+      const localConfirmation = target.page.getByRole('alertdialog', {
+        name: 'Local only',
+        exact: true,
+      });
+      await expect(
+        localConfirmation.getByRole('button', {
+          name: 'Prepare files and disconnect WebDAV',
+          exact: true,
+        })
+      ).toBeEnabled();
+      await target.page.screenshot({
+        path: info.outputPath('local-only-confirmation.png'),
+        fullPage: false,
+        animations: 'disabled',
+      });
+      await localConfirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(localConfirmation).toHaveCount(0);
+      await expect(localOnly).toBeEnabled();
+      await localOnly.click();
+      await localConfirmation
+        .getByRole('button', { name: 'Prepare files and disconnect WebDAV', exact: true })
+        .click();
+      await expect(
+        target.page.getByText(
+          'Local-only mode is active. Synchronization is disconnected and files are on this device.',
+          { exact: true }
+        )
+      ).toBeVisible({ timeout: 60_000 });
+      await expect(localConfirmation).toHaveCount(0);
+      expect(await nativeIds()).toEqual(expect.arrayContaining(beforeDetachIds));
+      await expect(
+        target.page.getByRole('button', { name: 'Join workspace', exact: true })
+      ).toBeEnabled();
+      await target.page.screenshot({
+        path: info.outputPath('local-only-complete.png'),
+        fullPage: false,
+      });
+      for (const object of [...seeded.first.objects, ...seeded.second.objects])
+        expect(await lab.externalProof(`${rootKey}${object.key}`)).toEqual({
+          size: object.size,
+          sha256: object.sha256,
+        });
+      const localLate = await nativeProof.evaluate(
+        (id) => window.webdavTransferHarness.portable.proof(id),
+        late.projectId
+      );
+      expect(localLate.exports).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: late.exportId })])
+      );
+      await expect(
+        target.page.getByText(
+          'Local-only mode is active. Synchronization is disconnected and files are on this device.',
+          { exact: true }
+        )
+      ).toBeInViewport({ ratio: 1 });
+      for (const object of late.objects)
+        expect(await lab.externalProof(`${rootKey}${object.key}`)).toEqual({
+          size: object.size,
+          sha256: object.sha256,
+        });
+      const localSecondary = await nativeProof.evaluate(
+        (id) => window.webdavTransferHarness.portable.proof(id),
+        seeded.second.projectId
+      );
+      expect(localSecondary.exports).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: seeded.second.exportId })])
+      );
+      const replacementRoot = await connectWorkspace(target.page, {
+        mode: 'create',
+        url: lab.credentials.rootUrl,
+        ...lab.credentials,
+      });
+      expect(replacementRoot).not.toBe(seeded.rootUrl);
+      await target.page.screenshot({
+        path: info.outputPath('new-space-after-local-only.png'),
+        fullPage: false,
+      });
       await target.context.close();
       // BrowserContext offline does not cover every MV3 offscreen network context.
       await lab.proxy.close();
@@ -344,6 +829,14 @@ for (const viewport of [
         actualSettingsCreateAndJoin: true,
         actualLibrarySelection: true,
         offlineRestartEditAndUndo: true,
+        manualReleaseAndOrdinaryReopen: true,
+        actualBackupAfterUnloadIncludesOriginals: true,
+        actualFullLibraryBackupIncludesCatalogOnlyProjectAndExports: true,
+        actualLocalOnlyAfterUnloadPreservesNativeFilesAndServerData: true,
+        actualFreshCreateAfterRetirement: true,
+        pinPreventsRelease: true,
+        unchangedNativeAssetIds: idsBefore,
+        releasedOriginalBytes: residentBefore.residentBytes - afterRelease.residentBytes,
         editingObjects: admitted.objects,
         viewport,
       });
@@ -590,6 +1083,7 @@ for (const viewport of [
           sha256: file.sha256,
         });
       expect(files.some((file) => file.sha256 === seeded.exported.sha256)).toBe(true);
+      const beforeTargetGets = lab.proxy.counts.getKeys.length;
       target = await openProvider(lab, info, 'roundtrip-target', false, build, { viewport });
       await connectionPage(target, viewport);
       await connectWorkspace(target.page, { mode: 'join', url: rootUrl, ...lab.credentials });
@@ -607,6 +1101,19 @@ for (const viewport of [
       await editor.close();
       const targetProof = await harnessPage(target);
       await targetProof.evaluate(() => window.webdavTransferHarness.connection.restore());
+      const admitted = await targetProof.evaluate(
+        (id) => window.webdavTransferHarness.portable.proof(id),
+        seeded.projectId
+      );
+      expect(admitted.exports).toEqual([expect.objectContaining({ id: seeded.exportId })]);
+      const exportKeys = new Set(
+        files
+          .filter((file) => file.sha256 === seeded.exported.sha256)
+          .map((file) => rootKey + file.remoteKey)
+      );
+      expect(
+        lab.proxy.counts.getKeys.slice(beforeTargetGets).filter((key) => exportKeys.has(key))
+      ).toEqual([]);
       const putsBeforeOffline = lab.proxy.counts.putBodies.filter((item) => item.complete).length;
       lab.proxy.armFault({ method: 'PUT', key: '*', kind: 'status', status: 503, repeat: true });
       await Promise.all([source.context.setOffline(true), target.context.setOffline(true)]);
@@ -653,6 +1160,40 @@ for (const viewport of [
           )
           .toBe('published');
       }
+      const targetPublication = await targetProof.evaluate(async (operationId) => {
+        const queue = await window.webdavTransferHarness.portable.outgoing.queueState();
+        const receipt = await window.webdavTransferHarness.portable.outgoing.published(
+          queue.connection.spaceId,
+          queue.connection.connectionGeneration,
+          operationId
+        );
+        if (!receipt) throw new Error('Target publication receipt is missing.');
+        return {
+          receipt,
+          manifest: await window.webdavTransferHarness.portable.outgoing.manifestProof(
+            receipt.remoteManifestKey
+          ),
+        };
+      }, second.operationId);
+      const publishedAttempt = targetPublication.manifest;
+      const envelope = publishedAttempt.operation.envelope;
+      if (!envelope) throw new Error('Published project envelope is missing.');
+      const metadata = envelope.metadata;
+      if (!isRecord(metadata) || !Array.isArray(metadata['projectExports']))
+        throw new Error('Published export inventory is missing.');
+      const retainedExport = metadata['projectExports'].find(
+        (item) =>
+          isRecord(item) && isRecord(item['entry']) && item['entry']['id'] === seeded.exportId
+      );
+      if (!isRecord(retainedExport) || typeof retainedExport['objectId'] !== 'string')
+        throw new Error('Target publication omitted the retained export.');
+      const objectId = retainedExport['objectId'];
+      expect(
+        publishedAttempt.operation.objects.find((item) => item.objectId === objectId)?.sha256
+      ).toBe(seeded.exported.sha256);
+      const exportedBody = publishedAttempt.objects.find((item) => item.objectId === objectId);
+      if (!exportedBody) throw new Error('Published export body binding is missing.');
+      expect(await lab.externalProof(rootKey + exportedBody.remoteKey)).toEqual(seeded.exported);
       await openLibrary(source, viewport);
       await refreshProductCatalog(source.page);
       const conflict = source.page.getByRole('group').filter({ hasText: 'Conflicting versions' });
@@ -731,6 +1272,196 @@ for (const viewport of [
       });
     } finally {
       lab.proxy.releaseFault();
+      await source.context.close();
+      await target?.context.close();
+    }
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`Library metadata and Trash prepare an unloaded original ${viewport.width}`, async ({
+    lab,
+  }, info) => {
+    test.setTimeout(240_000);
+    const source = await openProvider(lab, info, 'metadata-source', false, build, { viewport });
+    let target: Provider | null = null;
+    try {
+      console.info('metadata-proof', viewport.width, 'source-connect');
+      await connectionPage(source, viewport);
+      const rootUrl = await connectWorkspace(source.page, {
+        mode: 'create',
+        url: lab.credentials.rootUrl,
+        ...lab.credentials,
+      });
+      const sourceProof = await harnessPage(source);
+      const seeded = await sourceProof.evaluate(async () => {
+        await window.webdavTransferHarness.connection.restore();
+        const item = await window.webdavTransferHarness.portable.source(undefined, {
+          useExistingProfile: true,
+        });
+        const sent = await window.webdavTransferHarness.portable.outgoing.sendHistory(item.mediaId);
+        return { ...item, files: sent.flatMap((operation) => operation.files) };
+      });
+      console.info('metadata-proof', viewport.width, 'source-published');
+      await source.context.close();
+      target = await openProvider(lab, info, 'metadata-target', false, build, { viewport });
+      await connectionPage(target, viewport);
+      await connectWorkspace(target.page, { mode: 'join', url: rootUrl, ...lab.credentials });
+      console.info('metadata-proof', viewport.width, 'target-connected');
+      await openLibrary(target, viewport);
+      const card = target.page.getByRole('group', { name: 'borrowed 100%.png', exact: true });
+      await expect(card).toBeVisible();
+      await card.focus();
+      await target.page.keyboard.press('Enter');
+      const remoteDialog = target.page.getByRole('dialog', {
+        name: 'borrowed 100%.png',
+        exact: true,
+      });
+      await target.page.evaluate(() => {
+        const observations: unknown[] = [];
+        Object.defineProperty(window, '__metadataPreparationObservations', { value: observations });
+        const channel = new BroadcastChannel('sniptale-sync-product-settled');
+        channel.onmessage = async ({ data }: MessageEvent<unknown>) => {
+          if (
+            !data ||
+            typeof data !== 'object' ||
+            !('kind' in data) ||
+            data.kind !== 'product' ||
+            !('requestId' in data) ||
+            typeof data.requestId !== 'string'
+          )
+            return;
+          observations.push(
+            await chrome.runtime.sendMessage({
+              type: 'SYNC_PRODUCT_COMMAND',
+              requestId: crypto.randomUUID(),
+              command: { kind: 'inspect', requestId: data.requestId, advisory: true },
+              __sniptaleRuntimeFreshness: {
+                issuedAtEpochMs: Date.now(),
+                nonce: crypto.randomUUID(),
+              },
+            })
+          );
+        };
+        setTimeout(() => channel.close(), 30_000);
+      });
+      const opened = target.context.waitForEvent('page', { timeout: 30_000 });
+      await remoteDialog.getByRole('button', { name: 'Download and open', exact: true }).click();
+      const editor = await opened.catch(async (error: unknown) => {
+        const observations: unknown = await target!.page.evaluate(() =>
+          Reflect.get(window, '__metadataPreparationObservations')
+        );
+        const jobs = Array.isArray(observations)
+          ? observations.flatMap((raw: unknown) => {
+              const parsed = parseSyncProductResponse(raw);
+              return parsed?.success && parsed.result.kind === 'operation' ? [parsed.result] : [];
+            })
+          : [];
+        await saveProof(info, {
+          phase: 'initial-native-admission',
+          jobs,
+          dialog: await remoteDialog.allTextContents(),
+        });
+        await target!.page.screenshot({
+          path: info.outputPath('initial-native-admission-failure.png'),
+          fullPage: false,
+        });
+        throw error;
+      });
+      await expect(editor).toHaveURL(/assetId=/);
+      await editor.close();
+      console.info('metadata-proof', viewport.width, 'native-admitted');
+      await openLibrary(target, viewport);
+      await card.focus();
+      await target.page.keyboard.press('Enter');
+      const preview = target.page.locator('[data-ui="gallery.preview.surface"]');
+      const cache = preview.getByRole('region', { name: 'Files on this device', exact: true });
+      await cache.getByRole('button', { name: 'Free space on this device', exact: true }).click();
+      await expect(cache.getByText('Download files before opening', { exact: true })).toBeVisible();
+      await preview.getByLabel('Filename', { exact: true }).fill('Renamed after unload');
+      await target.page.keyboard.press('Escape');
+      const renamed = target.page.locator(`[data-gallery-keyboard-id="${seeded.mediaId}"]`);
+      await expect(renamed).toHaveAttribute('aria-label', 'Renamed after unload.png');
+      await expect(renamed).toBeVisible();
+      console.info('metadata-proof', viewport.width, 'renamed');
+      const proof = await harnessPage(target);
+      const metadataSent = await proof.evaluate(async (id) => {
+        await window.webdavTransferHarness.connection.restore();
+        return window.webdavTransferHarness.portable.outgoing.sendHistory(id);
+      }, seeded.mediaId);
+      const sourceDigests = new Set(seeded.files.map((file) => file.sha256));
+      expect(
+        metadataSent
+          .flatMap((operation) => operation.files)
+          .some((file) => sourceDigests.has(file.sha256))
+      ).toBe(true);
+      console.info('metadata-proof', viewport.width, 'metadata-published');
+      await renamed.focus();
+      await target.page.keyboard.press('Enter');
+      await expect(cache.getByText('Files are on this device', { exact: true })).toBeVisible();
+      await cache.getByRole('button', { name: 'Free space on this device', exact: true }).click();
+      await expect(cache.getByText('Download files before opening', { exact: true })).toBeVisible();
+      await preview
+        .locator('[data-ui="gallery.preview.lifecycle-actions"]')
+        .getByRole('button', { name: 'Delete', exact: true })
+        .click();
+      await target.page
+        .locator('[data-ui="gallery.deletion.menu"]')
+        .getByRole('menuitem', { name: 'Move to Trash Bin', exact: true })
+        .click();
+      await expect(renamed).toHaveCount(0);
+      console.info('metadata-proof', viewport.width, 'trashed');
+      await target.page
+        .locator(
+          '[data-ui="gallery.sidebar.footer"] button:not([data-ui="gallery.sidebar.toggle"])'
+        )
+        .click();
+      await expect(renamed).toBeVisible();
+      await renamed.focus();
+      await target.page.keyboard.press('Enter');
+      await target.page.screenshot({
+        path: info.outputPath('unloaded-metadata-trash.png'),
+        fullPage: false,
+      });
+      await preview.locator('[data-ui="gallery.preview.restore"]').click();
+      await expect(preview).toHaveCount(0);
+      await expect(renamed).toHaveCount(0);
+      await openLibrary(target, viewport);
+      await expect(renamed).toBeVisible();
+      const lifecycleSent = await proof.evaluate(
+        (id) => window.webdavTransferHarness.portable.outgoing.sendHistory(id),
+        seeded.mediaId
+      );
+      expect(lifecycleSent.length).toBeGreaterThan(0);
+      // The proof publisher bypasses the product scheduler. Refresh through the real Settings UI.
+      await target.page.goto(
+        `chrome-extension://${target.extensionId}/apps/extension/src/settings/index.html?section=saving&view=connection`
+      );
+      await target.page.getByRole('button', { name: 'Refresh catalog', exact: true }).click();
+      await expect(target.page.getByText('Catalog refreshed', { exact: true })).toBeVisible({
+        timeout: 30_000,
+      });
+      await openLibrary(target, viewport);
+      await expect(
+        target.page.getByRole('group', { name: 'Renamed after unload.png', exact: true })
+      ).toHaveCount(1);
+      await expect(renamed).toBeVisible();
+      await target.page.screenshot({
+        path: info.outputPath('restored-after-unload.png'),
+        fullPage: false,
+      });
+      await saveProof(info, {
+        viewport,
+        actualMetadataAfterUnload: true,
+        outgoingPreparedAndPublished: true,
+        actualTrashAfterUnloadAndRestore: true,
+        refreshedCatalogHasOneNativeCard: true,
+        mediaId: seeded.mediaId,
+      });
+    } finally {
       await source.context.close();
       await target?.context.close();
     }

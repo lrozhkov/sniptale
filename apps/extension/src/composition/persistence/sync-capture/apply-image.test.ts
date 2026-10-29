@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
@@ -8,6 +9,11 @@ import { createEditorDocumentFixture } from '../../../editor/document/page-sessi
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import { commitImagePresentation } from '../image-aggregates/mutations';
 import { mediaHasPendingPublication } from '../media-library/delete-cascade.sources';
+import { assetResidencyCopyId, type AssetResidencyCopy } from '../assets/residency-records';
+import { finishAssetResidencyTransitionInTransaction } from '../assets/residency';
+import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import { captureRootKey } from './contracts';
 import { parseSyncCaptureRecord } from './guards';
 import {
@@ -559,4 +565,196 @@ it('checks authorization before mutation and replays committed results after pau
   const committed = structuredClone(f.rows);
   await expect(applyPreparedImageReplica(f.input)).resolves.toMatchObject({ status: 'duplicate' });
   expect(f.rows).toEqual(committed);
+});
+
+async function unloadedPredecessor() {
+  const f = setup();
+  await applyPreparedImageReplica(f.input);
+  const media = parseMediaLibraryEntry(f.table('media_library').get(f.input.media.id));
+  const presentation = parseAggregatePresentationEntry(
+    f.table('aggregate_presentations').get(f.input.media.id)
+  );
+  const state = parseSyncCaptureRecord(f.table('sync_capture').get(f.stateKey));
+  if (
+    !media?.blob ||
+    !presentation?.previewBlob ||
+    !state ||
+    state.kind !== 'root-state' ||
+    !state.nativeDigest
+  )
+    throw new Error('Expected materialized predecessor');
+  const copy: AssetResidencyCopy = {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId({ kind: 'inline-image', mediaId: media.id }),
+    revision: 2,
+    operationId: 'unload',
+    phase: 'unloaded',
+    lastUsedAt: 1,
+    target: {
+      kind: 'inline-image',
+      mediaId: media.id,
+      createdAt: media.createdAt,
+      workspaceRevision: media.workspaceRevision ?? 0,
+      rootGeneration: state.generation,
+      nativeDigest: state.nativeDigest,
+      size: media.size,
+      mimeType: media.mimeType,
+      blobType: media.blob.type,
+      duplicatePreview: {
+        presentationRevision: presentation.presentationRevision,
+        blobType: presentation.previewBlob.type,
+      },
+    },
+    remote: {
+      key: 'Originals/old-original.png',
+      sha256: createHash('sha256').update(new Uint8Array(media.size)).digest('hex'),
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.example.test/root/',
+        accountId: 'alice',
+        spaceId: 'space',
+        connectionGeneration: 3,
+        profileCreatedAt: 1,
+      },
+    },
+  };
+  const { blob: _blob, ...missing } = media;
+  const { previewBlob: _preview, ...missingPreview } = presentation;
+  f.table('media_library').set(media.id, missing);
+  f.table('aggregate_presentations').set(media.id, missingPreview);
+  f.table('asset_residency').set(copy.id, copy);
+  const next: ApplyPreparedImageReplicaInput = {
+    ...f.input,
+    operationId: 'next-image',
+    sourceDigest: 'b'.repeat(64),
+    expectedLocalGeneration: state.generation,
+    expectedBasis: [...state.basis],
+    expectedNativeRevision: media.workspaceRevision ?? 0,
+    originalRef: {
+      ...f.input.originalRef,
+      assetId: 'next-original',
+      location: { kind: 'opfs', objectKey: 'objects/next-original' },
+    },
+  };
+  io.read.mockClear();
+  return { ...f, copy, next, media, state };
+}
+
+it('applies an incoming unloaded image without reading old bytes and retires its recovery row atomically', async () => {
+  const f = await unloadedPredecessor();
+  expect(await applyPreparedImageReplica(f.next)).toEqual({ status: 'applied', generation: 2 });
+  expect(f.table('asset_residency').has(f.copy.id)).toBe(false);
+  expect(f.table('media_library').get(f.media.id)).toMatchObject({
+    workspaceRevision: 2,
+    blob: expect.any(Blob),
+  });
+  expect(io.read).toHaveBeenCalledTimes(3);
+  expect(io.read.mock.calls.map(([ref]) => ref.assetId)).not.toContain(f.input.originalRef.assetId);
+  const committed = structuredClone(f.rows);
+  io.read.mockRejectedValue(new Error('Staging removed'));
+  expect(await applyPreparedImageReplica(f.next)).toEqual({ status: 'duplicate', generation: 2 });
+  expect(f.rows).toEqual(committed);
+});
+
+it('keeps unloaded predecessor and exact recovery evidence after receipt refusal and permits retry', async () => {
+  const f = await unloadedPredecessor();
+  const before = structuredClone(f.rows);
+  f.fail();
+  await expect(applyPreparedImageReplica(f.next)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  f.allow();
+  expect(await applyPreparedImageReplica(f.next)).toEqual({ status: 'applied', generation: 2 });
+  expect(f.table('asset_residency').has(f.copy.id)).toBe(false);
+});
+
+it('accepts unchanged unloaded originals borrowed by a project only after checking new staged SHA', async () => {
+  const f = await unloadedPredecessor();
+  const borrower = createVideoProjectEntryWithMediaClip({ id: 'borrower' });
+  borrower.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.media.id };
+  f.table('video_projects').set(borrower.id, borrower);
+  expect(await applyPreparedImageReplica(f.next)).toEqual({ status: 'applied', generation: 2 });
+  expect(f.table('asset_residency').has(f.copy.id)).toBe(false);
+});
+
+it('retains the replaceability guard when an unloaded borrowed original changes', async () => {
+  const f = await unloadedPredecessor();
+  const borrower = createVideoProjectEntryWithMediaClip({ id: 'borrower' });
+  borrower.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.media.id };
+  f.table('video_projects').set(borrower.id, borrower);
+  io.read.mockImplementation(
+    async (ref: { size: number; mimeType: string; assetId: string }, filename: string) =>
+      new File(
+        [
+          ref.assetId === 'next-original'
+            ? new TextEncoder().encode('changed!')
+            : new Uint8Array(ref.size),
+        ],
+        filename,
+        { type: ref.mimeType }
+      )
+  );
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedImageReplica(f.next)).rejects.toMatchObject({
+    name: 'MediaAssetDeletionBlockedError',
+  });
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses delayed incoming completion after a controlled native generation replacement', async () => {
+  const f = await unloadedPredecessor();
+  io.read.mockImplementation(async (ref: { size: number; mimeType: string }, filename: string) => {
+    f.table('sync_capture').set(f.stateKey, { ...f.state, generation: 2 });
+    return new File([new Uint8Array(ref.size)], filename, { type: ref.mimeType });
+  });
+  await expect(applyPreparedImageReplica(f.next)).rejects.toThrow('predecessor changed');
+  expect(f.table('asset_residency').get(f.copy.id)).toEqual(f.copy);
+  expect(f.table('media_library').get(f.media.id)).not.toHaveProperty('blob');
+});
+
+it('refuses an old restore settlement after incoming replaced the native image', async () => {
+  const f = await unloadedPredecessor();
+  await applyPreparedImageReplica(f.next);
+  const committed = structuredClone(f.rows);
+  await expect(
+    runWithIndexedDbMutation(async (db, permit) => {
+      const tx = db.transaction(['asset_residency'], 'readwrite');
+      try {
+        await finishAssetResidencyTransitionInTransaction(tx, f.copy, 'resident', permit);
+        await tx.done;
+      } catch (error) {
+        tx.abort();
+        await tx.done.catch(() => undefined);
+        throw error;
+      }
+    })
+  ).rejects.toThrow('source is stale');
+  expect(f.rows).toEqual(committed);
+});
+
+it('applies an unloaded image tombstone without reading originals and retires its recovery evidence', async () => {
+  const f = await unloadedPredecessor();
+  io.read.mockRejectedValue(new Error('Old originals must not be fetched'));
+  expect(
+    await applyCatalogDeletionNative({
+      rootKind: 'media',
+      rootId: f.media.id,
+      operationId: 'delete-unloaded',
+      sourceDigest: 'c'.repeat(64),
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 3,
+      expectedLocalGeneration: 1,
+      expectedBasis: [f.input.operationId],
+      expectedWorkspaceRevision: 1,
+    })
+  ).toEqual({ status: 'applied', generation: 2 });
+  expect(f.table('media_library').has(f.media.id)).toBe(false);
+  expect(f.table('asset_residency').has(f.copy.id)).toBe(false);
+  expect(io.read).not.toHaveBeenCalled();
+  expect(f.table('sync_capture').get(f.stateKey)).toMatchObject({
+    deleted: true,
+    generation: 2,
+    nativeRevision: 1,
+  });
 });

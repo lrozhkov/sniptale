@@ -8,14 +8,22 @@ import type { SyncQueueHistoryBatch } from '../../composition/persistence/sync-c
 import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
 import { createEventHistory } from '../../composition/persistence/diagnostics/event-history';
 import type { EventHistoryDatabase } from '../../composition/persistence/diagnostics/event-history-database';
-import { deliverSyncQueueHistory } from './queue-history';
+import { deliverSyncQueueHistory, deliverRetiringSyncQueueHistory } from './queue-history';
 
 const io = vi.hoisted(() => ({
+  scanState: vi.fn(),
+  scanPage: vi.fn(),
+  scanSave: vi.fn(),
   database: vi.fn(),
   load: vi.fn(),
   acknowledge: vi.fn(),
   append: vi.fn(),
   createLog: vi.fn(),
+}));
+vi.mock('../../composition/persistence/sync-capture/queue-history-scan', () => ({
+  loadSyncQueueHistoryScanState: io.scanState,
+  loadSyncQueueHistoryScanPage: io.scanPage,
+  saveSyncQueueHistoryScanState: io.scanSave,
 }));
 vi.mock('../../composition/persistence/infrastructure/indexed-db/core', () => ({
   initDB: io.database,
@@ -253,4 +261,33 @@ it('drains confirmed publication and acknowledgement before privacy erasure', as
   await erasure;
   expect(erased).toBe(true);
   expect(isActivePersistenceMutationPermit(io.append.mock.calls[0]![1])).toBe(false);
+});
+
+it('delivers all retained terminal streams from the start before retirement', async () => {
+  const state = { scope, revision: 2, afterKey: 'old-cursor' };
+  io.scanState.mockResolvedValue(state);
+  io.scanSave.mockImplementation(async (previous, afterKey) => ({
+    ...previous,
+    revision: previous.revision + 1,
+    afterKey,
+  }));
+  io.scanPage
+    .mockResolvedValueOnce({
+      sources: [source],
+      invalidSources: 0,
+      nextAfterKey: 'next',
+      more: true,
+    })
+    .mockResolvedValueOnce({ sources: [], invalidSources: 0, nextAfterKey: null, more: false });
+  await deliverRetiringSyncQueueHistory(scope);
+  expect(io.load.mock.calls.map((call) => call[1])).toEqual([{ kind: 'connection' }, source]);
+  expect(io.scanSave.mock.calls[0]).toEqual([state, null]);
+  expect(io.scanPage).toHaveBeenCalledTimes(2);
+  expect(io.acknowledge).toHaveBeenCalledTimes(2);
+});
+it('leaves an unavailable history sink to the exact native gap check without blocking retirement', async () => {
+  io.append.mockResolvedValueOnce(false);
+  await expect(deliverRetiringSyncQueueHistory(scope)).resolves.toBeUndefined();
+  expect(io.scanState).not.toHaveBeenCalled();
+  expect(io.acknowledge).not.toHaveBeenCalled();
 });

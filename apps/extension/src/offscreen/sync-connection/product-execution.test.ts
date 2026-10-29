@@ -2,6 +2,11 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSyncProductExecution } from './product-execution';
 const mocks = vi.hoisted(() => ({
+  logInfo: vi.fn(),
+  logWarn: vi.fn(),
+  release: vi.fn(),
+  trim: vi.fn(),
+  index: vi.fn(),
   connection: vi.fn(),
   authentication: vi.fn(),
   requests: vi.fn(),
@@ -13,6 +18,20 @@ const mocks = vi.hoisted(() => ({
   receive: vi.fn(),
   parse: vi.fn(),
   ready: vi.fn(),
+  prepareEditing: vi.fn(),
+  locallyReady: vi.fn(),
+}));
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => ({ info: mocks.logInfo, warn: mocks.logWarn }),
+}));
+vi.mock('../../workflows/sync-transfer/native-cache', () => ({
+  releaseNativeEditingRoot: mocks.release,
+}));
+vi.mock('../../workflows/sync-transfer/native-cache-policy', () => ({
+  trimNativeCache: mocks.trim,
+}));
+vi.mock('../../workflows/sync-transfer/residency-copy', () => ({
+  indexCatalogCopies: mocks.index,
 }));
 vi.mock('../../composition/persistence/remote-connection/store', () => ({
   loadSyncConnection: mocks.connection,
@@ -30,6 +49,10 @@ vi.mock('../../workflows/sync-transfer/catalog-refresh', () => ({
 }));
 vi.mock('../../workflows/sync-transfer/catalog-view', () => ({
   readCheckedPersistedSyncCatalog: mocks.cached,
+}));
+vi.mock('../../workflows/sync-transfer/native-residency', () => ({
+  prepareNativeEditingRoot: mocks.prepareEditing,
+  isNativeEditingRootReady: mocks.locallyReady,
 }));
 vi.mock('../../workflows/sync-transfer/incoming-selected', () => ({
   receiveSelectedCatalogRoot: mocks.receive,
@@ -87,6 +110,8 @@ beforeEach(() => {
   mocks.webdav.mockResolvedValue({ read: vi.fn(), list: vi.fn() });
   mocks.verify.mockResolvedValue(undefined);
   mocks.ready.mockResolvedValue(undefined);
+  mocks.prepareEditing.mockResolvedValue({ downloaded: 0 });
+  mocks.locallyReady.mockResolvedValue(true);
   mocks.refresh.mockResolvedValue(catalog());
   mocks.cached.mockResolvedValue(catalog());
   mocks.parse.mockResolvedValue({ kind: 'video-project', metadata: {}, envelope: { objects: [] } });
@@ -559,4 +584,272 @@ it('does not grant automatic native work after connection authority changes duri
   });
   expect(automatic.run).not.toHaveBeenCalled();
   expect(mocks.close).toHaveBeenCalledOnce();
+});
+
+it('reports ready only after committed native editing dependencies finish preparation', async () => {
+  let finish!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  mocks.prepareEditing.mockImplementationOnce(async () => {
+    entered();
+    await gate;
+    return { downloaded: 1 };
+  });
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'replica-prepare', selection: selected },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  let complete = false;
+  const run = execution.run().then((result) => {
+    complete = true;
+    return result;
+  });
+  await started;
+  expect(complete).toBe(false);
+  expect(mocks.prepareEditing).toHaveBeenCalledWith(
+    expect.objectContaining({
+      root: { rootKind: selected.rootKind, rootId: selected.rootId },
+      authorization,
+    })
+  );
+  finish();
+  await expect(run).resolves.toMatchObject({ state: 'ready', completion: { kind: 'replica' } });
+  await execution.drain();
+});
+
+it('keeps a completed native commit visible when missing-byte preparation is interrupted', async () => {
+  const controller = new AbortController();
+  const notify = vi.fn();
+  mocks.prepareEditing.mockImplementationOnce(async () => {
+    controller.abort();
+    throw new DOMException('Cancelled', 'AbortError');
+  });
+  mocks.locallyReady.mockResolvedValueOnce(false);
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'replica-prepare', selection: selected },
+      signal: controller.signal,
+    },
+    async () => true,
+    notify
+  );
+  await expect(execution.run()).resolves.toMatchObject({ state: 'interrupted' });
+  expect(notify).toHaveBeenCalledTimes(2);
+  await execution.drain();
+});
+
+it('preserves late-cancel completion only when all committed editing bytes are locally ready', async () => {
+  const controller = new AbortController();
+  mocks.prepareEditing.mockImplementationOnce(async () => {
+    controller.abort();
+    throw new DOMException('Cancelled', 'AbortError');
+  });
+  mocks.locallyReady.mockResolvedValueOnce(true);
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'replica-prepare', selection: selected },
+      signal: controller.signal,
+    },
+    async () => true
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'ready',
+    completion: { kind: 'replica' },
+  });
+  await execution.drain();
+});
+
+it('restores a native root without catalog enumeration or applying a remote revision', async () => {
+  const root = { rootKind: 'video-project' as const, rootId: 'project' };
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'native-prepare', root },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'ready',
+    completion: { kind: 'native', root },
+  });
+  expect(mocks.refresh).not.toHaveBeenCalled();
+  expect(mocks.cached).not.toHaveBeenCalled();
+  expect(mocks.receive).not.toHaveBeenCalled();
+  expect(mocks.prepareEditing).toHaveBeenCalledWith(
+    expect.objectContaining({ root, binding: metadata.binding, authorization })
+  );
+});
+
+it('notifies native availability only after preparation settles, including partial failure', async () => {
+  const notify = vi.fn();
+  let fail!: (reason: Error) => void;
+  const pending = new Promise<never>((_resolve, reject) => {
+    fail = reject;
+  });
+  mocks.prepareEditing.mockReturnValueOnce(pending);
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'native-prepare', root: { rootKind: 'media', rootId: 'image' } },
+      signal: new AbortController().signal,
+    },
+    async () => true,
+    notify
+  );
+  const result = execution.run();
+  await vi.waitFor(() => expect(mocks.prepareEditing).toHaveBeenCalledOnce());
+  expect(notify).not.toHaveBeenCalled();
+  fail(new Error('partial restore refused'));
+  await expect(result).resolves.toMatchObject({ state: 'failed' });
+  expect(notify).toHaveBeenCalledOnce();
+});
+
+it.each(['native-release', 'cache-trim'] as const)(
+  'executes %s using the current binding and a checked catalog, and refreshes after partial failure',
+  async (kind) => {
+    const checked = catalog();
+    mocks.refresh.mockResolvedValue(checked);
+    const index = { spaceId: 'space', copies: new Map(), operations: new Map() };
+    mocks.index.mockReturnValue(index);
+    const result = {
+      released: 1,
+      releasedBytes: 12,
+      absent: 0,
+      unavailable: 0,
+      busy: 0,
+      protected: 0,
+    };
+    const action = kind === 'native-release' ? mocks.release : mocks.trim;
+    action.mockResolvedValue(result);
+    const root = { rootKind: 'video-project' as const, rootId: 'project' };
+    const changed = vi.fn();
+    const signal = new AbortController().signal;
+    const work = kind === 'native-release' ? { kind, root } : { kind };
+    const execution = createSyncProductExecution(
+      { ...scopeBinding(), work, signal },
+      async () => true,
+      changed
+    );
+    await expect(execution.run()).resolves.toMatchObject({
+      state: 'ready',
+      completion: { kind, result },
+    });
+    expect(mocks.index).toHaveBeenCalledWith(checked, 'space');
+    expect(action).toHaveBeenCalledWith(
+      expect.objectContaining({ binding: metadata.binding, authorization, index, signal })
+    );
+    expect(mocks.receive).not.toHaveBeenCalled();
+    action.mockRejectedValueOnce(
+      Object.assign(new Error('Temporary refusal after partial release'), { code: 'temporary' })
+    );
+    const partial = createSyncProductExecution(
+      { ...scopeBinding(), work, signal },
+      async () => true,
+      changed
+    );
+    await expect(partial.run()).resolves.toMatchObject({
+      state: 'failed',
+      failureCode: 'temporary',
+      completion: null,
+      containment: 'contained',
+    });
+    expect(changed).toHaveBeenCalledTimes(4);
+  }
+);
+
+it('prepares a native backup closure without catalog refresh or replica replacement', async () => {
+  const root = { rootKind: 'video-project' as const, rootId: 'project' };
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'backup-prepare', root },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'ready',
+    completion: { kind: 'native', root },
+  });
+  expect(mocks.prepareEditing).toHaveBeenCalledWith(
+    expect.objectContaining({ root, purpose: 'backup' })
+  );
+  expect(mocks.refresh).not.toHaveBeenCalled();
+  expect(mocks.receive).not.toHaveBeenCalled();
+});
+
+it('logs fixed start and terminal outcomes without provider or source content', async () => {
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'catalog-refresh', bypassCache: false },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'ready',
+    containment: 'contained',
+  });
+  expect(mocks.logInfo.mock.calls).toEqual([
+    [
+      'sync.product.started kind=catalog-refresh code=none',
+      { kind: 'catalog-refresh', state: 'started', code: null },
+    ],
+    [
+      'sync.product.ready kind=catalog-refresh code=none',
+      { kind: 'catalog-refresh', state: 'ready', code: null },
+    ],
+  ]);
+  expect(JSON.stringify(mocks.logInfo.mock.calls)).not.toContain('dav.test');
+});
+it('logs a fixed failure code and preserves success when the diagnostic sink throws', async () => {
+  mocks.refresh.mockRejectedValueOnce(new Error('private provider body'));
+  const failed = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'catalog-refresh', bypassCache: false },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  await expect(failed.run()).resolves.toMatchObject({
+    state: 'failed',
+    failureCode: 'invalid-data',
+  });
+  expect(mocks.logWarn).toHaveBeenCalledExactlyOnceWith(
+    'sync.product.failed kind=catalog-refresh code=invalid-data',
+    {
+      kind: 'catalog-refresh',
+      state: 'failed',
+      code: 'invalid-data',
+    }
+  );
+  mocks.logInfo.mockImplementationOnce(() => {
+    throw new Error('sink unavailable');
+  });
+  const completed = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'catalog-refresh', bypassCache: false },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  await expect(completed.run()).resolves.toMatchObject({
+    state: 'ready',
+    containment: 'contained',
+  });
 });

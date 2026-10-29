@@ -1,5 +1,15 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'sync-connection-enrollment-and-retirement',
+    productionFile: 'apps/extension/src/composition/persistence/remote-connection/store.ts',
+    reason:
+      'Enrollment and local-only consumers prove replay, rollback, stale identities and authority retirement.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/remote-connection/enrollment.test.ts',
+      'apps/extension/src/composition/persistence/remote-connection/local-only.test.ts',
+    ],
+  },
+  {
     owner: 'sync-native-media-parser-backup-consumers',
     productionFile: 'apps/extension/src/composition/persistence/sync-capture/guards.ts',
     allowCrossOwner: true,

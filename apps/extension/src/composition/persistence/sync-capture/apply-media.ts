@@ -28,6 +28,7 @@ import {
   RECORDING_TELEMETRY_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   ASSET_OPERATIONS_STORE,
+  ASSET_RESIDENCY_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
   SYNC_CAPTURE_STORE,
@@ -50,7 +51,10 @@ import {
   publishPreparedMediaProjectChildInTransaction,
 } from '../media-library/source-publication';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
-import { parseAssetRef } from '../assets/guards';
+import { parseAssetRef, parseAssetOwner } from '../assets/guards';
+import { parseProjectExportEntry } from '../projects/read-guards';
+import { readAssetResidencyCopyInTransaction } from '../assets/residency';
+import { assetResidencyCopyId } from '../assets/residency-records';
 import {
   captureRootKey,
   type CapturedMediaRows,
@@ -300,12 +304,80 @@ async function assertExistingSource(
   return previous;
 }
 
+/** Adopt only an un-enrolled child retained by project sync, with its exact native file identity. */
+async function readUnenrolledProjectExport(
+  tx: ReadTransaction,
+  input: {
+    spaceId: string;
+    profileCreatedAt: number;
+    connectionGeneration: number;
+    authorization?: SyncConnectionIdentity;
+    mediaId: string;
+    exportSource?: { projectId: string; sha256: string };
+  }
+): Promise<AssetRef | null> {
+  if (!input.exportSource || !input.mediaId.startsWith('export:')) return null;
+  const id = input.mediaId.slice('export:'.length);
+  const raw: unknown = await tx.objectStore(PROJECT_EXPORTS_STORE).get(id);
+  if (raw === undefined) return null;
+  const entry = parseProjectExportEntry(raw);
+  const ref = entry
+    ? parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(entry.assetId))
+    : null;
+  if (
+    !entry ||
+    entry.id !== id ||
+    entry.projectId !== input.exportSource.projectId ||
+    !ref ||
+    entry.size !== ref.size ||
+    entry.mimeType !== ref.mimeType
+  )
+    throw new MediaReplicaConflictError('source-changed');
+  const rootKey = captureRootKey(input.spaceId, 'media', input.mediaId);
+  if (
+    (await tx.objectStore(SYNC_CAPTURE_STORE).get(JSON.stringify(['root-state', rootKey]))) !==
+      undefined ||
+    (await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.mediaId)) !== undefined
+  )
+    throw new MediaReplicaConflictError('source-changed');
+  for (const raw of await tx.objectStore(SYNC_CAPTURE_STORE).index('rootKey').getAll(rootKey)) {
+    const capture = parseSyncCaptureRecord(raw);
+    if (!capture || (capture.kind === 'sync-operation' && capture.phase !== 'published'))
+      throw new MediaReplicaConflictError('source-changed');
+  }
+  const owner = parseAssetOwner(
+    await tx.objectStore(ASSET_OWNERS_STORE).get(['project-export', id, 'body'])
+  );
+  const copy = await readAssetResidencyCopyInTransaction(
+    tx,
+    assetResidencyCopyId({ kind: 'opfs', ref })
+  );
+  const connection = await checkSyncConnectionAdmission(tx, input, input.authorization ?? null);
+  if (
+    !owner ||
+    owner.assetId !== ref.assetId ||
+    owner.ownerKind !== 'project-export' ||
+    owner.ownerId !== id ||
+    owner.role !== 'body' ||
+    !copy ||
+    copy.target.kind !== 'opfs' ||
+    !connection ||
+    JSON.stringify(copy.target.ref) !== JSON.stringify(ref) ||
+    JSON.stringify(copy.remote.binding) !== JSON.stringify(connection.binding) ||
+    copy.remote.sha256 !== input.exportSource.sha256
+  )
+    throw new MediaReplicaConflictError('source-changed');
+  return ref;
+}
+
 /** Read a candidate immutable original. The native commit must repeat predecessor admission. */
 export async function loadMediaReplicaPredecessorRef(input: {
   spaceId: string;
   profileCreatedAt: number;
   connectionGeneration: number;
   mediaId: string;
+  authorization?: SyncConnectionIdentity;
+  exportSource?: { projectId: string; sha256: string };
   expectedLocalGeneration: number;
   expectedBasis: readonly string[];
 }): Promise<AssetRef | null> {
@@ -313,6 +385,8 @@ export async function loadMediaReplicaPredecessorRef(input: {
   const tx = db.transaction(
     [
       SYNC_CAPTURE_STORE,
+      SYNC_CONNECTION_STORE,
+      ASSET_RESIDENCY_STORE,
       MEDIA_LIBRARY_STORE,
       PROJECT_ASSETS_STORE,
       PROJECT_EXPORTS_STORE,
@@ -347,8 +421,9 @@ export async function loadMediaReplicaPredecessorRef(input: {
   )
     throw new MediaReplicaConflictError('invalid-input');
   if (input.expectedLocalGeneration === 0) {
+    const retained = await readUnenrolledProjectExport(tx, input);
     await tx.done;
-    return null;
+    return retained;
   }
   const rootKey = captureRootKey(input.spaceId, 'media', input.mediaId);
   const state = await readMediaPredecessorState(tx, input, {
@@ -501,6 +576,7 @@ export async function applyPreparedMediaReplica(
         RECORDING_TELEMETRY_STORE,
         RECORDING_RECOVERY_SESSIONS_STORE,
         ASSET_OPERATIONS_STORE,
+        ASSET_RESIDENCY_STORE,
         VIDEO_PROJECTS_STORE,
         SCENARIO_ASSETS_STORE,
         SYNC_CAPTURE_STORE,
@@ -547,9 +623,23 @@ export async function applyPreparedMediaReplica(
         await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
       if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
         throw new MediaReplicaConflictError('profile-changed');
-      if (candidate.expectedLocalGeneration === 0)
-        await assertAbsentSource(tx, candidate, identity);
-      else {
+      if (candidate.expectedLocalGeneration === 0) {
+        const retained =
+          'projectExport' in candidate.rows && candidate.rows.ref.sha256 !== null
+            ? await readUnenrolledProjectExport(tx, {
+                ...candidate,
+                mediaId: candidate.rows.media.id,
+                exportSource: {
+                  projectId: candidate.rows.projectExport.projectId,
+                  sha256: candidate.rows.ref.sha256,
+                },
+              })
+            : null;
+        if (retained) {
+          if (JSON.stringify(retained) !== JSON.stringify(candidate.rows.ref))
+            throw new MediaReplicaConflictError('source-changed');
+        } else await assertAbsentSource(tx, candidate, identity);
+      } else {
         const previous = await assertExistingSource(tx, candidate, identity);
         if (
           previous &&

@@ -1,3 +1,4 @@
+import type { MediaHubBackupRootPreparation } from '../contracts';
 import {
   inventoryProjectThumbnail,
   projectInventoryDescriptor,
@@ -221,7 +222,9 @@ async function buildScenarioProjectRoot(args: {
   index: number;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
 }): Promise<MediaHubBackupRootInventoryItem> {
+  await args.prepareRoot?.({ rootKind: 'scenario-project', rootId: args.entry.id });
   const collector = createObjectCollector(
     `scenario-${String(args.index + 1).padStart(6, '0')}`,
     args.paths
@@ -288,6 +291,7 @@ export async function buildScenarioProjectRootInventory(args: {
   db: InventoryDatabase & Parameters<typeof getAllScenarioStoredProjects>[0];
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
+  prepareRoot?: MediaHubBackupRootPreparation;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const projects = readSelectedScenarioProjects(
     await getAllScenarioStoredProjects(args.db),

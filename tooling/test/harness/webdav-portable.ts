@@ -48,6 +48,7 @@ import {
 import { saveProjectExport } from '../../../apps/extension/src/composition/persistence/projects/index.exports';
 import {
   parseProjectAssetEntry,
+  parseProjectExportEntry,
   parseVideoProjectEntry,
 } from '../../../apps/extension/src/composition/persistence/projects/read-guards';
 import { parseMediaLibraryEntry } from '../../../apps/extension/src/composition/persistence/media-library/read-guards';
@@ -418,6 +419,16 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
     fullGraph?: { effectBundleBytes: number[] },
     options: { useExistingProfile?: boolean; name?: string } = {}
   ) {
+    async function stage<T>(name: string, operation: () => Promise<T>): Promise<T> {
+      try {
+        return await operation();
+      } catch (error) {
+        throw new Error(
+          `Portable source ${name}: ${error instanceof Error ? error.name : 'unknown'}`,
+          { cause: error }
+        );
+      }
+    }
     if (options.useExistingProfile) {
       const db = await initDB();
       const current = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
@@ -429,10 +440,14 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
     const borrowedId = crypto.randomUUID();
     const privateFile = await png('rgb(240,80,20)');
     const borrowedFile = await png('rgb(20,180,60)');
-    await saveProjectAsset(privateId, privateFile, privateFile.type, 'private.png', Date.now(), {
-      publishToLibrary: false,
-    });
-    await saveProjectAsset(borrowedId, borrowedFile, borrowedFile.type, 'borrowed 100%.png');
+    await stage('private-asset', () =>
+      saveProjectAsset(privateId, privateFile, privateFile.type, 'private.png', Date.now(), {
+        publishToLibrary: false,
+      })
+    );
+    await stage('borrowed-asset', () =>
+      saveProjectAsset(borrowedId, borrowedFile, borrowedFile.type, 'borrowed 100%.png')
+    );
     const mediaId = `project-asset:${borrowedId}`;
     let candidate = createEmptyVideoProject(
       options.name ?? 'WebDAV native portable project',
@@ -499,10 +514,12 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
       );
       candidate = await retainFullGraph(candidate, fullGraph.effectBundleBytes);
     }
-    let entry = await saveVideoProject(candidate, {
-      expectedProject: null,
-      expectedWorkspaceRevision: null,
-    });
+    let entry = await stage('project', () =>
+      saveVideoProject(candidate, {
+        expectedProject: null,
+        expectedWorkspaceRevision: null,
+      })
+    );
     if (fullGraph) {
       const thumbnail = await png('rgb(90,110,130)');
       const preview = await png('rgb(130,110,90)');
@@ -523,18 +540,20 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
     }
     const exportId = crypto.randomUUID();
     const exported = await png('rgb(20,80,240)');
-    await saveProjectExport({
-      id: exportId,
-      projectId: entry.id,
-      filename: 'saved-export.png',
-      createdAt: Date.now(),
-      duration: 2,
-      width: 24,
-      height: 24,
-      fps: 30,
-      mimeType: exported.type,
-      blob: exported,
-    });
+    await stage('export', () =>
+      saveProjectExport({
+        id: exportId,
+        projectId: entry.id,
+        filename: 'saved-export.png',
+        createdAt: Date.now(),
+        duration: 2,
+        width: 24,
+        height: 24,
+        fps: 30,
+        mimeType: exported.type,
+        blob: exported,
+      })
+    );
     // Capture the saved export in the actual frozen project snapshot.
     entry = await saveVideoProject(
       { ...entry.project, name: candidate.name },
@@ -551,9 +570,9 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
       mediaId,
       clipId: candidate.clips[0]!.id,
       exportId,
-      editing: await nativeProjectObjects(entry),
-      graph: await retainedGraph(entry.project),
-      presentation: await presentationProof(entry.id),
+      editing: await stage('native-originals', () => nativeProjectObjects(entry)),
+      graph: await stage('native-graph', () => retainedGraph(entry.project)),
+      presentation: await stage('presentation', () => presentationProof(entry.id)),
       exported: { size: exported.size, sha256: await hash(exported) },
     };
   }
@@ -585,7 +604,13 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
           'Private source was published to Library.'
         );
     }
-    check((await db.getAll('project_exports')).length === 0, 'Saved export was resurrected.');
+    const exports = (await db.getAllFromIndex('project_exports', 'projectId', projectId)).map(
+      (raw) => {
+        const entry = parseProjectExportEntry(raw);
+        check(entry && entry.projectId === projectId, 'Retained export metadata is invalid.');
+        return { id: entry.id, assetId: entry.assetId, size: entry.size };
+      }
+    );
     return {
       projectId,
       workspaceRevision: entry.workspaceRevision ?? 0,
@@ -593,7 +618,8 @@ export function createWebdavPortableHarness(connected: () => SyncRemoteStore) {
       graph: await retainedGraph(entry.project),
       presentation: await presentationProof(entry.id),
       clipIds: entry.project.clips.map((clip) => clip.id),
-      exportAbsent: true,
+      exports,
+      exportAbsent: exports.length === 0,
     };
   }
   return {

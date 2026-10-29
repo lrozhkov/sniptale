@@ -3,9 +3,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
 import { parseAssetRef } from '../assets/guards';
-import type { AssetRef } from '../assets/contracts';
 import type {
-  ScenarioProjectEntry,
   ScenarioAssetEntry,
   ScenarioExportEntry,
   StoredScenarioStepEditorDocumentEntry,
@@ -19,33 +17,25 @@ import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documen
 import { readScenarioStorage } from '../scenario/storage';
 import { SCENARIO_HISTORY_BYTE_LIMIT, SCENARIO_HISTORY_LIMIT } from '../scenario/history-model';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from '../media-library/read-guards';
-import type { MediaLibraryEntry, MediaThumbnailEntry } from '../media-library/contracts';
-import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
+import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import * as stores from '../infrastructure/indexed-db/core.stores';
-import { captureProfileBounds, type CapturedMediaDependency } from './contracts';
+import {
+  captureProfileBounds,
+  type CapturedScenarioRows,
+  type CapturedMediaDependency,
+} from './contracts';
 import { describeImageMetadata } from './image-snapshot';
 
 export const MAX_NATIVE_SCENARIO_HISTORY_BYTES =
   SCENARIO_HISTORY_BYTE_LIMIT + SCENARIO_HISTORY_LIMIT + 1;
 
-/** One native writer snapshot; large retained versions remain immutable inline bytes until preparation. */
-export interface CapturedScenarioRows {
-  entry: Omit<ScenarioProjectEntry, 'history'>;
-  history?: { blob: Blob; sha256: string };
-  assets: ScenarioAssetEntry[];
-  documents: StoredScenarioStepEditorDocumentEntry[];
-  exports: ScenarioExportEntry[];
-  refs: AssetRef[];
-  media: MediaLibraryEntry[];
-  thumbnails: MediaThumbnailEntry[];
-  presentation: AggregatePresentationEntry | null;
-  mediaDependencies?: CapturedMediaDependency[];
-}
+export type { CapturedScenarioRows } from './contracts';
 
 /** Stores required for a complete native Scenario after-image, including borrowed source admission. */
 export const SCENARIO_CAPTURE_STORES = [
   stores.SYNC_CAPTURE_STORE,
+  stores.ASSET_RESIDENCY_STORE,
   stores.SCENARIO_PROJECTS_STORE,
   stores.SCENARIO_PROJECT_HISTORY_STORE,
   stores.SCENARIO_PROJECT_UNITS_STORE,

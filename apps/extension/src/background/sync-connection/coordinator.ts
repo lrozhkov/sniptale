@@ -5,6 +5,8 @@ import type {
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import {
   sameConnectionScope,
+  sameConnectionBinding,
+  parseSyncConnectionIdentity,
   sameSyncConnectionIdentity,
   type SyncConnectionIdentity,
   type SyncConnectionMetadata,
@@ -53,6 +55,7 @@ export interface SyncConnectionCoordinatorDependencies {
   ): Promise<SyncConnectionMetadata>;
   /** Resolve only after durable revocation commits and its native admission lock releases. */
   revokeConnection(identity: SyncConnectionIdentity): Promise<void>;
+  completeLocalOnly?(connection: SyncConnectionMetadata): Promise<'delivered' | 'incomplete'>;
   ensureDocument(): Promise<string>;
   /** Null selects the existing document, including a surviving document after worker restart. */
   inspectExecutor(
@@ -241,7 +244,15 @@ class SyncConnectionCoordinator {
     const productTarget = snapshot?.products?.find((item) => item.requestId === requestId);
     if (
       (workspaceTarget && consumer === 'gallery') ||
-      (productTarget && consumer === 'settings' && productTarget.kind !== 'catalog-refresh')
+      (productTarget &&
+        consumer === 'settings' &&
+        productTarget.kind !== 'catalog-refresh' &&
+        productTarget.kind !== 'cache-trim' &&
+        productTarget.kind !== 'backup-prepare' &&
+        productTarget.kind !== 'replica-prepare' &&
+        productTarget.kind !== 'native-prepare' &&
+        productTarget.kind !== 'native-release' &&
+        productTarget.kind !== 'conflict-resolve')
     )
       refused();
     if (!snapshot || !this.#deps.productExecutor)
@@ -492,6 +503,50 @@ class SyncConnectionCoordinator {
       release();
     });
   }
+  /** Retire one exact connection only after native revocation and observed executor drain. */
+  async localOnly(expectedInput: SyncConnectionIdentity): Promise<'delivered' | 'incomplete'> {
+    const expected = parseSyncConnectionIdentity(structuredClone(expectedInput));
+    if (!expected || !this.#deps.completeLocalOnly) refused();
+    const exclusion = this.#exclusion.reserveExclusion();
+    try {
+      const selected = await this.#enqueue(async () => {
+        const current = await this.#deps.loadConnection();
+        if (
+          !current ||
+          current.phase === 'updating-auth' ||
+          !sameSyncConnectionIdentity(current.identity, expected)
+        )
+          refused();
+        const binding = structuredClone(current.binding);
+        const revision = expected.revision + (current.phase === 'paused' ? 0 : 1);
+        if (current.phase !== 'paused') await this.#deps.revokeConnection(current.identity);
+        const paused = await this.#deps.loadConnection();
+        if (
+          !paused ||
+          paused.phase !== 'paused' ||
+          paused.identity.incarnation !== expected.incarnation ||
+          paused.identity.revision !== revision ||
+          !sameConnectionBinding(paused.binding, binding)
+        )
+          refused();
+        return { paused: structuredClone(paused), snapshot: await this.#observe(null) };
+      });
+      await this.#contain(selected.snapshot);
+      return await this.#enqueue(async () => {
+        const current = await this.#deps.loadConnection();
+        if (
+          !current ||
+          current.phase !== 'paused' ||
+          !sameSyncConnectionIdentity(current.identity, selected.paused.identity) ||
+          !sameConnectionBinding(current.binding, selected.paused.binding)
+        )
+          refused();
+        return this.#deps.completeLocalOnly!(current);
+      });
+    } finally {
+      exclusion.release();
+    }
+  }
   inspect(): Promise<SyncExecutorSnapshot | null> {
     return this.#enqueue(async () => {
       const snapshot = await this.#observe(null);
@@ -523,7 +578,13 @@ class SyncConnectionCoordinator {
           refused();
         }
       }
-      if (!boundToCurrent(snapshot, metadata)) refused();
+      const stopped =
+        snapshot.phase === 'stopped' &&
+        snapshot.jobs.every((job) => job.state !== 'running') &&
+        snapshot.workspace?.state !== 'running' &&
+        !snapshot.products?.some((job) => job.state === 'running');
+      // Read-only status can describe a contained old executor after its namespace was retired.
+      if (!stopped && !boundToCurrent(snapshot, metadata)) refused();
       return snapshot;
     });
   }
@@ -589,6 +650,7 @@ export function createSyncConnectionCoordinator(deps: SyncConnectionCoordinatorD
     startWorkspace: coordinator.startWorkspace.bind(coordinator),
     enrollWorkspace: coordinator.enrollWorkspace.bind(coordinator),
     inspect: coordinator.inspect.bind(coordinator),
+    localOnly: coordinator.localOnly.bind(coordinator),
     reserveErasure: coordinator.reserveErasure.bind(coordinator),
     permissionsRemoved: coordinator.permissionsRemoved.bind(coordinator),
   };

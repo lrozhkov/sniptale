@@ -1,4 +1,5 @@
-import type { parsePortableSyncRoot } from './prepared-root';
+import type { ApplyPreparedVideoProjectRevisionInput } from '../../composition/persistence/sync-capture/apply-video-project';
+import type { VideoProjectEntry } from '../../composition/persistence/projects/contracts';
 import {
   MAX_CAPTURE_ROWS,
   type CausalRootDependency,
@@ -14,14 +15,21 @@ import type { AssetRef } from '../../composition/persistence/assets/contracts';
 import { parsePreparedScenarioReplicaRoot } from '../../composition/persistence/sync-capture/prepared-scenario';
 import { prepareScenarioProjectPublication } from '../media-hub-backup/v6/root-publication/scenario-project-publication';
 import type { PortableScenarioProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
-import type { PortableReplicaAdmission } from './prepared-root';
 
-type ParsedPortableRoot = Awaited<ReturnType<typeof parsePortableSyncRoot>>;
+type ScenarioDependencyRoot =
+  | {
+      kind: 'video-project';
+      entry: { project: Pick<VideoProjectEntry['project'], 'assets' | 'source'> };
+    }
+  | { kind: 'media' | 'image' | 'video-review' | 'scenario-project' };
 
 /** Reuse archive decoding, preserving normal-sync logical IDs and target-owned borrowed sources. */
 export async function preparePortableScenarioRoot(args: {
   metadata: PortableScenarioProjectMetadata;
-  admission: PortableReplicaAdmission;
+  admission: Pick<
+    ApplyPreparedVideoProjectRevisionInput,
+    'dependencies' | 'expectedWorkspaceRevision'
+  >;
   refFor: (id: string) => AssetRef;
   stageNativeMetadata: (blob: Blob) => Promise<AssetRef>;
   objectIds: readonly string[];
@@ -98,7 +106,7 @@ export async function preparePortableScenarioRoot(args: {
 
 /** Bind each actual Scenario source to one declared owning root, without admitting extra children. */
 export function portableSyncRootDependencyIds(
-  parsed: ParsedPortableRoot,
+  parsed: ScenarioDependencyRoot,
   declared: readonly CausalRootDependency[] = []
 ): string[] {
   if (parsed.kind !== 'video-project') {
@@ -131,8 +139,8 @@ export function portableSyncRootDependencyIds(
 }
 
 export function assertScenarioCausalDependencies(
-  parsed: ParsedPortableRoot,
-  local: PortableReplicaAdmission,
+  parsed: ScenarioDependencyRoot,
+  local: { rootDependencies?: ApplyPreparedVideoProjectRevisionInput['rootDependencies'] },
   sender: readonly CausalRootDependency[]
 ) {
   const needed = portableSyncRootDependencyIds(parsed, sender);

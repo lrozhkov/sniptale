@@ -1,3 +1,4 @@
+import type { RetainedLibraryPlan } from '../../../workflows/sync-transfer/retained-library';
 import type {
   MediaHubBackupExportOptions,
   MediaHubLocalBackupSummary,
@@ -13,7 +14,8 @@ export interface ImportConflictModalProps {
 
 export interface BackupExportModalProps {
   options: MediaHubBackupExportOptions;
-  summary: MediaHubLocalBackupSummary;
+  summary: MediaHubLocalBackupSummary | null;
+  preparation?: RetainedLibraryPlan;
   onClose: () => void;
   onExport: (options: MediaHubBackupExportOptions) => Promise<void>;
   onInspect: (options: MediaHubBackupExportOptions) => Promise<MediaHubLocalBackupSummary>;

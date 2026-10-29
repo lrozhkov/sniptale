@@ -3,7 +3,21 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-const mocks = vi.hoisted(() => ({ read: vi.fn(), command: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  read: vi.fn(),
+  command: vi.fn(),
+  readStatus: vi.fn(),
+  cancel: vi.fn(),
+  subscribe: vi.fn(),
+  unsubscribe: vi.fn(),
+}));
+vi.mock('../../../../platform/runtime-messaging/sync-product-client', () => ({
+  createSyncProductClient: () => mocks,
+  subscribeToSyncProductSettled: (listener: () => void) => {
+    mocks.subscribe(listener);
+    return mocks.unsubscribe;
+  },
+}));
 vi.mock('../../../../workflows/sync-transfer/queue-management', () => ({
   createSyncQueueManagement: () => mocks,
 }));
@@ -38,6 +52,8 @@ let cleanup: (() => void) | undefined;
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.read.mockResolvedValue(ready);
+  mocks.readStatus.mockResolvedValue({ kind: 'status', status: { products: [] } });
+  mocks.cancel.mockResolvedValue({ kind: 'cancelled', outcome: 'cancelled' });
   mocks.command.mockResolvedValue({ kind: 'applied', history: 'delivered' });
 });
 afterEach(() => {
@@ -185,4 +201,65 @@ it('identifies saved video review work as a project in the readable queue', asyn
   const row = f.node.querySelector('li');
   expect(row?.textContent).toContain(translate('settings.syncQueue.project'));
   expect(row?.textContent).not.toContain(translate('settings.syncQueue.media'));
+});
+
+it('shows and cancels runtime work after its original surface closes, then reloads the owner', async () => {
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  mocks.readStatus.mockResolvedValue({
+    kind: 'status',
+    status: {
+      products: [{ requestId, kind: 'replica-prepare', state: 'running', failureCode: null }],
+    },
+  });
+  const f = await render();
+  const row = f.node.querySelector('[data-ui="settings.sync-runtime-jobs"] li');
+  expect(row?.textContent).toContain(translate('settings.syncQueue.jobKind.replica-prepare'));
+  let release!: (value: unknown) => void;
+  mocks.cancel.mockReturnValueOnce(
+    new Promise((resolve) => {
+      release = resolve;
+    })
+  );
+  act(() => row?.querySelector('button')?.click());
+  expect(mocks.cancel).toHaveBeenCalledExactlyOnceWith(requestId);
+  expect(row?.querySelector('button')?.disabled).toBe(true);
+  mocks.readStatus.mockResolvedValue({
+    kind: 'status',
+    status: {
+      products: [
+        { requestId, kind: 'replica-prepare', state: 'interrupted', failureCode: 'interrupted' },
+      ],
+    },
+  });
+  await act(async () => release({ kind: 'cancelled', outcome: 'cancelled' }));
+  expect(f.node.querySelector('[data-ui="settings.sync-runtime-jobs"] li button')).toBeNull();
+  expect(f.node.textContent).toContain(translate('settings.syncQueue.jobState.interrupted'));
+});
+it('keeps outgoing management available when runtime status fails and disposes its subscription', async () => {
+  mocks.readStatus.mockRejectedValueOnce(new Error('private runtime detail'));
+  const f = await render();
+  expect(f.node.textContent).toContain(ready.sources[0]!.label);
+  expect(f.node.textContent).toContain(translate('settings.syncQueue.runtimeUnavailable'));
+  expect(f.node.textContent).not.toContain('private runtime detail');
+  cleanup?.();
+  cleanup = undefined;
+  expect(mocks.unsubscribe).toHaveBeenCalledOnce();
+});
+it('reports a refused runtime cancellation and retains the running row', async () => {
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  mocks.readStatus.mockResolvedValue({
+    kind: 'status',
+    status: {
+      products: [{ requestId, kind: 'backup-prepare', state: 'running', failureCode: null }],
+    },
+  });
+  mocks.cancel.mockResolvedValueOnce({ kind: 'cancelled', outcome: 'refused' });
+  const f = await render();
+  await act(async () =>
+    f.node
+      .querySelector<HTMLButtonElement>('[data-ui="settings.sync-runtime-jobs"] button')
+      ?.click()
+  );
+  expect(f.node.textContent).toContain(translate('settings.syncQueue.refused'));
+  expect(f.node.querySelector('[data-ui="settings.sync-runtime-jobs"] button')).not.toBeNull();
 });

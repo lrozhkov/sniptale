@@ -1,6 +1,13 @@
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { readAssetResidencyCopyInTransaction } from '../assets/residency';
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+  type AssetResidencyTarget,
+} from '../assets/residency-records';
+import type { SyncCaptureRootState } from './contracts';
 import { parseAssetRef, parseAssetOwner } from '../assets/guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
@@ -8,6 +15,7 @@ import { parseAggregatePresentationEntry } from '../aggregate-presentations/pars
 import {
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
+  SYNC_CAPTURE_STORE,
   MEDIA_LIBRARY_STORE,
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -59,7 +67,10 @@ export function isBoundedImageMetadata(value: unknown, allowBlobs = true): boole
 }
 
 /** Admit one screenshot aggregate and its exact persisted document asset closure. */
-export function parseCapturedImageRows(value: unknown): CapturedImageRows | null {
+function parseImageRows(
+  value: unknown,
+  unloaded?: Extract<AssetResidencyTarget, { kind: 'inline-image' }>
+): CapturedImageRows | null {
   if (!isRecord(value) || !isBoundedImageMetadata(value)) return null;
   if (
     Object.keys(value).some(
@@ -80,10 +91,18 @@ export function parseCapturedImageRows(value: unknown): CapturedImageRows | null
     (media.source.kind !== 'screenshot' && media.source.kind !== 'stored-asset') ||
     !['image', 'screenshot'].includes(media.kind) ||
     (media.source.kind === 'screenshot' &&
-      (!(media.blob instanceof Blob) ||
-        media.blob.size !== media.size ||
-        (media.blob.type && media.blob.type !== media.mimeType) ||
-        originalRef !== undefined)) ||
+      (unloaded
+        ? media.blob !== undefined ||
+          originalRef !== undefined ||
+          media.id !== unloaded.mediaId ||
+          media.createdAt !== unloaded.createdAt ||
+          media.workspaceRevision !== unloaded.workspaceRevision ||
+          media.size !== unloaded.size ||
+          media.mimeType !== unloaded.mimeType
+        : !(media.blob instanceof Blob) ||
+          media.blob.size !== media.size ||
+          (media.blob.type && media.blob.type !== media.mimeType) ||
+          originalRef !== undefined)) ||
     (media.source.kind === 'stored-asset' &&
       (media.blob !== undefined ||
         !originalRef ||
@@ -134,11 +153,16 @@ export function parseCapturedImageRows(value: unknown): CapturedImageRows | null
   };
 }
 
+/** Capture admission always requires the actual inline original bytes. */
+export function parseCapturedImageRows(value: unknown): CapturedImageRows | null {
+  return parseImageRows(value);
+}
+
 /** Read the accepted after-image exclusively through the writer's live transaction. */
-export async function freezeImageInTransaction(
+async function readImageRowsInTransaction(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   mediaId: string
-): Promise<CapturedImageRows> {
+) {
   const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
   let originalRef: unknown;
   if (media?.source.kind === 'stored-asset') {
@@ -163,13 +187,21 @@ export async function freezeImageInTransaction(
   const refs: unknown[] = [];
   for (const id of new Set(workspace?.document.assets.map((asset) => asset.assetId) ?? []))
     refs.push(await tx.objectStore(ASSET_REFS_STORE).get(id));
-  const rows = parseCapturedImageRows({
+  return {
     media,
     workspace: rawWorkspace ?? null,
     presentation: presentation ?? null,
     refs,
     ...(originalRef === undefined ? {} : { originalRef }),
-  });
+  };
+}
+
+/** Read a complete publishable after-image without admitting missing inline bytes. */
+export async function freezeImageInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
+  mediaId: string
+): Promise<CapturedImageRows> {
+  const rows = parseCapturedImageRows(await readImageRowsInTransaction(tx, mediaId));
   if (!rows || rows.media.id !== mediaId)
     throw new Error('Unsupported screenshot aggregate snapshot.');
   return structuredClone(rows);
@@ -181,4 +213,87 @@ export function digestCapturedImageRows(rows: CapturedImageRows): string {
   if (!accepted) throw new Error('Invalid image snapshot.');
   const bytes = new TextEncoder().encode(JSON.stringify(describeImageMetadata(accepted)));
   return Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function describedSlot(
+  source: Record<string, unknown>,
+  name: string,
+  size: number,
+  mimeType: string
+) {
+  const keys = [...new Set([...Object.keys(source), name])].sort();
+  return Object.fromEntries(
+    keys.map((key) => [key, key === name ? { binarySlot: 'blob', size, mimeType } : source[key]])
+  );
+}
+
+/** Metadata-only predecessor evidence. These rows cannot pass capture admission without their real bytes. */
+export async function readImageReplicaPredecessorInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
+  mediaId: string,
+  state: SyncCaptureRootState
+): Promise<{ rows: CapturedImageRows; digest: string; unloadedCopy: AssetResidencyCopy | null }> {
+  const raw = await readImageRowsInTransaction(tx, mediaId);
+  const complete = parseCapturedImageRows(raw);
+  if (complete)
+    return { rows: complete, digest: digestCapturedImageRows(complete), unloadedCopy: null };
+  const copy = await readAssetResidencyCopyInTransaction(
+    tx,
+    assetResidencyCopyId({ kind: 'inline-image', mediaId })
+  );
+  const profile: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get('profile');
+  if (
+    !copy ||
+    copy.phase !== 'unloaded' ||
+    copy.target.kind !== 'inline-image' ||
+    copy.target.rootGeneration !== state.generation ||
+    copy.target.nativeDigest !== state.nativeDigest ||
+    state.deleted ||
+    state.rootKind !== 'media' ||
+    state.rootId !== mediaId ||
+    state.spaceId !== copy.remote.binding.spaceId ||
+    state.nativeRevision !== copy.target.workspaceRevision ||
+    !isRecord(profile) ||
+    profile['version'] !== 1 ||
+    profile['kind'] !== 'profile' ||
+    profile['key'] !== 'profile' ||
+    profile['enabled'] !== true ||
+    profile['spaceId'] !== state.spaceId ||
+    profile['createdAt'] !== copy.remote.binding.profileCreatedAt ||
+    profile['connectionGeneration'] !== copy.remote.binding.connectionGeneration
+  )
+    throw new Error('Unloaded image predecessor changed.');
+  const rows = parseImageRows(raw, copy.target);
+  if (!rows || rows.media.id !== mediaId) throw new Error('Unloaded image metadata is invalid.');
+  const descriptor = copy.target.duplicatePreview;
+  if (
+    descriptor &&
+    (!rows.presentation ||
+      rows.presentation.previewBlob !== undefined ||
+      rows.presentation.presentationRevision !== descriptor.presentationRevision)
+  )
+    throw new Error('Unloaded image preview changed.');
+  const metadata = describeImageMetadata(rows);
+  if (!isRecord(metadata) || !isRecord(metadata['media']))
+    throw new Error('Unloaded image metadata is invalid.');
+  metadata['media'] = describedSlot(
+    metadata['media'],
+    'blob',
+    copy.target.size,
+    copy.target.blobType
+  );
+  if (descriptor) {
+    if (!isRecord(metadata['presentation'])) throw new Error('Unloaded image metadata is invalid.');
+    metadata['presentation'] = describedSlot(
+      metadata['presentation'],
+      'previewBlob',
+      copy.target.size,
+      descriptor.blobType
+    );
+  }
+  const digest = Array.from(sha256(new TextEncoder().encode(JSON.stringify(metadata))), (byte) =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
+  if (digest !== state.nativeDigest) throw new Error('Unloaded image metadata digest changed.');
+  return { rows, digest, unloadedCopy: copy };
 }

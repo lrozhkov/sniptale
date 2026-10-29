@@ -64,6 +64,28 @@ describe('named product execution containment', () => {
     completion: { kind: 'catalog' as const, count: 3 },
     containment: 'contained' as const,
   };
+  it('retires previous product observations when a new connection binding starts', async () => {
+    const f = productFixture();
+    await f.startProduct();
+    f.result.resolve(ready);
+    await settleWorkflow();
+    expect(f.inspect().products?.map((job) => job.requestId)).toEqual([f.operationRequestId]);
+    const nextId = '99999999-9999-4999-8999-999999999999';
+    const nextBinding = structuredClone(binding);
+    nextBinding.authorization = {
+      incarnation: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      revision: 1,
+    };
+    await expect(
+      f.command({
+        kind: 'start',
+        operationRequestId: nextId,
+        binding: nextBinding,
+        work: { kind: 'catalog-refresh', bypassCache: false },
+      })
+    ).resolves.toMatchObject({ success: true });
+    expect(f.inspect().products?.map((job) => job.requestId)).toEqual([nextId]);
+  });
   it('publishes terminal product state after accounting and contains notification failure', async () => {
     let observed: SyncExecutorSnapshot | undefined;
     const onSettled = vi.fn<NonNullable<SyncExecutorPorts['onSettled']>>(() => {

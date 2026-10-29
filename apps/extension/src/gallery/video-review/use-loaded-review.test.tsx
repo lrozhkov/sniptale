@@ -142,3 +142,7 @@ it('reports cleanup failure using a fixed content-free summary', async () => {
   await act(async () => root.render(null));
   expect(mocks.warn).toHaveBeenCalledExactlyOnceWith('video-review-resource-cleanup-deferred');
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

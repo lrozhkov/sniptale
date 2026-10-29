@@ -1,3 +1,4 @@
+import { ensureNativeEditingRootAvailable } from '../../../workflows/sync-transfer/editing-admission';
 import {
   getMediaAssetBlob,
   getMediaLibraryEntry,
@@ -194,6 +195,8 @@ export async function resolveEditorPageRestoreSource(
   autosaveService: Pick<EditorSessionAutosaveService, 'restoreDraft'>,
   isCurrent?: () => boolean
 ): Promise<EditorPageRestoreSource> {
+  if (locationState.assetId)
+    await ensureNativeEditingRootAvailable({ rootKind: 'media', rootId: locationState.assetId });
   let draftEntry: Awaited<ReturnType<EditorSessionAutosaveService['restoreDraft']>>;
   try {
     draftEntry = await autosaveService.restoreDraft(aggregateId, isCurrent);

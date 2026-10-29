@@ -1,3 +1,12 @@
+import {
+  runWithPersistenceMutationTransition,
+  type PersistenceMutationTransitionPermit,
+} from '../../composition/persistence/infrastructure/mutation-barrier';
+import {
+  RemoteContentMismatch,
+  verifyRemoteObject as verifyRemote,
+} from './remote-object-integrity';
+import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 import { releasePublishedOperationPins } from '../../composition/persistence/assets/operations';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import {
@@ -7,6 +16,8 @@ import {
 import type { SyncConnectionIdentity } from '../../composition/persistence/remote-connection/model';
 import {
   discardPreparedAsset,
+  MissingAssetObjectError,
+  AssetObjectSizeMismatchError,
   releaseAssetReadyProtection,
   runWithDurableAssetOperation,
   readAssetFile,
@@ -14,6 +25,9 @@ import {
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import {
   commitPreparedOutgoingOperation,
+  collectNativeOutgoingAssetRefs,
+  loadNativeOutgoingRecoveryCopy,
+  restoreNativeOutgoingAsset,
   loadNativeOutgoingCapture,
   loadPreparedOutgoingOperation,
   readOutgoingOperation,
@@ -141,7 +155,10 @@ async function settleTransportCopies(
     throw new AggregateError(failures, 'Competing sync preparation cleanup failed.');
 }
 
-async function prepareNativeOutgoing(capture: CapturedChange): Promise<PreparedOutgoingOperation> {
+async function prepareNativeOutgoing(
+  capture: CapturedChange,
+  transitionPermit: PersistenceMutationTransitionPermit
+): Promise<PreparedOutgoingOperation> {
   const portable =
     capture.change.kind === 'tombstone' ? null : await encodeCapturedPortableRoot(capture);
   const digests = new Map<string, string>();
@@ -157,6 +174,7 @@ async function prepareNativeOutgoing(capture: CapturedChange): Promise<PreparedO
       );
       if (unbound.length)
         staged = await stageRootObjects({
+          transitionPermit,
           objects: unbound,
           expectedSha256: new Map(
             unbound.map((object) => [object.objectId, digests.get(object.objectId)!])
@@ -189,8 +207,89 @@ async function prepareNativeOutgoing(capture: CapturedChange): Promise<PreparedO
   return accepted;
 }
 
+interface OutgoingResourceRecovery {
+  remote: SyncRemoteStore;
+  authorization?: SyncConnectionIdentity;
+  signal: AbortSignal;
+}
+
+async function prepareCapturedFiles(
+  capture: CapturedChange,
+  recovery: OutgoingResourceRecovery,
+  transitionPermit: PersistenceMutationTransitionPermit
+) {
+  for (const ref of collectNativeOutgoingAssetRefs(capture)) {
+    recovery.signal.throwIfAborted();
+    try {
+      await readAssetFile(ref, ref.assetId);
+      continue;
+    } catch (error) {
+      if (
+        !(
+          error instanceof MissingAssetObjectError ||
+          (error instanceof AssetObjectSizeMismatchError && error.actualSize === 0) ||
+          (error instanceof DOMException && error.name === 'NotFoundError')
+        )
+      )
+        throw error;
+    }
+    const copy = await loadNativeOutgoingRecoveryCopy({
+      capture,
+      ref,
+      authorization: recovery.authorization,
+    });
+    // The native owner rechecks capture, copy and authorization before physical installation and settlement.
+    const staged = await stageRootObjects({
+      transitionPermit,
+      objects: [
+        {
+          objectId: ref.assetId,
+          path: ref.location.objectKey,
+          filename: ref.assetId,
+          mimeType: ref.mimeType,
+          size: ref.size,
+        },
+      ],
+      expectedSha256: new Map([[ref.assetId, copy.remote.sha256]]),
+      signal: recovery.signal,
+      async readObject() {
+        const stream = await recovery.remote.read(copy.remote.key, recovery.signal);
+        return { pipeTo: (sink, signal) => stream.pipeTo(sink, signal ? { signal } : {}) };
+      },
+    });
+    try {
+      const source = staged[0];
+      check(source && staged.length === 1);
+      const result = await restoreNativeOutgoingAsset(
+        {
+          capture,
+          copy,
+          authorization: recovery.authorization,
+          sourceBlob: await readAssetFile(source.ref, ref.assetId),
+          signal: recovery.signal,
+        },
+        { persistenceTransitionPermit: transitionPermit }
+      );
+      if (result === 'busy') throw new SyncRemoteError('temporary');
+    } catch (error) {
+      return discardTransportCopies(staged, error);
+    }
+    const results = await Promise.allSettled(
+      staged.map((item) => discardPreparedAsset(item.ref.assetId))
+    );
+    const failures = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+    if (failures.length)
+      throw new AggregateError(failures, 'Outgoing file recovery cleanup failed.');
+  }
+}
+
 /** Freeze portable bytes once from authoritative native capture and reuse existing file refs. */
-export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedOutgoingOperation> {
+export async function prepareCapturedOutgoing(
+  value: unknown,
+  recovery?: OutgoingResourceRecovery
+): Promise<PreparedOutgoingOperation> {
   const parsed = parseSyncCaptureRecord(structuredClone(value));
   check(parsed?.kind === 'sync-operation');
   const existing = await loadPreparedOutgoingOperation(parsed.spaceId, parsed.operationId);
@@ -202,7 +301,14 @@ export async function prepareCapturedOutgoing(value: unknown): Promise<PreparedO
   }
   check(parsed.phase === 'native');
   const capture = await loadNativeOutgoingCapture(parsed);
-  return runWithDurableAssetOperation(() => prepareNativeOutgoing(capture));
+  return runWithPersistenceMutationTransition((transition) =>
+    runWithAssetResourceRead(() =>
+      runWithDurableAssetOperation(async () => {
+        if (recovery) await prepareCapturedFiles(capture, recovery, transition);
+        return prepareNativeOutgoing(capture, transition);
+      })
+    )
+  );
 }
 
 async function reserveAttempt(prepared: PreparedOutgoingOperation, retained: Map<string, string>) {
@@ -229,36 +335,6 @@ async function reserveAttempt(prepared: PreparedOutgoingOperation, retained: Map
   const next = await admit(physical);
   check(next.created);
   return next.attempt;
-}
-
-class RemoteContentMismatch extends Error {}
-
-async function verifyRemote(
-  remote: SyncRemoteStore,
-  key: string,
-  size: number,
-  sha256: string,
-  signal: AbortSignal
-) {
-  const stream = await remote.read(key, signal);
-  let bytes = 0;
-  const checked = stream.pipeThrough(
-    new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        bytes += chunk.byteLength;
-        if (!Number.isSafeInteger(bytes) || bytes > size) throw new RemoteContentMismatch();
-        controller.enqueue(chunk);
-      },
-      flush() {
-        if (bytes !== size) throw new RemoteContentMismatch();
-      },
-    })
-  );
-  const actual = await digestBackupObject(
-    { size, pipeTo: (sink) => checked.pipeTo(sink, { signal }) },
-    signal
-  );
-  if (actual !== sha256) throw new RemoteContentMismatch();
 }
 
 async function readDispatchSources(

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   completePhysicalDelete: vi.fn(),
   collectWriting: vi.fn(),
+  physicalAuthority: vi.fn(),
   deleteObject: vi.fn(),
   deleteJournal: vi.fn(),
   journals: vi.fn(),
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../assets/operations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets/operations')>()),
   completePhysicalDeleteOperation: mocks.completePhysicalDelete,
+  readPhysicalDeleteAuthority: mocks.physicalAuthority,
 }));
 vi.mock('../assets/opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets/opfs-store')>()),
@@ -819,4 +821,21 @@ it('selects the registered replica adapter and continues after a deferred replic
     expect.anything()
   );
   expect(mocks.deleteJournal.mock.calls).toEqual([['recording']]);
+});
+
+it('uses one existing native retention projection for a writing-cleanup batch', async () => {
+  mocks.runMutation.mockImplementation(async (effect) => effect({ getAll: async () => [] }));
+  mocks.physicalAuthority.mockResolvedValue((id: string) =>
+    id === 'retained' ? 'adopted' : 'unowned'
+  );
+  mocks.collectWriting.mockImplementationOnce(
+    async (_options, isRetained: (id: string) => Promise<boolean>) => {
+      expect(mocks.physicalAuthority).not.toHaveBeenCalled();
+      expect(await isRetained('retained')).toBe(true);
+      expect(await isRetained('abandoned')).toBe(false);
+      return 0;
+    }
+  );
+  await recoverPendingAssetPublications();
+  expect(mocks.physicalAuthority).toHaveBeenCalledOnce();
 });

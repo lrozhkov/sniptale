@@ -7,6 +7,7 @@ import {
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
 } from '../../infrastructure/indexed-db/core';
+import { abortIndexedDbMutation } from '../../infrastructure/indexed-db/transaction';
 import { runWithIndexedDbMutation } from '../../infrastructure/indexed-db/mutation';
 import { parseDbEntries } from '../../infrastructure/indexed-db/read-primitives';
 import { parseScenarioExportEntry } from '../read-guards';
@@ -69,20 +70,26 @@ export async function deleteScenarioExport(id: string): Promise<void> {
   const physicalDelete = buildPhysicalDeleteOperation([]);
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction([...SCENARIO_CAPTURE_STORES, ASSET_OPERATIONS_STORE], 'readwrite');
-    const previous = parseScenarioExportEntry(await tx.objectStore(SCENARIO_EXPORTS_STORE).get(id));
-    await unlinkScenarioHtmlOwnership(
-      id,
-      {
-        owners: tx.objectStore(ASSET_OWNERS_STORE),
-        refs: tx.objectStore(ASSET_REFS_STORE),
-      },
-      physicalDelete
-    );
-    await tx.objectStore(SCENARIO_EXPORTS_STORE).delete(id);
-    if (physicalDelete.assetIds.length)
-      await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-    if (previous) await captureScenarioProjectInTransaction(tx, previous.projectId);
-    await tx.done;
+    try {
+      const previous = parseScenarioExportEntry(
+        await tx.objectStore(SCENARIO_EXPORTS_STORE).get(id)
+      );
+      await unlinkScenarioHtmlOwnership(
+        id,
+        {
+          owners: tx.objectStore(ASSET_OWNERS_STORE),
+          refs: tx.objectStore(ASSET_REFS_STORE),
+        },
+        physicalDelete
+      );
+      await tx.objectStore(SCENARIO_EXPORTS_STORE).delete(id);
+      if (physicalDelete.assetIds.length)
+        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
+      if (previous) await captureScenarioProjectInTransaction(tx, previous.projectId);
+      await tx.done;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
+    }
   });
   if (physicalDelete.assetIds.length)
     await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);

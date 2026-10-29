@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-const io = vi.hoisted(() => ({ acquire: vi.fn(), prune: vi.fn() }));
+const io = vi.hoisted(() => ({
+  acquire: vi.fn(),
+  prune: vi.fn(),
+  prepare: vi.fn(async (): Promise<void> => undefined),
+}));
 vi.mock('../../../composition/persistence/scenario/resource-sessions', () => ({
   acquireScenarioResourceSession: io.acquire,
 }));
@@ -58,4 +62,20 @@ it('releases an acquisition that finishes after unmount and never admits its sta
   resolve({ release });
   expect(await pending).toBe(false);
   expect(release).toHaveBeenCalledOnce();
+});
+
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: io.prepare,
+}));
+
+it('releases a failed preparation and keeps the previously active project protected', async () => {
+  const oldRelease = vi.fn(async () => undefined);
+  const failedRelease = vi.fn(async () => undefined);
+  io.acquire.mockResolvedValueOnce({ release: oldRelease });
+  expect(await enter('first')).toBe(true);
+  io.acquire.mockResolvedValueOnce({ release: failedRelease });
+  io.prepare.mockRejectedValueOnce(new Error('download refused'));
+  await expect(enter('second')).rejects.toThrow('download refused');
+  expect(failedRelease).toHaveBeenCalledOnce();
+  expect(oldRelease).not.toHaveBeenCalled();
 });

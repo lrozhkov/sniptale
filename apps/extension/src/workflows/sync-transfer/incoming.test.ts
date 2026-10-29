@@ -1,3 +1,8 @@
+vi.mock('../../composition/persistence/sync-capture/apply-video-project', () => ({
+  loadProjectReplicaExport: vi.fn(async () => null),
+}));
+import { createProjectExportEntry } from '../../composition/persistence/projects/index.test-support';
+import { MissingAssetObjectError } from '../../composition/persistence/assets';
 import { parseScenarioAssetEntry } from '../../composition/persistence/scenario/read-guards';
 import { createGuideProject } from '../../features/scenario/project/factories';
 import { createScenarioProjectEntry } from '../../composition/persistence/scenario/projects/entry';
@@ -32,6 +37,12 @@ const io = vi.hoisted(() => ({
   predecessor: vi.fn(),
   scenarioPredecessor: vi.fn(),
   releaseReader: vi.fn(),
+  unloaded: vi.fn(),
+  restoreStaged: vi.fn(),
+}));
+vi.mock('./native-residency', () => ({
+  hasUnloadedNativeEditingRoot: io.unloaded,
+  restoreStagedNativeOriginal: io.restoreStaged,
 }));
 vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
   runWithAssetResourceRead: async (operation: () => Promise<unknown>) => {
@@ -73,6 +84,8 @@ vi.mock('../media-hub-backup/v6/staging', () => ({ stageRootObjects: io.stage })
 beforeEach(() => {
   vi.clearAllMocks();
   resetIncomingTestIO(io);
+  io.unloaded.mockReset().mockResolvedValue(false);
+  io.restoreStaged.mockReset().mockResolvedValue(false);
 });
 
 it('stages a media original and uses the stable logical digest for the native journal', async () => {
@@ -443,7 +456,7 @@ it('persists native connection authorization without using sender generation cou
   expect(journal.payload.input.expectedLocalGeneration).toBe(0);
 });
 
-it.each([false, true])(
+it.each([false, true, 'permission'] as const)(
   'keeps exact predecessor Scenario bytes only after streamed verification, changed body: %s',
   async (changed) => {
     const project = createGuideProject('Renamed guide', 'scenario-source', 1);
@@ -486,11 +499,16 @@ it.each([false, true])(
         },
       ];
     });
-    io.read.mockResolvedValueOnce(
-      new File([new Uint8Array(changed ? [1, 2, 3] : [0, 0, 0])], 'body.png', { type: 'image/png' })
-    );
+    if (changed === 'permission')
+      io.read.mockRejectedValueOnce(new DOMException('Read denied', 'NotAllowedError'));
+    else
+      io.read.mockResolvedValueOnce(
+        new File([new Uint8Array(changed ? [1, 2, 3] : [0, 0, 0])], 'body.png', {
+          type: 'image/png',
+        })
+      );
     const read = vi.fn(async () => new Blob([new Uint8Array(3)]).stream());
-    const journal = await prepareCatalogReplica({
+    const receiving = prepareCatalogReplica({
       rootKind: 'scenario-project',
       rootId: project.id,
       catalog: {
@@ -511,6 +529,12 @@ it.each([false, true])(
         dependencies: [],
       },
     });
+    if (changed === 'permission') {
+      await expect(receiving).rejects.toMatchObject({ name: 'NotAllowedError' });
+      expect(io.stage).not.toHaveBeenCalled();
+      return;
+    }
+    const journal = await receiving;
     expect(journal.payload.kind).toBe('scenario-project');
     if (journal.payload.kind !== 'scenario-project')
       throw new Error('Expected native Scenario publication');
@@ -521,3 +545,170 @@ it.each([false, true])(
     expect(io.read).toHaveBeenCalled();
   }
 );
+
+it.each(['missing-root', 'missing-file'] as const)(
+  'stages the current original when predecessor reuse finds missing local bytes: %s',
+  async (kind) => {
+    const f = await fixture();
+    const original = ref('unloaded-original');
+    io.predecessor.mockResolvedValue(original);
+    io.read.mockRejectedValue(
+      kind === 'missing-root'
+        ? new MissingAssetObjectError(original.assetId)
+        : new DOMException('Missing', 'NotFoundError')
+    );
+    const journal = await prepareCatalogReplica({
+      ...f,
+      admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+      rootKind: 'media',
+      rootId: mediaId,
+      signal: new AbortController().signal,
+    });
+    if (journal.payload.kind !== 'media') throw new Error('Expected media');
+    expect(journal.payload.input.rows.ref.assetId).toBe('staged-original');
+    expect(f.reads).toEqual(f.selected.objects.map((item) => item.remoteKey));
+    expect(io.read).toHaveBeenCalledTimes(1);
+    expect(io.discard).not.toHaveBeenCalled();
+  }
+);
+
+it('propagates predecessor read refusal without staging or treating it as a cache miss', async () => {
+  const f = await fixture();
+  io.predecessor.mockResolvedValue(ref('retained-original'));
+  const failure = new DOMException('Refused', 'NotAllowedError');
+  io.read.mockRejectedValue(failure);
+  await expect(
+    prepareCatalogReplica({
+      ...f,
+      admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+      rootKind: 'media',
+      rootId: mediaId,
+      signal: new AbortController().signal,
+    })
+  ).rejects.toBe(failure);
+  expect(f.reads).toEqual([]);
+  expect(io.stage).not.toHaveBeenCalled();
+  expect(io.journal).not.toHaveBeenCalled();
+});
+
+it('refuses a background source that became unloaded before staging under its reader', async () => {
+  const f = await fixture();
+  io.unloaded.mockResolvedValue(true);
+  await expect(
+    prepareCatalogReplica({
+      ...f,
+      rootKind: 'media',
+      rootId: mediaId,
+      residentOnly: true,
+      signal: new AbortController().signal,
+    })
+  ).rejects.toThrow('requires resident');
+  expect(io.unloaded).toHaveBeenCalledWith({ rootKind: 'media', rootId: mediaId });
+  expect(io.stage).not.toHaveBeenCalled();
+  expect(f.reads).toEqual([]);
+  expect(io.reading).toBe(false);
+});
+
+it('preserves shared original identity when incoming restores unloaded bytes', async () => {
+  const f = await fixture();
+  const original = ref('unloaded-shared-original');
+  io.predecessor.mockResolvedValue(original);
+  io.read.mockRejectedValue(new MissingAssetObjectError(original.assetId));
+  io.restoreStaged.mockResolvedValue(true);
+  const journal = await prepareCatalogReplica({
+    ...f,
+    admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+    rootKind: 'media',
+    rootId: mediaId,
+    signal: new AbortController().signal,
+  });
+  if (journal.payload.kind !== 'media') throw new Error('Expected media');
+  expect(journal.payload.input.rows.ref.assetId).toBe(original.assetId);
+  expect(io.restoreStaged).toHaveBeenCalledWith(
+    expect.objectContaining({
+      ref: original,
+      sourceRef: expect.objectContaining({ assetId: 'staged-original' }),
+      sha256: sha,
+    })
+  );
+  expect(io.discard).toHaveBeenCalledExactlyOnceWith('staged-original');
+  expect(f.reads).toEqual(f.selected.objects.map((item) => item.remoteKey));
+});
+
+it('does not publish or replace a shared original after native recovery refusal', async () => {
+  const f = await fixture();
+  const original = ref('unloaded-shared-original');
+  io.predecessor.mockResolvedValue(original);
+  io.read.mockRejectedValue(new MissingAssetObjectError(original.assetId));
+  io.restoreStaged.mockRejectedValue(new Error('Native source changed'));
+  await expect(
+    prepareCatalogReplica({
+      ...f,
+      admission: { ...f.admission, expectedLocalGeneration: 1, expectedBasis: ['media-op'] },
+      rootKind: 'media',
+      rootId: mediaId,
+      signal: new AbortController().signal,
+    })
+  ).rejects.toThrow('Native source changed');
+  expect(io.journal).not.toHaveBeenCalled();
+  expect(io.discard).toHaveBeenCalledExactlyOnceWith('staged-original');
+  expect(io.discard).not.toHaveBeenCalledWith(original.assetId);
+});
+
+it('restores a parent-retained export to the same native identity on its first media enrollment', async () => {
+  const f = await fixture();
+  const original = ref('parent-retained-export');
+  const { assetId: _assetId, ...projectExport } = createProjectExportEntry({
+    id: 'saved',
+    projectId: 'parent',
+    assetId: original.assetId,
+    mimeType: original.mimeType,
+    size: original.size,
+  });
+  const base = mediaEnvelope();
+  const id = 'export:saved';
+  const selected = await attempt(
+    parseRootEnvelope({
+      ...base.envelope,
+      descriptor: { ...base.envelope.descriptor, rootId: id },
+      metadata: {
+        entry: {
+          ...base.entry,
+          id,
+          kind: 'export',
+          source: { kind: 'project-export', exportId: 'saved', projectId: 'parent' },
+        },
+        projectExport,
+        originalObjectId: 'original',
+      },
+    }),
+    'export-op'
+  );
+  const data = new Map(
+    selected.objects.map((item) => [item.remoteKey, new Blob([new Uint8Array(3)])])
+  );
+  const catalog = { ...f.catalog, ...projectSyncCatalog('space', [selected]) };
+  io.predecessor.mockResolvedValue(original);
+  io.read.mockRejectedValue(new MissingAssetObjectError(original.assetId));
+  io.restoreStaged.mockResolvedValue(true);
+  const journal = await prepareCatalogReplica({
+    ...f,
+    catalog,
+    remote: { ...f.remote, read: async (key: string) => data.get(key)!.stream() },
+    rootKind: 'media',
+    rootId: id,
+    signal: new AbortController().signal,
+  });
+  if (journal.payload.kind !== 'media') throw new Error('Expected media.');
+  expect(journal.payload.input.rows.ref).toEqual(original);
+  expect(io.predecessor).toHaveBeenCalledWith(
+    expect.objectContaining({
+      expectedLocalGeneration: 0,
+      exportSource: { projectId: 'parent', sha256: sha },
+    })
+  );
+  expect(io.restoreStaged).toHaveBeenCalledWith(
+    expect.objectContaining({ ref: original, sha256: sha })
+  );
+  expect(io.discard).toHaveBeenCalledExactlyOnceWith('staged-original');
+});

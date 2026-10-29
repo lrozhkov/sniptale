@@ -6,6 +6,7 @@ import {
   publishSyncProductSettled,
   subscribeToWorkspaceSettled,
   subscribeToSyncQueueSettled,
+  subscribeToSyncProductSettled,
 } from './sync-product-client';
 
 const send = vi.hoisted(() => vi.fn());
@@ -197,4 +198,65 @@ it('admits bounded native queue identities while preserving product and workspac
   unsubscribe();
   unsubscribeWorkspace();
   expect(Channel.live.size).toBe(0);
+});
+
+it('sends only logical cache commands through the existing transport', async () => {
+  send.mockResolvedValue({ success: true, result: { kind: 'accepted', requestId: ids[0] } });
+  const client = createSyncProductClient();
+  const root = { rootKind: 'media' as const, rootId: 'asset' };
+  await client.readCacheStatus();
+  await client.setCacheBudget(0, 3);
+  await client.trimCache();
+  await client.readNativeCacheRoot(root);
+  await client.pinNative(root, true);
+  await client.releaseNative(root);
+  expect(send.mock.calls.map(([request]) => request.command)).toEqual([
+    { kind: 'cache-status' },
+    { kind: 'cache-budget', budgetBytes: 0, revision: 3 },
+    { kind: 'cache-trim' },
+    { kind: 'cache-root-status', root },
+    { kind: 'cache-pin', root, pinned: true },
+    { kind: 'native-release', root },
+  ]);
+});
+
+it('observes only product completion and releases its advisory subscription', () => {
+  const changed = vi.fn();
+  const dispose = subscribeToSyncProductSettled(changed);
+  publishSyncProductSettled(ids[0]!, 'queue');
+  publishSyncProductSettled(ids[0]!, 'workspace');
+  publishSyncProductSettled(ids[0]!, 'product');
+  expect(changed).toHaveBeenCalledOnce();
+  expect(send).not.toHaveBeenCalled();
+  dispose();
+  publishSyncProductSettled(ids[0]!, 'product');
+  expect(changed).toHaveBeenCalledOnce();
+});
+
+it('sends local-only identity and native preparation without provider authority', async () => {
+  send.mockResolvedValue({ success: true, result: { kind: 'local-only', history: 'incomplete' } });
+  const client = createSyncProductClient();
+  const expected = { incarnation: ids[0]!, revision: 7 };
+  const root = { rootKind: 'media' as const, rootId: 'native-id' };
+  const selection = {
+    rootKind: 'media' as const,
+    rootId: 'remote-id',
+    operationId: 'selected-op',
+    sourceDigest: 'a'.repeat(64),
+  };
+  await expect(client.switchToLocalOnly(expected)).resolves.toEqual({
+    kind: 'local-only',
+    history: 'incomplete',
+  });
+  await client.prepareNative(root);
+  await client.prepareNativeBackup(root);
+  await client.prepareReplica(selection, true);
+  await client.prepareReplica(selection);
+  expect(send.mock.calls.map(([request]) => request.command)).toEqual([
+    { kind: 'connection-local-only', expected },
+    { kind: 'native-prepare', root },
+    { kind: 'backup-prepare', root },
+    { kind: 'replica-prepare', selection, preserveNative: true },
+    { kind: 'replica-prepare', selection },
+  ]);
 });

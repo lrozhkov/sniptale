@@ -10,14 +10,43 @@ import { hashSyncText } from './wire-record';
 
 const io = vi.hoisted(() => ({
   admit: vi.fn(),
+  materialized: vi.fn(),
   receipt: vi.fn(),
   prepare: vi.fn(),
   publish: vi.fn(),
   cancel: vi.fn(),
+  nativeReady: vi.fn(),
+  nativePrepare: vi.fn(),
+  connection: vi.fn(),
+  reading: false,
   events: [] as string[],
+}));
+vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<
+    typeof import('../../composition/persistence/infrastructure/indexed-db/core')
+  >()),
+  initDB: vi.fn(async () => ({})),
+}));
+vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
+  runWithAssetResourceRead: async (operation: () => Promise<unknown>) => {
+    io.reading = true;
+    try {
+      return await operation();
+    } finally {
+      io.reading = false;
+    }
+  },
+}));
+vi.mock('../../composition/persistence/remote-connection/store', () => ({
+  loadSyncConnection: io.connection,
+}));
+vi.mock('./native-residency', () => ({
+  isNativeEditingRootReady: io.nativeReady,
+  prepareNativeEditingRoot: io.nativePrepare,
 }));
 vi.mock('../../composition/persistence/sync-capture/catalog-admission', () => ({
   loadCatalogReplicaAdmission: io.admit,
+  loadMaterializedCatalogSelections: io.materialized,
   hasCatalogReplicaReceipt: io.receipt,
 }));
 vi.mock('./incoming', () => ({ prepareCatalogReplica: io.prepare }));
@@ -133,7 +162,27 @@ function fixture(project = true) {
 beforeEach(() => {
   vi.clearAllMocks();
   io.events = [];
+  io.reading = false;
+  io.nativeReady.mockResolvedValue(true);
+  io.nativePrepare.mockResolvedValue({ downloaded: 1 });
+  const f = fixture();
+  io.connection.mockResolvedValue({
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    phase: 'active',
+    binding: {
+      ...f.scope,
+      provider: 'webdav',
+      rootUrl: 'https://dav.example.test/root/',
+      accountId: 'alice',
+    },
+    identity: f.authorization,
+    credentialId: '20000000-0000-4000-8000-000000000001',
+    updateNonce: null,
+  });
   io.receipt.mockResolvedValue(false);
+  io.materialized.mockResolvedValue([]);
   io.admit.mockImplementation(async ({ rootId }) => {
     io.events.push(`admit:${rootId}`);
     return {
@@ -283,7 +332,7 @@ it('preserves a committed selected root when cleanup fails after cancellation', 
     f.controller.abort();
     throw new Error('Cleanup failed');
   });
-  io.receipt.mockResolvedValue(true);
+  io.receipt.mockResolvedValueOnce(false).mockResolvedValue(true);
   await expect(receiveSelectedCatalogRoot(f)).resolves.toEqual({
     rootKind: 'media',
     rootId: 'source',
@@ -360,4 +409,130 @@ it('commits a compatible Scenario prerequisite before Montage admission using it
   f.catalog.roots.get(syncCatalogRootKey('scenario-project', 'scenario'))!.heads.push('missing');
   await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('dependency is unavailable');
   expect(io.admit).not.toHaveBeenCalled();
+});
+
+it('skips replica staging and native import when the selected receipt already exists', async () => {
+  const f = fixture(false);
+  io.receipt.mockResolvedValue(true);
+  expect(await receiveSelectedCatalogRoot(f)).toEqual({
+    rootKind: f.selection.rootKind,
+    rootId: f.selection.rootId,
+    operationId: f.selection.operationId,
+  });
+  expect(io.admit).not.toHaveBeenCalled();
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
+});
+
+it('passes the resident-only background policy to the preparation owner', async () => {
+  const f = fixture(false);
+  await receiveSelectedCatalogRoot({ ...f, residentOnly: true });
+  expect(io.prepare).toHaveBeenCalledWith(expect.objectContaining({ residentOnly: true }));
+});
+
+it('full backup refuses an existing dependency predecessor before staging or publishing a successor', async () => {
+  const args = fixture();
+  io.admit.mockResolvedValue({ expectedLocalGeneration: 2, expectedWorkspaceRevision: null });
+  await expect(receiveSelectedCatalogRoot({ ...args, preserveNative: true })).rejects.toThrow(
+    'preserves existing'
+  );
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
+});
+it('full backup reuses an exactly current native dependency without rewriting it', async () => {
+  const args = fixture();
+  io.materialized.mockImplementation(async ({ selections }) =>
+    selections[0].rootId === 'source' ? selections : []
+  );
+  await receiveSelectedCatalogRoot({ ...args, preserveNative: true });
+  expect(io.admit).toHaveBeenCalledTimes(1);
+  expect(io.admit).toHaveBeenCalledWith(expect.objectContaining({ rootId: 'parent' }));
+  expect(io.prepare).toHaveBeenCalledTimes(1);
+});
+
+it('prepares a received dependency under the same reader before parent admission and publication', async () => {
+  const f = fixture();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  io.nativePrepare.mockImplementation(async (input) => {
+    expect(io.reading).toBe(true);
+    expect(input.authorization).toEqual(f.authorization);
+    expect(input.root.rootId).toBe('source');
+    io.events.push('restore:source');
+  });
+  const admit = io.admit.getMockImplementation()!;
+  io.admit.mockImplementation(async (input) => {
+    expect(io.reading).toBe(true);
+    return admit(input);
+  });
+  const publish = io.publish.getMockImplementation()!;
+  io.publish.mockImplementation(async (journal) => {
+    expect(io.reading).toBe(true);
+    return publish(journal);
+  });
+  await receiveSelectedCatalogRoot(f);
+  expect(io.events).toEqual(['restore:source', 'admit:parent', 'prepare:parent', 'commit:parent']);
+  expect(io.reading).toBe(false);
+});
+
+it('keeps residentOnly receipt replay from downloading an unloaded dependency', async () => {
+  const f = fixture();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  await expect(receiveSelectedCatalogRoot({ ...f, residentOnly: true })).rejects.toThrow(
+    'resident dependencies'
+  );
+  expect(io.nativePrepare).not.toHaveBeenCalled();
+  expect(io.connection).not.toHaveBeenCalled();
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(f.remote.read).not.toHaveBeenCalled();
+  expect(io.reading).toBe(false);
+});
+
+it('preserves a dependency receipt on preparation refusal and permits exact parent retry', async () => {
+  const f = fixture();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  io.nativePrepare.mockRejectedValueOnce(new Error('Temporary source refusal'));
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('Temporary source refusal');
+  expect(io.admit).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
+  expect(io.reading).toBe(false);
+  await receiveSelectedCatalogRoot(f);
+  expect(io.nativePrepare).toHaveBeenCalledTimes(2);
+  expect(io.publish).toHaveBeenCalledOnce();
+});
+
+it('retains the reader until cancelled dependency preparation drains and prevents parent admission', async () => {
+  const f = fixture();
+  const held = deferred();
+  const started = deferred();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  io.nativePrepare.mockImplementation(async () => {
+    started.resolve();
+    await held.promise;
+  });
+  const operation = receiveSelectedCatalogRoot(f);
+  const refused = expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+  await started.promise;
+  f.controller.abort();
+  expect(io.reading).toBe(true);
+  expect(io.admit).not.toHaveBeenCalled();
+  held.resolve();
+  await refused;
+  expect(io.reading).toBe(false);
+  expect(io.publish).not.toHaveBeenCalled();
+});
+
+it('refuses changed connection identity before preparing a received dependency', async () => {
+  const f = fixture();
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  const connection = await io.connection();
+  io.connection.mockResolvedValue({ ...connection, identity: { ...f.authorization, revision: 2 } });
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('authorization changed');
+  expect(io.nativePrepare).not.toHaveBeenCalled();
+  expect(io.publish).not.toHaveBeenCalled();
+  expect(io.reading).toBe(false);
 });

@@ -1,3 +1,9 @@
+import type {
+  SyncCacheStatus,
+  SyncCacheRootStatus,
+  SyncCacheReleaseResult,
+  SyncCacheTrimResult,
+} from '../../../sync-cache';
 import type { RuntimeMessageResponse } from '@sniptale/runtime-contracts/messaging/contracts/response';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type {
@@ -179,10 +185,16 @@ export interface SyncRemoteCatalogCard {
   deleted: boolean;
 }
 
+export type SyncNativeEditingRoot = Pick<SyncRemoteSelection, 'rootKind' | 'rootId'>;
+
 export type SyncProductWork =
+  | { kind: 'backup-prepare'; root: SyncNativeEditingRoot }
+  | { kind: 'native-release'; root: SyncNativeEditingRoot }
+  | { kind: 'cache-trim' }
+  | { kind: 'native-prepare'; root: SyncNativeEditingRoot }
   | { kind: 'automatic-sync' }
   | { kind: 'catalog-refresh'; bypassCache: boolean }
-  | { kind: 'replica-prepare'; selection: SyncRemoteSelection }
+  | { kind: 'replica-prepare'; selection: SyncRemoteSelection; preserveNative?: true }
   | { kind: 'thumbnail-read'; selection: SyncRemoteSelection }
   | {
       kind: 'conflict-resolve';
@@ -191,6 +203,10 @@ export type SyncProductWork =
       resolutionId: string;
     };
 export type SyncProductCommand =
+  | { kind: 'cache-status' }
+  | { kind: 'cache-budget'; budgetBytes: number; revision: number }
+  | { kind: 'cache-root-status'; root: SyncNativeEditingRoot }
+  | { kind: 'cache-pin'; root: SyncNativeEditingRoot; pinned: boolean }
   | {
       kind: 'workspace-create';
       parentUrl: string;
@@ -215,6 +231,7 @@ export type SyncProductCommand =
     }
   | { kind: 'workspace-abandon'; source: SyncWorkspaceSource }
   | { kind: 'status' }
+  | { kind: 'connection-local-only'; expected: SyncConnectionIdentity }
   | Exclude<SyncProductWork, { kind: 'automatic-sync' }>
   | { kind: 'inspect'; requestId: string; advisory?: true }
   | { kind: 'cancel'; requestId: string; advisory?: true };
@@ -224,6 +241,9 @@ export type SyncProductFailureCode =
   | 'unavailable'
   | 'invalid-data';
 export type SyncProductCompletion =
+  | { kind: 'native-release'; root: SyncNativeEditingRoot; result: SyncCacheReleaseResult }
+  | { kind: 'cache-trim'; result: SyncCacheTrimResult }
+  | { kind: 'native'; root: SyncNativeEditingRoot }
   | { kind: 'automatic'; applied: number; deferred: number; remaining: boolean }
   | { kind: 'resolution'; operationId: string }
   | { kind: 'catalog'; count: number }
@@ -248,8 +268,17 @@ export interface SyncProductStatus {
     accountId: string;
   } | null;
   workspaceJob: SyncWorkspaceJobSnapshot | null;
+  products: SyncProductJobSnapshot[];
 }
 export type SyncProductResult =
+  | { kind: 'local-only'; history: 'delivered' | 'incomplete' }
+  | {
+      kind: 'local-only-refused';
+      code: 'missing-bytes' | 'local-changed' | 'pending-outgoing' | 'invalid-data';
+    }
+  | { kind: 'cache-status'; status: SyncCacheStatus }
+  | { kind: 'cache-budget'; budgetBytes: number; revision: number }
+  | { kind: 'cache-root'; status: SyncCacheRootStatus }
   | { kind: 'accepted'; requestId: string }
   | { kind: 'status'; status: SyncProductStatus }
   | { kind: 'enrolled' }

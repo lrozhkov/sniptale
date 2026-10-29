@@ -149,3 +149,9 @@ export interface ArchiveCentralDirectoryIdentity {
   path: string;
   size: number;
 }
+
+/** Product archive preparation uses logical roots; inventory remains the selection authority. */
+export type MediaHubBackupRootPreparation = (root: {
+  rootKind: 'media' | 'video-review' | 'video-project' | 'scenario-project';
+  rootId: string;
+}) => Promise<void>;

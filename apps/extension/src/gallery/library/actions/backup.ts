@@ -1,4 +1,10 @@
 import {
+  planRetainedLibrary,
+  RetainedLibraryNotReadyError,
+  prepareRetainedLibrary,
+} from '../../../workflows/sync-transfer/retained-library';
+import { runWithAssetResourceRead } from '../../../composition/persistence/assets/resource-sessions';
+import {
   createMediaHubBackupExportOptions,
   exportMediaHubBackup,
   importMediaHubBackup,
@@ -102,9 +108,20 @@ export function createExportBackupAction(
       async () => {
         try {
           const options = createInitialBackupExportOptions(controller);
-          const summary = await inspectLocalMediaHubBackup(options);
-          controller.actions.surface.setPendingExport({ options, summary });
+          const preparation =
+            options.scope === 'all' &&
+            typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' &&
+            __SNIPTALE_SECURITY_E2E__
+              ? await planRetainedLibrary()
+              : null;
+          if (preparation) {
+            controller.actions.surface.setPendingExport({ options, summary: null, preparation });
+          } else {
+            const summary = await inspectLocalMediaHubBackup(options);
+            controller.actions.surface.setPendingExport({ options, summary });
+          }
         } catch (error) {
+          if (error instanceof RetainedLibraryNotReadyError) throw error;
           throw backupFailure(error, 'prepare');
         }
       },
@@ -121,13 +138,19 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
         controller.actions.surface.replaceActiveBackupExport(abortController);
         let phase: 'prepare' | 'write' = 'prepare';
         try {
-          const summary = await inspectLocalMediaHubBackup(options);
-          if (abortController.signal.aborted) {
-            return;
-          }
-          controller.actions.surface.setPendingExport({ options, summary });
-          phase = 'write';
-          await exportMediaHubBackup(options, { signal: abortController.signal });
+          const preparation = controller.state.storage.pendingExport?.preparation;
+          await runWithAssetResourceRead(async () => {
+            if (preparation) {
+              await prepareRetainedLibrary(preparation, abortController.signal);
+            } else {
+              const summary = await inspectLocalMediaHubBackup(options);
+              abortController.signal.throwIfAborted();
+              controller.actions.surface.setPendingExport({ options, summary });
+            }
+            abortController.signal.throwIfAborted();
+            phase = 'write';
+            await exportMediaHubBackup(options, { signal: abortController.signal });
+          });
           if (abortController.signal.aborted) {
             return;
           }
@@ -136,6 +159,7 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
         } catch (error) {
           if (abortController.signal.aborted)
             throw new DOMException('Media backup export cancelled.', 'AbortError');
+          if (error instanceof RetainedLibraryNotReadyError) throw error;
           throw backupFailure(error, phase);
         } finally {
           controller.actions.surface.releaseActiveBackupExport(abortController);

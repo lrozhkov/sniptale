@@ -159,7 +159,11 @@ export async function runSyncQueueOperation(input: {
             status: 'finished',
             operation: await completeSyncQueueRun(run, { kind: 'verified', result: accepted }),
           };
-        const prepared = await prepareCapturedOutgoing(capture);
+        const prepared = await prepareCapturedOutgoing(capture, {
+          remote: admitRemote(remote, run, signal, authorize, 'preparing'),
+          ...(authorization ? { authorization } : {}),
+          signal,
+        });
         if (input.loadCatalog) {
           await advanceSyncQueueRun(run, 'checking');
           catalog = await input.loadCatalog(
@@ -222,7 +226,7 @@ function admitRemote(
   run: SyncQueueRun,
   signal: AbortSignal,
   authorize: () => Promise<void>,
-  readStage?: 'checking'
+  readStage?: 'checking' | 'preparing'
 ): SyncRemoteStore {
   const admit = async (stage: SyncQueueStage) => {
     signal.throwIfAborted();

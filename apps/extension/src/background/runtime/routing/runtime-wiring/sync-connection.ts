@@ -1,3 +1,5 @@
+import { deliverRetiringSyncQueueHistory } from '../../../../workflows/sync-transfer/queue-history';
+import { completeSyncLocalOnly } from '../../../../composition/persistence/remote-connection/local-only';
 import { subscribeToSyncQueueSettled } from '../../../../platform/runtime-messaging/sync-product-client';
 import { configureSyncProductRoute } from '../../../sync-connection/product-route';
 import {
@@ -163,6 +165,16 @@ export function initializeSyncConnectionRuntime(state: BackgroundModeState): voi
       return { kind: 'join', identity: join.identity };
     },
     loadConnection: loadSyncConnection,
+    completeLocalOnly: async (connection) => {
+      await deliverRetiringSyncQueueHistory(connection.binding);
+      const history = await completeSyncLocalOnly(connection);
+      try {
+        logger.info(`sync.connection.local-only history=${history}`);
+      } catch {
+        // A committed detach cannot become a refusal because diagnostics failed.
+      }
+      return history;
+    },
     loadWorkspace: loadSyncWorkspaceSelection,
     revokeWorkspace: async (source) => {
       if (source.kind === 'allocation')

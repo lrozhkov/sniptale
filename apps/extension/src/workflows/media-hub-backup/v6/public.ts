@@ -15,7 +15,11 @@ import type { ArchiveRestoreStrategy } from '../../../composition/persistence/as
 import { recoverAssetPublications } from '../../../composition/persistence/asset-publication-recovery';
 import { translate } from '../../../platform/i18n';
 import { createMediaHubBackupExportOptions } from './options';
-import type { MediaHubBackupExportOptions, MediaHubLocalBackupSummary } from './contracts';
+import type {
+  MediaHubBackupExportOptions,
+  MediaHubLocalBackupSummary,
+  MediaHubBackupRootPreparation,
+} from './contracts';
 import { buildMediaHubBackupExportPlanFromLibraryV6 } from './inventory';
 import { exportMediaHubBackupV6 } from './export';
 import { inspectMediaHubBackupV6 } from './inspect';
@@ -33,6 +37,16 @@ import { videoProjectRootPublisher } from './root-publication/video-project';
 import { listGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
 import { runWithScenarioResourceRead } from '../../../composition/persistence/scenario/resource-sessions';
 import { backfillScenarioLibraryAssets } from '../../../composition/persistence/scenario/library-publication';
+
+function productBackupPreparation(signal?: AbortSignal): MediaHubBackupRootPreparation | undefined {
+  if (typeof __SNIPTALE_SECURITY_E2E__ === 'undefined' || !__SNIPTALE_SECURITY_E2E__)
+    return undefined;
+  return async (root) => {
+    const { ensureNativeBackupRootAvailable } =
+      await import('../../sync-transfer/editing-admission');
+    await ensureNativeBackupRootAvailable(root, signal);
+  };
+}
 
 export type MediaHubImportConflictStrategy = ArchiveRestoreStrategy;
 
@@ -64,8 +78,9 @@ export async function inspectLocalMediaHubBackup(
   await recoverAssetPublications();
   await backfillScenarioLibraryAssets();
   const options = createMediaHubBackupExportOptions(rawOptions);
+  const prepareRoot = productBackupPreparation();
   const plan = await runWithScenarioResourceRead(() =>
-    buildMediaHubBackupExportPlanFromLibraryV6(options)
+    buildMediaHubBackupExportPlanFromLibraryV6(options, prepareRoot ? { prepareRoot } : {})
   );
   const summary = plan.roots.reduce(
     (total, root) => ({
@@ -145,7 +160,11 @@ export async function exportMediaHubBackup(
       mimeType: 'application/zip',
     });
     try {
-      const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options, runtime);
+      const prepareRoot = productBackupPreparation(runtime.signal);
+      const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options, {
+        ...runtime,
+        ...(prepareRoot ? { prepareRoot } : {}),
+      });
       await exportMediaHubBackupV6({
         plan,
         sink,

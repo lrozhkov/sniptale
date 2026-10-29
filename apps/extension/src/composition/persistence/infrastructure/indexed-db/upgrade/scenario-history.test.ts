@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
+  ASSET_RESIDENCY_STORE,
   SYNC_CAPTURE_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_OUTBOX_STORE,
@@ -49,6 +50,7 @@ it('adds only an empty scenario history store before publishing the current cont
     [SYNC_OUTBOX_STORE, { keyPath: 'key' }],
     [SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' }],
     [SYNC_CONNECTION_STORE, { keyPath: 'key' }],
+    [ASSET_RESIDENCY_STORE, { keyPath: 'id' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],
