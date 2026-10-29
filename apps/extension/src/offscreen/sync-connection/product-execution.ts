@@ -1,4 +1,4 @@
-import { readCurrentExecutionConnection } from './execution';
+import { readCurrentExecutionConnection } from './connection-admission';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { releaseNativeEditingRoot } from '../../workflows/sync-transfer/native-cache';
 import { trimNativeCache } from '../../workflows/sync-transfer/native-cache-policy';

@@ -32,6 +32,213 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 
 ## Production dependency licenses
 
+### `@ai-sdk/alibaba` 2.0.69
+
+- Installed path: `node_modules/@ai-sdk/alibaba`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/alibaba/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__alibaba-2.0.69.txt`](LICENSES/dependencies/@ai-sdk__alibaba-2.0.69.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/anthropic` 4.0.82
+
+- Installed path: `node_modules/@ai-sdk/anthropic`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/anthropic/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__anthropic-4.0.82.txt`](LICENSES/dependencies/@ai-sdk__anthropic-4.0.82.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/cohere` 4.0.63
+
+- Installed path: `node_modules/@ai-sdk/cohere`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/cohere/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__cohere-4.0.63.txt`](LICENSES/dependencies/@ai-sdk__cohere-4.0.63.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/deepgram` 3.1.33
+
+- Installed path: `node_modules/@ai-sdk/deepgram`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/deepgram/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__deepgram-3.1.33.txt`](LICENSES/dependencies/@ai-sdk__deepgram-3.1.33.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/deepseek` 3.0.67
+
+- Installed path: `node_modules/@ai-sdk/deepseek`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/deepseek/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__deepseek-3.0.67.txt`](LICENSES/dependencies/@ai-sdk__deepseek-3.0.67.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/elevenlabs` 3.0.63
+
+- Installed path: `node_modules/@ai-sdk/elevenlabs`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/elevenlabs/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__elevenlabs-3.0.63.txt`](LICENSES/dependencies/@ai-sdk__elevenlabs-3.0.63.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/gateway` 4.0.116
+
+- Installed path: `node_modules/@ai-sdk/gateway`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/gateway/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__gateway-4.0.116.txt`](LICENSES/dependencies/@ai-sdk__gateway-4.0.116.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/google` 4.0.99
+
+- Installed path: `node_modules/@ai-sdk/google`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/google/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__google-4.0.99.txt`](LICENSES/dependencies/@ai-sdk__google-4.0.99.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/minimax` 3.0.59
+
+- Installed path: `node_modules/@ai-sdk/minimax`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/minimax/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__minimax-3.0.59.txt`](LICENSES/dependencies/@ai-sdk__minimax-3.0.59.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/mistral` 4.0.66
+
+- Installed path: `node_modules/@ai-sdk/mistral`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/mistral/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__mistral-4.0.66.txt`](LICENSES/dependencies/@ai-sdk__mistral-4.0.66.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/moonshotai` 3.0.71
+
+- Installed path: `node_modules/@ai-sdk/moonshotai`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/moonshotai/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__moonshotai-3.0.71.txt`](LICENSES/dependencies/@ai-sdk__moonshotai-3.0.71.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/openai` 4.0.96
+
+- Installed path: `node_modules/@ai-sdk/openai`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/openai/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__openai-4.0.96.txt`](LICENSES/dependencies/@ai-sdk__openai-4.0.96.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/openai-compatible` 3.0.71
+
+- Installed path: `node_modules/@ai-sdk/openai-compatible`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/openai-compatible/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__openai-compatible-3.0.71.txt`](LICENSES/dependencies/@ai-sdk__openai-compatible-3.0.71.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/provider` 4.0.29
+
+- Installed path: `node_modules/@ai-sdk/provider`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/provider/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__provider-4.0.29.txt`](LICENSES/dependencies/@ai-sdk__provider-4.0.29.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/provider-utils` 5.0.62
+
+- Installed path: `node_modules/@ai-sdk/provider-utils`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `pinned-upstream`
+- License source: `tooling/release/dependency-legal/sources/ai-provider-utils-5.0.62.LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__provider-utils-5.0.62.txt`](LICENSES/dependencies/@ai-sdk__provider-utils-5.0.62.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+- Immutable license origin: https://raw.githubusercontent.com/vercel/ai/%40ai-sdk%2Fprovider-utils%405.0.62/LICENSE
+- Upstream license version: `@ai-sdk/provider-utils@5.0.62`
+- Pinned source SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+
+### `@ai-sdk/xai` 5.0.24
+
+- Installed path: `node_modules/@ai-sdk/xai`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/xai/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__xai-5.0.24.txt`](LICENSES/dependencies/@ai-sdk__xai-5.0.24.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
+### `@ai-sdk/zai` 3.0.33
+
+- Installed path: `node_modules/@ai-sdk/zai`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@ai-sdk/zai/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@ai-sdk__zai-3.0.33.txt`](LICENSES/dependencies/@ai-sdk__zai-3.0.33.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
+
 ### `@fontsource/marck-script` 5.3.0
 
 - Installed path: `node_modules/@fontsource/marck-script`
@@ -95,6 +302,42 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec`
 - Repository/source: https://github.com/paulmillr/noble-hashes.git
 
+### `@openrouter/ai-sdk-provider` 3.1.0
+
+- Installed path: `node_modules/@openrouter/ai-sdk-provider`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@openrouter/ai-sdk-provider/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@openrouter__ai-sdk-provider-3.1.0.txt`](LICENSES/dependencies/@openrouter__ai-sdk-provider-3.1.0.txt)
+- License text SHA-256: `dc5d6874c25b4d5af22aa7bb9a18422bc86c7516c80056c1788fc120c4121f72`
+- Repository/source: https://github.com/OpenRouterTeam/ai-sdk-provider.git
+
+### `@standard-schema/spec` 1.1.0
+
+- Installed path: `node_modules/@standard-schema/spec`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@standard-schema/spec/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@standard-schema__spec-1.1.0.txt`](LICENSES/dependencies/@standard-schema__spec-1.1.0.txt)
+- License text SHA-256: `653b779005a3a4d64a7288c940f7b9a0e8f0b1e0375f6aa6af9473caf131e564`
+- Repository/source: https://github.com/standard-schema/standard-schema
+
+### `@vercel/oidc` 3.2.0
+
+- Installed path: `node_modules/@vercel/oidc`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@vercel/oidc/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@vercel__oidc-3.2.0.txt`](LICENSES/dependencies/@vercel__oidc-3.2.0.txt)
+- License text SHA-256: `b070d77bfb2c52a1dd6996de0ce5f64c49a0ca55c889b163a963ddf5cb001ee2`
+- Repository/source: https://github.com/vercel/vercel.git
+
 ### `@webav/mp4box.js` 0.5.7
 
 - Installed path: `node_modules/@webav/mp4box.js`
@@ -106,6 +349,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt`](LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt)
 - License text SHA-256: `ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047`
 - Repository/source: https://github.com/gpac/mp4box.js.git
+
+### `@workflow/serde` 4.1.0
+
+- Installed path: `node_modules/@workflow/serde`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/@workflow/serde/LICENSE.md`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@workflow__serde-4.1.0.txt`](LICENSES/dependencies/@workflow__serde-4.1.0.txt)
+- License text SHA-256: `39248a57eaac37e120c65bae851c6382bf722fc87c3452bf6a245caef96db739`
+- Repository/source: https://github.com/vercel/workflow.git
 
 ### `@zip.js/zip.js` 2.24.0
 
@@ -130,6 +385,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/@zumer__snapdom-3.3.5.txt`](LICENSES/dependencies/@zumer__snapdom-3.3.5.txt)
 - License text SHA-256: `c5fbd8d2221c17ff18fc7f3fee7ecf3346fb5a3f5bb2dbd3eb08f1c0397ed1a2`
 - Repository/source: https://github.com/zumerlab/snapdom.git
+
+### `ai` 7.0.143
+
+- Installed path: `node_modules/ai`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/ai/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/ai-7.0.143.txt`](LICENSES/dependencies/ai-7.0.143.txt)
+- License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
+- Repository/source: https://github.com/vercel/ai
 
 ### `color-name` 1.1.4
 
@@ -190,6 +457,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/dompurify-3.4.17.txt`](LICENSES/dependencies/dompurify-3.4.17.txt)
 - License text SHA-256: `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`
 - Repository/source: https://github.com/cure53/DOMPurify.git
+
+### `eventsource-parser` 3.1.1
+
+- Installed path: `node_modules/eventsource-parser`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/eventsource-parser/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/eventsource-parser-3.1.1.txt`](LICENSES/dependencies/eventsource-parser-3.1.1.txt)
+- License text SHA-256: `835eb611a23301b27115ca1be9f754c876e643ceb7fe63049c6b50609a1cafeb`
+- Repository/source: https://github.com/rexxars/eventsource-parser.git
 
 ### `fabric` 7.4.0
 
@@ -262,6 +541,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/isarray-1.0.0.txt`](LICENSES/dependencies/isarray-1.0.0.txt)
 - License text SHA-256: `a1bd5deadb6a06dd74efa852c1b8b23f63b67f2214fbe9c8bd591da51da69268`
 - Repository/source: https://github.com/juliangruber/isarray.git
+
+### `json-schema` 0.4.0
+
+- Installed path: `node_modules/json-schema`
+- Declared license expression: `(AFL-2.1 OR BSD-3-Clause)`
+- Selected license: `BSD-3-Clause`
+- License source class: `installed-file`
+- License source: `node_modules/json-schema/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/json-schema-0.4.0.txt`](LICENSES/dependencies/json-schema-0.4.0.txt)
+- License text SHA-256: `4e053c510d6f3e4724213a292c65142df68d069c40f558582bc4270914e16f77`
+- Repository/source: http://github.com/kriszyp/json-schema
 
 ### `jszip` 3.10.2
 
@@ -343,6 +634,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/ms-2.1.3.txt`](LICENSES/dependencies/ms-2.1.3.txt)
 - License text SHA-256: `1662fae9b5314d11cf51284e2dcd1f006a354f7343f08712a730fcff9a359801`
 - Repository/source: vercel/ms
+
+### `ollama-ai-provider-v2` 4.0.1
+
+- Installed path: `node_modules/ollama-ai-provider-v2`
+- Declared license expression: `Apache-2.0`
+- Selected license: `Apache-2.0`
+- License source class: `installed-file`
+- License source: `node_modules/ollama-ai-provider-v2/LICENSE.md`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt`](LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt)
+- License text SHA-256: `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4`
+- Repository/source: https://github.com/nordwestt/ollama-ai-provider-v2.git
 
 ### `pako` 1.0.11
 
@@ -523,6 +826,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/tsdav-2.5.0.txt`](LICENSES/dependencies/tsdav-2.5.0.txt)
 - License text SHA-256: `2595fc934bdb521ec42681a25f9c75977da1640cebbbf8e69b3a046c431874c0`
 - Repository/source: https://github.com/natelindev/tsdav
+
+### `undici` 7.30.1
+
+- Installed path: `node_modules/undici`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/undici/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/undici-7.30.1.txt`](LICENSES/dependencies/undici-7.30.1.txt)
+- License text SHA-256: `a6db8096b2707bc0102d256917d4d33f298ba36d8c3f25de067a2b5bb379db27`
+- Repository/source: https://github.com/nodejs/undici.git
 
 ### `util-deprecate` 1.0.2
 

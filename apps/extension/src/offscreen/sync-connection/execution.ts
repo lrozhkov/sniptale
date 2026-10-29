@@ -1,11 +1,5 @@
-import {
-  loadSyncConnection,
-  loadSyncConnectionAuthentication,
-} from '../../composition/persistence/remote-connection/store';
-import {
-  sameConnectionScope,
-  sameSyncConnectionIdentity,
-} from '../../composition/persistence/remote-connection/model';
+import { loadSyncConnectionAuthentication } from '../../composition/persistence/remote-connection/store';
+import { readCurrentExecutionConnection } from './connection-admission';
 import { loadSyncQueueOperation } from '../../composition/persistence/sync-capture/queue';
 import { createSyncConnectionRequests } from '../../workflows/sync-transfer/connection-requests';
 import { refreshPersistedSyncCatalog } from '../../workflows/sync-transfer/catalog-refresh';
@@ -46,24 +40,6 @@ function refusedSnapshot(error: unknown, aborted: boolean): SyncExecutionResult[
   )
     failureCode = error.code;
   return { state: 'failed', stage: 'queued', failureCode, runId: null };
-}
-
-/** Read one current binding without granting another execution or credential lifetime. */
-export async function readCurrentExecutionConnection(
-  selection: SyncExecutorBinding,
-  signal: AbortSignal
-) {
-  signal.throwIfAborted();
-  const connection = await loadSyncConnection();
-  if (
-    !connection ||
-    connection.phase !== 'active' ||
-    !sameConnectionScope(connection.binding, selection.scope) ||
-    !sameSyncConnectionIdentity(connection.identity, selection.authorization)
-  )
-    return null;
-  signal.throwIfAborted();
-  return connection;
 }
 
 /** Own one native queue workflow and all of its HTTP requests until containment. */

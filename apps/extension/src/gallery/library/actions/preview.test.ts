@@ -16,6 +16,11 @@ import {
 } from './test-support/index';
 
 const renameQuickEditMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: async (_roots: unknown, operation: () => Promise<unknown>) =>
+    operation(),
+}));
+
 vi.mock('../../../workflows/media-hub/trash', async (original) => ({
   ...(await original<typeof import('../../../workflows/media-hub/trash')>()),
   renameQuickEditProject: renameQuickEditMock,

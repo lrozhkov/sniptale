@@ -12,13 +12,12 @@ import {
   type BackgroundOwnedRouteInventoryEntry,
 } from '../../../routing-contracts/owned-route-context';
 import type { BackgroundOwnedAuthorizationRequest } from './background-owned.types';
-import { classifyBackgroundOwnedSender } from './sender-classification';
+import { classifyBackgroundOwnedSender, isVideoEditorSenderUrl } from './sender-classification';
 import {
   classifySettingsPageSenderUrl,
   isScenarioEditorSenderUrl,
   isGallerySenderUrl,
   isImageEditorSenderUrl,
-  isVideoEditorSenderUrl,
 } from '../../../../platform/navigation/extension-pages/sender-url';
 
 export function authorizeAiSettingsMutationRoute(

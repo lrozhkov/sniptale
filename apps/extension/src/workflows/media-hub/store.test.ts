@@ -26,6 +26,11 @@ const mediaHubStoreMocks = vi.hoisted(() => ({
   withMediaHubWriteGuardMock: vi.fn(),
 }));
 
+vi.mock('../sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: async (_roots: unknown, operation: () => Promise<unknown>) =>
+    operation(),
+}));
+
 vi.mock('../../composition/persistence/media-library/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/media-library/index')>()),
   addMediaLibraryEntryTags: mediaHubStoreMocks.addMediaLibraryEntryTagsMock,

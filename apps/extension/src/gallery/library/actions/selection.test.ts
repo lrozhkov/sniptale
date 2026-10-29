@@ -46,6 +46,11 @@ const {
   updateScenarioProjectRecordMetadataMock: vi.fn(),
 }));
 
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: async (_roots: unknown, operation: () => Promise<unknown>) =>
+    operation(),
+}));
+
 vi.mock('../../../workflows/media-hub/trash', () => ({
   moveLibraryItemsToTrash: moveLibraryItemsToTrashMock,
   restoreLibraryTrashItems: restoreLibraryTrashItemsMock,
