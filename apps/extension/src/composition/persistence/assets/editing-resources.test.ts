@@ -10,6 +10,8 @@ import {
   createProjectExportEntry,
 } from '../projects/index.test-support';
 import { VideoProjectAssetType } from '../../../features/video/project/types';
+import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
+import { parseCapturedMediaRows } from '../sync-capture/media-snapshot';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import { reference } from '../sync-capture/test-support/freeze';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
@@ -625,5 +627,112 @@ it.each(['project-asset', 'export'] as const)(
       [source.assetId, child.assetId].sort()
     );
     expect(f.rows.get('media_library')!.has(id)).toBe(false);
+  }
+);
+
+it.each(['media', 'video-review', 'video-project'] as const)(
+  'projects %s recording resources beyond sync telemetry limits without changing native data',
+  async (rootKind) => {
+    const f = fixture();
+    const recording = betaV1Fixture.records.recordings[0];
+    const media = betaV1Fixture.records.media_library[0];
+    const ref = betaV1Fixture.records.asset_refs[0];
+    const telemetry = {
+      recordingId: recording.id,
+      createdAt: 1,
+      updatedAt: 2,
+      captureMode: null,
+      viewport: null,
+      cursorTrack: {
+        captureMode: 'embedded-fallback',
+        skin: { color: '#000000', hidden: false, scale: 1, shadow: false },
+        samples: Array.from({ length: 20_000 }, (_, index) => ({
+          id: `cursor-sample-${index}`,
+          time: index / 20_000,
+          x: 100,
+          y: 100,
+          visible: true,
+        })),
+      },
+      actionEvents: [],
+      signals: [],
+    };
+    expect(parseRecordingTelemetryEntry(telemetry)).not.toBeNull();
+    expect(new TextEncoder().encode(JSON.stringify(telemetry)).byteLength).toBeGreaterThan(
+      1024 * 1024
+    );
+    expect(parseCapturedMediaRows({ media, recording, ref, telemetry })).toBeNull();
+    f.seed('recordings', recording.id, recording);
+    f.seed('media_library', media.id, media);
+    f.seed('asset_refs', ref.assetId, ref);
+    f.owner('recording', recording.id, ref.assetId);
+    f.seed('recording_telemetry', recording.id, telemetry);
+    let rootId: string = media.id;
+    if (rootKind === 'video-project') {
+      const montage = createVideoProjectEntryWithMediaClip();
+      const source = montage.project.assets[0]!;
+      if (source.source.kind !== 'project-asset') throw new Error('Expected project source');
+      const asset = f.asset(source.source.projectAssetId, source.metadata.mimeType);
+      asset.size = source.metadata.size;
+      f.seed('project_assets', asset.id, asset);
+      f.seed('asset_refs', asset.assetId, reference(asset.assetId, asset.mimeType, asset.size));
+      montage.project.baseRecordingId = recording.id;
+      f.seed('video_projects', montage.id, montage);
+      rootId = montage.id;
+    }
+    const root = { rootKind, rootId };
+    // First opening has no workspace. Later openings retain the saved document.
+    for (const saved of [false, true]) {
+      if (saved)
+        f.seed('video_workspaces', media.id, {
+          ...structuredClone(template),
+          aggregateId: media.id,
+          sourceAssetId: ref.assetId,
+          source: { ...template.source, size: ref.size, mimeType: ref.mimeType },
+          history: [],
+          cursor: 0,
+        });
+      const before = structuredClone(f.rows);
+      for (const purpose of ['editing', 'backup'] as const) {
+        const result = await collectNativeEditingResources(f.tx(), root, purpose);
+        expect(result.refs).toContainEqual(ref);
+      }
+      expect(f.rows).toEqual(before);
+    }
+  }
+);
+
+it.each(['recording', 'owner', 'ref', 'size', 'mimeType', 'identity', 'group'] as const)(
+  'refuses a contradictory recording %s binding and admits retry after repair',
+  async (failure) => {
+    const f = fixture();
+    const recording = betaV1Fixture.records.recordings[0];
+    const media = betaV1Fixture.records.media_library[0];
+    const ref = betaV1Fixture.records.asset_refs[0];
+    const seed = () => {
+      f.seed('recordings', recording.id, recording);
+      f.seed('media_library', media.id, media);
+      f.seed('asset_refs', ref.assetId, ref);
+      f.owner('recording', recording.id, ref.assetId);
+    };
+    seed();
+    if (failure === 'recording') f.rows.get('recordings')!.delete(recording.id);
+    if (failure === 'owner') f.owner('recording', recording.id, 'foreign');
+    if (failure === 'ref') f.seed('asset_refs', ref.assetId, { ...ref, assetId: 'foreign' });
+    if (failure === 'size')
+      f.seed('recordings', recording.id, { ...recording, size: ref.size + 1 });
+    if (failure === 'mimeType')
+      f.seed('recordings', recording.id, { ...recording, mimeType: 'video/mp4' });
+    if (failure === 'identity') f.seed('recordings', recording.id, { ...recording, id: 'foreign' });
+    if (failure === 'group')
+      f.seed('media_library', media.id, {
+        ...media,
+        recordingGroup: { groupId: 'other', order: 0, role: 'display' },
+      });
+    const before = structuredClone(f.rows);
+    await expect(f.media(media.id)).rejects.toThrow('unavailable');
+    expect(f.rows).toEqual(before);
+    seed();
+    await expect(f.media(media.id)).resolves.toEqual({ refs: [ref], inlineMediaIds: [] });
   }
 );
