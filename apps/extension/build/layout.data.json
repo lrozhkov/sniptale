@@ -288,10 +288,10 @@
     "ollama-ai-provider-v2"
   ],
   "appWorkspaceDependencies": {
-    "@sniptale/foundation": "0.5.1",
-    "@sniptale/platform": "0.5.1",
-    "@sniptale/runtime-contracts": "0.5.1",
-    "@sniptale/ui": "0.5.1"
+    "@sniptale/foundation": "0.5.2",
+    "@sniptale/platform": "0.5.2",
+    "@sniptale/runtime-contracts": "0.5.2",
+    "@sniptale/ui": "0.5.2"
   },
   "appDevDependencies": [
     "@crxjs/vite-plugin",

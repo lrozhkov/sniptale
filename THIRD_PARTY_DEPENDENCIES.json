@@ -630,8 +630,8 @@
       "correspondingSourceUrl": "https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.6.tgz",
       "modifiedSource": {
         "archive": {
-          "file": "sniptale-dependency-source-0.5.1.zip",
-          "url": "https://github.com/lrozhkov/sniptale/releases/download/v0.5.1/sniptale-dependency-source-0.5.1.zip"
+          "file": "sniptale-dependency-source-0.5.2.zip",
+          "url": "https://github.com/lrozhkov/sniptale/releases/download/v0.5.2/sniptale-dependency-source-0.5.2.zip"
         },
         "upstreamIntegrity": "sha512-VHEZ53/7jGl4dQ+uOdndsZufFYwEUFWv9UXgvrGun3OapyzoqI9iaPOD7z3xxY/nAttLZBNwswgJzMtGJAquOQ==",
         "files": [
@@ -653,7 +653,7 @@
           },
           {
             "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/README.md",
-            "sha256": "35e090bb0019effc70359e2021ebde90705a7db44b615effbeacfbbd90007ded"
+            "sha256": "5905b057e08cc26b073407918e587bcc5f0c0dd91b086912cf768503dedf4af2"
           }
         ]
       },

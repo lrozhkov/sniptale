@@ -268,7 +268,7 @@
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/README.md",
-      "sha256": "35e090bb0019effc70359e2021ebde90705a7db44b615effbeacfbbd90007ded",
+      "sha256": "5905b057e08cc26b073407918e587bcc5f0c0dd91b086912cf768503dedf4af2",
       "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/README.md"
     },
     {
@@ -421,12 +421,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "5ec1e9dee8f93a19f6cc1b84e3b8ad38d2dbb2270074c1452aead57fd1265dd1",
+      "sha256": "d8b1296f47adcea86dd33eefbca4b01d04b453828d99335164d9094d25f96625",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "8d64899958a51e2ee95b87afcb4f1165ebe8b88bb9a014a830907de3bb99135d",
+      "sha256": "396ab54ae7db3699268891e3aa4c1d5012a52e4f51777c4fdc59ef0381e6cc0b",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],

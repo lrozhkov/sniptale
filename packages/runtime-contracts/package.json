@@ -1,6 +1,6 @@
 {
   "name": "@sniptale/runtime-contracts",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
@@ -74,7 +74,7 @@
     "./window-header": "./src/window-header.ts"
   },
   "dependencies": {
-    "@sniptale/foundation": "0.5.1",
+    "@sniptale/foundation": "0.5.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {
