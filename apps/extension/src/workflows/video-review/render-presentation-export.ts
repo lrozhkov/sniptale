@@ -29,7 +29,11 @@ import {
 } from './render-settings';
 import { supportedReviewVideoCodecs } from './media-index';
 import { createReviewPresentationRenderer } from './presentation-render';
-import { renderPresentationVideo, presentationPreviewFrames } from './presentation-video';
+import {
+  renderPresentationVideo,
+  presentationPreviewFrames,
+  iteratePresentationVideoFrames,
+} from './presentation-video';
 import {
   probePresentationAudio,
   renderPresentationAudio,
@@ -247,11 +251,23 @@ function audioRanges(
 }
 
 /** Assemble source-clock inputs once for export, preview and sparse probes. */
-function createRenderer(args: Args, prepared: Preparation) {
+function createRenderer(args: Args, prepared: Preparation, preview?: PresentationExportPreview) {
   return createReviewPresentationRenderer({
     plan: prepared.plan,
     settings: prepared.settings,
     main: {
+      *plannedCandidates() {
+        for (const { candidate } of iteratePresentationVideoFrames(prepared.plan, {
+          window: preview?.window,
+          windows: args.frameProbe
+            ? videoExportSampleWindows(
+                prepared.plan.totalDurationUs / 1_000_000,
+                prepared.profile.fps
+              )
+            : undefined,
+        }))
+          yield candidate;
+      },
       file: args.file,
       index: args.index,
       edits: args.edits,
@@ -363,7 +379,7 @@ export async function writeReviewPresentationFrames(
   };
   try {
     renderer = await reviewExportPhase(args.signal, 'compose', () =>
-      createRenderer(args, prepared)
+      createRenderer(args, prepared, preview)
     );
     const onProgress = preview ? args.onProgress : progress(args, prepared);
     if (args.frameProbe) {

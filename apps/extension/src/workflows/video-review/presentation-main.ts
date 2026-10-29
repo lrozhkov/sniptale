@@ -1,3 +1,4 @@
+import { createPresentationDecoder } from './presentation-decoder';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink, type InputAudioTrack } from 'mediabunny';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -35,6 +36,8 @@ export interface ReviewPresentationMainInput {
   captionTimeMap?: readonly ReviewTimeSegment[];
   effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
   fps?: number;
+  /** Repeatable export/preview lattice; sparse probes supply only their selected candidates. */
+  plannedCandidates?: () => Iterable<PresentationCandidate>;
   effective: ReturnType<typeof resolveQuickEditEffectiveState>;
   comments?: readonly CanvasCommentExport[];
   clickCues?: readonly ReviewClickCue[];
@@ -78,6 +81,7 @@ class PresentationMain {
   private scene: Scene | null = null;
   private sink: SampleSink | null = null;
   private transitionSink: SampleSink | null = null;
+  private decoder: ReturnType<typeof createPresentationDecoder> | null = null;
   private camera: Camera | null = null;
   private resolution = 0;
   private disposed = false;
@@ -198,6 +202,9 @@ class PresentationMain {
       signal,
       await video.getDecoderConfig()
     );
+    if (this.args.plannedCandidates) {
+      this.decoder = createPresentationDecoder(this.sink, () => this.plannedSourceTimes(), signal);
+    }
     if (effective.webcam) {
       const camera = await createReviewWebcamRenderer(
         effective.webcam,
@@ -226,6 +233,18 @@ class PresentationMain {
       } finally {
         prepared.release();
       }
+    }
+  }
+
+  private *plannedSourceTimes() {
+    for (const candidate of this.args.plannedCandidates?.() ?? []) {
+      if (
+        candidate.segment !== 'main' ||
+        candidate.mapping.kind !== 'main' ||
+        candidate.mapping.holdLast
+      )
+        continue;
+      yield { tick: candidate.tick, time: this.map(candidate, undefined).sourceTime };
     }
   }
 
@@ -269,7 +288,11 @@ class PresentationMain {
    * A held candidate requires the last non-held main clock from the frozen output lattice.
    */
   async render(candidate: PresentationCandidate, options: { heldMainLocalTime?: number } = {}) {
-    return this.renderFrame(this.map(candidate, options.heldMainLocalTime), candidate.tick);
+    return this.renderFrame(
+      this.map(candidate, options.heldMainLocalTime),
+      candidate.tick,
+      candidate.tick
+    );
   }
 
   /** Ordinary export preserves the original segment-relative frame schedule. */
@@ -277,7 +300,11 @@ class PresentationMain {
     return this.renderFrame(this.mapTime(localTime), ++this.frameGeneration);
   }
 
-  private async renderFrame(mapped: ReturnType<PresentationMain['mapTime']>, generation: number) {
+  private async renderFrame(
+    mapped: ReturnType<PresentationMain['mapTime']>,
+    generation: number,
+    plannedTick?: number
+  ) {
     if (this.disposed || this.busy || this.front)
       throw new Error('Main presentation frame is unavailable');
     this.busy = true;
@@ -294,7 +321,9 @@ class PresentationMain {
       prepared = await this.renderer.prepare(this.scene!, this.args.dimensions, signal);
       signal.throwIfAborted();
       this.assets = prepared.allocationAssets;
-      source = await this.sink!.getSample(this.sourceTime);
+      source = await (this.decoder
+        ? this.decoder.read(plannedTick, this.sourceTime)
+        : this.sink!.getSample(this.sourceTime));
       signal.throwIfAborted();
       if (!source) throw new Error('Main source frame is unavailable');
       const blend = reviewCutTransitionAt(mapped.localTime, this.transitions);
@@ -382,5 +411,8 @@ class PresentationMain {
     this.renderer.dispose();
     this.resources.dispose();
     this.input.dispose();
+    // Input disposal above terminates native decoding; pending iterator cleanup can reject on abort.
+    void this.decoder?.dispose().catch(() => undefined);
+    this.decoder = null;
   };
 }

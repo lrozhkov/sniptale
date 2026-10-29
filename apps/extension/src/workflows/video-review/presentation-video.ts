@@ -47,27 +47,11 @@ export async function renderPresentationVideo(args: {
     }
   };
   try {
-    const frames = args.window
-      ? presentationPreviewFrames(args.plan, args.window)
-      : (function* () {
-          for (const candidate of iteratePresentationCandidates(args.plan))
-            yield {
-              candidate,
-              timestampUs: candidate.timestampUs,
-              durationUs: candidate.durationUs,
-            };
-        })();
-    for (const { candidate, timestampUs, durationUs } of frames) {
+    for (const { candidate, timestampUs, durationUs } of iteratePresentationVideoFrames(
+      args.plan,
+      args
+    )) {
       args.signal.throwIfAborted();
-      if (
-        args.windows &&
-        !args.windows.some(
-          (window) =>
-            candidate.timestampUs >= window.start * 1_000_000 &&
-            candidate.timestampUs < window.end * 1_000_000
-        )
-      )
-        continue;
       const frame = await args.renderer.render(candidate);
       try {
         args.signal.throwIfAborted();
@@ -100,6 +84,34 @@ export async function renderPresentationVideo(args: {
     return count;
   } finally {
     adaptive?.dispose();
+  }
+}
+
+/** One lazy lattice selection feeds rendering and decoder admission, including sparse probes. */
+export function* iteratePresentationVideoFrames(
+  plan: PresentationSequencePlan,
+  selection: {
+    window?: PresentationPreviewWindow | undefined;
+    windows?: readonly VideoExportSampleWindow[] | undefined;
+  } = {}
+) {
+  const frames = selection.window
+    ? presentationPreviewFrames(plan, selection.window)
+    : (function* () {
+        for (const candidate of iteratePresentationCandidates(plan))
+          yield { candidate, timestampUs: candidate.timestampUs, durationUs: candidate.durationUs };
+      })();
+  for (const frame of frames) {
+    if (
+      selection.windows &&
+      !selection.windows.some(
+        (window) =>
+          frame.candidate.timestampUs >= window.start * 1_000_000 &&
+          frame.candidate.timestampUs < window.end * 1_000_000
+      )
+    )
+      continue;
+    yield frame;
   }
 }
 

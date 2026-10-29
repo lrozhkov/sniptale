@@ -10,16 +10,17 @@ export interface VideoExportSizeEstimate {
   sampledSeconds: number;
 }
 
-/** Bounded representative windows on the output clock; small videos are sampled in full. */
+/** Interior strata avoid overweighting opening/closing effects; at most 135 frame intervals are sampled. */
 export function videoExportSampleWindows(duration: number, fps = 30): VideoExportSampleWindow[] {
   if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(fps) || fps <= 0)
     throw new Error('Invalid export duration or frame rate');
   const length = Math.min(0.75, 15 / fps);
-  if (duration <= length * 3) return [{ start: 0, end: duration }];
-  return [0, (duration - length) / 2, duration - length].map((start) => ({
-    start,
-    end: start + length,
-  }));
+  const count = 9;
+  if (duration <= length * count) return [{ start: 0, end: duration }];
+  return Array.from({ length: count }, (_, index) => {
+    const start = (duration * (index + 0.5)) / count - length / 2;
+    return { start, end: start + length };
+  });
 }
 
 /** Normalize extra probe keyframes to the export cadence; otherwise short windows overestimate size. */
