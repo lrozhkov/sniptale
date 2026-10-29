@@ -1,0 +1,560 @@
+{
+  "date": "2026-10-29",
+  "implementationCommit": "d9e247b5b73496e8a0f69332a49ebadfb4090f8b",
+  "purpose": "Historical qualification evidence. Runtime outputs are not automatically committed.",
+  "normalization": "ANSI escapes removed. Absolute integration worktree replaced by <worktree>. JSON whitespace follows the canonical formatter. JSON values, outcomes and original failures are unchanged.",
+  "secretScan": "No known historical or fresh lab password or Basic authorization value found.",
+  "files": [
+    {
+      "source": "tasks/WebDAV/d-activation-connected-green.log",
+      "sourceSha256": "814f7849740e525cc00b609e3382cbec426bc8cc45955dd336c10a160f58f03a",
+      "file": "d-activation-connected-green.log",
+      "sha256": "c93493ce9152a886b31fd6415bc2badefa61c3188009be5a404ef14bd0d09c33"
+    },
+    {
+      "source": "tasks/WebDAV/d-activation-connected.log",
+      "sourceSha256": "e18c627e8d14955abf146251394f6fd860eb69f2ef2d3d182fe4e4e1a2346910",
+      "file": "d-activation-connected.log",
+      "sha256": "4e2f2effe0b475a28300f4cd838d7e8a75c4d57b3b348d7a5ca2999c4a887095"
+    },
+    {
+      "source": "tasks/WebDAV/d-activation-format-corrected.log",
+      "sourceSha256": "b84b9ebe59f35eb448fb792afa4c623cf1f3865127a49950362ecaeb6d2ab8e3",
+      "file": "d-activation-format-corrected.log",
+      "sha256": "b84b9ebe59f35eb448fb792afa4c623cf1f3865127a49950362ecaeb6d2ab8e3"
+    },
+    {
+      "source": "tasks/WebDAV/d-activation-format.log",
+      "sourceSha256": "8802e80ebfa74dcc245df231a12fe41a29533416e3a9a5dd6d8819ff60be8eaa",
+      "file": "d-activation-format.log",
+      "sha256": "dad108ae0317e72e0605af86394faff3a2c4b37e179043e95aa0d1d72f051521"
+    },
+    {
+      "source": "tasks/WebDAV/d-activation-red.log",
+      "sourceSha256": "37c38e8feebb4e283f422d9606df0e72d1dc3ded3d454c0951014eac3583f95a",
+      "file": "d-activation-red.log",
+      "sha256": "8669d9ce308872028a6efe76bd4e3cb17e0e726eed6a026f5d1ae07faf3fe889"
+    },
+    {
+      "source": "tasks/WebDAV/d-activation-release-build.log",
+      "sourceSha256": "47484819f397b5fa8c558dfeb0946b5153bb06cd9bb532ab1476bccb8c392938",
+      "file": "d-activation-release-build.log",
+      "sha256": "a308b26add5cbcc0700e5860c0009ba32900910d3bd2ea995e446942ca6390d3"
+    },
+    {
+      "source": "tasks/WebDAV/d-activation-security-build.log",
+      "sourceSha256": "32e643df9d10adc6c1126d95f0b389579dc6fb6e818fd70ef51dd1b5ccb4d371",
+      "file": "d-activation-security-build.log",
+      "sha256": "cbd591c24b5cbba4bd08118129ec88824919616e90eaff645804406de8b09bc1"
+    },
+    {
+      "source": "tasks/WebDAV/d-activation-typecheck.log",
+      "sourceSha256": "0e4e51daca6975cc097bc94fa8e9efde47c33072ce3946676ee1dafd821e5125",
+      "file": "d-activation-typecheck.log",
+      "sha256": "0e4e51daca6975cc097bc94fa8e9efde47c33072ce3946676ee1dafd821e5125"
+    },
+    {
+      "source": "tasks/WebDAV/d-allowances-format.log",
+      "sourceSha256": "b25a69a5e41c676e58e92487a920ffeb248f5b140ca87a0dbd17ff79ec012c60",
+      "file": "d-allowances-format.log",
+      "sha256": "b25a69a5e41c676e58e92487a920ffeb248f5b140ca87a0dbd17ff79ec012c60"
+    },
+    {
+      "source": "tasks/WebDAV/d-checkpoint-corrected.log",
+      "sourceSha256": "2bd07507713a7e0bcf1433f43aa454263da9cbabb96cbe0ab1ea0f7e6a4c078f",
+      "file": "d-checkpoint-corrected.log",
+      "sha256": "2bd07507713a7e0bcf1433f43aa454263da9cbabb96cbe0ab1ea0f7e6a4c078f"
+    },
+    {
+      "source": "tasks/WebDAV/d-checkpoint-type-correction-proof.log",
+      "sourceSha256": "0816baf7afa50b9165887f55f76f770cceeb00c57961fb9ff36806f0e9a8f2d6",
+      "file": "d-checkpoint-type-correction-proof.log",
+      "sha256": "371ad09426078711dbf2f0d23b3684e8a65ec94a26b1fabbf9ad1e9e2e31657a"
+    },
+    {
+      "source": "tasks/WebDAV/d-checkpoint.log",
+      "sourceSha256": "77a870351b0a87d1163d0bac738ec21f1c455522e21ab5fb8b7f306b8b06223c",
+      "file": "d-checkpoint.log",
+      "sha256": "77a870351b0a87d1163d0bac738ec21f1c455522e21ab5fb8b7f306b8b06223c"
+    },
+    {
+      "source": "tasks/WebDAV/d-closeout.log",
+      "sourceSha256": "f013d3af6dd7fc417bfdb3d68a2b01ae6775db8093da456dd17573f107b455cf",
+      "file": "d-closeout.log",
+      "sha256": "f013d3af6dd7fc417bfdb3d68a2b01ae6775db8093da456dd17573f107b455cf"
+    },
+    {
+      "source": "tasks/WebDAV/d-correction-structural-summary.log",
+      "sourceSha256": "73ab52ee979a2b74d787dda75a54cc0cccc46a0aee7b1c201e0b4170775b97a4",
+      "file": "d-correction-structural-summary.log",
+      "sha256": "73ab52ee979a2b74d787dda75a54cc0cccc46a0aee7b1c201e0b4170775b97a4"
+    },
+    {
+      "source": "tasks/WebDAV/d-current-db-profile-switch.log",
+      "sourceSha256": "6acaf87ee4ce891d50868c477eed93055a7ec3a5a83f2e831ad9ea2759656e62",
+      "file": "d-current-db-profile-switch.log",
+      "sha256": "6acaf87ee4ce891d50868c477eed93055a7ec3a5a83f2e831ad9ea2759656e62"
+    },
+    {
+      "source": "tasks/WebDAV/d-current-db-setup-queue.log",
+      "sourceSha256": "e38d286095d9850efda0d17786120c99729c85b9fc836eb8e3129843796b6c0c",
+      "file": "d-current-db-setup-queue.log",
+      "sha256": "e38d286095d9850efda0d17786120c99729c85b9fc836eb8e3129843796b6c0c"
+    },
+    {
+      "source": "tasks/WebDAV/d-current-redis-faults.log",
+      "sourceSha256": "f56f7da26c9e1bdc3509c6acb11826085d230018a58fb34ddd6b909d1f0f4074",
+      "file": "d-current-redis-faults.log",
+      "sha256": "af854754fd9f8e1e4bf0058ff1768c25576b430b1dfc4449a7d55340dbd1ab6d"
+    },
+    {
+      "source": "tasks/WebDAV/d-current-redis-retry.log",
+      "sourceSha256": "86d85b2c0bc71f23e519f8cf058f2a3e63136059f2f4f8729dde5d351c98c59a",
+      "file": "d-current-redis-retry.log",
+      "sha256": "86d85b2c0bc71f23e519f8cf058f2a3e63136059f2f4f8729dde5d351c98c59a"
+    },
+    {
+      "source": "tasks/WebDAV/d-current-redis-reuse-corrected.log",
+      "sourceSha256": "13112c77c579ded7d6600957276e3c798d4e93eb6e74f23f89078ce9264abc41",
+      "file": "d-current-redis-reuse-corrected.log",
+      "sha256": "f928527aeb1ee9f16d9e058f51c5c2d2c514c64383b7dff7346634dd1814f4c4"
+    },
+    {
+      "source": "tasks/WebDAV/d-current-redis-setup-queue.log",
+      "sourceSha256": "3c7b76d30233e67a2a5946d2916d8a203b0b3042ff2f85caaafcc3c7be19f333",
+      "file": "d-current-redis-setup-queue.log",
+      "sha256": "3c7b76d30233e67a2a5946d2916d8a203b0b3042ff2f85caaafcc3c7be19f333"
+    },
+    {
+      "source": "tasks/WebDAV/d-db-library.log",
+      "sourceSha256": "5c7894c37962469906b2572e38e95e0aaf30fe0e3f76e3b93230da8550fc891b",
+      "file": "d-db-library.log",
+      "sha256": "5c7894c37962469906b2572e38e95e0aaf30fe0e3f76e3b93230da8550fc891b"
+    },
+    {
+      "source": "tasks/WebDAV/d-db-permission-corrected.log",
+      "sourceSha256": "128fac7a737372273a396a658480ef247cf731cfdfedd5b87e75831e723335d8",
+      "file": "d-db-permission-corrected.log",
+      "sha256": "128fac7a737372273a396a658480ef247cf731cfdfedd5b87e75831e723335d8"
+    },
+    {
+      "source": "tasks/WebDAV/d-db-profile-switch.log",
+      "sourceSha256": "26977928406c1789418c1e1832d9ae09a4a0c3ee5372f7fb01eae4a1ce129895",
+      "file": "d-db-profile-switch.log",
+      "sha256": "26977928406c1789418c1e1832d9ae09a4a0c3ee5372f7fb01eae4a1ce129895"
+    },
+    {
+      "source": "tasks/WebDAV/d-db-setup-queue.log",
+      "sourceSha256": "3a4de9a7bcd993c2040a657479b4360b89a41ee47a36478083973afcd6736f57",
+      "file": "d-db-setup-queue.log",
+      "sha256": "0aec9314a7a7ba41d85e66b0b9d5d52bb34fded0f5cdbf401aa367f858934d55"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-build.log",
+      "sourceSha256": "7a90009a829da6c551b88754d48fa7c8c172951e57521d48b9e64db0f34417ac",
+      "file": "d-deferred-build.log",
+      "sha256": "8f41ad12b95a572abba6528530d41b5f0b44758cfa3b1923a5391928edfe0f26"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-connected-corrected.log",
+      "sourceSha256": "49193074e0f71d9c23be56ecb0a8ec9629c4eddbf243e55f98a108277cf3ce49",
+      "file": "d-deferred-connected-corrected.log",
+      "sha256": "6af2b8258379a63335e05c7f93905187c1c5757e35d6ed8700df0ff993dcbc9e"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-connected-final-green.log",
+      "sourceSha256": "197fe8b3c2ca2b1bc52cd50a2a3c48e59b8a58e1d95f4e4529cc9ddef1510dbe",
+      "file": "d-deferred-connected-final-green.log",
+      "sha256": "98d158841c7bb6477728b760d4c49feed2dda72a61e027e8d6afae407793fc1f"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-connected-green.log",
+      "sourceSha256": "5ae5cc26da306157375602e0878fbb5f0b5f11995de4a99d4b58001c3d2207ab",
+      "file": "d-deferred-connected-green.log",
+      "sha256": "31fc344ac43cf00b3904e3b2d5cb03a497465564f7535b280da718cf60645ee6"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-db-current.log",
+      "sourceSha256": "1af987690c611a92c608052e0a9cc8a3b3ef2115260eb20f26989ec5572a9b40",
+      "file": "d-deferred-db-current.log",
+      "sha256": "1af987690c611a92c608052e0a9cc8a3b3ef2115260eb20f26989ec5572a9b40"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-db-proof.log",
+      "sourceSha256": "dad24174232274a96bef3bf12775a3829cdc9cad5c16ea40e97dceb4c5022b1a",
+      "file": "d-deferred-db-proof.log",
+      "sha256": "dad24174232274a96bef3bf12775a3829cdc9cad5c16ea40e97dceb4c5022b1a"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-connected-corrected.log",
+      "sourceSha256": "ed899be98eefca098a15f37ec4f55f6d7c4d4b5565649e4b83ad007d9c1f4927",
+      "file": "d-deferred-export-connected-corrected.log",
+      "sha256": "b9c01ae2685939ff47d209f2a1b327a722b330cfde0e0a5909972e54d1013cd3"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-connected-final.log",
+      "sourceSha256": "fac5fff4ff06415c125ffa3a4a5eec82d2dd1da3b5eee36c91d154fd817c86f1",
+      "file": "d-deferred-export-connected-final.log",
+      "sha256": "94a17258e03666f3d5c42cb631c1484617de696def20632437a55ef4f65bb3b9"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-connected-first.log",
+      "sourceSha256": "28bd2677398fe6df98707916f5c239811056e58f4b25baa0698b5e41d9e2a9b2",
+      "file": "d-deferred-export-connected-first.log",
+      "sha256": "48f2fe0bd130cddff0dc113e7ff2c96390f11a780108f40c10e5779b208e5b82"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-failure-cases.log",
+      "sourceSha256": "619d9fafdfca67b39e8c32bf4d6b843d990c2e3d538413ba53e50a66fca92544",
+      "file": "d-deferred-export-failure-cases.log",
+      "sha256": "10acf07ff99dcbf7bd295c6caf4f9de3faf5bc481707097a6594e3064235acb3"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-final-format.log",
+      "sourceSha256": "b84b9ebe59f35eb448fb792afa4c623cf1f3865127a49950362ecaeb6d2ab8e3",
+      "file": "d-deferred-export-final-format.log",
+      "sha256": "b84b9ebe59f35eb448fb792afa4c623cf1f3865127a49950362ecaeb6d2ab8e3"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-first-green.log",
+      "sourceSha256": "6887b34585c25475317fe67d4fb5fe38b4fa40f91cb45f75d9905cdede9c2b3c",
+      "file": "d-deferred-export-first-green.log",
+      "sha256": "dfb7bb06608a2ccad4d44f909ac93962e256ee7710f75907851faaedd01b783f"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-format.log",
+      "sourceSha256": "02464dab575e3e6710ad428d65f46640f5a76c4b953c6d41d3684f7f1c2dea7f",
+      "file": "d-deferred-export-format.log",
+      "sha256": "02464dab575e3e6710ad428d65f46640f5a76c4b953c6d41d3684f7f1c2dea7f"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-preflight.log",
+      "sourceSha256": "f24aa4bbf31f6b711fbf4a4e97be3ffe3250d681bf12e1aea89256e61cf1a263",
+      "file": "d-deferred-export-preflight.log",
+      "sha256": "f24aa4bbf31f6b711fbf4a4e97be3ffe3250d681bf12e1aea89256e61cf1a263"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-red.log",
+      "sourceSha256": "2b3d541711f65dc54c1f78b201f43159b77fd184f707ac353036cdf56609b2cc",
+      "file": "d-deferred-export-red.log",
+      "sha256": "0675ce2ab620e4adc2ed03b0cae245dee603748adcc27427cea6648715c6ccdd"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-second-green.log",
+      "sourceSha256": "0fa35ef0ca4b28095ad9861ed0744d391ea9da71901ad27e657dc6512b293a26",
+      "file": "d-deferred-export-second-green.log",
+      "sha256": "cbbe4a1c75a5f63bf92c62fa4947fa25a2e43060934543012ab5ac49627073f3"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-typecheck-corrected.log",
+      "sourceSha256": "0e4e51daca6975cc097bc94fa8e9efde47c33072ce3946676ee1dafd821e5125",
+      "file": "d-deferred-export-typecheck-corrected.log",
+      "sha256": "0e4e51daca6975cc097bc94fa8e9efde47c33072ce3946676ee1dafd821e5125"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-export-typecheck.log",
+      "sourceSha256": "99ffb14b0fff291caa1efbe78d8bf318ea71fc2fcc214b1418a59022c2cb461c",
+      "file": "d-deferred-export-typecheck.log",
+      "sha256": "99ffb14b0fff291caa1efbe78d8bf318ea71fc2fcc214b1418a59022c2cb461c"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-key-preflight.log",
+      "sourceSha256": "5b893406ad75955b1e4aa6426da598f788b1f7311cec130b8552596cdc1a9d49",
+      "file": "d-deferred-key-preflight.log",
+      "sha256": "5b893406ad75955b1e4aa6426da598f788b1f7311cec130b8552596cdc1a9d49"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-native-green.log",
+      "sourceSha256": "7569cf32216c8b719a0ebc0a37b90e2148ec71f59d7c2a64bd1e643186b2ea94",
+      "file": "d-deferred-native-green.log",
+      "sha256": "2974358a3bf983efbd4189e1d8318fa61c2964956e097577e09046b59ebecd60"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-proof-final-format.log",
+      "sourceSha256": "47dade2e3352a71b19d310a81aa278f9bc335e530da7a7051c4b59c66a6fb307",
+      "file": "d-deferred-proof-final-format.log",
+      "sha256": "47dade2e3352a71b19d310a81aa278f9bc335e530da7a7051c4b59c66a6fb307"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-redis-current.log",
+      "sourceSha256": "1bd8f986fa19e9f1a191449049430302967ac3ae5665564119247f252e1dd315",
+      "file": "d-deferred-redis-current.log",
+      "sha256": "1bd8f986fa19e9f1a191449049430302967ac3ae5665564119247f252e1dd315"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-reuse-diagnosis.log",
+      "sourceSha256": "4e9f6e28da29931f2afcfa7d12e00e24dc0d0957643b99ce704e9a405107c250",
+      "file": "d-deferred-reuse-diagnosis.log",
+      "sha256": "02869ef574b72e46e33ee822af5f324417706f219f60231fc3e12fb7a0f2b972"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-structural-summary.log",
+      "sourceSha256": "864719c0cb2caa2cd3979b02a2acf25107d0a2234d078de530bf140d4ba75780",
+      "file": "d-deferred-structural-summary.log",
+      "sha256": "864719c0cb2caa2cd3979b02a2acf25107d0a2234d078de530bf140d4ba75780"
+    },
+    {
+      "source": "tasks/WebDAV/d-deferred-typecheck-green.log",
+      "sourceSha256": "0e4e51daca6975cc097bc94fa8e9efde47c33072ce3946676ee1dafd821e5125",
+      "file": "d-deferred-typecheck-green.log",
+      "sha256": "0e4e51daca6975cc097bc94fa8e9efde47c33072ce3946676ee1dafd821e5125"
+    },
+    {
+      "source": "tasks/WebDAV/d-final-structural-summary.log",
+      "sourceSha256": "e2068d37721e360ef37d9612bb58023888361e4eb55135db69ecfb93b60666a9",
+      "file": "d-final-structural-summary.log",
+      "sha256": "e2068d37721e360ef37d9612bb58023888361e4eb55135db69ecfb93b60666a9"
+    },
+    {
+      "source": "tasks/WebDAV/d-final-typecheck.log",
+      "sourceSha256": "0e4e51daca6975cc097bc94fa8e9efde47c33072ce3946676ee1dafd821e5125",
+      "file": "d-final-typecheck.log",
+      "sha256": "0e4e51daca6975cc097bc94fa8e9efde47c33072ce3946676ee1dafd821e5125"
+    },
+    {
+      "source": "tasks/WebDAV/d-join-proof-preflight.log",
+      "sourceSha256": "c9fa971f2c8669af295b7cb1768b90118adbe9090574170e3382ad74c000723f",
+      "file": "d-join-proof-preflight.log",
+      "sha256": "c9fa971f2c8669af295b7cb1768b90118adbe9090574170e3382ad74c000723f"
+    },
+    {
+      "source": "tasks/WebDAV/d-native-receive-proof-preflight.log",
+      "sourceSha256": "3c69da715bec4ecdcaccaab787a718ea13ca5b823c2abff3b88ac5e33a717986",
+      "file": "d-native-receive-proof-preflight.log",
+      "sha256": "3c69da715bec4ecdcaccaab787a718ea13ca5b823c2abff3b88ac5e33a717986"
+    },
+    {
+      "source": "tasks/WebDAV/d-owned-export-zero-format.log",
+      "sourceSha256": "2ccda39d7b9194b9885074338e9fa44a125a64ed1b912c2d0ff4490cf6078b55",
+      "file": "d-owned-export-zero-format.log",
+      "sha256": "2ccda39d7b9194b9885074338e9fa44a125a64ed1b912c2d0ff4490cf6078b55"
+    },
+    {
+      "source": "tasks/WebDAV/d-owned-export-zero-green.log",
+      "sourceSha256": "dc1b6b37df26b9bc9a56d42679248761a521c559f327f809c7157e982947b443",
+      "file": "d-owned-export-zero-green.log",
+      "sha256": "aed824b2d7a828b1b3a93a1ea721c276dd7105cdc61cff4dda8ae6ec45de4d2e"
+    },
+    {
+      "source": "tasks/WebDAV/d-owned-export-zero-red.log",
+      "sourceSha256": "c345888a45fe68951796ce294e6db7ec3c98d1d8da5d37ea244795b877a76937",
+      "file": "d-owned-export-zero-red.log",
+      "sha256": "a81aae5c6960c474b21c6f09fb7eff8c9b10e8d3f7456b4a9304bacbd58b2830"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-activation-preflight.log",
+      "sourceSha256": "bd60a8a61b5314e23458418d4c088d643a0380abe308771b771db1e921cfda8d",
+      "file": "d-production-activation-preflight.log",
+      "sha256": "bd60a8a61b5314e23458418d4c088d643a0380abe308771b771db1e921cfda8d"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-browser-corrected.log",
+      "sourceSha256": "7663e9d523be00fa32a6edb793d0fe02b17c4419949f2d44e5fc313983967509",
+      "file": "d-production-browser-corrected.log",
+      "sha256": "7663e9d523be00fa32a6edb793d0fe02b17c4419949f2d44e5fc313983967509"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-browser-diagnosis.log",
+      "sourceSha256": "eb1207d277d4d20f96caa8f3201831072e339da1f6b52a986b8eb1087789ac84",
+      "file": "d-production-browser-diagnosis.log",
+      "sha256": "eb1207d277d4d20f96caa8f3201831072e339da1f6b52a986b8eb1087789ac84"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-browser.log",
+      "sourceSha256": "f33698457b89a933a98387eee743d5d8eebe599c643b91b7e5f898e2d1e6861d",
+      "file": "d-production-browser.log",
+      "sha256": "a37298c28ffd15e60d0854b622185ba5503533f7b224c70496875d660e58d864"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-editor-1920.log",
+      "sourceSha256": "fa869ea4c6e6993bff847d4ffd550d618e89ea6787f8e3f1015a6ced68f8205a",
+      "file": "d-production-editor-1920.log",
+      "sha256": "fa869ea4c6e6993bff847d4ffd550d618e89ea6787f8e3f1015a6ced68f8205a"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-editor-confirmed.log",
+      "sourceSha256": "5d5c5e30291b095646e9fa869b03b07657b587826b632000ec272f7b9d362f20",
+      "file": "d-production-editor-confirmed.log",
+      "sha256": "5d5c5e30291b095646e9fa869b03b07657b587826b632000ec272f7b9d362f20"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-editor-current.log",
+      "sourceSha256": "c1b7bc03a59b8af5aafdc9d0b6d650c8969433bbe54941be3d4890679b0bcbf4",
+      "file": "d-production-editor-current.log",
+      "sha256": "7f4a0bc0bb50f3c69353e0d408a281482dcb8f556009ca9bfd78e2ac261dd323"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-editor-proof.log",
+      "sourceSha256": "5f67b056df4538c1f7186a71854b2c1f49e740277fe350136cbe3cd9af5d4f31",
+      "file": "d-production-editor-proof.log",
+      "sha256": "0c9132947b840b02b7e05350e00569785eba1b4dabc0015daaaacf483f4b2a05"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-proof-format-2.log",
+      "sourceSha256": "2ccda39d7b9194b9885074338e9fa44a125a64ed1b912c2d0ff4490cf6078b55",
+      "file": "d-production-proof-format-2.log",
+      "sha256": "2ccda39d7b9194b9885074338e9fa44a125a64ed1b912c2d0ff4490cf6078b55"
+    },
+    {
+      "source": "tasks/WebDAV/d-production-proof-format.log",
+      "sourceSha256": "2ccda39d7b9194b9885074338e9fa44a125a64ed1b912c2d0ff4490cf6078b55",
+      "file": "d-production-proof-format.log",
+      "sha256": "2ccda39d7b9194b9885074338e9fa44a125a64ed1b912c2d0ff4490cf6078b55"
+    },
+    {
+      "source": "tasks/WebDAV/d-qualification-proof-build.log",
+      "sourceSha256": "30a42400b9c7bccffb4d2a259f6ab4de013de7bae605497a0fb3bf855568b43a",
+      "file": "d-qualification-proof-build.log",
+      "sha256": "36dbdbc181da4b33d3215008c1682e8f8bf77bf3089b098c8ac93ea7c88fda9d"
+    },
+    {
+      "source": "tasks/WebDAV/d-qualification-proof-format.log",
+      "sourceSha256": "47dade2e3352a71b19d310a81aa278f9bc335e530da7a7051c4b59c66a6fb307",
+      "file": "d-qualification-proof-format.log",
+      "sha256": "47dade2e3352a71b19d310a81aa278f9bc335e530da7a7051c4b59c66a6fb307"
+    },
+    {
+      "source": "tasks/WebDAV/d-redis-library.log",
+      "sourceSha256": "810ea50421cfbef82a8a84ea7f7bb598564aa8b7614543a04886a61976a5a9b0",
+      "file": "d-redis-library.log",
+      "sha256": "810ea50421cfbef82a8a84ea7f7bb598564aa8b7614543a04886a61976a5a9b0"
+    },
+    {
+      "source": "tasks/WebDAV/d-redis-profile-switch.log",
+      "sourceSha256": "235c09d1eb44db80443ded78b211d37b0f11036cd8a3f997e435b998418e02bc",
+      "file": "d-redis-profile-switch.log",
+      "sha256": "235c09d1eb44db80443ded78b211d37b0f11036cd8a3f997e435b998418e02bc"
+    },
+    {
+      "source": "tasks/WebDAV/d-redis-setup-queue.log",
+      "sourceSha256": "63d3fb1b0570aed3246fd799511da15195d9bf039fe09b618dace230df6c49b1",
+      "file": "d-redis-setup-queue.log",
+      "sha256": "63d3fb1b0570aed3246fd799511da15195d9bf039fe09b618dace230df6c49b1"
+    },
+    {
+      "source": "tasks/WebDAV/d-release-harness.log",
+      "sourceSha256": "929936140f0f8c898695e0ad07d50a732ba35fb523f7f5abce02c1a0f37bc4c9",
+      "file": "d-release-harness.log",
+      "sha256": "929936140f0f8c898695e0ad07d50a732ba35fb523f7f5abce02c1a0f37bc4c9"
+    },
+    {
+      "source": "tasks/WebDAV/d-review-correction-checkpoint.log",
+      "sourceSha256": "cbfe0541c326a96eec6571c45873dc60b2a548631a4956943d84e8b880062aae",
+      "file": "d-review-correction-checkpoint.log",
+      "sha256": "cbfe0541c326a96eec6571c45873dc60b2a548631a4956943d84e8b880062aae"
+    },
+    {
+      "source": "tasks/WebDAV/d-structural-allowances-preflight.log",
+      "sourceSha256": "dfbee40d57be05f52a858d9f5a78ab75f6534e73f01e25dfaf17e10786735774",
+      "file": "d-structural-allowances-preflight.log",
+      "sha256": "dfbee40d57be05f52a858d9f5a78ab75f6534e73f01e25dfaf17e10786735774"
+    },
+    {
+      "source": "tasks/WebDAV/D-DB-ENVIRONMENT.json",
+      "sourceSha256": "658b795ed42189bbffb2502e6fbc3d1d2fede8dd769270492a4be10321e9a174",
+      "file": "D-DB-ENVIRONMENT.json",
+      "sha256": "658b795ed42189bbffb2502e6fbc3d1d2fede8dd769270492a4be10321e9a174"
+    },
+    {
+      "source": "tasks/WebDAV/D-DB-RESULTS.json",
+      "sourceSha256": "5033b04096776169e41915e3e760b5ac9e7131208df49ebb526a50bdf5e736ba",
+      "file": "D-DB-RESULTS.json",
+      "sha256": "5033b04096776169e41915e3e760b5ac9e7131208df49ebb526a50bdf5e736ba"
+    },
+    {
+      "source": "tasks/WebDAV/D-REDIS-ENVIRONMENT.json",
+      "sourceSha256": "3ac25dd8a07d57276ae84bac0149a3603c042ca160ea447c97ad34a4760307d5",
+      "file": "D-REDIS-ENVIRONMENT.json",
+      "sha256": "3ac25dd8a07d57276ae84bac0149a3603c042ca160ea447c97ad34a4760307d5"
+    },
+    {
+      "source": "tasks/WebDAV/D-REDIS-RESULTS.json",
+      "sourceSha256": "b46ff25c5f08bef82e1898b40f2a52b8e850dac265b50f53f49cb31acfdcc7cd",
+      "file": "D-REDIS-RESULTS.json",
+      "sha256": "b46ff25c5f08bef82e1898b40f2a52b8e850dac265b50f53f49cb31acfdcc7cd"
+    },
+    {
+      "source": "tasks/WebDAV/D-REVIEW-RESULTS.json",
+      "sourceSha256": "e240f6fac316c9eb4a79dd1b5419e4877cc039bf00aace77a7cace9eb7995727",
+      "file": "D-REVIEW-RESULTS.json",
+      "sha256": "e240f6fac316c9eb4a79dd1b5419e4877cc039bf00aace77a7cace9eb7995727"
+    },
+    {
+      "source": "tasks/WebDAV/lab/probe-result-initial-lock-refusal.json",
+      "sourceSha256": "cb684827e79db1a555737a2b003ee71addf0c10599f1346d3392090dbdfe634c",
+      "file": "probe-result-initial-lock-refusal.json",
+      "sha256": "9f5053b1618217e6342ca5002c92861767336c3abb0dbb78465d97f30788916e"
+    },
+    {
+      "source": "tasks/WebDAV/lab/probe-result.json",
+      "sourceSha256": "d942a4d463b6d1333b37ce1fe96f6b7f59560fa3762a94ee89789e3231c3a1d0",
+      "file": "probe-result.json",
+      "sha256": "99deffadec399fa7d6556e4598291830c143fe407f22d3d8a25c79d9113a31b5"
+    },
+    {
+      "source": "tasks/WebDAV/D-SUPPORT-AND-RELEASE-STATUS.md",
+      "sourceSha256": "ebae40eba832f94f26a6e883054a97ae5c1c4da92342871aea64de9de8231c8c",
+      "file": "D-SUPPORT-AND-RELEASE-STATUS.json",
+      "sha256": "138b7800c882249392b29bb6097234808e86b3a3a93b7bae7f44aa90c4c78f5b",
+      "representation": "JSON wrapper preserves the original Markdown report as data, not active guidance."
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-fresh-up.log",
+      "sourceSha256": "43bc1d93c1dd65bd702ef0d61d657623292417443131007d71743fecaa31934c",
+      "file": "e2e-portability-fresh-up.log",
+      "sha256": "b6e9fcb0876c8545f13f9b6e57f81992fd41e90c905dd84b6cc55664aea9c496"
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-fresh-up-corrected.log",
+      "sourceSha256": "4042ba7eae56e2a183c1f20b704781847b97e35dbd982f776e8aea086ca5395b",
+      "file": "e2e-portability-fresh-up-corrected.log",
+      "sha256": "4042ba7eae56e2a183c1f20b704781847b97e35dbd982f776e8aea086ca5395b"
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-clean-bootstrap.log",
+      "sourceSha256": "f478de215b4451d6ca7999ecc077c4f26205bd646691d5e068f19d38d79fc0b1",
+      "file": "e2e-portability-clean-bootstrap.log",
+      "sha256": "f478de215b4451d6ca7999ecc077c4f26205bd646691d5e068f19d38d79fc0b1"
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-run.log",
+      "sourceSha256": "b76d7b8afedaf89f4a1fc912ac531fcfd859c2aa5d6098b283fe3da04c59b1a9",
+      "file": "e2e-portability-run.log",
+      "sha256": "e09199322d6c952cedd9326776affea1cd8dacaf8bd926deb0b0d6df2e6717fa"
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-expected-failure.log",
+      "sourceSha256": "e3d49ee7551596189552b129ca20b8c16d5eb0b6ae6515ba3afa04e0cbba6e20",
+      "file": "e2e-portability-expected-failure.log",
+      "sha256": "ff4248a7e1a917f01980c93667b1b098ec272c200448368a1a9d25f52011af7f"
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-missing-credential.log",
+      "sourceSha256": "2a06d4b5e64586f890d9a9909d791373c863f46ec7b59869016c9937f54cab57",
+      "file": "e2e-portability-missing-credential.log",
+      "sha256": "2a06d4b5e64586f890d9a9909d791373c863f46ec7b59869016c9937f54cab57"
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-full-group-fixture-check.log",
+      "sourceSha256": "b89571a9681513f5536866c69b3b94790f60f6d8af0a85e3a2a80d9a1856783b",
+      "file": "e2e-portability-full-group-fixture-check.log",
+      "sha256": "1416d238b24b9d9c49c4a77ca92cc87e18ca3092ef18294491727fd713e4e80a"
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-full-group-fixtures-corrected.log",
+      "sourceSha256": "73d4578ac820f894e424e6d796684f5d9c6da194ee21ef5be686aea2bef362bd",
+      "file": "e2e-portability-full-group-fixtures-corrected.log",
+      "sha256": "73d4578ac820f894e424e6d796684f5d9c6da194ee21ef5be686aea2bef362bd"
+    },
+    {
+      "source": "tasks/WebDAV/e2e-portability-token-reissue.log",
+      "sourceSha256": "1347ed5ba779c35d2fb565f6533d06cddcc92bf1365ec81c02948b7746a71e5f",
+      "file": "e2e-portability-token-reissue.log",
+      "sha256": "1347ed5ba779c35d2fb565f6533d06cddcc92bf1365ec81c02948b7746a71e5f"
+    }
+  ],
+  "followupProof": {
+    "file": "portable-lab-proof.json",
+    "sha256": "69add96ecc1642c764a944185228935eda70b873f64355079b49beecf47fb1f6"
+  }
+}

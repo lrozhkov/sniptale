@@ -1,0 +1,25 @@
+
+Running 1 test using 1 worker
+
+(node:620853) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tooling/test/e2e/providers/webdav.spec.ts:720:1 › another browser reuses published files without media transfer and still rejects corrupt hydration (16.4s)
+
+
+  1) tooling/test/e2e/providers/webdav.spec.ts:720:1 › another browser reuses published files without media transfer and still rejects corrupt hydration 
+
+    Error: page.evaluate: NotFoundError: A requested file or directory could not be found at the time an operation was processed.
+
+      823 |       const beforeGets = lab.proxy.counts.getKeys.length;
+      824 |       const beforePuts = lab.proxy.counts.putBodies.length;
+    > 825 |       const next = await browser.page.evaluate(async (input) => {
+          |                                       ^
+      826 |         await window.webdavTransferHarness.portable.outgoing.reviseMetadata(input.projectId);
+      827 |         const prepared = await window.webdavTransferHarness.portable.outgoing.prepare(
+      828 |           input.projectId
+        at <worktree>/tooling/test/e2e/providers/webdav.spec.ts:825:39
+
+    Error Context: tasks/WebDAV/d-current-redis-reuse-corrected/webdav-another-browser-reu-b079f-l-rejects-corrupt-hydration/error-context.md
+
+  1 failed
+    tooling/test/e2e/providers/webdav.spec.ts:720:1 › another browser reuses published files without media transfer and still rejects corrupt hydration 

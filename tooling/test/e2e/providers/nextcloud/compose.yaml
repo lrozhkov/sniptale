@@ -1,0 +1,87 @@
+services:
+  db:
+    image: postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    mem_limit: 512m
+    cpus: 0.5
+    restart: 'no'
+    environment:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD_FILE: /run/secrets/database-password
+    secrets: [database-password]
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U nextcloud -d nextcloud']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '2'
+  redis:
+    image: redis@sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af
+    mem_limit: 128m
+    cpus: 0.25
+    restart: 'no'
+    env_file: ['${SNIPTALE_WEBDAV_LAB_STATE}/.secrets/locking.env']
+    command:
+      [
+        sh,
+        -c,
+        'exec redis-server --requirepass "$$LAB_REDIS_PASSWORD" --save "" --appendonly no --maxmemory 64mb --maxmemory-policy noeviction',
+      ]
+    tmpfs:
+      - /data:rw,noexec,nosuid,size=16m
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH=$$LAB_REDIS_PASSWORD redis-cli ping | grep -q PONG']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '2'
+  app:
+    image: nextcloud@sha256:1f9212adecae32010cdbf137d7e0db78d08c696dc3e77f1eddcbf902d10209b4
+    mem_limit: 2g
+    cpus: 2
+    restart: 'no'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - '127.0.0.1::80'
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD_FILE: /run/secrets/database-password
+      NEXTCLOUD_ADMIN_USER: labadmin
+      NEXTCLOUD_ADMIN_PASSWORD_FILE: /run/secrets/admin-password
+      NEXTCLOUD_TRUSTED_DOMAINS: '127.0.0.1 localhost'
+      PHP_MEMORY_LIMIT: 512M
+      PHP_UPLOAD_LIMIT: 256M
+    env_file: ['${SNIPTALE_WEBDAV_LAB_STATE}/.secrets/locking.env']
+    secrets: [database-password, admin-password]
+    volumes:
+      - nextcloud:/var/www/html
+      - ${SNIPTALE_WEBDAV_LAB_STATE}/locking.config.php:/run/sniptale-webdav-locking.php:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '2'
+secrets:
+  database-password:
+    file: ${SNIPTALE_WEBDAV_LAB_STATE}/.secrets/database-password
+  admin-password:
+    file: ${SNIPTALE_WEBDAV_LAB_STATE}/.secrets/admin-password
+volumes:
+  nextcloud:
+  database:

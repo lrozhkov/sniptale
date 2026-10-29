@@ -1,0 +1,16 @@
+Advisory: introduced=0, worsened=4, existing=25
+Worsened:
+- apps/extension/src/workflows/sync-transfer/outgoing.ts:1 [advisory.structural-file] score=3, delta=1, delta-kind=same-path, lines=792, owners=1, effects=1, state=0, clusters=0, cohesion=0.95 Hint: Narrow cross-owner edges or the exported surface. Extract only independently changing behavior, not line-count fragments. Keep cohesive transaction and orchestration boundaries intact.
+- apps/extension/src/workflows/sync-transfer/captured-project.ts:33 [advisory.structural-function] score=4, delta=4, delta-kind=same-path, lines=119, statements=36, cyclomatic=17, cognitive=17, nesting=2, recovery=0, params=2, effects=0, state=0, owners=2, cohesion=0.93 Hint: Name cohesive decision or recovery steps without breaking the transaction boundary.
+- apps/extension/src/workflows/sync-transfer/outgoing.ts:237 [advisory.structural-function] score=4, delta=4, delta-kind=new, lines=44, statements=27, cyclomatic=13, cognitive=20, nesting=3, recovery=1, params=2, effects=0, state=0, owners=2, cohesion=0.79 Hint: Name cohesive decision or recovery steps without breaking the transaction boundary.
+- apps/extension/src/workflows/sync-transfer/wire-record.ts:200 [advisory.structural-function] score=4, delta=4, delta-kind=new, lines=30, statements=6, cyclomatic=17, cognitive=16, nesting=1, recovery=0, params=3, effects=0, state=0, owners=1, cohesion=1.00 Hint: Name cohesive decision or recovery steps without breaking the transaction boundary.
+Existing context: 25 unchanged — see run log
+QA closeout: all passed in 54s
+Problems: none
+Timeline: wall=54s; critical=1ms; active=1ms
+Wait: queue=58ms; resource=58ms
+Slow: wrapper.host-admission=1ms
+Reused: none
+Skipped: none
+Run record: .tmp/qa-observability/runs/2026-10-29/f68cfe91-d660-476f-a831-e57e9333aac5.json
+Run log: .tmp/qa-logs/2026-10-29/f68cfe91-d660-476f-a831-e57e9333aac5.log

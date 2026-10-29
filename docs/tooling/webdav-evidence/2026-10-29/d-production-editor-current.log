@@ -1,0 +1,24 @@
+SyntaxError: <worktree>/tooling/test/e2e/providers/webdav-library.spec.ts: Missing semicolon. (1552:25)
+
+  1550 |           });
+  1551 |         } finally { db.close(); }
+> 1552 |       }, seed.projectId))).toBe(offlineTitle);
+       |                          ^
+  1553 |       await editor.close();
+  1554 |       console.info('production-proof', viewport.width, 'library-navigation');
+  1555 |       await openLibrary(target, viewport);
+
+   at webdav-library.spec.ts:1552
+
+  1550 |           });
+  1551 |         } finally { db.close(); }
+> 1552 |       }, seed.projectId))).toBe(offlineTitle);
+       |                         ^
+  1553 |       await editor.close();
+  1554 |       console.info('production-proof', viewport.width, 'library-navigation');
+  1555 |       await openLibrary(target, viewport);
+    at eval (<anonymous>:1:1)
+Error: No tests found.
+Make sure that arguments are regular expressions matching test files.
+You may need to escape symbols like "$" or "*" and quote the arguments.
+

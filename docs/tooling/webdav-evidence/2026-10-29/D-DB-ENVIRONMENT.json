@@ -1,0 +1,29 @@
+{
+  "profile": {
+    "profile": "db",
+    "endpoint": "http://127.0.0.1:36431",
+    "lockingConfig": "",
+    "configSha256": "066771716583d5e9e3e539eace6719369cb5fd7ac2806b7701ddae2ad4e2f932"
+  },
+  "server": {
+    "installed": true,
+    "version": "34.0.5.1",
+    "versionstring": "34.0.5",
+    "edition": "",
+    "maintenance": false,
+    "needsDbUpgrade": false,
+    "productname": "Nextcloud",
+    "extendedSupport": false
+  },
+  "services": {
+    "app": "nextcloud@sha256:1f9212adecae32010cdbf137d7e0db78d08c696dc3e77f1eddcbf902d10209b4 memory=2147483648 nanoCpus=2000000000",
+    "db": "postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b memory=536870912 nanoCpus=500000000",
+    "redis": "redis@sha256:6ba19c50b56777f5c11c58eff8ddb69d0d5f27ba131cffb63f180ccfd43c66af memory=134217728 nanoCpus=250000000"
+  },
+  "browserVersion": "156.0.8078.4",
+  "playwrightVersion": "1.64.1",
+  "tsdavVersion": "2.5.0",
+  "tls": "Browser uses the existing HTTPS lab proxy. Loopback upstream Nextcloud uses HTTP. The test browser accepts the lab certificate.",
+  "authentication": "Basic with a disposable Nextcloud app password. No credentials recorded.",
+  "dataScale": "Small physical fixtures. Large catalog proof is a metadata model test, not a physical 50 GiB dataset."
+}

@@ -1,0 +1,30 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts (67 tests | 1 failed | 66 skipped) 329ms
+   × publishes an offline metadata revision without materializing its deferred saved export 327ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export
+Error: Sync queue capture changed.
+ ❯ enqueueSyncQueueCaptureInTransaction apps/extension/src/composition/persistence/sync-capture/queue.ts:324:11
+    322|     JSON.stringify(current) !== JSON.stringify(capture)
+    323|   )
+    324|     throw new Error('Sync queue capture changed.');
+       |           ^
+    325|   const scope = {
+    326|     spaceId: profile.spaceId,
+ ❯ apps/extension/src/composition/persistence/sync-capture/queue.ts:386:20
+ ❯ apps/extension/src/composition/persistence/sync-capture/queue.ts:155:22
+ ❯ runWithActiveMutationPermit apps/extension/src/composition/persistence/infrastructure/mutation-barrier.ts:400:12
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:1865:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 66 skipped (67)
+   Start at  10:27:54
+   Duration  2.75s (transform 53%, import 34%, tests 13%)
+

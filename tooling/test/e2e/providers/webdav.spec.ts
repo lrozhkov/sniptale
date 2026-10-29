@@ -192,14 +192,17 @@ test('lost acknowledgements preserve exact replay bytes and cancellation preserv
 if (process.env['SNIPTALE_WEBDAV_TEST_REDIS_FAULTS'] === '1') {
   if (process.env['SNIPTALE_WEBDAV_TEST_PROFILE'] !== 'redis')
     throw new Error('Redis fault proof requires the Redis lab profile.');
+  const redisContainer =
+    process.env['SNIPTALE_WEBDAV_TEST_REDIS_CONTAINER'] ?? 'sniptale-webdav-lab-redis-1';
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/u.test(redisContainer))
+    throw new Error('Invalid Redis test container identity.');
   const docker = (command: 'stop' | 'start' | 'health') =>
-    promisify(execFile)('/usr/bin/sg', [
+    promisify(execFile)(
       'docker',
-      '-c',
       command === 'health'
-        ? "docker inspect --format '{{.State.Health.Status}}' sniptale-webdav-lab-redis-1"
-        : `docker ${command} sniptale-webdav-lab-redis-1`,
-    ]);
+        ? ['inspect', '--format', '{{.State.Health.Status}}', redisContainer]
+        : [command, redisContainer]
+    );
   test('real Redis outage refuses affected writes and restart preserves completed files', async ({
     lab,
   }, info) => {
@@ -998,12 +1001,16 @@ test('causal revisions and deletion cross WebDAV without echo or losing independ
         files: [...media, ...projects].flatMap((item) => item.files),
       };
     });
-    await target.page.evaluate(async (input) => {
-      const api = window.webdavTransferHarness.portable.outgoing;
-      await api.scan(input.spaceId);
-      await api.receive(input.spaceId, 'media', input.mediaId);
-      await api.receive(input.spaceId, 'video-project', input.projectId);
-    }, sent);
+    await target.page.evaluate(
+      async ({ input, credentials }) => {
+        const api = window.webdavTransferHarness.portable.outgoing;
+        await api.scan(input.spaceId);
+        await api.receive(input.spaceId, 'media', input.mediaId);
+        await window.webdavTransferHarness.connection.configure(credentials);
+        await api.receive(input.spaceId, 'video-project', input.projectId);
+      },
+      { input: sent, credentials: lab.credentials }
+    );
     const initial = await target.page.evaluate(
       (input) =>
         window.webdavTransferHarness.portable.outgoing.nativeState(
@@ -1207,16 +1214,20 @@ test('soft Trash and restore retain a shared original and its project across bro
         const project = await api.sendHistory(input.projectId);
         return [...media, ...project].flatMap((item) => item.files);
       }, seed);
-    const receive = () =>
-      target.page.evaluate(async (input) => {
-        const api = window.webdavTransferHarness.portable;
-        await api.outgoing.scan('provider-native-portable');
-        await api.outgoing.receive('provider-native-portable', 'media', input.mediaId);
-        await api.outgoing.receive('provider-native-portable', 'video-project', input.projectId);
-        return api.originalBinding(input.mediaId);
-      }, seed);
+    const receive = (initialize = false) =>
+      target.page.evaluate(
+        async ({ input, credentials, initialize }) => {
+          const api = window.webdavTransferHarness.portable;
+          await api.outgoing.scan('provider-native-portable');
+          await api.outgoing.receive('provider-native-portable', 'media', input.mediaId);
+          if (initialize) await window.webdavTransferHarness.connection.configure(credentials);
+          await api.outgoing.receive('provider-native-portable', 'video-project', input.projectId);
+          return api.originalBinding(input.mediaId);
+        },
+        { input: seed, credentials: lab.credentials, initialize }
+      );
     const files = await send();
-    const initial = await receive();
+    const initial = await receive(true);
     for (const restore of [false, true]) {
       await sender.page.evaluate(
         ({ input, restore }) =>

@@ -1,0 +1,35 @@
+{
+  "initialArchitecture": {
+    "agent": "d_final_architecture_sol",
+    "verdict": "Approve",
+    "allowances": "Seven exact Keep decisions accepted"
+  },
+  "initialSecurity": {
+    "agent": "d_final_security_sol",
+    "verdict": "Request changes",
+    "finding": "D-SEC-1: interrupted saved-export recovery"
+  },
+  "correction": {
+    "red": "d-owned-export-zero-red.log",
+    "green": "d-owned-export-zero-green.log",
+    "tests": 145,
+    "checkpoint": "6746905a-fc6c-435b-ac68-273af31c2d43"
+  },
+  "correctedArchitecture": {
+    "agent": "d_corrected_architecture_sol",
+    "verdict": "Approve",
+    "updatedKeepShapes": "Accepted"
+  },
+  "correctedSecurity": {
+    "agent": "d_corrected_security_sol",
+    "verdict": "Approve",
+    "D-SEC-1": "Resolved"
+  },
+  "closeout": {
+    "status": "passed",
+    "commit": "d9e247b5b73496e8a0f69332a49ebadfb4090f8b",
+    "record": "f68cfe91-d660-476f-a831-e57e9333aac5",
+    "durationSeconds": 54,
+    "reviewedSourceMatches": 27
+  }
+}

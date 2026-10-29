@@ -1,0 +1,26 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts (71 tests | 1 failed | 70 skipped) 301ms
+   × publishes an offline metadata revision without materializing its deferred saved export: normal 299ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: normal
+AssertionError: expected undefined to be defined
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:1967:27
+    1965|     expect(catalogProof.quarantined).toEqual([]);
+    1966|     const privateObject = wire.envelope.objects.find((item) => item.fi…
+    1967|     expect(privateObject).toBeDefined();
+       |                           ^
+    1968|     expect(parent.operation.envelope?.objects.find((item) => item.obje…
+    1969|       filename: privateObject.filename, size: privateObject.size, mime…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 70 skipped (71)
+   Start at  10:53:16
+   Duration  3.37s (transform 58%, import 32%, tests 9%, setup 1%)
+

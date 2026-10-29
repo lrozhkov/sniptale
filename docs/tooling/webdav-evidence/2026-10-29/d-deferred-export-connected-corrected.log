@@ -1,0 +1,37 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts (67 tests | 1 failed) 1458ms
+   × publishes an offline metadata revision without materializing its deferred saved export 73ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:1882:84
+    1880|   expect(result).toMatchObject({ status: 'finished', operation: { stat…
+    1881|   await expect(readAssetFile(ref, exported.filename)).rejects.toThrow(…
+    1882|   expect(f.remote.write.mock.calls.every(([key]) => key.startsWith('.s…
+       |                                                                                    ^
+    1883| });
+    1884|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 9 passed (10)
+      Tests  1 failed | 228 passed (229)
+   Start at  10:30:02
+   Duration  14.70s (import 59%, tests 21%, transform 18%, setup 1%)
+
+     Import  1111 modules were evaluated 1609 times · 7.96s total, 59% of tracked time
+             ~2.46s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+

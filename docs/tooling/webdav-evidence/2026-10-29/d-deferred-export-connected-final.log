@@ -1,0 +1,109 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts (71 tests | 4 failed) 6206ms
+   × publishes an offline metadata revision without materializing its deferred saved export: normal 262ms
+   × publishes an offline metadata revision without materializing its deferred saved export: temporary 222ms
+   × publishes an offline metadata revision without materializing its deferred saved export: copy-changed 313ms
+   × publishes an offline metadata revision without materializing its deferred saved export: connection-changed 228ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: normal
+AssertionError: expected [ …(2) ] to deeply equal [ StringMatching /^\.sniptale\//u ]
+
+- Expected
++ Received
+
+  [
+-   StringMatching /^\.sniptale\//u,
++   "Files/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/e9b329b2-cf24-4684-9057-a819633b8f48/video-000001-object-000001/Asset 001.png",
++   ".sniptale/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/records/e9b329b2-cf24-4684-9057-a819633b8f48-0e290bcd600a816c5ea67c23b084b7114b9eafacb9679d851ed8e622721caf53.json",
+  ]
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:2003:59
+    2001|     await expect(readAssetFile(ref, exported.filename)).rejects.toThro…
+    2002|     expect(f.remote.read.mock.calls.some(([key]) => key === remoteExpo…
+    2003|     expect(f.remote.write.mock.calls.map(([key]) => key)).toEqual([
+       |                                                           ^
+    2004|       expect.stringMatching(/^\.sniptale\//u),
+    2005|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: temporary
+AssertionError: expected [ …(2) ] to deeply equal [ StringMatching /^\.sniptale\//u ]
+
+- Expected
++ Received
+
+  [
+-   StringMatching /^\.sniptale\//u,
++   "Files/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/c0802782-a877-4bbe-adaf-9ff04ec550fa/video-000001-object-000001/Asset 001.png",
++   ".sniptale/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/records/c0802782-a877-4bbe-adaf-9ff04ec550fa-979bc45689c834abd08c8d58ffd9e122dd286b6496f0554daf5f5aa810895e58.json",
+  ]
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:2003:59
+    2001|     await expect(readAssetFile(ref, exported.filename)).rejects.toThro…
+    2002|     expect(f.remote.read.mock.calls.some(([key]) => key === remoteExpo…
+    2003|     expect(f.remote.write.mock.calls.map(([key]) => key)).toEqual([
+       |                                                           ^
+    2004|       expect.stringMatching(/^\.sniptale\//u),
+    2005|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: copy-changed
+AssertionError: expected [ …(2) ] to deeply equal [ StringMatching /^\.sniptale\//u ]
+
+- Expected
++ Received
+
+  [
+-   StringMatching /^\.sniptale\//u,
++   "Files/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/ead3bd13-2212-4200-82f9-6045b69f4a2d/video-000001-object-000001/Asset 001.png",
++   ".sniptale/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/records/ead3bd13-2212-4200-82f9-6045b69f4a2d-c4269d6becec3c0e1113c93a2c12c9b9bd903d9a6f9d37ffc4f44a0eab75e876.json",
+  ]
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:2003:59
+    2001|     await expect(readAssetFile(ref, exported.filename)).rejects.toThro…
+    2002|     expect(f.remote.read.mock.calls.some(([key]) => key === remoteExpo…
+    2003|     expect(f.remote.write.mock.calls.map(([key]) => key)).toEqual([
+       |                                                           ^
+    2004|       expect.stringMatching(/^\.sniptale\//u),
+    2005|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export: connection-changed
+AssertionError: expected [ …(2) ] to deeply equal [ StringMatching /^\.sniptale\//u ]
+
+- Expected
++ Received
+
+  [
+-   StringMatching /^\.sniptale\//u,
++   "Files/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/bb17844c-41e8-40bd-b187-420354b666e9/video-000001-object-000001/Asset 001.png",
++   ".sniptale/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/records/bb17844c-41e8-40bd-b187-420354b666e9-effb850b31506cc3f253f77bcee404179f17d94229b8f8b81275a2cc9e808ea2.json",
+  ]
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:2003:59
+    2001|     await expect(readAssetFile(ref, exported.filename)).rejects.toThro…
+    2002|     expect(f.remote.read.mock.calls.some(([key]) => key === remoteExpo…
+    2003|     expect(f.remote.write.mock.calls.map(([key]) => key)).toEqual([
+       |                                                           ^
+    2004|       expect.stringMatching(/^\.sniptale\//u),
+    2005|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed | 9 passed (10)
+      Tests  4 failed | 229 passed (233)
+   Start at  10:43:07
+   Duration  35.45s (import 51%, tests 28%, transform 20%, setup 1%)
+
+     Import  1111 modules were evaluated 1609 times · 16.94s total, 51% of tracked time
+             ~5.24s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+

@@ -48,6 +48,7 @@ This index lists current active documents and their authority.
 - [Wrapper summary](tooling/wrapper-summary.md) explains wrapper behavior.
 - [Code quality](tooling/code-quality.md) owns gate and exception policy.
 - [Web Snapshot Smoke](tooling/web-snapshot-smoke.md) owns local checks of snapshot fidelity.
+- [Optional WebDAV E2E](tooling/webdav-e2e.md) owns the disposable provider lab and links the retained qualification evidence.
 - [WSL setup](tooling/wsl-setup.md) owns environment setup. [Repository root inventory](tooling/repo-root-inventory.md) owns required root entries.
 - `docs/agent-tooling/agent-tooling.zip` is the optional agent-tooling distribution. `npm run agents:pack`, `npm run agents:install`, and `npm run agents:remove` own its lifecycle.
 - [Data handling](security/data-handling.md), [manifest permissions](security/manifest-permissions.md), and [threat model](security/threat-model.md) own security policy.

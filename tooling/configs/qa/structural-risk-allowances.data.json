@@ -3130,10 +3130,10 @@
       "file": "tooling/test/e2e/providers/webdav.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: The existing provider suite shares one DAV lab and browser fixture. Changed metadata-reuse proof retains cold and warm catalog checks, restart, ordinary remote references and corrupt hydration refusal. No production owner or new test platform enters this file. Main inspected this exact shape. Final independent architecture review must validate Keep.",
+      "reason": "tool-noise: The existing provider suite shares one DAV lab and browser fixture. Changed metadata-reuse proof retains cold and warm catalog checks, restart, ordinary remote references and corrupt hydration refusal. No production owner or new test platform enters this file. Main inspected this exact shape. Final independent architecture review must validate Keep. The optional portable lab supplies its exact Redis container identity to the existing outage case. Direct argv execution replaces the host-specific sg wrapper. No product authority or additional fixture enters this file. Final architecture review must inspect this exact update. Two legacy project consumers now configure native connection authority after initial media admission. Their existing causal, deletion and Trash assertions are preserved.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any new authority, transaction, writer, lifetime or independent contract. Remove when the analyzer models this boundary.",
       "reviewDate": "2026-10-29",
-      "astHash": "49356e60d1c27da5999c25d278ffb04ae22b4260e56b4210398e8868c859b87c",
+      "astHash": "42f519794856b6b36a3a36ddd4748a1ce6e8ea3abfb3c85287494d377e2fac98",
       "signatureHash": "352831f876464694eddd3698117ac787e971c8cc588b19fbcb7852273856a9e7"
     },
     {
