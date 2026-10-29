@@ -78,7 +78,7 @@ for (const viewport of [
   { width: 1920, height: 900 },
   { width: 1280, height: 560 },
 ]) {
-  test(`native project application preserves Library sources through editor save and restart ${viewport.width}`, async ({}, info) => {
+  test(`native project keeps Library sources after editor save and restart ${viewport.width}`, async ({}, info) => {
     test.setTimeout(120_000);
     const host = await startHostServer();
     const profile = info.outputPath('application-profile');

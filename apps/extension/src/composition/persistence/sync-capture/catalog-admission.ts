@@ -1,3 +1,4 @@
+import { readCaptureRootState } from './guards';
 import { readScenarioProjectDependenciesInTransaction } from './scenario-dependencies';
 import { readOutgoingOperation } from './outgoing';
 import { readScenarioStorage } from '../scenario/storage';
@@ -66,20 +67,9 @@ async function rootState(
   rootId: string
 ) {
   const rootKey = captureRootKey(spaceId, rootKind, rootId);
-  const key = JSON.stringify(['root-state', rootKey]);
-  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key);
-  if (raw === undefined) return null;
-  const state = parseSyncCaptureRecord(raw);
-  if (
-    !state ||
-    state.kind !== 'root-state' ||
-    state.key !== key ||
-    state.rootKey !== rootKey ||
-    state.spaceId !== spaceId ||
-    state.rootKind !== rootKind ||
-    state.rootId !== rootId
-  )
-    refuse();
+  const state = await readCaptureRootState(tx, rootKey, refuse);
+  if (!state) return null;
+  if (state.spaceId !== spaceId || state.rootKind !== rootKind || state.rootId !== rootId) refuse();
   return state;
 }
 

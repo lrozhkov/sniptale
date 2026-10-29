@@ -26,6 +26,12 @@
       "owner": "sync-webdav-provider",
       "justification": "The WebDAV adapter owns resolved provider authentication for one explicitly selected HTTPS root.",
       "reviewNote": "Resolve credentials in memory for each HTTP request. Require injected durable connection and origin-permission admission at actual fetch invocation, including the initial probe and DAV subrequests. Omit cookies, reject redirects and restrict requests to the selected root. Bound DAV metadata before parsing. Never log response bodies, addresses, filenames or raw errors. Track and drain issued requests outside the short admission lock."
+    },
+    {
+      "file": "tooling/test/e2e/providers/webdav-fixtures.ts",
+      "owner": "optional-webdav-loopback-provider-fixture",
+      "justification": "The optional provider fixture authenticates its synthetic collection and verifies ordinary originals independently from the extension transport.",
+      "reviewNote": "Require an explicit loopback HTTP URL without embedded credentials, query or fragment. Restrict writes and cleanup to the randomly generated test child. Reject redirects. Read generated test credentials from the ignored secret file; never log credentials or authorization values. This fixture is outside product runtime and required CI."
     }
   ],
   "credentialedFetchOwners": [

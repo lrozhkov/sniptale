@@ -1,5 +1,9 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { parseConnectionBinding, type SyncConnectionBinding } from '../remote-connection/model';
+import {
+  connectionText,
+  parseConnectionBinding,
+  type SyncConnectionBinding,
+} from '../remote-connection/model';
 import type { CaptureRootKind } from '../sync-capture/contracts';
 import type { AssetRef } from './contracts';
 import { parseAssetRef } from './guards';
@@ -60,15 +64,9 @@ function exact(value: Record<string, unknown>, keys: readonly string[]): boolean
   );
 }
 function text(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= 4096 &&
-    Array.from(value).every(
-      (character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127
-    )
-  );
+  return connectionText(value, 4096);
 }
+
 function ordinal(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }

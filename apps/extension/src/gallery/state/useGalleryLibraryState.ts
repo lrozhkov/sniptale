@@ -17,7 +17,7 @@ import {
   type GalleryMediaItem,
 } from '../library/items';
 import type { GalleryTrashSize } from '../library/types';
-import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
+import { loadGalleryLibrarySnapshot } from '../library/snapshot';
 
 interface UseGalleryLibraryStateOptions {
   onBanner: (message: string) => void;

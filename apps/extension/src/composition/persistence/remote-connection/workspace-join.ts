@@ -1,3 +1,4 @@
+import { connectionText, connectionExact as exact } from './model';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -40,21 +41,6 @@ const stores = [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, SYNC_OUTBOX_STORE];
 function refused(): never {
   throw new Error('Sync workspace join admission refused.');
 }
-function exact(value: Record<string, unknown>, keys: string[]): boolean {
-  return (
-    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
-  );
-}
-function account(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= 1024 &&
-    Array.from(value).every(
-      (character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127
-    )
-  );
-}
 function sameWorkspace(left: SyncWorkspaceIdentity, right: SyncWorkspaceIdentity): boolean {
   return (
     left.spaceId === right.spaceId &&
@@ -82,7 +68,7 @@ function parseJoin(value: unknown): SyncWorkspaceJoin | null {
     value['kind'] !== 'sync-workspace-join' ||
     value['key'] !== 'workspace-join' ||
     value['provider'] !== 'webdav' ||
-    !account(value['accountId']) ||
+    !connectionText(value['accountId'], 1024) ||
     typeof value['createdAt'] !== 'number' ||
     !Number.isSafeInteger(value['createdAt']) ||
     value['createdAt'] < 0
@@ -178,7 +164,7 @@ export async function createSyncWorkspaceJoin(
   if (
     !isRecord(detached) ||
     !exact(detached, ['rootUrl', 'accountId', 'expected']) ||
-    !account(detached['accountId']) ||
+    !connectionText(detached['accountId'], 1024) ||
     (expectedIdentityInput !== null && !expectedIdentity)
   )
     return refused();

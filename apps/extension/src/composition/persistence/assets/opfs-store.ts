@@ -677,3 +677,13 @@ export async function countAssetStorageRoots(options: AssetOpfsOptions = {}): Pr
   }
   return count;
 }
+
+/** Attempt every prepared-object cleanup and retain each refusal for caller-owned rollback. */
+export async function collectPreparedAssetCleanupFailures(
+  assetIds: readonly string[]
+): Promise<unknown[]> {
+  const results = await Promise.allSettled(assetIds.map((id) => discardPreparedAsset(id)));
+  return results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+}

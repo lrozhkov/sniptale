@@ -1,3 +1,6 @@
+import { isCaptureDependencyVersion } from './guards';
+import { readAppliedCaptureReceipt } from './guards';
+import { isCaptureReplicaHeader } from './guards';
 import {
   parseSyncConnectionIdentity,
   type SyncConnectionIdentity,
@@ -97,14 +100,7 @@ function isApplyReviewHeader(value: unknown): value is ApplyReviewHeader {
     (value['authorization'] !== undefined &&
       !parseSyncConnectionIdentity(value['authorization'])) ||
     !isBoundedImageMetadata(value, false) ||
-    !identity(value['operationId']) ||
-    !identity(value['spaceId']) ||
-    typeof value['sourceDigest'] !== 'string' ||
-    !/^[a-f0-9]{64}$/u.test(value['sourceDigest']) ||
-    !ordinal(value['profileCreatedAt']) ||
-    !ordinal(value['connectionGeneration']) ||
-    value['connectionGeneration'] < 1 ||
-    !ordinal(value['expectedLocalGeneration']) ||
+    !isCaptureReplicaHeader(value) ||
     (value['expectedWorkspaceRevision'] !== null && !ordinal(value['expectedWorkspaceRevision'])) ||
     !Array.isArray(value['expectedBasis']) ||
     !value['expectedBasis'].every(identity) ||
@@ -141,11 +137,7 @@ function parseReviewDependency(raw: unknown): Dependency | null {
     !isSupportedReviewDependencySource(entry) ||
     entry.size !== ref.size ||
     entry.mimeType !== ref.mimeType ||
-    !ordinal(raw['expectedGeneration']) ||
-    raw['expectedGeneration'] < 1 ||
-    !Array.isArray(raw['expectedBasis']) ||
-    raw['expectedBasis'].length !== 1 ||
-    !raw['expectedBasis'].every(identity)
+    !isCaptureDependencyVersion(raw)
   )
     return null;
   return {
@@ -224,21 +216,17 @@ async function receipt(
   tx: ReadTx,
   input: ApplyPreparedVideoReviewReplicaInput
 ): Promise<number | null> {
-  const key = JSON.stringify(['applied-operation', input.spaceId, input.operationId]);
-  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key);
-  if (raw === undefined) return null;
-  const parsed = parseSyncCaptureRecord(raw);
-  if (
-    !parsed ||
-    parsed.kind !== 'applied-operation' ||
-    parsed.key !== key ||
-    parsed.spaceId !== input.spaceId ||
-    parsed.operationId !== input.operationId ||
-    parsed.rootKey !== rootKey(input) ||
-    parsed.sourceDigest !== input.sourceDigest
-  )
-    refused();
-  return parsed.generation;
+  return readAppliedCaptureReceipt(
+    tx,
+    {
+      rootKey: rootKey(input),
+      receiptKey: JSON.stringify(['applied-operation', input.spaceId, input.operationId]),
+      spaceId: input.spaceId,
+      operationId: input.operationId,
+      sourceDigest: input.sourceDigest,
+    },
+    refused
+  );
 }
 async function profile(tx: ReadTx, input: ApplyPreparedVideoReviewReplicaInput, enabled: boolean) {
   const parsed = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));

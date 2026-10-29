@@ -1,12 +1,12 @@
+import { readCaptureRootState } from './guards';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
 import type { ScenarioAssetEntry } from '../scenario/contracts';
 import { parseAssetOwner, parseAssetRef } from '../assets/guards';
 import type { AssetRef } from '../assets/contracts';
-import { ASSET_OWNERS_STORE, SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
+import { ASSET_OWNERS_STORE } from '../infrastructure/indexed-db/core.stores';
 import { captureRootKey, type CausalRootDependency } from './contracts';
-import { parseSyncCaptureRecord } from './guards';
 import { freezeScenarioInTransaction, digestCapturedScenarioRows } from './scenario-snapshot';
 
 type ScenarioTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
@@ -117,13 +117,9 @@ async function readScenarioProjectDependency(
   )
     return null;
   const rootKey = captureRootKey(spaceId, 'scenario-project', dependency.rootId);
-  const key = JSON.stringify(['root-state', rootKey]);
-  const state = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get(key));
+  const state = await readCaptureRootState(tx, rootKey, undefined);
   if (
     !state ||
-    state.kind !== 'root-state' ||
-    state.key !== key ||
-    state.rootKey !== rootKey ||
     state.rootKind !== 'scenario-project' ||
     state.rootId !== dependency.rootId ||
     state.spaceId !== spaceId ||

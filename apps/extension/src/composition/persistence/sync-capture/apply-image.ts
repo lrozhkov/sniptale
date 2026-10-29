@@ -1,3 +1,6 @@
+import { parseAppliedCaptureReceipt } from './guards';
+import { isCaptureReplicaHeader } from './guards';
+import { identity, ordinal } from './guards';
 import {
   parseSyncConnectionIdentity,
   type SyncConnectionIdentity,
@@ -119,12 +122,6 @@ interface HydratedImageReplica {
 }
 type ImageDeleteOperation = ReturnType<typeof buildPhysicalDeleteOperation>;
 
-function ordinal(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-function identity(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length <= 256;
-}
 function refuseImageReplica(): never {
   throw new Error('Image replica predecessor changed.');
 }
@@ -136,14 +133,7 @@ function parseImageReplicaIdentity(value: Record<string, unknown>): ImageReplica
       : parseSyncConnectionIdentity(value['authorization']);
   if (
     authorization === null ||
-    !identity(value['operationId']) ||
-    !identity(value['spaceId']) ||
-    typeof value['sourceDigest'] !== 'string' ||
-    !/^[a-f0-9]{64}$/u.test(value['sourceDigest']) ||
-    !ordinal(value['profileCreatedAt']) ||
-    !ordinal(value['connectionGeneration']) ||
-    value['connectionGeneration'] < 1 ||
-    !ordinal(value['expectedLocalGeneration']) ||
+    !isCaptureReplicaHeader(value) ||
     (value['expectedNativeRevision'] !== null && !ordinal(value['expectedNativeRevision'])) ||
     !Array.isArray(value['expectedBasis']) ||
     value['expectedBasis'].length !== (value['expectedLocalGeneration'] === 0 ? 0 : 1) ||
@@ -325,19 +315,18 @@ function parseImageReplicaReceipt(
   keys: ImageReplicaKeys,
   message: string
 ): number | null {
-  if (raw === undefined) return null;
-  const receipt = parseSyncCaptureRecord(raw);
-  if (
-    !receipt ||
-    receipt.kind !== 'applied-operation' ||
-    receipt.key !== keys.receiptKey ||
-    receipt.spaceId !== input.spaceId ||
-    receipt.rootKey !== keys.rootKey ||
-    receipt.operationId !== input.operationId ||
-    receipt.sourceDigest !== input.sourceDigest
-  )
-    throw new Error(message);
-  return receipt.generation;
+  return parseAppliedCaptureReceipt(
+    raw,
+    {
+      ...keys,
+      spaceId: input.spaceId,
+      operationId: input.operationId,
+      sourceDigest: input.sourceDigest,
+    },
+    () => {
+      throw new Error(message);
+    }
+  );
 }
 
 async function readCompletedImageReceipt(

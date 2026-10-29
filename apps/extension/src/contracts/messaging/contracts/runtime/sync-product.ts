@@ -137,6 +137,28 @@ export function parseSyncProductWork(value: unknown): SyncProductWork | null {
   }
   return null;
 }
+function parseCacheBudget(
+  value: Record<string, unknown>
+): Extract<SyncProductCommand, { kind: 'cache-budget' }> | null {
+  return exact(value, ['kind', 'budgetBytes', 'revision']) &&
+    ordinal(value['budgetBytes']) &&
+    ordinal(value['revision'])
+    ? { kind: 'cache-budget', budgetBytes: value['budgetBytes'], revision: value['revision'] }
+    : null;
+}
+function hasProductRequestIdentity(
+  value: Record<string, unknown>
+): value is Record<string, unknown> & { requestId: string } {
+  return (
+    exact(value, [
+      'kind',
+      'requestId',
+      ...(Object.hasOwn(value, 'advisory') ? ['advisory'] : []),
+    ]) &&
+    (!Object.hasOwn(value, 'advisory') || value['advisory'] === true) &&
+    connectionUuid(value['requestId'])
+  );
+}
 export function parseSyncProductCommand(value: unknown): SyncProductCommand | null {
   if (!isRecord(value)) return null;
   const work = parseSyncProductWork(value);
@@ -146,13 +168,7 @@ export function parseSyncProductCommand(value: unknown): SyncProductCommand | nu
     return expected ? { kind: 'connection-local-only', expected } : null;
   }
   if (value['kind'] === 'cache-status' && exact(value, ['kind'])) return { kind: 'cache-status' };
-  if (
-    value['kind'] === 'cache-budget' &&
-    exact(value, ['kind', 'budgetBytes', 'revision']) &&
-    ordinal(value['budgetBytes']) &&
-    ordinal(value['revision'])
-  )
-    return { kind: 'cache-budget', budgetBytes: value['budgetBytes'], revision: value['revision'] };
+  if (value['kind'] === 'cache-budget') return parseCacheBudget(value);
   if (value['kind'] === 'cache-root-status' && exact(value, ['kind', 'root'])) {
     const root = nativeRoot(value['root']);
     return root ? { kind: 'cache-root-status', root } : null;
@@ -172,13 +188,7 @@ export function parseSyncProductCommand(value: unknown): SyncProductCommand | nu
   }
   if (
     (value['kind'] === 'inspect' || value['kind'] === 'cancel') &&
-    exact(value, [
-      'kind',
-      'requestId',
-      ...(Object.hasOwn(value, 'advisory') ? ['advisory'] : []),
-    ]) &&
-    (!Object.hasOwn(value, 'advisory') || value['advisory'] === true) &&
-    connectionUuid(value['requestId'])
+    hasProductRequestIdentity(value)
   )
     return value['kind'] === 'inspect'
       ? {
@@ -603,16 +613,7 @@ function status(value: unknown): SyncProductStatus | null {
 }
 export function parseSyncProductResult(value: unknown): SyncProductResult | null {
   if (!isRecord(value)) return null;
-  if (
-    value['kind'] === 'accepted' &&
-    exact(value, [
-      'kind',
-      'requestId',
-      ...(Object.hasOwn(value, 'advisory') ? ['advisory'] : []),
-    ]) &&
-    (!Object.hasOwn(value, 'advisory') || value['advisory'] === true) &&
-    connectionUuid(value['requestId'])
-  )
+  if (value['kind'] === 'accepted' && hasProductRequestIdentity(value))
     return { kind: 'accepted', requestId: value['requestId'] };
   if (value['kind'] === 'cache-status' && exact(value, ['kind', 'status'])) {
     const status = cacheStatus(value['status']);
@@ -622,13 +623,7 @@ export function parseSyncProductResult(value: unknown): SyncProductResult | null
     const status = cacheRootStatus(value['status']);
     return status ? { kind: 'cache-root', status } : null;
   }
-  if (
-    value['kind'] === 'cache-budget' &&
-    exact(value, ['kind', 'budgetBytes', 'revision']) &&
-    ordinal(value['budgetBytes']) &&
-    ordinal(value['revision'])
-  )
-    return { kind: 'cache-budget', budgetBytes: value['budgetBytes'], revision: value['revision'] };
+  if (value['kind'] === 'cache-budget') return parseCacheBudget(value);
   if (value['kind'] === 'local-only-refused' && exact(value, ['kind', 'code'])) {
     const code = value['code'];
     return code === 'missing-bytes' ||

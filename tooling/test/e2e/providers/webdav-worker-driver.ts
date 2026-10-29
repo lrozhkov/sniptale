@@ -341,7 +341,12 @@ export async function launchWebdavWorkerDriver(options: DriverOptions) {
         const result = await call(
           'Runtime.evaluate',
           {
-            expression: `new Promise((resolve,reject)=>chrome.developerPrivate.addHostPermission(${JSON.stringify(extensionId)},${JSON.stringify(origin + '/*')},()=>chrome.runtime.lastError?reject(new Error('Origin grant refused')):resolve(true)))`,
+            expression: [
+              `new Promise((resolve,reject)=>`,
+              `chrome.developerPrivate.addHostPermission(${JSON.stringify(extensionId)},`,
+              `${JSON.stringify(origin + '/*')},`,
+              `()=>chrome.runtime.lastError?reject(new Error('Origin grant refused')):resolve(true)))`,
+            ].join(''),
             awaitPromise: true,
             returnByValue: true,
           },

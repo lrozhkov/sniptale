@@ -8,7 +8,7 @@ import type {
   loadCatalogReplicaAdmission,
 } from '../../composition/persistence/sync-capture/catalog-admission';
 import { encodePortableVideoProjectAssetRefs } from '../media-hub-backup/v6/root-codecs/projects';
-import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
+import { assertMetadataJson, parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { createAutomaticCatalogSync } from './automatic';
 import { projectSyncCatalog, syncCatalogRootKey, type CatalogAttempt } from './catalog-graph';
 import type { applyCatalogDeletion } from './incoming';
@@ -186,19 +186,23 @@ it('reads 10000 remote-only roots without originals or native publication', asyn
   if (!template.operation.envelope) throw new Error('Expected edit envelope');
   const envelope = template.operation.envelope;
   const records: CatalogAttempt[] = [];
+  const recordPrefix = `.sniptale/${hashSyncText(scope.spaceId)}/records/`;
   for (let index = 0; index < 10_000; index++) {
     const rootId = `project-asset:remote-${String(index).padStart(5, '0')}`;
-    const operationText = JSON.stringify({
+    // The catalog consumer receives parsed operations. Vary the validated template's root identities.
+    const rootMetadata = metadata(rootId);
+    assertMetadataJson(rootMetadata);
+    const operation: CatalogAttempt['operation'] = {
       ...template.operation,
       operationId: rootId,
       rootId,
       envelope: {
         ...envelope,
         descriptor: { ...envelope.descriptor, rootId },
-        metadata: metadata(rootId),
+        metadata: rootMetadata,
       },
-    });
-    const operation = await parseSyncOperationText(operationText);
+    };
+    const operationText = JSON.stringify(operation);
     const physicalText = JSON.stringify({
       format: 'sniptale-sync-attempt',
       version: 1,
@@ -212,9 +216,11 @@ it('reads 10000 remote-only roots without originals or native publication', asyn
       ...template,
       operation,
       operationText,
-      recordKey: `.sniptale/${hashSyncText(scope.spaceId)}/records/${physicalName}`,
+      recordKey: `${recordPrefix}${physicalName}`,
     });
   }
+  for (const record of [records[0]!, records.at(-1)!])
+    expect(await parseSyncOperationText(record.operationText)).toEqual(record.operation);
   const input = args(catalog(records));
   expect(input.catalog.roots.size).toBe(10_000);
   expect(await createAutomaticCatalogSync().run(input)).toEqual({

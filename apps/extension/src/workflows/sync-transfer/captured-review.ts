@@ -1,7 +1,5 @@
-import {
-  createArchivePathAllocator,
-  sanitizeArchivePathSegment,
-} from '../../composition/archive-transfer';
+import { loadCapturedInventory, createCapturedRootEnvelope } from './captured-inventory';
+import { createArchivePathAllocator } from '../../composition/archive-transfer';
 import type { AssetRef } from '../../composition/persistence/assets';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import type { VideoReviewBackupDatabase } from '../../composition/persistence/review-workspaces/backup-restore';
@@ -22,7 +20,6 @@ import {
   parseCapturedVideoReviewRows,
   type CapturedVideoReviewRows,
 } from '../../composition/persistence/sync-capture/review-snapshot';
-import { assertPortableJson, parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { buildMediaRootInventory } from '../media-hub-backup/v6/inventory/media';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
@@ -51,13 +48,7 @@ export async function encodeCapturedVideoReviewRoot(value: CapturedVideoReviewRo
   });
   if (roots.length !== 1 || roots[0]!.descriptor.rootId !== aggregateId)
     throw new Error('Frozen video review inventory differs from its root.');
-  const loaded = await roots[0]!.load();
-  const objects = loaded.objects.map((object) => ({
-    ...object,
-    ref: { ...object.ref, filename: sanitizeArchivePathSegment(object.ref.filename) },
-  }));
-  const metadata: unknown = JSON.parse(JSON.stringify(loaded.metadata));
-  assertPortableJson(metadata);
+  const { objects, metadata } = await loadCapturedInventory(roots[0]!);
   const portable = parsePortableMediaMetadata(metadata);
   if (!portable.videoReview)
     throw new Error('Frozen video review inventory is missing its review.');
@@ -80,11 +71,7 @@ export async function encodeCapturedVideoReviewRoot(value: CapturedVideoReviewRo
   bind(portable.originalObjectId, rows.source.ref);
   for (const asset of portable.reviewAssets ?? [])
     bind(asset.objectId, refs.get(assets.get(asset.entry.id)?.assetId ?? ''));
-  const envelope = parseRootEnvelope({
-    descriptor: { ...roots[0]!.descriptor, metadataPath: 'Metadata/sync-root.json' },
-    metadata,
-    objects: objects.map((object) => object.ref),
-  });
+  const envelope = createCapturedRootEnvelope(roots[0]!, { metadata, objects });
   return { envelope, objects, bindings, reviewSourceMediaId: sourceMediaId };
 }
 

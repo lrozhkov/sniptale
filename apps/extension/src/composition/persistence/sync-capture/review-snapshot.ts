@@ -34,7 +34,8 @@ import { describeImageMetadata, isBoundedImageMetadata } from './image-snapshot'
 
 type ReadTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
 
-function parseReview(value: unknown): VideoWorkspaceSnapshot | null {
+/** Admit the native workspace and its matching optional draft together. */
+export function parseCapturedReview(value: unknown): VideoWorkspaceSnapshot | null {
   if (!isRecord(value)) return null;
   const workspace = parseVideoWorkspace(value['workspace']);
   if (!workspace) return null;
@@ -115,7 +116,7 @@ export function parseCapturedVideoReviewRows(value: unknown): CapturedVideoRevie
     )
   )
     return null;
-  const review = parseReview(value['review']);
+  const review = parseCapturedReview(value['review']);
   const thumbnail =
     value['thumbnail'] === undefined ? undefined : parseMediaThumbnailEntry(value['thumbnail']);
   const source = parseCapturedMediaRows(value['source']);
@@ -130,7 +131,7 @@ export function parseCapturedVideoReviewRows(value: unknown): CapturedVideoRevie
       : parseRows(value['projectExports'], parseProjectExportEntry);
   const refs = parseRows(value['refs'], parseAssetRef);
   const published = parseRows(value['media'], parseMedia);
-  const privateReviews = parseRows(value['privateReviews'], parseReview);
+  const privateReviews = parseRows(value['privateReviews'], parseCapturedReview);
   if (
     !review ||
     thumbnail === null ||
@@ -357,7 +358,7 @@ async function readReview(tx: ReadTransaction, id: string): Promise<VideoWorkspa
   const stored = await readWorkspaceStorage(tx, id);
   const draft: unknown = await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(id);
   if (stored.logical === undefined && draft === undefined) return null;
-  const review = parseReview({ workspace: stored.logical, draft: draft ?? null });
+  const review = parseCapturedReview({ workspace: stored.logical, draft: draft ?? null });
   if (!review || review.workspace.aggregateId !== id)
     throw new Error('Invalid native review snapshot.');
   return review;

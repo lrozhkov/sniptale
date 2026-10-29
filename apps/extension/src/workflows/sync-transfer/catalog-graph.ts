@@ -289,26 +289,17 @@ export function resolveSyncMediaDependency(
   if (requiredId === admittedId) return true;
   const version = immutableMediaVersion(required);
   if (version === null) return false;
-  const pending = [admittedId];
-  const visited = new Set<string>();
-  let reachesRequired = false;
-  while (pending.length) {
-    const id = pending.pop()!;
-    if (visited.has(id)) continue;
-    visited.add(id);
-    const operation = operations.get(id)?.operation;
-    if (
-      !operation ||
-      operation.rootKind !== 'media' ||
-      operation.rootId !== mediaId ||
-      operation.spaceId !== required.spaceId ||
-      immutableMediaVersion(operation) !== version
-    )
-      return false;
-    if (id === requiredId) reachesRequired = true;
-    else pending.push(...operation.parents);
-  }
-  return reachesRequired;
+  return compatibleDependencyAncestry(
+    operations,
+    admittedId,
+    requiredId,
+    (operation) =>
+      operation.rootKind === 'media' &&
+      operation.rootId === mediaId &&
+      operation.spaceId === required.spaceId &&
+      immutableMediaVersion(operation) === version,
+    false
+  );
 }
 
 function immutableScenarioChildren(
@@ -377,7 +368,26 @@ export function resolveSyncScenarioDependency(
   if (!required) return false;
   const version = immutableScenarioChildren(required, rootId, childIds);
   if (version === null) return false;
-  const pending = [admittedBasis[0]!];
+  return compatibleDependencyAncestry(
+    operations,
+    admittedBasis[0]!,
+    requiredId,
+    (operation) =>
+      operation.spaceId === required.spaceId &&
+      immutableScenarioChildren(operation, rootId, childIds) === version,
+    true
+  );
+}
+
+/** Check every causal branch against one immutable dependency identity. */
+function compatibleDependencyAncestry(
+  operations: ReadonlyMap<string, CatalogOperation>,
+  admittedId: string,
+  requiredId: string,
+  compatible: (operation: SyncOperation) => boolean,
+  refuseUnrelatedRoot: boolean
+): boolean {
+  const pending = [admittedId];
   const visited = new Set<string>();
   let reachesRequired = false;
   while (pending.length) {
@@ -385,15 +395,10 @@ export function resolveSyncScenarioDependency(
     if (visited.has(id)) continue;
     visited.add(id);
     const operation = operations.get(id)?.operation;
-    if (
-      !operation ||
-      operation.spaceId !== required.spaceId ||
-      immutableScenarioChildren(operation, rootId, childIds) !== version
-    )
-      return false;
+    if (!operation || !compatible(operation)) return false;
     if (id === requiredId) reachesRequired = true;
     else {
-      if (operation.parents.length === 0) return false;
+      if (refuseUnrelatedRoot && operation.parents.length === 0) return false;
       pending.push(...operation.parents);
     }
   }

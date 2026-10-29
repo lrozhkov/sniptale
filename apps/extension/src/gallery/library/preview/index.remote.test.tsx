@@ -36,7 +36,7 @@ vi.mock('../../../platform/runtime-messaging/sync-product-client', () => ({
     cancel: cancelReplicaMock,
   }),
 }));
-vi.mock('../../state/use-gallery-library-snapshot', () => ({
+vi.mock('../snapshot', () => ({
   loadGalleryLibrarySnapshot: loadNativeSnapshotMock,
 }));
 vi.mock('../actions/preview', () => ({ openInEditor: openNativeEditorMock }));

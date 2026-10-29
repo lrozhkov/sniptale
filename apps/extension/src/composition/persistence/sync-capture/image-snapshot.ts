@@ -37,12 +37,20 @@ export function describeImageMetadata(value: unknown): unknown {
 
 /** Bound native metadata without reading binary bytes or serializing class instances. */
 export function isBoundedImageMetadata(value: unknown, allowBlobs = true): boolean {
+  return isBoundedCaptureMetadata(value, { allowBlobs, allowNullPrototype: false });
+}
+
+/** Bound capture metadata with the source family's binary and object-prototype policy. */
+export function isBoundedCaptureMetadata(
+  value: unknown,
+  policy: { allowBlobs: boolean; allowNullPrototype: boolean }
+): boolean {
   const active = new WeakSet<object>();
   let nodes = 0;
   let characters = 0;
   function visit(item: unknown, depth: number): boolean {
     if (++nodes > 100_000 || depth > 64) return false;
-    if (item instanceof Blob) return allowBlobs && Number.isSafeInteger(item.size);
+    if (item instanceof Blob) return policy.allowBlobs && Number.isSafeInteger(item.size);
     if (typeof item === 'string') {
       characters += item.length;
       return characters <= MAX_CAPTURE_METADATA_BYTES;
@@ -50,7 +58,12 @@ export function isBoundedImageMetadata(value: unknown, allowBlobs = true): boole
     if (item === undefined || item === null || typeof item === 'boolean') return true;
     if (typeof item === 'number') return Number.isFinite(item);
     if (typeof item !== 'object' || active.has(item)) return false;
-    if (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype) return false;
+    if (
+      !Array.isArray(item) &&
+      Object.getPrototypeOf(item) !== Object.prototype &&
+      !(policy.allowNullPrototype && Object.getPrototypeOf(item) === null)
+    )
+      return false;
     active.add(item);
     const valid = Object.entries(item).every(([key, child]) => {
       characters += key.length;
@@ -61,8 +74,9 @@ export function isBoundedImageMetadata(value: unknown, allowBlobs = true): boole
   }
   return (
     visit(value, 0) &&
-    new TextEncoder().encode(JSON.stringify(describeImageMetadata(value))).byteLength <=
-      MAX_CAPTURE_METADATA_BYTES
+    new TextEncoder().encode(
+      JSON.stringify(policy.allowNullPrototype ? value : describeImageMetadata(value))
+    ).byteLength <= MAX_CAPTURE_METADATA_BYTES
   );
 }
 

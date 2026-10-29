@@ -467,8 +467,10 @@ test('offline saves exceed 128 captures and discovery resumes bounded pages afte
         .toBe('published');
     } catch (error) {
       const locks = await driver.evaluate(`navigator.locks.query().then(state => ({
-        held: state.held.filter(lock => lock.name.startsWith('sniptale:persistence')).map(({name,mode}) => ({name,mode})),
-        pending: state.pending.filter(lock => lock.name.startsWith('sniptale:persistence')).map(({name,mode}) => ({name,mode}))
+        held: state.held.filter(lock =>
+          lock.name.startsWith('sniptale:persistence')).map(({name,mode}) => ({name,mode})),
+        pending: state.pending.filter(lock =>
+          lock.name.startsWith('sniptale:persistence')).map(({name,mode}) => ({name,mode}))
       }))`);
       await saveProof(info, { stage: 'selected-native-read-refused', locks, pages });
       throw error;

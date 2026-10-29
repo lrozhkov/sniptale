@@ -1,8 +1,6 @@
+import { loadCapturedInventory, createCapturedRootEnvelope } from './captured-inventory';
 import { sha256 } from '@noble/hashes/sha2.js';
-import {
-  createArchivePathAllocator,
-  sanitizeArchivePathSegment,
-} from '../../composition/archive-transfer';
+import { createArchivePathAllocator } from '../../composition/archive-transfer';
 import { parseScenarioProjectEntry } from '../../composition/persistence/scenario/read-guards';
 import { getScenarioResourceReferences } from '../../features/scenario/project/public';
 import {
@@ -10,7 +8,6 @@ import {
   type CapturedScenarioRows,
 } from '../../composition/persistence/sync-capture/scenario-snapshot';
 import * as stores from '../../composition/persistence/infrastructure/indexed-db/core.stores';
-import { assertPortableJson, parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
 import { buildScenarioProjectRootInventory } from '../media-hub-backup/v6/inventory/scenario-projects';
 import type { AssetRef } from '../../composition/persistence/assets/contracts';
@@ -98,18 +95,8 @@ export async function encodeCapturedScenarioRoot(value: CapturedScenarioRows) {
   });
   if (roots.length !== 1 || roots[0]!.descriptor.rootId !== entry.id)
     throw new Error('Captured Scenario differs from its inventory.');
-  const loaded = await roots[0]!.load();
-  const objects = loaded.objects.map((object) => ({
-    ...object,
-    ref: { ...object.ref, filename: sanitizeArchivePathSegment(object.ref.filename) },
-  }));
-  const metadata: unknown = JSON.parse(JSON.stringify(loaded.metadata));
-  assertPortableJson(metadata);
-  const envelope = parseRootEnvelope({
-    descriptor: { ...roots[0]!.descriptor, metadataPath: 'Metadata/sync-root.json' },
-    metadata,
-    objects: objects.map((object) => object.ref),
-  });
+  const { objects, metadata } = await loadCapturedInventory(roots[0]!);
+  const envelope = createCapturedRootEnvelope(roots[0]!, { metadata, objects });
   const bindings: { objectId: string; ref: AssetRef }[] = [];
   return { envelope, objects, dependencies: rows.mediaDependencies ?? [], bindings };
 }

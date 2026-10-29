@@ -1,3 +1,4 @@
+import { useSyncCacheFeedback, SyncCacheFeedback } from '../../../ui/sync-cache-feedback';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -5,7 +6,6 @@ import type { SyncCacheRootStatus } from '../../../contracts/sync-cache';
 import type { SyncNativeEditingRoot } from '../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { createSyncProductClient } from '../../../platform/runtime-messaging/sync-product-client';
 import { translate, useAppLocale } from '../../../platform/i18n';
-import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { isGalleryMediaItem, type GalleryItem } from '../items';
 
 function nativeRoot(item: GalleryItem): SyncNativeEditingRoot | null {
@@ -35,17 +35,25 @@ function NativeRootCacheActions({
   useAppLocale();
   const [client] = useState(createSyncProductClient);
   const [status, setStatus] = useState<SyncCacheRootStatus | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [cancelRefused, setCancelRefused] = useState(false);
-  const [releasedBytes, setReleasedBytes] = useState<number | null>(null);
-  const [deferred, setDeferred] = useState(false);
   const active = useRef(false);
+  const {
+    failed,
+    setFailed,
+    cancelRefused,
+    setCancelRefused,
+    releasedBytes,
+    setReleasedBytes,
+    deferred,
+    setDeferred,
+    running,
+    setRunning,
+    cancelling,
+    cancel: cancelObservation,
+  } = useSyncCacheFeedback(active, (id) => client.cancel(id));
+  const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const request = useRef<{ id: string; kind: 'native' | 'native-release' } | null>(null);
   const waiter = useRef<AbortController | null>(null);
-  const cancelling = useRef(false);
   const revision = useRef(0);
   const read = useCallback(async () => {
     const current = ++revision.current;
@@ -87,7 +95,7 @@ function NativeRootCacheActions({
       window.removeEventListener('focus', invalidate);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [read, item]);
+  }, [read, item, setFailed]);
   const refresh = async () => {
     if (pending.current) return;
     setFailed(false);
@@ -185,30 +193,21 @@ function NativeRootCacheActions({
   };
   const cancel = async () => {
     const operation = request.current;
-    if (!operation || cancelling.current) return;
-    cancelling.current = true;
-    try {
-      const result = await client.cancel(operation.id);
-      if (!active.current || request.current !== operation) return;
-      if (result.kind === 'cancelled' && result.outcome === 'cancelled') {
+    if (!operation) return;
+    await cancelObservation({
+      requestId: operation.id,
+      isCurrent: () => request.current === operation,
+      async settle() {
         request.current = null;
         waiter.current?.abort();
-        setRunning(false);
         try {
           await read();
         } finally {
           pending.current = false;
           if (active.current) setBusy(false);
         }
-      } else setCancelRefused(true);
-    } catch {
-      if (active.current) {
-        if (request.current === operation) setCancelRefused(true);
-        else setFailed(true);
-      }
-    } finally {
-      cancelling.current = false;
-    }
+      },
+    });
   };
   if (status && !status.configured) return null;
   return (
@@ -288,21 +287,11 @@ function NativeRootCacheActions({
           </ProductActionButton>
         </div>
       ) : null}
-      {cancelRefused ? (
-        <p role="alert" className="text-xs">
-          {translate('shared.syncCache.cancelRefused')}
-        </p>
-      ) : null}
-      {releasedBytes !== null ? (
-        <p role="status" className="text-xs">
-          {translate('shared.syncCache.completed').replace('{bytes}', formatBytes(releasedBytes))}
-        </p>
-      ) : null}
-      {deferred ? (
-        <p role="status" className="text-xs">
-          {translate('shared.syncCache.deferred')}
-        </p>
-      ) : null}
+      <SyncCacheFeedback
+        cancelRefused={cancelRefused}
+        releasedBytes={releasedBytes}
+        deferred={deferred}
+      />
     </section>
   );
 }

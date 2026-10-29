@@ -274,12 +274,7 @@ function boundRefs(root: PreparedVideoProjectReplicaRoot): AssetRef[] {
     ...(root.exports ?? []).flatMap((item) => (item.thumbnail ? [item.thumbnail.ref] : [])),
     ...(root.snapshotRefs ?? []).map((binding) => binding.ref),
     ...(root.thumbnail ? [root.thumbnail.ref] : []),
-    ...(root.presentation
-      ? [
-          root.presentation.thumbnailRef,
-          ...(root.presentation.previewRef ? [root.presentation.previewRef] : []),
-        ]
-      : []),
+    ...preparedPresentationRefs(root.presentation),
   ];
   const unique = new Map<string, AssetRef>();
   for (const ref of refs) {
@@ -412,4 +407,13 @@ export async function hydratePreparedVideoProjectReplicaRoot(
     ...(thumbnail ? { thumbnail } : {}),
     ...(presentation ? { presentation } : {}),
   };
+}
+
+/** List each staged presentation slot in its native order. */
+export function preparedPresentationRefs(
+  presentation: { thumbnailRef: AssetRef; previewRef?: AssetRef } | null | undefined
+): AssetRef[] {
+  return presentation
+    ? [presentation.thumbnailRef, ...(presentation.previewRef ? [presentation.previewRef] : [])]
+    : [];
 }

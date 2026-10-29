@@ -1,3 +1,4 @@
+import { connectionText, connectionExact as exact } from './model';
 import type { IDBPTransaction } from 'idb';
 import {
   encodeSyncWorkspaceMarker,
@@ -44,21 +45,6 @@ type AllocationTransaction = IDBPTransaction<unknown, string[], 'readonly' | 're
 function refused(): never {
   throw new Error('Sync workspace allocation admission refused.');
 }
-function exact(value: Record<string, unknown>, keys: string[]): boolean {
-  return (
-    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
-  );
-}
-function account(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length > 0 &&
-    value.length <= 1024 &&
-    Array.from(value).every(
-      (character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127
-    )
-  );
-}
 function parseAllocation(value: unknown): SyncWorkspaceAllocation | null {
   if (
     !isRecord(value) ||
@@ -81,7 +67,7 @@ function parseAllocation(value: unknown): SyncWorkspaceAllocation | null {
     value['kind'] !== 'sync-workspace-allocation' ||
     value['key'] !== 'workspace-allocation' ||
     value['provider'] !== 'webdav' ||
-    !account(value['accountId']) ||
+    !connectionText(value['accountId'], 1024) ||
     !connectionUuid(value['spaceId']) ||
     !connectionUuid(value['bootstrapId']) ||
     typeof value['createdAt'] !== 'number' ||
@@ -237,7 +223,7 @@ export async function createSyncWorkspaceAllocation(
   if (
     !isRecord(detached) ||
     !exact(detached, ['parentUrl', 'accountId']) ||
-    !account(detached['accountId']) ||
+    !connectionText(detached['accountId'], 1024) ||
     (expectedInput !== null && !expected)
   )
     return refused();

@@ -569,15 +569,7 @@ async function unloadInlineInTransaction(
       throw new Error('Asset residency unloaded source contains unexpected bytes.');
     return copy;
   }
-  if (
-    !media.blob ||
-    media.blob.size !== target.size ||
-    media.blob.type !== target.blobType ||
-    (target.duplicatePreview &&
-      (!presentation?.previewBlob ||
-        presentation.previewBlob.size !== target.size ||
-        presentation.previewBlob.type !== target.duplicatePreview.blobType))
-  )
+  if (!inlineBytesMatch(target, media.blob, presentation?.previewBlob))
     throw new Error('Asset residency inline bytes changed.');
   const { blob: _blob, ...metadata } = rawMedia;
   await tx.objectStore(stores.MEDIA_LIBRARY_STORE).put(metadata);
@@ -600,15 +592,7 @@ async function restoreInlineInTransaction(
   );
   const current = await readAssetResidencyCopyInTransaction(tx, copy.id);
   if (current?.phase === 'resident') {
-    if (
-      !media.blob ||
-      media.blob.size !== target.size ||
-      media.blob.type !== target.blobType ||
-      (target.duplicatePreview &&
-        (!presentation?.previewBlob ||
-          presentation.previewBlob.size !== target.size ||
-          presentation.previewBlob.type !== target.duplicatePreview.blobType))
-    )
+    if (!inlineBytesMatch(target, media.blob, presentation?.previewBlob))
       throw new Error('Asset residency resident source bytes changed.');
     return current;
   }
@@ -638,4 +622,20 @@ async function hashInlineSource(source: Blob, signal?: AbortSignal): Promise<str
   }
   signal?.throwIfAborted();
   return Array.from(hash.digest(), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function inlineBytesMatch(
+  target: Extract<AssetResidencyCopy['target'], { kind: 'inline-image' }>,
+  blob: Blob | undefined,
+  preview: Blob | undefined
+): boolean {
+  return (
+    !!blob &&
+    blob.size === target.size &&
+    blob.type === target.blobType &&
+    (!target.duplicatePreview ||
+      (!!preview &&
+        preview.size === target.size &&
+        preview.type === target.duplicatePreview.blobType))
+  );
 }

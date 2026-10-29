@@ -239,7 +239,8 @@ async function openWorkspace(credentials: { rootUrl: string; username: string; p
         driver.evaluate(`window.webdavLifecycle.startWorkspace(${JSON.stringify(authentication)})`),
       refusedStart: () =>
         driver.evaluate(
-          `window.webdavLifecycle.startWorkspace(${JSON.stringify(authentication)}).then(()=>({refused:false}),()=>({refused:true}))`
+          `window.webdavLifecycle.startWorkspace(${JSON.stringify(authentication)})` +
+            '.then(()=>({refused:false}),()=>({refused:true}))'
         ),
     };
   } catch (error) {
@@ -340,7 +341,7 @@ test('workspace creation survives a real worker restart with a held marker body 
   }
 });
 
-test('workspace origin removal abandons the native lifetime and drains held root headers before refusing old start', async ({
+test('origin removal retires workspace, drains root headers and refuses old start', async ({
   lab,
 }, info) => {
   const { driver, prepared, rootKey, start, refusedStart } = await openWorkspace(lab.credentials);
@@ -643,7 +644,7 @@ function selectedNativeOperation(value: unknown, operationId: string) {
 }
 
 for (const restartBrowser of [false, true]) {
-  test(`temporary PUT 423 retries automatically${restartBrowser ? ' after browser restart without its alarm' : ''}`, async ({
+  test(`PUT 423 retries${restartBrowser ? ' after browser restart without alarm' : ''}`, async ({
     lab,
   }, info) => {
     test.setTimeout(240_000);
@@ -780,7 +781,9 @@ for (const restartBrowser of [false, true]) {
         .evaluate(`Promise.all([
         chrome.alarms.getAll(),
         chrome.permissions.contains({origins:[${JSON.stringify(new URL(lab.credentials.rootUrl).origin + '/*')}]}),
-        chrome.storage.local.get('sniptale_runtime_diagnostic_log').then(value => value.sniptale_runtime_diagnostic_log?.entries?.filter(entry => ['SyncQueueRetry','BackgroundRuntimeWiring','BackgroundOffscreenDocument'].includes(entry.source))),
+        chrome.storage.local.get('sniptale_runtime_diagnostic_log').then(value =>
+          value.sniptale_runtime_diagnostic_log?.entries?.filter(entry =>
+            ['SyncQueueRetry','BackgroundRuntimeWiring','BackgroundOffscreenDocument'].includes(entry.source))),
         window.webdavLifecycle.inspect().then(value => value, () => ({ inspectionRefused: true }))
       ])`)
         .catch(() => ({ diagnosticsUnavailable: true }));

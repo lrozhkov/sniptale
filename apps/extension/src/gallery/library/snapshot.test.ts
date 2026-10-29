@@ -101,12 +101,12 @@ vi.mock('../../features/media-hub/storage-capacity', async (importOriginal) => (
   getStorageEstimateInfo: getStorageEstimateInfoMock,
 }));
 
-vi.mock('../library/items', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../library/items')>()),
+vi.mock('./items', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./items')>()),
   createGalleryItems: createGalleryItemsMock,
 }));
 
-import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
+import { loadGalleryLibrarySnapshot } from './snapshot';
 
 describe('loadGalleryLibrarySnapshot', () => {
   it('loads committed gallery items without global repair or cleanup', async () => {

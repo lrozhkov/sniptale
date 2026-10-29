@@ -169,13 +169,13 @@ export async function preparePortableVideoReviewRoot(args: {
       ...(asset.libraryMediaId ? { reusePublished: true } : {}),
       ...(asset.videoReview
         ? {
-            videoReview: prepareVideoReviewRestore({
-              review: asset.videoReview,
-              sourceAggregateId: `project-asset:${asset.entry.id}`,
-              targetAggregateId: `project-asset:${entry.id}`,
-              sourceAssetId: ref.assetId,
-              assetIdMap: assetIds,
-            }),
+            videoReview: preparePortableAssetReview(
+              asset.videoReview,
+              asset.entry.id,
+              entry.id,
+              ref.assetId,
+              assetIds
+            ),
           }
         : {}),
     };
@@ -224,4 +224,21 @@ export async function preparePortableVideoReviewRoot(args: {
     if (asset.videoReview)
       await verifyPreparedMediaReviewAnnotations(asset.videoReview, root.assets);
   return root;
+}
+
+/** Restore a private asset review with its remapped native asset identity. */
+export function preparePortableAssetReview(
+  review: Parameters<typeof prepareVideoReviewRestore>[0]['review'],
+  sourceId: string,
+  targetId: string,
+  sourceAssetId: string,
+  assetIdMap: Map<string, string>
+) {
+  return prepareVideoReviewRestore({
+    review,
+    sourceAggregateId: `project-asset:${sourceId}`,
+    targetAggregateId: `project-asset:${targetId}`,
+    sourceAssetId,
+    assetIdMap,
+  });
 }

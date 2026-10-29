@@ -12,6 +12,7 @@ import {
   type ApplyCatalogDeletionInput,
 } from '../../composition/persistence/sync-capture/apply-deletion';
 import {
+  collectPreparedAssetCleanupFailures,
   discardPreparedAsset,
   MissingAssetObjectError,
   readAssetFile,
@@ -76,18 +77,12 @@ async function hashFile(file: Blob, signal: AbortSignal) {
     signal
   );
 }
-async function checkedPredecessorOriginal(
+async function loadOriginalPredecessorRef(
   parsed: Extract<Awaited<ReturnType<typeof parsePortableSyncRoot>>, { kind: 'media' | 'image' }>,
   operation: Awaited<ReturnType<typeof parseSyncOperationText>>,
-  admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>,
-  signal: AbortSignal
-): Promise<[string, AssetRef] | null> {
-  if (
-    admission.expectedLocalGeneration === 0 &&
-    (parsed.kind !== 'media' || !parsed.metadata.projectExport)
-  )
-    return null;
-  const ref = await loadMediaReplicaPredecessorRef({
+  admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>
+) {
+  return loadMediaReplicaPredecessorRef({
     spaceId: admission.spaceId,
     profileCreatedAt: admission.profileCreatedAt,
     connectionGeneration: admission.connectionGeneration,
@@ -106,6 +101,19 @@ async function checkedPredecessorOriginal(
         }
       : {}),
   });
+}
+async function checkedPredecessorOriginal(
+  parsed: Extract<Awaited<ReturnType<typeof parsePortableSyncRoot>>, { kind: 'media' | 'image' }>,
+  operation: Awaited<ReturnType<typeof parseSyncOperationText>>,
+  admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>,
+  signal: AbortSignal
+): Promise<[string, AssetRef] | null> {
+  if (
+    admission.expectedLocalGeneration === 0 &&
+    (parsed.kind !== 'media' || !parsed.metadata.projectExport)
+  )
+    return null;
+  const ref = await loadOriginalPredecessorRef(parsed, operation, admission);
   const object = parsed.envelope.objects.find(
     (item) => item.objectId === parsed.metadata.originalObjectId
   );
@@ -134,11 +142,8 @@ async function checkedPredecessorOriginal(
     : null;
 }
 async function cleanup(staged: StagedArchiveObject[], error: unknown): Promise<never> {
-  const results = await Promise.allSettled(
-    staged.map((item) => discardPreparedAsset(item.ref.assetId))
-  );
-  const failures = results.flatMap((result) =>
-    result.status === 'rejected' ? [result.reason as unknown] : []
+  const failures = await collectPreparedAssetCleanupFailures(
+    staged.map((item) => item.ref.assetId)
   );
   if (failures.length)
     throw new AggregateError([error, ...failures], 'Sync staging cleanup failed.');
@@ -386,6 +391,25 @@ async function checkReplicaDependencies(
   return checkedDependencies;
 }
 
+function checkedDependencyObject(
+  preparation: ReplicaPreparation,
+  checkedDependencies: ReadonlyMap<string, { ref: AssetRef; sha256: string }>,
+  mediaId: string | undefined,
+  objectId: string
+) {
+  const dependency = mediaId ? checkedDependencies.get(mediaId) : undefined;
+  const digest = preparation.operation.objects.find((item) => item.objectId === objectId);
+  const object = preparation.parsed.envelope.objects.find((item) => item.objectId === objectId);
+  check(
+    dependency &&
+      digest &&
+      object &&
+      dependency.ref.size === object.size &&
+      dependency.sha256 === digest.sha256
+  );
+  return { dependency, object };
+}
+
 function retainReviewDependencyObjects(
   preparation: ReplicaPreparation,
   checkedDependencies: ReadonlyMap<string, { ref: AssetRef; sha256: string }>,
@@ -411,17 +435,13 @@ function retainReviewDependencyObjects(
     borrowedRefs.set(parsed.metadata.originalObjectId, primary.ref);
     for (const asset of parsed.metadata.reviewAssets ?? []) {
       if (!asset.libraryMediaId) continue;
-      const dependency = checkedDependencies.get(asset.libraryMediaId);
-      const digest = operation.objects.find((item) => item.objectId === asset.objectId);
-      const object = parsed.envelope.objects.find((item) => item.objectId === asset.objectId);
-      check(
-        dependency &&
-          digest &&
-          object &&
-          dependency.ref.size === object.size &&
-          dependency.ref.mimeType === object.mimeType &&
-          dependency.sha256 === digest.sha256
+      const { dependency, object } = checkedDependencyObject(
+        preparation,
+        checkedDependencies,
+        asset.libraryMediaId,
+        asset.objectId
       );
+      check(dependency.ref.mimeType === object.mimeType);
       borrowedRefs.set(asset.objectId, dependency.ref);
     }
   }
@@ -432,7 +452,7 @@ function retainProjectDependencyObjects(
   checkedDependencies: ReadonlyMap<string, { ref: AssetRef; sha256: string }>,
   borrowedRefs: Map<string, AssetRef>
 ) {
-  const { parsed, operation, selectedIds } = preparation;
+  const { parsed, selectedIds } = preparation;
   if (parsed.kind === 'video-project') {
     const causalMedia = new Set(portableSyncDependencyIds(parsed));
     for (const asset of parsed.metadata.projectAssets.filter(
@@ -441,17 +461,11 @@ function retainProjectDependencyObjects(
         causalMedia.has(item.libraryMediaId) &&
         selectedIds.includes(item.objectId)
     )) {
-      const dependency = asset.libraryMediaId
-        ? checkedDependencies.get(asset.libraryMediaId)
-        : undefined;
-      const digest = operation.objects.find((item) => item.objectId === asset.objectId);
-      const object = parsed.envelope.objects.find((item) => item.objectId === asset.objectId);
-      check(
-        dependency &&
-          digest &&
-          object &&
-          dependency.ref.size === object.size &&
-          dependency.sha256 === digest.sha256
+      const { dependency } = checkedDependencyObject(
+        preparation,
+        checkedDependencies,
+        asset.libraryMediaId,
+        asset.objectId
       );
       borrowedRefs.set(asset.objectId, dependency.ref);
     }
@@ -593,25 +607,7 @@ async function retainRestoredOriginal(
       (item) => item.objectId === parsed.metadata.originalObjectId
     );
     if (!object || !digest) throw new Error('Incoming original binding is missing.');
-    const ref = await loadMediaReplicaPredecessorRef({
-      spaceId: admission.spaceId,
-      profileCreatedAt: admission.profileCreatedAt,
-      connectionGeneration: admission.connectionGeneration,
-      mediaId: parsed.metadata.entry.id,
-      expectedLocalGeneration: admission.expectedLocalGeneration,
-      expectedBasis: admission.expectedBasis,
-      ...(admission.authorization ? { authorization: admission.authorization } : {}),
-      ...(parsed.kind === 'media' && parsed.metadata.projectExport
-        ? {
-            exportSource: {
-              projectId: parsed.metadata.projectExport.projectId,
-              sha256: operation.objects.find(
-                (item) => item.objectId === parsed.metadata.originalObjectId
-              )!.sha256,
-            },
-          }
-        : {}),
-    });
+    const ref = await loadOriginalPredecessorRef(parsed, operation, admission);
     if (ref) originals.push({ object, ref, sha256: digest.sha256 });
   }
   for (const { object, ref, sha256 } of originals) {

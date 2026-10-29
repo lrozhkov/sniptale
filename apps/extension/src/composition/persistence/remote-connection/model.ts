@@ -38,7 +38,7 @@ export type SyncConnectionAuthentication =
   | { kind: 'basic'; username: string; password: string }
   | { kind: 'bearer'; accessToken: string };
 
-function exact(value: Record<string, unknown>, keys: string[]): boolean {
+export function connectionExact(value: Record<string, unknown>, keys: string[]): boolean {
   return (
     Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
   );
@@ -49,7 +49,7 @@ export function connectionUuid(value: unknown): value is string {
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(value)
   );
 }
-function text(value: unknown, limit: number): value is string {
+export function connectionText(value: unknown, limit: number): value is string {
   return (
     typeof value === 'string' &&
     value.length > 0 &&
@@ -65,7 +65,7 @@ function ordinal(value: unknown): value is number {
 export function parseSyncConnectionIdentity(value: unknown): SyncConnectionIdentity | null {
   if (
     !isRecord(value) ||
-    !exact(value, ['incarnation', 'revision']) ||
+    !connectionExact(value, ['incarnation', 'revision']) ||
     !connectionUuid(value['incarnation']) ||
     !ordinal(value['revision']) ||
     value['revision'] < 1
@@ -77,7 +77,7 @@ export function parseSyncConnectionIdentity(value: unknown): SyncConnectionIdent
 export function parseSyncWorkspaceSource(value: unknown): SyncWorkspaceSource | null {
   if (
     !isRecord(value) ||
-    !exact(value, ['kind', 'identity']) ||
+    !connectionExact(value, ['kind', 'identity']) ||
     (value['kind'] !== 'allocation' && value['kind'] !== 'join')
   )
     return null;
@@ -102,7 +102,7 @@ export function sameConnectionScope(
 }
 /** Admit a canonical HTTPS collection URL without credentials, query or fragment. */
 export function parseConnectionRootUrl(value: unknown): string | null {
-  if (!text(value, 4096)) return null;
+  if (!connectionText(value, 4096)) return null;
   try {
     const url = new URL(value);
     if (
@@ -124,7 +124,7 @@ export function parseConnectionRootUrl(value: unknown): string | null {
 export function parseConnectionBinding(value: unknown): SyncConnectionBinding | null {
   if (
     !isRecord(value) ||
-    !exact(value, [
+    !connectionExact(value, [
       'provider',
       'rootUrl',
       'accountId',
@@ -133,9 +133,9 @@ export function parseConnectionBinding(value: unknown): SyncConnectionBinding | 
       'profileCreatedAt',
     ]) ||
     value['provider'] !== 'webdav' ||
-    !text(value['rootUrl'], 4096) ||
-    !text(value['accountId'], 1024) ||
-    !text(value['spaceId'], 256) ||
+    !connectionText(value['rootUrl'], 4096) ||
+    !connectionText(value['accountId'], 1024) ||
+    !connectionText(value['spaceId'], 256) ||
     !ordinal(value['connectionGeneration']) ||
     value['connectionGeneration'] < 1 ||
     !ordinal(value['profileCreatedAt'])
@@ -165,7 +165,7 @@ export function sameConnectionBinding(
 export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata | null {
   if (
     !isRecord(value) ||
-    !exact(value, [
+    !connectionExact(value, [
       'version',
       'kind',
       'key',
@@ -239,17 +239,17 @@ export function parseConnectionAuthentication(
   if (!isRecord(value)) return null;
   if (
     value['kind'] === 'basic' &&
-    exact(value, ['kind', 'username', 'password']) &&
-    text(value['username'], 1024) &&
+    connectionExact(value, ['kind', 'username', 'password']) &&
+    connectionText(value['username'], 1024) &&
     value['username'] === accountId &&
     !value['username'].includes(':') &&
-    text(value['password'], 8192)
+    connectionText(value['password'], 8192)
   )
     return { kind: 'basic', username: value['username'], password: value['password'] };
   if (
     value['kind'] === 'bearer' &&
-    exact(value, ['kind', 'accessToken']) &&
-    text(value['accessToken'], 8192)
+    connectionExact(value, ['kind', 'accessToken']) &&
+    connectionText(value['accessToken'], 8192)
   )
     return { kind: 'bearer', accessToken: value['accessToken'] };
   return null;

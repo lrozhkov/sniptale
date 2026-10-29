@@ -3,7 +3,7 @@ import type {
   SyncProductResult,
   SyncRemoteSelection,
 } from '../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
-import type { loadGalleryLibrarySnapshot } from '../../state/use-gallery-library-snapshot';
+import type { loadGalleryLibrarySnapshot } from '../snapshot';
 import type { openInEditor } from '../actions/preview';
 import { isGalleryMediaItem } from '../items';
 import { canOpenGalleryProject, type GalleryRemoteRootItem } from '../items/types';

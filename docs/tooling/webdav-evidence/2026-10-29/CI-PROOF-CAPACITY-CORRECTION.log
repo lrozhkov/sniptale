@@ -1,0 +1,10 @@
+
+ RUN  v5.0.5 <worktree>
+      Coverage enabled with v8
+
+
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+   Start at  15:31:46
+   Duration  10.22s (tests 78%, transform 13%, import 9%)
+

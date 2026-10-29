@@ -368,7 +368,8 @@ for (const viewport of [
         storage: { 'sniptale-locale-preference': 'en' },
       });
       await target.page.goto(
-        `chrome-extension://${target.extensionId}/tooling/test/harness/video-editor.html?project=${sent.projectId}&theme=light`
+        `chrome-extension://${target.extensionId}/tooling/test/harness/video-editor.html` +
+          `?project=${sent.projectId}&theme=light`
       );
       await expect(target.page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       await expect

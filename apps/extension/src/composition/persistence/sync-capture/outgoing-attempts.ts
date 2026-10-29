@@ -1,3 +1,4 @@
+import { captureRemoteKey } from './guards';
 import { parseAssetRef } from '../assets/guards';
 import type { IDBPTransaction } from 'idb';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -57,17 +58,6 @@ function digest(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{64}$/u.test(value);
 }
 
-function relativeKey(value: unknown): value is string {
-  return (
-    bounded(value, 2048) &&
-    !/[\\?#:]/u.test(value) &&
-    Array.from(value).every(
-      (character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127
-    ) &&
-    value.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
-  );
-}
-
 function attemptKey(spaceId: string, operationId: string, attemptId: string): string {
   return JSON.stringify(['dispatch-attempt', spaceId, operationId, attemptId]);
 }
@@ -79,7 +69,7 @@ function parseObjects(
   if (!Array.isArray(value) || value.length > captureProfileBounds(rootKind).objects) return null;
   const objects: OutgoingDispatchAttempt['objects'] = [];
   for (const item of value) {
-    if (!isRecord(item) || !bounded(item['objectId'], 256) || !relativeKey(item['remoteKey']))
+    if (!isRecord(item) || !bounded(item['objectId'], 256) || !captureRemoteKey(item['remoteKey']))
       return null;
     objects.push({ objectId: item['objectId'], remoteKey: item['remoteKey'] });
   }
@@ -121,7 +111,7 @@ export function parseOutgoingDispatchAttempt(value: unknown): OutgoingDispatchAt
     createdAt < 0 ||
     !digest(preparedSha256) ||
     !digest(recordSha256) ||
-    !relativeKey(recordKey) ||
+    !captureRemoteKey(recordKey) ||
     typeof profileCreatedAt !== 'number' ||
     !Number.isSafeInteger(profileCreatedAt) ||
     profileCreatedAt < 0 ||
@@ -354,7 +344,7 @@ function parseCompletion(value: unknown): CompletedOutgoingFile | null {
     !digest(value['captureSha256']) ||
     !digest(value['sha256']) ||
     !bounded(value['filename'], 2048) ||
-    !relativeKey(value['remoteKey'])
+    !captureRemoteKey(value['remoteKey'])
   )
     return null;
   const ref = parseAssetRef(value['ref']);

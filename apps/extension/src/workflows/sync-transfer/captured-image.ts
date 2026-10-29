@@ -1,7 +1,5 @@
-import {
-  createArchivePathAllocator,
-  sanitizeArchivePathSegment,
-} from '../../composition/archive-transfer';
+import { loadCapturedInventory, createCapturedRootEnvelope } from './captured-inventory';
+import { createArchivePathAllocator } from '../../composition/archive-transfer';
 import type { CapturedImageRows } from '../../composition/persistence/sync-capture/contracts';
 import { parseCapturedImageRows } from '../../composition/persistence/sync-capture/guards';
 import {
@@ -10,7 +8,6 @@ import {
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
 } from '../../composition/persistence/infrastructure/indexed-db/core';
-import { assertPortableJson, parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { buildMediaRootInventory } from '../media-hub-backup/v6/inventory/media';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
 
@@ -55,22 +52,8 @@ export async function encodeCapturedImageRoot(value: CapturedImageRows) {
   });
   if (roots.length !== 1 || roots[0]!.descriptor.rootId !== rows.media.id)
     throw new Error('Frozen image inventory differs from its root.');
-  const loaded = await roots[0]!.load();
-  // Backup roles can contain path punctuation. Keep metadata intact and use the shared path sanitizer.
-  const objects = loaded.objects.map((object) => ({
-    ...object,
-    ref: { ...object.ref, filename: sanitizeArchivePathSegment(object.ref.filename) },
-  }));
-  const metadata: unknown = JSON.parse(JSON.stringify(loaded.metadata));
-  assertPortableJson(metadata);
-  const envelope = parseRootEnvelope({
-    descriptor: {
-      ...roots[0]!.descriptor,
-      metadataPath: 'Metadata/sync-root.json',
-    },
-    metadata,
-    objects: objects.map((object) => object.ref),
-  });
+  const { loaded, objects, metadata } = await loadCapturedInventory(roots[0]!);
+  const envelope = createCapturedRootEnvelope(roots[0]!, { metadata, objects });
   const bindings = [];
   if (rows.originalRef) {
     const metadata = loaded.metadata;

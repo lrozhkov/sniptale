@@ -48,6 +48,24 @@ function refusedSnapshot(error: unknown, aborted: boolean): SyncExecutionResult[
   return { state: 'failed', stage: 'queued', failureCode, runId: null };
 }
 
+/** Read one current binding without granting another execution or credential lifetime. */
+export async function readCurrentExecutionConnection(
+  selection: SyncExecutorBinding,
+  signal: AbortSignal
+) {
+  signal.throwIfAborted();
+  const connection = await loadSyncConnection();
+  if (
+    !connection ||
+    connection.phase !== 'active' ||
+    !sameConnectionScope(connection.binding, selection.scope) ||
+    !sameSyncConnectionIdentity(connection.identity, selection.authorization)
+  )
+    return null;
+  signal.throwIfAborted();
+  return connection;
+}
+
 /** Own one native queue workflow and all of its HTTP requests until containment. */
 export function createSyncQueueExecution(
   input: SyncExecutionInput,
@@ -63,18 +81,11 @@ export function createSyncQueueExecution(
     hasOriginPermission,
   });
   async function current() {
-    signal.throwIfAborted();
-    const connection = await loadSyncConnection();
-    if (
-      !connection ||
-      connection.phase !== 'active' ||
-      !sameConnectionScope(connection.binding, selection.scope) ||
-      !sameSyncConnectionIdentity(connection.identity, selection.authorization)
-    )
-      throw new SyncRemoteError('authentication');
-    signal.throwIfAborted();
+    const connection = await readCurrentExecutionConnection(selection, signal);
+    if (!connection) throw new SyncRemoteError('authentication');
     return connection;
   }
+
   return {
     drain: requests.close,
     async run(): Promise<SyncExecutionResult> {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { createSyncProductClient } from '../../../platform/runtime-messaging/sync-product-client';
-import { loadGalleryLibrarySnapshot } from '../../state/use-gallery-library-snapshot';
+import { loadGalleryLibrarySnapshot } from '../snapshot';
 import { openInEditor } from '../actions/preview';
 import { canOpenGalleryProject, type GalleryRemoteRootItem } from '../items/types';
 import { translate } from '../../../platform/i18n';

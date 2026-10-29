@@ -1,3 +1,4 @@
+import { useSyncCacheFeedback, SyncCacheFeedback } from '../../../../ui/sync-cache-feedback';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -16,17 +17,25 @@ export function SyncCacheSection() {
   const [client] = useState(createSyncProductClient);
   const [status, setStatus] = useState<SyncCacheStatus | null>(null);
   const [draft, setDraft] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [cancelRefused, setCancelRefused] = useState(false);
-  const [releasedBytes, setReleasedBytes] = useState<number | null>(null);
-  const [deferred, setDeferred] = useState(false);
-  const [running, setRunning] = useState(false);
   const active = useRef(false);
+  const {
+    failed,
+    setFailed,
+    cancelRefused,
+    setCancelRefused,
+    releasedBytes,
+    setReleasedBytes,
+    deferred,
+    setDeferred,
+    running,
+    setRunning,
+    cancelling,
+    cancel: cancelObservation,
+  } = useSyncCacheFeedback(active, (id) => client.cancel(id));
+  const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const request = useRef<string | null>(null);
   const waiter = useRef<AbortController | null>(null);
-  const cancelling = useRef(false);
 
   const read = useCallback(async () => {
     const result = await client.readCacheStatus();
@@ -48,7 +57,7 @@ export function SyncCacheSection() {
       pending.current = false;
       if (active.current) setBusy(false);
     }
-  }, [read]);
+  }, [read, setFailed]);
   useEffect(() => {
     active.current = true;
     void refresh();
@@ -132,30 +141,21 @@ export function SyncCacheSection() {
   };
   const cancel = async () => {
     const requestId = request.current;
-    if (!requestId || cancelling.current) return;
-    cancelling.current = true;
-    try {
-      const result = await client.cancel(requestId);
-      if (!active.current || request.current !== requestId) return;
-      if (result.kind === 'cancelled' && result.outcome === 'cancelled') {
+    if (!requestId) return;
+    await cancelObservation({
+      requestId: requestId,
+      isCurrent: () => request.current === requestId,
+      async settle() {
         request.current = null;
         waiter.current?.abort();
-        setRunning(false);
         try {
           await read();
         } finally {
           pending.current = false;
           if (active.current) setBusy(false);
         }
-      } else setCancelRefused(true);
-    } catch {
-      if (active.current) {
-        if (request.current === requestId) setCancelRefused(true);
-        else setFailed(true);
-      }
-    } finally {
-      cancelling.current = false;
-    }
+      },
+    });
   };
   const bytes = Number(draft) * MIB;
   return (
@@ -261,21 +261,11 @@ export function SyncCacheSection() {
           {translate('shared.syncCache.failed')}
         </p>
       ) : null}
-      {cancelRefused ? (
-        <p role="alert" className="text-xs">
-          {translate('shared.syncCache.cancelRefused')}
-        </p>
-      ) : null}
-      {releasedBytes !== null ? (
-        <p role="status" className="text-xs">
-          {translate('shared.syncCache.completed').replace('{bytes}', formatBytes(releasedBytes))}
-        </p>
-      ) : null}
-      {deferred ? (
-        <p role="status" className="text-xs">
-          {translate('shared.syncCache.deferred')}
-        </p>
-      ) : null}
+      <SyncCacheFeedback
+        cancelRefused={cancelRefused}
+        releasedBytes={releasedBytes}
+        deferred={deferred}
+      />
     </section>
   );
 }

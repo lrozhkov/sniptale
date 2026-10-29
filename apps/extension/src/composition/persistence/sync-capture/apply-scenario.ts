@@ -1,3 +1,6 @@
+import { isCaptureDependencyVersion } from './guards';
+import { readAppliedCaptureReceipt } from './guards';
+import { identity, ordinal } from './guards';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
@@ -61,12 +64,6 @@ export interface ApplyPreparedScenarioReplicaInput {
 function refuse(): never {
   throw new Error('Incoming Scenario predecessor or resource admission refused.');
 }
-function ordinal(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-}
-function identity(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length <= 256;
-}
 /** Parse journal recovery input through native owners before any mutation or resource hydration. */
 export function parseApplyPreparedScenarioReplicaInput(
   value: unknown
@@ -104,11 +101,7 @@ export function parseApplyPreparedScenarioReplicaInput(
       !ref ||
       entry.size !== ref.size ||
       entry.mimeType !== ref.mimeType ||
-      !ordinal(raw['expectedGeneration']) ||
-      raw['expectedGeneration'] < 1 ||
-      !Array.isArray(raw['expectedBasis']) ||
-      raw['expectedBasis'].length !== 1 ||
-      !raw['expectedBasis'].every(identity)
+      !isCaptureDependencyVersion(raw)
     )
       refuse();
     return {
@@ -145,21 +138,16 @@ async function receipt(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   input: ApplyPreparedScenarioReplicaInput
 ): Promise<number | null> {
-  const key = keys(input);
-  const raw: unknown = await tx.objectStore(stores.SYNC_CAPTURE_STORE).get(key.receiptKey);
-  if (raw === undefined) return null;
-  const row = parseSyncCaptureRecord(raw);
-  if (
-    !row ||
-    row.kind !== 'applied-operation' ||
-    row.key !== key.receiptKey ||
-    row.spaceId !== input.spaceId ||
-    row.rootKey !== key.rootKey ||
-    row.operationId !== input.operationId ||
-    row.sourceDigest !== input.sourceDigest
-  )
-    refuse();
-  return row.generation;
+  return readAppliedCaptureReceipt(
+    tx,
+    {
+      ...keys(input),
+      spaceId: input.spaceId,
+      operationId: input.operationId,
+      sourceDigest: input.sourceDigest,
+    },
+    refuse
+  );
 }
 async function checkProfile(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,

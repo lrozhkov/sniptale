@@ -10,6 +10,7 @@ import {
 } from '../../composition/persistence/remote-connection/model';
 import { preparePortableImageRows, validatePortableImageRows } from './prepared-image';
 import {
+  preparePortableAssetReview,
   preparePortableVideoReviewRoot,
   validatePortableVideoReviewMetadata,
 } from './prepared-review';
@@ -557,13 +558,13 @@ async function prepareVideoRoot(
       ...(borrowed(asset) ? { reusePublished: true } : { publishToLibrary: false }),
       ...(asset.videoReview
         ? {
-            videoReview: prepareVideoReviewRestore({
-              review: asset.videoReview,
-              sourceAggregateId: `project-asset:${asset.entry.id}`,
-              targetAggregateId: `project-asset:${entry.id}`,
-              sourceAssetId: ref.assetId,
-              assetIdMap: assetIds,
-            }),
+            videoReview: preparePortableAssetReview(
+              asset.videoReview,
+              asset.entry.id,
+              entry.id,
+              ref.assetId,
+              assetIds
+            ),
           }
         : {}),
     };

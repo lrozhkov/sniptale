@@ -166,6 +166,24 @@
       }
     },
     {
+      "classification": "tool-noise",
+      "owner": "composition/persistence/sync-capture/prepared-project",
+      "reason": "The exact match is bounded-array admission, a local ID accumulator, mapping, a record check and the opening of distinct allowed-key lists. Asset parsing then validates filenames, publication and source bindings. Export parsing validates project identity, remote bindings, thumbnails and export review. No matched source contains a duplicated asset or export validation algorithm. A generic record-mapping factory would hide these independent schemas.",
+      "removalCondition": "Remove when either schema admission prologue changes or a common accepted schema replaces both.",
+      "reviewBy": "2027-04-15",
+      "id": "0c4e8cfd2947f96b8b932f4392025058852b02dd470c3e8b745d0454836f1e5a",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
+        "start": 223,
+        "end": 227
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
+        "start": 57,
+        "end": 62
+      }
+    },
+    {
       "id": "0d73ba1bb2517e8e1d660e99657ee52a8245c95ca86f2d54cc3df6a097c5217f",
       "classification": "tool-noise",
       "owner": "apps/extension/src/design-system/previews/product-glass-controls",
@@ -217,24 +235,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
         "start": 1856,
         "end": 1865
-      }
-    },
-    {
-      "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db/database-migrations",
-      "reason": "The former duplicated executable store-existence check now has one owner, requireMigrationStores at database-migrations.ts:23-29. Current endpoints declare separately numbered contiguous historical migration descriptors and delegate validation to that owner with descriptor-specific inputs. migrate only returns undefined. The matched span crosses into the next descriptor. It contains no remaining duplicated store-validation algorithm. Preserve explicit historical descriptors; no descriptor factory is required for this exact match.",
-      "removalCondition": "Remove this record if either historical descriptor changes or the exact finding disappears.",
-      "reviewBy": "2027-04-15",
-      "id": "12f83ee0b730cf0ddad54373dafaf727113ff2ff709bd0b15b6f1c88b47737f3",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 840,
-        "end": 857
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 862,
-        "end": 879
       }
     },
     {
@@ -706,24 +706,6 @@
       }
     },
     {
-      "id": "33b5e370fd3b69c97d6d29d17abbd428f49d486f3eeb3f3b289b868eb17894d6",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-      "reason": "Existing card calls belong to absolute virtual rows and grouped members with distinct layout identities.",
-      "removalCondition": "Remove when rendering branches converge or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 573,
-        "end": 578
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 649,
-        "end": 654
-      }
-    },
-    {
       "id": "34d0e22632fdce2d1141172041e22f7b1c1fdac75fe8d55a291b019896a2e71d",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -811,6 +793,24 @@
         "path": "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
         "start": 27,
         "end": 35
+      }
+    },
+    {
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db/database-migrations",
+      "reason": "The former duplicated executable store-existence check now has one owner, requireMigrationStores at database-migrations.ts:23-29. Current endpoints declare separately numbered contiguous historical migration descriptors and delegate validation to that owner with descriptor-specific inputs. migrate only returns undefined. The matched span crosses into the next descriptor. It contains no remaining duplicated store-validation algorithm. Preserve explicit historical descriptors; no descriptor factory is required for this exact match.",
+      "removalCondition": "Remove this record if either historical descriptor changes or the exact finding disappears.",
+      "reviewBy": "2027-04-15",
+      "id": "3b76255b18501fc81fb2d9da029d8f28164e5ae5fa7656ef78abb14d6e81dfaf",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 846,
+        "end": 863
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 890,
+        "end": 907
       }
     },
     {
@@ -919,6 +919,24 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
         "start": 144,
         "end": 157
+      }
+    },
+    {
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db",
+      "reason": "Both ranges are import declarations from canonical store constants. Schema contracts describe stores; upgrade creates them. There is no duplicate executable migration or schema definition in this matched import span.",
+      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
+      "reviewBy": "2027-04-15",
+      "id": "458e5d91323dfba7bdd88cdbb8899e289d710dddfc970721cef572ac52f46097",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
+        "start": 5,
+        "end": 35
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
+        "start": 1,
+        "end": 31
       }
     },
     {
@@ -1063,6 +1081,24 @@
         "path": "packages/ui/src/styles/content-popover/index.css",
         "start": 231,
         "end": 241
+      }
+    },
+    {
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+      "reason": "Existing card calls belong to absolute virtual rows and grouped members with distinct layout identities.",
+      "removalCondition": "Remove when rendering branches converge or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "id": "4e417d31652d88b3a51dace75828f9228aed74f915befacfde7b982454ffe3f0",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 580,
+        "end": 585
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 656,
+        "end": 661
       }
     },
     {
@@ -1513,6 +1549,24 @@
         "path": "tooling/web-snapshot-smoke/runtime/runner.mjs",
         "start": 189,
         "end": 202
+      }
+    },
+    {
+      "classification": "tool-noise",
+      "owner": "ui/sync-cache-feedback",
+      "reason": "The exact match destructures feedback from the single useSyncCacheFeedback owner and declares caller-local observation references. Shared cancellation and feedback rendering now have one implementation. Gallery retains root-bound status revision and an operation-kind ticket. Settings retains budget input and a trim request ID. This match is consumer wiring, not another cancellation or cache state machine.",
+      "removalCondition": "Remove when either caller wiring changes or when both observation contracts converge.",
+      "reviewBy": "2027-04-15",
+      "id": "77a9f8690bd4ebc3a315349e6f3ae6b0c798fb9cb05b44a3b995b96f6ba643d2",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+        "start": 37,
+        "end": 55
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
+        "start": 19,
+        "end": 37
       }
     },
     {
@@ -2146,6 +2200,24 @@
       }
     },
     {
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db/database-migrations",
+      "reason": "The former duplicated executable store-existence check now has one owner, requireMigrationStores at database-migrations.ts:23-29. Current endpoints declare separately numbered contiguous historical migration descriptors and delegate validation to that owner with descriptor-specific inputs. migrate only returns undefined. The matched span crosses into the next descriptor. It contains no remaining duplicated store-validation algorithm. Preserve explicit historical descriptors; no descriptor factory is required for this exact match.",
+      "removalCondition": "Remove this record if either historical descriptor changes or the exact finding disappears.",
+      "reviewBy": "2027-04-15",
+      "id": "9bc52f69a9f516ec88375e9e37ad234d5ca731f7769cf92951d93e2b6d88ea4d",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 846,
+        "end": 863
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 868,
+        "end": 885
+      }
+    },
+    {
       "id": "9c22d0595ab4de301f055725bc187bd87d63e58231f099570cb702c16c60f7dc",
       "classification": "tool-noise",
       "owner": "Gallery video-review inspector and shared compact inspector",
@@ -2575,24 +2647,6 @@
         "path": "tooling/design-reference/examples/properties/index.html",
         "start": 6,
         "end": 15
-      }
-    },
-    {
-      "id": "b34efd805bafb46cbdd36f0eef82b2484ff4a610b53446a95caaa0df3d08879c",
-      "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db",
-      "reason": "Both ranges are import declarations from canonical store constants. Schema contracts describe stores; upgrade creates them. There is no duplicate executable migration or schema definition in this matched import span.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
-        "start": 5,
-        "end": 34
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
-        "start": 1,
-        "end": 30
       }
     },
     {

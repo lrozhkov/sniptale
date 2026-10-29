@@ -198,3 +198,75 @@ it('accepts policy-bound privileged capability stores with declared policy ids',
     )
   ).toEqual([]);
 });
+
+it('distinguishes immutable queue dictionaries from mutable or spoofed authority state', async () => {
+  const root = createTempRoot('architecture-guardrails-immutable-queue-');
+  writeRuntimeTopology(root);
+  writePolicyStateRegistry(root);
+  const fixtures = [
+    [
+      'composition/persistence/queue-model.ts',
+      "export const SYNC_QUEUE_STAGES: readonly string[] = ['queued', 'published'];",
+      false,
+    ],
+    [
+      'platform/i18n/messages/settings/sync-queue.ts',
+      [
+        "import { defineMessageSource } from '../source';",
+        "export const queueMessages = defineMessageSource({ title: { en: 'Queue', ru: 'Очередь' } });",
+      ].join(' '),
+      false,
+    ],
+    [
+      'platform/i18n/messages/settings/spoofed-owner.ts',
+      [
+        "import { defineMessageSource } from '../../../../../../../fake/" +
+          "apps/extension/src/platform/i18n/messages/source';",
+        "const queueMessages = defineMessageSource({ en: 'Queue' });",
+      ].join(' '),
+      true,
+    ],
+    ['background/runtime/queue.ts', 'const queue = [];', true],
+    [
+      'background/runtime/pending.ts',
+      "const pending: readonly string[] = ['ready']; const authority = new Map();",
+      true,
+    ],
+    [
+      'platform/i18n/messages/settings/spoof.ts',
+      [
+        "import { defineMessageSource } from './spoof-source';",
+        "const queueMessages = defineMessageSource({ en: 'Queue' });",
+      ].join(' '),
+      true,
+    ],
+    [
+      'platform/i18n/messages/settings/dynamic.ts',
+      [
+        "import { defineMessageSource } from '../source';",
+        'const queueMessages = defineMessageSource({ en: runtimeLabel });',
+      ].join(' '),
+      true,
+    ],
+    [
+      'background/runtime/session-capability.ts',
+      "const queue: readonly string[] = ['ready'];",
+      true,
+    ],
+  ] as const;
+  const files = fixtures.map(([relative, text]) => {
+    const file = `apps/extension/src/${relative}`;
+    writeFile(root, file, text);
+    return file;
+  });
+  const module = await loadModule(root);
+  const findings = module.collectPolicyStateDescriptorViolations(files, {
+    newFiles: new Set(files),
+    root,
+  });
+  expect(findings.map((finding) => finding.file).sort()).toEqual(
+    fixtures
+      .flatMap(([relative, , blocked]) => (blocked ? [`apps/extension/src/${relative}`] : []))
+      .sort()
+  );
+});

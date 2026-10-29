@@ -1,3 +1,5 @@
+import { isCaptureReplicaPredecessor } from './guards';
+import { readAppliedCaptureReceipt } from './guards';
 import {
   parseSyncConnectionIdentity,
   type SyncConnectionIdentity,
@@ -101,11 +103,7 @@ function preparedInput(input: ApplyPreparedMediaReplicaInput): ApplyPreparedMedi
     !Number.isSafeInteger(input.expectedLocalGeneration) ||
     input.expectedLocalGeneration < 0 ||
     !input.spaceId ||
-    !Number.isSafeInteger(input.profileCreatedAt) ||
-    input.profileCreatedAt < 0 ||
-    !Array.isArray(input.expectedBasis) ||
-    input.expectedBasis.length !== (input.expectedLocalGeneration === 0 ? 0 : 1) ||
-    input.expectedBasis.some((id) => typeof id !== 'string' || !id || id.length > 256) ||
+    !isCaptureReplicaPredecessor(input) ||
     rows.media.lifecycle?.storageClass !== 'library' ||
     ('projectAsset' in rows && rows.projectAsset.originMediaId)
   )
@@ -125,20 +123,13 @@ async function readReceipt(
   input: ApplyPreparedMediaReplicaInput,
   identity: ReplicaIdentity
 ): Promise<number | null> {
-  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(identity.receiptKey);
-  if (raw === undefined) return null;
-  const receipt = parseSyncCaptureRecord(raw);
-  if (
-    !receipt ||
-    receipt.kind !== 'applied-operation' ||
-    receipt.key !== identity.receiptKey ||
-    receipt.spaceId !== identity.spaceId ||
-    receipt.rootKey !== identity.rootKey ||
-    receipt.operationId !== input.operationId ||
-    receipt.sourceDigest !== input.sourceDigest
-  )
-    throw new MediaReplicaConflictError('receipt-conflict');
-  return receipt.generation;
+  return readAppliedCaptureReceipt(
+    tx,
+    { ...identity, operationId: input.operationId, sourceDigest: input.sourceDigest },
+    () => {
+      throw new MediaReplicaConflictError('receipt-conflict');
+    }
+  );
 }
 
 async function assertNoSourceSidecars(tx: ApplyTransaction, mediaId: string): Promise<void> {
@@ -217,14 +208,7 @@ async function assertUnclaimedIdentity(
       if ((await tx.objectStore(store).get(rows.recording.id)) !== undefined)
         throw new MediaReplicaConflictError('source-changed');
   }
-  for (const raw of await tx
-    .objectStore(SYNC_CAPTURE_STORE)
-    .index('rootKey')
-    .getAll(identity.rootKey)) {
-    const record = parseSyncCaptureRecord(raw);
-    if (!record || (record.kind === 'sync-operation' && record.phase !== 'published'))
-      throw new MediaReplicaConflictError('source-changed');
-  }
+  await assertNoPendingNativeCapture(tx, identity.rootKey);
 }
 
 async function assertAbsentSource(
@@ -263,14 +247,7 @@ async function readMediaPredecessorState(
     JSON.stringify(state.basis) !== JSON.stringify(input.expectedBasis)
   )
     throw new MediaReplicaConflictError('source-changed');
-  for (const raw of await tx
-    .objectStore(SYNC_CAPTURE_STORE)
-    .index('rootKey')
-    .getAll(identity.rootKey)) {
-    const record = parseSyncCaptureRecord(raw);
-    if (!record || (record.kind === 'sync-operation' && record.phase !== 'published'))
-      throw new MediaReplicaConflictError('source-changed');
-  }
+  await assertNoPendingNativeCapture(tx, identity.rootKey);
   return state;
 }
 
@@ -548,14 +525,7 @@ export async function applyPreparedMediaReplica(
   if ('webSnapshot' in candidate.rows) {
     const db = await initDB();
     const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
-    const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
-    if (
-      !profile ||
-      profile.kind !== 'profile' ||
-      profile.spaceId !== candidate.spaceId ||
-      profile.createdAt !== candidate.profileCreatedAt
-    )
-      throw new MediaReplicaConflictError('profile-changed');
+    const profile = await readReplicaProfile(tx, candidate);
     const rootKey = captureRootKey(profile.spaceId, 'media', candidate.rows.media.id);
     const generation = await readReceipt(tx, candidate, {
       rootKey,
@@ -597,16 +567,7 @@ export async function applyPreparedMediaReplica(
       'readwrite'
     );
     try {
-      const profile = parseSyncCaptureRecord(
-        await tx.objectStore(SYNC_CAPTURE_STORE).get('profile')
-      );
-      if (
-        !profile ||
-        profile.kind !== 'profile' ||
-        profile.spaceId !== candidate.spaceId ||
-        profile.createdAt !== candidate.profileCreatedAt
-      )
-        throw new MediaReplicaConflictError('profile-changed');
+      const profile = await readReplicaProfile(tx, candidate);
       const rootKey = captureRootKey(profile.spaceId, 'media', candidate.rows.media.id);
       const identity: ReplicaIdentity = {
         rootKey,
@@ -698,4 +659,28 @@ async function prepareSnapshotThumbnail(
     updatedAt: rows.webSnapshot.updatedAt,
     screenshotBlob: screenshot,
   });
+}
+
+async function assertNoPendingNativeCapture(tx: ReadTransaction, rootKey: string): Promise<void> {
+  const records: unknown[] = await tx
+    .objectStore(SYNC_CAPTURE_STORE)
+    .index('rootKey')
+    .getAll(rootKey);
+  for (const raw of records) {
+    const record = parseSyncCaptureRecord(raw);
+    if (!record || (record.kind === 'sync-operation' && record.phase !== 'published'))
+      throw new MediaReplicaConflictError('source-changed');
+  }
+}
+
+async function readReplicaProfile(tx: ReadTransaction, input: ApplyPreparedMediaReplicaInput) {
+  const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+  if (
+    !profile ||
+    profile.kind !== 'profile' ||
+    profile.spaceId !== input.spaceId ||
+    profile.createdAt !== input.profileCreatedAt
+  )
+    throw new MediaReplicaConflictError('profile-changed');
+  return profile;
 }

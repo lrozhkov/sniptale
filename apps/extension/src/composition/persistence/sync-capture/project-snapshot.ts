@@ -1,12 +1,11 @@
+import { parseCapturedReview } from './review-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
 import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from '../media-library/read-guards';
-import { parseVideoWorkspace, parseVideoWorkspaceDraft } from '../review-workspaces/parser';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
-import type { VideoWorkspaceSnapshot } from '../review-workspaces/contracts';
 import {
   parseProjectAssetEntry,
   parseProjectExportEntry,
@@ -349,19 +348,6 @@ export function parseCapturedVideoProjectRows(value: unknown): CapturedVideoProj
   return parsed;
 }
 
-function parseCapturedReview(value: unknown): VideoWorkspaceSnapshot | null {
-  if (!isRecord(value)) return null;
-  const workspace = parseVideoWorkspace(value['workspace']);
-  if (!workspace) return null;
-  const draft =
-    value['draft'] === null
-      ? null
-      : parseVideoWorkspaceDraft(value['draft'], workspace.source.duration);
-  if (value['draft'] !== null && (!draft || draft.aggregateId !== workspace.aggregateId))
-    return null;
-  return { workspace, draft };
-}
-
 /** Only native snapshot and presentation slots can retain inline binary values. */
 function projectMetadataDescriptors(rows: CapturedVideoProjectRows) {
   return {
@@ -438,16 +424,12 @@ class CapturedProjectClosure {
       this.neededMedia.add(`recording:${id}`);
     for (const asset of this.rows.project.project.assets) {
       const source = asset.source;
-      const resource =
-        source.kind === 'project-asset'
-          ? this.assets.get(source.projectAssetId)
-          : source.kind === 'library-asset'
-            ? this.media.get(source.mediaId)
-            : source.kind === 'recording'
-              ? this.media.get(`recording:${source.recordingId}`)
-              : source.kind === 'scenario-asset'
-                ? this.rows.scenarioAssets?.find((entry) => entry.id === source.scenarioAssetId)
-                : undefined;
+      const resource = resolveCapturedProjectAssetSource(
+        source,
+        this.assets,
+        this.media,
+        this.rows.scenarioAssets
+      );
       if (
         !resource ||
         resource.size !== asset.metadata.size ||
@@ -613,5 +595,26 @@ class CapturedProjectClosure {
       case 'web-snapshot':
         return false;
     }
+  }
+}
+
+/** Resolve a project's native resource using the same source identity in freeze and admission. */
+export function resolveCapturedProjectAssetSource(
+  source: VideoProjectMetadata['assets'][number]['source'],
+  assets: ReadonlyMap<string, CapturedVideoProjectRows['assets'][number]>,
+  media: ReadonlyMap<string, CapturedVideoProjectRows['media'][number]>,
+  scenarioAssets: CapturedVideoProjectRows['scenarioAssets']
+) {
+  switch (source.kind) {
+    case 'project-asset':
+      return assets.get(source.projectAssetId);
+    case 'library-asset':
+      return media.get(source.mediaId);
+    case 'recording':
+      return media.get(`recording:${source.recordingId}`);
+    case 'scenario-asset':
+      return scenarioAssets?.find((entry) => entry.id === source.scenarioAssetId);
+    default:
+      return undefined;
   }
 }

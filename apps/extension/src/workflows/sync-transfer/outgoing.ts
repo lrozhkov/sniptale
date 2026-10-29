@@ -18,6 +18,7 @@ import {
 import type { SyncConnectionIdentity } from '../../composition/persistence/remote-connection/model';
 import {
   discardPreparedAsset,
+  collectPreparedAssetCleanupFailures,
   MissingAssetObjectError,
   AssetObjectSizeMismatchError,
   releaseAssetReadyProtection,
@@ -141,11 +142,8 @@ async function discardTransportCopies(
   staged: StagedArchiveObject[],
   cause: unknown
 ): Promise<never> {
-  const results = await Promise.allSettled(
-    staged.map((object) => discardPreparedAsset(object.ref.assetId))
-  );
-  const failures = results.flatMap((result) =>
-    result.status === 'rejected' ? [result.reason as unknown] : []
+  const failures = await collectPreparedAssetCleanupFailures(
+    staged.map((object) => object.ref.assetId)
   );
   if (failures.length)
     throw new AggregateError([cause, ...failures], 'Sync preparation cleanup failed.');
@@ -342,11 +340,8 @@ async function prepareCapturedFiles(
     } catch (error) {
       return discardTransportCopies(staged, error);
     }
-    const results = await Promise.allSettled(
-      staged.map((item) => discardPreparedAsset(item.ref.assetId))
-    );
-    const failures = results.flatMap((result) =>
-      result.status === 'rejected' ? [result.reason as unknown] : []
+    const failures = await collectPreparedAssetCleanupFailures(
+      staged.map((item) => item.ref.assetId)
     );
     if (failures.length)
       throw new AggregateError(failures, 'Outgoing file recovery cleanup failed.');

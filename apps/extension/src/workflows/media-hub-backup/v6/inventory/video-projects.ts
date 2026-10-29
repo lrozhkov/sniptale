@@ -36,6 +36,7 @@ import { createProjectAssetMediaId } from '../../../../features/media-hub/media-
 import {
   UnsupportedEngine1VideoProjectError,
   type VideoProjectEntry,
+  type ProjectAssetEntry,
 } from '../../../../composition/persistence/projects/contracts';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance';
 import { encodePortableThumbnail } from '../root-codecs/media';
@@ -101,6 +102,38 @@ function readSelectedVideoProjects(
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
+function portableProjectAssetInventory(args: {
+  asset: ProjectAssetEntry;
+  portable: ReturnType<typeof encodePortableVideoProjectAsset>;
+  media: ReturnType<typeof parseMediaLibraryEntry>;
+  videoReview: Awaited<ReturnType<typeof readVideoReviewForBackup>> | undefined;
+  file: File;
+  filename: string;
+  entry: VideoProjectEntry;
+  collector: ReturnType<typeof createObjectCollector>;
+}) {
+  const { asset, portable, media, videoReview, file, filename, entry, collector } = args;
+  return {
+    entry: portable,
+    ...(media
+      ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
+      : { publishToLibrary: false }),
+    ...(videoReview && !media ? { videoReview: encodePortableReviewAssetRefs(videoReview) } : {}),
+    filename,
+    objectId: collector.addObject(
+      file,
+      filename,
+      asset.mimeType,
+      withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+        'Recordings',
+        'Projects',
+        entry.project.name,
+        'Assets',
+      ])
+    ),
+  };
+}
+
 async function buildProjectAssets(
   db: VideoInventoryDatabase,
   entry: VideoProjectEntry,
@@ -134,27 +167,18 @@ async function buildProjectAssets(
     if (videoReview && !media) {
       for (const id of collectReviewAssetReferences(videoReview.workspace)) referencedIds.add(id);
     }
-    output.push({
-      entry: portable,
-      ...(media
-        ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
-        : { publishToLibrary: false }),
-      ...(videoReview && !media
-        ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
-        : {}),
-      filename,
-      objectId: collector.addObject(
+    output.push(
+      portableProjectAssetInventory({
+        asset,
+        portable,
+        media,
+        videoReview,
         file,
         filename,
-        asset.mimeType,
-        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
-          'Recordings',
-          'Projects',
-          entry.project.name,
-          'Assets',
-        ])
-      ),
-    });
+        entry,
+        collector,
+      })
+    );
   }
   return output;
 }
@@ -303,25 +327,18 @@ async function buildReviewReferencedAssets(
       for (const reference of collectReviewAssetReferences(videoReview.workspace))
         referencedIds.add(reference);
     }
-    output.push({
-      entry: portable,
-      ...(media
-        ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
-        : { publishToLibrary: false }),
-      ...(videoReview ? { videoReview: encodePortableReviewAssetRefs(videoReview) } : {}),
-      filename,
-      objectId: collector.addObject(
+    output.push(
+      portableProjectAssetInventory({
+        asset,
+        portable,
+        media,
+        videoReview,
         file,
         filename,
-        asset.mimeType,
-        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
-          'Recordings',
-          'Projects',
-          entry.project.name,
-          'Assets',
-        ])
-      ),
-    });
+        entry,
+        collector,
+      })
+    );
   }
   return output;
 }

@@ -72,6 +72,12 @@ vi.mock('../../composition/persistence/assets', async (original) => ({
     }
   },
   discardPreparedAsset: io.discard,
+  collectPreparedAssetCleanupFailures: async (assetIds: readonly string[]) => {
+    const results = await Promise.allSettled(assetIds.map((id) => io.discard(id)));
+    return results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+  },
   readAssetFile: io.read,
 }));
 vi.mock('../../composition/persistence/sync-capture/replica-publication', () => ({

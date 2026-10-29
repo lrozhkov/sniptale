@@ -1,5 +1,36 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'sync-captured-root-portable-consumers',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/captured-root.ts',
+    reason:
+      'Frozen root encoding is exercised through portable recording, review, image and project consumers.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-recording.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-image.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-project.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-scenario.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-prepared-root-native-consumers',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/prepared-root.ts',
+    reason:
+      'Prepared root parsing and editing closure are consumed by replica staging and native hydration.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/prepared-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/prepared-scenario.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming-project.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+    ],
+  },
+
+  {
     owner: 'review-inspector-section-consumers',
     productionFile: 'apps/extension/src/gallery/video-review/inspector-sections.tsx',
     reason:

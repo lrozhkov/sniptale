@@ -73,7 +73,7 @@ async function bootstrap(page: Page) {
   });
 }
 for (const preset of PRIMARY_BROWSER_VIEWPORTS) {
-  test(`saved image crosses browser profiles, recovers publication, and edits again ${preset.name}`, async ({}, info) => {
+  test(`saved image syncs between browsers, recovers publication and edits again ${preset.name}`, async ({}, info) => {
     test.setTimeout(120_000);
     const host = await startHostServer();
     const rootId = 'native-image-sync';

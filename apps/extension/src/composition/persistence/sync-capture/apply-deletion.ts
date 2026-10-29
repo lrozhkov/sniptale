@@ -1,3 +1,4 @@
+import { readAppliedCaptureReceipt } from './guards';
 import { assetResidencyCopyId } from '../assets/residency-records';
 import {
   readAssetResidencyCopyInTransaction,
@@ -388,20 +389,16 @@ async function readDeletionReceipt(
   input: ApplyCatalogDeletionInput,
   identity: DeletionIdentity
 ): Promise<number | null> {
-  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(identity.receiptKey);
-  if (raw === undefined) return null;
-  const receipt = parseSyncCaptureRecord(raw);
-  if (
-    !receipt ||
-    receipt.kind !== 'applied-operation' ||
-    receipt.key !== identity.receiptKey ||
-    receipt.spaceId !== input.spaceId ||
-    receipt.rootKey !== identity.rootKey ||
-    receipt.sourceDigest !== input.sourceDigest ||
-    receipt.operationId !== input.operationId
-  )
-    refuse();
-  return receipt.generation;
+  return readAppliedCaptureReceipt(
+    tx,
+    {
+      ...identity,
+      spaceId: input.spaceId,
+      operationId: input.operationId,
+      sourceDigest: input.sourceDigest,
+    },
+    refuse
+  );
 }
 
 function hasPendingPublication(

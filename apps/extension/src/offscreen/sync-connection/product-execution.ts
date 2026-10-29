@@ -1,3 +1,4 @@
+import { readCurrentExecutionConnection } from './execution';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { releaseNativeEditingRoot } from '../../workflows/sync-transfer/native-cache';
 import { trimNativeCache } from '../../workflows/sync-transfer/native-cache-policy';
@@ -9,14 +10,7 @@ import {
 import type { createAutomaticCatalogSync } from '../../workflows/sync-transfer/automatic';
 import { resolveCatalogConflict } from '../../workflows/sync-transfer/conflict-resolution';
 import { readSyncProductThumbnail } from './product-thumbnail';
-import {
-  loadSyncConnection,
-  loadSyncConnectionAuthentication,
-} from '../../composition/persistence/remote-connection/store';
-import {
-  sameConnectionScope,
-  sameSyncConnectionIdentity,
-} from '../../composition/persistence/remote-connection/model';
+import { loadSyncConnectionAuthentication } from '../../composition/persistence/remote-connection/store';
 import type {
   SyncExecutorBinding,
   SyncProductCompletion,
@@ -178,16 +172,8 @@ export function createSyncProductExecution(
     hasOriginPermission,
   });
   async function current() {
-    signal.throwIfAborted();
-    const connection = await loadSyncConnection();
-    if (
-      !connection ||
-      connection.phase !== 'active' ||
-      !sameConnectionScope(connection.binding, selection.scope) ||
-      !sameSyncConnectionIdentity(connection.identity, selection.authorization)
-    )
-      throw new Error('Sync product authorization refused');
-    signal.throwIfAborted();
+    const connection = await readCurrentExecutionConnection(selection, signal);
+    if (!connection) throw new Error('Sync product authorization refused');
     return connection;
   }
   async function executeWork(

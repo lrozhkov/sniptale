@@ -3086,10 +3086,10 @@
       "file": "apps/extension/src/workflows/sync-transfer/prepared-root.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: Parsing, object selection and preparation transform one portable envelope into one admitted replica. Deferred exports reuse its identity maps. Actual reverse type cycles were corrected separately. No second state or effect authority appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "reason": "tool-noise: One portable-root parser and preparation owner retains its object-selection and native-ref maps. The candidate delegates identical optional review restoration to the existing prepared-review owner. It removes duplicate restore construction and adds no state, effect, transaction, writer or request lifetime. Score3 delta0; cohesive parsing and preparation remain together. Fresh independent architecture review must inspect this exact Keep classification.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-10-29",
-      "astHash": "0157717748e85c779dc9a9f3f8f2a0bc04f8eb398e6a9379e622a5320feab042",
+      "astHash": "8b9f4744673a0b5cedb04441a8f68a96dee0c27dbf4f4c2dccd3411778f6a634",
       "signatureHash": "59ec0a356585ff7b695c32d0a26e403055a19d31ca22c91e80448ef70ecf3fa3"
     },
     {

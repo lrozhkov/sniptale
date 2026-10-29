@@ -1,3 +1,4 @@
+import { resolveCapturedProjectAssetSource } from './project-snapshot';
 import { freezeImageInTransaction } from './image-snapshot';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
 import { collectCapturedProjectRecordingIds } from './project-snapshot';
@@ -548,16 +549,12 @@ class NativeProjectSnapshot {
   private requireProjectAssetBindings(): void {
     for (const asset of this.project.project.assets) {
       const source = asset.source;
-      const resource =
-        source.kind === 'project-asset'
-          ? this.assets.get(source.projectAssetId)
-          : source.kind === 'library-asset'
-            ? this.media.get(source.mediaId)
-            : source.kind === 'recording'
-              ? this.media.get(`recording:${source.recordingId}`)
-              : source.kind === 'scenario-asset'
-                ? this.scenarioAssets.find((entry) => entry.id === source.scenarioAssetId)
-                : undefined;
+      const resource = resolveCapturedProjectAssetSource(
+        source,
+        this.assets,
+        this.media,
+        this.scenarioAssets
+      );
       requireSupported(
         resource !== undefined &&
           resource.size === asset.metadata.size &&

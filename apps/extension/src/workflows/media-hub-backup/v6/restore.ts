@@ -8,7 +8,7 @@ import {
   completeArchiveRestoreSession,
   createAssetPublicationJournal,
   deleteReadyJournal,
-  discardPreparedAsset,
+  collectPreparedAssetCleanupFailures,
   publishReadyJournalWithRetry,
   readArchiveRestoreSession,
   runWithDurableAssetOperation,
@@ -99,11 +99,8 @@ function orderedRestoreCatalogs(
 }
 
 async function cleanupStaged(staged: readonly StagedArchiveObject[]): Promise<void> {
-  const results = await Promise.allSettled(
-    staged.map((object) => discardPreparedAsset(object.ref.assetId))
-  );
-  const failures = results.flatMap((result) =>
-    result.status === 'rejected' ? [result.reason as unknown] : []
+  const failures = await collectPreparedAssetCleanupFailures(
+    staged.map((object) => object.ref.assetId)
   );
   if (failures.length > 0) throw new AggregateError(failures, 'Archive restore cleanup failed.');
 }

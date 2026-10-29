@@ -154,7 +154,12 @@ export async function openProvider(
         const session = await loaded.context.newCDPSession(settings);
         try {
           const result: unknown = await session.send('Runtime.evaluate', {
-            expression: `new Promise((resolve,reject)=>chrome.developerPrivate.addHostPermission(${JSON.stringify(loaded.extensionId)},${JSON.stringify(origin + '/*')},()=>chrome.runtime.lastError?reject(new Error('Origin grant refused')):resolve(true)))`,
+            expression: [
+              `new Promise((resolve,reject)=>`,
+              `chrome.developerPrivate.addHostPermission(${JSON.stringify(loaded.extensionId)},`,
+              `${JSON.stringify(origin + '/*')},`,
+              `()=>chrome.runtime.lastError?reject(new Error('Origin grant refused')):resolve(true)))`,
+            ].join(''),
             awaitPromise: true,
             returnByValue: true,
           });

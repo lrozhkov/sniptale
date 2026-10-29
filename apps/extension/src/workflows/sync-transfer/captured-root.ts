@@ -1,9 +1,7 @@
+import { loadCapturedInventory, createCapturedRootEnvelope } from './captured-inventory';
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import { encodeCapturedScenarioRoot } from './captured-scenario';
-import {
-  createArchivePathAllocator,
-  sanitizeArchivePathSegment,
-} from '../../composition/archive-transfer';
+import { createArchivePathAllocator } from '../../composition/archive-transfer';
 import { readAssetFile, type AssetRef } from '../../composition/persistence/assets';
 import { sha256 } from '@noble/hashes/sha2.js';
 import type {
@@ -11,7 +9,6 @@ import type {
   CapturedRootDependency,
 } from '../../composition/persistence/sync-capture/contracts';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
-import { assertPortableJson, parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import type { ArchiveRootObjectSource } from '../media-hub-backup/v6/contracts';
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
 import { encodeCapturedImageRoot } from './captured-image';
@@ -86,18 +83,8 @@ export async function encodeCapturedPortableRoot(
       paths: createArchivePathAllocator(),
     });
     if (roots.length !== 1) throw new Error('Frozen recording inventory differs from its root.');
-    const loaded = await roots[0]!.load();
-    const objects = loaded.objects.map((object) => ({
-      ...object,
-      ref: { ...object.ref, filename: sanitizeArchivePathSegment(object.ref.filename) },
-    }));
-    const metadata: unknown = JSON.parse(JSON.stringify(loaded.metadata));
-    assertPortableJson(metadata);
-    const envelope = parseRootEnvelope({
-      descriptor: { ...roots[0]!.descriptor, metadataPath: 'Metadata/sync-root.json' },
-      metadata,
-      objects: objects.map((object) => object.ref),
-    });
+    const { objects, metadata } = await loadCapturedInventory(roots[0]!);
+    const envelope = createCapturedRootEnvelope(roots[0]!, { metadata, objects });
     const portable = parsePortableMediaMetadata(metadata);
     const bindings: { objectId: string; ref: AssetRef }[] = [];
     const bind = async (objectId: string, ref: AssetRef, checkBytes = false) => {

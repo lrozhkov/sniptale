@@ -21,7 +21,7 @@ import {
   isGallerySenderUrl,
   isImageEditorSenderUrl,
   isScenarioEditorSenderUrl,
-} from '../runtime/routing/authorization/sender-classification';
+} from '../../platform/navigation/extension-pages/sender-url';
 import { isOwnedExtensionPagePath } from '../../platform/navigation/extension-pages/sender-url';
 import type { createSyncConnectionCoordinator } from './coordinator';
 

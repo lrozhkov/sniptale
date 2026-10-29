@@ -1,5 +1,5 @@
 import { readPersistedSyncCatalogCards } from '../../workflows/sync-transfer/catalog-view';
-import { createRemoteRootGalleryItem } from '../library/items';
+import { createRemoteRootGalleryItem } from './items';
 import { listVideoWorkspaceSummaries } from '../../composition/persistence/review-workspaces/summaries';
 import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import {
@@ -13,9 +13,9 @@ import {
   getStorageEstimateInfo,
   type StorageEstimateInfo,
 } from '../../features/media-hub/storage-capacity';
-import { createGalleryItems, type GalleryItem } from '../library/items';
-import { isGalleryMediaItem } from '../library/items';
-import { isGalleryVideoProjectItem } from '../library/items';
+import { createGalleryItems, type GalleryItem } from './items';
+import { isGalleryMediaItem } from './items';
+import { isGalleryVideoProjectItem } from './items';
 import { loadSettings } from '../../composition/persistence/settings';
 import {
   DEFAULT_LOCAL_STORAGE_POLICY,

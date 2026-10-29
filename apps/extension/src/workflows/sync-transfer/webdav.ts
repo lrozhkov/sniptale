@@ -322,6 +322,14 @@ function checkedStream(
   });
 }
 
+function checkedDepthZeroEntry(result: unknown, root: URL, key: string) {
+  const values = entries(result);
+  if (values.length !== 1 || !values[0]) throw new SyncRemoteError('invalid-response');
+  const item = values[0];
+  if (listedKey(item['href'], root) !== key) throw new SyncRemoteError('invalid-response');
+  return item;
+}
+
 /** Probe an existing HTTPS directory. The caller owns host authorization and request cancellation. */
 export async function createWebdavRemoteStore(
   options: WebdavRemoteStoreOptions,
@@ -345,10 +353,7 @@ export async function createWebdavRemoteStore(
         fetch: guardedFetch,
       });
       requestSignal.throwIfAborted();
-      const values = entries(result);
-      if (values.length !== 1 || !values[0]) throw new SyncRemoteError('invalid-response');
-      const item = values[0];
-      if (listedKey(item['href'], root) !== key) throw new SyncRemoteError('invalid-response');
+      const item = checkedDepthZeroEntry(result, root, key);
       if (!directory(item)) throw new SyncRemoteError('collision');
     };
     await probe('', signal);
@@ -403,10 +408,7 @@ export async function createWebdavRemoteStore(
             fetch: guardedFetch,
           });
           requestSignal.throwIfAborted();
-          const values = entries(result);
-          if (values.length !== 1 || !values[0]) throw new SyncRemoteError('invalid-response');
-          const item = values[0];
-          if (listedKey(item['href'], root) !== key) throw new SyncRemoteError('invalid-response');
+          const item = checkedDepthZeroEntry(result, root, key);
           const resourceType = property(item, 'resourcetype');
           if (!record(resourceType) || Object.keys(resourceType).length !== 0) {
             throw new SyncRemoteError('invalid-response');

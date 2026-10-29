@@ -1,3 +1,4 @@
+import { readCaptureRootState } from './guards';
 import { freezeScenarioInTransaction, digestCapturedScenarioRows } from './scenario-snapshot';
 import { freezeVideoReviewInTransaction, digestCapturedVideoReviewRows } from './review-snapshot';
 import {
@@ -160,17 +161,16 @@ export async function readScenarioRevisionFence(
   const profile = await readEnabledCaptureProfile(tx);
   if (!profile) return null;
   const rootKey = captureRootKey(profile.spaceId, 'scenario-project', projectId);
-  const raw: unknown = await tx
-    .objectStore(SYNC_CAPTURE_STORE)
-    .get(JSON.stringify(['root-state', rootKey]));
-  if (raw === undefined) return null;
-  const state = parseSyncCaptureRecord(raw);
-  if (
-    !state ||
-    state.kind !== 'root-state' ||
-    state.rootKey !== rootKey ||
-    state.nativeRevision === undefined
-  )
+  const state = await readCaptureRootState(
+    tx,
+    rootKey,
+    () => {
+      throw new Error('Scenario revision fence is unavailable.');
+    },
+    false
+  );
+  if (!state) return null;
+  if (state.nativeRevision === undefined)
     throw new Error('Scenario revision fence is unavailable.');
   return state.nativeRevision;
 }
@@ -236,18 +236,11 @@ async function readVideoReviewState(
   id: string
 ): Promise<SyncCaptureRootState | null> {
   const rootKey = captureRootKey(profile.spaceId, 'video-review', id);
-  const key = JSON.stringify(['root-state', rootKey]);
-  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key);
-  if (raw === undefined) return null;
-  const state = parseSyncCaptureRecord(raw);
-  if (
-    !state ||
-    state.kind !== 'root-state' ||
-    state.key !== key ||
-    state.rootKey !== rootKey ||
-    state.nativeRevision === undefined
-  )
+  const state = await readCaptureRootState(tx, rootKey, () => {
     throw new Error('Invalid video review revision fence.');
+  });
+  if (!state) return null;
+  if (state.nativeRevision === undefined) throw new Error('Invalid video review revision fence.');
   return state;
 }
 
@@ -333,15 +326,16 @@ export async function readImageRevisionFence(
   const profile = await readEnabledCaptureProfile(tx);
   if (!profile) return null;
   const rootKey = captureRootKey(profile.spaceId, 'media', mediaId);
-  const raw: unknown = await tx
-    .objectStore(SYNC_CAPTURE_STORE)
-    .get(JSON.stringify(['root-state', rootKey]));
-  if (raw === undefined) return null;
-  const state = parseSyncCaptureRecord(raw);
+  const state = await readCaptureRootState(
+    tx,
+    rootKey,
+    () => {
+      throw new Error('Image identity has no safe native revision fence.');
+    },
+    false
+  );
+  if (!state) return null;
   if (
-    !state ||
-    state.kind !== 'root-state' ||
-    state.rootKey !== rootKey ||
     (state.deleted !== true && !allowLivePredecessor) ||
     (state.deleted === true && state.nativeRevision === undefined)
   )

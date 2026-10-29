@@ -1,3 +1,4 @@
+import { isBoundedImageMetadata } from './image-snapshot';
 import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { expect, it } from 'vitest';
@@ -330,4 +331,24 @@ it('preserves recording acquisition facts and group metadata and refuses contrad
       },
     })
   ).toBeNull();
+});
+
+it('preserves distinct image and media metadata policies for Blobs and null-prototype records', () => {
+  const rows = mediaFixture();
+  const metadata = { note: 'retained' };
+  Object.setPrototypeOf(metadata, null);
+  expect(parseCapturedMediaRows({ ...rows, metadata })).not.toBeNull();
+  expect(isBoundedImageMetadata({ metadata })).toBe(false);
+  expect(isBoundedImageMetadata({ metadata }, false)).toBe(false);
+
+  const binary = new Blob(['source'], { type: 'image/png' });
+  expect(isBoundedImageMetadata({ binary })).toBe(true);
+  expect(isBoundedImageMetadata({ binary }, false)).toBe(false);
+  expect(parseCapturedMediaRows({ ...rows, binary })).toBeNull();
+  expect(parseCapturedMediaRows({ ...rows, binary: new Uint8Array([1]) })).toBeNull();
+
+  const cyclic: Record<string, unknown> = {};
+  cyclic['self'] = cyclic;
+  expect(isBoundedImageMetadata(cyclic)).toBe(false);
+  expect(parseCapturedMediaRows({ ...rows, cyclic })).toBeNull();
 });

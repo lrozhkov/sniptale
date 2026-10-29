@@ -1,3 +1,4 @@
+import { isBoundedCaptureMetadata } from './image-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -7,40 +8,11 @@ import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/rea
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import type { MediaLibraryEntry } from '../media-library/contracts';
-import { MAX_CAPTURE_METADATA_BYTES, type CapturedMediaRows } from './contracts';
+import { type CapturedMediaRows } from './contracts';
 
 /** Reject binary, cyclic, or excessive metadata before any JSON size calculation. */
 function boundedMetadata(value: unknown): boolean {
-  const active = new WeakSet<object>();
-  let nodes = 0;
-  let characters = 0;
-  function visit(item: unknown, depth: number): boolean {
-    if (++nodes > 100_000 || depth > 64) return false;
-    if (typeof item === 'string') {
-      characters += item.length;
-      return characters <= MAX_CAPTURE_METADATA_BYTES;
-    }
-    if (item === undefined || item === null || typeof item === 'boolean') return true;
-    if (typeof item === 'number') return Number.isFinite(item);
-    if (typeof item !== 'object' || active.has(item)) return false;
-    if (
-      !Array.isArray(item) &&
-      Object.getPrototypeOf(item) !== Object.prototype &&
-      Object.getPrototypeOf(item) !== null
-    )
-      return false;
-    active.add(item);
-    const valid = Object.entries(item).every(([key, child]) => {
-      characters += key.length;
-      return characters <= MAX_CAPTURE_METADATA_BYTES && visit(child, depth + 1);
-    });
-    active.delete(item);
-    return valid;
-  }
-  return (
-    visit(value, 0) &&
-    new TextEncoder().encode(JSON.stringify(value)).byteLength <= MAX_CAPTURE_METADATA_BYTES
-  );
+  return isBoundedCaptureMetadata(value, { allowBlobs: false, allowNullPrototype: true });
 }
 
 /** Admit the original-only Library mirror that the native project asset publisher owns. */

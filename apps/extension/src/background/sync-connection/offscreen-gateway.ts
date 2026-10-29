@@ -31,6 +31,21 @@ interface GatewayDependencies {
   send(message: GatewayMessage): Promise<unknown>;
   createRequestId(): string;
 }
+function acceptedExecutorReceipt(
+  response: Record<string, unknown>,
+  input: { executorId: string; executorRevision: number }
+) {
+  const revision = response['executorRevision'];
+  if (
+    response['result'] !== 'accepted' ||
+    response['executorId'] !== input.executorId ||
+    typeof revision !== 'number' ||
+    !Number.isSafeInteger(revision) ||
+    revision < input.executorRevision
+  )
+    return refused();
+  return { executorId: input.executorId, executorRevision: revision };
+}
 function refused(): never {
   throw new Error('Sync executor command refused');
 }
@@ -109,15 +124,7 @@ export function createSyncOffscreenGateway(
         requestId: deps.createRequestId(),
         ...input,
       });
-      if (
-        response['result'] !== 'accepted' ||
-        response['executorId'] !== input.executorId ||
-        typeof response['executorRevision'] !== 'number' ||
-        !Number.isSafeInteger(response['executorRevision']) ||
-        response['executorRevision'] < input.executorRevision
-      )
-        return refused();
-      return { executorId: input.executorId, executorRevision: response['executorRevision'] };
+      return acceptedExecutorReceipt(response, input);
     },
     async startWorkspaceExecutor(input) {
       const response = await send({
@@ -129,15 +136,10 @@ export function createSyncOffscreenGateway(
         Object.keys(response).length !== 4 ||
         !['success', 'result', 'executorId', 'executorRevision'].every((key) =>
           Object.hasOwn(response, key)
-        ) ||
-        response['result'] !== 'accepted' ||
-        response['executorId'] !== input.executorId ||
-        typeof response['executorRevision'] !== 'number' ||
-        !Number.isSafeInteger(response['executorRevision']) ||
-        response['executorRevision'] < input.executorRevision
+        )
       )
         return refused();
-      return { executorId: input.executorId, executorRevision: response['executorRevision'] };
+      return acceptedExecutorReceipt(response, input);
     },
     async stopExecutor(input) {
       const response = await send({

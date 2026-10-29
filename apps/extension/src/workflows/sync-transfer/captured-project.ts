@@ -1,3 +1,4 @@
+import { loadCapturedInventory } from './captured-inventory';
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import type { ArchiveObjectRef } from '../../composition/archive-transfer';
 import type { InventoryDatabase } from '../media-hub-backup/v6/inventory/helpers';
@@ -24,7 +25,7 @@ import type { AssetRef } from '../../composition/persistence/assets';
 import type { CapturedVideoProjectRows } from '../../composition/persistence/sync-capture/contracts';
 import { parseCapturedVideoProjectRows } from '../../composition/persistence/sync-capture/guards';
 import { collectCapturedProjectScenarioDependencies } from '../../composition/persistence/sync-capture/project-snapshot';
-import { assertPortableJson, parseRootEnvelope } from '../media-hub-backup/v6/codec';
+import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { buildVideoProjectRootInventory } from '../media-hub-backup/v6/inventory/video-projects';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
 import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
@@ -85,13 +86,7 @@ export async function encodeCapturedProjectRoot(
   });
   if (roots.length !== 1 || roots[0]!.descriptor.rootId !== rows.project.id)
     throw new Error('Frozen project inventory differs from its root.');
-  const loaded = await roots[0]!.load();
-  const objects = loaded.objects.map((object) => ({
-    ...object,
-    ref: { ...object.ref, filename: sanitizeArchivePathSegment(object.ref.filename) },
-  }));
-  const metadata: unknown = JSON.parse(JSON.stringify(loaded.metadata));
-  assertPortableJson(metadata);
+  const { objects, metadata } = await loadCapturedInventory(roots[0]!);
   const portable = parsePortableVideoProjectMetadata(metadata);
   const assets = new Map(rows.assets.map((entry) => [entry.id, entry]));
   const exports = new Map(rows.exports.map((entry) => [entry.id, entry]));

@@ -1,7 +1,7 @@
 import { isOwnedExtensionPagePath } from '../../../../platform/navigation/extension-pages/sender-url';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { isGallerySenderUrl } from '../authorization/sender-classification';
+import { isGallerySenderUrl } from '../../../../platform/navigation/extension-pages/sender-url';
 import * as runtimeFreshness from '@sniptale/platform/security/runtime-message-freshness-authorizer';
 
 type ConsumeHandle = runtimeFreshness.RuntimeMessageFreshnessConsumeHandle;

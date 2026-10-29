@@ -1,3 +1,5 @@
+import type { IDBPTransaction } from 'idb';
+import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import { parseCapturedScenarioRows } from './scenario-snapshot';
 import { parseCapturedMediaRows } from './media-snapshot';
 export { parseCapturedMediaRows } from './media-snapshot';
@@ -26,7 +28,8 @@ import {
   type SyncCaptureRecord,
 } from './contracts';
 
-function identity(value: unknown): value is string {
+/** Admit one bounded native operation or root identifier. */
+export function identity(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 256;
 }
 
@@ -34,7 +37,8 @@ function storageKey(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 2048;
 }
 
-function ordinal(value: unknown): value is number {
+/** Admit a persisted nonnegative safe integer. */
+export function ordinal(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
@@ -204,7 +208,8 @@ export function hashCaptureText(text: string): string {
 function captureDigest(value: unknown): value is string {
   return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
 }
-function captureRemoteKey(value: unknown): value is string {
+/** Admit one bounded relative remote object key. */
+export function captureRemoteKey(value: unknown): value is string {
   return (
     storageKey(value) &&
     !/[\\?#:]/u.test(value) &&
@@ -505,4 +510,117 @@ export function parseSyncCaptureRecord(value: unknown): SyncCaptureRecord | null
     default:
       return null;
   }
+}
+
+type AppliedReceiptIdentity = Pick<
+  SyncCaptureAppliedOperation,
+  'spaceId' | 'rootKey' | 'operationId' | 'sourceDigest'
+> & { receiptKey: string };
+
+/** Admit an exact completed operation without requiring retained staging files. */
+export function parseAppliedCaptureReceipt(
+  raw: unknown,
+  expected: AppliedReceiptIdentity,
+  refuse: () => never
+): number | null {
+  if (raw === undefined) return null;
+  const receipt = parseSyncCaptureRecord(raw);
+  if (
+    !receipt ||
+    receipt.kind !== 'applied-operation' ||
+    receipt.key !== expected.receiptKey ||
+    receipt.spaceId !== expected.spaceId ||
+    receipt.rootKey !== expected.rootKey ||
+    receipt.operationId !== expected.operationId ||
+    receipt.sourceDigest !== expected.sourceDigest
+  )
+    refuse();
+  return receipt.generation;
+}
+
+/** Read and admit the durable receipt inside the caller's transaction. */
+export async function readAppliedCaptureReceipt(
+  tx: Pick<IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>, 'objectStore'>,
+  expected: AppliedReceiptIdentity,
+  refuse: () => never
+): Promise<number | null> {
+  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(expected.receiptKey);
+  return parseAppliedCaptureReceipt(raw, expected, refuse);
+}
+
+/** Check the shared persisted replica identity fields before caller-specific admission. */
+export function isCaptureReplicaHeader(value: Record<string, unknown>): value is Record<
+  string,
+  unknown
+> & {
+  operationId: string;
+  spaceId: string;
+  sourceDigest: string;
+  profileCreatedAt: number;
+  connectionGeneration: number;
+  expectedLocalGeneration: number;
+} {
+  return (
+    identity(value['operationId']) &&
+    identity(value['spaceId']) &&
+    captureDigest(value['sourceDigest']) &&
+    ordinal(value['profileCreatedAt']) &&
+    ordinal(value['connectionGeneration']) &&
+    value['connectionGeneration'] >= 1 &&
+    ordinal(value['expectedLocalGeneration'])
+  );
+}
+
+/** Admit a root-state identity; native revision and basis policies remain with the caller. */
+export async function readCaptureRootState(
+  tx: Pick<IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>, 'objectStore'>,
+  rootKey: string,
+  refuse: (() => never) | undefined,
+  checkStorageKey = true
+): Promise<SyncCaptureRootState | null> {
+  const key = JSON.stringify(['root-state', rootKey]);
+  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key);
+  if (raw === undefined) return null;
+  const state = parseSyncCaptureRecord(raw);
+  if (
+    !state ||
+    state.kind !== 'root-state' ||
+    state.rootKey !== rootKey ||
+    (checkStorageKey && state.key !== key)
+  ) {
+    if (refuse) refuse();
+    return null;
+  }
+  return state;
+}
+
+/** Preserve prepared caller admission of the target profile and causal predecessor basis. */
+export function isCaptureReplicaPredecessor(input: {
+  profileCreatedAt: number;
+  expectedLocalGeneration: number;
+  expectedBasis: readonly string[];
+}): boolean {
+  return (
+    ordinal(input.profileCreatedAt) &&
+    Array.isArray(input.expectedBasis) &&
+    input.expectedBasis.length === (input.expectedLocalGeneration === 0 ? 0 : 1) &&
+    input.expectedBasis.every(identity)
+  );
+}
+
+/** Admit the exact causal head named by a prepared media dependency. */
+export function isCaptureDependencyVersion(value: Record<string, unknown>): value is Record<
+  string,
+  unknown
+> & {
+  expectedGeneration: number;
+  expectedBasis: string[];
+} {
+  return (
+    ordinal(value['expectedGeneration']) &&
+    value['expectedGeneration'] >= 1 &&
+    Array.isArray(value['expectedBasis']) &&
+    value['expectedBasis'].length === 1 &&
+    value['expectedBasis'].every(identity)
+  );
 }

@@ -24,6 +24,12 @@ vi.mock('../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/assets')>()),
   readAssetFile: io.read,
   discardPreparedAsset: io.discard,
+  collectPreparedAssetCleanupFailures: async (assetIds: readonly string[]) => {
+    const results = await Promise.allSettled(assetIds.map((id) => io.discard(id)));
+    return results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+  },
   runWithDurableAssetOperation: async (operation: () => Promise<unknown>) => operation(),
 }));
 vi.mock('../../composition/persistence/assets/resource-sessions', () => ({

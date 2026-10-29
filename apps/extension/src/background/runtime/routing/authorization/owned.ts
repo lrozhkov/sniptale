@@ -31,12 +31,14 @@ import {
 import { authorizeAiSettingsMutationRoute, authorizeAiSettingsQueryRoute } from './ai-settings';
 import {
   classifyBackgroundOwnedSender,
-  classifySettingsPageSenderUrl,
   isPageAccessSenderUrl,
-  isImageEditorSenderUrl,
-  isGallerySenderUrl,
   isWebSnapshotViewerSenderUrl,
 } from './sender-classification';
+import {
+  classifySettingsPageSenderUrl,
+  isImageEditorSenderUrl,
+  isGallerySenderUrl,
+} from '../../../../platform/navigation/extension-pages/sender-url';
 import { hasOffscreenRuntimeCapability } from '../../../offscreen-document/sender-policy';
 
 export const backgroundOwnedPolicyAuthorityByMessageType = new Map(

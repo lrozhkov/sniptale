@@ -24,6 +24,12 @@ vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
   createAssetPublicationJournal: mocks.createJournal,
   deleteReadyJournal: mocks.deleteJournal,
   discardPreparedAsset: mocks.discard,
+  collectPreparedAssetCleanupFailures: async (assetIds: readonly string[]) => {
+    const results = await Promise.allSettled(assetIds.map((id) => mocks.discard(id)));
+    return results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+  },
   publishReadyJournalWithRetry: mocks.publishJournal,
   readArchiveRestoreSession: mocks.readSession,
 }));

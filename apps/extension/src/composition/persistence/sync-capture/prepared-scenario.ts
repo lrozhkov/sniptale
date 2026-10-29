@@ -1,3 +1,4 @@
+import { preparedPresentationRefs } from './prepared-project';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseAssetRef, readAssetFile, type AssetRef } from '../assets';
@@ -198,12 +199,7 @@ export function collectPreparedScenarioReplicaRefs(value: PreparedScenarioReplic
     ...root.stepDocuments.flatMap((item) => item.refs),
     ...root.thumbnails.map((item) => item.ref),
     ...(root.historyRef ? [root.historyRef] : []),
-    ...(root.presentation
-      ? [
-          root.presentation.thumbnailRef,
-          ...(root.presentation.previewRef ? [root.presentation.previewRef] : []),
-        ]
-      : []),
+    ...preparedPresentationRefs(root.presentation),
   ];
   const unique = new Map<string, AssetRef>();
   for (const source of refs) {

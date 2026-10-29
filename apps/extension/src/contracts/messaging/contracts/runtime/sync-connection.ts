@@ -366,6 +366,19 @@ function requestFor<T extends keyof RuntimeSyncConnectionRequestByType>(
   }
   return matches(parsed) ? parsed : invalid();
 }
+function acceptedExecutorResponse(value: Record<string, unknown>) {
+  return exact(value, ['success', 'result', 'executorId', 'executorRevision']) &&
+    value['result'] === 'accepted' &&
+    connectionUuid(value['executorId']) &&
+    positive(value['executorRevision'])
+    ? {
+        success: true as const,
+        result: 'accepted' as const,
+        executorId: value['executorId'],
+        executorRevision: value['executorRevision'],
+      }
+    : null;
+}
 export const runtimeSyncConnectionMessageContracts = {
   [MessageType.SYNC_PRODUCT_COMMAND]: {
     parseRequest: (value: unknown) => parseSyncProductRequest(value) ?? invalid(),
@@ -377,31 +390,11 @@ export const runtimeSyncConnectionMessageContracts = {
   },
   [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: contract(
     MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
-    (value) =>
-      exact(value, ['success', 'result', 'executorId', 'executorRevision']) &&
-      value['result'] === 'accepted' &&
-      connectionUuid(value['executorId']) &&
-      positive(value['executorRevision'])
-        ? {
-            success: true,
-            result: 'accepted',
-            executorId: value['executorId'],
-            executorRevision: value['executorRevision'],
-          }
-        : null
+    acceptedExecutorResponse
   ),
-  [MessageType.OFFSCREEN_SYNC_START]: contract(MessageType.OFFSCREEN_SYNC_START, (value) =>
-    exact(value, ['success', 'result', 'executorId', 'executorRevision']) &&
-    value['result'] === 'accepted' &&
-    connectionUuid(value['executorId']) &&
-    positive(value['executorRevision'])
-      ? {
-          success: true,
-          result: 'accepted',
-          executorId: value['executorId'],
-          executorRevision: value['executorRevision'],
-        }
-      : null
+  [MessageType.OFFSCREEN_SYNC_START]: contract(
+    MessageType.OFFSCREEN_SYNC_START,
+    acceptedExecutorResponse
   ),
   [MessageType.OFFSCREEN_SYNC_INSPECT]: contract(MessageType.OFFSCREEN_SYNC_INSPECT, (value) => {
     const snapshot = parseSyncExecutorSnapshot(value['snapshot']);

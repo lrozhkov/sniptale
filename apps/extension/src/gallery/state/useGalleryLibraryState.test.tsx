@@ -31,7 +31,7 @@ vi.mock('../../features/media-hub/events', async (importOriginal) => ({
   subscribeToMediaHubEvents: subscribeToMediaHubEventsMock,
 }));
 
-vi.mock('./use-gallery-library-snapshot', () => ({
+vi.mock('../library/snapshot', () => ({
   loadGalleryLibrarySnapshot: loadGalleryLibrarySnapshotMock,
 }));
 

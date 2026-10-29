@@ -28,6 +28,7 @@ export {
   createSeekableAssetObjectWriter,
   deleteAssetObject,
   discardPreparedAsset,
+  collectPreparedAssetCleanupFailures,
   deleteReadyJournal,
   eraseAssetStorage,
   isAssetReadyProtected,

@@ -1,3 +1,6 @@
+import { readCaptureRootState } from './guards';
+import { isCaptureReplicaPredecessor } from './guards';
+import { readAppliedCaptureReceipt } from './guards';
 import {
   parsePreparedScenarioProjectDependencies,
   verifyScenarioProjectDependenciesInTransaction,
@@ -96,20 +99,9 @@ async function readAppliedReceipt(
   tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   identity: ApplyIdentity
 ): Promise<number | null> {
-  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(identity.receiptKey);
-  if (raw === undefined) return null;
-  const receipt = parseSyncCaptureRecord(raw);
-  if (
-    !receipt ||
-    receipt.kind !== 'applied-operation' ||
-    receipt.key !== identity.receiptKey ||
-    receipt.spaceId !== identity.spaceId ||
-    receipt.operationId !== identity.operationId ||
-    receipt.sourceDigest !== identity.sourceDigest ||
-    receipt.rootKey !== identity.rootKey
-  )
+  return readAppliedCaptureReceipt(tx, identity, () => {
     throw new Error('Project application identity conflicts with its durable receipt.');
-  return receipt.generation;
+  });
 }
 
 async function readApplicationGeneration(
@@ -375,13 +367,9 @@ async function assertDependencyState(
   dependency: PreparedVideoProjectDependency
 ): Promise<void> {
   const rootKey = captureRootKey(spaceId, 'media', dependency.entry.id);
-  const key = JSON.stringify(['root-state', rootKey]);
-  const state = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get(key));
+  const state = await readCaptureRootState(tx, rootKey, undefined);
   if (
     !state ||
-    state.kind !== 'root-state' ||
-    state.key !== key ||
-    state.rootKey !== rootKey ||
     state.spaceId !== spaceId ||
     state.rootKind !== 'media' ||
     state.rootId !== dependency.entry.id ||
@@ -764,11 +752,7 @@ export async function applyPreparedVideoProjectRevision(
   if (
     (input.authorization !== undefined && !parseSyncConnectionIdentity(input.authorization)) ||
     !input.spaceId ||
-    !Number.isSafeInteger(input.profileCreatedAt) ||
-    input.profileCreatedAt < 0 ||
-    !Array.isArray(input.expectedBasis) ||
-    input.expectedBasis.length !== (input.expectedLocalGeneration === 0 ? 0 : 1) ||
-    input.expectedBasis.some((id) => typeof id !== 'string' || !id || id.length > 256) ||
+    !isCaptureReplicaPredecessor(input) ||
     !input.operationId ||
     input.operationId.length > 256 ||
     !/^[a-f0-9]{64}$/u.test(input.sourceDigest) ||

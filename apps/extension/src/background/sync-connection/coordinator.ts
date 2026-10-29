@@ -170,6 +170,45 @@ class SyncConnectionCoordinator {
     await this.#contain(result.snapshot);
     if (result.failed) refused();
   }
+  #workspaceOperation<T>(
+    input: WorkspaceSelection,
+    operation: (
+      source: SyncWorkspaceSource | null,
+      authentication: SyncConnectionAuthentication | null,
+      checkGeneration: () => void
+    ) => Promise<T>
+  ): Promise<T> {
+    const source = parseSyncWorkspaceSource(structuredClone(input.source));
+    let authentication: SyncConnectionAuthentication | null = structuredClone(input.authentication);
+    const admission = this.#operationPermit();
+    if (!admission) return Promise.reject(new Error('Sync coordinator operation refused'));
+    return this.#enqueue(async () => {
+      admission.checkGeneration();
+      return operation(source, authentication, admission.checkGeneration);
+    }).finally(() => {
+      authentication = null;
+      admission.release();
+    });
+  }
+  #operationPermit() {
+    const release = this.#exclusion.acquirePermit();
+    if (!release) return null;
+    const generation = this.#exclusion.getGeneration();
+    return {
+      release,
+      checkGeneration: () => {
+        if (generation !== this.#exclusion.getGeneration()) refused();
+      },
+    };
+  }
+  async #ensureObserved(checkGeneration: () => void) {
+    checkGeneration();
+    const startupId = await this.#deps.ensureDocument();
+    checkGeneration();
+    const snapshot = await this.#observe(startupId);
+    checkGeneration();
+    return snapshot;
+  }
   #matchesWorkspace(workspace: SyncWorkspaceSelection | null, source: SyncWorkspaceSource) {
     return (
       !!workspace &&
@@ -184,12 +223,9 @@ class SyncConnectionCoordinator {
     sourceInput: SyncWorkspaceSource
   ): Promise<{ kind: 'cancelled'; outcome: 'cancelled' }> {
     const source = parseSyncWorkspaceSource(structuredClone(sourceInput));
-    const release = this.#exclusion.acquirePermit();
-    if (!release) return Promise.reject(new Error('Sync coordinator operation refused'));
-    const generation = this.#exclusion.getGeneration();
-    const checkGeneration = () => {
-      if (generation !== this.#exclusion.getGeneration()) refused();
-    };
+    const admission = this.#operationPermit();
+    if (!admission) return Promise.reject(new Error('Sync coordinator operation refused'));
+    const { release, checkGeneration } = admission;
     return this.#enqueue(async () => {
       checkGeneration();
       if (!source || (await this.#deps.loadConnection())) refused();
@@ -383,11 +419,7 @@ class SyncConnectionCoordinator {
     return this.#enqueue(async () => {
       checkGeneration();
       if (!matches(await this.#deps.loadConnection(), selection)) refused();
-      checkGeneration();
-      const startupId = await this.#deps.ensureDocument();
-      checkGeneration();
-      const snapshot = await this.#observe(startupId);
-      checkGeneration();
+      const snapshot = await this.#ensureObserved(checkGeneration);
       if (
         !snapshot ||
         snapshot.phase === 'stopping' ||
@@ -412,23 +444,10 @@ class SyncConnectionCoordinator {
     }).finally(release);
   }
   startWorkspace(input: WorkspaceSelection): Promise<ExecutorReceipt> {
-    const source = parseSyncWorkspaceSource(structuredClone(input.source));
-    let authentication: SyncConnectionAuthentication | null = structuredClone(input.authentication);
-    const release = this.#exclusion.acquirePermit();
-    if (!release) return Promise.reject(new Error('Sync coordinator operation refused'));
-    const generation = this.#exclusion.getGeneration();
-    const checkGeneration = () => {
-      if (generation !== this.#exclusion.getGeneration()) refused();
-    };
-    return this.#enqueue(async () => {
-      checkGeneration();
+    return this.#workspaceOperation(input, async (source, authentication, checkGeneration) => {
       if (!source || (await this.#deps.loadConnection())) refused();
       if (!this.#matchesWorkspace(await this.#deps.loadWorkspace(), source)) refused();
-      checkGeneration();
-      const startupId = await this.#deps.ensureDocument();
-      checkGeneration();
-      const snapshot = await this.#observe(startupId);
-      checkGeneration();
+      const snapshot = await this.#ensureObserved(checkGeneration);
       if (
         !snapshot ||
         snapshot.phase === 'stopping' ||
@@ -456,23 +475,11 @@ class SyncConnectionCoordinator {
       )
         refused();
       return receipt;
-    }).finally(() => {
-      authentication = null;
-      release();
     });
   }
   /** Install native ready evidence only after the previous executor acknowledges containment. */
   enrollWorkspace(input: WorkspaceSelection): Promise<SyncConnectionMetadata> {
-    const source = parseSyncWorkspaceSource(structuredClone(input.source));
-    let authentication: SyncConnectionAuthentication | null = structuredClone(input.authentication);
-    const release = this.#exclusion.acquirePermit();
-    if (!release) return Promise.reject(new Error('Sync coordinator operation refused'));
-    const generation = this.#exclusion.getGeneration();
-    const checkGeneration = () => {
-      if (generation !== this.#exclusion.getGeneration()) refused();
-    };
-    return this.#enqueue(async () => {
-      checkGeneration();
+    return this.#workspaceOperation(input, async (source, authentication, checkGeneration) => {
       const selected = await this.#deps.loadWorkspace();
       if (!source || !this.#matchesWorkspace(selected, source) || selected?.phase !== 'ready')
         refused();
@@ -498,9 +505,6 @@ class SyncConnectionCoordinator {
       const connection = await this.#deps.enrollConnection(source, authentication);
       checkGeneration();
       return connection;
-    }).finally(() => {
-      authentication = null;
-      release();
     });
   }
   /** Retire one exact connection only after native revocation and observed executor drain. */

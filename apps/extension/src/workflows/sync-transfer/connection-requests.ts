@@ -103,14 +103,7 @@ export function createSyncWorkspaceRequests(options: {
         throw new SyncRemoteError('authentication');
       return value;
     }
-    return tracker.request(signal, issue, async (check) => {
-      const before = await current();
-      check();
-      if (!(await hasOriginPermission(new URL(before.rootUrl).origin)))
-        throw new SyncRemoteError('access-denied');
-      await current();
-      check();
-    });
+    return tracker.request(signal, issue, permissionCheckedAdmission(current, hasOriginPermission));
   }
   return { request, close: tracker.close };
 }
@@ -163,16 +156,24 @@ export function createSyncWorkspaceJoinRequests(options: {
         throw new SyncRemoteError('authentication');
       return value;
     }
-    return tracker.request(signal, issue, async (check) => {
-      const before = await current();
-      check();
-      if (!(await hasOriginPermission(new URL(before.rootUrl).origin)))
-        throw new SyncRemoteError('access-denied');
-      await current();
-      check();
-    });
+    return tracker.request(signal, issue, permissionCheckedAdmission(current, hasOriginPermission));
   }
   return { request, close: tracker.close };
+}
+
+/** Recheck the exact native request lifetime after the asynchronous permission check. */
+function permissionCheckedAdmission(
+  current: () => Promise<{ rootUrl: string }>,
+  hasOriginPermission: (origin: string) => Promise<boolean>
+) {
+  return async (check: () => void) => {
+    const before = await current();
+    check();
+    if (!(await hasOriginPermission(new URL(before.rootUrl).origin)))
+      throw new SyncRemoteError('access-denied');
+    await current();
+    check();
+  };
 }
 
 /** Keep issued transports and bodies owned until consumption or confirmed cancellation. */

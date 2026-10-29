@@ -1,0 +1,13 @@
+
+ RUN  v5.0.5 <worktree>
+
+
+ Test Files  104 passed (104)
+      Tests  2258 passed (2258)
+   Start at  15:10:36
+   Duration  176.29s (import 56%, tests 29%, transform 11%, environment 3%, setup 1%)
+
+     Import  2006 modules were evaluated 8999 times · 88.39s total, 56% of tracked time
+             ~68.69s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+
