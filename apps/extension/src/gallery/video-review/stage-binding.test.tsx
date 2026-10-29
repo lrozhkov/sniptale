@@ -148,3 +148,81 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
     }
   }
 );
+
+it('retains applied camera regions while the transport advances without a selected focus', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  const camera = createQuickEditZoomRegion({ id: 'camera', at: 5, duration: 3 });
+  const segments = [
+    {
+      id: 'path',
+      binding: { kind: 'project' as const },
+      start: 0,
+      end: 10,
+      keys: [
+        {
+          id: 'point',
+          time: 0,
+          x: 0.5,
+          y: 0.5,
+          anchor: 'manual' as const,
+          interpolation: 'hold' as const,
+        },
+      ],
+    },
+  ];
+  const readPath = vi.fn(() => segments);
+  camera.cursorFocus = {
+    path: {
+      version: 1,
+      mode: 'follow',
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      gapPolicy: 'hold',
+      get segments() {
+        return readPath();
+      },
+    },
+  };
+  const regions = [camera];
+  const props: Parameters<typeof ReviewStageBinding>[0] = {
+    url: 'blob:source',
+    source: { duration: 10, width: 1904, height: 984, mimeType: 'video/mp4', size: 1000 },
+    video: { current: null },
+    drawing: false,
+    region: undefined,
+    zoomRegions: regions,
+    background: { enabled: false },
+    outputTime: 0,
+    zoomOverlay: undefined,
+    comments: [],
+    annotations: [],
+    canvasComments: {
+      selectedId: null,
+      onSelect: vi.fn(),
+      onPatch: vi.fn(async () => {}),
+      setGeometry: vi.fn(),
+    },
+    overlaysVisible: true,
+    time: 0,
+    busy: false,
+    onRegion: vi.fn(),
+    onReady: vi.fn(),
+    onTime: vi.fn(),
+    onPlaying: vi.fn(),
+    onError: vi.fn(),
+  };
+  try {
+    act(() => root.render(<ReviewStageBinding {...props} />));
+    expect(scene?.focus?.regions).toBe(regions);
+    expect(readPath).toHaveBeenCalled();
+    const reads = readPath.mock.calls.length;
+    act(() => root.render(<ReviewStageBinding {...props} outputTime={1} time={1} />));
+    expect(scene?.focus?.regions).toBe(regions);
+    expect(scene?.focus?.time).toBe(1);
+    expect(readPath).toHaveBeenCalledTimes(reads);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

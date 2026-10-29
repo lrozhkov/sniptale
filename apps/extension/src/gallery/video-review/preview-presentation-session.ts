@@ -1,3 +1,4 @@
+import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { createReviewPreviewRenderer } from '../../workflows/video-review/render-preview';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import {
@@ -55,6 +56,7 @@ class ManualPresentationSession {
   private playing = false;
   private sequence = 0;
   private current: Description | null = null;
+  private cameraDescription: Description | null = null;
   private resultTime = 0;
   private front: Awaited<ReturnType<Renderer['render']>> | null = null;
   private cameraSource: CameraSource | null = null;
@@ -148,6 +150,13 @@ class ManualPresentationSession {
   private prepare = async (request: { scene: Description; time: number }, signal: AbortSignal) => {
     if (this.contextLost) throw new Error('Preview context lost');
     if (this.latest().input.backgroundPending) throw new PendingPresentation();
+    if (this.cameraDescription !== request.scene) {
+      prepareReviewCameraPlans(request.scene.scene.zoomRegions, {
+        ...request.scene.scene,
+        output: request.scene.dimensions.backing,
+      });
+      this.cameraDescription = request.scene;
+    }
     this.current = request.scene;
     this.resultTime =
       this.latest().input.playing && this.video
@@ -249,23 +258,58 @@ class ManualPresentationSession {
     };
   };
 
+  private publishCanvas(host: HTMLDivElement, value: Publication) {
+    const canvas = value.completed.canvas;
+    const previous = this.front;
+    if (
+      previous &&
+      previous.canvas.parentElement === host &&
+      previous.canvas.width === canvas.width &&
+      previous.canvas.height === canvas.height
+    ) {
+      // Replacing a canvas invalidates ancestor :has() rules across the editor on every frame.
+      const context = previous.context;
+      context.save();
+      try {
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.globalAlpha = 1;
+        context.globalCompositeOperation = 'copy';
+        context.filter = 'none';
+        context.drawImage(canvas, 0, 0);
+      } finally {
+        context.restore();
+      }
+      this.front = {
+        ...value.completed,
+        canvas: previous.canvas,
+        context,
+        release: previous.release,
+      };
+      value.retain();
+      value.completed.release();
+    } else {
+      canvas.className = 'pointer-events-none absolute inset-0 h-full w-full';
+      canvas.setAttribute('aria-hidden', 'true');
+      host.replaceChildren(canvas);
+      this.front = value.completed;
+      value.retain();
+      previous?.release();
+    }
+  }
+
   private publish = (value: Publication) => {
     const host = this.latest().input.host.current;
     if (!host) throw new PendingPresentation();
-    const canvas = value.completed.canvas;
-    canvas.className = 'pointer-events-none absolute inset-0 h-full w-full';
-    canvas.setAttribute('aria-hidden', 'true');
-    host.replaceChildren(canvas);
-    const previous = this.front;
-    this.front = value.completed;
-    value.retain();
-    previous?.release();
+    this.publishCanvas(host, value);
     this.waiting = false;
     if (this.diagnosed) {
       this.diagnostics = createReviewExportDiagnostics({ destination: 'preview', route: 'render' });
       this.diagnosed = false;
     }
-    if (this.playing) this.publications.push(performance.now());
+    const input = this.latest().input;
+    const cadenceRequested = input.preferences.showFrameRate || input.onStatistics !== undefined;
+    if (this.playing && cadenceRequested) this.publications.push(performance.now());
+    if (!cadenceRequested) this.publications.length = 0;
     while (this.publications.length > 2 && this.publications[0]! < performance.now() - 1000)
       this.publications.shift();
     this.reportBounds(value.prepared.watermarkBounds);

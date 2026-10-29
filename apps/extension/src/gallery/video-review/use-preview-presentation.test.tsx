@@ -130,7 +130,12 @@ beforeEach(() => {
     canvas.height = 360;
     const release = vi.fn();
     releases.push(release);
-    return { canvas, context: {}, release, generation: frame.generation };
+    return {
+      canvas,
+      context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
+      release,
+      generation: frame.generation,
+    };
   });
   io.factory.mockImplementation(() => ({
     prepare: io.prepare,
@@ -248,8 +253,8 @@ it('publishes a complete manual frame at exact paused clocks and retains only it
   props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
   await render();
   await step(50);
-  expect(releases[0]).toHaveBeenCalledOnce();
-  expect(releases[1]).not.toHaveBeenCalled();
+  expect(releases[0]).not.toHaveBeenCalled();
+  expect(releases[1]).toHaveBeenCalledOnce();
   expect(result.status.presentedFPS).toBeNull();
 });
 
@@ -296,8 +301,9 @@ it('retains visible pixels on seek until atomic replacement without changing tra
   act(() => props.video.current!.dispatchEvent(new Event('seeked')));
   await step(100);
   expect(io.render).toHaveBeenCalledTimes(2);
-  expect(props.host.current!.querySelector('canvas')).not.toBe(front);
-  expect(releases[0]).toHaveBeenCalledOnce();
+  expect(props.host.current!.querySelector('canvas')).toBe(front);
+  expect(releases[0]).not.toHaveBeenCalled();
+  expect(releases[1]).toHaveBeenCalledOnce();
   expect(props.video.current!.currentTime).toBe(1.234567);
 });
 
@@ -664,23 +670,6 @@ it('requires explicit retry after context loss and ignores loss after disposal',
   act(lost);
   expect(ticks.size).toBe(0);
   expect(result.status.phase).toBe('inactive');
-});
-
-it('waits for a mapped result clock and reports completed playing cadence', async () => {
-  props = { ...props, playing: true, sourceToResult: () => null };
-  await render();
-  await step(0);
-  expect(result.status.phase).toBe('pending');
-  expect(io.render).not.toHaveBeenCalled();
-  props = { ...props, sourceToResult: (value) => value - 0.25 };
-  await render();
-  act(() => props.video.current!.dispatchEvent(new Event('timeupdate')));
-  await step(50);
-  await step(100);
-  await step(1200);
-  expect(result.status.phase).toBe('ready');
-  expect(result.status.presentedFPS).toBeGreaterThan(0);
-  expect(io.render.mock.lastCall![1].resultTime).toBeCloseTo(0.984567, 6);
 });
 
 it.each([

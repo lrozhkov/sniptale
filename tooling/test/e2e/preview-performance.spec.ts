@@ -674,3 +674,55 @@ for (const recipe of selected)
         await new Promise<void>((resolve) => host.server.close(() => resolve()));
       }
     });
+
+test('publication probe counts retained front copies and excludes failed draws', async ({
+  page,
+}) => {
+  await page.setContent(
+    '<div data-ui="gallery.videoReview.stage"><video></video><div data-ui="gallery.videoReview.manualPreview"></div></div>'
+  );
+  await page.evaluate(() => {
+    const video = document.querySelector('video')!;
+    // This checks instrumentation events. It does not simulate decoded media performance.
+    Object.defineProperties(video, {
+      readyState: { value: 2 },
+      paused: { value: false },
+      getVideoPlaybackQuality: {
+        value: () => ({ totalVideoFrames: 0, droppedVideoFrames: 0, corruptedVideoFrames: 0 }),
+      },
+      requestVideoFrameCallback: { value: () => 1 },
+      cancelVideoFrameCallback: { value: () => undefined },
+    });
+  });
+  const probe = await startQuickPreviewPerformanceProbe(page, {
+    sampleId: 'publication-contract',
+    labels: { loading: 'loading', failed: 'failed', retry: 'retry' },
+  });
+  await page.evaluate(async () => {
+    const host = document.querySelector('[data-ui="gallery.videoReview.manualPreview"]')!;
+    const canvas = document.createElement('canvas');
+    canvas.width = 2;
+    canvas.height = 2;
+    host.append(canvas);
+    await Promise.resolve();
+    const source = document.createElement('canvas');
+    source.width = 2;
+    source.height = 2;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(source, 0, 0);
+    const empty = document.createElement('canvas');
+    empty.width = 0;
+    try {
+      context.drawImage(empty, 0, 0);
+    } catch {
+      /* A refused draw is not a publication. */
+    }
+    context.drawImage(source, 0, 0);
+  });
+  const metrics = await probe.end();
+  expect(metrics.measurementIdentity.valid).toBe(true);
+  expect(metrics.composedPublication.samples).toHaveLength(3);
+  expect(
+    metrics.composedPublication.samples.every((sample) => sample.width === 2 && sample.height === 2)
+  ).toBe(true);
+});

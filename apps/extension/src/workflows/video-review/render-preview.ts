@@ -1,5 +1,14 @@
+import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { reviewWatermarkAssets } from './asset-bytes';
-import type { PreviewScene as Scene, PreviewSceneDimensions as Dimensions } from './preview-scene';
+import {
+  reviewPreviewSceneKey,
+  reviewPreviewPreparationKey,
+  activeReviewPreviewScene,
+  sameReviewPreviewSceneKey,
+  type PreviewSceneKey,
+  type PreviewScene as Scene,
+  type PreviewSceneDimensions as Dimensions,
+} from './preview-scene';
 import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
 import {
   paintPreviewOuterFade,
@@ -112,6 +121,12 @@ type Assets = {
   spatial: ReturnType<typeof createReviewSpatialRenderer> | undefined;
   reservations: { release(): void }[];
 };
+
+function prepareSceneCameraPlans({ scene, dimensions }: PreparedScene) {
+  // Raster composition and canonical exposure use distinct geometry cache entries.
+  prepareReviewCameraPlans(scene.zoomRegions, scene);
+  prepareReviewCameraPlans(scene.zoomRegions, { ...scene, output: dimensions.backing });
+}
 
 function validSize(size: Size) {
   if (![size.width, size.height].every((value) => Number.isSafeInteger(value) && value > 0))
@@ -600,21 +615,6 @@ function needsSpatialRenderer(scene: Scene) {
   );
 }
 
-/** Persistence can reorder object properties without changing the rendered scene. */
-function orderedPreviewValue(_key: string, value: unknown) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)))
-    : value;
-}
-
-/** Camera motion refreshes caption reservations independently of the other prepared assets. */
-function preparationKey(scene: Scene, dimensions: Dimensions) {
-  return JSON.stringify(
-    [{ ...scene, zoomRegions: [] }, dimensions, needsSpatialRenderer(scene)],
-    orderedPreviewValue
-  );
-}
-
 /** One prepared scene owner; transport, immutable capture and publication remain with the caller. */
 export function createReviewPreviewRenderer(args: {
   resources: RenderResources;
@@ -628,7 +628,7 @@ export function createReviewPreviewRenderer(args: {
   let current: {
     prepared: PreparedScene;
     assets: Assets;
-    key: string;
+    key: PreviewSceneKey;
     preparationKey: string;
   } | null = null;
   let preparation: AbortController | null = null;
@@ -665,36 +665,22 @@ export function createReviewPreviewRenderer(args: {
       if (disposed) throw new Error('Preview renderer is disposed.');
       captionRefresh?.abort();
       captionRefresh = null;
-      const annotations = sourceScene.annotationEffects;
-      const instances = annotations?.lane.enabled
-        ? annotations.lane.instances.filter((instance) => instance.enabled)
-        : [];
-      const ids = new Set(instances.map((instance) => instance.snapshotId));
-      const scene: Scene = {
-        ...sourceScene,
-        ...(annotations
-          ? {
-              annotationEffects: {
-                ...annotations,
-                lane: { enabled: annotations.lane.enabled, instances },
-                snapshots: annotations.snapshots.filter((snapshot) => ids.has(snapshot.id)),
-              },
-            }
-          : {}),
-      };
+      const scene = activeReviewPreviewScene(sourceScene);
       validSize(scene.source);
       validSize(dimensions.canonical);
       validSize(dimensions.backing);
       signal.throwIfAborted();
-      const key = JSON.stringify([scene, dimensions], orderedPreviewValue);
-      if (current?.key === key) {
+      const key = reviewPreviewSceneKey(scene, dimensions);
+      if (current && sameReviewPreviewSceneKey(current.key, key)) {
+        current.key = key;
         admitRender(args.allocation, current.prepared, current.assets);
         return lease(current.prepared, current.assets, signal);
       }
-      const assetsKey = preparationKey(scene, dimensions);
+      const assetsKey = reviewPreviewPreparationKey(scene, dimensions, needsSpatialRenderer(scene));
       if (current?.preparationKey === assetsKey) {
         const captured = current;
         const prepared = structuredClone({ generation: ++generation, scene, dimensions });
+        prepareSceneCameraPlans(prepared);
         const controller = new AbortController();
         captionRefresh = controller;
         const abort = () => controller.abort(signal.reason);
@@ -726,6 +712,7 @@ export function createReviewPreviewRenderer(args: {
       const abort = () => controller.abort(signal.reason);
       signal.addEventListener('abort', abort, { once: true });
       const prepared = structuredClone({ generation: ++generation, scene, dimensions });
+      prepareSceneCameraPlans(prepared);
       const assets: Assets = {
         annotations: null,
         captions: null,
