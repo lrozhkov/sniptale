@@ -9,6 +9,7 @@ function getTrackedFiles(rootDir) {
     const output = execFileSync('git', ['ls-files'], {
       cwd: rootDir,
       encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
       stdio: ['ignore', 'pipe', 'ignore'],
     });
     return output

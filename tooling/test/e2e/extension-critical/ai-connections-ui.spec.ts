@@ -29,8 +29,9 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Fixture address unavailable');
     try {
-      const url = `chrome-extension://${browser.extensionId}/apps/extension/src/settings/index.html?section=ai-connections`;
-      await page.goto(url);
+      await page.goto(
+        `chrome-extension://${browser.extensionId}/apps/extension/src/settings/index.html?section=ai-connections`
+      );
       await page.getByRole('region', { name: /^(Providers|Провайдеры)$/u }).waitFor();
       const scope = await createAIProviderDestinationBinding({
         id: '00000000-0000-4000-8000-000000000001',

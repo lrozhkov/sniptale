@@ -80,8 +80,10 @@ it.each([
   }
 });
 
-it('excludes the live owner from ordinary Playwright discovery', () => {
-  expect(normalConfig.testIgnore).toEqual(['**/live/**']);
+it('excludes live and optional provider owners from ordinary Playwright discovery', () => {
+  expect(normalConfig.testIgnore).toEqual(
+    expect.arrayContaining(['**/tooling/test/e2e/providers/**', '**/live/**'])
+  );
 });
 
 it('retains the run provider snapshot when the external file changes before another worker starts', () => {

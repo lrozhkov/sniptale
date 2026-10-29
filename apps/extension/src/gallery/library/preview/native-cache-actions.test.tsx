@@ -1,5 +1,5 @@
-import type { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 // @vitest-environment jsdom
+import type { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

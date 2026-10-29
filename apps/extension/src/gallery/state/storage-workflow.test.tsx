@@ -1,5 +1,5 @@
-import { createRemoteRootGalleryItem } from '../library/items/adapters';
 // @vitest-environment jsdom
+import { createRemoteRootGalleryItem } from '../library/items/adapters';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
