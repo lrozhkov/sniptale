@@ -74,8 +74,6 @@ export async function runWithNativePublicationResources<T>(
   roots: readonly SyncNativeEditingRoot[],
   operation: () => Promise<T>
 ): Promise<T> {
-  if (typeof __SNIPTALE_SECURITY_E2E__ === 'undefined' || !__SNIPTALE_SECURITY_E2E__)
-    return operation();
   return runWithAssetResourceRead(async () => {
     const prepared = new Set<string>();
     for (const root of roots) {

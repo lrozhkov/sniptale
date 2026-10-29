@@ -1467,3 +1467,182 @@ for (const viewport of [
     }
   });
 }
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`production WebDAV opens, edits offline, publishes and reopens after release ${viewport.width}`, async ({
+    lab,
+  }, info) => {
+    test.setTimeout(240_000);
+    const source = await openProvider(lab, info, 'production-source', false, build, { viewport });
+    let target: Provider | null = null;
+    try {
+      await connectionPage(source, viewport);
+      const rootUrl = await connectWorkspace(source.page, {
+        mode: 'create',
+        url: lab.credentials.rootUrl,
+        ...lab.credentials,
+      });
+      const seedPage = await harnessPage(source);
+      const seed = await seedPage.evaluate(async () => {
+        await window.webdavTransferHarness.connection.restore();
+        const seeded = await window.webdavTransferHarness.portable.source(undefined, {
+          useExistingProfile: true,
+          name: 'Primary WebDAV project',
+        });
+        await window.webdavTransferHarness.portable.outgoing.sendHistory(seeded.mediaId);
+        await window.webdavTransferHarness.portable.outgoing.sendHistory(seeded.projectId, true);
+        return seeded;
+      });
+      await source.context.close();
+      target = await openProvider(
+        lab,
+        info,
+        'production-target',
+        false,
+        '.tmp/e2e-builds/release',
+        { viewport, harness: false }
+      );
+      expect(await target.page.evaluate(() => typeof window.webdavTransferHarness)).toBe(
+        'undefined'
+      );
+      await connectionPage(target, viewport);
+      await connectWorkspace(target.page, { mode: 'join', url: rootUrl, ...lab.credentials });
+      await target.page.screenshot({
+        path: info.outputPath('production-connected.png'),
+        fullPage: false,
+      });
+      console.info('production-proof', viewport.width, 'library-navigation');
+      await openLibrary(target, viewport);
+      console.info('production-proof', viewport.width, 'library-visible');
+      const card = target.page.getByRole('group', { name: firstTitle, exact: true });
+      await expect(card).toBeVisible();
+      await card.focus();
+      await target.page.keyboard.press('Enter');
+      const opened = target.context.waitForEvent('page', { timeout: 30_000 });
+      await target.page
+        .getByRole('dialog', { name: firstTitle, exact: true })
+        .getByRole('button', { name: 'Download and open', exact: true })
+        .click();
+      console.info('production-proof', viewport.width, 'download-clicked');
+      const editor = await opened;
+      await editor.setViewportSize(viewport);
+      await expectEditor(editor, seed.clipId);
+      console.info('production-proof', viewport.width, 'editor-ready');
+      await target.context.setOffline(true);
+      await expectEditor(editor, seed.clipId);
+      const offlineTitle = 'Production offline edit';
+      const beforePublication = lab.proxy.counts.putBodies.length;
+      await editor
+        .locator('[data-ui="video-editor.floating.document-bar"] input')
+        .fill(offlineTitle);
+      await expect
+        .poll(() =>
+          editor.evaluate(async (id) => {
+            const db = await new Promise<IDBDatabase>((resolve, reject) => {
+              const request = indexedDB.open('sniptale-db');
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+            });
+            try {
+              return await new Promise<unknown>((resolve, reject) => {
+                const request = db
+                  .transaction('video_projects')
+                  .objectStore('video_projects')
+                  .get(id);
+                request.onsuccess = () => {
+                  const row: unknown = request.result;
+                  const project =
+                    row !== null && typeof row === 'object' && 'project' in row
+                      ? row.project
+                      : null;
+                  resolve(
+                    project !== null && typeof project === 'object' && 'name' in project
+                      ? project.name
+                      : null
+                  );
+                };
+                request.onerror = () => reject(request.error);
+              });
+            } finally {
+              db.close();
+            }
+          }, seed.projectId)
+        )
+        .toBe(offlineTitle);
+      await editor.close();
+      console.info('production-proof', viewport.width, 'library-navigation');
+      await openLibrary(target, viewport);
+      console.info('production-proof', viewport.width, 'library-visible');
+      const preview = target.page.locator('[data-ui="gallery.preview.surface"]');
+      const changed = target.page.getByRole('group', { name: offlineTitle, exact: true });
+      await expect(changed).toBeVisible();
+      expect(lab.proxy.counts.putBodies.slice(beforePublication)).toEqual([]);
+      console.info('production-proof', viewport.width, 'offline-saved');
+      await target.context.setOffline(false);
+      await expect
+        .poll(
+          () =>
+            lab.proxy.counts.putBodies
+              .slice(beforePublication)
+              .filter((body) => body.key.includes('/records/')).length,
+          { timeout: 60_000 }
+        )
+        .toBeGreaterThan(0);
+      console.info('production-proof', viewport.width, 'published');
+      await changed.focus();
+      await target.page.keyboard.press('Enter');
+      const cache = preview.getByRole('region', { name: 'Files on this device', exact: true });
+      await cache.getByRole('button', { name: 'Keep offline', exact: true }).click();
+      await expect(cache.getByRole('button', { name: 'Unpin', exact: true })).toBeEnabled();
+      await cache.getByRole('button', { name: 'Unpin', exact: true }).click();
+      await cache.getByRole('button', { name: 'Free space on this device', exact: true }).click();
+      await expect(cache.getByText('Download files before opening', { exact: true })).toBeVisible();
+      await target.page.screenshot({
+        path: info.outputPath('production-released.png'),
+        fullPage: false,
+      });
+      await target.page.keyboard.press('Escape');
+      const reopened = target.context.waitForEvent('page', { timeout: 30_000 });
+      await changed.getByRole('button', { name: 'Open in editor', exact: true }).click();
+      const restored = await reopened;
+      await restored.setViewportSize(viewport);
+      await expectEditor(restored, seed.clipId);
+      await restored.screenshot({
+        path: info.outputPath('production-reopened.png'),
+        fullPage: false,
+      });
+      await restored.close();
+      await target.page.goto(
+        `chrome-extension://${target.extensionId}/apps/extension/src/settings/index.html?section=saving&view=queue`
+      );
+      await expect(target.page.locator('[data-ui="settings.sync-runtime-jobs"]')).toBeVisible();
+      await target.page.screenshot({
+        path: info.outputPath('production-queue.png'),
+        fullPage: false,
+      });
+      await saveProof(info, {
+        productionBuild: true,
+        harness: false,
+        offlineEdit: true,
+        published: true,
+        releaseAndReopen: true,
+        viewport,
+      });
+    } finally {
+      if (info.status !== info.expectedStatus && target) {
+        for (const [index, page] of target.context.pages().entries())
+          await page
+            .screenshot({
+              path: info.outputPath(`production-failure-${index}.png`),
+              fullPage: false,
+            })
+            .catch(() => undefined);
+      }
+      await source.context.close();
+      await target?.context.close();
+    }
+  });
+}

@@ -159,10 +159,11 @@ it('releases failed preparation admission and permits retry without native chang
   expect(writer).toHaveBeenCalledOnce();
   expect(io.reading).toBe(false);
 });
-it('preserves local publication behavior while the production sync gate is closed', async () => {
+it('preserves resident local publication without a sync connection in production', async () => {
   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
+  io.needs.mockResolvedValue(false);
   const writer = vi.fn(async () => 'local');
   await expect(runWithNativePublicationResources([root], writer)).resolves.toBe('local');
-  expect(io.needs).not.toHaveBeenCalled();
+  expect(io.needs).toHaveBeenCalledWith(root, 'backup');
   expect(io.client).not.toHaveBeenCalled();
 });

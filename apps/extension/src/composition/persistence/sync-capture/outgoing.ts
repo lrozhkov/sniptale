@@ -212,7 +212,12 @@ export function matchesCapture(
     record.connectionGeneration !== capture.connectionGeneration
   )
     return false;
-  if (capture.phase === 'native' && record.retainedObjects !== undefined) return false;
+  if (
+    capture.phase === 'native' &&
+    record.retainedObjects !== undefined &&
+    (capture.change.kind !== 'video-project' || record.retainedObjects.length === 0)
+  )
+    return false;
   if (capture.phase !== 'native')
     return (
       capture.phase === 'prepared' &&
@@ -304,10 +309,101 @@ export async function loadPreparedOutgoingOperation(
   return operation?.phase === 'prepared' ? projectPreparedOperation(operation) : null;
 }
 
+/** A frozen export reference can retain remote bytes without acquiring local file authority. */
+async function admitNativeRetainedExports(
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  capture: CapturedChange,
+  proposed: PreparedOutgoingOperation,
+  authorizationInput: unknown
+): Promise<void> {
+  const refused = (): never => {
+    throw new Error('Native retained export evidence changed.');
+  };
+  const authorization = parseSyncConnectionIdentity(authorizationInput);
+  if (capture.change.kind !== 'video-project' || !authorization) return refused();
+  const connection = await checkSyncConnectionAdmission(tx, capture, authorization);
+  if (!connection) return refused();
+  let wire: unknown;
+  try {
+    wire = JSON.parse(proposed.recordText);
+  } catch {
+    return refused();
+  }
+  if (
+    !isRecord(wire) ||
+    wire['spaceId'] !== capture.spaceId ||
+    wire['operationId'] !== capture.operationId ||
+    wire['rootKind'] !== 'video-project' ||
+    wire['rootId'] !== capture.rootId ||
+    !isRecord(wire['envelope']) ||
+    !Array.isArray(wire['objects'])
+  )
+    return refused();
+  const envelope = wire['envelope'];
+  const metadata = envelope['metadata'];
+  if (
+    !isRecord(metadata) ||
+    !Array.isArray(metadata['projectExports']) ||
+    !Array.isArray(envelope['objects'])
+  )
+    return refused();
+  const rows = capture.change.rows;
+  for (const binding of proposed.retainedObjects ?? []) {
+    const encoded: unknown = metadata['projectExports'].find(
+      (item: unknown) => isRecord(item) && item['objectId'] === binding.objectId
+    );
+    const descriptor: unknown = envelope['objects'].find(
+      (item: unknown) => isRecord(item) && item['objectId'] === binding.objectId
+    );
+    const digest: unknown = wire['objects'].find(
+      (item: unknown) => isRecord(item) && item['objectId'] === binding.objectId
+    );
+    if (
+      !isRecord(encoded) ||
+      !isRecord(encoded['entry']) ||
+      !isRecord(descriptor) ||
+      !isRecord(digest)
+    )
+      return refused();
+    const encodedEntry = encoded['entry'];
+    const exported = rows.exports.find((item) => item.id === encodedEntry['id']);
+    const ref = exported ? rows.refs.find((item) => item.assetId === exported.assetId) : null;
+    if (
+      !exported ||
+      !ref ||
+      encodedEntry['projectId'] !== exported.projectId ||
+      encodedEntry['filename'] !== exported.filename ||
+      encodedEntry['mimeType'] !== exported.mimeType ||
+      encodedEntry['size'] !== exported.size ||
+      descriptor['size'] !== ref.size ||
+      descriptor['mimeType'] !== ref.mimeType ||
+      (ref.sha256 !== null && ref.sha256 !== digest['sha256'])
+    )
+      return refused();
+    const copy = await readAssetResidencyCopyInTransaction(
+      tx,
+      assetResidencyCopyId({ kind: 'opfs', ref })
+    );
+    const rawRef: unknown = await tx.objectStore(ASSET_REFS_STORE).get(ref.assetId);
+    if (
+      !copy ||
+      copy.target.kind !== 'opfs' ||
+      (copy.phase !== 'unloaded' && copy.phase !== 'unloading') ||
+      JSON.stringify(copy.target.ref) !== JSON.stringify(ref) ||
+      JSON.stringify(copy.remote.binding) !== JSON.stringify(connection.binding) ||
+      copy.remote.key !== binding.remoteKey ||
+      copy.remote.sha256 !== digest['sha256'] ||
+      (rawRef !== undefined && JSON.stringify(parseAssetRef(rawRef)) !== JSON.stringify(ref))
+    )
+      return refused();
+  }
+}
+
 /** First accepted encoding replaces native rows atomically; every retry returns those bytes. */
 export async function commitPreparedOutgoingOperation(
   expectedCapture: unknown,
-  draft: unknown
+  draft: unknown,
+  authorization?: SyncConnectionIdentity
 ): Promise<PreparedOutgoingOperation> {
   const expected = parseSyncCaptureRecord(structuredClone(expectedCapture));
   const detachedDraft: unknown = structuredClone(draft);
@@ -328,7 +424,16 @@ export async function commitPreparedOutgoingOperation(
   )
     throw new Error('Invalid outgoing preparation.');
   return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readwrite');
+    const tx = db.transaction(
+      [
+        SYNC_CAPTURE_STORE,
+        SYNC_OUTBOX_STORE,
+        ...(proposed.retainedObjects?.length
+          ? [SYNC_CONNECTION_STORE, ASSET_RESIDENCY_STORE, ASSET_REFS_STORE]
+          : []),
+      ],
+      'readwrite'
+    );
     try {
       const captures = tx.objectStore(SYNC_CAPTURE_STORE);
       const profile = parseSyncCaptureRecord(await captures.get('profile'));
@@ -355,6 +460,8 @@ export async function commitPreparedOutgoingOperation(
       }
       if (JSON.stringify(current) !== JSON.stringify(expected))
         throw new Error('Outgoing capture changed.');
+      if (proposed.retainedObjects?.length)
+        await admitNativeRetainedExports(tx, current, proposed, authorization);
       const { change: _change, phase: _phase, ...header } = current;
       const operation: PreparedCaptureOperation = {
         ...header,

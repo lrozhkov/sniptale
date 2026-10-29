@@ -1,7 +1,10 @@
 import { THUMBNAILS_STORE } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import { encodePortableThumbnail } from '../root-codecs/media';
-import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
+import type {
+  ArchivePathAllocator,
+  ArchiveObjectRef,
+} from '../../../../composition/archive-transfer';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import type { ArchiveRootObjectSource } from '../export';
 import { createInternalObjectSegments } from '../layout';
@@ -14,28 +17,37 @@ export interface InventoryDatabase {
 
 export function createObjectCollector(rootLabel: string, paths: ArchivePathAllocator) {
   const objects: ArchiveRootObjectSource[] = [];
+  const references: { ref: ArchiveObjectRef }[] = [];
+  const addObjectDescriptor = (
+    size: number,
+    filename: string,
+    mimeType: string,
+    directory?: readonly string[]
+  ): ArchiveObjectRef => {
+    const objectId = `${rootLabel}-object-${String(references.length + 1).padStart(6, '0')}`;
+    const ref: ArchiveObjectRef = {
+      filename,
+      mimeType: mimeType.split(';', 1)[0]!.trim().toLowerCase(),
+      objectId,
+      path: paths.reserve(
+        directory ? [...directory, filename] : createInternalObjectSegments(objectId, filename)
+      ),
+      size,
+    };
+    references.push({ ref });
+    return ref;
+  };
   const addObject = (
     blob: Blob,
     filename: string,
     mimeType = blob.type || 'application/octet-stream',
     directory?: readonly string[]
   ) => {
-    const objectId = `${rootLabel}-object-${String(objects.length + 1).padStart(6, '0')}`;
-    objects.push({
-      blob,
-      ref: {
-        filename,
-        mimeType: mimeType.split(';', 1)[0]!.trim().toLowerCase(),
-        objectId,
-        path: paths.reserve(
-          directory ? [...directory, filename] : createInternalObjectSegments(objectId, filename)
-        ),
-        size: blob.size,
-      },
-    });
-    return objectId;
+    const ref = addObjectDescriptor(blob.size, filename, mimeType, directory);
+    objects.push({ blob, ref });
+    return ref.objectId;
   };
-  return { addObject, objects };
+  return { addObject, addObjectDescriptor, objects, references };
 }
 
 export async function readInventoryAssetFile(
@@ -84,7 +96,7 @@ export function projectInventoryDescriptor<Kind extends 'scenario-project' | 'vi
   rootKind: Kind,
   rootId: string,
   metadataPath: string,
-  objects: readonly ArchiveRootObjectSource[]
+  objects: readonly { ref: ArchiveObjectRef }[]
 ) {
   return {
     metadataPath,

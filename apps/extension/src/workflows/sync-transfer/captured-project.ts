@@ -1,3 +1,5 @@
+import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
+import type { ArchiveObjectRef } from '../../composition/archive-transfer';
 import type { InventoryDatabase } from '../media-hub-backup/v6/inventory/helpers';
 import type { VideoReviewBackupDatabase } from '../../composition/persistence/review-workspaces/backup-restore';
 import {
@@ -28,7 +30,10 @@ import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/option
 import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
 
 /** Feed the accepted project graph to the existing backup inventory without live reads. */
-export async function encodeCapturedProjectRoot(value: CapturedVideoProjectRows) {
+export async function encodeCapturedProjectRoot(
+  value: CapturedVideoProjectRows,
+  deferredExports: ReadonlyMap<string, AssetResidencyCopy> = new Map()
+) {
   const parsed = parseCapturedVideoProjectRows(value);
   if (!parsed || !parsed.mediaDependencies)
     throw new Error('Invalid frozen project source or dependency evidence.');
@@ -39,6 +44,20 @@ export async function encodeCapturedProjectRoot(value: CapturedVideoProjectRows)
     throw new Error('Frozen Scenario source has no admitted causal evidence.');
   const dependencies = structuredClone(parsed.mediaDependencies);
   const rows = structuredClone(parsed);
+  const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
+  const deferredRefs = new Map<string, AssetRef>();
+  const deferredObjects: { ref: ArchiveObjectRef; copy: AssetResidencyCopy }[] = [];
+  for (const [assetId, copy] of deferredExports) {
+    const ref = refs.get(assetId);
+    if (
+      !ref ||
+      copy.target.kind !== 'opfs' ||
+      !rows.exports.some((entry) => entry.assetId === assetId) ||
+      JSON.stringify(copy.target.ref) !== JSON.stringify(ref)
+    )
+      throw new Error('Deferred export differs from the frozen project.');
+    deferredRefs.set(assetId, ref);
+  }
   const roots = await buildVideoProjectRootInventory({
     db: createFrozenSnapshotDatabase(rows),
     options: createMediaHubBackupExportOptions({
@@ -48,6 +67,21 @@ export async function encodeCapturedProjectRoot(value: CapturedVideoProjectRows)
       includeWebSnapshots: false,
     }),
     paths: createArchivePathAllocator(),
+    ...(deferredRefs.size
+      ? {
+          deferredExports: {
+            refs: deferredRefs,
+            onObject(assetId, ref) {
+              const copy = deferredExports.get(assetId);
+              if (!copy) throw new Error('Deferred export binding is missing.');
+              deferredObjects.push({
+                ref: { ...ref, filename: sanitizeArchivePathSegment(ref.filename) },
+                copy,
+              });
+            },
+          },
+        }
+      : {}),
   });
   if (roots.length !== 1 || roots[0]!.descriptor.rootId !== rows.project.id)
     throw new Error('Frozen project inventory differs from its root.');
@@ -59,21 +93,30 @@ export async function encodeCapturedProjectRoot(value: CapturedVideoProjectRows)
   const metadata: unknown = JSON.parse(JSON.stringify(loaded.metadata));
   assertPortableJson(metadata);
   const portable = parsePortableVideoProjectMetadata(metadata);
-  const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
   const assets = new Map(rows.assets.map((entry) => [entry.id, entry]));
   const exports = new Map(rows.exports.map((entry) => [entry.id, entry]));
   const objectById = new Map(objects.map((object) => [object.ref.objectId, object]));
+  const objectRefs = [
+    ...objects.map((object) => object.ref),
+    ...deferredObjects.map((object) => object.ref),
+  ].sort((a, b) => a.objectId.localeCompare(b.objectId));
+  const descriptorById = new Map(objectRefs.map((ref) => [ref.objectId, ref]));
   const bindings: { objectId: string; ref: AssetRef }[] = [];
   const bind = (objectId: string, assetId: string | undefined) => {
     const ref = assetId ? refs.get(assetId) : undefined;
     const object = objectById.get(objectId);
+    const descriptor = descriptorById.get(objectId);
+    const retained = deferredObjects.find((item) => item.ref.objectId === objectId);
     if (
       !ref ||
-      !object ||
-      object.ref.size !== ref.size ||
-      object.ref.mimeType !== ref.mimeType ||
-      object.blob.size !== ref.size ||
-      object.blob.type !== ref.mimeType
+      !descriptor ||
+      descriptor.size !== ref.size ||
+      descriptor.mimeType !== ref.mimeType ||
+      (object
+        ? object.blob.size !== ref.size || object.blob.type !== ref.mimeType
+        : !retained ||
+          retained.copy.target.kind !== 'opfs' ||
+          JSON.stringify(retained.copy.target.ref) !== JSON.stringify(ref))
     )
       throw new Error('Captured project object differs from its native reference.');
     bindings.push({ objectId, ref });
@@ -85,13 +128,22 @@ export async function encodeCapturedProjectRoot(value: CapturedVideoProjectRows)
   const envelope = parseRootEnvelope({
     descriptor: { ...roots[0]!.descriptor, metadataPath: 'Metadata/sync-root.json' },
     metadata,
-    objects: objects.map((object) => object.ref),
+    objects: objectRefs,
   });
   return {
     envelope,
     objects,
     dependencies,
     bindings,
+    ...(deferredObjects.length
+      ? {
+          retainedObjects: deferredObjects.map(({ ref, copy }) => ({
+            objectId: ref.objectId,
+            remoteKey: copy.remote.key,
+            sha256: copy.remote.sha256,
+          })),
+        }
+      : {}),
     ...(parsed.rootDependencies?.length
       ? { rootDependencies: structuredClone(parsed.rootDependencies) }
       : {}),

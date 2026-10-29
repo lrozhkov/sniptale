@@ -3075,11 +3075,11 @@
       "file": "apps/extension/src/workflows/sync-transfer/native-residency.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One DB, OPFS and remote fixture proves prepare, release and prepare again, including capture, Trash, exports, pin and budget interactions. New receive cases use the same fixture to prove admission after actual unload, temporary refusal and exact retry while preserving shared original identity. Test-local project rows and assertions are not independent production state authorities. Splitting by called API would separate proof of the same originals-residency invariant. Main source inspection supports Keep. Correction architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One existing DB, OPFS and remote fixture proves the originals lifecycle. Added cases cover native offline capture, retained exports and deterministic evidence changes before commit. The same fixture proves refusal, exact retry and publication without export hydration. Test rows are not separate production authorities. Main inspected this exact shape. Final independent architecture review must validate Keep. The correction adds owned-empty recovery and unknown-empty refusal to this same saved-export fixture. Existing marker checks remain the recovery authority. Focused final review must inspect this exact correction.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new authority, transaction, writer, lifetime or independent contract. Remove when the analyzer models this boundary.",
       "reviewDate": "2026-10-29",
-      "astHash": "b39689724a8cae03fb545fdd709017cd3905375e8efd23065a1462a730e9fdde",
-      "signatureHash": "d669dc84e9ef364412940ab36e57c5a6b6fe9fc3f8fe4bff7a3eb18f89d5fa28"
+      "astHash": "b7221f404189b63bb251ba6e09497f9e02e81b98d9ade8afc0b7829f7afc0c39",
+      "signatureHash": "e8cc0176e3705b4b320d31230de770b61831a2e29b2a1bd7011a545de1595c80"
     },
     {
       "rule": "structural-file-risk",
@@ -3091,6 +3091,72 @@
       "reviewDate": "2026-10-29",
       "astHash": "0157717748e85c779dc9a9f3f8f2a0bc04f8eb398e6a9379e622a5320feab042",
       "signatureHash": "59ec0a356585ff7b695c32d0a26e403055a19d31ca22c91e80448ef70ecf3fa3"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/composition/persistence/sync-capture/outgoing.ts",
+      "symbol": "admitNativeRetainedExports",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: One atomic admission checks unknown wire descriptors against frozen exports and current connection, ref and copy evidence. The transaction must finish these checks before replacing native capture. Boolean validation accounts for the reported complexity. Splitting checks across transactions would lose the race guarantee. Main inspected this exact shape. Final independent architecture review must validate Keep.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new authority, transaction, writer, lifetime or independent contract. Remove when the analyzer models this boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "7726691aad680bc5738f4b0ac736a9ead6ebd7048ca1f240d2ddc0a6090e6b53",
+      "signatureHash": "413d4c44352a8d85fa9f8a190b6e15c441a7456c85ebe3df643e6ad7a5315a8b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/sync-transfer/native-residency.test.ts",
+      "symbol": "it.each([\n  'normal',\n  'temporary',\n  'copy-changed',\n  'connection-changed',\n  'ref-changed',\n  'owned-zero',\n  'unknown-zero',\n] as const) callback",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One consumer scenario receives, saves offline, prepares, publishes and retries without materializing an export. Controlled copy, connection and ref changes exercise the same preparation transaction. Shared setup and ordered assertions expose the complete invariant. Splitting by intermediate representation would duplicate that fixture and conceal the ordering. Main inspected this exact shape. Final independent architecture review must validate Keep. The correction adds owned-empty recovery and unknown-empty refusal to this same saved-export fixture. Existing marker checks remain the recovery authority. Focused final review must inspect this exact correction.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new authority, transaction, writer, lifetime or independent contract. Remove when the analyzer models this boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "174c2331639fff7cba5526cc8b947bfb62b06eb483cf6ea147c80867e4ed718a",
+      "signatureHash": "78b61a5d253fa2ba457eeeab4884fa058c06c447a89dd6c2f003986c1819980d"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/providers/webdav-library.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: Existing provider fixtures prove one user journey across Settings, Library and the native editor. Added production cases use the same controls without test ingress in the target browser. The source browser only creates data. Viewport variants share the same scenario and recovery requirements. Main inspected this exact shape. Final independent architecture review must validate Keep.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new authority, transaction, writer, lifetime or independent contract. Remove when the analyzer models this boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "76334dfd77175e48038a95e315b15a6f28ee552e9ad8e5bc75ae09541abe110c",
+      "signatureHash": "7454264cf6bc8c6a43dae31904b60d33bc5a17bcc110795284ad8b656b35971b"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/providers/webdav.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: The existing provider suite shares one DAV lab and browser fixture. Changed metadata-reuse proof retains cold and warm catalog checks, restart, ordinary remote references and corrupt hydration refusal. No production owner or new test platform enters this file. Main inspected this exact shape. Final independent architecture review must validate Keep.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new authority, transaction, writer, lifetime or independent contract. Remove when the analyzer models this boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "49356e60d1c27da5999c25d278ffb04ae22b4260e56b4210398e8868c859b87c",
+      "signatureHash": "352831f876464694eddd3698117ac787e971c8cc588b19fbcb7852273856a9e7"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/providers/webdav.spec.ts",
+      "symbol": "test callback#8",
+      "owner": "tooling:test:providers",
+      "reason": "tool-noise: One metadata revision scenario proves offline save, publication, browser restart, remote reuse and later checksum refusal. Native queue replaces direct dispatch in this same consumer proof. Separating its phases would break observation of retained keys and browser state. Main inspected this exact shape. Final independent architecture review must validate Keep.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new authority, transaction, writer, lifetime or independent contract. Remove when the analyzer models this boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "5d7bde56deddd04cd8595b0ea2fd2b2ef99ae3cdd40a60b774dad433aec9da35",
+      "signatureHash": "3aa202560712a9862d98c6c2d6720a4caa0d5adab290e710e58f438f1b867eb6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/harness/webdav-outgoing.ts",
+      "symbol": "createWebdavOutgoingHarness",
+      "owner": "tooling:test:providers",
+      "reason": "tool-noise: The existing harness factory returns one table of test adapters. Its methods call existing production owners. Added connection authority and recovery context correct those calls without introducing persistence or transport authority. The factory length counts method bodies rather than an independent orchestration. Main inspected this exact shape. Final independent architecture review must validate Keep.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new authority, transaction, writer, lifetime or independent contract. Remove when the analyzer models this boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "dfbdd7eb3e9ca08dcacdc76bad98c8f753595ea0bf8c60bcdb19b378417a2156",
+      "signatureHash": "ee6b0b0d7b37a9525646d273cc12bd3400c0af84a20f9d07214623fd32b4acc4"
     }
   ]
 }

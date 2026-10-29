@@ -108,12 +108,7 @@ export function createExportBackupAction(
       async () => {
         try {
           const options = createInitialBackupExportOptions(controller);
-          const preparation =
-            options.scope === 'all' &&
-            typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' &&
-            __SNIPTALE_SECURITY_E2E__
-              ? await planRetainedLibrary()
-              : null;
+          const preparation = options.scope === 'all' ? await planRetainedLibrary() : null;
           if (preparation) {
             controller.actions.surface.setPendingExport({ options, summary: null, preparation });
           } else {

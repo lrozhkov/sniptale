@@ -274,9 +274,25 @@ test('permission removal during JOIN prevents checked readiness', async ({ lab }
       throw new Error('JOIN evaluation was lost after permission removal.');
     const refused = outcome.value;
     expect(refused.code).toBe('access-denied');
-    expect(refused.intent?.phase).toBe('checking');
+    expect(refused.identity).toBeNull();
+    expect(refused.operationIds).toEqual([]);
+    // Permission removal revokes the native intent through the background event owner.
+    await expect
+      .poll(() => browser.page.evaluate(() => window.webdavTransferHarness.workspace.inspectJoin()))
+      .toBeNull();
+    const staleEnrollment = await browser.page.evaluate(
+      ({ credentials, identity }) =>
+        window.webdavTransferHarness.workspace.enrollJoin(credentials, identity),
+      { credentials: source.credentials, identity: intent.identity }
+    );
+    expect(staleEnrollment).toMatchObject({ code: 'refused', connection: null });
     expect(await hasConnection(browser)).toBe(false);
-    await saveProof(info, { refused, noEnrollment: true });
+    await saveProof(info, {
+      refused,
+      staleEnrollment,
+      nativeIntentRevoked: true,
+      noEnrollment: true,
+    });
   } finally {
     lab.proxy.releaseFault();
     await browser.context.close();

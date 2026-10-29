@@ -196,6 +196,38 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   return operation;
 }
 
+/** Check an existing file reference with the same rules as fresh physical manifests. */
+export function isSyncObjectRemoteKey(
+  spaceId: string,
+  filename: string,
+  remoteKey: string
+): boolean {
+  if (
+    !filename ||
+    /[\\/?#:]/u.test(filename) ||
+    filename === '.' ||
+    filename === '..' ||
+    remoteKey.length > 2048
+  )
+    return false;
+  const parts = remoteKey.split('/');
+  if (
+    parts.length !== 5 ||
+    parts[0] !== 'Files' ||
+    parts[1] !== hashSyncText(spaceId) ||
+    !UUID.test(parts[2] ?? '') ||
+    !identity(parts[3]) ||
+    parts[3] === '.' ||
+    parts[3] === '..' ||
+    /[\\/?#:%]/u.test(parts[3] ?? '') ||
+    parts[4] !== filename
+  )
+    return false;
+  return Array.from(filename + parts[3]).every(
+    (character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127
+  );
+}
+
 function objectKeys(
   operation: SyncOperation,
   attemptId: string,
@@ -204,33 +236,16 @@ function objectKeys(
   if (retained) check(retained.length === (operation.envelope?.objects.length ?? 0));
   return (operation.envelope?.objects ?? []).map((object) => {
     check(identity(object.objectId) && !/[\\/?#:%]/u.test(object.objectId));
-    check(object.filename.length > 0 && !/[\\/?#:]/u.test(object.filename));
-    check(object.filename !== '.' && object.filename !== '..');
-    for (const character of object.filename)
-      check(character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127);
     const proposed = retained?.find((item) => item.objectId === object.objectId);
     if (retained) check(proposed);
     const remoteKey =
       proposed?.remoteKey ??
       `Files/${hashSyncText(operation.spaceId)}/${attemptId}/${object.objectId}/${object.filename}`;
-    check(remoteKey.length <= 2048);
-    const parts = remoteKey.split('/');
-    check(
-      parts.length === 5 &&
-        parts[0] === 'Files' &&
-        parts[1] === hashSyncText(operation.spaceId) &&
-        UUID.test(parts[2] ?? '') &&
-        identity(parts[3]) &&
-        parts[3] !== '.' &&
-        parts[3] !== '..' &&
-        !/[\\/?#:%]/u.test(parts[3] ?? '') &&
-        parts[4] === object.filename
-    );
-    for (const character of parts[3] ?? '')
-      check(character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127);
+    check(isSyncObjectRemoteKey(operation.spaceId, object.filename, remoteKey));
     return { objectId: object.objectId, remoteKey };
   });
 }
+
 function physicalText(
   operationText: string,
   attemptId: string,

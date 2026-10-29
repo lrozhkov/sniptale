@@ -1,3 +1,5 @@
+import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
+import { sanitizeArchivePathSegment } from '../../composition/archive-transfer';
 import {
   runWithPersistenceMutationTransition,
   type PersistenceMutationTransitionPermit,
@@ -52,6 +54,7 @@ import {
   hashSyncText,
   type parseSyncAttemptText,
   parseSyncOperationText,
+  isSyncObjectRemoteKey,
 } from './wire-record';
 
 function check(condition: unknown): asserts condition {
@@ -102,7 +105,13 @@ function preparationDraft(
         }
       : {}),
     envelope: portable?.envelope ?? null,
-    objects: objects.map((item) => ({ objectId: item.objectId, sha256: item.sha256 })),
+    objects: (portable?.envelope.objects ?? []).map(({ objectId }) => {
+      const source =
+        objects.find((item) => item.objectId === objectId) ??
+        portable?.retainedObjects?.find((item) => item.objectId === objectId);
+      check(source);
+      return { objectId, sha256: source.sha256 };
+    }),
   });
   return {
     version: 1,
@@ -117,6 +126,14 @@ function preparationDraft(
     recordText,
     recordSha256: hashSyncText(recordText),
     objects,
+    ...(portable?.retainedObjects?.length
+      ? {
+          retainedObjects: portable.retainedObjects.map(({ objectId, remoteKey }) => ({
+            objectId,
+            remoteKey,
+          })),
+        }
+      : {}),
   };
 }
 
@@ -157,10 +174,14 @@ async function settleTransportCopies(
 
 async function prepareNativeOutgoing(
   capture: CapturedChange,
-  transitionPermit: PersistenceMutationTransitionPermit
+  transitionPermit: PersistenceMutationTransitionPermit,
+  deferredExports: ReadonlyMap<string, AssetResidencyCopy>,
+  authorization?: SyncConnectionIdentity
 ): Promise<PreparedOutgoingOperation> {
   const portable =
-    capture.change.kind === 'tombstone' ? null : await encodeCapturedPortableRoot(capture);
+    capture.change.kind === 'tombstone'
+      ? null
+      : await encodeCapturedPortableRoot(capture, deferredExports);
   const digests = new Map<string, string>();
   for (const object of portable?.objects ?? [])
     digests.set(object.ref.objectId, await hashFile(object.blob));
@@ -196,10 +217,10 @@ async function prepareNativeOutgoing(
       check(ref && sha256 && (ref.sha256 === null || ref.sha256 === sha256));
       return { objectId: object.ref.objectId, ref, sha256, filename: object.ref.filename };
     });
-    accepted = await commitPreparedOutgoingOperation(
-      capture,
-      preparationDraft(capture, portable, objects)
-    );
+    const draft = preparationDraft(capture, portable, objects);
+    accepted = portable?.retainedObjects?.length
+      ? await commitPreparedOutgoingOperation(capture, draft, authorization)
+      : await commitPreparedOutgoingOperation(capture, draft);
   } catch (error) {
     return discardTransportCopies(staged, error);
   }
@@ -213,12 +234,59 @@ interface OutgoingResourceRecovery {
   signal: AbortSignal;
 }
 
+async function selectDeferredExports(capture: CapturedChange, recovery?: OutgoingResourceRecovery) {
+  const copies = new Map<string, AssetResidencyCopy>();
+  if (capture.change.kind !== 'video-project' || !recovery?.authorization) return copies;
+  const rows = capture.change.rows;
+  const keys = new Set<string>();
+  for (const entry of rows.exports) {
+    if (rows.exports.filter((item) => item.assetId === entry.assetId).length !== 1) continue;
+    recovery.signal.throwIfAborted();
+    const ref = rows.refs.find((item) => item.assetId === entry.assetId);
+    check(ref);
+    try {
+      await readAssetFile(ref, entry.filename);
+      continue;
+    } catch (error) {
+      recovery.signal.throwIfAborted();
+      // Empty interrupted targets must pass the existing ownership-checked recovery.
+      if (error instanceof AssetObjectSizeMismatchError && error.actualSize === 0) continue;
+      if (
+        !(
+          error instanceof MissingAssetObjectError ||
+          (error instanceof DOMException && error.name === 'NotFoundError')
+        )
+      )
+        throw error;
+    }
+    const copy = await loadNativeOutgoingRecoveryCopy({
+      capture,
+      ref,
+      authorization: recovery.authorization,
+    });
+    if (
+      !isSyncObjectRemoteKey(
+        capture.spaceId,
+        sanitizeArchivePathSegment(entry.filename),
+        copy.remote.key
+      )
+    )
+      continue;
+    if (keys.has(copy.remote.key)) continue;
+    keys.add(copy.remote.key);
+    copies.set(ref.assetId, copy);
+  }
+  return copies;
+}
+
 async function prepareCapturedFiles(
   capture: CapturedChange,
   recovery: OutgoingResourceRecovery,
-  transitionPermit: PersistenceMutationTransitionPermit
+  transitionPermit: PersistenceMutationTransitionPermit,
+  deferredExports: ReadonlyMap<string, AssetResidencyCopy>
 ) {
   for (const ref of collectNativeOutgoingAssetRefs(capture)) {
+    if (deferredExports.has(ref.assetId)) continue;
     recovery.signal.throwIfAborted();
     try {
       await readAssetFile(ref, ref.assetId);
@@ -304,8 +372,9 @@ export async function prepareCapturedOutgoing(
   return runWithPersistenceMutationTransition((transition) =>
     runWithAssetResourceRead(() =>
       runWithDurableAssetOperation(async () => {
-        if (recovery) await prepareCapturedFiles(capture, recovery, transition);
-        return prepareNativeOutgoing(capture, transition);
+        const deferredExports = await selectDeferredExports(capture, recovery);
+        if (recovery) await prepareCapturedFiles(capture, recovery, transition, deferredExports);
+        return prepareNativeOutgoing(capture, transition, deferredExports, recovery?.authorization);
       })
     )
   );
@@ -516,7 +585,8 @@ async function selectRetainedFiles(
   remote: SyncRemoteStore,
   signal: AbortSignal,
   catalog: CatalogCandidate[],
-  checkReusedContents: boolean
+  checkReusedContents: boolean,
+  reservedKeys: ReadonlySet<string>
 ) {
   const candidates = await readRetainedCandidates(spaceId, connectionGeneration, catalog);
   const defaultBindings = await createSyncAttempt(preparedText, crypto.randomUUID());
@@ -527,6 +597,7 @@ async function selectRetainedFiles(
       signal.throwIfAborted();
       const { object, digest, binding } = candidate;
       if (
+        reservedKeys.has(binding.remoteKey) ||
         digest.sha256 !== source.sha256 ||
         object.size !== source.expected.size ||
         object.mimeType !== source.expected.mimeType ||
@@ -595,7 +666,8 @@ export async function dispatchPreparedOutgoing(
     remote,
     signal,
     catalog,
-    checkReusedContents
+    checkReusedContents,
+    new Set(prepared.retainedObjects?.map((item) => item.remoteKey))
   );
   if (prepared.retainedObjects !== undefined) {
     const operation = await parseSyncOperationText(prepared.recordText);

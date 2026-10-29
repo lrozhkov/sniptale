@@ -260,11 +260,7 @@ function PreviewPanelSidebar(
           />
           <PreviewActions key={props.item.id} {...props} />
         </div>
-        {!props.trashMode &&
-        typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' &&
-        __SNIPTALE_SECURITY_E2E__ ? (
-          <NativeCacheActions item={props.item} />
-        ) : null}
+        {!props.trashMode ? <NativeCacheActions item={props.item} /> : null}
       </div>
     </aside>
   );

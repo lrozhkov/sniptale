@@ -299,6 +299,7 @@ export function createWebdavOutgoingHarness(
       const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
       if (!profile || profile.kind !== 'profile' || !profile.enabled)
         throw new Error('Target capture profile is unavailable.');
+      const authorization = (await loadSyncConnection())?.identity;
       const localProject =
         rootKind === 'video-project'
           ? parseVideoProjectEntry(await db.get('video_projects', rootId))
@@ -321,6 +322,7 @@ export function createWebdavOutgoingHarness(
           signal: signal(),
           admission: {
             spaceId,
+            ...(authorization ? { authorization } : {}),
             profileCreatedAt: profile.createdAt,
             connectionGeneration: profile.connectionGeneration,
             expectedLocalGeneration: state?.generation ?? 0,
@@ -338,6 +340,7 @@ export function createWebdavOutgoingHarness(
         signal: signal(),
         admission: {
           spaceId,
+          ...(authorization ? { authorization } : {}),
           profileCreatedAt: profile.createdAt,
           connectionGeneration: profile.connectionGeneration,
           expectedLocalGeneration: state?.generation ?? 0,
@@ -351,7 +354,11 @@ export function createWebdavOutgoingHarness(
       return { rootId, operationId: journal.payload.input.operationId };
     },
     prepare: async (rootId: string) => {
-      const prepared = await prepareCapturedOutgoing(await latest(rootId));
+      const prepared = await prepareCapturedOutgoing(await latest(rootId), {
+        remote: connected(),
+        authorization: (await loadSyncConnection())?.identity,
+        signal: signal(),
+      });
       return {
         spaceId: prepared.spaceId,
         operationId: prepared.operationId,

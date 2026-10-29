@@ -1,3 +1,7 @@
+import {
+  parseProjectExportEntry,
+  parseVideoProjectEntry,
+} from '../../composition/persistence/projects/read-guards';
 import { receiveSelectedCatalogRoot } from './incoming-selected';
 import { indexCatalogCopies } from './residency-copy';
 import { projectSyncCatalog, type CatalogAttempt } from './catalog-graph';
@@ -48,6 +52,7 @@ import {
 import { ASSET_ROOT_DIRECTORY_NAME } from '../../composition/persistence/assets/opfs-store';
 import {
   assetResidencyCopyId,
+  parseAssetResidencyRecord,
   type AssetResidencyCopy,
 } from '../../composition/persistence/assets/residency-records';
 import type { AssetRef } from '../../composition/persistence/assets/contracts';
@@ -1791,5 +1796,289 @@ it.each(['normal', 'temporary-refusal'] as const)(
       f.table('asset_residency').get(assetResidencyCopyId({ kind: 'opfs', ref }))
     ).toMatchObject({ phase: 'resident' });
     expect(f.remote.read.mock.calls.map(([key]) => key)).toContain(after.objects[0]!.remoteKey);
+  }
+);
+
+it.each([
+  'normal',
+  'temporary',
+  'copy-changed',
+  'connection-changed',
+  'ref-changed',
+  'owned-zero',
+  'unknown-zero',
+] as const)(
+  'publishes an offline metadata revision without materializing its deferred saved export: %s',
+  async (mode) => {
+    const f = await receiveFixture();
+    const media = await attempt(mediaEnvelope().envelope, 'media-op');
+    const { parsePortableVideoProjectMetadata } =
+      await import('../media-hub-backup/v6/root-codecs/projects');
+    const { createReadableAssetFilename } =
+      await import('../media-hub-backup/v6/inventory/helpers');
+    const privateFilename = createReadableAssetFilename(0, 'image/png');
+    const envelope = projectEnvelope();
+    const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
+    // Use the canonical private-asset name so this fixture can reuse every existing file key.
+    const parent = await attempt(
+      parseRootEnvelope({
+        ...envelope,
+        objects: envelope.objects.map((item) =>
+          item.objectId === 'private'
+            ? {
+                ...item,
+                filename: privateFilename,
+                path: item.path.replace('private.png', privateFilename),
+              }
+            : item
+        ),
+        metadata: {
+          ...metadata,
+          projectAssets: metadata.projectAssets.map((item) => ({
+            ...item,
+            filename: privateFilename,
+          })),
+        },
+      }),
+      'project-op',
+      2
+    );
+    const attempts = [media, parent];
+    const bodies = new Map<string, Blob>(
+      attempts.flatMap((item) =>
+        item.objects.map((object) => [object.remoteKey, new Blob([new Uint8Array(3)])] as const)
+      )
+    );
+    f.remote.read.mockImplementation(async (key) => {
+      const body = bodies.get(key);
+      if (!body) throw new SyncRemoteError('missing');
+      return body.stream();
+    });
+    f.remote.stat.mockImplementation(async (key) => {
+      const body = bodies.get(key);
+      if (!body) throw new SyncRemoteError('missing');
+      return { size: body.size };
+    });
+    f.remote.write.mockImplementation(async (key, body) => {
+      bodies.set(key, body);
+    });
+    await f.receive(parent, attempts);
+    const project = parseVideoProjectEntry(f.table('video_projects').get('project'));
+    const exported = parseProjectExportEntry(f.table('project_exports').get('export'));
+    const ref = exported ? parseAssetRef(f.table('asset_refs').get(exported.assetId)) : null;
+    if (!project || !exported || !ref)
+      throw new Error('Expected received project and deferred export');
+    const copy = parseAssetResidencyRecord(
+      f.table('asset_residency').get(assetResidencyCopyId({ kind: 'opfs', ref }))
+    );
+    if (!copy || copy.kind !== 'copy') throw new Error('Expected remote export evidence');
+    const { parseConnectionMetadata } =
+      await import('../../composition/persistence/remote-connection/model');
+    const connection = parseConnectionMetadata(f.table('sync_connection').get('connection'));
+    if (!connection) throw new Error('Expected active connection');
+    await expect(readAssetFile(ref, exported.filename)).rejects.toThrow();
+    f.remote.read.mockClear();
+    f.remote.write.mockClear();
+    const { captureVideoProjectInTransaction } =
+      await import('../../composition/persistence/sync-capture/capture');
+    const tx = f.database.transaction([...EXPECTED_STORES], 'readwrite');
+    await tx
+      .objectStore('video_projects')
+      .put({ ...project, project: { ...project.project, name: 'Saved offline' } });
+    const native = tx as unknown as Parameters<typeof captureVideoProjectInTransaction>[0];
+    const capture = await captureVideoProjectInTransaction(native, project.id);
+    await tx.done;
+    if (!capture || capture.phase !== 'native') throw new Error('Expected native offline capture');
+    expect(f.remote.read).not.toHaveBeenCalled();
+    const { enqueueSyncQueueOperation, commandSyncQueueOperation } =
+      await import('../../composition/persistence/sync-capture/queue');
+    const queued = await enqueueSyncQueueOperation(capture);
+    const { prepareCapturedOutgoing } = await import('./outgoing');
+    const recovery = {
+      remote: f.remote,
+      authorization: f.args.authorization,
+      signal: f.args.signal,
+    };
+    if (mode === 'owned-zero' || mode === 'unknown-zero') {
+      if (mode === 'owned-zero') {
+        const { restoreNativeOutgoingAsset } =
+          await import('../../composition/persistence/sync-capture/outgoing');
+        await expect(
+          restoreNativeOutgoingAsset({
+            capture,
+            copy,
+            authorization: recovery.authorization,
+            sourceBlob: new Blob(['bad']),
+          })
+        ).rejects.toThrow('checksum');
+      } else await f.objects.getFileHandle(ref.assetId, { create: true });
+      expect((await (await f.objects.getFileHandle(ref.assetId)).getFile()).size).toBe(0);
+      const before = structuredClone(f.table('sync_capture'));
+      const pending = prepareCapturedOutgoing(capture, recovery);
+      if (mode === 'unknown-zero') {
+        await expect(pending).rejects.toThrow('Existing asset bytes');
+        expect(f.table('sync_capture')).toEqual(before);
+        expect((await (await f.objects.getFileHandle(ref.assetId)).getFile()).size).toBe(0);
+        expect(f.remote.write).not.toHaveBeenCalled();
+        return;
+      }
+      const prepared = await pending;
+      expect(prepared.objects.some((item) => item.ref.assetId === ref.assetId)).toBe(true);
+      expect((await readAssetFile(ref, exported.filename)).size).toBe(ref.size);
+      const remoteExport = parent.objects.find((item) => item.objectId === 'export')!;
+      expect(f.remote.read.mock.calls.map(([key]) => key)).toContain(remoteExport.remoteKey);
+      const { runSyncQueueOperation } = await import('./queue');
+      expect(
+        await runSyncQueueOperation({
+          scope: {
+            spaceId: 'space',
+            connectionGeneration: f.args.binding.connectionGeneration,
+            profileCreatedAt: 1,
+          },
+          operationId: capture.operationId,
+          expectedRevision: queued.revision,
+          authorization: recovery.authorization,
+          remote: f.remote,
+          catalog: f.catalog(attempts),
+          signal: f.args.signal,
+          authorize: async () => undefined,
+        })
+      ).toMatchObject({ status: 'finished', operation: { status: 'published' } });
+      expect(f.remote.write.mock.calls.map(([key]) => key)).toEqual([
+        expect.stringMatching(/^\.sniptale\//u),
+      ]);
+      return;
+    }
+    if (mode.endsWith('-changed')) {
+      let changed = false;
+      const original = f.objects.getFileHandle.bind(f.objects);
+      const getFile = vi
+        .spyOn(f.objects, 'getFileHandle')
+        .mockImplementation(async (name, options) => {
+          // Selection reads the missing export first. A later local-file read separates selection from commit.
+          if (name !== ref.assetId && !changed) {
+            changed = true;
+            if (mode === 'copy-changed')
+              f.table('asset_residency').set(copy.id, {
+                ...copy,
+                revision: copy.revision + 1,
+                remote: { ...copy.remote, sha256: 'f'.repeat(64) },
+              });
+            if (mode === 'connection-changed')
+              f.table('sync_connection').set('connection', {
+                ...connection,
+                identity: { ...connection.identity, revision: connection.identity.revision + 1 },
+              });
+            if (mode === 'ref-changed')
+              f.table('asset_refs').set(ref.assetId, { ...ref, createdAt: ref.createdAt + 1 });
+          }
+          return original(name, options);
+        });
+      await expect(prepareCapturedOutgoing(capture, recovery)).rejects.toThrow();
+      getFile.mockRestore();
+      expect(changed).toBe(true);
+      expect(f.table('sync_capture').get(capture.key)).toEqual(capture);
+      expect(f.remote.read).not.toHaveBeenCalled();
+      expect(f.remote.write).not.toHaveBeenCalled();
+      await expect(readAssetFile(ref, exported.filename)).rejects.toThrow();
+      if (mode === 'ref-changed') {
+        expect(f.table('asset_refs').get(ref.assetId)).toEqual({
+          ...ref,
+          createdAt: ref.createdAt + 1,
+        });
+        return;
+      }
+      if (mode === 'copy-changed') f.table('asset_residency').set(copy.id, copy);
+      if (mode === 'connection-changed')
+        recovery.authorization = {
+          ...connection.identity,
+          revision: connection.identity.revision + 1,
+        };
+    }
+    const prepared = await prepareCapturedOutgoing(capture, recovery);
+    expect(f.remote.read).not.toHaveBeenCalled();
+    await expect(readAssetFile(ref, exported.filename)).rejects.toThrow();
+    expect(prepared.objects.some((item) => item.ref.assetId === ref.assetId)).toBe(false);
+    const remoteExport = parent.objects.find((item) => item.objectId === 'export')!;
+    expect(prepared.retainedObjects).toEqual(
+      expect.arrayContaining([expect.objectContaining({ remoteKey: remoteExport.remoteKey })])
+    );
+    const { parseSyncOperationText } = await import('./wire-record');
+    const wire = await parseSyncOperationText(prepared.recordText);
+    if (!wire.envelope) throw new Error('Expected metadata operation');
+    const retainedExport = parsePortableVideoProjectMetadata(
+      wire.envelope.metadata
+    ).projectExports.find((item) => item.entry.id === exported.id);
+    expect(retainedExport?.entry).toMatchObject({
+      filename: exported.filename,
+      mimeType: exported.mimeType,
+      size: exported.size,
+    });
+    expect(wire.objects.find((item) => item.objectId === retainedExport?.objectId)?.sha256).toBe(
+      copy.remote.sha256
+    );
+    const catalogProof = f.catalog(attempts);
+    expect(catalogProof.pending).toEqual([]);
+    expect(catalogProof.invalidOperations).toEqual([]);
+    expect(catalogProof.quarantined).toEqual([]);
+    const privateObject = wire.envelope.objects.find((item) => item.filename === privateFilename)!;
+    expect(privateObject).toBeDefined();
+    expect(
+      parent.operation.envelope?.objects.find((item) => item.objectId === 'private')
+    ).toMatchObject({
+      filename: privateObject.filename,
+      size: privateObject.size,
+      mimeType: privateObject.mimeType,
+    });
+    expect(wire.objects.find((item) => item.objectId === privateObject.objectId)?.sha256).toBe(
+      parent.operation.objects.find((item) => item.objectId === 'private')?.sha256
+    );
+    const { runSyncQueueOperation } = await import('./queue');
+    const scope = {
+      spaceId: 'space',
+      connectionGeneration: f.args.binding.connectionGeneration,
+      profileCreatedAt: 1,
+    };
+    const execute = (revision: number) =>
+      runSyncQueueOperation({
+        scope,
+        operationId: capture.operationId,
+        expectedRevision: revision,
+        authorization: recovery.authorization,
+        remote: f.remote,
+        catalog: f.catalog(attempts),
+        signal: f.args.signal,
+        authorize: async () => undefined,
+      });
+    if (mode === 'temporary') {
+      f.remote.stat.mockRejectedValueOnce(new SyncRemoteError('temporary', 423));
+      const refused = await execute(queued.revision);
+      expect(refused).toMatchObject({
+        status: 'finished',
+        operation: { status: 'failed', failureCode: 'temporary' },
+      });
+      if (refused.status !== 'finished') throw new Error('Expected delayed retry');
+      expect(refused.operation.nextDueAt).toBeGreaterThan(Date.now());
+      expect(f.remote.write).not.toHaveBeenCalled();
+      const retry = await commandSyncQueueOperation(
+        scope,
+        capture.operationId,
+        refused.operation.revision,
+        'retry'
+      );
+      expect(await execute(retry.revision)).toMatchObject({
+        status: 'finished',
+        operation: { status: 'published' },
+      });
+    } else
+      expect(await execute(queued.revision)).toMatchObject({
+        status: 'finished',
+        operation: { status: 'published' },
+      });
+    await expect(readAssetFile(ref, exported.filename)).rejects.toThrow();
+    expect(f.remote.read.mock.calls.some(([key]) => key === remoteExport.remoteKey)).toBe(false);
+    expect(f.remote.write.mock.calls.map(([key]) => key)).toEqual([
+      expect.stringMatching(/^\.sniptale\//u),
+    ]);
   }
 );

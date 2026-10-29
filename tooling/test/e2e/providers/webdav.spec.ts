@@ -740,19 +740,23 @@ test('another browser reuses published files without media transfer and still re
   }
   let browser = await openProvider(lab, info, 'metadata-target');
   try {
-    await browser.page.evaluate(async (input) => {
-      await window.webdavTransferHarness.portable.outgoing.scan(input.spaceId);
-      await window.webdavTransferHarness.portable.outgoing.receive(
-        input.spaceId,
-        'media',
-        input.mediaId
-      );
-      await window.webdavTransferHarness.portable.outgoing.receive(
-        input.spaceId,
-        'video-project',
-        input.projectId
-      );
-    }, sent);
+    await browser.page.evaluate(
+      async ({ input, credentials }) => {
+        await window.webdavTransferHarness.portable.outgoing.scan(input.spaceId);
+        await window.webdavTransferHarness.portable.outgoing.receive(
+          input.spaceId,
+          'media',
+          input.mediaId
+        );
+        await window.webdavTransferHarness.connection.configure(credentials);
+        await window.webdavTransferHarness.portable.outgoing.receive(
+          input.spaceId,
+          'video-project',
+          input.projectId
+        );
+      },
+      { input: sent, credentials: lab.credentials }
+    );
     const coldStart = lab.proxy.counts.getKeys.length;
     const coldCatalog = await browser.page.evaluate(
       (spaceId) => window.webdavTransferHarness.portable.outgoing.refresh(spaceId),
@@ -818,21 +822,39 @@ test('another browser reuses published files without media transfer and still re
       expect(completed).toBe(0);
       const beforeGets = lab.proxy.counts.getKeys.length;
       const beforePuts = lab.proxy.counts.putBodies.length;
+      await browser.context.setOffline(true);
+      await browser.page.evaluate(
+        (input) => window.webdavTransferHarness.portable.outgoing.reviseMetadata(input.projectId),
+        sent
+      );
+      await browser.context.setOffline(false);
       const next = await browser.page.evaluate(async (input) => {
-        await window.webdavTransferHarness.portable.outgoing.reviseMetadata(input.projectId);
-        const prepared = await window.webdavTransferHarness.portable.outgoing.prepare(
-          input.projectId
-        );
-        return window.webdavTransferHarness.portable.outgoing.send(
+        const outgoing = window.webdavTransferHarness.portable.outgoing;
+        const queued = await outgoing.queueEnqueue(input.projectId);
+        const prepared = await outgoing.prepare(input.projectId);
+        const result = await outgoing.queueRun(queued.operationId, queued.revision);
+        if (
+          result.status !== 'finished' ||
+          result.operation.status !== 'published' ||
+          !result.operation.attemptId
+        )
+          throw new Error('Native metadata queue did not publish.');
+        const attempt = await outgoing.attempt(
           prepared.spaceId,
-          prepared.operationId
+          prepared.operationId,
+          result.operation.attemptId
         );
+        if (!attempt) throw new Error('Native metadata publication is missing.');
+        return attempt;
       }, sent);
       expect(lab.proxy.counts.getKeys.slice(beforeGets)).toEqual([next.recordKey]);
       expect(lab.proxy.counts.putBodies.slice(beforePuts).map((body) => body.key)).toEqual([
         next.recordKey,
       ]);
-      expect(next.objects).toHaveLength(1);
+      expect(next.objects).toHaveLength(sent.lastFiles.length);
+      expect(next.objects.map((object) => object.remoteKey).sort()).toEqual(
+        sent.lastFiles.map((object) => object.key).sort()
+      );
       expect(sent.lastFiles.some((file) => file.key === next.objects[0]!.remoteKey)).toBe(true);
       attempts.push(next);
       if (step === 0) {
@@ -863,15 +885,19 @@ test('another browser reuses published files without media transfer and still re
     const corruptHydrationReads: string[] = [];
     const verifier = await openProvider(lab, info, 'metadata-corrupt-target');
     try {
-      const discovered = await verifier.page.evaluate(async (input) => {
-        const snapshot = await window.webdavTransferHarness.portable.outgoing.scan(input.spaceId);
-        await window.webdavTransferHarness.portable.outgoing.receive(
-          input.spaceId,
-          'media',
-          input.mediaId
-        );
-        return snapshot;
-      }, sent);
+      const discovered = await verifier.page.evaluate(
+        async ({ input, credentials }) => {
+          const snapshot = await window.webdavTransferHarness.portable.outgoing.scan(input.spaceId);
+          await window.webdavTransferHarness.portable.outgoing.receive(
+            input.spaceId,
+            'media',
+            input.mediaId
+          );
+          await window.webdavTransferHarness.connection.configure(credentials);
+          return snapshot;
+        },
+        { input: sent, credentials: lab.credentials }
+      );
       expect(discovered.pending).toEqual([]);
       expect(discovered.quarantined).toEqual([]);
       expect(discovered.invalid).toEqual([]);

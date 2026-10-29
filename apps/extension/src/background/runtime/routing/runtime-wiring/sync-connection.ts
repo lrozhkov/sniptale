@@ -73,41 +73,41 @@ function subscribeToPermissionRemoval(sync: Coordinator): void {
   });
 }
 
-function registerSyncQualification(sync: Coordinator, state: BackgroundModeState): void {
-  if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
-    const retryWakeup = createSyncQueueRetryWakeup({
-      loadConnection: loadSyncConnection,
-      discoverInitialRoots: discoverInitialSyncRoots,
-      refreshIncoming: async () => {
-        const current = await loadSyncConnection();
-        if (!current || current.phase !== 'active' || !current.workspace) return;
-        const snapshot = await sync.inspect();
-        if (
-          snapshot?.phase === 'stopping' ||
-          snapshot?.phase === 'failed' ||
-          snapshot?.workspace?.state === 'running' ||
-          snapshot?.products?.some((job) => job.state === 'running')
-        )
-          return;
-        await sync.productCommand(crypto.randomUUID(), { kind: 'automatic-sync' });
-      },
-      reconcileCaptures: reconcileSyncQueueCaptures,
-      loadProgress: loadSyncQueueScheduleProgress,
-      initializePage: initializeSyncQueueSchedulePage,
-      discoverDue: discoverDueSyncQueueOperations,
-      deferDue: deferDueSyncQueueOperation,
-      recoverInterrupted: recoverInterruptedSyncQueueOperation,
-      coordinator: sync,
-      subscribeQueueSettled: subscribeToSyncQueueSettled,
-      getAlarm: (name) => chrome.alarms.get(name),
-      createAlarm: (name, options) => chrome.alarms.create(name, options),
-      subscribeAlarm: (listener) => subscribeToChromeEvent(chrome.alarms?.onAlarm, listener),
-      subscribeStartup: (listener) => subscribeToChromeEvent(chrome.runtime?.onStartup, listener),
-    });
-    configureSyncProductRoute(sync, () => {
-      void retryWakeup.run();
-    });
+function registerSyncRuntimeRoutes(sync: Coordinator, state: BackgroundModeState): void {
+  const retryWakeup = createSyncQueueRetryWakeup({
+    loadConnection: loadSyncConnection,
+    discoverInitialRoots: discoverInitialSyncRoots,
+    refreshIncoming: async () => {
+      const current = await loadSyncConnection();
+      if (!current || current.phase !== 'active' || !current.workspace) return;
+      const snapshot = await sync.inspect();
+      if (
+        snapshot?.phase === 'stopping' ||
+        snapshot?.phase === 'failed' ||
+        snapshot?.workspace?.state === 'running' ||
+        snapshot?.products?.some((job) => job.state === 'running')
+      )
+        return;
+      await sync.productCommand(crypto.randomUUID(), { kind: 'automatic-sync' });
+    },
+    reconcileCaptures: reconcileSyncQueueCaptures,
+    loadProgress: loadSyncQueueScheduleProgress,
+    initializePage: initializeSyncQueueSchedulePage,
+    discoverDue: discoverDueSyncQueueOperations,
+    deferDue: deferDueSyncQueueOperation,
+    recoverInterrupted: recoverInterruptedSyncQueueOperation,
+    coordinator: sync,
+    subscribeQueueSettled: subscribeToSyncQueueSettled,
+    getAlarm: (name) => chrome.alarms.get(name),
+    createAlarm: (name, options) => chrome.alarms.create(name, options),
+    subscribeAlarm: (listener) => subscribeToChromeEvent(chrome.alarms?.onAlarm, listener),
+    subscribeStartup: (listener) => subscribeToChromeEvent(chrome.runtime?.onStartup, listener),
+  });
+  configureSyncProductRoute(sync, () => {
     void retryWakeup.run();
+  });
+  void retryWakeup.run();
+  if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
     registerSecurityE2EControl({
       ...sync,
       start: async (input) => {
@@ -191,5 +191,5 @@ export function initializeSyncConnectionRuntime(state: BackgroundModeState): voi
   configureSyncPrivacyErasurePort({ reserveErasureExclusion: () => sync.reserveErasure() });
   subscribeToPermissionRemoval(sync);
   void sync.inspect().catch(() => logger.warn('Sync executor adoption refused'));
-  registerSyncQualification(sync, state);
+  registerSyncRuntimeRoutes(sync, state);
 }

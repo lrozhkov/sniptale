@@ -94,6 +94,7 @@ it('places Drafts immediately after Files and isolates its controls', async () =
     translate('settings.navigation.views.files'),
     translate('settings.navigation.views.drafts'),
     translate('settings.navigation.views.storage'),
+    translate('settings.syncConnection.title'),
     translate('settings.syncQueue.title'),
     translate('settings.navigation.views.folderTemplates'),
   ]);
@@ -155,12 +156,9 @@ it('forwards the editing preset only when the controller exposes it', async () =
   );
 });
 
-it('shows the connection subpage only under the existing experimental build admission', async () => {
+it('shows the connection subpage in the production build', async () => {
   useSavePresetsSectionSpy.mockReturnValue(createSectionState());
   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
-  await renderSection('connection');
-  expect(container?.querySelector('[data-testid="sync-connection"]')).toBeNull();
-  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
   await renderSection('connection');
   expect(container?.querySelector('[data-testid="sync-connection"]')).not.toBeNull();
   expect(container?.textContent).toContain(translate('settings.syncConnection.title'));

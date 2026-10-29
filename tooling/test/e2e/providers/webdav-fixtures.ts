@@ -115,7 +115,11 @@ export async function openProvider(
   name: string,
   connect = true,
   extensionBuildDir = process.env['SNIPTALE_EXTENSION_BUILD_DIR'] ?? '.tmp/e2e-builds/test',
-  options: { viewport?: { width: number; height: number }; offline?: boolean } = {}
+  options: {
+    viewport?: { width: number; height: number };
+    offline?: boolean;
+    harness?: boolean;
+  } = {}
 ) {
   const loaded = await launchExtensionBrowser({
     extensionBuildDir,
@@ -126,10 +130,15 @@ export async function openProvider(
   try {
     if (options.offline) await loaded.context.setOffline(true);
     const page = await loaded.context.newPage();
+    if (options.harness === false && connect)
+      throw new Error('Production provider starts through Settings.');
     await page.goto(
-      `chrome-extension://${loaded.extensionId}/tooling/test/harness/webdav-transfer.html`
+      options.harness === false
+        ? `chrome-extension://${loaded.extensionId}/apps/extension/src/settings/index.html`
+        : `chrome-extension://${loaded.extensionId}/tooling/test/harness/webdav-transfer.html`
     );
-    await page.waitForFunction(() => Boolean(window.webdavTransferHarness));
+    if (options.harness !== false)
+      await page.waitForFunction(() => Boolean(window.webdavTransferHarness));
     const origin = new URL(lab.proxy.rootUrl).origin;
     if (
       !(await page.evaluate(

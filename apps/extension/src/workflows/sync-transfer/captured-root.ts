@@ -1,3 +1,4 @@
+import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import { encodeCapturedScenarioRoot } from './captured-scenario';
 import {
   createArchivePathAllocator,
@@ -21,13 +22,17 @@ import { frozenReviewDatabase, encodeCapturedVideoReviewRoot } from './captured-
 import { parsePortableSyncRoot } from './prepared-root';
 
 /** Encodes an admitted frozen capture without reading live native rows or creating an archive. */
-export async function encodeCapturedPortableRoot(value: unknown): Promise<{
+export async function encodeCapturedPortableRoot(
+  value: unknown,
+  deferredExports: ReadonlyMap<string, AssetResidencyCopy> = new Map()
+): Promise<{
   envelope: Awaited<ReturnType<typeof parsePortableSyncRoot>>['envelope'];
   objects: ArchiveRootObjectSource[];
   dependencies: CapturedMediaDependency[];
   rootDependencies?: CapturedRootDependency[];
   bindings: { objectId: string; ref: AssetRef }[];
   reviewSourceMediaId?: string;
+  retainedObjects?: { objectId: string; remoteKey: string; sha256: string }[];
 }> {
   const parsed = parseSyncCaptureRecord(value);
   if (
@@ -50,7 +55,7 @@ export async function encodeCapturedPortableRoot(value: unknown): Promise<{
     return portable;
   }
   if (capture.change.kind === 'video-project') {
-    const portable = await encodeCapturedProjectRoot(capture.change.rows);
+    const portable = await encodeCapturedProjectRoot(capture.change.rows, deferredExports);
     await parsePortableSyncRoot(portable.envelope);
     return portable;
   }

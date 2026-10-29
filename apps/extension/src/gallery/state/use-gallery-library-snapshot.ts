@@ -32,8 +32,6 @@ async function loadScenarioExportsByProject(projectIds: string[]) {
 }
 
 async function loadRemoteGalleryItems() {
-  if (typeof __SNIPTALE_SECURITY_E2E__ === 'undefined' || !__SNIPTALE_SECURITY_E2E__)
-    return { items: [], unavailable: false };
   const cards = await readPersistedSyncCatalogCards();
   return {
     items: cards.filter((card) => !card.deleted).map(createRemoteRootGalleryItem),

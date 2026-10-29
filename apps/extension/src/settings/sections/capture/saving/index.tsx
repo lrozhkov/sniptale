@@ -14,10 +14,8 @@ export function SavePresetsSection(props: {
 }) {
   const savePresetsSection = useSavePresetsSection();
   const { editingPreset, ...contentProps } = savePresetsSection;
-  const connectionAvailable =
-    typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__;
   const view =
-    (connectionAvailable && props.view === 'connection') ||
+    props.view === 'connection' ||
     props.view === 'queue' ||
     props.view === 'templates' ||
     props.view === 'storage' ||
@@ -36,9 +34,7 @@ export function SavePresetsSection(props: {
           { id: 'files', label: translate('settings.navigation.views.files') },
           { id: 'drafts', label: translate('settings.navigation.views.drafts') },
           { id: 'storage', label: translate('settings.navigation.views.storage') },
-          ...(connectionAvailable
-            ? [{ id: 'connection', label: translate('settings.syncConnection.title') }]
-            : []),
+          { id: 'connection', label: translate('settings.syncConnection.title') },
           { id: 'queue', label: translate('settings.syncQueue.title') },
           {
             id: 'templates',
@@ -59,7 +55,7 @@ export function SavePresetsSection(props: {
       {view === 'queue' ? <SyncQueueSection /> : null}
       {view === 'files' ? <FilenameRulesSettings /> : null}
       {view === 'storage' ? <StorageDraftsSection view="storage" /> : null}
-      {view === 'storage' && connectionAvailable ? <SyncCacheSection /> : null}
+      {view === 'storage' ? <SyncCacheSection /> : null}
       {view === 'drafts' ? <StorageDraftsSection view="drafts" /> : null}
     </div>
   );

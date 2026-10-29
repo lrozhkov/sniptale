@@ -340,8 +340,8 @@ it('registers all background listeners through the runtime-wiring owner', () => 
   expect(subscribeToLocaleChanges).toHaveBeenCalledOnce();
   expect(nativeAppConnect).toHaveBeenCalledTimes(1);
   expect(registerWebSnapshotViewerPorts).toHaveBeenCalledWith(state.webSnapshotViewerPorts);
-  expect(createRetryWakeup).not.toHaveBeenCalled();
-  expect(runRetryWakeup).not.toHaveBeenCalled();
+  expect(createRetryWakeup).toHaveBeenCalledOnce();
+  expect(runRetryWakeup).toHaveBeenCalledOnce();
   expect(initializeBackgroundContextMenus).toHaveBeenCalledWith({
     captureGuardState: state.captureGuardState,
     screenshotModeState: state.screenshotModeState,
@@ -778,11 +778,8 @@ it('wires JOIN revocation and enrollment through the shared coordinator', async 
   expect(control?.enrollWorkspace).toBe(syncWiring.enrollWorkspace);
 });
 
-it('binds the product ingress to the existing coordinator only in the current qualification build', () => {
+it('binds product ingress and retry in production without security controls', () => {
   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
-  initializeBackgroundRuntime(createModeState());
-  expect(syncWiring.configureProductRoute).not.toHaveBeenCalled();
-  vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
   initializeBackgroundRuntime(createModeState());
   const coordinator = syncWiring.createCoordinator.mock.results.at(-1)?.value;
   expect(coordinator).toBeDefined();
@@ -790,6 +787,9 @@ it('binds the product ingress to the existing coordinator only in the current qu
     coordinator,
     expect.any(Function)
   );
+  expect(createRetryWakeup).toHaveBeenCalledOnce();
+  expect(runRetryWakeup).toHaveBeenCalledOnce();
+  expect(registerSecurityE2EControl).not.toHaveBeenCalled();
   expect(coordinatorDependencies().productExecutor).toBe(syncWiring.productExecutor);
   expect(coordinator?.planWorkspace).toBe(syncWiring.planWorkspace);
   expect(coordinator?.productCommand).toBe(syncWiring.productCommand);

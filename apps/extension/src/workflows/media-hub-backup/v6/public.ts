@@ -39,8 +39,6 @@ import { runWithScenarioResourceRead } from '../../../composition/persistence/sc
 import { backfillScenarioLibraryAssets } from '../../../composition/persistence/scenario/library-publication';
 
 function productBackupPreparation(signal?: AbortSignal): MediaHubBackupRootPreparation | undefined {
-  if (typeof __SNIPTALE_SECURITY_E2E__ === 'undefined' || !__SNIPTALE_SECURITY_E2E__)
-    return undefined;
   return async (root) => {
     const { ensureNativeBackupRootAvailable } =
       await import('../../sync-transfer/editing-admission');

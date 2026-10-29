@@ -61,8 +61,8 @@ export const settingsSyncQueueMessages = defineMessageSource({
     en: 'Cancel preserves local files and does not delete server data. An issued request can retain an unknown outcome.',
   },
   pilot: {
-    ru: 'Передача файлов ещё не включена. Здесь доступны только управление существующей очередью и история.',
-    en: 'File transfer is not enabled yet. This view manages the existing queue and its history.',
+    ru: 'Очередь хранит изменения до отправки на сервер. Здесь можно приостановить, повторить или отменить отправку и открыть историю.',
+    en: 'The queue keeps changes until publication. Pause, retry or cancel uploads here, or open their history.',
   },
   history: { ru: 'Открыть события и логи', en: 'Open events and logs' },
   refused: {

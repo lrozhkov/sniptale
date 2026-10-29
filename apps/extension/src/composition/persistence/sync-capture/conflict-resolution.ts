@@ -31,8 +31,8 @@ type Selection = {
 };
 type Transaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
 const stores = [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, SYNC_OUTBOX_STORE];
-function key(selection: Selection) {
-  return JSON.stringify(['resolution', selection.scope.spaceId, selection.operationId]);
+function key(spaceId: string, operationId: string) {
+  return JSON.stringify(['resolution', spaceId, operationId]);
 }
 function checkedSelection(input: Selection): Selection {
   const selected = structuredClone(input);
@@ -72,13 +72,15 @@ async function context(tx: Transaction, selection: Selection) {
     (!state || state.kind !== 'root-state' || state.key !== stateKey || state.rootKey !== rootKey)
   )
     throw new Error('Invalid conflict resolution root.');
-  const rawOperation: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key(selection));
+  const rawOperation: unknown = await tx
+    .objectStore(SYNC_CAPTURE_STORE)
+    .get(key(selection.scope.spaceId, selection.operationId));
   const operation = rawOperation === undefined ? null : parseSyncCaptureRecord(rawOperation);
   if (
     rawOperation !== undefined &&
     (!operation ||
       operation.kind !== 'sync-operation' ||
-      operation.key !== key(selection) ||
+      operation.key !== key(selection.scope.spaceId, selection.operationId) ||
       operation.rootKey !== rootKey ||
       operation.operationId !== selection.operationId ||
       operation.profileCreatedAt !== selection.scope.profileCreatedAt ||
@@ -120,7 +122,7 @@ export async function commitConflictResolution(
     !operation ||
     operation.kind !== 'sync-operation' ||
     operation.phase !== 'prepared' ||
-    operation.key !== key(selection) ||
+    operation.key !== key(selection.scope.spaceId, selection.operationId) ||
     operation.operationId !== selection.operationId ||
     operation.rootKey !==
       captureRootKey(selection.scope.spaceId, selection.rootKind, selection.rootId) ||
@@ -167,11 +169,21 @@ export async function commitConflictResolution(
   });
 }
 
+/** The resolution owner issues this exact capture identity independently from file mappings. */
+export function isConflictResolutionPrepared(
+  prepared: Pick<
+    import('./outgoing').PreparedOutgoingOperation,
+    'captureKey' | 'spaceId' | 'operationId'
+  >
+): boolean {
+  return prepared.captureKey === key(prepared.spaceId, prepared.operationId);
+}
+
 /** Refuse a stale decision before publishing; native publication still repeats its own CAS. */
 export async function assertConflictResolutionCurrent(
   prepared: import('./outgoing').PreparedOutgoingOperation
 ): Promise<void> {
-  if (prepared.retainedObjects === undefined) return;
+  if (!isConflictResolutionPrepared(prepared)) return;
   const db = capturePreparedDatabase();
   if (!db) throw new Error('Conflict resolution storage unavailable.');
   const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');

@@ -2,7 +2,10 @@ import {
   initDB,
   SYNC_CAPTURE_STORE,
 } from '../../composition/persistence/infrastructure/indexed-db/core';
-import { assertConflictResolutionCurrent } from '../../composition/persistence/sync-capture/conflict-resolution';
+import {
+  assertConflictResolutionCurrent,
+  isConflictResolutionPrepared,
+} from '../../composition/persistence/sync-capture/conflict-resolution';
 import { syncCatalogRootKey } from './catalog-graph';
 import { parseSyncOperationText } from './wire-record';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
@@ -180,7 +183,7 @@ export async function runSyncQueueOperation(input: {
               attempt: observed,
             }),
           };
-        if (prepared.retainedObjects !== undefined) {
+        if (isConflictResolutionPrepared(prepared)) {
           const logical = await parseSyncOperationText(prepared.recordText);
           const root = catalog?.roots.get(syncCatalogRootKey(logical.rootKind, logical.rootId));
           if (
