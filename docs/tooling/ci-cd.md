@@ -91,7 +91,15 @@ The provenance finalizer requires a later control commit with at least one path 
 
 Before `Prepare release`, require a completed source run. Both `Checks / Release result` and `Release result` must succeed. The successful `Tests and build` job alone does not satisfy this requirement. Let additional reports finish before preparation. Diagnose a failed consumer before repeating successful canonical execution.
 
-For a release, complete Release checks on the source commit before creating its signed version tag. Then land the allowed control-only correction. Run Prepare release from that later `main` commit with the successful source run ID. The tag stays on the proven source commit. The finalizer runs on the later control commit. Dispatching Prepare release on the source commit itself fails admission even when its proof is green.
+Use this order for a release:
+
+1. Complete **Release checks** on the source commit.
+2. Create a signed, annotated version tag for the source commit. Push the tag. Check that GitHub verifies its signature.
+3. Merge the permitted control-only correction through a pull request.
+4. Dispatch **Prepare release** from that later `main` commit with the successful source run ID.
+5. Dispatch **Publish release** with the version tag and successful finalizer run ID.
+
+Keep the tag on the proven source commit. The finalizer uses the later control commit. **Prepare release** rejects the source commit as its control commit, even after successful source proof.
 
 Publication is restricted to `main`. It requires a GitHub-verifiable annotated version tag, the matching finalizer result, checked release assets, and attestations for every published subject. Diagnostic mode remains read-only and cannot enter the publisher environment.
 
