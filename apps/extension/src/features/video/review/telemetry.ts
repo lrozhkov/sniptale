@@ -1,4 +1,5 @@
 import { buildHistoryCursorRuns } from './cursor-history';
+import { groupHistoryScrollActions } from './scroll-history';
 import type { RecordingKeyboardRhythmBlock } from '../project/types/interaction';
 import { resolveRecordingTarget, type RecordingTargetSemantics } from '../project/recording-target';
 import { isRecordingPoint } from '../project/validation/recording-telemetry';
@@ -77,7 +78,7 @@ export function projectReviewTelemetry(
         : []
     )
     .sort((a, b) => a.time - b.time);
-  for (const event of actions) {
+  for (const event of groupHistoryScrollActions(actions)) {
     const gesture = recordedGesture(event);
     const keyboardOnset = event.kind === 'KEY' ? event.data['keyboardOnsetTime'] : undefined;
     const observedKeyboard =
