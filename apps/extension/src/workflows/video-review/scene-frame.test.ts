@@ -334,3 +334,51 @@ it.each(['success', 'sample-failure', 'projection-failure'] as const)(
     if (failure === 'success') expect(draw).toHaveBeenCalledTimes(2);
   }
 );
+
+it('borrows a retained decorated plane without drawing or releasing its source again', () => {
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+    fillRect: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const source = { width: 1280, height: 720 };
+  const output = { width: 640, height: 378 };
+  const background = { enabled: false as const };
+  const layout = computeQuickEditSceneLayout({
+    source,
+    output,
+    background,
+    windowHeader: DEFAULT_WINDOW_HEADER,
+    camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+  });
+  const image = { width: 640, height: 378 } as HTMLCanvasElement;
+  const raster = { image, width: 640, height: 378 };
+  const draw = vi.fn();
+  const drawOverlays = vi.fn();
+  const canvas = vi.fn(() => {
+    throw new Error('source must not be reallocated');
+  });
+  drawReviewSceneFrame(context, {
+    canvas: { ...output } as HTMLCanvasElement,
+    layout,
+    background,
+    headerImage: image,
+    sample: { draw },
+    windowRaster: raster,
+    image: null,
+    drawOverlays,
+    resources: { canvas, bytes: () => ({ release() {} }) },
+  });
+  expect(draw).not.toHaveBeenCalled();
+  expect(canvas).not.toHaveBeenCalled();
+  expect(vi.mocked(context.drawImage).mock.calls.some((call) => call[0] === image)).toBe(true);
+  expect(drawOverlays).toHaveBeenCalledWith(raster);
+});

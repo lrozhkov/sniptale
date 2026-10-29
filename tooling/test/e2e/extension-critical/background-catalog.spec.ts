@@ -186,7 +186,9 @@ for (const viewport of [
         await route.fulfill({ response, contentType: 'image/svg+xml' });
       });
 
-      const canvas = page.locator('[data-ui="gallery.videoReview.manualPreview"] canvas');
+      const canvas = page.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      );
       const video = page.locator('[data-ui="gallery.videoReview.stage"] video').first();
       await expect(canvas).toBeVisible();
       await video.evaluate((node: HTMLVideoElement) => {

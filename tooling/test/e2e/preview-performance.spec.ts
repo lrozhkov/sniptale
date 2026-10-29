@@ -367,11 +367,15 @@ async function selectPreviewMode(page: Page, mode: (typeof modeNames)[number]) {
       await expect(panel.getByRole('button', { name: label(key), exact: true })).toHaveText(option);
     }
     await expect(
-      review.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+      review.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      )
     ).toBeVisible();
   } else
     await expect(
-      review.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+      review.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      )
     ).toHaveCount(0);
   await gear.click();
 }
@@ -500,7 +504,9 @@ for (const recipe of selected)
             await expect(video).toHaveCount(1);
             if (mode === 'manual720p30')
               await expect(
-                page.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+                page.locator(
+                  '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+                )
               ).toBeVisible();
           } finally {
             await source.dispose();
@@ -509,7 +515,7 @@ for (const recipe of selected)
         const presentationViewport = await page.evaluate(() => {
           const stage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
           const canvas = stage?.querySelector<HTMLCanvasElement>(
-            '[data-ui="gallery.videoReview.manualPreview"] canvas'
+            '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
           );
           const bounds = stage?.getBoundingClientRect();
           const output = canvas?.getBoundingClientRect();
@@ -675,7 +681,7 @@ for (const recipe of selected)
       }
     });
 
-test('publication probe counts retained front copies and excludes failed draws', async ({
+test('publication probe counts completed front changes and excludes unpublished draws', async ({
   page,
 }) => {
   await page.setContent(
@@ -703,6 +709,7 @@ test('publication probe counts retained front copies and excludes failed draws',
     const canvas = document.createElement('canvas');
     canvas.width = 2;
     canvas.height = 2;
+    canvas.dataset['previewFront'] = 'true';
     host.append(canvas);
     await Promise.resolve();
     const source = document.createElement('canvas');
@@ -718,6 +725,17 @@ test('publication probe counts retained front copies and excludes failed draws',
       /* A refused draw is not a publication. */
     }
     context.drawImage(source, 0, 0);
+    const back = document.createElement('canvas');
+    back.width = back.height = 2;
+    host.append(back);
+    back.getContext('2d')!.drawImage(source, 0, 0);
+    canvas.dataset['previewFront'] = 'false';
+    back.dataset['previewFront'] = 'true';
+    await Promise.resolve();
+    context.drawImage(source, 0, 0);
+    back.dataset['previewFront'] = 'false';
+    canvas.dataset['previewFront'] = 'true';
+    await Promise.resolve();
   });
   const metrics = await probe.end();
   expect(metrics.measurementIdentity.valid).toBe(true);

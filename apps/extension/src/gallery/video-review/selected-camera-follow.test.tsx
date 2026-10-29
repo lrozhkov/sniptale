@@ -6,6 +6,7 @@ import {
 import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
+import * as cursorProjection from '../../features/video/review/advanced/cursor-focus-path';
 import { ReviewSelectedProperties } from './selected-properties';
 import { ReviewZoomPreview } from './zoom-preview';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
@@ -30,6 +31,7 @@ let dispose: (() => void) | undefined;
 afterEach(() => {
   dispose?.();
   preview.mockClear();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -89,7 +91,7 @@ it.each([
       busy: false,
       resource: {
         file: null,
-        telemetry: null,
+        telemetry: { cursorTrack: null, actionEvents: [], signals: [] },
         source: { duration: 8, width: 640, height: 360 },
         session: {
           getSnapshot: () => ({
@@ -99,6 +101,7 @@ it.each([
       },
       editing: { exporter: { phase: 'idle', index: null } },
       zoom: {
+        previewChanges: { read: () => null, subscribe: () => () => {} },
         previewRegion: (item: typeof region) => item,
         revision: () => 'revision',
         changeAtRevision: vi.fn(),
@@ -109,9 +112,13 @@ it.each([
         : {}),
       toSourceTime: (time: number) => time * 2,
     } as unknown as ComponentProps<typeof ReviewSelectedProperties>;
+    const resolvePath = vi.spyOn(cursorProjection, 'resolveReviewCursorFocusPath');
     const root = createRoot(document.createElement('div'));
     dispose = () => act(() => root.unmount());
     act(() => root.render(<ReviewSelectedProperties {...props} />));
+    resolvePath.mockClear();
+    act(() => root.render(<ReviewSelectedProperties {...props} />));
+    expect(resolvePath).not.toHaveBeenCalled();
     const selected = preview.mock.lastCall![0] as ComponentProps<typeof ReviewZoomPreview>;
     expect(selected.cursorFollowing).toBe(
       type === 'spotlight' || type === 'border' ? false : (followCursor ?? true)

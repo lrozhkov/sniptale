@@ -154,7 +154,7 @@ for (const variant of variants) {
     const gear = review.locator('[data-ui="gallery.videoReview.previewSettings"]');
     const video = review.locator('[data-ui="gallery.videoReview.stage"] video').first();
     const manual = review.locator('[data-ui="gallery.videoReview.manualPreview"]');
-    const canvas = manual.locator('canvas');
+    const canvas = manual.locator('canvas[data-preview-front="true"]');
     const field = (key: Message) => panel.getByRole('button', { name: label(key), exact: true });
     const showFrameRate = panel.getByRole('switch', {
       name: label('gallery.videoReview.previewShowFrameRate'),

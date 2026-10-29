@@ -797,7 +797,9 @@ for (const viewport of [
           .toBe(true);
         const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
         const canvas = manual
-          ? stage.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+          ? stage.locator(
+              '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+            )
           : stage.locator('[data-ui="gallery.videoReview.webcamOverlay"] canvas');
         const painted = async () =>
           canvas.evaluateAll((nodes) =>

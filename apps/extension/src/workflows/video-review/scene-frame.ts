@@ -49,6 +49,8 @@ export function drawReviewSceneFrame(
     spatialRenderer?: ReviewSpatialRenderer | undefined;
     resources?: RenderResources | undefined;
     windowRasterBacking?: { width: number; height: number } | undefined;
+    /** Borrow the renderer-owned immutable source plane without releasing it. */
+    windowRaster?: ReviewWindowRaster | undefined;
     motionBlur?: readonly { camera: QuickEditCameraTransform; alpha: number }[] | undefined;
     drawOverlays?: ((raster: ReviewWindowRaster | null) => void) | undefined;
   }
@@ -59,7 +61,8 @@ export function drawReviewSceneFrame(
     else drawReviewSceneExposure(context, args, raster);
     args.drawOverlays?.(raster);
   };
-  if ((args.headerImage || args.layout.sourceCrop) && args.layout.windowRect)
+  if (args.windowRaster) paint(args.windowRaster);
+  else if ((args.headerImage || args.layout.sourceCrop) && args.layout.windowRect)
     withReviewWindowRaster(
       {
         header: args.headerImage ?? undefined,

@@ -148,7 +148,9 @@ test('preview quality never changes the encoded project output', async ({ page }
     await showFrameRate.click();
     await expect(showFrameRate).toBeChecked();
     await expect(
-      review.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+      review.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      )
     ).toBeVisible();
     await expect(
       review.getByText(label('gallery.videoReview.previewFailed'), { exact: true })
@@ -329,7 +331,9 @@ for (const viewport of [
         reviewAdvancedContentBaseline(saved.advanced)
       );
       expect(authored.advancedContent.zoom.regions[0]?.linkTo).toBe('right');
-      const preview = review.locator('[data-ui="gallery.videoReview.manualPreview"] canvas');
+      const preview = review.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      );
       await expect(preview).toBeVisible();
       const captures = [];
       for (const [sourceTime, resultTime] of [

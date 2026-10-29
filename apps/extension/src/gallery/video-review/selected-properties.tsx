@@ -12,7 +12,7 @@ import { ReviewSpeechPanel } from './speech-panel';
 import type { ReviewBeforeAction } from './note-transitions';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
-import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { ColorField, NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { planReviewCutTransitions } from '../../features/video/review/cuts';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -110,6 +110,18 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
       })
     : null;
   const previewLoader = useZoomPreviewSource(resource.file);
+  const cameraSelected = selection.kind === 'zoom' || selection.kind === 'zoom-link';
+  const cursorPath = useMemo(
+    () =>
+      cameraSelected
+        ? resolveReviewCursorFocusPath(
+            resource.telemetry,
+            resource.source,
+            advanced.cursorFocusPath
+          )
+        : undefined,
+    [cameraSelected, resource.telemetry, resource.source, advanced.cursorFocusPath]
+  );
   return (
     <>
       <fieldset disabled={busy || editing.exporter.phase !== 'idle'} className="min-w-0 space-y-3">
@@ -186,11 +198,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
         ) : selection.kind === 'zoom' || selection.kind === 'zoom-link' ? (
           <ReviewAdvancedPanels
             advanced={advanced}
-            cursorPath={resolveReviewCursorFocusPath(
-              resource.telemetry,
-              resource.source,
-              advanced.cursorFocusPath
-            )}
+            {...(cursorPath ? { cursorPath } : {})}
             zoom={zoom}
             zoomPreview={(region) => (
               <ReviewZoomPreview

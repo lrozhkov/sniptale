@@ -3776,7 +3776,7 @@ for (const variant of [
       const canvas = dialog.locator(
         variant.locale === 'ru'
           ? '[data-ui="gallery.videoReview.cutTransitionCanvas"]'
-          : '[data-ui="gallery.videoReview.manualPreview"] canvas'
+          : '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
       );
       await expect(canvas).toBeVisible();
       if (variant.locale === 'ru') {

@@ -1361,3 +1361,61 @@ it('preserves scene and preparation identity across persisted property reorderin
   ).toEqual(['second', 'camera']);
   renderer.dispose();
 });
+
+it('retains isolated native camera snapshots across a neighboring geometry refresh', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const input = scene();
+  const camera = {
+    ...createQuickEditZoomRegion({ id: 'camera', at: 0 }),
+    cursorFocus: {
+      path: {
+        version: 1 as const,
+        mode: 'fixed' as const,
+        smoothing: 0.5,
+        sensitivity: 0.5,
+        gapPolicy: 'hold' as const,
+        segments: [
+          {
+            id: 'native',
+            start: 0,
+            end: 4,
+            binding: { kind: 'project' as const },
+            keys: [
+              {
+                id: 'point',
+                time: 0,
+                x: 0.5,
+                y: 0.5,
+                anchor: 'movement' as const,
+                interpolation: 'linear' as const,
+              },
+            ],
+          },
+        ],
+      },
+    },
+  };
+  const neighbor = createQuickEditZoomRegion({ id: 'neighbor', at: 5 });
+  input.zoomRegions = [camera, neighbor];
+  const first = await renderer.prepare(input, dimensions, new AbortController().signal);
+  const output = await renderer.render(first, frame());
+  output.release();
+  const previous = io.overlays.mock.lastCall![0].regions[0].cursorFocus;
+  expect(previous).not.toBe(camera.cursorFocus);
+  expect(previous.path.segments).not.toBe(camera.cursorFocus.path.segments);
+  const second = await renderer.prepare(
+    {
+      ...input,
+      zoomRegions: [camera, { ...neighbor, transform: { ...neighbor.transform, centerX: 0.6 } }],
+    },
+    dimensions,
+    new AbortController().signal
+  );
+  const rendered = await renderer.render(second, frame());
+  rendered.release();
+  expect(io.overlays.mock.lastCall![0].regions[0].cursorFocus).toBe(previous);
+  first.release();
+  second.release();
+  renderer.dispose();
+});

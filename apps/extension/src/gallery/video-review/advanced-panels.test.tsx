@@ -15,7 +15,7 @@ import { setImmediate as settleHostTurn } from 'node:timers/promises';
 import { ReviewAdvancedPanels, ReviewSceneProperties } from './advanced-panels';
 import { ReviewZoomInspector } from './zoom-inspector';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { useReviewZoomEditor } from './zoom-editor';
+import { useReviewZoomEditor, useReviewZoomPreview } from './zoom-editor';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 
@@ -285,6 +285,10 @@ it('routes Border numeric drafts through the panel and cancels without a durable
   };
   advanced.zoom.regions = [region];
   const setZoom = vi.fn();
+  function DraftWidth({ zoom }: { zoom: ReturnType<typeof useReviewZoomEditor> }) {
+    const preview = useReviewZoomPreview(zoom);
+    return <output data-testid="draft-width">{preview.previewRegion(region).border!.width}</output>;
+  }
   function DraftHarness() {
     const zoom = useReviewZoomEditor({
       zoom: advanced.zoom,
@@ -294,7 +298,7 @@ it('routes Border numeric drafts through the panel and cancels without a durable
     });
     return (
       <>
-        <output data-testid="draft-width">{zoom.previewRegion(region).border!.width}</output>
+        <DraftWidth zoom={zoom} />
         <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />
       </>
     );

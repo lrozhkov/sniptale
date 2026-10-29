@@ -1,3 +1,4 @@
+import { createQuickEditBorder } from '../../project/scene/focus-appearance';
 import { createReviewWorkingZoneCameraGeometry } from './camera-geometry';
 import { fitQuickEditSourceCrop } from './canvas';
 import { expect, it } from 'vitest';
@@ -8,6 +9,7 @@ import {
 import {
   computeQuickEditSceneLayout,
   resolveReviewSceneCameraPlan,
+  resolveReviewCameraGeometry,
   resolveReviewCameraConflicts,
   evaluateQuickEditCameraAtTime,
 } from './scene';
@@ -387,4 +389,36 @@ it('starts a camera transition after crop re-entry without joining the hidden in
       .filter((span) => span.segmentId === 'two')
       .every((span) => span.start >= samples[1][0])
   ).toBe(true);
+});
+
+it('restores the linked camera exit after a neighboring Border becomes Zoom with the same cursor facts', () => {
+  const scene = { source: { width: 1000, height: 600 }, background: { enabled: false as const } };
+  const from: QuickEditZoomRegion = {
+    id: 'from',
+    start: 0,
+    end: 3,
+    linkTo: 'to',
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'ease-in-out', duration: 0.3 },
+    exit: { type: 'ease-in-out', duration: 0.6 },
+    cursorFocus: {
+      scene,
+      path: {
+        version: 1,
+        mode: 'follow',
+        smoothing: 0,
+        sensitivity: 0.5,
+        gapPolicy: 'hold',
+        segments: [],
+      },
+      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') }),
+    },
+  };
+  const target: QuickEditZoomRegion = { ...from, id: 'to', start: 4, end: 6 };
+  delete target.linkTo;
+  const border = { ...target, border: createQuickEditBorder() };
+  const independent = resolveReviewCameraGeometry([from, border], from, scene)!;
+  expect(independent.breaks).toContain(2.4);
+  const linked = resolveReviewCameraGeometry([from, target], from, scene)!;
+  expect(linked.breaks).not.toContain(2.4);
 });

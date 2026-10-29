@@ -70,7 +70,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
     tick = dependencies.requestTick(() => {
       tick = null;
       if (!state?.visible || failed || disposed) return;
-      if (state.playing || state.interacting) pending = state;
+      if (state.playing) pending = state;
       // A paused request is one-shot: wait until it can publish before consuming it.
       const admissionClock = state.playing || state.interacting ? lastAdmitted : lastPublished;
       if (!active && pending && due(admissionClock)) {
@@ -112,7 +112,11 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         request,
         controller.signal
       );
-      if (!current(version) || !due(lastPublished)) return;
+      if (!current(version)) return;
+      if (!due(lastPublished)) {
+        if (!description.playing) pending = state;
+        return;
+      }
       dependencies.publish(completed.value, request);
       if (current(version)) lastPublished = dependencies.now();
     } catch (error) {

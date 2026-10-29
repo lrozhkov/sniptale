@@ -175,7 +175,9 @@ for (const size of [
           })
           .click();
         await expect(
-          review.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+          review.locator(
+            '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+          )
         ).toBeVisible();
         await expect(actual).toContainText('×');
         await command('gallery.videoReview.play').click();
@@ -193,7 +195,9 @@ for (const size of [
         expect(frames).toEqual(Array.from({ length: 8 }, () => true));
         await command('gallery.videoReview.pause').click();
         await expect(
-          review.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+          review.locator(
+            '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+          )
         ).toBeVisible();
         await page.screenshot({
           path: info.outputPath('preview-readonly-raster-and-detailed-header.png'),

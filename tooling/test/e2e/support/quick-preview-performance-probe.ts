@@ -62,7 +62,7 @@ function installQuickPreviewPerformanceProbe({
   const uiState = () => {
     const currentStage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
     const host = currentStage?.querySelector('[data-ui="gallery.videoReview.manualPreview"]');
-    const canvas = host?.querySelector('canvas');
+    const canvas = host?.querySelector('canvas[data-preview-front="true"]');
     const bounds = canvas?.getBoundingClientRect();
     const alerts = [...(currentStage?.querySelectorAll(':scope > [role="alert"]') ?? [])];
     const statuses = [...(currentStage?.querySelectorAll(':scope > [role="status"]') ?? [])];
@@ -113,11 +113,17 @@ function installQuickPreviewPerformanceProbe({
     else overflow = true;
   };
   const publicationObserver = new MutationObserver((records) => {
+    const announcements = records.filter(
+      (record) => record.type === 'attributes' && record.oldValue !== 'true'
+    );
     const additions = records
       .flatMap((record) => [...record.addedNodes])
-      .filter((node) => node instanceof HTMLCanvasElement);
-    if (!additions.length || stopped) return;
-    const canvas = publicationHost?.firstElementChild;
+      .filter(
+        (node) => node instanceof HTMLCanvasElement && node.dataset['previewFront'] === 'true'
+      );
+    const announced = announcements.length || additions.length;
+    if (!announced || stopped) return;
+    const canvas = publicationHost?.querySelector('canvas[data-preview-front="true"]');
     if (
       !(canvas instanceof HTMLCanvasElement) ||
       !canvas.isConnected ||
@@ -125,10 +131,17 @@ function installQuickPreviewPerformanceProbe({
       canvas.height <= 0
     )
       return;
-    coalescedPublications += Math.max(0, additions.length - 1);
+    coalescedPublications += Math.max(0, announced - 1);
     recordPublication(canvas);
   });
-  if (publicationHost) publicationObserver.observe(publicationHost, { childList: true });
+  if (publicationHost)
+    publicationObserver.observe(publicationHost, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-preview-front'],
+      attributeOldValue: true,
+    });
 
   const surfaces = () =>
     [...document.querySelectorAll('canvas')].map((canvas) => ({
@@ -156,7 +169,6 @@ function installQuickPreviewPerformanceProbe({
     const start = performance.now();
     try {
       const result = Reflect.apply(originalDraw, this, args);
-      if (this.canvas === publicationHost?.firstElementChild) recordPublication(this.canvas);
       return result;
     } finally {
       if (detailed) {
@@ -522,13 +534,25 @@ export async function installQuickPreviewMediaDiagnostic(page: Page) {
         const host = document.querySelector('[data-ui="gallery.videoReview.manualPreview"]');
         observer = new MutationObserver((records) => {
           if (
-            records.some((entry) =>
-              [...entry.addedNodes].some((node) => node instanceof HTMLCanvasElement)
+            records.some(
+              (entry) =>
+                (entry.type === 'attributes' && entry.oldValue !== 'true') ||
+                [...entry.addedNodes].some(
+                  (node) =>
+                    node instanceof HTMLCanvasElement && node.dataset['previewFront'] === 'true'
+                )
             )
           )
             record('publication');
         });
-        if (host) observer.observe(host, { childList: true });
+        if (host)
+          observer.observe(host, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-preview-front'],
+            attributeOldValue: true,
+          });
         sampleTimer = setTimeout(() => {
           expired = true;
           stop();

@@ -1,6 +1,7 @@
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { reviewWatermarkAssets } from './asset-bytes';
 import {
+  createReviewPreviewSceneCapture,
   reviewPreviewSceneKey,
   reviewPreviewPreparationKey,
   activeReviewPreviewScene,
@@ -33,6 +34,8 @@ import { quickEditMotionBlurCameras } from '../../features/video/review/advanced
 import { resolveReviewAssetBytes } from './asset-bytes';
 import { createReviewBackgroundPainter } from './scene-background';
 import {
+  createReviewWindowRaster,
+  type ReviewWindowRaster,
   loadReviewWindowHeader,
   reviewWindowHeaderUrl,
   reviewWindowRasterBacking,
@@ -120,6 +123,11 @@ type Assets = {
   painter: ReturnType<typeof createReviewBackgroundPainter>;
   spatial: ReturnType<typeof createReviewSpatialRenderer> | undefined;
   reservations: { release(): void }[];
+  windowRaster: {
+    key: string;
+    lease: ReturnType<typeof createReviewWindowRaster>;
+    view: ReviewWindowRaster;
+  } | null;
 };
 
 function prepareSceneCameraPlans({ scene, dimensions }: PreparedScene) {
@@ -134,6 +142,8 @@ function validSize(size: Size) {
 }
 
 function disposeAssets(assets: Assets) {
+  assets.windowRaster?.lease.release();
+  assets.windowRaster = null;
   assets.annotations?.dispose();
   assets.annotations = null;
   assets.captions = null;
@@ -353,6 +363,53 @@ function prepareRetainedSceneCaptions(
   return enabled ? prepareSceneCaptions(prepared, assets, resources, signal) : null;
 }
 
+/** Keep the admitted static window plane; camera and overlays do not change its pixels. */
+function retainedWindowRaster(
+  scene: Scene,
+  assets: Assets,
+  frame: Frame,
+  layout: ReturnType<typeof sceneRequest>['layout'],
+  resources: RenderResources
+): ReviewWindowRaster | undefined {
+  // Click magnification changes raster density over time; its original lease path stays dynamic.
+  if (
+    (!assets.header && !layout.sourceCrop) ||
+    frame.transition ||
+    scene.clicks.some((cue) => cue.settings.effect === 'magnify')
+  ) {
+    assets.windowRaster?.lease.release();
+    assets.windowRaster = null;
+    return undefined;
+  }
+  const backing = reviewWindowRasterBacking({
+    windowRect: layout.windowRect,
+    sourceWidth: scene.source.width * (layout.sourceCrop?.width ?? 1),
+    magnify: false,
+  });
+  const key = JSON.stringify([
+    frame.source.timestamp,
+    backing,
+    layout.videoRect,
+    layout.visibleVideoRect,
+    layout.windowRect,
+  ]);
+  if (assets.windowRaster?.key === key) return assets.windowRaster.view;
+  assets.windowRaster?.lease.release();
+  assets.windowRaster = null;
+  const lease = createReviewWindowRaster({
+    header: assets.header ?? undefined,
+    resources,
+    backing,
+    videoRect: layout.videoRect,
+    visibleVideoRect: layout.visibleVideoRect,
+    windowRect: layout.windowRect,
+    draw: frame.source.draw,
+  });
+  const view = { image: lease.image, width: lease.width, height: lease.height };
+  assets.windowRaster = { key, lease, view };
+  return view;
+}
+
 async function drawPreparedFrame(
   prepared: PreparedScene,
   assets: Assets,
@@ -444,6 +501,7 @@ async function drawPreparedFrame(
         drawReviewSceneFrame(context, {
           ...drawScene,
           spatialRenderer: assets.spatial,
+          windowRaster: retainedWindowRaster(scene, assets, frame, request.layout, resources),
           windowRasterBacking: reviewWindowRasterBacking({
             windowRect: request.layout.windowRect,
             sourceWidth: scene.source.width * (request.layout.sourceCrop?.width ?? 1),
@@ -623,6 +681,7 @@ export function createReviewPreviewRenderer(args: {
   onContextLost?: () => void;
   annotationExecutor?: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor'];
 }) {
+  const captureScene = createReviewPreviewSceneCapture();
   let generation = 0;
   let disposed = false;
   let current: {
@@ -679,7 +738,11 @@ export function createReviewPreviewRenderer(args: {
       const assetsKey = reviewPreviewPreparationKey(scene, dimensions, needsSpatialRenderer(scene));
       if (current?.preparationKey === assetsKey) {
         const captured = current;
-        const prepared = structuredClone({ generation: ++generation, scene, dimensions });
+        const prepared = {
+          generation: ++generation,
+          scene: captureScene(scene),
+          dimensions: structuredClone(dimensions),
+        };
         prepareSceneCameraPlans(prepared);
         const controller = new AbortController();
         captionRefresh = controller;
@@ -711,7 +774,11 @@ export function createReviewPreviewRenderer(args: {
       preparation = controller;
       const abort = () => controller.abort(signal.reason);
       signal.addEventListener('abort', abort, { once: true });
-      const prepared = structuredClone({ generation: ++generation, scene, dimensions });
+      const prepared = {
+        generation: ++generation,
+        scene: captureScene(scene),
+        dimensions: structuredClone(dimensions),
+      };
       prepareSceneCameraPlans(prepared);
       const assets: Assets = {
         annotations: null,
@@ -728,6 +795,7 @@ export function createReviewPreviewRenderer(args: {
         painter: createReviewBackgroundPainter(args.resources),
         spatial: undefined,
         reservations: [],
+        windowRaster: null,
       };
       const releaseAssets = () => disposeAssets(assets);
       controller.signal.addEventListener('abort', releaseAssets, { once: true });

@@ -336,11 +336,11 @@
       "file": "apps/extension/src/gallery/video-review/preview-binding.tsx",
       "symbol": "ReviewPreviewStage",
       "owner": "extension:gallery:video-review",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when preview eligibility/session asset-read adaptation gains an independent state, renderer or request lifetime. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "9da7779e8e33acef23e7cddcbb8b373bdfb8f487c62025f4bfe192f07a87ddd3",
-      "signatureHash": "30e4ade6ab65b903a524ea55ed1ce6b351e8e4972d000600ca219d4de50fe69f",
-      "reason": "tool-noise: The stage binding derives annotation eligibility from the same editor busy/playback/mode/overlay state and supplies the session-backed asset reader and current immutable registry. Geometry and painter/capture owners remain in stage/overlay/workflow modules. New branches configure optional props in the existing stage JSX; there is no parallel state, durable mutation or independent request lifetime in this binding. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "removalCondition": "Remove this entry when the AST or signature changes. Reassess any new owner, writer, state receiver, resource lifetime, or recovery policy. Remove this entry when the analyzer models this cohesive boundary.",
+      "astHash": "c1d9c5a02976160ada72a789b6ef3ace33a0ac33b8e22888544b025eed02855a",
+      "signatureHash": "f5efa281eaba052ed28bf28a188e57a94feaeafc219e47c31b43b9c5064923ab",
+      "reason": "tool-noise: This JSX binding configures one stage from one editor snapshot. It adds the existing focus interaction signal to preview props. It owns no state, resource lease, durable writer, or request lifetime. Geometry, capture, and painting remain in their existing owners. Splitting optional props would add forwarding modules without isolating an authority. A fresh architecture review must check this exact classification.",
+      "reviewDate": "2026-10-29"
     },
     {
       "rule": "structural-function-risk",
@@ -424,10 +424,10 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: This test file checks one renderer through a shared resource fixture. Added cases cover caption refresh, semantic identity, cancellation, allocation, failure, and retry. Resource counters belong to the same preparation and publication lifetime. The line increase adds proof without introducing a production owner or writer. Independent architecture review must assess this exact classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-23",
-      "astHash": "04ff396c4a1701c880477f84442dbe21665e870cd576268a82eb5360a6a3ed43",
+      "reason": "tool-noise: This file tests one preview renderer with one shared resource fixture. The added case checks snapshot isolation and reuse during a neighboring geometry refresh. Existing setup and cleanup own all fake leases. The candidate adds no production owner or durable writer. A split would duplicate that fixture or add a forwarding helper. A fresh architecture review must check this exact classification.",
+      "removalCondition": "Remove this entry when the AST or signature changes. Reassess any new owner, writer, state receiver, resource lifetime, or recovery policy. Remove this entry when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "f883f4554e59c994b0de5146aee13d46aa5ab77475edf73729981f157e9d355e",
       "signatureHash": "db3098e942fda1cc0f25d863fb49281d664a5781b0becec4106d7d95505aa614"
     },
     {
@@ -2437,21 +2437,21 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: This file retains one prepared-scene resource lifetime. Later camera split changes call the existing render-allocation admission and pure panel painters within that same lifetime. Outer fade painting moved to the same scene helper. The complete file has one owner, one effect family and cohesion 0.96; no additional writer or runtime authority was introduced. Independent architecture review must inspect this exact candidate before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-24",
-      "astHash": "278a021f059eab378f8817f81b3c93ea47db5a0f589e93ca5708c3e4ab13ee11",
-      "signatureHash": "d48bf5df3c1bd234a4b93ac5971237130de41b8c1e850273bbe651c66e7d833a"
+      "reason": "tool-noise: One renderer owns one prepared scene and its admitted resources. The candidate retains one window raster inside the existing asset lifetime. It adds isolated snapshots that reuse immutable cursor paths. No new runtime, writer, or resource authority enters this file. Cache replacement and disposal use the same asset owner. A fresh architecture review must check this exact classification.",
+      "removalCondition": "Remove this entry when the AST or signature changes. Reassess any new owner, writer, state receiver, resource lifetime, or recovery policy. Remove this entry when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "0d69ee2f6d9191b21b99e2c4e114ad477a3e19103b99440e25ae99c3f928348c",
+      "signatureHash": "38d8e0404cb22879aca3ea6e5acb3534b88fb487073431b97888e84de884312c"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "createReviewPreviewRenderer",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: This factory owns the current scene, generation, resource leases, and disposal. Its outer line count includes nested lifecycle methods that the analyzer also measures separately. The outer body contains ten statements and one cyclomatic path. Moving these closures solely to reduce lines would distribute the same state authority. Independent architecture review must assess this exact classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-23",
-      "astHash": "d8db43c5d27d9e9f83ca14ad6a727c91b466d5c6c5d8fb6ce8226f8a9f20494c",
+      "reason": "tool-noise: The factory owns one scene generation and its prepare, render, release, and disposal methods. The outer body contains eleven statements and one cyclomatic path. One renderer-local snapshot cache joins the same lifetime. The candidate adds no independent writer or recovery domain. Moving nested methods solely to reduce lines would distribute this owner. A fresh architecture review must check this exact classification.",
+      "removalCondition": "Remove this entry when the AST or signature changes. Reassess any new owner, writer, state receiver, resource lifetime, or recovery policy. Remove this entry when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "51b76387f58bc7923133e279568a499ccfa2b56eaecb071d19b9f0dda6e8d44b",
       "signatureHash": "d7f57fe082b1ba8c068746bfd925235d6703826902782cd2634e5e1b11f20997"
     },
     {
@@ -2761,6 +2761,17 @@
       "reviewDate": "2026-10-27",
       "astHash": "3c370f092739f18a98f663a8fce5d48186119c4323d899afdb178b01bd08d05b",
       "signatureHash": "d37ee75ed607dc2d65a997c648dc58feb7aaabca0d6b5afc13f7f615ba5f75a5"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/spotlight-preview.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This file tests Focus preview through one DOM root and one graphics fixture. The added cases check paused source reuse and border repaint invalidation. Existing cleanup owns pointer capture, canvas mocks, and observers. The candidate adds no production owner or writer. A split would duplicate the same fixture or add a forwarding helper. A fresh architecture review must check this exact classification.",
+      "removalCondition": "Remove this entry when the AST or signature changes. Reassess any new owner, writer, state receiver, resource lifetime, or recovery policy. Remove this entry when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-10-29",
+      "astHash": "3ad696eb6a63cd1b850ea3dd4f491a38912eadfb39a5fb2b6d178e0ee4ef566d",
+      "signatureHash": "d7a0b4865d94a35e3ac10d149c06f07b7be97e7d62a8243a371f3a3e25458e8c"
     }
   ]
 }

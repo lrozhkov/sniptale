@@ -300,6 +300,14 @@ it.each(['playing', 'interacting'] as const)(
     });
     await f.step(0);
     expect(f.publishTimes).toEqual([50]);
+    if (mode === 'interacting')
+      f.scheduler.update({
+        ...f.state,
+        playing: false,
+        interacting: true,
+        generation: '2',
+        scene: 'changed',
+      });
     await f.step(66);
     expect(f.dependencies.prepare).toHaveBeenCalledTimes(2);
     expect(f.publishTimes).toEqual([50, 116]);
@@ -351,5 +359,44 @@ it('retains a detailed pause request until publication cadence permits its exact
   expect(f.ticks.size).toBe(0);
   await f.step(200);
   expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+  f.scheduler.dispose();
+});
+
+it('renders a paused interaction only after scene changes or explicit source invalidation', async () => {
+  const f = fixture();
+  const state = { ...f.state, playing: false, interacting: true };
+  f.scheduler.update(state);
+  await f.step(0);
+  await f.step(40);
+  await f.step(80);
+  expect(f.dependencies.prepare).toHaveBeenCalledOnce();
+  f.scheduler.update({ ...state, scene: 'changed', generation: '2' });
+  await f.step(120);
+  expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+  f.scheduler.invalidate();
+  await f.step(160);
+  expect(f.dependencies.publish).toHaveBeenCalledTimes(3);
+  f.scheduler.update({ ...state, interacting: false, detailedPaused: true });
+  await f.step(200);
+  expect(f.dependencies.prepare.mock.lastCall![0]).toMatchObject({ quality: 'detailed' });
+  f.scheduler.dispose();
+  expect(f.ticks.size).toBe(0);
+});
+
+it('retains a changed paused interaction after a completion falls before the publication cap', async () => {
+  const f = fixture();
+  f.dependencies.render.mockImplementationOnce(() => {
+    f.advance(50);
+    return f.completed;
+  });
+  const state = { ...f.state, playing: false, interacting: true };
+  f.scheduler.update(state);
+  await f.step(0);
+  f.scheduler.update({ ...state, scene: 'changed', generation: '2' });
+  await f.step(66);
+  expect(f.publishTimes).toEqual([50]);
+  await f.step(100);
+  expect(f.publishTimes).toEqual([50, 100]);
+  expect(f.dependencies.onError).not.toHaveBeenCalled();
   f.scheduler.dispose();
 });

@@ -199,46 +199,46 @@ it('waits for a mapped result clock and reports completed playing cadence', asyn
   expect(io.render.mock.lastCall![1].resultTime).toBeCloseTo(0.984567, 6);
 });
 
-it('publishes successive completed frames without replacing the visible canvas node', async () => {
+it('publishes a completed renderer buffer directly and releases the hidden previous lease', async () => {
   await render();
   await step(0);
-  const canvas = props.host.current!.querySelector('canvas');
+  const canvas = props.host.current!.querySelector('canvas[data-preview-front="true"]');
   props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
   await render();
   await step(50);
   expect(io.render).toHaveBeenCalledTimes(2);
-  expect(props.host.current!.querySelector('canvas')).toBe(canvas);
-  expect(releases[0]).not.toHaveBeenCalled();
-  expect(releases[1]).toHaveBeenCalledOnce();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBe(canvas);
+  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(2);
+  expect(releases[0]).toHaveBeenCalledOnce();
+  expect(releases[1]).not.toHaveBeenCalled();
 });
 
 it('keeps the last visible frame and releases the candidate when its publication fails', async () => {
   await render();
   await step(0);
-  const front = props.host.current!.querySelector('canvas');
-  const context = io.render.mock.results[0]!.value.context;
-  context.drawImage.mockImplementationOnce(() => {
+  const front = props.host.current!.querySelector('canvas[data-preview-front="true"]');
+  vi.spyOn(props.host.current!, 'appendChild').mockImplementationOnce(() => {
     throw new Error('Publication failed');
   });
   props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
   await render();
   await step(50);
   expect(result.status.phase).toBe('failed');
-  expect(props.host.current!.querySelector('canvas')).toBe(front);
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBe(front);
   expect(releases[0]).not.toHaveBeenCalled();
   expect(releases[1]).toHaveBeenCalledOnce();
-  expect(context.restore).toHaveBeenCalledOnce();
   act(() => result.retry());
   await step(100);
   expect(result.status.phase).toBe('ready');
-  expect(props.host.current!.querySelector('canvas')).toBe(front);
-  expect(releases[2]).toHaveBeenCalledOnce();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBe(front);
+  expect(releases[0]).toHaveBeenCalledOnce();
+  expect(releases[2]).not.toHaveBeenCalled();
 });
 
 it('replaces the retained canvas only when the completed frame needs a different backing size', async () => {
   await render();
   await step(0);
-  const front = props.host.current!.querySelector('canvas');
+  const front = props.host.current!.querySelector('canvas[data-preview-front="true"]');
   io.render.mockImplementationOnce((_prepared, frame) => {
     const canvas = document.createElement('canvas');
     canvas.width = 1280;
@@ -255,7 +255,7 @@ it('replaces the retained canvas only when the completed frame needs a different
   props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
   await render();
   await step(50);
-  expect(props.host.current!.querySelector('canvas')).not.toBe(front);
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBe(front);
   expect(result.status.actualRaster).toEqual({ width: 1280, height: 720 });
   expect(releases[0]).toHaveBeenCalledOnce();
   expect(releases[1]).not.toHaveBeenCalled();
@@ -324,4 +324,54 @@ it('paints manual FPS at native readout cadence while reporting frames and failu
   await step(800);
   expect(result.status.phase).toBe('failed');
   expect(statistics.mock.calls.at(-1)![0].phase).toBe('failed');
+});
+
+it('publishes through a bounded reusable pair without front pixel copies or warm DOM replacement', async () => {
+  const pair = [document.createElement('canvas'), document.createElement('canvas')];
+  for (const canvas of pair) {
+    canvas.width = 720;
+    canvas.height = 360;
+  }
+  const contexts = pair.map(() => ({
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
+    drawImage: vi.fn(),
+  }));
+  let index = 0;
+  io.render.mockImplementation((_prepared, frame) => {
+    const slot = index++ % 2;
+    const release = vi.fn();
+    releases.push(release);
+    return { canvas: pair[slot]!, context: contexts[slot]!, release, generation: frame.generation };
+  });
+  await render();
+  await step(0);
+  props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
+  await render();
+  await step(50);
+  expect(contexts[0]!.drawImage).not.toHaveBeenCalled();
+  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(2);
+  const mutations: MutationRecord[] = [];
+  const observer = new MutationObserver((records) => mutations.push(...records));
+  observer.observe(props.host.current!, { childList: true });
+  for (let count = 2; count < 5; count++) {
+    props = {
+      ...props,
+      pausedSourceTime: count + 1,
+      pausedResultTime: count + 0.75,
+      seekRevision: count,
+    };
+    await render();
+    await step(count * 50);
+    expect([...props.host.current!.querySelectorAll('canvas')]).toEqual(pair);
+    expect(props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')).toHaveLength(
+      1
+    );
+  }
+  expect([...mutations, ...observer.takeRecords()]).toHaveLength(0);
+  observer.disconnect();
+  for (const context of contexts) expect(context.drawImage).not.toHaveBeenCalled();
+  for (const release of releases.slice(0, -1)) expect(release).toHaveBeenCalledOnce();
+  expect(releases.at(-1)).not.toHaveBeenCalled();
 });

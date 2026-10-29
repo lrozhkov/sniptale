@@ -100,7 +100,7 @@ class ManualPresentationSession {
   }
 
   private clearFront() {
-    this.front?.canvas.remove();
+    this.front?.canvas.parentElement?.replaceChildren();
     this.front?.release();
     this.front = null;
   }
@@ -261,40 +261,25 @@ class ManualPresentationSession {
   private publishCanvas(host: HTMLDivElement, value: Publication) {
     const canvas = value.completed.canvas;
     const previous = this.front;
-    if (
-      previous &&
-      previous.canvas.parentElement === host &&
-      previous.canvas.width === canvas.width &&
-      previous.canvas.height === canvas.height
-    ) {
-      // Replacing a canvas invalidates ancestor :has() rules across the editor on every frame.
-      const context = previous.context;
-      context.save();
-      try {
-        context.setTransform(1, 0, 0, 1, 0, 0);
-        context.globalAlpha = 1;
-        context.globalCompositeOperation = 'copy';
-        context.filter = 'none';
-        context.drawImage(canvas, 0, 0);
-      } finally {
-        context.restore();
-      }
-      this.front = {
-        ...value.completed,
-        canvas: previous.canvas,
-        context,
-        release: previous.release,
-      };
-      value.retain();
-      value.completed.release();
-    } else {
+    if (canvas.parentElement !== host) {
       canvas.className = 'pointer-events-none absolute inset-0 h-full w-full';
       canvas.setAttribute('aria-hidden', 'true');
-      host.replaceChildren(canvas);
-      this.front = value.completed;
-      value.retain();
-      previous?.release();
+      canvas.style.opacity = '0';
+      canvas.style.willChange = 'opacity';
+      host.appendChild(canvas);
     }
+    canvas.style.opacity = '1';
+    canvas.dataset['previewFront'] = 'true';
+    if (previous && previous.canvas !== canvas) {
+      previous.canvas.style.opacity = '0';
+      previous.canvas.dataset['previewFront'] = 'false';
+    }
+    // Keep one idle publication buffer attached for pool reuse, without DOM replacement per frame.
+    for (const child of [...host.children])
+      if (child !== canvas && child !== previous?.canvas) child.remove();
+    this.front = value.completed;
+    value.retain();
+    previous?.release();
   }
 
   private publish = (value: Publication) => {

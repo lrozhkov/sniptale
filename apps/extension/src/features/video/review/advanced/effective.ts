@@ -121,7 +121,7 @@ type CursorFactsInput = {
 interface CursorRegionCache {
   key: string;
   facts: ReviewCursorFacts | null | undefined;
-  regions: readonly QuickEditZoomRegion[];
+  project(region: QuickEditZoomRegion): QuickEditZoomRegion;
 }
 const cursorRegions = new WeakMap<
   QuickEditAdvancedState | ReviewCursorFacts,
@@ -179,10 +179,15 @@ function resolveCursorRegions(
   cursorFacts: CursorFactsInput | undefined
 ) {
   const advanced = state.ui.mode === 'advanced';
+  const needsCursor =
+    features.zoomApplied &&
+    state.zoom.regions.some(
+      (region) => region.followCursor ?? state.cursorFocusPath?.mode === 'follow'
+    );
   const key = JSON.stringify({
+    needsCursor,
     defaults: state.cameraFollowDefaults,
     applied: features.zoomApplied,
-    zoom: state.zoom.regions,
     path: state.cursorFocusPath,
     timeMap: state.audio.voiceoverSegments,
     source: cursorFacts?.source,
@@ -194,68 +199,87 @@ function resolveCursorRegions(
   const owner = cursorFacts?.facts ?? state;
   const cached = cursorRegions.get(owner) ?? [];
   const previous = cached.find((entry) => entry.key === key && entry.facts === cursorFacts?.facts);
-  if (previous) return previous.regions;
-  const needsCursor =
-    features.zoomApplied &&
-    state.zoom.regions.some(
-      (region) => region.followCursor ?? state.cursorFocusPath?.mode === 'follow'
-    );
+  const project =
+    previous?.project ?? createCursorRegionProjection(state, cursorFacts, needsCursor);
+  if (!previous) {
+    cached.push({ key, facts: cursorFacts?.facts, project });
+    if (cached.length > 4) cached.shift();
+    cursorRegions.set(owner, cached);
+  }
+  return projectReviewFocus(
+    features.zoomApplied ? state.zoom.regions : [],
+    state.audio.voiceoverSegments
+  ).map(project);
+}
+
+/** A neighboring overlay edit does not replace native facts or unchanged camera plan receivers. */
+function createCursorRegionProjection(
+  state: QuickEditAdvancedState,
+  cursorFacts: CursorFactsInput | undefined,
+  needsCursor: boolean
+): CursorRegionCache['project'] {
+  const advanced = state.ui.mode === 'advanced';
+
   const cursorPath = needsCursor
     ? cursorFacts
       ? resolveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, state.cursorFocusPath)
       : state.cursorFocusPath
     : undefined;
-  const regions = projectReviewFocus(
-    features.zoomApplied ? state.zoom.regions : [],
-    state.audio.voiceoverSegments
-  ).map<QuickEditZoomRegion>((region) =>
-    (region.followCursor ?? cursorPath?.mode === 'follow') && cursorPath
-      ? {
-          ...region,
-          cursorFocus: {
-            policy: resolveCameraFollowPolicy({
-              ...(state.cameraFollowDefaults ? { defaults: state.cameraFollowDefaults } : {}),
-              ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
-              legacySensitivity: cursorPath.sensitivity,
-            }),
-            path: { ...cursorPath, mode: 'follow' },
-            ...(cursorFacts
-              ? {
-                  scene: {
-                    source: cursorFacts.source,
-                    background: advanced ? state.background : { enabled: false as const },
-                    ...(advanced && state.canvas ? { canvas: state.canvas } : {}),
-                    ...(advanced && state.windowHeader ? { windowHeader: state.windowHeader } : {}),
-                  },
-                }
-              : {}),
-            ...(cursorFacts && state.windowHeader
-              ? {
-                  sourceFrame: {
-                    headerHeight: windowHeaderGeometry(state.windowHeader, cursorFacts.source)
-                      .height,
-                    height: cursorFacts.source.height,
-                  },
-                }
-              : {}),
-            ...(cursorFacts
-              ? {
-                  observed: deriveReviewCursorFocusPath(
-                    cursorFacts.facts,
-                    cursorFacts.source,
-                    true
-                  ),
-                }
-              : {}),
-            ...(state.audio.voiceoverSegments ? { timeMap: state.audio.voiceoverSegments } : {}),
-          },
-        }
-      : region
-  );
-  cached.push({ key, facts: cursorFacts?.facts, regions });
-  if (cached.length > 4) cached.shift();
-  cursorRegions.set(owner, cached);
-  return regions;
+  const observed =
+    cursorFacts && cursorPath
+      ? deriveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, true)
+      : undefined;
+  const projected = new Map<string, QuickEditZoomRegion>();
+  return (input) => {
+    const signature = JSON.stringify(input);
+    const previous = projected.get(signature);
+    if (previous) {
+      projected.delete(signature);
+      projected.set(signature, previous);
+      return previous;
+    }
+    const region = input;
+    const result: QuickEditZoomRegion =
+      (region.followCursor ?? cursorPath?.mode === 'follow') && cursorPath
+        ? {
+            ...region,
+            cursorFocus: {
+              policy: resolveCameraFollowPolicy({
+                ...(state.cameraFollowDefaults ? { defaults: state.cameraFollowDefaults } : {}),
+                ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
+                legacySensitivity: cursorPath.sensitivity,
+              }),
+              path: { ...cursorPath, mode: 'follow' },
+              ...(cursorFacts
+                ? {
+                    scene: {
+                      source: cursorFacts.source,
+                      background: advanced ? state.background : { enabled: false as const },
+                      ...(advanced && state.canvas ? { canvas: state.canvas } : {}),
+                      ...(advanced && state.windowHeader
+                        ? { windowHeader: state.windowHeader }
+                        : {}),
+                    },
+                  }
+                : {}),
+              ...(cursorFacts && state.windowHeader
+                ? {
+                    sourceFrame: {
+                      headerHeight: windowHeaderGeometry(state.windowHeader, cursorFacts.source)
+                        .height,
+                      height: cursorFacts.source.height,
+                    },
+                  }
+                : {}),
+              ...(observed ? { observed } : {}),
+              ...(state.audio.voiceoverSegments ? { timeMap: state.audio.voiceoverSegments } : {}),
+            },
+          }
+        : region;
+    projected.set(signature, result);
+    if (projected.size > 128) projected.delete(projected.keys().next().value ?? '');
+    return result;
+  };
 }
 
 export type QuickEditExportReason =

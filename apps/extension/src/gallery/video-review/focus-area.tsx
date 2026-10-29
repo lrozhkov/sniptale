@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import {
   type QuickEditSpotlight,
   clampQuickEditSpotlightArea,
@@ -118,8 +119,9 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
     previewFrame.current = requestAnimationFrame(() => {
       previewFrame.current = null;
       if (drag.current !== active || !active.pending) return;
-      setDraft(active.pending);
-      onPreview?.(active.pending);
+      // Commit the local handle before this paint; scene preview keeps its lower priority.
+      flushSync(() => setDraft(active.pending));
+      if (drag.current === active) onPreview?.(active.pending);
     });
   };
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
