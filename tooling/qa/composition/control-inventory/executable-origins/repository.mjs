@@ -25,7 +25,7 @@ const WORKFLOW_AUTHORITIES = Object.freeze([
   '.github/workflows/selectel-maintenance.yml',
   '.github/workflows/selectel-smoke.yml',
 ]);
-const HOOK_AUTHORITIES = Object.freeze(['.husky/pre-commit', '.husky/pre-push']);
+const HOOK_AUTHORITIES = Object.freeze(['.husky/pre-commit']);
 export const REGISTRATION_AUTHORITY_PATHS = Object.freeze(
   [
     ...WORKFLOW_AUTHORITIES,

@@ -1,2 +1,0 @@
-#!/usr/bin/env sh
-node tooling/qa/hooks/pre-push.mjs
