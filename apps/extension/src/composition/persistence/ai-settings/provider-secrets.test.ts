@@ -2,18 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   AI_LOCAL_SECRET_KEY_STORAGE_KEY,
-  AI_PROVIDER_STORAGE_MIGRATION_PHASE,
-  AI_PROVIDERS_KEY,
-  AI_PROVIDER_SECRETS_KEY,
-  AI_STORAGE_MIGRATION_PHASE_KEY,
   AI_STORAGE_VERSION,
   AI_STORAGE_VERSION_KEY,
 } from './constants';
-import {
-  createAesGcmKeyMaterial,
-  encryptSecret,
-} from '@sniptale/platform/security/local-secret-crypto';
-
 const { localGetMock, localRemoveMock, localSetMock, syncGetMock, syncRemoveMock, syncSetMock } =
   vi.hoisted(() => ({
     localGetMock: vi.fn(),
@@ -51,7 +42,7 @@ function createStoredProvider(id = 'provider-1') {
   };
 }
 
-function createLegacyStoredProvider(id = 'provider-1') {
+function createProviderInput(id = 'provider-1') {
   return {
     id,
     name: `Provider ${id}`,
@@ -122,53 +113,6 @@ function resetAiStorageProviderSecretMocks() {
   installStorageState({});
 }
 
-async function verifyMigrationFailureDoesNotAdvanceVersion() {
-  installStorageState({
-    local: {
-      [AI_PROVIDERS_KEY]: [createLegacyStoredProvider('provider-1')],
-    },
-    sync: {
-      sniptale_settings: {
-        apiBaseUrl: 'https://legacy.example.com',
-        apiKey: 'legacy-secret',
-        modelName: 'legacy-model',
-      },
-    },
-  });
-
-  let localSetCallCount = 0;
-  localSetMock.mockImplementation(async (payload: Record<string, unknown>) => {
-    localSetCallCount += 1;
-    Object.assign(localState, payload);
-
-    if (localSetCallCount === 2) {
-      throw new Error('migration write failed');
-    }
-  });
-
-  const { initializeAiStorageAccess } = await import('./init');
-
-  await expect(initializeAiStorageAccess()).rejects.toThrow('migration write failed');
-  expect(localState[AI_STORAGE_VERSION_KEY]).toBeUndefined();
-  expect(localState[AI_STORAGE_MIGRATION_PHASE_KEY]).toBe(AI_PROVIDER_STORAGE_MIGRATION_PHASE);
-  expect(localState[AI_PROVIDERS_KEY]).toEqual([createStoredProvider('provider-1')]);
-  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual({
-    'provider-1': expect.objectContaining({
-      algorithm: 'AES-GCM',
-      version: 2,
-    }),
-  });
-  expect(syncState['sniptale_settings']).toEqual({
-    apiBaseUrl: 'https://legacy.example.com',
-    apiKey: 'legacy-secret',
-    modelName: 'legacy-model',
-  });
-
-  await expect(initializeAiStorageAccess()).resolves.toBeUndefined();
-  expect(localState[AI_STORAGE_VERSION_KEY]).toBe(AI_STORAGE_VERSION);
-  expect(localState[AI_STORAGE_MIGRATION_PHASE_KEY]).toBeUndefined();
-}
-
 async function verifyProviderSecretLifecycle() {
   installStorageState({
     local: {
@@ -180,9 +124,16 @@ async function verifyProviderSecretLifecycle() {
     await import('./core');
 
   await upsertAIProviderRecord({
-    ...createLegacyStoredProvider('provider-1'),
+    ...createProviderInput('provider-1'),
   });
-  await expect(loadAIProviders()).resolves.toEqual([createStoredProvider('provider-1')]);
+  await expect(loadAIProviders()).resolves.toEqual([
+    expect.objectContaining({
+      ...createStoredProvider('provider-1'),
+      incarnation: expect.any(String),
+      revision: 1,
+      credentialRevision: 1,
+    }),
+  ]);
   await expect(loadAIProviderSecret('provider-1')).resolves.toBe('provider-1-secret');
   expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toEqual(expect.any(String));
 
@@ -194,10 +145,12 @@ async function verifyProviderSecretLifecycle() {
     createdAt: 1,
   });
   await expect(loadAIProviders()).resolves.toEqual([
-    {
+    expect.objectContaining({
       ...createStoredProvider('provider-1'),
       name: 'Updated provider',
-    },
+      revision: 2,
+      credentialRevision: 1,
+    }),
   ]);
   await expect(loadAIProviderSecret('provider-1')).resolves.toBe('provider-1-secret');
 
@@ -217,76 +170,10 @@ async function verifyProviderSecretLifecycle() {
   expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeUndefined();
 }
 
-async function verifyMigrationPreservesValidEncryptedStorage() {
-  const created = await createAesGcmKeyMaterial();
-  const storedSecret = await encryptSecret('provider-1-secret', created.key);
-
-  installStorageState({
-    local: {
-      [AI_PROVIDERS_KEY]: [createStoredProvider('provider-1')],
-      [AI_PROVIDER_SECRETS_KEY]: {
-        'provider-1': storedSecret,
-      },
-      [AI_LOCAL_SECRET_KEY_STORAGE_KEY]: created.material,
-    },
-    sync: {
-      sniptale_settings: {
-        captureAction: 'download_default',
-      },
-    },
-  });
-
-  const { migrateAiProviderStorageToV3 } = await import('./provider-secrets.migration.ts');
-
-  await expect(migrateAiProviderStorageToV3()).resolves.toBeUndefined();
-  expect(localState[AI_PROVIDERS_KEY]).toEqual([createStoredProvider('provider-1')]);
-  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual({
-    'provider-1': storedSecret,
-  });
-  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBe(created.material);
-  expect(localState[AI_STORAGE_VERSION_KEY]).toBe(AI_STORAGE_VERSION);
-  expect(syncSetMock).not.toHaveBeenCalled();
-}
-
-async function verifyMigrationWarnsAboutInvalidSecretsPayload() {
-  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-
-  installStorageState({
-    local: {
-      [AI_PROVIDERS_KEY]: [createStoredProvider('provider-1')],
-      [AI_PROVIDER_SECRETS_KEY]: [],
-    },
-  });
-
-  const { migrateAiProviderStorageToV3 } = await import('./provider-secrets.migration.ts');
-
-  await expect(migrateAiProviderStorageToV3()).resolves.toBeUndefined();
-  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual({});
-  expect(localState[AI_STORAGE_VERSION_KEY]).toBe(AI_STORAGE_VERSION);
-  expect(warnSpy).toHaveBeenCalledWith(
-    '[SharedAiStorage]',
-    'Ignoring invalid AI provider secrets payload root',
-    { storageKey: AI_PROVIDER_SECRETS_KEY }
-  );
-}
-
-describe('ai.provider-secrets', () => {
+describe('AI provider secret lifecycle', () => {
   beforeEach(resetAiStorageProviderSecretMocks);
-
   it(
-    'retries migration after a failed v3 write without advancing the version marker',
-    verifyMigrationFailureDoesNotAdvanceVersion
-  );
-  it(
-    'encrypts, preserves, rotates, and deletes provider secrets in v3 storage',
+    'encrypts, preserves, rotates and deletes protected provider secrets',
     verifyProviderSecretLifecycle
-  );
-  it(
-    'preserves already-encrypted provider storage when migration runs on a valid v3 payload',
-    verifyMigrationPreservesValidEncryptedStorage
-  );
-  it(
-    'warns and resets invalid encrypted provider secret payloads during migration',
-    verifyMigrationWarnsAboutInvalidSecretsPayload
   );
 });

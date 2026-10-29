@@ -69,6 +69,7 @@ export function SettingsCollectionRow(props: RowProps) {
       data-settings-collection-dragging={props.dragging || undefined}
       className={[
         rowClassName,
+        props.item.footer === undefined ? '' : 'flex-wrap !gap-y-2',
         props.pointerDragging
           ? ''
           : 'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_68%,transparent)]',
@@ -90,6 +91,7 @@ export function SettingsCollectionRow(props: RowProps) {
       ) : null}
       <SettingsCollectionRowIdentity item={props.item} />
       <SettingsCollectionRowMarkers item={props.item} />
+      {props.item.actions}
       <SettingsCollectionPrimaryActions item={props.item} onAction={props.onAction} />
       <SettingsCollectionActionTray
         item={menuItem}
@@ -102,6 +104,11 @@ export function SettingsCollectionRow(props: RowProps) {
         open={props.menuOpen}
         onOpenChange={props.onMenuOpenChange}
       />
+      {props.item.footer === undefined ? null : (
+        <div data-settings-collection-footer className="w-full min-w-0 basis-full">
+          {props.item.footer}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { AudioJobProviderError } from './failure';
+import { AUDIO_JOB_TIMEOUT_MS } from '../../contracts/ai/audio';
 import { afterEach, expect, it, vi } from 'vitest';
 import { runReviewSpeechJob } from './client';
 vi.mock('../../composition/persistence/assets/audio-staging', () => ({
@@ -535,4 +537,60 @@ it('discards a Scenario output that crossed cancellation before releasing Apply 
   expect(staging.discard).toHaveBeenLastCalledWith(staged, scope);
   release();
   await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+});
+
+it('retains a fixed provider reason without changing the legacy audio code or retrying', async () => {
+  const job = connectedJob();
+  const pending = runReviewSpeechJob(job.start, { signal: new AbortController().signal });
+  job.receive({
+    type: 'failure',
+    requestId: 'r',
+    code: 'provider-auth',
+    failureReason: 'permission-denied',
+  });
+  await expect(pending).rejects.toMatchObject({
+    message: 'provider-auth',
+    reason: 'permission-denied',
+  });
+  expect(job.postMessage).toHaveBeenCalledOnce();
+});
+
+it.each([
+  ['network-failed', 'network'],
+  ['timeout', 'timeout'],
+  ['provider-auth', null],
+] as const)(
+  'distinguishes fixed local %s evidence from ambiguous provider codes',
+  async (code, reason) => {
+    const job = connectedJob();
+    const pending = runReviewSpeechJob(job.start, { signal: new AbortController().signal }).catch(
+      (cause: unknown) => cause
+    );
+    job.receive({ type: 'failure', requestId: 'r', code });
+    const failure = await pending;
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).toMatchObject({ message: code });
+    expect(failure instanceof AudioJobProviderError ? failure.reason : null).toBe(reason);
+    expect(job.postMessage).toHaveBeenCalledOnce();
+  }
+);
+
+it('reports the client deadline as a typed timeout without a server failure frame or replay', async () => {
+  vi.useFakeTimers();
+  try {
+    const job = connectedJob();
+    const pending = runReviewSpeechJob(job.start, { signal: new AbortController().signal }).catch(
+      (cause: unknown) => cause
+    );
+    await vi.advanceTimersByTimeAsync(AUDIO_JOB_TIMEOUT_MS);
+    const failure = await pending;
+    expect(failure).toBeInstanceOf(AudioJobProviderError);
+    expect(failure).toMatchObject({ message: 'timeout', reason: 'timeout' });
+    expect(job.postMessage.mock.calls.filter(([message]) => message.type === 'start')).toHaveLength(
+      1
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });

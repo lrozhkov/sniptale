@@ -12,8 +12,8 @@
     {
       "file": "apps/extension/src/background/ai/llm/transport/request.ts",
       "owner": "background-llm-transport",
-      "justification": "The background LLM transport is the only canonical outbound network seam that assembles Authorization headers from resolved model config.",
-      "reviewNote": "Secret-bearing headers must not drift into UI, hooks, storage, or orchestration modules."
+      "justification": "The background LLM transport passes resolved model credentials to the canonical SDK provider runtime with the guarded network transport.",
+      "reviewNote": "Keep SDK credential handoff in this owner. Require the guarded transport for destination checks, current admission, credentials omit, redirect refusal, bounded bodies, and deadlines. Keep secrets and secret-bearing headers outside UI, hooks, storage, and orchestration modules."
     },
     {
       "file": "apps/extension/src/background/ai/audio/request.ts",
@@ -32,6 +32,12 @@
       "owner": "optional-webdav-loopback-provider-fixture",
       "justification": "The optional provider fixture authenticates its synthetic collection and verifies ordinary originals independently from the extension transport.",
       "reviewNote": "Require an explicit loopback HTTP URL without embedded credentials, query or fragment. Restrict writes and cleanup to the randomly generated test child. Reject redirects. Read generated test credentials from the ignored secret file; never log credentials or authorization values. This fixture is outside product runtime and required CI."
+    },
+    {
+      "file": "apps/extension/src/background/ai/settings/managed-catalog.ts",
+      "owner": "background-ai-catalog-transport",
+      "justification": "The background catalog transport constructs documented provider authentication headers for bounded metadata discovery.",
+      "reviewNote": "Catalog calls require current provider admission, host permission, an already available secret, destination bounds, redirect refusal, a deadline, bounded pages and bytes. Never infer billing access from public catalogs or send user content."
     }
   ],
   "credentialedFetchOwners": [

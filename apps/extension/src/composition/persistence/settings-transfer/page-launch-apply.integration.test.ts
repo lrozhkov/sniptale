@@ -63,7 +63,6 @@ vi.mock('../ai-settings', async (original) => ({
   loadAISettings: async () => ({
     providers: [],
     models: [],
-    defaultModelId: null,
     chromeAiEnabled: false,
     globalSystemPrompt: '',
     scenarioEditorSystemPrompt: '',

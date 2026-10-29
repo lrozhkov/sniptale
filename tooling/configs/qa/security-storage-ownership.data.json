@@ -39,28 +39,6 @@
       "storageWrites": []
     },
     {
-      "file": "apps/extension/src/composition/persistence/ai-settings/provider-secrets.migration.ts",
-      "owner": "shared-ai-storage",
-      "justification": "The AI storage migration seam rewrites legacy plaintext provider records into encrypted secret envelopes.",
-      "reviewNote": "Migration may touch legacy secret material only to convert it into the canonical encrypted storage format.",
-      "storageWrites": [
-        {
-          "sink": "browserStorage.local.set",
-          "keys": [
-            "AI_LOCAL_SECRET_KEY_STORAGE_KEY",
-            "AI_PROVIDERS_KEY",
-            "AI_PROVIDER_SECRETS_KEY"
-          ]
-        },
-        {
-          "sink": "browserStorage.sync.set",
-          "keys": [
-            "LEGACY_AI_SETTINGS_STORAGE_KEY"
-          ]
-        }
-      ]
-    },
-    {
       "file": "apps/extension/src/composition/persistence/ai-settings/secret-protection.store.ts",
       "owner": "shared-ai-storage",
       "justification": "The AI passphrase protection seam owns non-secret protection metadata and the in-memory derived-key lifecycle.",

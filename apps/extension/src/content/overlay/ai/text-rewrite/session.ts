@@ -1,9 +1,8 @@
+import { TextJobProviderError } from '../../../../workflows/ai-session/text-request-port';
+import type { AIConnectionReason } from '../../../../contracts/settings/ai-catalog';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
-import type { AIModel } from '../../../../contracts/settings';
-import type { AIProviderSelectorEntry } from '../../../../contracts/messaging/ai-settings-runtime';
-import { requestAIModelSelectionBootstrap } from '../../../../workflows/ai-settings/query';
-import { reconcileSelectedAIModelId } from '../../../../features/ai/selection';
+import { useAIScenarioModelSelection } from '../../../../workflows/ai-settings/use-scenario-model-selection';
 import { translate } from '../../../../platform/i18n';
 import {
   startQuickEditTextPicker,
@@ -12,14 +11,9 @@ import {
 import { finalizeQuickEditElementChanges } from '../../../selection/quick-edit';
 import { setNavigationInputShieldSuspended } from '../../../selection/locker';
 import { isTrustedDomEvent } from '../../../platform/trusted-events';
+import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { requestTextReplacement } from './request';
 
-interface ModelCatalog {
-  models: AIModel[];
-  providers: AIProviderSelectorEntry[];
-  selectedModelId: string | null;
-}
-const EMPTY_CATALOG: ModelCatalog = { models: [], providers: [], selectedModelId: null };
 type RequestError =
   | 'stale'
   | 'failed'
@@ -29,37 +23,19 @@ type RequestError =
   | 'cancelled';
 
 function useTextReplacementModels(active: boolean) {
-  const [catalog, setCatalog] = useState(EMPTY_CATALOG);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    if (!active) return;
-    let current = true;
-    setCatalog(EMPTY_CATALOG);
-    setFailed(false);
-    void requestAIModelSelectionBootstrap()
-      .then(async (bootstrap) => ({
-        models: bootstrap.models,
-        providers: bootstrap.providers,
-        selectedModelId: await reconcileSelectedAIModelId(
-          bootstrap.models,
-          bootstrap.defaultModelId
-        ),
-      }))
-      .then((next) => {
-        if (current) setCatalog(next);
-      })
-      .catch(() => {
-        if (current) setFailed(true);
-      });
-    return () => {
-      current = false;
-    };
-  }, [active]);
+  const selection = useAIScenarioModelSelection('page-edit', active);
   return {
-    ...catalog,
-    failed,
-    select: (selectedModelId: string | null) =>
-      setCatalog((current) => ({ ...current, selectedModelId })),
+    models: selection.configuration?.models ?? [],
+    providers: selection.configuration?.providers ?? [],
+    selectedModelId: selection.modelId,
+    failed: selection.configurationFailed,
+    pending: selection.selectionPending,
+    unavailable: selection.selectionUnavailable,
+    unavailableModelName: selection.unavailableModelName,
+    selectionFailed: selection.selectionFailed,
+    select: selection.chooseModel,
+    reload: selection.retryConfiguration,
+    prepare: selection.prepareModelSelection,
   };
 }
 
@@ -82,7 +58,12 @@ function getSubmissionTarget(args: {
   pending: boolean;
   prompt: string;
 }): QuickEditTextReplacementTarget | null {
-  if (!isTrustedDomEvent(args.event) || !args.active || args.pending || !args.prompt.trim())
+  if (
+    (!isTrustedDomEvent(args.event) && !isBridgedMouseEvent(args.event)) ||
+    !args.active ||
+    args.pending ||
+    !args.prompt.trim()
+  )
     return null;
   return args.target;
 }
@@ -104,7 +85,10 @@ function useTextReplacementRequest(args: {
 }) {
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [error, setError] = useState<RequestError | null>(null);
+  const [error, setError] = useState<{
+    code: RequestError;
+    providerReason: AIConnectionReason | null;
+  } | null>(null);
   const flight = useRef<AbortController | null>(null);
   const startedAt = useRef(0);
   const scope = useRef({ active: args.active, target: args.target });
@@ -114,7 +98,7 @@ function useTextReplacementRequest(args: {
     flight.current = null;
     current?.abort();
     setBusy(false);
-    if (current && showStatus) setError('cancelled');
+    if (current && showStatus) setError({ code: 'cancelled', providerReason: null });
   }, []);
   useEffect(() => {
     setError(null);
@@ -137,17 +121,17 @@ function useTextReplacementRequest(args: {
       event,
       active: args.active,
       target: args.target,
-      pending: flight.current !== null,
+      pending: flight.current !== null || args.models.pending,
       prompt: args.prompt,
     });
     if (!target) return;
     const model = args.models.models.find((entry) => entry.id === args.models.selectedModelId);
     if (!model) {
-      setError('model-unavailable');
+      setError({ code: 'model-unavailable', providerReason: null });
       return;
     }
     if (!target.isCurrent()) {
-      setError('stale');
+      setError({ code: 'stale', providerReason: null });
       return;
     }
     const controller = new AbortController();
@@ -158,12 +142,17 @@ function useTextReplacementRequest(args: {
     setBusy(true);
     let applied = false;
     try {
+      const prepared = await args.models.prepare(controller.signal);
+      controller.signal.throwIfAborted();
+      if (!target.isCurrent()) throw new Error('stale');
+      const selectedModel = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
+      if (!selectedModel) throw new Error('model-unavailable');
       const text = await requestTextReplacement({
         text: target.text,
         prompt: args.prompt,
         sourceOrigin: readSourceOrigin(target),
-        model,
-        provider: args.models.providers.find((entry) => entry.id === model.providerId),
+        model: selectedModel,
+        provider: prepared.catalog.providers.find((entry) => entry.id === selectedModel.providerId),
         signal: controller.signal,
       });
       if (
@@ -176,8 +165,14 @@ function useTextReplacementRequest(args: {
       if (!target.apply(text)) throw new Error('stale');
       applied = true;
     } catch (failure) {
-      if (flight.current === controller && !controller.signal.aborted)
-        setError(requestError(failure));
+      if (flight.current === controller && !controller.signal.aborted) {
+        const code = failure instanceof Error ? failure.message : '';
+        if (code !== 'catalog-unavailable' && code !== 'selection-write-failed')
+          setError({
+            code: requestError(failure),
+            providerReason: failure instanceof TextJobProviderError ? failure.reason : null,
+          });
+      }
     } finally {
       if (flight.current === controller) {
         flight.current = null;
@@ -186,7 +181,16 @@ function useTextReplacementRequest(args: {
     }
     if (applied) args.onApplied();
   }
-  return { busy, elapsed, error, cancel, submit };
+  const clearError = useCallback(() => setError(null), []);
+  return {
+    busy,
+    elapsed,
+    error: error?.code ?? null,
+    providerFailureReason: error?.providerReason ?? null,
+    clearError,
+    cancel,
+    submit,
+  };
 }
 
 /** Owns one page selection, prompt draft and request lifetime for the toolbar text tool. */
@@ -253,5 +257,18 @@ export function useTextRewriteSession(args: {
   useEffect(() => {
     picker.current?.setSelectedTarget(target?.element ?? null);
   }, [target]);
-  return { target, prompt, setPrompt, models, request, close };
+  return {
+    target,
+    prompt,
+    setPrompt,
+    models: {
+      ...models,
+      select: (id: string | null) => {
+        request.clearError();
+        models.select(id);
+      },
+    },
+    request,
+    close,
+  };
 }

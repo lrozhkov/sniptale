@@ -1,3 +1,9 @@
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
+import { AudioJobProviderError } from '../../workflows/audio-jobs/failure';
+import {
+  parseVoiceProviderSelection,
+  type VoiceProviderSelection,
+} from '@sniptale/runtime-contracts/voice-input';
 import { runSpeechQueue } from '../../workflows/audio-jobs/speech-queue';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
@@ -55,6 +61,7 @@ type VoiceState = {
   elapsed: number;
   completed: number;
   total: number;
+  providerFailureReason: AIConnectionReason | null;
   error: 'duration' | 'stale' | 'model' | 'failed' | null;
 };
 
@@ -68,6 +75,7 @@ function useTextVoiceAttempt(props: Options) {
     completed: 0,
     total: 0,
     error: null,
+    providerFailureReason: null,
   });
   const lifetime = useRef({
     active: null as AbortController | null,
@@ -93,10 +101,16 @@ function useTextVoiceAttempt(props: Options) {
         : cause instanceof Error && cause.message === 'stale'
           ? 'stale'
           : 'failed';
-    if (lifetime.current.mounted) setState((current) => ({ ...current, error }));
+    if (lifetime.current.mounted)
+      setState((current) => ({
+        ...current,
+        error,
+        providerFailureReason: cause instanceof AudioJobProviderError ? cause.reason : null,
+      }));
   };
   const modelError = useCallback(() => {
-    if (lifetime.current.mounted) setState((current) => ({ ...current, error: 'model' }));
+    if (lifetime.current.mounted)
+      setState((current) => ({ ...current, error: 'model', providerFailureReason: null }));
   }, []);
   const command = (
     work: (signal: AbortSignal) => Promise<void>,
@@ -115,6 +129,7 @@ function useTextVoiceAttempt(props: Options) {
       completed: 0,
       total: count,
       error: null,
+      providerFailureReason: null,
     }));
     const timer = setInterval(() => {
       if (owner.mounted)
@@ -161,7 +176,8 @@ function useTextVoiceAttempt(props: Options) {
     complete: (completed: number) => {
       if (lifetime.current.mounted) setState((current) => ({ ...current, completed }));
     },
-    clearError: () => setState((current) => ({ ...current, error: null })),
+    clearError: () =>
+      setState((current) => ({ ...current, error: null, providerFailureReason: null })),
     cancel: () => lifetime.current.active?.abort(),
     discard: (selected: readonly Preview[]) => {
       const ids = new Set(selected.map((preview) => preview.clipId));
@@ -363,10 +379,24 @@ export function useReviewTextVoiceOperation(props: Options) {
       if (!pending) throw new Error('stale');
       await pending;
     },
-    generate: (profile: ReviewSpeechProfile, approvedProviderId: string) => {
+    generate: (
+      profile: ReviewSpeechProfile,
+      approvedSelection: VoiceProviderSelection,
+      prepareSelection?:
+        | ((signal: AbortSignal, approved: VoiceProviderSelection) => Promise<void>)
+        | undefined
+    ) => {
       const selected = [...remainingIds];
       const captured = structuredClone(profile);
+      const approved = parseVoiceProviderSelection(approvedSelection);
+      if (!approved || approved.modelId !== captured.modelId) {
+        attempt.modelError();
+        return;
+      }
       void command(async (signal) => {
+        await prepareSelection?.(signal, { ...approved });
+        signal.throwIfAborted();
+        if (!attempt.isCurrent()) throw new DOMException('Unmounted', 'AbortError');
         await attempt.beforeRequest();
         signal.throwIfAborted();
         const prepared = await prepareReviewTextVoiceBatch(props.access.session, selected, signal);
@@ -383,7 +413,7 @@ export function useReviewTextVoiceOperation(props: Options) {
                 basis.fragment.id,
                 captured,
                 activeSignal,
-                approvedProviderId,
+                approved,
                 basis
               ),
             cleanup: (preview) => cleanupReviewTextVoicePreview(props.access.session, preview),

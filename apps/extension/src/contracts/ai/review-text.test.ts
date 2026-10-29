@@ -292,3 +292,18 @@ describe('review text context admission', () => {
     }
   );
 });
+
+it('admits bounded Review provider evidence and rejects private or malformed metadata', () => {
+  const failure = {
+    type: 'failure',
+    requestId: 'bde5d973-b7d7-4c61-8ec9-784bdc7a4930',
+    code: 'provider-failed',
+  };
+  expect(parseReviewTextServerMessage({ ...failure, failureReason: 'quota-exceeded' })).toEqual({
+    ...failure,
+    failureReason: 'quota-exceeded',
+  });
+  expect(parseReviewTextServerMessage(failure)).toEqual(failure);
+  for (const failureReason of ['PRIVATE_RESPONSE_BODY', { status: 402 }, 402])
+    expect(parseReviewTextServerMessage({ ...failure, failureReason })).toBeNull();
+});

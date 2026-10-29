@@ -52,6 +52,19 @@ export function updateAIProvider(provider: AIProviderMutationInput): Promise<voi
   return sendAiSettingsMutation({ operation: 'update-provider', provider }).then(() => undefined);
 }
 
+export function setAIProviderEnabled(
+  providerId: string,
+  providerIncarnation: string,
+  enabled: boolean
+): Promise<void> {
+  return sendAiSettingsMutation({
+    operation: 'set-provider-enabled',
+    providerId,
+    providerIncarnation,
+    enabled,
+  }).then(() => undefined);
+}
+
 export function clearAIProviderSecret(providerId: string): Promise<void> {
   return sendAiSettingsMutation({ operation: 'clear-provider-secret', providerId }).then(
     () => undefined
@@ -62,12 +75,16 @@ export function deleteAIProvider(providerId: string): Promise<void> {
   return sendAiSettingsMutation({ operation: 'delete-provider', providerId }).then(() => undefined);
 }
 
-export function addAIModel(model: AIModel): Promise<void> {
-  return sendAiSettingsMutation({ operation: 'add-model', model }).then(() => undefined);
+export function addAIModel(model: AIModel, providerIncarnation: string): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'add-model', model, providerIncarnation }).then(
+    () => undefined
+  );
 }
 
-export function updateAIModel(model: AIModel): Promise<void> {
-  return sendAiSettingsMutation({ operation: 'update-model', model }).then(() => undefined);
+export function updateAIModel(model: AIModel, providerIncarnation: string): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'update-model', model, providerIncarnation }).then(
+    () => undefined
+  );
 }
 
 export function deleteAIModel(modelId: string): Promise<void> {
@@ -78,13 +95,6 @@ export function moveAIModel(modelId: string, beforeModelId: string | null): Prom
   return sendAiSettingsMutation({ beforeModelId, modelId, operation: 'move-model' }).then(
     () => undefined
   );
-}
-
-export function saveDefaultModelId(defaultModelId: string | null): Promise<void> {
-  return sendAiSettingsMutation({
-    defaultModelId,
-    operation: 'save-default-model',
-  }).then(() => undefined);
 }
 
 export function saveGlobalSystemPrompt(prompt: string): Promise<void> {
@@ -177,6 +187,13 @@ export function saveVoiceInputCorrectionSystemPrompt(prompt: string): Promise<vo
 }
 export function resetVoiceInputCorrectionSystemPrompt(): Promise<void> {
   return sendAiSettingsMutation({ operation: 'reset-voice-input-correction-prompt' }).then(
+    () => undefined
+  );
+}
+
+/** Runs a non-billable metadata check from an explicit Settings action. */
+export function refreshAIProviderCatalog(providerId: string): Promise<void> {
+  return sendAiSettingsMutation({ operation: 'refresh-provider-catalog', providerId }).then(
     () => undefined
   );
 }

@@ -1,3 +1,4 @@
+import { isAIConnectionReason, type AIConnectionReason } from '../settings/ai-catalog';
 import { z } from 'zod';
 import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
 import { CONTENT_AI_PAYLOAD_LIMITS } from '@sniptale/runtime-contracts/ai/payload-policy';
@@ -65,7 +66,12 @@ const serverSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('progress'), requestId }).strict(),
   z.object({ type: z.literal('result'), requestId, text }).strict(),
   z
-    .object({ type: z.literal('failure'), requestId, code: z.enum(CONTENT_TEXT_FAILURE_CODES) })
+    .object({
+      type: z.literal('failure'),
+      requestId,
+      code: z.enum(CONTENT_TEXT_FAILURE_CODES),
+      failureReason: z.custom<AIConnectionReason>(isAIConnectionReason).optional(),
+    })
     .strict(),
 ]);
 export type ContentTextStart = z.infer<typeof startSchema>;

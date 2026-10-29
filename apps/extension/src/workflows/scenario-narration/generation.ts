@@ -1,3 +1,7 @@
+import {
+  parseVoiceProviderSelection,
+  type VoiceProviderSelection,
+} from '@sniptale/runtime-contracts/voice-input';
 import type { ScenarioProjectSnapshot } from '../../composition/persistence/scenario/contracts';
 import { assertScenarioSpeechScope } from '../../composition/persistence/scenario/speech-scope';
 import {
@@ -63,13 +67,15 @@ export async function prepareScenarioNarrationBatch(
 export async function generateScenarioNarration(
   basis: ScenarioNarrationBasis,
   profile: AISpeechModelParameters & { modelId: string },
-  approvedProviderId: string,
+  approvedSelection: VoiceProviderSelection,
   signal: AbortSignal
 ): Promise<ScenarioNarrationPreview> {
   signal.throwIfAborted();
-  if (!approvedProviderId || (await assertScenarioSpeechScope(basis.scope)) !== basis.text)
-    throw new Error('stale');
+  const approved = parseVoiceProviderSelection(approvedSelection);
   const { modelId, ...parameters } = structuredClone(profile);
+  if (!approved?.approvedProviderId.trim() || approved.modelId !== modelId)
+    throw new Error('invalid-request');
+  if ((await assertScenarioSpeechScope(basis.scope)) !== basis.text) throw new Error('stale');
   const result = await runReviewSpeechJob(
     {
       type: 'start',
@@ -78,7 +84,8 @@ export async function generateScenarioNarration(
       scope: basis.scope,
       text: basis.text,
       modelId,
-      approvedProviderId,
+      approvedProviderId: approved.approvedProviderId,
+      approvedSelection: approved,
       profile: parameters,
     },
     { signal }

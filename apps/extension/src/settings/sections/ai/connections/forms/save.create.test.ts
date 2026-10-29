@@ -1,3 +1,7 @@
+import { saveProviderForm } from './save';
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { isAvailable: () => false },
+}));
 import type { SetStateAction } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
 
@@ -37,7 +41,6 @@ beforeEach(() => {
 });
 
 it('treats provider create saves without an optional provider object as a normal create flow', async () => {
-  const { saveProviderForm } = await import('./save');
   const onSave = vi.fn();
   const setErrors = createStateSetterMock<Record<string, string>>();
 

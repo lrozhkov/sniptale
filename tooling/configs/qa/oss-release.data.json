@@ -384,6 +384,19 @@
         "originUrl": "https://raw.githubusercontent.com/tabler/tabler-icons/v3.49.0/LICENSE",
         "sourcePath": "tooling/release/dependency-legal/sources/tabler-icons-3.49.0.LICENSE",
         "sha256": "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db"
+      },
+      {
+        "kind": "package-license",
+        "license": "Apache-2.0",
+        "packageName": "@ai-sdk/provider-utils",
+        "packageVersion": "5.0.62",
+        "packageResolved": "https://registry.npmjs.org/@ai-sdk/provider-utils/-/provider-utils-5.0.62.tgz",
+        "packageIntegrity": "sha512-//6sHa6QNQdM2KHOg5pxp1UMFQB4U8cqdw/kSm9BMr0DLeaFgG3TXZfxhpwRZmxgBpOrzMVZ/gwLXH309+Ortw==",
+        "upstreamRepository": "vercel/ai",
+        "upstreamVersion": "@ai-sdk/provider-utils@5.0.62",
+        "originUrl": "https://raw.githubusercontent.com/vercel/ai/%40ai-sdk%2Fprovider-utils%405.0.62/LICENSE",
+        "sourcePath": "tooling/release/dependency-legal/sources/ai-provider-utils-5.0.62.LICENSE",
+        "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529"
       }
     ],
     "reviewedSelections": [
@@ -396,6 +409,11 @@
         "packageName": "jszip",
         "version": "3.10.2",
         "selectedLicense": "MIT"
+      },
+      {
+        "packageName": "json-schema",
+        "version": "0.4.0",
+        "selectedLicense": "BSD-3-Clause"
       }
     ],
     "modifiedSources": [

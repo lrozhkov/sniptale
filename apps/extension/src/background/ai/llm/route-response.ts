@@ -1,9 +1,5 @@
 import type { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../../platform/i18n';
-import {
-  initializeAiStorageAccess,
-  loadDefaultModelId,
-} from '../../../composition/persistence/ai-settings';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 
 interface LlmRouteErrorDetails {
@@ -38,13 +34,7 @@ export async function resolveRequiredLlmModelId(modelId?: string | null): Promis
     return modelId;
   }
 
-  await initializeAiStorageAccess();
-  const resolvedModelId = await loadDefaultModelId();
-  if (!resolvedModelId) {
-    throw new Error(translate('background.runtime.llmModelMissing'));
-  }
-
-  return resolvedModelId;
+  throw new Error(translate('background.runtime.llmModelMissing'));
 }
 
 export function normalizeLlmRouteError(error: unknown): LlmRouteFailure {

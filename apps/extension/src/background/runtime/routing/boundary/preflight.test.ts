@@ -47,7 +47,7 @@ function verifiesAiSettingsMutationRouteShortCircuit() {
     undefined,
     'chrome-extension://test/apps/extension/src/settings/index.html'
   );
-  const message = { type: 'AI_SETTINGS_MUTATION', operation: 'save-default-model' };
+  const message = { type: 'AI_SETTINGS_MUTATION', operation: 'save-scenario-editor-prompt' };
   parseBackgroundRuntimeMessageMock.mockReturnValue(message);
   routeAiSettingsMutationMessageMock.mockReturnValue(true);
   expectListenerResult(true, listener, message, sender, sendResponse);

@@ -54,11 +54,18 @@ export function VoiceModelPreferences({
                 models={models.transcription.models}
                 providers={models.transcription.providers}
                 selectedModelId={models.transcriptionSelectionId}
-                disabled={disabled || models.loading}
+                onOpen={() => void models.refresh()}
+                disabled={disabled || models.loading || models.promptSaving}
                 onSelect={(id) => {
                   void models.selectTranscription(id);
                 }}
               />
+              {models.transcriptionUnavailable && (
+                <p role="alert" className="break-words text-xs text-[var(--sniptale-color-danger)]">
+                  {translate('aiModal.modelSelectionUnavailable')}{' '}
+                  {preferences.transcription?.approvedModelCode}
+                </p>
+              )}
             </div>
           </SettingsControlRow>
 
@@ -84,25 +91,41 @@ export function VoiceModelPreferences({
                     models={models.correction.models}
                     providers={models.correction.providers}
                     selectedModelId={models.correctionSelectionId}
-                    disabled={disabled || models.loading}
+                    onOpen={() => void models.refresh()}
+                    disabled={disabled || models.loading || models.promptSaving}
                     onSelect={(id) => {
                       void models.selectCorrection(id);
                     }}
                   />
+                  {models.correctionUnavailable && (
+                    <p
+                      role="alert"
+                      className="break-words text-xs text-[var(--sniptale-color-danger)]"
+                    >
+                      {translate('aiModal.modelSelectionUnavailable')}{' '}
+                      {preferences.correction.model?.approvedModelCode}
+                    </p>
+                  )}
                 </div>
               </SettingsControlRow>
               <VoiceCorrectionPrompt models={models} disabled={disabled} />
             </>
           ) : null}
-          {models.error ? (
+          {models.error ||
+          models.transcriptionUnavailable ||
+          models.correctionUnavailable ||
+          !models.transcription.models.length ||
+          (preferences.correction.enabled && !models.correction.models.length) ? (
             <div className="grid gap-2">
-              <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
-                {translate('settings.voiceInput.modelsError')}
-              </p>
+              {models.error && (
+                <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+                  {translate('settings.voiceInput.modelsError')}
+                </p>
+              )}
               <ProductActionButton
                 compact
                 tone="secondary"
-                disabled={models.loading}
+                disabled={models.loading || models.promptSaving}
                 onClick={() => {
                   void models.refresh();
                 }}

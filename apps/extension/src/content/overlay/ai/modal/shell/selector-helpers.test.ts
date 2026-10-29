@@ -3,15 +3,34 @@ import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import { getFilteredProviders, getSelectedModelLabel } from './selector-helpers';
 
 describe('ai modal model selector helpers', () => {
-  const providers = [
-    { id: 'openai', name: 'OpenAI' },
-    { id: 'anthropic', name: 'Anthropic' },
-  ] as AIProvider[];
+  const providers: AIProvider[] = [
+    {
+      id: 'openai',
+      name: 'OpenAI',
+      connectionType: 'openai',
+      baseUrl: 'https://api.openai.com/v1',
+      hasStoredApiKey: true,
+      createdAt: 1,
+    },
+    {
+      id: 'anthropic',
+      name: 'Anthropic',
+      connectionType: 'anthropic',
+      baseUrl: 'https://api.anthropic.com/v1',
+      hasStoredApiKey: true,
+      createdAt: 2,
+    },
+  ];
 
-  const models = [
-    { id: 'gpt-4.1', providerId: 'openai', displayName: 'GPT-4.1' },
-    { id: 'claude-3.7', providerId: 'anthropic', displayName: 'Claude 3.7 Sonnet' },
-  ] as AIModel[];
+  const models: AIModel[] = [
+    { id: 'gpt-4.1', providerId: 'openai', modelCode: 'gpt-4.1', displayName: 'GPT-4.1' },
+    {
+      id: 'claude-3.7',
+      providerId: 'anthropic',
+      modelCode: 'claude-3.7',
+      displayName: 'Claude 3.7 Sonnet',
+    },
+  ];
 
   it('builds selected model label from provider and display name', () => {
     expect(getSelectedModelLabel(models, providers, 'gpt-4.1')).toBe('OpenAI / GPT-4.1');

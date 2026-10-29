@@ -5,7 +5,7 @@ import type { LoadedAiProvidersRuntimeData } from './runtime-data';
 export function applyLoadedAiProvidersRuntimeData(
   props: Pick<
     AiProvidersDataState,
-    'setChromeAiEnabled' | 'setDefaultModelId' | 'setModels' | 'setProviders' | 'setSelectionState'
+    'setChromeAiEnabled' | 'setModels' | 'setProviders' | 'setSelectionState'
   > &
     Pick<AiSecretProtectionDataState, 'setSecretProtectionStatus'>,
   loaded: LoadedAiProvidersRuntimeData
@@ -15,7 +15,6 @@ export function applyLoadedAiProvidersRuntimeData(
     loadedModels,
     loadedSelectorProviders,
     loadedSelectorModels,
-    loadedDefaultId,
     _loadedPrompt,
     _loadedScenarioEditorPrompt,
     loadedChromeAiEnabled,
@@ -28,9 +27,8 @@ export function applyLoadedAiProvidersRuntimeData(
     models: loadedSelectorModels,
     providers: loadedSelectorProviders,
   });
-  props.setDefaultModelId(loadedDefaultId);
   props.setChromeAiEnabled(loadedChromeAiEnabled);
   props.setSecretProtectionStatus(loadedSecretProtectionStatus);
 
-  return { loadedDefaultId, loadedModels: loadedSelectorModels };
+  return { loadedModels: loadedSelectorModels };
 }

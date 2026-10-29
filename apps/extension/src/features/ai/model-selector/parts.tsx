@@ -47,7 +47,7 @@ export function Trigger(props: {
       <ChevronDown
         aria-hidden
         className={[
-          'sniptale-select-chevron shrink-0',
+          'sniptale-select-chevron sniptale-select-chevron-edge shrink-0',
           props.isOpen ? 'sniptale-select-chevron-open' : '',
         ].join(' ')}
       />

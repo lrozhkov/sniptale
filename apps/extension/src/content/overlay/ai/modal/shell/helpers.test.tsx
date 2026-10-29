@@ -6,6 +6,7 @@ import {
   getAIModalFooterProps,
 } from './helpers';
 import type { useAIModalState } from '../session';
+vi.mock('../../../../platform/trusted-events', () => ({ isTrustedDomEvent: () => true }));
 
 function createKeyboardEvent(overrides: Partial<React.KeyboardEvent<HTMLTextAreaElement>> = {}) {
   return {
@@ -13,12 +14,25 @@ function createKeyboardEvent(overrides: Partial<React.KeyboardEvent<HTMLTextArea
     key: '',
     metaKey: false,
     preventDefault: vi.fn(),
+    nativeEvent: new Event('keydown'),
     ...overrides,
   } as unknown as React.KeyboardEvent<HTMLTextAreaElement>;
 }
 
 function createModalState() {
   return {
+    modelSelection: {
+      configuration: null,
+      modelId: 'model-1',
+      selectionPending: false,
+      selectionUnavailable: false,
+      unavailableModelName: null,
+      selectionFailed: false,
+      configurationFailed: false,
+      chooseModel: vi.fn(),
+      prepareModelSelection: vi.fn(),
+      retryConfiguration: vi.fn(),
+    },
     availableModels: [
       {
         displayName: 'Model 1',

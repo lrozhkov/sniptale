@@ -43,6 +43,8 @@ function createProvider(overrides: Partial<AIProvider> = {}): AIProvider {
     createdAt: 1,
     hasStoredApiKey: true,
     id: 'provider-1',
+    incarnation: 'provider-incarnation-1',
+    credentialRevision: 1,
     name: 'Provider',
     ...overrides,
   };
@@ -189,4 +191,26 @@ it('migrates a legacy provider secret after one successful context-bound read', 
 
   const secrets = localState[AI_PROVIDER_SECRETS_KEY] as Record<string, { version: number }>;
   expect(secrets[provider.id]).toEqual(expect.objectContaining({ version: 2 }));
+});
+
+it('rejects a secret copied onto a recreated provider with the same ID and URL', async () => {
+  await installBoundProviderSecret('provider-secret');
+  localState[AI_PROVIDERS_KEY] = [createProvider({ incarnation: 'replacement-incarnation' })];
+  const { loadStoredAIProviderSecret } = await import('./provider-secrets.store.ts');
+  await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBeNull();
+});
+
+it('invalidates destination approval after credential rotation or provider recreation', async () => {
+  const { createAIProviderDestinationBinding } =
+    await import('../../../features/ai/egress-authority');
+  const provider = createProvider();
+  const original = await createAIProviderDestinationBinding(provider);
+  const renamed = { ...provider, name: 'Renamed' };
+  expect(await createAIProviderDestinationBinding(renamed)).toBe(original);
+  expect(await createAIProviderDestinationBinding({ ...provider, credentialRevision: 2 })).not.toBe(
+    original
+  );
+  expect(
+    await createAIProviderDestinationBinding({ ...provider, incarnation: 'replacement' })
+  ).not.toBe(original);
 });

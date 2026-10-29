@@ -1,4 +1,12 @@
 import {
+  getAIProviderDefinition,
+  type AIProviderType,
+} from '../../../contracts/settings/ai-provider';
+import {
+  supportsAIModelOperation,
+  supportsAIProviderModelOperation,
+} from '../../../contracts/settings/model-operation';
+import {
   initializeAiStorageAccess,
   loadAIModels,
   loadAIProviders,
@@ -18,12 +26,19 @@ import {
 import { isAudioSourceJobScope, type AudioJobStart } from '../../../contracts/ai/audio';
 import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 
+import type { AIOperationObservationBinding } from '../../../composition/persistence/ai-settings/operation-observations';
+
 export interface AudioModelConfig {
+  observationBinding?: AIOperationObservationBinding | undefined;
+  connectionType: AIProviderType;
+  baseUrl: string;
   url: string;
   apiKey: string;
   modelCode: string;
   transcriptionInstructions?: string;
   transcription?: AITranscriptionModelParameters;
+  /** Restricts synthesized word timing to explicitly supported segment fallback. */
+  transcriptionSegmentFallback?: boolean;
   speech?: AISpeechModelParameters;
 }
 
@@ -43,14 +58,40 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   const [models, providers] = await Promise.all([loadAIModels(), loadAIProviders()]);
   args.signal?.throwIfAborted();
   const model = models.find((entry) => entry.id === args.modelId);
-  if (!model || model.operation !== args.operation || !isValidAIModelOperationConfiguration(model))
+  if (
+    !model ||
+    !supportsAIModelOperation(model, args.operation) ||
+    !isValidAIModelOperationConfiguration(model)
+  )
     throw new Error('model-unavailable');
+  if (
+    args.operation === 'speech' &&
+    !isValidAIModelOperationConfiguration({ operation: 'speech', audio: { speech: args.profile } })
+  )
+    throw new Error('invalid-request');
   if (args.approvedProviderId !== undefined && args.approvedProviderId !== model.providerId)
     throw new Error('model-unavailable');
   const provider = providers.find((entry) => entry.id === model.providerId);
-  const chat =
-    args.operation === 'transcription' && model.audio?.transcription?.transport === 'audio-chat';
-  if (chat && !args.approvedProviderId) throw new Error('model-unavailable');
+  if (!provider || !supportsAIProviderModelOperation(model, provider, args.operation))
+    throw new Error('model-unavailable');
+  const granularity =
+    model.capabilities?.features['word-timestamps'] === 'supported'
+      ? 'word'
+      : model.capabilities?.features['segment-timestamps'] === 'supported' &&
+          provider.connectionType !== 'google' &&
+          provider.connectionType !== 'elevenlabs'
+        ? 'segment'
+        : 'none';
+  const transcription: AITranscriptionModelParameters | undefined =
+    args.operation === 'transcription'
+      ? (model.audio?.transcription ?? {
+          responseFormat: granularity === 'none' ? 'json' : 'verbose_json',
+          timestampGranularity: granularity,
+        })
+      : undefined;
+  const chat = transcription?.transport === 'audio-chat';
+  if (chat && (!args.approvedProviderId || provider.connectionType !== 'openai-compatible'))
+    throw new Error('model-unavailable');
   if (
     args.operation === 'transcription' &&
     args.recognition !== 'automatic' &&
@@ -60,7 +101,8 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   if (
     args.approved &&
     (!provider ||
-      provider.connectionType !== 'openai-compatible' ||
+      args.approved.modelId !== model.id ||
+      args.approved.approvedProviderId !== provider.id ||
       model.modelCode !== args.approved.approvedModelCode ||
       (await createAIProviderDestinationBinding(provider)) !== args.approved.approvedDestination)
   )
@@ -71,22 +113,43 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
     (chat
       ? resolveAIProviderChatCompletionsUrl(provider.baseUrl)
       : resolveAIProviderAudioUrl(provider.baseUrl, args.operation));
-  if (!provider || !url || !provider.hasStoredApiKey) throw new Error('model-unavailable');
+  const requiresSecret = getAIProviderDefinition(provider.connectionType).credential !== 'none';
+  if (!url || (requiresSecret && !provider.hasStoredApiKey)) throw new Error('model-unavailable');
   if (!(await chrome.permissions.contains({ origins: [`${new URL(url).origin}/*`] })))
     throw new Error('permission-denied');
   args.signal?.throwIfAborted();
-  const apiKey = await activateStoredAIProviderSecretForUse(provider);
+  const apiKey = provider.hasStoredApiKey
+    ? await activateStoredAIProviderSecretForUse(provider)
+    : '';
   args.signal?.throwIfAborted();
-  if (!apiKey) throw new Error('secret-unavailable');
+  if (apiKey === null || (requiresSecret && !apiKey)) throw new Error('secret-unavailable');
   const instructions = chat ? await loadAudioTranscriptionSystemPrompt() : undefined;
   args.signal?.throwIfAborted();
   return {
+    ...(provider.incarnation
+      ? {
+          observationBinding: {
+            model: { id: model.id, code: model.modelCode, operation: args.operation },
+            providerId: provider.id,
+            incarnation: provider.incarnation,
+            revision: provider.revision ?? 0,
+            credentialRevision: provider.credentialRevision ?? 0,
+            destination: await createAIProviderDestinationBinding(provider),
+          },
+        }
+      : {}),
+    connectionType: provider.connectionType,
+    baseUrl: provider.baseUrl,
     url,
     apiKey,
     modelCode: model.modelCode,
     ...(instructions === undefined ? {} : { transcriptionInstructions: instructions }),
-    ...(args.operation === 'transcription' && model.audio?.transcription
-      ? { transcription: model.audio.transcription }
+    ...(transcription ? { transcription } : {}),
+    ...(transcription && !model.audio?.transcription && granularity === 'word'
+      ? {
+          transcriptionSegmentFallback:
+            model.capabilities?.features['segment-timestamps'] === 'supported',
+        }
       : {}),
     ...(args.operation === 'speech' && args.profile ? { speech: args.profile } : {}),
   };
@@ -102,6 +165,7 @@ export function resolveAudioModelConfig(request: AudioJobStart): Promise<AudioMo
     ...(request.approvedProviderId === undefined
       ? {}
       : { approvedProviderId: request.approvedProviderId }),
+    ...(request.approvedSelection ? { approved: request.approvedSelection } : {}),
     recognition: request.operation === 'transcription' && Boolean(request.recognition),
     ...(request.operation === 'speech' ? { profile: request.profile } : {}),
   });

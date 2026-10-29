@@ -180,3 +180,18 @@ it('admits empty document scope and rejects block/document scope combinations', 
     ).success
   ).toBe(false);
 });
+
+it('admits only fixed provider failure reasons at the Scenario response boundary', () => {
+  expect(
+    processScenarioEditorWithLlmResponseSchema.parse({
+      success: false,
+      failureReason: 'quota-exceeded',
+    })
+  ).toEqual({ success: false, failureReason: 'quota-exceeded' });
+  for (const failureReason of ['private-provider-message', { reason: 'quota-exceeded' }, 402]) {
+    expect(
+      processScenarioEditorWithLlmResponseSchema.safeParse({ success: false, failureReason })
+        .success
+    ).toBe(false);
+  }
+});

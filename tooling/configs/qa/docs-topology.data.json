@@ -69,7 +69,8 @@
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "README.md",
-    "tooling/design-reference/README.md"
+    "tooling/design-reference/README.md",
+    "tooling/test/e2e/live/README.md"
   ],
   "skillDocuments": [],
   "productDocuments": [],

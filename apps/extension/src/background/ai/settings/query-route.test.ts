@@ -44,7 +44,6 @@ beforeEach(() => {
   routeMocks.resolveAISettingsQueryResponse.mockResolvedValue({
     modelSelection: {
       chromeAiEnabled: false,
-      defaultModelId: null,
       globalSystemPrompt: '',
       models: [],
       providers: [],
@@ -73,7 +72,6 @@ it('routes preauthorized AI settings queries through the background service', as
     expect(sendResponse).toHaveBeenCalledWith({
       modelSelection: {
         chromeAiEnabled: false,
-        defaultModelId: null,
         globalSystemPrompt: '',
         models: [],
         providers: [],

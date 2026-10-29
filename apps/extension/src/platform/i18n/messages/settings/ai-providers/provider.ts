@@ -149,4 +149,77 @@ export const settingsAiProvidersProviderMessages = defineMessageSource({
     ru: '» и все его модели будут удалены. Это действие нельзя отменить.',
     en: '" and all its models will be deleted. This action cannot be undone.',
   },
+  providerTypeLabel: { ru: 'Провайдер', en: 'Provider' },
+  providerManagementLabel: { ru: 'Управление моделями', en: 'Model management' },
+  providerModeAutomatic: { ru: 'Автоматически', en: 'Automatic' },
+  providerModeManual: { ru: 'Вручную', en: 'Manual' },
+  providerAutomaticHint: {
+    ru: 'Модели появятся в подходящих инструментах автоматически. Каталог обновляется при использовании, не чаще раза в сутки.',
+    en: 'Models appear automatically in the tools that support them. The catalog refreshes on use, at most once a day.',
+  },
+  providerManualHint: {
+    ru: 'Вы добавляете модели и задаёте их свойства. Каталог можно использовать как подсказку.',
+    en: 'Add models and configure their properties yourself. The catalog can help fill in the details.',
+  },
+  providerChromeSeparate: {
+    ru: 'Встроенный AI Chrome настраивается переключателем на этой странице.',
+    en: 'Use the Chrome AI switch on this page for built-in models.',
+  },
+  providerAdapterUnavailable: {
+    ru: 'Готовый адаптер для этой версии SDK недоступен.',
+    en: 'No ready-made adapter is available for this SDK version.',
+  },
+  providerAdvancedSettings: {
+    ru: 'Дополнительные настройки подключения',
+    en: 'Advanced connection settings',
+  },
+  providerEligibleModels: { ru: 'Подходящих моделей: {count}', en: 'Eligible models: {count}' },
+  providerCatalogUpdated: {
+    ru: 'Успешное обновление каталога: {date}',
+    en: 'Last successful catalog refresh: {date}',
+  },
+  providerCatalogNeverUpdated: {
+    ru: 'Каталог ещё не обновлялся успешно',
+    en: 'No successful catalog refresh yet',
+  },
+  providerChecked: { ru: 'Последняя проверка: {date}', en: 'Last check: {date}' },
+  providerCatalogMetadataMissing: {
+    ru: 'Для некоторых моделей каталог не сообщает поддерживаемые операции. Выберите модель и задайте её свойства вручную.',
+    en: 'The catalog does not declare supported operations for some models. Select a model and configure its properties manually.',
+  },
+  providerConfigureModel: { ru: 'Настроить модель', en: 'Configure a model' },
+  providerCheckAction: { ru: 'Проверить и обновить каталог', en: 'Check and refresh catalog' },
+  providerCheckPending: { ru: 'Обновление каталога…', en: 'Refreshing catalog…' },
+  providerCheckFailed: {
+    ru: 'Не удалось обновить каталог. Настройки подключения сохранены.',
+    en: 'Could not refresh the catalog. The connection settings are saved.',
+  },
+  providerStatusUnverified: { ru: 'Не проверено', en: 'Not checked' },
+  providerStatusCatalog: { ru: 'Каталог доступен', en: 'Catalog accessible' },
+  providerStatusCredentials: { ru: 'Ключ принят сервисом', en: 'Credential accepted' },
+  providerStatusOperation: { ru: 'Последний запрос выполнен', en: 'Last request succeeded' },
+  providerStatusPermission: {
+    ru: 'Нужен доступ Chrome к адресу сервиса',
+    en: 'Chrome needs access to the service address',
+  },
+  providerStatusLocked: { ru: 'Ключ заблокирован', en: 'Credential locked' },
+  providerStatusUnavailable: { ru: 'Сервис недоступен', en: 'Service unavailable' },
+  providerStatusInvalidKey: { ru: 'Ключ отклонён сервисом', en: 'Credential rejected' },
+  providerStatusDenied: { ru: 'У аккаунта нет доступа', en: 'Account access denied' },
+  providerStatusQuota: {
+    ru: 'Недостаточно средств или квоты',
+    en: 'Insufficient balance or quota',
+  },
+  providerStatusRate: { ru: 'Достигнут лимит запросов', en: 'Request rate limit reached' },
+  providerStatusNetwork: { ru: 'Ошибка сети', en: 'Network error' },
+  providerStatusTimeout: { ru: 'Сервис не ответил вовремя', en: 'Service timed out' },
+  providerStatusNoCatalog: {
+    ru: 'Автоматический каталог недоступен — добавьте модель вручную',
+    en: 'Automatic catalog unavailable — add a model manually',
+  },
+  providerLocalNoKey: {
+    ru: 'Локальное подключение без ключа',
+    en: 'Local connection without a key',
+  },
+  providerStatusModelUnavailable: { ru: 'Модель недоступна', en: 'Model unavailable' },
 });

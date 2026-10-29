@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   acquirePersistenceMutationTransition,
+  runWithAtomicPersistenceMutationPermit,
   isActivePersistenceMutationPermit,
   installPersistenceLockManagerForTests,
   runWithDurableAssetLifecycleLock,
@@ -644,4 +645,32 @@ it('refuses a reused transition that expires during an exclusive mutation wait',
   release();
   await expect(delayed).rejects.toThrow('Transition permit is not active');
   expect(mutate).not.toHaveBeenCalled();
+});
+
+it('publishes atomically before waiting erasure without another transition gate and revokes its permit', async () => {
+  const lease = await acquirePersistenceMutationTransition();
+  const order: string[] = [];
+  let publishedPermit: unknown;
+  const erasure = runWithPersistentDataErasureBarrier(() => {
+    order.push('erasure');
+  });
+  await runWithAtomicPersistenceMutationPermit((permit) => {
+    publishedPermit = permit;
+    expect(isActivePersistenceMutationPermit(permit)).toBe(true);
+    order.push('model');
+  });
+  expect(isActivePersistenceMutationPermit(publishedPermit)).toBe(false);
+  expect(order).toEqual(['model']);
+  await lease.release();
+  await erasure;
+  expect(order).toEqual(['model', 'erasure']);
+  await expect(
+    runWithAtomicPersistenceMutationPermit(() => {
+      throw new Error('Refused');
+    })
+  ).rejects.toThrow('Refused');
+  await runWithAtomicPersistenceMutationPermit(() => {
+    order.push('retry');
+  });
+  expect(order).toEqual(['model', 'erasure', 'retry']);
 });

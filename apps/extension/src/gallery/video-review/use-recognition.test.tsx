@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { AudioJobProviderError } from '../../workflows/audio-jobs/failure';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -12,6 +13,7 @@ import type {
   ReviewRecognitionJob,
   ReviewRecognitionProposal,
 } from '../../workflows/video-review/recognition';
+import type { requestAIScenarioModelSelection } from '../../workflows/ai-settings/query';
 import { createReviewSpeechEditGuard } from './speech-edit-guard';
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
@@ -19,6 +21,9 @@ const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
   wasApplied: vi.fn(),
   multimodal: false,
+  modelCode: 'first-code',
+  catalog: vi.fn(),
+  remember: vi.fn(),
 }));
 vi.mock('../../workflows/video-review/recognition', () => ({
   prepareReviewRecognition: mocks.prepare,
@@ -27,15 +32,20 @@ vi.mock('../../workflows/video-review/recognition', () => ({
   reviewRecognitionWasApplied: mocks.wasApplied,
 }));
 vi.mock('../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: async () => ({
+  requestAIScenarioModelSelection: mocks.catalog,
+  rememberAIScenarioModelSelection: mocks.remember,
+}));
+function recognitionContext(): Awaited<ReturnType<typeof requestAIScenarioModelSelection>> {
+  return {
     models: [
       {
         id: 'model',
+        modelCode: mocks.modelCode,
+        operation: 'transcription',
         displayName: 'Transcription',
         providerId: 'provider',
         ...(mocks.multimodal
           ? {
-              purpose: 'transcription',
               audio: {
                 transcription: {
                   transport: 'audio-chat',
@@ -49,12 +59,25 @@ vi.mock('../../workflows/ai-settings/query', () => ({
           : {}),
       },
     ],
-    providers: [{ id: 'provider', name: 'Provider' }],
-    defaultModelId: 'model',
-    chromeAiEnabled: false,
+    providers: [
+      {
+        id: 'provider',
+        name: 'Provider',
+        connectionType: 'openai-compatible',
+        incarnation: 'initial',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
+        destinationKind: 'external',
+        hasStoredApiKey: true,
+        createdAt: 1,
+      },
+    ],
+    scenario: 'gallery-transcription',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
     globalSystemPrompt: '',
-  }),
-}));
+  };
+}
+
 import { useReviewRecognition, type ReviewRecognitionAccess } from './use-recognition';
 let root: Root | undefined;
 let host: HTMLDivElement;
@@ -126,6 +149,9 @@ async function mount(access: ReviewRecognitionAccess) {
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.multimodal = false;
+  mocks.modelCode = 'first-code';
+  mocks.catalog.mockImplementation(async () => recognitionContext());
+  mocks.remember.mockResolvedValue(undefined);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -194,7 +220,16 @@ it('joins pending owners, binds consent, and keeps results disposable until Appl
     'model',
     'provider',
     expect.any(AbortSignal),
-    { original: access.original, grouping: 'sentences-pauses' }
+    {
+      original: access.original,
+      grouping: 'sentences-pauses',
+      approvedSelection: {
+        modelId: 'model',
+        approvedProviderId: 'provider',
+        approvedModelCode: mocks.modelCode,
+        approvedDestination: `sha256:${'a'.repeat(64)}`,
+      },
+    }
   );
   expect(current.proposal).toBe(proposal);
   expect(mocks.apply).not.toHaveBeenCalled();
@@ -496,4 +531,192 @@ it('aborts the in-flight request on unmount and discards its eventual result', a
   expect(activeSignal.aborted).toBe(true);
   await act(async () => complete?.(proposal));
   expect(mocks.apply).not.toHaveBeenCalled();
+});
+
+it('does not reuse partial recognition after the model code changes under its retained ID', async () => {
+  const { access } = fixture();
+  await mount(access);
+  mocks.run.mockRejectedValueOnce(new Error('provider failed'));
+  await act(async () => current.recognize('provider'));
+  mocks.modelCode = 'replacement-code';
+  await act(async () => current.reloadModels());
+  await act(async () => current.setModelId('model'));
+  await act(async () => current.recognize('provider'));
+  expect(mocks.prepare).toHaveBeenCalledTimes(2);
+  expect(mocks.prepare.mock.calls[1]?.[5]).not.toHaveProperty('previous');
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+function expectNoRecognitionWork(access: ReviewRecognitionAccess) {
+  expect(access.flushAdvanced).not.toHaveBeenCalled();
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  expect(mocks.run).not.toHaveBeenCalled();
+}
+it('reads Gallery transcription independently without writes on open or reload', async () => {
+  const { access } = fixture();
+  await mount(access);
+  await act(async () => current.reloadModels());
+  expect(mocks.catalog).toHaveBeenCalledWith('gallery-transcription');
+  expect(mocks.remember).not.toHaveBeenCalled();
+  expectNoRecognitionWork(access);
+  await act(async () => current.setModelId('model'));
+  expect(mocks.remember).toHaveBeenCalledExactlyOnceWith(
+    expect.anything(),
+    'gallery-transcription',
+    'model',
+    'explicit'
+  );
+  expectNoRecognitionWork(access);
+});
+it('refuses a first-use preference before recognition Save and permits explicit retry', async () => {
+  const { access } = fixture();
+  await mount(access);
+  await act(async () => current.setPrompt('Keep this draft'));
+  mocks.remember.mockRejectedValueOnce(new Error('refused'));
+  await act(async () => current.recognize('provider'));
+  expect(current.selectionFailed).toBe(true);
+  expect(current.prompt).toBe('Keep this draft');
+  expectNoRecognitionWork(access);
+  await act(async () => current.recognize('provider'));
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  expect(mocks.remember).toHaveBeenLastCalledWith(
+    expect.anything(),
+    'gallery-transcription',
+    'model',
+    'initial'
+  );
+});
+it('requires explicit replacement and retains grouping and instruction drafts after model removal', async () => {
+  const { access } = fixture();
+  await mount(access);
+  await act(async () => {
+    current.setGrouping('sentences');
+    current.setPrompt('Retained');
+  });
+  const next = recognitionContext();
+  next.models[0]!.id = 'replacement';
+  next.models[0]!.modelCode = 'replacement';
+  next.resolution.modelId = 'replacement';
+  mocks.catalog.mockResolvedValue(next);
+  await act(async () => current.reloadModels());
+  expect(current.modelId).toBe('');
+  expect(current.modelUnavailable).toBe(true);
+  await act(async () => current.recognize('provider'));
+  expectNoRecognitionWork(access);
+  expect(current.prompt).toBe('Retained');
+  expect(current.grouping).toBe('sentences');
+  await act(async () => current.setModelId('replacement'));
+  expect(current.modelId).toBe('replacement');
+  expect(current.prompt).toBe('Retained');
+  expectNoRecognitionWork(access);
+});
+it('refuses a changed destination before recognition flush, Save or provider work', async () => {
+  const { access } = fixture();
+  await mount(access);
+  const next = recognitionContext();
+  next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+  mocks.catalog.mockResolvedValue(next);
+  await act(async () => current.recognize('provider'));
+  expect(current.modelUnavailable).toBe(true);
+  expect(mocks.remember).not.toHaveBeenCalled();
+  expectNoRecognitionWork(access);
+});
+it.each(['catalog', 'preference'] as const)(
+  'cancels pending %s admission before recognition Save',
+  async (phase) => {
+    const { access } = fixture();
+    await mount(access);
+    const catalog = deferred<ReturnType<typeof recognitionContext>>();
+    const preference = deferred<void>();
+    if (phase === 'catalog') mocks.catalog.mockReturnValueOnce(catalog.promise);
+    else mocks.remember.mockReturnValueOnce(preference.promise);
+    await act(async () => current.recognize('provider'));
+    expect(current.running).toBe(true);
+    await act(async () => current.cancel());
+    await act(async () => {
+      catalog.resolve(recognitionContext());
+      preference.resolve();
+    });
+    expect(current.running).toBe(false);
+    expect(current.proposal).toBeNull();
+    expectNoRecognitionWork(access);
+  }
+);
+it('does not prepare the old session after replacement during preference admission', async () => {
+  const old = fixture();
+  await mount(old.access);
+  const preference = deferred<void>();
+  mocks.remember.mockReturnValueOnce(preference.promise);
+  await act(async () => current.recognize('provider'));
+  const next = fixture();
+  await mount(next.access);
+  await act(async () => preference.resolve());
+  expectNoRecognitionWork(old.access);
+  expectNoRecognitionWork(next.access);
+  expect(current.proposal).toBeNull();
+});
+it('admits a capability-only native transcription model without a stored audio profile', async () => {
+  const { access } = fixture();
+  const next = recognitionContext();
+  next.providers[0]!.connectionType = 'deepgram';
+  mocks.catalog.mockResolvedValue(next);
+  await mount(access);
+  expect(current.catalogs?.transcription.models[0]?.audio?.transcription).toBeUndefined();
+  expect(current.multimodal).toBe(false);
+  await act(async () => current.recognize('provider'));
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  expect(mocks.prepare.mock.calls[0]?.[5]).not.toHaveProperty('recognition');
+});
+it('keeps a completed proposal available when later model admission fails', async () => {
+  const { access, proposal } = fixture();
+  await mount(access);
+  await act(async () => current.recognize('provider'));
+  mocks.remember.mockRejectedValueOnce(new Error('refused'));
+  await act(async () => current.recognize('provider'));
+  expect(current.proposal).toBe(proposal);
+  expect(mocks.run).toHaveBeenCalledOnce();
+  await act(async () => current.apply());
+  expect(mocks.apply).toHaveBeenCalledOnce();
+});
+
+it('retains the admitted destination through a deferred recognition flush', async () => {
+  const { access } = fixture();
+  const flush = Promise.withResolvers<void>();
+  access.flushAdvanced = vi.fn(() => flush.promise);
+  await mount(access);
+  await act(async () => current.recognize('provider'));
+  expect(access.flushAdvanced).toHaveBeenCalledOnce();
+  const changed = recognitionContext();
+  changed.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+  mocks.catalog.mockResolvedValue(changed);
+  await act(async () => flush.resolve());
+  expect(mocks.prepare.mock.calls[0]?.[5]).toMatchObject({
+    approvedSelection: {
+      modelId: 'model',
+      approvedProviderId: 'provider',
+      approvedModelCode: mocks.modelCode,
+      approvedDestination: `sha256:${'a'.repeat(64)}`,
+    },
+  });
+});
+
+it('clears provider evidence before an explicit recognition retry', async () => {
+  const { access, proposal } = fixture();
+  await mount(access);
+  mocks.run.mockRejectedValueOnce(new AudioJobProviderError('quota-exceeded', 'provider-failed'));
+  await act(async () => current.recognize('provider'));
+  expect(current.providerFailureReason).toBe('quota-exceeded');
+  const gate = Promise.withResolvers<ReviewRecognitionProposal>();
+  mocks.run.mockReturnValueOnce(gate.promise);
+  await act(async () => current.recognize('provider'));
+  expect(current.running).toBe(true);
+  expect(current.providerFailureReason).toBeNull();
+  await act(async () => gate.resolve(proposal));
+  expect(current.proposal).toBe(proposal);
 });

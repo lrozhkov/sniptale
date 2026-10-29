@@ -112,6 +112,22 @@ Only the exact top-level Settings document can use the private history Port. Ret
 
 Use `apps/extension/src/features/ai/privacy/index.ts` and the content egress pipeline for sanitized AI payloads. Apply [data handling](../security/data-handling.md) to secrets, retention, diagnostics, and headers.
 
+### AI providers, catalogs and selections
+
+The background [provider factory](../../apps/extension/src/background/ai/providers.ts) admits ready-made SDK providers for each supported operation. Text uses SDK core with an explicit provider model object. Native speech, transcription and audio-chat use admitted SDK methods. Pages and content retain typed request clients. Chrome AI retains its local content and browser-session owners. The SDK does not own catalog discovery, capability evidence, model lifecycle or product authorization.
+
+[Catalog runtime](../../apps/extension/src/background/ai/settings/catalog-runtime.ts) owns explicit metadata egress through provider-specific readers. Automatic maintenance runs from active Settings and model-selection flows. It checks a 24-hour successful refresh period and a five-minute failure cooldown. Explicit refresh can bypass those periods. Maintenance never requests an origin grant or unlocks a secret.
+
+MV3 suspension gives no guaranteed refresh time. Failed discovery preserves saved configuration and permits explicit retry.
+
+Eligibility combines registered adapter support with declared model operations, input/output types and feature states. Missing evidence stays unknown. Names, IDs and generic image input do not establish image generation, editing or specialized audio support. Provider metadata supplies evidence, not permission to send source data.
+
+[Scenario selection](../../apps/extension/src/workflows/ai-settings/use-scenario-model-selection.ts) owns one frozen choice per mounted interface. Opening does not write a scenario preference. First use can propose an eligible model from the latest configured connection. Actual use records that choice. Explicit selection records a replacement. No global default participates in runtime selection.
+
+An unavailable saved identity retains its name without an execution context. Refresh cannot authorize recreated records or adopt another window's preference. The user must select an eligible replacement. Background repeats current source and destination admission before egress.
+
+SDK text calls set maxRetries to zero. Direct audio SDK calls add no retry loop. Existing bounded JSON-validation attempts remain separate from SDK transport retries. Provider failure never selects another model or provider. Result parsing, preview, Apply and durable publication retain their existing owners.
+
 ## Runtime changes
 
 For a new or changed runtime, update the runtime registry, manifest or build input, and entrypoint ownership. For that runtime change, update the documentation marker and drift proof. Declare a privileged background route once beside its parser. Include handler, authorization, sender, freshness and replay, policy-state, failure-response, and owner metadata for that route.
@@ -240,7 +256,7 @@ Gallery subtitle sidecars use `features/video/review/subtitle-export` with the e
 
 Literal payload escaping and bounded cue/text expansion precede the existing Gallery Blob download owner, which reports completion/interruption independently from backing-file release failures.
 
-Multimodal audio transcription is an explicitly declared transcription transport. The background audio request owner resolves the existing provider Chat Completions URL. It constructs the selected protocol and fixed timed schema. The protocol is standard input_audio or an explicitly configured Bothub media data URL. It parses the unknown response before returning it.
+Multimodal audio transcription is an explicitly declared transcription transport. The background audio owner builds the fixed timed schema and calls the admitted SDK language model. The ready-made adapter constructs the wire request. The SDK transformation hook maps explicitly selected Bothub proxy fields. Existing transcript parsers check the unknown result before returning it.
 
 Gallery prepares one complete native interval, including original Cuts, within the existing byte budget. It does not silently chunk or fall back to another paid transport. Mode, granularity and bounded operation instructions are frozen into the disposable job identity. User-editable additional instructions use the serialized AI-settings authority and existing Settings query/mutation routes. Model supplied timing remains coarse and requires proposal review before Apply.
 

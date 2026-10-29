@@ -1535,10 +1535,10 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx",
       "symbol": "TourNarrationAI",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: This 198-line form owns one catalog, profile, provider approval and target selection lifetime. Voice parameters and result presentation already have cohesive local components. Generation and explicit publication remain in the existing attempt hook and page adapters. Its 19 branches project catalog, disclosure, busy and error states, with no durable writer or independent recovery. Form tests and real browser proof cover provider reset, cancellation, retry, explicit Apply and focus. Further forwarding components would distribute this same form lifetime.",
+      "reason": "tool-noise: This existing 277-line form owns one voice draft, destination approval, profile-reset intent and target selection lifetime. Fixed provider copy consumes the same operation state and alert receiver. Score 5, delta 0, signatures, effects and three owner groups remain unchanged. Shared selection owns catalog and preferences. The existing attempt hook owns generation and explicit publication. The candidate adds no writer, network owner, resource or recovery authority. Mounted partial-success, typed-failure and explicit-retry proof supports Keep. Splitting presentation by line count would distribute the same visible receiver. Fresh independent architecture review must assess this exact renewal.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
-      "reviewDate": "2026-10-19",
-      "astHash": "ad10d2ed4eaf2c833ca69daa579f6e3ca18bc30dfb52b11a410db2aa26e21c8d",
+      "reviewDate": "2026-10-27",
+      "astHash": "7b735440d4a5910f09e09e79ccb6f496f9f3d7f6b3f9c7796db91bbcc3b1d299",
       "signatureHash": "fc2ff29cd7dd2af6b1c33aef69f08045dd9326a84c0b638dfa741c6352cf3124"
     },
     {
@@ -1546,11 +1546,11 @@
       "file": "apps/extension/src/scenario-editor/page-shell/tour/use-narration-ai.ts",
       "symbol": "useScenarioNarrationAI",
       "owner": "extension:scenario-editor:page-shell",
-      "reason": "tool-noise: This 156-line hook owns one mounted attempt and disposable preview receiver. Its owner ref and React state are imperative and rendered views of that same attempt. Generation and Apply serialize through one active controller. Profile reset removes only unaccepted previews. Accepted durable state remains with the page mutation owner. Controlled disposal, cancellation acknowledgement, partial success and retry tests prove this lifetime. The score1 pressure is length. Splitting these transitions would distribute their shared cancellation and cleanup state.",
+      "reason": "tool-noise: This existing 188-line hook owns one mounted attempt and disposable preview receiver. Its ref and React state represent the same attempt. Provider reasons accompany existing error state and clear in current transitions. Score 1, delta 0, signatures, effects and owner groups remain unchanged. One active controller retains source preparation, queued generation, cancellation, disposal and Apply. Accepted durable state remains with the page mutation owner. Current controlled tests cover deferred Save, refusal, cancellation, disposal, partial success, typed failure and explicit retry. Splitting these transitions would distribute cancellation and preview disposal authority. Fresh independent architecture review must assess this exact renewal.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, effect lifetime, runtime contract, durable writer or recovery domain. Remove when the analyzer models this documented cohesive boundary. Fresh complete-candidate architecture review must inspect this classification before closeout.",
-      "reviewDate": "2026-10-19",
-      "astHash": "f2b86151db71d3abf528ec83fb4ef0e57813e893e1723ca75e3fbeea51b7499a",
-      "signatureHash": "af9ffe5c891cb863fa2637479f1437e3560d7cf57dafc517286a716131ef455b"
+      "reviewDate": "2026-10-27",
+      "astHash": "a345dd70e80eea2d014ff670fb7b2d12dcf73a9ffd2bdac3704161bdf294504d",
+      "signatureHash": "ebbe3536369917af01b944fd961d6953a5f3f38a18ac1d8015c49bb992934c9e"
     },
     {
       "rule": "structural-function-risk",
@@ -3179,6 +3179,61 @@
       "reviewDate": "2026-10-29",
       "astHash": "dfbdd7eb3e9ca08dcacdc76bad98c8f753595ea0bf8c60bcdb19b378417a2156",
       "signatureHash": "ee6b0b0d7b37a9525646d273cc12bd3400c0af84a20f9d07214623fd32b4acc4"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/runtime/session/text-voice.ts",
+      "symbol": "useVideoProjectTextVoice",
+      "owner": "extension:video-editor:runtime",
+      "reason": "tool-noise: This existing Video coordinator retains one project lifetime for speech consent, audition, placement and explicit acceptance. Stage 33 adds only a returned presentation field from the existing scenario selection hook. State, effects, statements and owner groups remain unchanged. The hook retains choice identity and name authority. Existing workflows retain provider admission, persistence, byte publication and history authority. Splitting these closures for one returned field would distribute the same project lifetime. Main inspection, 449 receiving tests and native retained-source recovery proof support Keep. Fresh independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state receiver, writer, resource, consent, cancellation or recovery authority. Remove when the analyzer models this cohesive project-operation coordinator. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-28",
+      "astHash": "c040d4ef8b856dd7fc136dccadf561cd5d26af8a3ac5cdac56dd5f5193352978",
+      "signatureHash": "3d132dfa67d78dcd46b3165ccd760a4a9e28bc02659d1cc11292861bb070a33e"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/use-recognition.ts",
+      "symbol": "useReviewRecognition",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This existing Gallery recognition coordinator retains one parameter form, attempt, job, proposal and explicit acceptance lifetime. Provider failure feedback shares the existing attempt state and alert receiver. The candidate adds no controller, durable writer, egress, resource or recovery authority. The 198-line body retains 13 statements, cyclomatic 4, cognitive 3, nesting 1 and no recovery. Its score remains 1 with delta 0. The sole blocker is the function line limit. Line-only extraction would distribute the same cohesive operation across forwarding helpers. Mounted refusal, cancellation, retained-source retry and browser failure proof cover the changed feedback. Fresh independent architecture review must assess this exact body and the unchanged state authorities.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, controller, resource, consent, retry, acceptance or recovery authority. Remove when the analyzer models this cohesive recognition coordinator. Independent architecture review must assess this classification.",
+      "reviewDate": "2026-10-27",
+      "astHash": "e05c90716e3673fa378166e463179f61fc67f585ac9e97f587cde8c0a58244c5",
+      "signatureHash": "8e58752272e0524870e7b65e1c3bcee81b73dcc35914240ca0a335adcd71f173"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/runtime/session/recognition.ts",
+      "symbol": "useVideoProjectRecognition",
+      "owner": "extension:video-editor:runtime",
+      "reason": "tool-noise: This existing Video coordinator retains one project lifetime for recognition source admission, cancellation, proposal and explicit acceptance. Stage 33 adds only a returned presentation field from the existing scenario selection hook. State, effects, statements and owner groups remain unchanged. The hook retains choice identity and name authority. Existing workflows retain provider admission, persistence, byte publication and history authority. Splitting these closures for one returned field would distribute the same project lifetime. Main inspection, 449 receiving tests and native retained-source recovery proof support Keep. Fresh independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new independent state receiver, request controller, persistence writer, consent, retry, history or publication authority. Remove when the analyzer models this cohesive coordinator.",
+      "reviewDate": "2026-10-28",
+      "astHash": "42d0540ee873cfb1d53434457ed2c335e56d3756a1c60a5962c1ad7e4213d08c",
+      "signatureHash": "244a6f71f8761ae14a154a5611135a3a0a58bd0e2d84eca6c943ce77b68d4c48"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/text-voice-panel.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This mounted Gallery narration suite uses one React root, one review session fixture and the existing mocked catalog and operation boundaries. The added consent, same-ID replacement and deferred-flush cases use the same fixture. No import owner, runtime effect or production authority is added. The 867-line file has seven existing owner groups, one UI effect family, cohesion 1.00 and score 6 with delta 0. The remaining blocker is the test-file line limit. The analyzer counts separate test-local catalog snapshots as state receivers. A fixture extraction would distribute the same mounted-form state across test modules without an independent change reason. Main inspected the complete fixture and all new cases. Independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent fixture, runtime, effect lifetime, state owner or test subject. Remove when the analyzer models this cohesive mounted-form fixture. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-27",
+      "astHash": "7df14bc4a665165e15d47c0efa38b3a213900e1a1a11dd90b6eba34787507ba2",
+      "signatureHash": "031afdb9ec7d9e870b41c1dc68a59e04af8d2157a0bd9f7d088e4385730745e6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/runtime/session/text-rewrite.ts",
+      "symbol": "useVideoProjectTextRewrite",
+      "owner": "extension:video-editor:runtime",
+      "reason": "tool-noise: This existing Video coordinator retains one project lifetime for text rewrite draft, cancellation, proposal and explicit Apply. Stage 33 adds only a returned presentation field from the existing scenario selection hook. State, effects, statements and owner groups remain unchanged. The hook retains choice identity and name authority. Existing workflows retain provider admission, persistence, byte publication and history authority. Splitting these closures for one returned field would distribute the same project lifetime. Main inspection, 449 receiving tests and native retained-source recovery proof support Keep. Fresh independent architecture review must assess this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new independent state receiver, writer, resource, consent, cancellation or recovery authority. Remove when the analyzer models this cohesive project text operation.",
+      "reviewDate": "2026-10-28",
+      "astHash": "474a5f79ffa28b471e345c29d923ac2702f4a31873996913b21362329b44dccf",
+      "signatureHash": "a5862144e94f8138df1a63d57fe224b924d30f6e9ba423e165911b926efaaad4"
     }
   ]
 }

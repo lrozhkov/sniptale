@@ -5,7 +5,7 @@ import type { SecretAdditionalData } from '@sniptale/platform/security/local-sec
 const AI_PROVIDER_SECRET_BINDING_VERSION = 'ai-provider-secret:v1';
 
 export function createAIProviderSecretAdditionalData(
-  provider: Pick<AIProvider, 'baseUrl' | 'connectionType' | 'id'>
+  provider: Pick<AIProvider, 'baseUrl' | 'connectionType' | 'id' | 'incarnation'>
 ): SecretAdditionalData {
   const canonicalOrigin = resolveAIProviderCanonicalOrigin(provider.baseUrl);
   if (!canonicalOrigin) {
@@ -16,13 +16,14 @@ export function createAIProviderSecretAdditionalData(
     connectionType: provider.connectionType,
     providerId: provider.id,
     providerOrigin: canonicalOrigin,
+    ...(provider.incarnation ? { incarnation: provider.incarnation } : {}),
     version: AI_PROVIDER_SECRET_BINDING_VERSION,
   };
 }
 
 export function hasAIProviderSecretBindingChanged(
-  previousProvider: Pick<AIProvider, 'baseUrl' | 'connectionType' | 'id'>,
-  nextProvider: Pick<AIProvider, 'baseUrl' | 'connectionType' | 'id'>
+  previousProvider: Pick<AIProvider, 'baseUrl' | 'connectionType' | 'id' | 'incarnation'>,
+  nextProvider: Pick<AIProvider, 'baseUrl' | 'connectionType' | 'id' | 'incarnation'>
 ): boolean {
   return (
     JSON.stringify(createAIProviderSecretAdditionalData(previousProvider)) !==

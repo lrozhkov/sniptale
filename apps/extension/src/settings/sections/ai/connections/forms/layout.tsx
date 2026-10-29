@@ -14,7 +14,7 @@ type AiProvidersFormModalLayoutProps = {
 
 function handleAiProvidersModalKeyDown(onClose: () => void) {
   return (event: React.KeyboardEvent) => {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && !event.defaultPrevented) {
       event.preventDefault();
       onClose();
     }

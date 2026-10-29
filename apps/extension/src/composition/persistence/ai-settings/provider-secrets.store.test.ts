@@ -1,4 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { selectSettingsTransferProviderMetadata } from '../../../contracts/settings-transfer/provider-metadata';
+import { createAIProviderSecretAdditionalData } from './provider-secret-binding';
+import { parseStoredAIProviders } from './guards';
 
 import {
   AI_LOCAL_SECRET_KEY_STORAGE_KEY,
@@ -66,6 +69,7 @@ let sessionState: Record<string, unknown> = {};
 function createStoredProvider(id = 'provider-1') {
   return {
     id,
+    incarnation: `local-${id}`,
     name: `Provider ${id}`,
     connectionType: 'openai-compatible' as const,
     baseUrl: `https://${id}.example.com`,
@@ -353,4 +357,160 @@ it('rotates passphrase-protected secrets without storing key material in session
   await expect(unlockStoredAISecretProtection('old passphrase')).rejects.toThrow();
   await unlockStoredAISecretProtection('new passphrase');
   await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBe('provider-1-secret');
+});
+
+it('preserves a modern local secret binding across portable metadata restore', async () => {
+  const { provider, envelope } = await installModernProviderSecret();
+  const { prepareAIProviderTransferMutation, loadStoredAIProviderSecret } =
+    await import('./provider-secrets.store.ts');
+  const plan = await prepareAIProviderTransferMutation({
+    importedProviders: [
+      { ...selectSettingsTransferProviderMetadata(provider), hasStoredApiKey: false },
+    ],
+  });
+  expect(plan.clearedProviderIds).toEqual([]);
+  expect(plan.missingProviderIds).toEqual([]);
+  await plan.commit();
+  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual({ [provider.id]: envelope });
+  expect(localState[AI_PROVIDERS_KEY]).toEqual([
+    expect.objectContaining({
+      incarnation: 'local-incarnation',
+      revision: 8,
+      credentialRevision: 3,
+      observation: expect.objectContaining({ status: 'unverified', revision: 8 }),
+    }),
+  ]);
+  const restored = JSON.stringify(localState[AI_PROVIDERS_KEY]);
+  expect(restored).not.toContain('old-flight');
+  expect(restored).not.toContain('catalogUpdatedAt');
+  await expect(loadStoredAIProviderSecret(provider.id)).resolves.toBe('modern-test-secret');
+});
+
+it('generates a new local incarnation without trusting imported lifecycle', async () => {
+  const imported = {
+    ...createStoredProvider(),
+    hasStoredApiKey: true,
+    incarnation: 'foreign-incarnation',
+    revision: 99,
+    credentialRevision: 99,
+    refreshGeneration: 'foreign-flight',
+    catalogUpdatedAt: 123,
+    observation: {
+      status: 'available' as const,
+      scope: 'catalog' as const,
+      checkedAt: 123,
+      revision: 99,
+    },
+  };
+  const { prepareAIProviderTransferMutation } = await import('./provider-secrets.store.ts');
+  const plan = await prepareAIProviderTransferMutation({ importedProviders: [imported] });
+  await plan.commit();
+  expect(localState[AI_PROVIDERS_KEY]).toEqual([
+    expect.objectContaining({
+      incarnation: expect.any(String),
+      revision: 1,
+      credentialRevision: 0,
+      hasStoredApiKey: false,
+      observation: expect.objectContaining({ status: 'unverified', revision: 1 }),
+    }),
+  ]);
+  const serialized = JSON.stringify(localState[AI_PROVIDERS_KEY]);
+  expect(serialized).not.toContain('foreign-');
+  expect(serialized).not.toContain('catalogUpdatedAt');
+});
+
+async function installModernProviderSecret() {
+  const material = await createAesGcmKeyMaterial();
+  const provider = {
+    ...createStoredProvider(),
+    incarnation: 'local-incarnation',
+    revision: 7,
+    credentialRevision: 3,
+    refreshGeneration: 'old-flight',
+    catalogUpdatedAt: 123,
+    lastRefreshAttemptAt: 123,
+    observation: {
+      status: 'available' as const,
+      scope: 'catalog' as const,
+      checkedAt: 123,
+      revision: 7,
+    },
+  };
+  const envelope = await encryptSecret(
+    'modern-test-secret',
+    material.key,
+    createAIProviderSecretAdditionalData(provider)
+  );
+  installStorageState({
+    [AI_PROVIDERS_KEY]: [provider],
+    [AI_PROVIDER_SECRETS_KEY]: { [provider.id]: envelope },
+    [AI_LOCAL_SECRET_KEY_STORAGE_KEY]: material.material,
+  });
+  return { provider, envelope };
+}
+
+it('preserves a matching protected ciphertext while the key stays locked', async () => {
+  const { provider } = await installModernProviderSecret();
+  const protection = await import('./provider-secret-protection.store.ts');
+  const owner = await import('./provider-secrets.store.ts');
+  await protection.enableStoredAISecretPassphraseProtection('portable-test-passphrase');
+  await protection.lockStoredAISecretProtection();
+  const encryptedBefore = structuredClone(localState[AI_PROVIDER_SECRETS_KEY]);
+  const plan = await owner.prepareAIProviderTransferMutation({
+    importedProviders: [
+      { ...selectSettingsTransferProviderMetadata(provider), hasStoredApiKey: false },
+    ],
+  });
+  await plan.commit();
+  expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual(encryptedBefore);
+  await expectPassphraseProtectionStatus(protection.loadStoredAISecretProtectionStatus, false);
+  expectNoSessionPassphraseKeyMaterial();
+  await expect(owner.loadStoredAIProviderSecret(provider.id)).resolves.toBeNull();
+  await protection.unlockStoredAISecretProtection('portable-test-passphrase');
+  await expect(owner.loadStoredAIProviderSecret(provider.id)).resolves.toBe('modern-test-secret');
+});
+
+it('restores a modern binding after partial write refusal and permits explicit retry', async () => {
+  const { provider } = await installModernProviderSecret();
+  const before = structuredClone(localState);
+  const { prepareAIProviderTransferMutation, loadStoredAIProviderSecret } =
+    await import('./provider-secrets.store.ts');
+  const plan = await prepareAIProviderTransferMutation({
+    importedProviders: [
+      {
+        ...selectSettingsTransferProviderMetadata(provider),
+        name: 'Restored',
+        hasStoredApiKey: false,
+      },
+    ],
+  });
+  localSetMock.mockImplementationOnce(async (values: Record<string, unknown>) => {
+    Object.assign(localState, values);
+    throw new Error('Transfer write refused');
+  });
+  await expect(plan.commit()).rejects.toThrow('Transfer write refused');
+  expect(localState).toEqual(before);
+  await plan.commit();
+  expect(localState[AI_PROVIDERS_KEY]).toEqual([
+    expect.objectContaining({
+      id: provider.id,
+      name: 'Restored',
+      incarnation: provider.incarnation,
+      hasStoredApiKey: true,
+    }),
+  ]);
+  await expect(loadStoredAIProviderSecret(provider.id)).resolves.toBe('modern-test-secret');
+});
+
+it('does not reuse an imported old incarnation after deletion and same-ID restore', async () => {
+  const owner = await import('./provider-secrets.store.ts');
+  const imported = { ...createStoredProvider(), hasStoredApiKey: false };
+  await (await owner.prepareAIProviderTransferMutation({ importedProviders: [imported] })).commit();
+  const first = parseStoredAIProviders(localState[AI_PROVIDERS_KEY]).value[0]!;
+  await owner.deleteStoredAIProviderRecord(first.id);
+  await (await owner.prepareAIProviderTransferMutation({ importedProviders: [first] })).commit();
+  const second = parseStoredAIProviders(localState[AI_PROVIDERS_KEY]).value[0]!;
+  expect(second.id).toBe(first.id);
+  expect(second.incarnation).toBeTruthy();
+  expect(second.incarnation).not.toBe(first.incarnation);
 });

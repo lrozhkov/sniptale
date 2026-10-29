@@ -46,7 +46,10 @@ test('ordinary voiceover recognition links canonical text and excludes Music', a
     await applyHarnessBootstrap(page, {
       preserveMediaLibrary: true,
       storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
-      runtimeResponses: { AI_SETTINGS_QUERY: speechModelResponse },
+      runtimeResponses: {
+        AI_SETTINGS_QUERY: { ...speechModelResponse, scenarioSelection: null },
+        AI_SETTINGS_MUTATION: { success: true },
+      },
     });
     await page.goto(host.origin + GALLERY_HARNESS_PATH + '?theme=light');
     await page.locator('[data-ui="gallery.page.root"]').waitFor();
@@ -95,7 +98,7 @@ test('ordinary voiceover recognition links canonical text and excludes Music', a
         .poll(async () => (await persistedReviewContent(page))?.text?.fragments.length)
         .toBe(total);
       expect((await persistedReviewContent(page))?.audio).toEqual(before);
-      const related = panel.getByRole('button', { name: 'First phrase.', exact: true });
+      const related = panel.getByLabel('First phrase.', { exact: true });
       await expect(related).toBeVisible();
       await related.click();
       await expect(panel).toHaveCount(0);
@@ -124,15 +127,21 @@ test('ordinary voiceover recognition links canonical text and excludes Music', a
       .getByRole('button', { name: label('gallery.videoReview.textTrackOpen'), exact: true })
       .click();
     const document = dialog.locator('[data-ui="gallery.videoReview.textDocument"]');
+    await document
+      .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
+      .click();
     await expect(document.locator('[data-ui="gallery.videoReview.textPhrase"]')).toHaveCount(6);
     await page.screenshot({
       path: info.outputPath('voiceover-recognized-track-text.png'),
       fullPage: false,
     });
     await page.reload();
-    await open();
+    await expect(dialog).toBeVisible();
     await dialog
       .getByRole('button', { name: label('gallery.videoReview.textTrackOpen'), exact: true })
+      .click();
+    await document
+      .getByRole('button', { name: label('gallery.videoReview.textViewCards'), exact: true })
       .click();
     await expect(document.locator('[data-ui="gallery.videoReview.textPhrase"]')).toHaveCount(6);
     expect((await persistedReviewContent(page))?.audio.music).toHaveLength(1);
@@ -170,7 +179,10 @@ for (const layout of [
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
         storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': layout.theme },
-        runtimeResponses: { AI_SETTINGS_QUERY: response },
+        runtimeResponses: {
+          AI_SETTINGS_QUERY: { ...response, scenarioSelection: null },
+          AI_SETTINGS_MUTATION: { success: true },
+        },
       });
       await page.goto(host.origin + GALLERY_HARNESS_PATH + `?theme=${layout.theme}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();

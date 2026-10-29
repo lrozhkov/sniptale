@@ -6,6 +6,13 @@ import { createLibraryLifecycle } from '../../composition/persistence/library-li
 import type { ProjectVoiceReadAccess } from './project-voice-take';
 import { captureProjectTextVoice } from './project-text-voice';
 
+export const approvedSelection = {
+  modelId: 'model',
+  approvedProviderId: 'provider',
+  approvedModelCode: 'speech',
+  approvedDestination: `sha256:${'a'.repeat(64)}`,
+};
+
 const profile = { modelId: 'model', voiceId: 'voice', responseFormat: 'mp3' as const };
 export function fixture() {
   let project = createEmptyVideoProject('Voice');

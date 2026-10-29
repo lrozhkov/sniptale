@@ -1,3 +1,4 @@
+import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { TextRewriteSettings } from '../../ui/video-text/rewrite/settings';
@@ -27,6 +28,7 @@ export function ReviewTextRewriteForm(props: {
   const operation = useReviewTextRewrite(props);
   const { preview } = operation;
   const error = operation.error ?? operation.disclosureError;
+  const providerFailureKey = getAIProviderFailureKey(operation.providerFailureReason);
   const label = (key: keyof typeof errors) => translate(errors[key]);
   return (
     <section
@@ -65,7 +67,11 @@ export function ReviewTextRewriteForm(props: {
         wholeDocument={props.wholeDocument}
         windowFallback={(preview?.context ?? operation.disclosure?.context)?.window}
         resultDuration={operation.resultDuration}
-        catalogError={!!operation.error}
+        catalogError={operation.catalogError}
+        selectionPending={operation.selectionPending}
+        selectionUnavailable={operation.selectionUnavailable}
+        unavailableModelName={operation.unavailableModelName}
+        selectionFailed={operation.selectionFailed}
         onOptionsChange={(change) => operation.setOptions((current) => ({ ...current, ...change }))}
         onModelChange={operation.setModelId}
         onReloadModels={operation.reloadModels}
@@ -76,7 +82,9 @@ export function ReviewTextRewriteForm(props: {
       ) : null}
       {error && (
         <p role="alert" className="text-xs">
-          {label(error in errors ? (error as keyof typeof errors) : 'failed')}
+          {providerFailureKey
+            ? translate(providerFailureKey)
+            : label(error in errors ? (error as keyof typeof errors) : 'failed')}
         </p>
       )}
       {operation.running ? (
@@ -101,7 +109,12 @@ export function ReviewTextRewriteForm(props: {
           <ReviewButton
             label={translate('gallery.videoReview.textRewriteStart')}
             className={buttonClass}
-            disabled={!!props.disabled || !operation.disclosure || !operation.modelId}
+            disabled={
+              !!props.disabled ||
+              !operation.disclosure ||
+              !operation.modelId ||
+              operation.selectionPending
+            }
             onClick={operation.start}
           >
             {translate('gallery.videoReview.textRewriteStart')}

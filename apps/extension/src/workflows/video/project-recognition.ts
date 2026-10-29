@@ -1,3 +1,4 @@
+import type { VoiceProviderSelection } from '@sniptale/runtime-contracts/voice-input';
 import {
   AUDIO_INPUT_MAX_SECONDS,
   validAudioInputDuration,
@@ -38,6 +39,7 @@ export interface ProjectRecognitionOptions {
   clipId: string;
   modelId: string;
   approvedProviderId: string;
+  approvedSelection?: VoiceProviderSelection;
   start: number;
   end: number;
   grouping: ReviewRecognitionGrouping;
@@ -227,6 +229,9 @@ export async function runProjectRecognition(
           requestId: crypto.randomUUID(),
           modelId: job.options.modelId,
           approvedProviderId: job.options.approvedProviderId,
+          ...(job.options.approvedSelection
+            ? { approvedSelection: job.options.approvedSelection }
+            : {}),
           scope,
           ...(job.options.recognition ? { recognition: job.options.recognition } : {}),
         },

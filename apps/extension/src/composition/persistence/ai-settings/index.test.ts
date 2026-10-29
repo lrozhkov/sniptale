@@ -34,14 +34,20 @@ it('aggregates every stored AI settings field without mutating storage', async (
   await expect(loadAISettings()).resolves.toEqual({
     audioTranscriptionSystemPrompt: 'Transcription prompt',
     chromeAiEnabled: true,
-    defaultModelId: 'model-1',
     globalSystemPrompt: 'Global prompt',
     models: [{ id: 'model-1' }],
     providers: [{ id: 'provider-1' }],
     scenarioEditorSystemPrompt: 'Scenario prompt',
     voiceInputCorrectionSystemPrompt: 'Voice correction prompt',
   });
-  for (const loader of Object.values(coreMocks)) {
+  for (const [name, loader] of Object.entries(coreMocks)) {
+    if (name === 'loadDefaultModelId') continue;
     expect(loader).toHaveBeenCalledOnce();
   }
+});
+
+it('does not read or expose the retired global selection during settings aggregation', async () => {
+  const settings = await loadAISettings();
+  expect(settings).not.toHaveProperty('defaultModelId');
+  expect(coreMocks.loadDefaultModelId).not.toHaveBeenCalled();
 });

@@ -279,6 +279,130 @@ describe('verify-fetch-ownership', () => {
     ).toEqual([]);
   });
 
+  it.each([
+    ['../../providers', 'createAIProviderRuntime', 'createAIProviderRuntime'],
+    ['../../providers', 'createAIProviderRuntime as runtime', 'runtime'],
+  ])('classifies canonical SDK credentials through %s and %s', (module, imported, factory) => {
+    const relativePath = 'apps/extension/src/background/ai/llm/transport/request.ts';
+    const fileContents = `import { ${imported} } from '${module}';
+      ${factory}({ apiKey: options.apiKey, fetch: transport });`;
+    expect(
+      collectViolations({ fileContents, relativePath, policy: { secretHeaderOwners: [] } })
+    ).toEqual([expect.objectContaining({ rule: 'fetch-secret-header-outside-owner' })]);
+    expect(
+      collectViolations({
+        fileContents,
+        relativePath,
+        policy: {
+          secretHeaderOwners: [
+            {
+              file: relativePath,
+              owner: 'background-llm-transport',
+              justification: 'Canonical SDK credential handoff.',
+              reviewNote: 'Keep credentials here.',
+            },
+          ],
+        },
+      })
+    ).toEqual([]);
+  });
+
+  it.each([
+    [
+      "import { createAIProviderRuntime } from './providers';",
+      'createAIProviderRuntime({ apiKey: token });',
+    ],
+    [
+      "import { createAIProviderRuntime } from '../../providers';",
+      'createAIProviderRuntime({ model: token });',
+    ],
+    [
+      "import { createAIProviderRuntime } from '../../providers';",
+      'createAIProviderRuntime({ apiKey: undefined });',
+    ],
+    [
+      "import type { createAIProviderRuntime } from '../../providers';",
+      'createAIProviderRuntime({ apiKey: token });',
+    ],
+    ['', 'createAIProviderRuntime({ apiKey: token });'],
+  ])(
+    'does not grant a sink entitlement for unrelated or absent SDK credentials',
+    (imports, call) => {
+      const relativePath = 'apps/extension/src/background/ai/llm/transport/request.ts';
+      expect(
+        collectViolations({
+          fileContents: `${imports}\n${call}`,
+          relativePath,
+          policy: {
+            secretHeaderOwners: [
+              {
+                file: relativePath,
+                owner: 'background-llm-transport',
+                justification: 'Canonical SDK credential handoff.',
+                reviewNote: 'Keep credentials here.',
+              },
+            ],
+          },
+        })
+      ).toEqual([expect.objectContaining({ rule: 'fetch-secret-header-owner-stale' })]);
+    }
+  );
+
+  it.each(['Authorization', 'x-api-key', 'x-goog-api-key', 'xi-api-key'])(
+    'enforces ownership for guarded fetch aliases with %s',
+    (header) => {
+      const relativePath = 'apps/extension/src/background/ai/settings/managed-catalog.ts';
+      const fileContents = `import { createProviderSdkFetch as guardedFetch } from '../llm/transport/http';
+        const metadata = guardedFetch({ baseUrl });
+        const request = metadata;
+        const headers = new Headers(); headers.set('${header}', token);
+        request(url, { headers });`;
+      expect(
+        collectViolations({ fileContents, relativePath, policy: { secretHeaderOwners: [] } })
+      ).toEqual([expect.objectContaining({ rule: 'fetch-secret-header-outside-owner' })]);
+      expect(
+        collectViolations({
+          fileContents,
+          relativePath,
+          policy: {
+            secretHeaderOwners: [
+              {
+                file: relativePath,
+                owner: 'background-ai-catalog-transport',
+                justification: 'Canonical metadata credential transport.',
+                reviewNote: 'Keep credentials here.',
+              },
+            ],
+          },
+        })
+      ).toEqual([]);
+    }
+  );
+
+  it('classifies a canonical SDK import from another background consumer', () => {
+    expect(
+      collectViolations({
+        fileContents: `import { createAIProviderRuntime } from '../providers';
+        const apiKey = options.apiKey; const config = { apiKey };
+        createAIProviderRuntime(config);`,
+        relativePath: 'apps/extension/src/background/ai/settings/example.ts',
+        policy: { secretHeaderOwners: [] },
+      })
+    ).toEqual([expect.objectContaining({ rule: 'fetch-secret-header-outside-owner' })]);
+  });
+
+  it('does not classify an unrelated guarded fetch factory by name', () => {
+    expect(
+      collectViolations({
+        fileContents: `import { createProviderSdkFetch } from './unrelated';
+        const metadata = createProviderSdkFetch({});
+        metadata(url, { headers: { Authorization: token } });`,
+        relativePath: 'apps/extension/src/background/ai/settings/managed-catalog.ts',
+        policy: { secretHeaderOwners: [] },
+      })
+    ).toEqual([]);
+  });
+
   it('rejects an existing but stale owner entitlement', () => {
     expect(
       collectViolations({

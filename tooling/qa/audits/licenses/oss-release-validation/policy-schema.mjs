@@ -33,6 +33,23 @@ function validateLegalAndAssetEntries(policy) {
 }
 
 function pinnedSourceIsInvalid(source) {
+  if (source?.kind === 'package-license') {
+    const expectedRef = `${source.packageName}@${source.packageVersion}`;
+    const upstreamRoot = `https://raw.githubusercontent.com/${source.upstreamRepository}`;
+    const expectedOrigin = `${upstreamRoot}/${encodeURIComponent(expectedRef)}/LICENSE`;
+    return (
+      !isNonEmptyString(source.packageName) ||
+      !isNonEmptyString(source.packageVersion) ||
+      !isNonEmptyString(source.packageResolved) ||
+      !/^sha512-[A-Za-z0-9+/]+={0,2}$/u.test(source.packageIntegrity ?? '') ||
+      !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(source.upstreamRepository ?? '') ||
+      source.upstreamVersion !== expectedRef ||
+      source.originUrl !== expectedOrigin ||
+      !isNonEmptyString(source.license) ||
+      !source.sourcePath?.startsWith('tooling/release/dependency-legal/sources/') ||
+      !/^[a-f0-9]{64}$/u.test(source.sha256 ?? '')
+    );
+  }
   return (
     !isNonEmptyString(source?.packageName) ||
     !isNonEmptyString(source?.packageVersion) ||

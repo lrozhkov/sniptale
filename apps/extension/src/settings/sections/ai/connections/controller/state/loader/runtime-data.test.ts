@@ -41,7 +41,6 @@ it('loads ai providers runtime data in one batch and preserves order', async () 
     secretProtectionStatus: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
     selectionBootstrap: {
       chromeAiEnabled: true,
-      defaultModelId: 'chrome-ai-google-model',
       globalSystemPrompt: 'Shared prompt',
       models: [
         ...MODELS,
@@ -56,7 +55,6 @@ it('loads ai providers runtime data in one batch and preserves order', async () 
     MODELS,
     [PROVIDER, { id: 'chrome-ai-google-provider', name: 'Google' }],
     [...MODELS, { id: 'chrome-ai-google-model', providerId: 'chrome-ai-google-provider' }],
-    'chrome-ai-google-model',
     'Shared prompt',
     'Scenario prompt',
     true,

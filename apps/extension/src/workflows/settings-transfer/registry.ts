@@ -162,10 +162,7 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('ai.providers', 'api-keys', { classification: 'secret' }),
     field('ai.providers', 'security-binding', { classification: 'secret' }),
   ]),
-  ...domain('ai.models', [
-    field('ai.models', 'items', { kind: 'collection', dynamicItems: true }),
-    field('ai.models', 'default'),
-  ]),
+  ...domain('ai.models', [field('ai.models', 'items', { kind: 'collection', dynamicItems: true })]),
   ...domain('ai.chrome', [field('ai.chrome', 'enabled')]),
   ...domain('ai.prompts', [
     field('ai.prompts', 'global'),

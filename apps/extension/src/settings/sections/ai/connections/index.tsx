@@ -9,7 +9,7 @@ export function AIProvidersSection(props: {
 }) {
   const state = useAiProvidersSection();
 
-  if (state.isLoading && state.models.length === 0) {
+  if (state.isLoading && state.models.length === 0 && state.providers.length === 0) {
     return <DelayedSettingsCenteredLoadingState />;
   }
 

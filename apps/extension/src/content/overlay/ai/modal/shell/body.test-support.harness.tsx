@@ -55,6 +55,15 @@ function createBodyState(args: {
 }) {
   return {
     availableModels,
+    modelSelection: {
+      selectionPending: false,
+      selectionUnavailable: false,
+      unavailableModelName: null,
+      selectionFailed: false,
+      configurationFailed: false,
+      retryConfiguration: vi.fn(),
+      prepareModelSelection: async () => ({ modelId: args.selectedModelId }),
+    },
     editingTemplate: undefined,
     handleAddTemplate: vi.fn(),
     handleDeleteTemplate: vi.fn(async () => undefined),

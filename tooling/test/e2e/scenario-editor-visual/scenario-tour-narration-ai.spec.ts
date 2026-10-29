@@ -1,4 +1,5 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
+import type { AIScenarioSelection } from '../../../../apps/extension/src/contracts/settings/ai-catalog';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
 import { test } from '../support/extension-fixture';
@@ -19,8 +20,13 @@ const catalog = {
   modelSelection: {
     ...selection,
     providers: [
-      ...selection.providers,
-      { ...selection.providers[0]!, id: alternateProvider, name: 'Alternate fixture provider' },
+      ...selection.providers.map((entry) => ({ ...entry, incarnation: entry.id })),
+      {
+        ...selection.providers[0]!,
+        id: alternateProvider,
+        incarnation: alternateProvider,
+        name: 'Alternate fixture provider',
+      },
     ],
     models: [
       {
@@ -117,11 +123,49 @@ async function release(page: Page, index: number) {
   ).toBe(true);
 }
 async function installCatalog(page: Page) {
-  await page.evaluate(
-    (response) => window.__sniptaleHarness?.setRuntimeResponse('AI_SETTINGS_QUERY', response),
-    catalog
-  );
+  await page.evaluate((response) => {
+    let remembered: AIScenarioSelection | null = null;
+    window.__sniptaleHarness?.setRuntimeResponse('AI_SETTINGS_QUERY', () => ({
+      ...response,
+      scenarioSelection: remembered,
+    }));
+    window.__sniptaleHarness?.setRuntimeResponse('AI_SETTINGS_MUTATION', (message: unknown) => {
+      if (
+        !message ||
+        typeof message !== 'object' ||
+        Reflect.get(message, 'operation') !== 'remember-scenario-selection'
+      )
+        return { success: false };
+      const choice: unknown = Reflect.get(message, 'selection');
+      if (
+        !choice ||
+        typeof choice !== 'object' ||
+        Reflect.get(choice, 'scenario') !== 'scenario-speech'
+      )
+        return { success: false };
+      const model = response.modelSelection.models.find(
+        (entry) => entry.id === Reflect.get(choice, 'modelId')
+      );
+      const provider = response.modelSelection.providers.find(
+        (entry) => entry.id === model?.providerId
+      );
+      const source: unknown = Reflect.get(choice, 'source');
+      if (!model || !provider || (source !== 'explicit' && source !== 'initial'))
+        return { success: false };
+      remembered = {
+        modelId: model.id,
+        modelCode: model.modelCode,
+        providerId: provider.id,
+        providerIncarnation: provider.incarnation,
+        displayName: model.displayName,
+        source,
+        selectedAt: Date.now(),
+      };
+      return { success: true };
+    });
+  }, catalog);
 }
+
 function inspector(page: Page) {
   return page.locator('#guide-inspector-panel');
 }
@@ -284,6 +328,81 @@ for (const [locale, theme, viewport] of [
     await expect(
       inspector(page).getByRole('navigation').getByRole('button', { pressed: true })
     ).toHaveAttribute('aria-label', category!);
+  });
+
+  test(`remembers narration choices without changing accepted project content ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await setup(page, hostOrigin, locale, theme, viewport);
+    const before = await saved(page);
+    await openSingle(page, locale);
+    const selector = form(page).locator('.sniptale-ai-model-selector-trigger');
+    await selector.focus();
+    await selector.press('Enter');
+    const menu = form(page).locator('.sniptale-dropdown-menu');
+    await menu.getByRole('textbox').fill('Alternate');
+    const option = menu.getByRole('button', { name: 'Alternate fixture speech', exact: true });
+    await option.focus();
+    await option.press('Enter');
+    await expect(selector).toContainText('Alternate fixture speech');
+    expect(await saved(page)).toEqual(before);
+    expect(await requests(page)).toEqual([]);
+    await closeForm(page, locale);
+    await openSingle(page, locale);
+    await expect(form(page).locator('.sniptale-ai-model-selector-trigger')).toContainText(
+      'Alternate fixture speech'
+    );
+    await expect(form(page).locator('[data-ai-generate]')).toBeDisabled();
+    expect(await saved(page)).toEqual(before);
+    expect(await requests(page)).toEqual([]);
+    await screenshot(page, info, 'remembered-choice');
+  });
+
+  test(`recovers a refused narration choice without losing the voice draft ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = await setup(page, hostOrigin, locale, theme, viewport);
+    const before = await saved(page);
+    await openSingle(page, locale);
+    const selector = form(page).locator('.sniptale-ai-model-selector-trigger');
+    const voice = form(page).getByRole('textbox', {
+      name: t('gallery.videoReview.speechVoice'),
+      exact: true,
+    });
+    await voice.fill('retained draft');
+    await page.evaluate(() =>
+      window.__sniptaleHarness?.setRuntimeResponse('AI_SETTINGS_MUTATION', {
+        success: false,
+        error: 'fixture-refused',
+      })
+    );
+    const chooseAlternate = async () => {
+      await selector.click();
+      await form(page)
+        .locator('.sniptale-dropdown-menu')
+        .getByRole('button', { name: 'Alternate fixture speech', exact: true })
+        .click();
+    };
+    await chooseAlternate();
+    const error = form(page).getByText(t('scenario.editor.guideAiSelectionFailed'), {
+      exact: true,
+    });
+    await expect(error).toBeVisible();
+    await expect(voice).toHaveValue('retained draft');
+    await expect(selector).toContainText('Fixture speech');
+    expect(await saved(page)).toEqual(before);
+    expect(await requests(page)).toEqual([]);
+    await error.scrollIntoViewIfNeeded();
+    await screenshot(page, info, 'preference-error');
+    await installCatalog(page);
+    await chooseAlternate();
+    await expect(selector).toContainText('Alternate fixture speech');
+    await expect(voice).toHaveValue('alternate');
+    await expect(error).toHaveCount(0);
+    expect(await saved(page)).toEqual(before);
+    expect(await requests(page)).toEqual([]);
   });
 
   test(`generates selected action speech only after disclosure and applies it after preview ${locale}`, async ({

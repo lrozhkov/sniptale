@@ -163,8 +163,13 @@ export async function cacheUnlockedAISecretPassphraseKey(material: string): Prom
   await removeStoredPassphraseSessionKeyMaterial();
 }
 
-export async function lockStoredAISecretPassphrase(): Promise<void> {
+/** Discard the process-local key during reset without acquiring a nested storage permit. */
+export function clearAISecretPassphraseMemory(): void {
   unlockedAISecretPassphraseKey = null;
+}
+
+export async function lockStoredAISecretPassphrase(): Promise<void> {
+  clearAISecretPassphraseMemory();
   await Promise.all([
     removeStoredPassphraseSessionKeyMaterial(),
     clearStoredAISecretUnlockRequests(),

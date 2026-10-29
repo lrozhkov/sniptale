@@ -1,16 +1,18 @@
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { AIModelSelector } from '../../features/ai/model-selector';
 import { translate } from '../../platform/i18n';
-import type { useReviewSpeech } from './use-speech';
-import { SpeechSynthesisProfileFields } from '../../ui/video-text/speech/profile';
-type Controller = ReturnType<typeof useReviewSpeech>;
+import type { AIModelCatalogPayload } from '../../contracts/messaging/ai-settings-runtime';
 /** The same configured transcription selector serves original and recorded audio. */
 export function SpeechTranscriptionModelField({
   speech,
   onOpenModels,
 }: {
   onOpenModels?: (() => void) | undefined;
-  speech: Pick<Controller, 'catalogs' | 'modelId' | 'setModelId'>;
+  speech: {
+    catalogs: { transcription: AIModelCatalogPayload } | null;
+    modelId: string;
+    setModelId(id: string): void;
+  };
 }) {
   return (
     <InspectorParameterRow
@@ -29,32 +31,5 @@ export function SpeechTranscriptionModelField({
         <p role="status">{translate('common.states.loading')}</p>
       )}
     </InspectorParameterRow>
-  );
-}
-/** Gallery adapts its separate transcription and synthesis controllers to shared fields. */
-export function SpeechProfileFields({
-  speech,
-  operation = 'all',
-  onOpenModels,
-}: {
-  speech: Pick<Controller, 'profile' | 'changeProfile' | 'catalogs' | 'modelId' | 'setModelId'>;
-  operation?: 'transcription' | 'speech' | 'all';
-  onOpenModels?: (() => void) | undefined;
-}) {
-  return (
-    <>
-      {operation !== 'speech' && (
-        <SpeechTranscriptionModelField speech={speech} onOpenModels={onOpenModels} />
-      )}
-      {operation !== 'transcription' && (
-        <SpeechSynthesisProfileFields
-          catalog={speech.catalogs?.speech ?? null}
-          profile={speech.profile}
-          onChange={speech.changeProfile}
-          onOpenModels={onOpenModels}
-          preferenceId="speech.profile.advanced"
-        />
-      )}
-    </>
   );
 }

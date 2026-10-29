@@ -51,7 +51,6 @@ const LOCAL_KEYS = [
   'sniptale_prompt_templates',
   'sniptale_template_order',
   'sniptale_ai_models',
-  'sniptale_ai_default_model',
   'sniptale_ai_chrome_enabled',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
@@ -410,9 +409,6 @@ function applyAiWrites(context: WriteBuildContext): void {
     if (Array.isArray(models['items'])) {
       localWrites['sniptale_ai_models'] = models['items'].map(parseSettingsTransferModelMetadata);
     }
-    if (models['defaultModelId'] !== undefined) {
-      localWrites['sniptale_ai_default_model'] = models['defaultModelId'];
-    }
   }
   const chromeAi = data('ai.chrome');
   if (chromeAi) assign(localWrites, 'sniptale_ai_chrome_enabled', chromeAi['enabled']);
@@ -434,6 +430,13 @@ function readImportedProviders(
 }
 
 function toImportedProvider(imported: Record<string, unknown>): AIProvider {
+  const management = imported['management'];
+  const enabled = imported['enabled'];
+  if (
+    (management !== undefined && management !== 'automatic' && management !== 'manual') ||
+    (enabled !== undefined && typeof enabled !== 'boolean')
+  )
+    throw new TypeError('Invalid settings transfer AI provider controls');
   return {
     id: imported['id'] as string,
     name: imported['name'] as string,
@@ -441,6 +444,8 @@ function toImportedProvider(imported: Record<string, unknown>): AIProvider {
     baseUrl: imported['baseUrl'] as string,
     createdAt: imported['createdAt'] as number,
     hasStoredApiKey: false,
+    ...(management === undefined ? {} : { management }),
+    ...(enabled === undefined ? {} : { enabled }),
   };
 }
 

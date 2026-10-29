@@ -5,7 +5,6 @@ import type { AIModel, AIProvider } from '../../../contracts/settings';
 const storageMocks = vi.hoisted(() => ({
   loadAIModels: vi.fn(),
   loadAIProviders: vi.fn(),
-  loadDefaultModelId: vi.fn(),
   readStoredAIProviderSecretState: vi.fn(),
   readStoredProviderSecrets: vi.fn(),
 }));
@@ -14,7 +13,6 @@ vi.mock('./core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./core')>()),
   loadAIModels: storageMocks.loadAIModels,
   loadAIProviders: storageMocks.loadAIProviders,
-  loadDefaultModelId: storageMocks.loadDefaultModelId,
 }));
 vi.mock('./provider-secrets.store.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./provider-secrets.store.ts')>()),
@@ -43,7 +41,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   storageMocks.loadAIProviders.mockResolvedValue([provider]);
   storageMocks.loadAIModels.mockResolvedValue([model]);
-  storageMocks.loadDefaultModelId.mockResolvedValue(model.id);
   storageMocks.readStoredProviderSecrets.mockResolvedValue({ [provider.id]: {} });
   storageMocks.readStoredAIProviderSecretState.mockResolvedValue({
     status: 'ok',
@@ -51,20 +48,14 @@ beforeEach(() => {
   });
 });
 
-it('accepts a consistent provider, model, default, and secret graph', async () => {
+it('accepts a consistent provider, model and secret graph', async () => {
   await expect(assertAISettingsGraphInvariants()).resolves.toBeUndefined();
 });
 
-it('rejects model references and defaults that do not exist', async () => {
+it('rejects model references that do not exist', async () => {
   storageMocks.loadAIModels.mockResolvedValue([{ ...model, providerId: 'missing-provider' }]);
   await expect(assertAISettingsGraphInvariants()).rejects.toThrow(
     'AI model model-1 references missing provider missing-provider'
-  );
-
-  storageMocks.loadAIModels.mockResolvedValue([model]);
-  storageMocks.loadDefaultModelId.mockResolvedValue('missing-model');
-  await expect(assertAISettingsGraphInvariants()).rejects.toThrow(
-    'Default AI model missing-model not found'
   );
 });
 

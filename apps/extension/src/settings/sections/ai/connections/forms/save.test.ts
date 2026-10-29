@@ -1,3 +1,6 @@
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { isAvailable: () => false },
+}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SetStateAction } from 'react';
 
@@ -115,7 +118,7 @@ async function verifyProviderCreateFlow() {
   expect(ensureUnlockedBeforeSecretSave.mock.invocationCallOrder[0]).toBeLessThan(
     addAIProviderMock.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
   );
-  expect(ensureUnlockedBeforeSecretSave.mock.invocationCallOrder[0]).toBeLessThan(
+  expect(ensureUnlockedBeforeSecretSave.mock.invocationCallOrder[0]).toBeGreaterThan(
     setIsSaving.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
   );
   expect(onSave).toHaveBeenCalledTimes(1);
@@ -216,6 +219,8 @@ async function verifyProviderEditPreservesStoredSecretWhenApiKeyIsBlank() {
     connectionType: 'openai-compatible',
     baseUrl: 'https://api.example.com',
     createdAt: 1,
+    management: 'automatic',
+    enabled: true,
   });
   expect(ensureUnlockedBeforeSecretSave).not.toHaveBeenCalled();
   expect(onSave).toHaveBeenCalledTimes(1);

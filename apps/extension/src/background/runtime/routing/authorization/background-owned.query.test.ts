@@ -107,7 +107,10 @@ it('authorizes AI settings navigation only from an owned top-frame content runti
 });
 
 function authorizeQuery(
-  operation: Exclude<AiSettingsQueryMessage['operation'], 'read-chrome-ai-content-system-prompt'>,
+  operation: Exclude<
+    AiSettingsQueryMessage['operation'],
+    'read-chrome-ai-content-system-prompt' | 'read-scenario-selection'
+  >,
   sender: chrome.runtime.MessageSender
 ) {
   return authorizeBackgroundOwnedRoute(

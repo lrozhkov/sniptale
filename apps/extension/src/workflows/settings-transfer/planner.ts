@@ -384,7 +384,6 @@ function referenceTargetCollection(path: string): string | null {
   if (path.startsWith('capture.saving.default')) return 'capture.saving.templates';
   if (path.startsWith('ai.models.items.') && path.endsWith('.providerId'))
     return 'ai.providers.items';
-  if (path === 'ai.models.defaultModelId') return 'ai.models.items';
   if (path === 'ai.prompt-templates.order') return 'ai.prompt-templates.items';
   if (path.endsWith('.linkedTemplates.calloutPresetId')) return 'styles.callouts.presets';
   if (path.endsWith('.linkedTemplates.stepBadgePresetId')) return 'styles.numbering.presets';

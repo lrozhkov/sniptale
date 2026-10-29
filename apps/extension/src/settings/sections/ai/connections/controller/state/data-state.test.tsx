@@ -48,7 +48,6 @@ it('creates the ai providers runtime data state with stable defaults', async () 
 
   expect(latestState).toMatchObject({
     chromeAiEnabled: false,
-    defaultModelId: null,
     isLoading: true,
     models: [],
     providers: [],

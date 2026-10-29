@@ -40,6 +40,11 @@ vi.mock('../../../../../features/prompt-templates/editor', async (importOriginal
   PromptTemplateEditor: () => null,
 }));
 
+vi.mock('../../../../platform/trusted-events', () => ({
+  isTrustedDomEvent: () => true,
+  isTrustedKeyboardEvent: () => true,
+}));
+
 import {
   cleanupBodyHarness,
   dispatchBodyModalEscape,

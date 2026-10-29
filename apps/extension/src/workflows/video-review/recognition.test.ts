@@ -35,10 +35,17 @@ vi.mock('./speech-audio', () => ({
 }));
 
 const signal = () => new AbortController().signal;
+const approvedSelection = {
+  modelId: 'model',
+  approvedProviderId: 'provider',
+  approvedModelCode: 'whisper',
+  approvedDestination: `sha256:${'a'.repeat(64)}`,
+};
 const original = { file: new Blob(['source']), sourceAssetId: 'source' };
 const prepare = (session: ReturnType<typeof createVideoReviewSession>, options = {}) =>
   prepareReviewRecognition(session, { kind: 'original' }, 'model', 'provider', signal(), {
     original,
+    approvedSelection,
     ...options,
   });
 const words = (entries: Array<[string, number, number]>): AudioTranscriptResult => ({
@@ -427,6 +434,7 @@ describe('recognition Save and disposable proposal acceptance', () => {
     expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
     const proposal = await runReviewRecognition(session, job, signal());
     expect(remote.job).toHaveBeenCalledTimes(3);
+    for (const [start] of remote.job.mock.calls) expect(start).toMatchObject({ approvedSelection });
     expect(remote.job.mock.calls[0]?.[0]).toMatchObject({
       approvedProviderId: 'provider',
       scope: { workspaceRevision: 2, nativeStart: 0, nativeEnd: 60 },

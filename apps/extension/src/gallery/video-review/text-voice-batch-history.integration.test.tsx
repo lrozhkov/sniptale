@@ -100,7 +100,15 @@ it.each([
     root = createRoot(host);
     await act(async () => root?.render(<Harness />));
     await act(async () =>
-      current?.generate({ modelId: 'model', voiceId: 'voice', responseFormat: 'mp3' }, 'provider')
+      current?.generate(
+        { modelId: 'model', voiceId: 'voice', responseFormat: 'mp3' },
+        {
+          modelId: 'model',
+          approvedProviderId: 'provider',
+          approvedModelCode: 'speech',
+          approvedDestination: `sha256:${'a'.repeat(64)}`,
+        }
+      )
     );
     await vi.waitFor(async () => {
       await act(async () => {

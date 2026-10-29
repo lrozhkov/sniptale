@@ -416,3 +416,48 @@ it('admits exact Scenario speech scopes without video fields and compares every 
   ])
     expect(sameAudioJobScope(parsed, parseAudioJobScope({ ...scope, ...patch })!)).toBe(false);
 });
+
+it('preserves approved execution identity and refuses inconsistent audio starts', () => {
+  const approvedSelection = {
+    modelId: 'm',
+    approvedProviderId: 'provider',
+    approvedModelCode: 'whisper',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+  };
+  const start = {
+    type: 'start',
+    requestId: 'r',
+    modelId: 'm',
+    approvedProviderId: 'provider',
+    operation: 'transcription',
+    scope,
+    approvedSelection,
+  };
+  expect(parseAudioJobClientMessage(start)).toMatchObject({ approvedSelection });
+  for (const patch of [
+    { modelId: 'other' },
+    { approvedProviderId: 'other' },
+    { approvedDestination: 'https://unapproved.example.test' },
+    { approvedModelCode: '' },
+  ]) {
+    expect(
+      parseAudioJobClientMessage({
+        ...start,
+        approvedSelection: { ...approvedSelection, ...patch },
+      })
+    ).toBeNull();
+  }
+});
+
+it('retains admitted provider reasons and refuses raw audio failure metadata', () => {
+  const failure = {
+    type: 'failure',
+    requestId: 'r',
+    code: 'provider-auth',
+    failureReason: 'permission-denied',
+  };
+  expect(parseAudioJobServerMessage(failure)).toEqual(failure);
+  for (const failureReason of ['private response', { status: 402 }, 402]) {
+    expect(parseAudioJobServerMessage({ ...failure, failureReason })).toBeNull();
+  }
+});

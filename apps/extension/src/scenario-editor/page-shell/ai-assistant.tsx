@@ -197,16 +197,8 @@ function GuideAiDialog({
                 t={t}
               />
             )}
-            {failure && (
-              <p role="alert">
-                {t(
-                  failure === 'stale'
-                    ? 'scenario.editor.guideAiStale'
-                    : 'scenario.editor.guideAiFailed'
-                )}
-              </p>
-            )}
-            {failure === 'stale' && (
+            {failure && <p role="alert">{t(failure)}</p>}
+            {failure === 'scenario.editor.guideAiStale' && (
               <ProductActionButton
                 tone="secondary"
                 compact

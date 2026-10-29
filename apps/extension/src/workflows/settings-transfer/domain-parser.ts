@@ -1,7 +1,6 @@
 import { DEFAULT_PAGE_LAUNCH_PREFERENCES } from '../../contracts/page-launch';
 import { hasQuickActionArtwork } from '../../contracts/quick-action-appearance';
 import { normalizeConfigurableCaptureAction } from '../../features/quick-actions-presets/policy';
-import { getAIModelOperation } from '../../contracts/settings/model-operation';
 import { z } from 'zod';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type {
@@ -239,6 +238,8 @@ function parseAiDomain(
               connectionType: record['connectionType'],
               baseUrl: record['baseUrl'],
               createdAt: record['createdAt'],
+              ...(record['management'] === undefined ? {} : { management: record['management'] }),
+              ...(record['enabled'] === undefined ? {} : { enabled: record['enabled'] }),
               hasStoredApiKey: false,
             };
           })
@@ -251,7 +252,7 @@ function parseAiDomain(
       });
     }
     case 'ai.models': {
-      if (Object.keys(value).some((key) => key !== 'items' && key !== 'defaultModelId')) {
+      if (Object.keys(value).some((key) => key !== 'items')) {
         failSettingsTransferDomain(domainId);
       }
       if (!Array.isArray(value['items'])) failSettingsTransferDomain(domainId);
@@ -261,19 +262,7 @@ function parseAiDomain(
       } catch {
         return failSettingsTransferDomain(domainId);
       }
-      if (
-        value['defaultModelId'] !== null &&
-        value['defaultModelId'] !== undefined &&
-        typeof value['defaultModelId'] !== 'string'
-      )
-        failSettingsTransferDomain(domainId);
-      if (
-        items.some(
-          (model) => model.id === value['defaultModelId'] && getAIModelOperation(model) !== 'text'
-        )
-      )
-        failSettingsTransferDomain(domainId);
-      return json({ items, defaultModelId: value['defaultModelId'] ?? null });
+      return json({ items });
     }
     case 'ai.chrome':
       if (

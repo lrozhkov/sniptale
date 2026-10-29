@@ -4,7 +4,7 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { InspectorLayout, InspectorParameterRow, InspectorSurface } from './layout';
-import { CheckboxField, ColorField, SelectField, ToggleField } from './controls';
+import { CheckboxField, ColorField, SelectField, ToggleField, SegmentedRow } from './controls';
 import { TextField } from './text-field';
 import { NumericRow } from './numeric';
 import { CompactSegmentedSelector } from './control-renderers';
@@ -554,5 +554,74 @@ it('retains text fitting across equivalent option arrays and refits changed labe
   } finally {
     metric.mockRestore();
     context.mockRestore();
+  }
+});
+
+it('changes segments to a dropdown when enlarged label metrics no longer fit', () => {
+  let size = 13;
+  const listeners: Array<() => void> = [];
+  const observed: Element[] = [];
+  const metric = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(240);
+  const computedStyle = window.getComputedStyle.bind(window);
+  const style = vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+    const current = computedStyle(element);
+    Object.defineProperties(current, {
+      fontSize: { configurable: true, value: `${size}px` },
+      fontFamily: { configurable: true, value: 'sans-serif' },
+    });
+    return current;
+  });
+  const context = {
+    font: '',
+    measureText: (text: string) => ({
+      width: text.length * Number.parseFloat(context.font.split(' ')[1]!) * 0.5,
+    }),
+  };
+  const canvas = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null);
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: () => context,
+  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        listeners.push(callback);
+      }
+      observe(element: Element) {
+        observed.push(element);
+      }
+      disconnect() {}
+    }
+  );
+  try {
+    act(() =>
+      root.render(
+        <InspectorLayout>
+          <SegmentedRow
+            ariaLabel="Context"
+            columns={2}
+            value="phrase"
+            onChange={vi.fn()}
+            options={[
+              { value: 'phrase', label: 'Each phrase' },
+              { value: 'script', label: 'Whole script' },
+            ]}
+          />
+        </InspectorLayout>
+      )
+    );
+    expect(host.querySelector('[role="group"]')).not.toBeNull();
+    size = 20;
+    act(() => listeners.forEach((notify) => notify()));
+    expect(host.querySelector('[role="group"]')).toBeNull();
+    expect(host.querySelector('button[aria-label="Context"]')).not.toBeNull();
+    expect(
+      observed.some((element) => element.matches('.sniptale-property-segments > button'))
+    ).toBe(true);
+  } finally {
+    canvas.mockRestore();
+    style.mockRestore();
+    metric.mockRestore();
   }
 });

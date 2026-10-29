@@ -35,7 +35,7 @@ vi.mock(
   })
 );
 
-import { resolveModelConfig } from './model-config';
+import { assertResolvedLlmModelConfigCurrent, resolveModelConfig } from './model-config';
 import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
 
 function createProvider(baseUrl = 'https://provider-1.example.com') {
@@ -86,6 +86,8 @@ async function verifyResolvedModelConfigSuccessCases() {
     baseUrl: 'https://provider-1.example.com',
     apiKey: 'provider-1-secret',
     modelCode: 'model-1-code',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
     effectiveSystemPrompt: 'Global prompt',
   });
 
@@ -95,6 +97,8 @@ async function verifyResolvedModelConfigSuccessCases() {
     baseUrl: 'https://provider-1.example.com',
     apiKey: 'provider-1-secret',
     modelCode: 'model-2-code',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
     effectiveSystemPrompt: 'Model prompt',
   });
 }
@@ -142,6 +146,8 @@ async function verifyResolvedModelConfigSecretAndPolicyErrors() {
     baseUrl: 'http://127.0.0.1:11434/v1',
     apiKey: 'provider-1-secret',
     modelCode: 'model-1-code',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
     effectiveSystemPrompt: 'Global prompt',
   });
 }
@@ -254,6 +260,165 @@ it('rejects audio model IDs before activating credentials for a text request', a
       audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
     },
   ]);
-  await expect(resolveModelConfig('audio')).rejects.toThrow('does not support text');
+  await expect(resolveModelConfig('audio')).rejects.toThrow('model-unavailable');
   expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
 });
+
+describe('native model admission', () => {
+  beforeEach(resetResolveModelConfigMocks);
+
+  it('retains native provider kind and honors the catalog output budget', async () => {
+    mockResolvedModelConfigState();
+    loadAIProvidersMock.mockResolvedValue([
+      { ...createProvider(), connectionType: 'google', management: 'automatic', enabled: true },
+    ]);
+    loadAIModelsMock.mockResolvedValue([
+      {
+        ...createModel('native'),
+        source: 'catalog',
+        capabilities: {
+          operations: { text: 'supported', transcription: 'supported' },
+          input: { text: 'supported' },
+          output: { text: 'supported' },
+          features: {},
+          maxOutputTokens: 1024,
+        },
+      },
+    ]);
+    await expect(resolveModelConfig('native')).resolves.toMatchObject({
+      connectionType: 'google',
+      maxOutputTokens: 1024,
+    });
+  });
+
+  it('resolves a local provider without activating absent cloud credentials', async () => {
+    mockResolvedModelConfigState();
+    loadAIProvidersMock.mockResolvedValue([
+      {
+        ...createProvider('http://localhost:11434/api'),
+        connectionType: 'ollama',
+        hasStoredApiKey: false,
+      },
+    ]);
+    await expect(resolveModelConfig('model-1')).resolves.toMatchObject({
+      connectionType: 'ollama',
+      apiKey: '',
+    });
+    expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['disabled', 'manual-managed-record', 'unsupported-adapter', 'retired'] as const)(
+    'rejects %s before secret activation',
+    async (condition) => {
+      mockResolvedModelConfigState();
+      const provider = {
+        ...createProvider(),
+        ...(condition === 'disabled' ? { enabled: false } : {}),
+        ...(condition === 'unsupported-adapter' ? { connectionType: 'elevenlabs' as const } : {}),
+        management: 'manual',
+      };
+      loadAIProvidersMock.mockResolvedValue([provider]);
+      if (condition === 'manual-managed-record')
+        loadAIModelsMock.mockResolvedValue([{ ...createModel('model-1'), source: 'catalog' }]);
+      if (condition === 'retired')
+        loadAIModelsMock.mockResolvedValue([
+          {
+            ...createModel('model-1'),
+            catalog: {
+              lifecycle: 'retired',
+              displayName: 'Retired',
+              observedAt: 1,
+              capabilities: { operations: {}, input: {}, output: {}, features: {} },
+            },
+          },
+        ]);
+      await expect(resolveModelConfig('model-1')).rejects.toThrow('model-unavailable');
+      expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+    }
+  );
+});
+
+it('refuses a recreated provider or revoked host grant after resolving the request snapshot', async () => {
+  resetResolveModelConfigMocks();
+  mockResolvedModelConfigState();
+  const config = await resolveModelConfig('model-1');
+  vi.stubGlobal('chrome', { permissions: { contains: vi.fn(async () => false) } });
+  try {
+    await expect(assertResolvedLlmModelConfigCurrent(config)).rejects.toThrow('permission-denied');
+    loadAIProvidersMock.mockResolvedValue([{ ...createProvider(), incarnation: 'replacement' }]);
+    await expect(assertResolvedLlmModelConfigCurrent(config)).rejects.toThrow('model-unavailable');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('captures stable non-secret observation authority and invalidates it after credential rotation', async () => {
+  mockResolvedModelConfigState();
+  const provider = {
+    ...createProvider(),
+    incarnation: 'incarnation',
+    revision: 3,
+    credentialRevision: 4,
+  };
+  loadAIProvidersMock.mockResolvedValue([provider]);
+  vi.stubGlobal('chrome', { permissions: { contains: vi.fn().mockResolvedValue(true) } });
+  const first = await resolveModelConfig('model-1');
+  expect(first.observationBinding).toEqual({
+    model: { id: 'model-1', code: 'model-1-code', operation: 'text' },
+    providerId: provider.id,
+    incarnation: 'incarnation',
+    revision: 3,
+    credentialRevision: 4,
+    destination: first.destinationBinding,
+  });
+  expect(JSON.stringify(first.observationBinding)).not.toContain('secret');
+  expect(await resolveModelConfig('model-1')).toEqual(first);
+  await expect(assertResolvedLlmModelConfigCurrent(first)).resolves.toBeUndefined();
+  loadAIProvidersMock.mockResolvedValue([{ ...provider, credentialRevision: 5 }]);
+  await expect(assertResolvedLlmModelConfigCurrent(first)).rejects.toThrow('model-unavailable');
+});
+
+it.each([0, 1])(
+  'revalidates cached text retirement before secret activation at deadline offset %s',
+  async (offset) => {
+    resetResolveModelConfigMocks();
+    mockResolvedModelConfigState();
+    const retirementAt = Date.parse('2030-01-01T00:00:00Z');
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(retirementAt - 1);
+    const capabilities = {
+      operations: { text: 'supported' as const },
+      input: {},
+      output: {},
+      features: {},
+    };
+    loadAIProvidersMock.mockResolvedValue([{ ...createProvider(), management: 'automatic' }]);
+    loadAIModelsMock.mockResolvedValue([
+      {
+        ...createModel('model-1'),
+        source: 'catalog',
+        capabilities,
+        catalog: {
+          displayName: 'Scheduled',
+          capabilities,
+          lifecycle: 'deprecated',
+          observedAt: 1,
+          retirementAt,
+        },
+      },
+    ]);
+    vi.stubGlobal('chrome', { permissions: { contains: vi.fn(async () => true) } });
+    try {
+      const config = await resolveModelConfig('model-1');
+      expect(config.modelId).toBe('model-1');
+      activateStoredAIProviderSecretForUseMock.mockClear();
+      clock.mockReturnValue(retirementAt + offset);
+      await expect(assertResolvedLlmModelConfigCurrent(config)).rejects.toThrow(
+        'model-unavailable'
+      );
+      expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+    } finally {
+      clock.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  }
+);

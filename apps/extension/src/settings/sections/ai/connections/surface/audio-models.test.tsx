@@ -19,6 +19,7 @@ vi.mock('../../../../runtime/ai-settings/mutations', async (importOriginal) => (
 const provider: AIProvider = {
   id: '00000000-0000-4000-8000-000000000001',
   name: 'Audio connection',
+  incarnation: 'incarnation',
   connectionType: 'openai-compatible',
   baseUrl: 'https://example.test/v1',
   hasStoredApiKey: true,
@@ -104,10 +105,33 @@ async function save() {
   );
 }
 
-it('edits transcription parameters through real controls and sends a coherent timestamp format', async () => {
+async function declareOperation(key: 'modelOperationTranscription' | 'modelOperationSpeech') {
+  const summary = required(
+    Array.from(container.querySelectorAll('summary')).find(
+      (node) => node.textContent === translate('settings.aiProviders.modelOperationsTitle')
+    )
+  );
+  await act(async () => summary.click());
+  const name = `${translate('settings.aiProviders.modelOperationsTitle')}: ${translate(`settings.aiProviders.${key}`)}`;
+  const button = required(
+    Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (node) => node.getAttribute('aria-label') === name
+    )
+  );
+  await act(async () => button.click());
+  const yes = required(
+    Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+      (node) => node.textContent === translate('settings.aiProviders.modelSupportYes')
+    )
+  );
+  await act(async () => yes.click());
+}
+
+it('edits declared transcription parameters with a coherent timestamp format', async () => {
   await render(
     <ModelFormModal model={legacy} providers={[provider]} onClose={vi.fn()} onSave={vi.fn()} />
   );
+  await declareOperation('modelOperationTranscription');
   await choose(
     'settings.aiProviders.modelOperationLabel',
     translate('settings.aiProviders.modelOperationTranscription')
@@ -120,21 +144,28 @@ it('edits transcription parameters through real controls and sends a coherent ti
     translate('settings.aiProviders.modelAudioTimestampsSegment')
   );
   await save();
-  expect(updateModel).toHaveBeenLastCalledWith({
-    id: legacy.id,
-    providerId: provider.id,
-    modelCode: legacy.modelCode,
-    displayName: legacy.displayName,
-    operation: 'transcription',
-    audio: {
-      transcription: {
-        language: 'ru',
-        prompt: 'Project vocabulary',
-        responseFormat: 'verbose_json',
-        timestampGranularity: 'segment',
+  expect(updateModel).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      id: legacy.id,
+      providerId: provider.id,
+      modelCode: legacy.modelCode,
+      displayName: legacy.displayName,
+      operation: 'transcription',
+      systemPrompt: legacy.systemPrompt,
+      capabilities: expect.objectContaining({
+        operations: { text: 'supported', transcription: 'supported' },
+      }),
+      audio: {
+        transcription: {
+          language: 'ru',
+          prompt: 'Project vocabulary',
+          responseFormat: 'verbose_json',
+          timestampGranularity: 'segment',
+        },
       },
-    },
-  });
+    }),
+    'incarnation'
+  );
   await choose('settings.aiProviders.modelAudioFormat', 'JSON');
   await act(async () => control('settings.aiProviders.modelAudioTimestamps').click());
   expect(
@@ -154,7 +185,8 @@ it('edits transcription parameters through real controls and sends a coherent ti
           timestampGranularity: 'none',
         },
       },
-    })
+    }),
+    'incarnation'
   );
   await choose(
     'settings.aiProviders.modelAudioFormat',
@@ -174,14 +206,16 @@ it('edits transcription parameters through real controls and sends a coherent ti
           timestampGranularity: 'word',
         },
       },
-    })
+    }),
+    'incarnation'
   );
 });
 
-it('switches speech purpose, edits optional parameters and restores the legacy text prompt', async () => {
+it('edits speech parameters without replacing the text capability or prompt', async () => {
   await render(
     <ModelFormModal model={legacy} providers={[provider]} onClose={vi.fn()} onSave={vi.fn()} />
   );
+  await declareOperation('modelOperationSpeech');
   await choose(
     'settings.aiProviders.modelOperationLabel',
     translate('settings.aiProviders.modelOperationSpeech')
@@ -202,9 +236,10 @@ it('switches speech purpose, edits optional parameters and restores the legacy t
           instructions: 'Speak clearly',
         },
       },
-    })
+    }),
+    'incarnation'
   );
-  expect(updateModel.mock.lastCall?.[0]).not.toHaveProperty('systemPrompt');
+  expect(updateModel.mock.lastCall?.[0]).toHaveProperty('systemPrompt', legacy.systemPrompt);
   await choose(
     'settings.aiProviders.modelAudioFormat',
     translate('settings.aiProviders.modelAudioPcm')
@@ -220,7 +255,8 @@ it('switches speech purpose, edits optional parameters and restores the legacy t
           instructions: 'Speak clearly',
         },
       },
-    })
+    }),
+    'incarnation'
   );
   await fill('settings.aiProviders.modelAudioSpeed', '');
   await fill('settings.aiProviders.modelAudioInstructions', '');
@@ -229,7 +265,8 @@ it('switches speech purpose, edits optional parameters and restores the legacy t
   expect(updateModel).toHaveBeenLastCalledWith(
     expect.objectContaining({
       audio: { speech: { voiceId: 'custom-voice', responseFormat: 'mp3' } },
-    })
+    }),
+    'incarnation'
   );
   await choose(
     'settings.aiProviders.modelOperationLabel',
@@ -238,7 +275,17 @@ it('switches speech purpose, edits optional parameters and restores the legacy t
   expect(container.querySelector('textarea')?.value).toBe(legacy.systemPrompt);
   expect(container.textContent).not.toContain(translate('settings.aiProviders.modelAudioVoice'));
   await save();
-  expect(updateModel).toHaveBeenLastCalledWith({ ...legacy, operation: 'text' });
+  expect(updateModel).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      ...legacy,
+      operation: 'text',
+      audio: { speech: { voiceId: 'custom-voice', responseFormat: 'mp3' } },
+      capabilities: expect.objectContaining({
+        operations: { text: 'supported', speech: 'supported' },
+      }),
+    }),
+    'incarnation'
+  );
 });
 
 it('loads an existing speech model and refuses an invalid voice before saving a correction', async () => {
@@ -256,10 +303,13 @@ it('loads an existing speech model and refuses an invalid voice before saving a 
   expect(container.querySelector('.sniptale-error-text')).not.toBeNull();
   await fill('settings.aiProviders.modelAudioVoice', 'new-narrator');
   await save();
-  expect(updateModel).toHaveBeenCalledWith({
-    ...speech,
-    audio: { speech: { ...speech.audio!.speech!, voiceId: 'new-narrator' } },
-  });
+  expect(updateModel).toHaveBeenCalledWith(
+    expect.objectContaining({
+      ...speech,
+      audio: { speech: { ...speech.audio!.speech!, voiceId: 'new-narrator' } },
+    }),
+    'incarnation'
+  );
   expect(onSave).toHaveBeenCalledOnce();
 });
 
@@ -274,13 +324,14 @@ it('reloads the catalog before closing an edited audio model and keeps the dialo
   expect(container.querySelector('[role="alert"]')).not.toBeNull();
   await save();
   expect(state.reloadData).toHaveBeenCalledTimes(2);
+  expect(updateModel).toHaveBeenCalledTimes(1);
   expect(state.modals.closeModelModal).toHaveBeenCalledOnce();
   expect(vi.mocked(state.reloadData).mock.invocationCallOrder[1]).toBeLessThan(
     vi.mocked(state.modals.closeModelModal).mock.invocationCallOrder[0]!
   );
 });
 
-it('shows audio purposes while restricting the default action to text models', async () => {
+it('shows model purposes without a global-default action', async () => {
   const state = createMockAiProvidersSectionState();
   const transcription: AIModel = {
     ...speech,
@@ -311,14 +362,7 @@ it('shows audio purposes while restricting the default action to text models', a
   await act(async () =>
     required(row(legacy.id).querySelector<HTMLButtonElement>('[aria-expanded]')).click()
   );
-  await act(async () =>
-    required(
-      row(legacy.id).querySelector<HTMLButtonElement>(
-        '[data-collection-inline-action="set-default"]'
-      )
-    ).click()
-  );
-  expect(state.catalogActions.setDefaultModel).toHaveBeenCalledWith(legacy.id);
+  expect(row(legacy.id).querySelector('[data-collection-inline-action="set-default"]')).toBeNull();
   await act(async () =>
     required(
       row(speech.id).querySelector<HTMLButtonElement>(
@@ -336,7 +380,6 @@ it('shows audio purposes while restricting the default action to text models', a
     ).click()
   );
   expect(state.modals.setConfirmDelete).toHaveBeenCalledWith({ type: 'model', item: speech });
-  state.defaultModelId = legacy.id;
   await render(<AIProvidersModelsCard state={state} />);
   expect(row(legacy.id).querySelector('[data-collection-inline-action="set-default"]')).toBeNull();
 });

@@ -1,3 +1,11 @@
+import type { AIProviderType, AIModelManagement } from './ai-provider';
+import type {
+  AIModelCapabilities,
+  AICatalogFacts,
+  AIModelSource,
+  AIConnectionObservation,
+  AIModelOperationObservations,
+} from './ai-catalog';
 import type { PageLaunchPreferences } from '../page-launch';
 import type { QuickActionAppearance } from '../quick-action-appearance';
 import type { AIModelAudioParameters, AIModelOperation } from './model-operation';
@@ -284,9 +292,19 @@ export type SettingsPatch = Omit<
   voiceInput?: Partial<VoiceInputPreferences>;
 };
 
-export type AIConnectionType = 'chrome-built-in' | 'openai-compatible';
+export type AIConnectionType = AIProviderType;
 
 export interface AIProvider {
+  management?: AIModelManagement | undefined;
+  enabled?: boolean | undefined;
+  incarnation?: string | undefined;
+  revision?: number | undefined;
+  credentialRevision?: number | undefined;
+  observation?: AIConnectionObservation | undefined;
+  catalogUpdatedAt?: number | undefined;
+  lastRefreshAttemptAt?: number | undefined;
+  refreshGeneration?: string | undefined;
+  operationGeneration?: string | undefined;
   id: string;
   name: string;
   connectionType: AIConnectionType;
@@ -296,6 +314,14 @@ export interface AIProvider {
 }
 
 export interface AIModel {
+  operationObservations?: AIModelOperationObservations | undefined;
+  /** Property updates are independent from manual list membership and allowlist admission. */
+  propertySource?: AIModelSource | undefined;
+  source?: AIModelSource | undefined;
+  enabled?: boolean | undefined;
+  capabilities?: AIModelCapabilities | undefined;
+  catalog?: AICatalogFacts | undefined;
+  retirementOverride?: boolean | undefined;
   operation?: AIModelOperation | undefined;
   audio?: AIModelAudioParameters | undefined;
   id: string;
@@ -309,7 +335,6 @@ export interface AISettings {
   chromeAiEnabled: boolean;
   providers: AIProvider[];
   models: AIModel[];
-  defaultModelId: string | null;
   globalSystemPrompt: string;
   scenarioEditorSystemPrompt: string;
   audioTranscriptionSystemPrompt?: string;
@@ -322,7 +347,7 @@ export interface PromptTemplate {
   name: string;
   content: string;
   isDefault?: boolean;
-  enabled?: boolean;
+  enabled?: boolean | undefined;
   customized?: boolean;
   systemRevision?: number;
   lastUsedAt?: number;

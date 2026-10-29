@@ -1,4 +1,5 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react';
+import { getAIProviderFailureKey } from '../../../../features/ai/provider-failure-copy';
+import { useEffect, useId, useLayoutEffect, useRef, type SyntheticEvent } from 'react';
 import { Send, Square } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { CONTENT_AI_PAYLOAD_LIMITS } from '@sniptale/runtime-contracts/ai/payload-policy';
@@ -9,11 +10,15 @@ import { translate } from '../../../../platform/i18n';
 import { isContentEventWithinElement } from '../../../platform/dom-host';
 import { ContentVoiceInputButton } from '../../../voice-input/button';
 import { useAIModalPromptVoiceInput } from '../modal/session/prompt-voice-input';
-import { isTrustedKeyboardEvent } from '../../../platform/trusted-events';
+import { isTrustedDomEvent, isTrustedKeyboardEvent } from '../../../platform/trusted-events';
+import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import type { useTextRewriteSession } from './session';
+
 type Session = ReturnType<typeof useTextRewriteSession>;
 function TextRequestFeedback({ session }: { session: Session }) {
   const error = session.request.error;
+  const providerReason = session.request.providerFailureReason;
+  const providerKey = getAIProviderFailureKey(providerReason);
   const errorKeys = {
     stale: 'content.toolbar.aiTextStale',
     failed: 'content.toolbar.aiTextError',
@@ -50,13 +55,45 @@ function TextRequestFeedback({ session }: { session: Session }) {
               : 'text-[var(--sniptale-color-danger)]',
           ].join(' ')}
         >
-          {translate(errorKeys[error])}
+          {error === 'model-unavailable' && session.models.unavailableModelName ? (
+            <>
+              <bdi className="[overflow-wrap:anywhere]">
+                {session.models.unavailableModelName}
+              </bdi>{' '}
+            </>
+          ) : null}
+          {translate(providerKey ?? errorKeys[error])}
+        </p>
+      ) : null}
+      {session.models.pending && !session.request.busy ? (
+        <p role="status" className="sr-only">
+          {translate('common.states.saving')}
+        </p>
+      ) : null}
+      {session.models.unavailable && error !== 'model-unavailable' ? (
+        <p role="status" className="mt-2 text-xs">
+          <bdi className="[overflow-wrap:anywhere]">{session.models.unavailableModelName}</bdi>{' '}
+          {translate('aiModal.modelSelectionUnavailable')}
+        </p>
+      ) : null}
+      {session.models.selectionFailed ? (
+        <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-danger)]">
+          {translate('aiModal.modelSelectionSaveFailed')}
         </p>
       ) : null}
       {session.models.failed ? (
-        <p role="alert" className="mt-2 text-xs text-[var(--sniptale-color-danger)]">
-          {translate('content.toolbar.aiTextModelsError')}
-        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+            {translate('content.toolbar.aiTextModelsError')}
+          </p>
+          <ProductActionButton
+            compact
+            onClick={session.models.reload}
+            disabled={session.request.busy || session.models.pending}
+          >
+            {translate('common.actions.retry')}
+          </ProductActionButton>
+        </div>
       ) : null}
     </>
   );
@@ -104,7 +141,8 @@ function useTextRewritePrompt(session: Session) {
         event.key !== 'Enter' ||
         !(event.ctrlKey || event.metaKey) ||
         voiceBusy ||
-        requestBusy
+        requestBusy ||
+        session.models.pending
       )
         return;
       // The editable bridge dispatches an untrusted local key event before this original event.
@@ -114,7 +152,7 @@ function useTextRewritePrompt(session: Session) {
     };
     window.addEventListener('keydown', handleSubmitKey, true);
     return () => window.removeEventListener('keydown', handleSubmitKey, true);
-  }, [submitRequest, requestBusy, voiceBusy]);
+  }, [submitRequest, requestBusy, voiceBusy, session.models.pending]);
   return { textareaRef, voice, voiceBusy };
 }
 
@@ -199,20 +237,31 @@ function TextRewritePromptFields({
   );
 }
 
+function requireTrustedModelInteraction(event: SyntheticEvent) {
+  if (isTrustedDomEvent(event.nativeEvent) || isBridgedMouseEvent(event.nativeEvent)) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 function TextRewriteFooter({ session, voiceBusy }: { session: Session; voiceBusy: boolean }) {
   return (
     <div
       className="flex min-w-0 shrink-0 items-center gap-2 px-3 pb-3"
       data-ui="content.ai-text.footer"
     >
-      <div className="min-w-0 flex-1">
+      <div
+        className="min-w-0 flex-1"
+        onMouseDownCapture={requireTrustedModelInteraction}
+        onClickCapture={requireTrustedModelInteraction}
+      >
         <AIModelSelector
           models={session.models.models}
           providers={session.models.providers}
           selectedModelId={session.models.selectedModelId}
           onSelect={session.models.select}
+          onOpen={session.models.reload}
           isEventWithinElement={isContentEventWithinElement}
-          disabled={session.request.busy}
+          disabled={session.request.busy || session.models.pending}
         />
       </div>
       <ProductActionButton
@@ -222,7 +271,10 @@ function TextRewriteFooter({ session, voiceBusy }: { session: Session; voiceBusy
         data-ui="content.ai-text.submit"
         disabled={
           !session.request.busy &&
-          (!session.prompt.trim() || !session.models.selectedModelId || voiceBusy)
+          (!session.prompt.trim() ||
+            !session.models.selectedModelId ||
+            voiceBusy ||
+            session.models.pending)
         }
         title={session.request.busy ? undefined : getTextDisclosure(session.models)}
         aria-description={session.request.busy ? undefined : getTextDisclosure(session.models)}

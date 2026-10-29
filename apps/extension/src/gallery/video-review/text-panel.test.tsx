@@ -20,11 +20,6 @@ vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
-vi.mock('./use-speech', () => ({
-  useReviewSpeech: () => {
-    throw new Error('Text editing must not mount an audio job controller');
-  },
-}));
 vi.mock('./text-rewrite-panel', () => ({
   ReviewTextRewriteForm: (props: {
     ids: readonly string[];

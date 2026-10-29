@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -282,4 +283,114 @@ it('rejects stale pinned dependency license registrations', async () => {
       repoRoot,
     })
   ).rejects.toThrow('Stale pinned dependency license source for @iconify-icons/tabler@2.0.0');
+});
+
+it.each([
+  {
+    contents: 'BSD 3-Clause "New" License:\nRedistribution and use in source and binary forms',
+    valid: true,
+  },
+  { contents: 'Academic Free License version 2.1\n', valid: false },
+])(
+  'checks installed BSD-3-Clause text for a reviewed choice: $valid',
+  async ({ contents, valid }) => {
+    const repoRoot = await createLegalFixture({
+      packages: [
+        {
+          files: { LICENSE: contents },
+          license: '(AFL-2.1 OR BSD-3-Clause)',
+          name: 'json-schema',
+          version: '0.4.0',
+        },
+      ],
+      rootDependencies: { 'json-schema': '^0.4.0' },
+    });
+    const result = generateDependencyLegalClosure({
+      repoRoot,
+      reviewedSelections: [
+        { packageName: 'json-schema', selectedLicense: 'BSD-3-Clause', version: '0.4.0' },
+      ],
+    });
+    if (!valid) {
+      await expect(result).rejects.toThrow(
+        'Reviewed license text drift for json-schema@0.4.0: BSD-3-Clause'
+      );
+      return;
+    }
+    expect((await result).entries[0]).toMatchObject({
+      licenseSourceKind: 'installed-file',
+      selectedLicense: 'BSD-3-Clause',
+    });
+  }
+);
+
+async function createPackageLicenseFixture() {
+  const sourcePath = 'tooling/release/dependency-legal/sources/provider-utils.LICENSE';
+  const contents = 'Licensed under the Apache License, Version 2.0\n';
+  const repoRoot = await createLegalFixture({
+    packages: [
+      {
+        name: '@ai-sdk/provider-utils',
+        version: '5.0.62',
+        license: 'Apache-2.0',
+        repository: { url: 'https://github.com/vercel/ai' },
+      },
+    ],
+    rootDependencies: { '@ai-sdk/provider-utils': '5.0.62' },
+  });
+  await fs.mkdir(path.dirname(path.join(repoRoot, sourcePath)), { recursive: true });
+  await fs.writeFile(path.join(repoRoot, sourcePath), contents);
+  const source = {
+    kind: 'package-license',
+    license: 'Apache-2.0',
+    packageName: '@ai-sdk/provider-utils',
+    packageVersion: '5.0.62',
+    packageResolved: 'https://registry.example.test/@ai-sdk/provider-utils/-/5.0.62.tgz',
+    packageIntegrity: `sha512-${Buffer.from('@ai-sdk/provider-utils@5.0.62').toString('base64')}`,
+    upstreamRepository: 'vercel/ai',
+    upstreamVersion: '@ai-sdk/provider-utils@5.0.62',
+    originUrl:
+      'https://raw.githubusercontent.com/vercel/ai/%40ai-sdk%2Fprovider-utils%405.0.62/LICENSE',
+    sourcePath,
+    sha256: createHash('sha256').update(contents).digest('hex'),
+  };
+  return { repoRoot, source };
+}
+
+it('uses a byte-pinned package-tag license when installed package text is missing', async () => {
+  const { repoRoot, source } = await createPackageLicenseFixture();
+  const closure = await generateDependencyLegalClosure({ repoRoot, pinnedSources: [source] });
+  expect(closure.entries[0]).toMatchObject({
+    selectedLicense: 'Apache-2.0',
+    licenseSourceKind: 'pinned-upstream',
+    licenseProvenance: { originUrl: source.originUrl, sha256: source.sha256 },
+  });
+});
+
+it.each([
+  { packageIntegrity: 'sha512-drifted' },
+  { packageResolved: 'https://example.test/drifted.tgz' },
+  { license: 'MIT' },
+  { upstreamRepository: 'other/ai' },
+  { upstreamVersion: '@ai-sdk/provider-utils@5.0.61' },
+  { originUrl: 'https://raw.githubusercontent.com/vercel/ai/main/LICENSE' },
+])('rejects drift in a pinned package license identity: %j', async (change) => {
+  const { repoRoot, source } = await createPackageLicenseFixture();
+  await expect(
+    generateDependencyLegalClosure({
+      repoRoot,
+      pinnedSources: [{ ...source, ...change }],
+    })
+  ).rejects.toThrow('Pinned dependency license identity drift');
+});
+
+it('rejects changed bytes in a pinned package license', async () => {
+  const { repoRoot, source } = await createPackageLicenseFixture();
+  await fs.writeFile(path.join(repoRoot, source.sourcePath), 'changed');
+  await expect(
+    generateDependencyLegalClosure({
+      repoRoot,
+      pinnedSources: [source],
+    })
+  ).rejects.toThrow('Pinned dependency license source digest drift');
 });

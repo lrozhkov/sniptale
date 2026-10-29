@@ -63,6 +63,7 @@ function createMessage() {
     llmSessionToken: 'llm-token-1',
     projectSnapshotJson: '{"steps":[]}',
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
+    modelId: 'model-1',
   } as const;
 }
 
@@ -88,6 +89,8 @@ beforeEach(() => {
   resolveModelConfigMock.mockResolvedValue({
     apiKey: 'secret-key',
     baseUrl: 'https://api.openai.com/v1',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: 'fixture-destination-binding',
     effectiveSystemPrompt: 'unused here',
     modelCode: 'gpt-4.1',
     modelId: 'model-1',

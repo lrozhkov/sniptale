@@ -27,3 +27,7 @@ export function classifyBackgroundOwnedSender(sender: chrome.runtime.MessageSend
   }
   return sender.url ? 'extension-or-web-runtime' : 'unknown-runtime';
 }
+
+export function isVideoEditorSenderUrl(senderUrl: string | undefined): boolean {
+  return isOwnedExtensionPagePath(senderUrl, 'apps/extension/src/video-editor/index.html');
+}

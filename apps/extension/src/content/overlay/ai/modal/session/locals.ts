@@ -1,23 +1,15 @@
 import { useRef, useState } from 'react';
-import type { AIProviderSelectorEntry } from '../../../../../contracts/messaging/ai-settings-runtime';
-import type { AIModel } from '../../../../../contracts/settings';
+import { useAIScenarioModelSelection } from '../../../../../workflows/ai-settings/use-scenario-model-selection';
 import type { AIModalTemplateDraft } from '../shell/types';
 
-export function useAIModalSettingsState() {
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
-  const [globalSystemPrompt, setGlobalSystemPrompt] = useState('');
-  const [providers, setProviders] = useState<AIProviderSelectorEntry[]>([]);
-
+export function useAIModalSettingsState(enabled = false) {
+  const selection = useAIScenarioModelSelection('page-extract', enabled);
   return {
-    availableModels,
-    globalSystemPrompt,
-    providers,
-    selectedModelId,
-    setAvailableModels,
-    setGlobalSystemPrompt,
-    setProviders,
-    setSelectedModelId,
+    availableModels: selection.configuration?.models ?? [],
+    globalSystemPrompt: selection.configuration?.globalSystemPrompt ?? '',
+    providers: selection.configuration?.providers ?? [],
+    selectedModelId: selection.modelId,
+    selection,
   };
 }
 

@@ -19,7 +19,9 @@ vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => ({
 }));
 
 import {
-  requestAIModelSelectionBootstrap,
+  refreshManagedAICatalogs,
+  requestAIScenarioModelSelection,
+  rememberAIScenarioModelSelection,
   requestAISettingsPageRuntimeData,
   requestChromeAiContentSystemPrompt,
   requestScenarioEditorSystemPrompt,
@@ -30,94 +32,91 @@ beforeEach(() => {
   queryMocks.loadChromeAiAvailability.mockResolvedValue('unsupported');
 });
 
-it('requests sanitized model selection bootstrap through runtime messaging', async () => {
-  queryMocks.sendRuntimeMessage.mockResolvedValue({
-    modelSelection: {
-      chromeAiEnabled: false,
-      defaultModelId: 'model-1',
-      globalSystemPrompt: 'Prompt',
-      models: [{ displayName: 'Model', id: 'model-1', modelCode: 'm', providerId: 'p' }],
-      providers: [
-        {
-          connectionType: 'openai-compatible',
-          createdAt: 1,
-          destinationKind: 'external',
-          hasStoredApiKey: true,
-          id: 'p',
-          name: 'Provider',
-        },
-      ],
-    },
-    success: true,
-  });
+function mockScenarioCatalog(chromeAiEnabled = false) {
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) =>
+    message.operation === 'read-scenario-selection'
+      ? { success: true, scenarioSelection: null }
+      : {
+          success: true,
+          modelSelection: {
+            chromeAiEnabled,
+            globalSystemPrompt: 'Prompt',
+            models: [{ displayName: 'Model', id: 'model-1', modelCode: 'm', providerId: 'p' }],
+            providers: [
+              {
+                connectionType: 'openai-compatible',
+                createdAt: 1,
+                destinationKind: 'external',
+                hasStoredApiKey: true,
+                id: 'p',
+                name: 'Provider',
+              },
+            ],
+          },
+        }
+  );
+}
 
-  await expect(requestAIModelSelectionBootstrap()).resolves.toMatchObject({
-    defaultModelId: 'model-1',
+it('requests sanitized scenario catalog and remembered selection without writing', async () => {
+  mockScenarioCatalog();
+  await expect(requestAIScenarioModelSelection('page-edit')).resolves.toMatchObject({
+    globalSystemPrompt: 'Prompt',
+    resolution: { status: 'initial', modelId: 'model-1' },
     providers: [expect.not.objectContaining({ baseUrl: expect.any(String) })],
   });
-  expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledWith({
-    operation: 'read-model-selection-bootstrap',
-    type: MessageType.AI_SETTINGS_QUERY,
-  });
+  expect(queryMocks.sendRuntimeMessage.mock.calls.map(([message]) => message)).toEqual([
+    { operation: 'read-model-selection-bootstrap', type: MessageType.AI_SETTINGS_QUERY },
+    {
+      operation: 'read-scenario-selection',
+      scenario: 'page-edit',
+      type: MessageType.AI_SETTINGS_QUERY,
+    },
+  ]);
 });
 
-it('adds Chrome AI selector entries locally when the page runtime reports availability', async () => {
+it('adds available Chrome models only to supported page scenarios', async () => {
+  mockScenarioCatalog(true);
   queryMocks.loadChromeAiAvailability.mockResolvedValue('available');
-  queryMocks.sendRuntimeMessage.mockResolvedValue({
-    modelSelection: {
-      chromeAiEnabled: true,
-      defaultModelId: null,
-      globalSystemPrompt: '',
-      models: [],
-      providers: [],
-    },
-    success: true,
-  });
-
-  await expect(requestAIModelSelectionBootstrap()).resolves.toMatchObject({
-    models: [expect.objectContaining({ id: CHROME_AI_MODEL_ID })],
-    providers: [expect.objectContaining({ destinationKind: 'chrome-built-in' })],
-  });
-});
-
-it('drops an unavailable Chrome AI default model from selector bootstrap', async () => {
-  queryMocks.sendRuntimeMessage.mockResolvedValue({
-    modelSelection: {
-      chromeAiEnabled: true,
-      defaultModelId: CHROME_AI_MODEL_ID,
-      globalSystemPrompt: '',
-      models: [{ displayName: 'Fallback', id: 'fallback', modelCode: 'fallback', providerId: 'p' }],
-      providers: [
-        {
-          connectionType: 'openai-compatible',
-          createdAt: 1,
-          destinationKind: 'external',
-          hasStoredApiKey: false,
-          id: 'p',
-          name: 'Provider',
-        },
-      ],
-    },
-    success: true,
-  });
-
-  await expect(requestAIModelSelectionBootstrap()).resolves.toMatchObject({
-    defaultModelId: 'fallback',
-  });
-});
-
-it('throws when the background query returns an error response', async () => {
-  queryMocks.sendRuntimeMessage.mockResolvedValue({ error: 'denied', success: false });
-
-  await expect(requestAIModelSelectionBootstrap()).rejects.toThrow('denied');
-});
-
-it('throws when model selection bootstrap response omits its payload', async () => {
-  queryMocks.sendRuntimeMessage.mockResolvedValue({ success: true });
-
-  await expect(requestAIModelSelectionBootstrap()).rejects.toThrow(
-    'AI model selection bootstrap response missing payload'
+  const page = await requestAIScenarioModelSelection('page-edit');
+  expect(page.models.map((model) => model.id)).toContain(CHROME_AI_MODEL_ID);
+  expect(page.providers).toContainEqual(
+    expect.objectContaining({ destinationKind: 'chrome-built-in' })
   );
+  const scenario = await requestAIScenarioModelSelection('scenario-edit');
+  expect(scenario.models.map((model) => model.id)).not.toContain(CHROME_AI_MODEL_ID);
+});
+
+it('omits unavailable Chrome models without writing a fallback', async () => {
+  mockScenarioCatalog(true);
+  const page = await requestAIScenarioModelSelection('page-edit');
+  expect(page.models.map((model) => model.id)).toEqual(['model-1']);
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledTimes(2);
+});
+
+it('propagates a refused scenario query without mutation or retry', async () => {
+  queryMocks.sendRuntimeMessage.mockResolvedValue({ error: 'denied', success: false });
+  await expect(requestAIScenarioModelSelection('page-edit')).rejects.toThrow('denied');
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledTimes(2);
+  expect(
+    queryMocks.sendRuntimeMessage.mock.calls.every(
+      ([message]) => message.type === MessageType.AI_SETTINGS_QUERY
+    )
+  ).toBe(true);
+});
+
+it.each(['catalog', 'selection'])('rejects a missing scenario %s payload', async (missing) => {
+  mockScenarioCatalog();
+  const implementation = queryMocks.sendRuntimeMessage.getMockImplementation()!;
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) =>
+    message.operation ===
+    (missing === 'catalog' ? 'read-model-selection-bootstrap' : 'read-scenario-selection')
+      ? { success: true }
+      : implementation(message)
+  );
+  await expect(requestAIScenarioModelSelection('page-edit')).rejects.toThrow(
+    'AI scenario selection response missing payload'
+  );
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledTimes(2);
 });
 
 it('keeps full provider metadata scoped to settings page runtime data', async () => {
@@ -127,7 +126,6 @@ it('keeps full provider metadata scoped to settings page runtime data', async ()
       secretProtectionStatus: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
       selectionBootstrap: {
         chromeAiEnabled: false,
-        defaultModelId: null,
         globalSystemPrompt: '',
         models: [],
         providers: [
@@ -187,34 +185,190 @@ it('throws when prompt query responses omit their payloads', async () => {
   );
 });
 
-it('filters text and audio selectors before presentation and never adds Chrome AI to audio', async () => {
-  const text = { id: 'text', providerId: 'p', modelCode: 'same', displayName: 'Text' };
+it('filters the current scenario catalog and never adds Chrome models to voice recognition', async () => {
+  const text = { id: 'text', providerId: 'p', modelCode: 'text', displayName: 'Text' };
   const speech = {
     ...text,
     id: 'speech',
     operation: 'speech',
     audio: { speech: { voiceId: 'custom', responseFormat: 'mp3' } },
   };
+  const transcription = {
+    ...text,
+    id: 'transcription',
+    operation: 'transcription',
+    audio: { transcription: { responseFormat: 'json', timestampGranularity: 'none' } },
+  };
+  mockScenarioCatalog(true);
+  const implementation = queryMocks.sendRuntimeMessage.getMockImplementation()!;
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) => {
+    const response = await implementation(message);
+    return response.modelSelection
+      ? {
+          ...response,
+          modelSelection: { ...response.modelSelection, models: [text, speech, transcription] },
+        }
+      : response;
+  });
   queryMocks.loadChromeAiAvailability.mockResolvedValue('available');
-  queryMocks.sendRuntimeMessage.mockResolvedValue({
-    success: true,
-    modelSelection: {
-      chromeAiEnabled: true,
-      defaultModelId: 'text',
-      globalSystemPrompt: 'Global',
-      providers: [],
-      models: [text, speech],
-    },
-  });
-  expect((await requestAIModelSelectionBootstrap()).models.map((model) => model.id)).not.toContain(
-    'speech'
+  expect(
+    (await requestAIScenarioModelSelection('page-edit')).models.map((model) => model.id)
+  ).toEqual(['text', CHROME_AI_MODEL_ID]);
+  const voice = await requestAIScenarioModelSelection('voice-recognition');
+  expect(voice.models).toEqual([transcription]);
+  expect(voice.providers.some((provider) => provider.destinationKind === 'chrome-built-in')).toBe(
+    false
   );
-  await expect(requestAIModelSelectionBootstrap('speech')).resolves.toMatchObject({
-    models: [speech],
-    defaultModelId: 'speech',
+  expect(voice.resolution).toMatchObject({ status: 'empty', modelId: null });
+});
+
+it('resolves a first-use scenario candidate without inheriting or writing the global default', async () => {
+  const models = ['a-model', 'b-model'].map((id) => ({
+    id,
+    modelCode: id,
+    displayName: id,
+    providerId: 'provider',
+  }));
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) =>
+    message.operation === 'read-scenario-selection'
+      ? { success: true, scenarioSelection: null }
+      : {
+          success: true,
+          modelSelection: {
+            chromeAiEnabled: false,
+            globalSystemPrompt: 'Retained global system prompt',
+            models,
+            providers: [
+              {
+                id: 'provider',
+                name: 'Provider',
+                incarnation: 'incarnation',
+                createdAt: 1,
+                hasStoredApiKey: true,
+                connectionType: 'neuraldeep',
+                destinationKind: 'external',
+                destinationBinding: 'sha256:' + 'a'.repeat(64),
+              },
+            ],
+          },
+        }
+  );
+  const context = await requestAIScenarioModelSelection('page-edit');
+  expect(context.globalSystemPrompt).toBe('Retained global system prompt');
+  expect(context.resolution).toMatchObject({ status: 'initial', modelId: 'a-model' });
+  expect(
+    queryMocks.sendRuntimeMessage.mock.calls.every(
+      ([message]) => message.type === MessageType.AI_SETTINGS_QUERY
+    )
+  ).toBe(true);
+  queryMocks.sendRuntimeMessage.mockResolvedValue({ success: false, error: 'Storage refused' });
+  await expect(rememberAIScenarioModelSelection(context, 'page-edit', 'b-model')).rejects.toThrow(
+    'Storage refused'
+  );
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      operation: 'remember-scenario-selection',
+      selection: expect.objectContaining({
+        scenario: 'page-edit',
+        modelId: 'b-model',
+        source: 'explicit',
+      }),
+    })
+  );
+});
+
+it('does not silently replace a retired remembered model in another scenario', async () => {
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) =>
+    message.operation === 'read-scenario-selection'
+      ? {
+          success: true,
+          scenarioSelection: {
+            modelId: 'old',
+            modelCode: 'old',
+            providerId: 'provider',
+            providerIncarnation: 'incarnation',
+            displayName: 'Previous model',
+            selectedAt: 1,
+            source: 'explicit',
+          },
+        }
+      : {
+          success: true,
+          modelSelection: {
+            chromeAiEnabled: false,
+            globalSystemPrompt: '',
+            models: [
+              {
+                id: 'replacement',
+                modelCode: 'replacement',
+                displayName: 'Replacement',
+                providerId: 'provider',
+              },
+            ],
+            providers: [
+              {
+                id: 'provider',
+                name: 'Provider',
+                incarnation: 'incarnation',
+                createdAt: 1,
+                hasStoredApiKey: true,
+                connectionType: 'neuraldeep',
+                destinationKind: 'external',
+              },
+            ],
+          },
+        }
+  );
+  const context = await requestAIScenarioModelSelection('scenario-edit');
+  expect(context.resolution).toMatchObject({
+    status: 'unavailable',
+    modelId: null,
+    previousSelection: { displayName: 'Previous model' },
   });
-  await expect(requestAIModelSelectionBootstrap('transcription')).resolves.toMatchObject({
-    models: [],
-    defaultModelId: null,
+});
+
+it('requests bounded automatic catalog maintenance through an explicit command', async () => {
+  queryMocks.sendRuntimeMessage.mockResolvedValue({ success: true });
+  await refreshManagedAICatalogs();
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledExactlyOnceWith({
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'refresh-managed-catalogs',
   });
+});
+it('reports a refused maintenance command without retrying', async () => {
+  queryMocks.sendRuntimeMessage.mockResolvedValue({ success: false, error: 'Refused' });
+  await expect(refreshManagedAICatalogs()).rejects.toThrow('Refused');
+  expect(queryMocks.sendRuntimeMessage).toHaveBeenCalledTimes(1);
+});
+
+it('presents the latest configured connection through the normal first-use query without writing', async () => {
+  mockScenarioCatalog();
+  const original = queryMocks.sendRuntimeMessage.getMockImplementation()!;
+  queryMocks.sendRuntimeMessage.mockImplementation(async (message) => {
+    const response = await original(message);
+    if (!response.modelSelection) return response;
+    const base = response.modelSelection;
+    return {
+      ...response,
+      modelSelection: {
+        ...base,
+        models: [
+          ...base.models,
+          { ...base.models[0], id: 'new-model', providerId: 'new-provider' },
+        ],
+        providers: [
+          ...base.providers,
+          { ...base.providers[0], id: 'new-provider', name: 'New connection', createdAt: 2 },
+        ],
+      },
+    };
+  });
+  const context = await requestAIScenarioModelSelection('scenario-edit');
+  expect(context.resolution).toMatchObject({ status: 'initial', modelId: 'new-model' });
+  expect(context.remembered).toBeNull();
+  expect(
+    queryMocks.sendRuntimeMessage.mock.calls.every(
+      ([message]) => message.type === MessageType.AI_SETTINGS_QUERY
+    )
+  ).toBe(true);
 });

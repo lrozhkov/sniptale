@@ -418,8 +418,16 @@ async function settingsFromModal(
   c: Composition,
   key: TranslationKey
 ) {
-  const opened = context.waitForEvent('page');
   await named(modalRoot(page), c, key).click();
+  const section = key === 'aiModal.openModelSettings' ? 'ai-connections' : 'ai-prompts';
+  let opened: Page | undefined;
+  await expect
+    .poll(() => {
+      opened = context.pages().find((candidate) => candidate.url().includes(`section=${section}`));
+      return Boolean(opened);
+    })
+    .toBe(true);
+  if (!opened) throw new Error('Settings navigation did not reveal its destination');
   return opened;
 }
 
@@ -452,6 +460,12 @@ async function configureProvider(settings: Page, c: Composition, providerOrigin:
   await dialog.locator('input').nth(0).fill(providerName);
   await dialog.locator('input').nth(1).fill(`${providerOrigin}/v1`);
   await dialog.locator('input[type=password]').fill('synthetic-test-only-key');
+  await dialog
+    .getByLabel(tr(c, 'settings.aiProviders.providerManagementLabel'), { exact: true })
+    .click();
+  await settings
+    .getByRole('option', { name: tr(c, 'settings.aiProviders.providerModeManual'), exact: true })
+    .click();
   await named(dialog, c, 'common.actions.add').scrollIntoViewIfNeeded();
   await named(dialog, c, 'common.actions.add').click();
   await expect(dialog).toHaveCount(0);
@@ -486,6 +500,25 @@ async function models(
   await configureProvider(settings, c, origin);
   await settings.close();
   await page.bringToFront();
+  if (c.locale === 'en' && c.theme === 'light') {
+    await page.evaluate(() => {
+      for (const type of ['mousedown', 'click']) {
+        window.addEventListener(
+          type,
+          (event) => {
+            if (
+              !event.isTrusted ||
+              !event.composedPath().some((target) => target instanceof HTMLButtonElement)
+            )
+              return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          },
+          true
+        );
+      }
+    });
+  }
   await named(modalRoot(page), c, 'aiModal.closeTitle').click();
   await enter(page);
   await expect(page.locator('#ai-prompt')).toHaveValue(promptText);
@@ -693,7 +726,8 @@ async function waitingAndRecovery(
   const sourceText = await page.locator('#synthetic-paragraph').innerText();
   const submit = named(modal, c, 'aiModal.submitShortcutTitle');
   const before = provider.received();
-  await submit.click();
+  await expect(submit).toBeEnabled();
+  await prompt.press('Control+Enter');
   await expect.poll(provider.received).toBe(before + 1);
   await expect(ui(page, 'ai-modal.loading-state')).toBeVisible();
   await expect(prompt).toBeDisabled();

@@ -1,3 +1,4 @@
+import { AIProviderRequestError } from '../providers';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createContentTextJobService } from './content-text-job';
 import { createAiPrivacyProof } from '../../../features/ai/privacy';
@@ -21,6 +22,15 @@ const config = {
   baseUrl: 'https://provider.test/v1',
   apiKey: 'synthetic-key',
   modelCode: 'code',
+  connectionType: 'openai-compatible' as const,
+  destinationBinding: 'fixture-destination-binding',
+  observationBinding: {
+    providerId: 'provider',
+    incarnation: 'incarnation',
+    revision: 1,
+    credentialRevision: 2,
+    destination: 'fixture-destination-binding',
+  },
   effectiveSystemPrompt: 'Preserve meaning.',
 };
 async function fixture() {
@@ -86,6 +96,7 @@ it('returns literal text through the existing normalized transport and records m
     expect(options.userPrompt).toContain(h.request.text);
     expect(options.userPrompt).toContain(h.request.prompt);
     expect(options.rejectTruncated).toBe(true);
+    expect(options.observationBinding).toEqual(config.observationBinding);
     return '<b>Literal text</b>';
   });
   h.connection.receive(h.request);
@@ -243,4 +254,32 @@ it('keeps content erasure reservations local to a service and releases each only
   first.connection.receive(first.request);
   await first.service.reserveErasureExclusion().waitForActiveMutations();
   expect(first.events.at(-1)?.type).toBe('result');
+});
+
+it.each([
+  'invalid-credential',
+  'permission-denied',
+  'model-unavailable',
+  'quota-exceeded',
+  'rate-limited',
+  'network',
+  'timeout',
+  'service-error',
+] as const)('retains bounded %s evidence without sending provider messages', async (reason) => {
+  const h = await fixture();
+  h.requestProvider.mockRejectedValueOnce(
+    new AIProviderRequestError(reason, 'PRIVATE_RESPONSE_BODY')
+  );
+  h.connection.receive(h.request);
+  const reservation = h.service.reserveErasureExclusion();
+  await reservation.waitForActiveMutations();
+  reservation.release();
+  expect(h.events.at(-1)).toEqual({
+    type: 'failure',
+    requestId: h.request.requestId,
+    code: 'provider-failed',
+    failureReason: reason,
+  });
+  expect(JSON.stringify(h.events)).not.toContain('PRIVATE_RESPONSE_BODY');
+  expect(h.requestProvider).toHaveBeenCalledOnce();
 });

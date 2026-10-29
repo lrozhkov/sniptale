@@ -1,3 +1,5 @@
+import { browserPermissions } from '@sniptale/platform/browser/permissions';
+import { getAIProviderDefinition } from '../../../../../contracts/settings/ai-provider';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import type { AIProviderMutationInput } from '../../../../../contracts/messaging/ai-settings-runtime';
 import { isAllowedAIProviderBaseUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
@@ -24,7 +26,11 @@ function getProviderApiKeyError(
   formData: ProviderFormData,
   provider?: AIProvider | null
 ): Record<string, string> | null {
-  const requiresApiKey = !isEditing || provider?.hasStoredApiKey === false;
+  const requiresApiKey =
+    getAIProviderDefinition(formData.connectionType).credential !== 'none' &&
+    (!isEditing ||
+      provider?.hasStoredApiKey === false ||
+      provider?.connectionType !== formData.connectionType);
 
   if (!requiresApiKey || formData.apiKey) {
     return null;
@@ -49,6 +55,8 @@ async function persistProviderForm(args: {
     name: args.formData.name,
     connectionType: args.formData.connectionType,
     baseUrl: args.formData.baseUrl,
+    management: args.formData.management ?? 'automatic',
+    enabled: args.formData.enabled ?? true,
     createdAt: args.provider?.createdAt ?? Date.now(),
     ...(args.apiKey ? { apiKey: args.apiKey } : {}),
   };
@@ -76,6 +84,8 @@ function buildModelSaveErrorMessage(): string {
 }
 
 function buildMutationFailureMessage(error: unknown, fallbackMessage: string): string {
+  if (isAiSettingsMutationError(error) && error.reason === 'ai-provider-changed')
+    return translate('settings.aiProviders.modelProviderChanged');
   if (isAiSettingsMutationError(error) && error.reason === 'ai-secrets-locked') {
     return translate('settings.aiProviders.providerSaveSecretLocked');
   }
@@ -115,11 +125,17 @@ export async function saveProviderForm(args: ProviderFormSaveParams): Promise<vo
 
   try {
     assertProviderBaseUrlPolicy(args.formData.baseUrl);
+    args.setIsSaving(true);
+    didStartSave = true;
+    if (browserPermissions.isAvailable()) {
+      // Start the optional host request in the submit gesture, before unlocking can yield to another dialog.
+      await browserPermissions
+        .request({ origins: [`${new URL(args.formData.baseUrl).origin}/*`] })
+        .catch(() => false);
+    }
     if (args.formData.apiKey) {
       await args.ensureUnlockedBeforeSecretSave?.();
     }
-    args.setIsSaving(true);
-    didStartSave = true;
     await persistProviderForm(
       args.provider === undefined
         ? {
@@ -146,30 +162,46 @@ export async function saveProviderForm(args: ProviderFormSaveParams): Promise<vo
   }
 }
 
-async function persistModelForm(args: {
+function buildModelFormRecord(args: {
   formData: ModelFormData;
-  isEditing: boolean;
-  model?: AIModel | null;
-}): Promise<void> {
-  const nextModel: AIModel = {
-    id: args.model?.id ?? crypto.randomUUID(),
+  session: ModelFormSaveSession;
+}): AIModel {
+  return {
+    id: args.session.modelId,
     providerId: args.formData.providerId,
     displayName: args.formData.displayName,
     modelCode: args.formData.modelCode,
+    source: 'manual',
+    propertySource: args.formData.propertySource ?? 'manual',
+    ...(args.formData.capabilities === undefined
+      ? {}
+      : { capabilities: args.formData.capabilities }),
+    ...(args.formData.enabled === undefined ? {} : { enabled: args.formData.enabled }),
+    ...(args.formData.retirementOverride === undefined
+      ? {}
+      : { retirementOverride: args.formData.retirementOverride }),
     ...(args.formData.operation === undefined ? {} : { operation: args.formData.operation }),
     ...(args.formData.audio === undefined ? {} : { audio: args.formData.audio }),
-    ...((args.formData.operation ?? 'text') === 'text' && args.formData.systemPrompt
-      ? { systemPrompt: args.formData.systemPrompt }
-      : {}),
+    ...(args.formData.capabilities?.operations.text === 'supported'
+      ? { systemPrompt: args.formData.systemPrompt ?? '' }
+      : args.formData.capabilities === undefined &&
+          (args.formData.operation ?? 'text') === 'text' &&
+          args.formData.systemPrompt
+        ? { systemPrompt: args.formData.systemPrompt }
+        : {}),
   };
-  if (args.isEditing && args.model) {
-    await updateAIModel(nextModel);
-    return;
-  }
-  await addAIModel(nextModel);
 }
 
+export type ModelFormSaveSession = {
+  modelId: string;
+  pending: boolean;
+  committedRecord?: string;
+  existingRecord?: boolean;
+};
+
 export type ModelFormSaveParams = {
+  session: ModelFormSaveSession;
+  providerIncarnation: string;
   formData: ModelFormData;
   isEditing: boolean;
   model?: AIModel | null;
@@ -179,33 +211,45 @@ export type ModelFormSaveParams = {
 };
 
 export async function saveModelForm(args: ModelFormSaveParams): Promise<void> {
+  if (args.session.pending) return;
+
+  if (!args.providerIncarnation) {
+    args.setErrors({ submit: translate('settings.aiProviders.modelProviderChanged') });
+    return;
+  }
   const fieldErrors = mapModelFieldErrors(args.formData);
   if (fieldErrors) {
     args.setErrors(fieldErrors);
     return;
   }
 
+  args.session.pending = true;
+  args.setErrors({});
   args.setIsSaving(true);
 
   try {
-    await persistModelForm(
-      args.model === undefined
-        ? {
-            formData: args.formData,
-            isEditing: args.isEditing,
-          }
-        : {
-            formData: args.formData,
-            isEditing: args.isEditing,
-            model: args.model,
-          }
-    );
+    const nextModel = buildModelFormRecord(args);
+    const record = JSON.stringify(nextModel);
+    if (record !== args.session.committedRecord) {
+      if (
+        args.isEditing ||
+        args.session.existingRecord ||
+        args.session.committedRecord !== undefined
+      ) {
+        await updateAIModel(nextModel, args.providerIncarnation);
+      } else {
+        await addAIModel(nextModel, args.providerIncarnation);
+      }
+      // Reload can fail after publication. Retry must not create a second record.
+      args.session.committedRecord = record;
+    }
     await args.onSave();
   } catch (error) {
     logger.error('Failed to save model form', error);
     const message = buildMutationFailureMessage(error, buildModelSaveErrorMessage());
     args.setErrors({ submit: message });
   } finally {
+    args.session.pending = false;
     args.setIsSaving(false);
   }
 }

@@ -73,6 +73,7 @@ describe('settings transfer AI owner transaction', () => {
       sniptale_ai_providers: [
         {
           id: 'provider-a',
+          incarnation: 'current-local-incarnation',
           name: 'Provider',
           connectionType: 'openai-compatible',
           baseUrl: 'https://private.example',
@@ -181,7 +182,6 @@ describe('settings transfer AI owner transaction', () => {
                 displayName: 'Model',
               },
             ],
-            defaultModelId: null,
           },
         },
       },
@@ -199,7 +199,6 @@ describe('settings transfer AI owner transaction', () => {
     expect(mocks.localSet).toHaveBeenCalledWith(
       expect.objectContaining({
         sniptale_ai_models: [expect.not.objectContaining({ authorization: 'canary-secret' })],
-        sniptale_ai_default_model: null,
       }),
       undefined
     );
@@ -562,7 +561,7 @@ function allDomainFixtures(): Record<string, SettingsTransferDomainPayload> {
     'styles.gradients': { schemaVersion: 1, data: { presets: [] } },
     'styles.surfaces': { schemaVersion: 1, data: createSurfaceStylePresetCatalog() },
     'ai.prompt-templates': { schemaVersion: 1, data: { items: [], order: [] } },
-    'ai.models': { schemaVersion: 1, data: { items: [], defaultModelId: null } },
+    'ai.models': { schemaVersion: 1, data: { items: [] } },
     'ai.chrome': { schemaVersion: 1, data: { enabled: true } },
     'ai.prompts': { schemaVersion: 1, data: { global: 'Global', scenario: 'Scenario' } },
     'ai.providers': {

@@ -1,0 +1,138 @@
+import { APICallError, type ProviderV4 } from '@ai-sdk/provider';
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogle } from '@ai-sdk/google';
+import { createDeepSeek } from '@ai-sdk/deepseek';
+import { createXai } from '@ai-sdk/xai';
+import { createZai } from '@ai-sdk/zai';
+import { createMoonshotAI } from '@ai-sdk/moonshotai';
+import { createAlibaba } from '@ai-sdk/alibaba';
+import { createMistral } from '@ai-sdk/mistral';
+import { createMiniMax } from '@ai-sdk/minimax';
+import { createCohere } from '@ai-sdk/cohere';
+import { createElevenLabs } from '@ai-sdk/elevenlabs';
+import { createDeepgram } from '@ai-sdk/deepgram';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createOllama } from 'ollama-ai-provider-v2';
+import { getAIProviderOperations, type AIProviderType } from '../../contracts/settings/ai-provider';
+
+interface AIProviderRuntimeOptions {
+  type: AIProviderType;
+  baseUrl: string;
+  apiKey: string;
+  fetch: typeof globalThis.fetch;
+  operation: 'text' | 'transcription' | 'speech';
+  compatibleChat?: {
+    supportsStructuredOutputs: boolean;
+    transformRequestBody?: (body: Record<string, unknown>) => Record<string, unknown>;
+  };
+}
+
+/** Composes ready-made packages. Callers must supply the authorized, bounded network transport. */
+export function createAIProviderRuntime(options: AIProviderRuntimeOptions): ProviderV4 {
+  if (
+    options.type !== 'chrome-built-in' &&
+    !getAIProviderOperations(options.type).includes(options.operation)
+  )
+    throw new AIProviderRequestError('provider-unavailable');
+  const settings = { apiKey: options.apiKey, baseURL: options.baseUrl, fetch: options.fetch };
+  switch (options.type) {
+    case 'openai':
+      return createOpenAI(settings);
+    case 'anthropic':
+      return createAnthropic(settings);
+    case 'google':
+      return createGoogle(settings);
+    case 'deepseek':
+      return createDeepSeek(settings);
+    case 'xai':
+      return createXai(settings);
+    case 'zai':
+      return createZai(settings);
+    case 'moonshotai':
+      return createMoonshotAI(settings);
+    case 'alibaba':
+      return createAlibaba(settings);
+    case 'mistral':
+      return createMistral(settings);
+    case 'minimax':
+      return createMiniMax(settings);
+    case 'cohere':
+      return createCohere(settings);
+    case 'openrouter':
+      return createOpenRouter(settings);
+    case 'elevenlabs':
+      return createElevenLabs(settings);
+    case 'deepgram':
+      return createDeepgram(settings);
+    case 'ollama':
+      return createOllama({ baseURL: options.baseUrl, fetch: options.fetch });
+    case 'openai-compatible':
+    case 'lm-studio':
+    case 'yandex':
+    case 'neuraldeep':
+      return options.operation === 'text'
+        ? createOpenAICompatible({ ...settings, name: options.type, ...options.compatibleChat })
+        : createOpenAI(settings);
+    case 'chrome-built-in':
+      throw new Error('provider-runtime-unavailable');
+  }
+}
+
+/** A safe product error. It deliberately excludes SDK response bodies, request payloads, headers, and causes. */
+export class AIProviderRequestError extends Error {
+  constructor(
+    readonly reason: AIConnectionReason,
+    message: string = reason
+  ) {
+    super(message);
+    this.name = 'AIProviderRequestError';
+  }
+}
+
+/** Interprets documented transport evidence without treating HTTP status as retirement proof. */
+export function classifyAIProviderFailure(error: unknown): AIConnectionReason {
+  if (error instanceof AIProviderRequestError) return error.reason;
+  if (APICallError.isInstance(error)) {
+    return classifyAIProviderHttpStatus(error.statusCode, error.data);
+  }
+  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
+    return 'timeout';
+  if (error instanceof TypeError) return 'network';
+  return 'unknown';
+}
+
+const QUOTA_ERROR_CODES: readonly string[] = [
+  'insufficient_quota',
+  'credit_balance_exhausted',
+  'organization_spend_limit_exceeded',
+  'project_spend_limit_exceeded',
+  'organization_usage_limit_exceeded',
+];
+
+function hasQuotaEvidence(data: unknown): boolean {
+  if (typeof data !== 'object' || data === null || Array.isArray(data) || !('error' in data))
+    return false;
+  const error = data.error;
+  if (typeof error !== 'object' || error === null || Array.isArray(error)) return false;
+  return (
+    ('code' in error && typeof error.code === 'string' && QUOTA_ERROR_CODES.includes(error.code)) ||
+    ('type' in error && error.type === 'insufficient_quota')
+  );
+}
+
+/** Classifies HTTP status and parsed quota evidence without using provider message text or inferring retirement. */
+export function classifyAIProviderHttpStatus(
+  status: number | undefined,
+  data?: unknown
+): AIConnectionReason {
+  if (status === 401) return 'invalid-credential';
+  if (status === 403) return 'permission-denied';
+  if (status === 402) return 'quota-exceeded';
+  if (status === 404) return 'model-unavailable';
+  if (status === 429) return hasQuotaEvidence(data) ? 'quota-exceeded' : 'rate-limited';
+  if ((status ?? 0) >= 500) return 'service-error';
+  return 'unknown';
+}

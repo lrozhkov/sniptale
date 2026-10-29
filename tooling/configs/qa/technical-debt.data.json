@@ -362,6 +362,27 @@
         ]
       },
       "targetAction": "Keep the shared crop drawing controls and caller-owned interaction contract. Remove or review the decision when these edges or their authority change."
+    },
+    {
+      "id": "noise.codeql.catalog-refresh-flight-identity",
+      "classification": "tool-noise",
+      "owner": "background-ai-catalog",
+      "risk": "Awaiting the comparison operand would leave completed work registered and prevent later refresh attempts.",
+      "reason": "The service awaits work before this finally block. The comparison tests Promise object identity, not the resolved boolean. The controlled coalescing test proves one admission for concurrent callers and a new admission after settlement.",
+      "removalCondition": "Remove when CodeQL accepts Promise identity comparison or this exact cleanup changes.",
+      "reviewBy": "2027-04-29",
+      "source": {
+        "kind": "codeql",
+        "key": "js/missing-await:apps/extension/src/background/ai/settings/managed-catalog.ts:270:c11f5e8642bc7b5ea33876c41156f39b50243248b9cda048cdedec845110ca13:e65f923a68b7d7a94adcd0de39f1b44b843f51359d25743ef19ad4384b4ab6e2"
+      },
+      "scope": {
+        "contentHash": "c11f5e8642bc7b5ea33876c41156f39b50243248b9cda048cdedec845110ca13",
+        "file": "apps/extension/src/background/ai/settings/managed-catalog.ts",
+        "line": 270,
+        "messageHash": "e65f923a68b7d7a94adcd0de39f1b44b843f51359d25743ef19ad4384b4ab6e2",
+        "rule": "js/missing-await"
+      },
+      "targetAction": "Retain only the recorded rule, location, source hash, and message hash. Review any drift before retaining this entry."
     }
   ]
 }

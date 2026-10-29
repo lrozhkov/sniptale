@@ -1,3 +1,4 @@
+import { getAIProviderFailureKey } from '../../../../../features/ai/provider-failure-copy';
 import { OriginalAudioPlacementFields } from '../inputs/original-audio';
 import { useVideoEditorPlaybackPort } from '../../../../runtime/controller/store';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -169,32 +170,53 @@ function VoiceSourceControls({
   operation: VideoProjectTextVoiceController;
   hasText: boolean;
 }) {
-  const { loadModels, source } = op;
+  const { source } = op;
   const pauseTimeline = useVideoEditorPlaybackPort((port) => port.setPlaying);
   const locked =
     op.running ||
     op.recording.session.isSaving ||
     op.items.some((item) => !!item.preview) ||
     !!op.consent;
-  useEffect(() => {
-    if (source === 'ai') void loadModels();
-  }, [loadModels, source]);
   if (source === 'microphone')
     return op.preview ? null : <ProjectTextVoiceRecording recording={op.recording} />;
   return source === 'ai' ? (
     <>
-      <fieldset disabled={locked} className="min-w-0">
+      <fieldset disabled={locked || op.selectionPending} className="min-w-0">
         <SpeechSynthesisProfileFields
           catalog={op.catalog}
           profile={op.profile}
           onChange={op.changeProfile}
+          onSelectModel={op.chooseModel}
           onOpenModels={() => {
             void op.loadModels();
           }}
           preferenceId="project-text-voice.profile.advanced"
         />
       </fieldset>
-      {!op.catalog?.models.length && !locked ? (
+      {op.configurationFailed || op.selectionFailed || op.selectionUnavailable ? (
+        <p role="alert" className="text-xs">
+          {translate(
+            op.configurationFailed
+              ? 'aiModal.modelCatalogFailed'
+              : op.selectionFailed
+                ? 'aiModal.modelSelectionSaveFailed'
+                : 'aiModal.modelSelectionUnavailable'
+          )}
+          {op.selectionUnavailable && op.unavailableModelName ? (
+            <>
+              {' '}
+              <bdi className="[overflow-wrap:anywhere]">{op.unavailableModelName}</bdi>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      {op.selectionPending ? (
+        <p role="status" className="sr-only">
+          {translate('common.states.saving')}
+        </p>
+      ) : null}
+      {(!op.catalog?.models.length || op.configurationFailed || op.selectionUnavailable) &&
+      !locked ? (
         <InspectorActionButton
           onClick={() => {
             void op.loadModels();
@@ -411,7 +433,12 @@ function VoiceRequest({
         !op.pendingApply &&
         op.items.some((item) => item.selected && !item.preview && !item.accepted) ? (
         <InspectorActionButton
-          disabled={!op.profile || !hasText}
+          disabled={
+            !op.profile?.voiceId.trim() ||
+            op.profile.modelId !== op.modelId ||
+            op.selectionPending ||
+            !hasText
+          }
           onClick={() => {
             void op.prepare();
           }}
@@ -448,13 +475,14 @@ function VoiceRequestStatus({ operation: op }: { operation: VideoProjectTextVoic
       {op.error ? (
         <p role="alert" className="text-sm break-words">
           {translate(
-            op.error === 'selection'
-              ? 'videoEditor.sidebar.textVoicePlacementConflict'
-              : op.error === 'stale'
-                ? 'videoEditor.sidebar.textVoiceStale'
-                : op.error === 'model-unavailable'
-                  ? 'gallery.videoReview.speechMissingModel'
-                  : 'videoEditor.sidebar.recognitionFailed'
+            getAIProviderFailureKey(op.providerFailureReason) ??
+              (op.error === 'selection'
+                ? 'videoEditor.sidebar.textVoicePlacementConflict'
+                : op.error === 'stale'
+                  ? 'videoEditor.sidebar.textVoiceStale'
+                  : op.error === 'model-unavailable'
+                    ? 'gallery.videoReview.speechMissingModel'
+                    : 'videoEditor.sidebar.recognitionFailed')
           )}
         </p>
       ) : null}

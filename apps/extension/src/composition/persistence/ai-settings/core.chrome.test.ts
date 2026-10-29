@@ -190,23 +190,18 @@ it('delegates provider persistence helpers to the provider-secret store seam', a
 
   expect(saveStoredAIProvidersMock).toHaveBeenCalledWith([]);
   expect(upsertStoredAIProviderRecordMock).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'provider-1' })
+    expect.objectContaining({ id: 'provider-1' }),
+    undefined
   );
-  expect(clearStoredAIProviderSecretMock).toHaveBeenCalledWith('provider-1');
+  expect(clearStoredAIProviderSecretMock).toHaveBeenCalledWith('provider-1', undefined);
   expect(deleteStoredAIProviderRecordMock).toHaveBeenCalledWith('provider-1');
 });
 
 it('covers the local-only ai storage read and write helpers around the chrome toggle path', async () => {
   installLocalAiState();
 
-  const {
-    loadAIModels,
-    loadDefaultModelId,
-    loadGlobalSystemPrompt,
-    loadScenarioEditorSystemPrompt,
-    saveAIModels,
-    saveDefaultModelId,
-  } = await import('./core');
+  const { loadAIModels, loadGlobalSystemPrompt, loadScenarioEditorSystemPrompt, saveAIModels } =
+    await import('./core');
 
   await expect(loadAIModels()).resolves.toEqual([
     {
@@ -216,17 +211,12 @@ it('covers the local-only ai storage read and write helpers around the chrome to
       displayName: 'GPT 4.1',
     },
   ]);
-  await expect(loadDefaultModelId()).resolves.toBe('model-1');
   await expect(loadGlobalSystemPrompt()).resolves.toBe('Global prompt');
   await expect(loadScenarioEditorSystemPrompt()).resolves.toBe('Scenario prompt');
   await saveAIModels([]);
-  await saveDefaultModelId(null);
 
   expect(localSetMock).toHaveBeenCalledWith({
     [AI_MODELS_KEY]: [],
-  });
-  expect(localSetMock).toHaveBeenCalledWith({
-    [AI_DEFAULT_MODEL_KEY]: null,
   });
 });
 

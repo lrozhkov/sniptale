@@ -1,6 +1,10 @@
-import type { ReviewSpeechAccess } from './use-speech';
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
+import { AudioJobProviderError } from '../../workflows/audio-jobs/failure';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { AudioRecognitionOptions } from '../../contracts/ai/audio';
+import type { AudioRecognitionOptions, ReviewSpeechTarget } from '../../contracts/ai/audio';
+import type { ReviewSpeechSession } from '../../workflows/video-review/speech-publication';
+import type { ReviewBeforeAction } from './note-transitions';
+import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import type { ReviewTextDocument } from '../../features/video/review/text-document';
 import {
   applyReviewRecognition,
@@ -12,9 +16,19 @@ import {
   type ReviewRecognitionProposal,
 } from '../../workflows/video-review/recognition';
 
-import { useReviewSpeechCatalog } from './use-speech';
+import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
 
-export type ReviewRecognitionAccess = ReviewSpeechAccess;
+/** Current recognition access stays under its mounted operation owner. */
+export interface ReviewRecognitionAccess {
+  session: ReviewSpeechSession;
+  target: ReviewSpeechTarget;
+  original?: { file: Blob; sourceAssetId: string } | undefined;
+  selection?: { start: number; end: number } | undefined;
+  sourceAudioAvailable?: boolean | undefined;
+  beforeAction: ReviewBeforeAction;
+  flushAdvanced(): Promise<void>;
+  registerSpeechFlush(owner: ReviewSpeechFlushRegistration): () => void;
+}
 type RecognitionState = {
   proposal: ReviewRecognitionProposal | null;
   running: boolean;
@@ -23,6 +37,7 @@ type RecognitionState = {
   elapsed: number;
   completed: number;
   total: number;
+  providerFailureReason: AIConnectionReason | null;
   error: 'model' | 'selection' | 'stale' | 'failed' | 'too-large' | 'invalid-response' | null;
 };
 
@@ -51,11 +66,13 @@ function useRecognitionAttempt(args: ReviewRecognitionAccess) {
     completed: 0,
     total: 0,
     error: null,
+    providerFailureReason: null,
   });
   const lifetime = useRef({
     mounted: true,
     active: null as AbortController | null,
     job: undefined as ReviewRecognitionJob | undefined,
+    jobBinding: '',
     proposal: null as ReviewRecognitionProposal | null,
     args,
   });
@@ -84,7 +101,14 @@ function useRecognitionAttempt(args: ReviewRecognitionAccess) {
     const controller = new AbortController();
     owner.active = controller;
     const started = performance.now();
-    setState((current) => ({ ...current, running: true, applying, elapsed: 0, error: null }));
+    setState((current) => ({
+      ...current,
+      running: true,
+      applying,
+      elapsed: 0,
+      error: null,
+      providerFailureReason: null,
+    }));
     const timer = setInterval(() => {
       if (owner.mounted)
         setState((current) => ({
@@ -97,9 +121,11 @@ function useRecognitionAttempt(args: ReviewRecognitionAccess) {
         if (owner.mounted && !controller.signal.aborted)
           setState((current) => ({
             ...current,
+            providerFailureReason: cause instanceof AudioJobProviderError ? cause.reason : null,
             error:
               cause instanceof Error &&
-              (cause.message === 'stale' ||
+              (cause.message === 'model' ||
+                cause.message === 'stale' ||
                 cause.message === 'selection' ||
                 cause.message === 'too-large' ||
                 cause.message === 'invalid-response')
@@ -129,15 +155,22 @@ function useRecognitionAttempt(args: ReviewRecognitionAccess) {
       if (lifetime.current.active || lifetime.current.proposal?.receipt) return;
       lifetime.current.proposal = null;
       lifetime.current.job = undefined;
-      setState((current) => ({ ...current, proposal: null, accepted: false, error: null }));
+      lifetime.current.jobBinding = '';
+      setState((current) => ({
+        ...current,
+        proposal: null,
+        accepted: false,
+        error: null,
+        providerFailureReason: null,
+      }));
     },
-    clearError: () => setState((current) => ({ ...current, error: null })),
+    clearError: () =>
+      setState((current) => ({ ...current, error: null, providerFailureReason: null })),
   };
 }
 
 /** Form parameters remain independent of the async attempt and disposable proposal lifetime. */
 function useRecognitionParameters() {
-  const [modelId, setModelId] = useState('');
   const [grouping, setGrouping] = useState<ReviewRecognitionGrouping>('sentences-pauses');
   const [recognitionMode, setRecognitionMode] =
     useState<AudioRecognitionOptions['mode']>('transcribe');
@@ -147,8 +180,6 @@ function useRecognitionParameters() {
   const [selectionOnly, setSelectionOnly] = useState(false);
   const [mode, setMode] = useState<'add' | 'replace'>('add');
   return {
-    modelId,
-    setModelId,
     grouping,
     setGrouping,
     recognitionMode,
@@ -172,18 +203,19 @@ export function useReviewRecognition(args: ReviewRecognitionAccess) {
     args.session.getSnapshot
   );
   const parameters = useRecognitionParameters();
-  const { modelId, setModelId } = parameters;
+  const selection = useAIScenarioModelSelection('gallery-transcription');
+  const modelId = selection.modelId ?? '';
+  const catalogs = selection.configuration ? { transcription: selection.configuration } : null;
   const attempt = useRecognitionAttempt(args);
   const { state, setState, lifetime, command, acknowledge } = attempt;
   const modelError = useCallback(
-    () => setState((current) => ({ ...current, error: 'model' })),
+    () => setState((current) => ({ ...current, error: 'model', providerFailureReason: null })),
     [setState]
   );
-  const { catalogs, reloadModels } = useReviewSpeechCatalog(setModelId, modelError);
   const selectionUnavailable = parameters.selectionOnly && !validSelectedScope(args);
   const recognize = (approvedProviderId: string) => {
     if (selectionUnavailable) {
-      setState((current) => ({ ...current, error: 'selection' }));
+      setState((current) => ({ ...current, error: 'selection', providerFailureReason: null }));
       return;
     }
     const model = catalogs?.transcription.models.find((entry) => entry.id === modelId);
@@ -223,6 +255,34 @@ export function useReviewRecognition(args: ReviewRecognitionAccess) {
           acknowledge();
           return;
         }
+        const admitted = await selection.prepareModelSelection(signal);
+        const currentModel = admitted.catalog.models.find((entry) => entry.id === admitted.modelId);
+        const provider = admitted.catalog.providers.find(
+          (entry) => entry.id === currentModel?.providerId
+        );
+        if (
+          !currentModel ||
+          !provider?.destinationBinding ||
+          admitted.modelId !== chosenModel ||
+          provider.id !== approvedProviderId ||
+          (currentModel.audio?.transcription?.transport === 'audio-chat') !== !!recognition
+        )
+          throw new Error('model');
+        const approvedSelection = {
+          modelId: currentModel.id,
+          approvedProviderId: provider.id,
+          approvedModelCode: currentModel.modelCode,
+          approvedDestination: provider.destinationBinding,
+        };
+        const binding = JSON.stringify([
+          currentModel.id,
+          currentModel.modelCode,
+          provider.id,
+          provider.incarnation,
+          provider.connectionType,
+          provider.destinationBinding,
+          currentModel.audio?.transcription,
+        ]);
         await owner.args.flushAdvanced();
         signal.throwIfAborted();
         const job = await prepareReviewRecognition(
@@ -235,11 +295,15 @@ export function useReviewRecognition(args: ReviewRecognitionAccess) {
             ...(source ? { original: source } : {}),
             ...(selected ? { selection: selected } : {}),
             grouping: chosenGrouping,
+            approvedSelection,
             ...(recognition ? { recognition } : {}),
-            ...(owner.job && !owner.proposal ? { previous: owner.job } : {}),
+            ...(owner.job && !owner.proposal && owner.jobBinding === binding
+              ? { previous: owner.job }
+              : {}),
           }
         );
         owner.job = job;
+        owner.jobBinding = binding;
         owner.proposal = null;
         setState((current) => ({
           ...current,
@@ -300,13 +364,28 @@ export function useReviewRecognition(args: ReviewRecognitionAccess) {
   return {
     ...state,
     ...parameters,
+    modelId,
+    setModelId(id: string) {
+      if (!lifetime.current.mounted || lifetime.current.active || selection.selectionPending)
+        return;
+      attempt.clearError();
+      selection.chooseModel(id || null);
+    },
+    configurationFailed: selection.configurationFailed,
+    selectionFailed: selection.selectionFailed,
+    selectionPending: selection.selectionPending,
+    modelUnavailable: selection.selectionUnavailable,
+    rememberedModelName: selection.unavailableModelName,
     snapshot,
     multimodal:
       catalogs?.transcription.models.find((entry) => entry.id === modelId)?.audio?.transcription
         ?.transport === 'audio-chat',
     selectionUnavailable,
     catalogs,
-    reloadModels,
+    reloadModels() {
+      attempt.clearError();
+      return selection.retryConfiguration();
+    },
     recognize,
     apply,
     setText,

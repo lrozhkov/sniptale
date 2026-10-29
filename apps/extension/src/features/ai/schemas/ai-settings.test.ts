@@ -40,41 +40,18 @@ describe('ProviderFormSchema', () => {
 });
 
 describe('AISettingsSchema', () => {
-  it('accepts boolean chrome-ai toggle state and non-uuid default ids for virtual models', () => {
-    const result = AISettingsSchema.safeParse({
+  it('accepts current settings without a global model selection', () => {
+    const settings = {
       chromeAiEnabled: true,
       providers: [],
       models: [],
-      defaultModelId: 'chrome-ai-google-model',
       globalSystemPrompt: 'Global prompt',
       scenarioEditorSystemPrompt: 'Scenario prompt',
-    });
-
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects empty-string default model ids while still allowing null', () => {
-    expect(
-      AISettingsSchema.safeParse({
-        chromeAiEnabled: false,
-        providers: [],
-        models: [],
-        defaultModelId: '',
-        globalSystemPrompt: 'Global prompt',
-        scenarioEditorSystemPrompt: 'Scenario prompt',
-      }).success
-    ).toBe(false);
-
-    expect(
-      AISettingsSchema.safeParse({
-        chromeAiEnabled: true,
-        providers: [],
-        models: [],
-        defaultModelId: null,
-        globalSystemPrompt: 'Global prompt',
-        scenarioEditorSystemPrompt: 'Scenario prompt',
-      }).success
-    ).toBe(true);
+    };
+    expect(AISettingsSchema.parse(settings)).toEqual(settings);
+    expect(AISettingsSchema.parse({ ...settings, defaultModelId: 'obsolete' })).not.toHaveProperty(
+      'defaultModelId'
+    );
   });
 });
 
@@ -95,4 +72,41 @@ it('validates the same audio operation constraints in runtime models and the mod
     ModelFormSchema.safeParse({ ...model, audio: { speech: { ...model.audio.speech, speed: 5 } } })
       .success
   ).toBe(false);
+});
+
+it('retains catalog and manual property ownership and rejects an unknown ownership value', async () => {
+  const { AIModelSchema } = await import('./ai-settings');
+  const base = {
+    id: '00000000-0000-4000-8000-000000000001',
+    providerId: '00000000-0000-4000-8000-000000000002',
+    modelCode: 'exact',
+    displayName: 'Name',
+  };
+  for (const propertySource of ['catalog', 'manual']) {
+    expect(AIModelSchema.strict().parse({ ...base, propertySource })).toEqual({
+      ...base,
+      propertySource,
+    });
+  }
+  expect(AIModelSchema.strict().safeParse({ ...base, propertySource: 'automatic' }).success).toBe(
+    false
+  );
+});
+
+it('admits existing catalog identity bounds in runtime models without widening manual entry', async () => {
+  const { AIModelSchema, ModelFormSchema } = await import('./ai-settings');
+  const base = {
+    id: '00000000-0000-4000-8000-000000000001',
+    providerId: '00000000-0000-4000-8000-000000000002',
+    modelCode: 'c'.repeat(500),
+    displayName: 'n'.repeat(500),
+  };
+  expect(AIModelSchema.strict().safeParse(base).success).toBe(true);
+  expect(ModelFormSchema.safeParse(base).success).toBe(true);
+  expect(AIModelSchema.strict().safeParse({ ...base, modelCode: 'c'.repeat(501) }).success).toBe(
+    false
+  );
+  expect(AIModelSchema.strict().safeParse({ ...base, displayName: 'n'.repeat(501) }).success).toBe(
+    false
+  );
 });

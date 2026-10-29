@@ -81,7 +81,7 @@ it('round trips independent new material destinations without dropping categorie
   expect(parseSettingsTransferDomains(parseSettingsTransferDomains(input))).toEqual(input);
 });
 
-it('round trips audio model parameters while rejecting an audio text default', () => {
+it('round trips audio model parameters and rejects retired selection metadata', () => {
   const model = {
     id: 'audio',
     providerId: 'provider',
@@ -91,7 +91,7 @@ it('round trips audio model parameters while rejecting an audio text default', (
     audio: { speech: { voiceId: 'voice', responseFormat: 'mp3', speed: 1 } },
   };
   const payload = {
-    'ai.models': { schemaVersion: 1, data: { items: [model], defaultModelId: null } },
+    'ai.models': { schemaVersion: 1, data: { items: [model] } },
   };
   expect(parseSettingsTransferDomains(payload)).toEqual(payload);
   expect(() =>
@@ -211,3 +211,73 @@ it.each([
     })
   ).toThrow();
 });
+
+it('retains model capabilities, ownership and independent audio blocks through domain admission', () => {
+  const model = {
+    id: 'configured',
+    providerId: 'provider',
+    modelCode: 'exact/code',
+    displayName: 'Configured',
+    source: 'manual',
+    propertySource: 'catalog',
+    enabled: false,
+    retirementOverride: false,
+    capabilities: {
+      operations: { text: 'supported', transcription: 'supported', speech: 'supported' },
+      input: { text: 'supported', audio: 'supported' },
+      output: { audio: 'supported' },
+      features: {},
+    },
+    audio: {
+      transcription: { language: 'en', responseFormat: 'json', timestampGranularity: 'none' },
+      speech: { voiceId: 'voice', responseFormat: 'mp3' },
+    },
+  };
+  const input = {
+    'ai.models': { schemaVersion: 1, data: { items: [model] } },
+  };
+  expect(parseSettingsTransferDomains(input)).toEqual(input);
+  expect(parseSettingsTransferDomains(parseSettingsTransferDomains(input))).toEqual(input);
+  expect(() =>
+    parseSettingsTransferDomains({
+      'ai.models': {
+        schemaVersion: 1,
+        data: { items: [{ ...model, catalog: { lifecycle: 'active' } }] },
+      },
+    })
+  ).toThrow();
+});
+
+it('round trips provider management and disabled state without admitting runtime evidence', () => {
+  const provider = {
+    id: 'provider',
+    name: 'Provider',
+    baseUrl: 'https://example.com/v1',
+    connectionType: 'openai-compatible',
+    createdAt: 1,
+    management: 'manual',
+    enabled: false,
+  };
+  const domain = (item: SettingsTransferDomainPayload['data']) => ({
+    'ai.providers': { schemaVersion: 1, data: { items: [item] } },
+  });
+  expect(parseSettingsTransferDomains(domain(provider))).toEqual(domain(provider));
+  for (const invalid of [
+    { enabled: 'false' },
+    { management: 'unknown' },
+    { incarnation: 'imported' },
+  ]) {
+    expect(() => parseSettingsTransferDomains(domain({ ...provider, ...invalid }))).toThrow();
+  }
+});
+
+it.each([null, 'configured-model'])(
+  'rejects retired global model selection %s at domain admission',
+  (defaultModelId) => {
+    expect(() =>
+      parseSettingsTransferDomains({
+        'ai.models': { schemaVersion: 1, data: { items: [], defaultModelId } },
+      })
+    ).toThrow();
+  }
+);

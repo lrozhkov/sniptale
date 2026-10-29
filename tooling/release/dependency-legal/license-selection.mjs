@@ -10,6 +10,7 @@ const LICENSE_EXTENSIONS = ['', '.txt', '.md', '.markdown'];
 const README_NAMES = ['readme', 'readme.md', 'readme.markdown', 'readme.txt'];
 const REVIEWED_TEXT_MARKERS = new Map([
   ['Apache-2.0', /Apache License\s+Version 2\.0/iu],
+  ['BSD-3-Clause', /BSD 3-Clause[^\r\n]*License/iu],
   ['MIT', /MIT License|Permission is hereby granted, free of charge/iu],
 ]);
 

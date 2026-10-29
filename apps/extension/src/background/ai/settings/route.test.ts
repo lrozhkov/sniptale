@@ -77,11 +77,11 @@ it('allows settings page AI mutations', async () => {
   expect(mutateAiSettingsMock).toHaveBeenCalledWith(message);
 });
 
-it('allows settings page default model persistence', async () => {
+it('allows settings page scenario prompt persistence', async () => {
   const sendResponse = vi.fn();
   const message = {
-    defaultModelId: 'model-1',
-    operation: 'save-default-model',
+    prompt: 'Scenario prompt',
+    operation: 'save-scenario-editor-prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   } as const;
 
@@ -99,7 +99,7 @@ it('allows settings page default model persistence', async () => {
   expect(mutateAiSettingsMock).toHaveBeenCalledWith(message);
 });
 
-it('rejects content senders for default model persistence', () => {
+it('rejects content senders for scenario prompt persistence', () => {
   const sendResponse = vi.fn();
   hasPreauthorizedAiSettingsMutationMessageMock.mockReturnValue(false);
   const sender = { tab: { id: 7 } as chrome.tabs.Tab, url: 'https://example.test/page' };
@@ -107,8 +107,8 @@ it('rejects content senders for default model persistence', () => {
   expect(
     routeAiSettingsMutationMessage(
       {
-        defaultModelId: 'model-1',
-        operation: 'save-default-model',
+        prompt: 'Scenario prompt',
+        operation: 'save-scenario-editor-prompt',
         type: MessageType.AI_SETTINGS_MUTATION,
       },
       sender,
@@ -245,4 +245,28 @@ it('returns typed locked failures for protected AI secret mutations', async () =
       error: 'AI provider secrets are locked',
     });
   });
+});
+
+it('returns the typed provider-change reason without exposing the submitted model draft', async () => {
+  const { AIModelProviderChangedError } =
+    await import('../../../composition/persistence/ai-settings/graph-mutation-types');
+  mutateAiSettingsMock.mockRejectedValueOnce(new AIModelProviderChangedError());
+  const sendResponse = vi.fn();
+  routeAiSettingsMutationMessage(
+    {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'update-model',
+      providerIncarnation: 'old',
+      model: { id: 'model', providerId: 'provider', modelCode: 'code', displayName: 'Name' },
+    },
+    { url: 'chrome-extension://extension-id/apps/extension/src/settings/index.html' },
+    sendResponse
+  );
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({
+      success: false,
+      reason: 'ai-provider-changed',
+      error: 'The AI provider changed after this model draft was prepared',
+    })
+  );
 });

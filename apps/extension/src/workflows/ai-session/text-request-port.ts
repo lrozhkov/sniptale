@@ -1,8 +1,20 @@
+import type { AIConnectionReason } from '../../contracts/settings/ai-catalog';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import { cancelReviewRemoteJob, keepReviewRemoteJobAlive } from '../audio-jobs/remote-job-port';
 
+/** Carries an admitted provider category while preserving the existing text-job code. */
+export class TextJobProviderError extends Error {
+  constructor(
+    readonly reason: AIConnectionReason,
+    code: string
+  ) {
+    super(code);
+    this.name = 'TextJobProviderError';
+  }
+}
+
 type TextReply = { requestId: string } & (
-  | { type: 'failure'; code: string }
+  | { type: 'failure'; code: string; failureReason?: AIConnectionReason | undefined }
   | { type: 'progress' }
   | { type: 'result' | 'proposal' }
 );
@@ -57,7 +69,12 @@ export function runTextRequestPort<
       }
       if (message.requestId !== start.requestId) return;
       if (message.type === 'failure') {
-        finish(undefined, new Error(message.code));
+        finish(
+          undefined,
+          message.failureReason === undefined
+            ? new Error(message.code)
+            : new TextJobProviderError(message.failureReason, message.code)
+        );
         return;
       }
       if (message.type === 'progress') return;
@@ -65,7 +82,10 @@ export function runTextRequestPort<
       if (result === null) finish(undefined, new Error('invalid-response'));
       else finish(result);
     };
-    const timer = setTimeout(() => finish(undefined, new Error('timeout')), adapter.timeoutMs);
+    const timer = setTimeout(
+      () => finish(undefined, new TextJobProviderError('timeout', 'timeout')),
+      adapter.timeoutMs
+    );
     const keepalive = setInterval(() => {
       keepReviewRemoteJobAlive(port, start.requestId, finish);
     }, adapter.keepaliveMs);

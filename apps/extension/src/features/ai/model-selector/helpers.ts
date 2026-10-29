@@ -45,6 +45,7 @@ export function getFilteredAIProviders(
         return (
           searchQuery === '' ||
           model.displayName.toLowerCase().includes(normalizedQuery) ||
+          model.modelCode.toLowerCase().includes(normalizedQuery) ||
           provider.name.toLowerCase().includes(normalizedQuery)
         );
       }),

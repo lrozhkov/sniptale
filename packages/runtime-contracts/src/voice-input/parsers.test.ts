@@ -309,3 +309,27 @@ it('admits capture tokens only for model sessions and requires null for Chrome',
     })
   ).toBeNull();
 });
+
+it.each([
+  'provider-invalid-credential',
+  'provider-permission-denied',
+  'provider-quota-exceeded',
+  'provider-rate-limited',
+  'provider-service-error',
+  'provider-host-permission-required',
+  'provider-secret-locked',
+  'provider-unavailable',
+])('retains the bounded %s code across snapshot and failure receivers', (errorCode) => {
+  expect(parseVoiceInputSnapshot({ ...snapshot, phase: 'error', errorCode })?.errorCode).toBe(
+    errorCode
+  );
+  expect(
+    parseVoiceInputServerEvent({
+      type: VoiceInputPortMessageType.FAILURE,
+      requestId: 'request',
+      sessionId: 'session-1',
+      errorCode,
+      snapshot: { ...snapshot, phase: 'error', errorCode },
+    })
+  ).toMatchObject({ errorCode });
+});

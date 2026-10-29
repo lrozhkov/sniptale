@@ -5,7 +5,8 @@ import type {
   VoiceInputPreferences,
 } from '@sniptale/runtime-contracts/voice-input';
 import { VoiceHistoryError } from '../../composition/persistence/voice-input-history';
-import { createVoiceInputProcessor } from './processing';
+import { createVoiceInputProcessor, getVoiceInputProcessingErrorCode } from './processing';
+import { AIProviderRequestError } from '../ai/providers';
 import { createVoiceInputProcessingOperations } from './processing-operation';
 import {
   createHistoryFixture,
@@ -231,6 +232,8 @@ it('reports a failed revision so cancellation can remove the admitted entry', as
   expect(onScope).toHaveBeenLastCalledWith(failed);
 });
 const config: AudioModelConfig = {
+  connectionType: 'openai-compatible',
+  baseUrl: 'https://provider.test/v1',
   url: 'https://provider.test/v1/audio/transcriptions',
   apiKey: 'fixture-secret',
   modelCode: 'whisper',
@@ -415,3 +418,72 @@ it('preserves automatic model language when voice preferences select Russian', a
     })
   ).resolves.toMatchObject({ transcript: 'Automatic language' });
 });
+
+it.each([
+  ['invalid-credential', 'provider-invalid-credential'],
+  ['permission-denied', 'provider-permission-denied'],
+  ['quota-exceeded', 'provider-quota-exceeded'],
+  ['rate-limited', 'provider-rate-limited'],
+  ['service-error', 'provider-service-error'],
+  ['host-permission-required', 'provider-host-permission-required'],
+  ['secret-locked', 'provider-secret-locked'],
+  ['provider-unavailable', 'provider-unavailable'],
+  ['model-unavailable', 'model-unavailable'],
+  ['network', 'network'],
+  ['timeout', 'timeout'],
+  ['unknown', 'provider-failed'],
+  ['catalog-unsupported', 'provider-failed'],
+] as const)(
+  'retains typed %s evidence in failed dictation without replay',
+  async (reason, code) => {
+    const failure = new AIProviderRequestError(reason, 'private response must not be retained');
+    transcribe.mockRejectedValueOnce(failure);
+    await expect(run()).rejects.toBe(failure);
+    expect(history.fail).toHaveBeenCalledWith(next, { status: 'failed', failureCode: code });
+    expect(transcribe).toHaveBeenCalledOnce();
+    expect(history.saveRawTranscript).not.toHaveBeenCalled();
+    expect(correct).not.toHaveBeenCalled();
+  }
+);
+it('keeps microphone permission separate and refuses arbitrary provider text', () => {
+  expect(getVoiceInputProcessingErrorCode(new Error('permission-denied'))).toBe(
+    'permission-denied'
+  );
+  expect(getVoiceInputProcessingErrorCode(new Error('private provider response'))).toBe(
+    'provider-failed'
+  );
+});
+
+it.each([
+  ['invalid-credential', 'provider-invalid-credential'],
+  ['permission-denied', 'provider-permission-denied'],
+  ['quota-exceeded', 'provider-quota-exceeded'],
+  ['rate-limited', 'provider-rate-limited'],
+  ['service-error', 'provider-service-error'],
+  ['network', 'network'],
+  ['timeout', 'timeout'],
+  ['model-unavailable', 'model-unavailable'],
+  ['unknown', 'provider-failed'],
+] as const)(
+  'keeps ready raw text and bounded %s evidence when optional correction fails',
+  async (reason, code) => {
+    correct.mockRejectedValueOnce(
+      new AIProviderRequestError(reason, 'private response must not be retained')
+    );
+    await expect(run()).resolves.toMatchObject({
+      status: 'ready',
+      correctionStatus: 'failed',
+      transcript: 'Raw words',
+      failureCode: code,
+    });
+    expect(history.complete).toHaveBeenCalledWith(rawScope, {
+      rawTranscript: 'Raw words',
+      transcript: 'Raw words',
+      correctionStatus: 'failed',
+      failureCode: code,
+    });
+    expect(transcribe).toHaveBeenCalledOnce();
+    expect(correct).toHaveBeenCalledOnce();
+    expect(history.fail).not.toHaveBeenCalled();
+  }
+);
