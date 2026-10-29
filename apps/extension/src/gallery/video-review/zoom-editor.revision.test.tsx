@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useReviewZoomEditor, withReviewFocusType } from './zoom-editor';
+import { useReviewZoomEditor, useReviewZoomPreview, withReviewFocusType } from './zoom-editor';
 import type {
   QuickEditZoomRegion,
   QuickEditZoomState,
@@ -155,4 +155,82 @@ it('keeps authored revisions through own previews and autosave while committing 
   };
   act(() => editor.changeAtRevision('a', editor.revision(bounded.regions[0]), { centerX: 2 }));
   expect(apply(setZoom, bounded)).toBe(bounded);
+});
+
+it('does not rerender the document owner for transient geometry previews', () => {
+  const zoom = { enabled: true, regions: [region('a', 0, 2)] };
+  const setZoom = vi.fn();
+  let renders = 0;
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    renders++;
+    editor = useReviewZoomEditor({ setZoom, zoom, timelineDuration: 10, selection: 'a' });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  const initial = renders;
+  act(() => editor.preview('a', { centerX: 0.7 }));
+  expect(editor.previewRegion(zoom.regions[0]!).transform.centerX).toBe(0.7);
+  expect(renders).toBe(initial);
+  act(() => editor.preview('a', null));
+  expect(editor.previewRegion(zoom.regions[0]!)).toBe(zoom.regions[0]);
+  expect(renders).toBe(initial);
+  expect(setZoom).not.toHaveBeenCalled();
+});
+
+it('updates both preview consumers and cancels a draft without updating the document owner', async () => {
+  const zoom = { enabled: true, regions: [region('a', 0, 2)] };
+  const setZoom = vi.fn();
+  let ownerRenders = 0;
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Consumer({ editor }: { editor: ReturnType<typeof useReviewZoomEditor> }) {
+    const preview = useReviewZoomPreview(editor);
+    return (
+      <output data-previewing={preview.previewing}>
+        {preview.previewRegion(zoom.regions[0]!).transform.centerX}
+      </output>
+    );
+  }
+  function Harness() {
+    ownerRenders++;
+    editor = useReviewZoomEditor({ setZoom, zoom, timelineDuration: 10, selection: 'a' });
+    return (
+      <>
+        <Consumer editor={editor} />
+        <Consumer editor={editor} />
+      </>
+    );
+  }
+  act(() => root.render(<Harness />));
+  const initial = ownerRenders;
+  act(() => editor.preview('a', { centerX: 0.7 }));
+  expect(
+    [...host.querySelectorAll('output')].every(
+      (node) => node.getAttribute('data-previewing') === 'true'
+    )
+  ).toBe(true);
+  expect([...host.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+    '0.7',
+    '0.7',
+  ]);
+  act(() => editor.preview('a', null));
+  expect([...host.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+    '0.5',
+    '0.5',
+  ]);
+  await act(async () => {
+    editor.preview('a', { centerX: 0.8 });
+    editor.preview('a', null);
+  });
+  expect([...host.querySelectorAll('output')].map((node) => node.textContent)).toEqual([
+    '0.5',
+    '0.5',
+  ]);
+  expect(
+    [...host.querySelectorAll('output')].every(
+      (node) => node.getAttribute('data-previewing') === 'false'
+    )
+  ).toBe(true);
+  expect(ownerRenders).toBe(initial);
+  expect(setZoom).not.toHaveBeenCalled();
 });

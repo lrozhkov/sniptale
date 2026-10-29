@@ -1,0 +1,26 @@
+[ci:phase] start install
+
+added 413 packages in 27s
+
+95 packages are looking for funding
+  run `npm fund` for details
+Local install refreshed: 013c0f759409dbcb231c6a481b19ae5ce694a4404476c9be60f8e983e990bd0e
+[ci:phase] passed install
+[ci:phase] start verify-project-toolchain
+Project toolchain passed: tools=8; typescript-api=6.0.3; mutation-typescript=6.0.3
+[ci:phase] passed verify-project-toolchain
+[ci:phase] start validate-workflows
+Workflow validation skipped: candidate does not affect workflow policy.
+[ci:phase] passed validate-workflows
+[ci:phase] start provision-canvas
+rebuilt dependencies successfully
+Local canvas provisioning refreshed.
+[ci:phase] passed provision-canvas
+[ci:phase] start provision-ast-grep
+Local ast-grep provisioning refreshed.
+[ci:phase] passed provision-ast-grep
+[ci:phase] start proof
+[qa.audit.progress] control=codeql label="CodeQL" state=queued
+[qa.audit.progress] control=codeql label="CodeQL" state=skipped outcome=skipped durationMs=0
+[qa.audit.progress] control=full-product-coverage label="Full product coverage" state=queued
+[qa.audit.progress] control=full-product-coverage label="Full product coverage" state=started

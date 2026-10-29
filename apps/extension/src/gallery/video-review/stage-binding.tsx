@@ -1,8 +1,9 @@
+import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import type { ReviewCutPreviewBinding } from './cut-transition-preview';
 import type { RefObject } from 'react';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import type {
   QuickEditBackgroundSettings,
@@ -85,34 +86,42 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
   const framing =
     projected.length > 0 &&
     Math.abs(props.outputTime - (projected[0]!.start + projected.at(-1)!.end) / 2) < 0.05;
-  const regions = props.zoomRegions.map((region) => {
-    const target = projected.find((item) => item.id === region.id);
-    if (!target) return region;
-    // Resolved links belong to the complete scene, not the isolated selected projection.
-    const updated = { ...region, ...target };
-    if (!framing) return updated;
-    return {
-      ...updated,
-      enter: { type: 'none' as const, duration: 0 },
-      exit: { type: 'none' as const, duration: 0 },
-      ...(target.borderClock
-        ? {
-            borderClock: {
-              ...target.borderClock,
-              enter: { type: 'none' as const, duration: 0 },
-              exit: { type: 'none' as const, duration: 0 },
-            },
-          }
-        : {}),
+  const regions =
+    projected.length === 0
+      ? props.zoomRegions
+      : props.zoomRegions.map((region) => {
+          const target = projected.find((item) => item.id === region.id);
+          if (!target) return region;
+          // Resolved links belong to the complete scene, not the isolated selected projection.
+          const updated = { ...region, ...target };
+          if (!framing) return updated;
+          return {
+            ...updated,
+            enter: { type: 'none' as const, duration: 0 },
+            exit: { type: 'none' as const, duration: 0 },
+            ...(target.borderClock
+              ? {
+                  borderClock: {
+                    ...target.borderClock,
+                    enter: { type: 'none' as const, duration: 0 },
+                    exit: { type: 'none' as const, duration: 0 },
+                  },
+                }
+              : {}),
+          };
+        });
+  const cameraScene = useMemo(() => {
+    const input = {
+      source: props.source,
+      canvas: props.canvas,
+      background: props.background,
+      windowHeader: props.windowHeader,
     };
-  });
+    prepareReviewCameraPlans(regions, input);
+    return input;
+  }, [regions, props.source, props.canvas, props.background, props.windowHeader]);
   const camera: QuickEditCameraTransform = regions.length
-    ? evaluateQuickEditCameraAtTime(regions, props.outputTime, {
-        source: props.source,
-        canvas: props.canvas,
-        background: props.background,
-        windowHeader: props.windowHeader,
-      })
+    ? evaluateQuickEditCameraAtTime(regions, props.outputTime, cameraScene)
     : { scale: 1, centerX: 0.5, centerY: 0.5 };
   const geometryRef = useRef<{
     output: { width: number; height: number };

@@ -62,3 +62,29 @@ it('does not split a Unicode pair when bounding a page title for the header cont
     resolveQuickActionHeader(appearance, { date: 'Today', title: 'a'.repeat(511) + '😀' })?.title
   ).toBe('a'.repeat(511));
 });
+
+it('keeps multiple information fields in one row inside the framed image width', () => {
+  const appearance = createQuickActionAppearance();
+  appearance.background.kind = 'paint';
+  appearance.information.enabled = true;
+  const source = { width: 1280, height: 560 };
+  const single = quickActionAppearanceGeometry(appearance, source, 1);
+  const multiple = quickActionAppearanceGeometry(appearance, source, 5);
+  expect(multiple.informationHeight).toBe(single.informationHeight);
+  expect(multiple.height).toBe(single.height);
+});
+
+it('keeps the full caption line box within the rounded card at the maximum radius', () => {
+  const appearance = createQuickActionAppearance();
+  appearance.background.kind = 'paint';
+  appearance.background.radius = 256;
+  appearance.information.enabled = true;
+  const layout = quickActionAppearanceGeometry(appearance, { width: 1280, height: 560 }, 5);
+  expect(layout.informationInset).toBe(193);
+  for (const y of [layout.informationY, layout.informationY + layout.lineHeight]) {
+    const bottom = layout.padding + layout.frameHeight;
+    const circleY = bottom - layout.frameRadius;
+    const boundary = layout.frameRadius - Math.sqrt(layout.frameRadius ** 2 - (y - circleY) ** 2);
+    expect(layout.informationInset).toBeGreaterThan(boundary);
+  }
+});

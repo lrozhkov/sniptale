@@ -18,6 +18,17 @@ export function createPinToTabSessionStorageKey(tabId: number): string {
   return `${CONTENT_PIN_TO_TAB_SESSION_KEY_PREFIX}${tabId}`;
 }
 
+export function createPinToTabAutomaticSessionStorageKey(tabId: number): string {
+  return `sniptale.content.pin-to-tab-automatic:tab:${tabId}`;
+}
+
+export async function readPinToTabAutomaticSessionStorageState(tabId: number): Promise<boolean> {
+  if (!browserStorage.session.isAvailable()) return false;
+  const key = createPinToTabAutomaticSessionStorageKey(tabId);
+  const stored = await browserStorage.session.get({ [key]: false });
+  return stored[key] === true;
+}
+
 export function createPinToTabToolbarVisibilitySessionStorageKey(tabId: number): string {
   return `${CONTENT_PIN_TO_TAB_TOOLBAR_VISIBILITY_SESSION_KEY_PREFIX}${tabId}`;
 }
@@ -83,7 +94,7 @@ export async function readPinToTabToolbarVisibilitySessionStorageState(
 
 export type PinToTabSessionStorageMutation =
   | { pinToTab: false }
-  | { pinToTab: true; toolbarVisible: boolean }
+  | { pinToTab: true; toolbarVisible: boolean; automatic?: boolean }
   | { toolbarVisible: boolean };
 
 export async function writePinToTabSessionStorageState(
@@ -91,20 +102,26 @@ export async function writePinToTabSessionStorageState(
   mutation: PinToTabSessionStorageMutation,
   isCurrent: ContentPinToTabSessionWriteGuard
 ): Promise<void> {
-  if (!browserStorage.session.isAvailable() || !isCurrent()) {
-    return;
+  if (!isCurrent()) return;
+  if (!browserStorage.session.isAvailable()) {
+    throw new Error('Pin-to-tab session storage is unavailable');
   }
 
   const pinStorageKey = createPinToTabSessionStorageKey(tabId);
   const visibilityStorageKey = createPinToTabToolbarVisibilitySessionStorageKey(tabId);
   if ('pinToTab' in mutation) {
     if (!mutation.pinToTab) {
-      await browserStorage.session.remove([pinStorageKey, visibilityStorageKey]);
+      await browserStorage.session.remove([
+        pinStorageKey,
+        visibilityStorageKey,
+        createPinToTabAutomaticSessionStorageKey(tabId),
+      ]);
       return;
     }
 
     await browserStorage.session.set({
       [pinStorageKey]: true,
+      [createPinToTabAutomaticSessionStorageKey(tabId)]: mutation.automatic === true,
       [visibilityStorageKey]: mutation.toolbarVisible,
     });
     return;
@@ -121,5 +138,6 @@ export async function clearPinToTabSessionStorageState(tabId: number): Promise<v
   await browserStorage.session.remove([
     createPinToTabSessionStorageKey(tabId),
     createPinToTabToolbarVisibilitySessionStorageKey(tabId),
+    createPinToTabAutomaticSessionStorageKey(tabId),
   ]);
 }

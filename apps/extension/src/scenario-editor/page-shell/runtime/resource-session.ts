@@ -6,6 +6,8 @@ import {
 } from '../../../composition/persistence/scenario/resource-sessions';
 import { pruneScenarioResources } from '../../../composition/persistence/scenario/retention';
 
+import { ensureNativeEditingRootAvailable } from '../../../workflows/sync-transfer/editing-admission';
+
 const logger = createLogger({ namespace: 'GuideResourceSession' });
 type ActiveSession = { id: string; lease: ScenarioResourceSession };
 
@@ -26,6 +28,12 @@ export function useGuideResourceSession() {
     if (id) {
       await pruneScenarioResources(id);
       const lease = await acquireScenarioResourceSession(id);
+      try {
+        await ensureNativeEditingRootAvailable({ rootKind: 'scenario-project', rootId: id });
+      } catch (error) {
+        await lease.release();
+        throw error;
+      }
       next = { id, lease };
     }
     if (turn !== generation.current) {

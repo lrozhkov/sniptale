@@ -18,8 +18,9 @@ export function createIntegrationTemplatesState() {
 
 export function createIntegrationBootstrapPayload() {
   return {
-    chromeAiEnabled: false,
-    defaultModelId: 'model-1',
+    scenario: 'page-extract',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model-1' },
     globalSystemPrompt: 'Global system prompt',
     models: [
       {
@@ -33,7 +34,9 @@ export function createIntegrationBootstrapPayload() {
     providers: [
       {
         baseUrl: 'https://api.openai.com/v1',
-        connectionType: 'openai-compatible',
+        connectionType: 'neuraldeep',
+        incarnation: 'first-provider',
+        destinationBinding: 'sha256:' + 'a'.repeat(64),
         createdAt: 1,
         hasStoredApiKey: true,
         id: 'provider-1',

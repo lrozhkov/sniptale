@@ -13,8 +13,8 @@ it('keeps AI settings query and mutation payloads operation-specific', () => {
     type: MessageType.AI_SETTINGS_QUERY,
   } satisfies AiSettingsQueryMessage;
   const mutation = {
-    operation: 'save-default-model',
-    defaultModelId: null,
+    operation: 'save-scenario-editor-prompt',
+    prompt: 'Scenario prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   } satisfies AiSettingsMutationMessage;
   const resetMutation = {
@@ -23,7 +23,7 @@ it('keeps AI settings query and mutation payloads operation-specific', () => {
   } satisfies AiSettingsMutationMessage;
 
   expect(query.modelId).toBe('model-1');
-  expect(mutation.defaultModelId).toBeNull();
+  expect(mutation.prompt).toBe('Scenario prompt');
   expect(resetMutation.operation).toBe('reset-scenario-editor-prompt');
   expectTypeOf<AIProviderDestinationKind>().toEqualTypeOf<
     'chrome-built-in' | 'external' | 'local-custom'

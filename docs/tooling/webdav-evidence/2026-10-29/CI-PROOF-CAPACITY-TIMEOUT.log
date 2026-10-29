@@ -1,0 +1,44 @@
+[Unit tests: failure output tail]
+| 
+|  RUN  v5.0.5 <repo>
+|       Coverage enabled with v8
+| 
+|  ❯ apps/extension/src/workflows/sync-transfer/automatic.test.ts (20 tests | 1 failed) 18891ms
+|    × reads 10000 remote-only roots without originals or native publication 18426ms
+| 
+|  Test Files  1 failed | 148 passed (149)
+|       Tests  1 failed | 2549 passed (2550)
+|    Start at  15:22:35
+|    Duration  378.23s (tests 52%, import 37%, transform 5%, environment 4%, worker 2%, setup 1%)
+| 
+|      Import  2222 modules were evaluated 14563 times · 126.87s total, 37% of tracked time
+|              ~107.51s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+|              learn more: https://vitest.dev/guide/improving-performance#test-isolation
+| 
+| 
+| 
+| ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+| 
+|  FAIL  apps/extension/src/workflows/sync-transfer/automatic.test.ts > reads 10000 remote-only roots without originals or native publication
+| Error: Test timed out in 15000ms.
+| If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+|  ❯ apps/extension/src/workflows/sync-transfer/automatic.test.ts:184:1
+|     182| afterEach(() => vi.unstubAllGlobals());
+|     183|
+|     184| it('reads 10000 remote-only roots without originals or native publicat…
+|        | ^
+|     185|   const template = await attempt('project-asset:template', 'template');
+|     186|   if (!template.operation.envelope) throw new Error('Expected edit env…
+| 
+| ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+| 
+| 
+QA checkpoint: problems found in 8m 7s
+Problems: 1 — qa.rule.unit-tests.process-exit
+Timeline: wall=8m 7s; critical=7m 48s; active=7m 48s
+Wait: queue=10m 20s; resource=10m 20s
+Slow: scheduler-1.lane.tests=6m 46s, scheduler-1.lane.light=54s, scheduler-1.lane.target-paths=44s, scheduler-1.lane.app-owners=28s, scheduler-1.lane.lint=8.6s
+Reused: none
+Skipped: none
+Run record: .tmp/qa-observability/runs/2026-10-29/ec8fb5ad-68d2-4775-899c-468061ba501c.json
+Run log: .tmp/qa-logs/2026-10-29/ec8fb5ad-68d2-4775-899c-468061ba501c.log

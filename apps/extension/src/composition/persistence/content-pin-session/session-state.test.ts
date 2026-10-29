@@ -28,6 +28,7 @@ import {
   isPinToTabSessionStorageAvailable,
   loadPinToTabSessionStorageState,
   readPinToTabSessionStorageState,
+  readPinToTabAutomaticSessionStorageState,
   readPinToTabToolbarVisibilitySessionStorageState,
   writePinToTabSessionStorageState,
 } from './index';
@@ -110,6 +111,7 @@ describe('content pin-to-tab session reads', () => {
     expect(sessionRemoveMock).toHaveBeenCalledWith([
       'sniptale.content.pin-to-tab:tab:7',
       'sniptale.content.pin-to-tab-toolbar-visible:tab:7',
+      'sniptale.content.pin-to-tab-automatic:tab:7',
     ]);
   });
 });
@@ -131,6 +133,7 @@ describe('content pin-to-tab session writes', () => {
     expect(sessionSetMock).toHaveBeenCalledWith({
       'sniptale.content.pin-to-tab-toolbar-visible:tab:7': false,
       'sniptale.content.pin-to-tab:tab:7': true,
+      'sniptale.content.pin-to-tab-automatic:tab:7': false,
     });
   });
 
@@ -141,6 +144,7 @@ describe('content pin-to-tab session writes', () => {
     expect(sessionRemoveMock).toHaveBeenCalledWith([
       'sniptale.content.pin-to-tab:tab:7',
       'sniptale.content.pin-to-tab-toolbar-visible:tab:7',
+      'sniptale.content.pin-to-tab-automatic:tab:7',
     ]);
   });
 
@@ -154,10 +158,37 @@ describe('content pin-to-tab session writes', () => {
     });
   });
 
-  it('does not mutate toolbar visibility when storage is unavailable', async () => {
+  it('refuses authoritative visibility writes when session storage is unavailable', async () => {
     sessionIsAvailableMock.mockReturnValue(false);
-    await writePinToTabSessionStorageState(7, { toolbarVisible: false }, () => true);
+    await expect(
+      writePinToTabSessionStorageState(7, { toolbarVisible: false }, () => true)
+    ).rejects.toThrow('Pin-to-tab session storage is unavailable');
 
     expect(sessionSetMock).not.toHaveBeenCalled();
   });
+});
+
+it('stores an automatic collapse pin and its hidden toolbar atomically', async () => {
+  await writePinToTabSessionStorageState(
+    7,
+    {
+      pinToTab: true,
+      toolbarVisible: false,
+      automatic: true,
+    },
+    () => true
+  );
+  expect(sessionSetMock).toHaveBeenCalledOnce();
+  expect(sessionSetMock).toHaveBeenCalledWith({
+    'sniptale.content.pin-to-tab:tab:7': true,
+    'sniptale.content.pin-to-tab-toolbar-visible:tab:7': false,
+    'sniptale.content.pin-to-tab-automatic:tab:7': true,
+  });
+});
+
+it('treats legacy pins as manual and reads automatic origin without repair writes', async () => {
+  await expect(readPinToTabAutomaticSessionStorageState(7)).resolves.toBe(false);
+  sessionGetMock.mockResolvedValueOnce({ 'sniptale.content.pin-to-tab-automatic:tab:7': true });
+  await expect(readPinToTabAutomaticSessionStorageState(7)).resolves.toBe(true);
+  expect(sessionSetMock).not.toHaveBeenCalled();
 });

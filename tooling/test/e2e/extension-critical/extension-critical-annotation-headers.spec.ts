@@ -363,12 +363,13 @@ async function editorElementWorkflow(page: Page, locale: Locale, info: TestInfo)
       exact: true,
     })
     .click();
+  await toolbar.locator('.sniptale-annotation-effect-switch [aria-haspopup="dialog"]').click();
   let panel = visiblePanel(page);
   await temporaryWorkflow(page, panel, locale, true, info, 'element-frame');
   await panel.locator('[data-settings-action="close"]').click();
   await toolbar
     .getByRole('button', {
-      name: translate('content.interactiveFrame.calloutAdd', locale),
+      name: translate('content.callout.settingsTitle', locale),
       exact: true,
     })
     .click();
@@ -386,7 +387,13 @@ async function editorElementWorkflow(page: Page, locale: Locale, info: TestInfo)
   await expect(page.locator('.sniptale-callout')).toHaveCount(0);
   await toolbar
     .getByRole('button', {
-      name: translate('content.interactiveFrame.stepBadgeEnable', locale),
+      name: translate('content.stepBadge.settingsTitle', locale),
+      exact: true,
+    })
+    .click();
+  await toolbar
+    .getByRole('button', {
+      name: translate('content.interactiveFrame.stepBadgeSettings', locale),
       exact: true,
     })
     .click();
@@ -447,15 +454,145 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           }, locale);
           await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
           await expect(ui(page, 'editor.page.root')).toBeVisible();
-          await expect
-            .poll(() =>
-              page.evaluate(() => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0)
-            )
-            .toBeGreaterThan(0);
+          await expect(
+            page.locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas')
+          ).toBeVisible();
           await ui(page, 'content.toolbar.future-frame-style').click();
           await toolbarWorkflow(page, locale, info, false);
           await editorElementWorkflow(page, locale, info);
         });
     }
   }
+}
+
+async function effectParameterGeometry(panel: Locator) {
+  return panel.evaluate((node) => {
+    const toggle = node.querySelector<HTMLElement>('[role="switch"]')!;
+    const thumb = toggle.querySelector<HTMLElement>('.sniptale-glass-switch-thumb')!;
+    const input = node.querySelector<HTMLInputElement>('.sniptale-numeric-value input')!;
+    const row = toggle.closest<HTMLElement>('.sniptale-parameter-row')!;
+    return {
+      switchWidth: toggle.getBoundingClientRect().width,
+      switchHeight: toggle.getBoundingClientRect().height,
+      thumbWidth: thumb.getBoundingClientRect().width,
+      thumbHeight: thumb.getBoundingClientRect().height,
+      rowHeight: row.getBoundingClientRect().height,
+      inputFont: getComputedStyle(input).fontSize,
+      radius: getComputedStyle(node).borderRadius,
+      overflow: node.scrollWidth - node.clientWidth,
+      bodyOverflow:
+        node.querySelector('.sniptale-content-popover-body')!.scrollWidth -
+        node.querySelector('.sniptale-content-popover-body')!.clientWidth,
+    };
+  });
+}
+
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  const locale = index === 0 ? 'ru' : 'en';
+  const theme = index === 0 ? 'light' : 'dark';
+  test(`editor frame effect parameters match page ${viewport.name}`, async ({
+    context,
+    extensionId,
+    page,
+    hostOrigin,
+  }, info) => {
+    const reference = await contentHost(context, extensionId, viewport.size, locale, theme);
+    const expected = new Map<string, Awaited<ReturnType<typeof effectParameterGeometry>>>();
+    try {
+      for (const mode of ['focus', 'blur']) {
+        await reference.page.locator(`[data-frame-effect="${mode}"]`).click();
+        await ui(reference.page, menuIds.frame).click();
+        const panel = visiblePanel(reference.page);
+        expected.set(mode, await effectParameterGeometry(panel));
+        await capture(reference.page, info, `page-${mode}-reference`);
+        await ui(reference.page, menuIds.frame).click();
+      }
+    } finally {
+      await reference.page.close();
+      await reference.popup.close();
+    }
+    await page.setViewportSize(viewport.size);
+    await applyHarnessBootstrap(page, {
+      storage: {
+        'sniptale-locale-preference': locale,
+        'sniptale-theme-preference': theme,
+      },
+    });
+    await page.addInitScript(
+      (value) => localStorage.setItem('sniptale-locale-preference', value),
+      locale
+    );
+    await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+    await expect(ui(page, 'editor.page.root')).toBeVisible();
+    for (const surface of ['toolbar', 'element']) {
+      if (surface === 'element') {
+        const plane = (await ui(page, 'editor.frame-annotation-plane').boundingBox())!;
+        await page.mouse.move(plane.x + plane.width / 2 - 80, plane.y + plane.height / 2 - 50);
+        await page.mouse.down();
+        await page.mouse.move(plane.x + plane.width / 2 + 80, plane.y + plane.height / 2 + 50);
+        await page.mouse.up();
+      }
+      const controls =
+        surface === 'toolbar'
+          ? ui(page, 'content.toolbar.future-frame-effects-group')
+          : page.locator('.sniptale-action-toolbar:visible');
+      const menu = controls.locator('.sniptale-annotation-effect-switch [aria-haspopup="dialog"]');
+      for (const mode of ['focus', 'blur']) {
+        await controls.locator(`[data-frame-effect="${mode}"]`).click();
+        await menu.click();
+        const panel = visiblePanel(page);
+        await capture(page, info, `editor-${surface}-${mode}-parameters`);
+        const actual = await effectParameterGeometry(panel);
+        const referenceGeometry = expected.get(mode)!;
+        expect(actual.inputFont).toBe(referenceGeometry.inputFont);
+        expect(actual.radius).toBe(referenceGeometry.radius);
+        expect(actual.bodyOverflow).toBeLessThanOrEqual(1);
+        for (const key of [
+          'switchWidth',
+          'switchHeight',
+          'thumbWidth',
+          'thumbHeight',
+          'rowHeight',
+          'overflow',
+        ] as const)
+          expect(Math.abs(actual[key] - referenceGeometry[key])).toBeLessThanOrEqual(1);
+        await expect(panel.locator('.sniptale-content-popover-body')).toHaveCount(1);
+        const input = panel.locator('.sniptale-numeric-value input').first();
+        const value = mode === 'focus' ? '64' : '12';
+        await input.fill(value);
+        await input.press('Enter');
+        if (mode === 'blur') {
+          const marker = panel.getByRole('button', {
+            name: translate('content.overlayControls.blurTypeSolid', locale),
+            exact: true,
+          });
+          await marker.click();
+          await expect(marker).toHaveAttribute('aria-pressed', 'true');
+        }
+        const toggle = panel.getByRole('switch');
+        if ((await toggle.getAttribute('aria-checked')) === 'true') await toggle.click();
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-checked', 'true');
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-checked', 'false');
+        if (surface === 'toolbar') await menu.click();
+        else await panel.locator('[data-settings-action="close"]').click();
+        await menu.click();
+        await expect(panel.locator('.sniptale-numeric-value input').first()).toHaveValue(value);
+        if (surface === 'toolbar') await menu.click();
+        else await panel.locator('[data-settings-action="close"]').click();
+      }
+    }
+    await page.setViewportSize({ width: 1100, height: 560 });
+    const menu = page.locator(
+      '.sniptale-action-toolbar:visible .sniptale-annotation-effect-switch [aria-haspopup="dialog"]'
+    );
+    await menu.click();
+    const panel = visiblePanel(page);
+    const bounds = (await panel.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(1101);
+    expect((await effectParameterGeometry(panel)).bodyOverflow).toBeLessThanOrEqual(1);
+    await capture(page, info, 'editor-element-1100');
+  });
 }

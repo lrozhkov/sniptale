@@ -3,6 +3,7 @@
 import { expect, it, vi } from 'vitest';
 import type { ContentRuntimeShimBrowserAdapter } from '@sniptale/platform/browser/content-runtime-shim';
 
+import { bundledQuickActionConfigs } from '../../../features/quick-actions-presets/bundled';
 import { createShimQuickActionLoader, createShimQuickActionStorage } from './quick-actions';
 
 function createBrowserAdapter(payload: Record<string, unknown>): ContentRuntimeShimBrowserAdapter {
@@ -102,8 +103,31 @@ it('admits optional hotkeys and appends missing defaults after the accepted stor
   )();
   expect(actions.slice(0, 2)).toEqual([
     { id: 'custom', name: 'Custom', status: true, hotkey: null },
-    { id: 'default-visible-copy', status: false, hotkey: null },
+    { id: 'default-visible-copy', icon: 'Copy', status: false, hotkey: null },
   ]);
   expect(actions).toHaveLength(8);
   expect(actions.filter((action) => action.id === 'default-visible-copy')).toHaveLength(1);
+});
+
+it('projects only bounded icon identifiers and includes the bundled artwork', async () => {
+  const actions = await createShimQuickActionLoader(
+    createBrowserAdapter({
+      sniptale_quick_actions: [
+        { id: 'valid', status: true, icon: 'Zap', appearance: { private: 'omit' } },
+        { id: 'unknown', status: true, icon: '__proto__' },
+        { id: 'object', status: true, icon: { html: '<script>' } },
+        { id: 'oversized', status: true, icon: 'x'.repeat(129) },
+        { id: 'default-visible-copy', status: true, icon: null },
+      ],
+    })
+  )();
+  expect(actions.slice(0, 4)).toEqual([
+    { id: 'valid', status: true, hotkey: null, icon: 'Zap' },
+    { id: 'unknown', status: true, hotkey: null, icon: '__proto__' },
+    { id: 'object', status: true, hotkey: null },
+    { id: 'oversized', status: true, hotkey: null },
+  ]);
+  for (const bundled of bundledQuickActionConfigs) {
+    expect(actions.find((action) => action.id === bundled.id)?.icon).toBe(bundled.icon);
+  }
 });

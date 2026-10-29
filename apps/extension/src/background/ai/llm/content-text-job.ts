@@ -42,7 +42,12 @@ export function createContentTextJobService(overrides: Partial<Dependencies> = {
     run: (request, sender, signal) => runContentTextRequest(request, sender, signal, deps),
     progress: (request) => ({ type: 'progress', requestId: request.requestId }),
     result: (request, text) => ({ type: 'result', requestId: request.requestId, text }),
-    failure: (request, code) => ({ type: 'failure', requestId: request.requestId, code }),
+    failure: (request, code, failureReason) => ({
+      type: 'failure',
+      requestId: request.requestId,
+      code,
+      ...(failureReason === undefined ? {} : { failureReason }),
+    }),
   });
 }
 
@@ -74,6 +79,9 @@ async function runContentTextRequest(
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
       modelCode: config.modelCode,
+      connectionType: config.connectionType,
+      observationBinding: config.observationBinding,
+      ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
       systemPrompt: `${config.effectiveSystemPrompt}\n\n${CONTENT_TEXT_SYSTEM_PROMPT}`,
       userPrompt: `Selected text:\n${egress.request.markdownData}\n\nUser instruction:\n${egress.request.prompt}`,
       signal,

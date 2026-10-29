@@ -907,3 +907,7 @@ it('lists every lane with aligned settings, retains unavailable streams off, and
     await fixture.cleanup();
   }
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

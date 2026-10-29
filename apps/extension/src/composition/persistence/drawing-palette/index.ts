@@ -1,5 +1,4 @@
-// policyStateId: drawing-palette-mutation-queue - durable local storage is authoritative;
-// this disposable queue only preserves mutation order within one runtime.
+import { parseColor, formatHexColor } from '@sniptale/foundation/color';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { runWithPersistenceDomainMutationLock } from '../infrastructure/mutation-barrier';
 import { DRAWING_PALETTE_STORAGE_KEY, type DrawingPaletteStateV1 } from './contracts';
@@ -13,7 +12,6 @@ export * from './contracts';
 export { createDefaultDrawingPaletteState } from './parser';
 
 let snapshot: DrawingPaletteStateV1 | null = null;
-let queue: Promise<void> = Promise.resolve();
 
 const cache = (state: DrawingPaletteStateV1) => {
   snapshot = cloneDrawingPaletteState(state);
@@ -41,33 +39,53 @@ export function subscribeToDrawingPaletteState(
 
 type DrawingPaletteMutationResult = 'applied' | 'rejected';
 
+function mutateDrawingPaletteState(
+  mutate: (state: DrawingPaletteStateV1) => DrawingPaletteStateV1 | null
+): Promise<DrawingPaletteMutationResult> {
+  return runWithPersistenceDomainMutationLock('drawing-palette', async (permit) => {
+    const stored = await browserStorage.local.get([DRAWING_PALETTE_STORAGE_KEY]);
+    const current = parseDrawingPaletteState(stored[DRAWING_PALETTE_STORAGE_KEY]);
+    if (current.unsafeForWrite) return 'rejected';
+    const next = mutate(current.state);
+    if (!next) return 'rejected';
+    const parsed = parseDrawingPaletteState(next);
+    if (parsed.unsafeForWrite) return 'rejected';
+    await browserStorage.local.set(
+      { [DRAWING_PALETTE_STORAGE_KEY]: cloneDrawingPaletteState(parsed.state) },
+      permit
+    );
+    cache(parsed.state);
+    return 'applied';
+  });
+}
+
 function mutateDrawingPaletteColors(
   mutate: (colors: readonly string[]) => readonly string[] | null
 ): Promise<DrawingPaletteMutationResult> {
-  const run = queue
-    .catch(() => undefined)
-    .then(() =>
-      runWithPersistenceDomainMutationLock('drawing-palette', async (permit) => {
-        const stored = await browserStorage.local.get([DRAWING_PALETTE_STORAGE_KEY]);
-        const current = parseDrawingPaletteState(stored[DRAWING_PALETTE_STORAGE_KEY]);
-        if (current.unsafeForWrite) return 'rejected' as const;
-        const colors = mutate(current.state.colors);
-        if (!colors) return 'rejected' as const;
-        const parsed = parseDrawingPaletteState({ schemaVersion: 1, colors: [...colors] });
-        if (parsed.unsafeForWrite) return 'rejected' as const;
-        await browserStorage.local.set(
-          { [DRAWING_PALETTE_STORAGE_KEY]: cloneDrawingPaletteState(parsed.state) },
-          permit
-        );
-        cache(parsed.state);
-        return 'applied' as const;
-      })
-    );
-  queue = run.then(
-    () => undefined,
-    () => undefined
-  );
-  return run;
+  return mutateDrawingPaletteState((state) => {
+    const colors = mutate(state.colors);
+    return colors ? { ...state, colors } : null;
+  });
+}
+
+/** Names belong to RGB identities and are shared by every palette that uses that color. */
+export function renamePaletteColor(
+  color: string,
+  name: string
+): Promise<DrawingPaletteMutationResult> {
+  const parsed = parseColor(color);
+  if (!parsed) return Promise.resolve('rejected');
+  const hex = formatHexColor(parsed).slice(0, 7).toLowerCase();
+  return mutateDrawingPaletteState((state) => {
+    const names = { ...state.names };
+    if (name.trim()) names[hex] = name.trim();
+    else delete names[hex];
+    return {
+      schemaVersion: 1,
+      colors: state.colors,
+      ...(Object.keys(names).length ? { names } : {}),
+    };
+  });
 }
 
 export function changeDrawingPaletteColor(

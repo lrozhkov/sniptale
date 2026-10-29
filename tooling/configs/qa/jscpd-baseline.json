@@ -112,24 +112,6 @@
       }
     },
     {
-      "id": "0591e1eda2b5044646eba9e7649e2fbdb72771ed0b70d605a071d8b243636297",
-      "classification": "tool-noise",
-      "owner": "popup quick-action icon catalog",
-      "reason": "One endpoint is a named lucide-react import list; the other is ICON_MAP shorthand registration of those imported values. Import and lookup-table roles require the same names but execute no duplicated behavior.",
-      "removalCondition": "Retain explicit imports and the allowlisted icon table. Remove this decision if the endpoints become executable lookup or selection logic.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
-        "start": 2,
-        "end": 39
-      },
-      "secondFile": {
-        "path": "apps/extension/src/popup/shell/home/quick-actions/meta.tsx",
-        "start": 77,
-        "end": 114
-      }
-    },
-    {
       "id": "07e9c86fb0e10c170f1ed23c5a5cfa9c5ef51bbe3a08aee21737a45c34503970",
       "classification": "tool-noise",
       "owner": "apps/extension/src/content/selection/frame-settings-popover",
@@ -145,6 +127,24 @@
         "path": "apps/extension/src/content/selection/frame-settings-popover/state/index.ts",
         "start": 230,
         "end": 235
+      }
+    },
+    {
+      "id": "0bdbcfe1f909a651a7554bb135377eb43a9607d3cb7ff6e38ded84bac1898f8d",
+      "classification": "tool-noise",
+      "owner": "packages/ui glass and vertical content toolbar dividers",
+      "reason": "The glass divider is 1px wide with a 180deg gradient and horizontal margins. The vertical toolbar divider is 1px high, full width, with a 90deg gradient and vertical margins. Only color-stop tokens match.",
+      "removalCondition": "Remove this finding if the two axes share a parameterized divider owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
+        "start": 122,
+        "end": 129
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
+        "start": 142,
+        "end": 149
       }
     },
     {
@@ -166,6 +166,24 @@
       }
     },
     {
+      "classification": "tool-noise",
+      "owner": "composition/persistence/sync-capture/prepared-project",
+      "reason": "The exact match is bounded-array admission, a local ID accumulator, mapping, a record check and the opening of distinct allowed-key lists. Asset parsing then validates filenames, publication and source bindings. Export parsing validates project identity, remote bindings, thumbnails and export review. No matched source contains a duplicated asset or export validation algorithm. A generic record-mapping factory would hide these independent schemas.",
+      "removalCondition": "Remove when either schema admission prologue changes or a common accepted schema replaces both.",
+      "reviewBy": "2027-04-15",
+      "id": "0c4e8cfd2947f96b8b932f4392025058852b02dd470c3e8b745d0454836f1e5a",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
+        "start": 223,
+        "end": 227
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
+        "start": 57,
+        "end": 62
+      }
+    },
+    {
       "id": "0d73ba1bb2517e8e1d660e99657ee52a8245c95ca86f2d54cc3df6a097c5217f",
       "classification": "tool-noise",
       "owner": "apps/extension/src/design-system/previews/product-glass-controls",
@@ -184,21 +202,21 @@
       }
     },
     {
-      "id": "0f555468acf5ac5645a587f9637483ed52affca248d9136b312da961f77368f9",
+      "id": "0ec75348b1a6bb2e43570d22c291bb282ca4b2322ea5d226e273a37fe92b280e",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-      "reason": "Style-domain schemas explicitly allow different field sets: catalog/system revisions versus per-surface revision/maps. Repeated reject-unknown/default-projection syntax preserves domain-specific trust validation, and the subsequent validation predicates differ.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
+      "owner": "packages/ui toolbar indicator placement",
+      "reason": "Down-opening and right-opening menus share indicator corner offsets and indicator rotation 0deg. Their final chevron rotations are 0deg and -90deg. Merging the complete rules would erase menu-direction behavior.",
+      "removalCondition": "Remove this finding if indicator geometry uses one shared direction-independent declaration with a separate proven direction parameter.",
+      "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-        "start": 216,
-        "end": 221
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 206,
+        "end": 212
       },
       "secondFile": {
-        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
-        "start": 274,
-        "end": 279
+        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
+        "start": 233,
+        "end": 239
       }
     },
     {
@@ -217,42 +235,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
         "start": 1856,
         "end": 1865
-      }
-    },
-    {
-      "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db/database-migrations",
-      "reason": "The former duplicated executable store-existence check now has one owner, requireMigrationStores at database-migrations.ts:23-29. Current endpoints declare separately numbered contiguous historical migration descriptors and delegate validation to that owner with descriptor-specific inputs. migrate only returns undefined. The matched span crosses into the next descriptor. It contains no remaining duplicated store-validation algorithm. Preserve explicit historical descriptors; no descriptor factory is required for this exact match.",
-      "removalCondition": "Remove this record if either historical descriptor changes or the exact finding disappears.",
-      "reviewBy": "2027-04-15",
-      "id": "12f83ee0b730cf0ddad54373dafaf727113ff2ff709bd0b15b6f1c88b47737f3",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 840,
-        "end": 857
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 862,
-        "end": 879
-      }
-    },
-    {
-      "id": "1346d16647cf1adc05a06ed6ae212dfcbb29b63796753f8dbe1001babcee9b5a",
-      "classification": "tool-noise",
-      "owner": "frame annotation composition",
-      "reason": "Callout and frame bodies render the already shared ApplyToFutureFramesGuard and TemplateForkReturnGuard in the same priority order. The adjacent headers, template content and effect editors remain different; the state machines already belong to shared hooks.",
-      "removalCondition": "Remove this record if guard state or transition logic is copied outside the shared workflow hooks.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
-        "start": 102,
-        "end": 115
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
-        "start": 152,
-        "end": 165
       }
     },
     {
@@ -328,6 +310,24 @@
       }
     },
     {
+      "id": "1bf12ef16d9c8d7b42f60bb68a544c34017aa15547a8a13a333a22b188b5fad8",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/speech-panel.tsx",
+      "reason": "Gallery uses SelectField and its recognition command. Montage uses OptionButtonsField and inspector callbacks. Shared option literals do not unify field controls.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
+        "start": 544,
+        "end": 551
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
+        "start": 215,
+        "end": 222
+      }
+    },
+    {
       "id": "1e6bcf01ce6591cb14f7d63993ac0f1fa1820ab3a06832b30b83854bc6e38b5b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/design-system/parity/helpers.tsx",
@@ -361,6 +361,24 @@
         "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
         "start": 37,
         "end": 44
+      }
+    },
+    {
+      "id": "1f284e07a2826cc93d7256efd36f0a2b0bbf1cb09e2180e1036906ee5edcfe39",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/overlay/toolbar/capture/action-dropdown.tsx",
+      "reason": "The match contains imports and the next type declaration boundary. Capture-action and timer menus already use the same menu and digit hooks. They expose different settings and commands.",
+      "removalCondition": "Remove when this exact finding disappears or when these contracts acquire one common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/content/overlay/toolbar/capture/action-dropdown.tsx",
+        "start": 1,
+        "end": 18
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/overlay/toolbar/capture/timer-dropdown.tsx",
+        "start": 1,
+        "end": 18
       }
     },
     {
@@ -418,24 +436,6 @@
       }
     },
     {
-      "id": "2220b258cb0873bdd1766ebd7879b4fd976f4be2cc4ba577e3d56e1746d07c26",
-      "classification": "tool-noise",
-      "owner": "packages/ui content toolbar split-control styling",
-      "reason": "One matching hover/open/focus predicate paints the parent split-control surface. The second paints child command buttons transparent!important. These are complementary parent/child subjects, not repeated declarations on one subject.",
-      "removalCondition": "Remove this finding when the split-control DOM no longer needs separate container and child paint.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 512,
-        "end": 519
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 520,
-        "end": 527
-      }
-    },
-    {
       "id": "222b2753c3b2f66379098ac0f951b16503f71eb9f7214ce6335994598204da18",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/input-controls.css",
@@ -469,6 +469,24 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
         "start": 414,
         "end": 433
+      }
+    },
+    {
+      "id": "229b651abcc2e706563d9fb192a816333bae6c12bf047aed34a40e5b8ae188a2",
+      "classification": "tool-noise",
+      "owner": "packages/ui glass and content toolbar surfaces",
+      "reason": "Glass toolbar active buttons and content toolbar active states use the same 72% accent hover mix. Their selector families, disabled conditions, and base active-state text rules differ. The common token values do not identify one interaction owner.",
+      "removalCondition": "Remove this finding if these control families merge under one declared active-hover presentation.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
+        "start": 98,
+        "end": 109
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 253,
+        "end": 264
       }
     },
     {
@@ -562,6 +580,24 @@
       }
     },
     {
+      "id": "28b800992c9649204d5569e71497c1e6fd83cf26819dc564eb81c42c1fd1bc36",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/use-text-rewrite.ts",
+      "reason": "Gallery prepares a review workspace operation with its source guard and Apply receipt. Video prepares a project history operation. Equal selection assembly retains separate source authority.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/use-text-rewrite.ts",
+        "start": 175,
+        "end": 185
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/runtime/session/text-rewrite.ts",
+        "start": 329,
+        "end": 339
+      }
+    },
+    {
       "id": "2c15769854615f4ec75bbd88fe1cec5640a41a64ffc222ae6f058ec042f1146d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/scenario-editor/page-shell/print.tsx",
@@ -595,24 +631,6 @@
         "path": "apps/extension/src/content/overlay/toolbar/video-recording/media-menu.tsx",
         "start": 155,
         "end": 167
-      }
-    },
-    {
-      "id": "2d234daf0b556fe3d7e9fa7939b99260bb02a04ecede47a5d109a665396da2f9",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native recognition controls",
-      "reason": "The phrase/sentence/paragraph choices and enum validation are declarative metadata for the same recognition contract. Gallery writes recognition.setGranularity through SelectField; Native invokes onGranularityChange through OptionButtonsField. These are different consumer adapters.",
-      "removalCondition": "Remove this record if recognition grouping computation or request orchestration is duplicated.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/speech-panel.tsx",
-        "start": 511,
-        "end": 518
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/recognition.tsx",
-        "start": 215,
-        "end": 222
       }
     },
     {
@@ -706,24 +724,6 @@
       }
     },
     {
-      "id": "33b5e370fd3b69c97d6d29d17abbd428f49d486f3eeb3f3b289b868eb17894d6",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-      "reason": "Existing card calls belong to absolute virtual rows and grouped members with distinct layout identities.",
-      "removalCondition": "Remove when rendering branches converge or exact pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 573,
-        "end": 578
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 649,
-        "end": 654
-      }
-    },
-    {
       "id": "34d0e22632fdce2d1141172041e22f7b1c1fdac75fe8d55a291b019896a2e71d",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -814,6 +814,24 @@
       }
     },
     {
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db/database-migrations",
+      "reason": "The former duplicated executable store-existence check now has one owner, requireMigrationStores at database-migrations.ts:23-29. Current endpoints declare separately numbered contiguous historical migration descriptors and delegate validation to that owner with descriptor-specific inputs. migrate only returns undefined. The matched span crosses into the next descriptor. It contains no remaining duplicated store-validation algorithm. Preserve explicit historical descriptors; no descriptor factory is required for this exact match.",
+      "removalCondition": "Remove this record if either historical descriptor changes or the exact finding disappears.",
+      "reviewBy": "2027-04-15",
+      "id": "3b76255b18501fc81fb2d9da029d8f28164e5ae5fa7656ef78abb14d6e81dfaf",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 846,
+        "end": 863
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 890,
+        "end": 907
+      }
+    },
+    {
       "id": "3c57c58ff692095476e2d8e57c85c770b9d0318fb8bff0d1a62b5fa3c44c86b7",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/background-resources and gallery/video-review",
@@ -886,24 +904,6 @@
       }
     },
     {
-      "id": "414d6568063b52060ca5e57cbb90323d457abce9c2ad03878f639d85561f37f0",
-      "classification": "tool-noise",
-      "owner": "contracts/ai/content-text and contracts/ai/review-text",
-      "reason": "The matched union declarations repeat cancel/keepalive envelopes; start payloads differ materially (content privacy proof versus review context/scope), and result contracts differ. Strict schemas already own their own boundaries.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/contracts/ai/content-text.ts",
-        "start": 56,
-        "end": 63
-      },
-      "secondFile": {
-        "path": "apps/extension/src/contracts/ai/review-text.ts",
-        "start": 230,
-        "end": 237
-      }
-    },
-    {
       "id": "4269fd2736131a8a79789665df8a1d9e6ac2eb0834287af250400fd51eb108d9",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera appearance controls",
@@ -919,6 +919,60 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
         "start": 144,
         "end": 157
+      }
+    },
+    {
+      "id": "4541b6b1f6cdc75b370720f206119e97a7fa64ce027cc282f475595f214071fa",
+      "classification": "tool-noise",
+      "owner": "ui/compact-inspector-controls switch presentation",
+      "reason": "Checked-state selector repetition colors the switch track pseudo-element in one rule and translates its thumb descendant 16px in the other. These rules target different boxes and properties.",
+      "removalCondition": "Remove this finding if switch markup replaces the pseudo-element/descendant split.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 633,
+        "end": 640
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 660,
+        "end": 668
+      }
+    },
+    {
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db",
+      "reason": "Both ranges are import declarations from canonical store constants. Schema contracts describe stores; upgrade creates them. There is no duplicate executable migration or schema definition in this matched import span.",
+      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
+      "reviewBy": "2027-04-15",
+      "id": "458e5d91323dfba7bdd88cdbb8899e289d710dddfc970721cef572ac52f46097",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
+        "start": 5,
+        "end": 35
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
+        "start": 1,
+        "end": 31
+      }
+    },
+    {
+      "id": "47111a81f930caef1c62e218c759c831ce1785a5b660adb5b469e8cd000ffcf5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+      "reason": "Style-domain schemas explicitly allow different field sets: catalog/system revisions versus per-surface revision/maps. Repeated reject-unknown/default-projection syntax preserves domain-specific trust validation, and the subsequent validation predicates differ.",
+      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+        "start": 225,
+        "end": 230
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
+        "start": 283,
+        "end": 288
       }
     },
     {
@@ -973,24 +1027,6 @@
         "path": "packages/ui/src/styles/overlays/countdown.css",
         "start": 43,
         "end": 48
-      }
-    },
-    {
-      "id": "4a6a5ac269559297cbfef2bd0233db96a82ba6a6810f63802665f784ba98bfaa",
-      "classification": "tool-noise",
-      "owner": "frame annotation toolbar buttons",
-      "reason": "Step and callout functions declare the same event/ref shape then instantiate FrameAnnotationToolbarMenuButton with different command IDs and icons. The menu behavior is already centralized in that base component.",
-      "removalCondition": "Remove this record if they acquire separate menu/event lifecycle implementation.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/highlighter/frame-annotation/floating-toolbar.tsx",
-        "start": 160,
-        "end": 168
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/highlighter/frame-annotation/floating-toolbar.tsx",
-        "start": 174,
-        "end": 182
       }
     },
     {
@@ -1063,6 +1099,42 @@
         "path": "packages/ui/src/styles/content-popover/index.css",
         "start": 231,
         "end": 241
+      }
+    },
+    {
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+      "reason": "Existing card calls belong to absolute virtual rows and grouped members with distinct layout identities.",
+      "removalCondition": "Remove when rendering branches converge or exact pair disappears.",
+      "reviewBy": "2027-09-01",
+      "id": "4e417d31652d88b3a51dace75828f9228aed74f915befacfde7b982454ffe3f0",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 580,
+        "end": 585
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 656,
+        "end": 661
+      }
+    },
+    {
+      "id": "50112f3693d52df4f247678b274cbec58e3921855ea8d2d1c99ac5a87196fe7e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/contracts/ai/audio.ts",
+      "reason": "Project-clip input binds an asset and native interval. Project-text input binds document, fragment and basis hash. Equal project checks do not define one job scope.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/contracts/ai/audio.ts",
+        "start": 300,
+        "end": 307
+      },
+      "secondFile": {
+        "path": "apps/extension/src/contracts/ai/audio.ts",
+        "start": 331,
+        "end": 338
       }
     },
     {
@@ -1153,24 +1225,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
         "start": 1895,
         "end": 1906
-      }
-    },
-    {
-      "id": "574c5848875e9e799e8767e2e94155ae8d1beed0252865f6d7ad1255d6a44262",
-      "classification": "tool-noise",
-      "owner": "packages/ui glass and content toolbar surfaces",
-      "reason": "Glass toolbar active buttons and content toolbar active states use the same 72% accent hover mix. Their selector families, disabled conditions, and base active-state text rules differ. The common token values do not identify one interaction owner.",
-      "removalCondition": "Remove this finding if these control families merge under one declared active-hover presentation.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
-        "start": 98,
-        "end": 109
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 244,
-        "end": 255
       }
     },
     {
@@ -1354,24 +1408,6 @@
       }
     },
     {
-      "id": "6819ff487c18be2ed6d91255aa07e406f74887ff033aaf080c8bf2bcf52bf776",
-      "classification": "tool-noise",
-      "owner": "settings/sections/capture/quick-actions/section/constants",
-      "reason": "One endpoint is the static Lucide import list; the other is the explicit icon lookup registry using those bindings. This is registration syntax rather than two implementations.",
-      "removalCondition": "Remove when exact import/registry pair disappears or icon registration changes; never extend to arbitrary repeated code in constants.ts.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/settings/sections/capture/quick-actions/section/constants.ts",
-        "start": 131,
-        "end": 168
-      },
-      "secondFile": {
-        "path": "apps/extension/src/settings/sections/capture/quick-actions/section/constants.ts",
-        "start": 2,
-        "end": 39
-      }
-    },
-    {
       "id": "6e1384ef94b9fc327263ed7a99568290be8c66bbdbacb0c09ab042527b75d23b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/video/project/factories/project-recording.ts",
@@ -1462,6 +1498,24 @@
       }
     },
     {
+      "id": "72ae2b63fae1cc078d1d728ac790d368a978f3dd6b45a8c109775b5f96f87f6d",
+      "classification": "tool-noise",
+      "owner": "frame annotation composition",
+      "reason": "Callout and frame bodies configure shared template workflow/apply-to-future hooks and compose a temporary-mode header action. Their templates, restore/fork callbacks, labels and content remain type-specific. The repeated state policy is already delegated to the existing hooks.",
+      "removalCondition": "Remove this record if template workflow transitions move out of the shared hooks into these bodies.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
+        "start": 70,
+        "end": 90
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 127,
+        "end": 148
+      }
+    },
+    {
       "id": "7372a1862282ddd4d99a4fc7dbdf5b402585d27ba0d239582d18aaffa2f33f8a",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/shell/page/start.tsx <-> apps/extension/src/video-editor/shell/app/start.tsx",
@@ -1516,21 +1570,21 @@
       }
     },
     {
-      "id": "77c14dc6f731293860d34ada180cdf3560436c2c2b9a40c5379fe23156a7ab84",
       "classification": "tool-noise",
-      "owner": "editor annotation projections",
-      "reason": "Read-only and interactive projections pass the same snapshot-derived fill and shadow props into the shared badge component. The interactive version also owns settings anchors/handles; readonly deliberately does not. No annotation renderer or edit behavior is copied.",
-      "removalCondition": "Remove this record if either projection duplicates badge rendering rather than invoking the shared component.",
+      "owner": "ui/sync-cache-feedback",
+      "reason": "The exact match destructures feedback from the single useSyncCacheFeedback owner and declares caller-local observation references. Shared cancellation and feedback rendering now have one implementation. Gallery retains root-bound status revision and an operation-kind ticket. Settings retains budget input and a trim request ID. This match is consumer wiring, not another cancellation or cache state machine.",
+      "removalCondition": "Remove when either caller wiring changes or when both observation contracts converge.",
       "reviewBy": "2027-04-15",
+      "id": "77a9f8690bd4ebc3a315349e6f3ae6b0c798fb9cb05b44a3b995b96f6ba643d2",
       "firstFile": {
-        "path": "apps/extension/src/editor/frame-annotation/projection-read-only.tsx",
-        "start": 46,
-        "end": 54
+        "path": "apps/extension/src/gallery/library/preview/native-cache-actions.tsx",
+        "start": 37,
+        "end": 55
       },
       "secondFile": {
-        "path": "apps/extension/src/editor/frame-annotation/projection.tsx",
-        "start": 297,
-        "end": 305
+        "path": "apps/extension/src/settings/sections/capture/saving/sync-cache.tsx",
+        "start": 19,
+        "end": 37
       }
     },
     {
@@ -1588,24 +1642,6 @@
       }
     },
     {
-      "id": "80a336e4fac8db47c6df830cac43fcd40f7398c7c291c50de7a713e5efd03092",
-      "classification": "tool-noise",
-      "owner": "ui/compact-inspector-controls switch presentation",
-      "reason": "Checked-state selector repetition colors the switch track pseudo-element in one rule and translates its thumb descendant 16px in the other. These rules target different boxes and properties.",
-      "removalCondition": "Remove this finding if switch markup replaces the pseudo-element/descendant split.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 631,
-        "end": 638
-      },
-      "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 658,
-        "end": 666
-      }
-    },
-    {
       "classification": "tool-noise",
       "owner": "extension:scenario-editor:tour:inspector",
       "reason": "Hotspot and annotation settings pass common context into distinct typed controls. Each callback delegates to the shared updateAction operation. The callback retains its own action discriminant and object type. No immutable update algorithm remains duplicated. Mixed-action sibling preservation is covered by the inspector unit proof.",
@@ -1621,24 +1657,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
         "start": 520,
         "end": 529
-      }
-    },
-    {
-      "id": "8726f91e8e77efcc34d5f9763b0397b03d2a18fd04199dbe760501ea6e8f512b",
-      "classification": "tool-noise",
-      "owner": "packages/ui glass popover and content toolbar active controls",
-      "reason": "Both active families consume 55% accent border tokens, but glass popover controls and content toolbar controls have different class/state contracts. The matching span also includes boundaries to subsequent hover selectors.",
-      "removalCondition": "Remove this finding if one canonical active-control contract replaces both selector families.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/glass/popover-controls.css",
-        "start": 62,
-        "end": 73
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 228,
-        "end": 239
       }
     },
     {
@@ -1714,24 +1732,6 @@
       }
     },
     {
-      "id": "8b1d3ca358b60adcb7d4d3654c6a390002c8bf1bf635a1bbeec30ffd47e252c7",
-      "classification": "tool-noise",
-      "owner": "packages/ui toolbar indicator placement",
-      "reason": "Down-opening and right-opening menus share indicator corner offsets and indicator rotation 0deg. Their final chevron rotations are 0deg and -90deg. Merging the complete rules would erase menu-direction behavior.",
-      "removalCondition": "Remove this finding if indicator geometry uses one shared direction-independent declaration with a separate proven direction parameter.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/button.css",
-        "start": 197,
-        "end": 203
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
-        "start": 229,
-        "end": 235
-      }
-    },
-    {
       "id": "8b591fe6edbc7b1760ef4e0fb86577af0cfd0055a7958cf40154e7c4e030424b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
@@ -1801,6 +1801,24 @@
         "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v2.ts",
         "start": 34,
         "end": 64
+      }
+    },
+    {
+      "id": "924aa4a1664193253fa0ac0e76657a5dc7f185f9ceb6731fbb802ec69a7ee400",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/text-voice-panel.tsx",
+      "reason": "Gallery changeProfile invalidates disposable takes. Scenario reset can refuse while it owns selected targets and previews. Equal profile reset flags retain separate operation lifetimes.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/text-voice-panel.tsx",
+        "start": 169,
+        "end": 175
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/tour/narration-ai.tsx",
+        "start": 66,
+        "end": 72
       }
     },
     {
@@ -1909,24 +1927,6 @@
         "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
         "start": 58,
         "end": 69
-      }
-    },
-    {
-      "id": "94d7d217f4f2946f6c496fb52031064263d4ab554319b808cf5f4016470a6d3a",
-      "classification": "tool-noise",
-      "owner": "packages/ui glass and vertical content toolbar dividers",
-      "reason": "The glass divider is 1px wide with a 180deg gradient and horizontal margins. The vertical toolbar divider is 1px high, full width, with a 90deg gradient and vertical margins. Only color-stop tokens match.",
-      "removalCondition": "Remove this finding if the two axes share a parameterized divider owner.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
-        "start": 122,
-        "end": 129
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
-        "start": 138,
-        "end": 145
       }
     },
     {
@@ -2146,6 +2146,24 @@
       }
     },
     {
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db/database-migrations",
+      "reason": "The former duplicated executable store-existence check now has one owner, requireMigrationStores at database-migrations.ts:23-29. Current endpoints declare separately numbered contiguous historical migration descriptors and delegate validation to that owner with descriptor-specific inputs. migrate only returns undefined. The matched span crosses into the next descriptor. It contains no remaining duplicated store-validation algorithm. Preserve explicit historical descriptors; no descriptor factory is required for this exact match.",
+      "removalCondition": "Remove this record if either historical descriptor changes or the exact finding disappears.",
+      "reviewBy": "2027-04-15",
+      "id": "9bc52f69a9f516ec88375e9e37ad234d5ca731f7769cf92951d93e2b6d88ea4d",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 846,
+        "end": 863
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 868,
+        "end": 885
+      }
+    },
+    {
       "id": "9c22d0595ab4de301f055725bc187bd87d63e58231f099570cb702c16c60f7dc",
       "classification": "tool-noise",
       "owner": "Gallery video-review inspector and shared compact inspector",
@@ -2362,6 +2380,24 @@
       }
     },
     {
+      "id": "a7333f1fa6c41e8505f8dc5ea969d3cb98e8b2aeeab5aa316d4040d13118dc72",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/use-recognition.ts",
+      "reason": "Recognition owns Apply state and one accepted transcript. Speech owns multiple takes, completion and propagation. Equal controller setup does not define one publication lifetime.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/use-recognition.ts",
+        "start": 108,
+        "end": 118
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/use-text-voice.ts",
+        "start": 130,
+        "end": 140
+      }
+    },
+    {
       "id": "a7c4be7d00b0066ba82208d735cc3cddc574e367b8b45d7f37d116461b8a015e",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/toolbar-form-layout.css",
@@ -2401,7 +2437,7 @@
       "id": "aa6914db950192ac7705fe43e6d735e74c09a67144a00f8e226e9e406d75743e",
       "classification": "tool-noise",
       "owner": "features/video/audio/source-envelope",
-      "reason": "The common initial loop shape surrounds materially different accepted intent: gain allows volume\u22642, minimum0.001s, sorts and rejects overlap; attenuation allows volume\u22641, anypositive duration and retains overlapping/order intent.",
+      "reason": "The common initial loop shape surrounds materially different accepted intent: gain allows volume≤2, minimum0.001s, sorts and rejects overlap; attenuation allows volume≤1, anypositive duration and retains overlapping/order intent.",
       "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
       "reviewBy": "2027-04-15",
       "firstFile": {
@@ -2452,24 +2488,6 @@
       }
     },
     {
-      "id": "ae6b83b5bedf771335ee651917b84346e89b8b5ffde9900ad1beaff6c847a9df",
-      "classification": "tool-noise",
-      "owner": "frame annotation composition",
-      "reason": "Callout and frame bodies configure shared template workflow/apply-to-future hooks and compose a temporary-mode header action. Their templates, restore/fork callbacks, labels and content remain type-specific. The repeated state policy is already delegated to the existing hooks.",
-      "removalCondition": "Remove this record if template workflow transitions move out of the shared hooks into these bodies.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
-        "start": 64,
-        "end": 84
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
-        "start": 127,
-        "end": 148
-      }
-    },
-    {
       "id": "b07219f2e5af149f429fb7410de2f9d0a3a0aad276c90a83a758646d13147236",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -2506,21 +2524,21 @@
       }
     },
     {
-      "id": "b0e8bb081ce138bd5353e2ddb2f711ed11b266eb2087f79b51019109171c6017",
+      "id": "b0a7c9e618951d31fd8da9b028704e7ec1cd3536f320529c611edf80ab4738e1",
       "classification": "tool-noise",
-      "owner": "ui/compact-inspector-controls switch accessibility",
-      "reason": "The base thumb rule positions and animates thumbs. The same thumb selector inside prefers-reduced-motion disables transition. Sharing selector tokens does not duplicate a motion policy.",
-      "removalCondition": "Remove this finding if switch animation disappears or the reduced-motion policy moves to an existing owner.",
+      "owner": "editor annotation projections",
+      "reason": "Read-only and interactive projections pass the same snapshot-derived fill and shadow props into the shared badge component. The interactive version also owns settings anchors/handles; readonly deliberately does not. No annotation renderer or edit behavior is copied.",
+      "removalCondition": "Remove this record if either projection duplicates badge rendering rather than invoking the shared component.",
       "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 641,
-        "end": 647
+        "path": "apps/extension/src/editor/frame-annotation/projection-read-only.tsx",
+        "start": 46,
+        "end": 54
       },
       "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 670,
-        "end": 676
+        "path": "apps/extension/src/editor/frame-annotation/projection.tsx",
+        "start": 319,
+        "end": 327
       }
     },
     {
@@ -2575,24 +2593,6 @@
         "path": "tooling/design-reference/examples/properties/index.html",
         "start": 6,
         "end": 15
-      }
-    },
-    {
-      "id": "b34efd805bafb46cbdd36f0eef82b2484ff4a610b53446a95caaa0df3d08879c",
-      "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db",
-      "reason": "Both ranges are import declarations from canonical store constants. Schema contracts describe stores; upgrade creates them. There is no duplicate executable migration or schema definition in this matched import span.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
-        "start": 5,
-        "end": 34
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
-        "start": 1,
-        "end": 30
       }
     },
     {
@@ -2992,24 +2992,6 @@
       }
     },
     {
-      "id": "d0a1bc962e5bdaf1d623fcb5c1ba999cdd261807115fda4d2a89fea77529b66b",
-      "classification": "tool-noise",
-      "owner": "frame annotation callout and step-badge composition",
-      "reason": "Both bodies render existing apply-to-future and template-fork guards. Their template sections and settings mutation contracts are different; the guards already contain the confirmation behavior. Matching ternary composition does not create a second workflow owner.",
-      "removalCondition": "Remove this record if confirmation state or transitions are copied into either body.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
-        "start": 102,
-        "end": 116
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
-        "start": 110,
-        "end": 124
-      }
-    },
-    {
       "id": "d1f3afe5b9058c27e244806f48eb29eaaae869d1855161fbd0e1a96fc50562f3",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal-content",
@@ -3046,21 +3028,21 @@
       }
     },
     {
-      "id": "d620657b94a1fb37f4ae83b7fac761df62052d8462cf078a9e4fc2d040b25bb3",
+      "id": "d56557725388ed977e4bb43469700c17d221bf37453120cc477ccd41ed12fa22",
       "classification": "tool-noise",
-      "owner": "frame annotation callout and step-badge composition",
-      "reason": "Both call shared template/apply-to-future owners then declare the temporary-template header action. Fork defaults differ materially: callout clears sourcePresetId through handleSettingChange; step badge sends its own settings patch. Header labels and template bodies also differ.",
-      "removalCondition": "Remove this record if identical executable fork/restore logic is copied outside those owners.",
+      "owner": "packages/ui glass popover and content toolbar active controls",
+      "reason": "Both active families consume 55% accent border tokens, but glass popover controls and content toolbar controls have different class/state contracts. The matching span also includes boundaries to subsequent hover selectors.",
+      "removalCondition": "Remove this finding if one canonical active-control contract replaces both selector families.",
       "reviewBy": "2027-04-15",
       "firstFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
-        "start": 61,
-        "end": 84
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 62,
+        "end": 73
       },
       "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
-        "start": 68,
-        "end": 92
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 237,
+        "end": 248
       }
     },
     {
@@ -3082,6 +3064,24 @@
       }
     },
     {
+      "id": "d71f648769b5e4f611b81703e4adbf3298920e817f0c0ecfd1f2d27a0cbc2c65",
+      "classification": "tool-noise",
+      "owner": "ui/compact-inspector-controls switch accessibility",
+      "reason": "The base thumb rule positions and animates thumbs. The same thumb selector inside prefers-reduced-motion disables transition. Sharing selector tokens does not duplicate a motion policy.",
+      "removalCondition": "Remove this finding if switch animation disappears or the reduced-motion policy moves to an existing owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 643,
+        "end": 649
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 672,
+        "end": 678
+      }
+    },
+    {
       "id": "d8222537eae98913a47f118ff91137e9fcfa683a044b9fe472837534203592e5",
       "classification": "tool-noise",
       "owner": "apps/extension/src/popup/shell/app/startup.css",
@@ -3097,6 +3097,24 @@
         "path": "apps/extension/src/popup/shell/app/startup.css",
         "start": 28,
         "end": 35
+      }
+    },
+    {
+      "id": "db7482661d9e46db860943d7740ee467c303623fe2e6febf84ffdb96af364253",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/contracts/ai/content-text.ts",
+      "reason": "Content requests bind privacyProof and extracted text. Review requests bind workspace context and revisioned scope. Equal approval field spelling does not unify these wire protocols.",
+      "removalCondition": "Remove when this exact match disappears or an accepted common owner replaces the stated contract distinction.",
+      "reviewBy": "2027-04-28",
+      "firstFile": {
+        "path": "apps/extension/src/contracts/ai/content-text.ts",
+        "start": 57,
+        "end": 64
+      },
+      "secondFile": {
+        "path": "apps/extension/src/contracts/ai/review-text.ts",
+        "start": 231,
+        "end": 238
       }
     },
     {
@@ -3133,24 +3151,6 @@
         "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
         "start": 58,
         "end": 69
-      }
-    },
-    {
-      "id": "e162eaf56f5ffe630928deae21e11ebfade84a88b8b33982f4fb010fccc8a459",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/content/selection/frame-runtime/session <-> apps/extension/src/features/highlighter/step-badge-presets",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/content/selection/frame-runtime/session/step-badge-defaults.ts",
-        "start": 35,
-        "end": 43
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/highlighter/step-badge-presets/catalog.ts",
-        "start": 290,
-        "end": 298
       }
     },
     {
@@ -3208,6 +3208,24 @@
       }
     },
     {
+      "id": "e7bc5219cc853c831847fc45b6e5f180331e44d4503d631f1d06a736035349fb",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/selection/step-badge/index.tsx",
+      "reason": "The content adapter and shared surface declare compatible callback props. The adapter owns page portals and optional frame geometry. The shared surface requires explicit portal and coordinate inputs. No rendering or interaction implementation repeats here.",
+      "removalCondition": "Remove when this exact finding disappears or when these contracts acquire one common owner.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/content/selection/step-badge/index.tsx",
+        "start": 22,
+        "end": 29
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/step-badge/interactive-surface.tsx",
+        "start": 23,
+        "end": 30
+      }
+    },
+    {
       "id": "eacfb537ed2fa88094fa82d23cf66452b6a05f7005b3229df07dbd689a84b6e1",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/highlighter/frame-annotation/settings-parser.ts",
@@ -3241,24 +3259,6 @@
         "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
         "start": 42,
         "end": 46
-      }
-    },
-    {
-      "id": "f34a25f0971a81489cf6811aab9044404b3e033a4f2b2b8d2f34271612fd3245",
-      "classification": "tool-noise",
-      "owner": "contracts/ai/audio",
-      "reason": "The match checks common project reference fields, surrounded by distinct exact-key/target shapes: project audio clip target versus text document/fragment target. It does not duplicate a complete parser or state transition.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/contracts/ai/audio.ts",
-        "start": 288,
-        "end": 295
-      },
-      "secondFile": {
-        "path": "apps/extension/src/contracts/ai/audio.ts",
-        "start": 319,
-        "end": 326
       }
     },
     {
@@ -3313,6 +3313,24 @@
         "path": "packages/ui/src/styles/ai-modal-content/fields.css",
         "start": 29,
         "end": 39
+      }
+    },
+    {
+      "id": "fa554f439de1215e8f023db733a8f86e47c50aaa9fb00ff355608f5c11337491",
+      "classification": "tool-noise",
+      "owner": "packages/ui content toolbar split-control styling",
+      "reason": "One matching hover/open/focus predicate paints the parent split-control surface. The second paints child command buttons transparent!important. These are complementary parent/child subjects, not repeated declarations on one subject.",
+      "removalCondition": "Remove this finding when the split-control DOM no longer needs separate container and child paint.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 522,
+        "end": 529
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 530,
+        "end": 537
       }
     },
     {

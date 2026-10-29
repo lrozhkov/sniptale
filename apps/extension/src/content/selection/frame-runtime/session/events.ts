@@ -75,12 +75,15 @@ function createFrameCalloutHandlers(args: {
 }
 
 function createFrameStepBadgeHandlers(args: {
+  withHistoryCommit: WithHistoryCommit;
   updateGlobalStepBadgeSettings: (settings: Partial<GlobalStepBadgeSettings>) => void;
   updateFrameStepBadge: (frameId: string, settings: Partial<StepBadgeSettings>) => void;
   reorderStepBadge: (frameId: string, direction: 'up' | 'down') => void;
 }) {
   return {
-    handleFrameStepBadgeChanged: createFrameStepBadgeHandler(args.updateFrameStepBadge),
+    handleFrameStepBadgeChanged: args.withHistoryCommit(
+      createFrameStepBadgeHandler(args.updateFrameStepBadge)
+    ),
     handleGlobalStepBadgeSettingsChanged: createStepBadgeSettingsHandler(
       args.updateGlobalStepBadgeSettings
     ),

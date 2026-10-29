@@ -234,3 +234,51 @@ it('updates individual privacy toggles and closes through the modal frame', asyn
   expect(onExport).toHaveBeenCalledWith(expect.objectContaining({ includeTelemetry: false }));
   expect(onClose).toHaveBeenCalledTimes(1);
 });
+
+it('keeps catalog confirmation and privacy changes metadata-only before downloading a full backup', async () => {
+  const onInspect = vi.fn();
+  const onExport = vi.fn(async () => undefined);
+  const options = createExportOptions();
+  act(() =>
+    root?.render(
+      <BackupExportModalContent
+        options={options}
+        summary={null}
+        preparation={{
+          binding: {
+            provider: 'webdav',
+            rootUrl: 'https://dav.example/',
+            accountId: 'user',
+            spaceId: 'space',
+            connectionGeneration: 1,
+            profileCreatedAt: 1,
+          },
+          authorization: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 },
+          missing: [
+            {
+              rootKind: 'video-project',
+              rootId: 'remote',
+              operationId: 'op',
+              sourceDigest: 'a'.repeat(64),
+            },
+          ],
+          nativeRootCount: 2,
+          remoteBytesUpperBound: 4096,
+        }}
+        onInspect={onInspect}
+        onExport={onExport}
+        onClose={vi.fn()}
+      />
+    )
+  );
+  await act(async () => {
+    const toggle = container!.querySelector('input[type="checkbox"]');
+    if (!(toggle instanceof HTMLInputElement)) throw new Error('Privacy toggle missing.');
+    toggle.click();
+  });
+  expect(onInspect).not.toHaveBeenCalled();
+  expect(onExport).not.toHaveBeenCalled();
+  expect(container?.textContent).toContain('gallery.backupExportModal.remoteRoots');
+  await act(async () => findButton('gallery.backupExportModal.downloadAndExport').click());
+  expect(onExport).toHaveBeenCalledWith(expect.objectContaining({ includeDrafts: true }));
+});

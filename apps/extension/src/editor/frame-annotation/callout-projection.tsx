@@ -33,6 +33,7 @@ export function EditorFrameCallout(props: {
   onSnapshotPreview: (snapshot: FrameAnnotationSnapshotV1) => void;
   onDraftCommit: () => void;
   onMoveEnd?: () => void;
+  onDelete?: () => void;
   isSettingsOpen: boolean;
   onSettingsOpen: (anchor: HTMLButtonElement) => void;
   projectMoveRect?: (rect: { x: number; y: number; width: number; height: number }) => {
@@ -115,6 +116,17 @@ export function EditorFrameCallout(props: {
   return (
     <>
       <FrameCalloutInteractiveSurface
+        {...(props.snapshot.annotationKind === 'callout'
+          ? {
+              onAnchorPositionChange: (point, placement) =>
+                props.onSnapshotChange({
+                  ...props.snapshot,
+                  ...point,
+                  callout: { ...callout, placement },
+                }),
+            }
+          : {})}
+        {...(props.onDelete ? { onDelete: props.onDelete } : {})}
         chromeScale={1}
         coordinateSpace={props.coordinateSpace}
         {...(props.controlsPortalTarget

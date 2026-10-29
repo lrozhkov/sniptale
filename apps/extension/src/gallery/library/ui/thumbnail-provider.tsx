@@ -77,6 +77,12 @@ function loadThumbUrl(item: GalleryItem, setThumbUrl: (value: string | null) => 
 }
 
 function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
+  if (item.type === 'remote-root')
+    return JSON.stringify([
+      item.id,
+      item.remote.selection.operationId,
+      item.remote.selection.sourceDigest,
+    ]);
   if (item.type === 'video-project' || item.type === 'quick-edit-project') {
     return `${item.id}:${item.hasThumbnail}:${item.presentationRevision ?? ''}:${item.workspaceRevision ?? ''}`;
   }

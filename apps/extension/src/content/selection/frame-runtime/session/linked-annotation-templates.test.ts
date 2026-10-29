@@ -193,3 +193,38 @@ it('lets an explicit toolbar selection override both linked frame templates', ()
     resolveFrameStepBadgeTemplate(stepBadgeFallback, linkedBorderSettings()).sourcePresetId
   ).toBe(stepBadgeFallback.sourcePresetId);
 });
+
+it.each(['callout', 'step-badge'] as const)(
+  'preserves a standalone %s when linked frame catalogs become ready',
+  async (annotationKind) => {
+    const callout = createDefaultCalloutSettings(
+      snapshots.callouts!.presets[0]!.style,
+      snapshots.callouts!.presets[0]!.id
+    );
+    const stepBadge = createSessionStepBadgeSettings();
+    const original: FrameData = {
+      id: 'standalone',
+      annotationKind,
+      x: 10,
+      y: 20,
+      width: 1,
+      height: 1,
+      borderSettings: linkedBorderSettings(),
+      ...(annotationKind === 'callout' ? { callout } : { stepBadge }),
+    };
+    let frames = [original];
+    const setFrames = vi.fn<Dispatch<SetStateAction<FrameData[]>>>((update) => {
+      frames = typeof update === 'function' ? update(frames) : update;
+    });
+    reconcileLinkedAnnotationTemplatesWhenReady({
+      frameId: original.id,
+      setFrames,
+      ...(callout.sourcePresetId ? { expectedCalloutSourcePresetId: callout.sourcePresetId } : {}),
+      ...(stepBadge.sourcePresetId
+        ? { expectedStepBadgeSourcePresetId: stepBadge.sourcePresetId }
+        : {}),
+    });
+    await vi.waitFor(() => expect(setFrames).toHaveBeenCalledOnce());
+    expect(frames[0]).toBe(original);
+  }
+);

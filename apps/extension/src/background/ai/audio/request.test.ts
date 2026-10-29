@@ -35,6 +35,8 @@ const transcription: AudioJobStart = {
   scope,
 };
 const speechConfig: AudioModelConfig = {
+  connectionType: 'openai-compatible',
+  baseUrl: 'https://example.test',
   url: 'https://example.test/audio/speech',
   apiKey: 'fixture',
   modelCode: 'speech',
@@ -65,28 +67,37 @@ function run(request = speech, config = speechConfig) {
 }
 
 it.each([
-  [400, 'provider-request'],
-  [422, 'provider-request'],
-  [404, 'provider-not-found'],
-  [405, 'provider-not-found'],
-  [413, 'too-large'],
-  [401, 'provider-auth'],
-  [403, 'provider-auth'],
-  [429, 'provider-rate-limit'],
-  [500, 'provider-failed'],
-] as const)('rejects HTTP %s without reading or exposing its error body', async (status, code) => {
-  const cancel = vi.fn();
-  const body = new ReadableStream({ cancel });
-  const fetchMock = vi.fn<typeof fetch>(async () => new Response(body, { status }));
-  vi.stubGlobal('fetch', fetchMock);
-  await expect(run()).rejects.toThrow(code);
-  expect(cancel).toHaveBeenCalledOnce();
-  expect(fetchMock).toHaveBeenCalledTimes(1);
-});
+  [400, 'provider-request', 'unknown'],
+  [422, 'provider-request', 'unknown'],
+  [404, 'provider-not-found', 'model-unavailable'],
+  [405, 'provider-not-found', 'unknown'],
+  [413, 'too-large', 'unknown'],
+  [401, 'provider-auth', 'invalid-credential'],
+  [403, 'provider-auth', 'permission-denied'],
+  [402, 'provider-failed', 'quota-exceeded'],
+  [500, 'provider-failed', 'service-error'],
+] as const)(
+  'rejects non-429 HTTP %s without reading or exposing its error body',
+  async (status, code, reason) => {
+    const cancel = vi.fn();
+    const body = new ReadableStream({ cancel });
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(body, { status }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(run()).rejects.toMatchObject({ message: code, reason });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  }
+);
 it('rejects an incomplete operation before fetch or an already cancelled request', async () => {
   const fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal('fetch', fetchMock);
-  const noParameters = { url: speechConfig.url, apiKey: 'fixture', modelCode: 'model' };
+  const noParameters: AudioModelConfig = {
+    connectionType: speechConfig.connectionType,
+    baseUrl: speechConfig.baseUrl,
+    url: speechConfig.url,
+    apiKey: 'fixture',
+    modelCode: 'model',
+  };
   await expect(run(speech, noParameters)).rejects.toThrow('invalid-request');
   await expect(run(transcription, noParameters)).rejects.toThrow('invalid-request');
   await expect(
@@ -149,7 +160,7 @@ it('requests segment fallback alongside explicitly configured word timing', asyn
     },
   });
   const verboseRequest = fetchMock.mock.calls[0]?.[1];
-  expect(verboseRequest?.body).toBeInstanceOf(ArrayBuffer);
+  expect(verboseRequest?.body).toBeInstanceOf(FormData);
   const verbose = await new Response(verboseRequest?.body, {
     headers: new Headers(verboseRequest?.headers),
   }).formData();
@@ -253,9 +264,7 @@ it('reports a fixed network failure without retrying or exposing the raw excepti
 it('rejects unreadable staged audio locally before making a paid request', async () => {
   const fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal('fetch', fetchMock);
-  vi.spyOn(Response.prototype, 'arrayBuffer').mockRejectedValueOnce(
-    new Error('private local path')
-  );
+  vi.spyOn(input, 'arrayBuffer').mockRejectedValueOnce(new Error('private local path'));
   await expect(run(transcription, transcriptionConfig)).rejects.toThrow(/^storage-failed$/);
   expect(fetchMock).not.toHaveBeenCalled();
 });
@@ -264,16 +273,10 @@ it('does not start a request when cancelled during multipart preparation', async
   const fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal('fetch', fetchMock);
   const controller = new AbortController();
-  vi.spyOn(input, 'stream').mockImplementation(
-    () =>
-      new ReadableStream({
-        start(stream) {
-          controller.abort();
-          stream.enqueue(new TextEncoder().encode('bytes'));
-          stream.close();
-        },
-      })
-  );
+  vi.spyOn(input, 'arrayBuffer').mockImplementationOnce(async () => {
+    controller.abort();
+    return new TextEncoder().encode('bytes').buffer;
+  });
   await expect(
     requestAudio({
       request: transcription,
@@ -330,11 +333,18 @@ it('posts a complete declared multimodal file once and admits only schema-valid 
   expect(post).toHaveBeenCalledTimes(1);
   const request = post.mock.calls[0]![1]!;
   expect(new Headers(request.headers).get('Content-Type')).toBe('application/json');
-  const payload = JSON.parse(new TextDecoder().decode(request.body as ArrayBuffer));
+  const payload = JSON.parse(request.body as string);
   expect(payload.messages[1].content[1]).toEqual({
     type: 'image_url',
     image_url: { url: 'data:audio/wav;base64,Ynl0ZXM=' },
   });
+  expect(payload.responseFormat).toMatchObject({
+    type: 'json_schema',
+    json_schema: { name: 'timed_transcript', strict: true },
+  });
+  expect(payload.maxTokens).toBe(24000);
+  expect(payload).not.toHaveProperty('response_format');
+  expect(payload).not.toHaveProperty('max_tokens');
   expect(result).toMatchObject({ kind: 'transcript', result: { text: 'Hello.' } });
 });
 
@@ -370,7 +380,7 @@ it('preserves every audio byte across base64 block boundaries without extra POST
     onReceiving() {},
   });
   expect(post).toHaveBeenCalledOnce();
-  const payload = JSON.parse(new TextDecoder().decode(post.mock.calls[0]![1]!.body as ArrayBuffer));
+  const payload = JSON.parse(post.mock.calls[0]![1]!.body as string);
   const encoded = payload.messages[1].content[1].input_audio.data;
   expect(Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))).toEqual(bytes);
 });

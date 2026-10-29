@@ -27,9 +27,17 @@ import {
 } from '../../../../runtime/session/text-rewrite';
 
 vi.mock('../../../../../workflows/ai-settings/query', () => ({
+  rememberAIScenarioModelSelection: vi.fn(async () => undefined),
+  requestAIScenarioModelSelection: vi.fn(async () => ({
+    scenario: 'video-speech',
+    globalSystemPrompt: '',
+    remembered: null,
+    resolution: { status: 'empty', modelId: null, previousSelection: null, reason: null },
+    models: [],
+    providers: [],
+  })),
   requestAIModelSelectionBootstrap: vi.fn(async () => ({
     chromeAiEnabled: false,
-    defaultModelId: null,
     globalSystemPrompt: '',
     models: [],
     providers: [],

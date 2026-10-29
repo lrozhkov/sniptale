@@ -1,5 +1,6 @@
-import { Camera, Zap } from 'lucide-react';
+import { Icon, Zap } from 'lucide-react';
 
+import { getQuickActionReactIconNode } from '../../../../features/quick-actions-presets/icons';
 import { translate } from '../../../../platform/i18n';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import {
@@ -13,7 +14,7 @@ import {
   type SettingsCollectionItem,
   type SettingsCollectionMoveIntent,
 } from '../../../section-surface';
-import { afterCaptureLabels, quickActionIconMap, screenshotModeLabels } from './section/constants';
+import { afterCaptureLabels, screenshotModeLabels } from './section/constants';
 import { getDelayLabel, getViewportPresetLabel } from './section/helpers';
 import type { QuickActionsSectionState } from './controller';
 
@@ -22,7 +23,6 @@ export function QuickActionsList(props: {
   viewportPresets: ViewportPreset[] | undefined;
 }) {
   const items: readonly SettingsCollectionItem[] = props.state.actions.map((action) => {
-    const Icon = quickActionIconMap[action.icon] ?? Camera;
     const meta = [
       screenshotModeLabels[action.screenshotMode],
       action.viewportPresetId
@@ -39,7 +39,13 @@ export function QuickActionsList(props: {
       id: action.id,
       title: getQuickActionDisplayName(action),
       meta,
-      preview: <Icon className="h-4 w-4 text-[var(--sniptale-color-text-secondary)]" />,
+      preview: (
+        <Icon
+          iconNode={getQuickActionReactIconNode(action.icon)}
+          aria-hidden="true"
+          className="h-4 w-4 text-[var(--sniptale-color-text-secondary)]"
+        />
+      ),
       enabled: action.status,
       busy: props.state.isLoading,
       isBuiltIn: isBundledQuickAction(action),

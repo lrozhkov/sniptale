@@ -1,3 +1,5 @@
+import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
+import type { VoiceProviderSelection } from '@sniptale/runtime-contracts/voice-input';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import { SegmentedRow, ToggleField } from '../../ui/compact-inspector-controls';
@@ -5,8 +7,8 @@ import { ReviewTextVoiceRecording } from './text-voice-recording';
 import { ReviewTextVoiceGallery } from './text-voice-gallery';
 import type { ReviewSpeechProfile } from '../../features/video/review/speech-transcript';
 import { useReviewTextVoiceOperation, type ReviewTextVoiceAccess } from './use-text-voice';
-import { SpeechProfileFields } from './speech-profile';
-import { useReviewSpeechCatalog } from './use-speech';
+import { SpeechSynthesisProfileFields } from '../../ui/video-text/speech/profile';
+import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { formatNumber, translate, useAppLocale } from '../../platform/i18n';
 
@@ -147,7 +149,10 @@ export function ReviewTextVoiceForm(props: Props) {
       )}
       {operation.error && (operation.error !== 'model' || source === 'ai') && (
         <p role="alert" className="text-xs">
-          {translate(textVoiceErrors[operation.error])}
+          {translate(
+            getAIProviderFailureKey(operation.providerFailureReason) ??
+              textVoiceErrors[operation.error]
+          )}
         </p>
       )}
       <TextVoiceResults operation={operation} disabled={props.disabled} source={source} />
@@ -156,23 +161,70 @@ export function ReviewTextVoiceForm(props: Props) {
 }
 
 /** Model/profile discovery can change without restarting the disposable take operation. */
-function useTextVoiceProfile(onError: () => void) {
-  const [modelId, setModelId] = useState('');
-  const { catalogs, reloadModels } = useReviewSpeechCatalog(setModelId, onError);
+function useTextVoiceProfile(operation: VoiceOperation) {
+  const selection = useAIScenarioModelSelection('gallery-speech');
+  const catalog = selection.configuration;
   const [profile, setProfile] = useState<ReviewSpeechProfile>();
-  const model = catalogs?.speech.models.find((entry) => entry.id === profile?.modelId);
-  const provider = catalogs?.speech.providers.find((entry) => entry.id === model?.providerId);
+  const profileReset = useRef<string | null>(null);
+  const { changeProfile } = operation;
   useEffect(() => {
-    if (profile || !catalogs) return;
-    const preferred = catalogs.speech.models.find(
-      (entry) => entry.id === catalogs.speech.defaultModelId
+    if (selection.selectionPending) return;
+    const replace = profileReset.current === selection.modelId && !selection.selectionFailed;
+    profileReset.current = null;
+    const model = catalog?.models.find((entry) => entry.id === selection.modelId);
+    if (!model || (profile?.modelId === model.id && !replace)) return;
+    const provider = catalog?.providers.find((entry) => entry.id === model.providerId);
+    const next: ReviewSpeechProfile = model.audio?.speech
+      ? { modelId: model.id, ...model.audio.speech }
+      : {
+          modelId: model.id,
+          voiceId: '',
+          responseFormat: provider?.connectionType === 'google' ? 'wav' : 'mp3',
+        };
+    changeProfile(next);
+    setProfile(next);
+  }, [
+    catalog,
+    selection.modelId,
+    selection.selectionPending,
+    selection.selectionFailed,
+    profile,
+    changeProfile,
+  ]);
+  const model = catalog?.models.find((entry) => entry.id === profile?.modelId);
+  const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
+  const prepareSelection = async (signal: AbortSignal, approved: VoiceProviderSelection) => {
+    const prepared = await selection.prepareModelSelection(signal);
+    const current = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
+    const currentProvider = prepared.catalog.providers.find(
+      (entry) => entry.id === current?.providerId
     );
-    const selected = preferred?.audio?.speech
-      ? preferred
-      : catalogs.speech.models.find((entry) => entry.audio?.speech);
-    if (selected?.audio?.speech) setProfile({ modelId: selected.id, ...selected.audio.speech });
-  }, [catalogs, profile]);
-  return { catalogs, reloadModels, profile, setProfile, modelId, setModelId, provider, model };
+    if (
+      !current ||
+      prepared.modelId !== profile?.modelId ||
+      prepared.modelId !== approved.modelId ||
+      current.providerId !== approved.approvedProviderId ||
+      current.modelCode !== approved.approvedModelCode ||
+      currentProvider?.destinationBinding !== approved.approvedDestination
+    )
+      throw new Error('model-unavailable');
+  };
+  return {
+    ...selection,
+    catalog,
+    profile,
+    setProfile,
+    provider,
+    model,
+    prepareSelection,
+    chooseModel(id: string | null) {
+      if (!id || selection.selectionPending || !catalog?.models.some((entry) => entry.id === id))
+        return;
+      profileReset.current = id;
+      operation.clearError();
+      selection.chooseModel(id);
+    },
+  };
 }
 
 type VoiceOperation = ReturnType<typeof useReviewTextVoiceOperation>;
@@ -184,29 +236,59 @@ function TextVoiceSettings(props: {
   disabled?: boolean | undefined;
   autosaveEnabled: boolean;
 }) {
-  const settings = useTextVoiceProfile(props.operation.modelError);
-  const [consenting, setConsenting] = useState(false);
+  const settings = useTextVoiceProfile(props.operation);
+  const [consent, setConsent] = useState<{
+    selection: VoiceProviderSelection;
+    profile: ReviewSpeechProfile;
+    providerName: string;
+    modelName: string;
+  } | null>(null);
   const approved = useRef(new Set<string>());
   const { profile, provider, model } = settings;
   const start = () => {
-    if (!profile || !provider || props.disabled) return;
-    if (approved.current.has(provider.id)) props.operation.generate(profile, provider.id);
-    else setConsenting(true);
+    if (
+      !profile?.voiceId.trim() ||
+      !provider?.destinationBinding ||
+      !model ||
+      props.disabled ||
+      settings.selectionPending ||
+      profile.modelId !== settings.modelId
+    )
+      return;
+    const next = {
+      selection: {
+        modelId: model.id,
+        approvedProviderId: provider.id,
+        approvedModelCode: model.modelCode,
+        approvedDestination: provider.destinationBinding,
+      },
+      profile: structuredClone(profile),
+      providerName: provider.name,
+      modelName: model.displayName,
+    };
+    if (approved.current.has(JSON.stringify(next.selection)))
+      props.operation.generate(next.profile, next.selection, settings.prepareSelection);
+    else setConsent(next);
   };
   return (
     <>
-      <TextVoiceParameters {...props} settings={settings} consenting={consenting} start={start} />
-      {consenting && provider && profile && (
+      <TextVoiceParameters
+        {...props}
+        settings={settings}
+        consenting={consent !== null}
+        start={start}
+      />
+      {consent && (
         <TextVoiceConsent
-          providerName={provider.name}
-          modelName={model?.displayName}
-          instructions={!!profile.instructions}
+          providerName={consent.providerName}
+          modelName={consent.modelName}
+          instructions={!!consent.profile.instructions}
           disabled={props.disabled}
-          onCancel={() => setConsenting(false)}
+          onCancel={() => setConsent(null)}
           onContinue={() => {
-            approved.current.add(provider.id);
-            setConsenting(false);
-            props.operation.generate(profile, provider.id);
+            approved.current.add(JSON.stringify(consent.selection));
+            setConsent(null);
+            props.operation.generate(consent.profile, consent.selection, settings.prepareSelection);
           }}
         />
       )}
@@ -234,51 +316,73 @@ function TextVoiceParameters(props: {
   );
   return (
     <fieldset
-      disabled={props.disabled || operation.running || props.consenting}
+      disabled={
+        props.disabled || operation.running || props.consenting || settings.selectionPending
+      }
       className="min-w-0 space-y-2"
     >
-      <SpeechProfileFields
-        speech={{
-          catalogs: settings.catalogs,
-          modelId: settings.modelId,
-          setModelId: settings.setModelId,
-          profile: settings.profile,
-          changeProfile: (profile) => {
-            operation.changeProfile(profile);
-            settings.setProfile(profile);
-          },
+      <SpeechSynthesisProfileFields
+        catalog={settings.catalog}
+        profile={settings.profile}
+        preferenceId="speech.profile.advanced"
+        onSelectModel={settings.chooseModel}
+        onChange={(profile) => {
+          operation.changeProfile(profile);
+          settings.setProfile(profile);
         }}
-        operation="speech"
-        onOpenModels={() => {
-          operation.clearError();
-          settings.reloadModels();
-        }}
+        onOpenModels={() => void settings.retryConfiguration()}
       />
-      {!settings.catalogs && !operation.error && (
+      {!settings.catalog && !settings.configurationFailed && (
         <LoaderCircle
           className="animate-spin"
           size={14}
           aria-label={translate('common.states.loading')}
         />
       )}
-      {!settings.catalogs?.speech.models.length ? (
+      {settings.configurationFailed && (
+        <p role="alert" className="text-xs">
+          {translate('aiModal.modelCatalogFailed')}
+        </p>
+      )}
+      {settings.selectionFailed && (
+        <p role="alert" className="text-xs">
+          {translate('aiModal.modelSelectionSaveFailed')}
+        </p>
+      )}
+      {settings.selectionPending && (
+        <p role="status" className="sr-only">
+          {translate('common.states.saving')}
+        </p>
+      )}
+      {settings.selectionUnavailable && (
+        <p role="status" className="text-xs">
+          <bdi className="[overflow-wrap:anywhere]">{settings.unavailableModelName}</bdi>{' '}
+          {translate('aiModal.modelSelectionUnavailable')}
+        </p>
+      )}
+      {(!settings.catalog?.models.length ||
+        settings.configurationFailed ||
+        settings.selectionUnavailable) && (
         <ReviewButton
           label={translate('gallery.videoReview.speechReloadModels')}
           className={buttonClass}
-          onClick={() => {
-            operation.clearError();
-            settings.reloadModels();
-          }}
+          onClick={() => void settings.retryConfiguration()}
         >
           {translate('gallery.videoReview.speechReloadModels')}
         </ReviewButton>
-      ) : null}
+      )}
       <div className="review-recognition-commands border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           primary
           label={startLabel}
           className="!h-auto min-h-8! whitespace-normal text-left"
-          disabled={!settings.profile || !settings.provider || operation.remaining === 0}
+          disabled={
+            !settings.profile?.voiceId.trim() ||
+            settings.profile.modelId !== settings.modelId ||
+            !settings.provider ||
+            settings.selectionPending ||
+            operation.remaining === 0
+          }
           onClick={props.start}
         >
           {startLabel}

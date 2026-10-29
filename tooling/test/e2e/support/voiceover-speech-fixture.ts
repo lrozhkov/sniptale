@@ -20,13 +20,14 @@ export const speechModelResponse = aiSettingsQueryResponseSchema.parse({
   success: true,
   modelSelection: {
     chromeAiEnabled: false,
-    defaultModelId: null,
     globalSystemPrompt: '',
     providers: [
       {
         id: '00000000-0000-4000-8000-000000000101',
         name: 'Local speech fixture',
         connectionType: 'openai-compatible',
+        incarnation: 'fixture',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
         destinationKind: 'external',
         hasStoredApiKey: true,
         createdAt: 1,
@@ -217,7 +218,7 @@ export async function installSpeechPortFixture(page: Page, phraseCount?: number)
                   void stage(message).catch(() =>
                     emit({ type: 'failure', requestId: message.requestId, code: 'storage-failed' })
                   );
-              } else if (start)
+              } else if (start && message.type === 'execute')
                 void execute(message).catch(() =>
                   emit({ type: 'failure', requestId: message.requestId, code: 'storage-failed' })
                 );

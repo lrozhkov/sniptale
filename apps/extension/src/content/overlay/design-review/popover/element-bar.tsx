@@ -3,7 +3,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  ClipboardCopy,
+  Copy,
   Pencil,
   RotateCcw,
   TextCursorInput,
@@ -141,7 +141,7 @@ export function DesignReviewElementBar(props: {
         label={translate('content.designReview.copyElement')}
         onClick={() => void copy.onCopy()}
       >
-        {copy.status === 'copied' ? <Check size={16} /> : <ClipboardCopy size={16} />}
+        {copy.status === 'copied' ? <Check size={16} /> : <Copy size={16} />}
       </ElementActionButton>
       <span className="sr-only" role="status">
         {copy.status === 'copied' ? translate('content.designReview.elementCopied') : ''}

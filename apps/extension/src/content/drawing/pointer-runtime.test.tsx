@@ -215,3 +215,142 @@ it('tracks two-finger scrolling in client coordinates while the scroll root move
   expect(element.scrollTop).toBe(-5);
   act(() => root.unmount());
 });
+
+function setupAlignmentSurface(enabled = true) {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  Object.defineProperty(HTMLCanvasElement.prototype, 'setPointerCapture', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  const commit = vi.fn(() => true);
+  const session = createDrawingSession({ onDocumentCommit: commit });
+  session.commitObject({
+    id: 'target',
+    kind: 'rectangle',
+    bounds: { x: 300, y: 200, width: 200, height: 160 },
+    color: '#f00',
+    fillColor: '#f00',
+    width: 2,
+  });
+  session.commitObject({
+    id: 'moving',
+    kind: 'rectangle',
+    bounds: { x: 80, y: 80, width: 80, height: 60 },
+    color: '#f00',
+    fillColor: '#f00',
+    width: 2,
+  });
+  session.setActiveTool('select');
+  session.select('moving');
+  const controller: ContentDrawingController = {
+    session,
+    applyPalette: vi.fn(),
+    finalizeInteraction: vi.fn(),
+    getPalette: () => ['#f00'],
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const render = (chromeHidden = false) =>
+    act(() =>
+      root.render(
+        <DrawingSurface
+          active
+          alignMovesToPage={enabled}
+          chromeHidden={chromeHidden}
+          controller={controller}
+        />
+      )
+    );
+  render();
+  const canvas = host.querySelector('canvas')!;
+  commit.mockClear();
+  return {
+    commit,
+    session,
+    host,
+    render,
+    event: (type: string, x: number, y: number) =>
+      act(() => canvas.dispatchEvent(mousePointerEvent(type, x, y))),
+    moving: () => session.getSnapshot().document.objects.find((object) => object.id === 'moving'),
+    dispose: () => act(() => root.unmount()),
+  };
+}
+
+it.each([true, false])('commits one aligned page move with opt-in=%s', (enabled) => {
+  const scene = setupAlignmentSurface(enabled);
+  scene.event('pointerdown', 120, 110);
+  scene.event('pointermove', 344, 234);
+  expect(scene.moving()).toMatchObject({ bounds: { x: 80, y: 80 } });
+  expect(scene.commit).not.toHaveBeenCalled();
+  expect(
+    scene.host.querySelectorAll('[data-ui="content.drawing.alignment-guides"] line')
+  ).toHaveLength(enabled ? 2 : 0);
+  scene.event('pointerup', 344, 234);
+  expect(scene.moving()).toMatchObject({
+    bounds: { x: enabled ? 300 : 304, y: enabled ? 200 : 204 },
+  });
+  expect(scene.commit).toHaveBeenCalledOnce();
+  expect(scene.host.querySelector('[data-ui="content.drawing.alignment-guides"]')).toBeNull();
+  scene.dispose();
+});
+
+it.each(['pointercancel', 'lostpointercapture', 'blur'])(
+  'cancels aligned move on %s without saving preview',
+  (reason) => {
+    const scene = setupAlignmentSurface();
+    scene.event('pointerdown', 120, 110);
+    scene.event('pointermove', 344, 234);
+    expect(
+      scene.host.querySelectorAll('[data-ui="content.drawing.alignment-guides"] line')
+    ).toHaveLength(2);
+    if (reason === 'blur') act(() => window.dispatchEvent(new Event('blur')));
+    else scene.event(reason, 344, 234);
+    scene.event('pointerup', 344, 234);
+    expect(scene.host.querySelector('[data-ui="content.drawing.alignment-guides"]')).toBeNull();
+    expect(scene.moving()).toMatchObject({ bounds: { x: 80, y: 80 } });
+    expect(scene.commit).not.toHaveBeenCalled();
+    scene.dispose();
+  }
+);
+
+it('hides alignment feedback with capture chrome while preserving the disposable draft', () => {
+  const scene = setupAlignmentSurface();
+  scene.event('pointerdown', 120, 110);
+  scene.event('pointermove', 344, 234);
+  scene.render(true);
+  expect(scene.host.querySelector('[data-ui="content.drawing.alignment-guides"]')).toBeNull();
+  expect(scene.moving()).toMatchObject({ bounds: { x: 80, y: 80 } });
+  scene.render();
+  expect(
+    scene.host.querySelectorAll('[data-ui="content.drawing.alignment-guides"] line')
+  ).toHaveLength(2);
+  scene.event('pointercancel', 344, 234);
+  expect(scene.commit).not.toHaveBeenCalled();
+  scene.dispose();
+});
+
+it('does not snap the initial shape creation', () => {
+  const scene = setupAlignmentSurface();
+  act(() => {
+    scene.session.setActiveTool('shape');
+    scene.session.select(null);
+  });
+  scene.event('pointerdown', 304, 204);
+  scene.event('pointermove', 384, 264);
+  expect(scene.host.querySelector('[data-ui="content.drawing.alignment-guides"]')).toBeNull();
+  scene.event('pointerup', 384, 264);
+  expect(scene.session.getSnapshot().document.objects.at(-1)).toMatchObject({
+    bounds: { x: 304, y: 204, width: 80, height: 60 },
+  });
+  scene.dispose();
+});

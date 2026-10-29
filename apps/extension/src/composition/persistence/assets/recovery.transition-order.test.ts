@@ -351,6 +351,7 @@ it('keeps the transition gate outermost across full startup publication recovery
     `${PERSISTENCE_LOCK}:shared`,
     `${DURABLE_ASSET_OPERATION_LOCK}:exclusive`,
     `${DURABLE_ASSET_LOCK}:exclusive`,
+    `${DURABLE_ASSET_LOCK}:exclusive`,
     `${PERSISTENCE_LOCK}:shared`,
     `${PERSISTENCE_LOCK}:shared`,
     `${PERSISTENCE_LOCK}:shared`,

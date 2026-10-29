@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
+import type { AIModelCatalogPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import type { ReviewSpeechProfile } from '../../../features/video/review/speech-transcript';
 import { AIModelSelector } from '../../../features/ai/model-selector';
 import { useInspectorDisclosure } from '../../../composition/inspector-disclosures/state';
@@ -15,11 +15,12 @@ import { InspectorDisclosureView } from '../../compact-inspector-controls/disclo
 
 /** Both editors share synthesis settings; callers retain catalog and profile authority. */
 export function SpeechSynthesisProfileFields(props: {
-  catalog: AIModelSelectionBootstrapPayload | null;
+  catalog: AIModelCatalogPayload | null;
   profile: ReviewSpeechProfile | undefined;
   preferenceId: string;
   onChange(profile: ReviewSpeechProfile): void;
   onOpenModels?: (() => void) | undefined;
+  onSelectModel?: ((id: string | null) => void) | undefined;
 }) {
   const { profile, catalog } = props;
   const [advanced, setAdvanced] = useInspectorDisclosure(props.preferenceId, false);
@@ -36,6 +37,10 @@ export function SpeechSynthesisProfileFields(props: {
             selectedModelId={profile?.modelId ?? null}
             onOpen={props.onOpenModels}
             onSelect={(id) => {
+              if (props.onSelectModel) {
+                props.onSelectModel(id);
+                return;
+              }
               const model = catalog.models.find((entry) => entry.id === id);
               if (model?.audio?.speech)
                 props.onChange({ modelId: model.id, ...model.audio.speech });

@@ -43,7 +43,10 @@ for (const variant of [
           'sniptale-locale-preference': variant.locale,
           'sniptale-theme-preference': variant.theme,
         },
-        runtimeResponses: { AI_SETTINGS_QUERY: speechModelResponse },
+        runtimeResponses: {
+          AI_SETTINGS_QUERY: { ...speechModelResponse, scenarioSelection: null },
+          AI_SETTINGS_MUTATION: { success: true },
+        },
       });
       await page.goto(host.origin + GALLERY_HARNESS_PATH + '?theme=' + variant.theme);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
@@ -293,8 +296,10 @@ for (const viewport of [
           preserveMediaLibrary: true,
           storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'dark' },
           runtimeResponses: {
+            AI_SETTINGS_MUTATION: { success: true },
             AI_SETTINGS_QUERY: {
               ...speechModelResponse,
+              scenarioSelection: null,
               modelSelection: {
                 ...selection,
                 models: [

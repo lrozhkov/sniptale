@@ -143,7 +143,7 @@ it('commits a drop across groups once and suppresses its visibility click', asyn
   expect(preferences.layout.indexOf('capture-visible') + 1).toBe(
     preferences.layout.indexOf('mode')
   );
-  expect(preferences.controls['capture-visible']).toBeUndefined();
+  expect(preferences.controls['capture-visible']).toBe(true);
   expect(command).not.toHaveBeenCalled();
 });
 it.each(['pointercancel', 'lostpointercapture', 'Escape'])(
@@ -431,4 +431,249 @@ it('keeps a pending drop preview in its originating mode', async () => {
     preferences.layout.indexOf('mode')
   );
   expect(persistence.patch).toHaveBeenCalledTimes(1);
+});
+
+function addDividerSource() {
+  return host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.customize-add-divider"]'
+  )!;
+}
+function pointAt(id: string, rect = new DOMRect(0, 0, 28, 28)) {
+  const target = overlay(id);
+  vi.spyOn(target.parentElement!, 'getBoundingClientRect').mockReturnValue(rect);
+  Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => target });
+}
+it('does not add a divider on an ordinary pointer click', async () => {
+  await customize();
+  await act(async () =>
+    addDividerSource().dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+  );
+  expect(persistence.patch).not.toHaveBeenCalled();
+});
+it('copies the divider source into the pointer gap once and leaves its source available', async () => {
+  await customize();
+  const source = addDividerSource();
+  pointAt('capture-visible');
+  act(() => {
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+  });
+  expect(persistence.patch).not.toHaveBeenCalled();
+  const draft = host.querySelector<HTMLElement>('[data-page-toolbar-divider]')!;
+  expect(draft).not.toBeNull();
+  expect(Number(draft.style.order) + 1).toBe(
+    Number(overlay('capture-visible').parentElement!.style.order)
+  );
+  await act(async () => {
+    pointer(source, 'pointerup', 5, 10);
+    source.click();
+  });
+  expect(persistence.patch).toHaveBeenCalledTimes(1);
+  expect(addDividerSource()).toBe(source);
+  expect(preferences.layout.filter((item) => item.startsWith('separator:'))).toHaveLength(1);
+});
+it('previews a divider beside another divider but cancels an invalid terminal drop', async () => {
+  settings.contentToolbar!.pageLayouts = {
+    cursor: ['mode', 'separator:first', 'capture-visible', 'separator:second', 'settings'],
+  };
+  await customize();
+  const original = [...preferences.layout];
+  const source = overlay('separator:first');
+  pointAt('separator:second');
+  act(() => {
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+  });
+  expect(host.querySelector('[data-page-toolbar-invalid="true"]')).not.toBeNull();
+  expect(persistence.patch).not.toHaveBeenCalled();
+  await act(async () => {
+    pointer(source, 'pointerup', 5, 10);
+    source.click();
+  });
+  expect(persistence.patch).not.toHaveBeenCalled();
+  expect(preferences.layout).toEqual(original);
+  expect(host.querySelector('[data-page-toolbar-invalid="true"]')).toBeNull();
+});
+
+it('passes through a divider before committing beyond it without deleting either divider', async () => {
+  settings.contentToolbar!.pageLayouts = {
+    cursor: ['mode', 'separator:first', 'capture-visible', 'separator:second', 'settings'],
+  };
+  await customize();
+  const source = overlay('separator:first');
+  const dividerNodes = Array.from(host.querySelectorAll('[data-page-toolbar-divider]'));
+  pointAt('separator:second');
+  act(() => {
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+  });
+  expect(host.querySelector('[data-page-toolbar-invalid="true"]')).not.toBeNull();
+  pointAt('settings');
+  act(() => pointer(source, 'pointermove', 25, 10));
+  expect(host.querySelector('[data-page-toolbar-invalid="true"]')).toBeNull();
+  expect(Array.from(host.querySelectorAll('[data-page-toolbar-divider]'))).toEqual(dividerNodes);
+  await act(async () => {
+    pointer(source, 'pointerup', 25, 10);
+    source.click();
+  });
+  expect(preferences.layout.indexOf('separator:first')).toBe(
+    preferences.layout.indexOf('settings') + 1
+  );
+  expect(preferences.layout).toContain('separator:second');
+  expect(persistence.patch).toHaveBeenCalledTimes(1);
+});
+it('uses the terminal pointer hit and cancels a copy released outside without an extra move event', async () => {
+  await customize();
+  const original = [...preferences.layout];
+  const source = addDividerSource();
+  pointAt('capture-visible');
+  act(() => {
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+  });
+  expect(host.querySelector('[data-page-toolbar-divider]')).not.toBeNull();
+  Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => null });
+  await act(async () => {
+    pointer(source, 'pointerup', 500, 500);
+    source.click();
+  });
+  expect(preferences.layout).toEqual(original);
+  expect(persistence.patch).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-page-toolbar-divider]')).toBeNull();
+});
+it.each(['pointercancel', 'lostpointercapture', 'Escape', 'blur', 'mode'])(
+  'discards a provisional copy after %s without a write',
+  async (reason) => {
+    await customize();
+    const source = addDividerSource();
+    pointAt('capture-visible');
+    act(() => {
+      pointer(source, 'pointerdown', 100, 10);
+      pointer(source, 'pointermove', 5, 10);
+    });
+    expect(host.querySelector('[data-page-toolbar-divider]')).not.toBeNull();
+    if (reason === 'mode') await act(async () => root.render(<Harness mode="drawing" />));
+    else
+      act(() => {
+        if (reason === 'Escape')
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        else if (reason === 'blur') window.dispatchEvent(new Event('blur'));
+        else pointer(source, reason, 5, 10);
+      });
+    await act(async () => {
+      pointer(source, 'pointerup', 5, 10);
+      source.click();
+    });
+    expect(persistence.patch).not.toHaveBeenCalled();
+    expect(host.querySelector('[data-page-reordering]')).toBeNull();
+    expect(host.querySelector('[data-page-toolbar-invalid]')).toBeNull();
+  }
+);
+it('keeps a copy preview through pending save/lost capture and restores on refusal before explicit retry', async () => {
+  await customize();
+  let refuse!: (error: Error) => void;
+  persistence.patch.mockReturnValueOnce(
+    new Promise((_, reject) => {
+      refuse = reject;
+    })
+  );
+  const source = addDividerSource();
+  pointAt('capture-visible');
+  act(() => {
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+    pointer(source, 'pointerup', 5, 10);
+  });
+  expect(preferences.pending).toBe(true);
+  expect(host.querySelectorAll('[data-page-toolbar-divider]')).toHaveLength(1);
+  act(() => {
+    pointer(source, 'lostpointercapture', 5, 10);
+    source.click();
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+    pointer(source, 'pointerup', 5, 10);
+  });
+  expect(persistence.patch).toHaveBeenCalledTimes(1);
+  expect(host.querySelectorAll('[data-page-toolbar-divider]')).toHaveLength(1);
+  await act(async () => refuse(new Error('save refused')));
+  expect(preferences.error).not.toBeNull();
+  expect(host.querySelectorAll('[data-page-toolbar-divider]')).toHaveLength(0);
+  await act(async () => {
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+    pointer(source, 'pointerup', 5, 10);
+  });
+  expect(persistence.patch).toHaveBeenCalledTimes(2);
+  expect(preferences.layout.filter((item) => item.startsWith('separator:'))).toHaveLength(1);
+  expect(preferences.error).toBeNull();
+});
+it('skips invalid divider positions with keyboard reordering', async () => {
+  settings.contentToolbar!.pageLayouts = {
+    cursor: ['mode', 'separator:first', 'separator:second', 'capture-visible', 'settings'],
+  };
+  await customize();
+  await act(async () =>
+    overlay('separator:first').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, bubbles: true })
+    )
+  );
+  const shown = preferences.layout.filter((item) =>
+    ['mode', 'separator:first', 'separator:second', 'capture-visible', 'settings'].includes(item)
+  );
+  expect(shown).toEqual([
+    'mode',
+    'separator:second',
+    'capture-visible',
+    'separator:first',
+    'settings',
+  ]);
+  expect(persistence.patch).toHaveBeenCalledTimes(1);
+});
+
+it('keeps ordinary button self-hover free of divider placement errors', async () => {
+  await customize();
+  const source = overlay('capture-visible');
+  pointAt('capture-visible');
+  act(() => {
+    pointer(source, 'pointerdown', 5, 10);
+    pointer(source, 'pointermove', 15, 10);
+  });
+  expect(host.querySelector('[data-page-toolbar-invalid="true"]')).toBeNull();
+  expect(persistence.patch).not.toHaveBeenCalled();
+});
+it('cancels a provisional copy when the accepted layout is replaced', async () => {
+  await customize();
+  const source = addDividerSource();
+  pointAt('capture-visible');
+  act(() => {
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+  });
+  settings.contentToolbar!.pageLayouts = { cursor: ['mode', 'settings', 'capture-visible'] };
+  await act(async () => preferences.reload());
+  await act(async () => {
+    pointer(source, 'pointerup', 5, 10);
+    source.click();
+  });
+  expect(persistence.patch).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-page-reordering]')).toBeNull();
+});
+
+it('keeps the shown invalid drop when layout motion changes the hit beneath a stationary pointer', async () => {
+  settings.contentToolbar!.pageLayouts = {
+    cursor: ['mode', 'separator:first', 'capture-visible', 'separator:second', 'settings'],
+  };
+  await customize();
+  const original = [...preferences.layout];
+  const source = overlay('separator:first');
+  pointAt('separator:second');
+  act(() => {
+    pointer(source, 'pointerdown', 100, 10);
+    pointer(source, 'pointermove', 5, 10);
+  });
+  expect(host.querySelector('[data-page-toolbar-invalid="true"]')).not.toBeNull();
+  pointAt('mode');
+  await act(async () => pointer(source, 'pointerup', 5, 10));
+  expect(persistence.patch).not.toHaveBeenCalled();
+  expect(preferences.layout).toEqual(original);
 });

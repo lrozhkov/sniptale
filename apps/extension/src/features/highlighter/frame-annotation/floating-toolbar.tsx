@@ -1,17 +1,7 @@
 import React from 'react';
-import {
-  ChevronDown,
-  Eye,
-  EyeOff,
-  ListOrdered,
-  Minus,
-  Scaling,
-  Plus,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, Minus, Move, Plus, Trash2, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { AddFrameCommentIcon, FrameCommentIcon } from './icons';
+import { AddFrameCommentIcon, FrameCommentIcon, FrameNumberIcon } from './icons';
 import {
   ProductGlassToolbar,
   ProductGlassToolbarButton,
@@ -157,27 +147,20 @@ function FrameAnnotationToolbarMenuButton(props: FrameAnnotationToolbarMenuButto
   );
 }
 
-export function FrameAnnotationToolbarStepButton(props: {
-  active: boolean;
-  anchorRef?: React.RefObject<HTMLButtonElement | null>;
-  onClick: (event: React.MouseEvent) => void;
-  onMouseDown: (event: React.MouseEvent) => void;
-  onToggle: (event: React.MouseEvent) => void;
-}) {
+type FrameAnnotationToolbarToggleProps = Omit<
+  React.ComponentProps<typeof FrameAnnotationToolbarMenuButton>,
+  'commandId' | 'children'
+>;
+
+export function FrameAnnotationToolbarStepButton(props: FrameAnnotationToolbarToggleProps) {
   return (
     <FrameAnnotationToolbarMenuButton {...props} commandId="step-badge">
-      <ListOrdered size={16} />
+      <FrameNumberIcon size={16} />
     </FrameAnnotationToolbarMenuButton>
   );
 }
 
-export function FrameAnnotationToolbarCalloutButton(props: {
-  active: boolean;
-  anchorRef?: React.RefObject<HTMLButtonElement | null>;
-  onClick: (event: React.MouseEvent) => void;
-  onMouseDown: (event: React.MouseEvent) => void;
-  onToggle: (event: React.MouseEvent) => void;
-}) {
+export function FrameAnnotationToolbarCalloutButton(props: FrameAnnotationToolbarToggleProps) {
   return (
     <FrameAnnotationToolbarMenuButton {...props} commandId="callout">
       <FrameCommentIcon size={16} />
@@ -245,7 +228,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
           onMouseDown={props.onMouseDown}
           title={labels.get('edit')}
         >
-          <Scaling size={16} />
+          <Move size={16} />
         </ProductGlassToolbarButton>
       ) : null}
       {props.onCaptureVisibilityChange ? (

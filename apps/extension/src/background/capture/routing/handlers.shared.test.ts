@@ -1,3 +1,9 @@
+const { optimizeScreenshotDataUrlMock } = vi.hoisted(() => ({
+  optimizeScreenshotDataUrlMock: vi.fn(async (dataUrl: string) => dataUrl),
+}));
+vi.mock('../../../platform/media-utils/screenshot-encoding', () => ({
+  optimizeScreenshotDataUrl: optimizeScreenshotDataUrlMock,
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
@@ -55,6 +61,7 @@ import {
   respondWithCaptureAction,
 } from './handlers.shared';
 import { createScenarioSessionServiceStub } from '../../../../../../tooling/test/support/scenario-session-service.stub';
+import { reserveMediaErasureExclusion } from '../../mutation-exclusion/media-activity';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
 
 beforeEach(() => {
@@ -301,3 +308,186 @@ it.each(['capture.png', 'capture.jpg', 'capture.webp'])(
     });
   }
 );
+
+it('refuses native publication and delivery when erasure begins during final PNG optimization', async () => {
+  let resume!: (value: string) => void;
+  let started!: () => void;
+  const optimizing = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  optimizeScreenshotDataUrlMock.mockImplementationOnce(() => {
+    started();
+    return new Promise<string>((resolve) => {
+      resume = resolve;
+    });
+  });
+  const sendResponse = vi.fn();
+  const pending = runPreparedCaptureAction({
+    context: {
+      resolvedTabId: 42,
+      sendResponse,
+      viewportState: new Map(),
+      screenshotModeState: new Map(),
+      captureGuardState: { isCapturing: false },
+      scenarioSessionService: createScenarioSessionServiceStub(),
+      message: { actionType: 'copy' },
+    },
+    captureTarget: 'visible',
+    capture: async () => 'data:image/png;base64,old',
+  });
+  await optimizing;
+  const outcome = pending.then(
+    () => null,
+    (error: unknown) => error
+  );
+  const erasure = reserveMediaErasureExclusion();
+  let drained = false;
+  const drain = erasure.waitForActiveMutations().then(() => {
+    drained = true;
+  });
+  try {
+    await Promise.resolve();
+    expect(drained).toBe(false);
+    resume('data:image/png;base64,old');
+    expect(await outcome).toEqual(
+      expect.objectContaining({ message: expect.stringContaining('cancelled') })
+    );
+    await drain;
+    expect(saveScreenshotToMediaHubFromDataUrlMock).not.toHaveBeenCalled();
+    expect(sendResponse).not.toHaveBeenCalled();
+  } finally {
+    resume('data:image/png;base64,old');
+    erasure.release();
+    await pending.catch(() => undefined);
+  }
+});
+
+it.each(['visible', 'full'] as const)(
+  'uses the document profile for %s without changing persistent defaults',
+  async (captureTarget) => {
+    const capture = vi.fn(async () => 'data:image/jpeg;base64,AA==');
+    await runPreparedCaptureAction({
+      context: {
+        resolvedTabId: 42,
+        sendResponse: vi.fn(),
+        viewportState: new Map(),
+        screenshotModeState: new Map(),
+        captureGuardState: { isCapturing: false },
+        scenarioSessionService: createScenarioSessionServiceStub(),
+        message: {
+          actionType: 'download_default',
+          capturePreferences: { imageFormat: 'jpeg', imageQuality: 67 },
+        },
+      },
+      captureTarget,
+      capture,
+    });
+    expect(capture).toHaveBeenCalledWith(false, { format: 'jpeg', quality: 67 });
+    expect(generateFilenameMock).toHaveBeenCalledWith(
+      captureTarget,
+      'jpeg',
+      expect.objectContaining({ imageFormat: 'png' })
+    );
+  }
+);
+
+it.each(['visible', 'full'] as const)(
+  'cancels %s admitted before erasure while defaults load and permits a fresh retry',
+  async (captureTarget) => {
+    const settings = {
+      imageFormat: 'png',
+      captureAction: 'download_default',
+      saveCapturesToGallery: false,
+    };
+    let resume!: (value: typeof settings) => void;
+    let entered!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    loadSettingsMock.mockImplementationOnce(() => {
+      entered();
+      return new Promise((resolve) => {
+        resume = resolve;
+      });
+    });
+    const capture = vi.fn(async () => 'data:image/png;base64,new');
+    const sendResponse = vi.fn();
+    const args = {
+      context: {
+        resolvedTabId: 42,
+        sendResponse,
+        viewportState: new Map(),
+        screenshotModeState: new Map(),
+        captureGuardState: { isCapturing: false },
+        scenarioSessionService: createScenarioSessionServiceStub(),
+        message: { actionType: 'download_default' as const },
+      },
+      captureTarget,
+      capture,
+    };
+    const pending = runPreparedCaptureAction(args);
+    const outcome = pending.then(
+      () => null,
+      (error: unknown) => error
+    );
+    await reading;
+    const erasure = reserveMediaErasureExclusion();
+    let drained = false;
+    const drain = erasure.waitForActiveMutations().then(() => {
+      drained = true;
+    });
+    let drainedBeforeResume = false;
+    let failure: unknown;
+    try {
+      await flushPromises();
+      drainedBeforeResume = drained;
+      // Erasure releases admission after its drain completes, including the vulnerable ordering.
+      if (drained) erasure.release();
+      resume(settings);
+      failure = await outcome;
+      await drain;
+    } finally {
+      resume(settings);
+      erasure.release();
+      await pending.catch(() => undefined);
+    }
+    expect(drainedBeforeResume).toBe(false);
+    expect(failure).toEqual(
+      expect.objectContaining({ message: expect.stringContaining('cancelled') })
+    );
+    expect(capture).not.toHaveBeenCalled();
+    expect(saveScreenshotToMediaHubFromDataUrlMock).not.toHaveBeenCalled();
+    expect(executeDownloadMock).not.toHaveBeenCalled();
+    expect(sendResponse).not.toHaveBeenCalled();
+    await runPreparedCaptureAction(args);
+    expect(capture).toHaveBeenCalledOnce();
+    expect(sendResponse).toHaveBeenCalledOnce();
+  }
+);
+
+it('releases capture admission after a defaults read fails', async () => {
+  loadSettingsMock.mockRejectedValueOnce(new Error('settings unavailable'));
+  const capture = vi.fn(async () => 'data:image/png;base64,new');
+  await expect(
+    runPreparedCaptureAction({
+      context: {
+        resolvedTabId: 42,
+        sendResponse: vi.fn(),
+        viewportState: new Map(),
+        screenshotModeState: new Map(),
+        captureGuardState: { isCapturing: false },
+        scenarioSessionService: createScenarioSessionServiceStub(),
+        message: { actionType: 'download_default' },
+      },
+      captureTarget: 'visible',
+      capture,
+    })
+  ).rejects.toThrow('settings unavailable');
+  const erasure = reserveMediaErasureExclusion();
+  try {
+    await erasure.waitForActiveMutations();
+  } finally {
+    erasure.release();
+  }
+  expect(capture).not.toHaveBeenCalled();
+});

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { useScenarioNarrationAI, type ScenarioNarrationAccess } from './use-narration-ai';
@@ -27,6 +28,12 @@ const targets: ScenarioNarrationText[] = ['a', 'b', 'c'].map((objectId) => ({
   narration: null,
 }));
 const profile = { modelId: 'm', voiceId: 'alloy', responseFormat: 'wav' as const };
+const approvedSelection = {
+  modelId: 'm',
+  approvedProviderId: 'provider',
+  approvedModelCode: 'tts',
+  approvedDestination: `sha256:${'a'.repeat(64)}`,
+};
 const access: ScenarioNarrationAccess = { prepareNarration: vi.fn(), applyNarration: vi.fn() };
 function basis(target: ScenarioNarrationText): ScenarioNarrationBasis {
   return {
@@ -79,14 +86,18 @@ afterEach(async () => {
 it('keeps ready batch previews and retries only missing targets after a provider failure', async () => {
   io.generate
     .mockImplementationOnce(async (source: ScenarioNarrationBasis) => preview(source))
-    .mockRejectedValueOnce(new Error('provider-failed'));
-  await act(async () => operation.generate(profile, 'provider'));
+    .mockRejectedValueOnce(new AudioJobProviderError('quota-exceeded', 'provider-failed'));
+  await act(async () => operation.generate(profile, approvedSelection));
   expect(operation.ready.map((entry) => entry.preview.scope.target.objectId)).toEqual(['a', 'c']);
-  expect(operation.errors).toHaveProperty('["s","b"]');
-  await act(async () => operation.generate(profile, 'provider'));
+  expect(operation.errors).toHaveProperty('["s","b"]', {
+    code: 'provider-failed',
+    providerReason: 'quota-exceeded',
+  });
+  await act(async () => operation.generate(profile, approvedSelection));
   expect(io.generate).toHaveBeenCalledTimes(4);
   expect(io.generate.mock.calls[3]![0].scope.target.objectId).toBe('b');
   expect(operation.ready).toHaveLength(3);
+  expect(operation.errors).toEqual({});
   expect(access.applyNarration).not.toHaveBeenCalled();
 });
 it('retains completed previews and waits for cancellation settlement before enabling Apply', async () => {
@@ -101,7 +112,7 @@ it('retains completed previews and waits for cancellation settlement before enab
     );
   let pending!: Promise<void>;
   await act(async () => {
-    pending = operation.generate(profile, 'provider');
+    pending = operation.generate(profile, approvedSelection);
   });
   expect(operation.ready).toHaveLength(1);
   expect(operation.running).toBe(true);
@@ -122,7 +133,7 @@ it('retains completed previews and waits for cancellation settlement before enab
   expect(io.generate).toHaveBeenCalledTimes(2);
 });
 it('retains accepted imports and failed previews and stops further Apply after refusal', async () => {
-  await act(async () => operation.generate(profile, 'provider'));
+  await act(async () => operation.generate(profile, approvedSelection));
   vi.mocked(access.applyNarration).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
   await act(async () => operation.apply(operation.ready.map((entry) => entry.preview)));
   expect(operation.ready.map((entry) => entry.accepted)).toEqual([true, false, false]);
@@ -147,7 +158,7 @@ it('rejects changed selection during the explicit Save before starting generatio
   );
   let pending!: Promise<void>;
   await act(async () => {
-    pending = operation.generate(profile, 'provider');
+    pending = operation.generate(profile, approvedSelection);
   });
   await act(async () => root.render(<Probe selected={[targets[1]!]} />));
   await act(async () => {
@@ -167,7 +178,7 @@ it('disposes a completed result after form disposal and never publishes it', asy
   );
   let pending!: Promise<void>;
   await act(async () => {
-    pending = operation.generate(profile, 'provider');
+    pending = operation.generate(profile, approvedSelection);
   });
   await act(async () => root.unmount());
   const result = preview(basis(targets[0]!));
@@ -179,7 +190,7 @@ it('disposes a completed result after form disposal and never publishes it', asy
 });
 
 it('resets only unaccepted previews after a profile edit and preserves accepted narration', async () => {
-  await act(async () => operation.generate(profile, 'provider'));
+  await act(async () => operation.generate(profile, approvedSelection));
   const accepted = operation.ready[0]!.preview;
   await act(async () => operation.apply([accepted]));
   await act(async () => expect(operation.resetUnacceptedPreviews()).toBe(true));
@@ -187,10 +198,50 @@ it('resets only unaccepted previews after a profile edit and preserves accepted 
   expect(io.cleanup).toHaveBeenCalledTimes(3);
   expect(io.generate).toHaveBeenCalledTimes(3);
   expect(access.applyNarration).toHaveBeenCalledTimes(1);
-  await act(async () => operation.generate({ ...profile, voiceId: 'new-voice' }, 'provider'));
+  await act(async () =>
+    operation.generate({ ...profile, voiceId: 'new-voice' }, approvedSelection)
+  );
   expect(io.generate.mock.calls.slice(3).map(([source]) => source.scope.target.objectId)).toEqual([
     'b',
     'c',
   ]);
   expect(operation.ready[0]!.accepted).toBe(true);
+});
+
+it('pins Scenario approval and profile through deferred Save and every queued target', async () => {
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const snapshot = { project: createGuideProject('Guide', 'p'), workspaceRevision: 1 };
+  vi.mocked(access.prepareNarration).mockImplementationOnce(async () => {
+    await hold;
+    return snapshot;
+  });
+  const selectedProfile = { ...profile };
+  const approval = { ...approvedSelection };
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = operation.generate(selectedProfile, approval);
+  });
+  expect(access.prepareNarration).toHaveBeenCalledOnce();
+  expect(io.generate).not.toHaveBeenCalled();
+  selectedProfile.voiceId = 'changed';
+  approval.approvedDestination = `sha256:${'b'.repeat(64)}`;
+  approval.approvedModelCode = 'replacement-code';
+  await act(async () => {
+    release();
+    await pending;
+  });
+  expect(io.generate).toHaveBeenCalledTimes(3);
+  for (const [, sentProfile, sentApproval] of io.generate.mock.calls) {
+    expect(sentProfile).toEqual(profile);
+    expect(sentApproval).toEqual(approvedSelection);
+  }
+});
+it('refuses an approved Scenario model mismatch before source Save', async () => {
+  await act(async () => operation.generate(profile, { ...approvedSelection, modelId: 'other' }));
+  expect(operation.failed).toBe(true);
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(io.generate).not.toHaveBeenCalled();
 });

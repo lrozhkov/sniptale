@@ -79,7 +79,9 @@ for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
       await page
         .getByRole('option', { name: label('gallery.videoReview.webcamSplit_left'), exact: true })
         .click();
-      const composition = dialog.locator('[data-ui="gallery.videoReview.manualPreview"] canvas');
+      const composition = dialog.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      );
       await expect(composition).toBeVisible();
       await dialog
         .locator('video')

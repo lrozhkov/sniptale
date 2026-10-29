@@ -1,3 +1,7 @@
+import { ImageSettingsSectionFormat } from './format';
+import { ImageSettingsSectionQuality } from './quality';
+import { SettingsSwitch } from '../../../../section-surface/panel-controls';
+import { CompactSegmentedSelector } from '../../../../../ui/compact-inspector-controls/control-renderers';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FULL_PAGE_QUALITY_ABSOLUTE_LIMITS } from '../../../../../contracts/full-page-capture';
 import { translate } from '../../../../../platform/i18n';
@@ -95,8 +99,20 @@ function PolicyNumber({
 
 export function FullPageQualitySettings({ state }: { state: State }) {
   const limits = FULL_PAGE_QUALITY_ABSOLUTE_LIMITS;
+  const imageState = {
+    ...state,
+    imageFormat: state.fullImage.imageFormat,
+    imageQuality: state.fullImage.imageQuality,
+    isQualityDisabled: state.fullImage.imageFormat === 'png',
+    handleFormatChange: state.fullImage.handleFormatChange,
+    handleQualityPreview: state.fullImage.handleQualityPreview,
+    handleQualityCommit: state.fullImage.handleQualityCommit,
+  };
   return (
-    <div className="mt-2 space-y-1 border-t border-[var(--sniptale-color-border-subtle)] pt-3">
+    <div
+      data-ui="settings.image.full-page"
+      className="mt-2 space-y-1 border-t border-[var(--sniptale-color-border-subtle)] pt-3"
+    >
       <div className="px-1">
         <div>
           <div className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
@@ -107,6 +123,40 @@ export function FullPageQualitySettings({ state }: { state: State }) {
           </p>
         </div>
       </div>
+      <ImageSettingsSectionFormat state={imageState} />
+      <ImageSettingsSectionQuality state={imageState} />
+      {(
+        [
+          ['preloadLazyContent', 'content.toolbar.fullPageLazyContent'],
+          ['freezeMotion', 'content.toolbar.fullPageFreezeMotion'],
+        ] as const
+      ).map(([key, label]) => (
+        <SettingsControlRow key={key} label={translate(label)}>
+          <SettingsSwitch
+            size="sm"
+            checked={state.fullCapture.preferences[key]}
+            aria-label={translate(label)}
+            onClick={() =>
+              void state.fullCapture.update({ [key]: !state.fullCapture.preferences[key] })
+            }
+          />
+        </SettingsControlRow>
+      ))}
+      <SettingsControlRow label={translate('content.toolbar.fullPageFloatingTitle')}>
+        <CompactSegmentedSelector
+          columns={3}
+          ariaLabel={translate('content.toolbar.fullPageFloatingTitle')}
+          value={state.fullCapture.preferences.floatingElements}
+          options={(
+            [
+              ['once', 'content.toolbar.fullPageFloatingOnce'],
+              ['hide', 'content.toolbar.fullPageFloatingHide'],
+              ['repeat', 'content.toolbar.fullPageFloatingRepeat'],
+            ] as const
+          ).map(([value, label]) => ({ value, label: translate(label) }))}
+          onChange={(floatingElements) => void state.fullCapture.update({ floatingElements })}
+        />
+      </SettingsControlRow>
       <SettingsControlRow
         label={translate('imageSettings.section.fullPageProfileLabel')}
         className="settings-profile-choice !max-w-[560px]"

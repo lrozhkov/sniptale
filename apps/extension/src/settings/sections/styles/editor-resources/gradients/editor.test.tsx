@@ -75,7 +75,7 @@ it('opens the real gradient panel directly with one dialog and one Save action',
   expect(palette.querySelectorAll('button')).toHaveLength(10);
   expect(
     [...palette.querySelectorAll('button')].map((button) =>
-      button.getAttribute('aria-label')?.split(': ').at(-1)
+      button.getAttribute('aria-label')?.split(' · ').at(-1)?.toLowerCase()
     )
   ).toEqual(DEFAULT_DRAWING_COLORS);
 });

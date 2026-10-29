@@ -24,7 +24,10 @@ type ToolbarSettingsMenuProps = {
   freePlacement?: boolean;
   onFreePlacementChange?: ((value: boolean) => void) | undefined;
   toolbarMenuState: ToolbarMenuState;
-  onClose: (restoreFocus?: boolean) => void;
+  onClose: (
+    restoreFocus?: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisableScreenshotMode: (activationEvent?: Event) => void;
   onDisplayModeChange: (displayMode: ContentToolbarDisplayMode) => void;

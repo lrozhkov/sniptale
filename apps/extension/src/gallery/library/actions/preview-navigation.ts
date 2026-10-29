@@ -1,4 +1,4 @@
-import type { GalleryItem } from '../items';
+import { isGalleryRemoteItem, type GalleryItem } from '../items';
 import type { GalleryPreviewController } from './controller-types';
 import {
   getPreviewMetadataValues,
@@ -55,6 +55,7 @@ function needsPreviewNavigationSave(
   source: GalleryItem,
   draft: PreviewDraft
 ): boolean {
+  if (isGalleryRemoteItem(source)) return false;
   const persisted = getPersistedBaseline(coordinator, source);
   const current = getPreviewMetadataValues(source, draft);
   return (
@@ -152,7 +153,11 @@ export function createNavigatePreviewAction(
     const commitTarget = () =>
       controller.actions.preview.setPreview((current) =>
         coordinator.revision === requestRevision && current.item?.id === source.id
-          ? { inspectorCollapsed: current.inspectorCollapsed, item: target, url: null }
+          ? {
+              inspectorCollapsed: isGalleryRemoteItem(target) ? false : current.inspectorCollapsed,
+              item: target,
+              url: null,
+            }
           : current
       );
 

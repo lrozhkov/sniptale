@@ -90,6 +90,7 @@ export function InspectorParameterRow(props: {
   const row = React.useRef<HTMLDivElement>(null);
   const name = React.useRef<HTMLSpanElement>(null);
   const hasLabelAccessory = Boolean(props.labelAccessory);
+  const valueOptionsKey = JSON.stringify(props.valueOptions ?? []);
   const [stacked, setStacked] = React.useState(props.stacked ?? false);
   const deferredFit = React.useRef<number | null>(null);
   const fit = React.useCallback(() => {
@@ -116,16 +117,19 @@ export function InspectorParameterRow(props: {
       : 0;
     const labelWidth =
       context.measureText(props.label).width + (accessoryWidth ? accessoryWidth + 4 : 0);
+    const valueOptions: unknown = JSON.parse(valueOptionsKey);
+    if (
+      !Array.isArray(valueOptions) ||
+      !valueOptions.every((value): value is string => typeof value === 'string')
+    )
+      return;
     const valueWidth = Math.max(
       props.valueMinimum ?? 100,
       props.valueText ? context.measureText(props.valueText).width + 40 : 0,
-      props.valueOptions?.length
-        ? props.valueOptions.reduce(
-            (width, text) => width + context.measureText(text).width + 12,
-            0
-          ) +
+      valueOptions.length
+        ? valueOptions.reduce((width, text) => width + context.measureText(text).width + 12, 0) +
             4 +
-            2 * (props.valueOptions.length - 1)
+            2 * (valueOptions.length - 1)
         : 0
     );
     setStacked(labelWidth > (available - 8) * 0.45 || valueWidth > (available - 8) * 0.55);
@@ -136,7 +140,7 @@ export function InspectorParameterRow(props: {
     props.keepInline,
     props.valueMinimum,
     props.valueText,
-    props.valueOptions,
+    valueOptionsKey,
   ]);
   React.useLayoutEffect(() => {
     fit();

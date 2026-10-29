@@ -6,6 +6,9 @@ import type { InspectorDisclosureProps } from './shared';
 export function InspectorDisclosureView(
   props: Omit<InspectorDisclosureProps, 'preferenceId' | 'initiallyOpen'> & {
     dataUi: string;
+    summary?: string;
+    collapsedChevron?: 'down' | 'right';
+    animated?: boolean;
     variant?: 'structural' | 'information';
     bodyClassName: string;
     open: boolean;
@@ -21,6 +24,8 @@ export function InspectorDisclosureView(
       className={props.variant ? 'sniptale-disclosure' : undefined}
       data-variant={props.variant ?? 'structural'}
       data-level={level}
+      data-collapsed-chevron={props.collapsedChevron}
+      data-animated={props.animated ? 'true' : undefined}
       open={props.open}
       onToggle={(event) => {
         if (event.currentTarget.open !== props.open) props.onOpenChange(event.currentTarget.open);
@@ -31,7 +36,16 @@ export function InspectorDisclosureView(
         {props.variant === 'information' ? (
           <span>{props.label}</span>
         ) : (
-          <Heading>{props.label}</Heading>
+          <Heading>
+            {props.summary ? (
+              <>
+                <span className="sniptale-disclosure-label">{props.label}</span>
+                <span className="sniptale-disclosure-value">{props.summary}</span>
+              </>
+            ) : (
+              props.label
+            )}
+          </Heading>
         )}
         <ChevronDown size={level === 'section' ? 16 : 14} aria-hidden="true" />
       </summary>

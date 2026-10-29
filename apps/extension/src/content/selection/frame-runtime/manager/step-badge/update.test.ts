@@ -165,3 +165,44 @@ function expectStepBadgeRecalculationDetection() {
     shouldRecalculateBadge(manualSettings, { ...manualSettings, value: 'custom' }, false)
   ).toBe(false);
 }
+
+it('keeps standalone preset colors and diameter independent of frame bindings after updates', () => {
+  let frames = [
+    createFrameDataFixture('standalone', {
+      annotationKind: 'step-badge',
+      stepBadge: createStepBadgeSettingsFixture({ value: '7' }),
+    }),
+  ];
+  const update = createUpdateFrameStepBadge({
+    globalStepBadgeSettingsRef: { current: { autoMode: true } },
+    recalculateStepBadgesRef: { current: vi.fn() },
+    setFrames: (next) => {
+      frames = typeof next === 'function' ? next(frames) : next;
+    },
+  });
+  update('standalone', {
+    style: {
+      sizeSource: 'frame-border',
+      diameter: 76,
+      backgroundColorSource: 'frame-border',
+      backgroundColor: '#123456',
+      textColorSource: 'frame-fill',
+      textColor: '#abcdef',
+      outlineColorSource: 'frame-border',
+      outlineColor: '#654321',
+      outlineWidth: 2,
+      customCss: '',
+    },
+  });
+  expect(frames[0]?.stepBadge?.style).toMatchObject({
+    sizeSource: 'custom',
+    diameter: 76,
+    backgroundColorSource: 'custom',
+    backgroundColor: '#123456',
+    textColorSource: 'custom',
+    textColor: '#abcdef',
+    outlineColorSource: 'custom',
+    outlineColor: '#654321',
+  });
+  expect(frames[0]?.stepBadge?.value).toBe('7');
+});

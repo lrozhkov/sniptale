@@ -49,9 +49,7 @@ describe('step badge boundary placement', () => {
 
     expect(style.top).toBe('100%');
     expect(style.left).toBe('75%');
-    expect(style.transform).toBe(
-      'translate(-14.580000000000004px, -14.580000000000004px) scale(1)'
-    );
+    expect(style.transform).toBe('translate(-14.5px, -14.5px) scale(1) translateZ(0)');
 
     const thickStyle = getStepBadgeStyle({
       borderColor: '#111',
@@ -87,7 +85,7 @@ describe('step badge boundary placement', () => {
       zIndex: 10,
     });
 
-    expect(style.transform).toBe('translate(-3.6000000000000005px, -10.8px) scale(1)');
+    expect(style.transform).toBe('translate(-3.666666666666667px, -11px) scale(1) translateZ(0)');
   });
 
   it('compensates the visual offset together with the badge at page zoom', () => {
@@ -107,7 +105,9 @@ describe('step badge boundary placement', () => {
       zIndex: 10,
     });
 
-    expect(style.transform).toBe('translate(-1.8000000000000003px, -5.4px) scale(0.5)');
+    expect(style.transform).toBe(
+      'translate(-1.8333333333333335px, -5.5px) scale(0.5) translateZ(0)'
+    );
     expect(style.scale).toBeUndefined();
   });
 
@@ -244,8 +244,6 @@ describe('step badge boundary placement', () => {
       zIndex: 10,
     });
 
-    expect(style.transform).toBe(
-      'translate(-7.290000000000002px, 12.709999999999997px) scale(0.5)'
-    );
+    expect(style.transform).toBe('translate(-7.25px, 12.75px) scale(0.5) translateZ(0)');
   });
 });

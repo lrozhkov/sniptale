@@ -12,6 +12,7 @@ export function applyEditorDrawingInteractionControls(object: FabricObject): voi
   const drawing = readEditorDrawingObject(object);
   if (!drawing) return;
   applyDrawingSelectionChrome(object);
+  if (drawing.kind === 'rectangle') object.set({ hasBorders: false });
   if (drawing.kind === 'arrow' && object instanceof Path) {
     object.controls = createDrawingArrowControls(drawing);
     syncDrawingArrowControlAnchors(object, drawing);

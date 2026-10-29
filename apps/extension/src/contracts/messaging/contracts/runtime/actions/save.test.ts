@@ -70,3 +70,39 @@ it('bounds quick-action transaction identities for both save commands', () => {
     }
   }
 });
+
+it('accepts the actual screenshot destination and rejects unknown action types', () => {
+  const contract = runtimeActionSaveMessageContracts[MessageType.SAVE_SCREENSHOT_TO_GALLERY];
+  const request = {
+    type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+    dataUrl: 'data:image/png;base64,AA==',
+    filename: 'capture.png',
+  };
+  expect(contract.parseRequest({ ...request, actionType: 'copy' })).toMatchObject({
+    actionType: 'copy',
+  });
+  for (const actionType of ['bogus', 2, null])
+    expect(() => contract.parseRequest({ ...request, actionType })).toThrow();
+});
+
+it('validates session output preferences before gallery finalization', () => {
+  const contract = runtimeActionSaveMessageContracts[MessageType.SAVE_SCREENSHOT_TO_GALLERY];
+  const message = {
+    type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+    dataUrl: 'data:image/png;base64,AA==',
+    filename: 'capture.png',
+  };
+  expect(
+    contract.parseRequest({
+      ...message,
+      capturePreferences: { imageFormat: 'jpeg', imageQuality: 68 },
+    })
+  ).toMatchObject({ capturePreferences: { imageFormat: 'jpeg', imageQuality: 68 } });
+  for (const imageQuality of [-1, 101, Infinity, '80'])
+    expect(() =>
+      contract.parseRequest({
+        ...message,
+        capturePreferences: { imageFormat: 'jpeg', imageQuality },
+      })
+    ).toThrow();
+});

@@ -14,6 +14,14 @@ import {
   DEFAULT_BORDER_PRESET,
   DEFAULT_FOCUS_SETTINGS,
 } from '../../features/highlighter/style/defaults';
+import {
+  resolveStandaloneCalloutSettings,
+  resolveStandaloneStepBadgeSettings,
+} from '../../features/highlighter/frame-annotation/model';
+import {
+  createDefaultFrameCallout,
+  createDefaultFrameStepBadge,
+} from '../../features/highlighter/frame-annotation/defaults';
 import type { FrameAnnotationSnapshotV1 } from '../../features/highlighter/frame-annotation';
 import type { HighlighterSettings } from '../../features/highlighter/contracts';
 import { resolveEnabledBorderPreset } from '../../features/highlighter/presets/enabled-catalog';
@@ -102,10 +110,39 @@ export function useFrameAnnotationCreationDefaults(): FrameAnnotationCreationDef
 export function createFrameAnnotationFromDefaults(input: {
   id: string;
   ordering: number;
+  annotationKind?: FrameAnnotationSnapshotV1['annotationKind'];
   x: number;
   y: number;
 }): FrameAnnotationSnapshotV1 {
   const defaults = getFrameAnnotationCreationDefaults();
+  if (input.annotationKind) {
+    return {
+      version: 1,
+      id: input.id,
+      ordering: input.ordering,
+      annotationKind: input.annotationKind,
+      x: input.x - 0.5,
+      y: input.y - 0.5,
+      width: 1,
+      height: 1,
+      ...(input.annotationKind === 'callout'
+        ? {
+            callout: resolveStandaloneCalloutSettings({
+              ...(defaults.callout ?? createDefaultFrameCallout()),
+              enabled: true,
+            }),
+          }
+        : {
+            stepBadge: resolveStandaloneStepBadgeSettings({
+              ...(defaults.stepBadge ?? createDefaultFrameStepBadge()),
+              enabled: true,
+              anchor: 'center',
+              offsetDirections: [],
+              manualPlacement: undefined,
+            }),
+          }),
+    };
+  }
   return {
     version: 1,
     id: input.id,

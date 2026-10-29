@@ -15,6 +15,8 @@ const config = {
   baseUrl: 'https://example.test/v1',
   modelCode: 'text',
   apiKey: 'fixture',
+  connectionType: 'openai-compatible' as const,
+  destinationBinding: 'fixture-destination-binding',
   effectiveSystemPrompt: 'Unrelated global prompt',
 };
 beforeEach(() => {

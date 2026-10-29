@@ -5,6 +5,7 @@ import type {
   CalloutCurveSettings,
   CalloutSettings,
 } from '@sniptale/runtime-contracts/highlighter/callout';
+import { useCalloutFreeAnchor, type CalloutAnchorChange } from './free-anchor';
 import { CalloutBody } from './surface';
 import { createCalloutSettingsKey } from './settings-key';
 import { useCalloutInteractionLayout } from './interaction-layout';
@@ -51,6 +52,7 @@ export type FrameCalloutInteractiveSurfaceProps = {
   isEditing: boolean;
   isFrameEditing: boolean;
   isSettingsOpen: boolean;
+  onAnchorPositionChange?: CalloutAnchorChange | undefined;
   onContentChange?: (htmlContent: string) => void;
   onBadgeTextChange: (text: string) => void;
   onMoveEnd?: () => void;
@@ -60,6 +62,7 @@ export type FrameCalloutInteractiveSurfaceProps = {
     behavior: CalloutDragBehavior
   ) => void;
   onSettingsClick: () => void;
+  onDelete?: (() => void) | undefined;
   onStartEditing: () => void;
   onTailBaseRangeChange: (position: number, width: number, attachment?: CalloutAttachment) => void;
   onTailFramePositionChange: (position: number, attachment?: CalloutAttachment) => void;
@@ -126,7 +129,7 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
   }, [props.isEditing, props.settings.style.title.enabled, titleFocusRequested]);
   const coordinateSpace = props.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
   const visualScale = props.chrome === 'export' ? 1 : props.chromeScale;
-  const interaction = useCalloutInteractionLayout({
+  const freeAnchor = useCalloutFreeAnchor({
     coordinateSpace,
     dimensions: {
       width: props.editing.layout.dimensions.width * visualScale,
@@ -134,6 +137,20 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
     },
     frameBorderWidth: props.frameBorderWidth,
     frameRect: props.frameRect,
+    isEditing: props.isEditing,
+    settings: props.settings,
+    zIndex: props.zIndex,
+    visualScale,
+    onChange: props.onAnchorPositionChange,
+  });
+  const interaction = useCalloutInteractionLayout({
+    coordinateSpace,
+    dimensions: {
+      width: props.editing.layout.dimensions.width * visualScale,
+      height: props.editing.layout.dimensions.height * visualScale,
+    },
+    frameBorderWidth: props.frameBorderWidth,
+    frameRect: freeAnchor.frameRect,
     isEditing: props.isEditing,
     isSettingsOpen: props.isSettingsOpen,
     onPositionChange: props.onPositionChange,
@@ -144,7 +161,7 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
     onWaypointChange: props.onWaypointChange,
     onWidthChange: props.onWidthChange,
     ...(props.projectMoveRect ? { projectMoveRect: props.projectMoveRect } : {}),
-    settings: props.settings,
+    settings: freeAnchor.settings,
     visualScale,
     wrapperRef,
     zIndex: props.zIndex,
@@ -153,6 +170,9 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
   const bodyArgs = {
     props,
     interaction,
+    tailFrameDrag: props.onAnchorPositionChange
+      ? freeAnchor.drag
+      : interaction.handles.tailFrameDrag,
     coordinateSpace,
     requestTitleFocus: () => setTitleFocusRequested(true),
   };
@@ -160,6 +180,10 @@ export function FrameCalloutInteractiveSurface(props: FrameCalloutInteractiveSur
 }
 
 type BodyArgs = {
+  tailFrameDrag: Pick<
+    ReturnType<typeof useCalloutFreeAnchor>['drag'],
+    'handlePointerDown' | 'handleKeyDown' | 'isDragging'
+  >;
   coordinateSpace: FrameAnnotationCoordinateSpace;
   interaction: ReturnType<typeof useCalloutInteractionLayout>;
   props: FrameCalloutInteractiveSurfaceProps;
@@ -170,6 +194,7 @@ function createCalloutHandleCallbacks(args: BodyArgs) {
   const { interaction } = args;
   return {
     handleSettingsClick: args.props.onSettingsClick,
+    ...(args.props.onDelete ? { onDelete: args.props.onDelete } : {}),
     handleTitleToggleClick: () => {
       const enabled = args.interaction.effectiveSettings.style.title.enabled;
       args.props.onTitleEnabledChange(!enabled);
@@ -188,8 +213,8 @@ function createCalloutHandleCallbacks(args: BodyArgs) {
     handleTailBaseEndKeyDown: interaction.handles.tailBaseEndDrag.handleKeyDown,
     handleTailBaseRangePointerDown: interaction.handles.tailBaseRangeDrag.handlePointerDown,
     handleTailBaseRangeKeyDown: interaction.handles.tailBaseRangeDrag.handleKeyDown,
-    handleTailFramePointerDown: interaction.handles.tailFrameDrag.handlePointerDown,
-    handleTailFrameKeyDown: interaction.handles.tailFrameDrag.handleKeyDown,
+    handleTailFramePointerDown: args.tailFrameDrag.handlePointerDown,
+    handleTailFrameKeyDown: args.tailFrameDrag.handleKeyDown,
     handleWaypointPointerDown: interaction.handles.waypointDrag.handlePointerDown,
     handleWaypointKeyDown: interaction.handles.waypointDrag.handleKeyDown,
     handleWaypointDoubleClick: interaction.handles.waypointDrag.handleDoubleClick,
@@ -220,7 +245,7 @@ function createCalloutHandleState(args: BodyArgs) {
       handles.tailBaseStartDrag.isDragging ||
       handles.tailBaseEndDrag.isDragging ||
       handles.tailBaseRangeDrag.isDragging ||
-      handles.tailFrameDrag.isDragging ||
+      args.tailFrameDrag.isDragging ||
       handles.curveStartDrag.isDragging ||
       handles.curveEndDrag.isDragging ||
       handles.waypointDrag.isDragging ||
@@ -230,7 +255,7 @@ function createCalloutHandleState(args: BodyArgs) {
     isTailDragging: handles.tailBaseStartDrag.isDragging,
     isTailBaseEndDragging: handles.tailBaseEndDrag.isDragging,
     isTailBaseRangeDragging: handles.tailBaseRangeDrag.isDragging,
-    isTailFrameDragging: handles.tailFrameDrag.isDragging,
+    isTailFrameDragging: args.tailFrameDrag.isDragging,
     isWaypointDragging: handles.waypointDrag.isDragging,
     isCurveStartDragging: handles.curveStartDrag.isDragging,
     isCurveEndDragging: handles.curveEndDrag.isDragging,
@@ -293,6 +318,7 @@ function createCalloutBodyProps(args: BodyArgs) {
       coordinateSpace: args.coordinateSpace,
       layout,
       showSettingsHandle: args.props.showSettingsHandle,
+      showDeleteHandle: Boolean(args.props.onDelete),
       uiScale: args.props.chromeScale,
       viewport: args.coordinateSpace.viewport,
     }),

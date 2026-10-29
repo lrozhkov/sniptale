@@ -86,7 +86,7 @@ function useFrameCallbackRegistration(args: {
   useEffect(() => {
     registerFrameCallbacks(
       (...args) => addFrameRef.current(...args),
-      (input) => addFreeFrameRef.current(input),
+      (...args) => addFreeFrameRef.current(...args),
       (...args) => removeFrameRef.current(...args),
       () => clearFramesRef.current(),
       (...args) => hasFrameForElementRef.current(...args)

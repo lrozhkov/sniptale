@@ -1,3 +1,4 @@
+import { runtimeSyncConnectionMessageContracts } from './sync-connection';
 import { defineMessageContractRegistry } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import type { RuntimeRequestByType, RuntimeResponseByType } from '../runtime-message/index';
 import { runtimeCoreMessageContracts } from './core';
@@ -14,6 +15,7 @@ export const runtimeMessageContracts = defineRuntimeMessageRegistry({
   ...runtimeCoreMessageContracts,
   ...runtimeVideoMessageContracts,
   ...runtimeVoiceInputMessageContracts,
+  ...runtimeSyncConnectionMessageContracts,
 });
 
 export const backgroundIngressContracts = defineBackgroundIngressContracts(runtimeMessageContracts);

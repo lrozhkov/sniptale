@@ -25,8 +25,10 @@ import {
   parseFullPageQualityPolicy,
 } from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
+import { assertVoiceModelSelections } from '../ai-settings/selection-authority';
 import {
   runWithPersistenceMutationPermit,
+  runWithExclusivePersistenceMutationPermit,
   type PersistenceMutationPermit,
 } from '../infrastructure/mutation-barrier';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
@@ -111,6 +113,7 @@ export const DEFAULT_SETTINGS: NormalizedSettings = {
   defaultExportPresetId: null,
   imageFormat: 'png',
   imageQuality: 100,
+  fullPageImage: { imageFormat: 'png', imageQuality: 100 },
   fullPageQuality: DEFAULT_FULL_PAGE_QUALITY_POLICY,
   authenticatedSnapshotAssetsEnabled: true,
   anonymousCrossOriginSnapshotAssetsEnabled: true,
@@ -174,6 +177,7 @@ function cloneExportResourceLimits(settings: ExportResourceLimits): ExportResour
 export function createDefaultSettings(): NormalizedSettings {
   return {
     ...DEFAULT_SETTINGS,
+    fullPageImage: { imageFormat: 'png', imageQuality: 100 },
     contentToolbar: cloneContentToolbarSettings(DEFAULT_CONTENT_TOOLBAR_SETTINGS),
     contextMenu: cloneContextMenuSettings(DEFAULT_CONTEXT_MENU_SETTINGS),
     localStoragePolicy: { ...DEFAULT_LOCAL_STORAGE_POLICY },
@@ -295,6 +299,15 @@ function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSett
     ...defaultSettings,
     ...parsedValue,
     captureAction,
+    fullPageImage: parsedValue.fullPageImage ?? {
+      imageFormat: parsedValue.imageFormat ?? defaultSettings.imageFormat,
+      imageQuality:
+        parsedValue.imageQuality !== undefined &&
+        parsedValue.imageQuality >= 1 &&
+        parsedValue.imageQuality <= 100
+          ? parsedValue.imageQuality
+          : defaultSettings.imageQuality,
+    },
     localStoragePolicy,
     saveCapturesToGallery: localStoragePolicy.defaultDestination === 'library',
     contentToolbar: {
@@ -435,17 +448,6 @@ export function subscribeToSettingsChanges(
   });
 }
 
-/** Observe canonical image preferences, including reset and removal of the settings key. */
-export function subscribeToImagePreferencesChanges(
-  listener: (preferences: Pick<NormalizedSettings, 'imageFormat' | 'imageQuality'>) => void
-): () => void {
-  return subscribeToNormalizedSettingsChange((previous, next) => {
-    if (previous.imageFormat === next.imageFormat && previous.imageQuality === next.imageQuality)
-      return;
-    listener({ imageFormat: next.imageFormat, imageQuality: next.imageQuality });
-  });
-}
-
 /** Observe canonical voice preferences, including reset and removal of the settings key. */
 export function subscribeToVoiceInputPreferencesChanges(
   listener: (preferences: VoiceInputPreferences) => void
@@ -551,6 +553,12 @@ function applySettingsPatch(
       ...currentSettings.contextMenu,
       ...settingsPatch.contextMenu,
     },
+    fullPageImage: {
+      imageFormat: currentSettings.imageFormat,
+      imageQuality: currentSettings.imageQuality,
+      ...currentSettings.fullPageImage,
+      ...settingsPatch.fullPageImage,
+    },
     fullPageCapture: {
       ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES,
       ...currentSettings.fullPageCapture,
@@ -581,15 +589,22 @@ function applySettingsPatch(
  * Failed writes reject to the caller and the queue remains usable for later mutations.
  */
 export async function patchSettings(settingsPatch: SettingsPatch): Promise<NormalizedSettings> {
-  return queueSettingsMutation(() =>
-    withSettingsMutation(async (permit) => {
+  const changesModelSelection =
+    settingsPatch.voiceInput !== undefined &&
+    (Object.hasOwn(settingsPatch.voiceInput, 'transcription') ||
+      Object.hasOwn(settingsPatch.voiceInput, 'correction'));
+  return queueSettingsMutation(() => {
+    const apply = async (permit: PersistenceMutationPermit) => {
       const currentSettings = await loadSettings();
+      if (changesModelSelection) await assertVoiceModelSelections(settingsPatch.voiceInput!);
       const nextSettings = applySettingsPatch(currentSettings, settingsPatch);
-
       await writeSettings(nextSettings, permit);
       return nextSettings;
-    })
-  );
+    };
+    return changesModelSelection
+      ? runWithExclusivePersistenceMutationPermit((permit) => withSettingsLock(() => apply(permit)))
+      : withSettingsMutation(apply);
+  });
 }
 
 export class StaleLocalStoragePolicyError extends Error {
@@ -667,4 +682,25 @@ export function patchPageLaunchCorner(
       return next;
     })
   );
+}
+
+/** Clear obsolete AI references during explicit alpha reset under the caller's exclusive permit. */
+export function resetVoiceInputModelReferences(permit: PersistenceMutationPermit): Promise<void> {
+  return withSettingsLock(async () => {
+    const settings = await loadSettings();
+    const voice = settings.voiceInput;
+    await writeSettings(
+      {
+        ...settings,
+        voiceInput: {
+          ...DEFAULT_VOICE_INPUT_SETTINGS,
+          ...voice,
+          transcription: null,
+          correction: { enabled: false, model: null },
+          ...(voice?.backend === 'model' ? { enabled: false } : {}),
+        },
+      },
+      permit
+    );
+  });
 }

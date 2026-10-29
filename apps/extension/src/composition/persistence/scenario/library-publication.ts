@@ -1,3 +1,5 @@
+import { captureMediaInTransaction } from '../sync-capture/capture';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
 import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import type { ScenarioProjectEntry } from './contracts';
@@ -9,7 +11,7 @@ import {
   SCENARIO_ASSETS_STORE,
   STORE_NAME,
 } from '../infrastructure/indexed-db/core';
-import type { initDB } from '../infrastructure/indexed-db/core';
+import type { IDBPTransaction } from 'idb';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseAssetRef } from '../assets';
 import { scenarioChildUsesMedia } from '../media-library/dependencies';
@@ -24,7 +26,7 @@ import { parseRecordingEntry } from '../recordings/index.guards';
 const SCENARIO_LIBRARY_OWNER_KIND = 'media-library';
 const SCENARIO_LIBRARY_ASSET_ROLE = 'source';
 
-type ScenarioLibraryTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
+type ScenarioLibraryTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 export class UnavailableBorrowedScenarioSourceError extends Error {
   constructor(message = 'Borrowed scenario source is unavailable.') {
@@ -163,7 +165,10 @@ export async function publishScenarioAssetToLibrary(
       role: SCENARIO_LIBRARY_ASSET_ROLE,
     });
   }
-  if (!existing) await mediaStore.put!(buildScenarioLibraryEntry(asset));
+  if (!existing) {
+    await mediaStore.put!(buildScenarioLibraryEntry(asset));
+    await captureMediaInTransaction(tx, mediaId);
+  }
   return !existing;
 }
 
@@ -172,6 +177,7 @@ export async function backfillScenarioLibraryAssets(): Promise<number> {
   return runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
       [
+        ...SCENARIO_CAPTURE_STORES,
         SCENARIO_ASSETS_STORE,
         ASSET_REFS_STORE,
         ASSET_OWNERS_STORE,

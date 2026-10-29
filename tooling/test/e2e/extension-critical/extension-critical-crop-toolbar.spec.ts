@@ -26,6 +26,11 @@ async function openCropWorkspace(
     return Math.max(shell.top - menu.bottom, menu.top - shell.bottom);
   });
   await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+  if ((await page.locator('[data-ui="content.toolbar.timer-button"]').count()) === 0) {
+    await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+    await page.locator('[data-ui="content.toolbar.settings.show-hidden-buttons"]').click();
+    await page.keyboard.press('Escape');
+  }
   await page.locator('[data-ui="content.toolbar.timer-button"]').click();
   await page.locator('[data-ui="content.toolbar.timer-menu"]').getByRole('button').first().click();
   const capture = page.locator('[data-ui="content.toolbar.capture-selection-button"]');
@@ -1044,6 +1049,125 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         else await expect(toggle).not.toHaveClass(/sniptale-popover-item-selected/u);
         await page.screenshot({ path: info.outputPath(`compact-${compact}.png`), fullPage: false });
         await page.keyboard.press('Escape');
+      }
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Crop session format and toolbar settings indicators ${viewport.name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openCropWorkspace(
+      context,
+      extensionId,
+      hostOrigin,
+      viewport.size
+    );
+    try {
+      for (const compact of [true, false]) {
+        const settings = page.locator('[data-ui="content.toolbar.settings-button"]');
+        await settings.click();
+        const toggle = page.getByRole('button', { name: /Compact menu view|Компактный вид меню/u });
+        if (
+          (await toggle.getAttribute('class'))?.includes('sniptale-popover-item-selected') !==
+          compact
+        )
+          await toggle.click();
+        await expect(toggle.locator('.sniptale-popover-check')).toHaveCount(compact ? 1 : 0);
+        const show = page.locator('[data-ui="content.toolbar.settings.show-hidden-buttons"]');
+        if (await show.count()) {
+          await show.focus();
+          await show.click();
+          expect(await show.evaluate((button) => button.matches(':focus-visible'))).toBe(false);
+        }
+        const free = page.getByRole('button', {
+          name: /Free toolbar placement|Свободное размещение/u,
+        });
+        if (
+          (await page
+            .getByRole('button', { name: /Horizontal view|Горизонтальный вид/u })
+            .count()) === 0
+        )
+          await free.click();
+        for (const orientation of ['vertical', 'horizontal'] as const) {
+          const choice = page.getByRole('button', {
+            name:
+              orientation === 'vertical'
+                ? /Vertical view|Вертикальный вид/u
+                : /Horizontal view|Горизонтальный вид/u,
+          });
+          await choice.click();
+          await settings.click();
+          await expect(choice.locator('.sniptale-popover-check')).toBeVisible();
+          const other = page.getByRole('button', {
+            name:
+              orientation === 'vertical'
+                ? /Horizontal view|Горизонтальный вид/u
+                : /Vertical view|Вертикальный вид/u,
+          });
+          await expect(other.locator('.sniptale-popover-check')).toHaveCount(0);
+        }
+        await page.keyboard.press('Escape');
+        await expect
+          .poll(() =>
+            popup.evaluate(
+              async () =>
+                (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
+                  .contentToolbar.compactMenus
+            )
+          )
+          .toBe(compact);
+        await selectCrop(page, { x: 200, y: 180, width: 400, height: 200 });
+        const trigger = page.locator('.sniptale-selection-capture-menu-trigger');
+        await trigger.click();
+        const menu = page.locator('[data-ui="content.selection.capture-action-menu"]');
+        await expect(menu.locator('.sniptale-capture-action-icons')).toHaveCount(compact ? 1 : 0);
+        const actions = menu.locator('[data-ui^="content.selection.capture-action-option."]');
+        await expect(actions).toHaveCount(6);
+        if (!compact)
+          for (const action of await actions.all())
+            await expect(action.locator('.sniptale-toolbar-menu-item-label')).toBeVisible();
+        const defaults = await popup.evaluate(async () => {
+          const settings = (await chrome.storage.sync.get('sniptale_settings'))[
+            'sniptale_settings'
+          ];
+          return { imageFormat: settings.imageFormat, imageQuality: settings.imageQuality };
+        });
+        const summary = menu.locator('[data-ui="content.selection.capture-parameters"]');
+        await summary.click();
+        await menu.locator('[data-ui="content.selection.capture-format.webp"]').click();
+        await expect(
+          menu.locator('[data-ui="content.selection.capture-format.webp"]')
+        ).toHaveAttribute('aria-checked', 'true');
+        await expect(
+          menu.locator('[data-ui="content.selection.capture-format.webp"] .sniptale-popover-check')
+        ).toBeVisible();
+        await menu.locator('[data-ui="content.selection.capture-parameters.back"]').click();
+        await expect(summary).toContainText('WEBP');
+        await page.screenshot({
+          path: info.outputPath(`crop-format-compact-${compact}.png`),
+          fullPage: false,
+        });
+        await page.keyboard.press('Escape');
+        await trigger.click();
+        await expect(summary).toContainText('WEBP');
+        await page.keyboard.press('Escape');
+        expect(
+          await popup.evaluate(async () => {
+            const settings = (await chrome.storage.sync.get('sniptale_settings'))[
+              'sniptale_settings'
+            ];
+            return { imageFormat: settings.imageFormat, imageQuality: settings.imageQuality };
+          })
+        ).toEqual(defaults);
+        await page.locator('.sniptale-selection-size-cancel-button').click();
       }
     } finally {
       await popup.close();

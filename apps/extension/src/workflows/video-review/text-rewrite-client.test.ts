@@ -129,3 +129,31 @@ it.each(['start', 'keepalive'] as const)(
     expect(port.connect).toHaveBeenCalledOnce();
   }
 );
+
+it('retains admitted provider metadata in the local workflow error without retry', async () => {
+  const port = fixture();
+  const pending = runReviewTextJob(start, new AbortController().signal);
+  const refused = expect(pending).rejects.toMatchObject({
+    message: 'provider-failed',
+    reason: 'quota-exceeded',
+  });
+  port.onMessage.emit({
+    type: 'failure',
+    requestId: start.requestId,
+    code: 'provider-failed',
+    failureReason: 'quota-exceeded',
+  });
+  await refused;
+  expect(port.connect).toHaveBeenCalledOnce();
+  expect(port.postMessage).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});
+it('retains timeout evidence when the text client owns the deadline', async () => {
+  const port = fixture();
+  const pending = runReviewTextJob(start, new AbortController().signal);
+  const refused = expect(pending).rejects.toMatchObject({ message: 'timeout', reason: 'timeout' });
+  await vi.advanceTimersByTimeAsync(REVIEW_TEXT_TIMEOUT_MS);
+  await refused;
+  expect(port.connect).toHaveBeenCalledOnce();
+  expect(port.disconnect).toHaveBeenCalledOnce();
+});

@@ -70,6 +70,8 @@ function createResolvedConfig() {
     baseUrl: 'http://127.0.0.1:11434/v1',
     apiKey: 'secret-key',
     modelCode: 'llama3.2',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: 'fixture-destination-binding',
     effectiveSystemPrompt: 'Return valid JSON only',
   };
 }
@@ -125,9 +127,8 @@ async function verifyRoutesExplicitModelJsonRequest() {
   expect(saveRequestHistoryMock).not.toHaveBeenCalled();
 }
 
-async function verifyDefaultModelFallbackError() {
+async function verifyMissingExplicitModelRefusal() {
   const sendResponse = vi.fn();
-  loadDefaultModelIdMock.mockResolvedValue(null);
 
   expect(
     routeLlmMessage(
@@ -149,7 +150,9 @@ async function verifyDefaultModelFallbackError() {
     });
   });
 
+  expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
   expect(resolveModelConfigMock).not.toHaveBeenCalled();
+  expect(processMultiProviderRequestMock).not.toHaveBeenCalled();
   expect(saveRequestHistoryMock).toHaveBeenCalledWith({
     errorCode: 'model-missing',
     requestKind: 'markdown',
@@ -169,6 +172,7 @@ async function verifyStructuredProcessingErrorPropagation() {
     routeLlmMessage(
       {
         type: MessageType.PROCESS_WITH_LLM,
+        modelId: 'model-1',
         llmSessionToken: 'llm-token-1',
         prompt: 'Normalize selected nodes',
         ...(await withPrivacyProof({ jsonData: '{"fields":[]}' })),
@@ -187,6 +191,7 @@ async function verifyStructuredProcessingErrorPropagation() {
 
   expect(saveRequestHistoryMock).toHaveBeenCalledWith({
     errorCode: 'provider-invalid-response',
+    modelId: 'model-1',
     requestKind: 'json',
     resultCount: 0,
     status: 'failure',
@@ -201,6 +206,7 @@ async function verifyJsonRequestsSkipLegacyHistoryPersistence() {
     routeLlmMessage(
       {
         type: MessageType.PROCESS_WITH_LLM,
+        modelId: 'model-1',
         llmSessionToken: 'llm-token-1',
         prompt: 'Normalize selected nodes',
         ...(await withPrivacyProof({ jsonData: '{"fields":[]}' })),
@@ -234,6 +240,7 @@ async function verifyRejectsUnauthorizedMessages() {
     routeLlmMessage(
       {
         type: MessageType.PROCESS_WITH_LLM,
+        modelId: 'model-1',
         llmSessionToken: 'llm-token-1',
         prompt: 'Normalize selected nodes',
         ...(await withPrivacyProof({ jsonData: '{"fields":[]}' })),
@@ -256,6 +263,7 @@ async function verifyRejectsOversizedPayloads() {
     routeLlmMessage(
       {
         type: MessageType.PROCESS_WITH_LLM,
+        modelId: 'model-1',
         llmSessionToken: 'llm-token-1',
         prompt: 'Normalize selected nodes',
         ...(await withPrivacyProof({ jsonData: '\u0800'.repeat(700_000) })),
@@ -283,8 +291,8 @@ describe('router', () => {
     verifyRoutesExplicitModelJsonRequest
   );
   it(
-    'returns the translated missing-model error when no explicit or default model exists',
-    verifyDefaultModelFallbackError
+    'refuses missing explicit identity despite a stored global default',
+    verifyMissingExplicitModelRefusal
   );
   it(
     'propagates structured processing errors to the response payload',

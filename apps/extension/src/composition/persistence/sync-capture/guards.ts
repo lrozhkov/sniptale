@@ -1,0 +1,626 @@
+import type { IDBPTransaction } from 'idb';
+import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
+import { parseCapturedScenarioRows } from './scenario-snapshot';
+import { parseCapturedMediaRows } from './media-snapshot';
+export { parseCapturedMediaRows } from './media-snapshot';
+import { parseCapturedVideoReviewRows, type CapturedVideoReviewRows } from './review-snapshot';
+import { parseCapturedVideoProjectRows } from './project-snapshot';
+export { isSupportedCaptureProject, parseCapturedVideoProjectRows } from './project-snapshot';
+import { describeImageMetadata, parseCapturedImageRows } from './image-snapshot';
+export { parseCapturedImageRows } from './image-snapshot';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { parseAssetRef } from '../assets/guards';
+import {
+  captureRootKey,
+  captureProfileBounds,
+  MAX_CAPTURE_METADATA_BYTES,
+  MAX_CAPTURE_ROWS,
+  type CapturedMediaDependency,
+  type CapturedChange,
+  type CaptureOperation,
+  type CaptureOperationHeader,
+  type PreparedCaptureOperation,
+  type PublishedCaptureOperation,
+  type SyncCaptureAppliedOperation,
+  type SyncCaptureProfile,
+  type SyncCaptureRootState,
+  type SyncCaptureRecord,
+} from './contracts';
+
+/** Admit one bounded native operation or root identifier. */
+export function identity(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 256;
+}
+
+function storageKey(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 2048;
+}
+
+/** Admit a persisted nonnegative safe integer. */
+export function ordinal(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+/** Bind every retained published source to its accepted causal head. */
+function parseReviewDependencies(
+  value: unknown,
+  rows: CapturedVideoReviewRows
+): CapturedMediaDependency[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CAPTURE_ROWS) return null;
+  const required = new Set([rows.source.media.id, ...rows.media.map((entry) => entry.id)]);
+  const dependencies: CapturedMediaDependency[] = [];
+  for (const raw of value) {
+    if (
+      !isRecord(raw) ||
+      !identity(raw['mediaId']) ||
+      !ordinal(raw['generation']) ||
+      raw['generation'] === 0 ||
+      !Array.isArray(raw['basis']) ||
+      raw['basis'].length !== 1 ||
+      !raw['basis'].every(identity) ||
+      !required.delete(raw['mediaId'])
+    )
+      return null;
+    dependencies.push({
+      mediaId: raw['mediaId'],
+      generation: raw['generation'],
+      basis: [...raw['basis']],
+    });
+  }
+  return required.size === 0 ? dependencies : null;
+}
+
+type CaptureRecordHeader = Pick<SyncCaptureRecord, 'version' | 'key' | 'createdAt' | 'spaceId'>;
+type CaptureRoot = Pick<
+  SyncCaptureRootState,
+  'rootKind' | 'rootId' | 'rootKey' | 'generation' | 'basis'
+>;
+
+function parseCaptureHeader(value: Record<string, unknown>): CaptureRecordHeader | null {
+  if (
+    value['version'] !== 1 ||
+    !storageKey(value['key']) ||
+    !ordinal(value['createdAt']) ||
+    !identity(value['spaceId'])
+  )
+    return null;
+  return {
+    version: 1,
+    key: value['key'],
+    createdAt: value['createdAt'],
+    spaceId: value['spaceId'],
+  };
+}
+
+function parseCaptureProfile(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): SyncCaptureProfile | null {
+  if (
+    value['key'] !== 'profile' ||
+    typeof value['enabled'] !== 'boolean' ||
+    !ordinal(value['connectionGeneration']) ||
+    value['connectionGeneration'] === 0
+  )
+    return null;
+  return {
+    ...header,
+    kind: 'profile',
+    key: 'profile',
+    enabled: value['enabled'],
+    connectionGeneration: value['connectionGeneration'],
+  };
+}
+
+function parseAppliedOperation(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): SyncCaptureAppliedOperation | null {
+  if (
+    !storageKey(value['rootKey']) ||
+    !ordinal(value['generation']) ||
+    value['generation'] === 0 ||
+    !identity(value['operationId']) ||
+    typeof value['sourceDigest'] !== 'string' ||
+    !/^[a-f0-9]{64}$/u.test(value['sourceDigest'])
+  )
+    return null;
+  return {
+    ...header,
+    kind: 'applied-operation',
+    rootKey: value['rootKey'],
+    generation: value['generation'],
+    operationId: value['operationId'],
+    sourceDigest: value['sourceDigest'],
+  };
+}
+
+function parseCaptureRoot(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): CaptureRoot | null {
+  if (
+    !storageKey(value['rootKey']) ||
+    !ordinal(value['generation']) ||
+    value['generation'] === 0 ||
+    (value['rootKind'] !== 'video-project' &&
+      value['rootKind'] !== 'media' &&
+      value['rootKind'] !== 'video-review' &&
+      value['rootKind'] !== 'scenario-project') ||
+    !identity(value['rootId']) ||
+    captureRootKey(header.spaceId, value['rootKind'], value['rootId']) !== value['rootKey'] ||
+    !Array.isArray(value['basis']) ||
+    value['basis'].length > MAX_CAPTURE_ROWS
+  )
+    return null;
+  const basis: unknown[] = value['basis'];
+  if (!basis.every(identity) || new Set(basis).size !== basis.length) return null;
+  return {
+    rootKind: value['rootKind'],
+    rootId: value['rootId'],
+    rootKey: value['rootKey'],
+    generation: value['generation'],
+    basis,
+  };
+}
+
+/** Fingerprint normalized native input independently of object property order. */
+export function fingerprintNativeCapture(value: Omit<CapturedChange, 'sourceSha256'>): string {
+  const canonical = (item: unknown): unknown => {
+    if (item instanceof Blob) return describeImageMetadata(item);
+    if (Array.isArray(item)) return item.map(canonical);
+    if (isRecord(item))
+      return Object.fromEntries(
+        Object.keys(item)
+          .sort()
+          .map((key) => [key, canonical(item[key])])
+      );
+    return item;
+  };
+  const change = value.change;
+  const normalizedChange =
+    change.kind === 'media'
+      ? { kind: change.kind, rows: parseCapturedMediaRows(change.rows) ?? change.rows }
+      : change.kind === 'image'
+        ? { kind: change.kind, rows: parseCapturedImageRows(change.rows) ?? change.rows }
+        : change.kind === 'video-project'
+          ? { kind: change.kind, rows: parseCapturedVideoProjectRows(change.rows) ?? change.rows }
+          : change;
+  return hashCaptureText(
+    JSON.stringify(
+      canonical(
+        Object.fromEntries(
+          Object.entries({ ...value, change: normalizedChange }).filter(
+            ([key]) => key !== 'sourceSha256'
+          )
+        )
+      )
+    )
+  );
+}
+
+export function hashCaptureText(text: string): string {
+  return Array.from(sha256(new TextEncoder().encode(text)), (byte) =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
+}
+function captureDigest(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
+}
+/** Admit one bounded relative remote object key. */
+export function captureRemoteKey(value: unknown): value is string {
+  return (
+    storageKey(value) &&
+    !/[\\?#:]/u.test(value) &&
+    Array.from(value).every(
+      (character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127
+    ) &&
+    value.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
+  );
+}
+/** Validate actual immutable portable object bindings without adding phase-specific fields. */
+export function parseCaptureObjectBindings(
+  value: unknown,
+  rootKind?: unknown
+): PreparedCaptureOperation['prepared']['objects'] | null {
+  if (!Array.isArray(value) || value.length > captureProfileBounds(rootKind).objects) return null;
+  const objects: PreparedCaptureOperation['prepared']['objects'] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const ref = parseAssetRef(item['ref']);
+    if (
+      !ref ||
+      !identity(item['objectId']) ||
+      !captureDigest(item['sha256']) ||
+      (ref.sha256 !== null && ref.sha256 !== item['sha256']) ||
+      !storageKey(item['filename'])
+    )
+      return null;
+    objects.push({
+      objectId: item['objectId'],
+      ref,
+      sha256: item['sha256'],
+      filename: item['filename'],
+    });
+  }
+  return new Set(objects.map((item) => item.objectId)).size === objects.length ? objects : null;
+}
+/** Parse metadata-only immutable references separately from local file ownership. */
+export function parseCaptureRetainedBindings(
+  value: unknown,
+  rootKind?: unknown
+): { objectId: string; remoteKey: string }[] | null {
+  if (!Array.isArray(value) || value.length > captureProfileBounds(rootKind).objects) return null;
+  const objects: { objectId: string; remoteKey: string }[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || !identity(item['objectId']) || !captureRemoteKey(item['remoteKey']))
+      return null;
+    objects.push({ objectId: item['objectId'], remoteKey: item['remoteKey'] });
+  }
+  return new Set(objects.map((item) => item.objectId)).size === objects.length &&
+    new Set(objects.map((item) => item.remoteKey)).size === objects.length
+    ? objects
+    : null;
+}
+function parsePublishedObjects(
+  value: unknown,
+  rootKind?: unknown
+): PublishedCaptureOperation['objects'] | null {
+  const bindings = parseCaptureObjectBindings(value, rootKind);
+  if (!bindings || !Array.isArray(value)) return null;
+  const objects: PublishedCaptureOperation['objects'] = [];
+  for (const [index, binding] of bindings.entries()) {
+    const item: unknown = value[index];
+    if (
+      !isRecord(item) ||
+      !captureRemoteKey(item['remoteKey']) ||
+      typeof item['pinned'] !== 'boolean'
+    )
+      return null;
+    objects.push({ ...binding, remoteKey: item['remoteKey'], pinned: item['pinned'] });
+  }
+  return new Set(objects.map((item) => item.remoteKey)).size === objects.length ? objects : null;
+}
+function parseCapturedOperationHeader(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): CaptureOperationHeader | null {
+  const root = parseCaptureRoot(value, header);
+  const source = value['source'];
+  if (
+    !root ||
+    !identity(value['operationId']) ||
+    !ordinal(value['connectionGeneration']) ||
+    value['connectionGeneration'] === 0 ||
+    !ordinal(value['profileCreatedAt']) ||
+    !captureDigest(value['sourceSha256']) ||
+    (value['origin'] !== 'local-edit' && value['origin'] !== 'local-restore') ||
+    !(value['publicationId'] === null || identity(value['publicationId'])) ||
+    !isRecord(source) ||
+    (source['changeKind'] !== 'image' &&
+      source['changeKind'] !== 'media' &&
+      source['changeKind'] !== 'video-project' &&
+      source['changeKind'] !== 'video-review' &&
+      source['changeKind'] !== 'scenario-project' &&
+      source['changeKind'] !== 'tombstone') ||
+    typeof source['label'] !== 'string' ||
+    source['label'].length === 0 ||
+    source['label'].length > MAX_CAPTURE_METADATA_BYTES
+  )
+    return null;
+  return {
+    ...header,
+    ...root,
+    kind: 'sync-operation',
+    profileCreatedAt: value['profileCreatedAt'],
+    sourceSha256: value['sourceSha256'],
+    source: { changeKind: source['changeKind'], label: source['label'] },
+    operationId: value['operationId'],
+    connectionGeneration: value['connectionGeneration'],
+    origin: value['origin'],
+    publicationId: value['publicationId'],
+  };
+}
+
+function parseNativeOperation(
+  value: Record<string, unknown>,
+  stable: CaptureOperationHeader
+): CapturedChange | null {
+  const root = stable;
+  if ('prepared' in value || 'publication' in value || 'objects' in value) return null;
+  const change = value['change'];
+  if (!isRecord(change)) return null;
+  const rows =
+    change['kind'] === 'video-project' ? parseCapturedVideoProjectRows(change['rows']) : null;
+  const mediaRows = change['kind'] === 'media' ? parseCapturedMediaRows(change['rows']) : null;
+  const imageRows = change['kind'] === 'image' ? parseCapturedImageRows(change['rows']) : null;
+  const reviewRows =
+    change['kind'] === 'video-review' ? parseCapturedVideoReviewRows(change['rows']) : null;
+  const scenarioRows =
+    change['kind'] === 'scenario-project' ? parseCapturedScenarioRows(change['rows']) : null;
+  let parsedChange: CapturedChange['change'];
+  if (change['kind'] === 'tombstone') parsedChange = { kind: 'tombstone' };
+  else if (
+    reviewRows &&
+    reviewRows.review.workspace.aggregateId === root.rootId &&
+    root.rootKind === 'video-review'
+  ) {
+    const mediaDependencies = parseReviewDependencies(change['mediaDependencies'], reviewRows);
+    if (!mediaDependencies) return null;
+    parsedChange = { kind: 'video-review', rows: reviewRows, mediaDependencies };
+  } else if (
+    scenarioRows &&
+    scenarioRows.entry.id === root.rootId &&
+    root.rootKind === 'scenario-project'
+  )
+    parsedChange = { kind: 'scenario-project', rows: scenarioRows };
+  else if (rows && rows.project.id === root.rootId && root.rootKind === 'video-project')
+    parsedChange = { kind: 'video-project', rows };
+  else if (mediaRows && mediaRows.media.id === root.rootId && root.rootKind === 'media')
+    parsedChange = { kind: 'media', rows: mediaRows };
+  else if (imageRows && imageRows.media.id === root.rootId && root.rootKind === 'media')
+    parsedChange = { kind: 'image', rows: imageRows };
+  else return null;
+  const native: CapturedChange = { ...stable, phase: 'native', change: parsedChange };
+  return native.source.changeKind === parsedChange.kind &&
+    fingerprintNativeCapture(native) === native.sourceSha256
+    ? native
+    : null;
+}
+
+function parsePreparedOperation(
+  value: Record<string, unknown>,
+  stable: CaptureOperationHeader
+): PreparedCaptureOperation | null {
+  if ('change' in value || 'publication' in value || 'objects' in value) return null;
+  const prepared = value['prepared'];
+  if (
+    !isRecord(prepared) ||
+    typeof prepared['recordText'] !== 'string' ||
+    new TextEncoder().encode(prepared['recordText']).byteLength > 4 * 1024 * 1024 ||
+    !captureDigest(prepared['recordSha256']) ||
+    hashCaptureText(prepared['recordText']) !== prepared['recordSha256'] ||
+    !Array.isArray(prepared['objects'])
+  )
+    return null;
+  const objects = parseCaptureObjectBindings(prepared['objects'], stable.rootKind);
+  const retainedObjects = Object.hasOwn(prepared, 'retainedObjects')
+    ? parseCaptureRetainedBindings(prepared['retainedObjects'], stable.rootKind)
+    : undefined;
+  if (
+    !objects ||
+    retainedObjects === null ||
+    objects.length + (retainedObjects?.length ?? 0) >
+      captureProfileBounds(stable.rootKind).objects ||
+    retainedObjects?.some((item) => objects.some((local) => local.objectId === item.objectId))
+  )
+    return null;
+  return {
+    ...stable,
+    phase: 'prepared',
+    prepared: {
+      recordText: prepared['recordText'],
+      recordSha256: prepared['recordSha256'],
+      objects,
+      ...(retainedObjects === undefined ? {} : { retainedObjects }),
+    },
+  };
+}
+
+function parsePublishedOperation(
+  value: Record<string, unknown>,
+  stable: CaptureOperationHeader
+): PublishedCaptureOperation | null {
+  if ('change' in value || 'prepared' in value) return null;
+  const fact = value['publication'];
+  const objects = parsePublishedObjects(value['objects'], stable.rootKind);
+  if (
+    !objects ||
+    !isRecord(fact) ||
+    (fact['kind'] !== 'verified' && fact['kind'] !== 'observed') ||
+    !ordinal(fact['acceptedAt']) ||
+    !captureDigest(fact['preparedSha256']) ||
+    typeof fact['attemptId'] !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(fact['attemptId']) ||
+    !captureRemoteKey(fact['recordKey']) ||
+    !captureDigest(fact['recordSha256'])
+  )
+    return null;
+  return {
+    ...stable,
+    phase: 'published',
+    publication: {
+      kind: fact['kind'],
+      acceptedAt: fact['acceptedAt'],
+      preparedSha256: fact['preparedSha256'],
+      attemptId: fact['attemptId'],
+      recordKey: fact['recordKey'],
+      recordSha256: fact['recordSha256'],
+    },
+    objects,
+  };
+}
+
+function parseCapturedChange(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): CaptureOperation | null {
+  const stable = parseCapturedOperationHeader(value, header);
+  if (!stable) return null;
+  if (value['phase'] === 'native') return parseNativeOperation(value, stable);
+  if (value['phase'] === 'prepared') return parsePreparedOperation(value, stable);
+  if (value['phase'] === 'published') return parsePublishedOperation(value, stable);
+  return null;
+}
+
+/** Legacy root states have no native digest; new media states retain their admitted fingerprint. */
+function parseCaptureRootState(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): SyncCaptureRootState | null {
+  const root = parseCaptureRoot(value, header);
+  if (!root) return null;
+  const nativeDigest = value['nativeDigest'];
+  const nativeRevision = value['nativeRevision'];
+  if (
+    nativeRevision !== undefined &&
+    (!ordinal(nativeRevision) ||
+      (root.rootKind !== 'media' &&
+        root.rootKind !== 'video-review' &&
+        root.rootKind !== 'scenario-project'))
+  )
+    return null;
+  const deleted = value['deleted'];
+  if (deleted !== undefined && deleted !== true) return null;
+  if (deleted === true && nativeDigest !== undefined) return null;
+  if (
+    nativeDigest !== undefined &&
+    (typeof nativeDigest !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(nativeDigest) ||
+      (root.rootKind !== 'media' &&
+        root.rootKind !== 'video-review' &&
+        root.rootKind !== 'scenario-project'))
+  )
+    return null;
+  return {
+    ...header,
+    ...root,
+    kind: 'root-state',
+    ...(nativeDigest === undefined ? {} : { nativeDigest }),
+    ...(nativeRevision === undefined ? {} : { nativeRevision }),
+    ...(deleted === true ? { deleted: true } : {}),
+  };
+}
+
+/** Unknown or malformed capture data refuses mutation and physical cleanup. */
+export function parseSyncCaptureRecord(value: unknown): SyncCaptureRecord | null {
+  if (!isRecord(value)) return null;
+  const header = parseCaptureHeader(value);
+  if (!header) return null;
+  switch (value['kind']) {
+    case 'profile':
+      return parseCaptureProfile(value, header);
+    case 'applied-operation':
+      return parseAppliedOperation(value, header);
+    case 'root-state':
+      return parseCaptureRootState(value, header);
+    case 'sync-operation':
+      return parseCapturedChange(value, header);
+    default:
+      return null;
+  }
+}
+
+type AppliedReceiptIdentity = Pick<
+  SyncCaptureAppliedOperation,
+  'spaceId' | 'rootKey' | 'operationId' | 'sourceDigest'
+> & { receiptKey: string };
+
+/** Admit an exact completed operation without requiring retained staging files. */
+export function parseAppliedCaptureReceipt(
+  raw: unknown,
+  expected: AppliedReceiptIdentity,
+  refuse: () => never
+): number | null {
+  if (raw === undefined) return null;
+  const receipt = parseSyncCaptureRecord(raw);
+  if (
+    !receipt ||
+    receipt.kind !== 'applied-operation' ||
+    receipt.key !== expected.receiptKey ||
+    receipt.spaceId !== expected.spaceId ||
+    receipt.rootKey !== expected.rootKey ||
+    receipt.operationId !== expected.operationId ||
+    receipt.sourceDigest !== expected.sourceDigest
+  )
+    refuse();
+  return receipt.generation;
+}
+
+/** Read and admit the durable receipt inside the caller's transaction. */
+export async function readAppliedCaptureReceipt(
+  tx: Pick<IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>, 'objectStore'>,
+  expected: AppliedReceiptIdentity,
+  refuse: () => never
+): Promise<number | null> {
+  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(expected.receiptKey);
+  return parseAppliedCaptureReceipt(raw, expected, refuse);
+}
+
+/** Check the shared persisted replica identity fields before caller-specific admission. */
+export function isCaptureReplicaHeader(value: Record<string, unknown>): value is Record<
+  string,
+  unknown
+> & {
+  operationId: string;
+  spaceId: string;
+  sourceDigest: string;
+  profileCreatedAt: number;
+  connectionGeneration: number;
+  expectedLocalGeneration: number;
+} {
+  return (
+    identity(value['operationId']) &&
+    identity(value['spaceId']) &&
+    captureDigest(value['sourceDigest']) &&
+    ordinal(value['profileCreatedAt']) &&
+    ordinal(value['connectionGeneration']) &&
+    value['connectionGeneration'] >= 1 &&
+    ordinal(value['expectedLocalGeneration'])
+  );
+}
+
+/** Admit a root-state identity; native revision and basis policies remain with the caller. */
+export async function readCaptureRootState(
+  tx: Pick<IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>, 'objectStore'>,
+  rootKey: string,
+  refuse: (() => never) | undefined,
+  checkStorageKey = true
+): Promise<SyncCaptureRootState | null> {
+  const key = JSON.stringify(['root-state', rootKey]);
+  const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(key);
+  if (raw === undefined) return null;
+  const state = parseSyncCaptureRecord(raw);
+  if (
+    !state ||
+    state.kind !== 'root-state' ||
+    state.rootKey !== rootKey ||
+    (checkStorageKey && state.key !== key)
+  ) {
+    if (refuse) refuse();
+    return null;
+  }
+  return state;
+}
+
+/** Preserve prepared caller admission of the target profile and causal predecessor basis. */
+export function isCaptureReplicaPredecessor(input: {
+  profileCreatedAt: number;
+  expectedLocalGeneration: number;
+  expectedBasis: readonly string[];
+}): boolean {
+  return (
+    ordinal(input.profileCreatedAt) &&
+    Array.isArray(input.expectedBasis) &&
+    input.expectedBasis.length === (input.expectedLocalGeneration === 0 ? 0 : 1) &&
+    input.expectedBasis.every(identity)
+  );
+}
+
+/** Admit the exact causal head named by a prepared media dependency. */
+export function isCaptureDependencyVersion(value: Record<string, unknown>): value is Record<
+  string,
+  unknown
+> & {
+  expectedGeneration: number;
+  expectedBasis: string[];
+} {
+  return (
+    ordinal(value['expectedGeneration']) &&
+    value['expectedGeneration'] >= 1 &&
+    Array.isArray(value['expectedBasis']) &&
+    value['expectedBasis'].length === 1 &&
+    value['expectedBasis'].every(identity)
+  );
+}

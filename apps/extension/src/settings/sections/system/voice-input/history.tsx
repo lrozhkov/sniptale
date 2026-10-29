@@ -1,3 +1,4 @@
+import { getVoiceInputProviderErrorKey } from '../../../../composition/voice-input/provider-error-copy';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -336,6 +337,7 @@ function HistoryEntryRow({
           {translate('settings.voiceInput.historyCorrectionFailed')}
         </p>
       ) : null}
+      <HistoryProviderFailure entry={entry} />
       <HistoryEntryActions
         entry={entry}
         history={history}
@@ -366,4 +368,14 @@ function HistoryEntryRow({
       ) : null}
     </li>
   );
+}
+
+function HistoryProviderFailure({ entry }: { entry: VoiceHistoryEntry }) {
+  const key =
+    entry.status === 'failed' || (entry.status === 'ready' && entry.correctionStatus === 'failed')
+      ? getVoiceInputProviderErrorKey(entry.failureCode)
+      : undefined;
+  return key ? (
+    <p className="text-xs text-[var(--sniptale-color-text-secondary)]">{translate(key)}</p>
+  ) : null;
 }

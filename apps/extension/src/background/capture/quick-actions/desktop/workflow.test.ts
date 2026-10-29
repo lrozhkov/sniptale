@@ -1,3 +1,6 @@
+vi.mock('../../../../platform/media-utils/screenshot-encoding', () => ({
+  optimizeScreenshotDataUrl: vi.fn(async (dataUrl: string) => dataUrl),
+}));
 vi.mock('../appearance-render', () => ({ renderQuickActionAppearance: mocks.renderAppearance }));
 import { createQuickActionAppearance } from '../../../../contracts/quick-action-appearance';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -205,7 +208,7 @@ it('selects a desktop source and captures its frame through the reserved offscre
       tabId: 84,
     })
   ).resolves.toEqual({
-    dataUrl: 'data:image/webp;base64,AA==',
+    dataUrl: 'data:image/png;base64,AA==',
     height: 800,
     requestId: expect.any(String),
     reservationToken: expect.any(String),
@@ -216,7 +219,7 @@ it('selects a desktop source and captures its frame through the reserved offscre
   expect(mocks.chooseSource).not.toHaveBeenCalled();
   expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
     expect.objectContaining({
-      imageFormat: 'webp',
+      imageFormat: 'png',
       imageQuality: 80,
       delaySeconds: 5,
       type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
@@ -471,4 +474,25 @@ it('styles the captured desktop raster before publication without page metadata'
     'job-1'
   );
   expect(mocks.releasePermit).toHaveBeenCalledOnce();
+});
+
+it('keeps the desktop frame lossless until appearance is rendered', async () => {
+  const context = createContext();
+  context.action.appearance = createQuickActionAppearance();
+  const selection = await selectAndCaptureDesktopQuickAction({ context, tabId: 184 });
+  expect(selection).toMatchObject({ dataUrl: 'data:image/png;base64,AA==' });
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+      imageFormat: 'png',
+    })
+  );
+  await runDesktopQuickAction({ context, tabId: 184, desktopSelection: selection });
+  expect(mocks.renderAppearance).toHaveBeenCalledWith(
+    expect.objectContaining({
+      dataUrl: 'data:image/png;base64,AA==',
+      imageFormat: 'webp',
+      imageQuality: 80,
+    })
+  );
 });

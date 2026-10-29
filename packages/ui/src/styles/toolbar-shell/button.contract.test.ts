@@ -23,7 +23,7 @@ describe('toolbar-shell button contract', () => {
     );
     expect(toolbarShellButtonStylesheet).toContain('flex: 0 0 14px;');
     expect(toolbarShellButtonStylesheet).toContain(
-      '.sniptale-annotation-menu-control > button[aria-pressed] {'
+      ".sniptale-annotation-menu-control > button[aria-pressed]:not([data-content-tool='true']) {"
     );
     expect(toolbarShellButtonStylesheet).toContain(
       "> .sniptale-annotation-properties-arrow:enabled:is(:hover, :focus-visible, [aria-expanded='true'])"

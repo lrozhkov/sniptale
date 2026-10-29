@@ -1,3 +1,4 @@
+import { loadAIScenarioSelection } from '../../../composition/persistence/ai-settings/scenario-selections';
 import {
   loadAudioTranscriptionSystemPrompt,
   loadVoiceInputCorrectionSystemPrompt,
@@ -5,7 +6,6 @@ import {
   loadAIProviders,
   loadAISecretProtectionStatus,
   loadChromeAiEnabled,
-  loadDefaultModelId,
   loadGlobalSystemPrompt,
   loadScenarioEditorSystemPrompt,
   initializeAiStorageAccess,
@@ -37,6 +37,10 @@ function classifyProviderDestination(provider: AIProvider): AIProviderDestinatio
 async function createProviderSelectorEntry(provider: AIProvider): Promise<AIProviderSelectorEntry> {
   return {
     connectionType: provider.connectionType,
+    ...(provider.incarnation !== undefined ? { incarnation: provider.incarnation } : {}),
+    ...(provider.enabled !== undefined ? { enabled: provider.enabled } : {}),
+    ...(provider.management !== undefined ? { management: provider.management } : {}),
+    ...(provider.observation !== undefined ? { observation: provider.observation } : {}),
     createdAt: provider.createdAt,
     destinationKind: classifyProviderDestination(provider),
     destinationBinding: await createAIProviderDestinationBinding(provider),
@@ -48,24 +52,20 @@ async function createProviderSelectorEntry(provider: AIProvider): Promise<AIProv
 
 async function loadStoredModelSelection(): Promise<{
   chromeAiEnabled: boolean;
-  defaultModelId: string | null;
   globalSystemPrompt: string;
   models: AIModel[];
   providers: AIProvider[];
 }> {
   await initializeAiStorageAccess();
-  const [models, providers, chromeAiEnabled, defaultModelId, globalSystemPrompt] =
-    await Promise.all([
-      loadAIModels(),
-      loadAIProviders(),
-      loadChromeAiEnabled(),
-      loadDefaultModelId(),
-      loadGlobalSystemPrompt(),
-    ]);
+  const [models, providers, chromeAiEnabled, globalSystemPrompt] = await Promise.all([
+    loadAIModels(),
+    loadAIProviders(),
+    loadChromeAiEnabled(),
+    loadGlobalSystemPrompt(),
+  ]);
 
   return {
     chromeAiEnabled,
-    defaultModelId,
     globalSystemPrompt: globalSystemPrompt ?? '',
     models,
     providers,
@@ -79,6 +79,30 @@ async function loadSanitizedModelSelection(): Promise<AIModelSelectionBootstrapP
     ...selection,
     providers: await Promise.all(selection.providers.map(createProviderSelectorEntry)),
   };
+}
+
+async function projectCurrentSettingsCatalog(
+  models: AIModel[],
+  providers: AIProvider[]
+): Promise<AIModel[]> {
+  if (!models.some((model) => model.catalog)) return models;
+  const scopes = new Map(
+    await Promise.all(
+      providers.map(
+        async (provider) =>
+          [provider.id, await createAIProviderDestinationBinding(provider)] as const
+      )
+    )
+  );
+  return models.map((model) => {
+    if (
+      !model.catalog ||
+      (model.catalog.scope && model.catalog.scope === scopes.get(model.providerId))
+    )
+      return model;
+    const { catalog: _catalog, ...configured } = model;
+    return configured;
+  });
 }
 
 async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataPayload> {
@@ -101,7 +125,13 @@ async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataP
     audioTranscriptionSystemPrompt,
     voiceInputCorrectionSystemPrompt,
     secretProtectionStatus,
-    selectionBootstrap,
+    selectionBootstrap: {
+      ...selectionBootstrap,
+      models: await projectCurrentSettingsCatalog(
+        selectionBootstrap.models,
+        selectionBootstrap.providers
+      ),
+    },
   };
 }
 
@@ -117,6 +147,9 @@ export async function resolveAISettingsQueryResponse(
   message: AiSettingsQueryMessage
 ): Promise<AiSettingsQueryResponse> {
   switch (message.operation) {
+    case 'read-scenario-selection':
+      await initializeAiStorageAccess();
+      return { success: true, scenarioSelection: await loadAIScenarioSelection(message.scenario) };
     case 'read-chrome-ai-content-system-prompt':
       return {
         success: true,

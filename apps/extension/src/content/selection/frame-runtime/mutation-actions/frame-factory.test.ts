@@ -338,3 +338,58 @@ describe('frame mutation action frame factory', () => {
     expect(hostLayoutServiceRef.current.getNode('frame-1')).toBeNull();
   });
 });
+
+describe('standalone annotation commands', () => {
+  it.each(['callout', 'step-badge'] as const)(
+    'adds a standalone %s through the existing frame command and binds its source',
+    (annotationKind) => {
+      const { options, currentFrames, hostLayoutServiceRef } = createOptions();
+      const element = createVisibleElement();
+      const add = createAddFreeFrameHandler({ ...options, generateFrameId: () => 'standalone' });
+      const frame = add(
+        {
+          annotationKind,
+          x: 30,
+          y: 45,
+          width: 1,
+          height: 1,
+          pagePlacement: { iframePath: [], pageX: 30, pageY: 45 },
+        },
+        element
+      );
+      expect(frame.annotationKind).toBe(annotationKind);
+      expect(frame.offset).toEqual({ x: 20, y: 25, width: -119, height: -79 });
+      expect(hostLayoutServiceRef.current.getNode(frame.id)).toBe(element);
+      expect(currentFrames()).toHaveLength(1);
+      expect(currentFrames()[0]?.annotationKind).toBe(annotationKind);
+      if (annotationKind === 'callout') {
+        expect(consumeFrameCalloutEditRequest(frame.id)).toBe(true);
+        expect(frame.stepBadge).toBeUndefined();
+      } else {
+        expect(currentFrames()[0]?.stepBadge?.value).toBe('1');
+        expect(frame.callout).toBeUndefined();
+      }
+    }
+  );
+
+  it('preserves the standalone point when its initial DOM binding is unavailable', () => {
+    const { options, currentFrames, hostLayoutServiceRef } = createOptions();
+    const element = createVisibleElement();
+    element.remove();
+    const frame = createAddFreeFrameHandler({ ...options, generateFrameId: () => 'free' })(
+      {
+        annotationKind: 'step-badge',
+        x: 30,
+        y: 45,
+        width: 1,
+        height: 1,
+        pagePlacement: { iframePath: [], pageX: 30, pageY: 45 },
+      },
+      element
+    );
+    expect(frame.linkedElementSelector).toBeUndefined();
+    expect(frame.pagePlacement).toEqual({ iframePath: [], pageX: 30, pageY: 45 });
+    expect(hostLayoutServiceRef.current.getNode(frame.id)).toBeNull();
+    expect(currentFrames()).toHaveLength(1);
+  });
+});

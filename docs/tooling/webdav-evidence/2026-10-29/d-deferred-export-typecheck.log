@@ -1,0 +1,4 @@
+apps/extension/src/workflows/media-hub-backup/v6/inventory/helpers.ts(1,15): error TS2459: Module '"../contracts"' declares 'ArchiveObjectRef' locally, but it is not exported.
+apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts(2,15): error TS2459: Module '"../contracts"' declares 'ArchiveObjectRef' locally, but it is not exported.
+apps/extension/src/workflows/sync-transfer/captured-project.ts(2,15): error TS2459: Module '"../media-hub-backup/v6/contracts"' declares 'ArchiveObjectRef' locally, but it is not exported.
+apps/extension/src/workflows/sync-transfer/outgoing.ts(265,7): error TS2304: Cannot find name 'assertSyncObjectRemoteKey'.

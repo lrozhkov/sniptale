@@ -18,6 +18,9 @@ import type { CalloutDragBehavior } from '../../../features/highlighter/frame-an
 import { useContentUiScale } from '../../platform/dom-host';
 
 interface CalloutProps {
+  onAnchorPositionChange?: React.ComponentProps<
+    typeof FrameCalloutInteractiveSurface
+  >['onAnchorPositionChange'];
   frameId: string;
   frameBorderWidth: number;
   settings: CalloutSettings;
@@ -33,6 +36,7 @@ interface CalloutProps {
   onTitleChange: (titleText: string) => void;
   onTitleEnabledChange: (enabled: boolean) => void;
   onDelete: () => void;
+  onDeleteControl?: () => void;
   onSettingsClick: () => void;
   onPositionChange: (
     placement: NonNullable<CalloutSettings['placement']['manualPlacement']>,
@@ -71,6 +75,7 @@ export const Callout: React.FC<CalloutProps> = (props) => {
   return (
     <FrameCalloutInteractiveSurface
       chromeScale={chromeScale}
+      onAnchorPositionChange={props.onAnchorPositionChange}
       editing={{
         events: {
           applyFormatting: editing.applyFormatting,
@@ -100,6 +105,7 @@ export const Callout: React.FC<CalloutProps> = (props) => {
       onBadgeTextChange={props.onBadgeTextChange}
       onPositionChange={props.onPositionChange}
       onSettingsClick={props.onSettingsClick}
+      onDelete={props.onDeleteControl}
       onStartEditing={props.onStartEditing}
       onTailBaseRangeChange={props.onTailBaseRangeChange}
       onTailFramePositionChange={props.onTailFramePositionChange}

@@ -977,6 +977,7 @@ for (const width of [1280, 1920]) {
           '.sniptale-toolbar-menu'
         );
         await expect(fullPageMenu).toBeVisible();
+        await fullPageMenu.locator('[data-ui="content.toolbar.full-capture-parameters"]').click();
         const retainedMenu = await fullPageMenu.elementHandle();
         for (const mode of ['hide', 'repeat', 'once']) {
           const option = ui(page, `content.toolbar.full-page-floating.${mode}`);
@@ -1104,12 +1105,27 @@ for (const width of [1280, 1920]) {
         await trigger.click();
         await ui(page, 'content.toolbar.mode-option.drawing').click();
         await ui(page, 'content.toolbar.drawing.shape').click();
-        await page.mouse.move(450, 280);
+        const drawingCanvas = page.locator(
+          '[data-ui="content.drawing.surface"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+        );
+        await expect(drawingCanvas).toBeVisible();
+        const drawingStart = { x: width - 400, y: 280 };
+        expect(
+          await drawingCanvas.evaluate((node, point) => {
+            const root = node.getRootNode();
+            return (
+              (root instanceof ShadowRoot
+                ? root.elementFromPoint(point.x, point.y)
+                : node.ownerDocument.elementFromPoint(point.x, point.y)) === node
+            );
+          }, drawingStart)
+        ).toBe(true);
+        await page.mouse.move(drawingStart.x, drawingStart.y);
         await page.mouse.down();
-        await page.mouse.move(620, 400, { steps: 8 });
+        await page.mouse.move(drawingStart.x + 170, 400, { steps: 8 });
         await page.mouse.up();
         await ui(page, 'content.toolbar.drawing.select').click();
-        await page.mouse.click(500, 300);
+        await page.mouse.click(drawingStart.x + 50, 300);
         const deleteSelection = ui(page, 'drawing.selection.actions.delete');
         await expect(deleteSelection).toBeEnabled();
         await deleteSelection.hover();

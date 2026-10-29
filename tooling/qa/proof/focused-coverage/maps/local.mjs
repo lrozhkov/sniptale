@@ -1,5 +1,36 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'sync-captured-root-portable-consumers',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/captured-root.ts',
+    reason:
+      'Frozen root encoding is exercised through portable recording, review, image and project consumers.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-recording.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-image.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-project.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-scenario.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-prepared-root-native-consumers',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/prepared-root.ts',
+    reason:
+      'Prepared root parsing and editing closure are consumed by replica staging and native hydration.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/prepared-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/prepared-scenario.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming-project.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+    ],
+  },
+
+  {
     owner: 'review-inspector-section-consumers',
     productionFile: 'apps/extension/src/gallery/video-review/inspector-sections.tsx',
     reason:
@@ -676,6 +707,16 @@ unchanged project admission.',
     ],
   },
   {
+    owner: 'shared-paint-selector-editor',
+    productionFile: 'apps/extension/src/ui/paint-selector/editor-content.tsx',
+    reason:
+      'The selector integration tests exercise solid and gradient stop editing, preview, alpha and cancellation.',
+    testFiles: [
+      'apps/extension/src/ui/paint-selector/index.test.tsx',
+      'apps/extension/src/ui/paint-selector/popup.test.tsx',
+    ],
+  },
+  {
     owner: 'shared-paint-selector-trigger',
     productionFile: 'apps/extension/src/ui/paint-selector/trigger.tsx',
     reason:
@@ -734,6 +775,7 @@ unchanged project admission.',
       'apps/extension/src/composition/persistence/review-workspaces/project-commands.ts',
     reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
     testFiles: [
+      'apps/extension/src/composition/persistence/review-workspaces/sync-capture.test.ts',
       'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
       'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
       'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
@@ -744,6 +786,7 @@ unchanged project admission.',
     productionFile: 'apps/extension/src/composition/persistence/review-workspaces/store.ts',
     reason: 'Real writer tests prevent deleted content from returning after purge and recreation.',
     testFiles: [
+      'apps/extension/src/composition/persistence/review-workspaces/sync-capture.test.ts',
       'apps/extension/src/workflows/video-review/session.project-purge.test.ts',
       'apps/extension/src/gallery/video-review/use-session.purge.test.tsx',
     ],
@@ -875,6 +918,7 @@ unchanged project admission.',
     testFiles: [
       'apps/extension/src/composition/persistence/settings-transfer/read.test.ts',
       'apps/extension/src/composition/persistence/settings-transfer/apply.test.ts',
+      'apps/extension/src/composition/persistence/settings-transfer/apply-ai-configuration.test.ts',
       'apps/extension/src/composition/persistence/settings-transfer/page-launch-apply.integration.test.ts',
       'apps/extension/src/composition/persistence/infrastructure/mutation-barrier.test.ts',
       'apps/extension/src/composition/persistence/settings/coordination.test.ts',
@@ -885,6 +929,15 @@ unchanged project admission.',
     productionFile: 'apps/extension/src/background/index.ts',
     reason: 'The service-worker entrypoint is exercised by its bounded runtime bootstrap suite.',
     testFiles: ['apps/extension/src/background/runtime/bootstrap/index.test.ts'],
+  },
+  {
+    owner: 'offscreen-sync-executor-test-fixture',
+    productionFile: 'apps/extension/src/offscreen/sync-connection/test-support/executor.ts',
+    reason: 'Queue, workspace and product executor suites exercise the shared controlled fixture.',
+    testFiles: [
+      'apps/extension/src/offscreen/sync-connection/executor.test.ts',
+      'apps/extension/src/offscreen/sync-connection/executor-product.test.ts',
+    ],
   },
   {
     owner: 'offscreen-document-entrypoint',

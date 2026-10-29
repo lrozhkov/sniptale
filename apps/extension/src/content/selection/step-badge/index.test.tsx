@@ -263,6 +263,7 @@ it('omits interaction chrome for export and short-circuits a disabled shared bad
       <FrameStepBadgeInteractiveSurface
         borderColor="#123456"
         borderWidth={3}
+        onValueChange={vi.fn()}
         chrome="export"
         controlsPortalTarget={controlsHost}
         coordinateSpace={coordinateSpace}
@@ -283,6 +284,7 @@ it('omits interaction chrome for export and short-circuits a disabled shared bad
 
   expect(surfaceHost.querySelector('.sniptale-step-badge')).toBeInstanceOf(HTMLDivElement);
   expect(controlsHost.querySelector('.sniptale-step-badge-controls')).toBeNull();
+  expect(surfaceHost.querySelector('input')).toBeNull();
 
   act(() => {
     root.render(
@@ -302,4 +304,163 @@ it('omits interaction chrome for export and short-circuits a disabled shared bad
   expect(surfaceHost.querySelector('.sniptale-step-badge')).toBeNull();
   act(() => root.unmount());
   document.body.replaceChildren();
+});
+
+it.each(['Enter', 'Escape', 'blur', 'empty', 'outside'] as const)(
+  'edits a badge value in place with %s completion and owns input keys',
+  (completion) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const onValueChange = vi.fn();
+    const bubble = vi.fn();
+    document.addEventListener('keydown', bubble);
+    const settings = createStepBadgeSettingsFixture({
+      value: '7',
+      sourcePresetId: 'system-classic',
+    });
+    act(() =>
+      root.render(
+        <FrameStepBadgeInteractiveSurface
+          borderColor="#123456"
+          borderWidth={2}
+          controlsPortalTarget={host}
+          surfacePortalTarget={host}
+          portalTheme={null}
+          frameRect={{ x: 100, y: 80, width: 120, height: 80 }}
+          settings={settings}
+          onPositionChange={vi.fn()}
+          onValueChange={onValueChange}
+          showSettingsHandle
+        />
+      )
+    );
+    const pencil = host.querySelector<HTMLButtonElement>('.sniptale-step-badge-edit-handle')!;
+    expect(pencil).not.toBeNull();
+    act(() => pencil.click());
+    const input = host.querySelector<HTMLInputElement>('.sniptale-step-badge-value-editor')!;
+    expect(document.activeElement).toBe(input);
+    expect(input.maxLength).toBe(2);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 1]);
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        input,
+        completion === 'empty' ? '' : '429'
+      );
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true })));
+    expect(bubble).not.toHaveBeenCalled();
+    act(() => {
+      if (completion === 'outside') {
+        document.body.dispatchEvent(
+          new MouseEvent('pointerdown', { bubbles: true, composed: true })
+        );
+      } else if (completion === 'blur') input.blur();
+      else
+        input.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: completion === 'empty' ? 'Enter' : completion,
+            bubbles: true,
+          })
+        );
+    });
+    if (completion === 'outside') expect(host.querySelector('input')).toBeNull();
+    if (completion === 'Escape' || completion === 'empty')
+      expect(onValueChange).not.toHaveBeenCalled();
+    else expect(onValueChange).toHaveBeenCalledExactlyOnceWith('42');
+    expect(host.querySelector('input')).toBeNull();
+    expect(settings.value).toBe('7');
+    expect(settings.sourcePresetId).toBe('system-classic');
+    if (completion !== 'blur' && completion !== 'outside')
+      expect(document.activeElement).toBe(pencil);
+    document.removeEventListener('keydown', bubble);
+    act(() => root.unmount());
+    document.body.replaceChildren();
+  }
+);
+
+it.each(['Enter', 'Escape'])('keeps %s owned by the active IME composition', (key) => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onValueChange = vi.fn();
+  act(() =>
+    root.render(
+      <FrameStepBadgeInteractiveSurface
+        borderColor="#123456"
+        borderWidth={2}
+        controlsPortalTarget={host}
+        surfacePortalTarget={host}
+        portalTheme={null}
+        frameRect={{ x: 100, y: 80, width: 120, height: 80 }}
+        settings={createStepBadgeSettingsFixture({ value: '7' })}
+        onPositionChange={vi.fn()}
+        onValueChange={onValueChange}
+        showSettingsHandle
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('.sniptale-step-badge-edit-handle')!.click());
+  const input = host.querySelector<HTMLInputElement>('input')!;
+  const composingKey = new KeyboardEvent('keydown', {
+    key,
+    isComposing: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => input.dispatchEvent(composingKey));
+  expect(composingKey.defaultPrevented).toBe(false);
+  expect(document.activeElement).toBe(input);
+  expect(host.querySelector('input')).toBe(input);
+  expect(onValueChange).not.toHaveBeenCalled();
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(onValueChange).toHaveBeenCalledExactlyOnceWith('7');
+  act(() => root.unmount());
+  document.body.replaceChildren();
+});
+
+it('routes the standalone mini delete command once without starting a page gesture', async () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onDelete = vi.fn();
+  const onPositionChange = vi.fn();
+  const surroundingGesture = vi.fn();
+  document.addEventListener('pointerdown', surroundingGesture);
+  document.addEventListener('click', surroundingGesture);
+  try {
+    await act(async () =>
+      root.render(
+        <FrameStepBadgeInteractiveSurface
+          controlsPortalTarget={host}
+          surfacePortalTarget={host}
+          portalTheme={null}
+          settings={createStepBadgeSettingsFixture({ value: '7' })}
+          borderColor="#000"
+          borderWidth={2}
+          frameRect={{ x: 100, y: 100, width: 100, height: 80 }}
+          onPositionChange={onPositionChange}
+          onDelete={onDelete}
+          showSettingsHandle
+        />
+      )
+    );
+    const button = document.querySelector<HTMLButtonElement>('.sniptale-step-badge-delete-handle')!;
+    expect(button).not.toBeNull();
+    expect(button.getAttribute('aria-label')).toBe('common.actions.delete');
+    const pointer = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+    act(() => button.dispatchEvent(pointer));
+    expect(pointer.defaultPrevented).toBe(true);
+    expect(onDelete).not.toHaveBeenCalled();
+    act(() => button.click());
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith();
+    expect(onPositionChange).not.toHaveBeenCalled();
+    expect(surroundingGesture).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    document.removeEventListener('pointerdown', surroundingGesture);
+    document.removeEventListener('click', surroundingGesture);
+  }
 });

@@ -1,0 +1,47 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts (67 tests | 1 failed | 66 skipped) 323ms
+   × publishes an offline metadata revision without materializing its deferred saved export 321ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "Files/3f49dbbfe051cb20cc038923424fedf8d18307cc805e1520e4168e9360e2eb38/00000000-0000-0000-0000-000000000002/export/saved.png",
+      AbortSignal {
+        Symbol(kEvents): Map {},
+        Symbol(events.maxEventTargetListeners): 0,
+        Symbol(events.maxEventTargetListenersWarned): false,
+        Symbol(kHandlers): undefined,
+        Symbol(kAborted): false,
+        Symbol(kReason): undefined,
+        Symbol(kComposite): false,
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:1853:29
+    1851|     signal: f.args.signal,
+    1852|   });
+    1853|   expect(f.remote.read).not.toHaveBeenCalled();
+       |                             ^
+    1854|   await expect(readAssetFile(ref, exported.filename)).rejects.toThrow(…
+    1855|   expect(prepared.objects.some((item) => item.ref.assetId === ref.asse…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 66 skipped (67)
+   Start at  10:26:41
+   Duration  2.90s (transform 56%, import 31%, tests 12%, setup 1%)
+

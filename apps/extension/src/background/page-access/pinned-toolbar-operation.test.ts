@@ -151,3 +151,18 @@ it('blocks newer authoritative work behind permission cleanup', async () => {
   await Promise.all([cleanup, pinWork]);
   expect(events).toEqual(['cleanup-start', 'cleanup-end', 'pin']);
 });
+
+it('rejects an old writer after its tab operation identity is removed and recreated', async () => {
+  const old = beginPinnedToolbarDurableOperation(71);
+  const release = createDeferred<void>();
+  const oldWrite = old.runExclusive(async () => {
+    await release.promise;
+    return old.isCurrent();
+  });
+  clearPinnedToolbarOperationState(71);
+  const replacement = beginPinnedToolbarDurableOperation(71);
+  release.resolve(undefined);
+  await expect(oldWrite).resolves.toBe(false);
+  expect(replacement.isCurrent()).toBe(true);
+  clearPinnedToolbarOperationState(71);
+});

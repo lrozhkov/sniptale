@@ -191,7 +191,15 @@ it('retains a text draft when shared Drawing history rejects its commit', () => 
     return null;
   }
   act(() => root.render(<Harness />));
-  act(() => editor!.setDraft({ id: null, point: { x: 0, y: 0 }, value: 'Keep me' }));
+  act(() =>
+    editor!.setDraft({
+      id: null,
+      point: { x: 0, y: 0 },
+      value: 'Keep me',
+      width: 320,
+      fittedWidth: 70,
+    })
+  );
   act(() => editor!.finalize());
   expect(editor!.draft?.value).toBe('Keep me');
   expect(controller.hasPendingTextChange?.()).toBe(true);
@@ -286,3 +294,57 @@ it('keeps the first line visible while Shift+Enter creates an empty trailing lin
   expect(editor.scrollTop).toBe(0);
   act(() => root.unmount());
 });
+
+it.each([0, 45])(
+  'commits fitted text width while preserving its rotated origin at %s degrees',
+  (rotation) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    const controller = createContentDrawingController(session);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    let editor: ReturnType<typeof useDrawingTextEditor>;
+    function Harness() {
+      editor = useDrawingTextEditor(controller);
+      return null;
+    }
+    act(() => root.render(<Harness />));
+    session.commitObject({
+      id: 'fitted-text',
+      kind: 'text',
+      text: 'Original',
+      rotation,
+      bounds: { x: 100, y: 200, width: 320, height: 64 },
+      color: '#111827',
+      backgroundColor: null,
+      fontSize: 24,
+      fontFamily: 'sans',
+    });
+    act(() =>
+      editor!.setDraft({
+        id: 'fitted-text',
+        point: { x: 100, y: 200 },
+        value: 'Hi\nThere',
+        width: 320,
+        fittedWidth: 64,
+        height: 64,
+        rotation,
+      })
+    );
+    act(() => editor!.finalize());
+    const object = session.getSnapshot().document.objects[0]!;
+    const radians = (rotation * Math.PI) / 180;
+    expect(object).toMatchObject({
+      text: 'Hi\nThere',
+      rotation,
+      bounds: {
+        width: 64,
+        height: 64,
+        x: 100 + 128 * (1 - Math.cos(radians)),
+        y: 200 - 128 * Math.sin(radians),
+      },
+    });
+    act(() => root.unmount());
+  }
+);

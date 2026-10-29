@@ -1,20 +1,26 @@
+import { getAIProviderFailureKey } from '../../../features/ai/provider-failure-copy';
 import { useEffect, useRef, useState } from 'react';
 import { AIModelSelector } from '../../../features/ai/model-selector';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
+import type { AIModelCatalogPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import type { AISpeechModelParameters } from '../../../contracts/settings/model-operation';
 import type { ScenarioNarrationText } from '../../../features/scenario/project/public';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import { useAIScenarioModelSelection } from '../../../workflows/ai-settings/use-scenario-model-selection';
 import { InspectorParameterRow } from '../../../ui/compact-inspector-controls/layout';
 import { TextField, TextareaField, SelectField } from '../../../ui/compact-inspector-controls';
 import type { ScenarioNarrationPreview } from '../../../workflows/scenario-narration/generation';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import type { Translate } from '../../../platform/i18n';
+import type { Translate, TranslationKey } from '../../../platform/i18n';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
 import { TourInspectorNumericRow } from './numeric-row';
 import {
   scenarioNarrationTargetKey,
   useScenarioNarrationAI,
   type ScenarioNarrationAccess,
 } from './use-narration-ai';
+
+function narrationFailureKey(reason?: AIConnectionReason | null): TranslationKey {
+  return getAIProviderFailureKey(reason) ?? 'scenario.editor.guideOperationFailed';
+}
 
 type Profile = AISpeechModelParameters & { modelId: string };
 /** Scenario-local form composes the checked model catalog and page-owned commands. */
@@ -33,42 +39,71 @@ export function TourNarrationAI({
   useEffect(() => {
     form.current?.focus();
   }, []);
-  const [catalog, setCatalog] = useState<AIModelSelectionBootstrapPayload | null>(null);
-  const [catalogError, setCatalogError] = useState(false);
-  const [reload, setReload] = useState(0);
+  const selection = useAIScenarioModelSelection('scenario-speech');
+  const catalog = selection.configuration;
   const [profile, setProfile] = useState<Profile | null>(null);
+  const profileReset = useRef<string | null>(null);
   const [approved, setApproved] = useState<string | null>(null);
   const [selected, setSelected] = useState(() => new Set(targets.map(scenarioNarrationTargetKey)));
   const operation = useScenarioNarrationAI(
     access,
-    targets.filter((target) => selected.has(scenarioNarrationTargetKey(target)))
+    targets.filter((target) => selected.has(scenarioNarrationTargetKey(target))),
+    async (frozenProfile, approvedSelection, signal) => {
+      const prepared = await selection.prepareModelSelection(signal);
+      const model = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
+      const provider = prepared.catalog.providers.find((entry) => entry.id === model?.providerId);
+      if (
+        !model ||
+        prepared.modelId !== frozenProfile.modelId ||
+        prepared.modelId !== approvedSelection.modelId ||
+        model.providerId !== approvedSelection.approvedProviderId ||
+        model.modelCode !== approvedSelection.approvedModelCode ||
+        provider?.destinationBinding !== approvedSelection.approvedDestination
+      )
+        throw new Error('model-unavailable');
+    }
   );
+  const { resetUnacceptedPreviews } = operation;
   useEffect(() => {
-    let current = true;
-    setCatalogError(false);
-    void requestAIModelSelectionBootstrap('speech')
-      .then((value) => {
-        if (!current) return;
-        setCatalog(value);
-        setProfile((previous) => {
-          if (previous && value.models.some((model) => model.id === previous.modelId))
-            return previous;
-          const model =
-            value.models.find((model) => model.id === value.defaultModelId) ?? value.models[0];
-          return model?.audio?.speech ? { modelId: model.id, ...model.audio.speech } : null;
-        });
-      })
-      .catch(() => {
-        if (current) setCatalogError(true);
-      });
-    return () => {
-      current = false;
-    };
-  }, [reload]);
+    if (selection.selectionPending) return;
+    const replace = profileReset.current === selection.modelId && !selection.selectionFailed;
+    profileReset.current = null;
+    const model = catalog?.models.find((entry) => entry.id === selection.modelId);
+    if (!model) return;
+    if (profile?.modelId === model.id && !replace) return;
+    const provider = catalog?.providers.find((entry) => entry.id === model.providerId);
+    const next: Profile = model.audio?.speech
+      ? { modelId: model.id, ...model.audio.speech }
+      : {
+          modelId: model.id,
+          voiceId: '',
+          responseFormat: provider?.connectionType === 'google' ? 'wav' : 'mp3',
+        };
+    if (resetUnacceptedPreviews()) setProfile(next);
+  }, [
+    catalog,
+    selection.modelId,
+    selection.selectionPending,
+    selection.selectionFailed,
+    profile,
+    resetUnacceptedPreviews,
+  ]);
   const model = catalog?.models.find((entry) => entry.id === profile?.modelId);
   const provider = catalog?.providers.find((entry) => entry.id === model?.providerId);
-  useEffect(() => setApproved(null), [provider?.id]);
-  const busy = operation.running || operation.applying;
+  const approvedSelection =
+    model && provider?.destinationBinding
+      ? {
+          modelId: model.id,
+          approvedProviderId: provider.id,
+          approvedModelCode: model.modelCode,
+          approvedDestination: provider.destinationBinding,
+        }
+      : null;
+  const approvalKey = approvedSelection ? JSON.stringify(approvedSelection) : null;
+  const isApproved = approvalKey !== null && approved === approvalKey;
+  useEffect(() => setApproved(null), [approvalKey]);
+  const attemptBusy = operation.running || operation.applying;
+  const busy = attemptBusy || selection.selectionPending;
   return (
     <section
       ref={form}
@@ -110,20 +145,57 @@ export function TourNarrationAI({
         profile={profile}
         disabled={busy || disabled}
         busy={busy}
-        onChange={(next) => {
+        onSelectModel={(id) => {
           if (
-            JSON.stringify(next) !== JSON.stringify(profile) &&
-            operation.resetUnacceptedPreviews()
+            !id ||
+            selection.selectionPending ||
+            !catalog?.models.some((entry) => entry.id === id)
           )
+            return;
+          profileReset.current = id;
+          selection.chooseModel(id);
+        }}
+        onOpenModels={() => void selection.retryConfiguration()}
+        onChange={(next) => {
+          if (JSON.stringify(next) !== JSON.stringify(profile) && resetUnacceptedPreviews())
             setProfile(next);
         }}
         t={t}
       />
-      {(!catalog?.models.length || catalogError) && (
+      {!catalog && !selection.configurationFailed && (
+        <p role="status" className="sr-only">
+          {t('scenario.editor.loading')}
+        </p>
+      )}
+      {selection.configurationFailed && (
+        <p role="alert" className="guide-inspector-hint">
+          {t('scenario.editor.guideAiConfigurationFailed')}
+        </p>
+      )}
+      {selection.selectionFailed && (
+        <p role="alert" className="guide-inspector-hint">
+          {t('scenario.editor.guideAiSelectionFailed')}
+        </p>
+      )}
+      {selection.selectionUnavailable && (
+        <p role="status" className="guide-inspector-hint">
+          <bdi className="[overflow-wrap:anywhere]">{selection.unavailableModelName}</bdi>{' '}
+          {t('scenario.editor.guideAiModelUnavailable')}
+        </p>
+      )}
+      {selection.selectionPending && (
+        <p role="status" className="guide-inspector-hint">
+          {t('scenario.editor.loading')}
+        </p>
+      )}
+      {(!catalog?.models.length ||
+        selection.configurationFailed ||
+        selection.selectionUnavailable) && (
         <ProductActionButton
           compact
           tone="secondary"
-          onClick={() => setReload((value) => value + 1)}
+          onClick={() => void selection.retryConfiguration()}
+          disabled={busy || disabled}
         >
           {t('gallery.videoReview.speechReloadModels')}
         </ProductActionButton>
@@ -144,9 +216,9 @@ export function TourNarrationAI({
             <input
               data-ai-consent
               type="checkbox"
-              checked={approved === provider.id}
-              disabled={busy || disabled}
-              onChange={(event) => setApproved(event.currentTarget.checked ? provider.id : null)}
+              checked={isApproved}
+              disabled={busy || disabled || !approvedSelection}
+              onChange={(event) => setApproved(event.currentTarget.checked ? approvalKey : null)}
             />
             <span>{t('scenario.editor.tourNarrationAIConsent')}</span>
           </label>
@@ -160,18 +232,26 @@ export function TourNarrationAI({
             disabled ||
             busy ||
             !profile ||
-            !provider ||
-            approved !== provider.id ||
+            !profile.voiceId.trim() ||
+            profile.modelId !== selection.modelId ||
+            !approvedSelection ||
+            !isApproved ||
             !operation.remaining
           }
           onClick={() => {
-            if (profile && provider && approved === provider.id)
-              void operation.generate(profile, provider.id);
+            if (
+              profile &&
+              profile.voiceId.trim() &&
+              profile.modelId === selection.modelId &&
+              approvedSelection &&
+              isApproved
+            )
+              void operation.generate(profile, approvedSelection);
           }}
         >
           {t('gallery.videoReview.speechGenerateSelected')}
         </ProductActionButton>
-        {busy && (
+        {attemptBusy && (
           <ProductActionButton compact tone="secondary" onClick={operation.cancel}>
             {t('common.actions.cancel')}
           </ProductActionButton>
@@ -186,7 +266,7 @@ export function TourNarrationAI({
       )}
       {operation.failed && (
         <p role="alert" className="guide-inspector-hint">
-          {t('scenario.editor.guideOperationFailed')}
+          {t(narrationFailureKey(operation.providerFailureReason))}
         </p>
       )}
       <NarrationResults
@@ -210,7 +290,12 @@ export function TourNarrationAI({
         )
         .map((target) => (
           <p role="alert" className="guide-inspector-hint" key={scenarioNarrationTargetKey(target)}>
-            {target.text}: {t('scenario.editor.guideOperationFailed')}
+            {target.text}:{' '}
+            {t(
+              narrationFailureKey(
+                operation.errors[scenarioNarrationTargetKey(target)]?.providerReason
+              )
+            )}
           </p>
         ))}
     </section>
@@ -224,13 +309,17 @@ function NarrationVoiceParameters({
   disabled,
   busy,
   onChange,
+  onSelectModel,
+  onOpenModels,
   t,
 }: {
-  catalog: AIModelSelectionBootstrapPayload | null;
+  catalog: AIModelCatalogPayload | null;
   profile: Profile | null;
   disabled: boolean;
   busy: boolean;
   onChange(profile: Profile): void;
+  onSelectModel(id: string | null): void;
+  onOpenModels(): void;
   t: Translate;
 }) {
   const change = (patch: Partial<AISpeechModelParameters>) => {
@@ -244,11 +333,9 @@ function NarrationVoiceParameters({
             models={catalog.models}
             providers={catalog.providers}
             selectedModelId={profile?.modelId ?? null}
-            onSelect={(id) => {
-              const selected = catalog.models.find((entry) => entry.id === id);
-              if (selected?.audio?.speech)
-                onChange({ modelId: selected.id, ...selected.audio.speech });
-            }}
+            onSelect={onSelectModel}
+            onOpen={onOpenModels}
+            disabled={disabled}
           />
         )}
       </InspectorParameterRow>
@@ -310,7 +397,7 @@ function NarrationResults({
 }: {
   results: ReturnType<typeof useScenarioNarrationAI>['ready'];
   selected: ReadonlySet<string>;
-  errors: Record<string, string>;
+  errors: ReturnType<typeof useScenarioNarrationAI>['errors'];
   disabled: boolean;
   batch: boolean;
   onApply(previews: readonly ScenarioNarrationPreview[]): Promise<void>;
@@ -357,7 +444,7 @@ function NarrationResults({
                 )}
                 {errors[key] && (
                   <p role="alert" className="guide-inspector-hint">
-                    {t('scenario.editor.guideOperationFailed')}
+                    {t(narrationFailureKey(errors[key]?.providerReason))}
                   </p>
                 )}
               </div>

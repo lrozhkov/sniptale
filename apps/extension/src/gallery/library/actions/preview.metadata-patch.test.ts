@@ -21,6 +21,11 @@ const { updateMediaLibraryEntrySafelyMock, renameExportMock, updateProjectMock }
   })
 );
 
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: async (_roots: unknown, operation: () => Promise<unknown>) =>
+    operation(),
+}));
+
 vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../workflows/media-hub/store')>()),
   updateMediaLibraryEntrySafely: updateMediaLibraryEntrySafelyMock,

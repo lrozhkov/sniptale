@@ -26,6 +26,9 @@ export function createHandleCancelCountdown(args: CreateScreenshotControllerActi
       session: args.session,
       setNavigationLockEnabled: args.params.setNavigationLockEnabled,
     });
+    const editingMode = args.session.editingModeBaseline;
+    args.session.editingModeBaseline = null;
+    if (editingMode) args.runtime.restoreEditingMode(editingMode);
     args.params.setIsToolbarVisible(true);
   };
 }

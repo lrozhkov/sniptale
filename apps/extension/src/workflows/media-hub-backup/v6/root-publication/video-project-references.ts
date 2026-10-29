@@ -1,5 +1,5 @@
+import type { VideoProjectMetadata } from '../../../../features/video/project/validation';
 import type {
-  VideoProject,
   VideoProjectAssetSource,
   VideoProjectSource,
 } from '../../../../features/video/project/types';
@@ -90,12 +90,12 @@ function transformAssetSource(
 }
 
 /** Remaps only validated video-project reference fields; unknown object keys are never traversed. */
-export function transformPortableVideoProjectReferences(
-  project: VideoProject,
+export function transformPortableVideoProjectReferences<Project extends VideoProjectMetadata>(
+  project: Project,
   assetIds: ReadonlyMap<string, string>,
   rootIds: Readonly<Record<string, string>>,
   childIds: Readonly<Record<string, string>>
-): VideoProject {
+): Project {
   return {
     ...project,
     source: transformProjectSource(project.source, rootIds),

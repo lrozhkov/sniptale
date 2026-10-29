@@ -50,6 +50,7 @@ interface MissingStoreIndexes {
 function createDbCoreState() {
   return {
     databaseReady: false,
+    preparedDatabase: null as IDBPDatabase | null,
     dbTerminationListeners: new Set<DbTerminationListener>(),
     preparationPromise: null as Promise<void> | null,
   };
@@ -212,11 +213,13 @@ async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
       logger.warn('This tab is blocking a database upgrade');
       openedDb?.close();
       getDbCoreState().databaseReady = false;
+      getDbCoreState().preparedDatabase = null;
       void stateManager.remove(DB_CORE_STATE_DOMAIN, DB_PROMISE_KEY);
     },
     terminated() {
       logger.error('Database connection terminated unexpectedly');
       getDbCoreState().databaseReady = false;
+      getDbCoreState().preparedDatabase = null;
       void stateManager.remove(DB_CORE_STATE_DOMAIN, DB_PROMISE_KEY);
       notifyDbTerminationListeners();
     },
@@ -252,6 +255,12 @@ async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
 }
 
 export { requestPersistentStorageGrant as ensurePersistentStorage };
+
+/** Capture the current native handle without opening or repairing storage. */
+export function capturePreparedDatabase(): IDBPDatabase | null {
+  const state = getDbCoreState();
+  return state.databaseReady ? state.preparedDatabase : null;
+}
 
 export function initDB(permit?: PersistenceMutationPermit): Promise<IDBPDatabase> {
   if (isActivePersistenceMutationPermit(permit)) {
@@ -332,12 +341,13 @@ async function prepareDatabase(allowAlphaReset = false): Promise<void> {
       admission = await runStorageStartupPhase('database-schema-check', inspectDatabaseAdmission);
     }
     if (admission.status !== 'ready') throw new DatabaseAdmissionError(admission);
-    await openDbAuthority();
+    const preparedDatabase = await openDbAuthority();
     const verified = await runStorageStartupPhase(
       'database-schema-check',
       inspectDatabaseAdmission
     );
     if (verified.status !== 'ready') throw new DatabaseAdmissionError(verified);
+    state.preparedDatabase = preparedDatabase;
     state.databaseReady = true;
   });
   const observed = runStorageStartupPhase('database-admission', () => preparation);
@@ -381,6 +391,7 @@ function deleteDatabase(name: string) {
 async function closeDbAuthority(): Promise<void> {
   const state = getDbCoreState();
   state.databaseReady = false;
+  state.preparedDatabase = null;
   const cachedDb = await stateManager.read<IDBPDatabase>(DB_CORE_STATE_DOMAIN, DB_PROMISE_KEY);
   await stateManager.remove(DB_CORE_STATE_DOMAIN, DB_PROMISE_KEY);
   cachedDb?.close();

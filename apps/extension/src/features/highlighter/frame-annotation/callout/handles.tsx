@@ -1,4 +1,4 @@
-import { Heading, Move, Plus, Settings2 } from 'lucide-react';
+import { Heading, Move, Plus, Settings2, Trash2 } from 'lucide-react';
 import type {
   CSSProperties,
   MouseEvent as ReactMouseEvent,
@@ -30,6 +30,7 @@ export type CalloutInteractionHandleProps = {
   handleResizeRightPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleResizeRightKeyDown: (event: CalloutHandleKeyboardEvent) => void;
   handleSettingsClick: () => void;
+  onDelete?: () => void;
   handleTitleToggleClick: () => void;
   handleTailPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   handleTailKeyDown: (event: CalloutHandleKeyboardEvent) => void;
@@ -137,6 +138,20 @@ function stopCalloutControlEvent(
   event.nativeEvent.stopImmediatePropagation();
 }
 
+const calloutActionButtonStyle: CSSProperties = {
+  width: 26,
+  height: 26,
+  padding: 0,
+  borderRadius: '50%',
+  border: '1px solid var(--sniptale-color-border-soft)',
+  background: 'var(--sniptale-color-surface-panel)',
+  color: 'var(--sniptale-color-text-primary)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+};
+
 function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
   if (props.isEditing || !props.showSettingsHandle) return null;
   const label = translate('content.interactiveFrame.calloutSettings');
@@ -151,17 +166,7 @@ function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
       title={label}
       style={mergeThemeScopedStyle(props.portalTheme, {
         ...props.settingsHandleStyle,
-        width: 26,
-        height: 26,
-        padding: 0,
-        borderRadius: '50%',
-        border: '1px solid var(--sniptale-color-border-soft)',
-        background: 'var(--sniptale-color-surface-panel)',
-        color: 'var(--sniptale-color-text-primary)',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
+        ...calloutActionButtonStyle,
         opacity: props.isHandleVisible ? 1 : 0,
         pointerEvents: props.isHandleVisible ? 'auto' : 'none',
         boxShadow:
@@ -278,6 +283,39 @@ function renderCalloutTitleToggleHandle(props: CalloutInteractionHandleProps) {
   );
 }
 
+function renderCalloutDeleteHandle(props: CalloutInteractionHandleProps) {
+  if (props.isEditing || !props.onDelete) return null;
+  const label = translate('common.actions.delete');
+  return (
+    <button
+      data-sniptale-callout-control-frame-id={props.frameId}
+      type="button"
+      className="sniptale-callout-delete-handle"
+      aria-label={label}
+      title={label}
+      style={mergeThemeScopedStyle(props.portalTheme, {
+        ...removeFixedPlacement(props.dragHandleStyle),
+        ...calloutActionButtonStyle,
+        opacity: props.isHandleVisible ? 1 : 0,
+        pointerEvents: props.isHandleVisible ? 'auto' : 'none',
+        boxShadow:
+          '0 2px 8px color-mix(in srgb, var(--sniptale-color-shadow-strong) 24%, transparent)',
+      })}
+      onPointerDown={stopCalloutControlEvent}
+      onClick={(event) => {
+        stopCalloutControlEvent(event);
+        props.onDelete?.();
+      }}
+      onFocus={props.handleHandleFocus}
+      onBlur={props.handleHandleBlur}
+      onPointerEnter={props.handleMouseEnter}
+      onPointerLeave={props.handleMouseLeave}
+    >
+      <Trash2 aria-hidden="true" size={14} />
+    </button>
+  );
+}
+
 function removeFixedPlacement(style: CSSProperties): CSSProperties {
   const { left: _left, top: _top, position: _position, zIndex: _zIndex, ...buttonStyle } = style;
   return buttonStyle;
@@ -311,6 +349,7 @@ function renderCalloutAdjacentControls(props: CalloutInteractionHandleProps) {
         {renderCalloutMoveHandle(groupedProps)}
         {renderCalloutTitleToggleHandle(groupedProps)}
         {renderCalloutSettingsHandle(groupedProps)}
+        {renderCalloutDeleteHandle(groupedProps)}
       </div>
     </div>
   );

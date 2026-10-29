@@ -10,6 +10,7 @@ import {
 } from '../../features/drawing/public';
 import { translate } from '../../platform/i18n';
 import type { ContentDrawingController } from './controller';
+import { measureDrawingTextFittedWidth } from './text-measurement';
 import { createDrawingId } from '../../features/drawing/public';
 import {
   DrawingTextBackgrounds,
@@ -21,6 +22,7 @@ import {
 
 export type DrawingTextDraft = {
   autoWidth?: boolean;
+  fittedWidth?: number | undefined;
   id: string | null;
   maxWidth?: number;
   point: DrawingPoint;
@@ -71,22 +73,28 @@ export function useDrawingTextEditor(controller: ContentDrawingController) {
               fontSize: existing.fontSize,
             }
           : defaults;
-      const width = clampDrawingTextWidth(
-        text,
-        style.fontSize,
-        current.width ??
-          (existing?.kind === 'text'
-            ? existing.bounds.width
-            : resolveDrawingTextNaturalWidth(text, style.fontSize, current.maxWidth ?? 640)),
-        current.autoWidth ? current.maxWidth : Number.POSITIVE_INFINITY
-      );
+      const width =
+        current.fittedWidth ??
+        clampDrawingTextWidth(
+          text,
+          style.fontSize,
+          current.width ??
+            (existing?.kind === 'text'
+              ? existing.bounds.width
+              : resolveDrawingTextNaturalWidth(text, style.fontSize, current.maxWidth ?? 640)),
+          current.autoWidth ? current.maxWidth : Number.POSITIVE_INFINITY
+        );
+      const originalWidth = current.width ?? width;
+      const halfShrink = (originalWidth - width) / 2;
+      const radians = ((current.rotation ?? 0) * Math.PI) / 180;
       const object = {
         id: current.id ?? createDrawingId(),
         kind: 'text' as const,
         text,
         bounds: {
-          x: current.point.x,
-          y: current.point.y,
+          // Keep the rotated text origin fixed when its transform center moves.
+          x: current.point.x + halfShrink * (1 - Math.cos(radians)),
+          y: current.point.y - halfShrink * Math.sin(radians),
           width,
           height: current.height ?? resolveDrawingTextHeight(text, style.fontSize, width),
         },
@@ -186,9 +194,18 @@ function useDrawingTextEditorLayout(props: DrawingTextEditorProps) {
         draft.autoWidth && measuredWidth > 0
           ? clampDrawingTextWidth(draft.value, fontSize, measuredWidth, draft.maxWidth)
           : draft.width;
-      if (nextHeight === draft.height && nextWidth === draft.width) return;
+      const fittedWidth = mirror
+        ? measureDrawingTextFittedWidth(mirror, draft.value.trim())
+        : undefined;
+      if (
+        nextHeight === draft.height &&
+        nextWidth === draft.width &&
+        fittedWidth === draft.fittedWidth
+      )
+        return;
       onChange({
         ...draft,
+        fittedWidth,
         ...(nextHeight === undefined ? {} : { height: nextHeight }),
         ...(nextWidth === undefined ? {} : { width: nextWidth }),
       });
@@ -219,6 +236,7 @@ function resolveChangedTextDraft(args: {
   return {
     ...draft,
     value,
+    fittedWidth: undefined,
     ...(draft.autoWidth
       ? {
           width:

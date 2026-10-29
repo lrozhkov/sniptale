@@ -1,9 +1,22 @@
+import { setStoredAIProviderEnabled } from './provider-secrets.store';
+import { browserStorage } from '../infrastructure/browser-storage';
+import {
+  AI_STORAGE_VERSION,
+  AI_STORAGE_VERSION_KEY,
+  AI_STORAGE_RESET_PHASE_KEY,
+} from './constants';
 import {
   getAIModelOperation,
   isValidAIModelOperationConfiguration,
 } from '../../../contracts/settings/model-operation';
-import type { AIModel } from '../../../contracts/settings';
-import { acquirePersistenceMutationTransition } from '../infrastructure/mutation-barrier';
+import type { AIModel, AIProvider } from '../../../contracts/settings';
+import { createAIProviderDestinationBinding } from '../../../features/ai/egress-authority';
+import {
+  runWithExclusivePersistenceMutationPermit,
+  runWithAtomicPersistenceMutationPermit,
+  acquirePersistenceMutationTransition,
+  type PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 import type { AIProviderUpsertInput } from './core';
 import {
   changeAISecretPassphraseProtection,
@@ -14,7 +27,6 @@ import {
   loadAISecretProtectionStatus as loadUnserializedAISecretProtectionStatus,
   loadAIModels,
   loadAIProviders,
-  loadDefaultModelId,
   lockAISecretProtection,
   resetAudioTranscriptionSystemPrompt,
   saveAudioTranscriptionSystemPrompt,
@@ -24,9 +36,7 @@ import {
   resetAISecretPassphraseProtection,
   resetScenarioEditorSystemPrompt,
   saveAIModels,
-  saveAIModelGraph,
   saveChromeAiEnabled,
-  saveDefaultModelId,
   saveGlobalSystemPrompt,
   saveScenarioEditorSystemPrompt,
   unlockAISecretProtection,
@@ -34,8 +44,25 @@ import {
   type AISecretProtectionStatus,
 } from './core';
 import { initializeAiStorageAccess } from './init';
+import { rememberAIScenarioSelection } from './scenario-selections';
+import {
+  admitCatalogRefresh,
+  commitCatalogRefresh,
+  type AICatalogRefreshToken,
+  type AICatalogRefreshOutcome,
+} from './managed-catalog';
+import {
+  admitOperationObservation,
+  commitOperationObservation,
+  type AIOperationObservationBinding,
+  type AIOperationObservationToken,
+  type AIOperationObservationOutcome,
+} from './operation-observations';
 import { assertAISettingsGraphInvariants } from './graph-invariants';
-import type { AISettingsMutationCommand } from './graph-mutation-types';
+import {
+  AIModelProviderChangedError,
+  type AISettingsMutationCommand,
+} from './graph-mutation-types';
 
 // policyStateId: ai-settings-mutation-queue - durable storage remains authoritative while this
 // runtime-local queue serializes graph transitions and is recreated empty after runtime restart.
@@ -50,50 +77,114 @@ function queueAISettingsMutation<T>(run: () => Promise<T>): Promise<T> {
   return nextMutation;
 }
 
-async function assertModelProviderExists(model: AIModel): Promise<void> {
+async function assertModelProviderExists(
+  model: AIModel,
+  providerIncarnation?: string
+): Promise<AIProvider> {
   if (!isValidAIModelOperationConfiguration(model))
     throw new Error('Invalid AI model operation configuration');
   const providers = await loadAIProviders();
-  if (!providers.some((provider) => provider.id === model.providerId)) {
+  const provider = providers.find((entry) => entry.id === model.providerId);
+  if (!provider) {
+    if (providerIncarnation !== undefined) throw new AIModelProviderChangedError();
     throw new Error(`Provider ${model.providerId} not found for model ${model.id}`);
   }
+  if (providerIncarnation !== undefined && provider.incarnation !== providerIncarnation)
+    throw new AIModelProviderChangedError();
+  return provider;
 }
 
-async function addProvider(command: { provider: AIProviderUpsertInput }): Promise<void> {
+async function addProvider(
+  command: { provider: AIProviderUpsertInput },
+  permit: PersistenceMutationPermit
+): Promise<void> {
   const providers = await loadAIProviders();
   if (providers.some((provider) => provider.id === command.provider.id)) {
     throw new Error(`Provider ${command.provider.id} already exists`);
   }
-  await upsertAIProviderRecord(command.provider);
+  await upsertAIProviderRecord(command.provider, permit);
 }
 
-async function updateProvider(command: { provider: AIProviderUpsertInput }): Promise<void> {
+async function updateProvider(
+  command: { provider: AIProviderUpsertInput },
+  permit: PersistenceMutationPermit
+): Promise<void> {
   const providers = await loadAIProviders();
   if (!providers.some((provider) => provider.id === command.provider.id)) {
     throw new Error(`Provider ${command.provider.id} not found`);
   }
-  await upsertAIProviderRecord(command.provider);
+  await upsertAIProviderRecord(command.provider, permit);
 }
 
-async function clearProviderSecret(providerId: string): Promise<void> {
+async function clearProviderSecret(
+  providerId: string,
+  permit: PersistenceMutationPermit
+): Promise<void> {
   const providers = await loadAIProviders();
   if (!providers.some((provider) => provider.id === providerId)) {
     throw new Error(`Provider ${providerId} not found`);
   }
-  await clearAIProviderSecret(providerId);
+  await clearAIProviderSecret(providerId, permit);
 }
 
-async function addModel(model: AIModel): Promise<void> {
-  await assertModelProviderExists(model);
+async function resolveModelProperties(
+  model: AIModel,
+  models: readonly AIModel[],
+  provider: AIProvider
+): Promise<AIModel> {
+  const {
+    catalog: _submittedCatalog,
+    operationObservations: _submittedObservations,
+    ...configured
+  } = model;
+  const matches = models.filter(
+    (entry) =>
+      entry.providerId === model.providerId && entry.modelCode === model.modelCode && entry.catalog
+  );
+  const scope = matches.length ? await createAIProviderDestinationBinding(provider) : undefined;
+  const current = matches.find((entry) => entry.catalog?.scope === scope)?.catalog;
+  const provenance = current ?? matches.find((entry) => entry.id === model.id)?.catalog;
+  if (
+    model.propertySource === 'catalog' ||
+    (model.propertySource === undefined && model.source === 'catalog')
+  ) {
+    if (!current || current.lifecycle === 'absent' || current.lifecycle === 'unknown')
+      throw new Error('Current AI model catalog properties are unavailable');
+    return {
+      ...configured,
+      propertySource: 'catalog',
+      retirementOverride: false,
+      displayName: current.displayName,
+      capabilities: current.capabilities,
+      catalog: current,
+    };
+  }
+  return {
+    ...configured,
+    ...(model.propertySource === 'manual' ? { source: 'manual' as const } : {}),
+    ...(provenance ? { catalog: provenance } : {}),
+  };
+}
+
+async function addModel(
+  model: AIModel,
+  permit: PersistenceMutationPermit,
+  providerIncarnation?: string
+): Promise<void> {
+  const provider = await assertModelProviderExists(model, providerIncarnation);
   const models = await loadAIModels();
   if (models.some((current) => current.id === model.id)) {
     throw new Error(`Model ${model.id} already exists`);
   }
-  await saveAIModels([...models, model]);
+  await saveAIModels([...models, await resolveModelProperties(model, models, provider)], permit);
 }
 
-async function updateModel(model: AIModel): Promise<void> {
-  await assertModelProviderExists(model);
+async function updateModel(
+  model: AIModel,
+  permit: PersistenceMutationPermit,
+  providerIncarnation?: string
+): Promise<void> {
+  const provider = await assertModelProviderExists(model, providerIncarnation);
   const models = await loadAIModels();
   const index = models.findIndex((current) => current.id === model.id);
   if (index < 0) {
@@ -106,30 +197,43 @@ async function updateModel(model: AIModel): Promise<void> {
     systemPrompt: previousPrompt,
     ...previous
   } = nextModels[index]!;
-  nextModels[index] = {
-    ...previous,
-    ...(getAIModelOperation(model) === 'text' && previousPrompt !== undefined
-      ? { systemPrompt: previousPrompt }
-      : {}),
-    ...model,
-  };
-  const defaultModelId = await loadDefaultModelId();
-  await saveAIModelGraph(
-    nextModels,
-    defaultModelId === model.id && getAIModelOperation(model) !== 'text' ? null : defaultModelId
+  const {
+    catalog: _catalog,
+    capabilities: _capabilities,
+    source: _source,
+    propertySource: _propertySource,
+    retirementOverride: _retirementOverride,
+    ...changedIdentity
+  } = previous;
+  const sameIdentity =
+    previous.providerId === model.providerId && previous.modelCode === model.modelCode;
+  nextModels[index] = await resolveModelProperties(
+    {
+      ...(sameIdentity ? previous : changedIdentity),
+      ...(getAIModelOperation(model) === 'text' && previousPrompt !== undefined
+        ? { systemPrompt: previousPrompt }
+        : {}),
+      ...model,
+    },
+    models,
+    provider
   );
+  await saveAIModels(nextModels, permit);
 }
 
-async function deleteModel(modelId: string): Promise<void> {
+async function deleteModel(modelId: string, permit: PersistenceMutationPermit): Promise<void> {
   const models = await loadAIModels();
-  const defaultModelId = await loadDefaultModelId();
-  await saveAIModelGraph(
+  await saveAIModels(
     models.filter((model) => model.id !== modelId),
-    defaultModelId === modelId ? null : defaultModelId
+    permit
   );
 }
 
-async function moveModel(modelId: string, beforeModelId: string | null): Promise<void> {
+async function moveModel(
+  modelId: string,
+  beforeModelId: string | null,
+  permit: PersistenceMutationPermit
+): Promise<void> {
   const models = await loadAIModels();
   const sourceIndex = models.findIndex((model) => model.id === modelId);
   if (sourceIndex < 0) {
@@ -149,41 +253,87 @@ async function moveModel(modelId: string, beforeModelId: string | null): Promise
       : nextModels.findIndex((model) => model.id === beforeModelId);
   nextModels.splice(targetIndex, 0, source);
   if (nextModels.every((model, index) => model.id === models[index]?.id)) return;
-  await saveAIModels(nextModels);
+  await saveAIModels(nextModels, permit);
 }
 
-async function saveDefaultModel(defaultModelId: string | null): Promise<void> {
-  if (defaultModelId) {
-    const models = await loadAIModels();
-    if (
-      !models.some((model) => model.id === defaultModelId && getAIModelOperation(model) === 'text')
-    ) {
-      throw new Error(`Default AI model ${defaultModelId} not found`);
-    }
+type GraphCommand = Extract<
+  AISettingsMutationCommand,
+  {
+    operation:
+      | 'add-model'
+      | 'update-model'
+      | 'delete-model'
+      | 'move-model'
+      | 'add-provider'
+      | 'update-provider'
+      | 'clear-provider-secret'
+      | 'delete-provider';
   }
-  await saveDefaultModelId(defaultModelId);
+>;
+function isGraphCommand(command: AISettingsMutationCommand): command is GraphCommand {
+  return (
+    command.operation === 'add-model' ||
+    command.operation === 'update-model' ||
+    command.operation === 'delete-model' ||
+    command.operation === 'move-model' ||
+    command.operation === 'add-provider' ||
+    command.operation === 'update-provider' ||
+    command.operation === 'clear-provider-secret' ||
+    command.operation === 'delete-provider'
+  );
 }
-
-async function applyAISettingsMutation(command: AISettingsMutationCommand): Promise<void> {
+async function applyGraphMutation(
+  command: GraphCommand,
+  permit: PersistenceMutationPermit
+): Promise<void> {
   switch (command.operation) {
     case 'add-provider':
-      return addProvider(command);
+      return addProvider(command, permit);
     case 'update-provider':
-      return updateProvider(command);
+      return updateProvider(command, permit);
     case 'clear-provider-secret':
-      return clearProviderSecret(command.providerId);
+      return clearProviderSecret(command.providerId, permit);
     case 'delete-provider':
-      return deleteAIProviderGraphRecord(command.providerId);
+      return deleteAIProviderGraphRecord(command.providerId, permit);
     case 'add-model':
-      return addModel(command.model);
+      return addModel(command.model, permit, command.providerIncarnation);
     case 'update-model':
-      return updateModel(command.model);
+      return updateModel(command.model, permit, command.providerIncarnation);
     case 'delete-model':
-      return deleteModel(command.modelId);
+      return deleteModel(command.modelId, permit);
     case 'move-model':
-      return moveModel(command.modelId, command.beforeModelId);
-    case 'save-default-model':
-      return saveDefaultModel(command.defaultModelId);
+      return moveModel(command.modelId, command.beforeModelId, permit);
+  }
+}
+async function mutateGraph(command: GraphCommand): Promise<void> {
+  await runWithAtomicPersistenceMutationPermit(async (permit) => {
+    const state = await browserStorage.local.get([
+      AI_STORAGE_VERSION_KEY,
+      AI_STORAGE_RESET_PHASE_KEY,
+    ]);
+    if (
+      state[AI_STORAGE_VERSION_KEY] !== AI_STORAGE_VERSION ||
+      state[AI_STORAGE_RESET_PHASE_KEY] !== undefined
+    )
+      throw new Error('AI settings are not ready for graph publication');
+    await assertAISettingsGraphInvariants();
+    await applyGraphMutation(command, permit);
+    await assertAISettingsGraphInvariants();
+  });
+}
+
+async function applyAISettingsMutation(
+  command: Exclude<AISettingsMutationCommand, GraphCommand>
+): Promise<void> {
+  switch (command.operation) {
+    case 'remember-scenario-selection':
+      return runWithExclusivePersistenceMutationPermit((permit) =>
+        rememberAIScenarioSelection(command.selection, Date.now(), permit)
+      );
+    case 'set-provider-enabled':
+      return runWithExclusivePersistenceMutationPermit((permit) =>
+        setStoredAIProviderEnabled(command, permit)
+      );
     case 'save-voice-input-correction-prompt':
       return saveVoiceInputCorrectionSystemPrompt(command.prompt);
     case 'reset-voice-input-correction-prompt':
@@ -233,6 +383,10 @@ export function mutateStoredAISettings(command: AISettingsMutationCommand): Prom
     const lease = await transition;
     try {
       await initializeAiStorageAccess();
+      if (isGraphCommand(command)) {
+        await mutateGraph(command);
+        return;
+      }
       await assertAISettingsGraphInvariants();
       await applyAISettingsMutation(command);
       await assertAISettingsGraphInvariants();
@@ -253,4 +407,53 @@ export function loadSerializedAISecretProtectionStatus(): Promise<AISecretProtec
 
 export function resetAISettingsMutationQueueForTests(): void {
   aiSettingsMutationQueue = Promise.resolve<void>(undefined);
+}
+
+/** Admit metadata fetch through the same queue as user settings mutations; fetch runs outside it. */
+export function admitStoredAICatalogRefresh(
+  providerId: string,
+  explicit: boolean,
+  now = Date.now()
+) {
+  return queueAISettingsMutation(async () => {
+    await initializeAiStorageAccess();
+    return runWithExclusivePersistenceMutationPermit((permit) =>
+      admitCatalogRefresh(providerId, explicit, now, permit)
+    );
+  });
+}
+
+/** Commit one admitted metadata result without replaying a failed network request. */
+export function commitStoredAICatalogRefresh(
+  token: AICatalogRefreshToken,
+  outcome: AICatalogRefreshOutcome,
+  now = Date.now()
+): Promise<boolean> {
+  return queueAISettingsMutation(() =>
+    runWithExclusivePersistenceMutationPermit((permit) =>
+      commitCatalogRefresh(token, outcome, now, permit)
+    )
+  );
+}
+
+/** Admit advisory request metadata without initialization, secret activation or graph repair. */
+export function admitStoredAIOperation(binding: AIOperationObservationBinding) {
+  return queueAISettingsMutation(() =>
+    runWithExclusivePersistenceMutationPermit((permit) =>
+      admitOperationObservation(binding, permit)
+    )
+  );
+}
+
+/** Publish a bounded operation outcome after earlier graph mutations settle. */
+export function commitStoredAIOperation(
+  token: AIOperationObservationToken,
+  outcome: AIOperationObservationOutcome,
+  now = Date.now()
+): Promise<boolean> {
+  return queueAISettingsMutation(() =>
+    runWithExclusivePersistenceMutationPermit((permit) =>
+      commitOperationObservation(token, outcome, now, permit)
+    )
+  );
 }

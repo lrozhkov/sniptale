@@ -7,6 +7,12 @@ import { runNativeVisibleCaptureExclusive } from './coordinator';
 
 const logger = createLogger({ namespace: 'BackgroundVisibleCapture' });
 
+type VisibleCaptureOutputOptions = {
+  losslessSource?: boolean;
+  format?: 'png' | 'jpeg' | 'webp';
+  quality?: number;
+};
+
 type VisibleCaptureTransaction = {
   dataUrl: string;
   jobId: string;
@@ -56,8 +62,17 @@ async function convertPngToWebp(pngDataUrl: string, quality: number): Promise<st
   });
 }
 
-async function captureVisibleTabNative(tabId: number): Promise<string> {
-  const settings = await loadSettings();
+async function captureVisibleTabNative(
+  tabId: number,
+  options?: VisibleCaptureOutputOptions
+): Promise<string> {
+  const storedSettings = await loadSettings();
+  const settings = {
+    ...storedSettings,
+    imageFormat: options?.format ?? storedSettings.imageFormat,
+    imageQuality: options?.quality ?? storedSettings.imageQuality,
+  };
+  const losslessSource = options?.losslessSource ?? false;
   const apiFormat = resolveVisibleCaptureApiFormat(settings.imageFormat);
   const tab = await browserTabs.get(tabId);
   if (typeof tab.windowId !== 'number') {
@@ -70,13 +85,14 @@ async function captureVisibleTabNative(tabId: number): Promise<string> {
     const capturedDataUrl = await lease.capture(
       tab.windowId,
       {
-        format: apiFormat,
-        quality: settings.imageQuality,
+        format: losslessSource ? 'png' : apiFormat,
+        ...(losslessSource ? {} : { quality: settings.imageQuality }),
       },
       () => assertVisibleCaptureTargetIsActive(tabId, tab.windowId)
     );
     await assertVisibleCaptureTargetIsActive(tabId, tab.windowId);
 
+    if (losslessSource) return capturedDataUrl;
     return finalizeCapturedDataUrl({
       dataUrl: capturedDataUrl,
       settings,
@@ -108,11 +124,12 @@ export async function captureVisibleTabForCrop(tabId: number): Promise<string> {
 }
 
 export async function captureVisibleTabTransaction(
-  tabId: number
+  tabId: number,
+  options?: VisibleCaptureOutputOptions
 ): Promise<VisibleCaptureTransaction> {
   return runVisibleCaptureTransaction(
     tabId,
-    () => captureVisibleTabNative(tabId),
+    () => captureVisibleTabNative(tabId, options),
     'Visible capture failed'
   );
 }
@@ -120,5 +137,5 @@ export async function captureVisibleTabTransaction(
 export async function captureVisibleTabForCropTransaction(
   tabId: number
 ): Promise<VisibleCaptureTransaction> {
-  return captureVisibleTabTransaction(tabId);
+  return captureVisibleTabTransaction(tabId, { losslessSource: true });
 }

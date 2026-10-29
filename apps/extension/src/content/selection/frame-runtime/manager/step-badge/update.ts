@@ -1,3 +1,4 @@
+import { resolveStandaloneStepBadgeSettings } from '../../../../../features/highlighter/frame-annotation/model';
 import type {
   FrameData,
   GlobalStepBadgeSettings,
@@ -87,7 +88,13 @@ export function createUpdateFrameStepBadge(params: {
           scheduleStepBadgeRecalculation(recalculateStepBadgesRef);
         }
 
-        return { ...frame, stepBadge: newSettings };
+        return {
+          ...frame,
+          stepBadge:
+            frame.annotationKind === undefined
+              ? newSettings
+              : resolveStandaloneStepBadgeSettings(newSettings),
+        };
       })
     );
     if (fallback) {

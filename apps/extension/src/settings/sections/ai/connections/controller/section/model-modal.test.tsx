@@ -68,3 +68,16 @@ it('opens and closes the model modal locally', async () => {
 
   expect(latestState?.modelModal).toEqual({ open: false });
 });
+
+it('retains the recovery provider hint only for the current new-model dialog', async () => {
+  await render();
+  act(() => latestState?.openModelModal(undefined, 'recovery-provider'));
+  expect(latestState?.modelModal).toEqual({
+    open: true,
+    model: null,
+    initialProviderId: 'recovery-provider',
+  });
+  act(() => latestState?.closeModelModal());
+  act(() => latestState?.openModelModal(MODEL));
+  expect(latestState?.modelModal).toEqual({ open: true, model: MODEL });
+});

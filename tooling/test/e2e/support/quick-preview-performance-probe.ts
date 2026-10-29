@@ -1,243 +1,18 @@
 import type { Page } from '@playwright/test';
 import { arch, cpus, platform, release } from 'node:os';
 
+type QuickPreviewProbeOptions = {
+  sampleId: string;
+  detailed?: boolean;
+  labels: { loading: string; failed: string; retry: string };
+};
+
 /** Timing the native layer does not measure publication of independently painted effects. */
 export async function startQuickPreviewPerformanceProbe(
   page: Page,
-  options: {
-    sampleId: string;
-    detailed?: boolean;
-    labels: { loading: string; failed: string; retry: string };
-  }
+  options: QuickPreviewProbeOptions
 ) {
-  const handle = await page.evaluateHandle(({ sampleId, detailed, labels }) => {
-    const stage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
-    const video = stage?.querySelector('video');
-    if (!(video instanceof HTMLVideoElement) || video.readyState < 2 || video.paused)
-      throw new Error('Performance sample requires a playing, decoded stage video');
-    const limit = 10_000;
-    const frames: Array<{ now: number; mediaTime: number; presented: number; processing: number }> =
-      [];
-    const rafIntervals: number[] = [];
-    const publications: Array<{
-      now: number;
-      width: number;
-      height: number;
-      transportTime: number;
-    }> = [];
-    const publicationHost = stage?.querySelector('[data-ui="gallery.videoReview.manualPreview"]');
-    const identity = () => {
-      const currentStage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
-      const currentVideo = currentStage?.querySelector('video');
-      const currentHost = currentStage?.querySelector(
-        '[data-ui="gallery.videoReview.manualPreview"]'
-      );
-      return {
-        stageConnected: !!stage?.isConnected,
-        stageCurrent: stage === currentStage,
-        videoConnected: video.isConnected,
-        videoCurrent: video === currentVideo,
-        hostConnected: !!publicationHost?.isConnected,
-        hostCurrent: publicationHost === currentHost,
-      };
-    };
-    const uiState = () => {
-      const currentStage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
-      const host = currentStage?.querySelector('[data-ui="gallery.videoReview.manualPreview"]');
-      const canvas = host?.querySelector('canvas');
-      const bounds = canvas?.getBoundingClientRect();
-      const alerts = [...(currentStage?.querySelectorAll(':scope > [role="alert"]') ?? [])];
-      const statuses = [...(currentStage?.querySelectorAll(':scope > [role="status"]') ?? [])];
-      const failed = alerts.some(
-        (node) => node.querySelector('span')?.textContent === labels.failed
-      );
-      const pending = statuses.some(
-        (node) => node.querySelector('span')?.textContent === labels.loading
-      );
-      return {
-        phase: failed ? 'failed' : pending ? 'pending' : 'no-status',
-        retry: alerts.some((node) =>
-          [...node.querySelectorAll('button')].some(
-            (button) =>
-              button.getAttribute('aria-label') === labels.retry ||
-              button.textContent?.trim() === labels.retry
-          )
-        ),
-        canvasVisible: !!bounds && bounds.width > 0 && bounds.height > 0 && !!canvas?.isConnected,
-        backing:
-          canvas instanceof HTMLCanvasElement
-            ? { width: canvas.width, height: canvas.height }
-            : null,
-        visibility: document.visibilityState,
-        fullscreenOwnsStage: !!currentStage && !!document.fullscreenElement?.contains(currentStage),
-      };
-    };
-    const identityAtStart = identity();
-    const statusAtStart = uiState();
-    let identityValid = Object.values(identityAtStart).every(Boolean);
-    let previousIdentity = JSON.stringify(identityAtStart);
-    const identityChanges: Array<{ now: number; value: ReturnType<typeof identity> }> = [];
-    const inspectIdentity = () => {
-      const value = identity();
-      identityValid &&= Object.values(value).every(Boolean);
-      const key = JSON.stringify(value);
-      if (key !== previousIdentity && identityChanges.length < 16)
-        identityChanges.push({ now: performance.now(), value });
-      previousIdentity = key;
-      return value;
-    };
-    let coalescedPublications = 0;
-    const publicationObserver = new MutationObserver((records) => {
-      const additions = records
-        .flatMap((record) => [...record.addedNodes])
-        .filter((node) => node instanceof HTMLCanvasElement);
-      if (!additions.length || stopped) return;
-      const canvas = publicationHost?.firstElementChild;
-      if (
-        !(canvas instanceof HTMLCanvasElement) ||
-        !canvas.isConnected ||
-        canvas.getBoundingClientRect().width <= 0
-      )
-        return;
-      coalescedPublications += Math.max(0, additions.length - 1);
-      if (publications.length < limit)
-        publications.push({
-          now: performance.now(),
-          width: canvas.width,
-          height: canvas.height,
-          transportTime: video.currentTime,
-        });
-      else overflow = true;
-    });
-    if (publicationHost) publicationObserver.observe(publicationHost, { childList: true });
-
-    const surfaces = () =>
-      [...document.querySelectorAll('canvas')].map((canvas) => ({
-        width: canvas.width,
-        height: canvas.height,
-        cssWidth: canvas.clientWidth,
-        cssHeight: canvas.clientHeight,
-        inStage: !!stage?.contains(canvas),
-      }));
-    const initial = {
-      time: performance.now(),
-      mediaTime: video.currentTime,
-      quality: video.getVideoPlaybackQuality(),
-      surfaces: surfaces(),
-    };
-    let overflow = false;
-    let stopped = false;
-    let frameId = 0;
-    let rafId = 0;
-    let previousRaf: number | null = null;
-    let drawCalls = 0;
-    let drawSubmissionMs = 0;
-    const originalDraw = CanvasRenderingContext2D.prototype.drawImage;
-    const observedDraw: typeof originalDraw = function (...args: Parameters<typeof originalDraw>) {
-      const start = performance.now();
-      try {
-        return Reflect.apply(originalDraw, this, args);
-      } finally {
-        drawCalls++;
-        drawSubmissionMs += performance.now() - start;
-      }
-    };
-    if (detailed) CanvasRenderingContext2D.prototype.drawImage = observedDraw;
-    const onFrame: VideoFrameRequestCallback = (now, metadata) => {
-      if (stopped) return;
-      if (frames.length < limit)
-        frames.push({
-          now,
-          mediaTime: metadata.mediaTime,
-          presented: metadata.presentedFrames,
-          processing: metadata.processingDuration,
-        });
-      else overflow = true;
-      frameId = video.requestVideoFrameCallback(onFrame);
-    };
-    const onRaf = (now: number) => {
-      if (stopped) return;
-      inspectIdentity();
-      if (previousRaf !== null) {
-        if (rafIntervals.length < limit) rafIntervals.push(now - previousRaf);
-        else overflow = true;
-      }
-      previousRaf = now;
-      rafId = requestAnimationFrame(onRaf);
-    };
-    frameId = video.requestVideoFrameCallback(onFrame);
-    rafId = requestAnimationFrame(onRaf);
-    const cleanup = () => {
-      stopped = true;
-      publicationObserver.disconnect();
-      video.cancelVideoFrameCallback(frameId);
-      cancelAnimationFrame(rafId);
-      if (CanvasRenderingContext2D.prototype.drawImage === observedDraw)
-        CanvasRenderingContext2D.prototype.drawImage = originalDraw;
-    };
-    const timeout = setTimeout(cleanup, 45_000);
-    return {
-      stop() {
-        const expired = stopped;
-        const identityAtEnd = inspectIdentity();
-        const statusAtEnd = uiState();
-        cleanup();
-        clearTimeout(timeout);
-        const time = performance.now();
-        const quality = video.getVideoPlaybackQuality();
-        const first = frames[0];
-        const last = frames.at(-1);
-        const nativePresentedFps =
-          first && last && last.now > first.now
-            ? (1000 * (last.presented - first.presented)) / (last.now - first.now)
-            : null;
-        return {
-          sampleId,
-          measurementIdentity: {
-            valid: identityValid,
-            start: identityAtStart,
-            end: identityAtEnd,
-            changes: identityChanges,
-          },
-          previewStatus: { start: statusAtStart, end: statusAtEnd },
-          expired,
-          overflow,
-          durationMs: time - initial.time,
-          mediaStart: initial.mediaTime,
-          mediaEnd: video.currentTime,
-          paused: video.paused,
-          ended: video.ended,
-          visibility: document.visibilityState,
-          source: { width: video.videoWidth, height: video.videoHeight, rate: video.playbackRate },
-          nativePresentedFps,
-          composedPublication: {
-            available: !!publicationHost,
-            samples: publications,
-            coalescedPublications,
-            fps:
-              publications.length > 1
-                ? (1000 * (publications.length - 1)) /
-                  (publications.at(-1)!.now - publications[0]!.now)
-                : null,
-            measurement:
-              'visible manual canvas DOM replacement; application publication, not GPU scanout; ' +
-              'transportTime is not represented frame timestamp',
-          },
-          quality: {
-            total: quality.totalVideoFrames - initial.quality.totalVideoFrames,
-            dropped: quality.droppedVideoFrames - initial.quality.droppedVideoFrames,
-            corrupted: quality.corruptedVideoFrames - initial.quality.corruptedVideoFrames,
-          },
-          frames,
-          rafIntervals,
-          domSurfaces: { before: initial.surfaces, after: surfaces() },
-          canvasSubmission: detailed ? { drawCalls, drawSubmissionMs } : null,
-          measurement:
-            'native-rVFC; RAF intervals are jank, not composition FPS; DOM surfaces exclude detached/GPU buffers',
-        };
-      },
-    };
-  }, options);
+  const handle = await page.evaluateHandle(installQuickPreviewPerformanceProbe, options);
   return {
     async end() {
       try {
@@ -245,6 +20,256 @@ export async function startQuickPreviewPerformanceProbe(
       } finally {
         await handle.dispose();
       }
+    },
+  };
+}
+/** Browser instrumentation stays self-contained when Playwright serializes this function. */
+function installQuickPreviewPerformanceProbe({
+  sampleId,
+  detailed,
+  labels,
+}: QuickPreviewProbeOptions) {
+  const stage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
+  const video = stage?.querySelector('video');
+  if (!(video instanceof HTMLVideoElement) || video.readyState < 2 || video.paused)
+    throw new Error('Performance sample requires a playing, decoded stage video');
+  const limit = 10_000;
+  const frames: Array<{ now: number; mediaTime: number; presented: number; processing: number }> =
+    [];
+  const rafIntervals: number[] = [];
+  const publications: Array<{
+    now: number;
+    width: number;
+    height: number;
+    transportTime: number;
+  }> = [];
+  const publicationHost = stage?.querySelector('[data-ui="gallery.videoReview.manualPreview"]');
+  const identity = () => {
+    const currentStage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
+    const currentVideo = currentStage?.querySelector('video');
+    const currentHost = currentStage?.querySelector(
+      '[data-ui="gallery.videoReview.manualPreview"]'
+    );
+    return {
+      stageConnected: !!stage?.isConnected,
+      stageCurrent: stage === currentStage,
+      videoConnected: video.isConnected,
+      videoCurrent: video === currentVideo,
+      hostConnected: !!publicationHost?.isConnected,
+      hostCurrent: publicationHost === currentHost,
+    };
+  };
+  const uiState = () => {
+    const currentStage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
+    const host = currentStage?.querySelector('[data-ui="gallery.videoReview.manualPreview"]');
+    const canvas = host?.querySelector('canvas[data-preview-front="true"]');
+    const bounds = canvas?.getBoundingClientRect();
+    const alerts = [...(currentStage?.querySelectorAll(':scope > [role="alert"]') ?? [])];
+    const statuses = [...(currentStage?.querySelectorAll(':scope > [role="status"]') ?? [])];
+    const failed = alerts.some((node) => node.querySelector('span')?.textContent === labels.failed);
+    const pending = statuses.some(
+      (node) => node.querySelector('span')?.textContent === labels.loading
+    );
+    return {
+      phase: failed ? 'failed' : pending ? 'pending' : 'no-status',
+      retry: alerts.some((node) =>
+        [...node.querySelectorAll('button')].some(
+          (button) =>
+            button.getAttribute('aria-label') === labels.retry ||
+            button.textContent?.trim() === labels.retry
+        )
+      ),
+      canvasVisible: !!bounds && bounds.width > 0 && bounds.height > 0 && !!canvas?.isConnected,
+      backing:
+        canvas instanceof HTMLCanvasElement ? { width: canvas.width, height: canvas.height } : null,
+      visibility: document.visibilityState,
+      fullscreenOwnsStage: !!currentStage && !!document.fullscreenElement?.contains(currentStage),
+    };
+  };
+  const identityAtStart = identity();
+  const statusAtStart = uiState();
+  let identityValid = Object.values(identityAtStart).every(Boolean);
+  let previousIdentity = JSON.stringify(identityAtStart);
+  const identityChanges: Array<{ now: number; value: ReturnType<typeof identity> }> = [];
+  const inspectIdentity = () => {
+    const value = identity();
+    identityValid &&= Object.values(value).every(Boolean);
+    const key = JSON.stringify(value);
+    if (key !== previousIdentity && identityChanges.length < 16)
+      identityChanges.push({ now: performance.now(), value });
+    previousIdentity = key;
+    return value;
+  };
+  let coalescedPublications = 0;
+  const recordPublication = (canvas: HTMLCanvasElement) => {
+    if (stopped) return;
+    if (publications.length < limit)
+      publications.push({
+        now: performance.now(),
+        width: canvas.width,
+        height: canvas.height,
+        transportTime: video.currentTime,
+      });
+    else overflow = true;
+  };
+  const publicationObserver = new MutationObserver((records) => {
+    const announcements = records.filter(
+      (record) => record.type === 'attributes' && record.oldValue !== 'true'
+    );
+    const additions = records
+      .flatMap((record) => [...record.addedNodes])
+      .filter(
+        (node) => node instanceof HTMLCanvasElement && node.dataset['previewFront'] === 'true'
+      );
+    const announced = announcements.length || additions.length;
+    if (!announced || stopped) return;
+    const canvas = publicationHost?.querySelector('canvas[data-preview-front="true"]');
+    if (
+      !(canvas instanceof HTMLCanvasElement) ||
+      !canvas.isConnected ||
+      canvas.width <= 0 ||
+      canvas.height <= 0
+    )
+      return;
+    coalescedPublications += Math.max(0, announced - 1);
+    recordPublication(canvas);
+  });
+  if (publicationHost)
+    publicationObserver.observe(publicationHost, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-preview-front'],
+      attributeOldValue: true,
+    });
+
+  const surfaces = () =>
+    [...document.querySelectorAll('canvas')].map((canvas) => ({
+      width: canvas.width,
+      height: canvas.height,
+      cssWidth: canvas.clientWidth,
+      cssHeight: canvas.clientHeight,
+      inStage: !!stage?.contains(canvas),
+    }));
+  const initial = {
+    time: performance.now(),
+    mediaTime: video.currentTime,
+    quality: video.getVideoPlaybackQuality(),
+    surfaces: surfaces(),
+  };
+  let overflow = false;
+  let stopped = false;
+  let frameId = 0;
+  let rafId = 0;
+  let previousRaf: number | null = null;
+  let drawCalls = 0;
+  let drawSubmissionMs = 0;
+  const originalDraw = CanvasRenderingContext2D.prototype.drawImage;
+  const observedDraw: typeof originalDraw = function (...args: Parameters<typeof originalDraw>) {
+    const start = performance.now();
+    try {
+      const result = Reflect.apply(originalDraw, this, args);
+      return result;
+    } finally {
+      if (detailed) {
+        drawCalls++;
+        drawSubmissionMs += performance.now() - start;
+      }
+    }
+  };
+  CanvasRenderingContext2D.prototype.drawImage = observedDraw;
+  const onFrame: VideoFrameRequestCallback = (now, metadata) => {
+    if (stopped) return;
+    if (frames.length < limit)
+      frames.push({
+        now,
+        mediaTime: metadata.mediaTime,
+        presented: metadata.presentedFrames,
+        processing: metadata.processingDuration,
+      });
+    else overflow = true;
+    frameId = video.requestVideoFrameCallback(onFrame);
+  };
+  const onRaf = (now: number) => {
+    if (stopped) return;
+    inspectIdentity();
+    if (previousRaf !== null) {
+      if (rafIntervals.length < limit) rafIntervals.push(now - previousRaf);
+      else overflow = true;
+    }
+    previousRaf = now;
+    rafId = requestAnimationFrame(onRaf);
+  };
+  frameId = video.requestVideoFrameCallback(onFrame);
+  rafId = requestAnimationFrame(onRaf);
+  const cleanup = () => {
+    stopped = true;
+    publicationObserver.disconnect();
+    video.cancelVideoFrameCallback(frameId);
+    cancelAnimationFrame(rafId);
+    if (CanvasRenderingContext2D.prototype.drawImage === observedDraw)
+      CanvasRenderingContext2D.prototype.drawImage = originalDraw;
+  };
+  const timeout = setTimeout(cleanup, 45_000);
+  return {
+    stop() {
+      const expired = stopped;
+      const identityAtEnd = inspectIdentity();
+      const statusAtEnd = uiState();
+      cleanup();
+      clearTimeout(timeout);
+      const time = performance.now();
+      const quality = video.getVideoPlaybackQuality();
+      const first = frames[0];
+      const last = frames.at(-1);
+      const nativePresentedFps =
+        first && last && last.now > first.now
+          ? (1000 * (last.presented - first.presented)) / (last.now - first.now)
+          : null;
+      return {
+        sampleId,
+        measurementIdentity: {
+          valid: identityValid,
+          start: identityAtStart,
+          end: identityAtEnd,
+          changes: identityChanges,
+        },
+        previewStatus: { start: statusAtStart, end: statusAtEnd },
+        expired,
+        overflow,
+        durationMs: time - initial.time,
+        mediaStart: initial.mediaTime,
+        mediaEnd: video.currentTime,
+        paused: video.paused,
+        ended: video.ended,
+        visibility: document.visibilityState,
+        source: { width: video.videoWidth, height: video.videoHeight, rate: video.playbackRate },
+        nativePresentedFps,
+        composedPublication: {
+          available: !!publicationHost,
+          samples: publications,
+          coalescedPublications,
+          fps:
+            publications.length > 1
+              ? (1000 * (publications.length - 1)) /
+                (publications.at(-1)!.now - publications[0]!.now)
+              : null,
+          measurement:
+            'manual canvas attachment or successful front copy; application publication, not GPU scanout; ' +
+            'transportTime is not represented frame timestamp',
+        },
+        quality: {
+          total: quality.totalVideoFrames - initial.quality.totalVideoFrames,
+          dropped: quality.droppedVideoFrames - initial.quality.droppedVideoFrames,
+          corrupted: quality.corruptedVideoFrames - initial.quality.corruptedVideoFrames,
+        },
+        frames,
+        rafIntervals,
+        domSurfaces: { before: initial.surfaces, after: surfaces() },
+        canvasSubmission: detailed ? { drawCalls, drawSubmissionMs } : null,
+        measurement:
+          'native-rVFC; RAF intervals are jank, not composition FPS; DOM surfaces exclude detached/GPU buffers',
+      };
     },
   };
 }
@@ -509,13 +534,25 @@ export async function installQuickPreviewMediaDiagnostic(page: Page) {
         const host = document.querySelector('[data-ui="gallery.videoReview.manualPreview"]');
         observer = new MutationObserver((records) => {
           if (
-            records.some((entry) =>
-              [...entry.addedNodes].some((node) => node instanceof HTMLCanvasElement)
+            records.some(
+              (entry) =>
+                (entry.type === 'attributes' && entry.oldValue !== 'true') ||
+                [...entry.addedNodes].some(
+                  (node) =>
+                    node instanceof HTMLCanvasElement && node.dataset['previewFront'] === 'true'
+                )
             )
           )
             record('publication');
         });
-        if (host) observer.observe(host, { childList: true });
+        if (host)
+          observer.observe(host, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['data-preview-front'],
+            attributeOldValue: true,
+          });
         sampleTimer = setTimeout(() => {
           expired = true;
           stop();

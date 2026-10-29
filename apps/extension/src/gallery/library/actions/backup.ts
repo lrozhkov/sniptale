@@ -1,4 +1,10 @@
 import {
+  planRetainedLibrary,
+  RetainedLibraryNotReadyError,
+  prepareRetainedLibrary,
+} from '../../../workflows/sync-transfer/retained-library';
+import { runWithAssetResourceRead } from '../../../composition/persistence/assets/resource-sessions';
+import {
   createMediaHubBackupExportOptions,
   exportMediaHubBackup,
   importMediaHubBackup,
@@ -13,7 +19,12 @@ import {
 } from '../../../workflows/media-hub-backup/index';
 import type { GalleryBackupExportController, GalleryImportController } from './controller-types';
 import type { GalleryItem } from '../items';
-import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
+import {
+  isGalleryRemoteItem,
+  isGalleryMediaItem,
+  isGalleryScenarioItem,
+  isGalleryVideoProjectItem,
+} from '../items';
 import { type GalleryBusyAction } from './shared';
 
 const activeImportAbortControllers = new Map<string, AbortController>();
@@ -61,6 +72,7 @@ function hasSelectedBackupScope(
 export function createSelectedBackupExportOptions(
   items: GalleryItem[]
 ): MediaHubBackupExportOptions | null {
+  if (items.some(isGalleryRemoteItem)) return null;
   const selected = buildSelectedBackupScope(items);
   if (!hasSelectedBackupScope(selected)) return null;
 
@@ -89,15 +101,22 @@ export function createExportBackupAction(
   withBusy: GalleryBusyAction
 ) {
   return async () => {
+    if (controller.state.selection.selectedItems.some(isGalleryRemoteItem)) return;
     const activeImport = controller.state.storage.activeImport;
     if (activeImport?.status === 'running' || activeImport?.status === 'cancelling') return;
     await withBusy(
       async () => {
         try {
           const options = createInitialBackupExportOptions(controller);
-          const summary = await inspectLocalMediaHubBackup(options);
-          controller.actions.surface.setPendingExport({ options, summary });
+          const preparation = options.scope === 'all' ? await planRetainedLibrary() : null;
+          if (preparation) {
+            controller.actions.surface.setPendingExport({ options, summary: null, preparation });
+          } else {
+            const summary = await inspectLocalMediaHubBackup(options);
+            controller.actions.surface.setPendingExport({ options, summary });
+          }
         } catch (error) {
+          if (error instanceof RetainedLibraryNotReadyError) throw error;
           throw backupFailure(error, 'prepare');
         }
       },
@@ -114,13 +133,19 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
         controller.actions.surface.replaceActiveBackupExport(abortController);
         let phase: 'prepare' | 'write' = 'prepare';
         try {
-          const summary = await inspectLocalMediaHubBackup(options);
-          if (abortController.signal.aborted) {
-            return;
-          }
-          controller.actions.surface.setPendingExport({ options, summary });
-          phase = 'write';
-          await exportMediaHubBackup(options, { signal: abortController.signal });
+          const preparation = controller.state.storage.pendingExport?.preparation;
+          await runWithAssetResourceRead(async () => {
+            if (preparation) {
+              await prepareRetainedLibrary(preparation, abortController.signal);
+            } else {
+              const summary = await inspectLocalMediaHubBackup(options);
+              abortController.signal.throwIfAborted();
+              controller.actions.surface.setPendingExport({ options, summary });
+            }
+            abortController.signal.throwIfAborted();
+            phase = 'write';
+            await exportMediaHubBackup(options, { signal: abortController.signal });
+          });
           if (abortController.signal.aborted) {
             return;
           }
@@ -129,6 +154,7 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
         } catch (error) {
           if (abortController.signal.aborted)
             throw new DOMException('Media backup export cancelled.', 'AbortError');
+          if (error instanceof RetainedLibraryNotReadyError) throw error;
           throw backupFailure(error, phase);
         } finally {
           controller.actions.surface.releaseActiveBackupExport(abortController);

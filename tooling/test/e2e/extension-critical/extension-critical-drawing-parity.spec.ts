@@ -857,6 +857,22 @@ for (const variant of [
   });
 }
 
+async function verifyArrowDirectionToggle(page: Page) {
+  const button = page.locator('[data-ui$=".arrow.from-tip"]');
+  const initial = (await button.getAttribute('aria-pressed')) === 'true';
+  const check = async (active: boolean) => {
+    await expect(button).toHaveAttribute('aria-pressed', String(active));
+    await expect(
+      button.locator(active ? '.lucide-arrow-down-to-dot' : '.lucide-arrow-up-from-dot')
+    ).toBeVisible();
+  };
+  await check(initial);
+  await button.click();
+  await check(!initial);
+  await button.click();
+  await check(initial);
+}
+
 async function verifyDrawingParameterOrder(page: Page, editor: boolean) {
   for (const [tool, lastParameter] of [
     ['pencil', '[data-ui*=".pencil.width-"]'],
@@ -886,6 +902,7 @@ async function verifyDrawingParameterOrder(page: Page, editor: boolean) {
       );
     }, lastParameter);
     expect(ordered, `${tool} parameters precede color`).toBe(true);
+    if (tool === 'arrow') await verifyArrowDirectionToggle(page);
   }
   await page
     .locator(`[data-ui="${editor ? 'editor.floating.tool-rail' : 'content.toolbar.drawing'}.blur"]`)
@@ -1036,5 +1053,149 @@ for (const mode of ['drawing', 'video-recording'] as const) {
     });
     await popup.close();
     await page.close();
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`rectangle selection keeps handles without a perimeter ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    const editor = await context.newPage();
+    try {
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+      await page
+        .locator('[data-ui="content.toolbar.drawing-options.shape.kind-rectangle"]')
+        .click();
+      await page.mouse.move(500, 260);
+      await page.mouse.down();
+      await page.mouse.move(700, 360, { steps: 5 });
+      await page.mouse.up();
+      const chrome = page.locator('[data-ui="content.drawing.selection-chrome"]');
+      const checkChrome = async () => {
+        const pixels = await chrome.evaluate((node) => {
+          if (!(node instanceof HTMLCanvasElement)) throw new Error('Selection canvas unavailable');
+          const scale = node.width / innerWidth;
+          const context = node.getContext('2d')!;
+          const count = (x: number, y: number, width: number, height: number) => {
+            const data = context.getImageData(
+              Math.round(x * scale),
+              Math.round(y * scale),
+              Math.round(width * scale),
+              Math.round(height * scale)
+            ).data;
+            return data.filter((channel, index) => index % 4 === 3 && channel > 0).length;
+          };
+          return {
+            perimeter: count(520, 258, 50, 4),
+            corner: count(496, 256, 8, 8),
+            rotation: count(708, 242, 20, 20),
+          };
+        });
+        expect(pixels.perimeter).toBe(0);
+        expect(pixels.corner).toBeGreaterThan(0);
+        expect(pixels.rotation).toBeGreaterThan(0);
+      };
+      await expect
+        .poll(() => chrome.evaluate((node) => (node instanceof HTMLCanvasElement ? node.width : 0)))
+        .toBeGreaterThan(0);
+      await checkChrome();
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(800, 420);
+      await page.mouse.click(550, 260);
+      await checkChrome();
+      await page.screenshot({
+        path: info.outputPath('page-rectangle-handles.png'),
+        fullPage: false,
+      });
+      const ink = page.locator(
+        '[data-ui="content.drawing.surface"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+      );
+      const beforeResize = await pixels(ink);
+      await page.mouse.move(700, 360);
+      await page.mouse.down();
+      await page.mouse.move(740, 380, { steps: 5 });
+      await page.mouse.up();
+      await expect.poll(() => pixels(ink)).not.toBe(beforeResize);
+      const beforeRotate = await pixels(ink);
+      await page.mouse.move(756, 252);
+      await page.mouse.down();
+      await page.mouse.move(770, 310, { steps: 6 });
+      await page.mouse.up();
+      await expect.poll(() => pixels(ink)).not.toBe(beforeRotate);
+
+      await editor.setViewportSize(size);
+      await applyHarnessBootstrap(editor, {});
+      await editor.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+      await editor.locator('[data-ui="editor.floating.tool-rail.shape"]').click();
+      const upper = (await editor
+        .locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas')
+        .boundingBox())!;
+      const start = { x: upper.x + upper.width * 0.4, y: upper.y + upper.height * 0.4 };
+      await editor.mouse.move(start.x, start.y);
+      await editor.mouse.down();
+      await editor.mouse.move(start.x + 180, start.y + 90, { steps: 5 });
+      await editor.mouse.up();
+      const controls = editor.locator('[data-ui="editor.canvas.selection-controls"]');
+      await expect(controls.locator('circle')).toHaveCount(8);
+      await expect(controls.locator('polygon')).toHaveCount(0);
+      await editor.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+      await editor.mouse.click(start.x - 30, start.y - 30);
+      await editor.mouse.click(start.x + 40, start.y);
+      await expect(controls.locator('circle')).toHaveCount(8);
+      await expect(controls.locator('polygon')).toHaveCount(0);
+      await editor.screenshot({
+        path: info.outputPath('editor-rectangle-handles.png'),
+        fullPage: false,
+      });
+      const resize = (await controls.locator('circle').nth(4).boundingBox())!;
+      const canvas = editor.locator('[data-ui="editor.canvas.layer"] canvas.lower-canvas');
+      const beforeEditorResize = await pixels(canvas);
+      await editor.mouse.move(resize.x + resize.width / 2, resize.y + resize.height / 2);
+      await editor.mouse.down();
+      await editor.mouse.move(resize.x + 40, resize.y + 30, { steps: 5 });
+      await editor.mouse.up();
+      await expect.poll(() => pixels(canvas)).not.toBe(beforeEditorResize);
+      const rotation = (await controls.locator('g').boundingBox())!;
+      const beforeEditorRotate = await pixels(canvas);
+      await editor.mouse.move(rotation.x + rotation.width / 2, rotation.y + rotation.height / 2);
+      await editor.mouse.down();
+      await editor.mouse.move(rotation.x + 20, rotation.y + 60, { steps: 5 });
+      await editor.mouse.up();
+      await expect.poll(() => pixels(canvas)).not.toBe(beforeEditorRotate);
+    } finally {
+      await editor.close();
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`arrow direction button changes glyph in page and video drawing ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      for (const mode of ['drawing', 'video-recording']) {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+        await page.locator('[data-ui="content.toolbar.drawing.arrow"]').click();
+        await verifyArrowDirectionToggle(page);
+        await page.screenshot({
+          path: info.outputPath(`${mode}-arrow-direction.png`),
+          fullPage: false,
+        });
+      }
+    } finally {
+      await page.close();
+      await popup.close();
+    }
   });
 }

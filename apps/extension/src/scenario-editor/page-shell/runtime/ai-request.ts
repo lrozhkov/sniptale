@@ -1,3 +1,6 @@
+import { getAIProviderFailureKey } from '../../../features/ai/provider-failure-copy';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
+import type { TranslationKey } from '../../../platform/i18n';
 import { createScenarioAiManifest } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -15,7 +18,6 @@ import {
   createScenarioEditorEgressAuthority,
   canonicalizeScenarioEditorEgressPayload,
 } from '../../../features/ai/egress-authority';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
 import { requestLlmSessionToken } from '../../../workflows/ai-session/llm-session';
 import {
   createRuntimeMessagingTransport,
@@ -24,26 +26,21 @@ import {
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import { renderGuideImageFrame } from './image-frame';
 
+/** Carries an admitted failure category to local copy without displaying server error text. */
+export class GuideAiProviderError extends Error {
+  readonly messageKey: TranslationKey;
+  constructor(reason: AIConnectionReason) {
+    super('AI provider request failed.');
+    this.name = 'GuideAiProviderError';
+    this.messageKey = getAIProviderFailureKey(reason) ?? 'scenario.editor.guideAiFailed';
+  }
+}
+
 export class GuideAiStaleError extends Error {
   constructor() {
     super('AI proposal basis is no longer current.');
     this.name = 'GuideAiStaleError';
   }
-}
-
-/** Reads sanitized selector metadata through the existing background-owned settings query. */
-export async function loadGuideAiConfiguration() {
-  const configuration = await requestAIModelSelectionBootstrap();
-  const providers = configuration.providers.filter(
-    (provider) => provider.connectionType === 'openai-compatible'
-  );
-  const models = configuration.models.filter((model) =>
-    providers.some((provider) => provider.id === model.providerId)
-  );
-  const defaultModelId = models.some((model) => model.id === configuration.defaultModelId)
-    ? configuration.defaultModelId
-    : (models[0]?.id ?? null);
-  return { providers, models, defaultModelId };
 }
 
 /** Reads the committed authority again before request dispatch or proposal acceptance. */
@@ -123,6 +120,8 @@ export async function requestGuideAiProposal(
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
   });
   args.signal.throwIfAborted();
+  if (!response.success && response.failureReason)
+    throw new GuideAiProviderError(response.failureReason);
   if (!response.success || !response.operations) throw new Error('AI proposal unavailable.');
   return {
     baseRevision,

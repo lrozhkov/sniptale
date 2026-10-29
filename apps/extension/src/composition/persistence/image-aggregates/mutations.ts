@@ -1,3 +1,6 @@
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
+import { captureImageInTransaction, readImageRevisionFence } from '../sync-capture/capture';
+import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { EditorDocument } from '../../../features/editor/document/types';
@@ -55,6 +58,14 @@ import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/valida
 
 const IMAGE_WORKSPACE_PUBLICATION_DOMAIN = 'image-workspace';
 const IMAGE_WORKSPACE_OWNER_KIND = 'image-workspace';
+const IMAGE_SNAPSHOT_STORES = [
+  MEDIA_LIBRARY_STORE,
+  IMAGE_WORKSPACES_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  SYNC_CAPTURE_STORE,
+];
 
 interface PreparedImageWorkspaceInput extends Omit<
   CommitImageWorkspaceInput,
@@ -63,6 +74,7 @@ interface PreparedImageWorkspaceInput extends Omit<
   document: PersistedEditorDocumentV3;
   initialStorageClass?: 'temporary' | 'library';
   refs: AssetRef[];
+  publicationId?: string;
 }
 
 export interface CommitImageWorkspaceInput {
@@ -196,14 +208,7 @@ async function commitImageWorkspaceMutation(
   lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<{ revision: number; updatedAt: number }> {
   const tx = db.transaction(
-    [
-      MEDIA_LIBRARY_STORE,
-      IMAGE_WORKSPACES_STORE,
-      AGGREGATE_PRESENTATIONS_STORE,
-      ASSET_REFS_STORE,
-      ASSET_OWNERS_STORE,
-      ASSET_OPERATIONS_STORE,
-    ],
+    [...IMAGE_SNAPSHOT_STORES, ASSET_OWNERS_STORE, ASSET_OPERATIONS_STORE],
     'readwrite'
   );
   try {
@@ -226,7 +231,8 @@ async function commitImageWorkspaceMutation(
       if (
         !guardedMedia ||
         (guardedMedia.workspaceRevision ?? 0) !== input.sourceGuard.workspaceRevision ||
-        (guardedWorkspace?.revision ?? 0) !== input.sourceGuard.workspaceRevision
+        (guardedWorkspace?.revision ?? guardedMedia.workspaceRevision ?? 0) !==
+          input.sourceGuard.workspaceRevision
       ) {
         throw new StaleImageWorkspaceError(input.sourceGuard.aggregateId);
       }
@@ -234,6 +240,11 @@ async function commitImageWorkspaceMutation(
         throw new ImagePresentationNotCurrentError(input.sourceGuard.aggregateId);
       }
     }
+    if (
+      (await mediaStore.get(input.aggregateId)) === undefined &&
+      (await readImageRevisionFence(tx, input.aggregateId)) !== null
+    )
+      throw new ImageAggregateCollisionError(input.aggregateId);
     const media = await persistImageAggregateRootIfMissing({
       input,
       now,
@@ -276,6 +287,7 @@ async function commitImageWorkspaceMutation(
       await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
     }
     const revision = input.expectedRevision + 1;
+    if (!Number.isSafeInteger(revision)) throw new StaleImageWorkspaceError(input.aggregateId);
     await workspaceStore.put({
       aggregateId: input.aggregateId,
       createdAt: existing?.createdAt ?? media.createdAt,
@@ -297,6 +309,13 @@ async function commitImageWorkspaceMutation(
         ? promoteLibraryLifecycle({ ...media.lifecycle, updatedAt: now }, now)
         : createLibraryLifecycle('library', now),
     });
+    const acceptedRoot = parseMediaLibraryEntry(await mediaStore.get(input.aggregateId));
+    if (acceptedRoot?.source.kind === 'screenshot' || acceptedRoot?.source.kind === 'stored-asset')
+      await captureImageInTransaction(
+        tx,
+        input.aggregateId,
+        input.publicationId === undefined ? {} : { publicationId: input.publicationId }
+      );
     await tx.done;
     if (physicalDelete.assetIds.length > 0) {
       await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit).catch(() => undefined);
@@ -553,7 +572,12 @@ async function publishImageWorkspaceJournal(
         })()
       : null;
   return runWithIndexedDbMutation((mutationDb) =>
-    commitImageWorkspaceMutation(mutationDb, input, prepared, lifecyclePermit)
+    commitImageWorkspaceMutation(
+      mutationDb,
+      { ...input, publicationId: journal.journalId },
+      prepared,
+      lifecyclePermit
+    )
   );
 }
 
@@ -577,23 +601,29 @@ export interface CommitImagePresentationInput {
 
 export async function commitImagePresentation(input: CommitImagePresentationInput): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([MEDIA_LIBRARY_STORE, AGGREGATE_PRESENTATIONS_STORE], 'readwrite');
-    const media = parseMediaLibraryEntry(
-      await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.aggregateId)
-    );
-    if (!media) throw new ImageAggregateNotFoundError(input.aggregateId);
-    if ((media.workspaceRevision ?? 0) !== input.expectedWorkspaceRevision) {
-      throw new StaleImageWorkspaceError(input.aggregateId);
+    const tx = db.transaction(IMAGE_SNAPSHOT_STORES, 'readwrite');
+    try {
+      const media = parseMediaLibraryEntry(
+        await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.aggregateId)
+      );
+      if (!media) throw new ImageAggregateNotFoundError(input.aggregateId);
+      if ((media.workspaceRevision ?? 0) !== input.expectedWorkspaceRevision) {
+        throw new StaleImageWorkspaceError(input.aggregateId);
+      }
+      await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).put({
+        aggregateId: input.aggregateId,
+        aggregateKind: 'image',
+        presentationRevision: input.expectedWorkspaceRevision,
+        previewBlob: input.previewBlob,
+        thumbnailBlob: input.thumbnailBlob,
+        updatedAt: Date.now(),
+      });
+      if (media.source.kind === 'screenshot' || media.source.kind === 'stored-asset')
+        await captureImageInTransaction(tx, input.aggregateId);
+      await tx.done;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
     }
-    await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).put({
-      aggregateId: input.aggregateId,
-      aggregateKind: 'image',
-      presentationRevision: input.expectedWorkspaceRevision,
-      previewBlob: input.previewBlob,
-      thumbnailBlob: input.thumbnailBlob,
-      updatedAt: Date.now(),
-    });
-    await tx.done;
   });
 }
 
@@ -602,28 +632,34 @@ export async function promoteImageAggregate(
   expectedWorkspaceRevision: number
 ): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction([MEDIA_LIBRARY_STORE, AGGREGATE_PRESENTATIONS_STORE], 'readwrite');
-    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
-    const media = parseMediaLibraryEntry(await mediaStore.get(aggregateId));
-    if (!media) throw new ImageAggregateNotFoundError(aggregateId);
-    if ((media.workspaceRevision ?? 0) !== expectedWorkspaceRevision) {
-      throw new StaleImageWorkspaceError(aggregateId);
+    const tx = db.transaction(IMAGE_SNAPSHOT_STORES, 'readwrite');
+    try {
+      const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+      const media = parseMediaLibraryEntry(await mediaStore.get(aggregateId));
+      if (!media) throw new ImageAggregateNotFoundError(aggregateId);
+      if ((media.workspaceRevision ?? 0) !== expectedWorkspaceRevision) {
+        throw new StaleImageWorkspaceError(aggregateId);
+      }
+      const presentation = parseAggregatePresentationEntry(
+        await tx
+          .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+          .get(createAggregatePresentationKey({ id: aggregateId, kind: 'image' }))
+      );
+      if (!presentation || presentation.presentationRevision !== expectedWorkspaceRevision) {
+        throw new ImagePresentationNotCurrentError(aggregateId);
+      }
+      if (media.lifecycle?.storageClass === 'temporary') {
+        await mediaStore.put({
+          ...media,
+          lifecycle: promoteLibraryLifecycle(media.lifecycle),
+        });
+        if (media.source.kind === 'screenshot' || media.source.kind === 'stored-asset')
+          await captureImageInTransaction(tx, aggregateId);
+      }
+      await tx.done;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
     }
-    const presentation = parseAggregatePresentationEntry(
-      await tx
-        .objectStore(AGGREGATE_PRESENTATIONS_STORE)
-        .get(createAggregatePresentationKey({ id: aggregateId, kind: 'image' }))
-    );
-    if (!presentation || presentation.presentationRevision !== expectedWorkspaceRevision) {
-      throw new ImagePresentationNotCurrentError(aggregateId);
-    }
-    if (media.lifecycle?.storageClass === 'temporary') {
-      await mediaStore.put({
-        ...media,
-        lifecycle: promoteLibraryLifecycle(media.lifecycle),
-      });
-    }
-    await tx.done;
   });
 }
 

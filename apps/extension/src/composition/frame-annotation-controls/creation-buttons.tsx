@@ -1,8 +1,11 @@
-import { ChevronDown, ListOrdered } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react';
 import { bindFloatingInteractionPositionListeners } from '@sniptale/ui/floating-interactions/placement';
-import { FrameCommentIcon } from '../../features/highlighter/frame-annotation/icons';
+import {
+  FrameCommentIcon,
+  FrameNumberIcon,
+} from '../../features/highlighter/frame-annotation/icons';
 import { FrameAnnotationToolbarEffectButton } from '../../features/highlighter/frame-annotation/floating-toolbar';
 import type { EffectMode } from '../../features/highlighter/contracts';
 import { translate } from '../../platform/i18n';
@@ -38,8 +41,9 @@ function useCreationMenuDirection(
   return direction;
 }
 
-function CreationSplitButton(props: {
+function CreationAnnotationButton(props: {
   active: boolean;
+  standalone?: boolean;
   children: ReactNode;
   dataUi: string;
   disabled?: boolean;
@@ -53,15 +57,12 @@ function CreationSplitButton(props: {
 }) {
   const menuSide = useCreationMenuDirection(props.menu, props.menuRef, props.resolveMenuDirection);
   return (
-    <div
-      className="sniptale-split-action sniptale-full-page-wrapper sniptale-toolbar-split-control"
-      data-active={props.active ? 'true' : 'false'}
-    >
+    <div className="sniptale-annotation-menu-control" data-active={props.active ? 'true' : 'false'}>
       <ContentToolbarButton
-        tone="property"
+        tone={props.standalone ? 'default' : 'property'}
+        data-content-tool={props.standalone ? 'true' : undefined}
         active={props.active}
         aria-pressed={props.active}
-        className="sniptale-split-action-start sniptale-full-page-primary"
         dataUi={props.dataUi}
         disabled={props.disabled ?? false}
         onClick={(event) => {
@@ -76,8 +77,8 @@ function CreationSplitButton(props: {
         tone="property"
         ref={props.menuRef}
         aria-expanded={props.menuOpen}
-        aria-haspopup="menu"
-        className="sniptale-split-action-end sniptale-full-page-chevron"
+        aria-haspopup="dialog"
+        className="sniptale-annotation-properties-arrow sniptale-full-page-chevron"
         data-menu-side={menuSide}
         dataUi={`${props.dataUi}.menu`}
         disabled={props.disabled ?? false}
@@ -87,7 +88,7 @@ function CreationSplitButton(props: {
         }}
         title={props.title}
       >
-        <ChevronDown size={14} />
+        <ChevronDown size={12} />
       </ContentToolbarButton>
     </div>
   );
@@ -150,6 +151,9 @@ export function FrameStyleCreationButton(props: {
 }
 
 export function AnnotationCreationButtons(props: {
+  standalone?: boolean;
+  calloutActive?: boolean;
+  stepBadgeActive?: boolean;
   grouped?: boolean | undefined;
   renderControl?: ((menu: 'callout' | 'step-badge', control: ReactNode) => ReactNode) | undefined;
   activeMenu: FrameAnnotationCreationMenu | null;
@@ -166,17 +170,21 @@ export function AnnotationCreationButtons(props: {
   showStepBadge: boolean;
   stepBadgeRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const calloutActive = props.settings.callout !== null && props.settings.callout.enabled !== false;
+  const calloutActive =
+    props.calloutActive ??
+    (props.settings.callout !== null && props.settings.callout.enabled !== false);
   const stepBadgeActive =
-    props.settings.stepBadge !== null && props.settings.stepBadge.enabled !== false;
+    props.stepBadgeActive ??
+    (props.settings.stepBadge !== null && props.settings.stepBadge.enabled !== false);
   const renderControl = props.renderControl ?? ((_menu, control) => control);
   const buttons = (
     <>
       {props.showCallout
         ? renderControl(
             'callout',
-            <CreationSplitButton
+            <CreationAnnotationButton
               active={calloutActive}
+              standalone={props.standalone ?? false}
               dataUi={
                 props.contentContext
                   ? 'content.toolbar.future-frame-callout'
@@ -192,14 +200,15 @@ export function AnnotationCreationButtons(props: {
               title={translate('content.callout.settingsTitle')}
             >
               <FrameCommentIcon size={18} />
-            </CreationSplitButton>
+            </CreationAnnotationButton>
           )
         : null}
       {props.showStepBadge
         ? renderControl(
             'step-badge',
-            <CreationSplitButton
+            <CreationAnnotationButton
               active={stepBadgeActive}
+              standalone={props.standalone ?? false}
               dataUi={
                 props.contentContext
                   ? 'content.toolbar.future-frame-step-badge'
@@ -214,8 +223,8 @@ export function AnnotationCreationButtons(props: {
               onToggle={props.onToggleStepBadge}
               title={translate('content.stepBadge.settingsTitle')}
             >
-              <ListOrdered size={18} />
-            </CreationSplitButton>
+              <FrameNumberIcon size={18} />
+            </CreationAnnotationButton>
           )
         : null}
     </>

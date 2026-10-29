@@ -208,3 +208,19 @@ describe('media-hub-events subscription flow', () => {
     unsubscribe();
   });
 });
+
+it('owns one explicit publisher through disposal without creating a default consumer', async () => {
+  vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel);
+  const { createMediaHubEventPublisher } = await import('./index');
+  const publisher = createMediaHubEventPublisher();
+  publisher.publishLibraryChanged('sync', []);
+  publisher.publishLibraryChanged('sync', ['native-root']);
+  expect(FakeBroadcastChannel.instances).toHaveLength(1);
+  const channel = FakeBroadcastChannel.instances[0];
+  expect(channel?.postedMessages).toHaveLength(2);
+  publisher.dispose();
+  expect(channel?.closed).toBe(true);
+  publisher.publishLibraryChanged('sync', []);
+  expect(FakeBroadcastChannel.instances).toHaveLength(1);
+  expect(channel?.postedMessages).toHaveLength(2);
+});

@@ -79,22 +79,31 @@
   border-color: transparent;
   border-radius: var(--sniptale-radius-sm, 4px);
 }
-.sniptale-annotation-menu-control > button[aria-pressed] {
+.sniptale-annotation-menu-control > button[aria-pressed]:not([data-content-tool='true']) {
   border-color: transparent !important;
   color: var(--sniptale-color-text-secondary) !important;
 }
-.sniptale-annotation-menu-control > button[aria-pressed]:is(:hover, [aria-pressed='true']) {
+.sniptale-annotation-menu-control
+  > button[aria-pressed]:not([data-content-tool='true']):is(:hover, [aria-pressed='true']) {
   background: var(--sniptale-color-surface-hover) !important;
   color: var(--sniptale-color-text-primary) !important;
 }
-.sniptale-annotation-menu-control:has(
-    > .sniptale-annotation-properties-arrow:enabled:is(
-        :hover,
-        :focus-visible,
-        [aria-expanded='true']
-      )
-  )
-  > button[aria-pressed] {
+@layer utilities {
+  .sniptale-annotation-menu-control:has(
+      > .sniptale-annotation-properties-arrow:enabled:is(
+          :hover,
+          :focus-visible,
+          [aria-expanded='true']
+        )
+    )
+    > button {
+    background: transparent !important;
+  }
+}
+
+.sniptale-annotation-menu-control > button[data-content-tool='true'][aria-pressed='true'] {
+  border-color: var(--sniptale-color-accent) !important;
+  color: var(--sniptale-color-accent) !important;
   background: transparent !important;
 }
 
@@ -378,6 +387,7 @@
 .sniptale-content-toolbar-adopted
   .sniptale-btn[data-command-press]:not(
     .sniptale-full-page-chevron,
+    .sniptale-mode-selector-btn,
     .sniptale-btn-outline,
     .sniptale-btn-compact,
     .sniptale-btn-narrow,
@@ -535,4 +545,11 @@
     border-color: transparent !important;
     box-shadow: none !important;
   }
+}
+
+.sniptale-toolbar-menu-shortcut {
+  margin-inline-start: auto;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--sniptale-color-text-secondary);
 }

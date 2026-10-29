@@ -1,3 +1,5 @@
+import { captureDeletionInTransaction } from '../sync-capture/capture';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { createScenarioProjectStore } from './storage';
 import { detachScenarioVideoAssets } from './video-asset-detachment';
@@ -47,6 +49,7 @@ export async function deleteOrphanedScenarioAggregateChild(args: {
       args.kind === 'asset' ? SCENARIO_ASSETS_STORE : SCENARIO_STEP_EDITOR_DOCUMENTS_STORE;
     const tx = db.transaction(
       [
+        ...SCENARIO_CAPTURE_STORES,
         SCENARIO_PROJECTS_STORE,
         SCENARIO_PROJECT_HISTORY_STORE,
         SCENARIO_PROJECT_UNITS_STORE,
@@ -123,7 +126,18 @@ export async function deleteScenarioAggregate(projectId: string): Promise<void> 
   await runWithIndexedDbMutation(async (db) => {
     const tx = createScenarioCleanupTransaction(db);
     try {
-      await removeScenarioAggregateGraph(tx, projectId, physicalDelete);
+      const current = parseScenarioProjectEntry(
+        await createScenarioProjectStore(tx).get(projectId)
+      );
+      await deleteScenarioAggregateInTransaction(tx, projectId, physicalDelete);
+      if (current)
+        await captureDeletionInTransaction(
+          tx,
+          'scenario-project',
+          projectId,
+          'local-edit',
+          current.workspaceRevision
+        );
       await tx.done;
     } catch (error) {
       await abortIndexedDbMutation(tx, error);
@@ -137,6 +151,7 @@ export async function deleteScenarioAggregate(projectId: string): Promise<void> 
 function createScenarioCleanupTransaction(db: Awaited<ReturnType<typeof initDB>>) {
   return db.transaction(
     [
+      ...SCENARIO_CAPTURE_STORES,
       SCENARIO_PROJECTS_STORE,
       SCENARIO_PROJECT_HISTORY_STORE,
       SCENARIO_PROJECT_UNITS_STORE,
@@ -158,7 +173,7 @@ function createScenarioCleanupTransaction(db: Awaited<ReturnType<typeof initDB>>
 type ScenarioCleanupTransaction = ReturnType<typeof createScenarioCleanupTransaction>;
 
 /** Mutates root membership and resource edges inside the caller-owned atomic transaction. */
-async function removeScenarioAggregateGraph(
+export async function deleteScenarioAggregateInTransaction(
   tx: ScenarioCleanupTransaction,
   projectId: string,
   physicalDelete: PhysicalDeleteAssetOperation
@@ -166,6 +181,32 @@ async function removeScenarioAggregateGraph(
   const stored = await createScenarioProjectStore(tx).get(projectId);
   if (stored !== undefined && !parseScenarioProjectEntry(stored))
     throw new Error('Unavailable scenario project cannot be deleted.');
+  const { assetIds, exportIds, documentIds } = await readScenarioCleanupResources(tx, projectId);
+  await detachScenarioVideoAssets(tx, projectId, new Set(assetIds));
+  await createScenarioProjectStore(tx).delete(projectId);
+  const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
+  await removeScenarioAssetChildren(tx, assetIds, physicalDelete);
+  for (const exportId of exportIds) {
+    await unlinkScenarioHtmlOwnership(
+      exportId,
+      {
+        owners: ownerStore,
+        refs: tx.objectStore(ASSET_REFS_STORE),
+      },
+      physicalDelete
+    );
+    await tx.objectStore(SCENARIO_EXPORTS_STORE).delete(exportId);
+  }
+  await removeScenarioDocumentChildren(tx, documentIds, physicalDelete);
+  await tx
+    .objectStore(AGGREGATE_PRESENTATIONS_STORE)
+    .delete(createAggregatePresentationKey({ id: projectId, kind: 'scenario' }));
+  if (physicalDelete.assetIds.length > 0) {
+    await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
+  }
+}
+
+async function readScenarioCleanupResources(tx: ScenarioCleanupTransaction, projectId: string) {
   const [rawAssets, rawExports, rawDocuments] = await Promise.all([
     tx.objectStore(SCENARIO_ASSETS_STORE).index!('projectId').getAll(projectId),
     tx.objectStore(SCENARIO_EXPORTS_STORE).index!('projectId').getAll(projectId),
@@ -191,8 +232,14 @@ async function removeScenarioAggregateGraph(
     const stepId = parsed?.stepId ?? readOwnedScenarioStepId(value, projectId);
     return stepId ? [stepId] : [];
   });
-  await detachScenarioVideoAssets(tx, projectId, new Set(assetIds));
-  await createScenarioProjectStore(tx).delete(projectId);
+  return { assetIds, exportIds, documentIds };
+}
+
+async function removeScenarioAssetChildren(
+  tx: ScenarioCleanupTransaction,
+  assetIds: readonly string[],
+  physicalDelete: PhysicalDeleteAssetOperation
+): Promise<void> {
   const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
   for (const assetId of assetIds) {
     const asset = parseScenarioAssetEntry(await tx.objectStore(SCENARIO_ASSETS_STORE).get(assetId));
@@ -205,17 +252,13 @@ async function removeScenarioAggregateGraph(
       }
     }
   }
-  for (const exportId of exportIds) {
-    await unlinkScenarioHtmlOwnership(
-      exportId,
-      {
-        owners: ownerStore,
-        refs: tx.objectStore(ASSET_REFS_STORE),
-      },
-      physicalDelete
-    );
-    await tx.objectStore(SCENARIO_EXPORTS_STORE).delete(exportId);
-  }
+}
+
+async function removeScenarioDocumentChildren(
+  tx: ScenarioCleanupTransaction,
+  documentIds: readonly string[],
+  physicalDelete: PhysicalDeleteAssetOperation
+): Promise<void> {
   for (const stepId of documentIds) {
     const document = parseScenarioStepEditorDocumentEntry(
       await tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).get(stepId)
@@ -233,12 +276,6 @@ async function removeScenarioAggregateGraph(
       });
     }
     await tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE).delete(stepId);
-  }
-  await tx
-    .objectStore(AGGREGATE_PRESENTATIONS_STORE)
-    .delete(createAggregatePresentationKey({ id: projectId, kind: 'scenario' }));
-  if (physicalDelete.assetIds.length > 0) {
-    await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
   }
 }
 

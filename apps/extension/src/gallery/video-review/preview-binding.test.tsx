@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -56,12 +57,16 @@ const source: ReviewSource = {
 };
 const stage = () => io.stage.mock.lastCall![0] as ComponentProps<typeof ReviewStageBinding>;
 const frame = () => io.frame.mock.lastCall![0] as ComponentProps<typeof ReviewPreviewFrame>;
-async function render(sceneActive = true) {
+async function render(
+  sceneActive = true,
+  previewPreferences?: ComponentProps<typeof ReviewPreviewBinding>['previewPreferences']
+) {
   await act(async () =>
     root.render(
       <ReviewPreviewBinding
         state={state}
         sceneActive={sceneActive}
+        previewPreferences={previewPreferences}
         resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video', session }}
       />
     )
@@ -278,6 +283,7 @@ beforeEach(() => {
     video: { current: null },
     zoom: {
       selected: () => region,
+      previewChanges: { read: () => null, subscribe: () => () => {} },
       previewRegion: (value) => value,
       preview: vi.fn(),
       change: vi.fn(),
@@ -589,4 +595,31 @@ it('shows the cursor authoring overlay only for an explicitly selected key', asy
   state.playing = true;
   await render(false);
   expect(stage().cursorPath).toBeUndefined();
+});
+
+it('forwards inspector draft interaction to the preview and clears it after cancellation', async () => {
+  let draft: ReturnType<typeof state.zoom.previewChanges.read> = null;
+  const listeners = new Set<() => void>();
+  state.zoom.previewChanges = {
+    read: () => draft,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+  await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+  expect(stage().preview?.interacting).toBe(false);
+  act(() => {
+    draft = { id: 'focus', patch: { scale: 2 }, base: 'revision' };
+    for (const listener of listeners) listener();
+  });
+  expect(stage().preview?.interacting).toBe(true);
+  act(() => {
+    draft = null;
+    for (const listener of listeners) listener();
+  });
+  expect(stage().preview?.interacting).toBe(false);
+  expect(state.zoom.change).not.toHaveBeenCalled();
 });

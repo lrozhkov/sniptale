@@ -97,6 +97,8 @@ it('keeps scenario project and capture-mode controls off the main toolbar', () =
     'test.capture-action',
     'test.timer',
     'test.viewport',
+    'content.quick-actions',
+    'content.quick-actions.trigger',
     'content.toolbar.scenario-panel-button',
   ]);
 

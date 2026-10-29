@@ -53,6 +53,12 @@ function fixture() {
     clipId: media.id,
     modelId: 'model',
     approvedProviderId: 'provider',
+    approvedSelection: {
+      modelId: 'model',
+      approvedProviderId: 'provider',
+      approvedModelCode: 'whisper',
+      approvedDestination: `sha256:${'a'.repeat(64)}`,
+    },
     start: 2,
     end: 10,
     grouping: 'sentences-pauses',
@@ -129,6 +135,8 @@ it('keeps completed chunks for explicit retry and never publishes a proposal imp
   expect(resumed).toBe(job);
   const proposal = await runProjectRecognition(f.access, job, signal());
   expect(runReviewSpeechJob).toHaveBeenCalledTimes(3);
+  for (const [start] of vi.mocked(runReviewSpeechJob).mock.calls)
+    expect(start).toMatchObject({ approvedSelection: f.options.approvedSelection });
   expect(proposal.entry.binding).toEqual({
     kind: 'source',
     assetId: f.project.assets[0]!.id,
@@ -503,3 +511,28 @@ it('recognizes only a split window and rejects a result after its content offset
   await expect(runProjectRecognition(f.access, job, signal())).rejects.toThrow('stale');
   expect(f.update).not.toHaveBeenCalled();
 });
+
+it.each(['model', 'destination'] as const)(
+  'does not reuse prior chunks after an approved %s changes',
+  async (change) => {
+    const f = fixture();
+    const job = await prepareProjectRecognition(f.access, f.options, signal());
+    job.chunks[0]!.result = { text: 'Old.' };
+    const approved = f.options.approvedSelection;
+    if (!approved) throw new Error('Missing approved selection');
+    const options = {
+      ...f.options,
+      approvedSelection: {
+        ...approved,
+        ...(change === 'model'
+          ? { approvedModelCode: 'changed' }
+          : { approvedDestination: `sha256:${'b'.repeat(64)}` }),
+      },
+    };
+    const fresh = await prepareProjectRecognition(f.access, options, signal(), job);
+    expect(fresh).not.toBe(job);
+    expect(fresh.chunks.every((chunk) => chunk.result === undefined)).toBe(true);
+    expect(runReviewSpeechJob).not.toHaveBeenCalled();
+    expect(f.project.textDocuments).toBeUndefined();
+  }
+);

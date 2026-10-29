@@ -8,12 +8,16 @@ import {
   requestChatCompletion as requestChatCompletionTransport,
 } from './request';
 import { SYSTEM_PROMPT_JSON, SYSTEM_PROMPT_TABLES } from './prompts';
-import type { ResolvedLlmModelConfig } from '../model-config';
+import { assertResolvedLlmModelConfigCurrent, type ResolvedLlmModelConfig } from '../model-config';
 
 type TransportRequestSettings = {
+  observationBinding?: ResolvedLlmModelConfig['observationBinding'];
   baseUrl: string;
   apiKey: string;
   modelCode: string;
+  connectionType: ResolvedLlmModelConfig['connectionType'];
+  maxOutputTokens?: number | undefined;
+  beforeSend?(): Promise<void>;
 };
 
 type JsonRetryOptions = {
@@ -23,8 +27,6 @@ type JsonRetryOptions = {
 };
 
 const logger = createLogger({ namespace: 'BackgroundLlmTransport' });
-const BASE_LLM_RETRY_DELAY_MS = 1_000;
-const MAX_LLM_RETRY_DELAY_MS = 8_000;
 
 class LlmJsonValidationError extends Error {}
 
@@ -40,6 +42,18 @@ function buildUserPrompt(markdownData: string, userInstruction: string): string 
   return `${markdownData}\n\n### Instruction:\n${userInstruction}`;
 }
 
+function getTransportRequestSettings(config: ResolvedLlmModelConfig): TransportRequestSettings {
+  return {
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    modelCode: config.modelCode,
+    connectionType: config.connectionType,
+    observationBinding: config.observationBinding,
+    beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
+    ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
+  };
+}
+
 async function requestConfigChatCompletion(
   settings: TransportRequestSettings,
   systemPrompt: string,
@@ -50,9 +64,13 @@ async function requestConfigChatCompletion(
     baseUrl: settings.baseUrl,
     apiKey: settings.apiKey,
     modelCode: settings.modelCode,
+    connectionType: settings.connectionType,
+    observationBinding: settings.observationBinding,
+    ...(settings.maxOutputTokens ? { maxOutputTokens: settings.maxOutputTokens } : {}),
     systemPrompt,
     userPrompt,
     providerErrorLabel,
+    ...(settings.beforeSend ? { beforeSend: settings.beforeSend } : {}),
   });
 }
 
@@ -75,15 +93,8 @@ async function processJsonRequestWithRetry(
         logger.warn('LLM attempt failed', { attempt, error });
       }
 
-      if (attempt === options.maxRetries) {
+      if (!(error instanceof LlmJsonValidationError) || attempt === options.maxRetries)
         throw lastError;
-      }
-
-      if (error instanceof LlmJsonValidationError) {
-        continue;
-      }
-
-      await waitForRetryBackoff(attempt);
     }
   }
 
@@ -123,21 +134,6 @@ function assertValidJsonResponse(cleanedResponse: string, attempt: number): void
   }
 }
 
-function resolveRetryDelayMs(attempt: number): number {
-  const boundedDelay = Math.min(
-    BASE_LLM_RETRY_DELAY_MS * 2 ** Math.max(attempt - 1, 0),
-    MAX_LLM_RETRY_DELAY_MS
-  );
-  const jitter = Math.floor(boundedDelay * 0.2);
-  return boundedDelay + jitter;
-}
-
-function waitForRetryBackoff(attempt: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, resolveRetryDelayMs(attempt));
-  });
-}
-
 export async function processMarkdownRequest(
   request: LLMRequestOptimized,
   config: ResolvedLlmModelConfig
@@ -153,11 +149,7 @@ export async function processMarkdownRequest(
 
   try {
     const content = await requestConfigChatCompletion(
-      {
-        baseUrl: config.baseUrl,
-        apiKey: config.apiKey,
-        modelCode: config.modelCode,
-      },
+      getTransportRequestSettings(config),
       systemPrompt,
       userPrompt,
       translate('background.runtime.llmInvalidProviderApiKey')
@@ -204,11 +196,7 @@ export async function processJsonConfigRequest(
     },
     execute: (systemPrompt, userPrompt) =>
       requestConfigChatCompletion(
-        {
-          baseUrl: config.baseUrl,
-          apiKey: config.apiKey,
-          modelCode: config.modelCode,
-        },
+        getTransportRequestSettings(config),
         systemPrompt,
         userPrompt,
         translate('background.runtime.llmInvalidProviderApiKey')

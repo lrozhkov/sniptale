@@ -196,7 +196,12 @@
 }
 
 :host(.sniptale-drawing-mode-active) .sniptale-frame-container,
-:host(.sniptale-drawing-mode-active) .sniptale-interactive-frame {
+:host(.sniptale-drawing-mode-active) .sniptale-interactive-frame,
+:host(.sniptale-drawing-mode-active) .sniptale-frame-container *,
+:host(.sniptale-drawing-mode-active) .sniptale-callout,
+:host(.sniptale-drawing-mode-active) .sniptale-callout *,
+:host(.sniptale-drawing-mode-active) .sniptale-step-badge-layer,
+:host(.sniptale-drawing-mode-active) .sniptale-step-badge-layer * {
   pointer-events: none !important;
 }
 

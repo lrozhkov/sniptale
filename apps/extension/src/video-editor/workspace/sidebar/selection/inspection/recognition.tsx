@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { getAIProviderFailureKey } from '../../../../../features/ai/provider-failure-copy';
+import { useState } from 'react';
 import { AudioLines } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
 import type { AudioRecognitionOptions } from '../../../../../contracts/ai/audio';
@@ -25,10 +26,6 @@ interface RecognitionInspectorProps {
 export function InspectProjectRecognition(props: RecognitionInspectorProps) {
   const { controller } = props;
   useAppLocale();
-  const loadModels = controller.loadModels;
-  useEffect(() => {
-    void loadModels();
-  }, [loadModels]);
   return (
     <div data-ui="video-editor.recognition.panel" className="min-w-0 space-y-3 pe-2">
       <p className="text-xs text-[var(--sniptale-color-text-muted)]">
@@ -53,7 +50,6 @@ function RecognitionForm({ project, clipId, controller }: RecognitionInspectorPr
   const bounds = range ?? { start: 0, end: 0 };
   const [start, setStart] = useState(bounds.start);
   const [end, setEnd] = useState(bounds.end);
-  const [choice, setChoice] = useState('');
   const [grouping, setGrouping] = useState<'sentences' | 'sentences-pauses'>('sentences-pauses');
   const [mode, setMode] = useState<AudioRecognitionOptions['mode']>('transcribe');
   const [granularity, setGranularity] =
@@ -61,7 +57,7 @@ function RecognitionForm({ project, clipId, controller }: RecognitionInspectorPr
   const [prompt, setPrompt] = useState('');
   const [consent, setConsent] = useState<RecognitionConsent | null>(null);
   const loadModels = controller.loadModels;
-  const modelId = choice || controller.catalog?.defaultModelId || '';
+  const modelId = controller.modelId;
   const model = controller.catalog?.models.find((entry) => entry.id === modelId);
   const provider = controller.catalog?.providers.find((entry) => entry.id === model?.providerId);
   const multimodal = model?.audio?.transcription?.transport === 'audio-chat';
@@ -70,7 +66,8 @@ function RecognitionForm({ project, clipId, controller }: RecognitionInspectorPr
   }
   const validRange = hasValidSourceRange();
   const pendingReceipt = !!controller.proposal?.receipt && !controller.accepted;
-  const disabled = controller.running || consent !== null || pendingReceipt;
+  const disabled =
+    controller.running || consent !== null || pendingReceipt || controller.selectionPending;
   return (
     <>
       <fieldset disabled={disabled} className="min-w-0 sniptale-parameter-stack">
@@ -82,7 +79,7 @@ function RecognitionForm({ project, clipId, controller }: RecognitionInspectorPr
             models={controller.catalog?.models ?? []}
             providers={controller.catalog?.providers ?? []}
             selectedModelId={modelId || null}
-            onSelect={(id) => setChoice(id ?? '')}
+            onSelect={controller.setModelId}
             onOpen={() => {
               void loadModels();
             }}
@@ -161,7 +158,10 @@ function RecognitionForm({ project, clipId, controller }: RecognitionInspectorPr
           {label('videoEditor.sidebar.recognitionInvalidRange')}
         </p>
       ) : null}
-      {!controller.catalog?.models.length && (
+      {(!controller.catalog?.models.length ||
+        controller.configurationFailed ||
+        controller.selectionUnavailable ||
+        controller.error === 'model') && (
         <InspectorActionButton
           onClick={() => {
             void loadModels();
@@ -285,6 +285,30 @@ function RecognitionStatus({ controller }: { controller: VideoProjectRecognition
   ]);
   return (
     <>
+      {controller.configurationFailed ||
+      controller.selectionFailed ||
+      controller.selectionUnavailable ? (
+        <p role="alert" className="text-xs">
+          {translate(
+            controller.configurationFailed
+              ? 'aiModal.modelCatalogFailed'
+              : controller.selectionFailed
+                ? 'aiModal.modelSelectionSaveFailed'
+                : 'aiModal.modelSelectionUnavailable'
+          )}
+          {controller.selectionUnavailable && controller.unavailableModelName ? (
+            <>
+              {' '}
+              <bdi className="[overflow-wrap:anywhere]">{controller.unavailableModelName}</bdi>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      {controller.selectionPending && !controller.running ? (
+        <p role="status" className="sr-only">
+          {translate('common.states.saving')}
+        </p>
+      ) : null}
       {controller.running && (
         <div role="status" className="flex flex-wrap items-center gap-2 text-xs">
           {translate('common.states.loading')} {controller.completed} / {controller.total}
@@ -295,11 +319,18 @@ function RecognitionStatus({ controller }: { controller: VideoProjectRecognition
           )}
         </div>
       )}
-      {controller.error && (
-        <p role="alert" className="text-xs">
-          {translate(messages.get(controller.error) ?? 'videoEditor.sidebar.recognitionFailed')}
-        </p>
-      )}
+      {controller.error &&
+        !controller.configurationFailed &&
+        !controller.selectionFailed &&
+        !controller.selectionUnavailable && (
+          <p role="alert" className="text-xs">
+            {translate(
+              getAIProviderFailureKey(controller.providerFailureReason) ??
+                messages.get(controller.error) ??
+                'videoEditor.sidebar.recognitionFailed'
+            )}
+          </p>
+        )}
     </>
   );
 }

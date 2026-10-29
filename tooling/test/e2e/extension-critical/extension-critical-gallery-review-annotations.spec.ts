@@ -292,7 +292,9 @@ test('native imported PNG/SVG annotations retain complete sources after Undo, ca
       .evaluate((video) => {
         video.currentTime = 3;
       });
-    const canvas = dialog.locator('[data-ui="gallery.videoReview.manualPreview"] canvas');
+    const canvas = dialog.locator(
+      '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+    );
     await expect
       .poll(() =>
         canvas.evaluate((node) => {
@@ -701,7 +703,9 @@ for (const variant of [
         .evaluate((video) => {
           video.currentTime = 3;
         });
-      const canvas = dialog.locator('[data-ui="gallery.videoReview.manualPreview"] canvas');
+      const canvas = dialog.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      );
       await expect(canvas).toBeVisible();
       await expect
         .poll(() =>

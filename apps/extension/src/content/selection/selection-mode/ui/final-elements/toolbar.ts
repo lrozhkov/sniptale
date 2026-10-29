@@ -1,3 +1,4 @@
+import type { SelectionModeFinalElementsOptions } from '../types';
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 import type { CaptureActionType } from '../../../../../contracts/settings';
 import { translate } from '../../../../../platform/i18n';
@@ -18,6 +19,8 @@ import {
 
 type ToolbarOptions = {
   getCaptureAction: () => CaptureActionType;
+  getCapturePreferences: SelectionModeFinalElementsOptions['getCapturePreferences'];
+  onImageFormatChange: SelectionModeFinalElementsOptions['onImageFormatChange'];
   getSelection: () => Selection;
   onAdjustPadding: (direction: 'decrease' | 'increase') => void;
   onCaptureActionChange: (action: CaptureActionType) => void;

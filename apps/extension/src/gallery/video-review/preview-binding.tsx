@@ -1,3 +1,4 @@
+import { useReviewZoomPreview } from './zoom-editor';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
 import { useMemo } from 'react';
@@ -81,14 +82,14 @@ type PreviewState = Pick<
   backgroundImport: Pick<EditorState['backgroundImport'], 'pending'>;
   zoom: Pick<
     EditorState['zoom'],
-    'selected' | 'previewRegion' | 'preview' | 'change' | 'setSelection'
+    'selected' | 'previewRegion' | 'preview' | 'previewChanges' | 'change' | 'setSelection'
   >;
 };
 
 /** Preview layout, feedback and stage events share one visible-area binding. */
 export function ReviewPreviewBinding({
   resource,
-  state,
+  state: sourceState,
   sceneActive,
   previewPreferences,
   onPreviewRaster,
@@ -102,6 +103,8 @@ export function ReviewPreviewBinding({
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
   onOpenPreviewSettings?: ((trigger: HTMLButtonElement) => void) | undefined;
 }) {
+  const zoom = useReviewZoomPreview(sourceState.zoom);
+  const state = { ...sourceState, zoom };
   const { busy, audio } = state;
   return (
     <main
@@ -159,6 +162,7 @@ export function ReviewPreviewBinding({
             state={state}
             sceneActive={sceneActive}
             fullscreen={fullscreen}
+            focusInteracting={zoom.previewing}
             previewPreferences={previewPreferences}
             onPreviewRaster={onPreviewRaster}
           />
@@ -199,6 +203,7 @@ function ReviewPreviewStage({
   state,
   sceneActive,
   fullscreen,
+  focusInteracting,
   previewPreferences,
   onPreviewRaster,
 }: {
@@ -207,6 +212,7 @@ function ReviewPreviewStage({
   state: PreviewState;
   sceneActive: boolean;
   fullscreen: boolean;
+  focusInteracting: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
 }) {
@@ -264,6 +270,7 @@ function ReviewPreviewStage({
           ? {
               preferences: previewPreferences,
               playing: state.playing,
+              interacting: focusInteracting,
               sourceToResult: state.timeline.timeMap.sourceToTimeline,
               onRaster: onPreviewRaster,
               sourceFrameRate: state.exporter.index?.frameRate,

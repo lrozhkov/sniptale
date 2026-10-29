@@ -604,3 +604,70 @@ it('projects creation settings into the three shared popovers and supports an in
   );
   expect(document.querySelector('[data-custom-frame-popover="true"]')).toBeNull();
 });
+
+it.each([
+  ['callout', 'patch', 'callout'],
+  ['step-badge', 'settings', 'stepBadge'],
+] as const)(
+  'edits and removes future %s settings through the creation popover',
+  async (menu, action, key) => {
+    const highlighter = createDefaultHighlighterSettings();
+    const update = vi.fn();
+    const close = vi.fn();
+    const ref = { current: anchor };
+    const settings = {
+      blurSettings: highlighter.defaultBlurSettings,
+      borderSettings: highlighter.borderPresets[0]!,
+      callout: createDefaultFrameCallout(),
+      effectMode: highlighter.defaultEffectMode,
+      focusSettings: highlighter.defaultFocusSettings,
+      stepBadge: createDefaultFrameStepBadge(),
+    };
+    await act(async () =>
+      root.render(
+        <FrameCreationPopovers
+          activeMenu={menu}
+          calloutRef={ref}
+          close={close}
+          frameRef={ref}
+          portalTarget={portal}
+          renderFramePopover={() => null}
+          settings={settings}
+          showCallout
+          showStepBadge
+          stepBadgeRef={ref}
+          update={update}
+          creationPlacement={{ value: 'free', onChange: vi.fn() }}
+        />
+      )
+    );
+    const findButton = (text: string) =>
+      [...portal.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === text
+      );
+    expect(findButton(action)).toBeDefined();
+    act(() => findButton(action)!.click());
+    if (key === 'callout') {
+      expect(update).toHaveBeenCalledWith({
+        callout: expect.objectContaining({
+          content: settings.callout.content,
+          style: expect.objectContaining({ surface: expect.objectContaining({ borderWidth: 7 }) }),
+        }),
+      });
+      expect(settings.callout.style.surface.borderWidth).not.toBe(7);
+    } else {
+      expect(update).toHaveBeenCalledWith({
+        stepBadge: expect.objectContaining({
+          sizeLevel: 5,
+          value: settings.stepBadge.value,
+        }),
+      });
+      expect(settings.stepBadge).not.toHaveProperty('sizeLevel', 5);
+    }
+    update.mockClear();
+    close.mockClear();
+    act(() => findButton('disable')!.click());
+    expect(update).toHaveBeenCalledWith({ [key]: null });
+    expect(close).toHaveBeenCalledOnce();
+  }
+);

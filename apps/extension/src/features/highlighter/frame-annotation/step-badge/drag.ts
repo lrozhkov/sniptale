@@ -19,6 +19,19 @@ import {
   type FrameAnnotationCoordinateSpace,
 } from '../coordinate-space';
 
+function captureBadgeDrag(event: React.PointerEvent<HTMLButtonElement>): boolean {
+  if (event.button !== 0) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId);
+  } catch {
+    // The transient portal can disappear while capture is being requested.
+  }
+  return true;
+}
+
 function getKeyboardPlacement(args: {
   event: React.KeyboardEvent<HTMLButtonElement>;
   frameRect: StepBadgeFrameRect;
@@ -168,15 +181,7 @@ export function useStepBadgeBoundaryDrag(args: {
     draftPlacement,
     isDragging,
     handlePointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.nativeEvent.stopImmediatePropagation();
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      } catch {
-        // The transient portal can disappear while capture is being requested.
-      }
+      if (!captureBadgeDrag(event)) return;
       pointerIdRef.current = event.pointerId;
       const coordinateSpace = args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
       const pointer = coordinateSpace.clientPointToLogical({
@@ -203,6 +208,85 @@ export function useStepBadgeBoundaryDrag(args: {
       event.preventDefault();
       event.stopPropagation();
       args.onPositionChange(placement);
+    },
+  };
+}
+
+/** Moves a standalone badge owner in logical coordinates, independent of frame edges. */
+export function useStepBadgePointDrag(args: {
+  point: { x: number; y: number };
+  coordinateSpace?: FrameAnnotationCoordinateSpace;
+  onPositionChange: (point: { x: number; y: number }) => void;
+}) {
+  const [draftPoint, setDraftPoint] = React.useState<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const pointerIdRef = React.useRef<number | null>(null);
+  const grabOffsetRef = React.useRef({ x: 0, y: 0 });
+  const draftRef = React.useRef<{ x: number; y: number } | null>(null);
+  const clear = React.useCallback(() => {
+    draftRef.current = null;
+    setDraftPoint(null);
+  }, []);
+  const cancel = React.useCallback(() => {
+    if (pointerIdRef.current === null) return false;
+    pointerIdRef.current = null;
+    clear();
+    setIsDragging(false);
+    return true;
+  }, [clear]);
+  React.useEffect(() => {
+    if (!isDragging) return;
+    return registerPointerDragSession({
+      cancel,
+      move: (event) => {
+        if (!acceptPointerDragEvent(event, pointerIdRef.current)) return;
+        const space = args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
+        const point = space.clientPointToLogical({ x: event.clientX, y: event.clientY });
+        draftRef.current = {
+          x: point.x - grabOffsetRef.current.x,
+          y: point.y - grabOffsetRef.current.y,
+        };
+        setDraftPoint(draftRef.current);
+      },
+      up: (event) =>
+        commitPointerDragDraft({
+          draftRef,
+          event,
+          initialValue: args.point,
+          isEqual: (left, right) => left.x === right?.x && left.y === right?.y,
+          onClear: clear,
+          onCommit: (point) => {
+            try {
+              args.onPositionChange(point);
+            } finally {
+              clear();
+            }
+          },
+          onFinish: () => setIsDragging(false),
+          pointerIdRef,
+        }),
+    });
+  }, [args, cancel, clear, isDragging]);
+  return {
+    draftPoint,
+    isDragging,
+    handlePointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (!captureBadgeDrag(event)) return;
+      const space = args.coordinateSpace ?? identityFrameAnnotationCoordinateSpace;
+      const point = space.clientPointToLogical({ x: event.clientX, y: event.clientY });
+      grabOffsetRef.current = { x: point.x - args.point.x, y: point.y - args.point.y };
+      pointerIdRef.current = event.pointerId;
+      clear();
+      setIsDragging(true);
+    },
+    handleKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      const step = event.shiftKey ? 10 : 1;
+      const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0;
+      const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0;
+      if (dx === 0 && dy === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      args.onPositionChange({ x: args.point.x + dx, y: args.point.y + dy });
     },
   };
 }

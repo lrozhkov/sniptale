@@ -53,6 +53,17 @@ async function renderWithState(state: ImageSettingsState) {
 
 function createState(overrides: Partial<ImageSettingsState> = {}): ImageSettingsState {
   return {
+    fullImage: {
+      imageFormat: 'png',
+      imageQuality: 100,
+      handleFormatChange: vi.fn(),
+      handleQualityPreview: vi.fn(),
+      handleQualityCommit: vi.fn(),
+    },
+    fullCapture: {
+      preferences: { freezeMotion: true, preloadLazyContent: true, floatingElements: 'once' },
+      update: vi.fn(),
+    },
     fullPage: {
       error: null,
       policy: {
@@ -144,4 +155,28 @@ describe('ImageSettingsSectionContent quality states', () => {
       expect.objectContaining({ disabled: false, value: 73, unit: '%' })
     );
   });
+});
+
+it('routes full-page format and preparation controls without changing ordinary image defaults', async () => {
+  const state = createState();
+  await renderWithState(state);
+  const section = container!.querySelector<HTMLElement>('[data-ui="settings.image.full-page"]')!;
+  const click = (selector: string) => {
+    const button = section.querySelector<HTMLButtonElement>(selector);
+    expect(button).not.toBeNull();
+    act(() => button!.click());
+  };
+  click('[title="imageSettings.section.formatJpegLabel"]');
+  click('[aria-label="content.toolbar.fullPageLazyContent"]');
+  click('[aria-label="content.toolbar.fullPageFreezeMotion"]');
+  const floating = Array.from(section.querySelectorAll<HTMLButtonElement>('button')).find(
+    (button) => button.textContent === 'content.toolbar.fullPageFloatingHide'
+  );
+  expect(floating).toBeDefined();
+  act(() => floating!.click());
+  expect(state.fullImage.handleFormatChange).toHaveBeenCalledWith('jpeg');
+  expect(state.handleFormatChange).not.toHaveBeenCalled();
+  expect(state.fullCapture.update).toHaveBeenNthCalledWith(1, { preloadLazyContent: false });
+  expect(state.fullCapture.update).toHaveBeenNthCalledWith(2, { freezeMotion: false });
+  expect(state.fullCapture.update).toHaveBeenNthCalledWith(3, { floatingElements: 'hide' });
 });

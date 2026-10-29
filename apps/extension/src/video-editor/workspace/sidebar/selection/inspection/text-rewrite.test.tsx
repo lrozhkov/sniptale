@@ -1,17 +1,21 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { TextJobProviderError } from '../../../../../workflows/ai-session/text-request-port';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getVideoProject } from '../../../../../composition/persistence/projects';
 import { isCurrentVideoProjectSnapshot } from '../../../../../composition/persistence/projects/revision';
 import type { ReviewTextProposal } from '../../../../../contracts/ai/review-text';
-import type { AIModelSelectionBootstrapPayload } from '../../../../../contracts/messaging/ai-settings-runtime';
+
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
 } from '../../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
-import { requestAIModelSelectionBootstrap } from '../../../../../workflows/ai-settings/query';
+import {
+  requestAIScenarioModelSelection,
+  rememberAIScenarioModelSelection,
+} from '../../../../../workflows/ai-settings/query';
 import { requestLlmSessionToken } from '../../../../../workflows/ai-session/llm-session';
 import { runReviewTextJob } from '../../../../../workflows/video-review/text-rewrite-client';
 import { useVideoEditorStore } from '../../../../state/store';
@@ -24,7 +28,8 @@ vi.mock('../../../../../composition/persistence/projects/revision', () => ({
   isCurrentVideoProjectSnapshot: vi.fn(),
 }));
 vi.mock('../../../../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: vi.fn(),
+  requestAIScenarioModelSelection: vi.fn(),
+  rememberAIScenarioModelSelection: vi.fn(),
 }));
 vi.mock('../../../../../workflows/ai-session/llm-session', () => ({
   requestLlmSessionToken: vi.fn(),
@@ -44,15 +49,18 @@ vi.mock('../../../../../platform/i18n', async (original) => ({
   getCurrentLocale: () => 'en',
 }));
 
-const catalog: AIModelSelectionBootstrapPayload = {
-  chromeAiEnabled: false,
-  defaultModelId: 'model',
+type SelectionContext = Awaited<ReturnType<typeof requestAIScenarioModelSelection>>;
+const catalog: SelectionContext = {
+  scenario: 'video-text-edit',
   globalSystemPrompt: '',
+  remembered: null,
+  resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
   providers: [
     {
       id: 'provider',
       name: 'Approved provider',
-      connectionType: 'openai-compatible',
+      connectionType: 'neuraldeep',
+      incarnation: 'provider-incarnation',
       hasStoredApiKey: true,
       createdAt: 1,
       destinationKind: 'external',
@@ -144,7 +152,8 @@ beforeEach(() => {
   initial = useVideoEditorStore.getState();
   revision = 1;
   requestEntered = gate();
-  vi.mocked(requestAIModelSelectionBootstrap).mockResolvedValue(catalog);
+  vi.mocked(requestAIScenarioModelSelection).mockResolvedValue(catalog);
+  vi.mocked(rememberAIScenarioModelSelection).mockResolvedValue(undefined);
   vi.mocked(requestLlmSessionToken).mockResolvedValue('token');
   vi.mocked(getVideoProject).mockImplementation(async () => ({
     status: 'ready',
@@ -371,4 +380,23 @@ it('closes a disposable receipt without undoing accepted local work and restores
   expect(
     useVideoEditorStore.getState().project!.textDocuments![0]!.document.fragments[0]!.text
   ).toBe('Original text');
+});
+
+it('explains provider denial in the mounted text inspector without changing authored text', async () => {
+  await mount();
+  const before = useVideoEditorStore.getState().project;
+  vi.mocked(runReviewTextJob).mockImplementationOnce(async () => {
+    requestEntered.release();
+    throw new TextJobProviderError('permission-denied', 'provider-failed');
+  });
+  await act(async () => {
+    button('textRewriteStart').click();
+    await requestEntered.promise;
+  });
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'settings.aiProviders.providerStatusDenied'
+  );
+  expect(useVideoEditorStore.getState().project).toBe(before);
+  expect(host.querySelector('textarea')?.value).toBe('Make the text clear');
+  expect(runReviewTextJob).toHaveBeenCalledOnce();
 });

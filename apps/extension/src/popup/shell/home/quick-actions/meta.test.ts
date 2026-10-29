@@ -1,3 +1,4 @@
+import { Camera, Download } from 'lucide-react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -98,9 +99,11 @@ function verifiesDynamicIconVariants() {
   );
   const fallbackIcon = renderToStaticMarkup(createElement(DynamicIcon, { name: 'Unknown' }));
 
-  expect(configuredIcon).toContain('lucide-download');
+  const artwork = (markup: string) =>
+    markup.slice(markup.indexOf('>') + 1, markup.lastIndexOf('</svg>'));
+  expect(artwork(configuredIcon)).toBe(artwork(renderToStaticMarkup(createElement(Download))));
   expect(configuredIcon).toContain('color:#123456');
-  expect(fallbackIcon).toContain('lucide-camera');
+  expect(artwork(fallbackIcon)).toBe(artwork(renderToStaticMarkup(createElement(Camera))));
   expect(fallbackIcon).not.toContain('style=');
 }
 

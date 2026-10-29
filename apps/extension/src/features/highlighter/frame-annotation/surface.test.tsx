@@ -145,7 +145,9 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
   ).toBeGreaterThan(0);
   const badgeValueMarkup = renderToStaticMarkup(<StepBadgeValue value={12} />);
   expect(badgeValueMarkup).toContain('12');
-  expect(badgeValueMarkup).toContain('font-family:system-ui, -apple-system, sans-serif');
+  expect(badgeValueMarkup).toContain(
+    'font-family:var(--sniptale-font-interface, system-ui, sans-serif)'
+  );
   expect(
     getStepBadgeStyle({
       borderColor: '#000',
@@ -158,7 +160,8 @@ it('renders all effect styles, icons, focus masks, and badge metric branches', (
   ).toMatchObject({
     boxSizing: 'border-box',
     left: '100%',
-    transform: expect.stringContaining('scale(0.5)'),
+    transform: expect.stringContaining('scale(0.5) translateZ(0)'),
+    willChange: 'transform',
   });
   const cornerStyle = getStepBadgeStyle({
     borderColor: '#000',
@@ -537,7 +540,7 @@ it('preserves every floating-toolbar command and optional action branch', async 
   expect(calloutSettings).toHaveBeenCalledWith(expect.any(HTMLButtonElement));
   expect(onCommand).toHaveBeenCalledTimes(commandCount);
   expect(button('decrease').disabled).toBe(true);
-  expect(host.querySelector('.lucide-pencil')).toBeNull();
+  expect(host.querySelector('.lucide-move')).toBeNull();
 
   const onMouseDown = vi.fn();
   const onClick = vi.fn();
@@ -622,11 +625,164 @@ it('omits the page-owned edit action when the host does not implement it', async
   host.remove();
 });
 
-it('uses the current effect icon and dimension icon for annotation geometry commands', () => {
+it('distinguishes annotation editing from capture dimensions with a move icon', () => {
   const markup = renderToStaticMarkup(
     <FrameAnnotationFloatingToolbar effectMode="border" onCommand={() => {}} />
   );
   expect(markup).toContain('lucide-square');
-  expect(markup).toContain('lucide-scaling');
+  expect(markup).toContain('lucide-move');
+  expect(markup).not.toContain('lucide-scaling');
   expect(markup).not.toContain('lucide-pencil');
+});
+
+it('exports standalone number and comment content without frame paint or interactive controls', async () => {
+  const callout = createDefaultFrameCallout();
+  callout.content.bodyHtml = '<p>Standalone export comment</p>';
+  const snapshots = [
+    createFrameAnnotationSnapshot(
+      {
+        id: 'number',
+        annotationKind: 'step-badge',
+        x: 100,
+        y: 100,
+        width: 1,
+        height: 1,
+        stepBadge: { ...createDefaultFrameStepBadge(), value: '9' },
+      },
+      0
+    ),
+    createFrameAnnotationSnapshot(
+      { id: 'comment', annotationKind: 'callout', x: 250, y: 150, width: 1, height: 1, callout },
+      1
+    ),
+  ];
+  const html = await renderExportSurface({
+    baseImageUrl: 'blob:base',
+    width: 600,
+    height: 400,
+    snapshots,
+  });
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  expect(document.querySelector('.sniptale-step-badge')?.textContent).toBe('9');
+  expect(document.querySelector('.sniptale-callout')?.textContent).toContain(
+    'Standalone export comment'
+  );
+  for (const stroke of document.querySelectorAll<HTMLElement>(
+    '.sniptale-interactive-frame-stroke'
+  )) {
+    expect(['', 'none', 'hidden']).toContain(stroke.style.borderStyle);
+  }
+  for (const fill of document.querySelectorAll('.sniptale-interactive-frame-fill')) {
+    expect(fill.getAttribute('style')).toContain('background: transparent');
+  }
+  expect(document.querySelector('[contenteditable="true"]')).toBeNull();
+  expect(html).not.toContain('sniptale-step-badge-move-handle');
+  expect(html).not.toContain('sniptale-step-badge-settings-handle');
+});
+
+it('recenters on font and size changes, preserves text on metric failure and releases observers', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const canvasDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLCanvasElement.prototype,
+    'getContext'
+  )!;
+  const fontsDescriptor = Object.getOwnPropertyDescriptor(document, 'fonts');
+  const fonts = new EventTarget();
+  const disconnect = vi.fn();
+  let resize = () => {};
+  let available = true;
+  let right = 7;
+  let sampleWidth = 100;
+  const context = {
+    font: '',
+    letterSpacing: '',
+    fillText: vi.fn(),
+    getImageData: (_x: number, _y: number, width: number, height: number) => {
+      const data = new Uint8ClampedArray(width * height * 4);
+      if (Number.isFinite(right)) {
+        const start = (8 * width + 8 + right * 2) * 4 + 3;
+        data[start] = 255;
+        data[start + 4] = 85;
+      }
+      return { data };
+    },
+    measureText: vi.fn(() => ({
+      width: sampleWidth,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: 100,
+      fontBoundingBoxAscent: 10,
+      fontBoundingBoxDescent: 4,
+    })),
+  };
+  const nativeComputedStyle = getComputedStyle;
+  vi.stubGlobal('CanvasRenderingContext2D', class {});
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect() {
+        disconnect();
+      }
+    }
+  );
+  vi.stubGlobal('getComputedStyle', (element: Element) => {
+    const style = nativeComputedStyle(element);
+    style.width = `${(element.textContent?.length ?? 0) * 9}px`;
+    style.fontSize = '16.2px';
+    style.fontWeight = '700';
+    style.fontStyle = 'normal';
+    return style;
+  });
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: () => (available ? context : null),
+  });
+  Object.defineProperty(document, 'fonts', { configurable: true, value: fonts });
+  try {
+    act(() => root.render(<StepBadgeValue value="1" />));
+    const value = host.querySelector('span')!;
+    expect(Number.parseFloat(value.style.translate)).toBeCloseTo(0.76640625);
+    right = 8;
+    act(() => fonts.dispatchEvent(new Event('loadingdone')));
+    expect(Number.parseFloat(value.style.translate)).toBeCloseTo(0.26015625);
+    right = 7;
+    act(() => resize());
+    expect(Number.parseFloat(value.style.translate)).toBeCloseTo(0.76640625);
+    right = 18;
+    act(() => root.render(<StepBadgeValue value="12" customStyle={{ letterSpacing: '0.5px' }} />));
+    expect(Number.parseFloat(value.style.translate)).toBeCloseTo(-0.30234375);
+    expect(Number.parseFloat(context.letterSpacing)).toBeCloseTo((0.5 * 64) / 16.2);
+    expect(context.font).toContain('64px');
+    sampleWidth = 2048;
+    act(() => resize());
+    expect(value.style.translate).toBe('0px 0');
+    expect(value.textContent).toBe('12');
+    sampleWidth = 100;
+    available = false;
+    act(() => resize());
+    expect(value.style.translate).toBe('0px 0');
+    expect(value.textContent).toBe('12');
+    available = true;
+    right = Number.NaN;
+    act(() => fonts.dispatchEvent(new Event('loadingdone')));
+    expect(value.style.translate).toBe('0px 0');
+    expect(value.textContent).toBe('12');
+    act(() => root.unmount());
+    const calls = context.measureText.mock.calls.length;
+    fonts.dispatchEvent(new Event('loadingdone'));
+    expect(context.measureText).toHaveBeenCalledTimes(calls);
+    expect(disconnect).toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', canvasDescriptor);
+    if (fontsDescriptor) Object.defineProperty(document, 'fonts', fontsDescriptor);
+    else Reflect.deleteProperty(document, 'fonts');
+    vi.unstubAllGlobals();
+    host.remove();
+  }
 });

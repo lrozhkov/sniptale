@@ -112,6 +112,22 @@ Only the exact top-level Settings document can use the private history Port. Ret
 
 Use `apps/extension/src/features/ai/privacy/index.ts` and the content egress pipeline for sanitized AI payloads. Apply [data handling](../security/data-handling.md) to secrets, retention, diagnostics, and headers.
 
+### AI providers, catalogs and selections
+
+The background [provider factory](../../apps/extension/src/background/ai/providers.ts) admits ready-made SDK providers for each supported operation. Text uses SDK core with an explicit provider model object. Native speech, transcription and audio-chat use admitted SDK methods. Pages and content retain typed request clients. Chrome AI retains its local content and browser-session owners. The SDK does not own catalog discovery, capability evidence, model lifecycle or product authorization.
+
+[Catalog runtime](../../apps/extension/src/background/ai/settings/catalog-runtime.ts) owns explicit metadata egress through provider-specific readers. Automatic maintenance runs from active Settings and model-selection flows. It checks a 24-hour successful refresh period and a five-minute failure cooldown. Explicit refresh can bypass those periods. Maintenance never requests an origin grant or unlocks a secret.
+
+MV3 suspension gives no guaranteed refresh time. Failed discovery preserves saved configuration and permits explicit retry.
+
+Eligibility combines registered adapter support with declared model operations, input/output types and feature states. Missing evidence stays unknown. Names, IDs and generic image input do not establish image generation, editing or specialized audio support. Provider metadata supplies evidence, not permission to send source data.
+
+[Scenario selection](../../apps/extension/src/workflows/ai-settings/use-scenario-model-selection.ts) owns one frozen choice per mounted interface. Opening does not write a scenario preference. First use can propose an eligible model from the latest configured connection. Actual use records that choice. Explicit selection records a replacement. No global default participates in runtime selection.
+
+An unavailable saved identity retains its name without an execution context. Refresh cannot authorize recreated records or adopt another window's preference. The user must select an eligible replacement. Background repeats current source and destination admission before egress.
+
+SDK text calls set maxRetries to zero. Direct audio SDK calls add no retry loop. Existing bounded JSON-validation attempts remain separate from SDK transport retries. Provider failure never selects another model or provider. Result parsing, preview, Apply and durable publication retain their existing owners.
+
 ## Runtime changes
 
 For a new or changed runtime, update the runtime registry, manifest or build input, and entrypoint ownership. For that runtime change, update the documentation marker and drift proof. Declare a privileged background route once beside its parser. Include handler, authorization, sender, freshness and replay, policy-state, failure-response, and owner metadata for that route.
@@ -240,7 +256,7 @@ Gallery subtitle sidecars use `features/video/review/subtitle-export` with the e
 
 Literal payload escaping and bounded cue/text expansion precede the existing Gallery Blob download owner, which reports completion/interruption independently from backing-file release failures.
 
-Multimodal audio transcription is an explicitly declared transcription transport. The background audio request owner resolves the existing provider Chat Completions URL. It constructs the selected protocol and fixed timed schema. The protocol is standard input_audio or an explicitly configured Bothub media data URL. It parses the unknown response before returning it.
+Multimodal audio transcription is an explicitly declared transcription transport. The background audio owner builds the fixed timed schema and calls the admitted SDK language model. The ready-made adapter constructs the wire request. The SDK transformation hook maps explicitly selected Bothub proxy fields. Existing transcript parsers check the unknown result before returning it.
 
 Gallery prepares one complete native interval, including original Cuts, within the existing byte budget. It does not silently chunk or fall back to another paid transport. Mode, granularity and bounded operation instructions are frozen into the disposable job identity. User-editable additional instructions use the serialized AI-settings authority and existing Settings query/mutation routes. Model supplied timing remains coarse and requires proposal review before Apply.
 
@@ -278,3 +294,61 @@ The content shim reads `pageLaunch` preferences from the existing sync settings 
 The shim keeps its mount observer while the full content runtime is present. Initial passive wakeup completes before the launcher appears. The full runtime owns active UI and capture. Status and preset availability reads check page access without loading the full runtime. Explicit Close waits for page restoration, the unpin response, and scenario shutdown responses. The App owner then checks committed UI state before the existing cleanup callback can release the runtime. The callback removes the full host after it disposes listeners. A completed quick action requests the same guarded cleanup. Failed native commands request it after rollback. Active work prevents release.
 
 Quick-action placement has three independent settings: popup, corner group, and page toolbar. A corner menu requires the launcher group or a collapsed toolbar group. Menu commands use the existing trusted content capability flow. The full menu commits dismissal before it sends the capture command. The shim has no React, app persistence, parser, or full content service dependency. Its existing build limits and forbidden-input checks still apply.
+
+
+## WebDAV synchronization lifecycle
+
+The background sync coordinator controls admission, executor observation and erasure exclusion. The shared offscreen document owns each detached queue workflow and its HTTP requests. Queue commands carry native connection and queue identities. Workspace creation carries an allocation identity and bounded authentication through the same authenticated command channel. Neither command carries file bodies.
+
+Start returns a short acknowledgement. Inspect returns a bounded disposable snapshot without waiting for IO. Stop aborts requests and waits for response bodies, workflows and native locks to drain. A timeout or missing response cannot prove containment.
+
+The executor identity lasts for one document. Its revision changes after a binding change or Stop reservation. Delayed commands must match both values. Native queue records remain authoritative after runtime termination. Worker restart requires a fresh startup challenge and a check of current durable authorization.
+
+The background origin-permission query accepts only the exact offscreen sender. It checks the native identity and canonical HTTPS origin before and after the browser permission query. It does not enter the coordinator queue or acquire the connection admission lock. The coordinator attempts durable revocation before Stop. Failed revocation still requires an observation and containment attempt. It cannot produce successful privacy completion. Erasure must drain sync before mutation waits and media cleanup.
+
+Production pages cannot start synchronization in this slice. The separate provider suite uses a security-only control Port for lifecycle proof. Each lifecycle command closes its Port after its response. The driver never attaches to the worker.
+
+
+Build the lifecycle fixture with `npm run qa:e2e:build:security`. Run it with the separate configuration:
+
+```sh
+npm exec playwright test -- --config tooling/test/e2e/providers/webdav-lifecycle.config.ts
+```
+
+The lifecycle suite uses `.tmp/e2e-builds/security` by default. `SNIPTALE_WEBDAV_LIFECYCLE_BUILD_DIR` selects another security build. The existing provider command retains its test-e2e build and fixture list. Both suites require the explicit loopback server variables. Neither suite runs in the main pipeline.
+
+
+### Pre-enrollment workspace execution
+
+The same coordinator and offscreen executor own CREATE and JOIN before enrollment. The executor reserves one workspace execution handle before acknowledgement. A running queue job excludes workspace execution. A running or unsafe workspace excludes queue execution.
+
+A strict source contains kind and exact native identity. Native allocation and JOIN intents remain authoritative. Worker restart challenges the surviving document and checks source kind and current incarnation. Phase revisions can advance during execution. Missing, abandoned, replaced or unreadable authority requires containment before adoption fails.
+
+Stop closes workspace request admission synchronously. It waits for workflow and response bodies to drain. A stopped source kind and incarnation cannot restart in that document. A new native intent requires its own identity. Safe terminal failure permits an explicit retry against the current native revision.
+
+Permission queries check source kind, incarnation and selected origin without the coordinator queue or connection lock. The native reader selects both intents in one readonly transaction. Its immutable binding token preserves allocation parent and workspace checks. The token grants no authorization. Exact phase and revision admission remains with the request owner.
+
+Permission removal and erasure revoke the selected intent lifetime across phase revisions. Ordinary native commands retain exact revision checks. The security-only lifecycle fixture can start and explicitly enroll either source. Production Settings and public Start ingress remain disabled.
+
+### Workspace enrollment handoff
+
+Coordinator enrollment requires exact native ready evidence. It refuses running workspace or queue execution and unsafe executor state. Challenge-bound positive absence or acknowledged stop must precede installation. Unknown observation or failed containment refuses enrollment.
+
+After containment, the coordinator checks current readiness, origin permission and its mutation-exclusion generation. The existing native installer owns credential protection, final source checks, atomic publication and receipt replay. A repeated source cannot replace installed credentials. A native ready source alone never starts a queue operation.
+
+Checked queue execution verifies its retained marker identity before the first remote operation effect. This check runs after native claim, through the existing tracked provider. Concurrent effect admission shares one verification promise. Each effect still checks current connection authority. The check reads no catalog or original file.
+
+Temporary marker refusal follows existing durable delayed retries. Invalid or missing identity records invalid-workspace and requires explicit action. No mismatch can initialize, overwrite or clean the selected server root. Legacy experimental connections without checked workspace metadata retain their previous behavior.
+
+This verifies an observed identity. It cannot guarantee that a server remains unchanged after the check.
+
+
+## Sync retry wake-up
+
+The background sync owner composes bounded retry maintenance through the existing coordinator. The coordinator still selects the offscreen executor. That executor retains complete transfer, verification and cancellation ownership. No alarm owns credentials or an independent transfer client.
+
+A distinct periodic alarm wakes retry maintenance. A synchronous browser startup listener also supplies a wake-up when that alarm is absent. Startup recreates a missing alarm and reads the native schedule. Overlapping passes coalesce. Each pass bounds initialization, discovery and dispatch. The history alarm delivers local history only. It cannot start transfer work.
+
+A running executor job causes native metadata deferral. Missing execution permits recovery only through the workflow operation lock. Elapsed time cannot establish containment. Failed observation preserves work for a later wake-up.
+
+Automatic execution remains inside the security qualification boundary. This change does not activate production enrollment or unrestricted start ingress.

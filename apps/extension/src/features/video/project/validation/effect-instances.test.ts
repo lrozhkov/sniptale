@@ -7,6 +7,11 @@ import {
   validateEffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
 
+import {
+  isHydratableVideoProject,
+  isHydratableVideoProjectMetadata,
+  type VideoProjectMetadata,
+} from './index';
 import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { createEffectHostClip } from '../factories/overlay-clip';
 import { createRecordingBaseClip, createRecordingProjectAsset } from '../factories/recording';
@@ -258,3 +263,88 @@ function fixtureUrl(filename: string): URL {
     import.meta.url
   );
 }
+
+it('admits effect asset metadata before hydration without changing native Blob admission', async () => {
+  const snapshot = await createSnapshot('neutral-standalone.sniptale-effect.json');
+  const metadata: VideoProjectMetadata = {
+    ...createEmptyVideoProject('Detached effect resources'),
+    effectSnapshots: [
+      {
+        ...snapshot,
+        retainedByteLength: snapshot.retainedByteLength + 3,
+        assets: [
+          {
+            id: 'image',
+            kind: 'image',
+            mimeType: 'image/png',
+            byteLength: 3,
+            sha256: 'a'.repeat(64),
+          },
+        ],
+      },
+    ],
+  };
+  const before = JSON.stringify(metadata);
+  expect(isHydratableVideoProjectMetadata(metadata)).toBe(true);
+  expect(isHydratableVideoProject(metadata)).toBe(false);
+  expect(JSON.stringify(metadata)).toBe(before);
+  expect(Object.hasOwn(metadata.effectSnapshots![0]!.assets[0]!, 'blob')).toBe(false);
+  const hydrated = {
+    ...metadata,
+    effectSnapshots: metadata.effectSnapshots!.map((entry) => ({
+      ...entry,
+      assets: entry.assets.map((asset) => ({ ...asset, blob: new Blob(['png']) })),
+    })),
+  };
+  expect(isHydratableVideoProject(hydrated)).toBe(true);
+  expect(
+    isHydratableVideoProject({
+      ...hydrated,
+      effectSnapshots: hydrated.effectSnapshots.map((entry) => ({
+        ...entry,
+        assets: entry.assets.map((asset) => ({ ...asset, blob: new Blob(['wrong size']) })),
+      })),
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProjectMetadata({
+      ...metadata,
+      effectSnapshots: metadata.effectSnapshots!.map((entry) => ({
+        ...entry,
+        assets: entry.assets.map((asset) => ({ ...asset, sha256: 'malformed' })),
+      })),
+    })
+  ).toBe(false);
+});
+
+it('uses the same shape rules for project metadata and native projects', () => {
+  const project = createEmptyVideoProject('Metadata');
+  const metadata: VideoProjectMetadata = project;
+  expect(isHydratableVideoProjectMetadata(metadata)).toBe(true);
+  for (const patch of [
+    { id: 7 },
+    { width: NaN },
+    { duration: -1 },
+    { version: 49 },
+    { source: { kind: 'unsupported' } },
+    { templateInstances: [] },
+    { actionPresentation: { enabled: 'yes' } },
+  ]) {
+    const candidate = { ...project, ...patch };
+    expect(isHydratableVideoProject(candidate)).toBe(false);
+    expect(isHydratableVideoProjectMetadata(candidate)).toBe(false);
+  }
+});
+
+it('preserves recording and scenario source shape admission in the metadata phase', () => {
+  const project = createEmptyVideoProject('Source families');
+  for (const source of [
+    { kind: 'manual' },
+    { kind: 'recording', recordingId: 'retained-recording' },
+    { kind: 'scenario', scenarioProjectId: 'retained-scenario' },
+  ]) {
+    const candidate = { ...project, source };
+    expect(isHydratableVideoProjectMetadata(candidate)).toBe(isHydratableVideoProject(candidate));
+    expect(isHydratableVideoProjectMetadata(candidate)).toBe(true);
+  }
+});

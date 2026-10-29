@@ -158,7 +158,7 @@ it('renders the compact trigger with the current hex value and ten swatches per 
   ).not.toBeNull();
 
   const swatches = Array.from(document.body.querySelectorAll('button[title]') ?? []).filter(
-    (button) => button.getAttribute('title')?.startsWith('Grid color: #')
+    (button) => button.getAttribute('aria-label')?.startsWith('Grid color: #')
   );
   const swatchRows = document.body.querySelectorAll('div.grid-cols-10') ?? [];
 
@@ -192,7 +192,7 @@ it('commits a recent swatch only after applying the picker', async () => {
   await act(async () => {
     (
       Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
-        (button) => button.getAttribute('title') === 'Grid color: #111111'
+        (button) => button.getAttribute('title') === '#111111'
       ) as HTMLButtonElement | undefined
     )?.click();
   });
@@ -215,7 +215,7 @@ it('restores recent RGBA and preserves current alpha when choosing a palette col
   await act(async () => {
     (
       Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
-        (button) => button.getAttribute('title') === 'Grid color: #11111180'
+        (button) => button.getAttribute('title') === '#11111180'
       ) as HTMLButtonElement | undefined
     )?.click();
   });
@@ -225,7 +225,7 @@ it('restores recent RGBA and preserves current alpha when choosing a palette col
   await act(async () => {
     (
       Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
-        (button) => button.getAttribute('title') === 'Grid color: #abcdef'
+        (button) => button.getAttribute('title') === '#ABCDEF'
       ) as HTMLButtonElement | undefined
     )?.click();
   });
@@ -241,7 +241,7 @@ it('preserves stored palette alpha instead of replacing it with the current alph
   await act(async () => {
     (
       Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
-        (button) => button.getAttribute('title') === 'Grid color: #abcdef80'
+        (button) => button.getAttribute('title') === '#ABCDEF80'
       ) as HTMLButtonElement | undefined
     )?.click();
   });
@@ -259,7 +259,7 @@ it('does not inherit zero alpha from the semantic transparent value for palette 
   await act(async () => {
     (
       Array.from(document.body.querySelectorAll('button[title]') ?? []).find(
-        (button) => button.getAttribute('title') === 'Grid color: #abcdef'
+        (button) => button.getAttribute('title') === '#ABCDEF'
       ) as HTMLButtonElement | undefined
     )?.click();
   });
@@ -426,7 +426,7 @@ it('keeps palette preview cancellation on the existing owner in swatch mode', as
     picker.click();
   });
   await act(async () =>
-    document.querySelector<HTMLButtonElement>('button[title="Grid color: #abcdef"]')!.click()
+    document.querySelector<HTMLButtonElement>('button[title="#ABCDEF"]')!.click()
   );
   expect(onChange).not.toHaveBeenCalled();
   await act(async () =>

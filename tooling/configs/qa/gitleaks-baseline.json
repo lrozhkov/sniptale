@@ -91,6 +91,474 @@
       "Fingerprint": "9f558b7c1fffe86cd94d3a3818262779b3c88997:docs/architecture/release-source-architecture.md:generic-api-key:217",
       "SniptaleDebtId": "noise.gitleaks.release-source-e2e-prose.217",
       "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 40,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:40",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.40",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 77,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:77",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.77",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 114,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:114",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.114",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 151,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:151",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.151",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 188,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:188",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.188",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 225,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:225",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.225",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 262,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:262",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.262",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 299,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:299",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.299",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 336,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:336",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.336",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 373,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:373",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.373",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 410,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:410",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.410",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 447,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:447",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.447",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 484,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:484",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.484",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 521,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:521",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.521",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 558,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:558",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.558",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 595,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:595",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.595",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 632,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:632",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.632",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 669,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:669",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.669",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 706,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:706",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.706",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 743,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:743",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.743",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 780,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:780",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.780",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 817,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:817",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.817",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 854,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:854",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.854",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 891,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:891",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.891",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 928,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:928",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.928",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 965,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:965",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.965",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1002,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1002",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1002",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1039,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1039",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1039",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1076,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1076",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1076",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1113,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1113",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1113",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1150,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1150",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1150",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1187,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1187",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1187",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1224,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1224",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1224",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1261,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1261",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1261",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1298,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1298",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1298",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1335,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1335",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1335",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1372,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1372",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1372",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1409,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1409",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1409",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1446,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1446",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1446",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1483,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1483",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1483",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1520,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1520",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1520",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1557,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1557",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1557",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1594,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1594",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1594",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1631,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1631",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1631",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1668,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1668",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1668",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1705,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1705",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1705",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1742,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1742",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1742",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1779,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1779",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1779",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1816,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1816",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1816",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1853,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1853",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1853",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1890,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1890",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1890",
+      "SniptaleScope": "history"
+    },
+    {
+      "RuleID": "generic-api-key",
+      "File": "docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json",
+      "StartLine": 1927,
+      "Commit": "d3d27827dec703a2266d5608275120cf00f56c6b",
+      "Fingerprint": "d3d27827dec703a2266d5608275120cf00f56c6b:docs/tooling/webdav-evidence/2026-10-29/ci-proof-followup.json:generic-api-key:1927",
+      "SniptaleDebtId": "noise.gitleaks.webdav-clone-pair.1927",
+      "SniptaleScope": "history"
     }
   ]
 }

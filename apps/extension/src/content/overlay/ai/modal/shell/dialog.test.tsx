@@ -65,6 +65,18 @@ let root: Root | null = null;
 function createState(): ReturnType<typeof useAIModalState> {
   return {
     availableModels: [],
+    modelSelection: {
+      configuration: null,
+      modelId: null,
+      selectionPending: false,
+      selectionUnavailable: false,
+      unavailableModelName: null,
+      selectionFailed: false,
+      configurationFailed: false,
+      chooseModel: vi.fn(),
+      prepareModelSelection: vi.fn(),
+      retryConfiguration: vi.fn(),
+    },
     editingTemplate: undefined,
     handleAddTemplate: vi.fn(),
     handleDeleteTemplate: vi.fn(async () => undefined),

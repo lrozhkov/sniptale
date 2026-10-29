@@ -224,3 +224,35 @@ it('uses the blue drawing selection chrome for an editable layer group', () => {
   expect(group.borderDashArray).toEqual([4, 3]);
   expect(group.hasControls).toBe(true);
 });
+
+it.each(['rectangle', 'ellipse', 'triangle'] as const)(
+  'keeps resize and rotation controls while omitting only rectangle borders for %s',
+  (kind) => {
+    const object = createEditorDrawingFabricObject(
+      {
+        kind,
+        id: 'shape-chrome',
+        bounds: { x: 80, y: 90, width: 200, height: 100 },
+        color: '#111111',
+        fillColor: null,
+        width: 4,
+      },
+      1
+    );
+    applyEditorDrawingInteractionControls(object);
+    expect(object.hasBorders).toBe(kind !== 'rectangle');
+    expect(object.hasControls).toBe(true);
+    expect(object.lockRotation).toBe(false);
+    expect(Object.keys(object.controls)).toEqual([
+      'tl',
+      'mt',
+      'tr',
+      'mr',
+      'br',
+      'mb',
+      'bl',
+      'ml',
+      'mtr',
+    ]);
+  }
+);

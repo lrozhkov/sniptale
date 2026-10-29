@@ -1,3 +1,7 @@
+import {
+  AnnotationCreationPlacement,
+  type AnnotationPlacementControl,
+} from '../creation-placement';
 import type {
   CalloutAnchor,
   CalloutPlacement,
@@ -36,6 +40,7 @@ export function createCalloutAnchorPlacement(
 export function CalloutSettingsPopoverContent(props: {
   handleDelete: () => void;
   headerContext: SettingsPopoverContext;
+  hideDisableAction?: boolean;
   headerDrag?: FloatingPopoverDrag;
   handleSettingChange: (patch: CalloutSettingsPatch) => void;
   frameColors?: CalloutFrameColors;
@@ -53,6 +58,7 @@ export function CalloutSettingsPopoverContent(props: {
   onNestedLayerChange?: ((open: boolean) => void) | undefined;
   onApplyToFuture?: () => void;
   templateSourceControl?: TemplateSourceControl;
+  creationPlacement?: AnnotationPlacementControl;
 }) {
   const workflow = useTemplateForkWorkflow({
     ...(props.localSettings.sourcePresetId
@@ -83,10 +89,14 @@ export function CalloutSettingsPopoverContent(props: {
           : {})}
         closeLabel={translate('content.callout.closeSettings')}
         context={props.headerContext}
-        destructiveAction={{
-          label: translate('content.callout.disableButton'),
-          onClick: props.handleDelete,
-        }}
+        {...(!props.hideDisableAction
+          ? {
+              destructiveAction: {
+                label: translate('content.callout.disableButton'),
+                onClick: props.handleDelete,
+              },
+            }
+          : {})}
         {...(props.templateSourceControl
           ? {
               sourceControl: createTemplateSourceHeaderControl(props.templateSourceControl, {
@@ -101,6 +111,9 @@ export function CalloutSettingsPopoverContent(props: {
         onClose={props.onClose}
         title={translate('content.callout.settingsTitle')}
       />
+      {props.creationPlacement ? (
+        <AnnotationCreationPlacement {...props.creationPlacement} />
+      ) : null}
       {applyToFuture.confirming ? (
         <ApplyToFutureFramesGuard
           onCancel={applyToFuture.cancel}

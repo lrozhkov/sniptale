@@ -151,3 +151,161 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     });
   }
 }
+
+for (const { name, size, locale } of PRIMARY_BROWSER_VIEWPORTS.flatMap(({ name, size }) =>
+  ['en', 'ru'].map((locale) => ({ name: `${name}-${locale}`, size, locale }))
+)) {
+  test(`page toolbar digit modes preserve input ownership ${name}`, async ({}, info) => {
+    test.setTimeout(120000);
+    const host = await startHostServer();
+    const browser = await launchExtensionBrowser({ viewport: size });
+    try {
+      const worker =
+        browser.context.serviceWorkers()[0] ??
+        (await browser.context.waitForEvent('serviceworker'));
+      await worker.evaluate(async (locale) => {
+        await chrome.storage.local.set({
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': locale === 'ru' ? 'dark' : 'light',
+        });
+      }, locale);
+      const { page } = await openDesignReview(
+        browser.context,
+        browser.extensionId,
+        host.origin,
+        size
+      );
+      const trigger = ui(page, 'mode-selector-button');
+      const checkMenuBounds = async () => {
+        const menu = page.locator('.sniptale-toolbar-menu:visible');
+        const bounds = (await menu.boundingBox())!;
+        expect(bounds.y).toBeGreaterThanOrEqual(0);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(size.height + 0.5);
+        await menu.hover();
+        await page.mouse.wheel(0, 10000);
+        await expect
+          .poll(async () => {
+            const last = (await ui(page, 'mode-option.video-recording').boundingBox())!;
+            return last.y >= bounds.y && last.y + last.height <= bounds.y + bounds.height + 0.5;
+          })
+          .toBe(true);
+      };
+      await trigger.click();
+      const modes = [
+        'cursor',
+        'drawing',
+        'highlighter',
+        'quick-edit',
+        'design-review',
+        'video-recording',
+      ];
+      const labels: string[] = [];
+      for (const [index, mode] of modes.entries()) {
+        const option = ui(page, `mode-option.${mode}`);
+        await expect(option.locator('kbd')).toHaveText(String(index + 1));
+        await expect(option.locator('svg').first()).toBeVisible();
+        labels.push(await option.locator('.sniptale-toolbar-menu-item-label').innerText());
+      }
+      await checkMenuBounds();
+      await page.screenshot({ path: info.outputPath('mode-digit-menu.png'), fullPage: false });
+      await page.keyboard.press('1');
+      await expect(ui(page, 'mode-option.cursor')).toHaveCount(0);
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'cursor');
+      await expect(trigger).toHaveAttribute('aria-label', labels[0]!);
+      await expect(trigger).toHaveText('');
+      await page.keyboard.press('2');
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'cursor');
+      await page.evaluate(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true }));
+        const input = document.createElement('input');
+        input.id = 'digit-input-proof';
+        input.style.cssText = 'position:fixed;left:20px;top:200px';
+        document.body.append(input);
+        const shadowHost = document.createElement('div');
+        shadowHost.id = 'digit-shadow-proof';
+        shadowHost.style.cssText = 'position:fixed;left:20px;top:240px';
+        document.body.append(shadowHost);
+        shadowHost.attachShadow({ mode: 'open' }).append(document.createElement('input'));
+      });
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'cursor');
+      for (const selector of ['#digit-input-proof', '#digit-shadow-proof input']) {
+        const input = page.locator(selector);
+        await input.focus();
+        await page.keyboard.type('23456');
+        await expect(input).toHaveValue('23456');
+        await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'cursor');
+        await input.evaluate((node) => node.blur());
+      }
+      await ui(page, 'settings-button').click();
+      await page.keyboard.press('2');
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'cursor');
+      await expect(ui(page, 'settings-button')).toHaveAttribute('aria-expanded', 'true');
+      await page.keyboard.press('Escape');
+      for (const [index, mode] of modes.entries()) {
+        await trigger.click();
+        await page.keyboard.press(String(index + 1));
+        if (mode === 'video-recording')
+          await expect(ui(page, 'root')).toHaveAttribute('data-video-recording', 'true');
+        else await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', mode);
+        await expect(trigger).toHaveAttribute('aria-label', labels[index]!);
+        await expect(trigger).toHaveText('');
+        await expect(ui(page, 'mode-option.cursor')).toHaveCount(0);
+        await expect(trigger).toBeEnabled();
+      }
+      await trigger.click();
+      await page.keyboard.press('6');
+      await expect(ui(page, 'root')).toHaveAttribute('data-video-recording', 'true');
+      const customize = ui(page, 'video-recording.customize');
+      await customize.click();
+      await expect(customize).toHaveAttribute('aria-pressed', 'true');
+      await expect(trigger).toBeDisabled();
+      await page.keyboard.press('2');
+      await expect(ui(page, 'root')).toHaveAttribute('data-video-recording', 'true');
+      await expect(customize).toHaveAttribute('aria-pressed', 'true');
+      await page.screenshot({
+        path: info.outputPath('recording-customization-shortcut-ignored.png'),
+        fullPage: false,
+      });
+      await customize.click();
+      await expect(trigger).toBeEnabled();
+      await trigger.click();
+      await page.keyboard.press('2');
+      await expect(ui(page, 'root')).not.toHaveAttribute('data-video-recording');
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'drawing');
+      await page.screenshot({ path: info.outputPath('mode-digit-caption.png'), fullPage: false });
+      const grip = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
+      const box = (await grip.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(8, size.height / 2, { steps: 8 });
+      await page.mouse.up();
+      await expect(ui(page, 'root')).toHaveAttribute('data-display-mode', 'vertical');
+      await expect(trigger).toHaveText('');
+      await page.keyboard.press('3');
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'drawing');
+      await trigger.click();
+      await page.keyboard.press('3');
+      await expect(ui(page, 'root')).toHaveAttribute('data-page-mode', 'highlighter');
+      await expect(trigger).toHaveAttribute('aria-label', labels[2]!);
+      await ui(page, 'root').evaluate(async (node) => {
+        await Promise.allSettled(node.getAnimations().map((animation) => animation.finished));
+      });
+      await trigger.click();
+      await checkMenuBounds();
+      await page.screenshot({
+        path: info.outputPath('mode-digit-vertical-menu.png'),
+        fullPage: false,
+      });
+      await page.keyboard.press('3');
+      await page.screenshot({ path: info.outputPath('mode-digit-vertical.png'), fullPage: false });
+      await page.setViewportSize({ width: 1024, height: 480 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        1024
+      );
+      await expect(trigger).toBeVisible();
+    } finally {
+      await closeExtensionBrowser(browser);
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

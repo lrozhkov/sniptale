@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../../../platform/i18n';
 import { useEditorPresetStorageState } from '../storage';
+import { usePaletteNames } from '../../../../../composition/picker-preferences/use-palette-names';
 import { createPaletteActions } from './actions';
 import type { PaletteSettingsKey } from './types';
 import {
@@ -10,6 +11,7 @@ import {
   loadDrawingPaletteState,
   reorderDrawingPaletteColor,
   subscribeToDrawingPaletteState,
+  renamePaletteColor,
 } from '../../../../../composition/persistence/drawing-palette';
 
 function useDrawingPaletteColors(): readonly string[] {
@@ -38,6 +40,16 @@ function useDrawingPaletteColors(): readonly string[] {
 
 export function usePalettesController() {
   const state = useEditorPresetStorageState();
+  const names = usePaletteNames();
+  const renameColor = async (color: string, name: string) => {
+    try {
+      if ((await renamePaletteColor(color, name)) === 'applied') return true;
+    } catch {
+      /* Keep the editable name for an explicit retry. */
+    }
+    showToast(translate('settings.editor.paletteSaveError'), 'error');
+    return false;
+  };
   const drawingColors = useDrawingPaletteColors();
   const [key, setKey] = useState<PaletteSettingsKey>('drawing');
   if (key === 'drawing') {
@@ -52,6 +64,8 @@ export function usePalettesController() {
     };
     return {
       key,
+      names,
+      renameColor,
       setKey,
       colors: drawingColors,
       changeColor: async (index: number, color: string) => {
@@ -65,6 +79,8 @@ export function usePalettesController() {
   const actions = createPaletteActions({ key, palette: state.palette });
   return {
     key,
+    names,
+    renameColor,
     setKey,
     colors: state.palette[key],
     ...actions,

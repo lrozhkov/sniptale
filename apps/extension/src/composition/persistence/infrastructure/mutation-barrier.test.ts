@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   acquirePersistenceMutationTransition,
+  runWithAtomicPersistenceMutationPermit,
   isActivePersistenceMutationPermit,
   installPersistenceLockManagerForTests,
   runWithDurableAssetLifecycleLock,
@@ -581,4 +582,95 @@ it('refuses a page-local draft during erasure without publishing after verificat
   expect(publish).not.toHaveBeenCalled();
   expect(await tryRunWithPersistenceMutationPermit(publish)).toBe(true);
   expect(publish).toHaveBeenCalledOnce();
+});
+
+it('reuses the active transition before queued erasure without requesting its gate again', async () => {
+  const manager = createLockManager();
+  let sharedTransitionRequests = 0;
+  installPersistenceLockManagerForTests({
+    request(name, options, operation) {
+      if (name.endsWith(':transition') && options.mode === 'shared') {
+        sharedTransitionRequests++;
+        if (sharedTransitionRequests > 1)
+          throw new Error('Nested transition would wait behind erasure');
+      }
+      return manager.request(name, options, operation);
+    },
+  });
+  const order: string[] = [];
+  let erasure: Promise<unknown> | undefined;
+  await runWithPersistenceMutationTransition(async (transition) => {
+    erasure = runWithPersistentDataErasureBarrier(async () => {
+      order.push('erased');
+    });
+    await runWithExclusivePersistenceMutationPermit(async (permit) => {
+      expect(isActivePersistenceMutationPermit(permit)).toBe(true);
+      order.push('settled');
+    }, transition);
+    expect(order).toEqual(['settled']);
+  });
+  await erasure;
+  expect(order).toEqual(['settled', 'erased']);
+  expect(sharedTransitionRequests).toBe(1);
+});
+
+it('refuses expired transition reuse before acquiring exclusive mutation', async () => {
+  let retained!: PersistenceMutationTransitionPermit;
+  await runWithPersistenceMutationTransition(async (permit) => {
+    retained = permit;
+  });
+  const mutate = vi.fn();
+  await expect(runWithExclusivePersistenceMutationPermit(mutate, retained)).rejects.toThrow(
+    'Transition permit is not active'
+  );
+  expect(mutate).not.toHaveBeenCalled();
+});
+
+it('refuses a reused transition that expires during an exclusive mutation wait', async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  installPersistenceLockManagerForTests({
+    async request(name, _options, operation) {
+      if (name === 'sniptale:persistence:privacy-erasure') await gate;
+      return operation();
+    },
+  });
+  const mutate = vi.fn();
+  let delayed!: Promise<unknown>;
+  await runWithPersistenceMutationTransition(async (transition) => {
+    delayed = runWithExclusivePersistenceMutationPermit(mutate, transition);
+  });
+  release();
+  await expect(delayed).rejects.toThrow('Transition permit is not active');
+  expect(mutate).not.toHaveBeenCalled();
+});
+
+it('publishes atomically before waiting erasure without another transition gate and revokes its permit', async () => {
+  const lease = await acquirePersistenceMutationTransition();
+  const order: string[] = [];
+  let publishedPermit: unknown;
+  const erasure = runWithPersistentDataErasureBarrier(() => {
+    order.push('erasure');
+  });
+  await runWithAtomicPersistenceMutationPermit((permit) => {
+    publishedPermit = permit;
+    expect(isActivePersistenceMutationPermit(permit)).toBe(true);
+    order.push('model');
+  });
+  expect(isActivePersistenceMutationPermit(publishedPermit)).toBe(false);
+  expect(order).toEqual(['model']);
+  await lease.release();
+  await erasure;
+  expect(order).toEqual(['model', 'erasure']);
+  await expect(
+    runWithAtomicPersistenceMutationPermit(() => {
+      throw new Error('Refused');
+    })
+  ).rejects.toThrow('Refused');
+  await runWithAtomicPersistenceMutationPermit(() => {
+    order.push('retry');
+  });
+  expect(order).toEqual(['model', 'erasure', 'retry']);
 });

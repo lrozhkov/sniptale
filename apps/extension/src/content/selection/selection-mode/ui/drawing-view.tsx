@@ -1,4 +1,4 @@
-import { Crop, PenLine, Redo2, Undo2 } from 'lucide-react';
+import { Crop, Pencil, Redo2, Undo2 } from 'lucide-react';
 import { useEffect, useReducer } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -149,35 +149,31 @@ function DrawingToolbar(props: {
   return (
     <>
       {createPortal(
-        <div
-          role="group"
+        <button
+          type="button"
           className="sniptale-selection-mode-switch"
-          aria-label={translate('content.toolbar.modeMenuTitle')}
+          aria-label={props.drawing ? resizeLabel : drawingLabel}
+          title={props.drawing ? resizeLabel : drawingLabel}
           data-ui="content.crop.mode-toggle"
+          onClick={() => props.onModeChange(!props.drawing)}
         >
-          <button
-            type="button"
+          <span
             className="sniptale-selection-mode-option"
-            aria-pressed={!props.drawing}
-            aria-label={resizeLabel}
-            title={resizeLabel}
+            data-active={!props.drawing}
+            aria-hidden="true"
             data-ui="content.crop.mode.resize"
-            onClick={() => props.onModeChange(false)}
           >
             <Crop size={18} />
-          </button>
-          <button
-            type="button"
+          </span>
+          <span
             className="sniptale-selection-mode-option"
-            aria-pressed={props.drawing}
-            aria-label={drawingLabel}
-            title={drawingLabel}
+            data-active={props.drawing}
+            aria-hidden="true"
             data-ui="content.crop.mode.drawing"
-            onClick={() => props.onModeChange(true)}
           >
-            <PenLine size={18} />
-          </button>
-        </div>,
+            <Pencil size={18} />
+          </span>
+        </button>,
         props.modeSlot
       )}
       {props.drawing

@@ -274,3 +274,38 @@ it('keeps one continuous camera across adjacent speed runs of the same captured 
   );
   expect(region).toEqual(before);
 });
+
+it('reuses the camera plan as time advances and replaces it after geometry or trajectory changes', () => {
+  const scene = { source, background: { enabled: false as const } };
+  const region: QuickEditZoomRegion = {
+    id: 'retained-camera',
+    start: 0,
+    end: 4,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    cursorFocus: {
+      scene,
+      path: authored,
+      observed: deriveReviewCursorFocusPath(facts, source, true),
+    },
+  };
+  const plan = resolveReviewSceneCameraPlan([region], region, scene);
+  expect(plan?.status).toBe('ready');
+  for (const time of [0.1, 0.5, 1, 2, 3.5]) {
+    evaluateQuickEditCameraAtTime([region], time, scene);
+    expect(resolveReviewSceneCameraPlan([region], region, { ...scene })).toBe(plan);
+  }
+  const scaled = { ...region, transform: { ...region.transform, scale: 3 } };
+  expect(resolveReviewSceneCameraPlan([scaled], scaled, scene)).not.toBe(plan);
+  const resized = { ...scene, source: { width: 200, height: 100, duration: 4 } };
+  expect(resolveReviewSceneCameraPlan([region], region, resized)).not.toBe(plan);
+  const changed = {
+    ...region,
+    cursorFocus: {
+      ...region.cursorFocus!,
+      observed: structuredClone(region.cursorFocus!.observed!),
+    },
+  };
+  expect(resolveReviewSceneCameraPlan([changed], changed, scene)).not.toBe(plan);
+});

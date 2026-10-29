@@ -231,6 +231,8 @@ it.each(['admission', 'before-post', 'after-response'] as const)(
     const resolveModel = vi.fn(async () => {
       if (boundary === 'before-post') savedText = 'Changed action';
       return {
+        connectionType: 'openai-compatible' as const,
+        baseUrl: 'https://example.test',
         url: 'https://example.test/audio/speech',
         apiKey: 'fixture',
         modelCode: 'model',

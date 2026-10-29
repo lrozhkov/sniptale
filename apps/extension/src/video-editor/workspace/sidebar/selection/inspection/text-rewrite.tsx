@@ -1,3 +1,4 @@
+import { getAIProviderFailureKey } from '../../../../../features/ai/provider-failure-copy';
 import { useEffect } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types/model';
@@ -25,6 +26,7 @@ export function ProjectTextRewritePanel(props: {
   const target = operation.target;
   if (!target) return null;
   const context = operation.preview?.basis.context ?? operation.disclosure?.basis.context;
+  const providerFailureKey = getAIProviderFailureKey(operation.providerFailureReason);
   const error = operation.error ?? (operation.preview ? null : operation.disclosureError);
   return (
     <section
@@ -65,7 +67,11 @@ export function ProjectTextRewritePanel(props: {
         wholeDocument={target.wholeDocument}
         windowFallback={context?.window}
         resultDuration={operation.resultDuration}
-        catalogError={operation.error === 'model-unavailable'}
+        catalogError={operation.catalogError}
+        selectionPending={operation.selectionPending}
+        selectionUnavailable={operation.selectionUnavailable}
+        unavailableModelName={operation.unavailableModelName}
+        selectionFailed={operation.selectionFailed}
         onOptionsChange={(change) => operation.setOptions((value) => ({ ...value, ...change }))}
         onModelChange={operation.setModelId}
         onReloadModels={operation.loadModels}
@@ -73,7 +79,7 @@ export function ProjectTextRewritePanel(props: {
       <RewriteDisclosure {...props} />
       {error ? (
         <p role="alert" className="text-xs">
-          {rewriteErrorLabel(error)}
+          {providerFailureKey ? translate(providerFailureKey) : rewriteErrorLabel(error)}
         </p>
       ) : null}
       <RewriteRequestStatus operation={operation} />
@@ -177,7 +183,7 @@ function RewriteRequestStatus({ operation }: { operation: VideoProjectTextRewrit
   return (
     <TextRewriteButton
       label={translate('gallery.videoReview.textRewriteStart')}
-      disabled={!operation.disclosure || !operation.modelId}
+      disabled={!operation.disclosure || !operation.modelId || operation.selectionPending}
       onClick={operation.start}
     />
   );

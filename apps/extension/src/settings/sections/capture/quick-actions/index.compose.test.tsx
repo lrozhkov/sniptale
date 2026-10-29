@@ -122,7 +122,7 @@ function triggerQuickActionsButtons(container: HTMLDivElement) {
     [...container.querySelectorAll<HTMLButtonElement>('button')]
       .find((button) => button.textContent === 'settings.collection.actions.delete')
       ?.click();
-    container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[3]?.click();
+    container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')[2]?.click();
     container
       .querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
       .forEach((input) => input.click());
@@ -257,16 +257,12 @@ it('keeps placement controls disabled until load and serializes writes with fail
   const controls = () =>
     [...container.querySelectorAll<HTMLButtonElement>('[data-testid="settings-switch"]')].slice(
       0,
-      3
+      2
     );
   expect(controls().every((control) => control.disabled)).toBe(true);
   store.hasLoaded = true;
   await renderQuickActionsSection();
-  expect(controls().map((control) => control.dataset['checked'])).toEqual([
-    'true',
-    'false',
-    'false',
-  ]);
+  expect(controls().map((control) => control.dataset['checked'])).toEqual(['true', 'false']);
   let reject!: (error: Error) => void;
   updateSettings.mockImplementationOnce(
     () =>
@@ -276,7 +272,7 @@ it('keeps placement controls disabled until load and serializes writes with fail
   );
   await act(async () => controls()[1]!.click());
   expect(controls().every((control) => control.disabled)).toBe(true);
-  controls()[2]!.click();
+  controls()[0]!.click();
   expect(updateSettings).toHaveBeenCalledOnce();
   await act(async () => reject(new Error('write refused')));
   expect(container.querySelector('[role="alert"]')).not.toBeNull();
@@ -285,8 +281,7 @@ it('keeps placement controls disabled until load and serializes writes with fail
   await act(async () => controls()[1]!.click());
   expect(updateSettings).toHaveBeenLastCalledWith({ pageLaunch: { quickActionsCorner: true } });
   expect(container.querySelector('[role="alert"]')).toBeNull();
-  await act(async () => controls()[2]!.click());
-  expect(updateSettings).toHaveBeenLastCalledWith({ pageLaunch: { quickActionsToolbar: true } });
+  expect(container.textContent).not.toContain('settings.quickActions.placementToolbar');
   await act(async () => controls()[0]!.click());
   expect(updateSettings).toHaveBeenLastCalledWith({ pageLaunch: { quickActionsPopup: false } });
 });

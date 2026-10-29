@@ -3,6 +3,7 @@ import {
   createChromeAiSystemPromptMessage,
 } from '@sniptale/platform/browser/chrome-ai';
 import type { AIModel } from '../../../../contracts/settings';
+import { supportsAIScenarioModel } from '../../../../contracts/settings/model-operation';
 import type { AIProviderSelectorEntry } from '../../../../contracts/messaging/ai-settings-runtime';
 import {
   CONTENT_TEXT_MAX_CHARS,
@@ -147,7 +148,7 @@ export async function requestTextReplacement(args: TextReplacementRequest): Prom
   if (
     !provider ||
     provider.id !== args.model.providerId ||
-    provider.connectionType !== 'openai-compatible' ||
+    !supportsAIScenarioModel(args.model, provider, 'page-edit') ||
     !provider.destinationBinding
   )
     throw new Error('model-unavailable');

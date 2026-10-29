@@ -1,9 +1,19 @@
-import { resolveSelectablePageHtmlElement } from '../page-element-target';
+import {
+  resolveSelectablePageHtmlElement,
+  resolveDrawablePageHtmlElement,
+} from '../page-element-target';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { HoverOverlayActions } from './overlay';
 import type { HoverFrameCacheSession, HoverSession, HoverTrackingSession } from './session';
-import type { AddFreeFrameCallback } from '../../../features/highlighter/contracts';
-import { getViewportClientPoint } from '../../platform/frame';
+import type {
+  AddFreeFrameCallback,
+  StandaloneAnnotationCreationOptions,
+} from '../../../features/highlighter/contracts';
+import {
+  getViewportClientPoint,
+  getAbsolutePosition,
+  createDocumentPagePlacement,
+} from '../../platform/frame';
 import {
   hasBlockingHighlighterPopover,
   isInsideExistingFrame,
@@ -27,6 +37,7 @@ export type HighlighterStateGetters = {
   isModeEnabled: () => boolean;
   isPaused: () => boolean;
   isFrameEditing: () => boolean;
+  getStandaloneCreation?: () => StandaloneAnnotationCreationOptions | undefined;
 };
 
 type HoverInteractionSession = HoverTrackingSession &
@@ -81,7 +92,7 @@ export function handleFrozenHoverPreview(props: {
 
 export function shouldIgnoreHighlighterClick(props: {
   eventTarget: HTMLElement;
-  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused'>;
+  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused' | 'getStandaloneCreation'>;
 }): boolean {
   if (!props.getState.isModeEnabled() || props.getState.isPaused()) {
     return true;
@@ -117,15 +128,17 @@ function canShowHoverTarget(props: {
   getCallbacks: () => HighlighterCallbacks;
   session: Pick<HoverTrackingSession, 'lastHoverTarget'>;
   target: HTMLElement;
+  allowExistingTarget?: boolean;
 }): boolean {
   if (props.target === props.session.lastHoverTarget) return false;
+  if (props.allowExistingTarget) return true;
   const { hasFrameForElement } = props.getCallbacks();
   return !(hasFrameForElement && hasFrameForElement(props.target));
 }
 
 function processScheduledHoverTarget(props: {
   getCallbacks: () => HighlighterCallbacks;
-  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused'>;
+  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused' | 'getStandaloneCreation'>;
   hideHoverOverlay: () => void;
   session: HoverInteractionSession;
   showHoverOverlay: (element: HTMLElement) => boolean;
@@ -147,6 +160,7 @@ function processScheduledHoverTarget(props: {
       getCallbacks: props.getCallbacks,
       session: props.session,
       target: props.target,
+      allowExistingTarget: Boolean(props.getState.getStandaloneCreation?.()),
     })
   ) {
     if (props.session.lastHoverTarget !== props.target) {
@@ -164,7 +178,7 @@ function processScheduledHoverTarget(props: {
 export function scheduleHoverOverlayUpdate(props: {
   event: MouseEvent;
   getCallbacks: () => HighlighterCallbacks;
-  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused'>;
+  getState: Pick<HighlighterStateGetters, 'isModeEnabled' | 'isPaused' | 'getStandaloneCreation'>;
   hideHoverOverlay: () => void;
   iframe?: HTMLIFrameElement;
   session: HoverInteractionSession;
@@ -206,13 +220,17 @@ function createHoverClickHandler(props: HoverInteractionProps) {
       event.stopImmediatePropagation();
       return;
     }
-    const target = resolveSelectablePageHtmlElement(event, iframe);
+    const standalone = props.getState.getStandaloneCreation?.();
+    const target =
+      standalone?.placement === 'free'
+        ? resolveDrawablePageHtmlElement(event, iframe)
+        : resolveSelectablePageHtmlElement(event, iframe);
     const point = getViewportClientPoint(event.clientX, event.clientY, iframe);
     const insideExistingFrame = isInsideExistingFrame(props.session, point.x, point.y);
     const hasVisibleHoverTarget = props.session.lastHoverTarget !== null;
     if (
       !target ||
-      (insideExistingFrame && !hasVisibleHoverTarget) ||
+      (insideExistingFrame && !hasVisibleHoverTarget && !standalone) ||
       isNearExistingFrameBorder(props.session, point.x, point.y) ||
       shouldIgnoreHighlighterClick({ eventTarget: target, getState: props.getState })
     ) {
@@ -238,10 +256,15 @@ function createHoverClickHandler(props: HoverInteractionProps) {
 
     const cachedTarget = props.session.lastHoverTarget;
     const elementForFrame =
+      standalone?.placement !== 'free' &&
       cachedTarget &&
       (cachedTarget === target || cachedTarget.contains(target) || target.contains(cachedTarget))
         ? cachedTarget
         : target;
+    if (standalone) {
+      addStandaloneAnnotation(props, standalone, elementForFrame, point);
+      return;
+    }
     const { addFrame, hasFrameForElement } = props.getCallbacks();
     if (hasFrameForElement?.(elementForFrame)) {
       clickLogger.debug('Blocked duplicate frame creation');
@@ -258,9 +281,38 @@ function createHoverClickHandler(props: HoverInteractionProps) {
   };
 }
 
+function addStandaloneAnnotation(
+  props: HoverInteractionProps,
+  options: StandaloneAnnotationCreationOptions,
+  target: HTMLElement,
+  clickPoint: { x: number; y: number }
+) {
+  const add = props.getCallbacks().addFreeFrame;
+  if (!add) return;
+  const rect = getAbsolutePosition(target);
+  const point =
+    options.placement === 'element'
+      ? { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+      : clickPoint;
+  const pagePlacement = createDocumentPagePlacement(target.ownerDocument, point.x, point.y);
+  if (!pagePlacement) return;
+  cancelPendingHoverFrame(props.session);
+  add(
+    { ...point, width: 1, height: 1, pagePlacement, annotationKind: options.annotationKind },
+    target
+  );
+  props.session.isHoverPreviewFrozen = true;
+  hideHoverPreview(props.session, props.overlayActions.hideHoverOverlay);
+}
+
 function createHoverMouseMoveHandler(props: HoverInteractionProps) {
   return (event: MouseEvent, iframe?: HTMLIFrameElement) => {
     if (props.session.freeDraw.gesture) return;
+    if (props.getState.getStandaloneCreation?.()?.placement === 'free') {
+      cancelPendingHoverFrame(props.session);
+      hideHoverPreview(props.session, props.overlayActions.hideHoverOverlay);
+      return;
+    }
     if (hasBlockingHighlighterPopover()) {
       cancelPendingHoverFrame(props.session);
       hideHoverPreview(props.session, props.overlayActions.hideHoverOverlay);

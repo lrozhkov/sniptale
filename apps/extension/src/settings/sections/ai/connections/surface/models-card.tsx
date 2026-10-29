@@ -25,12 +25,9 @@ export function AIProvidersModelsCard(props: { state: AiProvidersSectionState })
       id: model.id,
       title: model.displayName,
       meta: `${props.state.getProviderName(model.providerId)} · ${model.modelCode} · ${purpose}`,
-      isDefault: props.state.defaultModelId === model.id,
       busy: movingModelId === model.id,
       capabilities: {
         edit: true,
-        setDefault:
-          getAIModelOperation(model) === 'text' && props.state.defaultModelId !== model.id,
         delete: true,
         reorder: true,
       },
@@ -40,13 +37,14 @@ export function AIProvidersModelsCard(props: { state: AiProvidersSectionState })
   const onAction = (action: SettingsCollectionAction) => {
     const model = byId.get(action.itemId);
     if (!model) return;
-    if (action.type === 'set-default' && getAIModelOperation(model) === 'text')
-      void props.state.catalogActions.setDefaultModel(model.id);
     if (action.type === 'edit') props.state.modals.openModelModal(model);
     if (action.type === 'delete')
       props.state.modals.setConfirmDelete({ type: 'model', item: model });
   };
   const hasProviders = props.state.providers.length > 0;
+  const hasAutomaticProviders = props.state.providers.some(
+    (provider) => provider.management === 'automatic'
+  );
   return (
     <SettingsCollection
       ariaLabel={translate('settings.aiProviders.modelsTitle')}
@@ -54,12 +52,20 @@ export function AIProvidersModelsCard(props: { state: AiProvidersSectionState })
       items={items}
       emptyState={
         <div>
-          <p>{translate('settings.aiProviders.modelsEmptyTitle')}</p>
           <p>
             {translate(
-              hasProviders
-                ? 'settings.aiProviders.modelsEmptyDescriptionWithProviders'
-                : 'settings.aiProviders.modelsEmptyDescriptionNoProviders'
+              hasAutomaticProviders
+                ? 'settings.aiProviders.manualModelsEmptyTitle'
+                : 'settings.aiProviders.modelsEmptyTitle'
+            )}
+          </p>
+          <p>
+            {translate(
+              hasAutomaticProviders
+                ? 'settings.aiProviders.modelsAutomaticDescription'
+                : hasProviders
+                  ? 'settings.aiProviders.modelsEmptyDescriptionWithProviders'
+                  : 'settings.aiProviders.modelsEmptyDescriptionNoProviders'
             )}
           </p>
         </div>

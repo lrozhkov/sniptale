@@ -2,12 +2,14 @@ import { translate } from '../../../../../platform/i18n';
 import { ProductModalFooter } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { Settings2 } from 'lucide-react';
+import { requireTrustedAIModalInteraction } from './helpers';
 import { ModelSelector } from './model-selector';
 import type { useAIModalState } from '../session';
 import { openAIModalSettings } from './settings-navigation';
 
 export function AIModalFooter({
   availableModels,
+  modelSelection,
   disabledSubmit,
   isLoading,
   onClose,
@@ -19,6 +21,7 @@ export function AIModalFooter({
   totalTokens,
 }: {
   availableModels: ReturnType<typeof useAIModalState>['availableModels'];
+  modelSelection: ReturnType<typeof useAIModalState>['modelSelection'];
   disabledSubmit: boolean;
   isLoading: boolean;
   onClose: () => void;
@@ -44,7 +47,8 @@ export function AIModalFooter({
           providers={providers}
           selectedModelId={selectedModelId}
           onSelect={onSelectModel}
-          disabled={isLoading}
+          onOpen={() => void modelSelection.retryConfiguration()}
+          disabled={isLoading || modelSelection.selectionPending}
         />
         <ProductActionButton
           tone="secondary"
@@ -65,7 +69,9 @@ export function AIModalFooter({
         </ProductActionButton>
         <ProductActionButton
           disabled={disabledSubmit}
-          onClick={onSubmit}
+          onClick={(event) => {
+            if (requireTrustedAIModalInteraction(event)) onSubmit();
+          }}
           title={disclosureHint}
           tone="primary"
         >

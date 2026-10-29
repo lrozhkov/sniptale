@@ -499,3 +499,32 @@ it('selects canonical scoped history and marker replay proof', async () => {
     ])
   );
 });
+
+it('retains serialized pin and toolbar visibility write proof for the content session owner', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/content/overlay/app/content-mode/state';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/pin-session.ts`)).toEqual(
+    expect.arrayContaining([`${root}/pin-session.test.ts`, `${root}/pin-session-writes.test.ts`])
+  );
+});
+
+it.each(['core.stores.ts', 'upgrade/core.ts'])(
+  'selects legacy-to-current upgrade consumers when %s changes',
+  async (owner) => {
+    const module = await importOwnerMap();
+    const root = 'apps/extension/src/composition/persistence/infrastructure/indexed-db';
+    expect(module.resolveMappedCoverageOwnerTests(`${root}/${owner}`)).toEqual(
+      expect.arrayContaining([
+        'apps/extension/src/composition/persistence/diagnostics/index.test.ts',
+        'apps/extension/src/composition/persistence/projects/index.read-guards.test.ts',
+        'apps/extension/src/composition/persistence/scenario/projects/assets.test.ts',
+        'apps/extension/src/composition/persistence/scenario/projects/exports.test.ts',
+        'apps/extension/src/composition/persistence/scenario/projects/project.test.ts',
+        'apps/extension/src/composition/persistence/effect-bundles/index.test.ts',
+        `${root}/upgrade/review-history.test.ts`,
+        `${root}/upgrade/scenario-history.test.ts`,
+        `${root}/upgrade/scenario-units.test.ts`,
+      ])
+    );
+  }
+);

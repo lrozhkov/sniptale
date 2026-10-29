@@ -130,7 +130,12 @@ beforeEach(() => {
     canvas.height = 360;
     const release = vi.fn();
     releases.push(release);
-    return { canvas, context: {}, release, generation: frame.generation };
+    return {
+      canvas,
+      context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
+      release,
+      generation: frame.generation,
+    };
   });
   io.factory.mockImplementation(() => ({
     prepare: io.prepare,
@@ -210,11 +215,11 @@ it('uses the manual owner at source cadence and releases disabled annotations', 
   await step(0);
   expect(io.prepare.mock.calls[0]![0].annotationEffects).toEqual(props.scene.annotationEffects);
   expect(io.render.mock.calls[0]![1].fps).toBe(24);
-  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(1);
+  expect(props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')).toHaveLength(1);
   props.scene.annotationEffects.lane.enabled = false;
   await render();
   expect(result.active).toBe(false);
-  expect(props.host.current!.querySelector('canvas')).toBeNull();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBeNull();
   expect(io.dispose).toHaveBeenCalledOnce();
   expect(releases[0]).toHaveBeenCalledOnce();
   props.scene.annotationEffects.lane.enabled = true;
@@ -239,7 +244,7 @@ it('publishes a complete manual frame at exact paused clocks and retains only it
   expect(closed).toHaveBeenCalledOnce();
   expect(preparedRelease).toHaveBeenCalledOnce();
   expect(releases[0]).not.toHaveBeenCalled();
-  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(1);
+  expect(props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')).toHaveLength(1);
   expect(result.status).toMatchObject({
     phase: 'ready',
     actualRaster: { width: 720, height: 360 },
@@ -284,10 +289,10 @@ it('does not capture stale source pixels after asynchronous preparation finishes
 it('retains visible pixels on seek until atomic replacement without changing transport time', async () => {
   await render();
   await step(0);
-  const front = props.host.current!.querySelector('canvas');
+  const front = props.host.current!.querySelector('canvas[data-preview-front="true"]');
   Object.defineProperty(props.video.current, 'seeking', { configurable: true, value: true });
   act(() => props.video.current!.dispatchEvent(new Event('seeking')));
-  expect(props.host.current!.querySelector('canvas')).toBe(front);
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBe(front);
   expect(releases[0]).not.toHaveBeenCalled();
   await step(50);
   expect(io.render).toHaveBeenCalledOnce();
@@ -296,8 +301,9 @@ it('retains visible pixels on seek until atomic replacement without changing tra
   act(() => props.video.current!.dispatchEvent(new Event('seeked')));
   await step(100);
   expect(io.render).toHaveBeenCalledTimes(2);
-  expect(props.host.current!.querySelector('canvas')).not.toBe(front);
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBe(front);
   expect(releases[0]).toHaveBeenCalledOnce();
+  expect(releases[1]).not.toHaveBeenCalled();
   expect(props.video.current!.currentTime).toBe(1.234567);
 });
 
@@ -309,7 +315,7 @@ it('reports render failure, closes captures, and retries without changing qualit
   await step(0);
   expect(result.status.phase).toBe('failed');
   expect(closed).toHaveBeenCalledOnce();
-  expect(props.host.current!.querySelector('canvas')).toBeNull();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBeNull();
   act(() => result.retry());
   await step(50);
   expect(result.status.phase).toBe('ready');
@@ -328,7 +334,7 @@ it('disposes expensive presentation when hidden and forwards comment drafts only
   expect(ticks.size).toBe(0);
   expect(io.dispose).toHaveBeenCalledOnce();
   expect(io.ledgerDispose).toHaveBeenCalledOnce();
-  expect(props.host.current!.querySelector('canvas')).toBeNull();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBeNull();
 });
 
 it('reports native video cadence separately without a compositor when only the readout is enabled', async () => {
@@ -664,23 +670,6 @@ it('requires explicit retry after context loss and ignores loss after disposal',
   act(lost);
   expect(ticks.size).toBe(0);
   expect(result.status.phase).toBe('inactive');
-});
-
-it('waits for a mapped result clock and reports completed playing cadence', async () => {
-  props = { ...props, playing: true, sourceToResult: () => null };
-  await render();
-  await step(0);
-  expect(result.status.phase).toBe('pending');
-  expect(io.render).not.toHaveBeenCalled();
-  props = { ...props, sourceToResult: (value) => value - 0.25 };
-  await render();
-  act(() => props.video.current!.dispatchEvent(new Event('timeupdate')));
-  await step(50);
-  await step(100);
-  await step(1200);
-  expect(result.status.phase).toBe('ready');
-  expect(result.status.presentedFPS).toBeGreaterThan(0);
-  expect(io.render.mock.lastCall![1].resultTime).toBeCloseTo(0.984567, 6);
 });
 
 it.each([

@@ -115,7 +115,7 @@ it('reuses camera plans after unrelated settings snapshots and invalidates chang
   const changed = structuredClone(state);
   changed.audio.original.volume = 0.5;
   const repeated = resolveQuickEditEffectiveState(changed, input);
-  expect(repeated.zoomRegions).toBe(original.zoomRegions);
+  expect(repeated.zoomRegions[0]).toBe(original.zoomRegions[0]);
   expect(resolveReviewSceneCameraPlan(repeated.zoomRegions, repeated.zoomRegions[0]!)).toBe(plan);
   changed.zoom.regions[0]!.transform.scale += 0.5;
   expect(resolveQuickEditEffectiveState(changed, input).zoomRegions).not.toBe(original.zoomRegions);

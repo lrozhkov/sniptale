@@ -1,3 +1,4 @@
+import { pageCapturePreferences } from '../../../application/capture-preferences';
 import { mountFrozenSelectionFrame, watchFrozenSelectionViewport } from '../frozen';
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
 import { getSelectionFrameVisual } from '../../frame-runtime/selection-frame-visual';
@@ -91,6 +92,24 @@ function watchSelectionModeFrozenViewport(
   };
 }
 
+function createSelectionCaptureOptions(): Pick<
+  Parameters<typeof createSelectionModeUiRuntime>[0],
+  'getCapturePreferences' | 'onImageFormatChange' | 'prepareVisual'
+> {
+  let compactMenus = false;
+  return {
+    getCapturePreferences: () => ({ ...pageCapturePreferences.read('selection'), compactMenus }),
+    onImageFormatChange: (imageFormat) =>
+      pageCapturePreferences.update('selection', { imageFormat }),
+    prepareVisual: async () => {
+      await pageCapturePreferences.load().catch(() => undefined);
+      compactMenus = await loadSettings()
+        .then((settings) => settings.contentToolbar?.compactMenus ?? false)
+        .catch(() => false);
+    },
+  };
+}
+
 export function createSelectionModeRuntime(args: SelectionModeRuntimeArgs): SelectionModeRuntime {
   let events: SelectionModeEvents;
   let handlers: SelectionModeHandlers;
@@ -110,6 +129,7 @@ export function createSelectionModeRuntime(args: SelectionModeRuntimeArgs): Sele
   });
   const uiRuntime = createSelectionModeUiRuntime({
     getCaptureAction: () => args.session.captureAction,
+    ...createSelectionCaptureOptions(),
     getDom: () => args.session.dom,
     getSelection: () => args.session.currentSelection,
     getVisual: () => visual,
@@ -133,7 +153,7 @@ export function createSelectionModeRuntime(args: SelectionModeRuntimeArgs): Sele
     onResetToIdle: () => getEvents().resetToIdleState(),
     onSetupSizePanelListeners: setupSizePanelListeners,
     overlayBackground: OVERLAY_BACKGROUND,
-    prepareVisual: async () => {},
+
     zIndexBase: Z_INDEX_BASE,
   });
   const runtimeArgs = createSelectionModeRuntimeSetup({

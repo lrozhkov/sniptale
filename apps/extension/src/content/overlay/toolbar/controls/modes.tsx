@@ -1,4 +1,5 @@
 import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from './page-layout';
+import { readContentUiScaleCompensation } from '@sniptale/ui/floating-interactions/scale';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Icon } from '@iconify/react';
@@ -35,6 +36,8 @@ import { useToolbarMenuDirection } from '../menu/direction';
 import { ModeSelectorButton } from './mode-selector-button';
 import type { ToolbarPageEditingMode } from '../types';
 import { PageControlVisibility, PageProtectedControls } from './control-visibility';
+import { isEditableElementTarget } from '../../../../ui/keyboard/editable-target';
+import { isTrustedKeyboardEvent } from '../../../platform/trusted-events';
 
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
@@ -143,7 +146,8 @@ function createModeSelectionHandler(
   props: ToolbarModeButtonsProps,
   onClose: () => void
 ) {
-  return (event: React.SyntheticEvent<HTMLElement>) => {
+  return (event: React.SyntheticEvent<HTMLElement> | KeyboardEvent) => {
+    const activationEvent = 'nativeEvent' in event ? event.nativeEvent : event;
     event.preventDefault();
     event.stopPropagation();
     if (selected) {
@@ -167,7 +171,7 @@ function createModeSelectionHandler(
           props.onToggleDrawing?.();
           break;
         case 'video-recording':
-          void props.onToggleVideoRecording?.(event.nativeEvent);
+          void props.onToggleVideoRecording?.(activationEvent);
           break;
         case 'highlighter':
           props.onToggleHighlighter();
@@ -183,7 +187,7 @@ function createModeSelectionHandler(
 
     if (props.videoRecordingMode && mode !== 'video-recording') {
       if (props.videoRecordingModeLocked) return;
-      void Promise.resolve(props.onToggleVideoRecording?.(event.nativeEvent)).then(
+      void Promise.resolve(props.onToggleVideoRecording?.(activationEvent)).then(
         (deactivated) => {
           if (deactivated !== false) selectMode();
         },
@@ -216,7 +220,12 @@ function ModeMenuItem(props: {
     >
       {getModeIcon(props.mode)}
       <ProductToolbarMenuItemCopy hint={copy.hint} label={copy.label} />
-      {props.selected ? <Check className="h-4 w-4 text-[var(--sniptale-color-accent)]" /> : null}
+      <kbd className="sniptale-toolbar-menu-shortcut">
+        {TOOLBAR_INTERACTION_MODES.indexOf(props.mode) + 1}
+      </kbd>
+      <span className="inline-flex w-4 shrink-0">
+        {props.selected ? <Check className="h-4 w-4 text-[var(--sniptale-color-accent)]" /> : null}
+      </span>
     </ProductToolbarMenuItem>
   );
 }
@@ -238,6 +247,19 @@ function resolveModeMenuLayout(props: {
     placement,
     viewportRightInset: props.triggerProps.sidebarVisible ? TOOLBAR_SIDEBAR_RIGHT_INSET_PX : 0,
   });
+  const anchor = props.triggerRef.current;
+  if (anchor && menuStyle) {
+    const rect = anchor.getBoundingClientRect();
+    const scale = readContentUiScaleCompensation(anchor);
+    const vertical = props.triggerProps.displayMode === 'vertical';
+    const top = typeof menuStyle.top === 'number' ? menuStyle.top : 0;
+    const available = vertical
+      ? (window.innerHeight - rect.top) / scale - top - 8
+      : (placement === 'up' ? rect.top : window.innerHeight - rect.bottom) / scale - 18;
+    // Keep the existing 8px viewport margin and, horizontally, the 10px menu gap.
+    menuStyle.maxHeight = Math.max(0, available);
+    menuStyle.overflowY = 'auto';
+  }
   return {
     placement: menuPlacement,
     style: menuStyle ? { ...menuStyle, zIndex: TOOLBAR_PRIMARY_MENU_Z_INDEX } : null,
@@ -403,6 +425,33 @@ function ToolbarQuickEditModeButtons(
   );
 }
 
+function acceptsModeDigit(event: KeyboardEvent, trigger: HTMLButtonElement | null): boolean {
+  if (
+    !isTrustedKeyboardEvent(event) ||
+    event.defaultPrevented ||
+    event.repeat ||
+    event.isComposing ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    event.shiftKey ||
+    event.composedPath().some(isEditableElementTarget) ||
+    !trigger ||
+    trigger.matches(':disabled') ||
+    trigger.getClientRects().length === 0 ||
+    getComputedStyle(trigger).visibility === 'hidden' ||
+    trigger.closest('[inert], [data-page-customizing="true"], [data-dragging="true"]')
+  )
+    return false;
+  const root = trigger.getRootNode();
+  if (!(root instanceof Document || root instanceof ShadowRoot)) return false;
+  return ![
+    ...root.querySelectorAll<HTMLElement>('[aria-modal="true"], [role="dialog"], [role="listbox"]'),
+  ].some(
+    (layer) => layer.getClientRects().length > 0 && getComputedStyle(layer).visibility !== 'hidden'
+  );
+}
+
 export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
   const { onSelectPageEditingMode } = props;
   const [selectionTool, setSelectionTool] = useState<'marker' | 'ai-text' | null>(null);
@@ -440,6 +489,26 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
   const buttonCopy = getModeCopy(selectedMode);
   const open = props.toolbarMenuState.activeMenuType === 'mode';
   const pending = props.pendingMode !== null && props.pendingMode !== undefined;
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const mode = TOOLBAR_INTERACTION_MODES[Number(event.key) - 1];
+      if (
+        !/^[1-6]$/u.test(event.key) ||
+        !mode ||
+        pending ||
+        !open ||
+        (props.videoRecordingModeLocked && mode !== 'video-recording') ||
+        !acceptsModeDigit(event, triggerRef.current)
+      )
+        return;
+      createModeSelectionHandler(mode, mode === selectedMode, props, () =>
+        props.toolbarMenuState.closeMenu('mode')
+      )(event);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [props, pending, selectedMode, open]);
 
   useToolbarFloatingMenuDismissal({
     menuRef,

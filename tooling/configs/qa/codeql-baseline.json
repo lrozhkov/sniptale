@@ -28,14 +28,6 @@
       "rule": "js/http-to-file-access"
     },
     {
-      "contentHash": "f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f",
-      "debtId": "noise.codeql.transform-stream-transformer-constructor",
-      "file": "apps/extension/src/composition/archive-transfer/writer.ts",
-      "line": 38,
-      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-      "rule": "js/superfluous-trailing-arguments"
-    },
-    {
       "contentHash": "83a3fa100ec01dd535d329a77470c936e154310fd070b8984ee0124786bba64b",
       "debtId": "noise.codeql.snapshot-literal-fragment-href",
       "file": "apps/extension/src/features/web-snapshot/sanitize.ts",
@@ -44,12 +36,12 @@
       "rule": "js/xss-through-dom"
     },
     {
-      "contentHash": "c3fac8359c6c1faa61427d17c599fd0f86227190056af9454085a4c8071ade3c",
-      "debtId": "noise.codeql.presentation-retry-identity",
-      "file": "apps/extension/src/editor/document/session-autosave/presentation.ts",
-      "line": 117,
-      "messageHash": "ab704472dfda4512f9a07fa483bf0830055e1c51afa89b60bd2f814b2babd973",
-      "rule": "js/missing-await"
+      "contentHash": "c11f5e8642bc7b5ea33876c41156f39b50243248b9cda048cdedec845110ca13",
+      "file": "apps/extension/src/background/ai/settings/managed-catalog.ts",
+      "line": 270,
+      "messageHash": "e65f923a68b7d7a94adcd0de39f1b44b843f51359d25743ef19ad4384b4ab6e2",
+      "rule": "js/missing-await",
+      "debtId": "noise.codeql.catalog-refresh-flight-identity"
     }
   ]
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import type {
   StepBadgeAnchor,
   StepBadgeSettings,
@@ -120,7 +120,7 @@ export function getStepBadgeStyle(props: {
     color: visual.textColor,
     fontSize: `${fontSize}px`,
     fontWeight: 'bold',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: 'var(--sniptale-font-interface, system-ui, sans-serif)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -128,7 +128,9 @@ export function getStepBadgeStyle(props: {
       (position.translateX * badgeSize + offset.x) * visualScale + position.normalX
     }px, ${
       (position.translateY * badgeSize + offset.y) * visualScale + position.normalY
-    }px) scale(${visualScale})`,
+    }px) scale(${visualScale}) translateZ(0)`,
+    // Keep the circle and glyph in one raster layer through fractional scene scaling.
+    willChange: 'transform',
     transformOrigin: 'top left',
     zIndex: props.zIndex,
     pointerEvents: 'auto',
@@ -143,23 +145,91 @@ export function getStepBadgeStyle(props: {
   };
 }
 
+function measureBadgeInkOffset(value: HTMLSpanElement): number {
+  const style = getComputedStyle(value);
+  // A fixed-size glyph sample captures stroke balance without small-font quantization.
+  const scale = 64 / Number.parseFloat(style.fontSize);
+  if (!Number.isFinite(scale) || scale <= 0) return 0;
+  const canvas = value.ownerDocument.createElement('canvas');
+  canvas.width = canvas.height = 0;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return 0;
+  const font = `${style.fontStyle} ${style.fontWeight} 64px ${style.fontFamily}`;
+  const letterSpacing = `${(Number.parseFloat(style.letterSpacing) || 0) * scale}px`;
+  context.font = font;
+  context.letterSpacing = letterSpacing;
+  const text = value.innerText || value.textContent || '';
+  const metrics = context.measureText(text);
+  const left = Math.min(0, -metrics.actualBoundingBoxLeft);
+  const width = Math.ceil(Math.max(metrics.width, metrics.actualBoundingBoxRight) - left + 16);
+  const height = Math.ceil(metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent + 16);
+  // Custom CSS must not cause an unbounded measurement allocation.
+  if (
+    !Number.isFinite(width + height) ||
+    width <= 0 ||
+    height <= 0 ||
+    width > 1024 ||
+    height > 256
+  ) {
+    return 0;
+  }
+  canvas.width = width;
+  canvas.height = height;
+  context.font = font;
+  context.letterSpacing = letterSpacing;
+  const origin = 8 - left;
+  context.fillText(text, origin, 8 + metrics.fontBoundingBoxAscent);
+  const pixels = context.getImageData(0, 0, width, height).data;
+  let coverage = 0;
+  let moment = 0;
+  for (let index = 3; index < pixels.length; index += 4) {
+    const alpha = pixels[index]!;
+    coverage += alpha;
+    moment += ((((index - 3) / 4) % width) + 0.5 - origin) * alpha;
+  }
+  // Center the stroke coverage, rather than the bounding box of an asymmetric glyph.
+  const next = Number.parseFloat(style.width) / 2 - moment / coverage / scale;
+  return Number.isFinite(next) ? next : 0;
+}
+
+function useBadgeInkOffset(element: React.RefObject<HTMLSpanElement | null>) {
+  const [offset, setOffset] = useState(0);
+  useLayoutEffect(() => {
+    const value = element.current;
+    if (!value || typeof CanvasRenderingContext2D === 'undefined') return;
+    const measure = () => setOffset(measureBadgeInkOffset(value));
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(value);
+    const fonts = value.ownerDocument.fonts;
+    fonts?.addEventListener('loadingdone', measure);
+    return () => {
+      observer?.disconnect();
+      fonts?.removeEventListener('loadingdone', measure);
+    };
+  });
+  return offset;
+}
+
 export function StepBadgeValue(props: {
   customStyle?: React.CSSProperties;
   value: string | number;
 }) {
+  const element = useRef<HTMLSpanElement>(null);
+  const inkOffset = useBadgeInkOffset(element);
   return (
     <span
+      ref={element}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        height: '100%',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
+        display: 'block',
+        fontFamily: 'var(--sniptale-font-interface, system-ui, sans-serif)',
         fontSize: 'inherit',
         fontWeight: 'inherit',
         lineHeight: 1,
-        transform: 'translateY(-1px)',
+        textBoxTrim: 'trim-both',
+        textBoxEdge: 'cap alphabetic',
+        textRendering: 'geometricPrecision',
+        translate: `${inkOffset}px 0`,
         ...props.customStyle,
       }}
     >
@@ -173,6 +243,7 @@ export function FrameStepBadgeSurface(props: {
   borderWidth: number;
   fillColor?: string;
   elementRef?: React.Ref<HTMLDivElement>;
+  valueEditor?: React.ReactNode;
   isDragging?: boolean;
   visualScale?: number;
   onClick?: () => void;
@@ -211,7 +282,9 @@ export function FrameStepBadgeSurface(props: {
       }}
       title={[translateStepBadgePrefix(), props.settings.value].filter(Boolean).join(' ')}
     >
-      <StepBadgeValue customStyle={customStyles.text} value={props.settings.value} />
+      {props.valueEditor ?? (
+        <StepBadgeValue customStyle={customStyles.text} value={props.settings.value} />
+      )}
     </div>
   );
 }

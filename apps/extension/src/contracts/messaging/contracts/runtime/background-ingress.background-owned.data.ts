@@ -2,6 +2,54 @@ import type { BackgroundIngressRouteGroupData } from './background-ingress.types
 
 export const backgroundIngressBackgroundOwnedRouteGroups = [
   {
+    acceptedSenderClass:
+      'exact ordinary Settings or Gallery top-level document with per-verb admission',
+    actionKind: 'background-owned',
+    alternateAuthorizationPolicyIds: [],
+    alternateAuthorityFamilies: [],
+    authorizationPolicyId: 'background-owned',
+    boundary: 'background-runtime',
+    errorShape: 'fixed sync product command refusal',
+    freshnessReplayPolicy:
+      'canonical freshness and replay checks before exact product verb admission',
+    handlerId: 'sync-product',
+    keepChannelBehaviorSource: 'background-owned-route-handler',
+    ownerModule: 'apps/extension/src/background/sync-connection/product-route.ts',
+    policyAuthorityFamily: 'sync-product',
+    policyStateIds: ['sync-connection-erasure-exclusion'],
+    requiredAuthority: 'exact product document and native workspace or active enrollment authority',
+    responseShape: 'bounded typed product status or accepted selection',
+    routeAuthorityFamily: 'background-owned-ipc',
+    sideEffects:
+      'native workspace selection and existing coordinator start, enrollment, catalog refresh, replica preparation, thumbnail read or targeted cancellation',
+    transitiveStateOwner: 'native remote-connection, sync catalog and replica publication owners',
+    messageTypes: ['SYNC_PRODUCT_COMMAND'],
+  },
+  {
+    acceptedSenderClass: 'exact extension offscreen document without a tab',
+    actionKind: 'background-owned',
+    alternateAuthorizationPolicyIds: [],
+    alternateAuthorityFamilies: [],
+    authorizationPolicyId: 'background-owned',
+    boundary: 'background-runtime',
+    errorShape: 'standard runtime response with fixed sync origin permission refusal',
+    freshnessReplayPolicy:
+      'canonical runtime freshness and replay checks before read-only permission query',
+    handlerId: 'sync-connection-origin-permission',
+    keepChannelBehaviorSource: 'background-owned-route-handler',
+    ownerModule: 'apps/extension/src/background/sync-connection/route.ts',
+    policyAuthorityFamily: 'sync-connection-origin-permission',
+    policyStateIds: [],
+    requiredAuthority:
+      'exact offscreen sender and current durable connection or workspace allocation identity and origin',
+    responseShape: 'allowed boolean or fixed sync origin permission refusal',
+    routeAuthorityFamily: 'background-owned-ipc',
+    sideEffects:
+      'read-only native connection or workspace allocation and optional host permission query',
+    transitiveStateOwner: 'native remote-connection owner and browser permission authority',
+    messageTypes: ['SYNC_CONNECTION_ORIGIN_PERMISSION', 'SYNC_WORKSPACE_ORIGIN_PERMISSION'],
+  },
+  {
     acceptedSenderClass: 'checked top-level content runtime including the owned shim sender',
     actionKind: 'background-owned',
     alternateAuthorizationPolicyIds: [],
@@ -272,6 +320,7 @@ export const backgroundIngressBackgroundOwnedRouteGroups = [
       'popup-export-erasure-exclusion',
       'project-export-capabilities',
       'project-export-job-ledger',
+      'sync-connection-erasure-exclusion',
       'tab-mode-runtime-state',
       'video-recording-control-lease',
       'voice-input-port-session-authority',

@@ -138,3 +138,24 @@ it('keeps click suppression under the hover input owner', () => {
   expect(actions.hasHoverPreviewTarget()).toBe(true);
   expect(hoverController.hasHoverTarget).toHaveBeenCalledOnce();
 });
+
+it('switches standalone tools and cancels the previous creation gesture', () => {
+  const state = createHighlighterRuntimeState();
+  const hoverController = createHoverControllerStub();
+  const actions = createHighlighterStateActions({
+    state,
+    hoverController,
+    logger: createLoggerStub(),
+  });
+  actions.setCreationEnabled(true, { annotationKind: 'callout', placement: 'element' });
+  expect(state.standaloneCreation).toEqual({ annotationKind: 'callout', placement: 'element' });
+  expect(hoverController.cancelDrawing).toHaveBeenCalledOnce();
+  actions.setCreationEnabled(true, { annotationKind: 'step-badge', placement: 'free' });
+  expect(state.standaloneCreation).toEqual({ annotationKind: 'step-badge', placement: 'free' });
+  expect(hoverController.cancelDrawing).toHaveBeenCalledTimes(2);
+  actions.setCreationEnabled(false);
+  expect(state.standaloneCreation).toBeUndefined();
+  expect(actions.isCreationEnabled()).toBe(false);
+  actions.setCreationEnabled(true);
+  expect(state.standaloneCreation).toBeUndefined();
+});

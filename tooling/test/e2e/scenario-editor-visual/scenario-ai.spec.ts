@@ -20,7 +20,6 @@ for (const theme of ['light', 'dark'] as const) {
             success: true,
             modelSelection: {
               chromeAiEnabled: false,
-              defaultModelId: '10000000-0000-4000-8000-000000000001',
               globalSystemPrompt: '',
               providers: [
                 {
@@ -324,7 +323,6 @@ async function installLargeModelCatalog(page: Page) {
         success: true,
         modelSelection: {
           chromeAiEnabled: false,
-          defaultModelId: models[0]!.id,
           globalSystemPrompt: '',
           providers: [
             {

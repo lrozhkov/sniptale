@@ -105,3 +105,24 @@ describe('frame-mutation-actions-frame-post-add', () => {
     expectPostAddSkipsBadgeRecalcWhenFrameHasNoBadge
   );
 });
+
+it('finishes standalone post-add effects without frame settings', () => {
+  const recalculateStepBadgesRef = { current: vi.fn() };
+  expect(() =>
+    applyAddedFrameSideEffects({
+      frameData: {
+        id: 'standalone',
+        annotationKind: 'step-badge',
+        x: 10,
+        y: 20,
+        width: 1,
+        height: 1,
+        stepBadge: createStepBadgeSettingsFixture(),
+      },
+      isAutoMode: true,
+      recalculateStepBadgesRef,
+    })
+  ).not.toThrow();
+  expect(recalculateStepBadgesRef.current).toHaveBeenCalledOnce();
+  expect(invalidateFrameCache).toHaveBeenCalledOnce();
+});

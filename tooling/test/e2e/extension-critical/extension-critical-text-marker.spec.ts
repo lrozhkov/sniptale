@@ -93,6 +93,14 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           ' text on multiple lines for selection.'
         );
         document.body.append(text);
+        const editable = document.createElement('p');
+        editable.id = 'marker-whitespace-editable';
+        editable.contentEditable = 'true';
+        editable.textContent = ' ';
+        editable.style.cssText =
+          `position:absolute;left:${left}px;top:330px;width:120px;` +
+          'white-space:pre;font:24px/36px Arial';
+        document.body.append(editable);
       },
       viewport.name === '1280x560' ? 500 : 100
     );
@@ -108,6 +116,58 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     const eraser = panel.locator('[data-ui="content.toolbar.text-marker-eraser"]');
     await expect(eraser).toBeVisible();
     const highlights = () => page.evaluate(() => CSS.highlights.size);
+    await paintText(page, 'marker-whitespace-editable', 0, 1);
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    await expect.poll(highlights).toBe(0);
+    await paintText(page, 'marker-proof', 6, 7);
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    await expect.poll(highlights).toBe(0);
+    await paintText(page, 'marker-proof', 0, 7);
+    await expect.poll(highlights).toBe(1);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Array.from(CSS.highlights.values()).flatMap((highlight) =>
+            Array.from(highlight).map((range) => (range instanceof Range ? range.toString() : null))
+          )
+        )
+      )
+      .toEqual(['Marker']);
+    await page.screenshot({ path: info.outputPath('marker-trailing-space.png'), fullPage: false });
+    await page.locator('[data-ui="content.toolbar.history-undo-button"]').click();
+    await expect.poll(highlights).toBe(0);
+    const paintedTexts = () =>
+      page.evaluate(() =>
+        Array.from(CSS.highlights.values()).flatMap((highlight) =>
+          Array.from(highlight).map((range) => (range instanceof Range ? range.toString() : null))
+        )
+      );
+    const undo = page.locator('[data-ui="content.toolbar.history-undo-button"]');
+    await paintText(page, 'marker-proof', 6, 21);
+    await expect.poll(paintedTexts).toEqual(['across inline']);
+    await page.screenshot({
+      path: info.outputPath('marker-both-edge-spaces.png'),
+      fullPage: false,
+    });
+    await undo.click();
+    await expect.poll(highlights).toBe(0);
+    await paintText(page, 'marker-proof', 0, 6);
+    await paintText(page, 'marker-proof', 7, 20);
+    await expect.poll(paintedTexts).toEqual(['Marker', 'across inline']);
+    await paintText(page, 'marker-proof', 6, 7);
+    await expect.poll(paintedTexts).toEqual(['Marker across inline']);
+    await page.screenshot({
+      path: info.outputPath('marker-explicit-gap-joined.png'),
+      fullPage: false,
+    });
+    await undo.click();
+    await expect.poll(paintedTexts).toEqual(['Marker', 'across inline']);
+    await page.locator('[data-ui="content.toolbar.history-redo-button"]').click();
+    await expect.poll(paintedTexts).toEqual(['Marker across inline']);
+    await undo.click();
+    await undo.click();
+    await undo.click();
+    await expect.poll(highlights).toBe(0);
     await paintText(page, 'marker-proof', 0, 30);
     await expect.poll(highlights).toBe(1);
     await page.screenshot({ path: info.outputPath('marker-translucent.png'), fullPage: false });

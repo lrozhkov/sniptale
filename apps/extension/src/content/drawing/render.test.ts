@@ -353,3 +353,43 @@ it.each([0, 5, 10, 45])('has continuous captured background pixels at %s degrees
     }
   }
 });
+
+it.each(['rectangle', 'ellipse', 'triangle'] as const)(
+  'preserves handles and omits only the rectangle selection perimeter for %s',
+  (kind) => {
+    const context = createPixelCanvas();
+    renderDrawingSelection(
+      context,
+      {
+        kind,
+        id: 'shape-selection',
+        bounds: { x: 80, y: 90, width: 200, height: 100 },
+        color: '#111111',
+        fillColor: null,
+        width: 4,
+      },
+      { x: 0, y: 0 }
+    );
+    const perimeter = context.getImageData(100, 89, 50, 3).data;
+    expect(perimeter.some((channel, index) => index % 4 === 3 && channel > 0)).toBe(
+      kind !== 'rectangle'
+    );
+    for (const [x, y] of [
+      [80, 90],
+      [180, 90],
+      [280, 90],
+      [280, 140],
+      [280, 190],
+      [180, 190],
+      [80, 190],
+      [80, 140],
+    ]) {
+      expect(context.getImageData(x!, y!, 1, 1).data[3]).toBeGreaterThan(0);
+    }
+    expect(
+      context
+        .getImageData(289, 73, 16, 16)
+        .data.some((channel, index) => index % 4 === 3 && channel > 0)
+    ).toBe(true);
+  }
+);

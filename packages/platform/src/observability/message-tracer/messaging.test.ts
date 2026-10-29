@@ -297,3 +297,43 @@ it('excludes quick-action artwork and private text from send, response and failu
     harness.dispose();
   }
 });
+
+describe('sync product trace privacy', () => {
+  it.each(['SYNC_PRODUCT_COMMAND', 'OFFSCREEN_SYNC_PRODUCT_COMMAND'])(
+    'omits request, response and raw failure content for %s',
+    (type) => {
+      const observer = installObserver();
+      try {
+        const tracker = beginSendTrace(
+          { type },
+          {
+            command: {
+              parentUrl: 'https://private.example/account/',
+              authentication: { kind: 'basic', username: 'alice', password: 'private-password' },
+            },
+          },
+          'bg'
+        );
+        recordMessageResponse(
+          { result: { kind: 'thumbnail', dataUrl: 'data:image/png;base64,cHJpdmF0ZQ==' } },
+          tracker
+        );
+        const failed = beginSendTrace({ type }, { accountId: 'alice' }, 'bg');
+        recordMessageFailure(new Error('private-provider-response'), failed);
+        const output = JSON.stringify(observer.events);
+        for (const secret of [
+          'private.example',
+          'alice',
+          'private-password',
+          'cHJpdmF0ZQ==',
+          'private-provider-response',
+        ])
+          expect(output).not.toContain(secret);
+        expect(output).toContain('sync-product-payload-omitted');
+        expect(output).toContain('sync-product-failed');
+      } finally {
+        observer.dispose();
+      }
+    }
+  );
+});

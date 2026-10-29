@@ -219,6 +219,7 @@ it('ignores messages outside the scenario editor LLM route', () => {
 
 function createV3Message() {
   return {
+    modelId: 'model-1',
     attachments: [],
     contractVersion: 4 as const,
     projectId: 'project-1',

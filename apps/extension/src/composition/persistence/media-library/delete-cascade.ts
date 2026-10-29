@@ -1,3 +1,8 @@
+import {
+  captureDeletionInTransaction,
+  captureVideoProjectInTransaction,
+  readEnabledCaptureProfile,
+} from '../sync-capture/capture';
 import { createStrictRecordingTransaction } from '../recordings/recovery/transaction';
 import { recoverMediaSourcePublications } from './delete-cascade.recovery';
 import { createScenarioProjectStore } from '../scenario/storage';
@@ -15,6 +20,7 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { removeVideoProjectLibrarySources } from '../../../features/video/project/library-source-removal';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
+  SYNC_CAPTURE_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -301,6 +307,7 @@ async function commitCascadeTransaction(
   expectedSource?: MediaDependencyTarget
 ): Promise<void> {
   const tx = createStrictRecordingTransaction(db, [
+    SYNC_CAPTURE_STORE,
     MEDIA_LIBRARY_STORE,
     VIDEO_PROJECTS_STORE,
     SCENARIO_PROJECTS_STORE,
@@ -326,6 +333,16 @@ async function commitCascadeTransaction(
   ]);
   try {
     const graph = await loadCascadeGraph(tx, mediaId, expectedSource);
+    const captureProfile = await readEnabledCaptureProfile(tx);
+    const currentMedia = captureProfile
+      ? parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId))
+      : null;
+    const imageNativeRevision =
+      currentMedia?.source.kind === 'screenshot' ||
+      (currentMedia?.source.kind === 'stored-asset' &&
+        (currentMedia.kind === 'image' || currentMedia.kind === 'screenshot'))
+        ? (currentMedia.workspaceRevision ?? 0)
+        : undefined;
     const now = Date.now();
     const scenarioChildIds = new Set(graph.scenarioChildren.map((child) => child.id));
     const detachedRepresentations = new Set([
@@ -341,12 +358,15 @@ async function commitCascadeTransaction(
         )
       ),
     ]);
+    const affectedVideos = await detachVideoProjects(tx, graph, now);
     const affected = [
-      ...(await detachVideoProjects(tx, graph, now)),
+      ...affectedVideos,
       ...(await detachScenarioProjects(tx, graph, now, physicalDelete)),
       ...(await detachReviewWorkspaces(tx, graph, now)),
     ];
     assertExpectedUsage(affected, expectedUsage);
+    if (captureProfile && affected.length !== affectedVideos.length)
+      throw new Error('The experimental sync capture does not support this cascade graph.');
     const ownAuxiliaries = await deleteMediaSidecars(tx, mediaId, physicalDelete);
     for (const id of ownAuxiliaries) detachedRepresentations.add(id);
     if (graph.media.source.kind === 'project-asset')
@@ -356,6 +376,10 @@ async function commitCascadeTransaction(
     physicalDelete.assetIds = [...new Set(physicalDelete.assetIds)];
     if (physicalDelete.assetIds.length > 0)
       await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
+    if (captureProfile) {
+      for (const entry of affectedVideos) await captureVideoProjectInTransaction(tx, entry.id);
+      await captureDeletionInTransaction(tx, 'media', mediaId, 'local-edit', imageNativeRevision);
+    }
     await tx.done;
   } catch (error) {
     try {

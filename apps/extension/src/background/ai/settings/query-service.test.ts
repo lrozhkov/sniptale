@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
   initializeAiStorageAccess: vi.fn(),
+  loadAIScenarioSelection: vi.fn(),
   loadAudioTranscriptionSystemPrompt: vi.fn(),
   loadVoiceInputCorrectionSystemPrompt: vi.fn(),
   loadAIModels: vi.fn(),
@@ -25,6 +26,10 @@ vi.mock('../../../composition/persistence/ai-settings', async (importOriginal) =
   loadDefaultModelId: storageMocks.loadDefaultModelId,
   loadGlobalSystemPrompt: storageMocks.loadGlobalSystemPrompt,
   loadScenarioEditorSystemPrompt: storageMocks.loadScenarioEditorSystemPrompt,
+}));
+
+vi.mock('../../../composition/persistence/ai-settings/scenario-selections', () => ({
+  loadAIScenarioSelection: storageMocks.loadAIScenarioSelection,
 }));
 
 import { resolveAISettingsQueryResponse } from './query-service';
@@ -76,7 +81,6 @@ it('returns sanitized model selection bootstrap without provider base URLs', asy
   ).resolves.toEqual({
     modelSelection: {
       chromeAiEnabled: false,
-      defaultModelId: 'model-1',
       globalSystemPrompt: 'Global prompt',
       models: [
         expect.objectContaining({
@@ -212,3 +216,124 @@ it('returns the scenario editor prompt through the read-only query route', async
     success: true,
   });
 });
+
+it.each([
+  null,
+  {
+    modelId: 'model-1',
+    modelCode: 'model-code',
+    providerId: 'provider-1',
+    providerIncarnation: 'incarnation-1',
+    displayName: 'Model',
+    source: 'explicit',
+    selectedAt: 1,
+  },
+])('returns the canonical scenario choice after initialization: %j', async (selection) => {
+  storageMocks.loadAIScenarioSelection.mockImplementationOnce(async () => {
+    expect(storageMocks.initializeAiStorageAccess).toHaveBeenCalledOnce();
+    return selection;
+  });
+  await expect(
+    resolveAISettingsQueryResponse({
+      operation: 'read-scenario-selection',
+      scenario: 'scenario-edit',
+      type: MessageType.AI_SETTINGS_QUERY,
+    })
+  ).resolves.toEqual({ success: true, scenarioSelection: selection });
+  expect(storageMocks.loadAIScenarioSelection).toHaveBeenCalledExactlyOnceWith('scenario-edit');
+});
+
+it('retains provider identity, availability and catalog status without disclosing its URL', async () => {
+  const metadata = {
+    incarnation: 'incarnation-1',
+    enabled: false,
+    management: 'automatic',
+    observation: { status: 'available', scope: 'catalog', checkedAt: 10, revision: 1 },
+  };
+  storageMocks.loadAIProviders.mockResolvedValueOnce([
+    {
+      baseUrl: 'https://api.provider.test/v1',
+      connectionType: 'openai-compatible',
+      createdAt: 1,
+      hasStoredApiKey: true,
+      id: 'provider-1',
+      name: 'Provider',
+      ...metadata,
+    },
+  ]);
+  const response = await resolveAISettingsQueryResponse({
+    operation: 'read-model-selection-bootstrap',
+    type: MessageType.AI_SETTINGS_QUERY,
+  });
+  expect(response.modelSelection?.providers[0]).toMatchObject(metadata);
+  expect(response.modelSelection?.providers[0]).not.toHaveProperty('baseUrl');
+});
+
+it.each(['address', 'credential', 'incarnation'] as const)(
+  'omits stale catalog preview after a provider %s change without changing stored manual values',
+  async (change) => {
+    const { createAIProviderDestinationBinding } =
+      await import('../../../features/ai/egress-authority');
+    const previousProvider = {
+      id: 'provider',
+      name: 'Provider',
+      connectionType: 'openai-compatible' as const,
+      baseUrl: 'https://previous.test/v1',
+      incarnation: 'first',
+      credentialRevision: 1,
+      hasStoredApiKey: false,
+      createdAt: 1,
+    };
+    const currentProvider = {
+      ...previousProvider,
+      ...(change === 'address' ? { baseUrl: 'https://current.test/v1' } : {}),
+      ...(change === 'credential' ? { credentialRevision: 2 } : {}),
+      ...(change === 'incarnation' ? { incarnation: 'second' } : {}),
+    };
+    const scope = await createAIProviderDestinationBinding(previousProvider);
+    const capabilities = {
+      operations: { text: 'supported' as const },
+      input: {},
+      output: {},
+      features: {},
+    };
+    const model = {
+      id: 'manual',
+      providerId: currentProvider.id,
+      modelCode: 'code',
+      displayName: 'My manual name',
+      source: 'manual',
+      propertySource: 'manual',
+      capabilities,
+      catalog: {
+        scope,
+        lifecycle: 'active',
+        observedAt: 1,
+        displayName: 'Previous provider name',
+        capabilities,
+      },
+    };
+    const original = structuredClone(model);
+    storageMocks.loadAIProviders.mockResolvedValue([currentProvider]);
+    storageMocks.loadAIModels.mockResolvedValue([model]);
+    const message = {
+      operation: 'read-settings-page-runtime-data' as const,
+      type: MessageType.AI_SETTINGS_QUERY,
+    };
+    const stale = await resolveAISettingsQueryResponse(message);
+    const preview = stale.settingsRuntimeData?.selectionBootstrap.models[0];
+    expect(preview?.catalog).toBeUndefined();
+    expect(preview?.displayName).toBe('My manual name');
+    expect(preview?.capabilities).toEqual(capabilities);
+    expect(model).toEqual(original);
+    const currentCatalog = {
+      ...model.catalog,
+      scope: await createAIProviderDestinationBinding(currentProvider),
+    };
+    storageMocks.loadAIModels.mockResolvedValue([{ ...model, catalog: currentCatalog }]);
+    const fresh = await resolveAISettingsQueryResponse(message);
+    expect(fresh.settingsRuntimeData?.selectionBootstrap.models[0]?.catalog).toEqual(
+      currentCatalog
+    );
+  }
+);

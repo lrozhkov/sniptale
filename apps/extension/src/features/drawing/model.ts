@@ -182,16 +182,16 @@ export function resolveDrawingTextFontFamily(fontFamily: DrawingFontFamily = 'sa
 }
 
 export const DEFAULT_DRAWING_COLORS = [
-  '#f97316',
-  '#60a5fa',
-  '#22c55e',
-  '#facc15',
-  '#ef4444',
-  '#111827',
+  '#ff7f50',
+  '#6495ed',
+  '#32cd32',
+  '#ffd700',
+  '#ff4500',
+  '#000000',
   '#ffffff',
-  '#8b5cf6',
-  '#14b8a6',
-  '#ec4899',
+  '#7b68ee',
+  '#20b2aa',
+  '#ff1493',
 ] as const;
 
 export function createDefaultDrawingToolDefaults(

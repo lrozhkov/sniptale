@@ -1,3 +1,4 @@
+import type { AnnotationPlacementControl } from '../creation-placement';
 import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useEffect, useRef, useState } from 'react';
 
@@ -35,8 +36,10 @@ export function FutureCalloutSettingsPopover(props: {
   settings: CalloutSettings;
   portalTarget?: Element | DocumentFragment;
   headerContext?: SettingsPopoverContext;
+  hideDisableAction?: boolean;
   resetKey?: string;
   templateSourceControl?: TemplateSourceControl;
+  creationPlacement?: AnnotationPlacementControl;
   frameColors?: CalloutFrameColors;
 }) {
   const inspector = useInspectorLayout();
@@ -147,10 +150,12 @@ export function FutureCalloutSettingsPopover(props: {
       style={{ ...presentation.style, width: SETTINGS_POPOVER_WIDTH }}
     >
       <CalloutSettingsPopoverContent
+        {...(props.creationPlacement ? { creationPlacement: props.creationPlacement } : {})}
         {...(props.frameColors ? { frameColors: props.frameColors } : {})}
         handleDelete={props.onDisable}
         handleSettingChange={handleSettingChange}
         headerContext={headerContext}
+        hideDisableAction={Boolean(props.creationPlacement) || Boolean(props.hideDisableAction)}
         {...(presentation.drag ? { headerDrag: presentation.drag } : {})}
         localSettings={localSettings}
         onApplyPreset={applyPreset}

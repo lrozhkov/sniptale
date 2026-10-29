@@ -8,7 +8,6 @@ import {
 const io = vi.hoisted(() => ({
   record: vi.fn(),
   asset: vi.fn(),
-  configuration: vi.fn(),
   token: vi.fn(),
   send: vi.fn(),
   frame: vi.fn(),
@@ -20,16 +19,13 @@ vi.mock('../../../composition/persistence/scenario/projects', () => ({
 vi.mock('../../../composition/persistence/scenario/store/public', () => ({
   getScenarioAssetBlob: io.asset,
 }));
-vi.mock('../../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: io.configuration,
-}));
 vi.mock('../../../workflows/ai-session/llm-session', () => ({ requestLlmSessionToken: io.token }));
 vi.mock('../../../platform/runtime-messaging', () => ({
   createRuntimeMessagingTransport: () => ({ sendRuntimeMessage: io.send }),
 }));
 vi.mock('../../../platform/media-utils/data-url', () => ({ blobToDataUrl: io.dataUrl }));
 vi.mock('./image-frame', () => ({ renderGuideImageFrame: io.frame }));
-import { loadGuideAiConfiguration, requestGuideAiProposal, verifyGuideAiBasis } from './ai-request';
+import { requestGuideAiProposal, verifyGuideAiBasis, GuideAiProviderError } from './ai-request';
 
 function setup() {
   const project = createGuideProject('Private name', 'guide', 1);
@@ -58,24 +54,6 @@ function setup() {
   };
 }
 beforeEach(() => vi.resetAllMocks());
-it('loads selector metadata without issuing an AI request and excludes unsupported built-in transport', async () => {
-  io.configuration.mockResolvedValue({
-    providers: [
-      { id: 'local', connectionType: 'chrome-built-in' },
-      { id: 'remote', connectionType: 'openai-compatible' },
-    ],
-    models: [
-      { id: 'builtin', providerId: 'local' },
-      { id: 'model', providerId: 'remote' },
-    ],
-    defaultModelId: 'builtin',
-  });
-  const config = await loadGuideAiConfiguration();
-  expect(config.models.map((model) => model.id)).toEqual(['model']);
-  expect(config.defaultModelId).toBe('model');
-  expect(io.token).not.toHaveBeenCalled();
-  expect(io.send).not.toHaveBeenCalled();
-});
 it('binds selected-only text and a committed revision to explicit authorized dispatch', async () => {
   const s = setup();
   const result = await requestGuideAiProposal(s.args);
@@ -198,4 +176,21 @@ it('checks limits and a revision changed during authorization before provider di
   });
   await expect(requestGuideAiProposal(s.args)).rejects.toThrow('basis');
   expect(io.send).not.toHaveBeenCalled();
+});
+
+it('uses fixed provider evidence and discards raw response text without applying changes', async () => {
+  const s = setup();
+  io.send.mockResolvedValueOnce({
+    success: false,
+    failureReason: 'quota-exceeded',
+    error: 'private-provider-text',
+  });
+  await expect(requestGuideAiProposal(s.args)).rejects.toMatchObject({
+    messageKey: 'settings.aiProviders.providerStatusQuota',
+  });
+  expect(s.step.blocks[0]).toMatchObject({
+    kind: 'text',
+    paragraphs: createGuideParagraphs('Before'),
+  });
+  expect(new GuideAiProviderError('unknown').messageKey).toBe('scenario.editor.guideAiFailed');
 });

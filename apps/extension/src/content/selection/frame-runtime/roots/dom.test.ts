@@ -424,3 +424,13 @@ it.each(['editing', 'resizing'] as const)(
     expect(Number(container.style.zIndex)).toBeLessThan(FRAME_ANNOTATION_Z_INDEX.blockingOverlay);
   }
 );
+
+it('invalidates root descriptors when an annotation kind changes without geometry changes', () => {
+  const frame = createFrame('kind-change');
+  expect(
+    areFrameRenderDescriptorsEqual(
+      buildFrameRenderDescriptors([frame], new Map()),
+      buildFrameRenderDescriptors([{ ...frame, annotationKind: 'callout' }], new Map())
+    )
+  ).toBe(false);
+});

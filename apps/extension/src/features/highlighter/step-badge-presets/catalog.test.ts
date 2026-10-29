@@ -38,7 +38,7 @@ it('provides fifteen independent stable system templates', () => {
     type: 'letter',
   });
   presets[0]!.settings.style.diameter = 99;
-  expect(createSystemStepBadgePresetCatalog()[0]!.settings.style.diameter).toBe(29.16);
+  expect(createSystemStepBadgePresetCatalog()[0]!.settings.style.diameter).toBe(29);
 });
 
 it('normalizes legacy settings and returns independent canonical system snapshots', () => {
@@ -73,5 +73,19 @@ it('applies a template as a deep frame snapshot without runtime placement', () =
   expect(settings).toMatchObject({ enabled: true, sourcePresetId: preset.id });
   expect(settings).not.toHaveProperty('manualPlacement');
   settings.style.diameter = 80;
-  expect(preset.settings.style.diameter).toBe(29.16);
+  expect(preset.settings.style.diameter).toBe(29);
+});
+
+it('normalizes fractional templates without changing their source', () => {
+  const settings = createSystemStepBadgePresetCatalog()[0]!.settings;
+  settings.style.diameter = 48.6;
+  expect(createStepBadgeSettingsFromTemplate(settings).style.diameter).toBe(49);
+  expect(createStepBadgeTemplateFromSettings({ ...settings, enabled: true }).style.diameter).toBe(
+    49
+  );
+  expect(
+    createStepBadgeTemplateFromSettings({ enabled: true, type: 'number', value: '1' }, 29.16).style
+      .diameter
+  ).toBe(29);
+  expect(settings.style.diameter).toBe(48.6);
 });

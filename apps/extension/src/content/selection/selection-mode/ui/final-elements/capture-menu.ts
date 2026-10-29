@@ -1,3 +1,4 @@
+import { ArrowLeft, Check, ChevronRight, createElement } from 'lucide';
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 import {
   bindFloatingInteractionPositionListeners,
@@ -7,6 +8,7 @@ import {
 import {
   createProductToolbarMenuDom,
   createProductToolbarMenuItemDom,
+  createProductToolbarMenuItemCopyDom,
 } from '@sniptale/ui/product-menus/toolbar/dom';
 import { translate } from '../../../../../platform/i18n';
 import { isContentEventWithinAnyElement } from '../../../../platform/dom-host';
@@ -102,6 +104,7 @@ function createCaptureMenuSurface(): {
   menu.classList.add('sniptale-selection-capture-menu', 'sniptale-content-menu-adopted');
   menu.dataset['ui'] = 'content.selection.capture-action-menu';
   menu.setAttribute('role', 'menu');
+  menu.dataset['sniptaleActivationBridge'] = 'defer';
   Object.assign(menu.style, {
     position: 'fixed',
     right: 'auto',
@@ -120,12 +123,15 @@ function createCaptureMenuItem(
   const button = createProductToolbarMenuItemDom({
     dataUi: `content.selection.capture-action-option.${descriptor.value}`,
   });
-  button.classList.add('sniptale-capture-action-icon');
+  const compact = options.getCapturePreferences().compactMenus;
+  if (compact) button.classList.add('sniptale-capture-action-icon');
   button.setAttribute('role', 'menuitem');
   button.setAttribute('aria-label', descriptor.label);
   button.title = descriptor.label;
   button.tabIndex = tabIndex;
   button.append(createSelectionCaptureActionIcon(descriptor.value, 18));
+  if (!compact)
+    button.append(createProductToolbarMenuItemCopyDom(descriptor.label, descriptor.hint));
   button.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -141,7 +147,7 @@ function appendCaptureMenuActions(list: HTMLElement, options: SelectionCaptureAc
     (descriptor) => descriptor.value !== 'scenario'
   );
   const row = document.createElement('div');
-  row.className = 'sniptale-capture-action-icons';
+  if (options.getCapturePreferences().compactMenus) row.className = 'sniptale-capture-action-icons';
   descriptors.forEach((descriptor, index) => {
     row.appendChild(createCaptureMenuItem(descriptor, index === 0 ? 0 : -1, options));
   });
@@ -159,7 +165,9 @@ function installCaptureMenuKeyboardNavigation(
       closeSelectionCaptureActionMenu(overlayContainer, true);
       return;
     }
-    const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    const items = Array.from(
+      menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"], [role="menuitemradio"]')
+    );
     const currentIndex = items.findIndex((item) => item === event.target);
     if (currentIndex < 0) return;
 
@@ -187,7 +195,90 @@ function installCaptureMenuKeyboardNavigation(
 
 function createCaptureMenu(options: SelectionCaptureActionOptions): HTMLElement {
   const { list, menu } = createCaptureMenuSurface();
-  appendCaptureMenuActions(list, options);
+  const reposition = () => {
+    const state = captureMenuStates.get(options.overlayContainer);
+    if (state?.menu === menu) positionCaptureMenu(menu, state.trigger);
+  };
+  const divider = () => {
+    const element = document.createElement('div');
+    element.className = 'sniptale-popover-divider';
+    return element;
+  };
+  const title = menu.querySelector<HTMLElement>('.sniptale-toolbar-menu-title');
+  const showActions = (restoreFocus = false) => {
+    if (title) title.hidden = false;
+    list.replaceChildren();
+    appendCaptureMenuActions(list, options);
+    const preferences = options.getCapturePreferences();
+    const summary =
+      preferences.imageFormat.toUpperCase() +
+      (preferences.imageFormat === 'png' ? '' : ` · ${preferences.imageQuality}%`);
+    const settings = createProductToolbarMenuItemDom({
+      dataUi: 'content.selection.capture-parameters',
+    });
+    settings.setAttribute('role', 'menuitem');
+    settings.tabIndex = -1;
+    settings.title = translate('content.toolbar.captureParameters');
+    const copy = createProductToolbarMenuItemCopyDom(summary);
+    copy.style.color = 'var(--sniptale-color-text-secondary)';
+    settings.append(copy, createElement(ChevronRight, { width: '16', height: '16' }));
+    settings.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showFormats();
+    });
+    list.append(divider(), settings);
+    reposition();
+    if (restoreFocus) settings.focus({ preventScroll: true });
+  };
+  const showFormats = () => {
+    if (title) title.hidden = true;
+    list.replaceChildren();
+    const back = createProductToolbarMenuItemDom({
+      dataUi: 'content.selection.capture-parameters.back',
+    });
+    back.setAttribute('role', 'menuitem');
+    back.tabIndex = 0;
+    back.append(
+      createElement(ArrowLeft, { width: '16', height: '16' }),
+      createProductToolbarMenuItemCopyDom(translate('content.toolbar.selectionCaptureActionTitle'))
+    );
+    back.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showActions(true);
+    });
+    list.append(back, divider());
+    for (const format of ['png', 'jpeg', 'webp'] as const) {
+      const selected = options.getCapturePreferences().imageFormat === format;
+      const button = createProductToolbarMenuItemDom({
+        dataUi: `content.selection.capture-format.${format}`,
+        selected,
+      });
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(selected));
+      button.tabIndex = -1;
+      button.append(
+        createProductToolbarMenuItemCopyDom(format === 'webp' ? 'WebP' : format.toUpperCase())
+      );
+      if (selected) button.append(createElement(Check, { class: 'sniptale-popover-check' }));
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        options.onImageFormatChange(format);
+        showFormats();
+        menu
+          .querySelector<HTMLButtonElement>(
+            `[data-ui="content.selection.capture-format.${format}"]`
+          )
+          ?.focus();
+      });
+      list.append(button);
+    }
+    reposition();
+    back.focus({ preventScroll: true });
+  };
+  showActions();
   installCaptureMenuKeyboardNavigation(menu, options.overlayContainer);
   return menu;
 }

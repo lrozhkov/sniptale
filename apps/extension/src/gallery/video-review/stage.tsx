@@ -95,6 +95,7 @@ type ReviewStageProps = {
     | {
         preferences: QuickPreviewPreferences;
         playing: boolean;
+        interacting?: boolean;
         sourceToResult(time: number): number | null;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;

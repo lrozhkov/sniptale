@@ -86,12 +86,12 @@ it('uses one Shapes panel for outline, width, and alpha-aware fill controls', as
       )?.style.height
   );
   expect(shapePreviewSizes).toEqual(['2px', '6px', '10px']);
-  const blue = host.querySelector<HTMLButtonElement>('button[title="#60a5fa"]');
+  const blue = host.querySelector<HTMLButtonElement>('button[title="#6495ed"]');
   act(() => triangle?.click());
   act(() => width8?.click());
   act(() => blue?.click());
   expect(session.getSnapshot().defaults.shape).toEqual({
-    color: '#60a5fa',
+    color: '#6495ed',
     fillColor: null,
     kind: 'triangle',
     width: 8,
@@ -115,17 +115,17 @@ it('uses one Shapes panel for outline, width, and alpha-aware fill controls', as
   ).toBeNull();
   expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);
   const fillBlue = panel?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.drawing-options.shape.fill-colors"] button[title="#60a5fa"]'
+    '[data-ui="content.toolbar.drawing-options.shape.fill-colors"] button[title="#6495ed"]'
   );
   act(() => fillBlue?.click());
-  expect(session.getSnapshot().defaults.shape.fillColor).toBe('#60a5fa');
+  expect(session.getSnapshot().defaults.shape.fillColor).toBe('#6495ed');
   act(() => fillToggle?.click());
   expect(session.getSnapshot().defaults.shape.fillColor).toBeNull();
   expect(
     panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-colors"]')
   ).toBeNull();
   act(() => fillToggle?.click());
-  expect(session.getSnapshot().defaults.shape.fillColor).toBe('#60a5fa');
+  expect(session.getSnapshot().defaults.shape.fillColor).toBe('#6495ed');
   const fillPickerTrigger = panel?.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.shape.fill"] ' +
       '[data-ui="shared.ui.color-selector.picker-trigger"]'

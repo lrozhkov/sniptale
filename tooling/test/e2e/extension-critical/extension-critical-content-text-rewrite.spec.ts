@@ -1,5 +1,5 @@
 import { createServer, type ServerResponse } from 'node:http';
-import type { Page, Locator, BrowserContext } from '@playwright/test';
+import type { Page, Locator, BrowserContext, TestInfo } from '@playwright/test';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
@@ -9,7 +9,7 @@ import {
   type TranslationKey,
 } from '../../../../apps/extension/src/platform/i18n';
 
-test.setTimeout(120_000);
+test.setTimeout(180_000);
 const replacement = '<b>Plain replacement text</b>';
 const ui = (page: Page, name: string) => page.locator(`[data-ui="${name}"]`);
 const command = (page: Page | Locator, locale: AppLocale, key: TranslationKey) =>
@@ -17,6 +17,7 @@ const command = (page: Page | Locator, locale: AppLocale, key: TranslationKey) =
 
 async function localProvider() {
   let mode: 'success' | 'hold' | 'error' | 'truncated' = 'success';
+  let failureStatus = 500;
   let received = 0;
   let aborted = 0;
   let plain = 0;
@@ -87,7 +88,7 @@ async function localProvider() {
       body = '';
       if (mode === 'hold') pending.add(response);
       else if (mode === 'error') {
-        response.writeHead(500, { 'content-type': 'application/json' });
+        response.writeHead(failureStatus, { 'content-type': 'application/json' });
         response.end(JSON.stringify({ error: { message: 'Synthetic private provider failure' } }));
       } else complete(response, replacement, mode === 'truncated');
     });
@@ -110,6 +111,9 @@ async function localProvider() {
     plain: () => plain,
     setMode: (value: typeof mode) => {
       mode = value;
+    },
+    setFailureStatus: (status: number) => {
+      failureStatus = status;
     },
     release: (value = replacement) => {
       for (const response of pending) complete(response, value);
@@ -165,6 +169,17 @@ async function configureProvider(
     await dialog.locator('input').nth(0).fill(providerName);
     await dialog.locator('input').nth(1).fill(`${origin}/v1`);
     await dialog.locator('input[type=password]').fill('synthetic-test-only-key');
+    await dialog
+      .getByLabel(translate('settings.aiProviders.providerManagementLabel', locale), {
+        exact: true,
+      })
+      .click();
+    await settings
+      .getByRole('option', {
+        name: translate('settings.aiProviders.providerModeManual', locale),
+        exact: true,
+      })
+      .click();
     await command(dialog, locale, 'common.actions.add').click();
     await expect(dialog).toHaveCount(0);
     const models = settings.getByRole('region', {
@@ -174,6 +189,7 @@ async function configureProvider(
     await command(models, locale, 'common.actions.add').click();
     await command(dialog, locale, 'settings.aiProviders.modelProviderPlaceholder').click();
     await settings.getByRole('option', { name: providerName, exact: true }).click();
+    await command(dialog, locale, 'settings.aiProviders.modelManualEntry').click();
     await dialog
       .getByPlaceholder(translate('settings.aiProviders.modelNamePlaceholder', locale), {
         exact: true,
@@ -201,6 +217,42 @@ async function expectWithinViewport(page: Page, element: Locator) {
   expect(box.y).toBeGreaterThanOrEqual(-1);
   expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+}
+
+async function expectProviderFailures(
+  page: Page,
+  provider: Awaited<ReturnType<typeof localProvider>>,
+  locale: AppLocale,
+  originalMarkup: string,
+  info: TestInfo
+) {
+  const popover = ui(page, 'content.ai-text.popover');
+  const prompt = ui(page, 'content.ai-text.prompt');
+  const submit = ui(page, 'content.ai-text.submit');
+  const source = page.locator('#ai-text-source');
+  for (const [status, key] of [
+    [401, 'providerStatusInvalidKey'],
+    [402, 'providerStatusQuota'],
+    [403, 'providerStatusDenied'],
+    [404, 'providerStatusModelUnavailable'],
+    [429, 'providerStatusRate'],
+    [500, 'providerStatusUnavailable'],
+  ] as const) {
+    provider.setFailureStatus(status);
+    const before = provider.received();
+    await submit.click();
+    await expect(popover.getByRole('alert')).toContainText(
+      translate(`settings.aiProviders.${key}`, locale)
+    );
+    expect(provider.received()).toBe(before + 1);
+    await expect(source).toHaveText('Original selected words');
+    expect(await source.evaluate((node) => node.innerHTML)).toBe(originalMarkup);
+    await expect(prompt).toHaveValue('Explicit retry after a provider failure.');
+    await expect(popover).not.toContainText('Synthetic private provider failure');
+    await expectWithinViewport(page, popover);
+    if (status === 402)
+      await page.screenshot({ path: info.outputPath('provider-quota.png'), fullPage: false });
+  }
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
@@ -335,6 +387,26 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(
         ui(page, 'content.ai-text.footer').locator('[data-ui="content.ai-text.voice"]')
       ).toHaveCount(0);
+      await page.evaluate(() => {
+        for (const type of ['mousedown', 'click']) {
+          window.addEventListener(
+            type,
+            (event) => {
+              if (
+                !event.isTrusted ||
+                event
+                  .composedPath()
+                  .some((node) => node instanceof HTMLElement && node.id === 'ai-text-ordinary') ||
+                !event.composedPath().some((node) => node instanceof HTMLButtonElement)
+              )
+                return;
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            },
+            true
+          );
+        }
+      });
       await popover.locator('.sniptale-ai-model-selector-trigger').click();
       await page.getByRole('button', { name: modelName, exact: true }).click();
       await expect(submit).toHaveAttribute('title', modelTitlePattern);
@@ -351,6 +423,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .toBeLessThan(beforeDrag.x - 30);
       await expectWithinViewport(page, popover);
       await prompt.fill('Rewrite only this selected text.');
+      await expect(submit).toBeEnabled();
       await expectWithinViewport(page, submit);
       await page.screenshot({ path: info.outputPath('plain-text-ready.png'), fullPage: false });
       await prompt.press('Control+Enter');
@@ -396,15 +469,13 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await popover.locator('.sniptale-ai-model-selector-trigger').click();
       await page.getByRole('button', { name: modelName, exact: true }).click();
       await prompt.fill('Explicit retry after a provider failure.');
-      await submit.click();
-      await expect(popover.getByRole('alert')).toContainText(
-        translate('content.toolbar.aiTextError', locale)
-      );
-      await expect(source).toHaveText('Original selected words');
-      await expect(popover).not.toContainText('Synthetic private provider failure');
+      await expectProviderFailures(page, provider, locale, originalMarkup, info);
       provider.setMode('truncated');
       await submit.click();
-      await expect(popover.getByRole('alert')).toBeVisible();
+      await expect(popover.getByRole('alert')).toHaveText(
+        translate('content.toolbar.aiTextError', locale)
+      );
+      await expect(submit).toHaveText(translate('content.toolbar.aiTextSend', locale));
       await expect(source).toHaveText('Original selected words');
       provider.setMode('success');
       await submit.click();

@@ -6,6 +6,20 @@ import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 
 const TEXT = 'A longer first line\nShort\nA final line';
 
+async function checkCompactMixedSelection(page: Page, viewport: { width: number; height: number }) {
+  await page.setViewportSize({ width: 1024, height: 560 });
+  const actions = page.locator('[data-ui="drawing.selection.actions"]');
+  await expect(actions).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await actions.boundingBox();
+      return Boolean(box && box.x >= 0 && box.x + box.width <= 1024);
+    })
+    .toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1024);
+  await page.setViewportSize(viewport);
+}
+
 for (const viewport of [
   { width: 1280, height: 560 },
   { width: 1920, height: 900 },
@@ -93,6 +107,28 @@ for (const viewport of [
       await input.fill('Edited text');
       await input.press('Enter');
       await expect(text).toContainText('Edited text');
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(bounds.x + bounds.width + 80, bounds.y + 80);
+      await page.mouse.move(bounds.x - 30, bounds.y - 30);
+      await page.mouse.down();
+      await page.mouse.move(bounds.x + bounds.width + 30, bounds.y + bounds.height + 30, {
+        steps: 5,
+      });
+      await page.mouse.up();
+      await expect(page.locator('[data-ui="drawing.selection.actions.delete"]')).toBeVisible();
+      await expect(page.locator('.sniptale-drawing-options-popover:visible')).toHaveCount(1);
+      await expect(
+        page.locator('[data-ui="content.toolbar.drawing-options.selection"]')
+      ).toHaveCount(0);
+      await page.screenshot({
+        path: info.outputPath('page-mixed-selection-actions.png'),
+        fullPage: false,
+      });
+      await checkCompactMixedSelection(page, viewport);
+      await page.locator('[data-ui="content.toolbar.drawing-options.deselect"]').click();
+      await expect(page.locator('[data-ui="drawing.selection.actions"]')).toHaveCount(0);
+      await page.mouse.click(bounds.x + 3, bounds.y + 3);
+      await expect(page.locator('[data-ui="content.toolbar.drawing-options.text"]')).toBeVisible();
     } finally {
       await popup.close();
       await page.close();
@@ -445,5 +481,53 @@ for (const viewport of [
     await expect(page.locator('textarea[data-fabric="textarea"]:focus')).toHaveCount(1);
     await page.keyboard.press('Escape');
     await page.close();
+  });
+}
+
+for (const { width, height } of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`editor mixed selection omits empty properties ${width}`, async ({
+    context,
+    hostOrigin,
+  }, info) => {
+    const page = await context.newPage();
+    try {
+      await page.setViewportSize({ width, height });
+      await applyHarnessBootstrap(page, {});
+      await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+      await page.locator('[data-ui="editor.floating.tool-rail.text"]').click();
+      const canvas = page.locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas');
+      const box = (await canvas.boundingBox())!;
+      const start = { x: box.x + box.width * 0.5 - 90, y: box.y + box.height * 0.5 - 30 };
+      await page.mouse.click(start.x, start.y);
+      await page.keyboard.insertText('Mixed text');
+      await page.keyboard.press('Escape');
+      await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+      await page.mouse.move(start.x, start.y + 70);
+      await page.mouse.down();
+      await page.mouse.move(start.x + 160, start.y + 70, { steps: 5 });
+      await page.mouse.up();
+      await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+      await page.mouse.click(start.x - 30, start.y - 25);
+      await page.mouse.move(start.x - 30, start.y - 25);
+      await page.mouse.down();
+      await page.mouse.move(start.x + 220, start.y + 100, { steps: 5 });
+      await page.mouse.up();
+      await expect(page.locator('[data-ui="editor.floating.selection-actions"]')).toBeVisible();
+      await expect(page.locator('[data-ui="editor.floating.tool-properties"]')).toHaveCount(0);
+      await page.screenshot({
+        path: info.outputPath('editor-mixed-selection-actions.png'),
+        fullPage: false,
+      });
+      await checkCompactMixedSelection(page, { width, height });
+      await page.locator('[data-ui="content.toolbar.drawing-options.deselect"]').click();
+      await expect(page.locator('[data-ui="editor.floating.selection-actions"]')).toHaveCount(0);
+      await page.mouse.click(start.x + 15, start.y + 5);
+      await expect(page.locator('[data-ui="editor.floating.tool-properties"]')).toBeVisible();
+    } finally {
+      await page.close();
+    }
   });
 }

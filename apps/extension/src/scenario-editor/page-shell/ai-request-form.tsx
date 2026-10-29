@@ -25,6 +25,8 @@ export function GuideAiRequestForm({
   const {
     configuration,
     configurationFailed,
+    selectionUnavailable,
+    selectionFailed,
     retryConfiguration,
     modelId,
     chooseModel,
@@ -67,6 +69,13 @@ export function GuideAiRequestForm({
               ? 'scenario.editor.guideAiConfigurationFailed'
               : 'scenario.editor.loading'
           )}
+        </p>
+      )}
+      {selectionFailed && <p role="alert">{t('scenario.editor.guideAiSelectionFailed')}</p>}
+      {selectionUnavailable && (
+        <p role="status">
+          <bdi className="[overflow-wrap:anywhere]">{session.unavailableModelName}</bdi>{' '}
+          {t('scenario.editor.guideAiModelUnavailable')}
         </p>
       )}
       {configurationFailed && (

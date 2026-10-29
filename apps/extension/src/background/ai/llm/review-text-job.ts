@@ -46,7 +46,12 @@ export function createReviewTextJobService(overrides: Partial<Dependencies> = {}
       phase: 'authorizing',
     }),
     result: (request, proposal) => ({ type: 'proposal', requestId: request.requestId, proposal }),
-    failure: (request, code) => ({ type: 'failure', requestId: request.requestId, code }),
+    failure: (request, code, failureReason) => ({
+      type: 'failure',
+      requestId: request.requestId,
+      code,
+      ...(failureReason === undefined ? {} : { failureReason }),
+    }),
   });
 }
 
@@ -79,9 +84,20 @@ async function run(
       baseUrl: config.baseUrl,
       apiKey: config.apiKey,
       modelCode: config.modelCode,
+      connectionType: config.connectionType,
+      observationBinding: config.observationBinding,
+      ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
       systemPrompt: REVIEW_TEXT_SYSTEM_PROMPT,
       userPrompt: JSON.stringify(request.context),
       signal,
+      beforeSend: async () => {
+        signal.throwIfAborted();
+        const current = await deps.resolveModel(request.modelId, approved);
+        if (JSON.stringify(current) !== JSON.stringify(config))
+          throw new Error('model-unavailable');
+        await deps.assertScope(request, signal);
+        signal.throwIfAborted();
+      },
     });
     signal.throwIfAborted();
     send({ type: 'progress', requestId: request.requestId, phase: 'receiving' });

@@ -1,3 +1,15 @@
+import { createAutomaticCatalogSync } from '../workflows/sync-transfer/automatic';
+import { createMediaHubEventPublisher } from '../features/media-hub/events';
+import { createSyncProductExecution } from './sync-connection/product-execution';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { publishSyncProductSettled } from '../platform/runtime-messaging/sync-product-client';
+import { createRuntimeMessagingTransport } from '../platform/runtime-messaging';
+import { createSyncConnectionExecutor } from './sync-connection/executor';
+import {
+  createSyncQueueExecution,
+  createSyncWorkspaceExecution,
+} from './sync-connection/execution';
+import { registerOffscreenSyncMessageListener } from './sync-connection/runtime';
 import { bootstrapOffscreenDocument } from './runtime/bootstrap';
 import { registerOffscreenRuntimeMessageListener } from './runtime';
 import { getCurrentLocale, translate } from '../platform/i18n';
@@ -24,4 +36,59 @@ function applyOffscreenDocumentMetadata(): void {
 applyOffscreenDocumentMetadata();
 registerOffscreenRuntimeMessageListener();
 registerOffscreenVoiceInputMessageListener();
+const offscreenUrl = new URL(globalThis.location.href);
+const offscreenStartupId = offscreenUrl.searchParams.get('offscreenStartupId');
+if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1') {
+  const messaging = createRuntimeMessagingTransport();
+  const libraryEvents = createMediaHubEventPublisher();
+  const automatic = createAutomaticCatalogSync();
+  globalThis.addEventListener('pagehide', () => libraryEvents.dispose(), { once: true });
+  const executor = createSyncConnectionExecutor({
+    onSettled: publishSyncProductSettled,
+    executorId: crypto.randomUUID(),
+    offscreenStartupId,
+    createWorkspaceExecution: (input) => {
+      const selectionIncarnation = input.source.identity.incarnation;
+      const sourceKind = input.source.kind;
+      return createSyncWorkspaceExecution(input, async (origin) => {
+        const response = await messaging.sendRuntimeMessage({
+          type: MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION,
+          requestId: crypto.randomUUID(),
+          sourceKind,
+          selectionIncarnation,
+          origin,
+        });
+        return response.success === true && response.allowed === true;
+      });
+    },
+    createProductExecution: (input) =>
+      createSyncProductExecution(
+        input,
+        async (origin) => {
+          const response = await messaging.sendRuntimeMessage({
+            type: MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION,
+            requestId: crypto.randomUUID(),
+            authorization: input.authorization,
+            ...(input.work.kind === 'thumbnail-read' ? { advisory: true as const } : {}),
+            origin,
+          });
+          return response.success === true && response.allowed === true;
+        },
+        () => libraryEvents.publishLibraryChanged('sync', []),
+        (operationId) => publishSyncProductSettled(operationId, 'queue'),
+        automatic
+      ),
+    createExecution: (input) =>
+      createSyncQueueExecution(input, async (origin) => {
+        const response = await messaging.sendRuntimeMessage({
+          type: MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION,
+          requestId: crypto.randomUUID(),
+          authorization: input.authorization,
+          origin,
+        });
+        return response.success === true && response.allowed === true;
+      }),
+  });
+  registerOffscreenSyncMessageListener(executor);
+}
 bootstrapOffscreenDocument();

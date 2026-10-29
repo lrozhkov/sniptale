@@ -9,7 +9,8 @@ const toLinear = (value: number) =>
 const toSrgb = (value: number) =>
   value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
 
-function rgbToOklab([red, green, blue]: Channels): Channels {
+/** Converts normalized sRGB channels to Oklab coordinates. */
+export function rgbToOklab([red, green, blue]: Channels): Channels {
   const r = toLinear(red),
     g = toLinear(green),
     b = toLinear(blue);

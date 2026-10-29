@@ -157,8 +157,8 @@ export function StepBadgeSizeSection(props: StepBadgeAppearanceProps & { embedde
         unit="px"
         value={style.sizeSource === 'frame-border' ? linkedDiameter : style.diameter}
         scrub={{ min: 16, max: 160, step: 1 }}
-        onPreviewValue={(diameter) => updateStyle({ diameter })}
-        onCommitValue={(diameter) => updateStyle({ diameter })}
+        onPreviewValue={(diameter) => updateStyle({ diameter: Math.round(diameter) })}
+        onCommitValue={(diameter) => updateStyle({ diameter: Math.round(diameter) })}
       />
     </div>
   );

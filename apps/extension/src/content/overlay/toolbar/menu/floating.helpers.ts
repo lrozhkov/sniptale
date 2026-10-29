@@ -158,8 +158,15 @@ export function resolveToolbarDrawingMenuStyle(params: {
   const anchorRect = projectClientRectToContentUi(anchor.getBoundingClientRect(), scale);
   const toolbarRect = projectClientRectToContentUi(toolbar.getBoundingClientRect(), scale);
   const viewport = resolveContentUiViewport({
-    clientWidth: window.innerWidth,
-    clientHeight: window.innerHeight,
+    // Fixed right/bottom offsets use the layout viewport, which excludes classic scrollbars.
+    clientWidth: Math.min(
+      window.innerWidth,
+      document.documentElement.clientWidth || window.innerWidth
+    ),
+    clientHeight: Math.min(
+      window.innerHeight,
+      document.documentElement.clientHeight || window.innerHeight
+    ),
     scale,
   });
   const position = resolveToolbarSurfacePlacement({

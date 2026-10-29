@@ -103,17 +103,21 @@ function createDb() {
     put: projectsDbMocks.dbPutMock,
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({
-        delete: projectsDbMocks.txDeleteMock,
-        get: projectsDbMocks.txGetMock,
-        getAll: projectsDbMocks.txGetAllMock,
-        index: vi.fn(() => ({
-          count: vi.fn().mockResolvedValue(0),
-          getAll: async () => [],
-          getAllKeys: async () => [],
-        })),
-        put: projectsDbMocks.txPutMock,
-      })),
+      objectStore: vi.fn((name: string) =>
+        name === 'sync_capture' || name === 'video_project_revisions'
+          ? { get: async () => undefined, put: async () => undefined }
+          : {
+              delete: projectsDbMocks.txDeleteMock,
+              get: projectsDbMocks.txGetMock,
+              getAll: projectsDbMocks.txGetAllMock,
+              index: vi.fn(() => ({
+                count: vi.fn().mockResolvedValue(0),
+                getAll: async () => [],
+                getAllKeys: async () => [],
+              })),
+              put: projectsDbMocks.txPutMock,
+            }
+      ),
     })),
   };
 }

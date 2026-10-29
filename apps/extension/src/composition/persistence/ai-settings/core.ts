@@ -1,19 +1,17 @@
 import type { AIModel, AIProvider } from '../../../contracts/settings';
+import {
+  isActivePersistenceMutationPermit,
+  type PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 import { browserStorage } from '../infrastructure/browser-storage';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import {
-  parseStoredAIModels,
-  parseStoredChromeAiEnabled,
-  parseStoredDefaultModelId,
-  parseStoredSystemPrompt,
-} from './guards';
+import { parseStoredAIModels, parseStoredChromeAiEnabled, parseStoredSystemPrompt } from './guards';
 import {
   AI_AUDIO_TRANSCRIPTION_PROMPT_KEY,
   AI_VOICE_INPUT_CORRECTION_PROMPT_KEY,
   DEFAULT_VOICE_INPUT_CORRECTION_SYSTEM_PROMPT,
   DEFAULT_AUDIO_TRANSCRIPTION_SYSTEM_PROMPT,
   AI_CHROME_ENABLED_KEY,
-  AI_DEFAULT_MODEL_KEY,
   AI_GLOBAL_PROMPT_KEY,
   AI_MODELS_KEY,
   AI_PROVIDERS_KEY,
@@ -56,8 +54,16 @@ export {
 
 const logger = createLogger({ namespace: 'SharedAiStorage' });
 
-function saveLocalValue<T>(key: string, value: T, logMessage: string): Promise<void> {
-  return browserStorage.local.set({ [key]: value }).then(() => {
+function saveLocalValue<T>(
+  key: string,
+  value: T,
+  logMessage: string,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
+  const publication = isActivePersistenceMutationPermit(permit)
+    ? browserStorage.local.set({ [key]: value }, permit)
+    : browserStorage.local.set({ [key]: value });
+  return publication.then(() => {
     logger.info(logMessage);
   });
 }
@@ -67,9 +73,12 @@ export async function saveAIProviders(providers: AIProvider[]): Promise<void> {
   return saveStoredAIProviders(providers);
 }
 
-export async function upsertAIProviderRecord(input: AIProviderUpsertInput): Promise<void> {
+export async function upsertAIProviderRecord(
+  input: AIProviderUpsertInput,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   await initializeAiStorageAccess();
-  return upsertStoredAIProviderRecord(input);
+  return upsertStoredAIProviderRecord(input, permit);
 }
 
 export async function deleteAIProviderRecord(providerId: string): Promise<void> {
@@ -77,34 +86,35 @@ export async function deleteAIProviderRecord(providerId: string): Promise<void> 
   return deleteStoredAIProviderRecord(providerId);
 }
 
-export async function deleteAIProviderGraphRecord(providerId: string): Promise<void> {
+export async function deleteAIProviderGraphRecord(
+  providerId: string,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   await initializeAiStorageAccess();
-  const [providers, secrets, models, defaultModelId] = await Promise.all([
+  const [providers, secrets, models] = await Promise.all([
     readStoredProviderMetadata(),
     readStoredProviderSecrets(),
     loadAIModels(),
-    loadDefaultModelId(),
   ]);
-  const deletedModelIds = new Set(
-    models.filter((model) => model.providerId === providerId).map((model) => model.id)
-  );
   const nextModels = models.filter((model) => model.providerId !== providerId);
-  const nextDefaultModelId =
-    defaultModelId && deletedModelIds.has(defaultModelId) ? null : defaultModelId;
   const { [providerId]: _removedSecret, ...remainingSecrets } = secrets;
 
-  await browserStorage.local.set({
-    [AI_DEFAULT_MODEL_KEY]: nextDefaultModelId,
+  const payload = {
     [AI_MODELS_KEY]: nextModels,
     [AI_PROVIDERS_KEY]: providers.filter((provider) => provider.id !== providerId),
     [AI_PROVIDER_SECRETS_KEY]: remainingSecrets,
-  });
-  await removeTransparentKeyIfUnused(Object.keys(remainingSecrets).length);
+  };
+  if (permit) await browserStorage.local.set(payload, permit);
+  else await browserStorage.local.set(payload);
+  await removeTransparentKeyIfUnused(Object.keys(remainingSecrets).length, permit);
 }
 
-export async function clearAIProviderSecret(providerId: string): Promise<void> {
+export async function clearAIProviderSecret(
+  providerId: string,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
   await initializeAiStorageAccess();
-  return clearStoredAIProviderSecret(providerId);
+  return clearStoredAIProviderSecret(providerId, permit);
 }
 
 export async function loadAISecretProtectionStatus(): Promise<AISecretProtectionStatus> {
@@ -159,39 +169,18 @@ export async function loadAIModels(): Promise<AIModel[]> {
   return parsedModels.value;
 }
 
-export async function saveAIModels(models: AIModel[]): Promise<void> {
-  await initializeAiStorageAccess();
-  return saveLocalValue(AI_MODELS_KEY, models, `AI models saved: ${models.length}`);
-}
-
-export async function saveAIModelGraph(
+/** Publishes model records with an active caller permit or admits an independent write. */
+export async function saveAIModels(
   models: AIModel[],
-  defaultModelId: string | null
+  permit?: PersistenceMutationPermit
 ): Promise<void> {
-  await initializeAiStorageAccess();
-  await browserStorage.local.set({
-    [AI_DEFAULT_MODEL_KEY]: defaultModelId,
-    [AI_MODELS_KEY]: models,
-  });
-}
-
-export async function loadDefaultModelId(): Promise<string | null> {
-  const result = await browserStorage.local.get([AI_DEFAULT_MODEL_KEY]);
-  return parseStoredDefaultModelId(result[AI_DEFAULT_MODEL_KEY]);
+  if (!isActivePersistenceMutationPermit(permit)) await initializeAiStorageAccess();
+  return saveLocalValue(AI_MODELS_KEY, models, `AI models saved: ${models.length}`, permit);
 }
 
 export async function loadChromeAiEnabled(): Promise<boolean> {
   const result = await browserStorage.local.get([AI_CHROME_ENABLED_KEY]);
   return parseStoredChromeAiEnabled(result[AI_CHROME_ENABLED_KEY]);
-}
-
-export async function saveDefaultModelId(modelId: string | null): Promise<void> {
-  await initializeAiStorageAccess();
-  return saveLocalValue(
-    AI_DEFAULT_MODEL_KEY,
-    modelId,
-    `Default model ID saved: ${String(modelId)}`
-  );
 }
 
 export async function saveChromeAiEnabled(enabled: boolean): Promise<void> {

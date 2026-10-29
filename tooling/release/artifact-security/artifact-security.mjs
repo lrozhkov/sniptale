@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
 import { getArtifactSourceSnapshot } from '../artifact-source/artifact-source-snapshot.mjs';
+import { hasForbiddenDevelopmentEndpoint } from './artifact-security-endpoints.mjs';
 import { verifyDynamicCodeUsage } from './artifact-security-dynamic.mjs';
 import { verifyArtifactIdentityFile } from './artifact-security-identity.mjs';
 import { assertReleaseLegalPayload } from '../policy/oss-release-policy.mjs';
@@ -54,6 +55,7 @@ const FORBIDDEN_TEXT_PATTERNS = [
   {
     message: 'development server endpoint',
     pattern: /https?:\/\/(?:localhost|127\.0\.0\.1):\d{2,5}/u,
+    allowLocalProviderDefaults: true,
   },
   { message: 'Vite development client', pattern: /@vite\/client|vite\/client/u },
   { message: 'dynamic code execution', pattern: /(?:\beval\s*\(|\(\s*eval\s*\)\s*\()/u },
@@ -303,8 +305,14 @@ function verifyTextContents(relativePath, contents) {
 
   const text = contents.toString('utf8');
   verifyRetiredEffectArtifactText(relativePath, text);
-  for (const { message, pattern } of FORBIDDEN_TEXT_PATTERNS) {
+  for (const { message, pattern, allowLocalProviderDefaults } of FORBIDDEN_TEXT_PATTERNS) {
     if (pattern.test(text)) {
+      if (
+        allowLocalProviderDefaults &&
+        JAVASCRIPT_FILE_PATTERN.test(relativePath) &&
+        !hasForbiddenDevelopmentEndpoint(getArtifactSourceSnapshot({ relativePath, text }))
+      )
+        continue;
       throw new Error(`Release artifact ${relativePath} contains forbidden ${message}.`);
     }
   }

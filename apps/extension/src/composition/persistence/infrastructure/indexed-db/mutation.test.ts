@@ -6,6 +6,8 @@ vi.mock('./core', () => ({ initDB: initDBMock }));
 
 import {
   installPersistenceLockManagerForTests,
+  isActivePersistenceMutationPermit,
+  type PersistenceMutationPermit,
   runWithPersistentDataErasureBarrier,
 } from '../mutation-barrier';
 import { runWithIndexedDbMutation } from './mutation';
@@ -50,7 +52,7 @@ it('finishes database readiness before admitting the mutation lock', async () =>
   resolveDatabase({ id: 'db' });
 
   await mutation;
-  expect(write).toHaveBeenCalledWith({ id: 'db' });
+  expect(write).toHaveBeenCalledWith({ id: 'db' }, expect.anything());
 });
 
 afterEach(() => {
@@ -67,7 +69,9 @@ it('holds mutation admission through completion and queues a late writer behind 
   const lateWrite = vi.fn(async () => undefined);
 
   const mutation = runWithIndexedDbMutation(admittedWrite);
-  await vi.waitFor(() => expect(admittedWrite).toHaveBeenCalledWith({ id: 'db' }));
+  await vi.waitFor(() =>
+    expect(admittedWrite).toHaveBeenCalledWith({ id: 'db' }, expect.anything())
+  );
   const erasure = runWithPersistentDataErasureBarrier(erasureOperation);
   const lateMutation = runWithIndexedDbMutation(lateWrite);
   await Promise.resolve();
@@ -80,5 +84,14 @@ it('holds mutation admission through completion and queues a late writer behind 
   await erasure;
   await lateMutation;
   expect(erasureOperation).toHaveBeenCalledOnce();
-  expect(lateWrite).toHaveBeenCalledWith({ id: 'db' });
+  expect(lateWrite).toHaveBeenCalledWith({ id: 'db' }, expect.anything());
+});
+
+it('provides its active native mutation permit to a transaction owner and expires it after completion', async () => {
+  let retained: PersistenceMutationPermit | undefined;
+  await runWithIndexedDbMutation(async (_db, permit) => {
+    expect(isActivePersistenceMutationPermit(permit)).toBe(true);
+    retained = permit;
+  });
+  expect(isActivePersistenceMutationPermit(retained)).toBe(false);
 });

@@ -9,6 +9,7 @@ import { loadSettings, patchSettings } from '../../../../composition/persistence
 import { translate } from '../../../../platform/i18n';
 import {
   createPageToolbarLayoutCommands,
+  createDefaultPageToolbarControls,
   getPageToolbarLayout,
   hasPageToolbarCustomization,
 } from './page-layout';
@@ -114,7 +115,7 @@ export function usePageToolbarControls(enabled: boolean, mode: PageToolbarMode =
   const layout = useMemo(() => getPageToolbarLayout(mode, savedLayout), [mode, savedLayout]);
   const modeOverrides = mode === 'cursor' ? undefined : overrides[mode];
   const modePrefix = MODE_CONTROL_PREFIX[mode];
-  const effectiveControls = { ...controls };
+  const effectiveControls = { ...createDefaultPageToolbarControls(), ...controls };
   for (const control of PAGE_TOOLBAR_CONTROLS) {
     const choice = modeOverrides?.[control];
     if (typeof choice === 'boolean') effectiveControls[control] = choice;

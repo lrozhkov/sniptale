@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { CSSProperties } from 'react';
 import type { EffectMode, FrameData } from '../../../../features/highlighter/contracts';
 import { getInteractiveFrameDisplay } from './render-model';
+import { Z_INDEX_FRAME_ACTIVE } from '../layout/portal';
 
 const baseFrame: FrameData = {
   id: 'frame-1',
@@ -165,8 +166,8 @@ describe('interactive-frame render model', () => {
       expect(hidden.strokeStyle.border).toBe('none');
       expect(visible.fillStyle.background).toBe('#16a34a40');
       expect(visible.strokeStyle.border).toBe('5px dashed #2563eb66');
-      expect(hidden.frameZIndex).toBe(2147483644);
-      expect(visible.frameZIndex).toBe(2147483644);
+      expect(hidden.frameZIndex).toBe(Z_INDEX_FRAME_ACTIVE);
+      expect(visible.frameZIndex).toBe(Z_INDEX_FRAME_ACTIVE);
     }
   );
 

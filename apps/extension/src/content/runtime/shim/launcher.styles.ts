@@ -77,6 +77,33 @@ display:grid;
 
 place-items:center}
 
+button.actions{
+position:relative}
+
+button.actions::before{
+content:'';
+position:absolute;
+right:2px;
+bottom:2px;
+width:0;
+height:0;
+border-inline:2px solid transparent;
+border-top:3px solid currentColor;
+opacity:.42;
+pointer-events:none}
+
+button.actions[data-menu-side=up]::before{
+top:2px;
+bottom:auto;
+transform:rotate(180deg)}
+
+button.actions[aria-expanded=true]::before{
+border-top-color:#ea580c;
+opacity:1}
+
+:host([data-theme=dark]) button.actions[aria-expanded=true]::before{
+border-top-color:#f97316}
+
 button:hover{
 
 background:#8882}
@@ -128,6 +155,26 @@ cursor:grab;
 
 touch-action:none}
 
+.group .grip{
+
+display:grid;
+
+place-items:center;
+
+padding:0;
+
+background:inherit;
+
+color:inherit}
+
+.group .grip svg{
+
+width:16px;
+
+height:16px;
+
+stroke-width:2}
+
 .group[data-left=true] .grip{
 
 left:100%}
@@ -147,6 +194,28 @@ pointer-events:auto}
 cursor:grabbing}
 
 
+.group[data-hover-only=true] .grip{
+position:relative;
+top:auto;
+left:auto;
+right:auto;
+flex:0 0 20px;
+margin-inline-end:2px;
+opacity:1;
+pointer-events:inherit;
+background:transparent}
+
+.group[data-hover-only=true] .grip::after{
+content:'';
+position:absolute;
+inset-block:6px;
+inset-inline-end:-2px;
+width:1px;
+background:currentColor;
+opacity:.16;
+pointer-events:none}
+
+
 .group[data-hidden=true]{
 
 opacity:0;
@@ -162,11 +231,15 @@ pointer-events:none}
 
 position:fixed;
 
-max-width:min(300px,calc(100vw - 16px));
+width:280px;
+
+max-width:calc(100vw - 16px);
 
 max-height:calc(100vh - 96px);
 
 overflow:auto;
+
+overscroll-behavior:contain;
 
 background:rgba(255,252,248,.98);
 
@@ -174,25 +247,41 @@ color:#3f3f46;
 
 box-shadow:0 4px 16px #0003;
 
-border-radius:8px;
+border-radius:4px;
 
-padding:4px;
+padding:5px;
 
 pointer-events:auto}
 
 .menu button{
 
-display:block;
+display:flex;
+
+align-items:center;
+
+gap:6px;
+
+min-height:32px;
+
+margin-top:2px;
 
 text-align:left;
 
 width:100%;
 
-padding:8px 12px;
+padding:6px 8px;
 
 white-space:normal;
 
 overflow-wrap:anywhere}
+
+.menu button:first-child{margin-top:0}
+
+.menu button svg{width:18px;height:18px;flex-shrink:0;stroke-width:1.75}
+
+.menu button span{min-width:0}
+
+.menu button kbd{margin-inline-start:auto;flex-shrink:0;font:inherit;font-variant-numeric:tabular-nums}
 
 .error{
 

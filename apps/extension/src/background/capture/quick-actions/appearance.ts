@@ -1,3 +1,5 @@
+import { loadSettings } from '../../../composition/persistence/settings';
+import { DEFAULT_FULL_PAGE_QUALITY_POLICY } from '../../../contracts/full-page-capture';
 import type { CaptureImagePreparation } from '../application/ports';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
@@ -69,17 +71,26 @@ async function captureMetadata(tabId?: number): Promise<QuickActionAppearanceMet
 function createPreparation(
   output: AppearanceOutput,
   assertCurrent: () => void,
-  tabId?: number
+  tabId?: number,
+  fullPageFileBudget = false
 ): CaptureImagePreparation {
   return async (dataUrl, filename) => {
     assertCurrent();
     if (!output.appearance) return { dataUrl, filename };
     try {
+      const maxEncodedBytes = fullPageFileBudget
+        ? ((await loadSettings()).fullPageQuality ?? DEFAULT_FULL_PAGE_QUALITY_POLICY)
+            .maxFileSizeMiB *
+          1024 *
+          1024
+        : undefined;
+      assertCurrent();
       const metadata = await captureMetadata(tabId);
       assertCurrent();
       const rendered = await renderQuickActionAppearance({
         ...output,
         appearance: output.appearance,
+        ...(maxEncodedBytes === undefined ? {} : { maxEncodedBytes }),
         dataUrl,
         metadata,
         assertCurrent,
@@ -124,7 +135,9 @@ function createPreparation(
 /** Admission is synchronous and remains held through the caller's existing delivery. */
 export function beginPageAppearance(
   tabId: number,
-  transactionId?: string
+  transactionId?: string,
+  outputFormat?: AppearanceOutput['imageFormat'],
+  fullPageFileBudget = false
 ): { prepare?: CaptureImagePreparation; assertCurrent(): void; release(): void } {
   if (transactionId === undefined) return { assertCurrent() {}, release() {} };
   const output = getQuickActionAppearanceSnapshot(tabId, transactionId);
@@ -139,7 +152,12 @@ export function beginPageAppearance(
     assertQuickActionAppearanceTransaction(tabId, transactionId);
   };
   return {
-    prepare: createPreparation(output, assertCurrent, tabId),
+    prepare: createPreparation(
+      outputFormat === undefined ? output : { ...output, imageFormat: outputFormat },
+      assertCurrent,
+      tabId,
+      fullPageFileBudget
+    ),
     assertCurrent,
     release() {
       if (!released) {

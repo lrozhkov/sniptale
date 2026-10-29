@@ -37,7 +37,8 @@ export function resolveToolbarDockEdge(
     top: Math.abs(pointer.y),
     bottom: Math.abs(viewport.height - pointer.y),
     left: Math.abs(pointer.x),
-    right: Math.abs(viewport.width - pointer.x),
+    // The right guides share the parked toolbar clearance from the usable viewport edge.
+    right: Math.abs(viewport.width - TOOLBAR_DOCK_SCROLLBAR_GAP - pointer.x),
   };
   const cornerLimit = TOOLBAR_DOCK_ZONE_SIZE + TOOLBAR_DOCK_INSET;
   if (distances.left <= cornerLimit && distances.top <= cornerLimit)

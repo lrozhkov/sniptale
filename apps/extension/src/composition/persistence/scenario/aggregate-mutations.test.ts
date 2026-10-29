@@ -613,6 +613,7 @@ it('keeps graph discovery and failed deletion inside one rollback-capable transa
           ),
       }),
       put: async (_value: { id?: string; stepId?: string }) => undefined,
+      add: async (_value: { id?: string; stepId?: string }) => undefined,
     }),
   }));
 

@@ -1,5 +1,6 @@
 import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { VideoExportFormat, VideoProject } from '../../../features/video/project/types';
+import type { VideoProjectMetadata } from '../../../features/video/project/validation';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 
 export interface VideoProjectEntry {
@@ -11,6 +12,11 @@ export interface VideoProjectEntry {
   /** Missing only on legacy rows; parsed as revision 0. */
   workspaceRevision?: number;
 }
+
+/** Persisted entry metadata before retained effect asset bytes are hydrated. */
+export type VideoProjectMetadataEntry = Omit<VideoProjectEntry, 'project'> & {
+  project: VideoProjectMetadata;
+};
 
 export interface UnsupportedVideoProjectMetadata {
   createdAt: number;

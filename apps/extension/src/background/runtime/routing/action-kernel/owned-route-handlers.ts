@@ -1,3 +1,4 @@
+import { routeSyncProductCommand } from '../../../sync-connection/product-route';
 import { routePageLaunchPreferencesMessage } from '../../page-access/page-launch-preferences';
 import {
   routeAISecretUnlockMessage,
@@ -26,6 +27,7 @@ import {
 import { backgroundOwnedRouteInventory } from './owned-route-inventory';
 import type { BackgroundOwnedRouteHandlerId } from '../../../routing-contracts/owned-route-context';
 import type { ActionResult, BackgroundOwnedAction } from './types';
+import { routeSyncConnectionOriginPermission } from '../../../sync-connection/route';
 import { routeVoiceInputOffscreenEvent } from '../../../voice-input/route';
 import { routeFrameAnnotationRasterMessage } from '../../../frame-annotation-raster/route';
 import { routeAnnotationForkSessionMessage } from '../../../annotation-fork-session/route';
@@ -70,6 +72,11 @@ export const backgroundOwnedHandlerBindings = {
   'popup-export-job': routePopupExportJobAction,
   'popup-tab-route-capability-issuance': routePopupTabRouteCapabilityAction,
   'settings-transfer': routeSettingsTransferAction,
+  'sync-product': (action) =>
+    keepOpen(
+      routeSyncProductCommand(action.message, action.context.sender, action.context.sendResponse)
+    ),
+  'sync-connection-origin-permission': routeSyncConnectionOriginPermissionAction,
   'voice-input-offscreen-event': routeVoiceInputOffscreenEventAction,
 } satisfies Record<BackgroundOwnedRouteHandlerId, BackgroundOwnedRouteHandler>;
 
@@ -105,6 +112,18 @@ function routeAggregatePromotionAction(action: BackgroundOwnedAction): ActionRes
 
 function routeFrameAnnotationRasterAction(action: BackgroundOwnedAction): ActionResult | null {
   return keepOpen(routeFrameAnnotationRasterMessage(action.message, action.context.sendResponse));
+}
+
+function routeSyncConnectionOriginPermissionAction(
+  action: BackgroundOwnedAction
+): ActionResult | null {
+  return keepOpen(
+    routeSyncConnectionOriginPermission(
+      action.message,
+      action.context.sender,
+      action.context.sendResponse
+    )
+  );
 }
 
 function routeVoiceInputOffscreenEventAction(action: BackgroundOwnedAction): ActionResult | null {

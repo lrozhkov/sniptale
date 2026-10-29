@@ -54,7 +54,6 @@ describe('settings transfer planner', () => {
                 displayName: 'Local',
               },
             ],
-            defaultModelId: null,
           },
         },
       },
@@ -70,7 +69,6 @@ describe('settings transfer planner', () => {
                 displayName: 'Imported',
               },
             ],
-            defaultModelId: null,
           },
         },
       },
@@ -92,7 +90,6 @@ describe('settings transfer planner', () => {
           displayName: 'Imported',
         },
       ],
-      defaultModelId: null,
     });
   });
 

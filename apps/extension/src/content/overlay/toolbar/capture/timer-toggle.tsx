@@ -1,4 +1,5 @@
 import React from 'react';
+import { Clock4 } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
 import { ContentToolbarButton, ContentToolbarDelayIndicator } from '@sniptale/ui/content-toolbar';
@@ -32,10 +33,7 @@ export function ToolbarTimerToggle(props: {
       aria-expanded={showTimerMenu}
     >
       <ContentToolbarDelayIndicator value={timerDelay} dataUi="content.toolbar.timer-value">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
-        </svg>
+        <Clock4 size={18} />
       </ContentToolbarDelayIndicator>
     </ContentToolbarButton>
   );

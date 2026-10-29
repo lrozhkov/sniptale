@@ -56,6 +56,7 @@ function reconcileLinkedAnnotationTemplates(
     expectedStepBadgeSourcePresetId?: string;
   }
 ): FrameData {
+  if (frame.annotationKind !== undefined) return frame;
   let next = frame;
   if (frame.callout && frame.callout.sourcePresetId === expected.expectedCalloutSourcePresetId) {
     const resolved = resolveFrameCalloutTemplate(frame.callout, frame.borderSettings);

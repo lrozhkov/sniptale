@@ -1,16 +1,9 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { VideoProject } from '../../../features/video/project/types/model';
 import { editReviewTextFragment } from '../../../features/video/review/text-document';
-import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import { useAIScenarioModelSelection } from '../../../workflows/ai-settings/use-scenario-model-selection';
 import {
   prepareProjectRecognition,
   runProjectRecognition,
@@ -31,6 +24,7 @@ interface RecognitionState {
   applying: boolean;
   accepted: boolean;
   error: string | null;
+  providerFailureReason?: AIConnectionReason | null;
   completed: number;
   total: number;
   proposal: ProjectRecognitionProposal | null;
@@ -40,30 +34,11 @@ const initial: RecognitionState = {
   applying: false,
   accepted: false,
   error: null,
+  providerFailureReason: null,
   completed: 0,
   total: 0,
   proposal: null,
 };
-
-function useRecognitionCatalog(lifetime: { mounted: boolean }, onError: () => void) {
-  const [catalog, setCatalog] = useState<AIModelSelectionBootstrapPayload | null>(null);
-  const owner = useRef(lifetime);
-  owner.current = lifetime;
-  const latestAttempt = useRef(0);
-  const loadModels = useCallback(async () => {
-    const lifetime = owner.current;
-    const attempt = ++latestAttempt.current;
-    try {
-      const result = await requestAIModelSelectionBootstrap('transcription');
-      if (owner.current === lifetime && lifetime.mounted && latestAttempt.current === attempt)
-        setCatalog(result);
-    } catch {
-      if (owner.current === lifetime && lifetime.mounted && latestAttempt.current === attempt)
-        onError();
-    }
-  }, [onError]);
-  return { catalog, loadModels };
-}
 
 function runRecognitionCommand(
   owner: { current: { mounted: boolean; active: AbortController | null } },
@@ -75,13 +50,20 @@ function runRecognitionCommand(
   if (lifetime.active) return;
   const controller = new AbortController();
   lifetime.active = controller;
-  setState((value) => ({ ...value, running: true, applying, error: null }));
+  setState((value) => ({
+    ...value,
+    running: true,
+    applying,
+    error: null,
+    providerFailureReason: null,
+  }));
   void work(controller.signal)
     .catch((error: unknown) => {
       if (owner.current === lifetime && lifetime.mounted && !controller.signal.aborted)
         setState((value) => ({
           ...value,
           error: error instanceof Error ? error.message : 'failed',
+          providerFailureReason: error instanceof AudioJobProviderError ? error.reason : null,
         }));
     })
     .finally(() => {
@@ -105,6 +87,7 @@ export function useVideoProjectRecognition(project: VideoProject) {
       mounted: true,
       active: null as AbortController | null,
       job: undefined as ProjectRecognitionJob | undefined,
+      jobBinding: '',
       proposal: null as ProjectRecognitionProposal | null,
     }),
     [project.id]
@@ -119,35 +102,48 @@ export function useVideoProjectRecognition(project: VideoProject) {
       lifetime.active?.abort();
     };
   }, [lifetime]);
-  const reportCatalogError = useCallback(() => {
-    setState((value) => ({ ...value, error: 'model' }));
-  }, []);
-  const { catalog, loadModels } = useRecognitionCatalog(lifetime, reportCatalogError);
+  const selection = useAIScenarioModelSelection('video-transcription');
+  const catalog = selection.configuration;
   const access = {
     getProject: getCurrentVideoEditorProjectSnapshot,
     save: () => waitForVideoEditorSave(lifetime.projectId),
     update: updateProject,
   };
   const recognize = (options: ProjectRecognitionOptions) => {
-    const model = catalog?.models.find((entry) => entry.id === options.modelId);
-    if (
-      !model ||
-      model.providerId !== options.approvedProviderId ||
-      (model.audio?.transcription?.transport === 'audio-chat') !== !!options.recognition
-    ) {
-      setState((value) => ({ ...value, error: 'model' }));
-      return;
-    }
     if (owner.current.proposal?.receipt && !state.accepted) return;
     runRecognitionCommand(owner, setState, async (signal) => {
       const lifetime = owner.current;
+      const admitted = await selection.prepareModelSelection(signal);
+      const model = admitted.catalog.models.find((entry) => entry.id === admitted.modelId);
+      const provider = admitted.catalog.providers.find((entry) => entry.id === model?.providerId);
+      if (
+        !model ||
+        !provider?.destinationBinding ||
+        admitted.modelId !== options.modelId ||
+        provider.id !== options.approvedProviderId ||
+        (model.audio?.transcription?.transport === 'audio-chat') !== !!options.recognition
+      )
+        throw new Error('model');
+      const approvedSelection = {
+        modelId: model.id,
+        approvedProviderId: provider.id,
+        approvedModelCode: model.modelCode,
+        approvedDestination: provider.destinationBinding,
+      };
+      const binding = JSON.stringify([
+        approvedSelection,
+        model.audio?.transcription,
+        model.capabilities?.features['word-timestamps'],
+        model.capabilities?.features['segment-timestamps'],
+      ]);
       const job = await prepareProjectRecognition(
         access,
-        options,
+        { ...options, approvedSelection },
         signal,
-        lifetime.proposal ? undefined : lifetime.job
+        !lifetime.proposal && lifetime.jobBinding === binding ? lifetime.job : undefined
       );
       lifetime.job = job;
+      lifetime.jobBinding = binding;
       lifetime.proposal = null;
       setState((value) => ({
         ...value,
@@ -209,12 +205,24 @@ export function useVideoProjectRecognition(project: VideoProject) {
     if (owner.current.active) return;
     owner.current.proposal = null;
     owner.current.job = undefined;
+    owner.current.jobBinding = '';
     setState(initial);
   };
   return {
     ...state,
     catalog,
-    loadModels,
+    modelId: selection.modelId ?? '',
+    configurationFailed: selection.configurationFailed,
+    selectionFailed: selection.selectionFailed,
+    selectionUnavailable: selection.selectionUnavailable,
+    unavailableModelName: selection.unavailableModelName,
+    selectionPending: selection.selectionPending,
+    setModelId(id: string | null) {
+      if (!owner.current.mounted || owner.current.active || selection.selectionPending) return;
+      setState((value) => ({ ...value, error: null, providerFailureReason: null }));
+      selection.chooseModel(id);
+    },
+    loadModels: selection.retryConfiguration,
     recognize,
     apply,
     edit,

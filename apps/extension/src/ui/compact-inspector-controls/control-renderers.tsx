@@ -42,6 +42,7 @@ function InspectorSegments<T extends string>(
   const host = useRef<HTMLDivElement>(null);
   const [dropdown, setDropdown] = useState(false);
   const iconOnly = props.options.every((option) => option.icon !== undefined);
+  const labelKey = JSON.stringify(props.options.map((option) => option.label));
   useLayoutEffect(() => {
     const element = host.current;
     if (!element) return;
@@ -54,16 +55,23 @@ function InspectorSegments<T extends string>(
         return;
       const context = document.createElement('canvas').getContext('2d');
       if (!context) return;
-      context.font = `500 13px ${getComputedStyle(element).fontFamily}`;
-      const width = props.options.reduce(
-        (sum, option) => sum + context.measureText(option.label).width + 12,
-        0
-      );
-      setDropdown(!iconOnly && width + 4 + 2 * (props.options.length - 1) > element.clientWidth);
+      const style = getComputedStyle(element);
+      context.font = `500 ${style.fontSize} ${style.fontFamily}`;
+      const labels: unknown = JSON.parse(labelKey);
+      if (
+        !Array.isArray(labels) ||
+        !labels.every((value): value is string => typeof value === 'string')
+      )
+        return;
+      const width = labels.reduce((sum, label) => sum + context.measureText(label).width + 12, 0);
+      setDropdown(!iconOnly && width + 4 + 2 * (labels.length - 1) > element.clientWidth);
     };
     fit();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
     observer?.observe(element);
+    element
+      .querySelectorAll('.sniptale-property-segments > button')
+      .forEach((button) => observer?.observe(button));
     let disposed = false;
     void document.fonts?.ready.then(() => {
       if (!disposed) fit();
@@ -75,7 +83,7 @@ function InspectorSegments<T extends string>(
       observer?.disconnect();
       element.removeEventListener('focusout', afterBlur);
     };
-  }, [iconOnly, props.options]);
+  }, [iconOnly, labelKey]);
   return (
     <div ref={host} className="sniptale-property-choice">
       {dropdown ? (

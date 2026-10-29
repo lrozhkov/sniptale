@@ -66,7 +66,7 @@ it('yields while validating many rows and returns only their retention projectio
     const snapshot = await collectDurableAssetSnapshot();
     expect(snapshot.authorityValid).toBe(true);
     expect(snapshot.expectedOwners).toHaveLength(1000);
-    expect(getAll).toHaveBeenCalledTimes(12);
+    expect(getAll).toHaveBeenCalledTimes(13);
     expect(ticks).toBeGreaterThan(10);
     expect(snapshot).not.toHaveProperty('recordings');
   } finally {

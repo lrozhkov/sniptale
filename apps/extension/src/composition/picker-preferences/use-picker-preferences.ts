@@ -1,5 +1,9 @@
+import { usePaletteNames } from './use-palette-names';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  loadPickerCatalog,
+  savePickerCatalog,
+  subscribePickerCatalog,
   loadPickerCompact,
   savePickerCompact,
   subscribePickerCompact,
@@ -12,6 +16,8 @@ import {
 
 /** Density is advisory: a refused preference write never prevents editing. */
 export function usePickerPreferences(density?: 'full' | 'compact') {
+  const paletteNames = usePaletteNames();
+  const catalog = useCatalogPreference();
   const [rememberedCompact, setRememberedCompact] = useState(false);
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const generation = useRef(0);
@@ -66,9 +72,41 @@ export function usePickerPreferences(density?: 'full' | 'compact') {
       .catch(() => undefined);
   }, []);
   return {
+    paletteNames,
+    ...catalog,
     compact: density === undefined ? rememberedCompact : density === 'compact',
     setCompact,
     recentColors,
     rememberColor,
   };
+}
+
+/** Failed advisory writes retain the current choice until the runtime ends. */
+function useCatalogPreference() {
+  const [catalogMode, setCatalogMode] = useState(false);
+  const generation = useRef(0);
+  useEffect(() => {
+    let active = true;
+    const revision = generation.current;
+    void loadPickerCatalog()
+      .then((value) => {
+        if (active && generation.current === revision) setCatalogMode(value);
+      })
+      .catch(() => undefined);
+    const stop = subscribePickerCatalog((value) => {
+      if (!active) return;
+      generation.current += 1;
+      setCatalogMode(value);
+    });
+    return () => {
+      active = false;
+      stop();
+    };
+  }, []);
+  const setCatalog = useCallback((value: boolean) => {
+    generation.current += 1;
+    setCatalogMode(value);
+    void savePickerCatalog(value).catch(() => undefined);
+  }, []);
+  return { catalogMode, setCatalogMode: setCatalog };
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createSelectionModeFinalFrame, createSelectionModeFinalResizeHandles } from './frame';
 import type { ResolvedBorderPresetVisual } from '../../../../../features/highlighter/style';
@@ -38,6 +38,12 @@ describe('selection-mode final frame', () => {
       getMaxSelectionWidth: () => 1280,
       getMaxSelectionHeight: () => 720,
       getCaptureAction: () => 'download_default',
+      getCapturePreferences: () => ({
+        imageFormat: 'png' as const,
+        imageQuality: 100,
+        compactMenus: false,
+      }),
+      onImageFormatChange: vi.fn(),
       getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
       onAdjustPadding: () => {},
       onCaptureActionChange: () => {},
@@ -70,6 +76,12 @@ describe('selection-mode final frame', () => {
       getMaxSelectionWidth: () => 1280,
       getMaxSelectionHeight: () => 720,
       getCaptureAction: () => 'download_default',
+      getCapturePreferences: () => ({
+        imageFormat: 'png' as const,
+        imageQuality: 100,
+        compactMenus: false,
+      }),
+      onImageFormatChange: vi.fn(),
       getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
       onAdjustPadding: () => {},
       onCaptureActionChange: () => {},

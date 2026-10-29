@@ -142,6 +142,12 @@ function SpotlightSourceFrame(
 ) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const cache = useRef<SpotlightBaseCache | null>(null);
+  const painted = useRef<{
+    key: string;
+    lenses: string;
+    frame: ZoomPreviewFrame | null;
+    header: CanvasImageSource | null | undefined;
+  } | null>(null);
   useEffect(
     () => () => {
       releaseSpotlightBase(cache.current);
@@ -154,16 +160,24 @@ function SpotlightSourceFrame(
     if (!context) return;
     const paint = () => {
       const reuse = !props.live && props.lensFrames.length > 0;
-      const key = reuse
-        ? JSON.stringify([
-            props.background,
-            props.scale,
-            props.camera,
-            props.cornerRadius,
-            props.output,
-            props.layout,
-          ])
-        : null;
+      const key = JSON.stringify([
+        props.background,
+        props.scale,
+        props.camera,
+        props.cornerRadius,
+        props.output,
+        props.layout,
+      ]);
+      const lenses = JSON.stringify(props.lensFrames);
+      const previous = painted.current;
+      if (
+        !props.live &&
+        previous?.key === key &&
+        previous.lenses === lenses &&
+        previous.frame === props.frame &&
+        previous.header === props.headerImage
+      )
+        return;
       if (!restoreSpotlightBase(context, cache.current, key, props)) {
         paintZoomPreview(context, {
           accent: '#ffffff',
@@ -179,7 +193,7 @@ function SpotlightSourceFrame(
           view: 'result',
         });
         if (reuse && canvas.current) {
-          cache.current = captureSpotlightBase(canvas.current, cache.current, key!, props);
+          cache.current = captureSpotlightBase(canvas.current, cache.current, key, props);
         } else {
           releaseSpotlightBase(cache.current);
           cache.current = null;
@@ -187,6 +201,9 @@ function SpotlightSourceFrame(
       }
       if (canvas.current && props.lensFrames.length)
         drawSceneSpotlights(context, canvas.current, null, props.lensFrames);
+      painted.current = props.live
+        ? null
+        : { key, lenses, frame: props.frame, header: props.headerImage };
     };
     paint();
     if (!props.live) return;

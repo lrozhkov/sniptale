@@ -108,7 +108,7 @@ export function FrameProjection(props: {
           snapshot={props.snapshot}
         />
       ) : null}
-      {toolbarSelected && props.controlsRoot ? (
+      {toolbarSelected && props.snapshot.annotationKind === undefined && props.controlsRoot ? (
         <FrameProjectionToolbar
           controlsRoot={props.controlsRoot}
           open={(menu, anchor) => {
@@ -204,7 +204,13 @@ function FrameProjectionOverlays(
 type FrameProjectionOverlayProps = Parameters<typeof FrameProjectionOverlays>[0];
 
 function FrameResizeOverlay(props: FrameProjectionOverlayProps) {
-  if (!props.selected || props.settingsMenu !== null || !props.sceneRoot) return null;
+  if (
+    props.snapshot.annotationKind !== undefined ||
+    !props.selected ||
+    props.settingsMenu !== null ||
+    !props.sceneRoot
+  )
+    return null;
   return createPortal(
     <div
       style={{
@@ -248,6 +254,9 @@ function FrameCalloutOverlay(props: FrameProjectionOverlayProps) {
   return getFrameCallouts(props.snapshot).map((callout, calloutIndex) =>
     callout.enabled ? (
       <EditorFrameCallout
+        {...(props.snapshot.annotationKind === 'callout'
+          ? { onDelete: () => props.onCommand('delete') }
+          : {})}
         calloutIndex={calloutIndex}
         coordinateSpace={props.coordinateSpace}
         object={object}
@@ -283,10 +292,23 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       controlsPortalTarget={props.controlsRoot}
       coordinateSpace={props.coordinateSpace}
       frameRect={props.frameRect}
+      {...(props.snapshot.annotationKind === 'step-badge'
+        ? {
+            onDelete: () => props.onCommand('delete'),
+            onFramePositionChange: (point: { x: number; y: number }) =>
+              props.onSnapshotChange({ ...props.snapshot, ...point }),
+          }
+        : {})}
       onPositionChange={(manualPlacement) =>
         props.onSnapshotChange({ ...props.snapshot, stepBadge: { ...settings, manualPlacement } })
       }
       portalTheme={null}
+      onValueChange={(value) =>
+        props.onSnapshotChange({
+          ...props.snapshot,
+          stepBadge: { ...settings, value, auto: false, sourcePresetId: undefined },
+        })
+      }
       isSettingsOpen={props.settingsMenu === 'step'}
       onSettingsClick={() => {
         if (anchorRef.current) props.onOpenSettings('step', anchorRef.current);

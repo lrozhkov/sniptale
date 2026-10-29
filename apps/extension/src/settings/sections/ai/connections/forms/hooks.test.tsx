@@ -47,8 +47,12 @@ function ProviderHarness(props: { provider?: AIProvider | null }) {
   return null;
 }
 
-function ModelHarness(props: { model?: AIModel | null }) {
-  latestModelState = useModelFormState(props.model);
+function ModelHarness(props: {
+  model?: AIModel | null;
+  initialProviderId?: string;
+  providers?: AIProvider[];
+}) {
+  latestModelState = useModelFormState(props.model, props.providers, [], props.initialProviderId);
   return null;
 }
 
@@ -106,6 +110,8 @@ it('keeps provider secrets out of React form state and reads them from the input
   expect(latestProviderState?.formData).toEqual({
     name: 'OpenAI',
     connectionType: 'openai-compatible',
+    management: 'automatic',
+    enabled: true,
     baseUrl: 'https://api.openai.com/v1',
   });
   expect('apiKey' in (latestProviderState?.formData ?? {})).toBe(false);
@@ -136,6 +142,8 @@ it('keeps provider secrets out of React form state and reads them from the input
       formData: {
         name: 'OpenAI',
         connectionType: 'openai-compatible',
+        management: 'automatic',
+        enabled: true,
         baseUrl: 'https://api.openai.com/v1',
         apiKey: 'provider-secret',
       },
@@ -154,6 +162,8 @@ it('updates provider form fields in create mode without storing the API key in s
   expect(latestProviderState?.formData).toEqual({
     name: '',
     connectionType: 'openai-compatible',
+    management: 'automatic',
+    enabled: true,
     baseUrl: '',
   });
 
@@ -170,6 +180,8 @@ it('updates provider form fields in create mode without storing the API key in s
   expect(latestProviderState?.formData).toEqual({
     name: 'Local provider',
     connectionType: 'openai-compatible',
+    management: 'automatic',
+    enabled: true,
     baseUrl: 'http://127.0.0.1:11434/v1',
   });
   expect('apiKey' in (latestProviderState?.formData ?? {})).toBe(false);
@@ -184,6 +196,16 @@ it('persists model hook updates through saveModelForm with current form values',
     displayName: 'GPT 4.1',
     modelCode: 'gpt-4.1',
     systemPrompt: 'Prompt',
+    source: 'manual',
+    propertySource: 'manual',
+    enabled: true,
+    retirementOverride: false,
+    capabilities: {
+      operations: { text: 'supported' },
+      input: { text: 'supported' },
+      output: { text: 'supported' },
+      features: {},
+    },
   });
 
   await act(async () => {
@@ -198,6 +220,11 @@ it('persists model hook updates through saveModelForm with current form values',
     displayName: 'GPT 4.1 mini',
     modelCode: 'gpt-4.1',
     systemPrompt: 'Prompt',
+    source: 'manual',
+    propertySource: 'manual',
+    enabled: true,
+    retirementOverride: false,
+    capabilities: { operations: {}, input: {}, output: {}, features: {} },
   });
 
   await act(async () => {
@@ -214,6 +241,11 @@ it('persists model hook updates through saveModelForm with current form values',
         displayName: 'GPT 4.1 mini',
         modelCode: 'gpt-4.1',
         systemPrompt: 'Prompt',
+        source: 'manual',
+        propertySource: 'manual',
+        enabled: true,
+        retirementOverride: false,
+        capabilities: { operations: {}, input: {}, output: {}, features: {} },
       },
       isEditing: true,
       model: MODEL,
@@ -253,28 +285,69 @@ it('omits optional provider and model params from save calls in create mode', as
   expect(saveModelFormMock).toHaveBeenCalledTimes(1);
 });
 
-it('switches purpose without keeping incompatible audio defaults', async () => {
+it('keeps capabilities and other audio parameters when switching the execution view', async () => {
   await renderModelHarness(MODEL);
-  await act(async () => {
-    latestModelState?.handleOperationChange('speech');
-  });
-  expect(latestModelState?.formData.audio).toEqual({
-    speech: { voiceId: '', responseFormat: 'mp3' },
-  });
-  await act(async () => {
+  const capabilities = latestModelState?.formData.capabilities;
+  await act(async () => latestModelState?.handleOperationChange('speech'));
+  expect(latestModelState?.formData.audio).toBeUndefined();
+  await act(async () =>
     latestModelState?.handleAudioChange({
       speech: { voiceId: 'custom', responseFormat: 'wav', speed: 1.2 },
-    });
-  });
-  expect(latestModelState?.formData.audio?.speech?.voiceId).toBe('custom');
-  await act(async () => {
-    latestModelState?.handleOperationChange('transcription');
-  });
+    })
+  );
+  await act(async () => latestModelState?.handleOperationChange('transcription'));
+  await act(async () =>
+    latestModelState?.handleAudioChange({
+      transcription: { responseFormat: 'json', timestampGranularity: 'none' },
+    })
+  );
+  await act(async () => latestModelState?.handleOperationChange('text'));
   expect(latestModelState?.formData.audio).toEqual({
-    transcription: { responseFormat: 'verbose_json', timestampGranularity: 'word' },
+    speech: { voiceId: 'custom', responseFormat: 'wav', speed: 1.2 },
+    transcription: { responseFormat: 'json', timestampGranularity: 'none' },
   });
-  await act(async () => {
-    latestModelState?.handleOperationChange('text');
+  expect(latestModelState?.formData.capabilities).toEqual(capabilities);
+});
+
+it('selects a named provider with its endpoint and clears a credential from the previous destination', async () => {
+  await renderProviderHarness();
+  const password = document.createElement('input');
+  password.value = 'previous-provider-secret';
+  if (latestProviderState) latestProviderState.apiKeyInputRef.current = password;
+  await act(async () => latestProviderState?.handleConnectionTypeChange('neuraldeep'));
+  expect(latestProviderState?.formData).toMatchObject({
+    connectionType: 'neuraldeep',
+    name: 'neuraldeep.ru',
+    baseUrl: 'https://api.neuraldeep.ru/v1',
+    management: 'automatic',
   });
-  expect(latestModelState?.formData.audio).toBeUndefined();
+  expect(password.value).toBe('');
+  expect(latestProviderState?.formData).not.toHaveProperty('apiKey');
+  await act(async () => latestProviderState?.handleManagementChange('manual'));
+  expect(latestProviderState?.formData.management).toBe('manual');
+});
+
+it('captures the recovery provider incarnation without a model identity', async () => {
+  await renderModelHarness();
+  await act(async () =>
+    root?.render(
+      <ModelHarness
+        key="recovery"
+        providers={[{ ...PROVIDER, incarnation: 'current-provider' }]}
+        initialProviderId={PROVIDER.id}
+      />
+    )
+  );
+  expect(latestModelState?.formData.providerId).toBe(PROVIDER.id);
+  expect(latestModelState?.formData.modelCode).toBe('');
+  expect(latestModelState?.isEditing).toBe(false);
+  await act(async () =>
+    latestModelState?.handleSubmit(
+      { preventDefault: vi.fn() } as unknown as React.FormEvent,
+      vi.fn()
+    )
+  );
+  expect(saveModelFormMock).toHaveBeenCalledWith(
+    expect.objectContaining({ providerIncarnation: 'current-provider', isEditing: false })
+  );
 });

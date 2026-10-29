@@ -13,6 +13,7 @@ import type {
   ReviewRecognitionProposal,
 } from '../../workflows/video-review/recognition';
 import { translate } from '../../platform/i18n';
+import { AudioJobProviderError } from '../../workflows/audio-jobs/failure';
 import { createReviewSpeechEditGuard } from './speech-edit-guard';
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
@@ -20,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
   wasApplied: vi.fn(),
   multimodal: false,
+  destination: 'a',
+  remember: vi.fn(),
 }));
 vi.mock('../../workflows/video-review/recognition', () => ({
   prepareReviewRecognition: mocks.prepare,
@@ -28,10 +31,12 @@ vi.mock('../../workflows/video-review/recognition', () => ({
   reviewRecognitionWasApplied: mocks.wasApplied,
 }));
 vi.mock('../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: async () => ({
+  rememberAIScenarioModelSelection: mocks.remember,
+  requestAIScenarioModelSelection: async () => ({
     models: [
       {
         id: 'model',
+        modelCode: 'speech-model',
         displayName: 'Model',
         providerId: 'provider',
         ...(mocks.multimodal
@@ -50,9 +55,21 @@ vi.mock('../../workflows/ai-settings/query', () => ({
           : {}),
       },
     ],
-    providers: [{ id: 'provider', name: 'Provider' }],
-    defaultModelId: 'model',
-    chromeAiEnabled: false,
+    providers: [
+      {
+        id: 'provider',
+        name: 'Provider',
+        connectionType: 'openai-compatible',
+        incarnation: 'initial',
+        destinationBinding: `sha256:${mocks.destination.repeat(64)}`,
+        destinationKind: 'external',
+        hasStoredApiKey: true,
+        createdAt: 1,
+      },
+    ],
+    scenario: 'gallery-transcription',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
     globalSystemPrompt: '',
   }),
 }));
@@ -92,6 +109,8 @@ let host: HTMLDivElement;
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.multimodal = false;
+  mocks.destination = 'a';
+  mocks.remember.mockResolvedValue(undefined);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.append(host);
@@ -491,3 +510,68 @@ it('requests distinct approval for saved instructions after an audio-only approv
   await click(translate('gallery.videoReview.recognitionStart'));
   expect(mocks.prepare).toHaveBeenCalledTimes(3);
 });
+
+it('shows preference refusal without discarding form values or preparing recognition', async () => {
+  mocks.multimodal = true;
+  await mount();
+  await chooseField(
+    'gallery.videoReview.recognitionProcessingMode',
+    'gallery.videoReview.recognitionRewrite'
+  );
+  const draft = host.querySelector<HTMLTextAreaElement>('textarea')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+      draft,
+      'Keep this instruction'
+    );
+    draft.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  mocks.remember.mockRejectedValueOnce(new Error('refused'));
+  await recognize();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    translate('aiModal.modelSelectionSaveFailed')
+  );
+  expect(draft.value).toBe('Keep this instruction');
+  expect(mocks.prepare).not.toHaveBeenCalled();
+  expect(mocks.run).not.toHaveBeenCalled();
+  expect(button(translate('gallery.videoReview.recognitionStart'))?.disabled).toBe(false);
+});
+it('requires fresh provider consent after its destination changes under the same provider ID', async () => {
+  await mount();
+  await recognize();
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  mocks.destination = 'b';
+  const selector = host.querySelector<HTMLSelectElement>('select[aria-label="configured model"]')!;
+  await act(async () => selector.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  await act(async () => {
+    selector.value = 'model';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await click(translate('gallery.videoReview.recognitionStart'));
+  expect(button(translate('gallery.videoReview.speechConsentContinue'))).toBeDefined();
+  expect(mocks.prepare).toHaveBeenCalledOnce();
+  await click(translate('gallery.videoReview.speechConsentContinue'));
+  expect(mocks.prepare).toHaveBeenCalledTimes(2);
+});
+
+it.each([
+  ['invalid-credential', 'settings.aiProviders.providerStatusInvalidKey'],
+  ['permission-denied', 'settings.aiProviders.providerStatusDenied'],
+  ['model-unavailable', 'settings.aiProviders.providerStatusModelUnavailable'],
+  ['quota-exceeded', 'settings.aiProviders.providerStatusQuota'],
+  ['rate-limited', 'settings.aiProviders.providerStatusRate'],
+  ['network', 'settings.aiProviders.providerStatusNetwork'],
+  ['timeout', 'settings.aiProviders.providerStatusTimeout'],
+  ['service-error', 'settings.aiProviders.providerStatusUnavailable'],
+] as const)(
+  'explains %s in the mounted recognition panel without changing source',
+  async (reason, key) => {
+    const { session } = await mount();
+    const before = structuredClone(session.getSnapshot().snapshot);
+    mocks.run.mockRejectedValueOnce(new AudioJobProviderError(reason, 'provider-failed'));
+    await recognize();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(translate(key));
+    expect(session.getSnapshot().snapshot).toEqual(before);
+    expect(mocks.apply).not.toHaveBeenCalled();
+  }
+);

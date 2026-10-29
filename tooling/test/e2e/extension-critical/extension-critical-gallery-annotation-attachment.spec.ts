@@ -78,7 +78,9 @@ for (const variant of [
         });
       await expect.poll(async () => (await instance())?.attachment).toBe('content');
       await expect(
-        dialog.locator('[data-ui="gallery.videoReview.manualPreview"] canvas')
+        dialog.locator(
+          '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+        )
       ).toBeVisible();
       await expect(
         dialog.getByText(label('gallery.videoReview.previewLoading'), { exact: true })

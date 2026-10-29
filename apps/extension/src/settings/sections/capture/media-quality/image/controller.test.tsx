@@ -196,3 +196,29 @@ describe('useImageSettingsSection', () => {
     expect(latestState?.fullPage.error).toBe('imageSettings.section.fullPageInvalidValue');
   });
 });
+
+it('keeps regular and full-page format defaults separate and saves full-page preparation', async () => {
+  const updateSettings = vi.fn().mockResolvedValue(undefined);
+  useSettingsStoreMock.mockReturnValue(
+    createStoreState({
+      settings: {
+        imageFormat: 'jpeg',
+        imageQuality: 77,
+        fullPageImage: { imageFormat: 'webp', imageQuality: 62 },
+      },
+      updateSettings,
+    })
+  );
+  await renderHarness();
+  expect(latestState?.imageFormat).toBe('jpeg');
+  expect(latestState?.fullImage.imageFormat).toBe('webp');
+  await act(async () => latestState!.fullImage.handleFormatChange('png'));
+  expect(updateSettings).toHaveBeenLastCalledWith({ fullPageImage: { imageFormat: 'png' } });
+  expect(latestState?.imageFormat).toBe('jpeg');
+  await act(async () => latestState!.fullImage.handleQualityCommit(69));
+  expect(updateSettings).toHaveBeenLastCalledWith({ fullPageImage: { imageQuality: 69 } });
+  await act(async () => latestState!.fullCapture.update({ preloadLazyContent: false }));
+  expect(updateSettings).toHaveBeenLastCalledWith({
+    fullPageCapture: { preloadLazyContent: false },
+  });
+});

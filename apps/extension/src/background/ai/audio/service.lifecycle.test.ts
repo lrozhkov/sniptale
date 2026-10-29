@@ -35,6 +35,8 @@ const transcription: AudioJobStart = {
   scope,
 };
 const config: AudioModelConfig = {
+  connectionType: 'openai-compatible',
+  baseUrl: 'https://example.test',
   url: 'https://example.test/audio/speech',
   apiKey: 'fixture',
   modelCode: 'm',

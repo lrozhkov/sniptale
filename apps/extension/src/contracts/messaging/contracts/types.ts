@@ -1,4 +1,4 @@
-import type { CaptureActionType } from '../../settings';
+import type { CaptureActionType, ScreenshotCapturePreferences } from '../../settings';
 import type {
   CaptureMessageType,
   MessageType,
@@ -64,6 +64,8 @@ export type ExecuteSaveMessage = {
 };
 
 export type SaveScreenshotToGalleryMessage = {
+  capturePreferences?: ScreenshotCapturePreferences;
+  actionType?: CaptureActionType;
   quickActionTransactionId?: string;
   type: MessageType.SAVE_SCREENSHOT_TO_GALLERY;
   dataUrl: string;

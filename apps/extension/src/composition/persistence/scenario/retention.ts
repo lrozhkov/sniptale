@@ -1,3 +1,5 @@
+import { captureScenarioProjectInTransaction } from '../sync-capture/capture';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { createScenarioProjectStore } from './storage';
 import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -44,10 +46,7 @@ function references(projects: GuideProject[]) {
 export async function clearScenarioSavedHistory(projectId: string, baseUpdatedAt: number) {
   await recoverScenarioAssetPublications();
   const project = await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [SCENARIO_PROJECTS_STORE, SCENARIO_PROJECT_HISTORY_STORE, SCENARIO_PROJECT_UNITS_STORE],
-      'readwrite'
-    );
+    const tx = db.transaction([...SCENARIO_CAPTURE_STORES], 'readwrite');
     try {
       const store = createScenarioProjectStore(tx);
       const existing = parseScenarioProjectEntry(await store.get(projectId));
@@ -67,6 +66,7 @@ export async function clearScenarioSavedHistory(projectId: string, baseUpdatedAt
         historyPolicy: 'discard',
       });
       await store.put(entry);
+      await captureScenarioProjectInTransaction(tx, projectId);
       await tx.done;
       return entry.project;
     } catch (error) {
@@ -91,6 +91,7 @@ export function pruneScenarioResources(projectId: string): Promise<number | unde
     const count = await runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction(
         [
+          ...SCENARIO_CAPTURE_STORES,
           SCENARIO_PROJECTS_STORE,
           SCENARIO_PROJECT_HISTORY_STORE,
           SCENARIO_PROJECT_UNITS_STORE,
@@ -134,6 +135,7 @@ export function pruneScenarioResources(projectId: string): Promise<number | unde
           updatedAt: entry.updatedAt,
         });
         await store.put(entry);
+        await captureScenarioProjectInTransaction(tx, projectId);
         await tx.done;
         return removed;
       } catch (error) {

@@ -160,7 +160,15 @@ async function runFullPageCapture(args: {
   const configuredPreferences =
     args.options.preferences ?? settings.fullPageCapture ?? DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES;
   const preferences = configuredPreferences;
-  const options = { ...args.options, qualityPolicy: settings.fullPageQuality };
+  const options = {
+    ...args.options,
+    format:
+      args.options.format ?? settings.fullPageImage?.imageFormat ?? settings.imageFormat ?? 'png',
+    quality:
+      args.options.quality ??
+      (settings.fullPageImage?.imageQuality ?? settings.imageQuality ?? 100) / 100,
+    qualityPolicy: settings.fullPageQuality,
+  };
   const agent = createFullPagePageAgentTransport({ documentId, tabId: args.tabId });
   let result: Omit<FullPageCaptureTransaction, 'jobId'> | null = null;
   let failure: unknown = null;
@@ -336,13 +344,18 @@ async function runPreparedViewportFallback(
     throwIfFullPageCaptureAborted(args.abortSignal);
     const fallbackDimensions = await assertFullPageViewportFallbackWithinPolicy({
       dataUrl,
+      ...(args.options.format === undefined ? {} : { format: args.options.format }),
+      ...(args.options.quality === undefined ? {} : { quality: args.options.quality }),
+      ...(args.options.outputPurpose === undefined
+        ? {}
+        : { outputPurpose: args.options.outputPurpose }),
       policy: args.options.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY,
       ...(args.abortSignal === undefined ? {} : { signal: args.abortSignal }),
     });
     throwIfFullPageCaptureAborted(args.abortSignal);
     const { viewportHeight, viewportWidth } = page.geometry;
     return {
-      dataUrl,
+      dataUrl: fallbackDimensions.dataUrl ?? dataUrl,
       metadata: {
         captureGeometry: page.geometry,
         cssHeight: viewportHeight,

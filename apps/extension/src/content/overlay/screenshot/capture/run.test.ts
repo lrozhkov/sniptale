@@ -53,6 +53,12 @@ vi.mock('../../../selection/selection-mode/lazy', async (importOriginal) => ({
   enableSelectionModeDeferredIfCurrent: enableSelectionModeDeferredIfCurrentMock,
 }));
 
+vi.mock('../../../../composition/persistence/settings', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../../../composition/persistence/settings')>();
+  return { ...original, loadSettings: vi.fn(async () => original.createDefaultSettings()) };
+});
+
 vi.mock('../persistence', () => ({
   persistBackgroundCapture: persistBackgroundCaptureMock,
   persistSelectionCapture: persistSelectionCaptureMock,
@@ -129,6 +135,7 @@ async function expectNormalDownloadViewportCapture() {
   expect(runtime.scenario.buildCapturePayload).not.toHaveBeenCalled();
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
     type: 'CAPTURE_VISIBLE',
+    capturePreferences: expect.objectContaining({ imageFormat: 'png', imageQuality: 100 }),
     actionType: 'download_default',
     scenarioCapture: undefined,
   });
@@ -148,6 +155,7 @@ async function expectScenarioViewportCapture() {
   expect(runtime.scenario.buildCapturePayload).toHaveBeenCalledWith('visible');
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
     type: 'CAPTURE_VISIBLE',
+    capturePreferences: expect.objectContaining({ imageFormat: 'png', imageQuality: 100 }),
     actionType: 'scenario',
     scenarioCapture: createScenarioPayload(),
   });
@@ -336,6 +344,7 @@ it.each(['visible', 'full'] as const)(
     await capture;
     expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
       type: type === 'full' ? 'CAPTURE_FULL' : 'CAPTURE_VISIBLE',
+      capturePreferences: expect.objectContaining({ imageFormat: 'png', imageQuality: 100 }),
       actionType: 'edit',
     });
     expect(runtime.captureActionRef.current).toBe('download_default');
@@ -345,6 +354,7 @@ it.each(['visible', 'full'] as const)(
     await next;
     expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith({
       type: type === 'full' ? 'CAPTURE_FULL' : 'CAPTURE_VISIBLE',
+      capturePreferences: expect.objectContaining({ imageFormat: 'png', imageQuality: 100 }),
       actionType: 'download_default',
     });
   }
@@ -357,6 +367,7 @@ it('does not add a scenario step when a one-shot action overrides the scenario d
   await capture;
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
     type: 'CAPTURE_VISIBLE',
+    capturePreferences: expect.objectContaining({ imageFormat: 'png', imageQuality: 100 }),
     actionType: 'save_to_library',
   });
   expect(runtime.scenario.ensureCaptureReady).not.toHaveBeenCalled();

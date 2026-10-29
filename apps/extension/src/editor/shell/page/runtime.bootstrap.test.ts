@@ -232,6 +232,7 @@ async function verifiesAssetRestore() {
   resolveEditorPageRestoreSourceMock.mockResolvedValue({
     kind: 'asset',
     assetId: 'asset-2',
+    nativeRevision: 7,
     dataUrl: 'data:image/png;base64,3',
     filename: 'capture.png',
     sourceTitle: 'Asset title',
@@ -243,6 +244,7 @@ async function verifiesAssetRestore() {
 
   expect(autosaveService.updateContext).toHaveBeenCalledWith({
     requireExistingRoot: true,
+    durableRevision: 7,
     sourceUrl: 'https://asset.example',
     sourceTitle: 'Asset title',
   });

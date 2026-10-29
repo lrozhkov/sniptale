@@ -125,6 +125,10 @@ it('renders the exact centered tool order with two vertical dividers', () => {
     'shared.ui.content-toolbar-button',
     'shared.ui.content-toolbar-button',
     'content.toolbar.future-frame-style.menu',
+    'content.toolbar.future-frame-callout',
+    'content.toolbar.future-frame-callout.menu',
+    'content.toolbar.future-frame-step-badge',
+    'content.toolbar.future-frame-step-badge.menu',
     'editor.floating.tool-rail.pencil',
     'editor.floating.tool-rail.marker',
     'editor.floating.tool-rail.text',
@@ -145,8 +149,12 @@ it('renders the exact centered tool order with two vertical dividers', () => {
     expect(divider?.classList.contains('sniptale-glass-toolbar-divider')).toBe(true);
     expect(divider?.classList.contains('sniptale-divider')).toBe(true);
   }
-  expect(queryUi('content.toolbar.future-frame-callout')).toBeNull();
-  expect(queryUi('content.toolbar.future-frame-step-badge')).toBeNull();
+  expect(queryUi('content.toolbar.future-frame-callout')?.getAttribute('aria-pressed')).toBe(
+    'false'
+  );
+  expect(queryUi('content.toolbar.future-frame-step-badge')?.getAttribute('aria-pressed')).toBe(
+    'false'
+  );
 
   act(() => getToolButton('text').click());
   expect(props.onActivateTool).toHaveBeenCalledWith('text');
@@ -199,8 +207,12 @@ it('uses the content frame controls with the same enable and popover behavior', 
 
   rerenderToolRail(createProps());
   expect(getContentFrameButton('future-frame-style').getAttribute('aria-pressed')).toBe('false');
-  expect(queryUi('content.toolbar.future-frame-callout')).toBeNull();
-  expect(queryUi('content.toolbar.future-frame-step-badge')).toBeNull();
+  expect(queryUi('content.toolbar.future-frame-callout')?.getAttribute('aria-pressed')).toBe(
+    'false'
+  );
+  expect(queryUi('content.toolbar.future-frame-step-badge')?.getAttribute('aria-pressed')).toBe(
+    'false'
+  );
 
   const restoredProps = createProps({
     activeTool: 'frame-annotation',
@@ -318,10 +330,10 @@ it('centers the expanded frame toolbar at HD width while keeping history in the 
   expect(stack?.className).toContain('max-[1439px]:justify-center');
   expect(stack?.className).toContain('max-[1439px]:!translate-none');
   expect(rail?.className).not.toContain('max-[1439px]:-translate-x-24');
-  expect(history?.className).toContain('max-[1439px]:!fixed');
-  expect(history?.className).toContain('max-[1439px]:!left-3');
-  expect(history?.className).toContain('max-[1439px]:!top-auto');
-  expect(history?.className).toContain('max-[1439px]:!bottom-');
+  expect(history?.className).toContain('max-[1639px]:!fixed');
+  expect(history?.className).toContain('max-[1639px]:!left-3');
+  expect(history?.className).toContain('max-[1639px]:!top-auto');
+  expect(history?.className).toContain('max-[1639px]:!bottom-');
 });
 
 it('keeps the tool rail in one row for page-level horizontal scrolling', () => {

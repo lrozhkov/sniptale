@@ -548,3 +548,140 @@ for (const orientation of ['horizontal', 'vertical']) {
     });
   }
 }
+
+for (const appearance of [
+  { width: 1280, height: 560, locale: 'ru', theme: 'dark' },
+  { width: 1920, height: 900, locale: 'en', theme: 'light' },
+] as const) {
+  test(`capture menu digit choices ${appearance.width} ${appearance.locale}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+    await worker.evaluate(async ({ locale, theme }) => {
+      await chrome.storage.local.set({
+        'sniptale-locale-preference': locale,
+        'sniptale-theme-preference': theme,
+      });
+    }, appearance);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, appearance);
+    const ui = (name: string) => page.locator(`[data-ui="content.toolbar.${name}"]`);
+    try {
+      await ui('mode-selector-button').click();
+      await ui('mode-option.cursor').click();
+      for (const orientation of ['horizontal', 'vertical']) {
+        await ui('settings-button').click();
+        const direction = page.getByRole('button', {
+          name:
+            orientation === 'horizontal'
+              ? /Horizontal view|Горизонтальный вид/u
+              : /Vertical view|Вертикальный вид/u,
+        });
+        if (!(await direction.isVisible()))
+          await page
+            .getByRole('button', { name: /Free toolbar placement|Свободное размещение/u })
+            .click();
+        await direction.click();
+        if ((await ui('settings-button').getAttribute('aria-expanded')) === 'true')
+          await page.keyboard.press('Escape');
+        for (const compact of [false, true]) {
+          await ui('settings-button').click();
+          const toggle = page
+            .locator('.sniptale-toolbar-menu-item')
+            .filter({ hasText: /Compact menu view|Компактный вид меню/ });
+          if (
+            (await toggle.getAttribute('class'))?.includes('sniptale-popover-item-selected') !==
+            compact
+          )
+            await toggle.click();
+          await page.keyboard.press('Escape');
+          const timer = ui('timer-button');
+          for (const [key, delay] of [
+            ['2', 3],
+            ['3', 5],
+            ['4', 10],
+            ['1', 0],
+          ] as const) {
+            await timer.click();
+            const menu = ui('timer-menu');
+            await expect(menu.locator('.sniptale-toolbar-menu-shortcut')).toHaveText([
+              '1',
+              '2',
+              '3',
+              '4',
+            ]);
+            if (key === '2') {
+              await page.screenshot({
+                path: info.outputPath(`digits-timer-${orientation}-${compact}.png`),
+                fullPage: false,
+              });
+              await page.keyboard.press('9');
+              await expect(menu.locator('.sniptale-popover-menu')).toBeVisible();
+              await page.evaluate(() =>
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true }))
+              );
+              await expect(menu.locator('.sniptale-popover-menu')).toBeVisible();
+              await page.evaluate(() => {
+                const host = document.createElement('section');
+                host.id = 'digit-editable-proof';
+                const input = document.createElement('input');
+                host.attachShadow({ mode: 'open' }).append(input);
+                document.body.append(host);
+                input.focus();
+              });
+              await page.keyboard.type('2');
+              await expect(page.locator('#digit-editable-proof input')).toHaveValue('2');
+              await expect(menu.locator('.sniptale-popover-menu')).toBeVisible();
+              await timer.focus();
+              await page.evaluate(() => document.querySelector('#digit-editable-proof')?.remove());
+            }
+            await page.keyboard.press(key);
+            await expect(menu).toHaveCount(0);
+            if (delay)
+              await expect(timer.locator('[data-ui="content.toolbar.timer-value"]')).toHaveText(
+                String(delay)
+              );
+            else
+              await expect(timer.locator('[data-ui="content.toolbar.timer-value"]')).toHaveCount(0);
+            await expect(ui('root')).toHaveAttribute('data-page-mode', 'cursor');
+            await expect(timer).toBeFocused();
+          }
+          await ui('capture-action-button').click();
+          const menu = ui('capture-action-menu');
+          const rows = menu.locator('.sniptale-toolbar-menu-item');
+          const count = await rows.count();
+          await expect(menu.locator('.sniptale-toolbar-menu-shortcut')).toHaveText(
+            Array.from({ length: count }, (_, index) => String(index + 1))
+          );
+          const target = rows.nth(count - 1);
+          const identity = await target.getAttribute('data-ui');
+          const bounds = await menu.locator('.sniptale-popover-menu').boundingBox();
+          expect(bounds!.x).toBeGreaterThanOrEqual(-0.5);
+          expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(appearance.width + 0.5);
+          await target.scrollIntoViewIfNeeded();
+          await page.screenshot({
+            path: info.outputPath(`digits-action-${orientation}-${compact}.png`),
+            fullPage: false,
+          });
+          await page.keyboard.press(String(count));
+          await expect(menu).toHaveCount(0);
+          await expect(ui('capture-action-button')).toBeFocused();
+          await expect(ui('root')).toHaveAttribute('data-page-mode', 'cursor');
+          await ui('capture-action-button').click();
+          await expect(page.locator(`[data-ui="${identity}"]`)).toHaveClass(
+            /sniptale-popover-item-selected/
+          );
+          await page.keyboard.press('Escape');
+        }
+      }
+      await page.setViewportSize({ width: 1024, height: 480 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true
+      );
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}

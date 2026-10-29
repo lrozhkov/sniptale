@@ -11,18 +11,7 @@ interface AIModalBootEffectProps extends Omit<
 }
 
 export function useAIModalBootEffect(props: AIModalBootEffectProps) {
-  const {
-    isOpen,
-    lastPrompt,
-    prompt,
-    setAvailableModels,
-    setGlobalSystemPrompt,
-    setLastPrompt,
-    setPrompt,
-    setProviders,
-    setSelectedModelId,
-    textareaRef,
-  } = props;
+  const { isOpen, lastPrompt, prompt, setLastPrompt, setPrompt, textareaRef } = props;
   const wasOpenRef = useRef(false);
   const bootedWhileOpenRef = useRef(false);
 
@@ -38,11 +27,7 @@ export function useAIModalBootEffect(props: AIModalBootEffectProps) {
     isOpen,
     lastPrompt,
     prompt,
-    setAvailableModels,
-    setGlobalSystemPrompt,
     setPrompt,
-    setProviders,
-    setSelectedModelId,
     textareaRef,
   });
 }

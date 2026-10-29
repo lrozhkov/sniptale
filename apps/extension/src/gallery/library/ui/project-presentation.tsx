@@ -1,7 +1,7 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { formatDate } from './date';
 import type { GalleryViewMode } from '../types';
-import type { GalleryItem } from '../items';
+import { isGalleryRemoteItem, type GalleryItem } from '../items';
 import { canOpenGalleryProject } from '../items/types';
 import { translate } from '../../../platform/i18n';
 import { ArrowUpRight } from 'lucide-react';
@@ -12,6 +12,12 @@ const PROJECT_ACTION_CLASS_NAME =
 
 /** Concise project content and availability, without treating projects as encoded files. */
 export function getGalleryProjectSummary(item: GalleryItem): string | null {
+  if (isGalleryRemoteItem(item)) {
+    if (item.remote.conflict) return translate('gallery.app.remoteConflict');
+    if (item.remote.unavailable || item.remote.deleted)
+      return translate('gallery.app.remoteUnavailable');
+    return translate('gallery.app.remoteOnly');
+  }
   if (
     item.type !== 'scenario' &&
     item.type !== 'video-project' &&
@@ -38,12 +44,18 @@ export function GalleryProjectOpenAction(props: {
   if (
     props.item.type !== 'scenario' &&
     props.item.type !== 'video-project' &&
-    props.item.type !== 'quick-edit-project'
+    props.item.type !== 'quick-edit-project' &&
+    !isGalleryRemoteItem(props.item)
   )
     return null;
   if (props.item.lifecycle?.trashedAt !== undefined) return null;
   const available = canOpenGalleryProject(props.item);
   const iconOnly = props.layout === 'grid';
+  const openLabel = translate(
+    isGalleryRemoteItem(props.item)
+      ? 'gallery.app.remoteDownloadOpen'
+      : 'gallery.preview.openInEditor'
+  );
   return (
     <ProductActionButton
       tone="secondary"
@@ -51,11 +63,11 @@ export function GalleryProjectOpenAction(props: {
       data-command-chrome={iconOnly ? 'true' : undefined}
       type="button"
       disabled={!available}
-      aria-label={iconOnly ? translate('gallery.preview.openInEditor') : undefined}
+      aria-label={iconOnly ? openLabel : undefined}
       title={
         available
           ? iconOnly
-            ? translate('gallery.preview.openInEditor')
+            ? openLabel
             : props.item.filename
           : translate('gallery.preview.projectUnavailable')
       }
@@ -70,11 +82,7 @@ export function GalleryProjectOpenAction(props: {
           : `${PROJECT_ACTION_CLASS_NAME} ${props.layout === 'list' ? 'w-full max-w-[180px]' : 'w-full'}`
       }
     >
-      {iconOnly ? (
-        <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-      ) : (
-        translate('gallery.preview.openInEditor')
-      )}
+      {iconOnly ? <ArrowUpRight className="h-4 w-4" aria-hidden="true" /> : openLabel}
     </ProductActionButton>
   );
 }
@@ -91,7 +99,9 @@ export function GalleryProjectDetails(props: {
   const isList = props.viewMode === 'list';
   const isCompact = props.viewMode === 'compact-grid';
   const gridSummary =
-    canOpenGalleryProject(props.item) && props.item.lifecycle?.trashedAt === undefined
+    canOpenGalleryProject(props.item) &&
+    props.item.lifecycle?.trashedAt === undefined &&
+    !isGalleryRemoteItem(props.item)
       ? formatDate(props.item.createdAt)
       : summary;
   return (

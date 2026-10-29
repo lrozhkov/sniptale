@@ -1,3 +1,4 @@
+import { isScreenshotCapturePreferences } from './capture';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import {
@@ -60,6 +61,8 @@ export const runtimeActionSaveMessageContracts = {
         type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
         required: { dataUrl: isImageDataUrl, filename: isString },
         optional: {
+          actionType: isCaptureActionType,
+          capturePreferences: isScreenshotCapturePreferences,
           contentIntent: isContentPrivilegedActionCapability,
           quickActionTransactionId: (value) =>
             isString(value) && value.length > 0 && value.length <= 128,

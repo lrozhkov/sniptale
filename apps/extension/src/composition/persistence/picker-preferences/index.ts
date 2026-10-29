@@ -25,3 +25,26 @@ export function subscribePickerCompact(listener: (compact: boolean) => void): ()
     }
   });
 }
+
+/** Advisory search preference shared by solid and gradient color editors. */
+export const PICKER_CATALOG_STORAGE_KEY = 'sniptale_picker_catalog';
+
+export async function loadPickerCatalog(): Promise<boolean> {
+  const stored = await browserStorage.local.get([PICKER_CATALOG_STORAGE_KEY]);
+  return stored[PICKER_CATALOG_STORAGE_KEY] === true;
+}
+
+export function savePickerCatalog(enabled: boolean): Promise<void> {
+  return runWithPersistenceMutationPermit(async (permit) => {
+    await browserStorage.local.set({ [PICKER_CATALOG_STORAGE_KEY]: enabled }, permit);
+  });
+}
+
+export function subscribePickerCatalog(listener: (enabled: boolean) => void): () => void {
+  if (!browserStorage.canObserveChanges()) return () => undefined;
+  return browserStorage.subscribeToChanges((changes, area) => {
+    if (area === 'local' && PICKER_CATALOG_STORAGE_KEY in changes) {
+      listener(changes[PICKER_CATALOG_STORAGE_KEY]?.newValue === true);
+    }
+  });
+}

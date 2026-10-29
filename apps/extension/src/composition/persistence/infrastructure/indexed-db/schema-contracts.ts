@@ -8,6 +8,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  ASSET_RESIDENCY_STORE,
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
@@ -33,10 +34,15 @@ import {
   SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STATE_MANAGER_STORE,
+  SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
+  SYNC_CATALOG_CACHE_STORE,
+  SYNC_CONNECTION_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_PROJECT_REVISIONS_STORE,
   WEB_SNAPSHOTS_STORE,
   type EXPECTED_STORES,
 } from './core.stores.ts';
@@ -60,6 +66,16 @@ interface StoredSchemaContract {
 }
 
 export const PERSISTENCE_DOMAIN_REGISTRY = [
+  {
+    domainId: 'syncCapture',
+    schemaVersion: 6,
+    stores: [
+      { storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' },
+      { storeName: SYNC_OUTBOX_STORE, dataClass: 'durable-authority' },
+      { storeName: SYNC_CATALOG_CACHE_STORE, dataClass: 'derived-rebuildable' },
+      { storeName: SYNC_CONNECTION_STORE, dataClass: 'durable-authority' },
+    ],
+  },
   {
     domainId: 'voiceInputHistory',
     schemaVersion: 1,
@@ -90,18 +106,20 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'assetGraph',
-    schemaVersion: 3,
+    schemaVersion: 4,
     stores: [
       { storeName: ASSET_REFS_STORE, dataClass: 'durable-authority' },
+      { storeName: ASSET_RESIDENCY_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_OWNERS_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_OPERATIONS_STORE, dataClass: 'operational-recoverable' },
     ],
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 8,
+    schemaVersion: 9,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_ASSETS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_EXPORTS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_EXPORT_INPUTS_STORE, dataClass: 'operational-recoverable' },

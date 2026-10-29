@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { ReviewBorderOverlay } from './border-overlay';
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
@@ -753,3 +754,63 @@ it.each([0.5, 0.01])(
     expect(area.x).toBeCloseTo(0.51 - diameter / 2, 12);
   }
 );
+
+it.each(['border', 'spotlight'] as const)(
+  'does not repaint a paused source for %s area-only drafts',
+  (kind) => {
+    const appearance = kind === 'border' ? createQuickEditBorder() : createQuickEditSpotlight();
+    const frame = { image: document.createElement('canvas'), ...output };
+    const region = { ...createQuickEditZoomRegion({ id: 'focus', at: 0 }), [kind]: appearance };
+    const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
+    const renderFrame = (area: typeof appearance.area, source = frame, scale = 1) =>
+      act(() =>
+        root.render(
+          <ReviewSpotlightPreview
+            region={{ ...region, [kind]: { ...appearance, area } }}
+            camera={{ scale: 1, centerX: 0.5, centerY: 0.5 }}
+            view="area"
+            frame={source}
+            output={output}
+            layout={layout}
+            cornerRadius={4}
+            scale={scale}
+            disabled={false}
+            onChange={vi.fn()}
+          />
+        )
+      );
+    renderFrame(appearance.area);
+    expect(paint).toHaveBeenCalledOnce();
+    renderFrame({ ...appearance.area, x: 0.3 });
+    expect(paint).toHaveBeenCalledOnce();
+    renderFrame(appearance.area, { ...frame, image: document.createElement('canvas') });
+    expect(paint).toHaveBeenCalledTimes(2);
+    renderFrame(appearance.area, frame, 2);
+    expect(paint).toHaveBeenCalledTimes(3);
+  }
+);
+
+it('paints identical border inputs once but repaints after geometry changes or remount', () => {
+  const frame = {
+    id: 'b',
+    path: 'M0 0H100V50Z',
+    perimeter: 300,
+    width: 2,
+    color: '#ffffff',
+    style: 'solid' as const,
+    start: 0,
+    end: 1,
+    opacity: 1,
+  };
+  vi.mocked(drawSceneBorders).mockClear();
+  const renderBorder = (frames: (typeof frame)[]) =>
+    act(() => root.render(<ReviewBorderOverlay output={{ ...output }} frames={frames} />));
+  renderBorder([frame]);
+  renderBorder([{ ...frame }]);
+  expect(drawSceneBorders).toHaveBeenCalledOnce();
+  renderBorder([{ ...frame, width: 3 }]);
+  expect(drawSceneBorders).toHaveBeenCalledTimes(2);
+  renderBorder([]);
+  renderBorder([{ ...frame, width: 3 }]);
+  expect(drawSceneBorders).toHaveBeenCalledTimes(3);
+});

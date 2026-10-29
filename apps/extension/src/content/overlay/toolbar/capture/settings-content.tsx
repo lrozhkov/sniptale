@@ -81,6 +81,7 @@ function renderDisplayModeItem(params: {
       label={params.label}
       hint={params.hint}
       selected={params.displayMode === params.nextDisplayMode}
+      checked={params.displayMode === params.nextDisplayMode}
       onSelect={(event) => {
         stopMenuEvent(event);
         params.onDisplayModeChange(params.nextDisplayMode);
@@ -143,7 +144,10 @@ type ToolbarSettingsUtilityItemsProps = {
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
   onDisableScreenshotMode: (activationEvent?: Event) => void;
-  onHide: (restoreFocus?: boolean) => void;
+  onHide: (
+    restoreFocus?: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
   onPinToTabChange: (
     value: boolean,
     contentIntentSource?: ContentPrivilegedActionIntentSource
@@ -191,6 +195,7 @@ function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsPro
         label={translate('content.toolbar.compactMenus')}
         hint={translate('content.toolbar.compactMenusHint')}
         selected={props.compactMenus}
+        checked={props.compactMenus}
         onSelect={(event) => {
           stopMenuEvent(event);
           props.onCompactMenusChange(!props.compactMenus);
@@ -205,7 +210,11 @@ function renderToolbarSettingsUtilityItems(props: ToolbarSettingsUtilityItemsPro
         : renderActionItem({
             icon: <PanelBottomClose className="sniptale-popover-icon" />,
             label: translate('content.toolbar.hideToolbar'),
-            onAction: (event) => props.onHide(event.detail === 0),
+            onAction: (event) =>
+              props.onHide(
+                event.detail === 0,
+                createTrustedContentActionIntentSource(event.nativeEvent) ?? undefined
+              ),
             onClose: props.onClose,
           })}
       {renderDisableScreenshotModeItem(props)}
@@ -246,6 +255,7 @@ function renderPinToTabItem(props: {
       }
       disabled={props.pinToTabLocked || !props.pinToTabAvailable}
       selected={props.pinToTab || props.pinToTabLocked}
+      checked={props.pinToTab || props.pinToTabLocked}
       onSelect={(event) => {
         stopMenuEvent(event);
         if (props.pinToTabLocked || !props.pinToTabAvailable) {

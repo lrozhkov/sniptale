@@ -165,6 +165,12 @@
       "mode": "test-e2e"
     },
     {
+      "outputPath": "tooling/test/harness/screenshot-encoding.html",
+      "sourcePath": "tooling/test/harness/screenshot-encoding.html",
+      "rollupName": "testHarnessScreenshotEncoding",
+      "mode": "test-e2e"
+    },
+    {
       "outputPath": "tooling/test/harness/full-page-capture.html",
       "sourcePath": "tooling/test/harness/full-page-capture.html",
       "rollupName": "testHarnessFullPageCapture",
@@ -187,6 +193,18 @@
       "sourcePath": "apps/extension/src/tour-preview-sandbox/index.html",
       "rollupName": null,
       "mode": "manifest"
+    },
+    {
+      "outputPath": "tooling/test/harness/sync-capture.html",
+      "sourcePath": "tooling/test/harness/sync-capture.html",
+      "rollupName": "testHarnessSyncCapture",
+      "mode": "test-e2e"
+    },
+    {
+      "outputPath": "tooling/test/harness/webdav-transfer.html",
+      "sourcePath": "tooling/test/harness/webdav-transfer.html",
+      "rollupName": "testHarnessWebdavTransfer",
+      "mode": "e2e"
     }
   ],
   "requiredReleaseArtifacts": [
@@ -235,23 +253,45 @@
     "@webav/mp4box.js",
     "@zip.js/zip.js",
     "@zumer/snapdom",
+    "color-name",
+    "color-name-list",
     "dompurify",
     "fabric",
     "idb",
     "jszip",
+    "lucide",
     "lucide-react",
     "mediabunny",
     "react",
     "react-dom",
     "roughjs",
+    "tsdav",
     "zod",
-    "zustand"
+    "zustand",
+    "@ai-sdk/alibaba",
+    "@ai-sdk/anthropic",
+    "@ai-sdk/cohere",
+    "@ai-sdk/deepgram",
+    "@ai-sdk/deepseek",
+    "@ai-sdk/elevenlabs",
+    "@ai-sdk/google",
+    "@ai-sdk/minimax",
+    "@ai-sdk/mistral",
+    "@ai-sdk/moonshotai",
+    "@ai-sdk/openai",
+    "@ai-sdk/openai-compatible",
+    "@ai-sdk/provider",
+    "@ai-sdk/xai",
+    "@ai-sdk/zai",
+    "@openrouter/ai-sdk-provider",
+    "ai",
+    "ollama-ai-provider-v2"
   ],
   "appWorkspaceDependencies": {
-    "@sniptale/foundation": "0.5.1",
-    "@sniptale/platform": "0.5.1",
-    "@sniptale/runtime-contracts": "0.5.1",
-    "@sniptale/ui": "0.5.1"
+    "@sniptale/foundation": "0.5.2",
+    "@sniptale/platform": "0.5.2",
+    "@sniptale/runtime-contracts": "0.5.2",
+    "@sniptale/ui": "0.5.2"
   },
   "appDevDependencies": [
     "@crxjs/vite-plugin",

@@ -1,9 +1,16 @@
-import { useRef } from 'react';
+import {
+  getAIProviderDefinition,
+  listAIProviderDefinitions,
+  type AIProviderType,
+  type AIModelManagement,
+} from '../../../../../contracts/settings/ai-provider';
+import { useRef, useState } from 'react';
+import { InspectorDisclosureView } from '../../../../../ui/compact-inspector-controls/disclosure';
 import { InspectorFieldClear } from '../../../../../ui/compact-inspector-controls/text-field';
 import type React from 'react';
 
 import { translate } from '../../../../../platform/i18n';
-import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
+import { ProductField, ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
 import { AiProvidersFormModalLayout } from './layout';
 import { AiProvidersFormModalBody } from './shared';
 
@@ -13,6 +20,8 @@ export type ProviderFormModalContentProps = {
   formData: {
     baseUrl: string;
     name: string;
+    connectionType: AIProviderType;
+    management?: AIModelManagement | undefined;
   };
   hasStoredApiKey: boolean;
   isEditing: boolean;
@@ -20,6 +29,8 @@ export type ProviderFormModalContentProps = {
   onApiKeyChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onBaseUrlChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onClose: () => void;
+  onConnectionTypeChange: (value: AIProviderType) => void;
+  onManagementChange: (value: AIModelManagement) => void;
   onNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (event: React.FormEvent) => void;
 };
@@ -42,8 +53,10 @@ function ProviderApiKeyField(props: ProviderFormModalContentProps) {
     >
       <ProductInput
         ref={props.apiKeyInputRef}
+        aria-label={translate('settings.aiProviders.providerApiKeyLabel')}
         type="password"
         defaultValue=""
+        disabled={props.isSaving}
         onChange={props.onApiKeyChange}
         placeholder={
           props.isEditing
@@ -68,7 +81,9 @@ function ProviderNameField(props: ProviderFormModalContentProps) {
       <div className="sniptale-text-value">
         <ProductInput
           ref={field}
+          aria-label={translate('settings.aiProviders.providerNameLabel')}
           type="text"
+          disabled={props.isSaving}
           value={props.formData.name}
           onChange={props.onNameChange}
           placeholder={translate('settings.aiProviders.providerNamePlaceholder')}
@@ -96,7 +111,9 @@ function ProviderApiUrlField(props: ProviderFormModalContentProps) {
       <div className="sniptale-text-value">
         <ProductInput
           ref={field}
+          aria-label={translate('settings.aiProviders.providerApiUrlLabel')}
           type="url"
+          disabled={props.isSaving}
           value={props.formData.baseUrl}
           onChange={props.onBaseUrlChange}
           placeholder={translate('settings.aiProviders.providerApiUrlPlaceholder')}
@@ -114,15 +131,72 @@ function ProviderApiUrlField(props: ProviderFormModalContentProps) {
   );
 }
 
+function ProviderApiUrlSettings(props: ProviderFormModalContentProps) {
+  const [open, setOpen] = useState(false);
+  const definition = getAIProviderDefinition(props.formData.connectionType);
+  const [customAddress] = useState(() => props.formData.baseUrl !== definition.baseUrl);
+  const required = definition.type === 'openai-compatible' || definition.credential === 'none';
+  if (required || customAddress) {
+    return <ProviderApiUrlField {...props} />;
+  }
+  return (
+    <InspectorDisclosureView
+      dataUi="settings.ai-provider.advanced"
+      variant="structural"
+      label={translate('settings.aiProviders.providerAdvancedSettings')}
+      open={open || Boolean(props.errors['baseUrl'])}
+      onOpenChange={setOpen}
+      bodyClassName="px-2 pt-2"
+    >
+      <ProviderApiUrlField {...props} />
+    </InspectorDisclosureView>
+  );
+}
+
 function ProviderFormModalBody(props: ProviderFormModalContentProps) {
   return (
     <AiProvidersFormModalBody
       onSubmit={props.onSubmit}
       {...(props.errors['submit'] === undefined ? {} : { submitError: props.errors['submit'] })}
     >
+      <ProductField
+        label={translate('settings.aiProviders.providerTypeLabel')}
+        error={props.errors['connectionType']}
+      >
+        <ProductSelect
+          aria-label={translate('settings.aiProviders.providerTypeLabel')}
+          value={props.formData.connectionType}
+          onChange={props.onConnectionTypeChange}
+          disabled={props.isSaving}
+          options={listAIProviderDefinitions()
+            .filter((definition) => definition.available && definition.type !== 'chrome-built-in')
+            .map((definition) => ({ value: definition.type, label: definition.label }))}
+        />
+      </ProductField>
       <ProviderNameField {...props} />
-      <ProviderApiUrlField {...props} />
-      <ProviderApiKeyField {...props} />
+      <ProviderApiUrlSettings key={props.formData.connectionType} {...props} />
+      {getAIProviderDefinition(props.formData.connectionType).credential !== 'none' && (
+        <ProviderApiKeyField {...props} />
+      )}
+      <ProductField
+        label={translate('settings.aiProviders.providerManagementLabel')}
+        hint={translate(
+          props.formData.management === 'manual'
+            ? 'settings.aiProviders.providerManualHint'
+            : 'settings.aiProviders.providerAutomaticHint'
+        )}
+      >
+        <ProductSelect
+          aria-label={translate('settings.aiProviders.providerManagementLabel')}
+          value={props.formData.management ?? 'automatic'}
+          onChange={props.onManagementChange}
+          disabled={props.isSaving}
+          options={[
+            { value: 'automatic', label: translate('settings.aiProviders.providerModeAutomatic') },
+            { value: 'manual', label: translate('settings.aiProviders.providerModeManual') },
+          ]}
+        />
+      </ProductField>
     </AiProvidersFormModalBody>
   );
 }

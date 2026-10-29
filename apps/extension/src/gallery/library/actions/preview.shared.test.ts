@@ -56,6 +56,11 @@ const {
   openVideoEditorPageMock: vi.fn(),
 }));
 
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: async (_roots: unknown, operation: () => Promise<unknown>) =>
+    operation(),
+}));
+
 vi.mock(
   '../../../composition/persistence/media-library/index.library.ts',
   async (importOriginal) => ({

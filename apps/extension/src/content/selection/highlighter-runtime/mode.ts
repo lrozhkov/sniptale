@@ -41,6 +41,7 @@ export function enableHighlighterRuntime(
     deactivateOtherContentModes('highlighter');
     state.isModeEnabled = true;
     state.isCreationEnabled = true;
+    delete state.standaloneCreation;
     setContentModeEnabled('highlighter', true);
     dispatchHighlighterModeChanged(true);
   });
@@ -77,6 +78,7 @@ export function disableHighlighterRuntime(
 
   state.isModeEnabled = false;
   state.isCreationEnabled = true;
+  delete state.standaloneCreation;
   state.isPaused = false;
   if (state.isFrameEditing) {
     state.isFrameEditing = false;

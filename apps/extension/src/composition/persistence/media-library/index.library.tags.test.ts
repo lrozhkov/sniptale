@@ -63,8 +63,8 @@ beforeEach(() => {
     put: dbMocks.putMock,
     transaction: () => ({
       done: Promise.resolve(),
-      objectStore: () => ({
-        get: dbMocks.getMock,
+      objectStore: (name: string) => ({
+        get: name === 'sync_capture' ? async () => undefined : dbMocks.getMock,
         put: (entry: unknown) => dbMocks.putMock('media_library', entry),
       }),
     }),

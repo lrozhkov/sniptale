@@ -1,5 +1,9 @@
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
-import type { CaptureActionType } from '../../../../contracts/settings';
+import type {
+  CaptureActionType,
+  ScreenshotCapturePreferences,
+  ScreenshotImagePreferences,
+} from '../../../../contracts/settings';
 import type { Selection } from '../types';
 
 export interface SelectionModeFinalElementsOptions {
@@ -10,6 +14,8 @@ export interface SelectionModeFinalElementsOptions {
   getMaxSelectionWidth: () => number;
   getMaxSelectionHeight: () => number;
   getCaptureAction: () => CaptureActionType;
+  getCapturePreferences: () => ScreenshotCapturePreferences & { compactMenus: boolean };
+  onImageFormatChange: (format: ScreenshotImagePreferences['imageFormat']) => void;
   getSelection: () => Selection;
   onConfirm: (event?: Event) => void;
   onCancel: () => void;

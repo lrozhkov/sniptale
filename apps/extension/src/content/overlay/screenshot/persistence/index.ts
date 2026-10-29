@@ -1,3 +1,4 @@
+import { pageCapturePreferences } from '../../../application/capture-preferences';
 import { createScreenshotFilename as generateFilename } from '../../../../workflows/file-naming/index';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type {
@@ -217,6 +218,7 @@ export async function persistSelectionCapture({
   setSaveDialogState,
 }: PersistSelectionCaptureParams): Promise<PersistenceResult> {
   const settings = await loadSettings();
+  await pageCapturePreferences.load();
   assertFresh(assertFreshness);
   let filename = await generateFilename(mode);
   const saveResponse = await sendRuntimeMessageWithFreshness({
@@ -225,6 +227,8 @@ export async function persistSelectionCapture({
     libraryDestinationRequested: actionType === 'save_to_library',
     message: {
       type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      actionType,
+      capturePreferences: pageCapturePreferences.read(mode),
       ...(quickActionTransactionId ? { quickActionTransactionId } : {}),
       dataUrl,
       filename,

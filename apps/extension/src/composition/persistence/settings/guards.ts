@@ -265,6 +265,24 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
   };
 }
 
+function parseOptionalFullPageImage(
+  value: unknown
+): ParsedFieldValue<NonNullable<Settings['fullPageImage']>> {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return INVALID_FIELD;
+  const format = value['imageFormat'];
+  const quality = value['imageQuality'];
+  if (
+    (format !== 'png' && format !== 'jpeg' && format !== 'webp') ||
+    typeof quality !== 'number' ||
+    !Number.isFinite(quality) ||
+    quality < 1 ||
+    quality > 100
+  )
+    return INVALID_FIELD;
+  return { imageFormat: format, imageQuality: quality };
+}
+
 function parseOptionalFullPageCapture(
   value: unknown
 ): ParsedFieldValue<FullPageCapturePreferences> {
@@ -448,6 +466,11 @@ function parseScalarSettingsFields(
     nextValue,
     'contentToolbar',
     parseOptionalContentToolbar(value['contentToolbar'])
+  );
+  invalidFieldCount += assignParsedSettingsField(
+    nextValue,
+    'fullPageImage',
+    parseOptionalFullPageImage(value['fullPageImage'])
   );
   invalidFieldCount += assignParsedSettingsField(
     nextValue,

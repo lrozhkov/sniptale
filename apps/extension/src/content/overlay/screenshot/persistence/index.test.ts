@@ -266,6 +266,7 @@ it.each(['copy', 'edit', 'download_default', 'ask_preset', 'save_to_library'] as
     });
     expect(sendRuntimeMessageMock.mock.calls[0]![0]).toMatchObject({
       type: MessageType.SAVE_SCREENSHOT_TO_GALLERY,
+      actionType,
       quickActionTransactionId: 'tx-1',
       dataUrl: 'raw',
     });

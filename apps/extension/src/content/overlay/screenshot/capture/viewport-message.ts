@@ -1,3 +1,4 @@
+import { pageCapturePreferences } from '../../../application/capture-preferences';
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { CaptureActionType } from '../../../../contracts/settings';
 import type { ScreenshotControllerRuntime } from '../types';
@@ -20,12 +21,14 @@ export function createViewportCaptureMessage(
     ? {
         type: CaptureMessageType.CAPTURE_FULL,
         actionType,
+        capturePreferences: pageCapturePreferences.read(type),
         ...transaction,
         ...(scenarioCapture == null ? {} : { scenarioCapture }),
       }
     : {
         type: CaptureMessageType.CAPTURE_VISIBLE,
         actionType,
+        capturePreferences: pageCapturePreferences.read(type),
         ...transaction,
         ...(scenarioCapture == null ? {} : { scenarioCapture }),
       };

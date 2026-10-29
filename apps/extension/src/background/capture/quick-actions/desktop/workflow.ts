@@ -1,3 +1,4 @@
+import { optimizeScreenshotDataUrl } from '../../../../platform/media-utils/screenshot-encoding';
 import { prepareDesktopAppearance } from '../appearance';
 import { getMediaAuthorityGeneration } from '../../../mutation-exclusion/media-activity';
 import { createScreenshotFilename as generateFilename } from '../../../../workflows/file-naming/index';
@@ -157,7 +158,10 @@ export async function selectAndCaptureDesktopQuickAction(args: {
     if (!pending) throw new Error('Desktop screenshot preparation is missing or expired');
     clearTimeout(pending.timeout);
     const response = await captureOffscreenFrame({
-      imageFormat: args.context.imageFormat,
+      imageFormat:
+        args.context.action.appearance || args.context.afterCapture === 'edit'
+          ? 'png'
+          : args.context.imageFormat,
       imageQuality: args.context.imageQuality,
       delaySeconds: args.context.delaySeconds,
       requestId: preparation.requestId,
@@ -258,7 +262,12 @@ export async function runDesktopQuickAction(args: {
     const createdJobId = await createRenderedCaptureJob(args.tabId);
     jobId = createdJobId;
     const appearanceGeneration = preparation.authorityGeneration;
-    const filename = await generateFilename('desktop', args.context.imageFormat);
+    const filename = await generateFilename(
+      'desktop',
+      args.context.afterCapture === 'edit' && !args.context.action.appearance
+        ? 'png'
+        : args.context.imageFormat
+    );
     const prepared = await prepareDesktopAppearance(
       {
         appearance: args.context.action.appearance,
@@ -267,6 +276,9 @@ export async function runDesktopQuickAction(args: {
       },
       appearanceGeneration
     )(selection.dataUrl, filename);
+    if (!args.context.action.appearance) {
+      prepared.dataUrl = await optimizeScreenshotDataUrl(prepared.dataUrl);
+    }
     const assetId = await saveScreenshotToMediaHubFromDataUrl(
       prepared.dataUrl,
       prepared.filename,

@@ -1,4 +1,6 @@
 import type React from 'react';
+import { isTrustedDomEvent } from '../../../../platform/trusted-events';
+import { isBridgedMouseEvent } from '../../../../platform/trusted-events/synthetic-mouse';
 
 import type { AIModalProps } from './types';
 import { canSubmitAiPickPrompt } from '../../pick/controller/submit/preconditions';
@@ -32,6 +34,7 @@ export function createAIModalKeyDownHandler(props: {
 }) {
   return (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      if (!isTrustedDomEvent(event.nativeEvent)) return;
       event.preventDefault();
       if (props.canSubmit) {
         props.handleSubmit();
@@ -49,7 +52,7 @@ export function getAIModalFooterProps(
   const submitGuardArgs = {
     prompt: state.prompt,
     selectedModelId: state.selectedModelId,
-    ...(isLoading === undefined ? {} : { isLoading }),
+    isLoading: Boolean(isLoading) || state.modelSelection.selectionPending,
   };
 
   return {
@@ -63,5 +66,14 @@ export function getAIModalFooterProps(
     selectedData: state.selectedData,
     selectedModelId: state.selectedModelId,
     totalTokens: state.totalTokens,
+    modelSelection: state.modelSelection,
   };
+}
+
+/** Admits native input and the existing synchronous private mouse bridge. */
+export function requireTrustedAIModalInteraction(event: React.SyntheticEvent): boolean {
+  if (isTrustedDomEvent(event.nativeEvent) || isBridgedMouseEvent(event.nativeEvent)) return true;
+  event.preventDefault();
+  event.stopPropagation();
+  return false;
 }

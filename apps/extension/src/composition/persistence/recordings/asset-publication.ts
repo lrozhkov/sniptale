@@ -1,3 +1,12 @@
+import { captureMediaInTransaction } from '../sync-capture/capture';
+import {
+  SYNC_CAPTURE_STORE,
+  RECORDING_TELEMETRY_STORE,
+  IMAGE_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+  THUMBNAILS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import { createStrictRecordingTransaction } from './recovery/transaction';
 import {
   markRecordingRecoveryPublished,
@@ -139,6 +148,12 @@ export async function publishRecordingAssetJournal(
     const storeNames = payload.completion
       ? ([
           STORE_NAME,
+          SYNC_CAPTURE_STORE,
+          RECORDING_TELEMETRY_STORE,
+          IMAGE_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+          THUMBNAILS_STORE,
+          AGGREGATE_PRESENTATIONS_STORE,
           MEDIA_LIBRARY_STORE,
           STATE_MANAGER_STORE,
           ASSET_REFS_STORE,
@@ -152,6 +167,12 @@ export async function publishRecordingAssetJournal(
         ] as const)
       : ([
           STORE_NAME,
+          SYNC_CAPTURE_STORE,
+          RECORDING_TELEMETRY_STORE,
+          IMAGE_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+          THUMBNAILS_STORE,
+          AGGREGATE_PRESENTATIONS_STORE,
           MEDIA_LIBRARY_STORE,
           ASSET_REFS_STORE,
           ASSET_OWNERS_STORE,
@@ -209,6 +230,7 @@ export async function publishRecordingAssetJournal(
           ...media,
           ...(currentMedia?.lifecycle ? { lifecycle: currentMedia.lifecycle } : {}),
         });
+        await captureMediaInTransaction(tx, media.id, { publicationId: journal.journalId });
       }
       if (payload.completion && !replayOnly) {
         const outboxStore = tx.objectStore(STATE_MANAGER_STORE);

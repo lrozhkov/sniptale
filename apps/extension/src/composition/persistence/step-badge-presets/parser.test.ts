@@ -1,3 +1,4 @@
+import { resolveStoredStepBadgePresetCatalog } from './migration';
 import { expect, it } from 'vitest';
 import { createSystemStepBadgePresetCatalog } from '../../../features/highlighter/step-badge-presets/catalog';
 import { parseStepBadgeTemplateSettings, parseStoredStepBadgePresetCatalog } from './parser';
@@ -136,4 +137,38 @@ it('rejects negative and fractional revision and ordering fields', () => {
   ]) {
     expect(parseStoredStepBadgePresetCatalog(value).invalidFieldCount).toBe(1);
   }
+});
+
+it('accepts old fractional diameters as whole pixels without mutating the input', () => {
+  const settings = createSystemStepBadgePresetCatalog()[0]!.settings;
+  settings.style.diameter = 29.16;
+  expect(parseStepBadgeTemplateSettings(settings)?.style.diameter).toBe(29);
+  expect(settings.style.diameter).toBe(29.16);
+});
+
+it('refreshes system templates and preserves customized metadata when reading old diameters', () => {
+  const settings = createSystemStepBadgePresetCatalog()[0]!.settings;
+  const parsed = parseStoredStepBadgePresetCatalog({
+    systemCatalogRevision: 6,
+    defaultPresetId: 'system-outline',
+    systemOverrides: [
+      {
+        systemPresetKey: 'system-outline',
+        name: 'My outline',
+        customized: true,
+        basedOnRevision: 6,
+        settings: { ...settings, style: { ...settings.style, diameter: 48.6 } },
+      },
+    ],
+  });
+  const catalog = resolveStoredStepBadgePresetCatalog(parsed.value);
+  expect(catalog.systemCatalogRevision).toBe(7);
+  expect(catalog.defaultPresetId).toBe('system-outline');
+  expect(catalog.presets[0]?.settings.style.diameter).toBe(29);
+  expect(catalog.presets.find((preset) => preset.id === 'system-outline')).toMatchObject({
+    name: 'My outline',
+    customized: true,
+    basedOnRevision: 6,
+    settings: { style: { diameter: 49 } },
+  });
 });

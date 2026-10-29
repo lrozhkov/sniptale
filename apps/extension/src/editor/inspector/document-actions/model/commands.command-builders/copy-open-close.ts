@@ -1,4 +1,4 @@
-import { ClipboardCopy, FilePlus2, X } from 'lucide-react';
+import { Copy, FilePlus2, X } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import type { BuildEditorDocumentActionGroupsParams } from '../types';
@@ -11,7 +11,7 @@ function createCopyPngCommand(
     id: 'copy-png',
     kind: 'command',
     label: translate('editor.documentActions.copyPng'),
-    icon: ClipboardCopy,
+    icon: Copy,
     emphasis: 'secondary',
     disabled: Boolean(params.copyRenderedImageDisabledReason),
     onClick: params.onCopyRenderedImage,

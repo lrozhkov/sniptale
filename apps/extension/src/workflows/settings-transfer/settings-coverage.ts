@@ -117,7 +117,11 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     ['clearAIProviderSecret'],
     'secret'
   ),
-  transferable('ai/connections/controller/save.ts', ['saveDefaultModelId'], ['ai.models']),
+  transferable(
+    'ai/connections/controller/provider-card-actions.ts',
+    ['setAIProviderEnabled'],
+    ['ai.providers']
+  ),
   excluded(
     'ai/connections/controller/section/secret-protection.ts',
     [

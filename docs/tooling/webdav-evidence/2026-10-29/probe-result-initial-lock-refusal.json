@@ -1,0 +1,55 @@
+{
+  "version": "34.0.5",
+  "results": [
+    {
+      "check": "MKCOL isolated namespace",
+      "passed": true
+    },
+    {
+      "check": "PUT create",
+      "passed": true
+    },
+    {
+      "check": "GET exact bytes and SHA-256",
+      "passed": true
+    },
+    {
+      "check": "PROPFIND depth=1",
+      "passed": true
+    },
+    {
+      "check": "If-None-Match refuses overwrite",
+      "passed": true
+    },
+    {
+      "check": "HEAD object create",
+      "passed": true
+    },
+    {
+      "check": "Strong ETag present",
+      "passed": true
+    },
+    {
+      "check": "Conditional PUT accepted",
+      "passed": true
+    },
+    {
+      "check": "Stale If-Match rejected",
+      "passed": true
+    },
+    {
+      "check": "20 concurrent CAS rounds: exactly one winner, no lost update",
+      "passed": false
+    }
+  ],
+  "races": [
+    {
+      "round": 0,
+      "statuses": [423, 423],
+      "passed": false
+    }
+  ],
+  "cleanupExactFiles": [true, true],
+  "namespace": "sniptale-probe-1a463a0f734a4da48631b5f8889443b2",
+  "note": "HTTP loopback smoke only; not full TLS, MV3 or server qualification."
+}

@@ -1,6 +1,234 @@
 {
   "entries": [
     {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__alibaba-2.0.69.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/alibaba/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/alibaba",
+      "packagePath": "node_modules/@ai-sdk/alibaba",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "2.0.69"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__anthropic-4.0.82.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/anthropic/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/anthropic",
+      "packagePath": "node_modules/@ai-sdk/anthropic",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "4.0.82"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__cohere-4.0.63.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/cohere/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/cohere",
+      "packagePath": "node_modules/@ai-sdk/cohere",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "4.0.63"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__deepgram-3.1.33.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/deepgram/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/deepgram",
+      "packagePath": "node_modules/@ai-sdk/deepgram",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "3.1.33"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__deepseek-3.0.67.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/deepseek/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/deepseek",
+      "packagePath": "node_modules/@ai-sdk/deepseek",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "3.0.67"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__elevenlabs-3.0.63.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/elevenlabs/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/elevenlabs",
+      "packagePath": "node_modules/@ai-sdk/elevenlabs",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "3.0.63"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__gateway-4.0.116.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/gateway/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/gateway",
+      "packagePath": "node_modules/@ai-sdk/gateway",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "4.0.116"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__google-4.0.99.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/google/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/google",
+      "packagePath": "node_modules/@ai-sdk/google",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "4.0.99"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__minimax-3.0.59.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/minimax/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/minimax",
+      "packagePath": "node_modules/@ai-sdk/minimax",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "3.0.59"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__mistral-4.0.66.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/mistral/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/mistral",
+      "packagePath": "node_modules/@ai-sdk/mistral",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "4.0.66"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__moonshotai-3.0.71.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/moonshotai/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/moonshotai",
+      "packagePath": "node_modules/@ai-sdk/moonshotai",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "3.0.71"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__openai-4.0.96.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/openai/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/openai",
+      "packagePath": "node_modules/@ai-sdk/openai",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "4.0.96"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__openai-compatible-3.0.71.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/openai-compatible/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/openai-compatible",
+      "packagePath": "node_modules/@ai-sdk/openai-compatible",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "3.0.71"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__provider-4.0.29.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/provider/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/provider",
+      "packagePath": "node_modules/@ai-sdk/provider",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "4.0.29"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__provider-utils-5.0.62.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseProvenance": {
+        "kind": "pinned-upstream",
+        "originUrl": "https://raw.githubusercontent.com/vercel/ai/%40ai-sdk%2Fprovider-utils%405.0.62/LICENSE",
+        "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+        "sourcePath": "tooling/release/dependency-legal/sources/ai-provider-utils-5.0.62.LICENSE",
+        "upstreamVersion": "@ai-sdk/provider-utils@5.0.62"
+      },
+      "licenseSource": "tooling/release/dependency-legal/sources/ai-provider-utils-5.0.62.LICENSE",
+      "licenseSourceKind": "pinned-upstream",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/provider-utils",
+      "packagePath": "node_modules/@ai-sdk/provider-utils",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "5.0.62"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__xai-5.0.24.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/xai/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/xai",
+      "packagePath": "node_modules/@ai-sdk/xai",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "5.0.24"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__zai-3.0.33.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@ai-sdk/zai/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@ai-sdk/zai",
+      "packagePath": "node_modules/@ai-sdk/zai",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "3.0.33"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt",
       "licenseExpression": "OFL-1.1",
       "licenseSource": "node_modules/@fontsource/marck-script/LICENSE",
@@ -73,6 +301,45 @@
       "version": "2.4.0"
     },
     {
+      "archivePath": "LICENSES/dependencies/@openrouter__ai-sdk-provider-3.1.0.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@openrouter/ai-sdk-provider/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@openrouter/ai-sdk-provider",
+      "packagePath": "node_modules/@openrouter/ai-sdk-provider",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "dc5d6874c25b4d5af22aa7bb9a18422bc86c7516c80056c1788fc120c4121f72",
+      "sourceUrl": "https://github.com/OpenRouterTeam/ai-sdk-provider.git",
+      "version": "3.1.0"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@standard-schema__spec-1.1.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/@standard-schema/spec/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@standard-schema/spec",
+      "packagePath": "node_modules/@standard-schema/spec",
+      "selectedLicense": "MIT",
+      "sha256": "653b779005a3a4d64a7288c940f7b9a0e8f0b1e0375f6aa6af9473caf131e564",
+      "sourceUrl": "https://github.com/standard-schema/standard-schema",
+      "version": "1.1.0"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@vercel__oidc-3.2.0.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@vercel/oidc/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@vercel/oidc",
+      "packagePath": "node_modules/@vercel/oidc",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b070d77bfb2c52a1dd6996de0ce5f64c49a0ca55c889b163a963ddf5cb001ee2",
+      "sourceUrl": "https://github.com/vercel/vercel.git",
+      "version": "3.2.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt",
       "licenseExpression": "BSD-3-Clause",
       "licenseSource": "node_modules/@webav/mp4box.js/LICENSE",
@@ -84,6 +351,19 @@
       "sha256": "ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047",
       "sourceUrl": "https://github.com/gpac/mp4box.js.git",
       "version": "0.5.7"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@workflow__serde-4.1.0.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/@workflow/serde/LICENSE.md",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@workflow/serde",
+      "packagePath": "node_modules/@workflow/serde",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "39248a57eaac37e120c65bae851c6382bf722fc87c3452bf6a245caef96db739",
+      "sourceUrl": "https://github.com/vercel/workflow.git",
+      "version": "4.1.0"
     },
     {
       "archivePath": "LICENSES/dependencies/@zip.js__zip.js-2.24.0.txt",
@@ -112,6 +392,45 @@
       "version": "3.3.5"
     },
     {
+      "archivePath": "LICENSES/dependencies/ai-7.0.143.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/ai/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "ai",
+      "packagePath": "node_modules/ai",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "sourceUrl": "https://github.com/vercel/ai",
+      "version": "7.0.143"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/color-name-1.1.4.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/color-name/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "color-name",
+      "packagePath": "node_modules/color-name",
+      "selectedLicense": "MIT",
+      "sha256": "c064f7a3e353bc1bc977f3c897941c75ef763f44f41677e0a15370ca0853d6e2",
+      "sourceUrl": "git@github.com:colorjs/color-name.git",
+      "version": "1.1.4"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/color-name-list-14.72.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/color-name-list/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "color-name-list",
+      "packagePath": "node_modules/color-name-list",
+      "selectedLicense": "MIT",
+      "sha256": "c5bc9b96e07b83b190604b21d0e03f2f95c551986ffd05ab3c613a23d5b0c5a5",
+      "sourceUrl": "https://github.com/meodai/color-names.git",
+      "version": "14.72.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/core-util-is/LICENSE",
@@ -125,6 +444,19 @@
       "version": "1.0.3"
     },
     {
+      "archivePath": "LICENSES/dependencies/debug-4.4.3.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/debug/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "debug",
+      "packagePath": "node_modules/debug",
+      "selectedLicense": "MIT",
+      "sha256": "3a61c6c96caf5c1d9b623fb9b04c822b783dfcb78aa7e49c76a3f643e6ed7f95",
+      "sourceUrl": "https://github.com/debug-js/debug.git",
+      "version": "4.4.3"
+    },
+    {
       "archivePath": "LICENSES/dependencies/dompurify-3.4.17.txt",
       "licenseExpression": "(MPL-2.0 OR Apache-2.0)",
       "licenseSource": "node_modules/dompurify/LICENSE",
@@ -136,6 +468,19 @@
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "sourceUrl": "https://github.com/cure53/DOMPurify.git",
       "version": "3.4.17"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/eventsource-parser-3.1.1.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/eventsource-parser/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "eventsource-parser",
+      "packagePath": "node_modules/eventsource-parser",
+      "selectedLicense": "MIT",
+      "sha256": "835eb611a23301b27115ca1be9f754c876e643ceb7fe63049c6b50609a1cafeb",
+      "sourceUrl": "https://github.com/rexxars/eventsource-parser.git",
+      "version": "3.1.1"
     },
     {
       "archivePath": "LICENSES/dependencies/fabric-7.4.0.txt",
@@ -216,6 +561,19 @@
       "version": "1.0.0"
     },
     {
+      "archivePath": "LICENSES/dependencies/json-schema-0.4.0.txt",
+      "licenseExpression": "(AFL-2.1 OR BSD-3-Clause)",
+      "licenseSource": "node_modules/json-schema/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "json-schema",
+      "packagePath": "node_modules/json-schema",
+      "selectedLicense": "BSD-3-Clause",
+      "sha256": "4e053c510d6f3e4724213a292c65142df68d069c40f558582bc4270914e16f77",
+      "sourceUrl": "http://github.com/kriszyp/json-schema",
+      "version": "0.4.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/jszip-3.10.2.txt",
       "licenseExpression": "(MIT OR GPL-3.0-or-later)",
       "licenseSource": "node_modules/jszip/LICENSE.markdown",
@@ -242,6 +600,19 @@
       "version": "3.3.0"
     },
     {
+      "archivePath": "LICENSES/dependencies/lucide-1.59.0.txt",
+      "licenseExpression": "ISC",
+      "licenseSource": "node_modules/lucide/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "lucide",
+      "packagePath": "node_modules/lucide",
+      "selectedLicense": "ISC",
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "sourceUrl": "https://github.com/lucide-icons/lucide.git",
+      "version": "1.59.0"
+    },
+    {
       "archivePath": "LICENSES/dependencies/lucide-react-1.59.0.txt",
       "licenseExpression": "ISC",
       "licenseSource": "node_modules/lucide-react/LICENSE",
@@ -259,8 +630,8 @@
       "correspondingSourceUrl": "https://registry.npmjs.org/mediabunny/-/mediabunny-1.61.6.tgz",
       "modifiedSource": {
         "archive": {
-          "file": "sniptale-dependency-source-0.5.1.zip",
-          "url": "https://github.com/lrozhkov/sniptale/releases/download/v0.5.1/sniptale-dependency-source-0.5.1.zip"
+          "file": "sniptale-dependency-source-0.5.2.zip",
+          "url": "https://github.com/lrozhkov/sniptale/releases/download/v0.5.2/sniptale-dependency-source-0.5.2.zip"
         },
         "upstreamIntegrity": "sha512-VHEZ53/7jGl4dQ+uOdndsZufFYwEUFWv9UXgvrGun3OapyzoqI9iaPOD7z3xxY/nAttLZBNwswgJzMtGJAquOQ==",
         "files": [
@@ -282,7 +653,7 @@
           },
           {
             "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/README.md",
-            "sha256": "35e090bb0019effc70359e2021ebde90705a7db44b615effbeacfbbd90007ded"
+            "sha256": "5905b057e08cc26b073407918e587bcc5f0c0dd91b086912cf768503dedf4af2"
           }
         ]
       },
@@ -296,6 +667,32 @@
       "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
       "sourceUrl": "https://github.com/Vanilagy/mediabunny.git",
       "version": "1.61.6"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/ms-2.1.3.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/ms/license.md",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "ms",
+      "packagePath": "node_modules/ms",
+      "selectedLicense": "MIT",
+      "sha256": "1662fae9b5314d11cf51284e2dcd1f006a354f7343f08712a730fcff9a359801",
+      "sourceUrl": "vercel/ms",
+      "version": "2.1.3"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt",
+      "licenseExpression": "Apache-2.0",
+      "licenseSource": "node_modules/ollama-ai-provider-v2/LICENSE.md",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "ollama-ai-provider-v2",
+      "packagePath": "node_modules/ollama-ai-provider-v2",
+      "selectedLicense": "Apache-2.0",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "sourceUrl": "https://github.com/nordwestt/ollama-ai-provider-v2.git",
+      "version": "4.0.1"
     },
     {
       "archivePath": "LICENSES/dependencies/pako-1.0.11.txt",
@@ -428,6 +825,19 @@
       "version": "5.1.2"
     },
     {
+      "archivePath": "LICENSES/dependencies/sax-1.6.1.txt",
+      "licenseExpression": "BlueOak-1.0.0",
+      "licenseSource": "node_modules/sax/LICENSE.md",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "sax",
+      "packagePath": "node_modules/sax",
+      "selectedLicense": "BlueOak-1.0.0",
+      "sha256": "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004",
+      "sourceUrl": "https://github.com/isaacs/sax-js.git",
+      "version": "1.6.1"
+    },
+    {
       "archivePath": "LICENSES/dependencies/scheduler-0.28.0.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/scheduler/LICENSE",
@@ -467,6 +877,32 @@
       "version": "1.1.1"
     },
     {
+      "archivePath": "LICENSES/dependencies/tsdav-2.5.0.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/tsdav/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "tsdav",
+      "packagePath": "node_modules/tsdav",
+      "selectedLicense": "MIT",
+      "sha256": "2595fc934bdb521ec42681a25f9c75977da1640cebbbf8e69b3a046c431874c0",
+      "sourceUrl": "https://github.com/natelindev/tsdav",
+      "version": "2.5.0"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/undici-7.30.1.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/undici/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "undici",
+      "packagePath": "node_modules/undici",
+      "selectedLicense": "MIT",
+      "sha256": "a6db8096b2707bc0102d256917d4d33f298ba36d8c3f25de067a2b5bb379db27",
+      "sourceUrl": "https://github.com/nodejs/undici.git",
+      "version": "7.30.1"
+    },
+    {
       "archivePath": "LICENSES/dependencies/util-deprecate-1.0.2.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/util-deprecate/LICENSE",
@@ -478,6 +914,19 @@
       "sha256": "0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7",
       "sourceUrl": "https://github.com/TooTallNate/util-deprecate.git",
       "version": "1.0.2"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/xml-js-1.6.11.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/xml-js/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "xml-js",
+      "packagePath": "node_modules/xml-js",
+      "selectedLicense": "MIT",
+      "sha256": "8ada61091ef0ef154a69321483e5ffadf5c50693ca945047ffb90a6b4b12b088",
+      "sourceUrl": "https://github.com/nashwaan/xml-js.git",
+      "version": "1.6.11"
     },
     {
       "archivePath": "LICENSES/dependencies/zod-4.6.7.txt",

@@ -26,6 +26,7 @@ export function ModeSelectorButton(props: {
         event.stopPropagation();
         props.onToggle();
       }}
+      aria-label={props.label}
       aria-haspopup="menu"
       aria-expanded={props.open}
     >

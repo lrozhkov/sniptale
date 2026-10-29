@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator, type TestInfo } from '@playwright/test';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { startHostServer } from '../support/host-server';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
@@ -124,20 +124,38 @@ async function mode(page: Page, name: string) {
   await expect(ui(page, `mode-option.${name}`)).toHaveCount(0);
 }
 async function expectSeparators(page: Page) {
-  const adjacent = await ui(page, 'root').evaluate((root) => {
-    const visible = [...root.children]
-      .sort((a, b) => Number(getComputedStyle(a).order) - Number(getComputedStyle(b).order))
-      .filter(
-        (child) =>
-          child.getBoundingClientRect().width > 0 && child.getBoundingClientRect().height > 0
-      );
-    return visible.some(
-      (child, index) =>
-        child.classList.contains('sniptale-divider') &&
-        visible[index + 1]?.classList.contains('sniptale-divider')
+  const dividers = ui(page, 'root').locator('.sniptale-divider');
+  for (const divider of await dividers.all()) {
+    const adjacent = await divider.evaluate((element) =>
+      element.previousElementSibling?.classList.contains('sniptale-divider')
     );
+    if (adjacent) await expect(divider).toBeHidden();
+    else await expect(divider).toBeVisible();
+  }
+}
+
+async function enableOptionalToolbarControls(popup: Page) {
+  await popup.evaluate(async () => {
+    const stored = await chrome.storage.sync.get('sniptale_settings');
+    const settings = stored.sniptale_settings ?? {};
+    await chrome.storage.sync.set({
+      sniptale_settings: {
+        ...settings,
+        contentToolbar: {
+          ...settings.contentToolbar,
+          pageControls: {
+            ...settings.contentToolbar?.pageControls,
+            'after-capture': true,
+            'capture-delay': true,
+            'capture-size': true,
+            'quick-actions': true,
+            'scenario-panel': true,
+            'auto-blur': true,
+          },
+        },
+      },
+    });
   });
-  expect(adjacent).toBe(false);
 }
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
@@ -150,6 +168,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       const hostOrigin = host.origin;
       try {
         const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+        await enableOptionalToolbarControls(popup);
         await popup.evaluate(
           async (theme) =>
             chrome.storage.local.set({
@@ -158,6 +177,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             }),
           size.width === 1920 ? 'dark' : 'light'
         );
+        await reopenToolbarAfterReload(page, popup, hostOrigin);
         await page.bringToFront();
         if (orientation === 'vertical') {
           await ui(page, 'settings-button').click();
@@ -430,6 +450,162 @@ async function verifyNativePageLayoutFocus(page: Page) {
   expect(actual).toEqual(expected);
 }
 
+async function savedDrawingOrder(popup: Page): Promise<string[]> {
+  return popup.evaluate(async () => {
+    const value: unknown = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
+      ?.contentToolbar?.pageLayouts?.drawing;
+    if (!Array.isArray(value)) throw new Error('Saved drawing layout missing');
+    return value.map((item: unknown) => {
+      if (typeof item !== 'string') throw new Error('Invalid saved layout identity');
+      return item;
+    });
+  });
+}
+async function startDividerPointer(page: Page, source: Locator) {
+  await source.scrollIntoViewIfNeeded();
+  const rect = (await source.boundingBox())!;
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await page.mouse.down();
+  await expect(ui(page, 'root')).toHaveAttribute('data-page-reordering', 'true');
+}
+async function pointDividerAt(page: Page, target: Locator, before: boolean) {
+  const toolbar = ui(page, 'root');
+  const vertical = (await toolbar.getAttribute('data-display-mode')) === 'vertical';
+  await toolbar.evaluate(async (node) => {
+    await Promise.allSettled(
+      node.getAnimations({ subtree: true }).map((animation) => animation.finished)
+    );
+  });
+  const revealTarget = async () => {
+    if (vertical) {
+      const root = (await toolbar.boundingBox())!;
+      const rect = (await target.boundingBox())!;
+      const delta =
+        rect.y < root.y
+          ? rect.y - root.y - 8
+          : rect.y + rect.height > root.y + root.height
+            ? rect.y + rect.height - root.y - root.height + 8
+            : 0;
+      if (delta) {
+        await page.mouse.move(root.x + root.width / 2, root.y + root.height / 2);
+        await toolbar.evaluate(async (node) => {
+          await Promise.allSettled(
+            node.getAnimations({ subtree: true }).map((animation) => animation.finished)
+          );
+        });
+        const current = (await target.boundingBox())!;
+        const scrollDelta =
+          current.y < root.y
+            ? current.y - root.y - 8
+            : current.y + current.height > root.y + root.height
+              ? current.y + current.height - root.y - root.height + 8
+              : 0;
+        await page.mouse.wheel(0, scrollDelta);
+        await expect
+          .poll(async () => {
+            const box = (await target.boundingBox())!;
+            return box.y >= root.y && box.y + box.height <= root.y + root.height;
+          })
+          .toBe(true);
+      }
+    }
+  };
+  await revealTarget();
+  const rect = (await target.boundingBox())!;
+  await page.mouse.move(
+    rect.x + rect.width * (vertical ? 0.5 : before ? 0.25 : 0.75),
+    rect.y + rect.height * (vertical ? (before ? 0.25 : 0.75) : 0.5),
+    { steps: 8 }
+  );
+  await toolbar.evaluate(async (node) => {
+    await Promise.allSettled(
+      node.getAnimations({ subtree: true }).map((animation) => animation.finished)
+    );
+  });
+  await revealTarget();
+  const settled = (await target.boundingBox())!;
+  await page.mouse.move(
+    settled.x + settled.width * (vertical ? 0.5 : before ? 0.25 : 0.75),
+    settled.y + settled.height * (vertical ? (before ? 0.25 : 0.75) : 0.5),
+    { steps: 1 }
+  );
+}
+async function verifyDividerDragEditing(page: Page, popup: Page, info: TestInfo) {
+  const toolbar = ui(page, 'root');
+  const source = ui(page, 'customize-add-divider');
+  const dividerIds = () =>
+    toolbar
+      .locator('[data-page-toolbar-divider]')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-page-toolbar-item')));
+  const item = (id: string) => toolbar.locator(`[data-page-toolbar-item="${id}"] > button`);
+  await expect(source).not.toHaveAttribute('aria-disabled', 'true');
+  const original = await dividerIds();
+  await source.click();
+  await expect(toolbar.locator('[data-page-toolbar-divider]')).toHaveCount(original.length);
+  const copies: string[] = [];
+  for (const target of ['drawing-marker', 'drawing-arrow']) {
+    const before = await dividerIds();
+    const saved = await savedDrawingOrder(popup);
+    await startDividerPointer(page, source);
+    await pointDividerAt(page, ui(page, `visibility.${target}`), false);
+    await expect(toolbar.locator('[data-page-toolbar-divider]')).toHaveCount(before.length + 1);
+    expect(await savedDrawingOrder(popup)).toEqual(saved);
+    const id = (await dividerIds()).find((id) => id && !before.includes(id));
+    if (!id) throw new Error('Provisional divider missing');
+    copies.push(id);
+    await expect(toolbar).toHaveAttribute('data-page-drop-invalid', 'false');
+    await page.screenshot({ path: info.outputPath(`divider-copy-${target}.png`), fullPage: false });
+    await page.mouse.up();
+    await expect.poll(() => savedDrawingOrder(popup)).toContain(id);
+    await expect(source).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(toolbar.locator('[data-page-toolbar-divider]')).toHaveCount(before.length + 1);
+  }
+  const first = copies[0]!;
+  const second = copies[1]!;
+  const accepted = await savedDrawingOrder(popup);
+  await startDividerPointer(page, item(first));
+  await pointDividerAt(page, item(second), false);
+  const invalid = toolbar.locator('[data-page-toolbar-invalid="true"]');
+  await expect(invalid).toHaveCount(1);
+  await expect(invalid).toHaveCSS('outline-style', 'dashed');
+  await expect(item(first)).toHaveCSS('cursor', 'not-allowed');
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: /Cannot place this divider|Здесь нельзя разместить разделитель/u })
+  ).toHaveCount(1);
+  expect(await savedDrawingOrder(popup)).toEqual(accepted);
+  await page.screenshot({ path: info.outputPath('divider-invalid-position.png'), fullPage: false });
+  await page.mouse.up();
+  await expect(invalid).toHaveCount(0);
+  expect(await savedDrawingOrder(popup)).toEqual(accepted);
+  await expect(item(first)).toHaveCount(1);
+  await startDividerPointer(page, item(first));
+  await pointDividerAt(page, item(second), false);
+  await expect(invalid).toHaveCount(1);
+  await pointDividerAt(page, ui(page, 'visibility.capture-selection'), true);
+  await expect(invalid).toHaveCount(0);
+  await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const order = await savedDrawingOrder(popup);
+      return (
+        order.indexOf(first) > order.indexOf(second) &&
+        order.indexOf(first) + 1 === order.indexOf('capture-selection')
+      );
+    })
+    .toBe(true);
+  await expect(source).not.toHaveAttribute('aria-disabled', 'true');
+  const restored = await savedDrawingOrder(popup);
+  await startDividerPointer(page, source);
+  await pointDividerAt(page, item('drawing-pencil'), false);
+  await expect(toolbar.locator('[data-page-toolbar-divider]')).toHaveCount(original.length + 3);
+  await page.mouse.move(1, page.viewportSize()!.height - 1);
+  await page.mouse.up();
+  await expect(toolbar.locator('[data-page-toolbar-divider]')).toHaveCount(original.length + 2);
+  expect(await savedDrawingOrder(popup)).toEqual(restored);
+}
+
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   for (const orientation of ['horizontal', 'vertical'] as const) {
     test(`page toolbar order dividers and unified reset ${name} ${orientation}`, async ({}, info) => {
@@ -444,6 +620,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           size
         );
         page.setDefaultTimeout(10000);
+        await enableOptionalToolbarControls(popup);
         await popup.evaluate(
           async (dark) =>
             chrome.storage.local.set({
@@ -527,10 +704,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         );
         await ui(page, 'visibility.capture-full').click();
         await expect(ui(page, 'visibility.capture-full')).toHaveAttribute('aria-pressed', 'false');
+        await verifyDividerDragEditing(page, popup, info);
         const before = await root
           .locator('[data-page-toolbar-divider]')
           .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-page-toolbar-item')));
-        await ui(page, 'customize-add-divider').click();
+        await ui(page, 'customize-add-divider').focus();
+        await page.keyboard.press('Enter');
         await expect(root.locator('[data-page-toolbar-divider]')).toHaveCount(before.length + 1);
         const ids = await root
           .locator('[data-page-toolbar-divider]')
@@ -577,11 +756,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect(root).not.toHaveAttribute('data-page-layout', 'true');
         await page.keyboard.press('Escape');
         await expect(ui(page, 'capture-full-button')).toBeVisible();
-        await expect(ui(page, 'timer-button')).toBeVisible();
+        await expect(ui(page, 'timer-button')).toHaveCount(0);
         await expect(root.locator('[data-page-toolbar-item]')).toHaveCount(0);
         await expect(ui(page, 'capture-leading-divider')).toBeVisible();
         await mode(page, 'cursor');
-        await expect(ui(page, 'timer-button')).toBeVisible();
+        await expect(ui(page, 'timer-button')).toHaveCount(0);
         await page.setViewportSize({ width: 1000, height: size.height });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true
@@ -593,4 +772,89 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       }
     });
   }
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`page toolbar optional defaults reset and recording transition ${name}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size });
+    try {
+      const { page, popup } = await openDesignReview(
+        launched.context,
+        launched.extensionId,
+        host.origin,
+        size
+      );
+      const errors: string[] = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      await mode(page, 'cursor');
+      const optional = {
+        'after-capture': '[data-ui="content.toolbar.capture-action-button"]',
+        'capture-delay': '[data-ui="content.toolbar.timer-button"]',
+        'capture-size': '[data-ui="content.toolbar.viewport-button"]',
+        'quick-actions': '[data-ui="content.quick-actions.trigger"]',
+        'scenario-panel': '[data-ui="content.toolbar.scenario-panel-button"]',
+        'auto-blur': '[data-ui="content.toolbar.auto-blur-button"]',
+      };
+      for (const selector of Object.values(optional))
+        await expect(page.locator(selector)).toHaveCount(0);
+      const separators = ui(page, 'root').locator('.sniptale-divider');
+      const count = await separators.count();
+      expect(count).toBeGreaterThanOrEqual(4);
+      await expectSeparators(page);
+      await page.screenshot({
+        path: info.outputPath('fresh-toolbar-defaults.png'),
+        fullPage: false,
+      });
+      const adjacent = ui(page, 'root').locator('.sniptale-divider + .sniptale-divider');
+      expect(await adjacent.count()).toBeGreaterThan(0);
+      for (const divider of await adjacent.all()) await expect(divider).toBeHidden();
+      await customize(page);
+      for (const divider of await separators.all()) await expect(divider).toBeVisible();
+      for (const control of Object.keys(optional)) {
+        const choice = ui(page, `visibility.${control}`);
+        await expect(choice).toHaveAttribute('aria-pressed', 'false');
+        await choice.click();
+        await expect(choice).toHaveAttribute('aria-pressed', 'true');
+      }
+      await ui(page, 'customize-done').click();
+      for (const selector of Object.values(optional))
+        await expect(page.locator(selector)).toBeVisible();
+      await page.locator(optional['quick-actions']).click();
+      await expect(
+        page.locator('[data-ui="content.quick-actions.dropdown"] .sniptale-popover-menu')
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.screenshot({
+        path: info.outputPath('optional-buttons-enabled.png'),
+        fullPage: false,
+      });
+      await ui(page, 'settings-button').click();
+      await ui(page, 'settings.reset-page-toolbar').click();
+      await expect(ui(page, 'settings.reset-page-toolbar')).toBeDisabled();
+      await page.keyboard.press('Escape');
+      for (const selector of Object.values(optional))
+        await expect(page.locator(selector)).toHaveCount(0);
+      await expect(separators).toHaveCount(count);
+      await expectSeparators(page);
+      await page.screenshot({
+        path: info.outputPath('reset-toolbar-defaults.png'),
+        fullPage: false,
+      });
+      await customize(page);
+      await mode(page, 'video-recording');
+      await expect(ui(page, 'root')).toHaveAttribute('data-video-recording', 'true');
+      await expect(ui(page, 'video-recording.quality.menu')).toBeVisible();
+      expect(errors).toEqual([]);
+      await page.screenshot({
+        path: info.outputPath('recording-from-page-customization.png'),
+        fullPage: false,
+      });
+      await popup.close();
+      await page.close();
+    } finally {
+      await closeExtensionBrowser(launched);
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
 }

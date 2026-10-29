@@ -1,3 +1,5 @@
+import { parseDrawingPaletteState } from '../drawing-palette/parser';
+import { parseStoredSettings } from '../settings/guards';
 import { parsePageLaunchPreferences } from '../../../contracts/page-launch';
 import { parseFilenameRules } from '../../../features/file-naming/rules';
 import { parseStoredHighlighterSettings } from '../highlighter/guards';
@@ -49,7 +51,6 @@ const LOCAL_KEYS = [
   'sniptale_prompt_templates',
   'sniptale_template_order',
   'sniptale_ai_models',
-  'sniptale_ai_default_model',
   'sniptale_ai_chrome_enabled',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
@@ -237,6 +238,18 @@ function applySettingsWrites(context: WriteBuildContext): void {
       'fullPageQuality'
     ] as NormalizedSettings['fullPageQuality'];
   }
+  if (image) {
+    const captureDefaults = parseStoredSettings({
+      fullPageImage: image['fullPageImage'],
+      fullPageCapture: image['fullPageCapture'],
+    });
+    if (captureDefaults.hasInvalidRoot || captureDefaults.invalidFieldCount > 0)
+      throw new Error('Imported screenshot defaults are invalid');
+    if (captureDefaults.value.fullPageImage)
+      nextSettings.fullPageImage = captureDefaults.value.fullPageImage;
+    if (captureDefaults.value.fullPageCapture)
+      nextSettings.fullPageCapture = captureDefaults.value.fullPageCapture;
+  }
   const pages = data('capture.pages');
   if (pages?.['timing'] !== undefined) {
     const timing = parsePagePackageCaptureTimingPolicy(pages['timing']);
@@ -368,10 +381,13 @@ function applyStyleWrites(context: WriteBuildContext): void {
     if (colors.some((color) => typeof color !== 'string')) {
       throw new TypeError('Invalid drawing palette transfer state');
     }
-    localWrites['sniptale_drawing_palette'] = {
+    const parsed = parseDrawingPaletteState({
       schemaVersion: 1,
       colors,
-    };
+      ...(palette['names'] === undefined ? {} : { names: palette['names'] }),
+    });
+    if (parsed.unsafeForWrite) throw new TypeError('Invalid drawing palette transfer state');
+    localWrites['sniptale_drawing_palette'] = parsed.state;
   }
   assign(syncWrites, 'sniptale_gradient_presets', data('styles.gradients'));
   const surfaces = data('styles.surfaces');
@@ -392,9 +408,6 @@ function applyAiWrites(context: WriteBuildContext): void {
   if (models) {
     if (Array.isArray(models['items'])) {
       localWrites['sniptale_ai_models'] = models['items'].map(parseSettingsTransferModelMetadata);
-    }
-    if (models['defaultModelId'] !== undefined) {
-      localWrites['sniptale_ai_default_model'] = models['defaultModelId'];
     }
   }
   const chromeAi = data('ai.chrome');
@@ -417,6 +430,13 @@ function readImportedProviders(
 }
 
 function toImportedProvider(imported: Record<string, unknown>): AIProvider {
+  const management = imported['management'];
+  const enabled = imported['enabled'];
+  if (
+    (management !== undefined && management !== 'automatic' && management !== 'manual') ||
+    (enabled !== undefined && typeof enabled !== 'boolean')
+  )
+    throw new TypeError('Invalid settings transfer AI provider controls');
   return {
     id: imported['id'] as string,
     name: imported['name'] as string,
@@ -424,6 +444,8 @@ function toImportedProvider(imported: Record<string, unknown>): AIProvider {
     baseUrl: imported['baseUrl'] as string,
     createdAt: imported['createdAt'] as number,
     hasStoredApiKey: false,
+    ...(management === undefined ? {} : { management }),
+    ...(enabled === undefined ? {} : { enabled }),
   };
 }
 

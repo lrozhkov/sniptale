@@ -22,7 +22,9 @@ interface StepBadgePopoverProps {
   frameId: string;
   frameRect: { x: number; y: number; width: number; height: number };
   isOpen: boolean;
+  hideDisableAction?: boolean;
   onClose: () => void;
+  onDisable?: () => void;
   stepBadge?: StepBadgeSettings;
   frameVisuals?: {
     borderColor: string;
@@ -84,6 +86,7 @@ function StepBadgePopoverSurface(props: {
         frameId={frameId}
         frameVisuals={props.visuals}
         headerContext="element"
+        hideDisableAction={props.request.hideDisableAction ?? false}
         headerDrag={props.presentation.drag}
         isAuto={props.state.isAuto}
         localStepBadgeSettings={props.state.localStepBadgeSettings}
@@ -105,7 +108,12 @@ function StepBadgePopoverSurface(props: {
         onAutoModeChange={props.state.handleAutoModeChange}
         onCreatePreset={props.presets.catalog.create}
         onClose={onClose}
-        onDisable={() => props.state.handleEnabledChange(false)}
+        onDisable={() => {
+          if (props.request.onDisable) {
+            props.request.onDisable();
+            props.request.onClose();
+          } else props.state.handleEnabledChange(false);
+        }}
         onFloatingInteractionChange={props.dismissal.onFloatingInteractionChange}
         onOffsetToggle={props.state.handleOffsetToggle}
         onResetPreset={(preset) => void props.presets.catalog.reset(preset)}

@@ -13,16 +13,12 @@ import { buildAiProvidersSectionControllerDependencies } from './assemble';
 
 function buildControllerDataState(
   dataState: ReturnType<typeof useAiProvidersDataState>
-): AiProvidersSectionControllerBuildProps['dataState'] & {
-  setDefaultModelId: (value: string | null) => void;
-} {
+): AiProvidersSectionControllerBuildProps['dataState'] {
   return {
-    defaultModelId: dataState.defaultModelId,
     isLoading: dataState.isLoading,
     models: dataState.models,
     providers: dataState.providers,
     selection: dataState.selection,
-    setDefaultModelId: dataState.setDefaultModelId,
   };
 }
 
@@ -59,11 +55,8 @@ export function useAiProvidersSectionControllerDependencies(): AiProvidersSectio
   const providerSecretActions = useAiProvidersProviderSecretActions({ reloadData });
   const chromeAi = useAiProvidersChromeAiState({
     chromeAiEnabled: dataState.chromeAiEnabled,
-    defaultModelId: dataState.defaultModelId,
-    models: dataState.models,
     reloadData,
     setChromeAiEnabled: dataState.setChromeAiEnabled,
-    setDefaultModelId: dataState.setDefaultModelId,
   });
   return buildAiProvidersSectionControllerDependencies({
     chromeAi,

@@ -25,14 +25,19 @@ async function observePublications(page: Page) {
     let overflow = false;
     let emptySurfaces = 0;
     const observer = new MutationObserver((records) => {
-      if (!(host.firstElementChild instanceof HTMLCanvasElement)) emptySurfaces++;
+      if (!(host.querySelector('canvas[data-preview-front="true"]') instanceof HTMLCanvasElement))
+        emptySurfaces++;
       if (
-        !records.some((record) =>
-          [...record.addedNodes].some((node) => node instanceof HTMLCanvasElement)
+        !records.some(
+          (record) =>
+            (record.type === 'attributes' && record.oldValue !== 'true') ||
+            [...record.addedNodes].some(
+              (node) => node instanceof HTMLCanvasElement && node.dataset['previewFront'] === 'true'
+            )
         )
       )
         return;
-      const canvas = host.firstElementChild;
+      const canvas = host.querySelector('canvas[data-preview-front="true"]');
       if (!(canvas instanceof HTMLCanvasElement) || !canvas.width || !canvas.height) return;
       if (samples.length >= 64) {
         overflow = true;
@@ -48,7 +53,13 @@ async function observePublications(page: Page) {
         pixels: [...context.getImageData(0, 0, 64, 36).data],
       });
     });
-    observer.observe(host, { childList: true });
+    observer.observe(host, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-preview-front'],
+      attributeOldValue: true,
+    });
     const timer = setTimeout(() => observer.disconnect(), 30_000);
     return {
       start() {
@@ -116,7 +127,7 @@ async function referencePixels(
         const context = canvas.getContext('2d', { willReadFrequently: true });
         if (!context) throw new Error('Missing reference context');
         const published = document.querySelector(
-          '[data-ui="gallery.videoReview.manualPreview"] canvas'
+          '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
         );
         if (!(published instanceof HTMLCanvasElement)) throw new Error('Missing reference backing');
         const raster = document.createElement('canvas');

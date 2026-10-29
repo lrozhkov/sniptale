@@ -40,6 +40,7 @@ type PresentationProps = {
     | {
         preferences: PreviewInput['preferences'];
         playing: boolean;
+        interacting?: boolean;
         sourceToResult: PreviewInput['sourceToResult'];
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
@@ -135,7 +136,7 @@ export function useStagePresentation(
     css: size,
     preferences: props.preview?.preferences ?? DEFAULT_QUICK_PREVIEW_PREFERENCES,
     playing: props.preview?.playing ?? false,
-    interacting,
+    interacting: interacting || !!props.preview?.interacting,
     visible: true,
     pausedSourceTime: props.comments?.time ?? props.video.current?.currentTime ?? 0,
     pausedResultTime: props.scene?.focus?.time ?? 0,
@@ -149,9 +150,15 @@ export function useStagePresentation(
     webcam: props.webcam,
   });
   const onRaster = props.preview?.onRaster;
+  const rasterWidth = presentation.status.actualRaster?.width;
+  const rasterHeight = presentation.status.actualRaster?.height;
   useEffect(() => {
-    onRaster?.(presentation.status.actualRaster);
-  }, [onRaster, presentation.status.actualRaster]);
+    onRaster?.(
+      rasterWidth === undefined || rasterHeight === undefined
+        ? null
+        : { width: rasterWidth, height: rasterHeight }
+    );
+  }, [onRaster, rasterWidth, rasterHeight]);
   return {
     presentation,
     beginInteraction(event: PointerEvent<HTMLDivElement>) {

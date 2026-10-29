@@ -34,6 +34,7 @@ type RuntimeStatePatch = Pick<
 type ResetDocumentState = Pick<
   EditorState,
   | 'activeTool'
+  | 'frameAnnotationCreationKind'
   | 'inspector'
   | 'freshImageBackgroundPending'
   | 'inspectorCollapsed'
@@ -185,6 +186,7 @@ function createResetDocumentUiState(
 ): Pick<
   ResetDocumentState,
   | 'activeTool'
+  | 'frameAnnotationCreationKind'
   | 'inspector'
   | 'freshImageBackgroundPending'
   | 'inspectorCollapsed'
@@ -203,6 +205,7 @@ function createResetDocumentUiState(
 > {
   return {
     activeTool: 'select',
+    frameAnnotationCreationKind: null,
     inspector: 'file',
     freshImageBackgroundPending: false,
     inspectorCollapsed: false,

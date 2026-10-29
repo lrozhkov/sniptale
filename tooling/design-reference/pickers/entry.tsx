@@ -1,3 +1,4 @@
+import { DEFAULT_DRAWING_COLORS } from '../../../apps/extension/src/features/drawing/public';
 import { createRoot } from 'react-dom/client';
 import { useRef, useState } from 'react';
 import { clonePaint, type Paint } from '@sniptale/foundation/paint';
@@ -27,25 +28,14 @@ import { getShowcaseGradientPaint } from '../../../apps/extension/src/features/h
 import { setLocalePreference, type AppLocale } from '../../../apps/extension/src/platform/i18n';
 import './reference.css';
 
-const palette = [
-  '#F97316',
-  '#EF4444',
-  '#FACC15',
-  '#22C55E',
-  '#14B8A6',
-  '#3B82F6',
-  '#8B5CF6',
-  '#EC4899',
-  '#FAFAFA',
-  '#18181B',
-];
+const palette = [...DEFAULT_DRAWING_COLORS];
 const createId = () => crypto.randomUUID();
 const densityKey = 'sniptale.design-reference.picker-compact';
 
-function useDensity() {
+function useReferencePreference(key = densityKey) {
   const [compact, setCompact] = useState(() => {
     try {
-      return localStorage.getItem(densityKey) === 'true';
+      return localStorage.getItem(key) === 'true';
     } catch {
       return false;
     }
@@ -55,7 +45,7 @@ function useDensity() {
     (value: boolean) => {
       setCompact(value);
       try {
-        localStorage.setItem(densityKey, String(value));
+        localStorage.setItem(key, String(value));
       } catch {
         /* The current session remains editable. */
       }
@@ -121,7 +111,10 @@ function ColorReference() {
   const [draft, setDraft] = useState(accepted);
   const [recent, setRecent] = useState<string[]>([]);
   const [session, setSession] = useState(0);
-  const [compact, setCompact] = useDensity();
+  const [compact, setCompact] = useReferencePreference();
+  const [catalogMode, setCatalogMode] = useReferencePreference(
+    'sniptale.design-reference.picker-catalog'
+  );
   const format = useFormatMode();
   const eyedropper = useEyedropper(setDraft, () => undefined);
   return (
@@ -130,6 +123,8 @@ function ColorReference() {
         key={session}
         color={draft}
         originalColor={accepted}
+        catalogMode={catalogMode}
+        onCatalogModeChange={setCatalogMode}
         compact={compact}
         onToggleCompact={() => setCompact(!compact)}
         eyedropper={eyedropper}
@@ -161,7 +156,10 @@ function PaintReference({ locale }: { locale: AppLocale }) {
   const [session, setSession] = useState(0);
   const [recent, setRecent] = useState<string[]>([]);
   const resources = useReferenceTemplates(locale);
-  const [compact, setCompact] = useDensity();
+  const [compact, setCompact] = useReferencePreference();
+  const [catalogMode, setCatalogMode] = useReferencePreference(
+    'sniptale.design-reference.picker-catalog'
+  );
   const [name, setName] = useState('');
   return (
     <div className="sniptale-reference-paint">
@@ -195,6 +193,8 @@ function PaintReference({ locale }: { locale: AppLocale }) {
         key={`${profile}:${session}`}
         accepted={accepted}
         resources={resources}
+        catalogMode={catalogMode}
+        onCatalogModeChange={setCatalogMode}
         compact={compact}
         onToggleCompact={() => setCompact(!compact)}
         profile={profile}
@@ -219,6 +219,8 @@ function PaintReference({ locale }: { locale: AppLocale }) {
 function PaintReferenceSession(props: {
   accepted: Paint;
   resources: GradientTemplateResources;
+  catalogMode: boolean;
+  onCatalogModeChange: (enabled: boolean) => void;
   compact: boolean;
   onToggleCompact: () => void;
   profile: Profile;
@@ -286,6 +288,8 @@ function PaintReferenceSession(props: {
         resources={props.resources}
         draft={draft}
         original={props.accepted}
+        catalogMode={props.catalogMode}
+        onCatalogModeChange={props.onCatalogModeChange}
         compact={props.compact}
         onToggleCompact={props.onToggleCompact}
         history={history}

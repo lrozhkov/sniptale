@@ -3,7 +3,6 @@ import type { AIModel, AIProvider } from '../../../../../../contracts/settings';
 
 export type AiProvidersDataState = {
   setChromeAiEnabled: (value: boolean) => void;
-  setDefaultModelId: (value: string | null) => void;
   setIsLoading: (value: boolean) => void;
   setModels: (value: AIModel[]) => void;
   setProviders: (value: AIProvider[]) => void;
@@ -16,7 +15,6 @@ export function useAiProvidersDataState() {
   const [models, setModels] = useState<AIModel[]>([]);
   const [selectorProviders, setSelectorProviders] = useState<AIProvider[]>([]);
   const [selectorModels, setSelectorModels] = useState<AIModel[]>([]);
-  const [defaultModelId, setDefaultModelId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const setSelectionState = useCallback((value: { models: AIModel[]; providers: AIProvider[] }) => {
     setSelectorModels(value.models);
@@ -25,7 +23,6 @@ export function useAiProvidersDataState() {
 
   return {
     chromeAiEnabled,
-    defaultModelId,
     isLoading,
     models,
     providers,
@@ -34,7 +31,6 @@ export function useAiProvidersDataState() {
       providers: selectorProviders,
     },
     setChromeAiEnabled,
-    setDefaultModelId,
     setIsLoading,
     setModels,
     setProviders,

@@ -1,4 +1,13 @@
-import { ArrowDownLeft, Blend, Circle, PaintBucket, Square, Triangle, Type } from 'lucide-react';
+import {
+  ArrowDownToDot,
+  ArrowUpFromDot,
+  Blend,
+  Circle,
+  PaintBucket,
+  Square,
+  Triangle,
+  Type,
+} from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
@@ -298,7 +307,11 @@ export function ArrowDrawDirectionOption(props: {
       ].join(' ')}
       onClick={() => props.onChange(!props.active)}
     >
-      <ArrowDownLeft aria-hidden size={16} />
+      {props.active ? (
+        <ArrowDownToDot aria-hidden size={16} />
+      ) : (
+        <ArrowUpFromDot aria-hidden size={16} />
+      )}
     </ContentToolbarButton>
   );
 }

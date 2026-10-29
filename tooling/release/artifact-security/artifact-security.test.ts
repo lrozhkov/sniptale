@@ -154,6 +154,18 @@ it('accepts a release artifact that matches manifest policy', async () => {
   ).resolves.toBeUndefined();
 });
 
+it('accepts exact local AI provider defaults in a bundled catalog', async () => {
+  const repoRoot = await createRepoRoot();
+  const text =
+    'const providers={"lm-studio":{label:"LM Studio",' +
+    'baseUrl:"http://localhost:1234/v1",catalog:"openai",credential:"none",available:!0},' +
+    'ollama:{label:"Ollama",baseUrl:"http://localhost:11434/api",' +
+    'catalog:"ollama",credential:"none",available:!0}};';
+  await expect(
+    verifyReleaseArtifactFiles({ files: createFiles({ text }), repoRoot })
+  ).resolves.toBeUndefined();
+});
+
 it('accepts the policy-owned dynamic recording permission frame', async () => {
   const repoRoot = await createRepoRoot({ policy: recordingPermissionPolicy });
   const manifest = {
@@ -299,6 +311,13 @@ it.each([
   ['assets/popup.js', 'eval("payload")', 'dynamic code execution'],
   ['assets/popup.js', '(eval)("payload")', 'dynamic code execution'],
   ['assets/popup.js', 'new WebSocket("ws://localhost:9223")', 'development websocket endpoint'],
+  ['assets/popup.js', 'fetch("http://localhost:11434/api")', 'development server endpoint'],
+  ['assets/popup.js', 'fetch("http://localhost:1234/v1")', 'development server endpoint'],
+  [
+    'assets/catalog.json',
+    '{"baseUrl":"http://localhost:11434/api"}',
+    'development server endpoint',
+  ],
   ['assets/popup.js', 'import "/@vite/client"', 'Vite development client'],
   ['assets/popup.js', 'const enabled = VITE_TRACE_MESSAGES', 'trace-enabled release marker'],
 ])('rejects claimed text smell in %s: %s', async (path, text, message) => {

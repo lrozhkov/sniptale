@@ -1,3 +1,4 @@
+import { FRAME_ANNOTATION_Z_INDEX } from '../../../../features/highlighter/frame-annotation/interaction/z-index';
 import { createPortal } from 'react-dom';
 import { getThemedPortalStyle, resolveContentPortalTarget } from '../layout/portal';
 import { InteractiveFrameHoverOverlaySurface } from './hover-surface';
@@ -21,7 +22,7 @@ export function FrameEditingOverlay(props: {
         position: 'fixed',
         inset: 0,
         backgroundColor: 'transparent',
-        zIndex: 2147483645,
+        zIndex: FRAME_ANNOTATION_Z_INDEX.editingOverlay,
         cursor: 'default',
         pointerEvents: 'auto',
         clipPath,

@@ -1,5 +1,5 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ArrowLeft, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Link2, Unlink2, Trash2, X } from 'lucide-react';
 
 import { ProductToolbarMenuGroupLabel } from '@sniptale/ui/product-menus/toolbar';
 import type { FloatingPopoverDrag } from './drag';
@@ -19,6 +19,9 @@ export function SettingsPopoverHeader(props: {
 }) {
   const draggable = props.context === 'element' && props.drag !== undefined;
   const sourceControl = props.sourceControl;
+  const currentSource = sourceControl?.options.find(
+    (option) => option.value === sourceControl.value
+  );
   return (
     <div
       className="sniptale-settings-popover-header"
@@ -61,22 +64,26 @@ export function SettingsPopoverHeader(props: {
             className="sniptale-settings-popover-source-switch"
             data-ui="shared.annotation-template-source"
           >
-            {sourceControl.options.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={sourceControl.value === option.value}
-                className="sniptale-settings-popover-source-option"
-                onClick={() => {
-                  if (sourceControl.value !== option.value) {
-                    sourceControl.onChange(option.value);
-                  }
-                }}
-                title={option.description}
-              >
-                {option.label}
-              </button>
-            ))}
+            <ContentToolbarButton
+              tone="utility"
+              size="compact"
+              className="sniptale-settings-popover-icon-action sniptale-settings-popover-source-toggle"
+              data-settings-action="toggle-template-source"
+              aria-pressed={sourceControl.value === 'frame-default'}
+              aria-label={currentSource?.description}
+              title={currentSource?.description}
+              onClick={() =>
+                sourceControl.onChange(
+                  sourceControl.value === 'frame-default' ? 'forced' : 'frame-default'
+                )
+              }
+            >
+              {sourceControl.value === 'frame-default' ? (
+                <Link2 aria-hidden="true" size={16} />
+              ) : (
+                <Unlink2 aria-hidden="true" size={16} />
+              )}
+            </ContentToolbarButton>
           </div>
         ) : null}
         {props.destructiveAction ? (

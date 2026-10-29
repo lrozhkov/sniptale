@@ -97,3 +97,14 @@ describe('frame-surface projectElementFrameSurface', () => {
     ).toEqual({ x: 29, y: 20, width: 183, height: 113 });
   });
 });
+
+it.each(['callout', 'step-badge'] as const)(
+  'does not decorate a standalone %s with a frame border or fill',
+  (annotationKind) => {
+    expect(resolveFrameSurface(createFrame({ annotationKind }))).toMatchObject({
+      decorationVisible: false,
+      strokeVisible: false,
+      fillVisible: false,
+    });
+  }
+);

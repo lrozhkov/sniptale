@@ -117,7 +117,9 @@ for (const variant of [
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     };
-    const canvas = dialog.locator('[data-ui="gallery.videoReview.manualPreview"] canvas');
+    const canvas = dialog.locator(
+      '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+    );
     try {
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,

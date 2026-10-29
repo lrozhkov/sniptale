@@ -1,16 +1,11 @@
-import { getAIModelOperation } from '../../../contracts/settings/model-operation';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
-import { loadAIModels, loadAIProviders, loadDefaultModelId } from './core';
+import { loadAIModels, loadAIProviders } from './core';
 import {
   readStoredAIProviderSecretState,
   readStoredProviderSecrets,
 } from './provider-secrets.store.ts';
 
-function assertModelGraphInvariants(
-  providers: AIProvider[],
-  models: AIModel[],
-  defaultModelId: string | null
-): Set<string> {
+function assertModelGraphInvariants(providers: AIProvider[], models: AIModel[]): Set<string> {
   const providerIds = new Set(providers.map(({ id }) => id));
   const modelIds = new Set<string>();
 
@@ -26,13 +21,6 @@ function assertModelGraphInvariants(
       throw new Error(`Duplicate AI model id ${model.id}`);
     }
     modelIds.add(model.id);
-  }
-
-  if (
-    defaultModelId &&
-    !models.some((model) => model.id === defaultModelId && getAIModelOperation(model) === 'text')
-  ) {
-    throw new Error(`Default AI model ${defaultModelId} not found`);
   }
 
   return providerIds;
@@ -68,12 +56,11 @@ async function assertProviderSecretInvariants(
 }
 
 export async function assertAISettingsGraphInvariants(): Promise<void> {
-  const [providers, models, defaultModelId, providerSecrets] = await Promise.all([
+  const [providers, models, providerSecrets] = await Promise.all([
     loadAIProviders(),
     loadAIModels(),
-    loadDefaultModelId(),
     readStoredProviderSecrets(),
   ]);
-  const providerIds = assertModelGraphInvariants(providers, models, defaultModelId);
+  const providerIds = assertModelGraphInvariants(providers, models);
   await assertProviderSecretInvariants(providers, providerIds, providerSecrets);
 }

@@ -118,3 +118,22 @@ it.each(['start', 'keepalive'] as const)(
     expect(port.connect).toHaveBeenCalledOnce();
   }
 );
+
+it('retains admitted provider evidence without replaying a content request', async () => {
+  const port = fixture();
+  const pending = runContentTextJob(start, new AbortController().signal);
+  const refused = expect(pending).rejects.toMatchObject({
+    message: 'provider-failed',
+    reason: 'quota-exceeded',
+  });
+  port.onMessage.emit({
+    type: 'failure',
+    requestId: start.requestId,
+    code: 'provider-failed',
+    failureReason: 'quota-exceeded',
+  });
+  await refused;
+  expect(port.connect).toHaveBeenCalledOnce();
+  expect(port.postMessage).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});

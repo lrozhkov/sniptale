@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { AudioJobProviderError } from '../../../workflows/audio-jobs/failure';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { TourNarrationAI } from './narration-ai';
@@ -26,18 +27,25 @@ import type {
 } from '../../../workflows/scenario-narration/generation';
 const io = vi.hoisted(() => ({
   catalog: vi.fn(),
+  remember: vi.fn(),
   prepare: vi.fn(),
   generate: vi.fn(),
   cleanup: vi.fn(),
 }));
 vi.mock('../../../workflows/ai-settings/query', () => ({
-  requestAIModelSelectionBootstrap: io.catalog,
+  requestAIScenarioModelSelection: io.catalog,
+  rememberAIScenarioModelSelection: io.remember,
 }));
 vi.mock('../../../workflows/scenario-narration/generation', () => ({
   prepareScenarioNarrationBatch: io.prepare,
   generateScenarioNarration: io.generate,
   cleanupScenarioNarrationPreview: io.cleanup,
 }));
+type Catalog = Awaited<
+  ReturnType<typeof import('../../../workflows/ai-settings/query').requestAIScenarioModelSelection>
+>;
+let fixture: Catalog;
+let formVersion = 0;
 let root: Root;
 let host: HTMLDivElement;
 const targets: ScenarioNarrationText[] = ['a', 'b', 'c'].map((objectId) => ({
@@ -73,9 +81,10 @@ beforeEach(async () => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  io.catalog.mockResolvedValue({
-    chromeAiEnabled: false,
-    defaultModelId: 'm',
+  fixture = {
+    scenario: 'scenario-speech',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'm', previousSelection: null, reason: null },
     globalSystemPrompt: '',
     models: [
       {
@@ -91,13 +100,17 @@ beforeEach(async () => {
       {
         id: 'p',
         name: 'Disclosed provider',
+        incarnation: 'one',
+        destinationBinding: `sha256:${'a'.repeat(64)}`,
         connectionType: 'openai-compatible',
         destinationKind: 'external',
         hasStoredApiKey: true,
         createdAt: 1,
       },
     ],
-  });
+  };
+  io.catalog.mockResolvedValue(fixture);
+  io.remember.mockResolvedValue(undefined);
   vi.mocked(access.prepareNarration).mockResolvedValue({
     project: createGuideProject('Guide', 'p'),
     workspaceRevision: 1,
@@ -131,6 +144,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 it('requires provider approval and explicit Apply before changing the current narration', async () => {
@@ -141,6 +155,12 @@ it('requires provider approval and explicit Apply before changing the current na
   expect(io.generate).not.toHaveBeenCalled();
   await start();
   expect(io.generate).toHaveBeenCalledTimes(3);
+  expect(io.generate.mock.calls[0]?.[2]).toEqual({
+    modelId: 'm',
+    approvedProviderId: 'p',
+    approvedModelCode: 'tts',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+  });
   expect(access.applyNarration).not.toHaveBeenCalled();
   expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(3);
   await act(async () => button('[data-ai-apply="a"]').click());
@@ -152,15 +172,18 @@ it('requires provider approval and explicit Apply before changing the current na
 it('retains ready batch previews when a later provider request fails', async () => {
   io.generate
     .mockImplementationOnce(async (source: ScenarioNarrationBasis) => result(source))
-    .mockRejectedValueOnce(new Error('provider-failed'));
+    .mockRejectedValueOnce(new AudioJobProviderError('quota-exceeded', 'provider-failed'));
   await start();
   expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(2);
-  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    createTranslator('en')('settings.aiProviders.providerStatusQuota')
+  );
   expect(access.applyNarration).not.toHaveBeenCalled();
   await act(async () => button('[data-ai-generate]').click());
   expect(io.generate).toHaveBeenCalledTimes(4);
   expect(io.generate.mock.calls[3]![0].scope.target.objectId).toBe('b');
   expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(3);
+  expect(host.querySelector('[role="alert"]')).toBeNull();
 });
 it('disables Apply All until generation settles and all ready results contain Blobs', async () => {
   let finish!: (value: ScenarioNarrationPreview) => void;
@@ -336,5 +359,362 @@ it('applies only currently selected batch results while keeping an unchecked ind
   expect(
     vi.mocked(access.applyNarration).mock.calls.map(([preview]) => preview.scope.target.objectId)
   ).toEqual(['a', 'c', 'b']);
+  expect(io.generate).toHaveBeenCalledTimes(3);
+});
+
+async function remountCatalog(value: Catalog) {
+  io.catalog.mockResolvedValue(value);
+  await act(async () =>
+    root.render(
+      <TourNarrationAI
+        key={++formVersion}
+        targets={targets}
+        access={access}
+        disabled={false}
+        t={createTranslator('en')}
+      />
+    )
+  );
+}
+async function editVoice(value: string) {
+  const field = host.querySelector('input[aria-label="Voice"]');
+  if (!(field instanceof HTMLInputElement)) throw new Error('Missing voice field');
+  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  if (!set) throw new Error('Missing native input setter');
+  await act(async () => {
+    set.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+it('opens without preference or project writes and remembers first use before source Save', async () => {
+  expect(io.catalog).toHaveBeenCalledWith('scenario-speech');
+  expect(io.remember).not.toHaveBeenCalled();
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  await start();
+  expect(io.remember).toHaveBeenCalledWith(
+    expect.objectContaining({ scenario: 'scenario-speech' }),
+    'scenario-speech',
+    'm',
+    'initial'
+  );
+  expect(io.remember.mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(access.prepareNarration).mock.invocationCallOrder[0]!
+  );
+});
+
+it('preserves the voice draft and allows retry after preference storage refuses generation', async () => {
+  await editVoice('retained voice');
+  io.remember.mockRejectedValueOnce(new Error('refused'));
+  await start();
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(io.generate).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'retained voice'
+  );
+  expect(host.textContent).toContain(
+    createTranslator('en')('scenario.editor.guideAiSelectionFailed')
+  );
+  await act(async () => button('[data-ai-generate]').click());
+  expect(io.generate).toHaveBeenCalledTimes(3);
+  expect(io.generate.mock.calls[0]![1].voiceId).toBe('retained voice');
+});
+
+it('refuses a disappeared model during generation preparation without using another candidate', async () => {
+  io.catalog.mockResolvedValueOnce({ ...fixture, models: [] });
+  await start();
+  expect(io.remember).not.toHaveBeenCalled();
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(io.generate).not.toHaveBeenCalled();
+  expect(button('[data-ai-generate]').disabled).toBe(true);
+  expect(host.textContent).toContain(
+    createTranslator('en')('scenario.editor.guideAiModelUnavailable')
+  );
+});
+
+it.each(['cancel', 'close'] as const)(
+  'settles %s during selection preparation without late source Save or paid work',
+  async (action) => {
+    let finish!: (value: Catalog) => void;
+    io.catalog.mockImplementationOnce(
+      () =>
+        new Promise<Catalog>((resolve) => {
+          finish = resolve;
+        })
+    );
+    await start();
+    const cancel = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (node) => node.textContent === createTranslator('en')('common.actions.cancel')
+    );
+    if (!cancel) throw new Error('Missing cancellation');
+    await act(async () => {
+      if (action === 'cancel') cancel.click();
+      else root.render(null);
+    });
+    await act(async () => finish(fixture));
+    expect(io.remember).not.toHaveBeenCalled();
+    expect(access.prepareNarration).not.toHaveBeenCalled();
+    expect(io.generate).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  { connectionType: 'openai-compatible' as const, responseFormat: 'mp3' },
+  { connectionType: 'google' as const, responseFormat: 'wav' },
+  { connectionType: 'elevenlabs' as const, responseFormat: 'mp3' },
+])(
+  'requires explicit voice entry for a capability-only $connectionType speech model',
+  async ({ connectionType, responseFormat }) => {
+    await remountCatalog({
+      ...fixture,
+      providers: fixture.providers.map((entry) => ({
+        ...entry,
+        connectionType,
+        management: 'automatic' as const,
+      })),
+      models: [
+        {
+          id: 'm',
+          providerId: 'p',
+          modelCode: 'catalog-speech',
+          displayName: 'Catalog speech',
+          source: 'catalog',
+          capabilities: {
+            operations: { speech: 'supported' },
+            input: { text: 'supported' },
+            output: { audio: 'supported' },
+            features: {},
+          },
+        },
+      ],
+    });
+    const approval = host.querySelector<HTMLInputElement>('[data-ai-consent]');
+    await act(async () => approval?.click());
+    expect(button('[data-ai-generate]').disabled).toBe(true);
+    expect(io.remember).not.toHaveBeenCalled();
+    await editVoice('explicit voice');
+    expect(button('[data-ai-generate]').disabled).toBe(false);
+    await act(async () => button('[data-ai-generate]').click());
+    expect(io.generate.mock.calls[0]![1]).toMatchObject({
+      modelId: 'm',
+      voiceId: 'explicit voice',
+      responseFormat,
+    });
+  }
+);
+
+it('persists explicit model choices while a failed choice preserves the accepted voice draft', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(100, 100, 280, 32)
+  );
+  const other = {
+    ...fixture.models[0]!,
+    id: 'other',
+    modelCode: 'other-voice',
+    displayName: 'Other speech',
+    audio: { speech: { voiceId: 'other voice', responseFormat: 'wav' as const } },
+  };
+  await remountCatalog({ ...fixture, models: [...fixture.models, other] });
+  await editVoice('retained draft');
+  const chooseOther = async () => {
+    await act(async () => button('.sniptale-ai-model-selector-trigger').click());
+    const option = [
+      ...host.querySelectorAll<HTMLButtonElement>('.sniptale-dropdown-menu button'),
+    ].find((node) => node.textContent?.includes('Other speech'));
+    if (!option) throw new Error('Missing model option');
+    await act(async () => option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  };
+  io.remember.mockRejectedValueOnce(new Error('refused'));
+  await chooseOther();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'retained draft'
+  );
+  expect(button('.sniptale-ai-model-selector-trigger').textContent).toContain('Configured speech');
+  await chooseOther();
+  expect(io.remember).toHaveBeenLastCalledWith(
+    expect.objectContaining({ scenario: 'scenario-speech' }),
+    'scenario-speech',
+    'other',
+    'explicit'
+  );
+  expect(button('.sniptale-ai-model-selector-trigger').textContent).toContain('Other speech');
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'other voice'
+  );
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(access.applyNarration).not.toHaveBeenCalled();
+  expect(io.generate).not.toHaveBeenCalled();
+});
+
+it('keeps a remembered missing narration model unresolved instead of selecting another model', async () => {
+  const previous = {
+    modelId: 'removed',
+    modelCode: 'historic',
+    providerId: 'p',
+    providerIncarnation: 'old',
+    displayName: 'Removed speech model',
+    selectedAt: 1,
+    source: 'explicit' as const,
+  };
+  await remountCatalog({
+    ...fixture,
+    remembered: previous,
+    resolution: {
+      status: 'unavailable',
+      modelId: null,
+      previousSelection: previous,
+      reason: 'model-unavailable',
+    },
+  });
+  expect(host.textContent).toContain('Removed speech model');
+  expect(button('[data-ai-generate]').disabled).toBe(true);
+  expect(button('.sniptale-ai-model-selector-trigger').textContent).not.toContain(
+    'Configured speech'
+  );
+  expect(io.remember).not.toHaveBeenCalled();
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(access.applyNarration).not.toHaveBeenCalled();
+});
+
+it('retains the voice draft while its model is unavailable and restores the same identity after reload', async () => {
+  await editVoice('retained unavailable draft');
+  io.catalog.mockResolvedValueOnce({ ...fixture, models: [] });
+  await start();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'retained unavailable draft'
+  );
+  expect(button('[data-ai-generate]').disabled).toBe(true);
+  const reload = [...host.querySelectorAll<HTMLButtonElement>('button')].find((node) =>
+    node.textContent?.includes(createTranslator('en')('gallery.videoReview.speechReloadModels'))
+  );
+  if (!reload) throw new Error('Missing model reload');
+  await act(async () => reload.click());
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'retained unavailable draft'
+  );
+  expect(button('.sniptale-ai-model-selector-trigger').textContent).toContain('Configured speech');
+  expect(io.remember).not.toHaveBeenCalled();
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(io.generate).not.toHaveBeenCalled();
+});
+
+it('initializes the updated profile only after explicit replacement under the same model ID succeeds', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(100, 100, 280, 32)
+  );
+  await editVoice('retained draft');
+  const replacement: Catalog = {
+    ...fixture,
+    models: [
+      {
+        ...fixture.models[0]!,
+        modelCode: 'replacement-voice',
+        displayName: 'Updated speech',
+        audio: { speech: { voiceId: 'updated voice', responseFormat: 'wav' } },
+      },
+    ],
+  };
+  io.catalog.mockResolvedValue(replacement);
+  const choose = async () => {
+    await act(async () => button('.sniptale-ai-model-selector-trigger').click());
+    const option = [
+      ...host.querySelectorAll<HTMLButtonElement>('.sniptale-dropdown-menu button'),
+    ].find((node) => node.textContent?.includes('Updated speech'));
+    if (!option) throw new Error('Missing updated model');
+    await act(async () => option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  };
+  io.remember.mockRejectedValueOnce(new Error('refused'));
+  await choose();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'retained draft'
+  );
+  await choose();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+    'updated voice'
+  );
+  expect(access.prepareNarration).not.toHaveBeenCalled();
+  expect(access.applyNarration).not.toHaveBeenCalled();
+  expect(io.generate).not.toHaveBeenCalled();
+});
+
+it.each(['destination', 'model-code'] as const)(
+  'clears Scenario approval after same-ID %s replacement',
+  async (change) => {
+    const checkbox = host.querySelector<HTMLInputElement>('[data-ai-consent]')!;
+    await act(async () => checkbox.click());
+    expect(checkbox.checked).toBe(true);
+    const next = structuredClone(fixture);
+    if (change === 'destination')
+      next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+    else next.models[0]!.modelCode = 'replacement-code';
+    io.catalog.mockResolvedValue(next);
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!.click()
+    );
+    expect(host.querySelector<HTMLInputElement>('[data-ai-consent]')?.checked ?? false).toBe(false);
+    expect(button('[data-ai-generate]').disabled).toBe(true);
+    expect(access.prepareNarration).not.toHaveBeenCalled();
+    expect(io.generate).not.toHaveBeenCalled();
+  }
+);
+it.each(['destination', 'model-code'] as const)(
+  'refuses changed Scenario %s after approval before source Save',
+  async (change) => {
+    await editVoice('retained voice');
+    await act(async () => host.querySelector<HTMLInputElement>('[data-ai-consent]')!.click());
+    const next = structuredClone(fixture);
+    if (change === 'destination')
+      next.providers[0]!.destinationBinding = `sha256:${'b'.repeat(64)}`;
+    else next.models[0]!.modelCode = 'replacement-code';
+    io.catalog.mockResolvedValue(next);
+    await act(async () => button('[data-ai-generate]').click());
+    expect(access.prepareNarration).not.toHaveBeenCalled();
+    expect(io.generate).not.toHaveBeenCalled();
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="Voice"]')?.value).toBe(
+      'retained voice'
+    );
+  }
+);
+
+it.each([
+  ['invalid-credential', 'providerStatusInvalidKey'],
+  ['permission-denied', 'providerStatusDenied'],
+  ['model-unavailable', 'providerStatusModelUnavailable'],
+  ['rate-limited', 'providerStatusRate'],
+  ['network', 'providerStatusNetwork'],
+  ['timeout', 'providerStatusTimeout'],
+  ['service-error', 'providerStatusUnavailable'],
+] as const)('explains %s without applying or replaying narration', async (reason, key) => {
+  io.generate.mockRejectedValueOnce(new AudioJobProviderError(reason, 'provider-failed'));
+  await start();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    createTranslator('en')(`settings.aiProviders.${key}`)
+  );
+  expect(io.generate).toHaveBeenCalledTimes(3);
+  expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(2);
+  expect(access.applyNarration).not.toHaveBeenCalled();
+});
+
+it('explains a typed preparation failure and clears it after explicit successful retry', async () => {
+  vi.mocked(access.prepareNarration).mockRejectedValueOnce(
+    new AudioJobProviderError('invalid-credential', 'provider-failed')
+  );
+  await start();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    createTranslator('en')('settings.aiProviders.providerStatusInvalidKey')
+  );
+  expect(io.generate).not.toHaveBeenCalled();
+  await act(async () => button('[data-ai-generate]').click());
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(host.querySelectorAll('[data-ai-preview]')).toHaveLength(3);
+});
+
+it('keeps unknown provider evidence generic and excludes arbitrary server text', async () => {
+  io.generate.mockRejectedValueOnce(new Error('PRIVATE_SERVER_ERROR_BODY'));
+  await start();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    createTranslator('en')('scenario.editor.guideOperationFailed')
+  );
+  expect(host.textContent).not.toContain('PRIVATE_SERVER_ERROR_BODY');
   expect(io.generate).toHaveBeenCalledTimes(3);
 });

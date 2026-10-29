@@ -55,6 +55,7 @@ vi.mock('../index', async (importOriginal) => ({
   captureFullPage: captureFullPageMock,
   captureFullPageTransaction: captureFullPageTransactionMock,
   captureVisibleTabForCropTransaction: captureVisibleTabForCropTransactionMock,
+  captureVisibleTabTransaction: captureVisibleTabForCropTransactionMock,
 }));
 
 vi.mock('../jobs/state-machine', async (importOriginal) => ({
@@ -136,7 +137,11 @@ async function verifiesVisibleCaptureDownloadFlow() {
   await flushCaptureHandlerPromises();
 
   expect(loggerLogMock).toHaveBeenCalledWith('Handling visible capture request', { tabId: 42 });
-  expect(captureVisibleTabForCropTransactionMock).toHaveBeenCalledWith(42);
+  expect(captureVisibleTabForCropTransactionMock).toHaveBeenCalledWith(42, {
+    losslessSource: false,
+    format: 'png',
+    quality: 100,
+  });
   expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
     'data:image/png;base64,1',
     'visible.png',
@@ -198,8 +203,7 @@ async function verifiesVisibleCaptureCopyAndEditFlows() {
 
   expect(copyContext.sendResponse).toHaveBeenCalledWith({
     success: true,
-    dataUrl: 'data:image/png;base64,2',
-    action: 'copy',
+    result: 'accepted',
   });
   expect(openEditorWithImageMock).toHaveBeenCalledWith('data:image/jpeg;base64,3', { tabId: 42 });
   expect(editContext.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });

@@ -144,12 +144,19 @@ export async function createReviewTextEgressAuthority(
 }
 
 export function createAIProviderDestinationBinding(
-  provider: Pick<AIProvider, 'id' | 'baseUrl' | 'connectionType'>
+  provider: Pick<
+    AIProvider,
+    'id' | 'baseUrl' | 'connectionType' | 'incarnation' | 'credentialRevision'
+  >
 ): Promise<string> {
   return createAiEgressPayloadHash({
     id: provider.id,
     baseUrl: provider.baseUrl,
     connectionType: provider.connectionType,
+    ...(provider.incarnation ? { incarnation: provider.incarnation } : {}),
+    ...(provider.credentialRevision !== undefined
+      ? { credentialRevision: provider.credentialRevision }
+      : {}),
   });
 }
 

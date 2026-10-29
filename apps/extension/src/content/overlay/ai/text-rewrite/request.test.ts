@@ -195,3 +195,29 @@ it('enforces a local deadline and releases the browser session without applying 
   expect(vi.getTimerCount()).toBe(0);
   response.resolve('Late response');
 });
+
+it.each(['anthropic', 'google', 'neuraldeep', 'ollama', 'openrouter'] as const)(
+  'sends the approved %s selection through the existing external content workflow',
+  async (connectionType) => {
+    const input = { ...args(), provider: { ...provider, connectionType } };
+    await expect(requestTextReplacement(input)).resolves.toBe('<b>Literal replacement</b>');
+    expect(mocks.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: model.id,
+        approvedProviderId: provider.id,
+        approvedDestination: provider.destinationBinding,
+        approvedModelCode: model.modelCode,
+      }),
+      input.signal
+    );
+    expect(mocks.create).not.toHaveBeenCalled();
+  }
+);
+it('refuses a disabled external provider before capability or inference admission', async () => {
+  await expect(
+    requestTextReplacement({ ...args(), provider: { ...provider, enabled: false } })
+  ).rejects.toThrow('model-unavailable');
+  expect(mocks.token).not.toHaveBeenCalled();
+  expect(mocks.run).not.toHaveBeenCalled();
+  expect(mocks.create).not.toHaveBeenCalled();
+});

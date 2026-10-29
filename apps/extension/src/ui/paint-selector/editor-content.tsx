@@ -17,6 +17,7 @@ type EditorOptions = {
   draft: Paint;
   original: Paint;
   palette: readonly string[];
+  paletteNames?: Readonly<Record<string, string>> | undefined;
   recentColors: readonly string[];
   compact: boolean;
   title: string;
@@ -38,6 +39,8 @@ export function PaintSelectorEditorContent(props: {
   popup: EditorOptions;
   selected: GradientStop | null;
   originalStopColors: ReadonlyMap<string, string>;
+  catalogMode?: boolean;
+  onCatalogExit?: () => void;
 }) {
   const { popup } = props;
   const color =
@@ -48,9 +51,14 @@ export function PaintSelectorEditorContent(props: {
       ? popup.original.color
       : '#000000ff';
   const colorEditor = (
-    <div className="sniptale-paint-color min-w-0 space-y-3">
+    <div
+      data-color-picker-body="true"
+      data-color-search={props.catalogMode === true}
+      className="sniptale-paint-color min-w-0 space-y-3"
+    >
       {popup.palette.length > 0 && (
         <ColorSelectorSwatchSection
+          names={popup.paletteNames}
           colors={popup.palette.slice(0, 10)}
           gridClassName="grid grid-cols-10 justify-items-center gap-1"
           label=""
@@ -71,6 +79,8 @@ export function PaintSelectorEditorContent(props: {
       )}
       <ColorEditorPanel
         key={props.selected?.id ?? 'solid'}
+        catalogMode={props.catalogMode}
+        onCatalogExit={props.onCatalogExit}
         allowAlpha
         compact={popup.compact}
         originalColor={originalColor}

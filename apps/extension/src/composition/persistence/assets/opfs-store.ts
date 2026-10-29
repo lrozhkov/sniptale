@@ -21,7 +21,7 @@ const OBJECTS_DIRECTORY_NAME = 'objects';
 const WRITING_DIRECTORY_NAME = 'writing';
 const READY_DIRECTORY_NAME = 'ready';
 
-interface AssetOpfsOptions {
+export interface AssetOpfsOptions {
   createId?: () => string;
   getOriginRoot?: () => Promise<FileSystemDirectoryHandle>;
   requestExclusiveLock?: RequestExclusiveAssetLock;
@@ -43,6 +43,16 @@ export class MissingAssetObjectError extends Error {
 
   constructor(assetId: string) {
     super(`Asset object is missing: ${assetId}.`);
+  }
+}
+
+/** A size refusal remains distinct from absence so owned interrupted writes can retry safely. */
+export class AssetObjectSizeMismatchError extends Error {
+  constructor(
+    assetId: string,
+    readonly actualSize: number
+  ) {
+    super(`Asset object size mismatch: ${assetId}.`);
   }
 }
 
@@ -497,7 +507,7 @@ export async function readAssetFile(
   if (!objects) throw new MissingAssetObjectError(ref.assetId);
   const handle = await objects.getFileHandle(ref.assetId);
   const source = await handle.getFile();
-  if (source.size !== ref.size) throw new Error(`Asset object size mismatch: ${ref.assetId}.`);
+  if (source.size !== ref.size) throw new AssetObjectSizeMismatchError(ref.assetId, source.size);
   return new File([source], filename, { lastModified: source.lastModified, type: ref.mimeType });
 }
 
@@ -599,7 +609,8 @@ export async function discardPreparedAsset(
 }
 
 export async function collectQuiescentWritingObjects(
-  options: AssetOpfsOptions = {}
+  options: AssetOpfsOptions = {},
+  isRetained: (assetId: string) => Promise<boolean> = async () => false
 ): Promise<number> {
   const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
   if (!writing) return 0;
@@ -612,6 +623,13 @@ export async function collectQuiescentWritingObjects(
     if (handle.kind !== 'file') continue;
     await requestLock(assetLockName(assetId), { ifAvailable: true }, async (locked) => {
       if (!locked) return;
+      // Enumeration can outlive publication. Only a current marker can authorize abandoned cleanup.
+      try {
+        await writing.getFileHandle(assetId);
+      } catch (error) {
+        if (readErrorName(error) === 'NotFoundError') return;
+        throw error;
+      }
       const readyAssetIds = new Set(
         (await listReadyJournals(options)).flatMap((journal) =>
           journal.assetRefs.map((ref) => ref.assetId)
@@ -621,6 +639,8 @@ export async function collectQuiescentWritingObjects(
         await removeIfPresent(writing, assetId);
         return;
       }
+      // Marker unlink can fail after a ready journal commits; native claims remain authoritative.
+      if (await isRetained(assetId)) return;
       await deleteAssetObject(assetId, options);
       await removeIfPresent(writing, assetId);
       removed += 1;
@@ -656,4 +676,14 @@ export async function countAssetStorageRoots(options: AssetOpfsOptions = {}): Pr
     }
   }
   return count;
+}
+
+/** Attempt every prepared-object cleanup and retain each refusal for caller-owned rollback. */
+export async function collectPreparedAssetCleanupFailures(
+  assetIds: readonly string[]
+): Promise<unknown[]> {
+  const results = await Promise.allSettled(assetIds.map((id) => discardPreparedAsset(id)));
+  return results.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
 }

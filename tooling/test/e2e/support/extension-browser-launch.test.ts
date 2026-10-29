@@ -102,3 +102,23 @@ it('can test browser permission refusal with fake devices without auto-granting 
   expect(args).toContain('--use-fake-device-for-media-stream=fps=30');
   expect(args).not.toContain('--use-fake-ui-for-media-stream');
 });
+
+it('enables classic scrollbar proof only for the requested browser profile', async () => {
+  preparePersistentBrowser();
+  await launchExtensionBrowser({ userDataDir: '/tmp/scrollbar-profile', showScrollbars: true });
+  expect(browserIo.launch.mock.calls[0]?.[1]?.ignoreDefaultArgs).toEqual([
+    '--disable-extensions',
+    '--hide-scrollbars',
+  ]);
+  await launchExtensionBrowser({ userDataDir: '/tmp/default-profile' });
+  expect(browserIo.launch.mock.calls[1]?.[1]?.ignoreDefaultArgs).toEqual(['--disable-extensions']);
+});
+
+it('applies an explicit laboratory TLS override to offscreen requests without changing ordinary profiles', async () => {
+  preparePersistentBrowser();
+  await launchExtensionBrowser({ userDataDir: '/tmp/dav-lab-profile', ignoreHTTPSErrors: true });
+  expect(browserIo.launch.mock.calls[0]?.[1]?.args).toContain('--ignore-certificate-errors');
+  await launchExtensionBrowser({ userDataDir: '/tmp/ordinary-profile' });
+  expect(browserIo.launch.mock.calls[1]?.[1]?.args).not.toContain('--ignore-certificate-errors');
+  expect(browserIo.launch.mock.calls[1]?.[1]?.ignoreHTTPSErrors).not.toBe(true);
+});

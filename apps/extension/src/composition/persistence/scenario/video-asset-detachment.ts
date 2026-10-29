@@ -1,4 +1,6 @@
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
+import type { IDBPTransaction } from 'idb';
+import { captureVideoProjectInTransaction } from '../sync-capture/capture';
 import type { VideoProjectAssetSource } from '../../../features/video/project/types';
 import { parseAssetRef, type AssetRef } from '../assets';
 import {
@@ -8,7 +10,6 @@ import {
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   VIDEO_PROJECTS_STORE,
-  type initDB,
 } from '../infrastructure/indexed-db/core';
 import { parseVideoDependencyEnvelope } from '../media-library/dependencies';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -17,7 +18,7 @@ import { PROJECT_ASSET_OWNER_KIND, PROJECT_MEDIA_ASSET_ROLE } from '../projects/
 import { parseScenarioAssetEntry } from './read-guards';
 import { scenarioLibraryMediaId } from './library-publication';
 
-type Transaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
+type Transaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 
 async function retainScenarioRepresentation(
   tx: Transaction,
@@ -107,5 +108,6 @@ export async function detachScenarioVideoAssets(
         },
       })
     );
+    await captureVideoProjectInTransaction(tx, entry.id);
   }
 }

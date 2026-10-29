@@ -1,3 +1,6 @@
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { isAvailable: () => false },
+}));
 import type { SetStateAction } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../../../platform/i18n';
@@ -66,6 +69,8 @@ async function verifyModelSaveErrorPath() {
   addAIModelMock.mockRejectedValue(new Error('save failed'));
 
   await saveModelForm({
+    session: { modelId: 'generated-id', pending: false },
+    providerIncarnation: 'incarnation',
     formData: {
       providerId: 'provider-1',
       displayName: 'Model',
@@ -84,7 +89,8 @@ async function verifyModelSaveErrorPath() {
       providerId: 'provider-1',
       displayName: 'Model',
       modelCode: 'gpt-test',
-    })
+    }),
+    'incarnation'
   );
   expect(loggerErrorMock).toHaveBeenCalledTimes(1);
   expect(toastErrorMock).not.toHaveBeenCalled();
@@ -106,6 +112,8 @@ async function verifyModelCreateOmitsEmptyPrompt() {
   addAIModelMock.mockResolvedValue(undefined);
 
   await saveModelForm({
+    session: { modelId: 'generated-id', pending: false },
+    providerIncarnation: 'incarnation',
     formData: {
       providerId: 'provider-1',
       displayName: 'Model',
@@ -118,14 +126,19 @@ async function verifyModelCreateOmitsEmptyPrompt() {
     setIsSaving,
   });
 
-  expect(addAIModelMock).toHaveBeenCalledWith({
-    id: 'generated-id',
-    providerId: 'provider-1',
-    displayName: 'Model',
-    modelCode: 'gpt-test',
-  });
+  expect(addAIModelMock).toHaveBeenCalledWith(
+    {
+      id: 'generated-id',
+      providerId: 'provider-1',
+      displayName: 'Model',
+      modelCode: 'gpt-test',
+      source: 'manual',
+      propertySource: 'manual',
+    },
+    'incarnation'
+  );
   expect(onSave).toHaveBeenCalledTimes(1);
-  expect(setErrors).not.toHaveBeenCalled();
+  expect(setErrors).toHaveBeenCalledExactlyOnceWith({});
 }
 
 describe('ai-providers-section-form-save.model', () => {
@@ -142,6 +155,8 @@ it('saves speech defaults without carrying over a text system prompt', async () 
   resetModelFormSaveMocks();
   const { saveModelForm } = await import('./save');
   await saveModelForm({
+    session: { modelId: 'generated-id', pending: false },
+    providerIncarnation: 'incarnation',
     formData: {
       providerId: 'provider-1',
       displayName: 'Speech',
@@ -155,12 +170,47 @@ it('saves speech defaults without carrying over a text system prompt', async () 
     setErrors: createStateSetterMock<Record<string, string>>(),
     setIsSaving: createStateSetterMock<boolean>(),
   });
-  expect(addAIModelMock).toHaveBeenCalledWith({
-    id: 'generated-id',
-    providerId: 'provider-1',
-    displayName: 'Speech',
-    modelCode: 'custom',
-    operation: 'speech',
-    audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+  expect(addAIModelMock).toHaveBeenCalledWith(
+    {
+      id: 'generated-id',
+      providerId: 'provider-1',
+      displayName: 'Speech',
+      modelCode: 'custom',
+      operation: 'speech',
+      audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+      source: 'manual',
+      propertySource: 'manual',
+    },
+    'incarnation'
+  );
+});
+
+it('keeps text instructions when a multi-operation model views recognition parameters', async () => {
+  resetModelFormSaveMocks();
+  const { saveModelForm } = await import('./save');
+  await saveModelForm({
+    session: { modelId: 'generated-id', pending: false },
+    providerIncarnation: 'incarnation',
+    formData: {
+      providerId: 'provider-1',
+      displayName: 'Several operations',
+      modelCode: 'custom',
+      systemPrompt: 'Keep these text instructions',
+      operation: 'transcription',
+      capabilities: {
+        operations: { text: 'supported', transcription: 'supported' },
+        input: {},
+        output: {},
+        features: {},
+      },
+    },
+    isEditing: false,
+    onSave: vi.fn(),
+    setErrors: createStateSetterMock<Record<string, string>>(),
+    setIsSaving: createStateSetterMock<boolean>(),
   });
+  expect(addAIModelMock).toHaveBeenCalledWith(
+    expect.objectContaining({ systemPrompt: 'Keep these text instructions' }),
+    'incarnation'
+  );
 });

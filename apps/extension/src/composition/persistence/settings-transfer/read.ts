@@ -125,6 +125,8 @@ export async function readSettingsTransferSnapshot(
       format: settings.imageFormat,
       quality: settings.imageQuality,
       fullPageQuality: settings.fullPageQuality,
+      fullPageImage: settings.fullPageImage,
+      fullPageCapture: settings.fullPageCapture,
     }),
     'capture.pages': payload({
       resourceLimits: settings.exportResourceLimits,
@@ -151,6 +153,7 @@ export async function readSettingsTransferSnapshot(
     'styles.tool-presets': payload(editorPresets),
     'styles.palettes': payload({
       slots: Object.fromEntries(palette.colors.map((color, index) => [`slot-${index}`, color])),
+      ...(palette.names ? { names: palette.names } : {}),
     }),
     'styles.surfaces': payload(serializeSurfaceStylePresetCatalog(surfaces)),
     'styles.gradients': payload(gradients),
@@ -201,7 +204,6 @@ function collectAITransferDomains(
     'ai.providers': payload({ items: providers }),
     'ai.models': payload({
       items: ai.models.map(selectSettingsTransferModelMetadata),
-      defaultModelId: ai.defaultModelId,
     }),
     'ai.chrome': payload({ enabled: ai.chromeAiEnabled }),
     'ai.prompts': payload({
@@ -243,10 +245,6 @@ export function collectSettingsTransferDependencies(
     .filter((id): id is string => typeof id === 'string')
     .map((id) => `capture.saving.templates.${id}`);
   if (savingDependencies.length > 0) result['capture.saving.defaults'] = savingDependencies;
-  const models = asRecord(domains['ai.models']?.data);
-  if (typeof models?.['defaultModelId'] === 'string') {
-    result['ai.models.default'] = [`ai.models.items.${models['defaultModelId']}`];
-  }
   const tags = asRecord(domains['styles.tags']?.data);
   const tagDependencies = availableReferences(
     tags?.['activeFilterTagIds'],

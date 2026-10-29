@@ -1,9 +1,15 @@
 import {
+  publishPreparedVideoProjectRevisionInTransaction,
+  publishPreparedVideoProjectSidecarsInTransaction,
+  type PreparedVideoProjectRevision,
+  type VideoProjectRevisionPublicationStores,
+} from './revision-publication';
+import { allocateVideoProjectRevisionInTransaction } from './revisions';
+import {
   promoteReviewPrimarySourceLifecycles,
   promoteReviewSourceLifecycles,
 } from '../review-workspaces/new-reference-admission';
 import type { IDBPTransaction } from 'idb';
-import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import { promoteProjectSourceLifecycles } from './new-reference-admission';
 import {
   STORE_NAME,
@@ -34,10 +40,7 @@ import type {
 } from '../assets';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { MediaLibraryEntry, MediaThumbnailEntry } from '../media-library/contracts';
-import {
-  buildProjectAssetMediaEntry,
-  buildProjectExportMediaEntry,
-} from '../media-library/entry-mapping';
+import { buildProjectExportMediaEntry } from '../media-library/entry-mapping';
 import type {
   StoredProjectAssetEntry,
   StoredProjectExportEntry,
@@ -48,16 +51,11 @@ import {
   parseProjectExportEntry,
   parseVideoProjectEntry,
 } from './read-guards';
-import {
-  PROJECT_ASSET_OWNER_KIND,
-  PROJECT_EXPORT_OWNER_KIND,
-  PROJECT_MEDIA_ASSET_ROLE,
-} from './asset-publication';
+import { PROJECT_EXPORT_OWNER_KIND, PROJECT_MEDIA_ASSET_ROLE } from './asset-publication';
 import {
   collectProjectAssetOwnership,
   type ProjectAssetOwnership,
 } from './backup-restore-asset-ownership';
-import { createLibraryLifecycle, promoteLibraryLifecycle } from '../library-lifecycle/contracts';
 
 interface Store<T = unknown> {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -74,16 +72,7 @@ interface IndexStore<T = unknown> extends Store<T> {
   index(name: 'projectId'): { getAll(projectId: string): Promise<unknown[]> };
 }
 
-interface PreparedVideoProjectArchiveRoot {
-  assets: Array<{
-    entry: StoredProjectAssetEntry;
-    filename: string;
-    publishToLibrary?: boolean;
-    reusePublished?: boolean;
-    ref: AssetRef;
-    videoReview?: VideoWorkspaceSnapshot;
-  }>;
-  entry: VideoProjectEntry;
+interface PreparedVideoProjectArchiveRoot extends PreparedVideoProjectRevision {
   exports: Array<{
     entry: StoredProjectExportEntry;
     ref: AssetRef;
@@ -91,11 +80,9 @@ interface PreparedVideoProjectArchiveRoot {
     thumbnail?: MediaThumbnailEntry;
     videoReview?: VideoWorkspaceSnapshot;
   }>;
-  presentation?: AggregatePresentationEntry;
-  thumbnail?: MediaThumbnailEntry;
 }
 
-export interface VideoProjectBackupRestoreStores {
+export interface VideoProjectBackupRestoreStores extends VideoProjectRevisionPublicationStores {
   assets: Store<StoredProjectAssetEntry>;
   exports: IndexStore<StoredProjectExportEntry>;
   media: Store<MediaLibraryEntry>;
@@ -238,36 +225,6 @@ async function hasExportConflict(args: {
   return conflicted;
 }
 
-async function publishProjectAssets(
-  root: PreparedVideoProjectArchiveRoot,
-  stores: VideoProjectBackupRestoreStores
-) {
-  for (const asset of root.assets) {
-    if (asset.reusePublished) continue;
-    await stores.refs.put(asset.ref);
-    await stores.owners.put({
-      assetId: asset.ref.assetId,
-      ownerId: asset.entry.id,
-      ownerKind: PROJECT_ASSET_OWNER_KIND,
-      role: PROJECT_MEDIA_ASSET_ROLE,
-    });
-    await stores.assets.put(asset.entry);
-    if (asset.videoReview)
-      await putVideoReviewRestore({
-        review: asset.videoReview,
-        workspaces: stores.videoWorkspaces,
-        drafts: stores.videoDrafts,
-      });
-    if (asset.publishToLibrary !== false) {
-      await stores.media.put({
-        ...buildProjectAssetMediaEntry(asset.entry),
-        filename: asset.filename,
-        originalFilename: asset.filename,
-      });
-    }
-  }
-}
-
 async function publishProjectExports(
   root: PreparedVideoProjectArchiveRoot,
   stores: VideoProjectBackupRestoreStores
@@ -299,14 +256,6 @@ async function publishProjectExports(
     await stores.media.put(buildProjectExportMediaEntry(item.entry));
     if (item.thumbnail) await stores.thumbnails.put(item.thumbnail);
   }
-}
-
-async function publishProjectSidecars(
-  root: PreparedVideoProjectArchiveRoot,
-  stores: VideoProjectBackupRestoreStores
-) {
-  if (root.thumbnail) await stores.thumbnails.put(root.thumbnail);
-  if (root.presentation) await stores.presentations.put(root.presentation);
 }
 
 async function retainRestoredReviewSources(
@@ -360,6 +309,11 @@ export async function putVideoProjectBackupRestore(args: {
   if ((existing || childConflict) && args.strategy === 'duplicate') {
     throw new Error('Video project restore conflict changed after preflight.');
   }
+  const workspaceRevision = await allocateVideoProjectRevisionInTransaction(
+    args.tx,
+    args.root.entry.id,
+    existing?.workspaceRevision ?? 0
+  );
   const releasedCandidates = new Set(assetOwnership.owned);
   if (existing && args.strategy === 'replace')
     await deleteExisting({
@@ -371,17 +325,17 @@ export async function putVideoProjectBackupRestore(args: {
       tx: args.tx,
       releasedCandidates,
     });
-  const lifecycle =
-    args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
-  await args.stores.projects.put(
-    withVideoProjectUsage({
-      ...args.root.entry,
-      lifecycle: promoteLibraryLifecycle(lifecycle, lifecycle.updatedAt),
-    })
-  );
-  await publishProjectAssets(args.root, args.stores);
+  await publishPreparedVideoProjectRevisionInTransaction({
+    root: args.root,
+    stores: args.stores,
+    workspaceRevision,
+  });
   await publishProjectExports(args.root, args.stores);
-  await publishProjectSidecars(args.root, args.stores);
+  await publishPreparedVideoProjectSidecarsInTransaction({
+    root: args.root,
+    stores: args.stores,
+    workspaceRevision,
+  });
   await retainRestoredReviewSources(args.root, args.tx);
   await promoteProjectSourceLifecycles(
     args.root.entry.project,

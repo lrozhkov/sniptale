@@ -552,3 +552,7 @@ it.each(['none', 'image', 'video'] as const)(
     expect(original).toEqual(before);
   }
 );
+
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

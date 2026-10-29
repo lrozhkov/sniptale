@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { encodeChatTranscription, parseChatTranscription } from './chat-transcription';
+import {
+  buildChatTranscriptionCall,
+  transformBothubChatRequest,
+  parseChatTranscription,
+} from './chat-transcription';
 import type { AudioRecognitionOptions } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
 const options: AudioRecognitionOptions = {
@@ -8,6 +12,8 @@ const options: AudioRecognitionOptions = {
   prompt: '',
 };
 const config: AudioModelConfig = {
+  connectionType: 'openai-compatible',
+  baseUrl: 'https://provider.test/v1/chat/completions',
   url: 'https://provider.test/v1/chat/completions',
   apiKey: 'unused',
   modelCode: 'declared',
@@ -28,41 +34,54 @@ function response(segments: unknown, finish = 'stop') {
 }
 
 describe('declared multimodal audio protocol', () => {
-  it('encodes standard audio and a fixed schema without credentials in the payload', () => {
-    const body = JSON.parse(encodeChatTranscription(config, options, 10, 'YWJj'));
-    expect(body.messages[1].content[1]).toEqual({
-      type: 'input_audio',
-      input_audio: { data: 'YWJj', format: 'wav' },
+  it('builds SDK audio parts and a fixed schema without credentials in the payload', () => {
+    const bytes = new Uint8Array([97, 98, 99]);
+    const call = buildChatTranscriptionCall(config, options, 10, bytes);
+    expect(call.prompt[1]).toMatchObject({
+      role: 'user',
+      content: [
+        expect.anything(),
+        { type: 'file', data: { type: 'data', data: bytes }, mediaType: 'audio/wav' },
+      ],
     });
-    expect(body.response_format.type).toBe('json_schema');
-    expect(body.messages[0].content).toContain('User instructions');
-    expect(body.messages[0].content).toContain('verbatim');
-    expect(body.messages[0].content).toContain('Audio-relative duration: 10');
-    expect(body).not.toHaveProperty('apiKey');
+    expect(call.responseFormat).toMatchObject({
+      type: 'json',
+      name: 'timed_transcript',
+      schema: { type: 'object' },
+    });
+    expect(call.prompt[0]).toMatchObject({ content: expect.stringContaining('User instructions') });
+    expect(call.prompt[0]).toMatchObject({ content: expect.stringContaining('verbatim') });
+    expect(call.prompt[0]).toMatchObject({
+      content: expect.stringContaining('Audio-relative duration: 10'),
+    });
+    expect(call).not.toHaveProperty('apiKey');
   });
-  it('uses the explicitly selected Bothub media protocol and JSON Object without transport fallback', () => {
-    const body = JSON.parse(
-      encodeChatTranscription(
-        {
-          ...config,
-          transcription: {
-            ...config.transcription!,
-            chatProtocol: 'bothub',
-            structuredOutput: 'json_object',
-          },
+  it('retains rewrite instructions and explicitly selected JSON Object mode', () => {
+    const call = buildChatTranscriptionCall(
+      {
+        ...config,
+        transcription: {
+          ...config.transcription!,
+          chatProtocol: 'bothub',
+          structuredOutput: 'json_object',
         },
-        { ...options, mode: 'rewrite', prompt: 'Make concise' },
-        10,
-        'YWJj'
-      )
+      },
+      { ...options, mode: 'rewrite', prompt: 'Make concise' },
+      10,
+      new Uint8Array([97])
     );
-    expect(body.messages[1].content[1]).toEqual({
-      type: 'image_url',
-      image_url: { url: 'data:audio/wav;base64,YWJj' },
-    });
-    expect(body.responseFormat).toEqual({ type: 'json_object' });
-    expect(body).not.toHaveProperty('response_format');
-    expect(body.messages[0].content).toContain('Make concise');
+    expect(call.responseFormat).toEqual({ type: 'json' });
+    expect(call.prompt[0]).toMatchObject({ content: expect.stringContaining('Make concise') });
+  });
+  it('refuses malformed SDK audio fields before Bothub egress', () => {
+    expect(() =>
+      transformBothubChatRequest({
+        messages: [
+          { content: [{ type: 'input_audio', input_audio: { format: 'mp3', data: 'YWJj' } }] },
+        ],
+      })
+    ).toThrow('invalid-request');
+    expect(() => transformBothubChatRequest({})).toThrow('invalid-request');
   });
   it('preserves native gaps and distinct verbatim text in correction mode', () => {
     const corrected = { ...segment, text: 'Коротко.', originalText: 'Первая фраза.' };

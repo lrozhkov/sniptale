@@ -4,6 +4,7 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  ASSET_RESIDENCY_STORE,
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
@@ -30,10 +31,15 @@ import {
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   SCHEMA_CONTRACTS_STORE,
   STATE_MANAGER_STORE,
+  SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
+  SYNC_CATALOG_CACHE_STORE,
+  SYNC_CONNECTION_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_PROJECT_REVISIONS_STORE,
   WEB_SNAPSHOTS_STORE,
 } from '../core.stores.ts';
 import {
@@ -111,6 +117,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, DIAGNOSTICS_META_STORE, 'recordingId');
   createStore(db, DIAGNOSTICS_EVENTS_STORE, ['recordingId', 'chunkIndex'], ['recordingId']);
   createStore(db, VIDEO_PROJECTS_STORE, 'id', ['updatedAt', 'usageReferenceKeys']);
+  createStore(db, VIDEO_PROJECT_REVISIONS_STORE, 'projectId');
   createStore(db, SCENARIO_PROJECTS_STORE, 'id', ['updatedAt']);
   createStore(db, SCENARIO_PROJECT_HISTORY_STORE, ['projectId', 'revision'], ['projectId']);
   createStore(db, SCENARIO_PROJECT_UNITS_STORE, ['projectId', 'unitId', 'revision'], ['projectId']);
@@ -144,6 +151,22 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, ASSET_OWNERS_STORE, ['ownerKind', 'ownerId', 'role'], ['assetId']);
   createStore(db, ASSET_OPERATIONS_STORE, 'operationId', ['status', 'updatedAt']);
   createStore(db, VOICE_INPUT_HISTORY_STORE, 'id');
+  createStore(db, SYNC_CAPTURE_STORE, 'key', ['kind', 'rootKey', 'createdAt']);
+  db.createObjectStore(SYNC_OUTBOX_STORE, { keyPath: 'key' }).createIndex(
+    'syncQueueDue',
+    [
+      'spaceId',
+      'connectionGeneration',
+      'profileCreatedAt',
+      'authorization.incarnation',
+      'nextDueAt',
+      'key',
+    ],
+    { unique: false }
+  );
+  createStore(db, SYNC_CATALOG_CACHE_STORE, 'key');
+  createStore(db, SYNC_CONNECTION_STORE, 'key');
+  createStore(db, ASSET_RESIDENCY_STORE, 'id');
   const contracts = db.createObjectStore(SCHEMA_CONTRACTS_STORE, { keyPath: 'domainId' });
   for (const contract of CURRENT_SCHEMA_CONTRACTS) contracts.put(contract);
 }

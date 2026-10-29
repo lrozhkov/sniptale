@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+import { formatDateTime } from '../../../../../platform/i18n';
 import { translate } from '../../../../../platform/i18n';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import type { AiProvidersSectionState } from '../controller/types';
@@ -12,6 +13,19 @@ import { AIProvidersProvidersCard } from './cards';
 import { AIProvidersChromeAiCard } from './chrome-ai-card';
 import { createMockChromeAiState, createMockSecretProtectionState } from './test-support';
 
+import {
+  refreshAIProviderCatalog,
+  setAIProviderEnabled,
+} from '../../../../runtime/ai-settings/mutations';
+import { browserPermissions } from '@sniptale/platform/browser/permissions';
+vi.mock('../../../../runtime/ai-settings/mutations', () => ({
+  refreshAIProviderCatalog: vi.fn(),
+  setAIProviderEnabled: vi.fn(),
+}));
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: { request: vi.fn() },
+}));
+
 const PROVIDER: AIProvider = {
   id: 'provider-1',
   name: 'OpenAI',
@@ -19,6 +33,7 @@ const PROVIDER: AIProvider = {
   baseUrl: 'https://api.openai.com/v1',
   hasStoredApiKey: true,
   createdAt: 1,
+  incarnation: 'provider-incarnation',
 };
 
 const MODEL: AIModel = {
@@ -51,13 +66,12 @@ function createState(overrides: Partial<AiProvidersSectionState> = {}): AiProvid
       deleteModel: vi.fn().mockResolvedValue(undefined),
       deleteProvider: vi.fn().mockResolvedValue(undefined),
       moveModel: vi.fn().mockResolvedValue(undefined),
-      setDefaultModel: vi.fn().mockResolvedValue(undefined),
     },
     chromeAi: createMockChromeAiState(),
     secretProtection: createMockSecretProtectionState(),
     providers: [PROVIDER],
     models: [MODEL],
-    defaultModelId: 'model-1',
+    catalogModels: [],
     isLoading: false,
     modelOptions: [],
     modals: {
@@ -193,7 +207,7 @@ it('renders provider rows and wires provider add, edit, and delete callbacks', a
   await renderUi(<AIProvidersProvidersCard state={state} />);
 
   expect(container?.textContent).toContain('OpenAI');
-  expect(container?.textContent).toContain('openai-compatible');
+  expect(container?.textContent).toContain('OpenAI-compatible');
 
   await openFirstActionMenu();
 
@@ -249,8 +263,8 @@ it('renders a compact clear-secret action only for providers with a stored key',
   ).toBe(false);
 });
 
-it('renders model rows, default actions, and empty states when providers are unavailable', async () => {
-  const state = createState({ defaultModelId: null });
+it('renders model rows and empty states without a global-default action', async () => {
+  const state = createState();
   await renderUi(<AIProvidersModelsCard state={state} />);
 
   expect(container?.textContent).toContain('GPT 4.1');
@@ -277,7 +291,6 @@ it('renders model rows, default actions, and empty states when providers are una
 
   expect(state.modals.openModelModal).toHaveBeenCalledTimes(2);
   expect(state.modals.openModelModal).toHaveBeenCalledWith(MODEL);
-  expect(state.catalogActions.setDefaultModel).toHaveBeenCalledWith('model-1');
   expect(state.modals.setConfirmDelete).toHaveBeenCalledWith({ type: 'model', item: MODEL });
 
   const emptyState = createState({
@@ -351,4 +364,339 @@ it('runs the Chrome AI diagnostic only when the integration is enabled', async (
       (button) => button.textContent === translate('settings.aiProviders.chromeAiTestAction')
     )?.disabled
   ).toBe(true);
+});
+
+it('explains automatic catalogs without asking the user to add those models manually', async () => {
+  await renderUi(
+    <AIProvidersModelsCard
+      state={createState({ models: [], providers: [{ ...PROVIDER, management: 'automatic' }] })}
+    />
+  );
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.manualModelsEmptyTitle')
+  );
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.modelsAutomaticDescription')
+  );
+  expect(container?.textContent).not.toContain(
+    translate('settings.aiProviders.modelsEmptyDescriptionWithProviders')
+  );
+});
+
+it('refreshes metadata with explicit host permission recovery and retains the card after failure', async () => {
+  let finish!: () => void;
+  vi.mocked(refreshAIProviderCatalog).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const state = createState({
+    providers: [
+      {
+        ...PROVIDER,
+        revision: 1,
+        observation: {
+          revision: 1,
+          status: 'permission-required',
+          scope: 'catalog',
+          checkedAt: 1,
+          reason: 'host-permission-required',
+        },
+      },
+    ],
+  });
+  await renderUi(<AIProvidersProvidersCard state={state} />);
+  const checkButton = () =>
+    getButtons().find(
+      (button) =>
+        button.getAttribute('aria-label') ===
+          translate('settings.aiProviders.providerCheckAction') ||
+        button.getAttribute('aria-label') === translate('settings.aiProviders.providerCheckPending')
+    )!;
+  await act(async () => {
+    checkButton().click();
+  });
+  expect(browserPermissions.request).toHaveBeenCalledWith({
+    origins: ['https://api.openai.com/*'],
+  });
+  expect(refreshAIProviderCatalog).toHaveBeenCalledWith(PROVIDER.id);
+  expect(checkButton().disabled).toBe(true);
+  await act(async () => {
+    finish();
+  });
+  expect(state.reloadData).toHaveBeenCalledOnce();
+  expect(checkButton().disabled).toBe(false);
+  vi.mocked(refreshAIProviderCatalog).mockRejectedValueOnce(new Error('offline'));
+  await act(async () => {
+    checkButton().click();
+  });
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    translate('settings.aiProviders.providerCheckFailed')
+  );
+  expect(container?.textContent).toContain(PROVIDER.name);
+});
+
+it('persists provider enable changes and reports refusal without replacing provider data', async () => {
+  const state = createState();
+  vi.mocked(setAIProviderEnabled).mockResolvedValueOnce(undefined);
+  await renderUi(<AIProvidersProvidersCard state={state} />);
+  const toggle = container!.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  expect(toggle).toBeTruthy();
+  await act(async () => {
+    toggle.click();
+  });
+  expect(setAIProviderEnabled).toHaveBeenCalledWith(PROVIDER.id, 'provider-incarnation', false);
+  expect(state.reloadData).toHaveBeenCalledOnce();
+  vi.mocked(setAIProviderEnabled).mockRejectedValueOnce(new Error('storage refused'));
+  await act(async () => {
+    toggle.click();
+  });
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    translate('common.errors.saveFailed')
+  );
+});
+
+it('distinguishes local credentials and disables checks for a disabled provider', async () => {
+  await renderUi(
+    <AIProvidersProvidersCard
+      state={createState({
+        providers: [
+          {
+            ...PROVIDER,
+            connectionType: 'ollama',
+            hasStoredApiKey: false,
+            enabled: false,
+            management: 'manual',
+          },
+        ],
+      })}
+    />
+  );
+  expect(container?.textContent).toContain(translate('settings.aiProviders.providerLocalNoKey'));
+  expect(
+    getButtons().find(
+      (button) =>
+        button.getAttribute('aria-label') === translate('settings.aiProviders.providerCheckAction')
+    )?.disabled
+  ).toBe(true);
+});
+
+it('refuses an enabled change when the mounted card has no current provider incarnation', async () => {
+  vi.mocked(setAIProviderEnabled).mockClear();
+  await renderUi(
+    <AIProvidersProvidersCard
+      state={createState({ providers: [{ ...PROVIDER, incarnation: undefined }] })}
+    />
+  );
+  await act(async () => {
+    container!.querySelector<HTMLButtonElement>('[role="switch"]')!.click();
+  });
+  expect(setAIProviderEnabled).not.toHaveBeenCalled();
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    translate('common.errors.saveFailed')
+  );
+});
+
+it('shows successful catalog freshness separately from later failed and operation checks', async () => {
+  const successfulAt = Date.UTC(2026, 0, 2, 10);
+  const checkedAt = Date.UTC(2026, 0, 3, 11);
+  for (const scope of ['catalog', 'operation'] as const) {
+    await renderUi(
+      <AIProvidersProvidersCard
+        state={createState({
+          providers: [
+            {
+              ...PROVIDER,
+              management: 'automatic',
+              catalogUpdatedAt: successfulAt,
+              observation: {
+                scope,
+                checkedAt,
+                revision: 1,
+                status: 'unavailable',
+                reason: 'network',
+              },
+            },
+          ],
+        })}
+      />
+    );
+    expect(container?.textContent).not.toMatch(/\{(?:date|count)\}/u);
+    expect(container?.textContent).toContain(
+      translate('settings.aiProviders.providerCatalogUpdated').replace(
+        '{date}',
+        formatDateTime(successfulAt, { dateStyle: 'short', timeStyle: 'short' })
+      )
+    );
+    expect(container?.textContent).toContain(
+      translate('settings.aiProviders.providerChecked').replace(
+        '{date}',
+        formatDateTime(checkedAt, { dateStyle: 'short', timeStyle: 'short' })
+      )
+    );
+  }
+});
+
+it('counts each usable model once with adapter, enabled and lifecycle admission', async () => {
+  const capabilities = {
+    operations: { text: 'supported', speech: 'supported' },
+    input: {},
+    output: {},
+    features: {},
+  } as const;
+  const catalog = {
+    capabilities,
+    displayName: 'Model',
+    lifecycle: 'active',
+    observedAt: 1,
+  } as const;
+  await renderUi(
+    <AIProvidersProvidersCard
+      state={createState({
+        providers: [{ ...PROVIDER, management: 'automatic' }],
+        models: [],
+        catalogModels: [
+          { ...MODEL, capabilities, catalog, source: 'catalog' },
+          { ...MODEL, id: 'disabled', enabled: false, capabilities, catalog },
+          { ...MODEL, id: 'retired', capabilities, catalog: { ...catalog, lifecycle: 'retired' } },
+          { ...MODEL, id: 'other', providerId: 'other', capabilities },
+          { ...MODEL, id: 'unknown', capabilities: { ...capabilities, operations: {} } },
+        ],
+      })}
+    />
+  );
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.providerEligibleModels').replace('{count}', '1')
+  );
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.providerCatalogNeverUpdated')
+  );
+});
+
+it('explains ID-only catalogs and opens manual setup for the relevant connection', async () => {
+  const capabilities = { operations: {}, input: {}, output: {}, features: {} };
+  const state = createState({
+    providers: [{ ...PROVIDER, management: 'automatic' }],
+    models: [],
+    catalogModels: [
+      {
+        ...MODEL,
+        source: 'catalog',
+        capabilities,
+        catalog: {
+          capabilities,
+          displayName: MODEL.displayName,
+          lifecycle: 'active',
+          observedAt: 1,
+        },
+      },
+    ],
+  });
+  await renderUi(<AIProvidersProvidersCard state={state} />);
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.providerCatalogMetadataMissing')
+  );
+  await act(async () =>
+    getButtons()
+      .find(
+        (button) =>
+          button.getAttribute('aria-label') ===
+          translate('settings.aiProviders.providerConfigureModel')
+      )
+      ?.click()
+  );
+  expect(state.modals.openModelModal).toHaveBeenCalledWith(undefined, PROVIDER.id);
+  await renderUi(
+    <AIProvidersProvidersCard
+      state={createState({
+        providers: [{ ...PROVIDER, management: 'automatic' }],
+        catalogModels: [],
+      })}
+    />
+  );
+  expect(container?.textContent).not.toContain(
+    translate('settings.aiProviders.providerCatalogMetadataMissing')
+  );
+});
+
+it('does not confuse retired, disabled or explicitly unsupported models with missing metadata', async () => {
+  for (const variant of ['retired', 'disabled', 'unsupported'] as const) {
+    const capabilities = {
+      operations:
+        variant === 'unsupported'
+          ? ({ text: 'unsupported', transcription: 'unsupported', speech: 'unsupported' } as const)
+          : {},
+      input: {},
+      output: {},
+      features: {},
+    };
+    await renderUi(
+      <AIProvidersProvidersCard
+        state={createState({
+          providers: [{ ...PROVIDER, management: 'automatic' }],
+          catalogModels: [
+            {
+              ...MODEL,
+              source: 'catalog',
+              enabled: variant !== 'disabled',
+              capabilities,
+              catalog: {
+                capabilities,
+                displayName: 'm',
+                lifecycle: variant === 'retired' ? 'retired' : 'active',
+                observedAt: 1,
+              },
+            },
+          ],
+        })}
+      />
+    );
+    expect(container?.textContent).not.toContain(
+      translate('settings.aiProviders.providerCatalogMetadataMissing')
+    );
+    expect(container?.textContent).toContain(
+      translate('settings.aiProviders.providerEligibleModels').replace('{count}', '0')
+    );
+  }
+});
+
+it('does not count an operation outside the admitted provider adapter', async () => {
+  await renderUi(
+    <AIProvidersProvidersCard
+      state={createState({
+        providers: [{ ...PROVIDER, connectionType: 'anthropic', management: 'automatic' }],
+        catalogModels: [
+          {
+            ...MODEL,
+            capabilities: {
+              operations: { speech: 'supported' },
+              input: {},
+              output: {},
+              features: {},
+            },
+          },
+        ],
+      })}
+    />
+  );
+  expect(container?.textContent).toContain(
+    translate('settings.aiProviders.providerEligibleModels').replace('{count}', '0')
+  );
+});
+
+it('keeps provider commands together and status in the full-width footer', async () => {
+  await renderUi(<AIProvidersProvidersCard state={createState()} />);
+  const row = container!.querySelector('[data-settings-collection-item]')!;
+  const footer = row.querySelector('[data-settings-collection-footer]')!;
+  expect(footer).not.toBeNull();
+  expect(footer.querySelector('[data-provider-status]')?.textContent).toBeTruthy();
+  expect(footer.querySelector('button')).toBeNull();
+  for (const key of ['providerCheckAction', 'providerConfigureModel'] as const) {
+    const action = row.querySelector(
+      `button[aria-label="${translate(`settings.aiProviders.${key}`)}"]`
+    )!;
+    expect(action).not.toBeNull();
+    expect(footer.contains(action)).toBe(false);
+  }
 });

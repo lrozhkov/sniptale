@@ -49,7 +49,7 @@
   justify-content: space-between;
   min-width: 0;
   gap: 8px;
-  padding-bottom: 4px;
+  padding-block: 2px;
   cursor: default !important;
   user-select: none;
 }
@@ -97,33 +97,7 @@
 .sniptale-settings-popover-source-switch {
   display: inline-flex;
   flex: 0 0 auto;
-  align-items: stretch;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 6px;
-  background: var(--sniptale-color-surface-input);
-}
-
-.sniptale-settings-popover-source-option {
-  min-height: 24px;
-  padding: 2px 8px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  box-shadow: none;
-  color: var(--sniptale-color-text-secondary);
-  font: 400 12px / 20px var(--sniptale-font-interface);
-  white-space: nowrap;
-  cursor: pointer !important;
-}
-
-.sniptale-settings-popover-source-option:hover {
-  color: var(--sniptale-color-text-primary);
-}
-
-.sniptale-settings-popover-source-option[aria-pressed='true'] {
-  background: var(--sniptale-color-surface-hover);
-  color: var(--sniptale-color-text-primary);
+  align-items: center;
 }
 
 .sniptale-settings-popover-header .sniptale-settings-popover-icon-action {
@@ -151,40 +125,42 @@
   box-shadow: none;
 }
 
-.sniptale-settings-popover-header
-  :is(.sniptale-settings-popover-icon-action, .sniptale-settings-popover-source-option):focus {
+.sniptale-settings-popover-header .sniptale-settings-popover-source-toggle[aria-pressed='true'] {
+  color: var(--sniptale-color-accent);
+}
+
+.sniptale-settings-popover-header .sniptale-settings-popover-icon-action:focus {
   outline: none;
 }
 
 .sniptale-settings-popover-header
-  :is(
-    .sniptale-settings-popover-icon-action,
-    .sniptale-settings-popover-source-option
-  ):focus-visible:not([data-focus-restoration='pointer']) {
+  .sniptale-settings-popover-icon-action:focus-visible:not([data-focus-restoration='pointer']) {
   outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: -1px;
 }
 
 /* Embedded annotation chrome opts in without changing the rendered page annotation. */
-.sniptale-content-appearance-surface.sniptale-content-popover {
+.sniptale-content-appearance-surface.sniptale-content-popover.sniptale-content-popover--toolbar-menu {
   padding: 8px;
   border-radius: 4px;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-body {
+.sniptale-content-appearance-surface.sniptale-content-popover .sniptale-content-popover-body {
   gap: 8px;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-section {
+.sniptale-content-appearance-surface.sniptale-content-popover .sniptale-content-popover-section {
   gap: 8px;
   padding: 8px 0;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-section:first-child {
+.sniptale-content-appearance-surface.sniptale-content-popover
+  .sniptale-content-popover-section:first-child {
   padding-top: 0;
 }
 
-.sniptale-content-appearance-surface .sniptale-content-popover-section-label {
+.sniptale-content-appearance-surface.sniptale-content-popover
+  .sniptale-content-popover-section-label {
   color: var(--sniptale-color-text-secondary);
   font: 500 13px / 18px var(--sniptale-font-interface);
 }
@@ -194,10 +170,6 @@
   font: 500 12px / 16px var(--sniptale-font-interface);
   text-transform: none;
   letter-spacing: normal;
-}
-
-.sniptale-content-appearance-surface .sniptale-settings-popover-header {
-  padding-bottom: 0;
 }
 
 .sniptale-content-appearance-surface

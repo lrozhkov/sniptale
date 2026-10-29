@@ -1,0 +1,620 @@
+import { parseCapturedReview } from './review-snapshot';
+import { parseRecordingEntry } from '../recordings/index.guards';
+import { parseScenarioAssetEntry } from '../scenario/read-guards';
+import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
+import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from '../media-library/read-guards';
+import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+  parseVideoProjectEntry,
+} from '../projects/read-guards';
+import { parseAssetRef } from '../assets/guards';
+import type { VideoProjectMetadata } from '../../../features/video/project/validation';
+import {
+  MAX_CAPTURE_ROWS,
+  MAX_CAPTURE_METADATA_BYTES,
+  type CapturedVideoProjectRows,
+  type CapturedMediaDependency,
+  type CapturedRootDependency,
+} from './contracts';
+import { isBoundedImageMetadata, describeImageMetadata } from './image-snapshot';
+
+function identity(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 256;
+}
+function ordinal(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+function parseRows<T>(value: unknown, parse: (row: unknown) => T | null): T[] | null {
+  if (!Array.isArray(value) || value.length > MAX_CAPTURE_ROWS) return null;
+  const parsed = value.map(parse);
+  return parsed.some((row) => row === null) ? null : parsed.filter((row) => row !== null);
+}
+
+/** Native recording sources retain their canonical recording roots and authored bindings. */
+export function isSupportedCaptureProject(project: VideoProjectMetadata): boolean {
+  if (
+    project.source.kind !== 'manual' &&
+    project.source.kind !== 'recording' &&
+    project.source.kind !== 'scenario'
+  )
+    return false;
+  const ids = new Set(project.assets.map((asset) => asset.id));
+  return (
+    project.assets.length <= MAX_CAPTURE_ROWS &&
+    ids.size === project.assets.length &&
+    project.assets.every(
+      (asset) =>
+        asset.source.kind === 'recording' ||
+        asset.source.kind === 'library-asset' ||
+        asset.source.kind === 'project-asset' ||
+        asset.source.kind === 'scenario-asset'
+    ) &&
+    project.clips.every(
+      (clip) =>
+        (clip.type !== 'VIDEO' && clip.type !== 'AUDIO' && clip.type !== 'IMAGE') ||
+        ids.has(clip.assetId)
+    )
+  );
+}
+
+/** Group exact authored Scenario children by their native owning project. */
+export function collectCapturedProjectScenarioDependencies(
+  rows: CapturedVideoProjectRows
+): Map<string, string[]> {
+  const owners = new Map<string, Set<string>>();
+  if (rows.project.project.source.kind === 'scenario')
+    owners.set(rows.project.project.source.scenarioProjectId, new Set());
+  for (const asset of rows.scenarioAssets ?? []) {
+    const children = owners.get(asset.projectId) ?? new Set<string>();
+    children.add(asset.id);
+    owners.set(asset.projectId, children);
+  }
+  return new Map(
+    [...owners]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([id, children]) => [id, [...children].sort()])
+  );
+}
+
+/** Parse optional causal evidence without manufacturing evidence for legacy captures. */
+function parseCapturedRootDependencies(value: unknown): CapturedRootDependency[] | null {
+  return parseRows<CapturedRootDependency>(value, (item) => {
+    if (
+      !isRecord(item) ||
+      item['rootKind'] !== 'scenario-project' ||
+      !identity(item['rootId']) ||
+      !ordinal(item['generation']) ||
+      item['generation'] < 1 ||
+      !Array.isArray(item['basis']) ||
+      item['basis'].length !== 1 ||
+      !identity(item['basis'][0]) ||
+      !Array.isArray(item['childIds']) ||
+      item['childIds'].length > MAX_CAPTURE_ROWS ||
+      !item['childIds'].every(identity) ||
+      new Set(item['childIds']).size !== item['childIds'].length
+    )
+      return null;
+    return {
+      rootKind: 'scenario-project',
+      rootId: item['rootId'],
+      generation: item['generation'],
+      basis: [item['basis'][0]],
+      childIds: item['childIds'].filter(identity),
+    };
+  });
+}
+
+/** Recording identities used by media and authored source bindings share the same original dependency. */
+export function collectCapturedProjectRecordingIds(project: VideoProjectMetadata): Set<string> {
+  const ids = new Set<string>();
+  if (project.source.kind === 'recording') ids.add(project.source.recordingId);
+  if (project.baseRecordingId) ids.add(project.baseRecordingId);
+  for (const asset of project.assets) {
+    if (asset.source.kind === 'recording') ids.add(asset.source.recordingId);
+    if (asset.source.kind === 'project-asset' && asset.source.originRecordingId)
+      ids.add(asset.source.originRecordingId);
+    if (asset.recordingPart) ids.add(asset.recordingPart.recordingId);
+  }
+  for (const group of project.cursorTrack?.sourceObservations ?? []) ids.add(group.recordingId);
+  for (const sample of project.cursorTrack?.samples ?? [])
+    if (sample.sourceAnchor) ids.add(sample.sourceAnchor.recordingId);
+  for (const segment of project.cursorFocusPath?.segments ?? [])
+    if (segment.binding.kind === 'recording-source') ids.add(segment.binding.recordingId);
+  for (const group of project.actionFeedback ?? []) ids.add(group.recordingId);
+  for (const event of project.actionEvents ?? [])
+    if (event.anchor.kind === 'recording-source') ids.add(event.anchor.recordingId);
+  return ids;
+}
+
+/** Select only resources reachable from editable materials, excluding export-only reviews. */
+export function collectCapturedProjectEditingMediaIds(rows: CapturedVideoProjectRows): Set<string> {
+  const mediaIds = new Set(
+    [...collectCapturedProjectRecordingIds(rows.project.project)].map((id) => `recording:${id}`)
+  );
+  const assetIds = new Set<string>();
+  for (const asset of rows.project.project.assets) {
+    if (asset.source.kind === 'library-asset') mediaIds.add(asset.source.mediaId);
+    if (asset.source.kind === 'project-asset') {
+      assetIds.add(asset.source.projectAssetId);
+      if (asset.source.originMediaId) mediaIds.add(asset.source.originMediaId);
+    }
+  }
+  // Set iteration visits newly added review resources and terminates on cycles.
+  for (const id of assetIds) {
+    const asset = rows.assets.find((entry) => entry.id === id);
+    if (asset?.originMediaId) mediaIds.add(asset.originMediaId);
+    const mirrorId = `project-asset:${id}`;
+    if (rows.media.some((entry) => entry.id === mirrorId)) mediaIds.add(mirrorId);
+    const review = rows.reviews?.find((entry) => entry.workspace.aggregateId === mirrorId);
+    if (review) {
+      for (const reference of collectReviewAssetReferences(review.workspace)) {
+        if (reference.startsWith('project-asset:'))
+          assetIds.add(reference.slice('project-asset:'.length));
+      }
+    }
+  }
+  return mediaIds;
+}
+
+function parseMediaDependencies(value: unknown): CapturedMediaDependency[] | null {
+  return parseRows(value, (item) => {
+    if (
+      !isRecord(item) ||
+      !identity(item['mediaId']) ||
+      !ordinal(item['generation']) ||
+      item['generation'] === 0 ||
+      !Array.isArray(item['basis']) ||
+      item['basis'].length === 0 ||
+      item['basis'].length > MAX_CAPTURE_ROWS ||
+      !item['basis'].every(identity) ||
+      new Set(item['basis']).size !== item['basis'].length
+    )
+      return null;
+    return { mediaId: item['mediaId'], generation: item['generation'], basis: item['basis'] };
+  });
+}
+
+function parseCapturedProjectSidecars(value: Record<string, unknown>) {
+  const reviews =
+    value['reviews'] === undefined ? undefined : parseRows(value['reviews'], parseCapturedReview);
+  const thumbnails =
+    value['thumbnails'] === undefined
+      ? undefined
+      : parseRows(value['thumbnails'], parseMediaThumbnailEntry);
+  const presentation =
+    value['presentation'] === undefined
+      ? undefined
+      : value['presentation'] === null
+        ? null
+        : parseAggregatePresentationEntry(value['presentation']);
+  const mediaDependencies =
+    value['mediaDependencies'] === undefined
+      ? undefined
+      : parseMediaDependencies(value['mediaDependencies']);
+  if (
+    reviews === null ||
+    thumbnails === null ||
+    mediaDependencies === null ||
+    (value['presentation'] != null && presentation === null)
+  )
+    return null;
+  return {
+    ...(reviews === undefined ? {} : { reviews }),
+    ...(thumbnails === undefined ? {} : { thumbnails }),
+    ...(presentation === undefined ? {} : { presentation }),
+    ...(mediaDependencies === undefined ? {} : { mediaDependencies }),
+  };
+}
+
+/** Native row identities and file descriptors must describe the same frozen resources. */
+function matchesCapturedBinaryRows(rows: CapturedVideoProjectRows): boolean {
+  if (rows.media.some((row) => 'blob' in row && Boolean(row.blob))) return false;
+  for (const entries of [
+    rows.assets,
+    rows.exports,
+    rows.media,
+    rows.sourceExports ?? [],
+    rows.scenarioAssets ?? [],
+  ]) {
+    if (new Set(entries.map((entry) => entry.id)).size !== entries.length) return false;
+  }
+  const resources = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
+  return (
+    resources.size === rows.refs.length &&
+    [
+      ...rows.assets,
+      ...rows.exports,
+      ...(rows.sourceExports ?? []),
+      ...(rows.scenarioAssets ?? []),
+    ].every((entry) => {
+      const ref = resources.get(entry.assetId);
+      return (
+        ref !== undefined &&
+        ref.size === entry.size &&
+        (entry.mimeType === undefined || ref.mimeType === entry.mimeType)
+      );
+    }) &&
+    rows.exports.every((entry) => entry.projectId === rows.project.id)
+  );
+}
+
+function matchesCapturedEditingDependencies(rows: CapturedVideoProjectRows): boolean {
+  if (rows.mediaDependencies === undefined) return true;
+  const ids = new Set(rows.mediaDependencies.map((entry) => entry.mediaId));
+  const editing = collectCapturedProjectEditingMediaIds(rows);
+  return (
+    ids.size === rows.mediaDependencies.length &&
+    ids.size === editing.size &&
+    [...editing].every((id) => ids.has(id))
+  );
+}
+
+/** Parse accepted native rows again when they cross the persistence boundary. */
+export function parseCapturedVideoProjectRows(value: unknown): CapturedVideoProjectRows | null {
+  if (!isRecord(value) || !isBoundedImageMetadata(value)) return null;
+  const project = parseVideoProjectEntry(value['project']);
+  const assets = parseRows(value['assets'], parseProjectAssetEntry);
+  const exports = parseRows(value['exports'], parseProjectExportEntry);
+  const media = parseRows(value['media'], parseMediaLibraryEntry);
+  const refs = parseRows(value['refs'], parseAssetRef);
+  const sidecars = parseCapturedProjectSidecars(value);
+  const recordings =
+    value['recordings'] === undefined ? [] : parseRows(value['recordings'], parseRecordingEntry);
+  const telemetry =
+    value['telemetry'] === undefined
+      ? []
+      : parseRows(value['telemetry'], parseRecordingTelemetryEntry);
+  const sourceExports =
+    value['sourceExports'] === undefined
+      ? []
+      : parseRows(value['sourceExports'], parseProjectExportEntry);
+  const scenarioAssets =
+    value['scenarioAssets'] === undefined
+      ? []
+      : parseRows(value['scenarioAssets'], parseScenarioAssetEntry);
+  const rootDependencies =
+    value['rootDependencies'] === undefined
+      ? undefined
+      : parseCapturedRootDependencies(value['rootDependencies']);
+  if (
+    !project ||
+    !assets ||
+    !exports ||
+    !media ||
+    !refs ||
+    !sidecars ||
+    !recordings ||
+    !telemetry ||
+    !sourceExports ||
+    !scenarioAssets ||
+    rootDependencies === null
+  )
+    return null;
+  const parsed = {
+    project,
+    assets,
+    exports,
+    media,
+    refs,
+    ...sidecars,
+    ...(value['scenarioAssets'] === undefined ? {} : { scenarioAssets }),
+    ...(rootDependencies === undefined ? {} : { rootDependencies }),
+    ...(value['sourceExports'] === undefined ? {} : { sourceExports }),
+    ...(value['recordings'] === undefined ? {} : { recordings }),
+    ...(value['telemetry'] === undefined ? {} : { telemetry }),
+  };
+  const neededRecordingIds = collectCapturedProjectRecordingIds(project.project);
+  const neededScenarioChildren = new Set(
+    project.project.assets.flatMap((asset) =>
+      asset.source.kind === 'scenario-asset' ? [asset.source.scenarioAssetId] : []
+    )
+  );
+  if (
+    neededScenarioChildren.size !== scenarioAssets.length ||
+    scenarioAssets.some((asset) => !neededScenarioChildren.has(asset.id))
+  )
+    return null;
+  if (rootDependencies !== undefined) {
+    const needed = collectCapturedProjectScenarioDependencies(parsed);
+    if (
+      needed.size !== rootDependencies.length ||
+      new Set(rootDependencies.map((item) => item.rootId)).size !== rootDependencies.length ||
+      rootDependencies.some(
+        (item) =>
+          JSON.stringify(needed.get(item.rootId)) !== JSON.stringify([...item.childIds].sort())
+      )
+    )
+      return null;
+  }
+  if (
+    neededRecordingIds.size !== recordings.length ||
+    new Set(recordings.map((entry) => entry.id)).size !== recordings.length ||
+    recordings.some((entry) => !neededRecordingIds.has(entry.id)) ||
+    telemetry.some((entry) => !neededRecordingIds.has(entry.recordingId)) ||
+    new Set(telemetry.map((entry) => entry.recordingId)).size !== telemetry.length
+  )
+    return null;
+  if (!matchesCapturedBinaryRows(parsed) || !matchesCapturedEditingDependencies(parsed))
+    return null;
+  const described = projectMetadataDescriptors(parsed);
+  if (!isBoundedImageMetadata({ ...value, ...described }, false)) return null;
+  if (!isSupportedCaptureProject(project.project) || !completeCapturedGraph(parsed)) return null;
+  if (new TextEncoder().encode(JSON.stringify(described)).byteLength > MAX_CAPTURE_METADATA_BYTES)
+    return null;
+  return parsed;
+}
+
+/** Only native snapshot and presentation slots can retain inline binary values. */
+function projectMetadataDescriptors(rows: CapturedVideoProjectRows) {
+  return {
+    ...rows,
+    project: {
+      ...rows.project,
+      project: {
+        ...rows.project.project,
+        ...(rows.project.project.effectSnapshots
+          ? {
+              effectSnapshots: rows.project.project.effectSnapshots.map((snapshot) => ({
+                ...snapshot,
+                assets: snapshot.assets.map(({ blob, ...asset }) => ({
+                  ...asset,
+                  blob: describeImageMetadata(blob),
+                })),
+              })),
+            }
+          : {}),
+      },
+    },
+    ...(rows.thumbnails
+      ? {
+          thumbnails: rows.thumbnails.map(({ blob, ...thumbnail }) => ({
+            ...thumbnail,
+            blob: describeImageMetadata(blob),
+          })),
+        }
+      : {}),
+    ...(rows.presentation
+      ? {
+          presentation: {
+            ...rows.presentation,
+            thumbnailBlob: describeImageMetadata(rows.presentation.thumbnailBlob),
+            ...(rows.presentation.previewBlob
+              ? { previewBlob: describeImageMetadata(rows.presentation.previewBlob) }
+              : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/** Resolve the full admitted dependency closure; do not silently discard missing rows. */
+function completeCapturedGraph(rows: CapturedVideoProjectRows): boolean {
+  const closure = new CapturedProjectClosure(rows);
+  return (
+    closure.admitProjectSources() &&
+    closure.admitExports() &&
+    closure.admitSidecars() &&
+    closure.resolveDependencies()
+  );
+}
+
+class CapturedProjectClosure {
+  private readonly assets;
+  private readonly media;
+  private readonly exports;
+  private readonly refs;
+  private readonly neededAssets = new Set<string>();
+  private readonly neededMedia = new Set<string>();
+  private readonly neededRefs = new Set<string>();
+  private readonly neededSourceExports = new Set<string>();
+
+  constructor(private readonly rows: CapturedVideoProjectRows) {
+    this.assets = new Map(rows.assets.map((entry) => [entry.id, entry]));
+    this.media = new Map(rows.media.map((entry) => [entry.id, entry]));
+    this.exports = new Map(rows.exports.map((entry) => [entry.id, entry]));
+    this.refs = new Map(rows.refs.map((entry) => [entry.assetId, entry]));
+  }
+
+  admitProjectSources(): boolean {
+    for (const id of collectCapturedProjectRecordingIds(this.rows.project.project))
+      this.neededMedia.add(`recording:${id}`);
+    for (const asset of this.rows.project.project.assets) {
+      const source = asset.source;
+      const resource = resolveCapturedProjectAssetSource(
+        source,
+        this.assets,
+        this.media,
+        this.rows.scenarioAssets
+      );
+      if (
+        !resource ||
+        resource.size !== asset.metadata.size ||
+        resource.mimeType !== asset.metadata.mimeType
+      )
+        return false;
+      if (source.kind === 'project-asset') {
+        this.neededAssets.add(source.projectAssetId);
+        if (source.originMediaId) this.neededMedia.add(source.originMediaId);
+      } else if (source.kind === 'library-asset') this.neededMedia.add(source.mediaId);
+      else if (source.kind === 'recording') this.neededMedia.add(`recording:${source.recordingId}`);
+      else if (source.kind === 'scenario-asset' && 'assetId' in resource)
+        this.neededRefs.add(resource.assetId);
+    }
+    return true;
+  }
+
+  admitExports(): boolean {
+    for (const entry of this.rows.exports) {
+      if (!entry.mimeType) return false;
+      this.neededRefs.add(entry.assetId);
+      if (this.media.has(`export:${entry.id}`)) this.neededMedia.add(`export:${entry.id}`);
+    }
+    return true;
+  }
+
+  admitSidecars(): boolean {
+    const reviews = this.rows.reviews ?? [];
+    if (new Set(reviews.map((review) => review.workspace.aggregateId)).size !== reviews.length)
+      return false;
+    for (const review of reviews) {
+      const id = review.workspace.aggregateId;
+      const child =
+        [...this.assets.values()].find((asset) => `project-asset:${asset.id}` === id) ??
+        [...this.exports.values()].find((entry) => `export:${entry.id}` === id);
+      if (
+        !child ||
+        !child.mimeType?.startsWith('video/') ||
+        child.assetId !== review.workspace.sourceAssetId ||
+        this.media.has(id)
+      )
+        return false;
+      for (const reference of collectReviewAssetReferences(review.workspace)) {
+        if (!reference.startsWith('project-asset:')) return false;
+        this.neededAssets.add(reference.slice('project-asset:'.length));
+      }
+    }
+    const thumbnails = this.rows.thumbnails ?? [];
+    if (new Set(thumbnails.map((thumbnail) => thumbnail.assetId)).size !== thumbnails.length)
+      return false;
+    if (
+      thumbnails.some(
+        (thumbnail) =>
+          thumbnail.assetId !== `video-project:${this.rows.project.id}` &&
+          ![...this.exports.values()].some((entry) => thumbnail.assetId === `export:${entry.id}`)
+      )
+    )
+      return false;
+    return (
+      !this.rows.presentation ||
+      (this.rows.presentation.aggregateId === this.rows.project.id &&
+        this.rows.presentation.aggregateKind === 'video-project')
+    );
+  }
+
+  resolveDependencies(): boolean {
+    // Growing sets traverse cycles once; input row limits bound the work.
+    let assetOffset = 0;
+    let mediaOffset = 0;
+    while (assetOffset < this.neededAssets.size || mediaOffset < this.neededMedia.size) {
+      const assetIds = [...this.neededAssets];
+      for (; assetOffset < assetIds.length; assetOffset++) {
+        if (!this.admitProjectAsset(assetIds[assetOffset]!)) return false;
+      }
+      const mediaIds = [...this.neededMedia];
+      for (; mediaOffset < mediaIds.length; mediaOffset++) {
+        if (!this.admitMedia(mediaIds[mediaOffset]!)) return false;
+      }
+    }
+    return (
+      this.neededAssets.size === this.assets.size &&
+      this.neededMedia.size === this.media.size &&
+      this.neededSourceExports.size === (this.rows.sourceExports?.length ?? 0) &&
+      this.neededRefs.size === this.refs.size &&
+      [...this.neededRefs].every((id) => this.refs.has(id))
+    );
+  }
+
+  private admitProjectAsset(id: string): boolean {
+    const entry = this.assets.get(id);
+    if (!entry) return false;
+    this.neededRefs.add(entry.assetId);
+    if (entry.originMediaId) this.neededMedia.add(entry.originMediaId);
+    if (this.media.has(`project-asset:${entry.id}`))
+      this.neededMedia.add(`project-asset:${entry.id}`);
+    return true;
+  }
+
+  private admitMedia(id: string): boolean {
+    const entry = this.media.get(id);
+    if (
+      !entry ||
+      (entry.source.kind !== 'recording' &&
+        (entry.recordingGroup ||
+          (entry.source.kind !== 'project-export' && entry.recordingMetadata)))
+    )
+      return false;
+    const source = entry.source;
+    switch (source.kind) {
+      case 'project-asset': {
+        const target = this.assets.get(source.projectAssetId);
+        if (!target || entry.size !== target.size || entry.mimeType !== target.mimeType)
+          return false;
+        if (
+          entry.id.startsWith('project-asset:') &&
+          entry.id !== `project-asset:${source.projectAssetId}`
+        )
+          return false;
+        this.neededAssets.add(source.projectAssetId);
+        return true;
+      }
+      case 'project-export': {
+        const owned = this.exports.get(source.exportId);
+        const target =
+          owned ?? this.rows.sourceExports?.find((item) => item.id === source.exportId);
+        if (!owned && target) {
+          this.neededSourceExports.add(target.id);
+          this.neededRefs.add(target.assetId);
+        }
+        return (
+          target !== undefined &&
+          entry.size === target.size &&
+          entry.mimeType === target.mimeType &&
+          JSON.stringify(entry.recordingMetadata) === JSON.stringify(target.recordingMetadata) &&
+          source.projectId === target.projectId &&
+          (!entry.id.startsWith('export:') || entry.id === `export:${source.exportId}`)
+        );
+      }
+      case 'stored-asset': {
+        const target = this.refs.get(source.assetId);
+        if (!target || entry.size !== target.size || entry.mimeType !== target.mimeType)
+          return false;
+        this.neededRefs.add(source.assetId);
+        return true;
+      }
+      case 'recording': {
+        const recording = this.rows.recordings?.find((item) => item.id === source.recordingId);
+        const ref = recording && this.refs.get(recording.assetId);
+        if (
+          !recording ||
+          !ref ||
+          entry.id !== `recording:${recording.id}` ||
+          recording.size !== entry.size ||
+          recording.mimeType !== entry.mimeType ||
+          ref.size !== entry.size ||
+          ref.mimeType !== entry.mimeType
+        )
+          return false;
+        this.neededRefs.add(ref.assetId);
+        return true;
+      }
+      case 'screenshot':
+      case 'web-snapshot':
+        return false;
+    }
+  }
+}
+
+/** Resolve a project's native resource using the same source identity in freeze and admission. */
+export function resolveCapturedProjectAssetSource(
+  source: VideoProjectMetadata['assets'][number]['source'],
+  assets: ReadonlyMap<string, CapturedVideoProjectRows['assets'][number]>,
+  media: ReadonlyMap<string, CapturedVideoProjectRows['media'][number]>,
+  scenarioAssets: CapturedVideoProjectRows['scenarioAssets']
+) {
+  switch (source.kind) {
+    case 'project-asset':
+      return assets.get(source.projectAssetId);
+    case 'library-asset':
+      return media.get(source.mediaId);
+    case 'recording':
+      return media.get(`recording:${source.recordingId}`);
+    case 'scenario-asset':
+      return scenarioAssets?.find((entry) => entry.id === source.scenarioAssetId);
+    default:
+      return undefined;
+  }
+}

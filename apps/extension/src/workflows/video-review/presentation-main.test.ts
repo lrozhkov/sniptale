@@ -21,6 +21,9 @@ const io = vi.hoisted(() => ({
   inputs: [] as { dispose: ReturnType<typeof vi.fn> }[],
   canvases: [] as HTMLCanvasElement[],
   sample: vi.fn(),
+  single: vi.fn(),
+  stream: vi.fn(),
+  streamClosed: vi.fn(),
   audio: vi.fn(),
   prepare: vi.fn(),
   render: vi.fn(),
@@ -59,13 +62,19 @@ vi.mock('mediabunny', () => ({
   },
   VideoSampleSink: class {
     async getSample(time: number) {
+      io.single(time);
       return io.sample(time);
     }
     async *samples(start: number) {
       yield await io.sample(start);
     }
     async *samplesAtTimestamps(times: Iterable<number>) {
-      for (const time of times) yield await io.sample(time);
+      io.stream();
+      try {
+        for (const time of times) yield await io.sample(time);
+      } finally {
+        io.streamClosed();
+      }
     }
   },
 }));
@@ -557,4 +566,18 @@ it('refuses main caption conflicts and admits conflicts outside the export', asy
   expect(io.inputs.every((input) => input.dispose.mock.calls.length > 0)).toBe(true);
   io.captionConflicts = [{ fragmentId: 'outside', reason: 'space', start: 0, end: 2 }];
   await expect(open(args)).resolves.toBeDefined();
+});
+
+it('decodes planned presentation frames in one stream at the exact mapped clocks', async () => {
+  const frames = [0.1001, 0.2002, 0.3003].map((time, index) => ({
+    ...candidate(time),
+    tick: index + 1,
+  }));
+  const args = { ...fixture(), plannedCandidates: () => frames };
+  const owner = await open(args);
+  for (const frame of frames) (await owner.render(frame)).release();
+  expect(io.single).not.toHaveBeenCalled();
+  expect(io.stream).toHaveBeenCalledOnce();
+  expect(io.times).toEqual([0.1, 0.2, 0.3]);
+  expect(io.samples.every((sample) => sample.close.mock.calls.length === 1)).toBe(true);
 });

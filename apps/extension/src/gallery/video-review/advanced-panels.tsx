@@ -24,7 +24,7 @@ import type {
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
 import { resolveQuickEditZoomLink } from '../../features/video/review/advanced/zoom';
-import type { useReviewZoomEditor } from './zoom-editor';
+import { useReviewZoomPreview, type useReviewZoomEditor } from './zoom-editor';
 import {
   ReviewCanvasSettings,
   ReviewSceneAudio,
@@ -58,7 +58,9 @@ function removeZoomRegion(args: ReviewAdvancedPanelsProps, regionId: string): vo
 }
 
 /** Advanced-mode inspector panels: the canvas background, a zoom region, or a zoom link. */
-export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
+export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
+  const zoom = useReviewZoomPreview(input.zoom);
+  const args = { ...input, zoom };
   if (args.advanced.ui.mode !== 'advanced') return null;
   const zoomRegion = args.zoom.selected(args.advanced.zoom);
   const link =

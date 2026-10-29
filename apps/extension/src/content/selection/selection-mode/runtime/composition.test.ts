@@ -27,7 +27,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../ui/drawing', () => ({ createSelectionDrawingRuntime: mocks.createDrawingRuntime }));
-vi.mock('../../../../composition/persistence/settings', () => ({
+vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
   loadSettings: mocks.loadSettings,
   patchSettings: mocks.patchSettings,
 }));

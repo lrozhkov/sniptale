@@ -1,3 +1,4 @@
+import type { SelectionModeFinalElementsOptions } from './types';
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
 import type { CaptureActionType } from '../../../../contracts/settings';
 import type { SelectionModeSession } from '../session';
@@ -11,6 +12,8 @@ import {
 type SelectionModeUiRuntimeConfig = {
   getDom: () => SelectionModeSession['dom'];
   getCaptureAction: () => CaptureActionType;
+  getCapturePreferences: SelectionModeFinalElementsOptions['getCapturePreferences'];
+  onImageFormatChange: SelectionModeFinalElementsOptions['onImageFormatChange'];
   getSelection: () => SelectionModeSession['currentSelection'];
   getVisual: () => ResolvedBorderPresetVisual;
   getMaxSelectionHeight: () => number;
@@ -36,6 +39,8 @@ function createFinalElementsOptions(config: SelectionModeUiRuntimeConfig) {
     getMaxSelectionWidth: config.getMaxSelectionWidth,
     getMaxSelectionHeight: config.getMaxSelectionHeight,
     getCaptureAction: config.getCaptureAction,
+    getCapturePreferences: config.getCapturePreferences,
+    onImageFormatChange: config.onImageFormatChange,
     getSelection: config.getSelection,
     onAdjustPadding: config.onAdjustPadding,
     onCaptureActionChange: config.onCaptureActionChange,

@@ -10,7 +10,10 @@ import {
   triggerExtensionAction,
 } from '../support/recording-action';
 import { createQuickActionAppearance } from '../../../../apps/extension/src/contracts/quick-action-appearance';
-import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import {
+  DEFAULT_WINDOW_HEADER,
+  windowHeaderGeometry,
+} from '@sniptale/runtime-contracts/window-header';
 
 async function settled(page: Page) {
   await page.evaluate(async () => {
@@ -121,7 +124,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   });
 }
 
-test('styles native visible, full and selection output before download', async ({}, info) => {
+test('styles native capture with captions and an overlong address', async ({}, info) => {
   const size = { width: 1280, height: 560 };
   const browser = await launchExtensionBrowser({ viewport: size });
   const host = await startHostServer();
@@ -131,7 +134,7 @@ test('styles native visible, full and selection output before download', async (
   await downloadSession.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath });
   try {
     const page = await browser.context.newPage();
-    await page.goto(host.origin);
+    await page.goto(`${host.origin}/?query=${'a'.repeat(2200)}`);
     await page.evaluate(() => {
       document.body.style.minHeight = '1400px';
       document.body.style.background = '#f97316';
@@ -177,7 +180,13 @@ test('styles native visible, full and selection output before download', async (
     );
     expect(registered).toMatchObject({ success: true });
     const appearance = createQuickActionAppearance();
-    appearance.header = { ...DEFAULT_WINDOW_HEADER, theme: 'dark', title: 'Quick action proof' };
+    appearance.header = {
+      ...DEFAULT_WINDOW_HEADER,
+      theme: 'dark',
+      title: 'Quick action proof',
+      faviconEnabled: true,
+    };
+    appearance.faviconMode = 'page';
     appearance.titleSource = 'static';
     appearance.background = {
       ...appearance.background,
@@ -190,7 +199,10 @@ test('styles native visible, full and selection output before download', async (
     appearance.information = {
       ...appearance.information,
       enabled: true,
-      title: false,
+      title: true,
+      url: true,
+      date: true,
+      dimensions: true,
       text: 'Appearance proof',
     };
     for (const { mode, format } of [
@@ -200,6 +212,8 @@ test('styles native visible, full and selection output before download', async (
       { mode: 'visible', format: 'jpeg' },
       { mode: 'visible', format: 'webp' },
     ] as const) {
+      appearance.information.position = format === 'webp' ? 'above' : 'below';
+      appearance.background.radius = mode === 'visible' && format === 'png' ? 256 : 0;
       const id = `appearance-${mode}-${format}`;
       await popup.evaluate(
         async ({ id, mode, format, appearance }) =>
@@ -271,16 +285,52 @@ test('styles native visible, full and selection output before download', async (
       const { width, height } = dimensions;
       expect(width).toBe((mode === 'selection' ? 300 : 1280) + 40);
       expect(height).toBeGreaterThan((mode === 'selection' ? 180 : 560) + 80);
-      const pixels = await popup.evaluate(async (url) => {
-        const image = await createImageBitmap(await (await fetch(url)).blob());
-        const canvas = new OffscreenCanvas(image.width, image.height);
-        const context = canvas.getContext('2d')!;
-        context.drawImage(image, 0, 0);
-        image.close();
-        return Array.from(context.getImageData(0, 0, 1, 1).data);
-      }, dataUrl);
+      const captionY =
+        appearance.information.position === 'above'
+          ? 20 + Math.ceil(windowHeaderGeometry(appearance.header!, size).height) + 36
+          : height - 24;
+      const pixels = await popup.evaluate(
+        async ({ url, captionY, radius }) => {
+          const image = await createImageBitmap(await (await fetch(url)).blob());
+          const canvas = new OffscreenCanvas(image.width, image.height);
+          const context = canvas.getContext('2d')!;
+          context.drawImage(image, 0, 0);
+          image.close();
+          let captionInkOutsideCard = 0;
+          if (radius) {
+            context.beginPath();
+            context.roundRect(20, 20, canvas.width - 40, canvas.height - 40, radius);
+            const bandTop = canvas.height - 60;
+            const band = context.getImageData(0, bandTop, canvas.width, 40);
+            for (let y = 0; y < 40; y++) {
+              for (let x = 0; x < canvas.width; x++) {
+                const offset = (y * canvas.width + x) * 4;
+                const isCaptionInk =
+                  Math.abs(band.data[offset]! - 51) < 16 &&
+                  Math.abs(band.data[offset + 1]! - 65) < 16 &&
+                  Math.abs(band.data[offset + 2]! - 85) < 16;
+                if (isCaptionInk && !context.isPointInPath(x + 0.5, bandTop + y + 0.5))
+                  captionInkOutsideCard++;
+              }
+            }
+          }
+          return {
+            captionInkOutsideCard,
+            background: Array.from(context.getImageData(0, 0, 1, 1).data),
+            caption: Array.from(
+              context.getImageData(Math.floor(canvas.width / 2), captionY, 1, 1).data
+            ),
+          };
+        },
+        { url: dataUrl, captionY, radius: appearance.background.radius }
+      );
       for (const [index, channel] of [66, 184, 131, 255].entries())
-        expect(Math.abs(pixels[index]! - channel)).toBeLessThanOrEqual(format === 'png' ? 0 : 4);
+        expect(Math.abs(pixels.background[index]! - channel)).toBeLessThanOrEqual(
+          format === 'png' ? 0 : 4
+        );
+      expect(pixels.captionInkOutsideCard).toBe(0);
+      for (const channel of pixels.caption)
+        expect(Math.abs(channel - 255)).toBeLessThanOrEqual(format === 'png' ? 0 : 4);
       await writeFile(
         info.outputPath(`appearance-${mode}.${format === 'jpeg' ? 'jpg' : format}`),
         bytes

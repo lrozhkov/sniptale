@@ -178,3 +178,13 @@ describe('screenshot-controller-action-cancel', () => {
     verifyStandardCancelBranch
   );
 });
+
+it('restores the suspended editing mode once when an ordinary countdown is cancelled', () => {
+  const { args } = createArgs();
+  args.session.editingModeBaseline = 'drawing';
+  const cancel = createHandleCancelCountdown(args);
+  cancel();
+  cancel();
+  expect(args.runtime.restoreEditingMode).toHaveBeenCalledExactlyOnceWith('drawing');
+  expect(args.session.editingModeBaseline).toBeNull();
+});

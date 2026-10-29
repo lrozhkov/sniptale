@@ -1,3 +1,4 @@
+import { AIProviderRequestError } from '../providers';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createReviewTextJobService } from './review-text-job';
 import {
@@ -34,6 +35,15 @@ const config = {
   baseUrl: 'https://provider.test/v1',
   apiKey: 'private-key',
   modelCode: 'code',
+  connectionType: 'openai-compatible' as const,
+  destinationBinding: 'fixture-destination-binding',
+  observationBinding: {
+    providerId: 'provider',
+    incarnation: 'incarnation',
+    revision: 1,
+    credentialRevision: 2,
+    destination: 'fixture-destination-binding',
+  },
   effectiveSystemPrompt: 'hidden prompt must not be sent',
 };
 function setup() {
@@ -77,6 +87,7 @@ describe('one-shot cancellable text editing jobs', () => {
         systemPrompt: REVIEW_TEXT_SYSTEM_PROMPT,
         userPrompt: JSON.stringify(start.context),
         modelCode: 'code',
+        observationBinding: config.observationBinding,
         signal: expect.any(AbortSignal),
       })
     );
@@ -184,6 +195,7 @@ describe('one-shot cancellable text editing jobs', () => {
       type: 'failure',
       requestId: start.requestId,
       code: 'timeout',
+      failureReason: 'timeout',
     });
     wait.resolve();
     await service.cancelActiveJob();
@@ -251,3 +263,82 @@ it('keeps review erasure reservations local to a service and releases each only 
   await first.service.reserveErasureExclusion().waitForActiveMutations();
   expect(first.messages.at(-1)?.type).toBe('proposal');
 });
+
+it('rechecks the current model and workspace at the transport send boundary', async () => {
+  const { connection, deps, service, messages } = setup();
+  deps.request.mockImplementationOnce(async ({ beforeSend }) => {
+    await beforeSend?.();
+    return JSON.stringify(proposal);
+  });
+  connection.receive(start);
+  const reservation = service.reserveErasureExclusion();
+  await reservation.waitForActiveMutations();
+  reservation.release();
+  expect(deps.resolveModel).toHaveBeenCalledTimes(3);
+  expect(deps.assertScope).toHaveBeenCalledTimes(3);
+  expect(messages.at(-1)).toEqual({ type: 'proposal', requestId: start.requestId, proposal });
+});
+
+it.each(['model-change', 'workspace-change'] as const)(
+  'refuses %s after transport preparation before sending review text',
+  async (change) => {
+    const { connection, deps, service, messages } = setup();
+    const send = vi.fn();
+    deps.request.mockImplementationOnce(async ({ beforeSend }) => {
+      if (change === 'model-change') {
+        deps.resolveModel.mockResolvedValueOnce({ ...config, modelCode: 'replacement' });
+      } else {
+        deps.assertScope.mockRejectedValueOnce(new Error('stale'));
+      }
+      await beforeSend?.();
+      send();
+      return JSON.stringify(proposal);
+    });
+    connection.receive(start);
+    const reservation = service.reserveErasureExclusion();
+    await reservation.waitForActiveMutations();
+    reservation.release();
+    expect(send).not.toHaveBeenCalled();
+    expect(messages.at(-1)).toEqual({
+      type: 'failure',
+      requestId: start.requestId,
+      code: change === 'model-change' ? 'model-unavailable' : 'stale',
+    });
+    expect(deps.history).toHaveBeenCalledExactlyOnceWith({
+      modelId: 'model',
+      requestKind: 'json',
+      resultCount: 0,
+      status: 'failure',
+      errorCode: 'provider-failure',
+    });
+  }
+);
+
+it.each([
+  'invalid-credential',
+  'permission-denied',
+  'model-unavailable',
+  'quota-exceeded',
+  'rate-limited',
+  'network',
+  'timeout',
+  'service-error',
+] as const)(
+  'retains bounded %s evidence without sending private provider messages',
+  async (reason) => {
+    const { connection, deps, service, messages } = setup();
+    deps.request.mockRejectedValueOnce(new AIProviderRequestError(reason, 'PRIVATE_RESPONSE_BODY'));
+    connection.receive(start);
+    const reservation = service.reserveErasureExclusion();
+    await reservation.waitForActiveMutations();
+    reservation.release();
+    expect(messages.at(-1)).toEqual({
+      type: 'failure',
+      requestId: start.requestId,
+      code: 'provider-failed',
+      failureReason: reason,
+    });
+    expect(JSON.stringify(messages)).not.toContain('PRIVATE_RESPONSE_BODY');
+    expect(deps.request).toHaveBeenCalledOnce();
+  }
+);

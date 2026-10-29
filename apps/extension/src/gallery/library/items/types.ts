@@ -1,3 +1,4 @@
+import type { SyncRemoteCatalogCard } from '../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import type { VideoWorkspaceSummary } from '../../../composition/persistence/review-workspaces/summaries';
 import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
@@ -108,7 +109,23 @@ export function isGalleryQuickEditProjectItem(
   return item.type === 'quick-edit-project';
 }
 
+/** Catalog presentation only. No native entity or persistence source exists until preparation commits. */
+export interface GalleryRemoteRootItem extends GalleryItemBase {
+  type: 'remote-root';
+  remote: SyncRemoteCatalogCard;
+  entityId?: never;
+  mimeType: string;
+  duration: number | null;
+  width: number | null;
+  height: number | null;
+}
+
+export function isGalleryRemoteItem(item: GalleryItem): item is GalleryRemoteRootItem {
+  return item.type === 'remote-root';
+}
+
 export type GalleryItem =
+  | GalleryRemoteRootItem
   | GalleryMediaItem
   | GalleryScenarioItem
   | GalleryScenarioExportItem
@@ -161,6 +178,8 @@ export function createGalleryMediaItem(item: MediaLibraryItem): GalleryMediaItem
 
 /** Project availability is shared by gallery cards, details and editor actions. */
 export function canOpenGalleryProject(item: GalleryItem): boolean {
+  if (isGalleryRemoteItem(item))
+    return !item.remote.conflict && !item.remote.unavailable && !item.remote.deleted;
   if (item.lifecycle?.trashedAt !== undefined) return false;
   if (item.type === 'scenario') return item.project.availability === 'available';
   return (

@@ -100,7 +100,6 @@ function expectParsedSanitizedModelSelection() {
     aiSettingsQueryResponseSchema.parse({
       modelSelection: {
         chromeAiEnabled: false,
-        defaultModelId: '00000000-0000-4000-8000-000000000001',
         globalSystemPrompt: 'Prompt',
         models: [
           {
@@ -131,7 +130,6 @@ function expectRejectsProviderBaseUrlLeak() {
     aiSettingsQueryResponseSchema.parse({
       modelSelection: {
         chromeAiEnabled: false,
-        defaultModelId: null,
         globalSystemPrompt: '',
         models: [],
         providers: [
@@ -167,7 +165,7 @@ it('rejects removed default-model capability messages', () => {
       operation: 'save-default-model',
       type: MessageType.AI_SETTINGS_MUTATION,
     })
-  ).toThrow(/capabilityToken/);
+  ).toThrow();
 });
 
 it('accepts bounded model reorder commands and rejects extra fields', () => {
@@ -202,7 +200,12 @@ it.each(['mp3', 'wav', 'pcm'])(
       operation: 'speech',
       audio: { speech: { voiceId: 'voice', responseFormat } },
     };
-    const message = { type: MessageType.AI_SETTINGS_MUTATION, operation: 'add-model', model };
+    const message = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'add-model',
+      providerIncarnation: 'incarnation',
+      model,
+    };
     expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
     expect(
       aiSettingsMutationMessageSchema.safeParse({
@@ -241,4 +244,125 @@ it('admits bounded correction prompts and rejects payloads on reset', () => {
       operation: 'reset-voice-input-correction-prompt',
     })
   ).toEqual({ type: message.type, operation: 'reset-voice-input-correction-prompt' });
+});
+
+it('accepts bounded scenario choices and rejects a second writable voice authority', () => {
+  const message = {
+    type: 'AI_SETTINGS_MUTATION',
+    operation: 'remember-scenario-selection',
+    selection: {
+      scenario: 'page-edit',
+      modelId: 'model',
+      providerId: 'provider',
+      modelCode: 'exact-id',
+      destinationBinding: 'sha256:' + 'a'.repeat(64),
+      source: 'explicit',
+    },
+  };
+  expect(aiSettingsMutationMessageSchema.safeParse(message).success).toBe(true);
+  expect(
+    aiSettingsMutationMessageSchema.safeParse({
+      ...message,
+      selection: { ...message.selection, scenario: 'voice-correction' },
+    }).success
+  ).toBe(false);
+  expect(
+    aiSettingsMutationMessageSchema.safeParse({
+      ...message,
+      selection: { ...message.selection, selectedAt: 1 },
+    }).success
+  ).toBe(false);
+});
+
+it('accepts identity-bound enabled changes without configuration replacement fields', () => {
+  const message = {
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'set-provider-enabled',
+    providerId: 'provider',
+    providerIncarnation: 'incarnation',
+    enabled: false,
+  };
+  expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
+  for (const invalid of [
+    { ...message, providerIncarnation: undefined },
+    { ...message, enabled: 'false' },
+    { ...message, baseUrl: 'https://stale.example.test/v1' },
+    { ...message, apiKey: 'fixture-key' },
+  ])
+    expect(aiSettingsMutationMessageSchema.safeParse(invalid).success).toBe(false);
+});
+
+it.each(['add-model', 'update-model'] as const)(
+  'preserves property ownership through strict %s messages',
+  (operation) => {
+    const model = {
+      id: '00000000-0000-4000-8000-000000000001',
+      providerId: '00000000-0000-4000-8000-000000000002',
+      modelCode: 'c'.repeat(500),
+      displayName: 'n'.repeat(500),
+      source: 'manual',
+      propertySource: 'catalog',
+    };
+    const message = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation,
+      model,
+      providerIncarnation: 'incarnation',
+    };
+    expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
+    expect(
+      aiSettingsMutationMessageSchema.safeParse({
+        ...message,
+        model: { ...model, propertySource: 'invalid' },
+      }).success
+    ).toBe(false);
+  }
+);
+
+it.each(['add-model', 'update-model'])(
+  'requires captured provider incarnation for Settings %s',
+  (operation) => {
+    const model = {
+      id: '00000000-0000-4000-8000-000000000001',
+      providerId: '00000000-0000-4000-8000-000000000002',
+      displayName: 'Model',
+      modelCode: 'code',
+    };
+    const message = { type: MessageType.AI_SETTINGS_MUTATION, operation, model };
+    expect(aiSettingsMutationMessageSchema.safeParse(message).success).toBe(false);
+    expect(
+      aiSettingsMutationMessageSchema.safeParse({ ...message, providerIncarnation: '' }).success
+    ).toBe(false);
+    expect(
+      aiSettingsMutationMessageSchema.safeParse({
+        ...message,
+        providerIncarnation: 'current-incarnation',
+      }).success
+    ).toBe(true);
+  }
+);
+
+it('rejects the retired global-model writer without a compatibility capability', () => {
+  expect(
+    aiSettingsMutationMessageSchema.safeParse({
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'save-default-model',
+      defaultModelId: null,
+    }).success
+  ).toBe(false);
+});
+
+it('rejects retired global selection metadata in current catalog responses', () => {
+  expect(
+    aiSettingsQueryResponseSchema.safeParse({
+      success: true,
+      modelSelection: {
+        chromeAiEnabled: false,
+        globalSystemPrompt: '',
+        models: [],
+        providers: [],
+        defaultModelId: null,
+      },
+    }).success
+  ).toBe(false);
 });

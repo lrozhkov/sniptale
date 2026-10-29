@@ -1,3 +1,4 @@
+import { AIProviderRequestError } from '../providers';
 import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import { beforeEach, expect, it, vi } from 'vitest';
 
@@ -67,6 +68,7 @@ import { routeScenarioEditorLlmMessage } from './editor-router';
 function createMessage() {
   return {
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
+    modelId: 'model-1',
     contractVersion: 4 as const,
     projectId: 'project-1',
     baseRevision: 1,
@@ -93,6 +95,8 @@ function createResolvedConfig() {
     baseUrl: 'https://api.openai.com/v1',
     apiKey: 'secret-key',
     modelCode: 'gpt-4.1',
+    connectionType: 'openai-compatible' as const,
+    destinationBinding: 'fixture-destination-binding',
     effectiveSystemPrompt: 'unused here',
   };
 }
@@ -129,7 +133,7 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
   expect(routeScenarioEditorLlmMessage(createMessage(), sendResponse, createSender())).toBe(true);
   await expectSuccessfulResponse(sendResponse);
 
-  expect(loadDefaultModelIdMock).toHaveBeenCalledTimes(1);
+  expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
   expect(resolveModelConfigMock).toHaveBeenCalledWith('model-1');
   expect(loadScenarioEditorSystemPromptMock).toHaveBeenCalledTimes(1);
   expect(requestMultimodalChatCompletionMock).toHaveBeenCalledWith({
@@ -138,6 +142,8 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
     modelCode: 'gpt-4.1',
     providerErrorLabel: 'provider-1',
     systemPrompt: buildScenarioAiSystemPrompt('Scenario editor system prompt'),
+    beforeSend: expect.any(Function),
+    connectionType: 'openai-compatible',
     userContent: [
       {
         type: 'text',
@@ -208,11 +214,16 @@ it('prefers an explicit model id over the stored default model selection', async
   expect(resolveModelConfigMock).toHaveBeenCalledWith('model-explicit');
 });
 
-it('returns the translated missing-model error when no explicit or default model exists', async () => {
+it('refuses missing explicit identity despite a stored global default', async () => {
   const sendResponse = vi.fn();
-  loadDefaultModelIdMock.mockResolvedValue(null);
 
-  expect(routeScenarioEditorLlmMessage(createMessage(), sendResponse, createSender())).toBe(true);
+  expect(
+    routeScenarioEditorLlmMessage(
+      { ...createMessage(), modelId: null },
+      sendResponse,
+      createSender()
+    )
+  ).toBe(true);
 
   await vi.waitFor(() => {
     expect(sendResponse).toHaveBeenCalledWith({
@@ -220,6 +231,9 @@ it('returns the translated missing-model error when no explicit or default model
       success: false,
     });
   });
+  expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
+  expect(resolveModelConfigMock).not.toHaveBeenCalled();
+  expect(requestMultimodalChatCompletionMock).not.toHaveBeenCalled();
 });
 
 it('surfaces schema parse failures without exposing raw provider output', async () => {
@@ -299,3 +313,15 @@ it.each([
     }
   }
 );
+
+it('returns only a fixed provider reason without logging or returning provider text', async () => {
+  requestMultimodalChatCompletionMock.mockRejectedValueOnce(
+    new AIProviderRequestError('quota-exceeded', 'private-provider-text')
+  );
+  const sendResponse = vi.fn();
+  routeScenarioEditorLlmMessage(createMessage(), sendResponse, createSender());
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({ success: false, failureReason: 'quota-exceeded' })
+  );
+  expect(loggerErrorMock).not.toHaveBeenCalled();
+});

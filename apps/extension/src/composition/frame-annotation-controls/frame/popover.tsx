@@ -1,3 +1,4 @@
+import { useInspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 import { useRef } from 'react';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import type { BlurType } from '../../../features/highlighter/contracts';
@@ -24,6 +25,7 @@ export function FrameAnnotationCreationFramePopover(props: {
   headerContext?: SettingsPopoverContext;
   resetKey?: string;
 }) {
+  const inspector = useInspectorLayout();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const state = useFrameCreationPopoverState(props);
   const dismissal = usePopoverInteractionDismissal({ blocked: false, isOpen: props.isOpen });
@@ -53,6 +55,9 @@ export function FrameAnnotationCreationFramePopover(props: {
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
       className={[
+        inspector
+          ? 'sniptale-compact-workspace sniptale-inspector-surface sniptale-content-appearance-surface'
+          : '',
         'sniptale-frame-settings-popover sniptale-glass-popover',
         'sniptale-content-popover sniptale-content-popover--toolbar-menu',
         'sniptale-main-toolbar-popover',
@@ -63,62 +68,60 @@ export function FrameAnnotationCreationFramePopover(props: {
       portalTarget={props.portalTarget ?? document.body}
       style={{ ...presentation.style, width: SETTINGS_POPOVER_WIDTH }}
     >
-      <div className="sniptale-content-popover-body">
-        <FrameSettingsPopoverContent
-          effectMode={props.settings.effectMode}
-          globalSettings={state.catalog.settings}
-          handleBlurChange={(amount) =>
-            state.border.apply({ blurSettings: { ...props.settings.blurSettings, amount } })
-          }
-          handleBlurShowBorderChange={(showBorder) =>
-            state.border.apply({ blurSettings: { ...props.settings.blurSettings, showBorder } })
-          }
-          handleBlurTypeChange={(blurType: BlurType) =>
-            state.border.apply({ blurSettings: { ...props.settings.blurSettings, blurType } })
-          }
-          handleForkPreset={state.border.forkPreset}
-          handleFocusChange={(opacity) =>
-            state.border.apply({ focusSettings: { ...props.settings.focusSettings, opacity } })
-          }
-          handleFocusBlurChange={handleFocusBlurChange}
-          handleFocusShowBorderChange={(showBorder) =>
-            state.border.apply({ focusSettings: { ...props.settings.focusSettings, showBorder } })
-          }
-          handleManualBorderChange={state.border.applyPatch}
-          handleSelectPreset={state.border.selectPreset}
-          handleTogglePresetEnabled={state.catalog.togglePresetEnabled}
-          headerContext={headerContext}
-          {...(presentation.drag ? { headerDrag: presentation.drag } : {})}
-          localBlurSettings={props.settings.blurSettings}
-          localBorderSettings={props.settings.borderSettings}
-          localFocusSettings={props.settings.focusSettings}
-          linkedTemplateOptions={linkedTemplateOptions}
-          manual={{
-            cssDraft: state.css.draft,
-            cssError: getBorderPresetCssValidation(state.css.draft).cssError,
-            isSaving: state.presetSaving.isSaving,
-            onCssDraftChange: (next) => {
-              state.css.setDraft(next);
-              const validation = getBorderPresetCssValidation(next);
-              if (!validation.cssError && !validation.hasBlockedProps) {
-                state.border.applyPatch({
-                  customCss: next,
-                  inheritCustomCss: Boolean(next.trim()),
-                });
-              }
-            },
-            save: state.presetSaving.save,
-          }}
-          onClose={props.onClose}
-          onFloatingInteractionChange={dismissal.onFloatingInteractionChange}
-          onEffectModeChange={(effectMode) => state.border.apply({ effectMode })}
-          onShowPresets={state.catalog.refresh}
-          pendingPresetIds={state.catalog.pendingPresetIds}
-          {...(props.settings.borderSettings.sourcePresetId
-            ? { selectedPresetId: props.settings.borderSettings.sourcePresetId }
-            : {})}
-        />
-      </div>
+      <FrameSettingsPopoverContent
+        effectMode={props.settings.effectMode}
+        globalSettings={state.catalog.settings}
+        handleBlurChange={(amount) =>
+          state.border.apply({ blurSettings: { ...props.settings.blurSettings, amount } })
+        }
+        handleBlurShowBorderChange={(showBorder) =>
+          state.border.apply({ blurSettings: { ...props.settings.blurSettings, showBorder } })
+        }
+        handleBlurTypeChange={(blurType: BlurType) =>
+          state.border.apply({ blurSettings: { ...props.settings.blurSettings, blurType } })
+        }
+        handleForkPreset={state.border.forkPreset}
+        handleFocusChange={(opacity) =>
+          state.border.apply({ focusSettings: { ...props.settings.focusSettings, opacity } })
+        }
+        handleFocusBlurChange={handleFocusBlurChange}
+        handleFocusShowBorderChange={(showBorder) =>
+          state.border.apply({ focusSettings: { ...props.settings.focusSettings, showBorder } })
+        }
+        handleManualBorderChange={state.border.applyPatch}
+        handleSelectPreset={state.border.selectPreset}
+        handleTogglePresetEnabled={state.catalog.togglePresetEnabled}
+        headerContext={headerContext}
+        {...(presentation.drag ? { headerDrag: presentation.drag } : {})}
+        localBlurSettings={props.settings.blurSettings}
+        localBorderSettings={props.settings.borderSettings}
+        localFocusSettings={props.settings.focusSettings}
+        linkedTemplateOptions={linkedTemplateOptions}
+        manual={{
+          cssDraft: state.css.draft,
+          cssError: getBorderPresetCssValidation(state.css.draft).cssError,
+          isSaving: state.presetSaving.isSaving,
+          onCssDraftChange: (next) => {
+            state.css.setDraft(next);
+            const validation = getBorderPresetCssValidation(next);
+            if (!validation.cssError && !validation.hasBlockedProps) {
+              state.border.applyPatch({
+                customCss: next,
+                inheritCustomCss: Boolean(next.trim()),
+              });
+            }
+          },
+          save: state.presetSaving.save,
+        }}
+        onClose={props.onClose}
+        onFloatingInteractionChange={dismissal.onFloatingInteractionChange}
+        onEffectModeChange={(effectMode) => state.border.apply({ effectMode })}
+        onShowPresets={state.catalog.refresh}
+        pendingPresetIds={state.catalog.pendingPresetIds}
+        {...(props.settings.borderSettings.sourcePresetId
+          ? { selectedPresetId: props.settings.borderSettings.sourcePresetId }
+          : {})}
+      />
     </ContentPopoverAdapter>
   );
 }

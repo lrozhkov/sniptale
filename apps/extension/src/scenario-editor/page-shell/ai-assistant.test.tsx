@@ -9,18 +9,26 @@ import {
   createGuideImageBlock,
 } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
-const io = vi.hoisted(() => ({ configuration: vi.fn(), request: vi.fn(), verify: vi.fn() }));
-vi.mock('./runtime/ai-request', () => ({
-  loadGuideAiConfiguration: io.configuration,
+const io = vi.hoisted(() => ({
+  configuration: vi.fn(),
+  request: vi.fn(),
+  verify: vi.fn(),
+  remember: vi.fn(),
+}));
+vi.mock('./runtime/ai-request', async (original) => ({
+  ...(await original<typeof import('./runtime/ai-request')>()),
   requestGuideAiProposal: io.request,
   verifyGuideAiBasis: io.verify,
-  GuideAiStaleError: class extends Error {},
+}));
+vi.mock('../../workflows/ai-settings/query', () => ({
+  requestAIScenarioModelSelection: io.configuration,
+  rememberAIScenarioModelSelection: io.remember,
 }));
 vi.mock('../../features/prompt-templates/hooks/use-prompt-templates', () => ({
   usePromptTemplates: () => ({ templates: [], isLoading: false, isMutating: false, error: null }),
 }));
 import { GuideAiAssistant, GuideAiEntry } from './ai-assistant';
-import { GuideAiStaleError } from './runtime/ai-request';
+import { GuideAiStaleError, GuideAiProviderError } from './runtime/ai-request';
 const project = createGuideProject('Guide');
 const step = createGuideStep('Before title', 'step');
 step.blocks = [{ kind: 'text', id: 'text', paragraphs: createGuideParagraphs('Before text') }];
@@ -76,7 +84,24 @@ async function open(
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.resetAllMocks();
-  io.configuration.mockResolvedValue({ providers: [], models: [], defaultModelId: 'model' });
+  io.remember.mockResolvedValue(undefined);
+  io.configuration.mockResolvedValue({
+    scenario: 'scenario-edit',
+    providers: [
+      {
+        id: 'provider',
+        name: 'NeuralDeep',
+        connectionType: 'neuraldeep',
+        incarnation: 'one',
+        destinationKind: 'external',
+        createdAt: 1,
+        hasStoredApiKey: true,
+      },
+    ],
+    models: [{ id: 'model', providerId: 'provider', modelCode: 'model', displayName: 'Model' }],
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
+  });
   io.request.mockResolvedValue(proposal);
   io.verify.mockResolvedValue(1);
   host = document.createElement('div');
@@ -87,6 +112,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 it('requests only explicitly, previews and applies a selected subset once, then restores focus', async () => {
   await open();
@@ -468,4 +494,73 @@ it('rejects a late proposal when actual draft content changed during the request
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('changed');
   expect(change).not.toHaveBeenCalled();
   expect(document.body.textContent).not.toContain('After title');
+});
+
+it('explains a refused model preference write and preserves the previous visible choice', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    () => new DOMRect(10, 20, 200, 30)
+  );
+  await open();
+  io.remember.mockRejectedValue(new Error('Storage refused'));
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!.click()
+  );
+  await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('button[title="Model"]')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  );
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+    'Could not save the model selection'
+  );
+  expect(document.querySelector('.sniptale-ai-model-selector-trigger')?.textContent).toContain(
+    'Model'
+  );
+  expect(io.request).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['permission-denied', 'settings.aiProviders.providerStatusDenied'],
+  ['quota-exceeded', 'settings.aiProviders.providerStatusQuota'],
+  ['model-unavailable', 'settings.aiProviders.providerStatusModelUnavailable'],
+] as const)('explains %s while preserving input and explicit retry', async (reason, key) => {
+  await open();
+  const instruction = document.querySelector('textarea')!.value;
+  io.request.mockRejectedValueOnce(new GuideAiProviderError(reason));
+  await act(async () => button('Get suggestions').click());
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe(createTranslator('en')(key));
+  expect(document.querySelector('textarea')!.value).toBe(instruction);
+  expect(change).not.toHaveBeenCalled();
+  expect(io.request).toHaveBeenCalledTimes(1);
+  expect(button('Get suggestions').disabled).toBe(false);
+});
+
+it('shows the saved unavailable model name through the Scenario session without a request', async () => {
+  io.configuration.mockResolvedValue({
+    scenario: 'scenario-edit',
+    providers: [],
+    models: [],
+    remembered: {
+      modelId: 'removed-model',
+      modelCode: 'removed-code',
+      providerId: 'provider',
+      providerIncarnation: 'one',
+      displayName: 'Saved Scenario model',
+      selectedAt: 1,
+      source: 'explicit',
+    },
+    resolution: {
+      status: 'unavailable',
+      modelId: null,
+      previousSelection: null,
+      reason: 'missing',
+    },
+  });
+  await open();
+  const dialog = document.querySelector('[role="dialog"]');
+  expect(dialog?.textContent).toContain('Saved Scenario model');
+  expect(button('Get suggestions').disabled).toBe(true);
+  expect(io.request).not.toHaveBeenCalled();
+  expect(io.remember).not.toHaveBeenCalled();
+  expect(change).not.toHaveBeenCalled();
 });

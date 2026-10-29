@@ -8,7 +8,8 @@
 }
 
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-annotation-effect-switch,
-.sniptale-toolbar[data-display-mode='vertical'] .sniptale-annotation-effect-options {
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-annotation-effect-options,
+.sniptale-toolbar[data-display-mode='vertical'] .sniptale-annotation-menu-control {
   flex-direction: column;
 }
 .sniptale-toolbar[data-display-mode='vertical'] .sniptale-annotation-effect-switch {
@@ -16,6 +17,9 @@
 }
 .sniptale-toolbar[data-display-mode='vertical']
   .sniptale-annotation-effect-switch
+  > .sniptale-annotation-properties-arrow,
+.sniptale-toolbar[data-display-mode='vertical']
+  .sniptale-annotation-menu-control
   > .sniptale-annotation-properties-arrow {
   width: var(--sniptale-toolbar-button-size);
   height: 14px;

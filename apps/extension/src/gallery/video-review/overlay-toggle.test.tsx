@@ -164,3 +164,7 @@ it('keeps conflict recovery accessible while a Basic comment is being edited', a
     await fixture.cleanup();
   }
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

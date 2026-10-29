@@ -1,0 +1,161 @@
+import { parseSyncProductResponse } from '../../contracts/messaging/contracts/runtime/sync-product';
+import type { SyncProductExecutorRequest } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { parseSyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime/sync-connection';
+import type { SyncConnectionCoordinatorDependencies } from './coordinator';
+
+import type {
+  SyncStartRequest,
+  SyncWorkspaceStartRequest,
+  SyncInspectRequest,
+  SyncStopRequest,
+} from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+type GatewayMessage =
+  | SyncProductExecutorRequest
+  | SyncStartRequest
+  | SyncWorkspaceStartRequest
+  | SyncInspectRequest
+  | SyncStopRequest;
+type GatewayCommand =
+  | Omit<SyncProductExecutorRequest, 'capabilityToken'>
+  | Omit<SyncStartRequest, 'capabilityToken'>
+  | Omit<SyncWorkspaceStartRequest, 'capabilityToken'>
+  | Omit<SyncInspectRequest, 'capabilityToken'>
+  | Omit<SyncStopRequest, 'capabilityToken'>;
+interface GatewayDependencies {
+  ensureDocument(): Promise<unknown>;
+  waitForReady(): Promise<void>;
+  getDocumentUrls(): Promise<readonly string[]>;
+  send(message: GatewayMessage): Promise<unknown>;
+  createRequestId(): string;
+}
+function acceptedExecutorReceipt(
+  response: Record<string, unknown>,
+  input: { executorId: string; executorRevision: number }
+) {
+  const revision = response['executorRevision'];
+  if (
+    response['result'] !== 'accepted' ||
+    response['executorId'] !== input.executorId ||
+    typeof revision !== 'number' ||
+    !Number.isSafeInteger(revision) ||
+    revision < input.executorRevision
+  )
+    return refused();
+  return { executorId: input.executorId, executorRevision: revision };
+}
+function refused(): never {
+  throw new Error('Sync executor command refused');
+}
+
+/** Bridge one shared document service to identity-bound sync commands. */
+export function createSyncOffscreenGateway(
+  deps: GatewayDependencies
+): Pick<
+  SyncConnectionCoordinatorDependencies,
+  | 'ensureDocument'
+  | 'inspectExecutor'
+  | 'startExecutor'
+  | 'startWorkspaceExecutor'
+  | 'stopExecutor'
+  | 'productExecutor'
+> {
+  async function document() {
+    const urls = await deps.getDocumentUrls();
+    if (urls.length === 0) return null;
+    if (urls.length !== 1) return refused();
+    const url = new URL(urls[0]!);
+    if (url.searchParams.get('privacyErasure') === '1') return { privacy: true, startupId: null };
+    const startupId = url.searchParams.get('offscreenStartupId');
+    if (!startupId) return refused();
+    return { privacy: false, startupId };
+  }
+  async function send(message: GatewayCommand) {
+    const response = await deps.send(attachOffscreenCommandCapability(message));
+    if (!isRecord(response) || response['success'] !== true) return refused();
+    return response;
+  }
+  return {
+    async ensureDocument() {
+      const before = await document();
+      if (before?.privacy) refused();
+      await deps.ensureDocument();
+      await deps.waitForReady();
+      const current = await document();
+      if (!current || current.privacy || !current.startupId) return refused();
+      return current.startupId;
+    },
+    async inspectExecutor(startupId, challenge, advisory) {
+      const current = await document();
+      if (!current || current.privacy) return { kind: 'absent' };
+      if (!current.startupId || (startupId !== null && startupId !== current.startupId))
+        return refused();
+      const response = await send({
+        type: MessageType.OFFSCREEN_SYNC_INSPECT,
+        requestId: deps.createRequestId(),
+        offscreenStartupId: current.startupId,
+        challenge,
+        ...(advisory ? { advisory } : {}),
+      });
+      const snapshot = parseSyncExecutorSnapshot(response['snapshot']);
+      if (
+        !snapshot ||
+        response['challenge'] !== challenge ||
+        snapshot.offscreenStartupId !== current.startupId
+      )
+        return refused();
+      return { kind: 'present', challenge, snapshot };
+    },
+    async productExecutor(input) {
+      const response = await deps.send(
+        attachOffscreenCommandCapability({
+          type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+          requestId: deps.createRequestId(),
+          ...input,
+        })
+      );
+      return parseSyncProductResponse(response) ?? refused();
+    },
+    async startExecutor(input) {
+      const response = await send({
+        type: MessageType.OFFSCREEN_SYNC_START,
+        requestId: deps.createRequestId(),
+        ...input,
+      });
+      return acceptedExecutorReceipt(response, input);
+    },
+    async startWorkspaceExecutor(input) {
+      const response = await send({
+        type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+        requestId: deps.createRequestId(),
+        ...input,
+      });
+      if (
+        Object.keys(response).length !== 4 ||
+        !['success', 'result', 'executorId', 'executorRevision'].every((key) =>
+          Object.hasOwn(response, key)
+        )
+      )
+        return refused();
+      return acceptedExecutorReceipt(response, input);
+    },
+    async stopExecutor(input) {
+      const response = await send({
+        type: MessageType.OFFSCREEN_SYNC_STOP,
+        requestId: deps.createRequestId(),
+        ...input,
+      });
+      if (
+        response['result'] !== 'stopped' ||
+        response['executorId'] !== input.executorId ||
+        typeof response['executorRevision'] !== 'number' ||
+        !Number.isSafeInteger(response['executorRevision']) ||
+        response['executorRevision'] <= input.executorRevision
+      )
+        return refused();
+      return { executorId: input.executorId, executorRevision: response['executorRevision'] };
+    },
+  };
+}

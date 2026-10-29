@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createRemoteRootGalleryItem } from '../items/adapters';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +16,11 @@ import {
 } from './test-support/index';
 
 const renameQuickEditMock = vi.hoisted(() => vi.fn());
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: async (_roots: unknown, operation: () => Promise<unknown>) =>
+    operation(),
+}));
+
 vi.mock('../../../workflows/media-hub/trash', async (original) => ({
   ...(await original<typeof import('../../../workflows/media-hub/trash')>()),
   renameQuickEditProject: renameQuickEditMock,
@@ -425,6 +431,46 @@ it('renames a quick-edit project through its revisioned owner without renaming i
   });
   await createClosePreviewAction(controller)(runBusyAction);
   expect(renameQuickEditMock).toHaveBeenCalledExactlyOnceWith('source', 4, 'Renamed edit');
+  expect(updateMediaLibraryEntrySafelyMock).not.toHaveBeenCalled();
+  expect(updateScenarioProjectRecordMetadataMock).not.toHaveBeenCalled();
+});
+
+it('preserves local metadata autosave when navigating to a remote root and never saves remote metadata', async () => {
+  const remote = createRemoteRootGalleryItem({
+    source: 'remote',
+    tags: [],
+    label: 'Remote project',
+    kind: 'image',
+    mimeType: 'image/png',
+    size: 1024,
+    createdAt: 10,
+    updatedAt: 20,
+    conflict: false,
+    unavailable: false,
+    deleted: false,
+    selection: {
+      rootKind: 'media',
+      rootId: 'remote-root',
+      operationId: 'operation-1',
+      sourceDigest: 'a'.repeat(64),
+    },
+  });
+  const local = createMediaItem({ id: 'local-1', filename: 'before.png' });
+  const { controller, getState } = createController({
+    previewItem: local,
+    filenameDraft: 'edited.png',
+  });
+  await createNavigatePreviewAction(controller)(remote, runBusyAction);
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenCalledWith('local-1', {
+    filename: 'edited.png',
+  });
+  expect(getState().preview.session.item).toEqual(remote);
+  updateMediaLibraryEntrySafelyMock.mockClear();
+  const remoteController = createController({
+    previewItem: remote,
+    filenameDraft: 'forged.png',
+  }).controller;
+  await createSaveMetadataAction(remoteController)(runBusyAction);
   expect(updateMediaLibraryEntrySafelyMock).not.toHaveBeenCalled();
   expect(updateScenarioProjectRecordMetadataMock).not.toHaveBeenCalled();
 });

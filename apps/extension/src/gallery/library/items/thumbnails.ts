@@ -4,6 +4,7 @@ import { getAggregatePresentation } from '../../../composition/persistence/aggre
 import type { GalleryItem } from './types';
 import { ensureLegacyGalleryThumbnail } from './legacy-thumbnails';
 import { getGalleryProjectCover } from './project-covers';
+import { readRemoteGalleryThumbnail } from './remote-thumbnails';
 
 const THUMBNAIL_WIDTH = 320;
 const THUMBNAIL_HEIGHT = 180;
@@ -38,6 +39,7 @@ export async function ensureGalleryItemThumbnail(
   item: GalleryItem,
   signal?: AbortSignal
 ): Promise<MediaThumbnailEntry | undefined> {
+  if (item.type === 'remote-root') return readRemoteGalleryThumbnail(item, signal);
   if (item.type === 'quick-edit-project') {
     const thumbnail = await getMediaThumbnail(item.entityId);
     return thumbnail ? { ...thumbnail, assetId: item.id } : undefined;

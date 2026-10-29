@@ -1,10 +1,20 @@
+vi.mock('../../../platform/media-utils/screenshot-encoding', () => ({
+  optimizeScreenshotBlob: mocks.optimizeBlob,
+  finalizeScreenshotDataUrl: mocks.finalizeDataUrl,
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ dataUrlToBlob: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  dataUrlToBlob: vi.fn(),
+  finalizeDataUrl: vi.fn(),
+  optimizeBlob: vi.fn(async (blob: Blob) => blob),
+  blobToDataUrl: vi.fn(async () => 'data:image/png;base64,optimized'),
+}));
 
 vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
   dataUrlToBlob: mocks.dataUrlToBlob,
+  blobToDataUrl: mocks.blobToDataUrl,
 }));
 
 import {
@@ -53,6 +63,8 @@ function capturedPng(args: { height: number; size: number; width: number }): Blo
 
 beforeEach(() => {
   mocks.dataUrlToBlob.mockReset();
+  mocks.finalizeDataUrl.mockReset();
+  mocks.optimizeBlob.mockReset().mockImplementation(async (blob: Blob) => blob);
 });
 
 it('admits a browser PNG within the selected file and raster budgets', async () => {
@@ -88,4 +100,144 @@ it('rejects hostile viewport dimensions from the PNG header without decoding the
       policy: DEFAULT_FULL_PAGE_QUALITY_POLICY,
     })
   ).rejects.toThrow('configured quality limits');
+});
+
+it('admits a bounded lossless appearance fallback above the selected final file cap', async () => {
+  mocks.dataUrlToBlob.mockResolvedValue(
+    capturedPng({ height: 500, width: 800, size: 70 * 1024 * 1024 })
+  );
+  await expect(
+    assertFullPageViewportFallbackWithinPolicy({
+      dataUrl: 'source',
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
+      outputPurpose: 'appearance-source',
+    })
+  ).resolves.toEqual({ height: 500, width: 800 });
+  expect(mocks.optimizeBlob).not.toHaveBeenCalled();
+});
+it('keeps the absolute encoded source ceiling and raster limits for appearance fallbacks', async () => {
+  mocks.dataUrlToBlob.mockResolvedValue(
+    capturedPng({ height: 500, width: 800, size: 128 * 1024 * 1024 + 1 })
+  );
+  await expect(
+    assertFullPageViewportFallbackWithinPolicy({
+      dataUrl: 'source',
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
+      outputPurpose: 'appearance-source',
+    })
+  ).rejects.toThrow('maximum file size');
+  mocks.dataUrlToBlob.mockResolvedValue(capturedPng({ height: 500, width: 40000, size: 4096 }));
+  await expect(
+    assertFullPageViewportFallbackWithinPolicy({
+      dataUrl: 'source',
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
+      outputPurpose: 'appearance-source',
+    })
+  ).rejects.toThrow('quality limits');
+});
+
+it('returns the optimized ordinary fallback bytes after checking the final file budget', async () => {
+  mocks.dataUrlToBlob.mockResolvedValue(
+    capturedPng({ height: 500, width: 800, size: 70 * 1024 * 1024 })
+  );
+  mocks.optimizeBlob.mockResolvedValueOnce(new Blob(['smaller'], { type: 'image/png' }));
+  await expect(
+    assertFullPageViewportFallbackWithinPolicy({
+      dataUrl: 'source',
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
+    })
+  ).resolves.toEqual({ height: 500, width: 800, dataUrl: 'data:image/png;base64,optimized' });
+});
+
+it.each(['jpeg', 'webp'] as const)(
+  'encodes an admitted fallback as %s at the selected quality before final file admission',
+  async (format) => {
+    const source = capturedPng({ height: 500, width: 800, size: 70 * 1024 * 1024 });
+    const output = new Blob(['fits'], { type: `image/${format}` });
+    mocks.dataUrlToBlob.mockResolvedValueOnce(source).mockResolvedValueOnce(output);
+    mocks.finalizeDataUrl.mockResolvedValue(`data:image/${format};base64,encoded`);
+    await expect(
+      assertFullPageViewportFallbackWithinPolicy({
+        dataUrl: 'data:image/png;base64,source',
+        policy: FULL_PAGE_QUALITY_PROFILES.safe,
+        format,
+        quality: 0.61,
+      })
+    ).resolves.toEqual({ height: 500, width: 800, dataUrl: `data:image/${format};base64,encoded` });
+    expect(mocks.finalizeDataUrl).toHaveBeenCalledWith('data:image/png;base64,source', {
+      format,
+      quality: 61,
+    });
+    expect(mocks.optimizeBlob).not.toHaveBeenCalled();
+  }
+);
+it.each(['jpeg', 'webp'] as const)(
+  'rejects an oversized final %s fallback after encoding',
+  async (format) => {
+    mocks.dataUrlToBlob
+      .mockResolvedValueOnce(capturedPng({ height: 500, width: 800, size: 4096 }))
+      .mockResolvedValueOnce(
+        new (class extends Blob {
+          get size() {
+            return 64 * 1024 * 1024 + 1;
+          }
+        })(['large'], { type: `image/${format}` })
+      );
+    mocks.finalizeDataUrl.mockResolvedValue(`data:image/${format};base64,encoded`);
+    await expect(
+      assertFullPageViewportFallbackWithinPolicy({
+        dataUrl: 'data:image/png;base64,source',
+        policy: FULL_PAGE_QUALITY_PROFILES.safe,
+        format,
+        quality: 0.61,
+      })
+    ).rejects.toThrow('maximum file size');
+  }
+);
+
+it('keeps appearance-source fallbacks PNG despite the eventual JPEG profile', async () => {
+  mocks.dataUrlToBlob.mockResolvedValue(
+    capturedPng({ height: 500, width: 800, size: 70 * 1024 * 1024 })
+  );
+  await expect(
+    assertFullPageViewportFallbackWithinPolicy({
+      dataUrl: 'source',
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
+      outputPurpose: 'appearance-source',
+      format: 'jpeg',
+      quality: 0.61,
+    })
+  ).resolves.toEqual({ height: 500, width: 800 });
+  expect(mocks.finalizeDataUrl).not.toHaveBeenCalled();
+  expect(mocks.optimizeBlob).not.toHaveBeenCalled();
+});
+it('rejects hostile fallback dimensions before JPEG decoding or encoding', async () => {
+  mocks.dataUrlToBlob.mockResolvedValue(capturedPng({ height: 500, width: 40000, size: 4096 }));
+  await expect(
+    assertFullPageViewportFallbackWithinPolicy({
+      dataUrl: 'source',
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
+      format: 'jpeg',
+      quality: 0.61,
+    })
+  ).rejects.toThrow('quality limits');
+  expect(mocks.finalizeDataUrl).not.toHaveBeenCalled();
+});
+it('refuses a converted fallback after cancellation before final data admission', async () => {
+  const controller = new AbortController();
+  mocks.dataUrlToBlob.mockResolvedValue(capturedPng({ height: 500, width: 800, size: 4096 }));
+  mocks.finalizeDataUrl.mockImplementation(async () => {
+    controller.abort(new Error('capture cancelled'));
+    return 'data:image/webp;base64,encoded';
+  });
+  await expect(
+    assertFullPageViewportFallbackWithinPolicy({
+      dataUrl: 'source',
+      policy: FULL_PAGE_QUALITY_PROFILES.safe,
+      format: 'webp',
+      quality: 0.61,
+      signal: controller.signal,
+    })
+  ).rejects.toThrow('capture cancelled');
+  expect(mocks.dataUrlToBlob).toHaveBeenCalledOnce();
 });

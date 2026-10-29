@@ -108,6 +108,8 @@ export function createVideoProjectRestoreTransaction(
     put: async () => undefined,
   };
   const byName = {
+    sync_capture: empty,
+    video_project_revisions: empty,
     project_assets: stores.assets,
     project_exports: stores.exports,
     media_library: stores.media,

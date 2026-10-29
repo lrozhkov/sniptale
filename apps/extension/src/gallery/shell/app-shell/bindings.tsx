@@ -10,6 +10,7 @@ import type { RuntimeMessagingTransport } from '../../../platform/runtime-messag
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   isGalleryMediaItem,
+  isGalleryRemoteItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
   isGallerySelectableItem,
@@ -70,6 +71,16 @@ function openPreview(
   });
 }
 
+function openRemotePreview(
+  actions: UseGalleryAppActionsResult,
+  controller: GalleryAppStateController,
+  item: GalleryItem
+) {
+  const current = controller.state.preview.session.item;
+  if (current && current.id !== item.id) void actions.preview.navigate(item);
+  else openPreview(controller, item, { inspectorCollapsed: false });
+}
+
 function isReadOnlyTrashPreview(controller: GalleryAppStateController): boolean {
   return Boolean(
     controller.state.filters.trashMode ||
@@ -111,12 +122,20 @@ function buildGalleryPreviewHandlers(
     onPreviewCopy: () =>
       isReadOnlyTrashPreview(controller) ? Promise.resolve(false) : actions.preview.copy(),
     onPreviewEdit: (item: GalleryItem) => {
+      if (isGalleryRemoteItem(item)) {
+        if (!isReadOnlyTrashPreview(controller)) openRemotePreview(actions, controller, item);
+        return;
+      }
       if (!isReadOnlyTrashPreview(controller) && item.lifecycle?.trashedAt === undefined) {
         actions.preview.openInEditor(item);
       }
     },
     onProjectOpen: (item: GalleryItem) => {
       if (controller.state.filters.trashMode || item.lifecycle?.trashedAt !== undefined) return;
+      if (isGalleryRemoteItem(item)) {
+        openRemotePreview(actions, controller, item);
+        return;
+      }
       actions.preview.openInEditor(item);
     },
     onRecordingGroupOpen: (item: GalleryItem) => {
@@ -158,7 +177,16 @@ function buildGalleryPreviewHandlers(
           ? openPreview(controller, item, { inspectorCollapsed: false })
           : undefined
         : item.lifecycle?.trashedAt === undefined
-          ? openPreview(controller, item, options)
+          ? controller.state.preview.session.item &&
+            controller.state.preview.session.item.id !== item.id &&
+            (isGalleryRemoteItem(item) ||
+              isGalleryRemoteItem(controller.state.preview.session.item))
+            ? void actions.preview.navigate(item)
+            : openPreview(
+                controller,
+                item,
+                isGalleryRemoteItem(item) ? { inspectorCollapsed: false } : options
+              )
           : undefined,
     onPreviewNavigate: (item: GalleryItem) => {
       if (isReadOnlyTrashPreview(controller)) {

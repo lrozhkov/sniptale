@@ -1,4 +1,5 @@
 import { expect, test } from '../support/extension-fixture';
+import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import type { Page } from '@playwright/test';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 
@@ -413,6 +414,17 @@ for (const viewport of [
         await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
         await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
         for (const orientation of ['vertical', 'horizontal'] as const) {
+          // Open the setup menu from the top edge before testing the free-placement positions.
+          const setupHandle = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
+          await setupHandle.hover();
+          const setupGrip = (await setupHandle.boundingBox())!;
+          await page.mouse.move(
+            setupGrip.x + setupGrip.width / 2,
+            setupGrip.y + setupGrip.height / 2
+          );
+          await page.mouse.down();
+          await page.mouse.move(viewport.width / 2, 20, { steps: 5 });
+          await page.mouse.up();
           await page.locator('[data-ui="content.toolbar.settings-button"]').click();
           await page
             .getByRole('button', {
@@ -421,7 +433,7 @@ for (const viewport of [
                   ? /Vertical view|Вертикальный вид/u
                   : /Horizontal view|Горизонтальный вид/u,
             })
-            .click();
+            .click({ timeout: 10_000 });
           await page.keyboard.press('Escape');
           await expect(toolbar).toHaveAttribute('data-display-mode', orientation);
           for (const position of ['far', 'near', 'interior']) {
@@ -498,6 +510,113 @@ for (const viewport of [
     } finally {
       await page.close();
       await popup.close();
+    }
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+  { width: 1024, height: 560 },
+]) {
+  test(`right dock entry and scrollbar menu clearance ${viewport.width}`, async ({
+    hostOrigin,
+  }, info) => {
+    const launched = await launchExtensionBrowser({ viewport, showScrollbars: true });
+    try {
+      const { context, extensionId } = launched;
+      const { page } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+      const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+      const menuButton = page.locator('[data-ui="content.toolbar.mode-selector-button"]');
+      const handle = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
+      await menuButton.click();
+      await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+      await page.addStyleTag({
+        content: [
+          'html { overflow-y: scroll !important; scrollbar-gutter: stable !important; }',
+          'html::-webkit-scrollbar { width: 17px; }',
+          'body { min-height: 2400px; }',
+        ].join(' '),
+      });
+      await page.evaluate(() => new Promise(requestAnimationFrame));
+      const gutter = await page.evaluate(() => innerWidth - document.documentElement.clientWidth);
+      expect(gutter).toBeGreaterThan(0);
+      for (const target of ['right', 'top-right', 'bottom-right']) {
+        await handle.hover();
+        const grip = (await handle.boundingBox())!;
+        await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+        await page.mouse.down();
+        const guide = page.locator(`[data-ui="content.toolbar.dock-zone.${target}"]`);
+        await expect(guide).toBeVisible();
+        const rect = (await guide.boundingBox())!;
+        await page.mouse.move(rect.x - 1, rect.y + rect.height / 2);
+        await expect(guide).toHaveAttribute('data-active', 'false');
+        await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
+        await expect.soft(guide).toHaveAttribute('data-active', 'true', { timeout: 1000 });
+        await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        await page.mouse.up();
+        await expect(page.locator('[data-ui="content.toolbar.dock-guides"]')).toHaveCount(0);
+      }
+      // Park vertically on the right using the accepted inner edge, even on a failing baseline.
+      await handle.hover();
+      const grip = (await handle.boundingBox())!;
+      await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+      await page.mouse.down();
+      const right = (await page
+        .locator('[data-ui="content.toolbar.dock-zone.right"]')
+        .boundingBox())!;
+      await page.mouse.move(right.x + right.width / 2, right.y + right.height / 2);
+      await page.mouse.up();
+      await expect(toolbar).toHaveAttribute('data-display-mode', 'vertical');
+      for (const hasScrollbar of [true, false]) {
+        await page.evaluate((visible) => {
+          document.documentElement.style.setProperty(
+            'overflow-y',
+            visible ? 'scroll' : 'hidden',
+            'important'
+          );
+          document.documentElement.style.setProperty(
+            'scrollbar-gutter',
+            visible ? 'stable' : 'auto',
+            'important'
+          );
+        }, hasScrollbar);
+        await expect
+          .poll(async () => {
+            const box = (await toolbar.boundingBox())!;
+            return Math.abs(
+              (await page.evaluate(() => document.documentElement.clientWidth)) -
+                box.x -
+                box.width -
+                20
+            );
+          })
+          .toBeLessThanOrEqual(1);
+        for (const mode of ['cursor', 'quick-edit']) {
+          await menuButton.click();
+          await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+          await menuButton.click();
+          const menu = toolbar
+            .locator('.sniptale-popover-menu:visible')
+            .filter({ has: page.locator('[data-ui="content.toolbar.mode-option.cursor"]') });
+          await expect(menu).toBeVisible();
+          const box = (await toolbar.boundingBox())!,
+            surface = (await menu.boundingBox())!;
+          expect.soft(Math.abs(box.x - surface.x - surface.width - 1)).toBeLessThanOrEqual(1);
+          await page.screenshot({
+            path: info.outputPath(`right-menu-${mode}-scrollbar-${hasScrollbar}.png`),
+            fullPage: false,
+          });
+          await page.keyboard.press('Escape');
+        }
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+          )
+        ).toBe(true);
+      }
+    } finally {
+      await closeExtensionBrowser(launched, { removeUserDataDir: true });
     }
   });
 }

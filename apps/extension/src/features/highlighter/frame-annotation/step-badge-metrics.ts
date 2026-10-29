@@ -53,7 +53,7 @@ export function getStepBadgeVisualMetrics(settings: StepBadgeSettings, borderWid
   }
   const fontSize =
     Math.max(12, borderWidth * 2.5) * sizeLevelToMultiplier(getEffectiveSizeLevel(settings));
-  const badgeSize = fontSize * 1.8;
+  const badgeSize = Math.round(fontSize * 1.8);
   return {
     badgeSize,
     fontSize,

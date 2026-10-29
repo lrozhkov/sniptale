@@ -1,33 +1,63 @@
+import { mkdir, readdir, readFile } from 'node:fs/promises';
+import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { expect, test } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import type { Page } from '@playwright/test';
 
+async function readCaptureDefaults(popup: Page) {
+  return popup.evaluate(async () => {
+    const settings = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
+    return {
+      imageFormat: settings.imageFormat,
+      imageQuality: settings.imageQuality,
+      fullPageImage: settings.fullPageImage,
+      fullPageCapture: settings.fullPageCapture,
+    };
+  });
+}
+
 async function configureToolbar(
   popup: Page,
   page: Page,
   hostOrigin: string,
-  displayMode: 'horizontal' | 'vertical'
+  displayMode: 'horizontal' | 'vertical',
+  compactMenus = true,
+  captureAction: 'edit' | 'copy' = 'edit'
 ) {
-  await popup.evaluate(async (displayMode) => {
-    const current = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
-    await chrome.storage.sync.set({
-      sniptale_settings: {
-        ...current,
-        captureAction: 'edit',
-        imageFormat: 'png',
-        imageQuality: 83,
-        contentToolbar: {
-          ...current?.contentToolbar,
-          pageControls: { ...current?.contentToolbar?.pageControls, 'scenario-panel': true },
-          displayMode,
-          freePlacement: false,
-          position: null,
-          dockEdge: displayMode === 'horizontal' ? 'bottom' : 'right-bottom',
+  await popup.evaluate(
+    async ({ displayMode, compactMenus, captureAction }) => {
+      const current = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
+      await chrome.storage.sync.set({
+        sniptale_settings: {
+          ...current,
+          captureAction,
+          imageFormat: 'png',
+          imageQuality: 83,
+          fullPageImage: { imageFormat: 'png', imageQuality: 83 },
+          fullPageCapture: {
+            freezeMotion: true,
+            preloadLazyContent: true,
+            floatingElements: 'once',
+          },
+          contentToolbar: {
+            ...current?.contentToolbar,
+            pageControls: {
+              ...current?.contentToolbar?.pageControls,
+              'scenario-panel': true,
+              'after-capture': true,
+            },
+            compactMenus,
+            displayMode,
+            freePlacement: false,
+            position: null,
+            dockEdge: displayMode === 'horizontal' ? 'bottom' : 'right-bottom',
+          },
         },
-      },
-    });
-  }, displayMode);
+      });
+    },
+    { displayMode, compactMenus, captureAction }
+  );
   await page.reload();
   await popup.evaluate(async (origin) => {
     const tab = (await chrome.tabs.query({})).find((tab) => tab.url === `${origin}/`);
@@ -44,15 +74,236 @@ async function configureToolbar(
   }, hostOrigin);
   await page.bringToFront();
   await expect(page.locator('[data-ui="content.toolbar.root"]')).toBeVisible();
+  await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+  const compactToggle = page.getByRole('button', {
+    name: /Compact menu view|Компактный вид меню/u,
+  });
+  if (
+    (await compactToggle.getAttribute('class'))?.includes('sniptale-popover-item-selected') !==
+    compactMenus
+  )
+    await compactToggle.click();
+  await expect(compactToggle.locator('.sniptale-popover-check')).toHaveCount(compactMenus ? 1 : 0);
+  await page.keyboard.press('Escape');
 }
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   for (const theme of ['light', 'dark'] as const) {
+    test(`navigation pin chrome ${theme} ${name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      try {
+        await popup.evaluate(async (theme) => {
+          await chrome.storage.local.set({
+            'sniptale-theme-preference': theme,
+            'sniptale-locale-preference': theme === 'light' ? 'en' : 'ru',
+          });
+          const grant = document.createElement('button');
+          grant.textContent = 'Grant pin proof';
+          grant.onclick = async () => {
+            grant.dataset['granted'] = String(
+              await chrome.permissions.request({ origins: ['<all_urls>'] })
+            );
+          };
+          document.body.append(grant);
+        }, theme);
+        const grant = popup.getByRole('button', { name: 'Grant pin proof' });
+        await grant.click();
+        await expect(grant).toHaveAttribute('data-granted', 'true');
+        for (const orientation of ['horizontal', 'vertical'] as const) {
+          await configureToolbar(popup, page, hostOrigin, orientation);
+          const pin = page.locator('[data-ui="content.toolbar.navigation.pin-to-tab"]');
+          await expect(pin).toBeEnabled();
+          const readPinned = () =>
+            popup.evaluate(async (origin) => {
+              const tab = (await chrome.tabs.query({})).find((tab) => tab.url === `${origin}/`);
+              const key = `sniptale.content.pin-to-tab:tab:${tab!.id}`;
+              return (await chrome.storage.session.get(key))[key] === true;
+            }, hostOrigin);
+          await expect(pin).toHaveAttribute('aria-pressed', 'false');
+          const inactiveColor = await pin
+            .locator('svg')
+            .evaluate((icon) => getComputedStyle(icon).stroke);
+          const inactiveIcon = await pin.locator('svg').getAttribute('class');
+          await page.mouse.move(10, 100);
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await pin.hover();
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await pin.click();
+          await expect(pin).toHaveAttribute('aria-pressed', 'true');
+          await expect.poll(readPinned).toBe(true);
+          await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+          await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+          await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+          await expect(
+            page
+              .getByRole('button', { name: /Pin toolbar to.*tab|Закрепить панель во вкладке/u })
+              .locator('.sniptale-popover-check')
+          ).toBeVisible();
+          await page.screenshot({
+            path: info.outputPath(`pin-settings-${orientation}.png`),
+            fullPage: false,
+          });
+          await page.keyboard.press('Escape');
+          await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+          await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+          await page.mouse.move(10, 100);
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await expect(pin).toHaveCSS('box-shadow', 'none');
+          await expect(pin.locator('svg')).not.toHaveAttribute('class', inactiveIcon!);
+          await expect
+            .poll(() => pin.locator('svg').evaluate((icon) => getComputedStyle(icon).stroke))
+            .not.toBe(inactiveColor);
+          await pin.hover();
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await page.mouse.down();
+          await expect(pin).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+          await page.mouse.move(10, 100);
+          await page.mouse.up();
+          await expect(pin).toHaveAttribute('aria-pressed', 'true');
+          await page.getByRole('button', { name: 'Host action', exact: true }).click();
+          await page.screenshot({
+            path: info.outputPath(`navigation-pin-${orientation}-rest.png`),
+            fullPage: false,
+            animations: 'disabled',
+          });
+          await pin.focus();
+          await pin.press('Tab');
+          await page.keyboard.press('Shift+Tab');
+          await expect(pin).toBeFocused();
+          await expect(pin).toHaveCSS('outline-style', 'solid');
+          await page.screenshot({
+            path: info.outputPath(`navigation-pin-${orientation}.png`),
+            fullPage: false,
+            animations: 'disabled',
+          });
+          await pin.press('Enter');
+          await expect(pin).toHaveAttribute('aria-pressed', 'false');
+          await expect.poll(readPinned).toBe(false);
+        }
+      } finally {
+        await page.close();
+        await popup.close();
+      }
+    });
+
+    test(`collapsed toolbar pin lifecycle ${theme} ${name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      test.setTimeout(180_000);
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      page.setDefaultTimeout(10_000);
+      try {
+        await popup.evaluate(async (theme) => {
+          await chrome.storage.local.set({
+            'sniptale-theme-preference': theme,
+            'sniptale-locale-preference': theme === 'light' ? 'en' : 'ru',
+          });
+          const grant = document.createElement('button');
+          grant.textContent = 'Grant collapse proof';
+          grant.onclick = async () => {
+            grant.dataset['granted'] = String(
+              await chrome.permissions.request({ origins: ['<all_urls>'] })
+            );
+          };
+          document.body.append(grant);
+        }, theme);
+        const grant = popup.getByRole('button', { name: 'Grant collapse proof' });
+        await grant.click();
+        await expect(grant).toHaveAttribute('data-granted', 'true');
+        await configureToolbar(
+          popup,
+          page,
+          hostOrigin,
+          theme === 'light' ? 'horizontal' : 'vertical'
+        );
+        const tabId = await popup.evaluate(
+          async (origin) =>
+            (await chrome.tabs.query({})).find((tab) => tab.url === `${origin}/`)!.id!,
+          hostOrigin
+        );
+        const session = () =>
+          popup.evaluate(async (id) => {
+            const pin = `sniptale.content.pin-to-tab:tab:${id}`;
+            const automatic = `sniptale.content.pin-to-tab-automatic:tab:${id}`;
+            const visible = `sniptale.content.pin-to-tab-toolbar-visible:tab:${id}`;
+            const stored = await chrome.storage.session.get([pin, automatic, visible]);
+            return {
+              pin: stored[pin] === true,
+              automatic: stored[automatic] === true,
+              visible: stored[visible] !== false,
+            };
+          }, tabId);
+        const root = page.locator('[data-ui="content.toolbar.root"]');
+        const restore = page.locator('[data-ui="content.collapsed-panels.restore-toolbar"]');
+        const pin = page.locator('[data-ui="content.toolbar.navigation.pin-to-tab"]');
+        await expect(pin).toHaveAttribute('aria-pressed', 'false');
+        await page.locator('[data-ui="content.toolbar.navigation.collapse"]').click();
+        await expect.poll(session).toEqual({ pin: true, automatic: true, visible: false });
+        const crossSite = new URL(hostOrigin);
+        crossSite.hostname = 'localhost';
+        for (const destination of [page.url(), `${hostOrigin}/?collapsed=1`, crossSite.href]) {
+          await page.goto(destination);
+          await expect(restore).toBeVisible();
+          await expect(root).toBeHidden();
+          await expect.poll(session).toEqual({ pin: true, automatic: true, visible: false });
+        }
+        await page.screenshot({
+          path: info.outputPath('automatic-pin-collapsed.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await restore.click();
+        await expect(root).toBeVisible();
+        await expect.poll(session).toEqual({ pin: false, automatic: false, visible: true });
+        await expect(pin).toHaveAttribute('aria-pressed', 'false');
+        await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+        await page
+          .getByRole('button', {
+            name: translate('content.toolbar.hideToolbar', theme === 'light' ? 'en' : 'ru'),
+            exact: true,
+          })
+          .click();
+        await expect.poll(session).toEqual({ pin: true, automatic: true, visible: false });
+        await page.reload();
+        await expect(restore).toBeVisible();
+        await restore.press('Enter');
+        await expect(root).toBeVisible();
+        await expect.poll(session).toEqual({ pin: false, automatic: false, visible: true });
+        await pin.click();
+        await expect.poll(session).toEqual({ pin: true, automatic: false, visible: true });
+        await page.locator('[data-ui="content.toolbar.navigation.collapse"]').click();
+        await expect.poll(session).toEqual({ pin: true, automatic: false, visible: false });
+        await page.reload();
+        await expect(restore).toBeVisible();
+        await restore.click();
+        await expect(root).toBeVisible();
+        await expect.poll(session).toEqual({ pin: true, automatic: false, visible: true });
+        await expect(pin).toHaveAttribute('aria-pressed', 'true');
+        await page.screenshot({
+          path: info.outputPath('manual-pin-expanded.png'),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        await pin.click();
+        await expect.poll(session).toEqual({ pin: false, automatic: false, visible: true });
+      } finally {
+        await page.close();
+        await popup.close();
+      }
+    });
+
     test(`screenshot quick menus ${theme} ${name}`, async ({
       context,
       extensionId,
       hostOrigin,
     }, info) => {
+      test.setTimeout(180000);
       const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
       try {
         await popup.evaluate(
@@ -64,7 +315,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           theme
         );
         for (const orientation of ['horizontal', 'vertical'] as const) {
-          await configureToolbar(popup, page, hostOrigin, orientation);
+          const compact = theme === 'light';
+          await configureToolbar(popup, page, hostOrigin, orientation, compact);
           const captureButtons = page
             .locator('[data-ui="content.toolbar.root"] button[data-ui^="content.toolbar.capture-"]')
             .filter({ has: page.locator('svg') });
@@ -113,39 +365,58 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             const menu = page.locator(
               `[data-ui="content.toolbar.${mode === 'full' ? 'full' : 'visible'}-page-menu"]`
             );
-            const icons = menu.locator('.sniptale-capture-action-icons button');
+            const parameters = menu.locator(
+              `[data-ui="content.toolbar.${mode}-capture-parameters"]`
+            );
+            const back = menu.locator(
+              `[data-ui="content.toolbar.${mode}-capture-parameters-back"]`
+            );
+            const summary = menu.locator(`[id="content.toolbar.${mode}-capture-summary"]`);
+            const savedBefore = await readCaptureDefaults(popup);
+            await expect(parameters).toContainText('PNG');
+            await expect(parameters).not.toContainText(/Options|Параметры/u);
+            await expect(parameters.locator('.lucide-chevron-right')).toBeVisible();
+            await expect(summary).toContainText('PNG');
+            await expect(menu.getByRole('button', { name: 'JPEG', exact: true })).toHaveCount(0);
+            await page.screenshot({
+              path: info.outputPath(`${orientation}-${mode}-root.png`),
+              fullPage: false,
+            });
+            await parameters.focus();
+            await parameters.press('Enter');
+            await expect(back).toBeVisible();
+            await expect(
+              menu.locator('.sniptale-screenshot-menu > .sniptale-toolbar-menu-title')
+            ).toHaveCount(0);
+            await expect(menu.getByRole('button', { name: 'JPEG', exact: true })).toBeVisible();
+            await back.click();
+            await expect(parameters).toBeFocused();
+            expect(await readCaptureDefaults(popup)).toEqual(savedBefore);
+            const icons = menu.locator(`[data-ui^="content.toolbar.capture-${mode}-action."]`);
             await expect(icons).toHaveCount(6);
             await icons.first().hover();
             await expect(trigger.locator('..')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-            expect(
-              await icons.evaluateAll(
-                (nodes) =>
-                  new Set(nodes.map((node) => Math.round(node.getBoundingClientRect().y))).size
-              )
-            ).toBe(1);
+            if (compact) {
+              expect(
+                await icons.evaluateAll(
+                  (nodes) =>
+                    new Set(nodes.map((node) => Math.round(node.getBoundingClientRect().y))).size
+                )
+              ).toBe(1);
+              await expect(menu.locator('.sniptale-capture-action-icons')).toBeVisible();
+            } else {
+              await expect(menu.locator('.sniptale-capture-action-icons')).toHaveCount(0);
+              for (const action of await icons.all())
+                await expect(action.locator('.sniptale-toolbar-menu-item-label')).toBeVisible();
+            }
             await expect(menu.locator('[data-ui$=".scenario"]')).toHaveCount(0);
+            await parameters.click();
             await expect(menu.getByRole('slider')).toHaveCount(0);
             await menu.getByRole('button', { name: 'WebP', exact: true }).click();
-            await expect
-              .poll(() =>
-                popup.evaluate(
-                  async () =>
-                    (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
-                      .imageFormat
-                )
-              )
-              .toBe('webp');
+
             await menu.getByRole('button', { name: 'JPEG', exact: true }).click();
             await expect(menu.getByRole('slider')).toHaveCount(0);
-            await expect
-              .poll(() =>
-                popup.evaluate(
-                  async () =>
-                    (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
-                      .imageFormat
-                )
-              )
-              .toBe('jpeg');
+
             const input = menu.getByRole('textbox', {
               name: /Image quality|Качество изображения/u,
             });
@@ -194,6 +465,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             await page.screenshot({
               path: info.outputPath(`${orientation}-${mode}-quality-focus.png`),
               fullPage: false,
+              animations: 'disabled',
             });
             const accepted = await input.inputValue();
             await input.fill('77');
@@ -201,18 +473,17 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
             await expect(input).toHaveValue(accepted);
             await input.fill('76');
             await input.press('Enter');
-            await expect
-              .poll(() =>
-                popup.evaluate(
-                  async () =>
-                    (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings']
-                      .imageQuality
-                )
-              )
-              .toBe(76);
+
+            await back.click();
+            await expect(summary).toContainText('JPEG · 76%');
+            await expect(parameters).toBeFocused();
+            await expect(input).toHaveCount(0);
+            await parameters.press('Enter');
+            await expect(input).toHaveValue('76');
             await page.screenshot({
               path: info.outputPath(`${orientation}-${mode}-quality.png`),
               fullPage: false,
+              animations: 'disabled',
             });
             await menu.getByRole('button', { name: 'PNG', exact: true }).click();
             await expect(input).toHaveCount(0);
@@ -230,16 +501,24 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
               await expect(
                 menu.locator('[data-ui="content.toolbar.full-page-floating.hide"]')
               ).toHaveClass(/selected/u);
-              await menu.locator('.sniptale-capture-action-icons').scrollIntoViewIfNeeded();
             }
             await page.screenshot({
               path: info.outputPath(`${orientation}-${mode}.png`),
               fullPage: false,
+              animations: 'disabled',
             });
+            await back.click();
+            expect(await readCaptureDefaults(popup)).toEqual(savedBefore);
+            await expect(icons.first()).toBeVisible();
             await icons.first().focus();
             await page.keyboard.press('Escape');
             await expect(menu).toHaveCount(0);
             await expect(trigger).toBeFocused();
+            await trigger.click();
+            await expect(parameters).toBeVisible();
+            await expect(back).toHaveCount(0);
+            await page.keyboard.press('Escape');
+            await expect(menu).toHaveCount(0);
           }
           await page.locator('[data-ui="content.toolbar.capture-action-button"]').click();
           const defaults = page.locator('[data-ui="content.toolbar.capture-action-menu"]');
@@ -261,8 +540,14 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           await page.screenshot({
             path: info.outputPath(`${orientation}-after-capture-list.png`),
             fullPage: false,
+            animations: 'disabled',
           });
           await defaults.locator('[data-ui="content.toolbar.capture-action-option.copy"]').click();
+          await page.setViewportSize({ width: 1000, height: size.height });
+          await expect
+            .poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth))
+            .toBeLessThanOrEqual(1);
+          await page.setViewportSize(size);
           await expect(defaults).toHaveCount(0);
           await expect
             .poll(() =>
@@ -447,6 +732,364 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
               .pageControls['scenario-panel']
         )
       ).toBe(false);
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`screenshot parameters section retains real capture output ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+    launchedExtension,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    page.setDefaultTimeout(10000);
+    const locale = size.width === 1280 ? 'en' : 'ru';
+    const directory = info.outputPath('parameter-downloads');
+    await mkdir(directory, { recursive: true });
+    const session = await launchedExtension.browser.newBrowserCDPSession();
+    await session.send('Browser.setDownloadBehavior', {
+      behavior: 'allow',
+      downloadPath: directory,
+    });
+    try {
+      await popup.evaluate(async (locale) => {
+        const current = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
+        await chrome.storage.sync.set({
+          sniptale_settings: {
+            ...current,
+            imageFormat: 'png',
+            imageQuality: 83,
+            fullPageImage: { imageFormat: 'png', imageQuality: 83 },
+            contentToolbar: { ...current?.contentToolbar, compactMenus: true },
+            pageLaunch: {
+              enabled: true,
+              hoverOnly: false,
+              corner: 'bottom-right',
+              quickActionsCorner: true,
+              quickActionsToolbar: true,
+            },
+            fullPageCapture: {
+              preloadLazyContent: true,
+              freezeMotion: true,
+              floatingElements: 'once',
+            },
+          },
+        });
+        await chrome.storage.local.set({
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': locale === 'ru' ? 'dark' : 'light',
+        });
+      }, locale);
+      await page.reload();
+      await page.bringToFront();
+      await page
+        .locator('#sniptale-page-launcher')
+        .getByRole('button', { name: /Open page toolbar|Открыть панель страницы/u })
+        .click();
+      await page.evaluate(() => {
+        document.body.style.minHeight = '1200px';
+        const marker = document.createElement('div');
+        marker.id = 'capture-floating-proof';
+        marker.style.cssText =
+          'position:fixed;right:20px;top:20px;width:50px;height:50px;background:#ff00ff;z-index:1000000';
+        document.body.append(marker);
+      });
+      const globalDefaults = await readCaptureDefaults(popup);
+      for (const [mode, format] of [
+        ['visible', 'webp'],
+        ['full', 'jpeg'],
+      ] as const) {
+        const root = page.locator('[data-ui="content.toolbar.root"]');
+        await expect(root).toBeVisible();
+        await page.locator(`[data-ui="content.toolbar.capture-${mode}-settings-button"]`).click();
+        const menu = page.locator(
+          `[data-ui="content.toolbar.${mode === 'full' ? 'full' : 'visible'}-page-menu"]`
+        );
+        const parameters = menu.locator(`[data-ui="content.toolbar.${mode}-capture-parameters"]`);
+        const back = menu.locator(`[data-ui="content.toolbar.${mode}-capture-parameters-back"]`);
+        const summary = menu.locator(`[id="content.toolbar.${mode}-capture-summary"]`);
+        await expect(parameters).toBeVisible();
+        await parameters.click();
+        await menu
+          .getByRole('button', { name: format === 'webp' ? 'WebP' : 'JPEG', exact: true })
+          .click();
+        const input = menu.getByRole('textbox', { name: /Image quality|Качество изображения/u });
+        await input.fill('76');
+        await input.press('Enter');
+        if (mode === 'full') {
+          for (const key of ['fullPageLazyContent', 'fullPageFreezeMotion'] as const)
+            await menu
+              .getByRole('button')
+              .filter({ hasText: translate(`content.toolbar.${key}`, locale) })
+              .click();
+          await menu.locator('[data-ui="content.toolbar.full-page-floating.hide"]').click();
+        }
+        expect(await readCaptureDefaults(popup)).toEqual(globalDefaults);
+        await back.click();
+        await expect(parameters).toBeFocused();
+        await expect(summary).toContainText(format.toUpperCase() + ' · 76%');
+        await page.screenshot({
+          path: info.outputPath(`${mode}-accepted-collapsed.png`),
+          fullPage: false,
+          animations: 'disabled',
+        });
+        const previous = new Set(await readdir(directory));
+        await menu
+          .locator(`[data-ui="content.toolbar.capture-${mode}-action.download_default"]`)
+          .click();
+        let downloaded: string | undefined;
+        await expect
+          .poll(
+            async () => {
+              downloaded = (await readdir(directory)).find(
+                (file) =>
+                  !previous.has(file) &&
+                  (file.endsWith(`.${format}`) || (format === 'jpeg' && file.endsWith('.jpg')))
+              );
+              return Boolean(downloaded);
+            },
+            { timeout: 30000 }
+          )
+          .toBe(true);
+        const bytes = await readFile(`${directory}/${downloaded!}`);
+        if (format === 'webp') {
+          expect(bytes.subarray(0, 4).toString()).toBe('RIFF');
+          expect(bytes.subarray(8, 12).toString()).toBe('WEBP');
+        } else expect(Array.from(bytes.subarray(0, 3))).toEqual([255, 216, 255]);
+        const result = await page.evaluate(
+          async ({ data, mime }) => {
+            const bitmap = await createImageBitmap(
+              new Blob([new Uint8Array(data)], { type: mime })
+            );
+            const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(bitmap, 0, 0);
+            const pixel = Array.from(ctx.getImageData(bitmap.width - 45, 45, 1, 1).data);
+            const dimensions = { width: bitmap.width, height: bitmap.height };
+            bitmap.close();
+            return { ...dimensions, pixel };
+          },
+          { data: Array.from(bytes), mime: `image/${format}` }
+        );
+        const expectedWidth =
+          mode === 'full'
+            ? await page.evaluate(() => document.documentElement.clientWidth)
+            : size.width;
+        expect(result.width).toBe(expectedWidth);
+        expect(result.height).toBeGreaterThanOrEqual(size.height);
+        if (mode === 'visible') {
+          expect(result.pixel[0]).toBeGreaterThan(230);
+          expect(result.pixel[1]).toBeLessThan(30);
+          expect(result.pixel[2]).toBeGreaterThan(230);
+        } else expect(result.pixel[1]).toBeGreaterThan(200);
+        await expect(page.locator('#capture-floating-proof')).toBeVisible();
+      }
+    } finally {
+      await session.detach();
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`capture defaults stay separate from document overrides ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    const settingsPage = await context.newPage();
+    await settingsPage.setViewportSize(size);
+    try {
+      await popup.evaluate(async () => {
+        const current = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
+        await chrome.storage.sync.set({
+          sniptale_settings: {
+            ...current,
+            imageFormat: 'png',
+            imageQuality: 83,
+            fullPageImage: { imageFormat: 'png', imageQuality: 72 },
+            fullPageCapture: {
+              preloadLazyContent: true,
+              freezeMotion: true,
+              floatingElements: 'once',
+            },
+          },
+        });
+        await chrome.storage.local.set({ 'sniptale-locale-preference': 'en' });
+      });
+      await settingsPage.goto(
+        `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=media-quality&view=image`
+      );
+      const full = settingsPage.locator('[data-ui="settings.image.full-page"]');
+      await expect(full).toBeVisible();
+      await full.getByRole('radio', { name: 'WebP', exact: true }).click();
+      await expect
+        .poll(async () => (await readCaptureDefaults(popup)).fullPageImage?.imageFormat)
+        .toBe('webp');
+      const quality = full.getByRole('textbox', { name: /Image quality|Качество изображения/u });
+      await quality.fill('64');
+      await quality.press('Enter');
+      await expect
+        .poll(async () => (await readCaptureDefaults(popup)).fullPageImage?.imageQuality)
+        .toBe(64);
+      await settingsPage.getByRole('radio', { name: 'JPEG', exact: true }).first().click();
+      await expect.poll(async () => (await readCaptureDefaults(popup)).imageFormat).toBe('jpeg');
+      await full
+        .getByRole('switch', {
+          name: translate('content.toolbar.fullPageLazyContent', 'en'),
+          exact: true,
+        })
+        .click();
+      await expect
+        .poll(async () => (await readCaptureDefaults(popup)).fullPageCapture?.preloadLazyContent)
+        .toBe(false);
+      await full
+        .getByRole('button', {
+          name: translate('content.toolbar.fullPageFloatingHide', 'en'),
+          exact: true,
+        })
+        .click();
+      await expect
+        .poll(async () => (await readCaptureDefaults(popup)).fullPageCapture?.floatingElements)
+        .toBe('hide');
+      await quality.scrollIntoViewIfNeeded();
+      await settingsPage.screenshot({
+        path: info.outputPath('settings-full-page-defaults.png'),
+        fullPage: false,
+      });
+      const defaults = await readCaptureDefaults(popup);
+      expect(defaults).toMatchObject({
+        imageFormat: 'jpeg',
+        imageQuality: 83,
+        fullPageImage: { imageFormat: 'webp', imageQuality: 64 },
+      });
+      for (const pass of [0, 1]) {
+        await page.reload();
+        await expect
+          .poll(() =>
+            popup.evaluate(async (origin) => {
+              const tab = (await chrome.tabs.query({})).find((item) => item.url === `${origin}/`);
+              if (tab?.id === undefined) return false;
+              await chrome.runtime.sendMessage({
+                type: 'PAGE_ACCESS',
+                operation: 'register-granted-site',
+                tabId: tab.id,
+                __sniptaleRuntimeFreshness: {
+                  issuedAtEpochMs: Date.now(),
+                  nonce: crypto.randomUUID(),
+                },
+              });
+              const response = await chrome.tabs
+                .sendMessage(tab.id, { type: 'ENABLE_SCREENSHOT_MODE', workingMode: 'cursor' })
+                .catch(() => null);
+              return response?.success === true;
+            }, hostOrigin)
+          )
+          .toBe(true);
+        await page.bringToFront();
+        for (const mode of ['visible', 'full'] as const) {
+          const trigger = page.locator(
+            `[data-ui="content.toolbar.capture-${mode}-settings-button"]`
+          );
+          await trigger.click();
+          const summary = page.locator(`[data-ui="content.toolbar.${mode}-capture-parameters"]`);
+          await expect(summary).toContainText(mode === 'visible' ? 'JPEG · 83%' : 'WEBP · 64%');
+          if (pass === 0) {
+            await summary.click();
+            await page.getByRole('button', { name: 'PNG', exact: true }).click();
+            await page
+              .locator(`[data-ui="content.toolbar.${mode}-capture-parameters-back"]`)
+              .click();
+            await expect(summary).toContainText('PNG');
+            await page.keyboard.press('Escape');
+            await trigger.click();
+            await expect(summary).toContainText('PNG');
+          }
+          await page.screenshot({
+            path: info.outputPath(`document-${pass}-${mode}.png`),
+            fullPage: false,
+          });
+          await page.keyboard.press('Escape');
+          expect(await readCaptureDefaults(popup)).toEqual(defaults);
+        }
+      }
+      await page.setViewportSize({ width: 1000, height: 560 });
+      await page.locator('[data-ui="content.toolbar.capture-full-settings-button"]').click();
+      const menu = page.locator(
+        '[data-ui="content.toolbar.full-page-menu"] .sniptale-toolbar-menu'
+      );
+      const bounds = (await menu.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(1000);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true
+      );
+    } finally {
+      await settingsPage.close();
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`toolbar Copy retains drawing mode for primary and menu captures ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: hostOrigin });
+    try {
+      await configureToolbar(popup, page, hostOrigin, 'horizontal', true, 'copy');
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+      await page.mouse.move(600, 220);
+      await page.mouse.down();
+      await page.mouse.move(700, 260, { steps: 5 });
+      await page.mouse.up();
+      const canvas = page.locator(
+        '[data-ui="content.drawing.surface"] canvas.sniptale-drawing-canvas[tabindex="0"]'
+      );
+      const before = await canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL());
+      for (const [mode, menu] of [
+        ['visible', false],
+        ['full', true],
+      ] as const) {
+        await page.evaluate(() => navigator.clipboard.writeText('before capture'));
+        if (menu) {
+          await page.locator(`[data-ui="content.toolbar.capture-${mode}-settings-button"]`).click();
+          await page.locator(`[data-ui="content.toolbar.capture-${mode}-action.copy"]`).click();
+        } else await page.locator(`[data-ui="content.toolbar.capture-${mode}-button"]`).click();
+        await expect
+          .poll(() =>
+            page.evaluate(async () => {
+              const items = await navigator.clipboard.read();
+              const image = items.find((item) => item.types.includes('image/png'));
+              return image ? (await image.getType('image/png')).size : 0;
+            })
+          )
+          .toBeGreaterThan(0);
+        await expect(page.locator('[data-ui="content.toolbar.drawing.pencil"]')).toBeVisible();
+        await expect
+          .poll(() => canvas.evaluate((node) => (node as HTMLCanvasElement).toDataURL()))
+          .toBe(before);
+        await page.screenshot({
+          path: info.outputPath(`${mode}-copy-drawing-restored.png`),
+          fullPage: false,
+        });
+      }
     } finally {
       await page.close();
       await popup.close();

@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const contentStepBadgeMessages = defineMessageSource({
+  editValue: { ru: 'Изменить значение номера', en: 'Edit number value' },
   settingsTitle: {
     ru: 'Нумерация',
     en: 'Numbering',
@@ -16,12 +17,12 @@ export const contentStepBadgeMessages = defineMessageSource({
   templateSourceFrame: { ru: 'Рамка', en: 'Frame' },
   templateSourceForced: { ru: 'По умолчанию', en: 'Default' },
   templateSourceFrameHint: {
-    ru: 'Переключить на шаблон нумерации из настроек рамки.',
-    en: 'Switch to the numbering template from the frame settings.',
+    ru: 'Связь с рамкой включена. Новые рамки используют связанный шаблон нумерации, а при его отсутствии — основной. Нажмите, чтобы всегда использовать основной.',
+    en: 'Frame link on. New frames use their linked numbering template, or the default when no link exists. Click to always use the default template.',
   },
   templateSourceForcedHint: {
-    ru: 'Переключить на основной шаблон нумерации независимо от настроек рамки.',
-    en: 'Switch to the default numbering template regardless of the frame settings.',
+    ru: 'Связь с рамкой выключена. Новые рамки используют основной шаблон нумерации. Нажмите, чтобы использовать шаблон из рамки.',
+    en: 'Frame link off. New frames use the default numbering template. Click to use the template linked to the frame.',
   },
   presetsSection: { ru: 'Шаблоны', en: 'Templates' },
   configurePreset: { ru: 'Настроить шаблон', en: 'Configure template' },

@@ -27,6 +27,91 @@
       "source": "LICENSES/OFL-1.1.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__alibaba-2.0.69.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__alibaba-2.0.69.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__anthropic-4.0.82.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__anthropic-4.0.82.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__cohere-4.0.63.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__cohere-4.0.63.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__deepgram-3.1.33.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__deepgram-3.1.33.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__deepseek-3.0.67.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__deepseek-3.0.67.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__elevenlabs-3.0.63.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__elevenlabs-3.0.63.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__gateway-4.0.116.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__gateway-4.0.116.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__google-4.0.99.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__google-4.0.99.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__minimax-3.0.59.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__minimax-3.0.59.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__mistral-4.0.66.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__mistral-4.0.66.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__moonshotai-3.0.71.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__moonshotai-3.0.71.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__openai-4.0.96.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__openai-4.0.96.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__openai-compatible-3.0.71.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__openai-compatible-3.0.71.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__provider-4.0.29.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__provider-4.0.29.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__provider-utils-5.0.62.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__provider-utils-5.0.62.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__xai-5.0.24.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__xai-5.0.24.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@ai-sdk__zai-3.0.33.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/@ai-sdk__zai-3.0.33.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt",
       "sha256": "bc79b2867a4357a57c3aaf112545723516083d022d2675d5af22b3e06090b07c",
       "source": "LICENSES/dependencies/@fontsource__marck-script-5.3.0.txt"
@@ -52,9 +137,29 @@
       "source": "LICENSES/dependencies/@noble__hashes-2.4.0.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@openrouter__ai-sdk-provider-3.1.0.txt",
+      "sha256": "dc5d6874c25b4d5af22aa7bb9a18422bc86c7516c80056c1788fc120c4121f72",
+      "source": "LICENSES/dependencies/@openrouter__ai-sdk-provider-3.1.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@standard-schema__spec-1.1.0.txt",
+      "sha256": "653b779005a3a4d64a7288c940f7b9a0e8f0b1e0375f6aa6af9473caf131e564",
+      "source": "LICENSES/dependencies/@standard-schema__spec-1.1.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@vercel__oidc-3.2.0.txt",
+      "sha256": "b070d77bfb2c52a1dd6996de0ce5f64c49a0ca55c889b163a963ddf5cb001ee2",
+      "source": "LICENSES/dependencies/@vercel__oidc-3.2.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt",
       "sha256": "ebad0332150a08f37389158289d93ab2f70b0ee8717d1db9b3d002febc6c5047",
       "source": "LICENSES/dependencies/@webav__mp4box.js-0.5.7.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/@workflow__serde-4.1.0.txt",
+      "sha256": "39248a57eaac37e120c65bae851c6382bf722fc87c3452bf6a245caef96db739",
+      "source": "LICENSES/dependencies/@workflow__serde-4.1.0.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/@zip.js__zip.js-2.24.0.txt",
@@ -67,14 +172,39 @@
       "source": "LICENSES/dependencies/@zumer__snapdom-3.3.5.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/ai-7.0.143.txt",
+      "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529",
+      "source": "LICENSES/dependencies/ai-7.0.143.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/color-name-1.1.4.txt",
+      "sha256": "c064f7a3e353bc1bc977f3c897941c75ef763f44f41677e0a15370ca0853d6e2",
+      "source": "LICENSES/dependencies/color-name-1.1.4.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/color-name-list-14.72.0.txt",
+      "sha256": "c5bc9b96e07b83b190604b21d0e03f2f95c551986ffd05ab3c613a23d5b0c5a5",
+      "source": "LICENSES/dependencies/color-name-list-14.72.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/core-util-is-1.0.3.txt",
       "sha256": "33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710",
       "source": "LICENSES/dependencies/core-util-is-1.0.3.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/debug-4.4.3.txt",
+      "sha256": "3a61c6c96caf5c1d9b623fb9b04c822b783dfcb78aa7e49c76a3f643e6ed7f95",
+      "source": "LICENSES/dependencies/debug-4.4.3.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/dompurify-3.4.17.txt",
       "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "source": "LICENSES/dependencies/dompurify-3.4.17.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/eventsource-parser-3.1.1.txt",
+      "sha256": "835eb611a23301b27115ca1be9f754c876e643ceb7fe63049c6b50609a1cafeb",
+      "source": "LICENSES/dependencies/eventsource-parser-3.1.1.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/fabric-7.4.0.txt",
@@ -107,6 +237,11 @@
       "source": "LICENSES/dependencies/isarray-1.0.0.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/json-schema-0.4.0.txt",
+      "sha256": "4e053c510d6f3e4724213a292c65142df68d069c40f558582bc4270914e16f77",
+      "source": "LICENSES/dependencies/json-schema-0.4.0.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/jszip-3.10.2.txt",
       "sha256": "566c953c6090b1218ca6217dd7359d45dde46581968586dc607d59a78af6a9c4",
       "source": "LICENSES/dependencies/jszip-3.10.2.txt"
@@ -115,6 +250,11 @@
       "archivePath": "LICENSES/dependencies/lie-3.3.0.txt",
       "sha256": "5c81b0caa98593408b03125efa25efe622341ed87ae55561968828cd887d64a4",
       "source": "LICENSES/dependencies/lie-3.3.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/lucide-1.59.0.txt",
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "source": "LICENSES/dependencies/lucide-1.59.0.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/lucide-react-1.59.0.txt",
@@ -128,7 +268,7 @@
     },
     {
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6-modified/README.md",
-      "sha256": "35e090bb0019effc70359e2021ebde90705a7db44b615effbeacfbbd90007ded",
+      "sha256": "5905b057e08cc26b073407918e587bcc5f0c0dd91b086912cf768503dedf4af2",
       "source": "LICENSES/dependencies/mediabunny-1.61.6-modified/README.md"
     },
     {
@@ -153,6 +293,16 @@
       "archivePath": "LICENSES/dependencies/mediabunny-1.61.6.txt",
       "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
       "source": "LICENSES/dependencies/mediabunny-1.61.6.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/ms-2.1.3.txt",
+      "sha256": "1662fae9b5314d11cf51284e2dcd1f006a354f7343f08712a730fcff9a359801",
+      "source": "LICENSES/dependencies/ms-2.1.3.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "source": "LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/pako-1.0.11.txt",
@@ -205,6 +355,11 @@
       "source": "LICENSES/dependencies/safe-buffer-5.1.2.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/sax-1.6.1.txt",
+      "sha256": "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004",
+      "source": "LICENSES/dependencies/sax-1.6.1.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/scheduler-0.28.0.txt",
       "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
       "source": "LICENSES/dependencies/scheduler-0.28.0.txt"
@@ -220,9 +375,24 @@
       "source": "LICENSES/dependencies/string_decoder-1.1.1.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/tsdav-2.5.0.txt",
+      "sha256": "2595fc934bdb521ec42681a25f9c75977da1640cebbbf8e69b3a046c431874c0",
+      "source": "LICENSES/dependencies/tsdav-2.5.0.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/undici-7.30.1.txt",
+      "sha256": "a6db8096b2707bc0102d256917d4d33f298ba36d8c3f25de067a2b5bb379db27",
+      "source": "LICENSES/dependencies/undici-7.30.1.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/util-deprecate-1.0.2.txt",
       "sha256": "0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7",
       "source": "LICENSES/dependencies/util-deprecate-1.0.2.txt"
+    },
+    {
+      "archivePath": "LICENSES/dependencies/xml-js-1.6.11.txt",
+      "sha256": "8ada61091ef0ef154a69321483e5ffadf5c50693ca945047ffb90a6b4b12b088",
+      "source": "LICENSES/dependencies/xml-js-1.6.11.txt"
     },
     {
       "archivePath": "LICENSES/dependencies/zod-4.6.7.txt",
@@ -251,12 +421,12 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "bd8cc40ce59be43fa0f958c8916e578543547804ca4f26d8f9c9a97dc33a5293",
+      "sha256": "d8b1296f47adcea86dd33eefbca4b01d04b453828d99335164d9094d25f96625",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "bdf5787ad56c97f7631602bb437720ea96cc4bb2b1af28f105d8ab45a23bfa1b",
+      "sha256": "396ab54ae7db3699268891e3aa4c1d5012a52e4f51777c4fdc59ef0381e6cc0b",
       "source": "THIRD_PARTY_NOTICES.md"
     }
   ],
@@ -344,6 +514,19 @@
         "originUrl": "https://raw.githubusercontent.com/tabler/tabler-icons/v3.49.0/LICENSE",
         "sourcePath": "tooling/release/dependency-legal/sources/tabler-icons-3.49.0.LICENSE",
         "sha256": "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db"
+      },
+      {
+        "kind": "package-license",
+        "license": "Apache-2.0",
+        "packageName": "@ai-sdk/provider-utils",
+        "packageVersion": "5.0.62",
+        "packageResolved": "https://registry.npmjs.org/@ai-sdk/provider-utils/-/provider-utils-5.0.62.tgz",
+        "packageIntegrity": "sha512-//6sHa6QNQdM2KHOg5pxp1UMFQB4U8cqdw/kSm9BMr0DLeaFgG3TXZfxhpwRZmxgBpOrzMVZ/gwLXH309+Ortw==",
+        "upstreamRepository": "vercel/ai",
+        "upstreamVersion": "@ai-sdk/provider-utils@5.0.62",
+        "originUrl": "https://raw.githubusercontent.com/vercel/ai/%40ai-sdk%2Fprovider-utils%405.0.62/LICENSE",
+        "sourcePath": "tooling/release/dependency-legal/sources/ai-provider-utils-5.0.62.LICENSE",
+        "sha256": "b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529"
       }
     ],
     "reviewedSelections": [
@@ -356,6 +539,11 @@
         "packageName": "jszip",
         "version": "3.10.2",
         "selectedLicense": "MIT"
+      },
+      {
+        "packageName": "json-schema",
+        "version": "0.4.0",
+        "selectedLicense": "BSD-3-Clause"
       }
     ],
     "modifiedSources": [

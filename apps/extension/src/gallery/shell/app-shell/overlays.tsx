@@ -76,6 +76,9 @@ function GalleryBackupExportOverlay(
     <BackupExportModalContent
       options={props.state.storage.pendingExport.options}
       summary={props.state.storage.pendingExport.summary}
+      {...(props.state.storage.pendingExport.preparation
+        ? { preparation: props.state.storage.pendingExport.preparation }
+        : {})}
       onClose={props.onPendingExportClose}
       onExport={async (options) => props.onBackupExportConfirm(options)}
       onInspect={props.onBackupExportInspect}

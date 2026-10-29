@@ -1,4 +1,4 @@
-import { ClipboardCopy, Download, FileJson2, FileOutput, FilePlus2, Save, X } from 'lucide-react';
+import { Copy, Download, FileJson2, FileOutput, FilePlus2, Save, X } from 'lucide-react';
 import { expect, it } from 'vitest';
 import { translate } from '../../../../platform/i18n';
 import { buildDocumentActionCommandBuilders } from './commands';
@@ -23,7 +23,7 @@ it('builds the close and copy commands', () => {
     id: 'copy-png',
     kind: 'command',
     label: translate('editor.documentActions.copyPng'),
-    icon: ClipboardCopy,
+    icon: Copy,
     emphasis: 'secondary',
     disabled: true,
     disabledReason: 'unsupported',

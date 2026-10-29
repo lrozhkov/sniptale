@@ -343,3 +343,36 @@ it.each([
   expect(Number(style?.top)).toBeGreaterThanOrEqual(8);
   expect(Number(style?.top) + 360).toBeLessThanOrEqual(552);
 });
+
+it.each([1, 0.5, 1.5])(
+  'keeps fixed vertical menu gap independent of classic scrollbar at scale %s',
+  (scale) => {
+    vi.stubGlobal('innerWidth', 1200);
+    vi.stubGlobal('innerHeight', 700);
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1183);
+    vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(700);
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar';
+    toolbar.dataset['pageControls'] = 'true';
+    toolbar.style.setProperty('--sniptale-content-ui-scale', String(scale));
+    const anchor = document.createElement('button');
+    toolbar.append(anchor);
+    document.body.append(toolbar);
+    const x = 1183 - 20 * scale - 50 * scale;
+    vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(x, 100, 50 * scale, 300 * scale)
+    );
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(x + 9 * scale, 150, 32 * scale, 32 * scale)
+    );
+    const style = resolveToolbarDrawingMenuStyle({
+      anchorEl: anchor,
+      displayMode: 'vertical',
+      menuWidth: 190,
+      menuHeight: 200,
+      placement: 'down',
+    })!;
+    const menuRight = 1183 - Number(style.right) * scale;
+    expect(x - menuRight).toBeCloseTo(scale, 6);
+  }
+);

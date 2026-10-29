@@ -1,3 +1,4 @@
+import { createPagePackageManifestFixture } from '../../features/web-snapshot/manifest.test-support';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -24,6 +25,11 @@ const mediaHubStoreMocks = vi.hoisted(() => ({
   saveWebSnapshotMediaAssetMock: vi.fn(),
   updateMediaLibraryEntryMock: vi.fn(),
   withMediaHubWriteGuardMock: vi.fn(),
+}));
+
+vi.mock('../sync-transfer/editing-admission', () => ({
+  runWithNativePublicationResources: async (_roots: unknown, operation: () => Promise<unknown>) =>
+    operation(),
 }));
 
 vi.mock('../../composition/persistence/media-library/index', async (importOriginal) => ({
@@ -137,17 +143,19 @@ describe('media-hub-store web snapshot save flow', () => {
     });
     const input = {
       filename: 'snapshot.zip',
-      manifest: { source: { title: 'Page', url: 'https://example.com' } },
+      manifest: createPagePackageManifestFixture({
+        source: { faviconUrl: null, title: 'Page', url: 'https://example.com' },
+      }),
       packageBlob: new Blob(['zip']),
       screenshotBlob: new Blob(['png']),
     };
     const assertPersistenceAllowed = vi.fn().mockResolvedValue(undefined);
 
-    await expect(
-      saveWebSnapshotMediaAssetSafely(input as never, assertPersistenceAllowed)
-    ).resolves.toEqual({
-      assetId: 'asset-web',
-    });
+    await expect(saveWebSnapshotMediaAssetSafely(input, assertPersistenceAllowed)).resolves.toEqual(
+      {
+        assetId: 'asset-web',
+      }
+    );
 
     expect(mediaHubStoreMocks.withMediaHubWriteGuardMock).toHaveBeenCalledWith(
       'сохранение Веб-снимка в Библиотеку',

@@ -41,7 +41,6 @@ const LOADED_RUNTIME_DATA: LoadedAiProvidersRuntimeData = [
   MODELS,
   [PROVIDER],
   MODELS,
-  'model-2',
   'Global',
   'Scenario',
   true,
@@ -50,7 +49,6 @@ const LOADED_RUNTIME_DATA: LoadedAiProvidersRuntimeData = [
 
 it('applies loaded runtime data to the ai providers state setters', () => {
   const setChromeAiEnabled = vi.fn();
-  const setDefaultModelId = vi.fn();
   const setModels = vi.fn();
   const setProviders = vi.fn();
   const setSelectionState = vi.fn();
@@ -59,7 +57,6 @@ it('applies loaded runtime data to the ai providers state setters', () => {
   const result = applyLoadedAiProvidersRuntimeData(
     {
       setChromeAiEnabled,
-      setDefaultModelId,
       setModels,
       setProviders,
       setSelectionState,
@@ -69,7 +66,6 @@ it('applies loaded runtime data to the ai providers state setters', () => {
   );
 
   expect(result).toEqual({
-    loadedDefaultId: 'model-2',
     loadedModels: MODELS,
   });
   expect(setProviders).toHaveBeenCalledWith([PROVIDER]);
@@ -78,7 +74,6 @@ it('applies loaded runtime data to the ai providers state setters', () => {
     models: MODELS,
     providers: [PROVIDER],
   });
-  expect(setDefaultModelId).toHaveBeenCalledWith('model-2');
   expect(setChromeAiEnabled).toHaveBeenCalledWith(true);
   expect(setSecretProtectionStatus).toHaveBeenCalledWith(SECRET_PROTECTION_STATUS);
 });

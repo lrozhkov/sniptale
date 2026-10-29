@@ -55,3 +55,18 @@ it('returns response markup as literal text and rejects invalid terminal respons
   ])
     expect(parseContentTextServerMessage(value)).toBeNull();
 });
+
+it('admits bounded provider reasons and rejects private or malformed failure evidence', () => {
+  const failure = {
+    type: 'failure',
+    requestId: 'bde5d973-b7d7-4c61-8ec9-784bdc7a4930',
+    code: 'provider-failed',
+  };
+  expect(parseContentTextServerMessage({ ...failure, failureReason: 'quota-exceeded' })).toEqual({
+    ...failure,
+    failureReason: 'quota-exceeded',
+  });
+  expect(parseContentTextServerMessage(failure)).toEqual(failure);
+  for (const failureReason of ['PRIVATE_RESPONSE_BODY', { status: 402 }, 402])
+    expect(parseContentTextServerMessage({ ...failure, failureReason })).toBeNull();
+});

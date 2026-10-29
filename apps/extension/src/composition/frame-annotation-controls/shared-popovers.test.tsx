@@ -377,12 +377,10 @@ it('runs the shared draggable header actions without leaking pointer events', ()
   const sourceButtons = host?.querySelectorAll<HTMLButtonElement>(
     '[data-ui="shared.annotation-template-source"] button'
   );
-  expect(sourceButtons).toHaveLength(2);
+  expect(sourceButtons).toHaveLength(1);
   expect(sourceButtons?.[0]?.getAttribute('aria-pressed')).toBe('false');
-  expect(sourceButtons?.[1]?.getAttribute('aria-pressed')).toBe('true');
-  act(() => sourceButtons?.[1]?.click());
-  expect(source).toHaveBeenCalledOnce();
-  expect(host?.querySelector('[title="Use the template linked to the frame"]')).not.toBeNull();
+  expect(sourceButtons?.[0]?.querySelector('.lucide-unlink-2')).not.toBeNull();
+  expect(sourceButtons?.[0]?.getAttribute('title')).toBe('Use default template');
   expect(close).toHaveBeenCalledOnce();
 });
 
@@ -406,4 +404,35 @@ it('keeps frame preset icons unfilled when the authored frame has a fill', () =>
     fillPaint: { kind: 'solid', color: '#ff0000' },
   });
   expect(preview.background).toBe('transparent');
+});
+
+it('shows linked source state and toggles it off through the existing callback', () => {
+  const onChange = vi.fn();
+  act(() =>
+    root?.render(
+      <SettingsPopoverHeader
+        closeLabel="Close"
+        context="toolbar"
+        onClose={vi.fn()}
+        title="Settings"
+        sourceControl={{
+          value: 'frame-default',
+          onChange,
+          options: [
+            { value: 'frame-default', label: 'Frame', description: 'Frame link on' },
+            { value: 'forced', label: 'Default', description: 'Frame link off' },
+          ],
+        }}
+      />
+    )
+  );
+  const button = host!.querySelector<HTMLButtonElement>(
+    '[data-settings-action="toggle-template-source"]'
+  )!;
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(button.getAttribute('aria-label')).toBe('Frame link on');
+  expect(button.querySelector('.lucide-link-2')).not.toBeNull();
+  expect(button.textContent).toBe('');
+  act(() => button.click());
+  expect(onChange).toHaveBeenCalledExactlyOnceWith('forced');
 });

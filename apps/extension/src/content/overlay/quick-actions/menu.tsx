@@ -1,4 +1,4 @@
-import { Zap } from 'lucide-react';
+import { Icon, Zap } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ProductToolbarMenu,
@@ -6,6 +6,7 @@ import {
   ProductToolbarMenuItemCopy,
 } from '@sniptale/ui/product-menus/toolbar';
 import { translate } from '../../../platform/i18n';
+import { getQuickActionReactIconNode } from '../../../features/quick-actions-presets/icons';
 import { getQuickActionDisplayName } from '../../../features/quick-actions-presets/catalog';
 import { ToolbarMenuDropdown } from '../toolbar/menu/dropdown';
 import type { ToolbarMenuState } from '../toolbar/state/menu';
@@ -28,6 +29,7 @@ export function PageQuickActionsMenu(props: {
         dataUi="content.quick-actions.trigger"
         title={title}
         aria-label={title}
+        menuIndicator
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={busy}
@@ -51,7 +53,7 @@ export function PageQuickActionsMenu(props: {
               width: 280,
               minWidth: 0,
               maxWidth: 'calc(100vw - 16px)',
-              maxHeight: 'calc(100vh - 16px)',
+              maxHeight: dropdown.style.maxHeight ?? 'calc(100vh - 16px)',
               overflowY: 'auto',
             }}
           >
@@ -60,14 +62,24 @@ export function PageQuickActionsMenu(props: {
                 <ProductToolbarMenuItemCopy label={translate('content.pageLauncher.empty')} />
               </ProductToolbarMenuItem>
             ) : null}
-            {actions.map((action) => (
+            {actions.map((action, index) => (
               <ProductToolbarMenuItem
                 key={action.id}
                 onClick={(event) => {
                   void trigger(action, event.nativeEvent);
                 }}
               >
+                <Icon
+                  iconNode={getQuickActionReactIconNode(action.icon)}
+                  size={18}
+                  aria-hidden="true"
+                />
                 <ProductToolbarMenuItemCopy label={getQuickActionDisplayName(action)} />
+                {index < 10 ? (
+                  <kbd className="sniptale-toolbar-menu-shortcut">
+                    {index === 9 ? '0' : index + 1}
+                  </kbd>
+                ) : null}
               </ProductToolbarMenuItem>
             ))}
           </ProductToolbarMenu>

@@ -1,6 +1,10 @@
+import { syncReplicaPublicationAdapter } from '../sync-capture/replica-publication';
 import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
-import { completePhysicalDeleteOperations } from '../assets/operations';
+import {
+  completePhysicalDeleteOperations,
+  readPhysicalDeleteAuthority,
+} from '../assets/operations';
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { sameMediaSource } from '../media-library/dependencies';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
@@ -535,7 +539,16 @@ async function recoverPublications(
   await initDB();
   return runStorageStartupPhase('asset-recovery', () =>
     runWithDurableAssetOperationRecovery(permit, async () => {
-      await runStorageStartupPhase('asset-writing-cleanup', () => collectQuiescentWritingObjects());
+      await runStorageStartupPhase('asset-writing-cleanup', () =>
+        runWithDurableAssetLifecycleLock(async () => {
+          // Publication holds this same lifecycle lock, so one lazy snapshot covers this cleanup batch.
+          let authority: ReturnType<typeof readPhysicalDeleteAuthority> | undefined;
+          return collectQuiescentWritingObjects({}, async (assetId) => {
+            authority ??= readPhysicalDeleteAuthority();
+            return (await authority)(assetId) !== 'unowned';
+          });
+        })
+      );
       await runStorageStartupPhase('asset-backup-recovery', () =>
         runWithDurableAssetLifecycleLock((permit) => recoverBackupRestoreOperations(permit))
       );
@@ -549,6 +562,7 @@ async function recoverPublications(
             scenarioHtmlPublicationAdapter,
             imageWorkspacePublicationAdapter,
             webSnapshotPublicationAdapter,
+            syncReplicaPublicationAdapter,
           ],
           transitionPermit
         )

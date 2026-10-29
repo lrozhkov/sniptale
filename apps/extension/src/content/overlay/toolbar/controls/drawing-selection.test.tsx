@@ -44,7 +44,7 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
   const onDocumentCommit = vi.fn(() => true);
   const session = createDrawingSession({ onDocumentCommit });
   session.commitObject({
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'pencil',
     kind: 'pencil',
     samples: [
@@ -55,7 +55,7 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
   });
   session.commitObject({
     bounds: { x: 40, y: 0, width: 30, height: 30 },
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'shape',
     kind: 'rectangle',
     width: 8,
@@ -73,14 +73,14 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
   expect(host.querySelectorAll('.sniptale-drawing-options-popover')).toHaveLength(2);
   expect(panel?.querySelectorAll('.grid-cols-5 button[title^="#"]')).toHaveLength(5);
   expect(panel?.querySelector('.grid-cols-5')).not.toBeNull();
-  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
+  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#6495ed"]')?.click());
 
   expect(onDocumentCommit).toHaveBeenCalledTimes(1);
   expect(
     session
       .getSnapshot()
       .document.objects.map((object) => ('color' in object ? object.color : null))
-  ).toEqual(['#60a5fa', '#60a5fa']);
+  ).toEqual(['#6495ed', '#6495ed']);
   act(() => root.unmount());
 });
 
@@ -118,10 +118,10 @@ it('uses the effective alpha for a mixed legacy marker selection', () => {
     '[data-ui="shared.ui.color-selector.picker-trigger"]'
   );
   expect(picker?.title).toBe('#FFFF004D');
-  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
+  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#6495ed"]')?.click());
   expect(session.getSnapshot().document.objects).toMatchObject([
-    { color: '#60a5fa4d', kind: 'marker', opacity: 1 },
-    { color: '#60a5fa4d', kind: 'pencil' },
+    { color: '#6495ed4d', kind: 'marker', opacity: 1 },
+    { color: '#6495ed4d', kind: 'pencil' },
   ]);
   expect(onDocumentCommit).toHaveBeenCalledTimes(1);
   act(() => root.unmount());
@@ -162,14 +162,14 @@ it('shows shared shape properties and changes both selected shapes in one commit
   const session = createDrawingSession({ onDocumentCommit });
   session.commitObject({
     bounds: { x: 0, y: 0, width: 30, height: 30 },
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'rectangle',
     kind: 'rectangle',
     width: 4,
   });
   session.commitObject({
     bounds: { x: 50, y: 0, width: 30, height: 30 },
-    color: '#ef4444',
+    color: '#ff4500',
     id: 'ellipse',
     kind: 'ellipse',
     width: 4,
@@ -278,6 +278,44 @@ it.each(['horizontal', 'vertical'] as const)(
     act(() => session.select('one'));
     expect(button('reveal')?.getAttribute('aria-expanded')).toBe('false');
     expect(button('front')).toBeNull();
+    act(() => root.unmount());
+  }
+);
+
+it.each(['horizontal', 'vertical'] as const)(
+  'omits empty mixed text options and restores single selection in %s mode',
+  (displayMode) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject({
+      id: 'text',
+      kind: 'text',
+      bounds: { x: 40, y: 0, width: 120, height: 30 },
+      text: 'Text',
+      color: '#111111',
+      backgroundColor: null,
+      fontFamily: 'sans',
+      fontSize: 24,
+    });
+    session.commitObject({
+      id: 'pencil',
+      kind: 'pencil',
+      samples: [
+        { x: 0, y: 0, t: 0 },
+        { x: 20, y: 0, t: 10 },
+      ],
+      color: '#111111',
+      width: 4,
+    });
+    session.setActiveTool('select');
+    session.setSelection(['text', 'pencil']);
+    const { host, root } = renderSelectionToolbar(session, displayMode);
+    expect(host.querySelectorAll('.sniptale-drawing-options-popover')).toHaveLength(1);
+    expect(host.querySelector('[data-ui="content.toolbar.drawing-options.selection"]')).toBeNull();
+    expect(host.querySelector('[data-ui="drawing.selection.actions.delete"]')).not.toBeNull();
+    act(() => session.setSelection(['text']));
+    expect(host.querySelector('[data-ui="content.toolbar.drawing-options.text"]')).not.toBeNull();
+    expect(host.querySelectorAll('.sniptale-drawing-options-popover')).toHaveLength(2);
     act(() => root.unmount());
   }
 );

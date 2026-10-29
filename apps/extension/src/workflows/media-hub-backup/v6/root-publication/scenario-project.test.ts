@@ -52,6 +52,9 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 beforeEach(() => {
   vi.clearAllMocks();
+  io.db.mockReset();
+  io.read.mockReset();
+  io.put.mockReset();
   io.deleteBeforeCommit = false;
   io.put.mockResolvedValue({ imported: true, conflicted: false });
   io.mutate.mockImplementation(async (operation) => {
@@ -411,8 +414,11 @@ it('keeps stable child identities and checkpoints validated children when replac
     operation({
       get: async () => ({ id: 'guide' }),
       transaction: () => ({
-        objectStore: () => ({
-          get: async () => restoredAsset ?? metadata.assets[0]?.entry,
+        objectStore: (store: string) => ({
+          get: async () =>
+            store === SCENARIO_ASSETS_STORE
+              ? (restoredAsset ?? metadata.assets[0]?.entry)
+              : undefined,
           put: vi.fn(),
           index: () => ({ getAll: async () => [] }),
         }),

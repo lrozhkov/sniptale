@@ -23,7 +23,9 @@
   user-select: none;
 }
 
-.sniptale-toolbar[data-page-controls='true'] > .sniptale-divider + .sniptale-divider,
+.sniptale-toolbar[data-page-controls='true']:not([data-page-customizing='true'])
+  > .sniptale-divider
+  + .sniptale-divider,
 .sniptale-toolbar[data-page-controls='true'] .sniptale-toolbar-annotation-group:empty {
   display: none;
 }
@@ -154,6 +156,15 @@
 .sniptale-page-toolbar-slot[data-page-toolbar-dragging='true'] {
   opacity: 0.8;
   cursor: grabbing;
+}
+.sniptale-page-toolbar-slot[data-page-toolbar-invalid='true'] {
+  outline: 1px dashed var(--sniptale-color-danger);
+  outline-offset: 1px;
+  opacity: 1;
+}
+.sniptale-toolbar[data-page-reordering='true'][data-page-drop-invalid='true'],
+.sniptale-toolbar[data-page-reordering='true'][data-page-drop-invalid='true'] * {
+  cursor: not-allowed !important;
 }
 .sniptale-toolbar[data-display-mode='vertical'][data-page-layout='true'] {
   reading-flow: flex-flow;

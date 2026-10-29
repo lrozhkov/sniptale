@@ -211,3 +211,24 @@ describe('callout interaction handles', () => {
     act(() => root.unmount());
   });
 });
+
+it('deletes from the adjacent action without activating the underlying comment', () => {
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const onDelete = vi.fn();
+  const onUnderlyingClick = vi.fn();
+  act(() => {
+    root.render(
+      <div onClick={onUnderlyingClick}>
+        {renderCalloutInteractionHandles(createProps({ onDelete }))}
+      </div>
+    );
+  });
+  const button = host.querySelector<HTMLButtonElement>('.sniptale-callout-delete-handle')!;
+  expect(button.style.width).toBe('26px');
+  expect(button.style.cursor).toBe('pointer');
+  act(() => button.click());
+  expect(onDelete).toHaveBeenCalledOnce();
+  expect(onUnderlyingClick).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});

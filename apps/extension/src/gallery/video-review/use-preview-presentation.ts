@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import type { QuickEditWebcamPlacement } from '../../features/video/review/advanced/webcam';
 import { useReviewCutTransitionProvider } from './cut-transition-preview';
@@ -6,6 +14,9 @@ import type { ReviewWebcamManualBinding } from './webcam-overlay';
 import { createManualPresentationOwner } from './preview-presentation-session';
 import {
   resolvePresentationDescription,
+  createPresentationFeedback,
+  retainPresentationBounds,
+  PREVIEW_STATISTICS_INTERVAL_MS,
   type PresentationInput,
   type ReviewPreviewPresentationStatus,
   type PresentationCameraState,
@@ -99,11 +110,12 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
       owner.current = null;
     };
   }, [owner]);
-  const reportNative = useCallback(
-    (value: ReviewPreviewPresentationStatus) => {
-      setReported({ key: owner.key, status: value });
-      latest.current.input.onStatistics?.(value);
-    },
+  const reportPresentation = useMemo(
+    () =>
+      createPresentationFeedback(
+        (value) => setReported({ key: owner.key, status: value }),
+        (value) => latest.current.input.onStatistics?.(value)
+      ),
     [owner]
   );
   useNativePreviewCadence(
@@ -114,7 +126,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
       pageVisible &&
       input.playing &&
       input.preferences.showFrameRate,
-    reportNative
+    reportPresentation
   );
   const stable = useRef<ReturnType<typeof resolvePresentationDescription> | null>(null);
   stable.current = resolvePresentationDescription(
@@ -130,16 +142,13 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     if (active && !owner.current) {
       owner.current = createManualPresentationOwner(
         () => latest.current,
-        (value) => {
-          setReported({ key: owner.key, status: value });
-          latest.current.input.onStatistics?.(value);
-        },
-        setBounds,
+        reportPresentation,
+        (value) => setBounds((previous) => retainPresentationBounds(previous, value)),
         setCamera
       );
     }
     owner.current?.update(current.description, current.generation, !!interacting, active);
-  }, [active, owner, key, interacting]);
+  }, [active, owner, key, interacting, reportPresentation]);
   useEffect(() => {
     owner.current?.ready();
   }, [owner, cut.current, camera.ready, camera.phase]);
@@ -205,7 +214,7 @@ function useNativePreviewCadence(
       }
       if (!start) start = { time: metadata.expectedDisplayTime, frames: metadata.presentedFrames };
       const elapsed = metadata.expectedDisplayTime - start.time;
-      if (elapsed >= 500) {
+      if (elapsed >= PREVIEW_STATISTICS_INTERVAL_MS) {
         const nativeVideoFPS = ((metadata.presentedFrames - start.frames) * 1000) / elapsed;
         const next: ReviewPreviewPresentationStatus = {
           phase: 'inactive',

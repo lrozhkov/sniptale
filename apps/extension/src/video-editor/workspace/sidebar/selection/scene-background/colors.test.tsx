@@ -85,7 +85,7 @@ describe('workspace-sidebar/selection/scene-background-colors', () => {
     for (const color of SCENE_BACKGROUND_PALETTE) {
       expect(
         popup?.querySelectorAll(
-          `button[aria-label="videoEditor.sidebar.sceneBackgroundColorLabel: ${color}"]`
+          `button[aria-label^="videoEditor.sidebar.sceneBackgroundColorLabel: "][aria-label$="${color.toUpperCase()}"]`
         )
       ).toHaveLength(1);
     }

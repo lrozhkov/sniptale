@@ -61,3 +61,21 @@ it('maps physical app and harness sources to stable legacy output ids', () => {
     },
   ]);
 });
+
+it('includes sync capture proof only in the test build', () => {
+  const input = extensionRollupInputs(layout, 'test-e2e').testHarnessSyncCapture;
+  expect(input).toBe(path.join(appRoot, 'tooling/test/harness/sync-capture.html'));
+  expect(extensionRollupInputs(layout, 'release').testHarnessSyncCapture).toBeUndefined();
+  expect(extensionRollupInputs(layout, 'security-e2e').testHarnessSyncCapture).toBeUndefined();
+});
+
+it('includes WebDAV proof in functional and optional-permission security builds only', () => {
+  for (const mode of ['test-e2e', 'security-e2e']) {
+    expect(extensionRollupInputs(layout, mode).testHarnessWebdavTransfer).toBe(
+      path.join(appRoot, 'tooling/test/harness/webdav-transfer.html')
+    );
+  }
+  for (const mode of ['release', 'development']) {
+    expect(extensionRollupInputs(layout, mode).testHarnessWebdavTransfer).toBeUndefined();
+  }
+});

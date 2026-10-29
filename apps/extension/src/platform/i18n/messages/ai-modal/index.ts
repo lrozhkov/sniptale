@@ -1,6 +1,18 @@
 import { defineMessageSource } from '../source';
 
 export const aiModalMessages = defineMessageSource({
+  modelSelectionUnavailable: {
+    ru: 'Выбранная модель недоступна. Выберите модель заново.',
+    en: 'The selected model is unavailable. Select a model again.',
+  },
+  modelSelectionSaveFailed: {
+    ru: 'Не удалось сохранить выбор модели. Выберите модель ещё раз.',
+    en: 'Could not save the model selection. Select the model again.',
+  },
+  modelCatalogFailed: {
+    ru: 'Не удалось обновить список моделей. Повторите попытку.',
+    en: 'Could not refresh models. Try again.',
+  },
   modelNotSelected: {
     ru: 'Модель не выбрана',
     en: 'Model not selected',

@@ -30,6 +30,7 @@ it('uses the canonical IndexedDB store inventory for local data erasure', () => 
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('aggregate_presentations');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('recording_recovery_sessions');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('recording_recovery_blocks');
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('sync_connection');
   expect(getIndexedDbStoresForLocalExtensionDataErasure()).not.toContain('editor_sessions');
 });
 
@@ -41,6 +42,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
 
   expect(plan.local).not.toContain('sniptale-theme-preference');
   expect(plan.local).not.toContain('sniptale_picker_compact');
+  expect(plan.local).not.toContain('sniptale_picker_catalog');
   expect(plan.local).not.toContain('sniptale_ai_modal_spoiler_open');
   expect(plan.local).not.toContain('sniptale_editor_file_menu_save_to_folder_open');
   expect(plan.local).not.toContain(POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY);
@@ -94,6 +96,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
 
   expect(plan.local).toContain('sniptale-theme-preference');
   expect(plan.local).toContain('sniptale_picker_compact');
+  expect(plan.local).toContain('sniptale_picker_catalog');
   expect(plan.local).toContain('sniptale_ai_modal_spoiler_open');
   expect(plan.local).toContain('sniptale_export_json_spoiler_open');
   expect(plan.local).toContain('sniptale_export_md_spoiler_open');
@@ -167,3 +170,16 @@ it('erases page recovery records and identity claims while preferences are prese
   expect(plan.session).toContain('sniptale_page_recovery_claims');
   expect(plan.local).not.toContain('sniptale_drawing_palette');
 });
+
+it.each([true, false])(
+  'always erases native connection authority when preservePreferences is %s',
+  (preservePreferences) => {
+    const plan = buildBrowserStorageErasurePlan({
+      includeAiProviderSecrets: false,
+      preservePreferences,
+    });
+    expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('sync_connection');
+    if (preservePreferences) expect(plan.local).not.toContain('sniptale-theme-preference');
+    else expect(plan.local).toContain('sniptale-theme-preference');
+  }
+);

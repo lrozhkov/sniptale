@@ -1,11 +1,7 @@
 import type { AIModalProps } from '../shell/types';
 import { useAIModalBootEffect } from './boot';
 import { useAIModalCoreState } from './core-state';
-import {
-  createModelSelectHandler,
-  createResizeStartHandler,
-  createTemplateSelectHandler,
-} from './selection';
+import { createResizeStartHandler, createTemplateSelectHandler } from './selection';
 import { createTemplateAddHandler, createTemplateEditHandler } from './template-editor';
 import { createTemplateDeleteHandler, createTemplateSaveHandler } from './template-persistence';
 import { buildAIModalState } from './view-state';
@@ -23,7 +19,7 @@ function createAIModalActions(core: AIModalCoreState, stopVoiceInput: () => void
       setEditingTemplate: core.editor.setEditingTemplate,
       setIsEditorOpen: core.editor.setIsEditorOpen,
     }),
-    handleModelSelect: createModelSelectHandler(core.settings.setSelectedModelId),
+    handleModelSelect: core.settings.selection.chooseModel,
     handleResizeStart: createResizeStartHandler({
       setIsResizing: core.resize.setIsResizing,
       textareaRef: core.resize.textareaRef,
@@ -43,7 +39,7 @@ function createAIModalActions(core: AIModalCoreState, stopVoiceInput: () => void
 }
 
 export function useAIModalState({ isOpen, isLoading }: Pick<AIModalProps, 'isOpen' | 'isLoading'>) {
-  const core = useAIModalCoreState();
+  const core = useAIModalCoreState(isOpen);
   const voice = useAIModalPromptVoiceInput({
     enabled: isOpen && !isLoading,
     setPrompt: core.setPrompt,
@@ -53,12 +49,8 @@ export function useAIModalState({ isOpen, isLoading }: Pick<AIModalProps, 'isOpe
     isOpen,
     lastPrompt: core.lastPrompt,
     prompt: core.prompt,
-    setAvailableModels: core.settings.setAvailableModels,
-    setGlobalSystemPrompt: core.settings.setGlobalSystemPrompt,
     setLastPrompt: core.setLastPrompt,
     setPrompt: core.setPrompt,
-    setProviders: core.settings.setProviders,
-    setSelectedModelId: core.settings.setSelectedModelId,
     textareaRef: core.resize.textareaRef,
   });
 

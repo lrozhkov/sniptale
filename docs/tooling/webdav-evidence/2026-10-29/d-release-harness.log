@@ -1,0 +1,9 @@
+QA release harness: all passed in 20s
+Problems: none
+Timeline: wall=20s; critical=9.6s; active=9.6s
+Wait: queue=22s; resource=15s
+Slow: scheduler-1.lane.static=6.2s, scheduler-1.lane.oxlint=2.3s, scheduler-1.lane.tests=842ms, scheduler-1.lane.typecheck=311ms, scheduler-1.lane.static.worker-bootstrap=7ms
+Reused: none
+Skipped: none
+Run record: .tmp/qa-observability/runs/2026-10-29/abdc81de-155c-43bb-8752-481b54b2e16c.json
+Run log: .tmp/qa-logs/2026-10-29/abdc81de-155c-43bb-8752-481b54b2e16c.log

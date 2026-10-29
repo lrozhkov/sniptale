@@ -77,16 +77,22 @@ function DrawingOptionsPair(
   props: DrawingOptionsBodyProps & {
     controller: ContentDrawingController;
     layout: ReturnType<typeof useDrawingOptionsLayout>;
+    showOptions?: boolean;
     selectedCount: number;
     totalCount: number;
   }
 ) {
   const adopted = useContext(CommandPressScope);
-  const options = (
-    <DrawingOptionsBody panelRef={props.panelRef} tool={props.tool} displayMode={props.displayMode}>
-      {props.children}
-    </DrawingOptionsBody>
-  );
+  const options =
+    props.showOptions === false ? null : (
+      <DrawingOptionsBody
+        panelRef={props.panelRef}
+        tool={props.tool}
+        displayMode={props.displayMode}
+      >
+        {props.children}
+      </DrawingOptionsBody>
+    );
   const actions = (
     <DrawingSelectionActions
       disclosure={props.selectionDisclosure}
@@ -102,6 +108,7 @@ function DrawingOptionsPair(
   );
   return (
     <div
+      ref={props.showOptions === false ? props.panelRef : undefined}
       data-ui="content.toolbar.drawing-options.pair"
       className={[
         'absolute flex max-w-[calc(100vw-16px)] items-start gap-2 overflow-x-auto',
@@ -109,17 +116,19 @@ function DrawingOptionsPair(
       ].join(' ')}
       style={props.layout.style}
     >
-      {Object.entries({ options, actions }).map(([key, content]) => (
-        <ProductToolbarMenu
-          key={key}
-          compact
-          variant="drawing"
-          className={`sniptale-drawing-options-popover ${adopted ? 'sniptale-drawing-options-adopted' : ''}`}
-          style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
-        >
-          {content}
-        </ProductToolbarMenu>
-      ))}
+      {Object.entries({ options, actions })
+        .filter(([, content]) => content !== null)
+        .map(([key, content]) => (
+          <ProductToolbarMenu
+            key={key}
+            compact
+            variant="drawing"
+            className={`sniptale-drawing-options-popover ${adopted ? 'sniptale-drawing-options-adopted' : ''}`}
+            style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
+          >
+            {content}
+          </ProductToolbarMenu>
+        ))}
     </div>
   );
 }
@@ -227,6 +236,8 @@ function ToolbarDrawingSelectionOptions(props: {
   panelRef: RefObject<HTMLDivElement | null>;
   selected: readonly DrawingObject[];
   snapshot: DrawingSessionSnapshot;
+  selectionDisclosure: DrawingSelectionDisclosure;
+  layout: ReturnType<typeof useDrawingOptionsLayout>;
 }) {
   const tools = props.selected.map(resolveObjectOptionsTool);
   const sharedTool = tools[0] && tools.every((tool) => tool === tools[0]) ? tools[0] : null;
@@ -256,7 +267,19 @@ function ToolbarDrawingSelectionOptions(props: {
   const firstStrokeColor = strokeObjects[0] ? visibleStrokeColor(strokeObjects[0]) : null;
   const first = selectedQuick[0] ?? null;
   return (
-    <>
+    <DrawingOptionsPair
+      selectionDisclosure={props.selectionDisclosure}
+      controller={props.controller}
+      displayMode={props.displayMode}
+      layout={props.layout}
+      panelRef={props.panelRef}
+      selectedCount={props.selected.length}
+      totalCount={props.snapshot.document.objects.length}
+      tool="selection"
+      showOptions={Boolean(
+        (sharedTool && first) || (hasSharedStrokeColor && props.selected.length)
+      )}
+    >
       {sharedTool === 'text' && first?.kind === 'text' ? (
         <DrawingTextToolOptions
           controller={props.controller}
@@ -307,7 +330,7 @@ function ToolbarDrawingSelectionOptions(props: {
           onPreviewReset={resetPreview}
         />
       ) : null}
-    </>
+    </DrawingOptionsPair>
   );
 }
 
@@ -593,24 +616,15 @@ export function ToolbarDrawingOptions(props: {
       snapshot.selectedObjectIds.includes(object.id)
     );
     return (
-      <DrawingOptionsPair
+      <ToolbarDrawingSelectionOptions
         selectionDisclosure={props.selectionDisclosure}
         controller={controller}
         displayMode={displayMode}
         layout={layout}
         panelRef={panelRef}
-        selectedCount={selected.length}
-        totalCount={snapshot.document.objects.length}
-        tool="selection"
-      >
-        <ToolbarDrawingSelectionOptions
-          controller={controller}
-          displayMode={displayMode}
-          panelRef={panelRef}
-          selected={selected}
-          snapshot={snapshot}
-        />
-      </DrawingOptionsPair>
+        selected={selected}
+        snapshot={snapshot}
+      />
     );
   }
   if (tool === 'blur') {

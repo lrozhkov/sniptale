@@ -120,7 +120,7 @@ export function previewPlaybackControls(page: Page) {
     review.getByRole('button', { name: translate(key, 'en'), exact: true });
   const video = review.locator('[data-ui="gallery.videoReview.stage"] video').first();
   const host = review.locator('[data-ui="gallery.videoReview.manualPreview"]');
-  const canvas = host.locator('canvas');
+  const canvas = host.locator('canvas[data-preview-front="true"]');
   const panel = review.locator('[data-ui="gallery.videoReview.previewInspector"]');
   return {
     review,
@@ -251,8 +251,18 @@ export async function observePreviewPlayback(
     }> = [];
     const transport: Array<{ wall: number; time: number; rate: number; seeking: boolean }> = [];
     const start = performance.now();
-    const observer = new MutationObserver(() => {
-      const canvas = host.querySelector('canvas');
+    const observer = new MutationObserver((records) => {
+      if (
+        !records.some(
+          (record) =>
+            (record.type === 'attributes' && record.oldValue !== 'true') ||
+            [...record.addedNodes].some(
+              (node) => node instanceof HTMLCanvasElement && node.dataset['previewFront'] === 'true'
+            )
+        )
+      )
+        return;
+      const canvas = host.querySelector('canvas[data-preview-front="true"]');
       if (canvas && samples.length < 1000 && video.readyState >= 2)
         samples.push({
           wall: performance.now() - start,
@@ -262,7 +272,13 @@ export async function observePreviewPlayback(
           composedHash: hash(canvas),
         });
     });
-    observer.observe(host, { childList: true });
+    observer.observe(host, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-preview-front'],
+      attributeOldValue: true,
+    });
     const sampleTransport = () => {
       if (transport.length < 2000)
         transport.push({

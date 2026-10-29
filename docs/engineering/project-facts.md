@@ -5,9 +5,9 @@ This file projects changeable values and inventories from their existing machine
 
 | Fact | Current projection | Machine authority |
 | --- | --- | --- |
-| Product version | `0.5.1` | `package.json#/version` |
+| Product version | `0.5.2` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `39` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `46` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -87,12 +87,15 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/quick-preview-preferences`
 - `apps/extension/src/composition/persistence/recent-colors`
 - `apps/extension/src/composition/persistence/recordings`
+- `apps/extension/src/composition/persistence/remote-connection`
 - `apps/extension/src/composition/persistence/review-workspaces`
 - `apps/extension/src/composition/persistence/scenario`
 - `apps/extension/src/composition/persistence/settings`
 - `apps/extension/src/composition/persistence/settings-transfer`
 - `apps/extension/src/composition/persistence/step-badge-presets`
 - `apps/extension/src/composition/persistence/surface-style-presets`
+- `apps/extension/src/composition/persistence/sync-capture`
+- `apps/extension/src/composition/persistence/sync-catalog`
 - `apps/extension/src/composition/persistence/video-editor-preview-preferences`
 - `apps/extension/src/composition/persistence/video-preview-cache`
 - `apps/extension/src/composition/persistence/voice-input-history`
@@ -116,6 +119,9 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/contracts/quick-action-appearance.ts`
 - `apps/extension/src/contracts/settings`
 - `apps/extension/src/contracts/settings-transfer`
+- `apps/extension/src/contracts/sync-cache.ts`
+- `apps/extension/src/contracts/sync-workspace.test.ts`
+- `apps/extension/src/contracts/sync-workspace.ts`
 - `apps/extension/src/contracts/video`
 - `apps/extension/src/features/ai`
 - `apps/extension/src/features/autosave`
@@ -188,6 +194,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/recording-icon.test.tsx`
 - `apps/extension/src/ui/recording-icon.tsx`
 - `apps/extension/src/ui/surface-style-selector`
+- `apps/extension/src/ui/sync-cache-feedback.tsx`
 - `apps/extension/src/ui/text-document.test.tsx`
 - `apps/extension/src/ui/text-document.tsx`
 - `apps/extension/src/ui/theme`
@@ -210,6 +217,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/scenario-capture-edit`
 - `apps/extension/src/workflows/scenario-narration`
 - `apps/extension/src/workflows/settings-transfer`
+- `apps/extension/src/workflows/sync-transfer`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`
 - `apps/extension/src/workflows/voice-input`
@@ -301,6 +309,8 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities.ts`
 - `apps/extension/src/background/runtime/tab-mode-router/router.ts`
 - `apps/extension/src/background/scenario/router/index.ts`
+- `apps/extension/src/background/sync-connection/product-route.ts`
+- `apps/extension/src/background/sync-connection/route.ts`
 - `apps/extension/src/background/voice-input/route.ts`
 
 The route registry remains the semantic authority for handler, authorization, policy-state, failure-shape, and mutation ownership. This projection is navigation aid only.

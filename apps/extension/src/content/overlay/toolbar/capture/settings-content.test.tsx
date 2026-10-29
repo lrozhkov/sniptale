@@ -395,3 +395,32 @@ it('activates once for a bridged pointer gesture and still accepts keyboard clic
   act(() => button.click());
   expect(onFreePlacementChange).toHaveBeenCalledTimes(2);
 });
+
+it.each(['horizontal', 'vertical'] as const)(
+  'shows checks for compact view and the selected %s orientation',
+  (displayMode) => {
+    renderSettingsDropdown({ displayMode, freePlacement: true });
+    expect(
+      findButton('content.toolbar.compactMenus')?.querySelector('.sniptale-popover-check')
+    ).not.toBeNull();
+    const horizontal = findButton('content.toolbar.panelHorizontal')!;
+    const vertical = findButton('content.toolbar.panelVertical')!;
+    expect(horizontal.querySelector('.sniptale-popover-check') !== null).toBe(
+      displayMode === 'horizontal'
+    );
+    expect(vertical.querySelector('.sniptale-popover-check') !== null).toBe(
+      displayMode === 'vertical'
+    );
+  }
+);
+
+it.each([
+  { pinToTab: false, pinToTabLocked: false, checked: false },
+  { pinToTab: true, pinToTabLocked: false, checked: true },
+  { pinToTab: false, pinToTabLocked: true, checked: true },
+])('shows the accepted pin state as a check: %j', ({ checked, ...state }) => {
+  renderSettingsDropdown(state);
+  expect(
+    findButton('content.toolbar.pinToTab')?.querySelector('.sniptale-popover-check') !== null
+  ).toBe(checked);
+});

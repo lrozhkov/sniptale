@@ -5,14 +5,14 @@ import { usePromptTemplates } from '../../../../../features/prompt-templates/hoo
 import { useAIModalEditorState, useAIModalResizeState, useAIModalSettingsState } from './locals';
 import { useAIModalTotalTokens } from './tokens';
 
-export function useAIModalCoreState() {
+export function useAIModalCoreState(enabled = false) {
   const lastPrompt = useAIModalStore(selectLastPrompt);
   const setLastPrompt = useAIModalStore((state) => state.setLastPrompt);
   const [prompt, setPromptValue] = useState(lastPrompt);
   const promptRef = useRef(lastPrompt);
   const [selectedData, setSelectedData] = useState('');
   const editor = useAIModalEditorState();
-  const settings = useAIModalSettingsState();
+  const settings = useAIModalSettingsState(enabled);
   const resize = useAIModalResizeState();
   const templatesState = usePromptTemplates();
   const totalTokens = useAIModalTotalTokens({

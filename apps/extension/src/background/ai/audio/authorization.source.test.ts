@@ -317,6 +317,8 @@ it('rechecks original source after authorization and discards stale response bef
     request: post,
     write,
     resolveModel: async () => ({
+      connectionType: 'openai-compatible' as const,
+      baseUrl: 'https://example.test',
       url: 'https://example.test/audio/speech',
       apiKey: 'fixture',
       modelCode: 'm',
@@ -351,6 +353,8 @@ it('a replaced Library source after ticket issuance cannot send the staged input
     discard,
     createId: () => ticket,
     resolveModel: async () => ({
+      connectionType: 'openai-compatible' as const,
+      baseUrl: 'https://example.test',
       url: 'https://example.test/audio/transcriptions',
       apiKey: 'fixture',
       modelCode: 'm',

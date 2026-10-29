@@ -1,7 +1,21 @@
+import { getAIModelLifecycle } from '../../../../../contracts/settings/model-operation';
+import {
+  getAIProviderDefinition,
+  type AIProviderType,
+  type AIModelManagement,
+} from '../../../../../contracts/settings/ai-provider';
 import type {
   AIModelOperation,
   AIModelAudioParameters,
 } from '../../../../../contracts/settings/model-operation';
+import type { AIModelCapabilities } from '../../../../../contracts/settings/ai-catalog';
+import {
+  applyCatalogModelDraft,
+  clearModelIdentityClaims,
+  createModelDraft,
+  getModelCatalogEntries,
+  updateDraftCapabilities,
+} from './model-draft';
 import { useRef, useState } from 'react';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import {
@@ -13,6 +27,7 @@ import {
   saveModelForm,
   saveProviderForm,
   type ModelFormSaveParams,
+  type ModelFormSaveSession,
   type ProviderFormSaveParams,
 } from './save';
 
@@ -44,7 +59,9 @@ function buildProviderSaveParams(args: ProviderFormSaveParams) {
 function createInitialProviderFormData(provider?: AIProvider | null): ProviderFormData {
   return {
     name: provider?.name || '',
-    connectionType: 'openai-compatible',
+    connectionType: provider?.connectionType ?? 'openai-compatible',
+    management: provider?.management ?? 'automatic',
+    enabled: provider?.enabled ?? true,
     baseUrl: provider?.baseUrl || '',
   };
 }
@@ -114,6 +131,23 @@ export function useProviderFormState(
       clearFieldError(errors, setErrors, field);
     };
 
+  const handleConnectionTypeChange = (connectionType: AIProviderType) => {
+    if (apiKeyInputRef.current) apiKeyInputRef.current.value = '';
+    const definition = getAIProviderDefinition(connectionType);
+    setFormData((previous) => ({
+      ...previous,
+      connectionType,
+      baseUrl: definition.baseUrl,
+      name:
+        !previous.name || previous.name === getAIProviderDefinition(previous.connectionType).label
+          ? definition.label
+          : previous.name,
+    }));
+    setErrors({});
+  };
+  const handleManagementChange = (management: AIModelManagement) =>
+    setFormData((previous) => ({ ...previous, management }));
+
   const handleApiKeyChange = (_event: React.ChangeEvent<HTMLInputElement>) => {
     clearFieldError(errors, setErrors, 'apiKey');
   };
@@ -139,6 +173,8 @@ export function useProviderFormState(
     errors,
     formData,
     handleApiKeyChange,
+    handleConnectionTypeChange,
+    handleManagementChange,
     handleChange,
     handleSubmit,
     isEditing,
@@ -154,6 +190,8 @@ async function submitModelForm(
   params.event.preventDefault();
 
   await saveModelForm({
+    session: params.session,
+    providerIncarnation: params.providerIncarnation,
     formData: params.formData,
     isEditing: params.isEditing,
     onSave: params.onSave,
@@ -163,73 +201,160 @@ async function submitModelForm(
   });
 }
 
-export function useModelFormState(model?: AIModel | null) {
-  const [formData, setFormData] = useState<ModelFormData>({
-    providerId: model?.providerId || '',
-    displayName: model?.displayName || '',
-    modelCode: model?.modelCode || '',
-    systemPrompt: model?.systemPrompt || '',
-    ...(model?.operation === undefined ? {} : { operation: model.operation }),
-    ...(model?.audio === undefined ? {} : { audio: structuredClone(model.audio) }),
-  });
+function captureInitialModelProvider(
+  model: AIModel | null | undefined,
+  providers: AIProvider[],
+  initialProviderId: string | undefined
+) {
+  const id = model?.providerId ?? initialProviderId ?? '';
+  return { id, incarnation: providers.find((provider) => provider.id === id)?.incarnation ?? '' };
+}
+
+function initialModelEntryMode(model: AIModel | null | undefined): 'catalog' | 'manual' {
+  return !model || model.propertySource === 'catalog' || model.source === 'catalog'
+    ? 'catalog'
+    : 'manual';
+}
+
+export function useModelFormState(
+  model?: AIModel | null,
+  providers: AIProvider[] = [],
+  models: AIModel[] = [],
+  initialProviderId?: string
+) {
+  const [saveSession] = useState<ModelFormSaveSession>(() => ({
+    modelId: model?.id ?? crypto.randomUUID(),
+    pending: false,
+  }));
+  const [formData, setFormData] = useState<ModelFormData>(() =>
+    createModelDraft(model, initialProviderId)
+  );
+  const [entryMode, setEntryMode] = useState(() => initialModelEntryMode(model));
+  const [providerContext, setProviderContext] = useState(() =>
+    captureInitialModelProvider(model, providers, initialProviderId)
+  );
+  const identityClaims = useRef(Boolean(model));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isEditing = Boolean(model);
+  const catalogModels = getModelCatalogEntries(models, formData.providerId);
+  const catalogModel = catalogModels.find((entry) => entry.modelCode === formData.modelCode);
+  const catalogFacts =
+    catalogModel?.catalog ??
+    (model?.providerId === formData.providerId && model.modelCode === formData.modelCode
+      ? model.catalog
+      : undefined);
+  const lifecycle = getAIModelLifecycle(catalogFacts);
+  const retirementAt = catalogFacts?.retirementAt;
 
   const handleChange =
-    (field: keyof ModelFormData) =>
+    (field: 'displayName' | 'modelCode' | 'systemPrompt') =>
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+      const value = event.target.value;
+      const clearClaims =
+        field === 'modelCode' && identityClaims.current && value !== formData.modelCode;
+      if (clearClaims) identityClaims.current = false;
+      setFormData((previous) => ({
+        ...(clearClaims ? clearModelIdentityClaims(previous) : previous),
+        [field]: value,
+      }));
       clearFieldError(errors, setErrors, field);
     };
-
   const handleProviderChange = (value: string) => {
-    setFormData((prev) => ({ ...prev, providerId: value }));
-    clearFieldError(errors, setErrors, 'providerId');
-  };
-
-  const handleOperationChange = (operation: AIModelOperation) => {
-    setFormData((previous) => {
-      const { audio: _audio, ...base } = previous;
-      return {
-        ...base,
-        operation,
-        ...(operation === 'transcription'
-          ? {
-              audio: {
-                transcription: {
-                  responseFormat: 'verbose_json' as const,
-                  timestampGranularity: 'word' as const,
-                },
-              },
-            }
-          : operation === 'speech'
-            ? { audio: { speech: { voiceId: '', responseFormat: 'mp3' as const } } }
-            : {}),
-      };
+    setProviderContext({
+      id: value,
+      incarnation: providers.find((provider) => provider.id === value)?.incarnation ?? '',
     });
+    const changed = value !== formData.providerId && Boolean(formData.providerId);
+    if (changed) identityClaims.current = false;
+    setFormData((previous) => ({
+      ...(changed ? clearModelIdentityClaims(previous) : previous),
+      providerId: value,
+    }));
+    if (changed) setEntryMode('catalog');
+    setErrors({});
+  };
+  const handleCatalogSelect = (id: string | null) => {
+    const selected = catalogModels.find((entry) => entry.id === id);
+    if (!selected) return;
+    const followsSelectedIdentity = !model && saveSession.committedRecord === undefined;
+    if (followsSelectedIdentity) {
+      saveSession.modelId = selected.id;
+      saveSession.existingRecord = true;
+    }
+    identityClaims.current = true;
+    setFormData((previous) =>
+      applyCatalogModelDraft(
+        followsSelectedIdentity ? { ...previous, enabled: selected.enabled ?? true } : previous,
+        selected
+      )
+    );
+    setEntryMode('catalog');
+    setErrors({});
+  };
+  const handleManualEntry = () => {
+    setFormData((previous) => ({ ...previous, propertySource: 'manual' }));
+    setEntryMode('manual');
+    setErrors({});
+  };
+  const handleResetFromCatalog = () => {
+    if (!catalogModel) return;
+    identityClaims.current = true;
+    setFormData((previous) => applyCatalogModelDraft(previous, catalogModel));
+    setEntryMode('catalog');
+    setErrors({});
+  };
+  const handleCapabilitiesChange = (capabilities: AIModelCapabilities) => {
+    setFormData((previous) => updateDraftCapabilities(previous, capabilities));
+  };
+  const handleOperationChange = (operation: AIModelOperation) => {
+    setFormData((previous) => ({ ...previous, operation }));
     clearFieldError(errors, setErrors, 'audio');
   };
   const handleAudioChange = (audio: AIModelAudioParameters) => {
-    setFormData((previous) => ({ ...previous, audio }));
+    setFormData((previous) => ({ ...previous, audio: { ...previous.audio, ...audio } }));
     clearFieldError(errors, setErrors, 'audio');
   };
+  const handleEnabledChange = (enabled: boolean) =>
+    setFormData((previous) => ({ ...previous, enabled }));
+  const handleRetirementOverrideChange = (retirementOverride: boolean) =>
+    setFormData((previous) => ({
+      ...previous,
+      retirementOverride,
+      ...(!retirementOverride && lifecycle === 'retired' ? { enabled: false } : {}),
+    }));
   const handleResizeStart = createTextareaResizeStartHandler(textareaRef);
-
   const handleSubmit = async (event: React.FormEvent, onSave: () => void | Promise<void>) => {
-    await submitModelForm(
-      model === undefined
-        ? { event, formData, isEditing, onSave, setErrors, setIsSaving }
-        : { event, formData, isEditing, model, onSave, setErrors, setIsSaving }
-    );
+    await submitModelForm({
+      session: saveSession,
+      providerIncarnation:
+        providerContext.id === formData.providerId ? providerContext.incarnation : '',
+      event,
+      formData,
+      isEditing,
+      onSave,
+      setErrors,
+      setIsSaving,
+      ...(model === undefined ? {} : { model }),
+    });
   };
-
   return {
     errors,
     formData,
+    entryMode,
+    catalogModels,
+    catalogModel,
+    lifecycle,
+    retirementAt,
     handleChange,
     handleProviderChange,
+    handleCatalogSelect,
+    handleManualEntry,
+    handleResetFromCatalog,
+    handleCapabilitiesChange,
+    handleEnabledChange,
+    handleRetirementOverrideChange,
     handleResizeStart,
     handleOperationChange,
     handleAudioChange,

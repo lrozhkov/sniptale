@@ -85,6 +85,7 @@ function getInteractiveFrameFloatingUiProps(props: InteractiveFrameContentProps)
 
 function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
   return {
+    onDeleteAnnotation: props.handleDelete,
     frame: props.currentFrame,
     currentFrame: props.currentFrame,
     isPopoverOpen: props.isPopoverOpen,

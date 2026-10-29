@@ -1,3 +1,4 @@
+import { createAudioJobFailure } from './failure';
 import { cancelReviewRemoteJob, keepReviewRemoteJobAlive } from './remote-job-port';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import {
@@ -63,7 +64,10 @@ export function runReviewSpeechJob(
         cancelled();
       }
     };
-    const timer = setTimeout(() => finish(undefined, new Error('timeout')), AUDIO_JOB_TIMEOUT_MS);
+    const timer = setTimeout(
+      () => finish(undefined, createAudioJobFailure('timeout')),
+      AUDIO_JOB_TIMEOUT_MS
+    );
     const keepalive = setInterval(() => {
       if (finished) return;
       keepReviewRemoteJobAlive(port, start.requestId, finish);
@@ -89,7 +93,8 @@ export function runReviewSpeechJob(
         } else if (message.type === 'failure') void cancellationCleanup.then(cancelled);
         return;
       }
-      if (message.type === 'failure') finish(undefined, new Error(message.code));
+      if (message.type === 'failure')
+        finish(undefined, createAudioJobFailure(message.code, message.failureReason));
       else if (message.type === 'transcript' || message.type === 'audio') {
         if ((message.type === 'transcript') !== (start.operation === 'transcription'))
           finish(undefined, new Error('invalid-response'));

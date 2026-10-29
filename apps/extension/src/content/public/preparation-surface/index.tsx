@@ -81,7 +81,8 @@ function usePreparationFrameCallbacks(
       },
       (input, sourceElement) => {
         if (acceptsElementRef.current(sourceElement)) {
-          frameManagerRef.current.addFreeFrame(input);
+          if (input.annotationKind === undefined) frameManagerRef.current.addFreeFrame(input);
+          else frameManagerRef.current.addFreeFrame(input, sourceElement);
         }
       },
       (...args) => frameManagerRef.current.removeFrame(...args),

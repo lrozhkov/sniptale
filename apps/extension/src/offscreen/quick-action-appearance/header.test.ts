@@ -70,3 +70,32 @@ it('releases the object URL after raster failure and allows an explicit retry', 
   await expect(renderQuickActionHeader(input)).resolves.toEqual({ dataUrl: raster });
   expect(revoke).toHaveBeenCalledTimes(2);
 });
+
+it('finishes the header after the optional favicon budget even when acquisition ignores abort', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  let release!: (value: null) => void;
+  mocks.favicon.mockReturnValue(
+    new Promise<null>((resolve) => {
+      release = resolve;
+    })
+  );
+  const rendering = renderQuickActionHeader({
+    header: { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true },
+    source: { width: 1280, height: 560 },
+    faviconWebsite: 'https://example.test',
+  });
+  let completed = false;
+  void rendering.then(() => {
+    completed = true;
+  });
+  try {
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(completed).toBe(true);
+    expect(draw).toHaveBeenCalledOnce();
+    expect(mocks.favicon.mock.calls[0]![1].aborted).toBe(true);
+  } finally {
+    release(null);
+    await rendering;
+    vi.useRealTimers();
+  }
+});

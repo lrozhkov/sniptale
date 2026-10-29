@@ -3,7 +3,7 @@ import type { ChromeAiAvailability } from '@sniptale/platform/browser/chrome-ai'
 import type { AISecretProtectionStatusPayload } from '../../../../../contracts/messaging/ai-settings-runtime';
 
 type ProviderModalState = { open: boolean; provider?: AIProvider | null };
-type ModelModalState = { open: boolean; model?: AIModel | null };
+type ModelModalState = { open: boolean; model?: AIModel | null; initialProviderId?: string };
 
 export type AiProvidersDeleteState =
   | { type: 'provider'; item: AIProvider }
@@ -59,7 +59,7 @@ interface AiProvidersModalsState {
   confirmDelete: AiProvidersDeleteState;
   openProviderModal: (provider?: AIProvider) => void;
   closeProviderModal: () => void;
-  openModelModal: (model?: AIModel) => void;
+  openModelModal: (model?: AIModel, initialProviderId?: string) => void;
   closeModelModal: () => void;
   setConfirmDelete: (value: AiProvidersDeleteState) => void;
 }
@@ -70,13 +70,12 @@ export interface AiProvidersSectionState {
     deleteModel: () => Promise<void>;
     deleteProvider: () => Promise<void>;
     moveModel: (modelId: string, beforeModelId: string | null) => Promise<boolean>;
-    setDefaultModel: (value: string) => Promise<void>;
   };
   chromeAi: AiProvidersChromeAiState;
   secretProtection: AiSecretProtectionState;
   providers: AIProvider[];
   models: AIModel[];
-  defaultModelId: string | null;
+  catalogModels: AIModel[];
   isLoading: boolean;
   modelOptions: { value: string; label: string }[];
   modals: AiProvidersModalsState;

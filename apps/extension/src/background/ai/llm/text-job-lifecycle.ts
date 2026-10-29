@@ -1,3 +1,5 @@
+import { AIProviderRequestError } from '../providers';
+import type { AIConnectionReason } from '../../../contracts/settings/ai-catalog';
 type LifecycleFailure = 'invalid-request' | 'cancelled' | 'timeout' | 'provider-failed';
 type TextStart = { type: 'start'; requestId: string };
 type TextCommand<Start> =
@@ -16,7 +18,11 @@ interface TextJobAdapter<Start, Server, Result, Failure extends string> {
   ): Promise<Result>;
   progress(request: Start): Server;
   result(request: Start, result: Result): Server;
-  failure(request: Start, code: Failure | LifecycleFailure): Server;
+  failure(
+    request: Start,
+    code: Failure | LifecycleFailure,
+    failureReason?: AIConnectionReason
+  ): Server;
 }
 
 interface TextJob {
@@ -91,7 +97,13 @@ export function createTextJobLifecycle<
             flight: Promise.resolve(),
             cancel() {
               controller.abort();
-              finish(adapter.failure(message, timedOut ? 'timeout' : 'cancelled'));
+              finish(
+                adapter.failure(
+                  message,
+                  timedOut ? 'timeout' : 'cancelled',
+                  timedOut ? 'timeout' : undefined
+                )
+              );
             },
           };
           job = current;
@@ -111,7 +123,19 @@ export function createTextJobLifecycle<
                 : (error instanceof Error &&
                     adapter.failureCodes.find((entry) => entry === error.message)) ||
                   'provider-failed';
-              finish(adapter.failure(message, code));
+              finish(
+                adapter.failure(
+                  message,
+                  code,
+                  controller.signal.aborted
+                    ? timedOut
+                      ? 'timeout'
+                      : undefined
+                    : error instanceof AIProviderRequestError
+                      ? error.reason
+                      : undefined
+                )
+              );
             })
             .finally(() => {
               clearTimeout(timer);

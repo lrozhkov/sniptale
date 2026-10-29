@@ -83,7 +83,14 @@ export type FrameState = FrameAnnotationInteractionState;
 
 export type FreeFrameInput = Pick<FrameData, 'x' | 'y' | 'width' | 'height'> & {
   pagePlacement: NonNullable<FrameData['pagePlacement']>;
+  annotationKind?: FrameData['annotationKind'];
 };
+
+/** Disposable creation intent shared by the toolbar and page input controller. */
+export interface StandaloneAnnotationCreationOptions {
+  annotationKind: NonNullable<FrameData['annotationKind']>;
+  placement: 'element' | 'free';
+}
 
 export type AddFreeFrameCallback = (input: FreeFrameInput, sourceElement: HTMLElement) => void;
 

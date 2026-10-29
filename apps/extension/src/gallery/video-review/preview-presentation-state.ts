@@ -1,4 +1,8 @@
-import { previewKeyValue } from './preview-key';
+import {
+  reviewPreviewSceneKey,
+  sameReviewPreviewSceneKey,
+  type PreviewSceneKey,
+} from '../../workflows/video-review/preview-scene';
 import type { RefObject } from 'react';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import { resolveQuickPreviewRasterSize } from '../../features/video/preview/raster';
@@ -39,7 +43,7 @@ export interface PresentationInput {
   onStatistics?(status: ReviewPreviewPresentationStatus): void;
 }
 
-/** FPS counts completed manual publications; native transport statistics are a separate contract. */
+/** Requested FPS counts completed manual publications; native transport statistics are separate. */
 export interface ReviewPreviewPresentationStatus {
   captionConflicts?: Prepared['captionConflicts'];
   phase: 'inactive' | 'pending' | 'ready' | 'failed';
@@ -62,7 +66,11 @@ export type PresentationCameraState = {
   ready: boolean;
 };
 
-type StableDescription = { key: string; generation: number; description: Description };
+type StableDescription = {
+  key: PreviewSceneKey;
+  generation: number;
+  description: Description;
+};
 
 /** Snapshot drafts and backing together; geometry remains canonical across quality changes. */
 export function resolvePresentationDescription(
@@ -81,27 +89,23 @@ export function resolvePresentationDescription(
       position: comments[comment.id] ?? comment.position,
     })),
   };
-  const key = JSON.stringify(
-    [
-      scene,
-      input.canonical,
-      input.css,
-      input.preferences,
-      input.sourceFrameRate,
-      input.seekRevision,
-      input.backgroundPending,
-      input.playing,
-      interacting,
-      !input.playing && input.cameraTransform,
-      !input.playing && input.pausedSourceTime,
-      !input.playing && input.pausedResultTime,
-      placement,
-      input.webcam?.editor.crop,
-      input.webcam?.editor.placement,
-    ],
-    previewKeyValue
-  );
-  if (previous?.key !== key) {
+  const key = reviewPreviewSceneKey(scene, [
+    input.canonical,
+    input.css,
+    input.preferences,
+    input.sourceFrameRate,
+    input.seekRevision,
+    input.backgroundPending,
+    input.playing,
+    interacting,
+    !input.playing && input.cameraTransform,
+    !input.playing && input.pausedSourceTime,
+    !input.playing && input.pausedResultTime,
+    placement,
+    input.webcam?.editor.crop,
+    input.webcam?.editor.placement,
+  ]);
+  if (!previous || !sameReviewPreviewSceneKey(previous.key, key)) {
     const backing = resolveQuickPreviewRasterSize({
       canonical: input.canonical,
       css: input.css,
@@ -127,5 +131,60 @@ export function resolvePresentationDescription(
       },
     };
   }
+  Object.assign(previous.key, key);
   return previous;
+}
+
+export const PREVIEW_STATISTICS_INTERVAL_MS = 500;
+
+function samePresentationMetadata(
+  left: ReviewPreviewPresentationStatus,
+  right: ReviewPreviewPresentationStatus
+) {
+  return (
+    left.phase === right.phase &&
+    left.nativeVideoFPS === right.nativeVideoFPS &&
+    left.actualRaster?.width === right.actualRaster?.width &&
+    left.actualRaster?.height === right.actualRaster?.height &&
+    JSON.stringify(left.captionConflicts ?? []) === JSON.stringify(right.captionConflicts ?? [])
+  );
+}
+
+/** Gate UI readout updates; explicit statistics consumers still receive every publication. */
+export function createPresentationFeedback(
+  report: (value: ReviewPreviewPresentationStatus) => void,
+  statistics: (value: ReviewPreviewPresentationStatus) => void
+) {
+  let previous: { status: ReviewPreviewPresentationStatus; at: number } | null = null;
+  return (value: ReviewPreviewPresentationStatus) => {
+    const now = performance.now();
+    const sameMetadata = previous !== null && samePresentationMetadata(previous.status, value);
+    const sameFPS = previous?.status.presentedFPS === value.presentedFPS;
+    const pendingReadout =
+      previous &&
+      previous.status.presentedFPS !== null &&
+      value.presentedFPS !== null &&
+      now - previous.at < PREVIEW_STATISTICS_INTERVAL_MS;
+    if (!sameMetadata || (!sameFPS && !pendingReadout)) {
+      previous = { status: value, at: now };
+      report(value);
+    }
+    statistics(value);
+  };
+}
+
+/** Unchanged measurements must not invalidate the surrounding editor controls. */
+export function retainPresentationBounds(
+  previous: Prepared['watermarkBounds'] | null,
+  value: Prepared['watermarkBounds'] | null
+) {
+  return previous === value ||
+    (previous !== null &&
+      value !== null &&
+      previous.x === value.x &&
+      previous.y === value.y &&
+      previous.width === value.width &&
+      previous.height === value.height)
+    ? previous
+    : value;
 }

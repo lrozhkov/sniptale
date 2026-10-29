@@ -1,6 +1,43 @@
 import { defineMessageSource } from '../source';
 
 export const galleryAppMessages = defineMessageSource({
+  remoteOnly: { ru: 'На сервере', en: 'On server' },
+  remoteConflictHint: {
+    ru: 'Выберите версию, которую нужно сохранить. Остальные версии останутся в истории сервера.',
+    en: 'Select the version to keep. The other versions remain in the server history.',
+  },
+  remoteChooseVersion: { ru: 'Сохранить версию {number}', en: 'Keep version {number}' },
+  remoteChooseDeletion: { ru: 'Подтвердить удаление', en: 'Confirm deletion' },
+  remoteResolutionQueued: {
+    ru: 'Решение добавлено в очередь синхронизации. Локальные файлы сохранены до проверки результата.',
+    en: 'The decision is in the sync queue. Local files are retained until the result is checked.',
+  },
+  remoteConflict: { ru: 'Конфликт версий', en: 'Conflicting versions' },
+  remoteUnavailable: { ru: 'Удалённый проект недоступен', en: 'Remote project unavailable' },
+  remoteDownloadOpen: { ru: 'Скачать и открыть', en: 'Download and open' },
+  remotePreparing: { ru: 'Подготавливаем проект…', en: 'Preparing project…' },
+  remoteFailed: {
+    ru: 'Не удалось подготовить проект. Локальные файлы не изменены.',
+    en: 'Could not prepare this project. Your local files are unchanged.',
+  },
+  remoteSelectionChanged: {
+    ru: 'Версия проекта изменилась. Обновите каталог и выберите проект снова.',
+    en: 'The project version changed. Refresh the catalog and select it again.',
+  },
+  remoteCancel: { ru: 'Отменить скачивание', en: 'Cancel download' },
+  remoteCancelled: { ru: 'Скачивание отменено.', en: 'Download cancelled.' },
+  remoteCancelRefused: {
+    ru: 'Не удалось подтвердить отмену. Обновите состояние.',
+    en: 'Cancellation could not be confirmed. Refresh the status.',
+  },
+  remoteHint: {
+    ru: 'Для работы офлайн скачайте проект и необходимые ему файлы.',
+    en: 'Download this project and its required files to work offline.',
+  },
+  remoteCatalogFailed: {
+    ru: 'Не удалось загрузить удалённый каталог. Локальная библиотека доступна.',
+    en: 'Could not load the remote catalog. Your local library is available.',
+  },
   sidebarCollapse: { ru: 'Свернуть меню библиотеки', en: 'Collapse library sidebar' },
   sidebarExpand: { ru: 'Развернуть меню библиотеки', en: 'Expand library sidebar' },
   trashTitle: { ru: 'Корзина', en: 'Trash Bin' },
@@ -382,6 +419,10 @@ export const galleryAppMessages = defineMessageSource({
     scenario: { ru: 'Сценарии', en: 'Scenarios' },
     'scenario-export': { ru: 'Экспорты сценариев', en: 'Scenario exports' },
     'video-project': { ru: 'Видеопроекты', en: 'Video projects' },
+  },
+  backupSyncNotReady: {
+    ru: 'Полный набор пока не готов: обновите синхронизацию и разрешите различия локальных и серверных версий перед созданием копии.',
+    en: 'The full set is not ready. Refresh synchronization and resolve local/server version differences before creating a backup.',
   },
   exportBackup: {
     ru: 'Создать резервную копию',

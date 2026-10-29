@@ -14,9 +14,11 @@ export const AI_SECRET_PROTECTION_KEY = 'sniptale_ai_secret_protection';
 export const AI_SECRET_PROTECTION_TRANSITION_KEY = 'sniptale_ai_secret_protection_transition';
 export const AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY = 'sniptale_ai_passphrase_session_key_material';
 export const AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY = 'sniptale_ai_secret_unlock_requests';
-export const AI_STORAGE_VERSION = 3;
+export const AI_STORAGE_VERSION = 4;
+export const AI_STORAGE_RESET_PHASE_KEY = 'sniptale_ai_storage_reset_phase';
+export const AI_SETTINGS_RESET_NOTICE_KEY = 'sniptale_ai_settings_reset_notice';
+export const AI_SCENARIO_SELECTIONS_KEY = 'sniptale_ai_scenario_selections';
 export const AI_PROVIDER_STORAGE_MIGRATION_PHASE = 'provider-secrets-v3';
-export const LEGACY_AI_SETTINGS_STORAGE_KEY = 'sniptale_settings';
 export const LEGACY_AI_MASTER_KEY_STORAGE_KEY = 'sniptale_master_key_material';
 
 export {

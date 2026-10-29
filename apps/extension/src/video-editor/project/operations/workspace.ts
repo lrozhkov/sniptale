@@ -1,3 +1,4 @@
+import { ensureNativeEditingRootAvailable } from '../../../workflows/sync-transfer/editing-admission';
 import type { LibraryProjectBinding } from '../../../composition/persistence/projects/known-library-source';
 import {
   reviewProjectBookendReferences,
@@ -611,6 +612,8 @@ export async function openPersistedProject(projectId: string): Promise<VideoProj
       ].join('')
     );
   }
+
+  await ensureNativeEditingRootAvailable({ rootKind: 'video-project', rootId: projectId });
 
   const retainedProject =
     result.status === 'ready' && result.lifecycle?.storageClass === 'temporary'

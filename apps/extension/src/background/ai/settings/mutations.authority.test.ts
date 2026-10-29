@@ -1,6 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import type { AIModel, AIProvider } from '../../../contracts/settings';
+vi.mock('../../../composition/persistence/infrastructure/browser-storage', () => ({
+  browserStorage: { local: { get: vi.fn(async () => ({ sniptale_ai_storage_version: 4 })) } },
+}));
 
 interface Deferred {
   promise: Promise<void>;
@@ -9,6 +12,7 @@ interface Deferred {
 
 let models: AIModel[] = [];
 let writes: Array<{ models: AIModel[]; release: Deferred }> = [];
+let nextWriteStarted = createDeferred();
 
 const provider: AIProvider = {
   baseUrl: 'https://provider.example.com/v1',
@@ -17,6 +21,7 @@ const provider: AIProvider = {
   hasStoredApiKey: false,
   id: 'provider-1',
   name: 'Provider 1',
+  incarnation: 'incarnation',
 };
 
 function createDeferred(): Deferred {
@@ -37,10 +42,18 @@ function createModel(id: string): AIModel {
 }
 
 async function waitForWrite(index: number): Promise<void> {
-  for (let attempt = 0; attempt < 100 && writes.length <= index; attempt += 1) {
-    await Promise.resolve();
-  }
+  if (writes.length <= index) await nextWriteStarted.promise;
   expect(writes.length).toBeGreaterThan(index);
+}
+
+async function publishModels(nextModels: AIModel[]): Promise<void> {
+  const release = createDeferred();
+  writes.push({ models: nextModels, release });
+  const started = nextWriteStarted;
+  nextWriteStarted = createDeferred();
+  started.resolve();
+  await release.promise;
+  models = nextModels;
 }
 
 const storageMocks = vi.hoisted(() => ({
@@ -54,12 +67,7 @@ vi.mock('../../../composition/persistence/ai-settings/core', async (importOrigin
   loadAIProviders: vi.fn(async () => [provider]),
   loadDefaultModelId: vi.fn(async () => null),
   loadAISecretProtectionStatus: storageMocks.loadAISecretProtectionStatus,
-  saveAIModels: vi.fn(async (nextModels: AIModel[]) => {
-    const release = createDeferred();
-    writes.push({ models: nextModels, release });
-    await release.promise;
-    models = nextModels;
-  }),
+  saveAIModels: vi.fn(publishModels),
 }));
 
 vi.mock('../../../composition/persistence/ai-settings/index', async (importOriginal) => ({
@@ -67,12 +75,7 @@ vi.mock('../../../composition/persistence/ai-settings/index', async (importOrigi
   loadAIModels: vi.fn(async () => [...models]),
   loadAIProviders: vi.fn(async () => [provider]),
   loadDefaultModelId: vi.fn(async () => null),
-  saveAIModels: vi.fn(async (nextModels: AIModel[]) => {
-    const release = createDeferred();
-    writes.push({ models: nextModels, release });
-    await release.promise;
-    models = nextModels;
-  }),
+  saveAIModels: vi.fn(publishModels),
 }));
 
 vi.mock('../../../composition/persistence/ai-settings/init', async (importOriginal) => ({
@@ -91,6 +94,7 @@ import { mutateAiSettings, resetAiSettingsMutationQueueForTests } from './mutati
 beforeEach(() => {
   models = [];
   writes = [];
+  nextWriteStarted = createDeferred();
   resetAiSettingsMutationQueueForTests();
   storageMocks.initializeAiStorageAccess.mockResolvedValue(undefined);
   storageMocks.loadAISecretProtectionStatus.mockResolvedValue({
@@ -104,14 +108,13 @@ it('serializes background and persistence facade graph mutations without stale r
   const backgroundMutation = mutateAiSettings({
     model: createModel('model-1'),
     operation: 'add-model',
+    providerIncarnation: 'incarnation',
     type: 'AI_SETTINGS_MUTATION',
   });
   await waitForWrite(0);
 
   const facadeMutation = addAIModel(createModel('model-2'));
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await Promise.resolve();
-  }
+  expect(writes).toHaveLength(1);
 
   writes[0]?.release.resolve();
   await backgroundMutation;
@@ -126,14 +129,12 @@ it('orders secret-protection status reads after an in-flight settings mutation',
   const mutation = mutateAiSettings({
     model: createModel('model-1'),
     operation: 'add-model',
+    providerIncarnation: 'incarnation',
     type: 'AI_SETTINGS_MUTATION',
   });
   await waitForWrite(0);
 
   const statusRead = loadAISecretProtectionStatus();
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await Promise.resolve();
-  }
   expect(storageMocks.loadAISecretProtectionStatus).not.toHaveBeenCalled();
 
   writes[0]?.release.resolve();

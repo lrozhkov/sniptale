@@ -17,7 +17,17 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@sniptale/ui/content-popover-adapter', () => ({
-  ContentPopoverAdapter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  ContentPopoverAdapter: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className: string;
+  }) => (
+    <div className={className}>
+      <div className="sniptale-content-popover-body">{children}</div>
+    </div>
+  ),
 }));
 vi.mock('../popover/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../popover/hooks')>()),
@@ -63,6 +73,7 @@ vi.mock('./popover-state', () => ({
 import { createDefaultHighlighterSettings } from '../../../features/highlighter/style/defaults';
 import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import { FrameAnnotationCreationFramePopover } from './popover';
+import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -121,3 +132,34 @@ it('wires every frame effect callback, including focus blur, through the creatio
 
   act(() => root.unmount());
 });
+
+it.each([false, true])(
+  'keeps the portaled frame surface in its inspector scope: %s',
+  (inspector) => {
+    const defaults = createDefaultHighlighterSettings();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const content = (
+      <FrameAnnotationCreationFramePopover
+        anchorEl={host}
+        isOpen
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+        settings={{
+          blurSettings: defaults.defaultBlurSettings,
+          borderSettings: projectBorderPresetToAppliedSettings(defaults.borderPresets[0]!),
+          effectMode: 'focus',
+          focusSettings: defaults.defaultFocusSettings,
+        }}
+      />
+    );
+    act(() => root.render(inspector ? <InspectorLayout>{content}</InspectorLayout> : content));
+    const surface = host.querySelector('.sniptale-frame-settings-popover')!;
+    expect(surface.classList.contains('sniptale-compact-workspace')).toBe(inspector);
+    expect(surface.classList.contains('sniptale-inspector-surface')).toBe(inspector);
+    expect(surface.classList.contains('sniptale-content-appearance-surface')).toBe(inspector);
+    expect(surface.querySelectorAll('.sniptale-content-popover-body')).toHaveLength(1);
+    act(() => root.unmount());
+  }
+);

@@ -19,7 +19,6 @@ describe('settings transfer canonical node projection', () => {
     ['styles.callouts', 'defaultPresetId', 'defaults'],
     ['styles.numbering', 'defaultPresetId', 'defaults'],
     ['styles.tags', 'activeFilterTagIds', 'active-filter'],
-    ['ai.models', 'defaultModelId', 'default'],
     ['ai.prompt-templates', 'order', 'items'],
     ['capture.video', 'profiles', 'profiles'],
     ['capture.pages', 'resourceLimits', 'resourceLimits'],

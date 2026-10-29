@@ -126,6 +126,52 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
     });
   });
 
+  test(`voice model catalogs keep disabled approvals unresolved ${viewport.name} ${locale}`, async ({}, info) => {
+    await withVoiceBrowser(viewport.size, locale, async ({ page, extensionId, provider }) => {
+      const before = await page.evaluate(() => chrome.storage.sync.get('sniptale_settings'));
+      await page.goto(
+        `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=ai-connections`
+      );
+      const toggle = page
+        .getByRole('region', {
+          name: translate('settings.aiProviders.providersTitle', locale),
+          exact: true,
+        })
+        .getByRole('switch');
+      await toggle.click();
+      await expect(toggle).not.toBeChecked();
+      await openVoiceSettings(page, extensionId);
+      for (const [kind, code] of [
+        ['transcription', 'synthetic-asr'],
+        ['correction', 'synthetic-text'],
+      ]) {
+        const field = ui(page, `settings.voice.${kind}-model`);
+        await expect(field.getByRole('alert')).toContainText(
+          translate('aiModal.modelSelectionUnavailable', locale)
+        );
+        await expect(field.getByRole('alert')).toContainText(code);
+      }
+      await expect(ui(page, 'settings.voice.correction-prompt')).toHaveValue(CORRECTION_PROMPT);
+      const refresh = page.getByRole('button', {
+        name: translate('settings.voiceInput.reloadModels', locale),
+        exact: true,
+      });
+      await refresh.scrollIntoViewIfNeeded();
+      await refresh.click();
+      await expect(refresh).toBeEnabled();
+      await expect(ui(page, 'settings.voice.transcription-model').getByRole('alert')).toContainText(
+        'synthetic-asr'
+      );
+      await ui(page, 'settings.voice.correction-model').scrollIntoViewIfNeeded();
+      await voiceScreenshot(page, info, 'unavailable-voice-models');
+      expect(await page.evaluate(() => chrome.storage.sync.get('sniptale_settings'))).toEqual(
+        before
+      );
+      expect(provider.uploads).toHaveLength(0);
+      expect(provider.corrections).toHaveLength(0);
+    });
+  });
+
   test(`native model dictation settings pipeline and private history ${viewport.name} ${locale}`, async ({}, info) => {
     await withVoiceBrowser(viewport.size, locale, async ({ page, extensionId, provider }) => {
       await captureVoicePreferences(page, info, viewport.name);
@@ -260,7 +306,7 @@ test('native ASR failure retains audio and retries without inserting a partial r
       status: 'failed',
       rawTranscript: null,
       transcript: null,
-      failureCode: 'provider-failed',
+      failureCode: 'provider-service-error',
     });
     expect(await readVoiceStorage(page)).toMatchObject({ privateAudio: 1, libraryCount: 0 });
     await expect(ui(row, 'settings.voice.history-play')).toBeEnabled();
@@ -306,12 +352,16 @@ test('native correction failure preserves raw text and original audio for explic
     expect(original).toMatchObject({
       status: 'ready',
       correctionStatus: 'failed',
+      failureCode: 'provider-service-error',
       rawTranscript: RAW_TRANSCRIPT,
       transcript: RAW_TRANSCRIPT,
     });
     expect(await readVoiceStorage(page)).toMatchObject({ privateAudio: 1, libraryCount: 0 });
     expect(provider.uploads).toHaveLength(1);
     expect(provider.corrections).toHaveLength(1);
+    await expect(row).toContainText(
+      translate('settings.aiProviders.providerStatusUnavailable', 'en')
+    );
     await row.scrollIntoViewIfNeeded();
     await voiceScreenshot(page, info, 'correction-failure-raw-recovery');
     provider.respond('correction');
@@ -322,6 +372,7 @@ test('native correction failure preserves raw text and original audio for explic
       entryId: original.entryId,
       audioDigest: original.audioDigest,
       correctionStatus: 'applied',
+      failureCode: null,
     });
     expect(provider.uploads).toHaveLength(2);
     expect((await readVoiceStorage(page)).privateAudio).toBe(1);
@@ -534,6 +585,10 @@ test('native content field keeps click recording and applies the saved correctio
         });
         await settings.bringToFront();
         await ui(settings, 'settings.voice.correction').click();
+        await expect(ui(settings, 'settings.voice.correction')).toHaveAttribute(
+          'aria-checked',
+          'false'
+        );
         await page.bringToFront();
         await field.fill('');
         await microphone.click();

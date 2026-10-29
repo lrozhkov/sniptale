@@ -1,3 +1,5 @@
+import { createElement as createLucideElement } from 'lucide';
+import { getQuickActionIconNode } from '../../../features/quick-actions-presets/icons';
 import { isTrustedDomEvent } from '../../platform/trusted-events';
 import { PAGE_CORNERS, type PageCorner } from '../../../contracts/page-launch';
 import { pageLauncherMessages } from '../../../platform/i18n/messages/content/page-launcher';
@@ -25,7 +27,7 @@ function menuProjection(options: ShimLauncherOptions): string {
     locale,
     options.actions
       .filter((action) => action.status)
-      .map((action) => [action.id, getShimQuickActionName(action, locale)]),
+      .map((action) => [action.id, getShimQuickActionName(action, locale), action.icon]),
   ]);
 }
 
@@ -53,8 +55,15 @@ function createLauncherElements() {
   group.className = 'group';
   group.setAttribute('role', 'toolbar');
   const open = button('main', ['M4 4h16v16H4z', 'M4 9h16']);
-  const actions = button('main', ['m13 2-9 12h7l-1 8 10-12h-7z']);
-  const grip = button('grip', ['M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01']);
+  const actions = button('main actions', ['m13 2-9 12h7l-1 8 10-12h-7z']);
+  const grip = button('grip', [
+    'M10 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M10 12a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M10 19a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M16 5a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M16 12a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+    'M16 19a1 1 0 1 1-2 0a1 1 0 0 1 2 0Z',
+  ]);
   group.append(grip, open, actions);
   shadow.append(style, group);
   document.documentElement.append(host);
@@ -157,6 +166,7 @@ class ShimLauncherView {
           : 'light'
         : theme;
     this.elements.host.setAttribute('data-theme', resolvedTheme);
+    this.elements.group.dataset['hoverOnly'] = String(preferences.hoverOnly);
     this.elements.group.dataset['left'] = String(corner.endsWith('left'));
     this.elements.group.dataset['dragging'] = String(this.dragState.dragging);
     this.elements.group.style.cssText = '';
@@ -184,6 +194,7 @@ class ShimLauncherView {
     this.elements.actions.setAttribute('aria-label', this.label('actions'));
     this.elements.actions.title = this.label('actions');
     this.elements.actions.setAttribute('aria-haspopup', 'menu');
+    this.elements.actions.dataset['menuSide'] = corner.startsWith('bottom') ? 'up' : 'down';
     this.elements.actions.hidden = !preferences.quickActionsCorner;
     this.elements.open.disabled = this.pending;
     this.elements.actions.disabled = this.pending;
@@ -219,6 +230,48 @@ class ShimLauncherView {
       this.render();
     }
   }
+  private refreshMenu() {
+    if (!this.menu) return;
+    const previousItems = Array.from(this.menu.querySelectorAll<HTMLButtonElement>('button'));
+    const focusedIndex = previousItems.findIndex(
+      (item) => item === this.elements.shadow.activeElement
+    );
+    const focusedId = previousItems[focusedIndex]?.dataset['actionId'];
+    this.menu.replaceChildren();
+    const enabled = this.options.actions.filter((action) => action.status);
+    if (!enabled.length) this.menu.textContent = this.label('empty');
+    for (const [index, action] of enabled.entries()) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.setAttribute('role', 'menuitem');
+      item.dataset['actionId'] = action.id;
+      const glyph = createLucideElement(getQuickActionIconNode(action.icon), {
+        'aria-hidden': 'true',
+      });
+      const label = document.createElement('span');
+      label.textContent = getShimQuickActionName(action, this.options.presentation.locale);
+      item.append(glyph, label);
+      if (index < 10) {
+        const digit = String(index === 9 ? 0 : index + 1);
+        const shortcut = document.createElement('kbd');
+        shortcut.textContent = digit;
+        item.setAttribute('aria-keyshortcuts', digit);
+        item.append(shortcut);
+      }
+      item.addEventListener('click', (click) => {
+        void this.run(click, () => this.options.trigger(action, click));
+      });
+      this.menu.append(item);
+    }
+    if (focusedIndex >= 0) {
+      const items = Array.from(this.menu.querySelectorAll<HTMLButtonElement>('button'));
+      const focus =
+        items.find((item) => item.dataset['actionId'] === focusedId) ??
+        items[Math.min(focusedIndex, items.length - 1)] ??
+        this.elements.actions;
+      focus.focus();
+    }
+  }
   private toggleMenu = (event: MouseEvent) => {
     if (!isTrustedDomEvent(event) || this.pending) return;
     if (this.menu) {
@@ -228,18 +281,7 @@ class ShimLauncherView {
     this.menu = document.createElement('div');
     this.menu.className = 'menu';
     this.menu.setAttribute('role', 'menu');
-    const enabled = this.options.actions.filter((action) => action.status);
-    if (!enabled.length) this.menu.textContent = this.label('empty');
-    for (const action of enabled) {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.setAttribute('role', 'menuitem');
-      item.textContent = getShimQuickActionName(action, this.options.presentation.locale);
-      item.addEventListener('click', (click) => {
-        void this.run(click, () => this.options.trigger(action, click));
-      });
-      this.menu.append(item);
-    }
+    this.refreshMenu();
     this.elements.shadow.append(this.menu);
     this.elements.actions.setAttribute('aria-expanded', 'true');
     this.render();
@@ -257,6 +299,38 @@ class ShimLauncherView {
   };
   private key = (event: Event) => {
     if (!(event instanceof KeyboardEvent)) return;
+    if (this.menu && /^[0-9]$/.test(event.key)) {
+      const action = this.options.actions.filter((entry) => entry.status)[
+        event.key === '0' ? 9 : Number(event.key) - 1
+      ];
+      const trigger = this.elements.actions;
+      if (
+        !action ||
+        !isTrustedDomEvent(event) ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        this.pending ||
+        this.options.busy ||
+        this.disposed ||
+        this.dragState.dragging ||
+        this.dragState.pending ||
+        trigger.matches(':disabled') ||
+        trigger.getClientRects().length === 0 ||
+        getComputedStyle(trigger).visibility === 'hidden' ||
+        this.elements.host.closest('[inert]')
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      trigger.focus({ preventScroll: true });
+      void this.run(event, () => this.options.trigger(action, event));
+      return;
+    }
     if (event.key === 'Escape' && this.menu) {
       event.preventDefault();
       this.closeMenu(true);
@@ -278,7 +352,7 @@ class ShimLauncherView {
     const menuChanged = this.menu && menuProjection(this.options) !== menuProjection(next);
     this.options = next;
     if (next.busy || !next.presentation.preferences.quickActionsCorner) this.closeMenu();
-    else if (menuChanged) this.closeMenu(true);
+    else if (menuChanged) this.refreshMenu();
     this.drag.refresh();
     this.render();
   };

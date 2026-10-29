@@ -227,6 +227,25 @@ describe('editor aggregate restore', () => {
     expect(mocks.bootstrap).not.toHaveBeenCalled();
   });
 
+  it('opens a legacy immutable original without a workspace revision at native revision zero', async () => {
+    mocks.restore.mockResolvedValue(undefined);
+    mocks.bootstrap.mockResolvedValue(null);
+    mocks.getBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
+    mocks.getEntry.mockResolvedValue({ filename: 'legacy.png', createdAt: 150 });
+    mocks.toDataUrl.mockResolvedValue('data:image/png;base64,b3JpZ2luYWw=');
+    const { resolveEditorPageRestoreSource } = await import('./');
+    await expect(
+      resolveEditorPageRestoreSource({ assetId: 'legacy', bootstrapId: null }, 'legacy', {
+        restoreDraft: mocks.restore,
+      })
+    ).resolves.toMatchObject({
+      kind: 'asset',
+      assetId: 'legacy',
+      nativeRevision: 0,
+      filename: 'legacy.png',
+    });
+  });
+
   it('falls back to bootstrap and then immutable original', async () => {
     mocks.restore.mockResolvedValue(undefined);
     mocks.bootstrap.mockResolvedValueOnce({
@@ -247,7 +266,11 @@ describe('editor aggregate restore', () => {
 
     mocks.bootstrap.mockResolvedValueOnce(null);
     mocks.getBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
-    mocks.getEntry.mockResolvedValue({ filename: 'original.png', createdAt: 150 });
+    mocks.getEntry.mockResolvedValue({
+      filename: 'original.png',
+      createdAt: 150,
+      workspaceRevision: 7,
+    });
     mocks.toDataUrl.mockResolvedValue('data:image/png;base64,b3JpZ2luYWw=');
     await expect(
       resolveEditorPageRestoreSource({ assetId: 'image-2', bootstrapId: null }, 'image-2', {
@@ -257,7 +280,12 @@ describe('editor aggregate restore', () => {
       kind: 'asset',
       assetId: 'image-2',
       filename: 'original.png',
+      nativeRevision: 7,
       capturedAt: 150,
     });
   });
 });
+
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

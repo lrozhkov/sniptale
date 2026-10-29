@@ -1,0 +1,52 @@
+{
+  "base": "c69623c2f",
+  "profile": "redis",
+  "setupQueue": {
+    "log": "d-redis-setup-queue.log",
+    "passed": 20,
+    "qualificationAccepted": false,
+    "reason": "Default test build stale; explicit current-build rerun required."
+  },
+  "library": {
+    "log": "d-redis-library.log",
+    "passed": 2,
+    "build": ".tmp/e2e-builds/security",
+    "currentBuild": true,
+    "viewport": "1280x560",
+    "duration": "3.2 minutes"
+  },
+  "qualificationComplete": true,
+  "currentSetupQueue": {
+    "log": "d-current-redis-setup-queue.log",
+    "passed": 20,
+    "build": ".tmp/e2e-builds/security",
+    "productionInputs": "Reviewed C candidate, committed as c69623c2f"
+  },
+  "faults": {
+    "log": "d-current-redis-faults.log",
+    "passed": 7,
+    "failed": 1,
+    "remaining": "Metadata-reuse fixture authority corrected; deferred-export preparation gap established."
+  },
+  "delayedRetry": {
+    "log": "d-current-redis-retry.log",
+    "passed": 3,
+    "cases": [
+      "External delayed retry verifies publication",
+      "Automatic retry",
+      "Automatic retry after browser restart without alarm"
+    ]
+  },
+  "deferredExportMetadata": {
+    "passed": 1,
+    "log": "d-deferred-redis-current.log",
+    "offlineRevisions": 3,
+    "fullBrowserRestart": true,
+    "mediaBodyUpload": false,
+    "corruptHydrationRefused": true
+  },
+  "remaining": [],
+  "productionChanged": true,
+  "releaseCandidate": "D closed after independent architecture/security approval",
+  "commit": "d9e247b5b73496e8a0f69332a49ebadfb4090f8b"
+}

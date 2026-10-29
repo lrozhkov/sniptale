@@ -10,7 +10,13 @@ import type {
 } from '../../../../features/highlighter/contracts';
 import type { StepBadgeSettings } from '../../../../features/highlighter/contracts';
 import { createFrameDataFixture } from '../react/test-support';
-import { buildFrameForAdd, buildFreeFrameForAdd } from './frame-build';
+import {
+  buildFrameForAdd,
+  buildFreeFrameForAdd,
+  buildStandaloneAnnotationForAdd,
+} from './frame-build';
+import { createDefaultFrameCallout } from '../../../../features/highlighter/frame-annotation/defaults';
+import { setFutureFrameCallout, resetFutureFrameCallout } from '../session/future-callout';
 import { setFrameSessionBorderPreset } from '../session/border-preset';
 
 function createBlurSettings(): BlurSettings {
@@ -211,4 +217,115 @@ describe('frame-mutation-actions-frame-build', () => {
     expect(frame.linkedElementSelector).toBeUndefined();
     expect(frame.offset).toBeUndefined();
   });
+});
+
+describe('standalone annotation construction', () => {
+  it.each(['callout', 'step-badge'] as const)(
+    'builds a %s with its own settings and no frame effects',
+    (annotationKind) => {
+      const args = createBuildArgs();
+      const callout = createDefaultFrameCallout();
+      setFutureFrameCallout(callout);
+      try {
+        const frame = buildStandaloneAnnotationForAdd({
+          ...args,
+          annotationKind,
+          generateFrameId: () => 'standalone-1',
+          input: {
+            x: 30,
+            y: 40,
+            width: 1,
+            height: 1,
+            pagePlacement: { iframePath: [], pageX: 130, pageY: 240 },
+          },
+        });
+        expect(frame).toMatchObject({
+          id: 'standalone-1',
+          annotationKind,
+          x: 30,
+          y: 40,
+          pagePlacement: { iframePath: [], pageX: 130, pageY: 240 },
+        });
+        expect(frame.borderSettings).toBeUndefined();
+        expect(frame.blurSettings).toBeUndefined();
+        expect(frame.focusSettings).toBeUndefined();
+        expect(frame.effectMode).toBeUndefined();
+        if (annotationKind === 'callout') {
+          expect(frame.stepBadge).toBeUndefined();
+          expect(frame.callout).toMatchObject({
+            enabled: true,
+            style: {
+              colorBindings: {
+                accent: 'custom',
+                connector: 'custom',
+                surfaceBackground: 'custom',
+                surfaceBorder: 'custom',
+              },
+            },
+          });
+          expect(frame.callout).not.toBe(callout);
+          expect(callout).toEqual(createDefaultFrameCallout());
+        } else {
+          expect(frame.callout).toBeUndefined();
+          expect(frame.stepBadge).toMatchObject({
+            enabled: true,
+            auto: true,
+            value: '',
+            style: {
+              sizeSource: 'custom',
+              backgroundColorSource: 'custom',
+              textColorSource: 'custom',
+            },
+          });
+          expect(args.sessionStepBadgeTemplateRef.current?.value).toBe('4');
+        }
+      } finally {
+        resetFutureFrameCallout();
+      }
+    }
+  );
+
+  it('keeps a standalone manual badge value out of the automatic sequence', () => {
+    const args = createBuildArgs();
+    args.sessionStepBadgeTemplateRef.current = createStepBadgeTemplate(false);
+    const frame = buildStandaloneAnnotationForAdd({
+      ...args,
+      annotationKind: 'step-badge',
+      generateFrameId: () => 'manual',
+      input: {
+        x: 20,
+        y: 30,
+        width: 1,
+        height: 1,
+        pagePlacement: { iframePath: [], pageX: 20, pageY: 30 },
+      },
+    });
+    expect(frame.stepBadge).toMatchObject({ enabled: true, auto: false, value: '4' });
+  });
+});
+
+it('places standalone badges at the chosen point without inherited frame-boundary offsets', () => {
+  const args = createBuildArgs();
+  args.sessionStepBadgeTemplateRef.current = {
+    ...createStepBadgeTemplate(false),
+    anchor: 'bottom-right',
+    offsetDirections: ['right', 'down'],
+    manualPlacement: { side: 'right', position: 0.8, normalOffset: 50, tangentialOffset: 30 },
+  };
+  const frame = buildStandaloneAnnotationForAdd({
+    ...args,
+    annotationKind: 'step-badge',
+    generateFrameId: () => 'point',
+    input: {
+      x: 20,
+      y: 30,
+      width: 1,
+      height: 1,
+      pagePlacement: { iframePath: [], pageX: 20, pageY: 30 },
+    },
+  });
+  expect(frame.stepBadge?.manualPlacement).toBeUndefined();
+  expect(frame.stepBadge?.offsetDirections).toEqual([]);
+  expect(frame.stepBadge?.anchor).toBe('center');
+  expect(args.sessionStepBadgeTemplateRef.current.manualPlacement?.normalOffset).toBe(50);
 });

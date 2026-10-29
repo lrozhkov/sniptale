@@ -11,6 +11,7 @@ import { loadInitialProjectFromLocation } from './workspace';
 const {
   deleteProjectAsset,
   getProjectAsset,
+  ensureNativeEditingRootAvailable,
   ensureLibraryMediaAssetsMock,
   getRecording,
   getRecordingTelemetry,
@@ -19,6 +20,7 @@ const {
   importRecordingProjectAssetMock,
   saveVideoProject,
 } = vi.hoisted(() => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
   deleteProjectAsset: vi.fn(),
   getProjectAsset: vi.fn(),
   ensureLibraryMediaAssetsMock: vi.fn(),
@@ -28,6 +30,10 @@ const {
   getVideoProject: vi.fn(),
   importRecordingProjectAssetMock: vi.fn(),
   saveVideoProject: vi.fn(),
+}));
+
+vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable,
 }));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
@@ -290,6 +296,10 @@ it('opens the saved Native root on reload instead of creating another migration'
   window.history.replaceState({}, '', `/video-editor.html?project=${transferred.project!.id}`);
   const reopened = await loadInitialProjectFromLocation();
   expect(reopened.project).toEqual(transferred.project);
+  expect(ensureNativeEditingRootAvailable).toHaveBeenCalledWith({
+    rootKind: 'video-project',
+    rootId: transferred.project!.id,
+  });
   expect(saveVideoProject).not.toHaveBeenCalled();
   expect(ensureLibraryMediaAssetsMock).not.toHaveBeenCalled();
 });

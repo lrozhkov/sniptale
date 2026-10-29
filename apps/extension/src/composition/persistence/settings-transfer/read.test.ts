@@ -150,7 +150,6 @@ beforeEach(() => {
         authorization: 'canary-secret',
       },
     ],
-    defaultModelId: 'model-a',
     chromeAiEnabled: true,
     globalSystemPrompt: 'Global',
     scenarioEditorSystemPrompt: 'Scenario',
@@ -200,7 +199,8 @@ it('reads every visible domain while removing secret and device-bound state', as
       expect.objectContaining({ id: 'slot-0', collectionNodeId: 'styles.palettes.items' }),
     ])
   );
-  expect(snapshot.dependencies['ai.models.default']).toEqual(['ai.models.items.model-a']);
+  expect(snapshot.domains['ai.models']?.data).not.toHaveProperty('defaultModelId');
+  expect(snapshot.dependencies).not.toHaveProperty('ai.models.default');
 });
 
 it('uses the current Settings locale for system item display names', async () => {
@@ -721,4 +721,83 @@ it('excludes quick-action artwork and keeps a valid projected transfer', async (
   expect(action.appearance.background.imageDataUrl).toBe(
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII='
   );
+});
+
+it('exports independent full-page image and preparation defaults', async () => {
+  const fullPageImage = { imageFormat: 'webp', imageQuality: 68 };
+  const fullPageCapture = {
+    freezeMotion: false,
+    preloadLazyContent: true,
+    floatingElements: 'hide',
+  };
+  mocks.settings.mockResolvedValue({ ...settingsFixture(), fullPageImage, fullPageCapture });
+  const snapshot = await readSettingsTransferSnapshot();
+  expect(snapshot.domains['capture.image']?.data).toMatchObject({ fullPageImage, fullPageCapture });
+});
+
+it('includes RGB names in the transferable palette snapshot', async () => {
+  mocks.palette.mockResolvedValue({
+    colors: Array.from({ length: 10 }, () => '#ff7f50'),
+    names: { '#ff7f50': 'Brand coral', '#663399': 'Scene violet' },
+  });
+  const snapshot = await readSettingsTransferSnapshot();
+  expect(parseSettingsTransferDomains(snapshot.domains)['styles.palettes']?.data).toMatchObject({
+    names: { '#ff7f50': 'Brand coral', '#663399': 'Scene violet' },
+  });
+});
+
+it('exports configured model properties and audio without catalog cache or destination scope', async () => {
+  const current = await mocks.ai();
+  const capabilities = {
+    operations: { text: 'supported', transcription: 'supported', speech: 'supported' },
+    input: { text: 'supported', audio: 'supported' },
+    output: { audio: 'supported' },
+    features: {},
+  };
+  const model = {
+    id: 'configured',
+    providerId: 'provider-a',
+    modelCode: 'exact/code',
+    displayName: 'Configured',
+    source: 'manual',
+    propertySource: 'manual',
+    enabled: false,
+    retirementOverride: true,
+    capabilities,
+    systemPrompt: 'Authored instructions',
+    audio: {
+      transcription: { language: 'en', responseFormat: 'json', timestampGranularity: 'none' },
+      speech: { voiceId: 'voice', responseFormat: 'mp3' },
+    },
+    catalog: {
+      capabilities,
+      displayName: 'Remote',
+      lifecycle: 'active',
+      observedAt: 1,
+      scope: 'private-scope',
+    },
+  };
+  mocks.ai.mockResolvedValue({
+    ...current,
+    models: [model],
+    providers: current.providers.map((provider: { id: string }) => ({
+      ...provider,
+      management: 'manual',
+      enabled: false,
+      incarnation: 'local-only',
+    })),
+  });
+  const snapshot = await readSettingsTransferSnapshot();
+  const { catalog: _catalog, ...configuration } = model;
+  expect(snapshot.domains['ai.models']?.data).toEqual({
+    items: [configuration],
+  });
+  expect(parseSettingsTransferDomains(snapshot.domains)['ai.models']).toEqual(
+    snapshot.domains['ai.models']
+  );
+  expect(JSON.stringify(snapshot.domains)).not.toContain('private-scope');
+  expect(JSON.stringify(snapshot.domains)).not.toContain('local-only');
+  expect(snapshot.domains['ai.providers']?.data).toMatchObject({
+    items: [{ management: 'manual', enabled: false }],
+  });
 });

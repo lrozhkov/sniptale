@@ -1,3 +1,5 @@
+import { RemoteProjectActions } from './remote-project-actions';
+import { NativeCacheActions } from './native-cache-actions';
 import './preview.css';
 import { BadgeCheck, ChevronDown, Info } from 'lucide-react';
 import { InspectorFieldClear } from '../../../ui/compact-inspector-controls/text-field';
@@ -8,6 +10,7 @@ import { translate } from '../../../platform/i18n';
 import { PreviewSourceField } from './source-field';
 import {
   isGalleryMediaItem,
+  isGalleryRemoteItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
   isGalleryVideoProjectItem,
@@ -23,7 +26,13 @@ import {
   PreviewProjectUsage,
   PreviewTagEditor,
 } from './sidebar-sections';
-import { FOLDER_LABELS, formatDate, getGalleryFolderIcon, getGalleryItemFolder } from '../ui';
+import {
+  FOLDER_LABELS,
+  formatDate,
+  getGalleryFolderIcon,
+  getGalleryItemFolder,
+  MediaThumb,
+} from '../ui';
 
 function isMetadataEditable(item: PreviewPanelProps['item']) {
   return (
@@ -178,6 +187,36 @@ function PreviewFilenameField(
 function PreviewPanelSidebar(
   props: PreviewPanelProps & { onReview?: () => void; pending?: boolean }
 ) {
+  if (isGalleryRemoteItem(props.item))
+    return (
+      <aside
+        data-ui="gallery.preview.inspector"
+        className={[
+          'flex min-h-0 w-full flex-col overflow-y-auto border-l p-3',
+          'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
+          'text-[var(--sniptale-color-text-primary)]',
+        ].join(' ')}
+      >
+        <PreviewPanelHeader {...props} />
+        <div className="mt-4 space-y-4">
+          <h3 className="break-words text-sm">{props.item.filename}</h3>
+          <p className="text-xs">
+            {translate(
+              props.item.remote.conflict
+                ? 'gallery.app.remoteConflict'
+                : props.item.remote.unavailable
+                  ? 'gallery.app.remoteUnavailable'
+                  : 'gallery.app.remoteOnly'
+            )}
+          </p>
+          <PreviewMetadataCards item={props.item} />
+          <RemoteProjectActions
+            key={JSON.stringify(props.item.remote.selection)}
+            item={props.item}
+          />
+        </div>
+      </aside>
+    );
   return (
     <aside
       data-ui="gallery.preview.inspector"
@@ -187,40 +226,41 @@ function PreviewPanelSidebar(
       <PreviewPanelHeader {...props} />
       <div
         data-ui="gallery.preview.inspectorContent"
-        inert={props.pending}
-        aria-busy={props.pending}
         className="mt-4 min-h-0 space-y-4 overflow-y-auto"
       >
-        <PreviewFilenameField
-          filenameDraft={props.filenameDraft}
-          item={props.item}
-          onFilenameChange={props.onFilenameChange}
-          trashMode={Boolean(props.trashMode)}
-        />
-        <UnavailableProjectNotice item={props.item} />
-        <details key={`metadata:${props.item.id}`} className="gallery-preview-disclosure" open>
-          <summary>
-            <Info size={14} aria-hidden="true" />
-            <span>{translate('gallery.preview.properties')}</span>
-            <ChevronDown size={14} aria-hidden="true" />
-          </summary>
-          <div className="gallery-preview-disclosure-body">
-            <PreviewMetadataCards item={props.item} />
-            <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
-          </div>
-        </details>
-        <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
-        <PreviewTagEditor
-          {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
-          item={props.item}
-          trashMode={Boolean(props.trashMode)}
-          tagDraft={props.tagDraft}
-          tagDrafts={props.tagDrafts}
-          onTagDraftChange={props.onTagDraftChange}
-          onRemoveTag={props.onRemoveTag}
-          onAddTag={props.onAddTag}
-        />
-        <PreviewActions key={props.item.id} {...props} />
+        <div inert={props.pending} aria-busy={props.pending} className="space-y-4">
+          <PreviewFilenameField
+            filenameDraft={props.filenameDraft}
+            item={props.item}
+            onFilenameChange={props.onFilenameChange}
+            trashMode={Boolean(props.trashMode)}
+          />
+          <UnavailableProjectNotice item={props.item} />
+          <details key={`metadata:${props.item.id}`} className="gallery-preview-disclosure" open>
+            <summary>
+              <Info size={14} aria-hidden="true" />
+              <span>{translate('gallery.preview.properties')}</span>
+              <ChevronDown size={14} aria-hidden="true" />
+            </summary>
+            <div className="gallery-preview-disclosure-body">
+              <PreviewMetadataCards item={props.item} />
+              <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
+            </div>
+          </details>
+          <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
+          <PreviewTagEditor
+            {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
+            item={props.item}
+            trashMode={Boolean(props.trashMode)}
+            tagDraft={props.tagDraft}
+            tagDrafts={props.tagDrafts}
+            onTagDraftChange={props.onTagDraftChange}
+            onRemoveTag={props.onRemoveTag}
+            onAddTag={props.onAddTag}
+          />
+          <PreviewActions key={props.item.id} {...props} />
+        </div>
+        {!props.trashMode ? <NativeCacheActions item={props.item} /> : null}
       </div>
     </aside>
   );
@@ -446,18 +486,26 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
             text-[var(--sniptale-color-text-primary)] shadow-sm
             ${inspectorCollapsed ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_360px]'}`}
         >
-          <PreviewMedia
-            onEdit={props.onEdit}
-            trashMode={Boolean(props.trashMode)}
-            item={item}
-            previewUrl={previewUrl}
-            previewLoadStatus={props.previewLoadStatus}
-            previewRequestRevision={props.previewRequestRevision}
-            onPresented={handlePresented}
-            onVideoDuration={onVideoDuration}
-            inspectorCollapsed={inspectorCollapsed}
-            {...(props.navigation ? { navigation: props.navigation } : {})}
-          />
+          {isGalleryRemoteItem(item) ? (
+            <div className="grid min-h-0 min-w-0 place-items-center overflow-hidden p-4">
+              <div className="h-full max-h-[360px] w-full max-w-[640px]">
+                <MediaThumb item={item} fit="contain" />
+              </div>
+            </div>
+          ) : (
+            <PreviewMedia
+              onEdit={props.onEdit}
+              trashMode={Boolean(props.trashMode)}
+              item={item}
+              previewUrl={previewUrl}
+              previewLoadStatus={props.previewLoadStatus}
+              previewRequestRevision={props.previewRequestRevision}
+              onPresented={handlePresented}
+              onVideoDuration={onVideoDuration}
+              inspectorCollapsed={inspectorCollapsed}
+              {...(props.navigation ? { navigation: props.navigation } : {})}
+            />
+          )}
           {inspectorCollapsed ? null : (
             <PreviewPanelSidebar
               {...panel}

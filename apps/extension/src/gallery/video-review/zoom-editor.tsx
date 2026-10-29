@@ -8,7 +8,7 @@ import {
   quickEditFocusType,
 } from '../../features/video/review/advanced/focus-layout';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import type {
   QuickEditAdvancedState,
   QuickEditZoomRegion,
@@ -391,20 +391,57 @@ function duplicateFocus(args: ZoomEditorArgs, id: string): string | null {
   return copy.id;
 }
 
+type FocusDraft = { id: string; patch: QuickEditZoomRegionPatch; base: string } | null;
+
+function createFocusPreview() {
+  let draft: FocusDraft = null;
+  const listeners = new Set<() => void>();
+  return {
+    read: () => draft,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    write(value: FocusDraft) {
+      if (draft === value) return;
+      draft = value;
+      for (const listener of listeners) listener();
+    },
+  };
+}
+
+/** React snapshots let local controls interrupt full-scene draft rendering. */
+export function useReviewZoomPreview<
+  T extends Pick<ReturnType<typeof useReviewZoomEditor>, 'previewChanges' | 'previewRegion'>,
+>(zoom: T): T & { previewing: boolean } {
+  const { read, subscribe } = zoom.previewChanges;
+  const [draft, setDraft] = useState(read);
+  useLayoutEffect(() => {
+    const update = () => setDraft(read());
+    const unsubscribe = subscribe(update);
+    update();
+    return unsubscribe;
+  }, [read, subscribe]);
+  return {
+    ...zoom,
+    previewing: draft !== null,
+    previewRegion: (region: QuickEditZoomRegion) => zoom.previewRegion(region, draft),
+  };
+}
+
 /** One zoom-editing workflow owner: region selection, updates, and the stage focus overlay. */
 export function useReviewZoomEditor(args: ZoomEditorArgs) {
-  const [draft, setDraft] = useState<{
-    id: string;
-    patch: QuickEditZoomRegionPatch;
-    base: string;
-  } | null>(null);
+  const [previewChanges] = useState(createFocusPreview);
+  const setDraft = previewChanges.write;
   const [insertionType, setInsertionType] = useState<ReviewFocusType>('zoom');
   const [drawing, setDrawing] = useState(false);
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const selection = args.selection === undefined ? localSelection : args.selection;
   useEffect(() => {
     setDraft(null);
-  }, [selection]);
+  }, [selection, setDraft]);
   const setSelection = (id: string | null) => {
     if (args.selection === undefined) setLocalSelection(id);
     args.onSelectionChange?.(id);
@@ -442,13 +479,17 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
         ? { id, patch, base: focusRevision(args.zoom.regions.find((item) => item.id === id)) }
         : null
     );
-  const previewRegion = (region: QuickEditZoomRegion): QuickEditZoomRegion =>
-    draft &&
-    draft.id === selection &&
-    draft.id === region.id &&
-    draft.base === focusRevision(region)
+  const previewRegion = (
+    region: QuickEditZoomRegion,
+    draft = previewChanges.read()
+  ): QuickEditZoomRegion => {
+    return draft &&
+      draft.id === selection &&
+      draft.id === region.id &&
+      draft.base === focusRevision(region)
       ? updateQuickEditZoomRegion([region], region.id, draft.patch)[0]!
       : region;
+  };
   const commitDrag = (
     id: string,
     range: { start: number; end: number },
@@ -520,6 +561,7 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
       ),
     preview,
     previewRegion,
+    previewChanges: { read: previewChanges.read, subscribe: previewChanges.subscribe },
     toggleEnabled: () =>
       args.setEnabled
         ? args.setEnabled(!args.zoom.enabled)

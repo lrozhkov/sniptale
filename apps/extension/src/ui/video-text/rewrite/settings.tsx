@@ -1,6 +1,6 @@
 import { LoaderCircle } from 'lucide-react';
 import type { ReviewTextContext } from '../../../contracts/ai/review-text';
-import type { AIModelSelectionBootstrapPayload } from '../../../contracts/messaging/ai-settings-runtime';
+import type { AIModelCatalogPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import { InspectorParameterRow } from '../../compact-inspector-controls/layout';
 import { ToggleField, SegmentedRow, TextareaField } from '../../compact-inspector-controls';
 import { AIModelSelector } from '../../../features/ai/model-selector';
@@ -15,22 +15,31 @@ export type TextRewriteOptions = Pick<
 /** Shared settings receive explicit values; runtime adapters retain all request authority. */
 export function TextRewriteSettings(props: {
   options: TextRewriteOptions;
-  catalog: AIModelSelectionBootstrapPayload | null;
+  catalog: AIModelCatalogPayload | null;
   modelId: string;
   locked: boolean;
   wholeDocument: boolean;
   windowFallback?: { start: number; end: number } | undefined;
   resultDuration: number;
   catalogError: boolean;
+  selectionPending: boolean;
+  selectionUnavailable: boolean;
+  unavailableModelName?: string | null | undefined;
+  selectionFailed: boolean;
   onOptionsChange(change: Partial<TextRewriteOptions>): void;
   onModelChange(id: string): void;
   onReloadModels(): void;
 }) {
-  const { options, locked, wholeDocument } = props;
+  const { options, wholeDocument } = props;
+  const locked = props.locked || props.selectionPending;
   const window = options.window ?? props.windowFallback;
   const patch = props.onOptionsChange;
   return (
-    <fieldset disabled={locked} className="min-w-0 sniptale-parameter-stack">
+    <fieldset
+      disabled={locked}
+      aria-busy={props.selectionPending || undefined}
+      className="min-w-0 sniptale-parameter-stack"
+    >
       <InspectorParameterRow stacked label={translate('gallery.videoReview.textRewriteModel')}>
         {props.catalog ? (
           <AIModelSelector
@@ -50,6 +59,27 @@ export function TextRewriteSettings(props: {
           )
         )}
       </InspectorParameterRow>
+      {props.selectionPending && (
+        <p role="status" className="sr-only">
+          {translate('common.states.saving')}
+        </p>
+      )}
+      {props.selectionUnavailable && (
+        <p role="status" className="text-xs">
+          <bdi className="[overflow-wrap:anywhere]">{props.unavailableModelName}</bdi>{' '}
+          {translate('aiModal.modelSelectionUnavailable')}
+        </p>
+      )}
+      {props.selectionFailed && (
+        <p role="alert" className="text-xs">
+          {translate('aiModal.modelSelectionSaveFailed')}
+        </p>
+      )}
+      {props.catalogError && (
+        <p role="alert" className="text-xs">
+          {translate('aiModal.modelCatalogFailed')}
+        </p>
+      )}
       {((!props.catalog && props.catalogError) || props.catalog?.models.length === 0) && (
         <TextRewriteButton
           label={translate('gallery.videoReview.speechReloadModels')}

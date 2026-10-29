@@ -9,11 +9,17 @@ export function ReviewBorderOverlay(props: {
   clip?: Parameters<typeof drawSceneBorders>[3];
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const painted = useRef<{ canvas: HTMLCanvasElement; key: string } | null>(null);
   useEffect(() => {
-    const context = ref.current?.getContext('2d');
-    if (!context || !props.frames.length) return;
+    const canvas = ref.current;
+    if (!canvas || !props.frames.length) return;
+    const key = JSON.stringify([props.output, props.frames, props.clip]);
+    if (painted.current?.canvas === canvas && painted.current.key === key) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
     context.clearRect(0, 0, props.output.width, props.output.height);
     drawSceneBorders(context, props.output, props.frames, props.clip);
+    painted.current = { canvas, key };
   }, [props.output, props.frames, props.clip]);
   return props.frames.length ? (
     <canvas

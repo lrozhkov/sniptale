@@ -117,7 +117,10 @@ export type ContentAppLayoutToolbarProps = {
     value: boolean,
     contentIntentSource?: ContentPrivilegedActionIntentSource
   ) => void | Promise<boolean>;
-  setPinnedToolbarVisible: (visible: boolean) => void;
+  setPinnedToolbarVisible: (
+    visible: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => void;
   setTimerDelay: (delay: number) => void;
   setVideoRecordingMode?: (enabled: boolean) => void;
   timerDelay: number;

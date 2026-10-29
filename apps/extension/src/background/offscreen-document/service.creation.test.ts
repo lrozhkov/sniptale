@@ -163,7 +163,7 @@ it('recreates a reused context whose readiness probe reports bootstrap failure',
   expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
-    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA', 'BLOBS'],
     justification: 'Recover failed document',
   });
 });
@@ -268,7 +268,7 @@ it('creates a new offscreen document when none exists yet', async () => {
 
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
-    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA', 'BLOBS'],
     justification: 'Custom recording reason',
   });
   expect(loggerLogMock).toHaveBeenCalledWith('Created offscreen document');
@@ -294,7 +294,7 @@ it('shares one creation flight across concurrent offscreen owners', async () => 
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
-    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA', 'BLOBS'],
     justification: 'recording',
   });
 });
@@ -341,7 +341,7 @@ it('creates a document after logging a failed runtime-context lookup', async () 
   );
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
-    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA', 'BLOBS'],
     justification: 'Run extension-owned offscreen media work',
   });
 });
@@ -393,7 +393,7 @@ it('shares a creation rejection and admits a new generation after it settles', a
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledTimes(2);
   expect(browserOffscreenCreateDocumentMock).toHaveBeenLastCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
-    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA', 'BLOBS'],
     justification: 'retry',
   });
 });

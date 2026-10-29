@@ -12,7 +12,6 @@ export type LoadedAiProvidersRuntimeData = [
   AIModel[],
   AIProvider[],
   AIModel[],
-  string | null,
   string,
   string,
   boolean,
@@ -27,12 +26,12 @@ export async function loadAiProvidersRuntimeData() {
     filterChromeAiSelectorEntries(selectionBootstrap.providers, (provider) =>
       isChromeAiProviderId(provider.id)
     ),
-    filterChromeAiSelectorEntries(selectionBootstrap.models, (model) =>
-      isChromeAiModelId(model.id)
+    filterChromeAiSelectorEntries(
+      selectionBootstrap.models,
+      (model) => isChromeAiModelId(model.id) || model.source === 'catalog'
     ),
     selectionBootstrap.providers,
     selectionBootstrap.models,
-    selectionBootstrap.defaultModelId,
     selectionBootstrap.globalSystemPrompt,
     runtimeData.scenarioEditorSystemPrompt,
     selectionBootstrap.chromeAiEnabled,

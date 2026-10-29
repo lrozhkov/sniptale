@@ -619,3 +619,34 @@ it.each([5, 31])(
     expect(event).toEqual(snapshot);
   }
 );
+
+it('projects a burst of browser scroll observations as one history interval per family', () => {
+  const scroll = (id: string, time: number, eventType: string): RecordingActionEvent => ({
+    id,
+    kind: 'SCROLL',
+    time,
+    duration: 0.45,
+    point: null,
+    label: eventType,
+    preset: 'SCROLL_EMPHASIS',
+    data: { eventType, captureSegment: 0, observationClockId: 'clock' },
+  });
+  const actionEvents = [
+    scroll('wheel', 1, 'wheel'),
+    ...Array.from({ length: 50 }, (_, i) => scroll(`scroll-${i}`, 1.02 + i * 0.016, 'scroll')),
+    scroll('wheel-2', 1.2, 'wheel'),
+    scroll('later', 5, 'scroll'),
+  ];
+  const input = { actionEvents, signals: [], cursorTrack: null };
+  const snapshot = structuredClone(input);
+  const { markers } = projectReviewTelemetry(input, 5.2);
+  expect(markers.map((marker) => [marker.ref.id, marker.eventType])).toEqual([
+    ['wheel', 'WHEEL'],
+    ['scroll-0', 'SCROLL'],
+    ['later', 'SCROLL'],
+  ]);
+  expect(markers[0]).toMatchObject({ start: 1, end: 1.65 });
+  expect(markers[1]?.end).toBeCloseTo(1.02 + 49 * 0.016 + 0.45);
+  expect(markers[2]).toMatchObject({ start: 5, end: 5.2 });
+  expect(input).toEqual(snapshot);
+});

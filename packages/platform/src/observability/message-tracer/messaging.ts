@@ -145,11 +145,13 @@ export function recordMessageFailure(error: unknown, tracker: SendTracker | null
   const start = tracker.sendTimestamps.get(correlationId);
   tracker.sendTimestamps.delete(correlationId);
   const isVoiceInputFailure = isVoiceInputTraceMessageType(messageType);
-  const failureCode = isVoiceInputFailure
-    ? VOICE_INPUT_TRACE_FAILURE_CODE
-    : isQuickActionAppearanceTraceMessageType(messageType)
-      ? QUICK_ACTION_APPEARANCE_TRACE_FAILURE_CODE
-      : undefined;
+  const failureCode = isSyncProductTrace(messageType)
+    ? 'sync-product-failed'
+    : isVoiceInputFailure
+      ? VOICE_INPUT_TRACE_FAILURE_CODE
+      : isQuickActionAppearanceTraceMessageType(messageType)
+        ? QUICK_ACTION_APPEARANCE_TRACE_FAILURE_CODE
+        : undefined;
   const traceError = failureCode ?? sanitizeTraceErrorText(error, config);
 
   const sanitizedPayload = sanitizeValue(
@@ -179,7 +181,12 @@ function extractMessageType(message: unknown): string | undefined {
   return undefined;
 }
 
+function isSyncProductTrace(messageType: string): boolean {
+  return messageType === 'SYNC_PRODUCT_COMMAND' || messageType === 'OFFSCREEN_SYNC_PRODUCT_COMMAND';
+}
+
 function sanitizeMessageTracePayload(messageType: string, payload: unknown): unknown {
+  if (isSyncProductTrace(messageType)) return { code: 'sync-product-payload-omitted' };
   return sanitizeSettingsTransferTracePayload(
     messageType,
     sanitizeRuntimeBlobTracePayload(

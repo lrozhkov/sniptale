@@ -162,6 +162,7 @@ export function reviewCameraNominalDescriptor(region: QuickEditZoomRegion) {
     perspective: region.perspective,
     dormant: region.dormant,
     spotlight: !!region.spotlight,
+    border: !!region.border,
   };
 }
 

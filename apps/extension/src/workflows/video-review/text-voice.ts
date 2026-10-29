@@ -1,3 +1,7 @@
+import {
+  parseVoiceProviderSelection,
+  type VoiceProviderSelection,
+} from '@sniptale/runtime-contracts/voice-input';
 import { readPreparedReviewSpeechAudio } from './speech-publication';
 import {
   AUDIO_STAGING_TTL_MS,
@@ -70,12 +74,14 @@ export async function generateReviewTextVoice(
   fragmentId: string,
   selectedProfile: ReviewSpeechProfile,
   signal: AbortSignal,
-  approvedProviderId: string,
+  approvedSelection: VoiceProviderSelection,
   prepared?: Awaited<ReturnType<typeof prepareReviewTextVoiceBatch>>[number]
 ): Promise<ReviewTextVoicePreview> {
   signal.throwIfAborted();
   const profile = parseReviewSpeechProfile(selectedProfile);
-  if (!profile || !approvedProviderId?.trim()) throw new Error('invalid-request');
+  const approved = parseVoiceProviderSelection(approvedSelection);
+  if (!profile || !approved?.approvedProviderId.trim() || profile.modelId !== approved.modelId)
+    throw new Error('invalid-request');
   const { fragment, scope, geometry, resultStart, resultDuration, expiresAt } =
     prepared ?? (await prepareReviewTextVoiceBatch(session, [fragmentId], signal))[0]!;
   if (
@@ -92,7 +98,8 @@ export async function generateReviewTextVoice(
   const result = await runReviewSpeechJob(
     {
       type: 'start',
-      approvedProviderId,
+      approvedProviderId: approved.approvedProviderId,
+      approvedSelection: approved,
       requestId: crypto.randomUUID(),
       operation: 'speech',
       modelId,

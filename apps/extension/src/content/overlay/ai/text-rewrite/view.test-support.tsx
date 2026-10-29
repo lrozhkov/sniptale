@@ -10,12 +10,11 @@ import {
   type PagePreparationHistoryBridge,
 } from '../../../parser/page-preparation/history';
 import { initializeContentUiRoots } from '../../../platform/dom-host';
-import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { TextRewriteControl } from './view';
 import { installEditableKeydownBridge } from '../../../runtime/ui-activation-bridge/targets';
 
 const trusted = vi.hoisted(() => new WeakSet<Event>());
-const mocks = vi.hoisted(() => ({ request: vi.fn(), models: vi.fn() }));
+const mocks = vi.hoisted(() => ({ request: vi.fn(), models: vi.fn(), remember: vi.fn() }));
 vi.mock('../../../../features/prompt-templates/hooks/use-prompt-templates', () => ({
   usePromptTemplates: () => ({
     isLoading: false,
@@ -28,7 +27,8 @@ vi.mock('../../../../features/prompt-templates/hooks/use-prompt-templates', () =
 vi.mock('./request', () => ({ requestTextReplacement: mocks.request }));
 vi.mock('../../../../workflows/ai-settings/query', async (original) => ({
   ...(await original<typeof import('../../../../workflows/ai-settings/query')>()),
-  requestAIModelSelectionBootstrap: mocks.models,
+  requestAIScenarioModelSelection: mocks.models,
+  rememberAIScenarioModelSelection: mocks.remember,
 }));
 vi.mock('../../../../platform/i18n', async (original) => {
   const actual = await original<typeof import('../../../../platform/i18n')>();
@@ -63,28 +63,6 @@ vi.mock('../../../../composition/persistence/settings', async (original) => ({
   subscribeToVoiceInputPreferencesChanges: vi.fn(() => vi.fn()),
 }));
 vi.mock('../../../selection/locker', () => ({ setNavigationInputShieldSuspended: vi.fn() }));
-vi.mock('../../../../features/ai/model-selector', () => ({
-  AIModelSelector: (props: {
-    models: Array<{ id: string; displayName: string }>;
-    selectedModelId: string | null;
-    disabled?: boolean;
-    onSelect(id: string | null): void;
-  }) => (
-    <select
-      data-ui="test.ai-model"
-      value={props.selectedModelId ?? ''}
-      disabled={props.disabled}
-      onChange={(event) => props.onSelect(event.currentTarget.value || null)}
-    >
-      <option value="">Choose a model</option>
-      {props.models.map((model) => (
-        <option key={model.id} value={model.id}>
-          {model.displayName}
-        </option>
-      ))}
-    </select>
-  ),
-}));
 export let root: Root;
 export let shadow: ShadowRoot;
 let cleanupKeyboardBridge: () => void;
@@ -129,15 +107,7 @@ export function ui<T extends HTMLElement = HTMLElement>(name: string): T {
   return element;
 }
 export async function click(element: HTMLElement, admitted = true) {
-  const event = createBridgedMouseEvent('click', {
-    button: 0,
-    buttons: 0,
-    clientX: 20,
-    clientY: 30,
-    ctrlKey: false,
-    metaKey: false,
-    shiftKey: false,
-  });
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true, composed: false });
   if (admitted) trusted.add(event);
   await act(async () => element.dispatchEvent(event));
 }
@@ -159,16 +129,26 @@ export async function submit() {
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.request.mockReset().mockResolvedValue('Edited source');
+  mocks.remember.mockReset().mockResolvedValue(undefined);
   mocks.models.mockReset().mockResolvedValue({
-    chromeAiEnabled: false,
-    defaultModelId: 'model',
-    globalSystemPrompt: '',
-    models: [{ id: 'model', providerId: 'provider', modelCode: 'code', displayName: 'Text model' }],
+    scenario: 'page-edit',
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
+    models: [
+      { id: 'model', providerId: 'provider', modelCode: 'code', displayName: 'Text model' },
+      {
+        id: 'other',
+        providerId: 'provider',
+        modelCode: 'other-code',
+        displayName: 'Other text model',
+      },
+    ],
     providers: [
       {
         id: 'provider',
         name: 'Provider',
-        connectionType: 'openai-compatible',
+        connectionType: 'neuraldeep',
+        incarnation: 'page-provider-incarnation',
         createdAt: 1,
         hasStoredApiKey: true,
         destinationKind: 'external',

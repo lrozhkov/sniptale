@@ -19,6 +19,7 @@ import { PopoverCheckIcon } from '../../icons/icons';
 type FullPageMenuProps = {
   quickActions?: React.ReactNode;
   imageParameters?: React.ReactNode;
+  imageSummary?: string;
   compactMenus: boolean;
   currentViewport: { height: number; width: number } | null;
   disabled: boolean;
@@ -115,6 +116,9 @@ function BooleanPreferenceItem(props: {
 }
 
 export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
+  const floatingLabel = FLOATING_OPTIONS.find(
+    (option) => option.value === props.preferences.floatingElements
+  )!.translationKey;
   return (
     <ScreenshotCaptureSplitButton
       compactMenus={props.compactMenus}
@@ -124,6 +128,25 @@ export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
       onPrimaryClick={props.onPrimaryClick}
       toolbarMenuState={props.toolbarMenuState}
       quickActions={props.quickActions}
+      summary={translate('content.toolbar.captureFullParametersSummary')
+        .replace('{image}', props.imageSummary ?? '')
+        .replace(
+          '{lazy}',
+          translate(
+            props.preferences.preloadLazyContent
+              ? 'content.toolbar.captureOptionOn'
+              : 'content.toolbar.captureOptionOff'
+          )
+        )
+        .replace(
+          '{motion}',
+          translate(
+            props.preferences.freezeMotion
+              ? 'content.toolbar.captureOptionOn'
+              : 'content.toolbar.captureOptionOff'
+          )
+        )
+        .replace('{floating}', translate(`content.toolbar.${floatingLabel}`))}
     >
       {props.imageParameters}
       <BooleanPreferenceItem

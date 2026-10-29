@@ -20,6 +20,7 @@ import { useInteractiveFrameViewState } from './view-state';
 function cloneFrameData(frame: FrameData): FrameData {
   return {
     id: frame.id,
+    ...(frame.annotationKind === undefined ? {} : { annotationKind: frame.annotationKind }),
     x: frame.x,
     y: frame.y,
     width: frame.width,

@@ -43,6 +43,12 @@ vi.mock('../../composition/persistence/assets/audio-staging', () => ({
 vi.mock('../../composition/persistence/projects', () => ({ prepareProjectAsset: mocks.prepare }));
 vi.mock('../../features/media-hub/events', () => ({ publishMediaHubLibraryChanged: mocks.event }));
 const profile = { modelId: 'model', voiceId: 'voice', responseFormat: 'mp3' as const };
+const approvedSelection = {
+  modelId: 'model',
+  approvedProviderId: 'provider',
+  approvedModelCode: 'speech',
+  approvedDestination: `sha256:${'a'.repeat(64)}`,
+};
 const signal = () => new AbortController().signal;
 let decodedDuration = 2;
 
@@ -194,7 +200,13 @@ it('saves the full paused workspace before dispatch, retaining autosave off and 
     expect(request.scope).not.toHaveProperty('assetId');
     return { type: 'audio', staged: { id: 'staged', mimeType: 'audio/mpeg', size: 5 } };
   });
-  const preview = await generateReviewTextVoice(session, 'text', profile, signal(), 'provider');
+  const preview = await generateReviewTextVoice(
+    session,
+    'text',
+    profile,
+    signal(),
+    approvedSelection
+  );
   expect(saveSnapshot).toHaveBeenCalledWith(
     expect.objectContaining({
       draft: expect.objectContaining({
@@ -210,7 +222,7 @@ it('saves the full paused workspace before dispatch, retaining autosave off and 
 it('does not save or request by opening a workflow, and avoids a write for already durable text', async () => {
   const { session, saveSnapshot } = fixture();
   expect(mocks.job).not.toHaveBeenCalled();
-  await generateReviewTextVoice(session, 'text', profile, signal(), 'provider');
+  await generateReviewTextVoice(session, 'text', profile, signal(), approvedSelection);
   expect(saveSnapshot).not.toHaveBeenCalled();
   expect(mocks.job).toHaveBeenCalledOnce();
 });
@@ -221,7 +233,7 @@ it('refuses a later batch item whose captured text changed without implicitly sa
   const prepared = await prepareReviewTextVoiceBatch(session, ['text'], signal());
   await editText('Changed while another request was running');
   await expect(
-    generateReviewTextVoice(session, 'text', profile, signal(), 'provider', prepared[0])
+    generateReviewTextVoice(session, 'text', profile, signal(), approvedSelection, prepared[0])
   ).rejects.toThrow('stale');
   expect(saveSnapshot).not.toHaveBeenCalled();
   expect(mocks.job).not.toHaveBeenCalled();
@@ -236,7 +248,7 @@ it.each(['conflict', 'storage'])(
     await editText('Unsaved text');
     saveSnapshot.mockRejectedValueOnce({ code });
     await expect(
-      generateReviewTextVoice(session, 'text', profile, signal(), 'provider')
+      generateReviewTextVoice(session, 'text', profile, signal(), approvedSelection)
     ).rejects.toEqual({
       code,
     });
@@ -263,7 +275,7 @@ it('cancel during Save prevents POST while preserving the explicit successful Sa
     return persist(args);
   });
   await expect(
-    generateReviewTextVoice(session, 'text', profile, controller.signal, 'provider')
+    generateReviewTextVoice(session, 'text', profile, controller.signal, approvedSelection)
   ).rejects.toThrow();
   expect(mocks.job).not.toHaveBeenCalled();
   expect(session.getSnapshot()).toMatchObject({ dirty: false, autosaveEnabled: false });
@@ -279,7 +291,7 @@ it('discards late output when text changes or cancellation occurs during decodin
       return decodedDuration;
     });
     await expect(
-      generateReviewTextVoice(session, 'text', profile, controller.signal, 'provider')
+      generateReviewTextVoice(session, 'text', profile, controller.signal, approvedSelection)
     ).rejects.toThrow();
   }
   expect(mocks.discard).toHaveBeenCalledTimes(2);
@@ -290,7 +302,7 @@ it('refuses output beyond the project without durable staging or trimming the te
   const { session } = fixture();
   decodedDuration = 10;
   await expect(
-    generateReviewTextVoice(session, 'text', profile, signal(), 'provider')
+    generateReviewTextVoice(session, 'text', profile, signal(), approvedSelection)
   ).rejects.toThrow('duration');
   expect(mocks.discard).toHaveBeenCalledOnce();
   expect(mocks.prepare).not.toHaveBeenCalled();
@@ -302,7 +314,13 @@ it.each([0.5, 3])(
   async (duration) => {
     const { session, commit } = fixture();
     decodedDuration = duration;
-    const preview = await generateReviewTextVoice(session, 'text', profile, signal(), 'provider');
+    const preview = await generateReviewTextVoice(
+      session,
+      'text',
+      profile,
+      signal(),
+      approvedSelection
+    );
     const asset = { id: 'take', protect: vi.fn(), publish: vi.fn(), cancel: vi.fn() };
     mocks.prepare.mockResolvedValue(asset);
     await applyReviewTextVoice(session, preview, signal(), {
@@ -349,7 +367,13 @@ it.each([0.5, 3])(
 
 it('retains accepted bytes and retries publication without paid generation or duplicate clips', async () => {
   const { session, commit } = fixture();
-  const preview = await generateReviewTextVoice(session, 'text', profile, signal(), 'provider');
+  const preview = await generateReviewTextVoice(
+    session,
+    'text',
+    profile,
+    signal(),
+    approvedSelection
+  );
   const asset = {
     id: 'take',
     protect: vi.fn(),
@@ -368,7 +392,13 @@ it('retains accepted bytes and retries publication without paid generation or du
 
 it('refuses requested source mute when capability is missing before adopting generated bytes', async () => {
   const { session, commit } = fixture();
-  const preview = await generateReviewTextVoice(session, 'text', profile, signal(), 'provider');
+  const preview = await generateReviewTextVoice(
+    session,
+    'text',
+    profile,
+    signal(),
+    approvedSelection
+  );
   await expect(
     applyReviewTextVoice(session, preview, signal(), { muteSource: true })
   ).rejects.toThrow('invalid-request');
@@ -381,7 +411,13 @@ it.each(['cleanup', 'retry'])(
   'preserves a history-only accepted take after publication failure during %s',
   async (action) => {
     const { session, commit } = fixture();
-    const preview = await generateReviewTextVoice(session, 'text', profile, signal(), 'provider');
+    const preview = await generateReviewTextVoice(
+      session,
+      'text',
+      profile,
+      signal(),
+      approvedSelection
+    );
     const asset = {
       id: 'take',
       protect: vi.fn(),
@@ -414,7 +450,13 @@ it.each(['cleanup', 'retry'])(
 
 it('rejects stale apply before preparing private bytes and cleans up the disposable output', async () => {
   const { session, editText } = fixture();
-  const preview = await generateReviewTextVoice(session, 'text', profile, signal(), 'provider');
+  const preview = await generateReviewTextVoice(
+    session,
+    'text',
+    profile,
+    signal(),
+    approvedSelection
+  );
   await editText('New text');
   await expect(applyReviewTextVoice(session, preview, signal())).rejects.toThrow('stale');
   expect(mocks.prepare).not.toHaveBeenCalled();
@@ -441,7 +483,13 @@ it('places source-authored narration through Speed while keeping its natural pla
       audio: 'speed',
     },
   });
-  const preview = await generateReviewTextVoice(session, 'text', profile, signal(), 'provider');
+  const preview = await generateReviewTextVoice(
+    session,
+    'text',
+    profile,
+    signal(),
+    approvedSelection
+  );
   expect(preview.resultStart).toBe(0.5);
   expect(preview.scope.timeDomain).toBe('source');
   mocks.prepare.mockResolvedValue({
@@ -477,7 +525,7 @@ it('refuses a failed durable history Save before a new paid request instead of c
     })
   ).rejects.toThrow('storage');
   await expect(
-    generateReviewTextVoice(session, 'text', profile, signal(), 'provider')
+    generateReviewTextVoice(session, 'text', profile, signal(), approvedSelection)
   ).rejects.toThrow('Review storage');
   expect(mocks.job).not.toHaveBeenCalled();
   expect(session.getSnapshot().error).toBe('storage');
@@ -492,7 +540,7 @@ it('keeps PCM in the take profile while publishing an ordinary WAV filename and 
     staged: { id: '12345678-1234-4234-8234-123456789abc', mimeType: 'audio/wav', size: 36_044 },
   });
   mocks.read.mockResolvedValueOnce(new Blob([new Uint8Array(36_044)], { type: 'audio/wav' }));
-  const preview = await generateReviewTextVoice(session, 'text', pcm, signal(), 'provider');
+  const preview = await generateReviewTextVoice(session, 'text', pcm, signal(), approvedSelection);
   const asset = { id: 'pcm-take', protect: vi.fn(), publish: vi.fn(), cancel: vi.fn() };
   mocks.prepare.mockResolvedValueOnce(asset);
   await applyReviewTextVoice(session, preview, signal());
@@ -506,4 +554,47 @@ it('keeps PCM in the take profile while publishing an ordinary WAV filename and 
   await session.history('redo');
   expect(session.getSnapshot().document.advancedContent.audio.voiceover[0]).toEqual(clip);
   await cleanupReviewTextVoicePreview(session, preview);
+});
+
+it('retains the approved narration destination during a deferred workspace Save', async () => {
+  const { session, saveSnapshot, editText } = fixture();
+  session.setAutosaveEnabled(false);
+  await editText('Unsaved narration');
+  const selection = { ...approvedSelection };
+  let release!: () => void;
+  let entered!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const save = saveSnapshot.getMockImplementation()!;
+  saveSnapshot.mockImplementationOnce(async (...args) => {
+    entered();
+    await hold;
+    return save(...args);
+  });
+  const pending = generateReviewTextVoice(session, 'text', profile, signal(), selection);
+  await waiting;
+  expect(mocks.job).not.toHaveBeenCalled();
+  selection.approvedDestination = `sha256:${'b'.repeat(64)}`;
+  selection.approvedModelCode = 'replacement-code';
+  release();
+  await pending;
+  expect(mocks.job).toHaveBeenCalledWith(
+    expect.objectContaining({ approvedSelection }),
+    expect.anything()
+  );
+});
+it('rejects a foreign approved narration model before Save or provider work', async () => {
+  const { session, saveSnapshot } = fixture();
+  await expect(
+    generateReviewTextVoice(session, 'text', profile, signal(), {
+      ...approvedSelection,
+      modelId: 'other',
+    })
+  ).rejects.toThrow('invalid-request');
+  expect(saveSnapshot).not.toHaveBeenCalled();
+  expect(mocks.job).not.toHaveBeenCalled();
 });

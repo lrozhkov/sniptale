@@ -39,6 +39,12 @@ const basis: ScenarioNarrationBasis = {
 };
 const staged = { id: '12345678-1234-4234-8234-123456789abc', mimeType: 'audio/wav', size: 4 };
 const profile = { modelId: 'm', voiceId: 'alloy', responseFormat: 'wav' as const };
+const approvedSelection = {
+  modelId: 'm',
+  approvedProviderId: 'provider',
+  approvedModelCode: 'tts',
+  approvedDestination: `sha256:${'a'.repeat(64)}`,
+};
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.scope.mockResolvedValue(basis.text);
@@ -61,7 +67,7 @@ it('materializes a source-bound Blob and disposes only the temporary preview', a
   const preview = await generateScenarioNarration(
     basis,
     profile,
-    'provider',
+    approvedSelection,
     new AbortController().signal
   );
   expect(mocks.job).toHaveBeenCalledWith(
@@ -89,7 +95,7 @@ it('discards Scenario speech completed after cancellation', async () => {
       })
   );
   const controller = new AbortController();
-  const pending = generateScenarioNarration(basis, profile, 'provider', controller.signal);
+  const pending = generateScenarioNarration(basis, profile, approvedSelection, controller.signal);
   await vi.waitFor(() => expect(mocks.job).toHaveBeenCalledTimes(1));
   controller.abort();
   finish({ type: 'audio', staged });
@@ -100,7 +106,7 @@ it('discards Scenario speech completed after cancellation', async () => {
 it('rejects a changed saved source after decoding without admitting its preview', async () => {
   mocks.scope.mockResolvedValueOnce(basis.text).mockResolvedValueOnce('changed');
   await expect(
-    generateScenarioNarration(basis, profile, 'provider', new AbortController().signal)
+    generateScenarioNarration(basis, profile, approvedSelection, new AbortController().signal)
   ).rejects.toThrow('stale');
   expect(mocks.discard).toHaveBeenCalledWith(staged, basis.scope);
   expect(URL.createObjectURL).not.toHaveBeenCalled();
@@ -214,11 +220,16 @@ it('preserves the source and does no paid work when capture has already been can
 });
 it('requires provider approval and the unchanged saved text before a provider request', async () => {
   await expect(
-    generateScenarioNarration(basis, profile, '', new AbortController().signal)
-  ).rejects.toThrow('stale');
+    generateScenarioNarration(
+      basis,
+      profile,
+      { ...approvedSelection, approvedProviderId: '' },
+      new AbortController().signal
+    )
+  ).rejects.toThrow('invalid-request');
   mocks.scope.mockResolvedValueOnce('changed');
   await expect(
-    generateScenarioNarration(basis, profile, 'provider', new AbortController().signal)
+    generateScenarioNarration(basis, profile, approvedSelection, new AbortController().signal)
   ).rejects.toThrow('stale');
   expect(mocks.job).not.toHaveBeenCalled();
   expect(mocks.read).not.toHaveBeenCalled();
@@ -226,11 +237,11 @@ it('requires provider approval and the unchanged saved text before a provider re
 it('propagates a provider refusal and rejects transcript output without reading audio', async () => {
   mocks.job.mockRejectedValueOnce(new Error('provider-rate-limit'));
   await expect(
-    generateScenarioNarration(basis, profile, 'provider', new AbortController().signal)
+    generateScenarioNarration(basis, profile, approvedSelection, new AbortController().signal)
   ).rejects.toThrow('provider-rate-limit');
   mocks.job.mockResolvedValueOnce({ type: 'transcript', result: { text: 'wrong operation' } });
   await expect(
-    generateScenarioNarration(basis, profile, 'provider', new AbortController().signal)
+    generateScenarioNarration(basis, profile, approvedSelection, new AbortController().signal)
   ).rejects.toThrow('invalid-response');
   expect(mocks.read).not.toHaveBeenCalled();
   expect(mocks.discard).not.toHaveBeenCalled();
@@ -239,7 +250,7 @@ it('discards unreadable staged output and preserves its failure when disposal al
   mocks.read.mockRejectedValueOnce(new Error('stale staging'));
   mocks.discard.mockRejectedValueOnce(new Error('cleanup unavailable'));
   await expect(
-    generateScenarioNarration(basis, profile, 'provider', new AbortController().signal)
+    generateScenarioNarration(basis, profile, approvedSelection, new AbortController().signal)
   ).rejects.toThrow('stale staging');
   expect(mocks.decode).not.toHaveBeenCalled();
   expect(mocks.discard).toHaveBeenCalledWith(staged, basis.scope);
@@ -248,7 +259,7 @@ it('discards unreadable staged output and preserves its failure when disposal al
 it('closes the decoder and discards the temporary result after a decode failure', async () => {
   mocks.decode.mockRejectedValueOnce(new Error('invalid audio'));
   await expect(
-    generateScenarioNarration(basis, profile, 'provider', new AbortController().signal)
+    generateScenarioNarration(basis, profile, approvedSelection, new AbortController().signal)
   ).rejects.toThrow('invalid audio');
   expect(mocks.close).toHaveBeenCalledOnce();
   expect(mocks.discard).toHaveBeenCalledWith(staged, basis.scope);
@@ -259,7 +270,7 @@ it.each([0, 3600.01, Number.POSITIVE_INFINITY])(
   async (duration) => {
     mocks.decode.mockResolvedValueOnce({ duration });
     await expect(
-      generateScenarioNarration(basis, profile, 'provider', new AbortController().signal)
+      generateScenarioNarration(basis, profile, approvedSelection, new AbortController().signal)
     ).rejects.toThrow('decode-failed');
     expect(mocks.close).toHaveBeenCalledOnce();
     expect(mocks.discard).toHaveBeenCalledWith(staged, basis.scope);
@@ -275,7 +286,7 @@ it('discards output cancelled during asynchronous decoding without allocating a 
       })
   );
   const controller = new AbortController();
-  const pending = generateScenarioNarration(basis, profile, 'provider', controller.signal);
+  const pending = generateScenarioNarration(basis, profile, approvedSelection, controller.signal);
   await vi.waitFor(() => expect(mocks.decode).toHaveBeenCalledOnce());
   controller.abort();
   finish({ duration: 1 });
@@ -289,7 +300,7 @@ it('cleans temporary staging if preview URL creation fails', async () => {
     throw new Error('URL unavailable');
   });
   await expect(
-    generateScenarioNarration(basis, profile, 'provider', new AbortController().signal)
+    generateScenarioNarration(basis, profile, approvedSelection, new AbortController().signal)
   ).rejects.toThrow('URL unavailable');
   expect(mocks.discard).toHaveBeenCalledWith(staged, basis.scope);
   expect(URL.revokeObjectURL).not.toHaveBeenCalled();
@@ -298,10 +309,50 @@ it('revokes its URL before reporting a temporary staging cleanup failure', async
   const preview = await generateScenarioNarration(
     basis,
     profile,
-    'provider',
+    approvedSelection,
     new AbortController().signal
   );
   mocks.discard.mockRejectedValueOnce(new Error('cleanup unavailable'));
   await expect(cleanupScenarioNarrationPreview(preview)).rejects.toThrow('cleanup unavailable');
   expect(URL.revokeObjectURL).toHaveBeenCalledWith(preview.url);
+});
+
+it('retains approved Scenario identity and speech parameters while canonical scope admission waits', async () => {
+  let release!: (text: string) => void;
+  const hold = new Promise<string>((resolve) => {
+    release = resolve;
+  });
+  mocks.scope.mockImplementationOnce(() => hold);
+  const selectedProfile = { ...profile };
+  const approval = { ...approvedSelection };
+  const pending = generateScenarioNarration(
+    basis,
+    selectedProfile,
+    approval,
+    new AbortController().signal
+  );
+  selectedProfile.voiceId = 'changed';
+  approval.approvedDestination = `sha256:${'b'.repeat(64)}`;
+  approval.approvedModelCode = 'replacement-code';
+  release(basis.text);
+  await pending;
+  expect(mocks.job).toHaveBeenCalledWith(
+    expect.objectContaining({
+      approvedSelection,
+      profile: { voiceId: 'alloy', responseFormat: 'wav' },
+    }),
+    expect.anything()
+  );
+});
+it('refuses a foreign approved Scenario model before canonical scope admission', async () => {
+  await expect(
+    generateScenarioNarration(
+      basis,
+      profile,
+      { ...approvedSelection, modelId: 'other' },
+      new AbortController().signal
+    )
+  ).rejects.toThrow('invalid-request');
+  expect(mocks.scope).not.toHaveBeenCalled();
+  expect(mocks.job).not.toHaveBeenCalled();
 });

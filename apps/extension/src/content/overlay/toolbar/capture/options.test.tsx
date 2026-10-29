@@ -279,3 +279,45 @@ it.each(['visible', 'full'] as const)(
     expect(container?.querySelector('.sniptale-screenshot-menu')).not.toBeNull();
   }
 );
+
+it.each(['visible', 'full'] as const)(
+  'keeps %s quick actions available beside a separate parameters section',
+  async (mode) => {
+    const onTakeScreenshot = vi.fn();
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+    await act(async () =>
+      root?.render(<InteractiveCaptureButtons onTakeScreenshot={onTakeScreenshot} />)
+    );
+    act(() =>
+      container!
+        .querySelector<HTMLButtonElement>(
+          `[data-ui="content.toolbar.capture-${mode}-settings-button"]`
+        )!
+        .click()
+    );
+    const parameters = container!.querySelector<HTMLButtonElement>(
+      `[data-ui="content.toolbar.${mode}-capture-parameters"]`
+    )!;
+    expect(
+      parameters.querySelector(`[id="content.toolbar.${mode}-capture-summary"]`)
+    ).not.toBeNull();
+    expect(parameters.textContent).not.toBe('content.toolbar.captureParameters');
+    expect(parameters.querySelector('.lucide-chevron-right')).not.toBeNull();
+    expect(
+      container!.querySelector(`[data-ui="content.toolbar.${mode}-capture-parameters-panel"]`)
+    ).toBeNull();
+    const action = container!.querySelector<HTMLButtonElement>(
+      `[data-ui="content.toolbar.capture-${mode}-action.download_default"]`
+    )!;
+    expect(parameters.contains(action)).toBe(false);
+    expect(onTakeScreenshot).not.toHaveBeenCalled();
+    act(() => action.click());
+    expect(onTakeScreenshot).toHaveBeenCalledExactlyOnceWith(
+      mode,
+      { kind: 'trusted-content-event' },
+      { captureAction: 'download_default' }
+    );
+  }
+);

@@ -14,9 +14,12 @@ import './styles/timeline-items.css';
 // Инициализация трассировщика (только в dev/build режимах)
 initTracer('video-editor');
 
+const initialProjectId = new URLSearchParams(window.location.search).get('project');
 renderPageShell({
   element: (
-    <EditorResourceAdmission>
+    <EditorResourceAdmission
+      root={initialProjectId ? { rootKind: 'video-project', rootId: initialProjectId } : undefined}
+    >
       <App />
     </EditorResourceAdmission>
   ),

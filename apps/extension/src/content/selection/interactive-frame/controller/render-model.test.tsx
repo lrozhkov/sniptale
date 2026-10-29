@@ -237,3 +237,21 @@ describe('useInteractiveFrameRenderModel', () => {
     });
   });
 });
+
+it.each(['callout', 'step-badge'] as const)(
+  'preserves standalone %s kind in the normalized runtime model',
+  async (annotationKind) => {
+    const frames: FrameData[] = [];
+    const frame: FrameData = { ...baseFrame, annotationKind };
+    function Harness() {
+      const model = useInteractiveFrameRenderModel({
+        ...getBaseRenderModelProps(),
+        frame,
+      });
+      frames.push(model.currentFrame);
+      return null;
+    }
+    await renderHarness(<Harness />);
+    expect(frames.at(-1)?.annotationKind).toBe(annotationKind);
+  }
+);

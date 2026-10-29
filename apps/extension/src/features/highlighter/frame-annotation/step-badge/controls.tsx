@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Move, Settings2 } from 'lucide-react';
+import { Move, Pencil, Settings2, Trash2 } from 'lucide-react';
 import { mergeThemeScopedStyle } from '@sniptale/ui/theme/safe-portal';
 import type { AppTheme } from '@sniptale/ui/theme/types';
 import { translate } from '../../../../platform/i18n';
@@ -13,6 +13,7 @@ export function useStepBadgeControlPosition(args: {
   badgeRef: React.RefObject<HTMLDivElement | null>;
   isEnabled: boolean;
   placementKey: string;
+  controlCount?: number;
   uiScale?: number;
 }) {
   const [position, setPosition] = React.useState<{ x: number; y: number } | null>(null);
@@ -23,7 +24,7 @@ export function useStepBadgeControlPosition(args: {
       if (!rect) return;
       setPosition(
         getAdjacentControlGroupPosition({
-          controlCount: 2,
+          controlCount: args.controlCount ?? 2,
           targetRect: rect,
           ...(args.uiScale === undefined ? {} : { uiScale: args.uiScale }),
           viewport: { height: window.innerHeight, width: window.innerWidth },
@@ -37,14 +38,27 @@ export function useStepBadgeControlPosition(args: {
       window.removeEventListener('resize', refresh);
       window.removeEventListener('scroll', refresh, true);
     };
-  }, [args.badgeRef, args.isEnabled, args.placementKey, args.uiScale]);
+  }, [args.badgeRef, args.controlCount, args.isEnabled, args.placementKey, args.uiScale]);
   return position;
 }
 
+function stopBadgeControlEvent(event: React.SyntheticEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.nativeEvent.stopImmediatePropagation();
+}
+
 export function FrameStepBadgeControls(props: {
-  drag: ReturnType<typeof useStepBadgeBoundaryDrag>;
+  drag: Pick<
+    ReturnType<typeof useStepBadgeBoundaryDrag>,
+    'isDragging' | 'handlePointerDown' | 'handleKeyDown'
+  >;
   visibility: ReturnType<typeof useTransientControlVisibility>;
   onSettingsClick?: () => void;
+  onEditValue?: () => void;
+  onDelete?: () => void;
+  isEditingValue?: boolean;
+  editAnchorRef?: React.RefObject<HTMLButtonElement | null>;
   portalTarget: Element | DocumentFragment;
   portalTheme: AppTheme | null;
   position: { x: number; y: number } | null;
@@ -98,6 +112,30 @@ export function FrameStepBadgeControls(props: {
         >
           <Move size={14} aria-hidden="true" />
         </button>
+        {props.onEditValue ? (
+          <button
+            ref={props.editAnchorRef}
+            type="button"
+            className="sniptale-step-badge-edit-handle"
+            aria-pressed={props.isEditingValue ?? false}
+            aria-label={translate('content.stepBadge.editValue')}
+            title={translate('content.stepBadge.editValue')}
+            style={{ ...buttonStyle, cursor: 'pointer' }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              props.onEditValue?.();
+            }}
+            onFocus={props.visibility.handleFocus}
+            onBlur={props.visibility.handleBlur}
+          >
+            <Pencil size={14} aria-hidden="true" />
+          </button>
+        ) : null}
         {props.showSettingsHandle ? (
           <button
             {...(props.settingsAnchorRef ? { ref: props.settingsAnchorRef } : {})}
@@ -106,21 +144,33 @@ export function FrameStepBadgeControls(props: {
             aria-label={translate('content.interactiveFrame.stepBadgeSettings')}
             title={translate('content.interactiveFrame.stepBadgeSettings')}
             style={{ ...buttonStyle, cursor: 'pointer' }}
-            onPointerDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              event.nativeEvent.stopImmediatePropagation();
-            }}
+            onPointerDown={stopBadgeControlEvent}
             onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              event.nativeEvent.stopImmediatePropagation();
+              stopBadgeControlEvent(event);
               props.onSettingsClick?.();
             }}
             onFocus={props.visibility.handleFocus}
             onBlur={props.visibility.handleBlur}
           >
             <Settings2 size={15} aria-hidden="true" />
+          </button>
+        ) : null}
+        {props.onDelete ? (
+          <button
+            type="button"
+            className="sniptale-step-badge-delete-handle"
+            aria-label={translate('common.actions.delete')}
+            title={translate('common.actions.delete')}
+            style={{ ...buttonStyle, cursor: 'pointer' }}
+            onPointerDown={stopBadgeControlEvent}
+            onClick={(event) => {
+              stopBadgeControlEvent(event);
+              props.onDelete?.();
+            }}
+            onFocus={props.visibility.handleFocus}
+            onBlur={props.visibility.handleBlur}
+          >
+            <Trash2 size={14} aria-hidden="true" />
           </button>
         ) : null}
       </div>

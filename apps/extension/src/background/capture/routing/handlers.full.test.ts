@@ -1,3 +1,11 @@
+const { getQuickActionAppearanceSnapshotMock } = vi.hoisted(() => ({
+  getQuickActionAppearanceSnapshotMock: vi.fn(),
+}));
+vi.mock('../quick-actions/flow/surface', () => ({
+  getQuickActionAppearanceSnapshot: getQuickActionAppearanceSnapshotMock,
+}));
+const { beginPageAppearanceMock } = vi.hoisted(() => ({ beginPageAppearanceMock: vi.fn() }));
+vi.mock('../quick-actions/appearance', () => ({ beginPageAppearance: beginPageAppearanceMock }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -101,6 +109,8 @@ function flushPromises() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getQuickActionAppearanceSnapshotMock.mockReturnValue({ imageFormat: 'webp', imageQuality: 61 });
+  beginPageAppearanceMock.mockReturnValue({ assertCurrent() {}, release() {} });
   loadSettingsMock.mockResolvedValue({
     captureAction: 'ask_system',
     imageFormat: 'jpeg',
@@ -169,6 +179,8 @@ describe('capture-router-handlers.full', () => {
     expect(captureFullPageTransactionMock).toHaveBeenCalledWith(42, undefined, {
       backendKind: 'native',
       documentId: 'document-42',
+      format: 'jpeg',
+      quality: 1,
     });
     expect(sendTabMessageMock).toHaveBeenCalledWith(42, {
       payload: { message: expect.any(String), type: 'warning' },
@@ -208,7 +220,7 @@ async function verifiesFullCaptureFailures() {
   expect(generateFilenameMock).toHaveBeenCalledWith(
     'full',
     'png',
-    expect.objectContaining({ imageFormat: 'png' })
+    expect.objectContaining({ imageFormat: 'jpeg' })
   );
   expect(settingsFailureContext.sendResponse).toHaveBeenCalledWith({
     success: false,
@@ -246,3 +258,65 @@ describe('capture-router-handlers.full edit actions', () => {
     expect(context.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
   });
 });
+
+it('stitches a lossless source before quick action appearance encoding', async () => {
+  beginPageAppearanceMock.mockReturnValue({
+    prepare: async (dataUrl: string, filename: string) => ({ dataUrl, filename }),
+    assertCurrent() {},
+    release() {},
+  });
+  const context = createContext();
+  handleFullCapture(context);
+  await vi.waitFor(() => expect(captureFullPageTransactionMock).toHaveBeenCalled());
+  expect(captureFullPageTransactionMock).toHaveBeenCalledWith(
+    42,
+    undefined,
+    expect.objectContaining({ format: 'png', quality: 1, outputPurpose: 'appearance-source' })
+  );
+});
+
+it('selects lossless appearance output for an explicit full clipboard action', async () => {
+  beginPageAppearanceMock.mockReturnValue({
+    prepare: async (dataUrl: string, filename: string) => ({ dataUrl, filename }),
+    assertCurrent() {},
+    release() {},
+  });
+  const context = createContext();
+  context.message = { actionType: 'copy', quickActionTransactionId: 'clipboard-appearance' };
+  handleFullCapture(context);
+  await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalled());
+  expect(beginPageAppearanceMock).toHaveBeenCalledWith(42, 'clipboard-appearance', 'png', true);
+});
+
+it.each(['png', 'webp'] as const)(
+  'uses an unstyled quick action %s format and quality for full capture and filename',
+  async (imageFormat) => {
+    getQuickActionAppearanceSnapshotMock.mockReturnValue({ imageFormat, imageQuality: 61 });
+    loadSettingsMock.mockResolvedValue({
+      captureAction: 'download_default',
+      imageFormat: 'jpeg',
+      imageQuality: 90,
+    });
+    generateFilenameMock.mockImplementation((_mode: string, format: string) => `full.${format}`);
+    captureFullPageTransactionMock.mockResolvedValue({
+      dataUrl: `data:image/${imageFormat};base64,captured`,
+      jobId: 'profile-job',
+      metadata: { downscaled: false, frozenExtentWarning: false },
+    });
+    const context = createContext();
+    context.message = { actionType: 'download_default', quickActionTransactionId: 'profile' };
+    handleFullCapture(context);
+    await vi.waitFor(() => expect(context.sendResponse).toHaveBeenCalled());
+    expect(captureFullPageTransactionMock).toHaveBeenCalledWith(42, undefined, {
+      backendKind: 'native',
+      format: imageFormat,
+      quality: 0.61,
+    });
+    expect(saveScreenshotToMediaHubFromDataUrlMock).toHaveBeenCalledWith(
+      `data:image/${imageFormat};base64,captured`,
+      `full.${imageFormat}`,
+      42,
+      'temporary'
+    );
+  }
+);

@@ -14,6 +14,8 @@ import {
   ui,
 } from './view.test-support';
 import { act } from 'react';
+import { TextJobProviderError } from '../../../../workflows/ai-session/text-request-port';
+import { dispatchBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { translate } from '../../../../platform/i18n';
 import { expect, it, vi } from 'vitest';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
@@ -26,6 +28,7 @@ it('opens the selected text form, rejects synthetic submission and commits liter
   await fill('Shorten this');
   await click(ui('content.ai-text.submit'), false);
   expect(mocks.request).not.toHaveBeenCalled();
+  expect(mocks.remember).not.toHaveBeenCalled();
   mocks.request.mockResolvedValueOnce('<b>Literal answer</b>');
   await submit();
   expect(mocks.request).toHaveBeenCalledWith(
@@ -217,7 +220,14 @@ it.each([false, true])(
   async (local) => {
     await click(ui('content.toolbar.ai-text'));
     mocks.models.mockResolvedValueOnce({
-      defaultModelId: 'disclosed',
+      scenario: 'page-edit',
+      remembered: null,
+      resolution: {
+        status: 'initial',
+        modelId: 'disclosed',
+        previousSelection: null,
+        reason: null,
+      },
       models: [
         {
           id: 'disclosed',
@@ -266,4 +276,227 @@ it('offers ready prompts and places public dictation inside the prompt field', a
     'Make the selected text concise.'
   );
   expect(mocks.request).not.toHaveBeenCalled();
+});
+
+it('persists only a trusted explicit model choice from the actual selector', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ x: 10, y: 10, width: 200, height: 40 })
+  );
+  await selectTarget();
+  expect(mocks.remember).not.toHaveBeenCalled();
+  const trigger = shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!;
+  await click(trigger);
+  const option = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Other text model'
+  );
+  if (!option) throw new Error('Model option missing');
+  await click(option, false);
+  expect(mocks.remember).not.toHaveBeenCalled();
+  await click(option);
+  expect(mocks.remember).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ scenario: 'page-edit' }),
+    'page-edit',
+    'other',
+    'explicit'
+  );
+  expect(target.textContent).toBe('Original words');
+  expect(mocks.request).not.toHaveBeenCalled();
+});
+
+it.each(['catalog', 'preference', 'destination'] as const)(
+  'preserves the page and prompt without inference when %s preparation fails',
+  async (failure) => {
+    await selectTarget();
+    await fill('Keep this instruction');
+    const markup = target.innerHTML;
+    const catalog = await mocks.models.mock.results[0]!.value;
+    if (failure === 'catalog') mocks.models.mockRejectedValueOnce(new Error('Unavailable'));
+    if (failure === 'preference') mocks.remember.mockRejectedValueOnce(new Error('Unavailable'));
+    if (failure === 'destination') {
+      const next = structuredClone(catalog);
+      next.providers[0].destinationBinding = `sha256:${'b'.repeat(64)}`;
+      mocks.models.mockResolvedValue(next);
+    }
+    await submit();
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(target.innerHTML).toBe(markup);
+    expect(ui<HTMLTextAreaElement>('content.ai-text.prompt').value).toBe('Keep this instruction');
+    expect(shadow.textContent).toContain(
+      failure === 'catalog'
+        ? 'content.toolbar.aiTextModelsError'
+        : failure === 'preference'
+          ? 'aiModal.modelSelectionSaveFailed'
+          : 'content.toolbar.aiTextModelUnavailable'
+    );
+    if (failure === 'catalog') {
+      const retry = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+        (node) => node.textContent === 'common.actions.retry'
+      );
+      if (!retry) throw new Error('Retry control missing');
+      await click(retry);
+      await submit();
+      expect(mocks.request).toHaveBeenCalledOnce();
+    }
+  }
+);
+it('blocks submission and duplicate choices while an explicit choice is being saved', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ x: 10, y: 10, width: 200, height: 40 })
+  );
+  await selectTarget();
+  await fill('Instruction');
+  const pending = deferred<void>();
+  mocks.remember.mockReturnValueOnce(pending.promise);
+  await click(shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!);
+  const option = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Other text model'
+  );
+  if (!option) throw new Error('Model option missing');
+  await click(option);
+  expect(ui<HTMLButtonElement>('content.ai-text.submit').disabled).toBe(true);
+  expect(
+    shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')?.disabled
+  ).toBe(true);
+  await submit();
+  expect(mocks.request).not.toHaveBeenCalled();
+  expect(mocks.remember).toHaveBeenCalledOnce();
+  await act(async () => pending.resolve());
+  expect(ui<HTMLButtonElement>('content.ai-text.submit').disabled).toBe(false);
+  expect(target.textContent).toBe('Original words');
+});
+it.each(['cancel', 'source-change'] as const)(
+  'does not send a request after %s while fresh selection preparation is pending',
+  async (change) => {
+    await selectTarget();
+    await fill('Instruction');
+    const catalog = await mocks.models.mock.results[0]!.value;
+    const pending = deferred<typeof catalog>();
+    mocks.models.mockReturnValueOnce(pending.promise);
+    await submit();
+    expect(mocks.request).not.toHaveBeenCalled();
+    if (change === 'cancel') await click(ui('content.ai-text.submit'));
+    else target.textContent = 'Page changed during preparation';
+    await act(async () => pending.resolve(catalog));
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(target.textContent).toBe(
+      change === 'cancel' ? 'Original words' : 'Page changed during preparation'
+    );
+    expect(ui<HTMLTextAreaElement>('content.ai-text.prompt').value).toBe('Instruction');
+    if (change === 'cancel') expect(mocks.remember).not.toHaveBeenCalled();
+  }
+);
+
+it('accepts the private synchronous bridge for model choice and refuses its retained replay', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ x: 10, y: 10, width: 200, height: 40 })
+  );
+  await selectTarget();
+  const source = new MouseEvent('click');
+  await act(async () => {
+    dispatchBridgedMouseEvent(
+      shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!,
+      'click',
+      source
+    );
+  });
+  const option = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Other text model'
+  );
+  if (!option) throw new Error('Model option missing');
+  let retained: Event | null = null;
+  option.addEventListener('click', (event) => {
+    retained = event;
+  });
+  await act(async () => {
+    dispatchBridgedMouseEvent(option, 'click', source);
+  });
+  expect(mocks.remember).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ scenario: 'page-edit' }),
+    'page-edit',
+    'other',
+    'explicit'
+  );
+  mocks.remember.mockClear();
+  await click(shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!);
+  const reopened = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Text model'
+  );
+  if (!reopened || !retained) throw new Error('Replay fixture missing');
+  await act(async () => {
+    reopened.dispatchEvent(retained!);
+  });
+  expect(mocks.remember).not.toHaveBeenCalled();
+});
+
+it('accepts private bridged Submit once and refuses the retained event on a later target', async () => {
+  await selectTarget();
+  await fill('Bridge instruction');
+  const button = ui('content.ai-text.submit');
+  let retained: Event | null = null;
+  button.addEventListener('click', (event) => {
+    retained = event;
+  });
+  await act(async () => {
+    dispatchBridgedMouseEvent(button, 'click', new MouseEvent('click'));
+  });
+  expect(mocks.request).toHaveBeenCalledOnce();
+  expect(target.textContent).toBe('Edited source');
+  act(() => pagePreparationHistory.undo('page-editing'));
+  await selectTarget();
+  await fill('Retained instruction');
+  mocks.request.mockClear();
+  mocks.remember.mockClear();
+  if (!retained) throw new Error('Retained bridge event missing');
+  await act(async () => {
+    ui('content.ai-text.submit').dispatchEvent(retained!);
+  });
+  expect(mocks.request).not.toHaveBeenCalled();
+  expect(mocks.remember).not.toHaveBeenCalled();
+  expect(target.textContent).toBe('Original words');
+});
+
+it.each([
+  ['invalid-credential', 'providerStatusInvalidKey'],
+  ['permission-denied', 'providerStatusDenied'],
+  ['model-unavailable', 'providerStatusModelUnavailable'],
+  ['quota-exceeded', 'providerStatusQuota'],
+  ['rate-limited', 'providerStatusRate'],
+  ['network', 'providerStatusNetwork'],
+  ['timeout', 'providerStatusTimeout'],
+  ['service-error', 'providerStatusUnavailable'],
+] as const)(
+  'explains %s and preserves markup and the instruction for explicit retry',
+  async (reason, key) => {
+    await selectTarget();
+    const before = target.innerHTML;
+    await fill('Keep this instruction');
+    mocks.request.mockRejectedValueOnce(new TextJobProviderError(reason, 'provider-failed'));
+    await submit();
+    expect(ui('content.ai-text.feedback').textContent).toBe(
+      translate(`settings.aiProviders.${key}`)
+    );
+    expect(target.innerHTML).toBe(before);
+    expect((ui('content.ai-text.prompt') as HTMLTextAreaElement).value).toBe(
+      'Keep this instruction'
+    );
+    expect(mocks.request).toHaveBeenCalledOnce();
+  }
+);
+it('clears provider evidence on a trusted explicit model choice without replay', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ x: 10, y: 10, width: 200, height: 40 })
+  );
+  await selectTarget();
+  await fill('Keep this instruction');
+  mocks.request.mockRejectedValueOnce(
+    new TextJobProviderError('quota-exceeded', 'provider-failed')
+  );
+  await submit();
+  await click(shadow.querySelector<HTMLButtonElement>('.sniptale-ai-model-selector-trigger')!);
+  const choice = [...shadow.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Other text model'
+  )!;
+  await click(choice);
+  expect(shadow.querySelector('[data-ui="content.ai-text.feedback"]')).toBeNull();
+  expect(mocks.request).toHaveBeenCalledOnce();
 });

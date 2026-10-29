@@ -50,10 +50,12 @@ it('creates visible and full capture messages with optional scenario payloads', 
     type: CaptureMessageType.CAPTURE_VISIBLE,
     actionType: 'scenario',
     scenarioCapture: createScenarioPayload('visible'),
+    capturePreferences: { imageFormat: 'png', imageQuality: 100 },
   });
   expect(createViewportCaptureMessage('full', 'copy', runtime, false)).toEqual({
     type: CaptureMessageType.CAPTURE_FULL,
     actionType: 'copy',
+    capturePreferences: expect.objectContaining({ imageFormat: 'png', imageQuality: 100 }),
   });
 });
 

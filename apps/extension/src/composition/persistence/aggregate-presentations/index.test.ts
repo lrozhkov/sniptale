@@ -110,6 +110,7 @@ it('writes scenario preview and thumbnail blobs against the scenario root revisi
     workspaceRevision: 4,
   };
   const put = vi.fn();
+  const readProfile = vi.fn(async () => undefined);
   mocks.runWithIndexedDbMutation.mockImplementation(async (effect) =>
     effect({
       transaction: vi.fn(() => ({
@@ -119,7 +120,9 @@ it('writes scenario preview and thumbnail blobs against the scenario root revisi
             ? { get: vi.fn(async () => root) }
             : name === 'scenario_project_history' || name === 'scenario_project_units'
               ? { index: () => ({ getAll: async () => [] }) }
-              : { put }
+              : name === 'sync_capture'
+                ? { get: readProfile }
+                : { put }
         ),
       })),
     })
@@ -140,6 +143,8 @@ it('writes scenario preview and thumbnail blobs against the scenario root revisi
       previewBlob,
     })
   );
+  expect(readProfile).toHaveBeenCalledWith('profile');
+  expect(put).toHaveBeenCalledOnce();
 });
 
 it('rejects presentation commits when the aggregate root is missing', async () => {

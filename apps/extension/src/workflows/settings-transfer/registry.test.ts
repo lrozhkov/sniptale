@@ -57,8 +57,8 @@ describe('settings transfer registry', () => {
       displayName: 'Model',
     };
     for (const data of [
-      { items: [{ ...model, authorization: 'canary-secret' }], defaultModelId: null },
-      { items: [model], defaultModelId: null, authorization: 'canary-secret' },
+      { items: [{ ...model, authorization: 'canary-secret' }] },
+      { items: [model], authorization: 'canary-secret' },
     ]) {
       expect(() =>
         parseSettingsTransferDomains({

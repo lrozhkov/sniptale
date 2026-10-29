@@ -1,0 +1,35 @@
+
+Running 1 test using 1 worker
+
+(node:73913) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+production-proof 1280 library-navigation
+production-proof 1280 library-visible
+production-proof 1280 download-clicked
+production-proof 1280 editor-ready
+  ✘  1 tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 (40.6s)
+
+
+  1) tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Production offline edit"
+    Received: null
+
+    Call Log:
+    - Timeout 10000ms exceeded while waiting on the predicate
+
+      1566 |           }, seed.projectId)
+      1567 |         )
+    > 1568 |         .toBe(offlineTitle);
+           |          ^
+      1569 |       await editor.close();
+      1570 |       console.info('production-proof', viewport.width, 'library-navigation');
+      1571 |       await openLibrary(target, viewport);
+        at <worktree>/tooling/test/e2e/providers/webdav-library.spec.ts:1568:10
+
+    Error Context: tasks/WebDAV/d-production-editor-proof/webdav-library-production--4efbf--reopens-after-release-1280/error-context.md
+
+  1 failed
+    tooling/test/e2e/providers/webdav-library.spec.ts:1475:3 › production WebDAV opens, edits offline, publishes and reopens after release 1280 

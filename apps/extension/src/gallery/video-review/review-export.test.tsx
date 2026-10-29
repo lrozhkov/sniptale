@@ -269,3 +269,7 @@ it('opens the completed copy and dismisses feedback on tool or inspector changes
     await fixture.cleanup();
   }
 });
+
+vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
+}));

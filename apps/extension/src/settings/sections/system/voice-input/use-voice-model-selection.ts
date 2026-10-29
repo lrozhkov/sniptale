@@ -3,9 +3,10 @@ import type {
   VoiceInputPreferences,
   VoiceProviderSelection,
 } from '@sniptale/runtime-contracts/voice-input';
-import type { AIModelSelectionBootstrapPayload } from '../../../../contracts/messaging/ai-settings-runtime';
+import type { AIModelCatalogPayload } from '../../../../contracts/messaging/ai-settings-runtime';
 import {
-  requestAIModelSelectionBootstrap,
+  refreshManagedAICatalogs,
+  requestAIScenarioModelSelection,
   requestAISettingsPageRuntimeData,
 } from '../../../../workflows/ai-settings/query';
 import {
@@ -13,15 +14,14 @@ import {
   resetVoiceInputCorrectionSystemPrompt,
 } from '../../../runtime/ai-settings/mutations';
 
-const EMPTY_CATALOG: AIModelSelectionBootstrapPayload = {
-  chromeAiEnabled: false,
-  defaultModelId: null,
-  globalSystemPrompt: '',
+const EMPTY_CATALOG: AIModelCatalogPayload = {
   models: [],
   providers: [],
 };
 const defaultDeps = {
-  bootstrap: requestAIModelSelectionBootstrap,
+  maintain: refreshManagedAICatalogs,
+  catalog: (scenario: 'voice-recognition' | 'voice-correction'): Promise<AIModelCatalogPayload> =>
+    requestAIScenarioModelSelection(scenario),
   prompt: async () =>
     (await requestAISettingsPageRuntimeData()).voiceInputCorrectionSystemPrompt ?? '',
   savePrompt: saveVoiceInputCorrectionSystemPrompt,
@@ -30,7 +30,7 @@ const defaultDeps = {
 
 /** Accepts only configured providers with a destination binding; selection never grants permission. */
 export function voiceProviderSelection(
-  catalog: AIModelSelectionBootstrapPayload,
+  catalog: AIModelCatalogPayload,
   modelId: string | null
 ): VoiceProviderSelection | null {
   const model = catalog.models.find((item) => item.id === modelId);
@@ -38,7 +38,7 @@ export function voiceProviderSelection(
   if (
     !model ||
     !provider ||
-    provider.connectionType !== 'openai-compatible' ||
+    provider.connectionType === 'chrome-built-in' ||
     !provider.destinationBinding
   )
     return null;
@@ -49,9 +49,7 @@ export function voiceProviderSelection(
     approvedModelCode: model.modelCode,
   };
 }
-function availableCatalog(
-  catalog: AIModelSelectionBootstrapPayload
-): AIModelSelectionBootstrapPayload {
+function availableCatalog(catalog: AIModelCatalogPayload): AIModelCatalogPayload {
   return {
     ...catalog,
     models: catalog.models.filter((model) => voiceProviderSelection(catalog, model.id) !== null),
@@ -76,13 +74,14 @@ export function useVoiceModelSelection(args: {
   const currentDraft = useRef({ prompt, acceptedPrompt });
   currentDraft.current = { prompt, acceptedPrompt };
   const refresh = useCallback(async () => {
+    if (promptMutation.current) return;
     const current = ++generation.current;
     setLoading(true);
     setError(false);
     try {
       const [asr, text, value] = await Promise.all([
-        deps.bootstrap('transcription'),
-        deps.bootstrap('text'),
+        deps.catalog('voice-recognition'),
+        deps.catalog('voice-correction'),
         deps.prompt(),
       ]);
       if (current !== generation.current) return;
@@ -92,8 +91,23 @@ export function useVoiceModelSelection(args: {
       setAcceptedPrompt(value);
     } catch {
       if (current === generation.current) setError(true);
+      return;
     } finally {
       if (current === generation.current) setLoading(false);
+    }
+    if (current !== generation.current) return;
+    try {
+      await deps.maintain();
+      if (current !== generation.current) return;
+      const [asr, text] = await Promise.all([
+        deps.catalog('voice-recognition'),
+        deps.catalog('voice-correction'),
+      ]);
+      if (current !== generation.current) return;
+      setTranscription(availableCatalog(asr));
+      setCorrection(availableCatalog(text));
+    } catch {
+      // Advisory metadata failure preserves saved catalogs and the independent prompt mutation.
     }
   }, [deps]);
   useEffect(() => {
@@ -124,7 +138,7 @@ export function useVoiceModelSelection(args: {
     }
   };
   const currentSelectionId = (
-    catalog: AIModelSelectionBootstrapPayload,
+    catalog: AIModelCatalogPayload,
     selected: VoiceProviderSelection | null | undefined
   ) => {
     if (!selected) return null;
@@ -136,9 +150,18 @@ export function useVoiceModelSelection(args: {
       ? selected.modelId
       : null;
   };
+  const transcriptionSelectionId = currentSelectionId(
+    transcription,
+    args.preferences.transcription
+  );
+  const correctionSelectionId = currentSelectionId(correction, args.preferences.correction?.model);
   return {
-    transcriptionSelectionId: currentSelectionId(transcription, args.preferences.transcription),
-    correctionSelectionId: currentSelectionId(correction, args.preferences.correction?.model),
+    transcriptionUnavailable:
+      !loading && !error && !!args.preferences.transcription && !transcriptionSelectionId,
+    correctionUnavailable:
+      !loading && !error && !!args.preferences.correction?.model && !correctionSelectionId,
+    transcriptionSelectionId,
+    correctionSelectionId,
     transcription,
     correction,
     loading,

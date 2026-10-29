@@ -154,7 +154,7 @@ async function expectSetupHidden(page: Page) {
 }
 
 async function selectArea(page: Page) {
-  await control(page, 'capture-target.menu').click();
+  await control(page, 'quality.menu').click();
   const area = control(page, 'capture-target').getByRole('button', { name: /^(Area|Область)$/u });
   await area.focus();
   await page.keyboard.press('Enter');
@@ -163,16 +163,32 @@ async function selectArea(page: Page) {
 
 async function moveToolbar(page: Page, destination: { x: number; y: number }) {
   const toolbar = page.locator('[data-ui="content.toolbar.root"]');
+  const handle = toolbar.locator('.sniptale-drag-handle');
+  await handle.scrollIntoViewIfNeeded();
   const box = (await toolbar.boundingBox())!;
-  const grip = (await toolbar.locator('.sniptale-drag-handle').boundingBox())!;
+  const grip = (await handle.boundingBox())!;
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();
+  await expect(toolbar).toHaveClass(/sniptale-toolbar-dragging/u);
   await page.mouse.move(
     grip.x + grip.width / 2 + destination.x - box.x,
     grip.y + grip.height / 2 + destination.y - box.y,
     { steps: 8 }
   );
   await page.mouse.up();
+  await expect(toolbar).not.toHaveClass(/sniptale-toolbar-dragging/u);
+  const viewport = page.viewportSize()!;
+  const expected = {
+    x: Math.max(0, Math.min(destination.x, viewport.width - box.width)),
+    y: Math.max(0, Math.min(destination.y, viewport.height - box.height)),
+  };
+  await expect
+    .poll(async () => {
+      const placed = (await toolbar.boundingBox())!;
+      // Fractional bounds and integer offset dimensions can differ by one CSS pixel.
+      return Math.abs(placed.x - expected.x) <= 1 && Math.abs(placed.y - expected.y) <= 1;
+    })
+    .toBe(true);
 }
 
 async function chooseRegion(page: Page) {
@@ -290,8 +306,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         const { page, popup } = await openSetup(launched, host.origin, size, orientation);
         const quality = control(page, 'quality.menu');
         const qualityMenu = control(page, 'quality.dropdown');
-        const target = control(page, 'capture-target.menu');
-        const targetMenu = control(page, 'capture-target.dropdown');
+        const target = control(page, 'quality.menu');
+        const targetMenu = control(page, 'quality.dropdown');
         await quality.focus();
         await page.keyboard.press('Enter');
         await expectFitsViewport(qualityMenu, page);
@@ -300,8 +316,10 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         }
         await expect(control(page, `quality.profile.${profileId}`)).toContainText(profileName);
         await screenshot(page, info, 'quality-profiles.png');
-        await target.click();
-        await expect(qualityMenu).toHaveCount(0);
+        await expect(control(page, 'capture-target.menu')).toHaveCount(0);
+        const region = await control(page, 'capture-target').boundingBox();
+        const firstProfile = await control(page, 'quality.profile.builtin:compact').boundingBox();
+        expect(region!.y + region!.height).toBeLessThan(firstProfile!.y);
         await expectFitsViewport(targetMenu, page);
         await page.keyboard.press('Escape');
         await expect(targetMenu).toHaveCount(0);
@@ -468,6 +486,11 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect.poll(opacity).toBe(1);
         await screenshot(page, info, 'recording-toolbar-outside-area.png');
         await moveToolbar(page, { x: selected.x + 20, y: selected.y + 20 });
+        const overlapping = (await toolbar.boundingBox())!;
+        expect(overlapping.x).toBeLessThan(selected.x + selected.width);
+        expect(overlapping.x + overlapping.width).toBeGreaterThan(selected.x);
+        expect(overlapping.y).toBeLessThan(selected.y + selected.height);
+        expect(overlapping.y + overlapping.height).toBeGreaterThan(selected.y);
         await page.mouse.click(size.width - 4, size.height - 4);
         await expect.poll(opacity).toBeCloseTo(0.2, 2);
         await screenshot(page, info, 'recording-toolbar-overlaps-area.png');
@@ -494,6 +517,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await page.keyboard.press('Escape');
         await expect(quality).toBeVisible();
         await target.click();
+        await expectFitsViewport(qualityMenu, page);
         await control(page, 'capture-target')
           .getByRole('button', { name: /^(Full tab|Вся вкладка)$/u })
           .click();
@@ -529,8 +553,8 @@ test('native recording setup menus fit below the desktop width', async ({}, info
     await expectFitsViewport(control(page, 'quality.dropdown'), page);
     await screenshot(page, info, 'narrow-quality-details.png');
     await page.keyboard.press('Escape');
-    await control(page, 'capture-target.menu').click();
-    await expectFitsViewport(control(page, 'capture-target.dropdown'), page);
+    await control(page, 'quality.menu').click();
+    await expectFitsViewport(control(page, 'quality.dropdown'), page);
     await screenshot(page, info, 'narrow-capture-target.png');
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
@@ -540,3 +564,54 @@ test('native recording setup menus fit below the desktop width', async ({}, info
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`recording quality dropdown surface and customization ${name}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size });
+    try {
+      const { page } = await openSetup(launched, host.origin, size, 'horizontal');
+      await control(page, 'quality.menu').click();
+      await control(page, 'quality.details').click();
+      for (const field of ['quality', 'container', 'codec', 'resolution', 'frameRate']) {
+        const trigger = control(page, `output.${field}`).locator('button[aria-haspopup="listbox"]');
+        await trigger.click();
+        const list = page.getByRole('listbox');
+        await expect(list).toBeVisible();
+        const material = await list.evaluate((element) => {
+          const css = getComputedStyle(element);
+          return {
+            border: css.borderTopWidth,
+            style: css.borderTopStyle,
+            color: css.borderTopColor,
+            shadow: css.boxShadow,
+            background: css.backgroundColor,
+          };
+        });
+        await info.attach(`${field}-material`, {
+          body: JSON.stringify(material),
+          contentType: 'application/json',
+        });
+        await screenshot(page, info, `${field}-surface.png`);
+        expect(material.border).toBe('1px');
+        expect(material.style).toBe('solid');
+        expect(material.shadow).not.toBe('none');
+        await page.keyboard.press('Escape');
+        await expect(list).toHaveCount(0);
+        await expect(control(page, 'quality.dropdown')).toBeVisible();
+      }
+      await page.keyboard.press('Escape');
+      await control(page, 'customize').click();
+      await expect(control(page, 'quality.menu')).toBeDisabled();
+      await screenshot(page, info, 'quality-customizing-disabled.png');
+      await control(page, 'customize').click();
+      await expect(control(page, 'quality.menu')).toBeEnabled();
+      await control(page, 'quality.menu').click();
+      await expect(control(page, 'quality.dropdown')).toBeVisible();
+    } finally {
+      await closeExtensionBrowser(launched);
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

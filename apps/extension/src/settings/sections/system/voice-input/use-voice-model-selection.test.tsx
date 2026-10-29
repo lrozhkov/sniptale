@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { AIModelSelectionBootstrapPayload } from '../../../../contracts/messaging/ai-settings-runtime';
+import type { AIModelCatalogPayload } from '../../../../contracts/messaging/ai-settings-runtime';
 import type { VoiceInputPreferences } from '@sniptale/runtime-contracts/voice-input';
 import { useVoiceModelSelection, voiceProviderSelection } from './use-voice-model-selection';
 
@@ -15,11 +15,8 @@ const provider = {
   destinationKind: 'external',
   destinationBinding: `sha256:${'a'.repeat(64)}`,
 } as const;
-function catalog(operation: 'text' | 'transcription'): AIModelSelectionBootstrapPayload {
+function catalog(operation: 'text' | 'transcription'): AIModelCatalogPayload {
   return {
-    chromeAiEnabled: false,
-    defaultModelId: 'model',
-    globalSystemPrompt: '',
     providers: [provider],
     models: [
       {
@@ -38,8 +35,9 @@ let state: ReturnType<typeof useVoiceModelSelection> | null;
 let prefs: VoiceInputPreferences;
 const updatePreference = vi.fn().mockResolvedValue(undefined);
 const deps = {
-  bootstrap: vi.fn(async (operation) =>
-    catalog(operation === 'transcription' ? 'transcription' : 'text')
+  maintain: vi.fn().mockResolvedValue(undefined),
+  catalog: vi.fn(async (operation) =>
+    catalog(operation === 'voice-recognition' ? 'transcription' : 'text')
   ),
   prompt: vi.fn(async () => 'Local instructions'),
   savePrompt: vi.fn().mockResolvedValue(undefined),
@@ -59,9 +57,10 @@ beforeEach(() => {
   vi.resetAllMocks();
   prefs = { language: 'ru-RU', microphoneDeviceId: null, mode: 'local-first' };
   updatePreference.mockResolvedValue(undefined);
-  deps.bootstrap.mockImplementation(async (operation) =>
-    catalog(operation === 'transcription' ? 'transcription' : 'text')
+  deps.catalog.mockImplementation(async (operation) =>
+    catalog(operation === 'voice-recognition' ? 'transcription' : 'text')
   );
+  deps.maintain.mockResolvedValue(undefined);
   deps.resetPrompt.mockResolvedValue(undefined);
   deps.prompt.mockResolvedValue('Local instructions');
   deps.savePrompt.mockResolvedValue(undefined);
@@ -76,8 +75,8 @@ afterEach(() => {
 });
 it('loads operation-specific catalogues without approving the first model', async () => {
   await render();
-  expect(deps.bootstrap).toHaveBeenCalledWith('transcription');
-  expect(deps.bootstrap).toHaveBeenCalledWith('text');
+  expect(deps.catalog).toHaveBeenCalledWith('voice-recognition');
+  expect(deps.catalog).toHaveBeenCalledWith('voice-correction');
   expect(updatePreference).not.toHaveBeenCalled();
   expect(state?.transcriptionSelectionId).toBeNull();
   await act(async () => state?.selectTranscription('model'));
@@ -123,8 +122,8 @@ it('saves correction instructions only through the local prompt owner and preser
   expect(state?.prompt).toBe('Default instructions');
 });
 it('does not apply an asynchronous catalogue after unmount', async () => {
-  let resolve!: (value: AIModelSelectionBootstrapPayload) => void;
-  deps.bootstrap.mockImplementationOnce(
+  let resolve!: (value: AIModelCatalogPayload) => void;
+  deps.catalog.mockImplementationOnce(
     () =>
       new Promise((done) => {
         resolve = done;
@@ -144,8 +143,8 @@ it('recognizes approved pins and requires a new selection when a provider destin
   expect(state?.transcriptionSelectionId).toBe('model');
   expect(state?.correctionSelectionId).toBe('model');
   const destination = `sha256:${'b'.repeat(64)}`;
-  deps.bootstrap.mockImplementation(async (operation) => ({
-    ...catalog(operation === 'transcription' ? 'transcription' : 'text'),
+  deps.catalog.mockImplementation(async (operation) => ({
+    ...catalog(operation === 'voice-recognition' ? 'transcription' : 'text'),
     providers: [{ ...provider, destinationBinding: destination }],
   }));
   await act(async () => state?.refresh());
@@ -160,7 +159,7 @@ it('recognizes approved pins and requires a new selection when a provider destin
 it('keeps edited instructions and usable models through refresh failure and recovery', async () => {
   await render();
   act(() => state?.setPrompt('Keep this unsaved draft'));
-  deps.bootstrap.mockRejectedValueOnce(new Error('worker unavailable'));
+  deps.catalog.mockRejectedValueOnce(new Error('worker unavailable'));
   await act(async () => state?.refresh());
   expect(state?.error).toBe(true);
   expect(state?.loading).toBe(false);
@@ -197,7 +196,7 @@ it('does not start a second prompt mutation while Save owns the pending operatio
 it('ignores a failed older reload after a newer catalogue has recovered', async () => {
   await render();
   let fail!: (error: Error) => void;
-  deps.bootstrap.mockImplementationOnce(
+  deps.catalog.mockImplementationOnce(
     () =>
       new Promise((_resolve, reject) => {
         fail = reject;
@@ -217,4 +216,240 @@ it('ignores a failed older reload after a newer catalogue has recovered', async 
   expect(state?.error).toBe(false);
   expect(state?.loading).toBe(false);
   expect(state?.prompt).toBe('Latest instructions');
+});
+
+it('lists admitted named providers without approving canonical voice preferences', async () => {
+  deps.catalog.mockImplementation(async (operation) => ({
+    ...catalog(operation === 'voice-recognition' ? 'transcription' : 'text'),
+    providers: [{ ...provider, connectionType: 'neuraldeep' }],
+  }));
+  await render();
+  expect(state?.transcription.models.map((model) => model.id)).toEqual(['model']);
+  expect(state?.correction.models.map((model) => model.id)).toEqual(['model']);
+  expect(state?.transcriptionSelectionId).toBeNull();
+  expect(updatePreference).not.toHaveBeenCalled();
+});
+
+it('keeps canonical voice choices separate and waits for their accepted preference snapshot', async () => {
+  const selected = voiceProviderSelection(catalog('transcription'), 'model');
+  if (!selected) throw new Error('Missing selection');
+  prefs = { ...prefs, transcription: selected, correction: { enabled: true, model: null } };
+  await render();
+  expect(state?.transcriptionSelectionId).toBe('model');
+  expect(state?.correctionSelectionId).toBeNull();
+  let finish!: () => void;
+  updatePreference.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  let pending: Promise<void> | undefined;
+  act(() => {
+    pending = state?.selectCorrection('model');
+  });
+  expect(state?.correctionSelectionId).toBeNull();
+  expect(state?.transcriptionSelectionId).toBe('model');
+  await act(async () => {
+    finish();
+    await pending;
+  });
+  expect(state?.correctionSelectionId).toBeNull();
+  prefs = { ...prefs, correction: { enabled: true, model: selected } };
+  await render();
+  expect(state?.correctionSelectionId).toBe('model');
+  expect(updatePreference).toHaveBeenCalledExactlyOnceWith({
+    correction: { enabled: true, model: selected },
+  });
+});
+
+it('retains the accepted selection after a refused voice write and permits explicit retry', async () => {
+  await render();
+  updatePreference.mockRejectedValueOnce(new Error('write refused'));
+  await act(async () => {
+    await expect(state?.selectTranscription('model')).rejects.toThrow('write refused');
+  });
+  expect(state?.transcriptionSelectionId).toBeNull();
+  await act(async () => state?.selectTranscription('model'));
+  expect(updatePreference).toHaveBeenCalledTimes(2);
+  expect(state?.transcriptionSelectionId).toBeNull();
+});
+
+it('keeps a missing approved model unresolved across refresh without selecting another model', async () => {
+  const approved = voiceProviderSelection(catalog('transcription'), 'model');
+  if (!approved) throw new Error('Missing selection');
+  prefs = { ...prefs, transcription: approved, correction: { enabled: true, model: approved } };
+  await render();
+  deps.catalog.mockImplementation(async (scenario) => ({
+    ...catalog(scenario === 'voice-recognition' ? 'transcription' : 'text'),
+    models: [{ ...catalog('text').models[0]!, id: 'replacement' }],
+  }));
+  await act(async () => state?.refresh());
+  expect(state?.transcriptionSelectionId).toBeNull();
+  expect(state?.correctionSelectionId).toBeNull();
+  expect(state?.transcriptionUnavailable).toBe(true);
+  expect(state?.correctionUnavailable).toBe(true);
+  expect(updatePreference).not.toHaveBeenCalled();
+});
+
+it('admits local configured correction without borrowing a global model choice', async () => {
+  deps.catalog.mockImplementation(async (scenario) => ({
+    ...catalog(scenario === 'voice-recognition' ? 'transcription' : 'text'),
+    providers: [{ ...provider, connectionType: 'lm-studio', hasStoredApiKey: false }],
+  }));
+  await render();
+  expect(state?.correction.models).toHaveLength(1);
+  expect(state?.correctionSelectionId).toBeNull();
+  await act(async () => state?.selectCorrection('model'));
+  expect(updatePreference).toHaveBeenCalledWith({
+    correction: { enabled: false, model: voiceProviderSelection(catalog('text'), 'model') },
+  });
+});
+
+it('reports a failed initial catalog read without declaring an approved model unavailable', async () => {
+  const approved = voiceProviderSelection(catalog('transcription'), 'model');
+  if (!approved) throw new Error('Missing selection');
+  prefs = { ...prefs, transcription: approved };
+  deps.catalog.mockRejectedValue(new Error('network failed'));
+  await render();
+  expect(state?.error).toBe(true);
+  expect(state?.transcriptionUnavailable).toBe(false);
+  expect(updatePreference).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['save', 'success'],
+  ['save', 'failure'],
+  ['reset', 'success'],
+  ['reset', 'failure'],
+] as const)(
+  'serializes catalog refresh with %s prompt %s and releases recovery controls',
+  async (command, outcome) => {
+    await render();
+    act(() => state?.setPrompt('Keep this instruction draft'));
+    let resolve!: () => void;
+    let reject!: (cause: Error) => void;
+    const hold = new Promise<void>((done, fail) => {
+      resolve = done;
+      reject = fail;
+    });
+    if (command === 'save') deps.savePrompt.mockReturnValueOnce(hold);
+    else deps.resetPrompt.mockReturnValueOnce(hold);
+    let mutation: Promise<void> | undefined;
+    act(() => {
+      mutation = command === 'save' ? state?.savePrompt() : state?.resetPrompt();
+    });
+    expect(state?.promptSaving).toBe(true);
+    await act(async () => state?.refresh());
+    await act(async () => {
+      if (outcome === 'success') resolve();
+      else reject(new Error('Storage refused'));
+      await mutation;
+    });
+    expect(state?.promptSaving).toBe(false);
+    expect(deps.catalog).toHaveBeenCalledTimes(4);
+    if (outcome === 'failure') {
+      expect(state?.prompt).toBe('Keep this instruction draft');
+      expect(state?.promptDirty).toBe(true);
+      expect(state?.error).toBe(true);
+      await act(async () => state?.savePrompt());
+      expect(state?.promptSaving).toBe(false);
+      expect(state?.promptDirty).toBe(false);
+    }
+    await act(async () => state?.refresh());
+    expect(deps.catalog).toHaveBeenCalledTimes(8);
+    expect(state?.loading).toBe(false);
+    expect(state?.promptSaving).toBe(false);
+  }
+);
+
+function holdMaintenance() {
+  let release!: () => void;
+  deps.maintain.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      release = resolve;
+    })
+  );
+  return () => release();
+}
+it('presents usable saved voice catalogs and instructions before metadata maintenance completes', async () => {
+  const release = holdMaintenance();
+  await render();
+  expect(deps.maintain).toHaveBeenCalledTimes(1);
+  expect(state?.loading).toBe(false);
+  expect(state?.transcription.models).toHaveLength(1);
+  expect(state?.prompt).toBe('Local instructions');
+  act(() => state?.setPrompt('Unsaved draft'));
+  await act(async () => release());
+  expect(state?.prompt).toBe('Unsaved draft');
+  expect(state?.promptDirty).toBe(true);
+  expect(deps.prompt).toHaveBeenCalledTimes(1);
+  expect(updatePreference).not.toHaveBeenCalled();
+});
+it.each(['save', 'reset'] as const)(
+  'preserves an active prompt %s when advisory metadata completes',
+  async (operation) => {
+    const release = holdMaintenance();
+    await render();
+    act(() => state?.setPrompt('Edited instructions'));
+    let finish!: () => void;
+    const writer = operation === 'save' ? deps.savePrompt : deps.resetPrompt;
+    writer.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+    );
+    let saving: Promise<void> | undefined;
+    act(() => {
+      saving = operation === 'save' ? state?.savePrompt() : state?.resetPrompt();
+    });
+    await act(async () => release());
+    expect(state?.promptSaving).toBe(true);
+    expect(state?.prompt).toBe('Edited instructions');
+    expect(deps.prompt).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish();
+      await saving;
+    });
+    expect(state?.promptSaving).toBe(false);
+    expect(state?.promptDirty).toBe(false);
+    expect(state?.prompt).toBe(operation === 'save' ? 'Edited instructions' : 'Local instructions');
+  }
+);
+it.each(['maintenance', 'read'] as const)(
+  'retains usable voice values after advisory %s failure',
+  async (failure) => {
+    if (failure === 'maintenance')
+      deps.maintain.mockRejectedValueOnce(new Error('Metadata failed'));
+    else {
+      deps.catalog
+        .mockResolvedValueOnce(catalog('transcription'))
+        .mockResolvedValueOnce(catalog('text'))
+        .mockRejectedValueOnce(new Error('Read failed'));
+    }
+    await render();
+    expect(state?.loading).toBe(false);
+    expect(state?.error).toBe(false);
+    expect(state?.transcription.models).toHaveLength(1);
+    await act(async () => state?.refresh());
+    expect(deps.maintain).toHaveBeenCalledTimes(2);
+  }
+);
+it('ignores old maintenance after a newer voice refresh', async () => {
+  const release = holdMaintenance();
+  await render();
+  await act(async () => state?.refresh());
+  const calls = deps.catalog.mock.calls.length;
+  await act(async () => release());
+  expect(deps.catalog).toHaveBeenCalledTimes(calls);
+  expect(deps.prompt).toHaveBeenCalledTimes(2);
+});
+
+it('does not read voice catalogs after maintenance completes for a disposed surface', async () => {
+  const release = holdMaintenance();
+  await render();
+  act(() => root.unmount());
+  const calls = deps.catalog.mock.calls.length;
+  await act(async () => release());
+  expect(deps.catalog).toHaveBeenCalledTimes(calls);
+  root = createRoot(container);
 });

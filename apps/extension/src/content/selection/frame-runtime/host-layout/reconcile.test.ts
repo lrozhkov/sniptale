@@ -608,3 +608,39 @@ describe('frame host-layout identity race safety', () => {
     expect(registry.get(frame.id)?.bindingStatus).toBe('bound');
   });
 });
+
+it.each(['callout', 'step-badge'] as const)(
+  'moves a standalone %s with its DOM anchor without resizing its point',
+  (annotationKind) => {
+    const target = document.createElement('div');
+    target.id = 'standalone-anchor';
+    document.body.append(target);
+    installRect(target, { x: 100, y: 200, width: 400, height: 150 });
+    const frame: FrameData = {
+      id: 'standalone',
+      annotationKind,
+      x: 30,
+      y: 45,
+      width: 1,
+      height: 1,
+      linkedElementSelector: '#standalone-anchor',
+      offset: { x: 20, y: 25, width: -119, height: -79 },
+    };
+    const registry = createAnchorRegistry();
+    registry.link(frame.id, target, frame.linkedElementSelector!);
+    const result = reconcileFrameHostLayout({
+      frameStates: new Map(),
+      frames: [frame],
+      movingFrameGenerations: new Map(),
+      registry,
+    });
+    expect(result.frames[0]).toMatchObject({
+      annotationKind,
+      x: 120,
+      y: 225,
+      width: 1,
+      height: 1,
+      pagePlacement: { pageX: 120, pageY: 225 },
+    });
+  }
+);

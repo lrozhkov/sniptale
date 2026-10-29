@@ -3,7 +3,7 @@ import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import {
   AppWindow,
-  ClipboardCopy,
+  Copy,
   Crop,
   Film,
   Library,
@@ -342,7 +342,7 @@ function MenuQuickScenarios(props: {
       onClick: () => void props.onCapture('edit-tab', 'visible', 'edit'),
     },
     {
-      icon: ClipboardCopy,
+      icon: Copy,
       label: translate('popup.home.quickCopyTabLabel'),
       title: props.disabledReason ?? translate('popup.home.quickCopyTabHint'),
       disabled: Boolean(props.disabledReason) || props.pendingAction !== null,

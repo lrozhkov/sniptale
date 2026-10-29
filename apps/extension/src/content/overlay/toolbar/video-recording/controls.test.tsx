@@ -242,6 +242,9 @@ it('customizes icons without activating their tools or media controls', () => {
   expect(drawingOwner.controller.session.getSnapshot().activeTool).toBe(previousTool);
   expect(queryButton('content.toolbar.video-recording.start')?.disabled).toBe(true);
   expect(
+    queryButton('content.toolbar.video-recording.quality.menu')?.closest('fieldset')?.disabled
+  ).toBe(true);
+  expect(
     queryButton('content.toolbar.video-recording.auto-hide')?.closest('fieldset')?.disabled
   ).toBe(true);
 });
@@ -454,8 +457,6 @@ for (const phase of ['idle', 'error', 'starting', 'recording', 'paused', 'stoppi
     renderPhase(phase);
     const setupVisible = phase === 'idle' || phase === 'error';
     expect(Boolean(queryButton('content.toolbar.video-recording.quality.menu'))).toBe(setupVisible);
-    expect(Boolean(queryButton('content.toolbar.video-recording.capture-target.menu'))).toBe(
-      setupVisible
-    );
+    expect(queryButton('content.toolbar.video-recording.capture-target.menu')).toBeNull();
   });
 }

@@ -2,6 +2,7 @@
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import * as scenePlans from '../../features/video/review/advanced/scene';
 import { ReviewZoomPreview } from './zoom-preview';
 import type { ZoomPreviewFrame } from './use-zoom-preview-source';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -50,6 +51,7 @@ const frame: ZoomPreviewFrame = {
 
 function renderPreview(args: {
   cursorFollowing?: boolean;
+  focus?: ComponentProps<typeof ReviewZoomPreview>['focus'];
   region?: QuickEditZoomRegion;
   spatialEdit?: ComponentProps<typeof ReviewZoomPreview>['spatialEdit'];
   sourceTime?: number | null;
@@ -64,6 +66,7 @@ function renderPreview(args: {
     root.render(
       <ReviewZoomPreview
         region={args.region ?? region()}
+        focus={args.focus}
         cursorFollowing={args.cursorFollowing ?? false}
         {...(args.spatialEdit ? { spatialEdit: args.spatialEdit } : {})}
         background={background}
@@ -478,9 +481,18 @@ it('paints live transport, then restores the target and cancels animation on sto
   expect(onInteract).not.toHaveBeenCalled();
   expect(onChange).not.toHaveBeenCalled();
   await render();
-  expect(requests.size).toBe(0);
   expect(Number.parseFloat(area().style.width)).toBeCloseTo(50);
   expect(drawImage).toHaveBeenLastCalledWith(frame.image, 0, 0, 480, 270);
+  drawImage.mockClear();
+  await act(async () => {
+    const pending = [...requests.entries()];
+    for (const [id, callback] of pending) {
+      requests.delete(id);
+      callback(32);
+    }
+  });
+  expect(drawImage).not.toHaveBeenCalled();
+  expect(requests.size).toBe(0);
   expect(loadFrame).toHaveBeenCalledTimes(1);
   await render(1);
   await act(async () => root.render(null));
@@ -754,3 +766,34 @@ it('keeps Area/Result navigation available while following disables manual posit
   await act(async () => previewButton('zoomPreviewResult').click());
   expect(view.section().getAttribute('data-view')).toBe('result');
 });
+
+it.each(['border', 'spotlight'] as const)(
+  'does not prepare a follow-camera plan for a %s edit overlay',
+  async (type) => {
+    const { createQuickEditBorder, createQuickEditSpotlight } =
+      await import('../../features/video/project/scene/focus-appearance');
+    vi.spyOn(await import('./border-overlay'), 'ReviewBorderOverlay').mockImplementation(() => (
+      <></>
+    ));
+    vi.spyOn(await import('./spotlight-overlay'), 'ReviewSpotlightOverlay').mockImplementation(
+      () => <></>
+    );
+    const plan = vi.spyOn(scenePlans, 'resolveReviewSceneCameraPlan').mockReturnValue(null);
+    const overlay = region({
+      [type]: type === 'border' ? createQuickEditBorder() : createQuickEditSpotlight(),
+      cursorFocus: {
+        path: {
+          version: 1,
+          mode: 'follow',
+          smoothing: 0.5,
+          sensitivity: 0.5,
+          gapPolicy: 'hold',
+          segments: [],
+        },
+      },
+    });
+    renderPreview({ region: overlay, focus: { regions: [overlay], time: 3 } });
+    await act(async () => Promise.resolve());
+    expect(plan).not.toHaveBeenCalled();
+  }
+);

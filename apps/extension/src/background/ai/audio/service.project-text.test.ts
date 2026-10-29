@@ -79,6 +79,8 @@ async function setup() {
     profile: { voiceId: 'voice', responseFormat: 'wav' },
   };
   const config: AudioModelConfig = {
+    connectionType: 'openai-compatible',
+    baseUrl: 'https://provider.test',
     url: 'https://provider.test/audio/speech',
     apiKey: 'fixture-key',
     modelCode: 'speech-model',

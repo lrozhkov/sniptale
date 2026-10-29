@@ -256,39 +256,63 @@ it('falls back to a visible viewport after persistent viewport changes', async (
   expect(raster.captureFrame).toHaveBeenCalledOnce();
 });
 
-it('returns an explicit visible-area fallback when the configured single-image budget is exceeded', async () => {
-  const agent = {
-    heartbeat: vi.fn().mockResolvedValue(undefined),
-    prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
-    restore: vi.fn().mockResolvedValue(undefined),
-  };
-  const raster = {
-    captureFrame: vi.fn().mockResolvedValue('data:image/png;base64,limited'),
-    release: vi.fn().mockResolvedValue(undefined),
-  };
-  mocks.createAgent.mockReturnValue(agent);
-  mocks.createNative.mockResolvedValue(raster);
-  mocks.captureTiles.mockRejectedValueOnce(
-    new Error('Full-page screenshot exceeds the configured quality limits')
-  );
+it.each([
+  { format: 'png', outputPurpose: undefined },
+  { format: 'jpeg', outputPurpose: undefined },
+  { format: 'webp', outputPurpose: undefined },
+  { format: 'jpeg', outputPurpose: 'appearance-source' },
+] as const)(
+  'returns the selected $format viewport fallback after a file-budget failure ($outputPurpose)',
+  async ({ format, outputPurpose }) => {
+    mocks.loadSettings.mockResolvedValue({ imageFormat: format, imageQuality: 73 });
+    const agent = {
+      heartbeat: vi.fn().mockResolvedValue(undefined),
+      prepare: vi.fn().mockResolvedValue({ geometry, layoutGeneration: 'layout-1', warnings: [] }),
+      restore: vi.fn().mockResolvedValue(undefined),
+    };
+    const raster = {
+      captureFrame: vi.fn().mockResolvedValue('data:image/png;base64,limited'),
+      release: vi.fn().mockResolvedValue(undefined),
+    };
+    if (outputPurpose === undefined)
+      mocks.admitFallback.mockResolvedValueOnce({
+        height: 500,
+        width: 800,
+        dataUrl: `data:image/${format};base64,optimized`,
+      });
+    mocks.createAgent.mockReturnValue(agent);
+    mocks.createNative.mockResolvedValue(raster);
+    mocks.captureTiles.mockRejectedValueOnce(
+      new Error('Full-page screenshot exceeds the configured quality limits')
+    );
 
-  await expect(
-    captureFullPageTransaction(154, undefined, {
-      backendKind: 'native',
-      documentId: 'document-154',
-    })
-  ).resolves.toEqual(
-    expect.objectContaining({
-      dataUrl: 'data:image/png;base64,limited',
-      metadata: expect.objectContaining({
-        viewportFallback: true,
-        warnings: expect.arrayContaining([expect.stringContaining('configured full-page')]),
-      }),
-    })
-  );
-  expect(mocks.captureTiles).toHaveBeenCalledOnce();
-  expect(raster.captureFrame).toHaveBeenCalledOnce();
-});
+    await expect(
+      captureFullPageTransaction(154, undefined, {
+        backendKind: 'native',
+        documentId: 'document-154',
+        ...(outputPurpose === undefined ? {} : { outputPurpose }),
+      })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        dataUrl:
+          outputPurpose === undefined
+            ? `data:image/${format};base64,optimized`
+            : 'data:image/png;base64,limited',
+        metadata: expect.objectContaining({
+          viewportFallback: true,
+          warnings: expect.arrayContaining([expect.stringContaining('configured full-page')]),
+        }),
+      })
+    );
+    expect(mocks.captureTiles).toHaveBeenCalledOnce();
+    expect(raster.captureFrame).toHaveBeenCalledOnce();
+    expect(mocks.admitFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ format, quality: 0.73 })
+    );
+    if (outputPurpose)
+      expect(mocks.admitFallback).toHaveBeenCalledWith(expect.objectContaining({ outputPurpose }));
+  }
+);
 
 it('retries an export as a reduced full-page image before considering a visible-area fallback', async () => {
   mocks.loadSettings.mockResolvedValueOnce({

@@ -645,6 +645,7 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
             'sniptale-theme-preference': variant.theme,
           },
           runtimeResponses: {
+            AI_SETTINGS_MUTATION: { success: true },
             AI_SETTINGS_QUERY:
               input === 'ai'
                 ? textModelResponse
@@ -983,6 +984,12 @@ for (const input of ['ai', 'file', 'library', 'microphone', 'microphone-interrup
         await operate(back);
         await expect(text.locator('[data-project-text-voice]').first()).toBeFocused();
         await operate(
+          text.getByRole('button', {
+            name: label('gallery.videoReview.textViewCards'),
+            exact: true,
+          })
+        );
+        await operate(
           text.locator('article').first().getByRole('button', { expanded: false }).first()
         );
         await editor.fill('Edited after generation');
@@ -1193,7 +1200,10 @@ for (const variant of [
           'sniptale-locale-preference': variant.locale,
           'sniptale-theme-preference': variant.theme,
         },
-        runtimeResponses: { AI_SETTINGS_QUERY: textModelResponse },
+        runtimeResponses: {
+          AI_SETTINGS_QUERY: textModelResponse,
+          AI_SETTINGS_MUTATION: { success: true },
+        },
       });
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
@@ -1242,6 +1252,12 @@ for (const variant of [
         )
         .toEqual(phrases);
       const before = await readProject(page);
+      await chooseInspectorValue(
+        page,
+        text,
+        label('gallery.videoReview.textView'),
+        label('gallery.videoReview.textViewCards')
+      );
       await operate(
         text.getByRole('button', { name: label('gallery.videoReview.speechBatch'), exact: true })
       );

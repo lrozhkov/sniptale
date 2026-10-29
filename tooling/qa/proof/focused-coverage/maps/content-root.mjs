@@ -1,5 +1,15 @@
 export const CONTENT_ROOT_OWNER_MAPPINGS = [
   {
+    owner: 'content-pin-session-writes',
+    productionFile: 'apps/extension/src/content/overlay/app/content-mode/state/pin-session.ts',
+    reason:
+      'Pin and visibility writes share one queue. Retain delayed-write, failure and retry proof.',
+    testFiles: [
+      'apps/extension/src/content/overlay/app/content-mode/state/pin-session.test.ts',
+      'apps/extension/src/content/overlay/app/content-mode/state/pin-session-writes.test.ts',
+    ],
+  },
+  {
     owner: 'content-toolbar-drag-position-effects',
     productionFile: 'apps/extension/src/content/overlay/toolbar/shell/drag-position.effects.ts',
     reason:

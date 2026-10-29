@@ -35,7 +35,7 @@ export function FrameAnnotationResizeHandleLayer(props: {
     border: `1px solid color-mix(in srgb, ${resolvedBorderColor} 46%, var(--sniptale-color-border-soft))`,
     borderRadius: '50%',
     boxShadow: '0 1px 4px color-mix(in srgb, var(--sniptale-color-shadow-strong) 22%, transparent)',
-    zIndex: FRAME_ANNOTATION_Z_INDEX.floatingUi,
+    zIndex: FRAME_ANNOTATION_Z_INDEX.resizeHandles,
     pointerEvents: 'auto',
   };
 

@@ -165,13 +165,36 @@ export function tryRunWithPersistenceMutationPermit<T>(
 }
 
 /**
+ * Holds the publication lock across one complete read/validate/write transaction.
+ * Erasure takes this same lock, so it cannot split the transaction. No transition gate is
+ * acquired: a queued transaction cannot wait behind erasure while a later command holds a lease.
+ * Keep every read and write inside the callback. Multi-step workflows retain their transition gate.
+ */
+export function runWithAtomicPersistenceMutationPermit<T>(
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+): Promise<T> {
+  return runWithPersistenceLock('exclusive', () => runWithActiveMutationPermit(operation));
+}
+
+/**
  * Reserves the complete persistent mutation authority for an atomic cross-domain workflow.
  * The transition lease keeps privacy erasure ordered outside the workflow while the active
  * permit lets owner-prepared writes and compensating rollback use the guarded storage adapter.
  */
 export function runWithExclusivePersistenceMutationPermit<T>(
-  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>,
+  transitionPermit?: PersistenceMutationTransitionPermit
 ): Promise<T> {
+  // A lifecycle owner can reuse its transition without queuing behind erasure that already waits for it.
+  if (transitionPermit !== undefined) {
+    if (!isActivePersistenceMutationTransitionPermit(transitionPermit))
+      return Promise.reject(new Error('Transition permit is not active.'));
+    return runWithPersistenceLock('exclusive', () => {
+      if (!isActivePersistenceMutationTransitionPermit(transitionPermit))
+        throw new Error('Transition permit is not active.');
+      return runWithActiveMutationPermit(operation);
+    });
+  }
   return getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },

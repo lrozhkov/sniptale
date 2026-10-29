@@ -352,7 +352,11 @@ it('blocks requested-item actions and retained-frame zoom until presentation or 
     />
   );
   expect(
-    container?.querySelector('[data-ui="gallery.preview.inspectorContent"]')?.hasAttribute('inert')
+    Boolean(
+      container
+        ?.querySelector('[data-ui="gallery.preview.inspectorContent"] input')
+        ?.closest('[inert]')
+    )
   ).toBe(false);
   ImagePreloaderStub.deferLoad = true;
   renderNode(
@@ -360,8 +364,9 @@ it('blocks requested-item actions and retained-frame zoom until presentation or 
       {...createProps({ item: next, previewUrl: 'blob:b', previewRequestRevision: 2 })}
     />
   );
-  const inspector = container?.querySelector('[data-ui="gallery.preview.inspectorContent"]');
-  expect(inspector?.hasAttribute('inert')).toBe(true);
+  const filename = container?.querySelector('[data-ui="gallery.preview.inspectorContent"] input');
+  expect(filename).not.toBeNull();
+  expect(filename?.closest('[inert]')).not.toBeNull();
   const image = container?.querySelector('img');
   const style = image?.getAttribute('style');
   act(() =>
@@ -372,7 +377,7 @@ it('blocks requested-item actions and retained-frame zoom until presentation or 
   expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
     'gallery.preview.mediaInvalid'
   );
-  expect(inspector?.hasAttribute('inert')).toBe(false);
+  expect(filename?.closest('[inert]')).toBeNull();
   expect(container?.querySelector('img')).toBeNull();
 });
 

@@ -1,80 +1,49 @@
 import { browserStorage } from '../infrastructure/browser-storage';
-import { createLogger } from '@sniptale/platform/observability/logger';
 import {
-  AI_PROVIDER_STORAGE_MIGRATION_PHASE,
-  AI_STORAGE_MIGRATION_PHASE_KEY,
+  AI_STORAGE_RESET_PHASE_KEY,
   AI_STORAGE_VERSION,
   AI_STORAGE_VERSION_KEY,
 } from './constants';
-import { recoverStoredAISecretPassphraseProtectionTransition } from './secret-protection-transition.store.ts';
-import { migrateAiProviderStorageToV3 } from './provider-secrets.migration.ts';
-
-const logger = createLogger({ namespace: 'SharedAiStorage' });
+import { recoverStoredAISecretPassphraseProtectionTransition } from './secret-protection-transition.store';
+import { resetIncompatibleAISettings } from './alpha-reset';
 
 let aiStoragePreparationPromise: Promise<void> | null = null;
 
-async function readStorageInitializationState(): Promise<{
-  migrationPhase: string | null;
-  version: number | null;
-}> {
-  const result = await browserStorage.local.get([
-    AI_STORAGE_MIGRATION_PHASE_KEY,
-    AI_STORAGE_VERSION_KEY,
-  ]);
-
-  return {
-    version:
-      typeof result[AI_STORAGE_VERSION_KEY] === 'number' ? result[AI_STORAGE_VERSION_KEY] : null,
-    migrationPhase:
-      typeof result[AI_STORAGE_MIGRATION_PHASE_KEY] === 'string'
-        ? result[AI_STORAGE_MIGRATION_PHASE_KEY]
-        : null,
-  };
-}
-
 export interface AiStorageReadiness {
   isReady: boolean;
-  migrationPhase: string | null;
-  requiresMigration: boolean;
+  resetPhase: string | null;
+  requiresReset: boolean;
   version: number | null;
 }
 
+/** Read readiness without reset, migration, credential activation, or other writes. */
 export async function readAiStorageReadiness(): Promise<AiStorageReadiness> {
-  const { migrationPhase, version } = await readStorageInitializationState();
-
-  return {
-    isReady: version === AI_STORAGE_VERSION,
-    migrationPhase,
-    requiresMigration: version !== AI_STORAGE_VERSION,
-    version,
-  };
+  const result = await browserStorage.local.get([
+    AI_STORAGE_RESET_PHASE_KEY,
+    AI_STORAGE_VERSION_KEY,
+  ]);
+  const version =
+    typeof result[AI_STORAGE_VERSION_KEY] === 'number' ? result[AI_STORAGE_VERSION_KEY] : null;
+  const resetPhase =
+    typeof result[AI_STORAGE_RESET_PHASE_KEY] === 'string'
+      ? result[AI_STORAGE_RESET_PHASE_KEY]
+      : null;
+  const isReady =
+    version === AI_STORAGE_VERSION && result[AI_STORAGE_RESET_PHASE_KEY] === undefined;
+  return { isReady, resetPhase, requiresReset: !isReady, version };
 }
 
+/** Explicit startup authority; concurrent callers share one preparation and failures remain retryable. */
 export function initializeAiStorageAccess(): Promise<void> {
-  if (aiStoragePreparationPromise) {
-    return aiStoragePreparationPromise;
-  }
-
+  if (aiStoragePreparationPromise) return aiStoragePreparationPromise;
   aiStoragePreparationPromise = readAiStorageReadiness()
-    .then(({ isReady, migrationPhase }) => {
-      if (isReady) {
-        return recoverStoredAISecretPassphraseProtectionTransition();
-      }
-
-      if (migrationPhase === AI_PROVIDER_STORAGE_MIGRATION_PHASE) {
-        logger.warn('Resuming pending AI storage migration during initialization', {
-          phase: migrationPhase,
-        });
-      }
-
-      return migrateAiProviderStorageToV3().then(() =>
-        recoverStoredAISecretPassphraseProtectionTransition()
-      );
+    .then(async ({ isReady }) => {
+      if (!isReady) await resetIncompatibleAISettings();
+      await recoverStoredAISecretPassphraseProtectionTransition();
     })
     .catch((error) => {
       aiStoragePreparationPromise = null;
       throw error;
     });
-
   return aiStoragePreparationPromise;
 }

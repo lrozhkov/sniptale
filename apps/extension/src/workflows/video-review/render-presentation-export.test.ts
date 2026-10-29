@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { writeReviewPresentationFrames } from './render-presentation-export';
 import type { writeReviewFrames } from './render-export';
+import type { ReviewPresentationRendererInput } from './presentation-render';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { planPresentationPreview } from '../../features/video/review/presentation-preview';
@@ -10,8 +11,13 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createReviewExportDiagnostics } from './export-diagnostics';
 
 const io = vi.hoisted(() => ({
-  open: vi.fn(),
-  render: vi.fn(),
+  open: vi.fn<(args: ReviewPresentationRendererInput) => Promise<unknown>>(),
+  render:
+    vi.fn<
+      Awaited<
+        ReturnType<typeof import('./presentation-render').createReviewPresentationRenderer>
+      >['render']
+    >(),
   release: vi.fn(),
   rendererDispose: vi.fn(),
   probe: vi.fn(),
@@ -242,6 +248,11 @@ it('renders the complete rational sequence with explicit geometry and a partial 
   };
   args.index.frameRate = 30000 / 1001;
   const result = await writeReviewPresentationFrames(args);
+  const opened: ReviewPresentationRendererInput = io.open.mock.calls[0]![0];
+  expect([...opened.main.plannedCandidates!()]).toEqual(
+    io.render.mock.calls.map(([frame]) => frame)
+  );
+  expect([...opened.main.plannedCandidates!()]).toEqual([...opened.main.plannedCandidates!()]);
   expect(result.resultDuration).toBe(3.105);
   expect(result.videoPackets).toBe(io.samples.length);
   expect(io.samples.at(-1)!.timestamp + io.samples.at(-1)!.duration).toBeCloseTo(3.105, 12);
@@ -372,7 +383,7 @@ it('omits fragment bookends and visual/audio fades while retaining main clocks',
   expect(result.resultDuration).toBe(2.105);
   const plan = io.open.mock.calls[0]![0].plan;
   expect(plan.segments).toHaveLength(1);
-  expect(plan.segments[0].content.fragmentOffset).toBe(4);
+  expect(plan.segments[0]).toMatchObject({ content: { kind: 'main', fragmentOffset: 4 } });
   expect(plan.visualEnvelope).toMatchObject({ fadeIn: 0, fadeOut: 0 });
   expect(plan.audioEnvelope).toMatchObject({ fadeIn: 0, fadeOut: 0 });
 });
@@ -486,8 +497,12 @@ it('renders a bounded late window with original mappings and rebased container a
   const preview = endingPreview(args);
   io.probe.mockResolvedValue({ audible: true, multichannel: false, codec: 'aac' });
   const receipt = await writeReviewPresentationFrames(args, preview);
+  const opened: ReviewPresentationRendererInput = io.open.mock.calls[0]![0];
+  expect([...opened.main.plannedCandidates!()]).toEqual(
+    io.render.mock.calls.map(([frame]) => frame)
+  );
   expect(receipt.resultDuration).toBe((preview.window.endUs - preview.window.startUs) / 1e6);
-  expect(io.open.mock.calls[0]![0].dimensions).toBeUndefined();
+  expect(opened).not.toHaveProperty('dimensions');
   expect(io.open.mock.calls[0]![0].main.dimensions).toEqual({
     canonical: { width: 1920, height: 1080 },
     backing: { width: 640, height: 360 },
@@ -585,4 +600,17 @@ it('releases presentation output acquired during abort before starting it', asyn
   expect(io.cancel).toHaveBeenCalledOnce();
   expect(io.start).not.toHaveBeenCalled();
   expect(io.rendererDispose).toHaveBeenCalledOnce();
+});
+
+it('admits only the sparse probe candidates to the repeatable decoder schedule', async () => {
+  const args = fixture();
+  args.index.duration = 100;
+  args.frameProbe = { add: vi.fn(async () => {}) };
+  await writeReviewPresentationFrames(args);
+  const opened: ReviewPresentationRendererInput = io.open.mock.calls[0]![0];
+  const planned = [...opened.main.plannedCandidates!()];
+  expect(planned).toEqual(io.render.mock.calls.map(([frame]) => frame));
+  expect(planned.length).toBeGreaterThan(0);
+  expect(planned.length).toBeLessThanOrEqual(135);
+  expect(io.media).not.toHaveBeenCalled();
 });

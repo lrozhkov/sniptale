@@ -77,7 +77,7 @@ function updateOption(
 
 function BackupExportSummaryGrid(props: {
   options: MediaHubBackupExportOptions;
-  summary: BackupExportModalProps['summary'];
+  summary: NonNullable<BackupExportModalProps['summary']>;
 }) {
   const scopeLabel =
     props.options.scope === 'selected'
@@ -107,7 +107,11 @@ function BackupExportSummaryGrid(props: {
   );
 }
 
-function BackupDataClassesPanel({ summary }: Pick<BackupExportModalProps, 'summary'>) {
+function BackupDataClassesPanel({
+  summary,
+}: {
+  summary: NonNullable<BackupExportModalProps['summary']>;
+}) {
   return (
     <section className="mt-4 border-t border-[var(--sniptale-color-border-soft)] pt-4">
       <div
@@ -189,6 +193,7 @@ function BackupPrivacyOptionsGrid(props: {
 }
 
 function BackupExportActions(props: {
+  requiresPreparation: boolean;
   options: MediaHubBackupExportOptions;
   onClose: () => void;
   onExport: (options: MediaHubBackupExportOptions) => void;
@@ -227,7 +232,11 @@ function BackupExportActions(props: {
       </ProductActionButton>
       <ProductActionButton compact type="button" onClick={() => props.onExport(props.options)}>
         <Download className="h-4 w-4" />
-        {translate('gallery.backupExportModal.export')}
+        {translate(
+          props.requiresPreparation
+            ? 'gallery.backupExportModal.downloadAndExport'
+            : 'gallery.backupExportModal.export'
+        )}
       </ProductActionButton>
     </div>
   );
@@ -248,6 +257,7 @@ function useBackupExportDraft({
 
   useEffect(() => {
     let isCurrent = true;
+    if (summary === null) return;
 
     void onInspect(draftOptions)
       .then((nextSummary) => {
@@ -260,7 +270,7 @@ function useBackupExportDraft({
     return () => {
       isCurrent = false;
     };
-  }, [draftOptions, onInspect]);
+  }, [draftOptions, onInspect, summary]);
 
   return { currentSummary, draftOptions, setDraftOptions };
 }
@@ -269,6 +279,7 @@ export function BackupExportModalContent({
   options,
   onInspect,
   summary,
+  preparation,
   onClose,
   onExport,
 }: BackupExportModalProps) {
@@ -285,13 +296,31 @@ export function BackupExportModalContent({
       maxWidthClassName="max-w-3xl"
       onClose={onClose}
     >
-      <BackupExportSummaryGrid options={draftOptions} summary={currentSummary} />
-      <BackupDataClassesPanel summary={currentSummary} />
+      {currentSummary ? (
+        <>
+          <BackupExportSummaryGrid options={draftOptions} summary={currentSummary} />
+          <BackupDataClassesPanel summary={currentSummary} />
+        </>
+      ) : preparation ? (
+        <div className="mt-4 space-y-3 text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
+          <p>{translate('gallery.backupExportModal.remotePreparation')}</p>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+            <dt>{translate('gallery.backupExportModal.remoteRoots')}</dt>
+            <dd className="text-right tabular-nums">{preparation.missing.length}</dd>
+            <dt>{translate('gallery.backupExportModal.remoteSize')}</dt>
+            <dd className="text-right tabular-nums">
+              {formatBytes(preparation.remoteBytesUpperBound, 1)}
+            </dd>
+          </dl>
+          <p>{translate('gallery.backupExportModal.nativePreparation')}</p>
+        </div>
+      ) : null}
       <BackupPrivacyOptionsGrid
         options={draftOptions}
         onChange={(patch) => setDraftOptions((current) => updateOption(current, patch))}
       />
       <BackupExportActions
+        requiresPreparation={currentSummary === null}
         options={draftOptions}
         onClose={onClose}
         onExport={(nextOptions) => void onExport(nextOptions)}

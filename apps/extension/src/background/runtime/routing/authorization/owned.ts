@@ -1,3 +1,5 @@
+import { parseSyncProductRequest } from '../../../../contracts/messaging/contracts/runtime/sync-product';
+import { isSyncProductSenderAllowed } from '../../../sync-connection/product-route';
 import type { AISecretUnlockMessage } from '../../../../contracts/messaging/ai-secret-unlock';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isOwnedSettingsPage } from '../../../../platform/navigation/extension-pages';
@@ -29,12 +31,14 @@ import {
 import { authorizeAiSettingsMutationRoute, authorizeAiSettingsQueryRoute } from './ai-settings';
 import {
   classifyBackgroundOwnedSender,
-  classifySettingsPageSenderUrl,
   isPageAccessSenderUrl,
-  isImageEditorSenderUrl,
-  isGallerySenderUrl,
   isWebSnapshotViewerSenderUrl,
 } from './sender-classification';
+import {
+  classifySettingsPageSenderUrl,
+  isImageEditorSenderUrl,
+  isGallerySenderUrl,
+} from '../../../../platform/navigation/extension-pages/sender-url';
 import { hasOffscreenRuntimeCapability } from '../../../offscreen-document/sender-policy';
 
 export const backgroundOwnedPolicyAuthorityByMessageType = new Map(
@@ -72,6 +76,8 @@ export const backgroundOwnedAuthorizationBindings = {
   'popup-export-job': authorizePopupExportJobRoute,
   'popup-tab-route-capability-issuance': authorizePopupTabRouteCapabilityIssuance,
   'settings-transfer': authorizeSettingsTransferRoute,
+  'sync-product': authorizeSyncProduct,
+  'sync-connection-origin-permission': authorizeSyncConnectionOriginPermission,
   'voice-input-offscreen-event': authorizeVoiceInputOffscreenEvent,
 } satisfies Record<
   BackgroundOwnedRouteInventoryEntry['handlerId'],
@@ -231,6 +237,23 @@ function authorizePopupTabRouteCapabilityIssuance(
   return AUTHORIZED;
 }
 
+function authorizeSyncConnectionOriginPermission(
+  request: BackgroundOwnedAuthorizationRequest,
+  routeEntry: BackgroundOwnedRouteInventoryEntry
+): IpcAuthorizationResult {
+  if (request.sender.tab || !hasOffscreenRuntimeCapability(request.sender)) {
+    return reject('Sync origin permission query refused');
+  }
+  return authorize(
+    createBackgroundOwnedRoutePreauthorization({
+      entry: routeEntry,
+      handle: { kind: 'background-owned-route-policy' },
+      message: request.message,
+      senderClassification: 'offscreen-document',
+    })
+  );
+}
+
 function authorizeVoiceInputOffscreenEvent(
   request: BackgroundOwnedAuthorizationRequest,
   routeEntry: BackgroundOwnedRouteInventoryEntry
@@ -285,7 +308,7 @@ function authorizeContentRuntimeWakeupRoute(
     return reject(`Unauthorized content runtime wake-up sender: ${senderDecision.reason}`);
   }
   if (
-    request.message['pinToTab'] === true &&
+    (request.message['pinToTab'] === true || request.message['autoPinToTab'] === true) &&
     !consumeContentPrivilegedActionCapabilityBinding({
       actionType: MessageType.CONTENT_RUNTIME_WAKEUP,
       contentIntent: request.message['contentIntent'],
@@ -357,4 +380,13 @@ function authorizePageLaunchPreferencesRoute(
       senderClassification: 'content-tab-runtime',
     })
   );
+}
+
+function authorizeSyncProduct(
+  request: BackgroundOwnedAuthorizationRequest
+): IpcAuthorizationResult {
+  const parsed = parseSyncProductRequest(request.message);
+  return parsed && isSyncProductSenderAllowed(parsed.command, request.sender)
+    ? AUTHORIZED
+    : reject('Sync product command refused');
 }

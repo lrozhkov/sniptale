@@ -14,7 +14,11 @@ import type {
 import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ViewportPresetAvailabilityPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ViewportStatusResponse } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { CaptureActionType, QuickActionOverlay } from '../../../settings';
+import type {
+  CaptureActionType,
+  QuickActionOverlay,
+  ScreenshotCapturePreferences,
+} from '../../../settings';
 import type {
   PageAccessMessage,
   PageAccessResponse,
@@ -166,6 +170,7 @@ type RuntimeCoreBaseRequestByType = RuntimePageLaunchRequestByType &
     [MessageType.CONTENT_RUNTIME_WAKEUP]: {
       contentIntent?: ContentPrivilegedActionCapability;
       pinToTab?: boolean;
+      autoPinToTab?: boolean;
       toolbarVisible?: boolean;
       type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
     };
@@ -192,6 +197,7 @@ type RuntimeCoreBaseRequestByType = RuntimePageLaunchRequestByType &
     [CaptureMessageType.CAPTURE_VISIBLE]: {
       type: typeof CaptureMessageType.CAPTURE_VISIBLE;
       actionType?: CaptureActionType;
+      capturePreferences?: ScreenshotCapturePreferences;
       quickActionTransactionId?: string;
       contentIntent?: ContentPrivilegedActionCapability;
       scenarioCapture?: ScenarioRuntimeCapturePayload;
@@ -199,6 +205,7 @@ type RuntimeCoreBaseRequestByType = RuntimePageLaunchRequestByType &
     [CaptureMessageType.CAPTURE_FULL]: {
       type: typeof CaptureMessageType.CAPTURE_FULL;
       actionType?: CaptureActionType;
+      capturePreferences?: ScreenshotCapturePreferences;
       quickActionTransactionId?: string;
       contentIntent?: ContentPrivilegedActionCapability;
       scenarioCapture?: ScenarioRuntimeCapturePayload;
@@ -243,6 +250,7 @@ type RuntimeCoreBaseResponseByType = RuntimePageLaunchResponseByType &
     [MessageType.CONTENT_RUNTIME_WAKEUP]: RuntimeMessageResponse<{
       pinToTab: boolean;
       pinToTabAvailable: boolean;
+      pinToTabAutomatic?: boolean;
       restored?: boolean;
       reason?: 'pin-to-tab' | 'scenario';
       toolbarVisible?: boolean;

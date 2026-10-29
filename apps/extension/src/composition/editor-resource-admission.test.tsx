@@ -6,6 +6,7 @@ import { EditorResourceAdmission } from './editor-resource-admission';
 import { PageBootstrapErrorBoundary } from '../ui/page-bootstrap/page-bootstrap-error-boundary';
 const harness = vi.hoisted(() => ({
   acquire: vi.fn(),
+  prepare: vi.fn(async (): Promise<void> => undefined),
 }));
 vi.mock('./persistence/assets/resource-sessions', () => ({
   acquireAssetResourceSession: harness.acquire,
@@ -84,3 +85,65 @@ it.each(['admitted', 'unmounted-before-admission'] as const)(
     expect(release).toHaveBeenCalledOnce();
   }
 );
+
+vi.mock('../workflows/sync-transfer/editing-admission', () => ({
+  ensureNativeEditingRootAvailable: harness.prepare,
+}));
+
+it('keeps the existing reader through preparation after unmount and never mounts a stale editor', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const release = vi.fn(async () => undefined);
+  harness.acquire.mockResolvedValue({ release });
+  harness.prepare.mockReturnValueOnce(pending);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <EditorResourceAdmission root={{ rootKind: 'media', rootId: 'asset' }}>
+        <span>editor</span>
+      </EditorResourceAdmission>
+    )
+  );
+  expect(host.querySelector('[role="status"]')).not.toBeNull();
+  expect(host.textContent).not.toContain('editor');
+  expect(release).not.toHaveBeenCalled();
+  await act(async () => root.unmount());
+  expect(release).not.toHaveBeenCalled();
+  await act(async () => {
+    finish();
+    await pending;
+  });
+  expect(release).toHaveBeenCalledOnce();
+});
+
+it('retries missing-byte preparation without mounting an unprotected editor', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const release = vi.fn(async () => undefined);
+  harness.acquire.mockResolvedValue({ release });
+  harness.prepare.mockRejectedValueOnce(new Error('Provider unavailable'));
+  harness.prepare.mockResolvedValueOnce(undefined);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(
+        <EditorResourceAdmission root={{ rootKind: 'media', rootId: 'asset' }}>
+          <span data-editor>editor</span>
+        </EditorResourceAdmission>
+      )
+    );
+    expect(host.querySelector('[data-editor]')).toBeNull();
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(release).toHaveBeenCalledOnce();
+    await act(async () => host.querySelector('button')?.click());
+    expect(host.querySelector('[data-editor]')).not.toBeNull();
+    expect(release).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => root.unmount());
+  }
+  expect(release).toHaveBeenCalledTimes(2);
+});

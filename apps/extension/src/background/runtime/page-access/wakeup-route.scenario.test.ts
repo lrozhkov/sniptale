@@ -5,6 +5,7 @@ import type { BackgroundRuntimeMessageDeps } from '../routing/boundary/shared';
 
 const pinStorageMocks = vi.hoisted(() => ({
   readPinToTabSessionStorageState: vi.fn(),
+  readPinToTabAutomaticSessionStorageState: vi.fn(async () => false),
   readPinToTabToolbarVisibilitySessionStorageState: vi.fn(async () => true),
   writePinToTabSessionStorageState: vi.fn(),
 }));

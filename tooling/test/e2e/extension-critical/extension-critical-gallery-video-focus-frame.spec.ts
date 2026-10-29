@@ -54,6 +54,12 @@ for (const variant of [
       await type
         .getByRole('button', { name: label('gallery.videoReview.zoomRegionLabel'), exact: true })
         .click();
+      await expect
+        .poll(async () => {
+          const region = await persistedFocus(page);
+          return !!region && !region.spotlight && !region.border;
+        })
+        .toBe(true);
       const preview = dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await expect(preview).toHaveAttribute('data-status', 'ready');
       const frame = preview.locator('[data-focus-frame]');

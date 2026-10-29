@@ -41,6 +41,7 @@ import {
   loadContentPinToTabSessionState,
   readContentPinToTabSessionState,
   writeContentPinToTabSessionState,
+  writeContentPinToTabToolbarVisibilityState,
 } from './pin-session';
 
 beforeEach(() => {
@@ -191,4 +192,37 @@ it('skips a stale write before crossing the runtime boundary', async () => {
   });
 
   expect(runtimeMocks.sendRuntimeMessage).not.toHaveBeenCalled();
+});
+
+it('binds automatic collapse to its trusted event and projects the authoritative origin ACK', async () => {
+  const source = { kind: 'trusted-content-event' as const };
+  const onAccepted = vi.fn();
+  runtimeMocks.sendRuntimeMessage.mockResolvedValueOnce({
+    success: true,
+    pinToTab: true,
+    pinToTabAutomatic: true,
+    pinToTabAvailable: true,
+    toolbarVisible: false,
+  });
+  await writeContentPinToTabToolbarVisibilityState(false, source, onAccepted);
+  expect(intentMocks.attachContentActionIntent).toHaveBeenLastCalledWith(
+    {
+      type: 'CONTENT_RUNTIME_WAKEUP',
+      toolbarVisible: false,
+      autoPinToTab: true,
+    },
+    source
+  );
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenLastCalledWith({
+    type: 'CONTENT_RUNTIME_WAKEUP',
+    toolbarVisible: false,
+    autoPinToTab: true,
+    contentIntent: { requestId: 'pin-request-1', token: 'pin-token-1' },
+  });
+  expect(onAccepted).toHaveBeenCalledWith({
+    pinToTab: true,
+    pinToTabAutomatic: true,
+    pinToTabAvailable: true,
+    toolbarVisible: false,
+  });
 });

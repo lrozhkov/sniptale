@@ -1,3 +1,5 @@
+import { captureScenarioProjectInTransaction } from '../sync-capture/capture';
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { readScenarioStorage } from '../scenario/storage';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
@@ -58,6 +60,7 @@ export async function commitProjectAggregatePresentation(args: {
       args.ref.kind === 'scenario' ? SCENARIO_PROJECTS_STORE : VIDEO_PROJECTS_STORE;
     const tx = db.transaction(
       [
+        ...(args.ref.kind === 'scenario' ? SCENARIO_CAPTURE_STORES : []),
         rootStoreName,
         SCENARIO_PROJECT_HISTORY_STORE,
         SCENARIO_PROJECT_UNITS_STORE,
@@ -86,6 +89,7 @@ export async function commitProjectAggregatePresentation(args: {
       updatedAt: Date.now(),
     };
     await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).put(entry);
+    if (args.ref.kind === 'scenario') await captureScenarioProjectInTransaction(tx, args.ref.id);
     await tx.done;
     return entry;
   });

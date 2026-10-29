@@ -279,7 +279,7 @@ export function prepareScreenshotMode(
     };
   }
   session.editingModeBaseline =
-    type === 'selection'
+    !session.preparationBaseline || type === 'selection'
       ? (session.preparationBaseline?.editingMode ??
         resolveEditingModeBaseline(params.editingModes))
       : null;

@@ -6,6 +6,8 @@ import { applyResolvedPickerColorChange } from '@sniptale/ui/color-selector/pick
 import { getColorFromPlanePoint } from '@sniptale/ui/color-selector/helpers';
 import { PickerControls } from './picker-layout';
 import { ColorPlane } from './picker-sections';
+import { ColorCatalogPanel } from './catalog-panel';
+import { useCatalogPlacement } from './catalog-state';
 import {
   useHslInputs,
   usePickerColorState,
@@ -20,6 +22,8 @@ function displayHex(color: string) {
 
 type ColorEditorPanelProps = {
   compact?: boolean | undefined;
+  catalogMode?: boolean | undefined;
+  onCatalogExit?: (() => void) | undefined;
   originalColor?: string | undefined;
   allowAlpha?: boolean | undefined;
   allowTransparent?: boolean | undefined;
@@ -32,6 +36,8 @@ type ColorEditorPanelProps = {
 };
 
 export function ColorEditorPanel(props: ColorEditorPanelProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const placement = useCatalogPlacement(editorRef, props.catalogMode === true);
   const initialColor = useRef(props.color);
   const planeRef = useRef<HTMLDivElement | null>(null);
   const color = usePickerColorState(props.color);
@@ -90,9 +96,23 @@ export function ColorEditorPanel(props: ColorEditorPanelProps) {
   const hslInputs = useHslInputs(color.resolvedColor, handleChannelColorChange);
   return (
     <div
-      className="@container/picker space-y-3 [--sniptale-compact-control-height:32px]"
+      ref={editorRef}
+      data-catalog-mode={props.catalogMode === true}
+      className="relative @container/picker space-y-3 [--sniptale-compact-control-height:32px]"
       data-ui="shared.ui.color-selector.editor-panel"
     >
+      {props.catalogMode && (
+        <div
+          className="sniptale-color-catalog-overlay"
+          style={{ top: placement.top, height: placement.height }}
+        >
+          <ColorCatalogPanel
+            color={color.resolvedColor}
+            onColorChange={handlePickerColorChange}
+            onExit={() => props.onCatalogExit?.()}
+          />
+        </div>
+      )}
       <ColorPlane
         getColorFromPlanePoint={getColorFromPlanePoint}
         hue={color.hue}

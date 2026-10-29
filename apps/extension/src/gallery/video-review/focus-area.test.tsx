@@ -50,11 +50,14 @@ it.each(['nw', 'ne', 'sw', 'se'])(
       const x = corner.endsWith('w') ? -200 : 400;
       const y = corner.startsWith('n') ? -200 : 200;
       preview.mockClear();
+      const queuedBefore = frames.length;
       pointer(plane, 'pointermove', 80, 50);
       pointer(plane, 'pointermove', x, y);
       expect(preview).not.toHaveBeenCalled();
-      expect(frames).toHaveLength(1);
-      act(() => frames[0]!(0));
+      expect(frames).toHaveLength(queuedBefore + 1);
+      act(() => {
+        for (const callback of [...frames]) callback(0);
+      });
       expect(preview).toHaveBeenCalledTimes(1);
       pointer(plane, 'pointermove', 80, 50);
       pointer(plane, 'pointerup', x, y);
@@ -138,7 +141,9 @@ it('moves the Focus body and cancels a pending preview when disabled', () => {
     pointer(body, 'pointerdown', 50);
     pointer(plane, 'pointerup', 50, 2);
     pointer(plane, 'pointermove', 70);
-    act(() => frames[0]!(0));
+    act(() => {
+      for (const callback of [...frames]) callback(0);
+    });
     expect(preview).toHaveBeenLastCalledWith({ ...props.area, x: 0.35 });
     pointer(plane, 'pointerup', 90);
     expect(change).toHaveBeenCalledExactlyOnceWith({ ...props.area, x: 0.45 });

@@ -1,3 +1,7 @@
+import {
+  AnnotationCreationPlacement,
+  type AnnotationPlacementControl,
+} from '../creation-placement';
 import { translate } from '../../../platform/i18n';
 import type {
   StepBadgeAnchor,
@@ -17,9 +21,10 @@ import {
 import { TemplateForkReturnGuard, useTemplateForkWorkflow } from '../popover/template-fork';
 import { ApplyToFutureFramesGuard, useApplyToFutureFrames } from '../popover/apply-future';
 
-export function StepBadgePopoverContent(props: {
+type StepBadgePopoverContentProps = {
   frameId: string;
   headerContext: SettingsPopoverContext;
+  hideDisableAction?: boolean;
   headerDrag?: FloatingPopoverDrag;
   isAuto: boolean;
   localStepBadgeSettings: StepBadgeSettings;
@@ -54,13 +59,16 @@ export function StepBadgePopoverContent(props: {
   presetError: string | null;
   templateSettings: StepBadgeTemplateSettings;
   templateSourceControl?: TemplateSourceControl;
+  creationPlacement?: AnnotationPlacementControl;
   frameVisuals: {
     borderColor: string;
     borderWidth: number;
     fillColor?: string;
   };
   onReorder?: (direction: 'up' | 'down', frameId: string) => void;
-}) {
+};
+
+export function StepBadgePopoverContent(props: StepBadgePopoverContentProps) {
   const workflow = useTemplateForkWorkflow({
     ...(props.localStepBadgeSettings.sourcePresetId
       ? { activeTemplateId: props.localStepBadgeSettings.sourcePresetId }
@@ -71,12 +79,6 @@ export function StepBadgePopoverContent(props: {
     templates: props.presets,
   });
   const applyToFuture = useApplyToFutureFrames(props.onApplyToFuture);
-  const onUseForNewFrames =
-    workflow.session.mode === 'temporary' &&
-    props.headerContext === 'element' &&
-    props.onApplyToFuture
-      ? applyToFuture.request
-      : undefined;
 
   return (
     <>
@@ -91,10 +93,14 @@ export function StepBadgePopoverContent(props: {
           : {})}
         closeLabel={translate('content.stepBadge.closeSettings')}
         context={props.headerContext}
-        destructiveAction={{
-          label: translate('content.stepBadge.disableButton'),
-          onClick: props.onDisable,
-        }}
+        {...(!props.hideDisableAction
+          ? {
+              destructiveAction: {
+                label: translate('content.stepBadge.disableButton'),
+                onClick: props.onDisable,
+              },
+            }
+          : {})}
         {...(props.templateSourceControl
           ? {
               sourceControl: createTemplateSourceHeaderControl(props.templateSourceControl, {
@@ -109,58 +115,79 @@ export function StepBadgePopoverContent(props: {
         onClose={props.onClose}
         title={translate('content.stepBadge.settingsTitle')}
       />
-      {applyToFuture.confirming ? (
-        <ApplyToFutureFramesGuard
-          onCancel={applyToFuture.cancel}
-          onConfirm={applyToFuture.confirm}
-        />
-      ) : workflow.confirmingReturn ? (
-        <TemplateForkReturnGuard
-          onContinue={workflow.continueEditing}
-          onDiscard={workflow.discard}
-          onGoToSave={workflow.goToSave}
-        />
-      ) : workflow.session.mode === 'templates' ? (
-        <StepBadgePresetSection
-          {...(props.localStepBadgeSettings.sourcePresetId
-            ? { activePresetId: props.localStepBadgeSettings.sourcePresetId }
-            : {})}
-          error={props.presetError}
-          onApply={(preset) => {
-            selectOrClosePopoverPreset({
-              isActive: props.localStepBadgeSettings.sourcePresetId === preset.id,
-              onApply: props.onApplyPreset,
-              onClose: props.onClose,
-              preset,
-            });
-          }}
-          onFork={workflow.fork}
-          {...(props.onFloatingInteractionChange
-            ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
-            : {})}
-          onReset={props.onResetPreset}
-          onToggle={props.onTogglePreset}
-          pending={props.pendingPresetIds}
-          presets={props.presets}
-        />
-      ) : (
-        <StepBadgeManualSettings
-          {...props}
-          {...(workflow.session.mode === 'temporary'
-            ? { saveSectionStatus: translate('content.templateFork.temporaryStatus') }
-            : {})}
-          onTemplateCreated={(templateId) => {
-            props.onTemplateCreated?.(templateId);
-            workflow.completeSave();
-          }}
-          {...(workflow.session.sourceTemplate
-            ? { createTagIds: workflow.session.sourceTemplate.tagIds }
-            : {})}
-          {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
-          {...(onUseForNewFrames ? { onUseForNewFrames } : {})}
-          settings={props.localStepBadgeSettings}
-        />
-      )}
+      {props.creationPlacement ? (
+        <AnnotationCreationPlacement {...props.creationPlacement} />
+      ) : null}
+      {renderStepBadgePopoverBody(props, workflow, applyToFuture)}
     </>
+  );
+}
+
+function renderStepBadgePopoverBody(
+  props: StepBadgePopoverContentProps,
+  workflow: ReturnType<typeof useTemplateForkWorkflow<StepBadgePreset>>,
+  applyToFuture: ReturnType<typeof useApplyToFutureFrames>
+) {
+  const onUseForNewFrames =
+    workflow.session.mode === 'temporary' &&
+    props.headerContext === 'element' &&
+    props.onApplyToFuture
+      ? applyToFuture.request
+      : undefined;
+
+  if (applyToFuture.confirming)
+    return (
+      <ApplyToFutureFramesGuard onCancel={applyToFuture.cancel} onConfirm={applyToFuture.confirm} />
+    );
+  if (workflow.confirmingReturn)
+    return (
+      <TemplateForkReturnGuard
+        onContinue={workflow.continueEditing}
+        onDiscard={workflow.discard}
+        onGoToSave={workflow.goToSave}
+      />
+    );
+  if (workflow.session.mode === 'templates')
+    return (
+      <StepBadgePresetSection
+        {...(props.localStepBadgeSettings.sourcePresetId
+          ? { activePresetId: props.localStepBadgeSettings.sourcePresetId }
+          : {})}
+        error={props.presetError}
+        onApply={(preset) => {
+          selectOrClosePopoverPreset({
+            isActive: props.localStepBadgeSettings.sourcePresetId === preset.id,
+            onApply: props.onApplyPreset,
+            onClose: props.onClose,
+            preset,
+          });
+        }}
+        onFork={workflow.fork}
+        {...(props.onFloatingInteractionChange
+          ? { onFloatingInteractionChange: props.onFloatingInteractionChange }
+          : {})}
+        onReset={props.onResetPreset}
+        onToggle={props.onTogglePreset}
+        pending={props.pendingPresetIds}
+        presets={props.presets}
+      />
+    );
+  return (
+    <StepBadgeManualSettings
+      {...props}
+      {...(workflow.session.mode === 'temporary'
+        ? { saveSectionStatus: translate('content.templateFork.temporaryStatus') }
+        : {})}
+      onTemplateCreated={(templateId) => {
+        props.onTemplateCreated?.(templateId);
+        workflow.completeSave();
+      }}
+      {...(workflow.session.sourceTemplate
+        ? { createTagIds: workflow.session.sourceTemplate.tagIds }
+        : {})}
+      {...(workflow.saveRequest > 0 ? { saveSectionRequest: workflow.saveRequest } : {})}
+      {...(onUseForNewFrames ? { onUseForNewFrames } : {})}
+      settings={props.localStepBadgeSettings}
+    />
   );
 }

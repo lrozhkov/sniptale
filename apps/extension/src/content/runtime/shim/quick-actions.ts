@@ -8,6 +8,7 @@ import type { QuickActionHotkeyAction } from '../../platform/quick-action-hotkey
 
 export interface ShimQuickAction extends QuickActionHotkeyAction {
   name?: string;
+  icon?: string;
   bundledId?: string;
   customized?: boolean;
 }
@@ -39,7 +40,12 @@ function parseQuickActionHotkey(value: unknown): ShimQuickAction | null {
     return null;
   }
 
+  const icon =
+    typeof value['icon'] === 'string' && value['icon'].length <= 128
+      ? value['icon']
+      : bundledQuickActionConfigs.find((config) => config.id === value['id'])?.icon;
   return {
+    ...(icon ? { icon } : {}),
     hotkey,
     id: value['id'],
     status: value['status'],
@@ -71,7 +77,7 @@ export function createShimQuickActionLoader(browser: ContentRuntimeShimBrowserAd
       ...actions,
       ...bundledQuickActionConfigs
         .filter((config) => !storedIds.has(config.id))
-        .map((config) => ({ id: config.id, status: true, hotkey: null })),
+        .map((config) => ({ id: config.id, icon: config.icon, status: true, hotkey: null })),
     ];
   };
 }

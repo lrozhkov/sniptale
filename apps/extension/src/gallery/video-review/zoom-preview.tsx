@@ -88,9 +88,12 @@ type ZoomPreviewProps = {
 
 function resolvePreviewCameraAdmission(props: ZoomPreviewProps) {
   const region = props.region;
-  const followRegion = props.focus?.regions.find(
-    (item) => item.id === region.id || item.id.startsWith(`${region.id}:slice:`)
-  );
+  const followRegion =
+    !region.border && !region.spotlight
+      ? props.focus?.regions.find(
+          (item) => item.id === region.id || item.id.startsWith(`${region.id}:slice:`)
+        )
+      : undefined;
   const followGeometry =
     followRegion &&
     resolveReviewCameraGeometry(props.focus?.regions ?? [followRegion], followRegion, {

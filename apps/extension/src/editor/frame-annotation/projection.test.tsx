@@ -539,3 +539,73 @@ it('projects a font selected in shared callout settings into the editor DOM surf
     vi.unstubAllGlobals();
   }
 });
+
+it('keeps a selected standalone badge editable without frame resize or effect controls', () => {
+  const host = document.createElement('div');
+  const controlsRoot = document.createElement('div');
+  const sceneRoot = document.createElement('div');
+  document.body.append(host, controlsRoot, sceneRoot);
+  const root = createRoot(host);
+  const onSnapshotChange = vi.fn();
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'standalone',
+      annotationKind: 'step-badge',
+      x: 120,
+      y: 80,
+      width: 1,
+      height: 1,
+      stepBadge: { ...createDefaultFrameStepBadge(), value: '7', sourcePresetId: 'system-classic' },
+    },
+    0
+  );
+  act(() =>
+    root.render(
+      <FrameProjection
+        coordinateSpace={identityFrameAnnotationCoordinateSpace}
+        controlsRoot={controlsRoot}
+        interactive
+        object={null}
+        sceneRoot={sceneRoot}
+        selected
+        scale={1}
+        snapshot={snapshot}
+        settingsAnchor={null}
+        settingsMenu={null}
+        onCommand={vi.fn()}
+        onDraftCommit={vi.fn()}
+        onCloseSettings={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onMoveStart={vi.fn()}
+        onResizeStart={vi.fn()}
+        onSnapshotChange={onSnapshotChange}
+        onSnapshotPreview={vi.fn()}
+        onStepBadgeReorder={vi.fn()}
+      />
+    )
+  );
+  expect(controlsRoot.querySelector('.sniptale-action-toolbar')).toBeNull();
+  expect(sceneRoot.querySelector('.sniptale-resize-handle')).toBeNull();
+  expect(sceneRoot.querySelector('.sniptale-step-badge')).not.toBeNull();
+  expect(controlsRoot.querySelector('.sniptale-step-badge-settings-handle')).not.toBeNull();
+  act(() =>
+    controlsRoot.querySelector<HTMLButtonElement>('.sniptale-step-badge-edit-handle')!.click()
+  );
+  const input = sceneRoot.querySelector<HTMLInputElement>('input')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '42');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(onSnapshotChange).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      stepBadge: expect.objectContaining({ value: '42', auto: false, sourcePresetId: undefined }),
+    })
+  );
+  expect(snapshot.stepBadge).toMatchObject({ value: '7', sourcePresetId: 'system-classic' });
+
+  act(() => root.unmount());
+  host.remove();
+  controlsRoot.remove();
+  sceneRoot.remove();
+});

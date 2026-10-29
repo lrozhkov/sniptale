@@ -66,7 +66,10 @@ type EditorFloatingToolRailProps = EditorToolbarContentProps & {
 
 export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
   const annotationDefaults = useFrameAnnotationCreationDefaults();
-  const frameAnnotationActive = props.isToolButtonActive('frame-annotation');
+  const creationKind = useEditorStore((state) => state.frameAnnotationCreationKind);
+  const setCreationKind = useEditorStore((state) => state.setFrameAnnotationCreationKind);
+  const annotationModeActive = props.isToolButtonActive('frame-annotation');
+  const frameAnnotationActive = annotationModeActive && creationKind === null;
   useEffect(() => {
     void initializeFrameAnnotationCreationDefaults(loadHighlighterSettings);
   }, []);
@@ -103,13 +106,18 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
             context="content"
             disabled={!props.hasImage}
             frameActive={frameAnnotationActive}
-            onFrameActiveChange={(active) =>
-              props.onActivateTool(active ? 'frame-annotation' : 'select')
-            }
+            allowElementPlacement={false}
+            standaloneTool={annotationModeActive ? creationKind : null}
+            onStandaloneCreationChange={(options) => {
+              props.onActivateTool(options ? 'frame-annotation' : 'select');
+              setCreationKind(options?.annotationKind ?? null);
+            }}
+            onFrameActiveChange={(active) => {
+              setCreationKind(null);
+              props.onActivateTool(active ? 'frame-annotation' : 'select');
+            }}
             onChange={setFrameAnnotationCreationDefaults}
             settings={annotationDefaults}
-            showCallout={frameAnnotationActive}
-            showStepBadge={frameAnnotationActive}
           />
         </div>
         <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.after-frame" />

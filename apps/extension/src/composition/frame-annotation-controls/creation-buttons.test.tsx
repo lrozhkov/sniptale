@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { AnnotationCreationPlacement } from './creation-placement';
 
 import { act, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -276,4 +277,72 @@ it('places page controls independently and retains editor grouping by default', 
     root.render(<FrameAnnotationCreationControls settings={createSettings()} onChange={vi.fn()} />)
   );
   expect(host.querySelector('.sniptale-toolbar-annotation-group')).not.toBeNull();
+});
+
+it('keeps standalone tools visible and mutually exclusive when the frame is off', () => {
+  const onStandaloneCreationChange = vi.fn();
+  const onChange = vi.fn();
+  const settings = {
+    ...createSettings(),
+    callout: createDefaultFrameCallout(),
+    stepBadge: createDefaultFrameStepBadge(),
+  };
+  act(() =>
+    root.render(
+      <FrameAnnotationCreationControls
+        context="content"
+        frameActive={false}
+        settings={settings}
+        onChange={onChange}
+        onStandaloneCreationChange={onStandaloneCreationChange}
+      />
+    )
+  );
+  const callout = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.future-frame-callout"]'
+  )!;
+  const badge = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.future-frame-step-badge"]'
+  )!;
+  expect(callout).not.toBeNull();
+  expect(badge).not.toBeNull();
+  expect(callout.getAttribute('aria-pressed')).toBe('false');
+  expect(badge.getAttribute('aria-pressed')).toBe('false');
+  act(() => callout.click());
+  expect(callout.getAttribute('aria-pressed')).toBe('true');
+  expect(onStandaloneCreationChange).toHaveBeenLastCalledWith({
+    annotationKind: 'callout',
+    placement: 'free',
+  });
+  act(() => badge.click());
+  expect(callout.getAttribute('aria-pressed')).toBe('false');
+  expect(badge.getAttribute('aria-pressed')).toBe('true');
+  expect(onStandaloneCreationChange).toHaveBeenLastCalledWith({
+    annotationKind: 'step-badge',
+    placement: 'free',
+  });
+  act(() => badge.click());
+  expect(badge.getAttribute('aria-pressed')).toBe('false');
+  expect(onStandaloneCreationChange).toHaveBeenLastCalledWith(null);
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+it('offers explicit element and free placement through the existing segmented control', () => {
+  const onChange = vi.fn();
+  act(() => root.render(<AnnotationCreationPlacement value="element" onChange={onChange} />));
+  const buttons = host.querySelectorAll<HTMLButtonElement>('button[aria-pressed]');
+  expect(buttons).toHaveLength(2);
+  expect(buttons[0]!.getAttribute('aria-pressed')).toBe('true');
+  expect(buttons[1]!.getAttribute('aria-pressed')).toBe('false');
+  const pointer = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+  act(() => buttons[1]!.dispatchEvent(pointer));
+  expect(pointer.defaultPrevented).toBe(true);
+  act(() => buttons[1]!.click());
+  expect(onChange).toHaveBeenCalledWith('free');
+  act(() =>
+    root.render(
+      <AnnotationCreationPlacement value="free" onChange={onChange} allowElementPlacement={false} />
+    )
+  );
+  expect(host.querySelector('button')).toBeNull();
 });

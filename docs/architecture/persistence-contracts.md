@@ -158,6 +158,24 @@ Use `sniptale-video-db` only in alpha-reset and privacy-erasure inventories. Und
 
 Do not fix or reset on read. Gallery may offer retry for blocked or insufficient-space states and confirmed reset for corrupt or unsupported data. Never downgrade a future-version database. Reset preserves browser-storage preferences and removes IndexedDB, OPFS, and transition metadata.
 
+### AI settings graph and alpha reset
+
+AI browser storage uses AI_STORAGE_VERSION 4, independently of the physical IndexedDB version. [Alpha reset](../../apps/extension/src/composition/persistence/ai-settings/alpha-reset.ts) writes a durable reset marker before cleanup and removes it only after completion. Retry resumes an interrupted reset. AI initialization remains unavailable after failure. Unrelated product data stays usable.
+
+Reset removes incompatible AI providers, models, secrets, cached observations and scenario selections. It clears the legacy global default and dependent voice model references. It preserves valid independent prompts, projects, media and unrelated settings.
+
+Affected model voice input and correction become disabled. The recognition backend remains unchanged. Reset does not select Chrome as a fallback. The command replaces incompatible configuration without migrating old records.
+
+[Graph commands](../../apps/extension/src/composition/persistence/ai-settings/graph-mutations.ts) serialize configuration mutations under existing persistence permits. A catalog refresh captures provider incarnation, configuration revision, credential revision, destination scope and generation before network access. Commit reloads current state and rejects stale receipts after mutation, deletion, recreation, restore or a newer refresh. Advisory network work stays outside the graph mutation permit.
+
+[Reconciliation](../../apps/extension/src/composition/persistence/ai-settings/catalog-reconciliation.ts) computes a semantic diff by provider and exact model code. Equal records and stable configured identities remain. Manual properties and referenced unavailable models survive refresh. Failure, incomplete results and a changed scope cannot establish absence in the previous scope. Unreferenced catalog-owned records permit cleanup after 30 days of absence and at least two observations separated by 24 hours.
+
+Known retirement evidence and deadlines constrain eligibility. An explicit manual retirement override permits an attempt without guaranteeing availability.
+
+Provider and model-operation observations contain fixed reasons and timestamps. Their current-generation checks remain separate. Late or refused publication cannot resurrect state after deletion or overwrite a newer result. Explicit retry uses the current owner admission. Observations do not change model eligibility or establish retirement from an HTTP error.
+
+[Portable model metadata](../../apps/extension/src/contracts/settings-transfer/model-metadata.ts) excludes cached catalog facts and observations. It preserves blocked models as disabled without that evidence. Imported configuration supplies no local credential or source approval.
+
 ## Change proof
 
 For a database or domain version change, update the registry, retained source fixture, target fixture, and contiguous descriptor. Prove deterministic output, interruption and rerun, quota handling, backup or refusal, and affected runtime and UI behavior.
@@ -679,7 +697,7 @@ Publication writes immutable bytes before committing metadata and eviction inten
 
 Capture admission completes recovery before it creates a new token. Cleanup failure refuses admission and preserves accepted entries. Incomplete deletion prevents further retained publication until cleanup succeeds. Recovery does not change a live processing status. Reads never initialize, repair, evict, or rewrite data.
 
-Raw transcript publication precedes optional correction. Correction failure retains that raw text. Deletion, eviction, erasure, and identity recreation invalidate old results. Complete local-data erasure deletes metadata and the private OPFS root even when preferences remain preserved. Its required participant verifies deletion without reopening the deleted database under the exclusive erasure barrier.
+Raw transcript publication precedes optional correction. Correction failure retains that raw text. A ready entry with failed correction can retain its bounded stage failure in `failureCode`. This field does not determine whether the transcript is usable. Successful or disabled correction clears the field. Explicit retry clears the previous failure before processing. Unsupported failure metadata never replaces accepted text. Deletion, eviction, erasure, and identity recreation invalidate old results. Complete local-data erasure deletes metadata and the private OPFS root even when preferences remain preserved. Its required participant verifies deletion without reopening the deleted database under the exclusive erasure barrier.
 
 Browser termination before a completed audio Blob has no crash recovery guarantee. Retained audio remains available after recognition failure. Voice history never becomes a project source or an AI provider authorization record.
 
@@ -713,3 +731,373 @@ Two-sided entrance reveals equal contour lengths in both directions from the ori
 Both editors retain the origin across phase changes and preserve it through conversion, history, save and reopen. Sampling remains independent of previous frames. Existing source cuts, rates and retained phase clocks keep their semantics.
 
 Database version 39 changes the mediaLibrary contract to 31 and the videoProjects contract to 8. This additive migration preserves all rows, history, stores, indexes and immutable media. Earlier writers cannot admit this database. Existing mutation, history, CAS, save and resource owners retain authority.
+
+## Local Montage admission revisions
+
+`workspaceRevision` is a local admission token. An archived revision does not authorize a local write. The `videoProjects` contract version 9 owns `video_project_revisions` in physical database version 40. Each record retains one project identity and its highest allocated or retired revision.
+
+Creation, save and restore allocate a fresh safe integer in the native domain transaction. Allocation uses the highest current native revision and retained revision. Ordinary deletion retains the current revision before it removes the project. In-place cascade writers can advance the live revision without rewriting this record. The next allocation or deletion includes that live revision. Refuse malformed records and safe-integer exhaustion instead of resetting the counter.
+
+Restore preserves authored project content and timestamps. It allocates local admission metadata and rebinds `presentationRevision` to that local revision. Retain revision records after ordinary deletion. Remove them during whole-local-data erasure. Exclude these local counters from portable media backup and synchronization. Editors must submit their loaded numeric admission token to obtain lifetime fencing. A timestamp-only caller does not obtain that guarantee.
+
+## Experimental immutable sync capture
+
+The additive sync stores preserve released domain rows and immutable objects. An explicit profile enables the bounded capture path. The profile remains disabled by default.
+
+The domain transaction saves its accepted change and one native sync operation together. The operation header retains enrollment lifetime, causal identity, source fingerprint and display metadata. Root state independently retains generation and predecessors after deletion and recreation. Capture generation does not allocate native project admission revisions.
+
+One operation key spans native, prepared and published phases. Preparation replaces the native snapshot with exact portable bytes. Publication replaces portable bytes with compact publication facts and immutable file descriptors. Publication replay uses stable identity in every phase. Queue controls and history do not require an old full snapshot.
+
+The bounded capture path accepts at most 32 rows in each collection and 1 MiB of metadata per native snapshot. No fixed operation-count limit blocks saving. Actual storage failure aborts the native transaction. Missing dependencies or unsupported sidecars refuse the enabled mutation. An absent or disabled profile does not read the graph or append an operation.
+
+Native and prepared phases retain file claims. Published operations retain explicit compact pins until checked release. Unknown prototype records remain unchanged and refuse sync and destructive cleanup. Native media bytes remain in OPFS. Sync records contain metadata and references without media Blobs. Existing backup codecs supply the portable representation.
+
+## Prepared Montage revision publication
+
+The project owner publishes accepted native revisions through two transaction phases. The first phase writes the project and prepared project assets. The second phase writes project sidecars with the assigned local revision. Callers retain admission, revision allocation, transaction completion and resource cleanup.
+
+Archive restoration retains its strategy, conflict checks and complete replacement policy. It publishes independent exports between the two project phases. Synchronization does not use archive replacement to apply a project revision. Saved exports remain independent unless the project uses them as editing sources.
+
+The bounded sync command requires an enabled experimental profile and the prepared native predecessor. It checks accepted dependency generations and causal predecessors inside the project transaction. It also checks current Library identities, child records and immutable physical references. Metadata and file preparation occur before this command under the existing resource protection.
+
+A dependency that lacks local bytes requires hydration before application. A tombstone, conflicting revision or different incarnation requires explicit resolution. Matching bytes alone do not authorize a different logical dependency. The command preserves Library relationships and refuses hidden source substitution.
+
+Incoming project admission also compares the receiver's space, enrollment creation time and exact expected basis. Matching generation and workspace revision alone do not authorize replacement.
+
+Project publication, detached private-resource release and the application receipt commit together. Failure preserves current roots and the prepared candidate. A repeated accepted operation returns its receipt before checking later dependency changes. Pending local project changes refuse incoming replacement. This bounded command adds no product network route or automatic historical binding.
+
+
+### Experimental media replica admission
+
+The enabled experimental profile captures a published project-asset Library source in its native publication transaction. The capture has an independent operation identity. Pending media captures retain their physical files through the existing asset retention authority.
+
+Project capture records the causal heads of its editing dependencies in the same transaction. It compares the current normalized source snapshot with the digest of the accepted media head. A metadata change without a matching media revision causes refusal. Unknown prototype records remain unchanged and prevent destructive cleanup. They do not supply admitted dependency evidence.
+
+The media replica command accepts a verified original-only project-asset source under the receiver's exact space and enrollment lifetime. First import requires an absent native identity. An update requires the expected generation, basis and native digest. Pending local changes cause refusal. Source publication, causal state, receipt and any durable delete intent commit together.
+
+Canonical source admission refuses byte replacement when a retained dependent uses that identity. The existing asset deletion owner preserves other claims and completes physical cleanup after commit. An exact receipt replay returns a duplicate without reverting later accepted state. The caller must verify bytes and retain durable staging protection until publication commits.
+
+Each accepted local or incoming tombstone marks its causal root state as deleted. Accepted live capture or application clears that fact. Restoration of an absent nonzero predecessor requires the exact graveyard. A missing root or missing digest alone cannot authorize restoration. The parser rejects a deleted state that also claims a live native digest.
+
+Incoming deletion verifies the same enrollment, generation and basis as revision application. It refuses active resource readers, pending publications and independent dependencies. Domain transaction participants delete the logical root without an outgoing capture. The graveyard, receipt and physical-delete intent commit together. No prepared publication journal is necessary because deletion stages no object bytes before commit.
+
+The existing transition and lifecycle holds protect native deletion through physical cleanup. Cancellation before commit preserves the source and provenance. Cancellation after commit preserves the applied result and durable cleanup intent. Exact receipt replay cannot delete a later restored root.
+
+The media source publication participant also serves backup restoration. Backup retains conflict policy, transaction completion, sidecars and cleanup. Its publication order remains Library source, thumbnail, project child, then other sidecars. The participant does not start transactions or transfer files.
+
+This bounded integration does not implement all media writers, existing-data bootstrap, remote catalog admission or network transfer. The experimental profile remains disabled by default.
+
+
+## Durable outgoing preparation
+
+The existing sync_capture and sync_outbox stores retain the operation and a compact operation locator. The locator contains no portable payload. This first release format does not convert unsupported prototype records or change released native storage.
+
+Preparation detaches inputs before database admission. The owner checks the exact normalized native source, its immutable fingerprint and enrollment lifetime. One transaction replaces the native phase with accepted portable text and immutable object bindings. It does not require the latest root generation. Earlier operations remain valid after later editing, deletion or recreation.
+
+The first accepted encoding wins. Every caller uses the returned accepted value. Portable text has a 4 MiB UTF8 bound and at most 64 object bindings. The workflow owns portable and wire parsing. Physical attempt keys do not belong to preparation.
+
+A refused preparation preserves the native snapshot and claims. Repeated preparation returns accepted bytes without reading a newer live source. Reads perform no writes. Preparation does not authorize source release.
+
+## Durable physical dispatch attempts
+
+The sync persistence owner stores immutable attempt identities, digests, remote manifest keys and object mappings in sync_outbox. Attempts contain no portable or manifest text. The dispatcher reconstructs exact manifest text in memory from the accepted preparation and canonical wire encoder.
+
+Admission detaches inputs before waits. The native transaction checks current enrollment, exact preparation and physical bindings. Exact attempt replay returns accepted metadata. Contradictory identity reuse refuses without replacement. Later dispatches reserve independent physical paths for unfinished files.
+
+The wire format still carries unchanged logical operation text and ordinary remote file mappings. Native file locations and credentials do not enter remote records. Existing transfer adapters send the files. New files require acknowledged PUT and streamed size/SHA readback before completion evidence. Manifest publication follows file preparation.
+
+Unknown outcomes preserve the single prepared payload and physical attempt identities for recovery. Verified publication compacts the operation without granting source-release authority.
+
+## Metadata catalog and selected replica preparation
+
+The catalog scanner lists only the selected space manifest prefix. It checks bounded streamed metadata, exact physical keys, digests, canonical wire records and space identity. Discovery reads no original or export files and writes no native state. The current scanner admits at most 10000 manifest keys, 1024 pages and 64 MiB of decoded keys and manifest bytes. Each manifest has a 4 MiB bound. These limits bound the current implementation. They do not qualify full R1 capacity. A budget failure, cursor cycle or unavailable metadata fails the scan instead of publishing partial authoritative state. Invalid immutable entries retain fixed diagnostics.
+
+The pure graph groups exact logical bytes and retains physical alternatives. Contradictory logical variants quarantine the whole operation identity independently of listing order. Missing, cyclic, quarantined or foreign-root ancestry cannot authorize a root. Known affected roots remain blocked while other roots retain their state. Concurrent heads remain explicit. Deletion remains active until an explicit restore covers the unresolved deletion ancestry. Project dependency availability compares exact current media heads with causal operation IDs. Native generation counters do not become remote ordering authority.
+
+Before staging, selected preparation verifies that each expected local head belongs to the selected remote ancestry. At commit, native publication verifies the same expected basis, generation and enrollment lifetime. A stale catalog observation cannot authorize a different local branch.
+
+Selected preparation refuses deleted, blocked, conflicting or unavailable roots. Unreadable manifest ownership also prevents native admission. The workflow detaches selected metadata and target-local admission before asynchronous work. It checks actual borrowed Library files against their independently selected media revision. It stages only editing files through the existing streamed backup staging owner and creates the existing native ready journal under durable-operation protection. The native receipt uses the logical record digest across physical attempts. Missing physical copies can use another retained attempt. Failure before journal admission cleans new staged files through the existing owner. After admission, the caller publishes through the existing ready-journal retry and recovery owner. Saved exports remain discoverable metadata and ordinary remote files without forced download to open a project. The profile remains disabled until runtime, queue, catalog persistence, capacity and retention acceptance are complete.
+
+
+## Checked remote file reuse
+
+The outgoing-attempt owner records compact completed-file facts after acknowledged PUT and complete size/SHA readback. Each fact retains enrollment, immutable source binding, digest, ordinary filename and remote path. It does not require a retained snapshot, portable text or physical manifest text.
+
+Unknown-outcome PUT does not supply completion evidence. A server write can remain pending after a lost response. Reuse never assigns new references to that uncertain path.
+
+Completion admission checks the current enrollment, exact preparation and immutable attempt in one transaction. Exact retry returns accepted evidence. Failure preserves prior successful evidence and source claims. Read-only discovery checks compact descriptors. The current bounded lookup remains a capacity gate for the full release.
+
+The workflow checks digest, size, MIME type and filename against the selected source. The wire owner confines retained mappings to the same space Files namespace. Normal reuse checks current existence and size. Explicit content recheck verifies bytes. Missing or corrupt candidates receive independent replacement paths. Temporary failures, authorization failures and cancellation stop the affected dispatch.
+
+Independent revisions retain independent manifests even when they reference the same completed file. Historical completion and provider stat grant no release authority. Local file retirement requires its own current integrity check.
+
+## Metadata-cost reference publication
+
+Provider stat observes one ordinary file and its safe integer size through bounded provider metadata. It supplies no content digest, durability or release proof. WebDAV uses the existing guarded SDK PROPFIND with depth zero. The common contract does not use ETag, locks, rename or folder semantics for this observation.
+
+Outgoing reference selection accepts native acknowledged completion evidence and caller-owned checked catalog mappings from causally ready operations. It detaches relevant strings, mappings and exclusion state before asynchronous work. The wire owner checks canonical logical bytes, physical keys and space identity. Pending, quarantined, invalid and malformed alternatives cannot supply references. Dispatch does not scan the remote namespace itself.
+
+Normal metadata publication uses stat instead of downloading unchanged files. A missing file or changed size causes a fresh upload path. Unavailable or malformed metadata, authentication failure and cancellation stop dispatch. New uploads still require acknowledged PUT and streamed size and SHA readback before native completion admission. Reused catalog paths do not create native completion evidence.
+
+A same-size external change can pass stat. Successful reference publication does not attest current file bytes. Actual hydration still checks streamed size and SHA before staging finalization or native publication. Explicit content recheck remains available for outgoing integrity checks. Reference publication does not release source claims or permit unload. Any later operation that can reclaim local files must independently establish its exact release conditions and current remote integrity.
+
+This bounded flow supports another browser through a fresh checked metadata scan, including after restart. It does not persist the catalog or qualify incremental lookup capacity. Preparation still requires local originals and hashes their bytes. It does not enable metadata editing while originals are absent locally. The experimental profile remains disabled until the remaining R1 gates pass.
+
+## Advisory sync manifest cache
+
+The sync-catalog owner stores one bounded raw-manifest snapshot in sync_catalog_cache. Physical database version 42 adds that empty store under syncCapture contract version 3. Store classification: derived-rebuildable. Migration preserves existing source rows, claims, outbox evidence and immutable files. The cache has no publication, completion, settlement, retention or unload authority.
+
+A snapshot contains exact manifest keys, declared sizes and raw text for one enabled native profile. Space, connection generation and profile creation identity bind its scope. The cache owner detaches and checks structural inputs before mutation. One transaction checks the current profile and atomically replaces the bounded snapshot under the existing mutation barrier. A missing, changed or recreated profile refuses a delayed replacement. Read operations never repair or rewrite storage. Cache IO refusal remains advisory and permits network fallback.
+
+The transfer workflow performs a complete remote listing on every refresh. Only currently listed keys participate. Cached bytes must match the listed size, key digest, exact wire identity and selected space. The existing wire and domain parsers remain authoritative for admission. The workflow rebuilds causal heads, dependencies, conflicts and quarantine decisions from those checked manifests. A failed or cancelled scan returns no partial catalog and does not replace the previous cache. Cancellation during subsequent cache admission prevents graph return but can leave a complete advisory snapshot. Concurrent completed refreshes can replace this advisory snapshot in either order without changing domain state.
+
+Normal cache hits assume immutable manifest keys. They do not detect a same-key, same-size external rewrite. An explicit cache bypass reads and checks current remote manifest bytes. No ETag or CAS property grants integrity. Media hydration still checks streamed size and SHA before native publication. This cache removes repeated metadata GET within existing pilot limits. It does not optimize parsing or remote listing. Production connection lifecycle, offline admission and full capacity remain separate release gates.
+
+## Durable outgoing queue and verified publication
+
+Physical database version 43 advances syncCapture to contract version 4. The migration checks the three existing sync stores without rewriting rows. It adds no store. Older clients refuse the newer database.
+
+The sync-capture owner stores queue controls in sync_outbox. Compact publication facts belong to the operation in sync_capture. Connection controls bind space, namespace generation and profile creation timestamp. Operation controls bind the immutable native-source fingerprint across every phase. Owner revisions reject stale commands. Each execution receives a fresh run ID. Stage events preserve that command revision.
+
+The native queue offers bounded pages and an exact operation reader. Each read checks the current profile and stable operation header. A page contains at most 128 operations and an explicit continuation cursor. The reader checks one additional row to determine continuation. The cursor binds the enrollment lifetime and last operation key. It grants no mutation authority.
+
+Each page uses one readonly transaction. Multiple pages do not share a snapshot. Refresh from the beginning to discover later insertions before the cursor. Changed enrollment refuses an old cursor. Selected execution and recovery read only the requested operation. Unrelated invalid rows cannot prevent that selection. The legacy pilot projection retains its explicit 128-entry refusal.
+
+Queue pause does not disable capture enrollment. Accepted local edits and tombstones still enter native capture while transfer is paused. Operation pause and cancellation fence late callbacks. Unpublished operations preserve their payload, attempts, checked files and claims. Late acknowledged publication can compact payload while preserving paused or cancelled controls. An issued write can retain an unknown outcome. Cancellation promises no remote rollback.
+
+The transfer workflow holds one native exclusive lock per operation. Independent operations can execute concurrently. Recovery requires an available lock and the exact interrupted run. A timer cannot prove that a server writer stopped. Lock identities encode scope primitives in a fixed order.
+
+Acknowledged manifest PUT and full size/SHA readback precede compact verified publication. Native admission checks the exact prepared operation and physical attempt. One transaction replaces prepared payload with publication facts and immutable file pins. The first accepted valid publication remains authoritative across alternative attempts. Restart can consume this fact without another transfer. Historical publication grants no source release or unload authority.
+
+A checked ready catalog can establish observed publication of the exact prepared logical bytes. The workflow excludes pending, quarantined, invalid, foreign and contradictory records. Native completion checks the exact prepared operation and observed physical binding before compacting payload. Observed publication does not create acknowledged dispatch evidence or checked-file receipts.
+
+Every queue mutation retains bounded diagnostic transition markers in the same transaction. Markers contain fixed codes, stages, sequence numbers, hashed operation references and safe attempt IDs. Overflow retains an explicit history-gap count. Later delivery must use the existing event-history owner. These markers do not create another archive.
+
+Queue history delivery stores one monotonic cursor per native source under a disjoint sync_outbox key. Existing queue rows and retained markers keep their formats. The cursor binds the source key digest and enrollment lifetime. Reads create no cursor. Acknowledgement joins the current profile, retained source and selected markers in one write transaction. It uses the caller's active mutation permit.
+
+The delivery workflow opens the database before it requests that permit. Native history reads and acknowledgement reuse the same active permit. They do not enter shared admission again while exclusive admission can wait. It publishes fixed runtime rows through the existing event-history archive and recent runtime-log tail. Both writes must succeed before acknowledgement. The archive keeps its existing retention policy. A failed archive, tail or acknowledgement leaves native delivery eligible for retry. Logging failure cannot change transfer success or release source bytes.
+
+Delivery is at least once. A restart after archive publication can repeat a row with the same source digest and sequence. The journal timestamp identifies delivery observation because native markers contain no original event timestamp. Explicit gap rows report markers outside bounded retention. The workflow preserves every retained native marker after acknowledgement.
+
+Selected offscreen execution sends source hints through the existing diagnostic Port after request containment. The background receiver admits exact offscreen provenance and reloads native transitions. It coalesces duplicate hints and admits at most four pending deliveries. A hint is not a delivery receipt. Cancellation does not start another submission. The workflow and its admitted writes finish before privacy erasure can pass its mutation barrier. The queue command interface remains a separate release requirement.
+
+Background diagnostic registration starts one local history pass and listens to its dedicated browser alarm. Each pass checks or recreates the one-minute alarm before enrollment reads. Missing enrollment clears only that alarm. Browser scheduling provides no exact deadline. Overlapping automatic passes share one promise.
+
+Disposal prevents new sources and progress writes. Already admitted publication drains through the existing mutation barrier.
+
+Native history discovery reads at most two pages of 64 operation rows per pass. Each page uses bounded readonly metadata queries and skips acknowledged sources without capture or file reads. A separate enrollment-bound cursor stores the last scanned native key and revision under sync_outbox. Reads create no cursor. Position writes require current enrollment, mutation admission and revision CAS.
+
+The pass attempts each selected source before saving its page position. Failed delivery preserves the source acknowledgement for another cycle. The final page resets the position to the beginning. New rows before a saved position appear on the next cycle. Malformed rows and delivery cursors remain intact.
+
+Discovery counts them and advances past their native keys. A backend failure or stale scan state refuses the page or progress write. Restart resumes the last committed position. These bounds require capacity qualification before production activation. Enrollment commands must schedule discovery when activation becomes available.
+
+This experimental runner requires an explicitly admitted provider client. Production credentials, request authorization, offscreen lifecycle, Settings controls and event-history delivery remain separate release requirements. Capture enrollment is not network authorization. Future lifecycle admission must check its own revision at every actual HTTP request. The profile remains disabled by default.
+
+
+## Published source pin release
+
+Published operations retain explicit immutable file pins after payload compaction. A pin is a local retention claim. A publication digest or queue status alone cannot remove it.
+
+The workflow checks current remote size and SHA before native release admission. The existing asset lifecycle owner then checks exact operation identity, current connection authority and native retention evidence. Active readers, native owners, projected dependencies, rollback claims and staged publications prevent affected pin release. Cancellation before commit preserves pins. The native owner holds the existing transition lease through pin mutation and physical cleanup. Remote verification precedes that lease.
+
+Eligible pin removal and the intent for physical removal commit in one transaction. Another sync operation can continue to retain the same file. Releasing one checked pin does not promise physical eviction. Releasing the final pin lets the existing deletion owner complete its intent after fresh retention checks.
+
+Physical failure retains the durable intent for existing recovery. Concurrent edits, replacement enrollment or changed immutable bindings refuse delayed release. Unknown prototype records make destructive retention authority invalid and preserve bytes.
+
+This command releases only native bytes without local owners. Remote-only residency for an active media or project owner requires the later hydration contract. This stage does not remove current project files or add remote garbage collection.
+
+## Native sync connection authorization
+
+Physical database version 44 adds the empty sync_connection store under syncCapture contract version 5. The migration preserves existing captures, claims, queue rows, receipts and immutable files. The store contains durable authorization state. It is not a derived cache.
+
+The connection owner separates metadata from credentials. Metadata binds one provider root and account to the native space, namespace generation and profile creation timestamp. A random incarnation and increasing revision reject stale commands and results after recreation. Pause and same-binding authentication changes preserve capture enrollment and namespace generation. An implicit root, account or space change is refused.
+
+An authentication update first reserves the updating-auth phase with a fresh nonce. WebCrypto runs outside the native transaction. One final transaction joins the exact reservation and current profile before it publishes encrypted credentials and the active revision. Missing or replaced state refuses a delayed result. Reads do not repair storage. A failed update remains closed until an explicit update succeeds.
+
+Credentials use the platform AES-GCM owner and version 2 context-bound envelopes. The store retains a non-exportable random CryptoKey and its encrypted envelope. The additional authenticated data binds the provider, root, account, native scope, incarnation and credential identity. A decrypt rechecks the current durable identity before returning credentials. Backups, Settings transfer, remote sync, diagnostics and logs exclude all connection rows. Core local-data erasure removes the store even when preferences remain.
+
+Every actual HTTP request requires the exact active connection identity and current origin permission. The native admission lock covers the final checks and fetch invocation only. Headers and response bodies complete outside that lock, so independent transfers can overlap. The request executor tracks issued requests and bodies separately. After durable revocation, its caller must abort and drain the executor before reporting closure. Failed containment cannot report successful closure. A timeout supplies no containment proof.
+
+Queue begin, effect admission and completion check connection identity inside the same transaction as their queue mutation. Missing authorization remains valid only for legacy pilot runs before any connection exists. Obsolete runs can retain failure uncertainty and historical verification evidence. They cannot complete under a replacement connection.
+
+This foundation enables no production network ingress. Offscreen lifecycle, background permission IPC, privacy producer containment and Settings controls remain required release gates. The experimental profile remains disabled by default.
+
+
+## Settings sync queue management
+
+The native paged queue reader returns display metadata from each operation's admitted retained capture. It preserves the complete source label and performs no file read. Display sources follow the operation order and exclude the lookahead row. Failed capture admission refuses the complete page.
+
+The sync-transfer management workflow applies selected commands through existing native revision CAS. It attempts confirmed history delivery after a successful command. A history failure retains the applied command result and leaves native events eligible for automatic discovery. Commands grant no transport, settlement or source-release authority.
+
+Settings owns page selection, pending interaction and recovery feedback. Refresh starts a new live traversal. A stale command refuses without automatic mutation retry. The interface reloads native revisions before another command and restores keyboard focus. Queue pause controls future admissions. Cancellation retains local sources and promises no server rollback.
+
+## Native workspace allocation
+
+The remote-connection owner stores one workspace-allocation journal in sync_connection. The journal contains the selected parent, account, generated child root and workspace identities. It contains no credentials. Existing backup, transfer and erasure policies apply to the entire store.
+
+Journal operations refuse an installed capture profile or connection. Initial commands require a prepared native database. One native transaction checks these records and changes the journal. The existing connection admission lock serializes commands. A random incarnation and increasing revision reject stale commands after abandonment, erasure or recreation. Reads refuse malformed records. They do not change storage.
+
+Before waiting for connection admission, the journal owner captures the prepared database handle synchronously. This read does not initialize storage. The canonical mutation permit orders the transaction after other maintenance. Erasure closes the captured handle. A delayed command cannot reopen the database or write into its replacement. Cold database admission refuses the command. The connection page loads native state before it enables creation.
+
+The native owner generates the workspace and bootstrap UUIDs. The child name is Sniptale- followed by the bootstrap UUID. The immutable plan precedes any remote write. The allocating phase precedes the root MKCOL request. Only a positive HTTP 201 response permits the `confirm` command to record allocated state.
+
+An error leaves allocating state unchanged. Restart and folder existence cannot grant ownership. Explicit abandonment changes local evidence only. A replacement requires the exact abandoned identity and receives new identities. A delayed result cannot advance that replacement.
+
+The provider primitive issues one MKCOL for the final child root. It refuses an occupied path and does not create parents or retry. The generic object store requires no collection allocation operation. Callers retain responsibility for current request authorization, cancellation and drain. The test harness checks the exact allocating identity before dispatch and records allocated state under that revision after success.
+
+Allocated state records root allocation only. Production enrollment and request admission remain separate release requirements. Production ingress remains disabled.
+
+## Workspace marker publication
+
+The pure sync-workspace contract owns the fixed marker key, canonical bytes and exact workspace identity. Both the native writer and remote reader use that contract. Stream limits, cancellation and catalog inspection remain in the transfer workflow.
+
+Journal version 2 adds a frozen marker and the preparing-marker, publishing-marker and ready phases. A readonly load accepts version 1 and returns normalized state without changing storage. The next accepted command writes version 2. Older readers refuse version 2 without deleting it.
+
+Only allocated state permits marker preparation. The native owner freezes canonical text and its SHA before metadata directory creation or publication. A publication command reserves a fresh revision and preserves those exact bytes. Completion requires publishing-marker state and matching checked workspace, bootstrap and fingerprint values. Each command retains the native transaction, prepared-handle fence, revision check and mutation permit.
+
+The WebDAV workflow refuses unexpected files or child prefixes before initial publication. It can reuse only an empty expected metadata directory inside a positively allocated root. It never adopts an uncertain root. The provider uses the existing guarded tsdav adapter for metadata MKCOL and conditional marker PUT. Only HTTP 201 acknowledges creation. A collision permits no unconditional overwrite, cleanup or automatic retry.
+
+Recovery first reads the exact marker, scans the catalog and reads the marker again. Matching evidence permits native ready state without another PUT. Missing marker evidence in publishing-marker state permits an explicit fresh publication revision with the same frozen bytes. A collision or temporary transport failure permits one checked readback. Failed verification preserves uncertainty. Ready state permits inspection only. A missing ready marker never starts initialization.
+
+The explicit test harness binds every HTTP dispatch to its current native journal revision. This proof does not activate production enrollment or establish production credential containment. Browser replay can issue more than one HTTP request for one library invocation. All such requests must retain the same key and frozen body.
+
+
+## Workspace creation request lifetime
+
+The transfer request owner shares its issued-request and response-body tracker between active connections and workspace creation. Each public adapter retains its own admission rules. The common private tracker owns cancellation and drain. It adds no durable authority or transport implementation.
+
+Workspace requests bind the native allocation lifetime, including its parent, child root, account and random identities. Each phase client supplies the exact current revision and phase. Under the existing connection admission lock, the adapter reads native state, checks current origin permission and reads native state again. The lock ends after fetch invocation, before response headers or body completion. Installed enrollment, changed state or missing state refuses dispatch.
+
+The named creation execution owns one run promise, one controller and one request tracker across all phase clients. It can allocate a planned root and finish the existing marker protocol. It refuses uncertain allocating state. Closing refuses new dispatch synchronously, aborts issued requests and waits for their actual completion. It also waits for the creation promise. Failed body cancellation prevents a successful containment result. A timeout grants no containment evidence.
+
+Creation credentials stay in memory and use a callback that reads the execution's current credential reference. The execution clears its own reference after drain. This does not promise physical erasure of JavaScript strings or copies that another caller owns. Successful run results contain checked workspace evidence only.
+
+This owner enables no production ingress or enrollment. Its production caller must close and drain it before reporting privacy or permission closure. The shared runtime integrates background and offscreen lifecycle ownership and worker recovery. Atomic native enrollment remains a separate release gate. Closing one execution does not revoke a different execution's authority.
+
+
+### Allocation lifetime revocation
+
+Workspace creation can advance its native journal revision while an offscreen execution remains active. Privacy revocation selects the exact current allocation incarnation. It abandons that lifetime at its current revision under the existing admission lock, mutation permit and transaction. Repeated revocation of the same abandoned lifetime performs no write.
+
+A missing, replaced or malformed allocation refuses revocation. An installed profile or connection also refuses this pre-enrollment operation. The command captures its prepared database handle before its first wait. Erasure closes that handle and prevents delayed recreation. Ordinary allocation commands retain exact revision checks.
+
+Runtime workspace snapshots are disposable projections. They do not replace native journal evidence or grant enrollment authority. No new store or persistent credential record supports this execution boundary.
+
+
+### Explicit workspace allocation refusal
+
+An explicit MKCOL 423 response grants no ownership. The creation owner records that refusal against the exact allocating revision. The native transaction restores planned with the same root, lifetime and workspace identifiers. It advances the revision and creates no new allocation. A later attempt still requires its own positive 201 response. A 405 collision never authorizes adoption or cleanup.
+
+Only numeric status 423 admits this refusal transition. Missing responses, transport failures and other statuses cannot invoke it. A lost acknowledgement therefore retains allocating uncertainty. Native replacement, abandonment, enrollment and erasure refuse delayed refusal callbacks.
+
+
+## Durable queue retry schedule
+
+DB45 adds the nonunique syncQueueDue index to sync_outbox. Its keys contain enrollment scope, connection incarnation, deadline and native primary key. The synchronous upgrade preserves existing rows and bytes. It advances the syncCapture contract to6.
+
+The native queue owns deadlines, automatic retry counts and bounded schedule progress. Legacy readers supply schedule defaults without writes. Explicit maintenance initializes old rows under current native admission. Discovery advances a durable cursor through bounded index pages. Native index keys preserve progress past malformed rows and order equal deadlines. Discovery wraps to revisit earlier insertions. It preserves malformed evidence.
+
+Native time and the existing operation lock control run admission. An alarm grants no authority. Temporary failures retain source evidence and store a delayed retry atomically. Retry delays start at30seconds, increase exponentially and stop after five automatic retries. A manual retry resets this budget. Permanent failures require explicit action.
+
+Running rows retain their exact run authorization and a future recovery-check time. Metadata deferral cannot change their command revision. Recovery requires the existing exclusive operation lock. Pause, cancel, replacement and erasure refuse stale claims. Published operations have no retry deadline.
+
+
+## Checked workspace enrollment
+
+The remote-connection owner installs checked workspace enrollment in one native transaction. The first source is an exact ready allocation. Callers select its native identity, not a root, account or purported checked marker. The owner derives the connection binding and workspace identity from retained native evidence.
+
+The transaction installs the capture profile, connection metadata, protected credential and narrow enrollment receipt together. It refuses existing capture, outbox, connection or orphan credential state. A failed transaction preserves ready evidence and installs nothing. The command captures its prepared database handle before crypto or admission waits. Erasure closes that handle and prevents delayed recreation.
+
+The receipt identifies a repeated successful source without replacing credentials or rotating identity. The connection retains the checked workspace spaceId, bootstrapId and marker fingerprint. Legacy experimental metadata lacks this identity and retains its previous decoding behavior. Legacy decoding does not establish checked enrollment.
+
+JOIN must produce a native ready source through its selected-root verification workflow before it uses this activation boundary. A read-only catalog snapshot or structurally valid identity cannot activate a connection. Production ingress and remaining release gates remain closed.
+
+
+## Existing workspace JOIN readiness
+
+The remote-connection owner records one selected JOIN root and account under workspace-join in sync_connection. Its planned, checking and ready phases use native incarnation and revision checks. The row contains no credentials or catalog payload. CREATE refuses a present JOIN intent. JOIN permits only absent or valid abandoned CREATE evidence.
+
+Only exact checking evidence can become ready after the existing marker, catalog, marker verification. A repeated check retains the previously checked workspace identity as its expectation. Explicit abandonment or lifetime revocation erases this read-only intent without remote cleanup. Source absence, replacement and erased database handles refuse delayed completion.
+
+Ready JOIN uses the existing atomic connection installer and receipt. It derives endpoint, account and workspace identity from native evidence. Retained abandoned allocation evidence cannot select the joined root or adopt old outbox data. Receipt replay checks source kind as well as identity and binding.
+
+The read-only workflow drains issued requests before it records readiness. Active close revokes the intent, aborts and drains IO. A settled, contained failure retains checking for explicit retry. Production producer registration and activation handoff remain separate required release gates.
+
+
+## Unified workspace source selection
+
+SyncWorkspaceSource identifies allocation or JOIN with an exact native identity. The strict parser reconstructs this value at storage and IPC boundaries. The native selection reader parses both rows in one readonly transaction. Conflicting live intents or malformed evidence refuse selection without repair. An abandoned allocation can coexist with JOIN but cannot choose its endpoint.
+
+The selection projection contains no credential or catalog payload. Its bindingKey encodes immutable parsed selection fields. Phase and revision changes do not change that token. It preserves permission consistency checks and grants no mutation authority. Retained native ready evidence remains readable after enrollment for receipt replay.
+
+Coordinator containment precedes the existing atomic enrollment installer. Native source checks, prepared database capture, credential protection and transaction rollback remain with that installer. No runtime snapshot replaces native readiness or the enrollment receipt.
+
+The queue accepts invalid-workspace as a bounded failure code. Marker verification occurs after claim and before the first remote effect. Temporary refusal retains the existing retry budget and deadlines. Invalid identity requires explicit action and preserves local source evidence.
+
+
+## Project dependencies created before sync enrollment
+
+A supported native project save can reference a Library original from before sync enrollment. If its causal state is absent, the sync-capture owner records that original in the same project transaction. The project references the actual media operation and generation from that transaction. Later saves reuse the accepted head only while its native metadata digest matches. Malformed, empty or mismatched existing evidence still refuses the complete transaction.
+
+The native transaction commits the dependency and project together. A later capture write failure rolls back both captures and the project mutation. Parallel saves share the initial media head through native transaction serialization. Local-only saving creates no capture rows. Enrollment does not scan or upload the existing Library.
+
+This change freezes native metadata and immutable file references, not file bytes inside IndexedDB. The existing capture claims retain those files. Outgoing preparation checks their bytes through the existing codecs. Production activation still requires a producer that enqueues dependency operations before dependent publication.
+
+
+## Retained capture queue reconciliation
+
+The native queue owner reconciles retained capture keys into its existing operations. Each capture uses the same admission writer as explicit enqueue. Discovery reads at most 64 primary keys and one continuation lookahead. It handles one metadata body at a time. The budget counts all physical entries, including noncapture and refused rows.
+
+The command captures the prepared database handle before mutation admission. Each operation checks the exact profile lifetime, enabled capture and active connection authorization. Erasure closes that handle. Delayed work cannot reopen a replacement database. Each transaction commits or aborts independently. A refused capture retains its evidence and does not suppress other valid captures.
+
+Repeated reconciliation preserves operation controls, history, retry budgets and deadlines. Queue refusal leaves committed native content and capture rows unchanged. The existing wakeup reconciles before due discovery and recovers missed notifications after restart. A reconciliation failure does not suppress independently admitted queued retries. Native project saving does not wait for enqueue, hashing or network IO.
+
+The security qualification composition uses the existing coordinator and wakeup. Automatic capture discovery requires checked CREATE or JOIN workspace identity. Legacy experimental connections retain explicit enqueue and existing due retries. Production activation remains a separate gate. Immutable records can arrive out of order because catalog and incoming admission reject incomplete dependency closure. Publication of one operation does not establish complete project readiness or current remote file integrity.
+
+
+## Offline capture capacity and continuation
+
+Native saves do not depend on the number of retained captures or remote availability. Per-snapshot graph and metadata checks remain authoritative. The native transaction preserves its source mutation, capture and causal root state together. A genuine storage failure aborts that complete transaction.
+
+Capture discovery retains its own authorization, revision and native-key position on the existing queue connection. It does not replace scheduling or due-discovery positions. Each pass attempts one bounded page. At the end, the position resets so a later pass can find earlier insertions and revisit refused items. The existing startup and periodic wakeup drive continuation. They add no new alarm or service.
+
+Progress commits after the item attempts and rechecks current admission. A concurrent pass cannot overwrite a newer position. A failed progress commit preserves earlier admissions and the previous committed position. Replaying that page preserves existing operation controls, history and retry deadlines. Erasure closes the captured database handle and prevents delayed reopening.
+
+Capture discovery grants no settlement or byte-release authority. The phased operation replaces native snapshots with prepared payloads and then compact publication facts. Existing claims retain required files through these phases. Safe unload remains a release gate. The legacy whole-queue pilot projection keeps its explicit limit. Production queue consumers use bounded pages or exact operation reads.
+
+
+## Saved screenshot sync
+
+An enrolled screenshot save records one native image snapshot in the existing sync operation. The snapshot contains the media row, workspace, presentation and document asset references. Local-only writes retain their existing format and create no sync records. Temporary drafts enter sync only after promotion.
+
+The backup inventory and document codec encode the retained rows through a bounded database view. Outgoing preparation reloads the authoritative native snapshot before it reads binary slots. A metadata fingerprint does not attest Blob bytes. The existing streaming digest checks the actual bytes. Preparation replaces the native snapshot with portable metadata and file bindings. Publication retains compact facts through the existing operation lifecycle.
+
+The existing asset writer creates transport copies for inline images. Prepared claims retain those copies. A competing preparation removes only its own unused copies. Incoming journals retain native JSON metadata and staged references. The native publisher detaches original and presentation Blobs before its database transaction. The transaction commits native rows, document ownership, causal state and the receipt together. After commit, existing publication cleanup removes unowned transport copies. Document ownership retains required files. Receipt replay precedes binary reads because completed cleanup can remove staging.
+
+The existing root state retains an image revision high-water mark. Local deletion and incoming deletion preserve that mark. Incoming restore and local recreation allocate a later revision. Native revisions remain separate from causal generations. An original-only image can have a nonzero native revision. Editor activation and copy admission use that revision. A stale presentation never becomes current on the receiver.
+
+This boundary covers screenshot sources with inline originals. Other image source families and native residency remain release gates. Production activation remains closed.
+
+
+## Sync lifecycle metadata and unchanged originals
+
+Soft Trash and restore remain edits to retained roots. They do not publish permanent deletion records or release children and files. Supported Library media and manual video projects capture these edits in the native lifecycle transaction. A mixed selection captures media before projects to bind the final dependency heads. Duplicate commands create no new capture. Local-only writes create no sync records. Temporary roots skip graph capture before validation.
+
+Original metadata edits use the existing capture and portable backup codecs. Incoming preparation can retain an original reference after native predecessor admission and a streaming SHA-256 comparison. Size, MIME type and a stored digest alone do not prove equality. The existing resource reader holds the file until journal protection takes over. Failure cleanup removes only newly staged files. Native publication repeats profile, generation, basis and metadata checks before commit.
+
+Screenshot publication compares the incoming original with the retained inline Blob outside its database transaction. Byte equality binds to the exact predecessor metadata digest. Unchanged original bytes permit metadata and workspace changes while projects retain that source. Different bytes still require source replacement admission. Native revision and causal checks remain authoritative after Trash, restore, deletion and recreation.
+
+A project replica can retain an exact known source in Trash after dependency state admission. Its native rows and file binding must still match. Default prepared source admission and new local project selection retain their active-source requirements. This change adds no operation kind, database store, journal format or release authority. Unsupported source families and safe unload remain separate release gates.
+
+
+## Manual project graph in experimental sync
+
+Manual project capture uses the existing backup inventory over frozen native rows. The snapshot includes private source reviews, their referenced assets, saved exports, thumbnails and presentation files. It preserves native effect snapshots and authored project metadata. Recording and scenario sources still require their own capture owners.
+
+The complete portable inventory differs from the resources required for editing. Editing dependencies start with project materials and follow their source review references. Export-only reviews and saved export bodies do not become editing dependencies. Incoming preparation selects the required objects before staging and preserves borrowed native file references.
+
+The ready journal contains JSON metadata and exact immutable file references. Effect references identify each snapshot and asset slot. Thumbnail and presentation references identify their native aggregate. No ready payload contains a Blob. Native apply hydrates detached binary values before its write transaction and verifies effect integrity with the existing project verifier.
+
+The transaction repeats profile, causal, dependency and native revision checks. It publishes project rows, private sources, sidecars and the receipt atomically. A failed transaction preserves the predecessor and permits an exact retry. A matching completed receipt permits replay without staging files or another native revision.
+
+Outgoing preparation reuses existing file references for originals and saved exports. It stages only portable objects without a native file binding. Prepared claims retain those temporary files until publication or recovery permits release. This change adds no store, queue, journal domain or transfer platform. Production activation and safe unload remain separate release gates.

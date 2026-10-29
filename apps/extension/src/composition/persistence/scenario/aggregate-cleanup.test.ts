@@ -77,6 +77,7 @@ it('retains an external montage snapshot when its scenario is replaced from an a
 
 function getStoreNames() {
   return [
+    'sync_capture',
     'scenario_projects',
     'scenario_assets',
     'scenario_exports',

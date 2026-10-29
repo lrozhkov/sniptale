@@ -16,6 +16,7 @@ import { createHydrateDefaultsAction, createToolSettingsUpdaters } from './tool-
 export type EditorStoreSetters = Pick<
   EditorState,
   | 'setActiveTool'
+  | 'setFrameAnnotationCreationKind'
   | 'syncActiveTool'
   | 'setInspector'
   | 'setFreshImageBackgroundPending'
@@ -54,8 +55,19 @@ export type EditorStoreLayoutActions = Pick<
 
 export function createEditorStoreSetterActions(set: EditorStoreSet): EditorStoreSetters {
   return {
-    setActiveTool: (activeTool) => set({ activeTool, inspector: 'tool' }),
-    syncActiveTool: (activeTool) => set({ activeTool }),
+    setFrameAnnotationCreationKind: (frameAnnotationCreationKind) =>
+      set({ frameAnnotationCreationKind }),
+    setActiveTool: (activeTool) =>
+      set({
+        activeTool,
+        inspector: 'tool',
+        ...(activeTool !== 'frame-annotation' ? { frameAnnotationCreationKind: null } : {}),
+      }),
+    syncActiveTool: (activeTool) =>
+      set({
+        activeTool,
+        ...(activeTool !== 'frame-annotation' ? { frameAnnotationCreationKind: null } : {}),
+      }),
     setInspector: (inspector) => set({ inspector }),
     setFreshImageBackgroundPending: (freshImageBackgroundPending) =>
       set({ freshImageBackgroundPending }),

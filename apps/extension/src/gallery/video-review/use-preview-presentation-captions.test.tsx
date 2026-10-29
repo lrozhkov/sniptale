@@ -133,7 +133,12 @@ beforeEach(() => {
     canvas.height = 360;
     const release = vi.fn();
     releases.push(release);
-    return { canvas, context: {}, release, generation: frame.generation };
+    return {
+      canvas,
+      context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
+      release,
+      generation: frame.generation,
+    };
   });
   io.factory.mockImplementation(() => ({
     prepare: io.prepare,

@@ -384,3 +384,216 @@ it('admits border origins and two-sided phases without rewriting released projec
     ],
   });
 });
+
+it('adds empty capture and native revision stores without rewriting version 39 rows or OPFS objects', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 39
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 40
+  )!;
+  expect(target.records).toEqual({
+    ...source.records,
+    sync_capture: [],
+    video_project_revisions: [],
+  });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(
+    target.stores.filter((name) => name !== 'sync_capture' && name !== 'video_project_revisions')
+  ).toEqual(source.stores);
+  expect(target.indexes).toEqual({
+    ...source.indexes,
+    sync_capture: ['kind', 'rootKey', 'createdAt'],
+    video_project_revisions: [],
+  });
+  expect(target.domainVersions).toEqual({
+    ...source.domainVersions,
+    syncCapture: 1,
+    videoProjects: 9,
+  });
+  expect(
+    PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
+  ).toMatchObject({
+    schemaVersion: 9,
+    stores: expect.arrayContaining([
+      { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
+    ]),
+  });
+  expect(PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'syncCapture')).toEqual({
+    domainId: 'syncCapture',
+    schemaVersion: 6,
+    stores: [
+      { storeName: 'sync_capture', dataClass: 'durable-authority' },
+      { storeName: 'sync_outbox', dataClass: 'durable-authority' },
+      { storeName: 'sync_catalog_cache', dataClass: 'derived-rebuildable' },
+      { storeName: 'sync_connection', dataClass: 'durable-authority' },
+    ],
+  });
+});
+
+it('adds an empty outgoing store without rewriting version 40 rows or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 40
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 41
+  )!;
+  expect(target.records).toEqual({ ...source.records, sync_outbox: [] });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'sync_outbox')).toEqual(source.stores);
+  expect(target.indexes).toEqual({ ...source.indexes, sync_outbox: [] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 2 });
+});
+
+it('retains populated version 40 capture rows and profiles during outgoing admission', () => {
+  const profile = {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: true,
+    spaceId: 'retained',
+    connectionGeneration: 3,
+  };
+  const capture = {
+    version: 1,
+    kind: 'captured-change',
+    key: '["change","retained-op"]',
+    createdAt: 2,
+    spaceId: 'retained',
+    connectionGeneration: 3,
+    rootKind: 'media',
+    rootId: 'source',
+    rootKey: '["retained","media","source"]',
+    generation: 1,
+    operationId: 'retained-op',
+    basis: [],
+    origin: 'local-edit',
+    publicationId: null,
+    change: { kind: 'tombstone' },
+  };
+  const rows = new Map<string, unknown[]>([['sync_capture', [profile, capture]]]);
+  const before = structuredClone(rows);
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Released rows must remain untouched.');
+  });
+  const db = {
+    objectStoreNames: { contains: (name: string) => rows.has(name) },
+    createObjectStore(name: string) {
+      rows.set(name, []);
+      return { createIndex: sourceAccess, put: sourceAccess };
+    },
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = { abort: vi.fn(), objectStore: sourceAccess };
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 40)!;
+  expect(migration.migrate(db, tx)).toBeUndefined();
+  expect(migration.validate(db, tx)).toBeUndefined();
+  expect(rows.get('sync_capture')).toEqual(before.get('sync_capture'));
+  expect(rows.get('sync_outbox')).toEqual([]);
+  expect(sourceAccess).not.toHaveBeenCalled();
+});
+
+it('adds an empty derived catalog cache without rewriting version 41 rows or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 41
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 42
+  )!;
+  expect(target.records).toEqual({ ...source.records, sync_catalog_cache: [] });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'sync_catalog_cache')).toEqual(source.stores);
+  expect(target.indexes).toEqual({ ...source.indexes, sync_catalog_cache: [] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 3 });
+});
+
+it('retains populated native and outgoing rows during version 41 cache admission', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 41
+  )!;
+  const rows = new Map<string, readonly unknown[]>(Object.entries(source.records));
+  rows.set('sync_capture', [{ key: 'profile', retained: 'native profile and capture evidence' }]);
+  rows.set('sync_outbox', [{ key: 'prepared', retained: 'dispatch and source evidence' }]);
+  const before = structuredClone(rows);
+  const sourceAccess = vi.fn(() => {
+    throw new Error('Released rows must remain untouched.');
+  });
+  const db = {
+    objectStoreNames: { contains: (name: string) => rows.has(name) },
+    createObjectStore(name: string) {
+      rows.set(name, []);
+      return { createIndex: sourceAccess, put: sourceAccess };
+    },
+    deleteObjectStore: sourceAccess,
+  };
+  const tx = { abort: vi.fn(), objectStore: sourceAccess };
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 41)!;
+  expect(migration.migrate(db, tx)).toBeUndefined();
+  expect(migration.validate(db, tx)).toBeUndefined();
+  expect(rows).toEqual(new Map([...before, ['sync_catalog_cache', []]]));
+  expect(sourceAccess).not.toHaveBeenCalled();
+});
+
+it('admits queue control without changing version 42 stores, rows, history or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 42
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 43
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 4 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 42)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [{ domainId: 'syncCapture', from: 3, to: 4 }],
+    stores: ['sync_capture', 'sync_outbox', 'sync_catalog_cache'],
+    toDatabaseVersion: 43,
+  });
+});
+
+it('adds empty connection authority without changing version 43 source rows or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 43
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 44
+  )!;
+  expect(target.records).toEqual({ ...source.records, sync_connection: [] });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'sync_connection')).toEqual(source.stores);
+  expect(target.indexes).toEqual({ ...source.indexes, sync_connection: [] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 5 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 43)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [{ domainId: 'syncCapture', from: 4, to: 5 }],
+    stores: ['sync_connection'],
+    toDatabaseVersion: 44,
+  });
+});
+
+it('adds only due indexing without rewriting version 44 rows or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 44
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 45
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual({ ...source.indexes, sync_outbox: ['syncQueueDue'] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 6 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 44)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    domainVersions: [{ domainId: 'syncCapture', from: 5, to: 6 }],
+    stores: ['sync_outbox'],
+    toDatabaseVersion: 45,
+  });
+});

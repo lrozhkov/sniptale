@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import {
   resolveDrawingArrowBendTarget,
+  getDrawingSelectionBounds,
+  translateDrawingObject,
   type DrawingPoint,
+  type DrawingObject,
   type DrawingSessionSnapshot,
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
@@ -16,18 +19,84 @@ import {
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { DrawingTextDraft } from './text-editor';
 import { updateDrawingPointerDraft } from './pointer-update';
+import {
+  isDrawingAlignmentObject,
+  resolveDrawingMoveAlignment,
+  type DrawingAlignmentGuide,
+} from './move-alignment';
+import { collectDrawingDomAlignmentBounds } from './move-alignment-dom';
 
 export const TEXT_DRAG_THRESHOLD = 4;
 
-export function useDrawingPointerRuntime(args: {
+function alignMovedDraft(
+  draft: PointerDraft,
+  objects: readonly DrawingObject[],
+  root: PageScrollRoot
+): { draft: PointerDraft; guides: DrawingAlignmentGuide[] } {
+  const moving =
+    draft.kind === 'move' ? [draft.object] : draft.kind === 'move-selection' ? draft.objects : [];
+  const bounds = getDrawingSelectionBounds(moving);
+  if (!bounds || !moving.every(isDrawingAlignmentObject)) return { draft, guides: [] };
+  const alignment = resolveDrawingMoveAlignment({
+    moving,
+    objects,
+    domBounds: collectDrawingDomAlignmentBounds(bounds, root),
+  });
+  if (draft.kind === 'move')
+    return {
+      draft: { ...draft, object: translateDrawingObject(draft.object, alignment.delta) },
+      guides: alignment.guides,
+    };
+  if (draft.kind === 'move-selection')
+    return {
+      draft: {
+        ...draft,
+        objects: draft.objects.map((object) => translateDrawingObject(object, alignment.delta)),
+      },
+      guides: alignment.guides,
+    };
+  return { draft, guides: [] };
+}
+
+function useDrawingDraftInterruption(
+  draftRef: RefObject<PointerDraft | null>,
+  alignMoves: boolean,
+  cancelDraft: () => void,
+  cancelPointer: (event: ReactPointerEvent<HTMLCanvasElement>) => void
+) {
+  const shouldCancel = useCallback(() => {
+    const kind = draftRef.current?.kind;
+    return kind === 'bend' || (alignMoves && (kind === 'move' || kind === 'move-selection'));
+  }, [alignMoves, draftRef]);
+  useEffect(() => {
+    const cancelOnBlur = () => {
+      if (shouldCancel()) cancelDraft();
+    };
+    window.addEventListener('blur', cancelOnBlur);
+    return () => window.removeEventListener('blur', cancelOnBlur);
+  }, [cancelDraft, shouldCancel]);
+  return useCallback(
+    (event: ReactPointerEvent<HTMLCanvasElement>) => {
+      if (shouldCancel()) cancelPointer(event);
+    },
+    [cancelPointer, shouldCancel]
+  );
+}
+
+type DrawingPointerRuntimeOptions = {
   active: boolean;
+  /** Enables disposable page alignment; crop and recording retain their current gestures. */
+  alignMoves?: boolean;
   controller: ContentDrawingController;
   root: PageScrollRoot;
   onCancelText: () => void;
   onText: (draft: DrawingTextDraft) => void;
-}) {
+};
+
+export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   const { active, controller, root, onCancelText, onText } = args;
   const draftRef = useRef<PointerDraft | null>(null);
+  const alignmentGuidesRef = useRef<DrawingAlignmentGuide[]>([]);
   const hoverBendRef = useRef<DrawingArrowHover | null>(null);
   const activePointerRef = useRef<number | null>(null);
   const touchPointsRef = useRef(new Map<number, DrawingPoint>());
@@ -38,19 +107,12 @@ export function useDrawingPointerRuntime(args: {
     const draft = draftRef.current;
     if (draft?.kind === 'marquee') controller.session.setSelection(draft.initialSelectionIds);
     draftRef.current = null;
+    alignmentGuidesRef.current = [];
     hoverBendRef.current = null;
     activePointerRef.current = null;
     onCancelText();
     changed();
   }, [changed, controller, onCancelText]);
-
-  useEffect(() => {
-    const cancelBend = () => {
-      if (draftRef.current?.kind === 'bend') cancelDraft();
-    };
-    window.addEventListener('blur', cancelBend);
-    return () => window.removeEventListener('blur', cancelBend);
-  }, [cancelDraft]);
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -73,6 +135,7 @@ export function useDrawingPointerRuntime(args: {
         timestamp: event.timeStamp,
       });
       draftRef.current = start.draft;
+      alignmentGuidesRef.current = [];
       activePointerRef.current = event.pointerId;
       hoverBendRef.current = null;
       if (start.selection) controller.session.setSelection(start.selection);
@@ -110,12 +173,31 @@ export function useDrawingPointerRuntime(args: {
         point,
         root,
       });
+      alignmentGuidesRef.current = [];
+      if (args.alignMoves && Math.hypot(point.x - draft.start.x, point.y - draft.start.y) >= 4) {
+        const aligned = alignMovedDraft(
+          update.draft,
+          controller.session.getSnapshot().document.objects,
+          root
+        );
+        update.draft = aligned.draft;
+        alignmentGuidesRef.current = aligned.guides;
+      }
       draftRef.current = update.draft;
       if (update.selection) controller.session.setSelection(update.selection);
       changed();
     },
-    [active, changed, controller, root]
+    [active, args.alignMoves, changed, controller, root]
   );
+
+  const finalizeDraft = useCallback(() => {
+    commitDrawingPointerDraft(controller.session, draftRef.current);
+    draftRef.current = null;
+    alignmentGuidesRef.current = [];
+    hoverBendRef.current = null;
+    activePointerRef.current = null;
+    changed();
+  }, [changed, controller]);
 
   const finishPointer = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -124,21 +206,10 @@ export function useDrawingPointerRuntime(args: {
         touchPointsRef.current.delete(event.pointerId);
         if (touchPointsRef.current.size < 2) touchCentroidRef.current = null;
       }
-      commitDrawingPointerDraft(controller.session, draftRef.current);
-      draftRef.current = null;
-      activePointerRef.current = null;
-      changed();
+      finalizeDraft();
     },
-    [changed, controller]
+    [finalizeDraft]
   );
-
-  const finalizeDraft = useCallback(() => {
-    commitDrawingPointerDraft(controller.session, draftRef.current);
-    draftRef.current = null;
-    hoverBendRef.current = null;
-    activePointerRef.current = null;
-    changed();
-  }, [changed, controller]);
 
   const cancelPointer = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -150,7 +221,16 @@ export function useDrawingPointerRuntime(args: {
     [cancelDraft]
   );
 
+  const cancelLostPointer = useDrawingDraftInterruption(
+    draftRef,
+    args.alignMoves ?? false,
+    cancelDraft,
+    cancelPointer
+  );
+
   return {
+    alignmentGuidesRef,
+    cancelLostPointer,
     cancelDraft,
     cancelPointer,
     changed,

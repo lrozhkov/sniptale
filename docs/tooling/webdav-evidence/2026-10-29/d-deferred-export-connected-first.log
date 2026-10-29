@@ -1,0 +1,33 @@
+
+ RUN  v5.0.5 <worktree>
+
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts (67 tests | 1 failed) 1271ms
+   × publishes an offline metadata revision without materializing its deferred saved export 46ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  apps/extension/src/workflows/sync-transfer/native-residency.test.ts > publishes an offline metadata revision without materializing its deferred saved export
+Error: Sync queue capture changed.
+ ❯ enqueueSyncQueueCaptureInTransaction apps/extension/src/composition/persistence/sync-capture/queue.ts:324:11
+    322|     JSON.stringify(current) !== JSON.stringify(capture)
+    323|   )
+    324|     throw new Error('Sync queue capture changed.');
+       |           ^
+    325|   const scope = {
+    326|     spaceId: profile.spaceId,
+ ❯ apps/extension/src/composition/persistence/sync-capture/queue.ts:386:20
+ ❯ apps/extension/src/composition/persistence/sync-capture/queue.ts:155:22
+ ❯ runWithActiveMutationPermit apps/extension/src/composition/persistence/infrastructure/mutation-barrier.ts:400:12
+ ❯ apps/extension/src/workflows/sync-transfer/native-residency.test.ts:1865:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 6 passed (7)
+      Tests  1 failed | 209 passed (210)
+   Start at  10:28:54
+   Duration  9.77s (import 54%, tests 28%, transform 17%, setup 1%)
+
+    Isolate  7 workers spawned · ~109ms startup each (spawn + environment, per file)
+             at least ~652ms faster with isolate: false — reuses workers across files instead of one per file
+

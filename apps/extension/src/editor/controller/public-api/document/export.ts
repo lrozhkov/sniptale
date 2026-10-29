@@ -1,3 +1,4 @@
+import { optimizeScreenshotDataUrl } from '../../../../platform/media-utils/screenshot-encoding';
 import { useEditorStore } from '../../../state/useEditorStore';
 import {
   buildEditorCanvasDocument,
@@ -80,12 +81,13 @@ export async function renderEditorControllerForExport(
   options: EditorRenderToDataUrlOptions,
   draftPolicy: FrameAnnotationDraftRenderPolicy = 'finalize'
 ): Promise<string> {
-  return renderEditorWithFrameAnnotations({
+  const rendered = await renderEditorWithFrameAnnotations({
     canvas: controller.canvas,
     canvasDocumentSize: controller.canvasDocumentSize,
     draftPolicy,
     renderOptions: options,
   });
+  return optimizeScreenshotDataUrl(rendered, options.signal);
 }
 
 export async function copyRenderedEditorImageViaController(

@@ -393,3 +393,147 @@ it('excludes and drains page recovery before erasing private bytes', async () =>
   expect(ports.pageRecovery.cleanup).toHaveBeenCalledOnce();
   expect(release).toHaveBeenCalledOnce();
 });
+
+it('quiesces sync before mutation drains, media closure and persistent erasure', async () => {
+  const ports = createPorts();
+  const quiescing = deferred();
+  const syncGate = deferred();
+  const draining = deferred();
+  const mutationGate = deferred();
+  const release = vi.fn();
+  ports.sync.reserveErasureExclusion = vi.fn(() => ({
+    release,
+    async quiesce() {
+      quiescing.resolve();
+      await syncGate.promise;
+    },
+  }));
+  const waitForActiveMutations = vi.fn(async () => {
+    draining.resolve();
+    await mutationGate.promise;
+  });
+  ports.media.reserveErasureExclusion = () => ({ release() {}, waitForActiveMutations });
+
+  const execution = new PrivacyErasureUseCase(ports).execute(createErasureRequest());
+  expect(ports.sync.reserveErasureExclusion).toHaveBeenCalledOnce();
+  await quiescing.promise;
+  expect(waitForActiveMutations).not.toHaveBeenCalled();
+  expect(ports.media.cleanup).not.toHaveBeenCalled();
+  expect(ports.storage.cleanup).not.toHaveBeenCalled();
+  expect(release).not.toHaveBeenCalled();
+
+  syncGate.resolve();
+  await draining.promise;
+  expect(ports.media.cleanup).not.toHaveBeenCalled();
+  mutationGate.resolve();
+  await expect(execution).resolves.toEqual(expect.objectContaining({ success: true }));
+  expect(release).toHaveBeenCalledOnce();
+});
+
+it('preserves local data and releases every exclusion after sync quiescence fails', async () => {
+  const ports = createPorts();
+  const releaseSync = vi.fn();
+  ports.sync.reserveErasureExclusion = () => ({
+    release: releaseSync,
+    quiesce: vi.fn().mockRejectedValue(new Error('private remote address')),
+  });
+  const releases = [];
+  const waits = [];
+  for (const owner of [
+    'audioJobs',
+    'media',
+    'diagnostics',
+    'nativeIngestion',
+    'pageRecovery',
+    'popupExport',
+  ] as const) {
+    const release = vi.fn();
+    const waitForActiveMutations = vi.fn(async () => undefined);
+    releases.push(release);
+    waits.push(waitForActiveMutations);
+    ports[owner].reserveErasureExclusion = () => ({ release, waitForActiveMutations });
+  }
+
+  const result = await new PrivacyErasureUseCase(ports).execute(createErasureRequest());
+
+  expect(result).toEqual({
+    failedRequiredParticipantIds: ['sync-runtime-state'],
+    indexedDbStoresCleared: 0,
+    localStorageKeysRemoved: [],
+    participants: [
+      {
+        error: 'sync-quiescence-failed',
+        id: 'sync-runtime-state',
+        severity: 'required',
+        status: 'failed',
+      },
+    ],
+    sessionStorageKeysRemoved: [],
+    success: false,
+    syncStorageKeysRemoved: [],
+  });
+  expect(ports.audioJobs.cancelActiveJob).not.toHaveBeenCalled();
+  expect(ports.popupExport.cancelActiveJob).not.toHaveBeenCalled();
+  expect(ports.media.cleanup).not.toHaveBeenCalled();
+  expect(ports.diagnostics.cleanup).not.toHaveBeenCalled();
+  expect(ports.nativeIngestion.cleanup).not.toHaveBeenCalled();
+  expect(ports.pageRecovery.cleanup).not.toHaveBeenCalled();
+  expect(ports.runtime.cleanup).not.toHaveBeenCalled();
+  expect(ports.storage.cleanup).not.toHaveBeenCalled();
+  for (const wait of waits) expect(wait).not.toHaveBeenCalled();
+  for (const release of releases) expect(release).toHaveBeenCalledOnce();
+  expect(releaseSync).toHaveBeenCalledOnce();
+});
+
+it('reserves sync admission immediately for each queued request and retries after refusal', async () => {
+  const ports = createPorts();
+  const entered = deferred();
+  const gate = deferred();
+  const release = vi.fn();
+  const quiesce = vi
+    .fn()
+    .mockImplementationOnce(async () => {
+      entered.resolve();
+      await gate.promise;
+      throw new Error('stop refused');
+    })
+    .mockResolvedValueOnce(undefined);
+  ports.sync.reserveErasureExclusion = vi.fn(() => ({ release, quiesce }));
+  const useCase = new PrivacyErasureUseCase(ports);
+
+  const first = useCase.execute(createErasureRequest());
+  const second = useCase.execute(createErasureRequest());
+  expect(ports.sync.reserveErasureExclusion).toHaveBeenCalledTimes(2);
+  await entered.promise;
+  expect(quiesce).toHaveBeenCalledOnce();
+  expect(release).not.toHaveBeenCalled();
+  gate.resolve();
+  expect((await first).success).toBe(false);
+  expect((await second).success).toBe(true);
+  expect(quiesce).toHaveBeenCalledTimes(2);
+  expect(release).toHaveBeenCalledTimes(2);
+  expect(ports.storage.cleanup).toHaveBeenCalledOnce();
+});
+
+it('releases sync admission when another exclusion reservation throws', () => {
+  const ports = createPorts();
+  const release = vi.fn();
+  ports.sync.reserveErasureExclusion = () => ({ release, async quiesce() {} });
+  ports.audioJobs.reserveErasureExclusion = () => {
+    throw new Error('reservation failed');
+  };
+
+  expect(() => new PrivacyErasureUseCase(ports).execute(createErasureRequest())).toThrow(
+    'reservation failed'
+  );
+  expect(release).toHaveBeenCalledOnce();
+  expect(ports.storage.cleanup).not.toHaveBeenCalled();
+});
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}

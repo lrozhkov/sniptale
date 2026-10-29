@@ -14,6 +14,15 @@ const {
   translateMock: vi.fn((key: string) => key),
 }));
 
+const mediaEvents = vi.hoisted(() => ({
+  publishLibraryChanged: vi.fn(),
+  dispose: vi.fn(),
+  create: vi.fn(),
+}));
+vi.mock('../../features/media-hub/events', () => ({
+  createMediaHubEventPublisher: mediaEvents.create,
+}));
+
 vi.mock('./bootstrap', () => ({
   bootstrapOffscreenDocument: bootstrapOffscreenDocumentMock,
   probeOffscreenRuntimeReadiness: vi.fn(),
@@ -27,16 +36,57 @@ vi.mock('../voice-input/runtime', () => ({
   registerOffscreenVoiceInputMessageListener: registerOffscreenVoiceInputMessageListenerMock,
 }));
 
+vi.mock('../sync-connection/runtime', () => ({
+  registerOffscreenSyncMessageListener: vi.fn(),
+}));
+vi.mock('../sync-connection/executor', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../sync-connection/executor')>();
+  return {
+    ...original,
+    createSyncConnectionExecutor: vi.fn(original.createSyncConnectionExecutor),
+  };
+});
+vi.mock('../sync-connection/execution', () => ({
+  createSyncQueueExecution: vi.fn(),
+  createSyncWorkspaceExecution: vi.fn(),
+}));
+vi.mock('../sync-connection/product-execution', () => ({ createSyncProductExecution: vi.fn() }));
+vi.mock('../../platform/runtime-messaging', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../platform/runtime-messaging')>();
+  return {
+    ...original,
+    createRuntimeMessagingTransport: vi.fn(original.createRuntimeMessagingTransport),
+  };
+});
+import { createSyncConnectionExecutor } from '../sync-connection/executor';
+import {
+  createSyncQueueExecution,
+  createSyncWorkspaceExecution,
+} from '../sync-connection/execution';
+import { createSyncProductExecution } from '../sync-connection/product-execution';
+import { registerOffscreenSyncMessageListener } from '../sync-connection/runtime';
+import { createRuntimeMessagingTransport } from '../../platform/runtime-messaging';
+
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   getCurrentLocale: getCurrentLocaleMock,
   translate: translateMock,
 }));
 
+let documentEvents: EventTarget;
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
   vi.unstubAllGlobals();
+  documentEvents = new EventTarget();
+  vi.stubGlobal('addEventListener', vi.fn(documentEvents.addEventListener.bind(documentEvents)));
+  mediaEvents.create.mockReturnValue({
+    publishLibraryChanged: mediaEvents.publishLibraryChanged,
+    dispose: mediaEvents.dispose,
+  });
+  vi.stubGlobal('location', {
+    href: 'chrome-extension://extension/apps/extension/src/offscreen/offscreen.html',
+  });
 });
 
 describe('offscreen entrypoint', () => {
@@ -94,4 +144,177 @@ describe('offscreen entrypoint', () => {
     expect(registerOffscreenRuntimeMessageListenerMock).toHaveBeenCalledOnce();
     expect(registerOffscreenVoiceInputMessageListenerMock).toHaveBeenCalledOnce();
   });
+});
+
+it('installs sync before READY and keeps credentials outside the permission query', async () => {
+  const startup = '11111111-1111-4111-8111-111111111111';
+  vi.stubGlobal('location', {
+    href:
+      'chrome-extension://extension/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=' +
+      startup,
+  });
+  const send = vi.fn(async (_message: unknown) => ({ success: true, allowed: true }));
+  const transport = createRuntimeMessagingTransport({
+    runtimeSendMessage: send,
+    tabSendMessage: vi.fn(),
+  });
+  vi.mocked(createRuntimeMessagingTransport).mockReturnValue(transport);
+  await import('../offscreen');
+  expect(registerOffscreenSyncMessageListener).toHaveBeenCalledBefore(
+    bootstrapOffscreenDocumentMock
+  );
+  const ports = vi.mocked(createSyncConnectionExecutor).mock.calls[0]?.[0];
+  if (!ports) throw new Error('Sync executor was not composed.');
+  const authorization = { incarnation: '22222222-2222-4222-8222-222222222222', revision: 2 };
+  ports.createExecution({
+    scope: { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 1 },
+    authorization,
+    operationId: 'operation',
+    expectedRevision: 1,
+    signal: new AbortController().signal,
+    onProgress: () => {},
+  });
+  const query = vi.mocked(createSyncQueueExecution).mock.calls[0]?.[1];
+  if (!query) throw new Error('Origin query was not injected.');
+  expect(await query('https://dav.example')).toBe(true);
+  expect(send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'SYNC_CONNECTION_ORIGIN_PERMISSION',
+      requestId: expect.any(String),
+      authorization,
+      origin: 'https://dav.example',
+    })
+  );
+  send.mockResolvedValue({ success: true, allowed: false });
+  expect(await query('https://dav.example')).toBe(false);
+});
+it('does not install a sync executor in the privacy-only document', async () => {
+  const url = new URL('chrome-extension://extension/apps/extension/src/offscreen/offscreen.html');
+  url.searchParams.set('offscreenStartupId', '11111111-1111-4111-8111-111111111111');
+  url.searchParams.set('privacyErasure', '1');
+  vi.stubGlobal('location', { href: url.href });
+  await import('../offscreen');
+  expect(createSyncConnectionExecutor).not.toHaveBeenCalled();
+  expect(mediaEvents.create).not.toHaveBeenCalled();
+  expect(registerOffscreenSyncMessageListener).not.toHaveBeenCalled();
+  expect(bootstrapOffscreenDocumentMock).toHaveBeenCalledOnce();
+});
+
+it.each(['catalog-refresh', 'thumbnail-read'] as const)(
+  'binds %s and workspace permission callbacks to their native identity and fails closed',
+  async (kind) => {
+    const id = '11111111-1111-4111-8111-111111111111';
+    vi.stubGlobal('location', {
+      href: `chrome-extension://extension/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=${id}`,
+    });
+    const send = vi.fn<(message: unknown) => Promise<unknown>>();
+    const original = await vi.importActual<typeof import('../../platform/runtime-messaging')>(
+      '../../platform/runtime-messaging'
+    );
+    vi.mocked(createRuntimeMessagingTransport).mockReturnValue(
+      original.createRuntimeMessagingTransport({
+        runtimeSendMessage: send,
+        tabSendMessage: vi.fn(),
+      })
+    );
+    await import('../offscreen');
+    const ports = vi.mocked(createSyncConnectionExecutor).mock.calls[0]?.[0];
+    if (!ports?.createProductExecution) throw new Error('Product executor was not composed.');
+    const authorization = { incarnation: id, revision: 2 };
+    const source = { kind: 'join' as const, identity: authorization };
+    ports.createProductExecution({
+      scope: { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 1 },
+      authorization,
+      work:
+        kind === 'catalog-refresh'
+          ? { kind, bypassCache: false }
+          : {
+              kind,
+              selection: {
+                rootKind: 'media',
+                rootId: 'root',
+                operationId: 'operation',
+                sourceDigest: 'a'.repeat(64),
+              },
+            },
+      signal: new AbortController().signal,
+    });
+    ports.createWorkspaceExecution({
+      source,
+      authentication: { kind: 'bearer', accessToken: 'private-token' },
+    });
+    const productQuery = vi.mocked(createSyncProductExecution).mock.calls[0]?.[1];
+    const workspaceQuery = vi.mocked(createSyncWorkspaceExecution).mock.calls[0]?.[1];
+    if (!productQuery || !workspaceQuery) throw new Error('Permission callback was not composed.');
+    for (const [query, expected] of [
+      [
+        productQuery,
+        {
+          type: 'SYNC_CONNECTION_ORIGIN_PERMISSION',
+          authorization,
+          ...(kind === 'thumbnail-read' ? { advisory: true } : {}),
+        },
+      ],
+      [
+        workspaceQuery,
+        { type: 'SYNC_WORKSPACE_ORIGIN_PERMISSION', sourceKind: 'join', selectionIncarnation: id },
+      ],
+    ] as const) {
+      for (const [response, allowed] of [
+        [{ success: true, allowed: true }, true],
+        [{ success: true, allowed: false }, false],
+        [{ success: false, error: 'Sync origin permission query refused' }, false],
+      ] as const) {
+        send.mockResolvedValue(response);
+        expect(await query('https://dav.test')).toBe(allowed);
+        expect(send).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            ...expected,
+            requestId: expect.any(String),
+            origin: 'https://dav.test',
+          })
+        );
+        expect(JSON.stringify(send.mock.lastCall?.[0])).not.toContain('private-token');
+      }
+      send.mockResolvedValue({ success: false, error: 'provider details' });
+      await expect(query('https://dav.test')).rejects.toThrow('Invalid sync runtime contract');
+    }
+  }
+);
+
+it('owns one media publisher through offscreen disposal', async () => {
+  const startup = '11111111-1111-4111-8111-111111111111';
+  vi.stubGlobal('location', {
+    href: `chrome-extension://extension/offscreen.html?offscreenStartupId=${startup}`,
+  });
+  await import('../offscreen');
+  const ports = vi.mocked(createSyncConnectionExecutor).mock.calls[0]?.[0];
+  if (!ports?.createProductExecution) throw new Error('Missing product execution factory');
+  const input = {
+    scope: { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 1 },
+    authorization: { incarnation: startup, revision: 1 },
+    work: { kind: 'catalog-refresh' as const, bypassCache: false },
+    signal: new AbortController().signal,
+  };
+  ports.createProductExecution(input);
+  ports.createProductExecution(input);
+  for (const call of vi.mocked(createSyncProductExecution).mock.calls) {
+    const notify = call[2];
+    if (!notify) throw new Error('Missing library advisory');
+    notify();
+  }
+  expect(mediaEvents.create).toHaveBeenCalledOnce();
+  expect(mediaEvents.publishLibraryChanged.mock.calls).toEqual([
+    ['sync', []],
+    ['sync', []],
+  ]);
+  expect(mediaEvents.dispose).not.toHaveBeenCalled();
+  expect(globalThis.addEventListener).toHaveBeenCalledExactlyOnceWith(
+    'pagehide',
+    expect.any(Function),
+    { once: true }
+  );
+  documentEvents.dispatchEvent(new Event('pagehide'));
+  documentEvents.dispatchEvent(new Event('pagehide'));
+  expect(mediaEvents.dispose).toHaveBeenCalledOnce();
 });

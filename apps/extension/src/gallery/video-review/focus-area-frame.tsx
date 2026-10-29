@@ -77,6 +77,7 @@ export function ReviewFocusFrame(
 export function useFocusFrameHover() {
   const frame = useRef<HTMLDivElement>(null);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
+  const pending = useRef<number | null>(null);
   const [pointerInteraction, setPointerInteraction] = useState(false);
   const [hovered, setHovered] = useState(false);
   const reconcile = () => {
@@ -91,7 +92,20 @@ export function useFocusFrameHover() {
         point.y <= bounds.bottom
     );
   };
-  useLayoutEffect(reconcile);
+  useLayoutEffect(() => {
+    if (!lastPoint.current || pending.current !== null) return;
+    // Coalesce bounds reads instead of forcing layout immediately after each geometry commit.
+    pending.current = requestAnimationFrame(() => {
+      pending.current = null;
+      reconcile();
+    });
+  });
+  useLayoutEffect(
+    () => () => {
+      if (pending.current !== null) cancelAnimationFrame(pending.current);
+    },
+    []
+  );
   const trackPointer = (event: PointerEvent<HTMLElement>) => {
     setPointerInteraction(true);
     lastPoint.current = { x: event.clientX, y: event.clientY };

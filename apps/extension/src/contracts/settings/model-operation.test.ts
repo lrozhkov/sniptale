@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   filterAIModelsByOperation,
+  supportsAIModelOperation,
+  supportsAIProviderModelOperation,
   getAIModelOperation,
   isValidAIModelOperationConfiguration,
 } from './model-operation';
@@ -121,4 +123,130 @@ it('admits explicitly selected PCM synthesis without model-name inference', () =
       audio: { speech: { voiceId: 'Leda', responseFormat: 'pcm' } },
     })
   ).toBe(true);
+});
+
+it('requires manual property ownership for a retired model override', () => {
+  const model = {
+    source: 'manual' as const,
+    retirementOverride: true,
+    capabilities: {
+      operations: { text: 'supported' as const },
+      input: {},
+      output: {},
+      features: {},
+    },
+    catalog: {
+      displayName: 'Retired',
+      lifecycle: 'retired' as const,
+      observedAt: 1,
+      capabilities: {
+        operations: { text: 'supported' as const },
+        input: {},
+        output: {},
+        features: {},
+      },
+    },
+  };
+  expect(supportsAIModelOperation({ ...model, propertySource: 'catalog' }, 'text')).toBe(false);
+  expect(supportsAIModelOperation({ ...model, propertySource: 'manual' }, 'text')).toBe(true);
+  expect(
+    supportsAIModelOperation({ ...model, propertySource: 'manual', enabled: false }, 'text')
+  ).toBe(false);
+});
+
+it('admits catalog-owned properties on a manual allowlist without enabling automatic rows', () => {
+  const model = {
+    source: 'manual' as const,
+    propertySource: 'catalog' as const,
+    capabilities: {
+      operations: { text: 'supported' as const },
+      input: {},
+      output: {},
+      features: {},
+    },
+  };
+  const provider = { connectionType: 'neuraldeep' as const, management: 'manual' as const };
+  expect(supportsAIProviderModelOperation(model, provider, 'text')).toBe(true);
+  expect(supportsAIProviderModelOperation({ ...model, source: 'catalog' }, provider, 'text')).toBe(
+    false
+  );
+});
+
+it('accepts independent speech and recognition parameters for a model with several declared operations', () => {
+  const capabilities = {
+    operations: { text: 'supported', speech: 'supported', transcription: 'supported' },
+    input: {},
+    output: {},
+    features: {},
+  };
+  expect(isValidAIModelOperationConfiguration({ capabilities })).toBe(true);
+  expect(
+    isValidAIModelOperationConfiguration({
+      capabilities,
+      operation: 'text',
+      audio: {
+        speech: { voiceId: 'voice', responseFormat: 'mp3' },
+        transcription: { responseFormat: 'json', timestampGranularity: 'none' },
+      },
+    })
+  ).toBe(true);
+  expect(
+    isValidAIModelOperationConfiguration({
+      capabilities: { ...capabilities, operations: { text: 'supported' } },
+      audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+    })
+  ).toBe(false);
+});
+
+it('blocks cached capabilities exactly at the known retirement deadline', () => {
+  const capabilities = {
+    operations: { text: 'supported' as const },
+    input: {},
+    output: {},
+    features: {},
+  };
+  const model = {
+    source: 'catalog' as const,
+    capabilities,
+    catalog: {
+      displayName: 'Timed model',
+      lifecycle: 'deprecated' as const,
+      observedAt: 1,
+      retirementAt: 1000,
+      capabilities,
+    },
+  };
+  const clock = vi.spyOn(Date, 'now');
+  try {
+    clock.mockReturnValue(999);
+    expect(supportsAIModelOperation(model, 'text')).toBe(true);
+    clock.mockReturnValue(1000);
+    expect(supportsAIModelOperation(model, 'text')).toBe(false);
+    clock.mockReturnValue(1001);
+    expect(supportsAIModelOperation(model, 'text')).toBe(false);
+    expect(
+      supportsAIModelOperation(
+        {
+          ...model,
+          source: 'manual',
+          propertySource: 'catalog',
+          retirementOverride: true,
+        },
+        'text'
+      )
+    ).toBe(false);
+    expect(
+      supportsAIModelOperation(
+        {
+          ...model,
+          source: 'manual',
+          propertySource: 'manual',
+          retirementOverride: true,
+        },
+        'text'
+      )
+    ).toBe(true);
+  } finally {
+    clock.mockRestore();
+  }
 });

@@ -43,8 +43,27 @@ vi.mock('./video-frame-resources', () => ({
       <p>No frameless action</p>
     ),
 }));
+vi.mock('../../workflows/ai-settings/query', () => ({
+  requestAIScenarioModelSelection: async () => ({
+    scenario: 'scenario-edit',
+    providers: [
+      {
+        id: 'provider',
+        name: 'NeuralDeep',
+        connectionType: 'neuraldeep',
+        incarnation: 'one',
+        destinationKind: 'external',
+        createdAt: 1,
+        hasStoredApiKey: true,
+      },
+    ],
+    models: [{ id: 'model', providerId: 'provider', modelCode: 'model', displayName: 'Model' }],
+    remembered: null,
+    resolution: { status: 'initial', modelId: 'model', previousSelection: null, reason: null },
+  }),
+  rememberAIScenarioModelSelection: async () => undefined,
+}));
 vi.mock('./runtime/ai-request', () => ({
-  loadGuideAiConfiguration: async () => ({ providers: [], models: [], defaultModelId: 'model' }),
   requestGuideAiProposal: io.request,
   verifyGuideAiBasis: async () => 1,
   GuideAiStaleError: class extends Error {},

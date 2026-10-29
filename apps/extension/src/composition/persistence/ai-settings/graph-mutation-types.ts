@@ -1,16 +1,27 @@
+import type { AIRememberScenarioSelectionInput } from '../../../contracts/settings/ai-catalog';
 import type { AIModel } from '../../../contracts/settings';
 import type { AIProviderUpsertInput } from './provider-secret-upsert-plan';
 
 export type AISettingsMutationCommand =
   | {
+      operation: 'set-provider-enabled';
+      providerId: string;
+      providerIncarnation: string;
+      enabled: boolean;
+    }
+  | { operation: 'remember-scenario-selection'; selection: AIRememberScenarioSelectionInput }
+  | {
       operation: 'add-provider' | 'update-provider';
       provider: AIProviderUpsertInput;
     }
   | { operation: 'clear-provider-secret' | 'delete-provider'; providerId: string }
-  | { operation: 'add-model' | 'update-model'; model: AIModel }
+  | {
+      operation: 'add-model' | 'update-model';
+      model: AIModel;
+      providerIncarnation?: string | undefined;
+    }
   | { operation: 'delete-model'; modelId: string }
   | { operation: 'move-model'; modelId: string; beforeModelId: string | null }
-  | { operation: 'save-default-model'; defaultModelId: string | null }
   | {
       operation:
         | 'save-global-prompt'
@@ -37,3 +48,12 @@ export type AISettingsMutationCommand =
     }
   | { operation: 'lock-secret-passphrase-protection' }
   | { operation: 'reset-secret-passphrase-protection' };
+
+/** Refuses a model draft prepared for a replaced connection. */
+export class AIModelProviderChangedError extends Error {
+  readonly reason = 'ai-provider-changed';
+  constructor() {
+    super('The AI provider changed after this model draft was prepared');
+    this.name = 'AIModelProviderChangedError';
+  }
+}

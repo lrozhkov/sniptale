@@ -21,6 +21,7 @@ import {
 import { resolveAudioModelConfig, type AudioModelConfig } from './model-config';
 import { requestAudio } from './request';
 import { validateAudioUpload } from './response';
+import { AIProviderRequestError } from '../providers';
 
 function failure(error: unknown): AudioJobFailureCode {
   return (error instanceof Error && parseAudioJobFailureCode(error.message)) || 'provider-failed';
@@ -69,7 +70,16 @@ class AudioJobCoordinator {
       : job.controller.signal.aborted
         ? 'cancelled'
         : failure(error);
-    job.send({ type: 'failure', requestId: job.request.requestId, code });
+    const failureReason =
+      !job.timedOut && !job.controller.signal.aborted && error instanceof AIProviderRequestError
+        ? error.reason
+        : undefined;
+    job.send({
+      type: 'failure',
+      requestId: job.request.requestId,
+      code,
+      ...(failureReason === undefined ? {} : { failureReason }),
+    });
   }
 
   private abort(job: Job): void {

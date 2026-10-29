@@ -1,9 +1,12 @@
+import type { SyncNativeEditingRoot } from '../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import { runWithNativePublicationResources } from '../../../workflows/sync-transfer/editing-admission';
 import { addMediaLibraryEntryTagsSafely } from '../../../workflows/media-hub/store';
 import { translate } from '../../../platform/i18n';
 import { updateScenarioProjectRecordMetadata } from '../../../composition/persistence/scenario/store/public';
 import type { GallerySelectionController } from './controller-types';
 import {
   isGalleryMediaItem,
+  isGalleryRemoteItem,
   isGalleryQuickEditProjectItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
@@ -37,6 +40,7 @@ function splitSelectableTargets(targets: GalleryItem[]) {
 }
 
 function trashTarget(item: GalleryItem): LibraryTrashTarget {
+  if (isGalleryRemoteItem(item)) throw new Error('Remote roots have no local trash target.');
   if (item.type === 'quick-edit-project')
     return {
       kind: 'quick-edit-project',
@@ -265,17 +269,25 @@ export function createApplySelectionTagAction(controller: GallerySelectionContro
     }
 
     await withBusy(async () => {
-      await Promise.all(
-        targets.map((item) => {
-          if (isGalleryMediaItem(item)) {
-            return addMediaLibraryEntryTagsSafely(item.entityId ?? item.id, [normalizedTag]);
-          }
-
-          const nextTags = [...item.tags, normalizedTag];
-          return updateScenarioProjectRecordMetadata(item.entityId, {
-            tags: nextTags,
-          });
-        })
+      await runWithNativePublicationResources(
+        targets.flatMap<SyncNativeEditingRoot>((item) => {
+          if (isGalleryMediaItem(item))
+            return [{ rootKind: 'media' as const, rootId: item.entityId ?? item.id }];
+          if (isGalleryScenarioItem(item))
+            return [{ rootKind: 'scenario-project' as const, rootId: item.entityId }];
+          return [];
+        }),
+        () =>
+          Promise.all(
+            targets.map((item) => {
+              if (isGalleryMediaItem(item))
+                return addMediaLibraryEntryTagsSafely(item.entityId ?? item.id, [normalizedTag]);
+              if (!isGalleryScenarioItem(item)) return;
+              return updateScenarioProjectRecordMetadata(item.entityId, {
+                tags: [...item.tags, normalizedTag],
+              });
+            })
+          )
       );
 
       controller.actions.selection.setSelectionTagDraft('');

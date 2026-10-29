@@ -1,4 +1,5 @@
 import React from 'react';
+import { useEditorStore } from '../state/useEditorStore';
 import type { FabricObject } from 'fabric';
 import type { FrameAnnotationSnapshotV1 } from '../../features/highlighter/frame-annotation';
 import type { FrameAnnotationCommandId } from '../../features/highlighter/frame-annotation/commands';
@@ -50,6 +51,7 @@ export function useFrameAnnotationInteraction(props: {
   controller: EditorFrameAnnotationPlaneController;
   layers?: EditorLayerItem[];
 }) {
+  const creationKind = useEditorStore((state) => state.frameAnnotationCreationKind);
   const [, forceRender] = React.useReducer((value) => value + 1, 0);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState<FrameAnnotationSnapshotV1 | null>(null);
@@ -162,6 +164,7 @@ export function useFrameAnnotationInteraction(props: {
   );
 
   const shared = {
+    creationKind,
     commitPendingHistory,
     dragRef,
     entries,
@@ -180,6 +183,7 @@ export function useFrameAnnotationInteraction(props: {
 }
 
 function createPlaneEvents(input: {
+  creationKind: FrameAnnotationSnapshotV1['annotationKind'] | null;
   commitPendingHistory: () => void;
   dragRef: React.RefObject<DragState | null>;
   entries: ReturnType<typeof collectFrameAnnotationProxies>;
@@ -199,7 +203,11 @@ function createPlaneEvents(input: {
       if (!coordinateSpace) return;
       const point = toLogicalPoint(event, coordinateSpace);
       if (!point) return;
-      const start = createDefaultSnapshot(point, input.entries.length);
+      const start = createDefaultSnapshot(
+        point,
+        input.entries.length,
+        input.creationKind ?? undefined
+      );
       input.dragRef.current = {
         coordinateSpace,
         mode: 'create',
@@ -291,6 +299,22 @@ function createObjectSnapshotActions(input: ObjectActionInput) {
       input.pendingHistoryRef.current = false;
       input.pendingPreviewObjectRef.current = null;
       input.updateDraft(null);
+      const emptyStandalone =
+        snapshot.annotationKind !== undefined &&
+        !snapshot.stepBadge?.enabled &&
+        !snapshot.callout?.enabled &&
+        !snapshot.additionalCallouts?.some((callout) => callout.enabled);
+      if (emptyStandalone) {
+        runCommand({
+          command: 'delete',
+          controller: props.controller,
+          forceRender: input.forceRender,
+          object,
+          setSelectedId: input.setSelectedId,
+          snapshot,
+        });
+        return;
+      }
       commitFrameAnnotationProxy(object, snapshot);
       synchronizeFrameAnnotationAutoStepBadges(props.controller.canvas?.getObjects?.() ?? []);
       props.controller.canvas?.requestRenderAll();
@@ -394,7 +418,10 @@ function useFinishDrag(input: {
         forceRender();
         return;
       }
-      if (draft.width < MIN_FRAME_SIZE || draft.height < MIN_FRAME_SIZE) {
+      if (
+        draft.annotationKind === undefined &&
+        (draft.width < MIN_FRAME_SIZE || draft.height < MIN_FRAME_SIZE)
+      ) {
         updateDraft(null);
         forceRender();
         return;
@@ -486,11 +513,13 @@ function buildProjection(
 
 function createDefaultSnapshot(
   point: { x: number; y: number },
-  ordering: number
+  ordering: number,
+  annotationKind?: FrameAnnotationSnapshotV1['annotationKind']
 ): FrameAnnotationSnapshotV1 {
   return createFrameAnnotationFromDefaults({
     id: crypto.randomUUID(),
     ordering,
+    ...(annotationKind ? { annotationKind } : {}),
     x: point.x,
     y: point.y,
   });
@@ -530,6 +559,7 @@ function resolveDraggedFrame(input: {
   point: { x: number; y: number };
 }): FrameAnnotationSnapshotV1 {
   const { drag } = input;
+  if (drag.mode === 'create' && drag.start.annotationKind) return drag.start;
   if (drag.mode === 'move') {
     return { ...drag.start, x: drag.start.x + input.dx, y: drag.start.y + input.dy };
   }

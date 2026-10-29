@@ -78,8 +78,7 @@ export function normalizeSettingsTransferRegistryField(domainId: string, field: 
   if (domainId === 'styles.tool-presets' && field === 'palette') return 'preferences';
   if ((domainId === 'styles.surfaces' || domainId === 'styles.gradients') && field !== 'presets')
     return 'defaults';
-  if (domainId === 'ai.models' && field === 'defaultModelId') return 'default';
   if (domainId === 'ai.prompt-templates' && field === 'order') return 'items';
-  if (domainId === 'styles.palettes' && field === 'slots') return 'items';
+  if (domainId === 'styles.palettes' && (field === 'slots' || field === 'names')) return 'items';
   return field;
 }

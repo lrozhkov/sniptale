@@ -1,3 +1,5 @@
+import { isAllowedAIProviderBaseUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
+
 const DEFAULT_LLM_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_LLM_RESPONSE_BYTES = 1_000_000;
 const JSON_CONTENT_TYPE_PATTERN = /\b(?:application\/json|[^;\s]+\/[^;\s+]+\+json)\b/iu;
@@ -135,4 +137,115 @@ export async function postJsonWithTimeout(args: {
     clearTimeout(timeoutId);
     args.signal?.removeEventListener('abort', abort);
   }
+}
+
+export interface ProviderSdkFetchOptions {
+  baseUrl: string;
+  maxResponseBytes?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  beforeSend?(): Promise<void>;
+  transport?: typeof globalThis.fetch;
+}
+
+async function readSdkResponseBytes(
+  response: Response,
+  maximum: number
+): Promise<Uint8Array<ArrayBuffer>> {
+  const declared = response.headers.get('Content-Length');
+  if (
+    declared !== null &&
+    (!Number.isFinite(Number(declared)) || Number(declared) < 0 || Number(declared) > maximum)
+  ) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error('provider-response-too-large');
+  }
+  if (!response.body) return new Uint8Array();
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maximum) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error('provider-response-too-large');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+/** Keeps SDK network effects inside the admitted destination and existing response budget. */
+export function createProviderSdkFetch(options: ProviderSdkFetchOptions): typeof globalThis.fetch {
+  if (!isAllowedAIProviderBaseUrl(options.baseUrl)) throw new Error('provider-destination-invalid');
+  const base = new URL(options.baseUrl);
+  const basePath = base.pathname.replace(/\/+$/u, '');
+  return async (input, init) => {
+    const url = new URL(
+      typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    );
+    if (
+      url.origin !== base.origin ||
+      url.username ||
+      url.password ||
+      (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`))
+    ) {
+      throw new Error('provider-destination-changed');
+    }
+    options.signal?.throwIfAborted();
+    await options.beforeSend?.();
+    options.signal?.throwIfAborted();
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      options.timeoutMs ?? DEFAULT_LLM_REQUEST_TIMEOUT_MS
+    );
+    const signals = [controller.signal, options.signal, init?.signal].filter(
+      (signal): signal is AbortSignal => signal !== undefined && signal !== null
+    );
+    const signal = signals.length ? AbortSignal.any(signals) : undefined;
+    signal?.throwIfAborted();
+    try {
+      const response = await (options.transport ?? globalThis.fetch)(input, {
+        ...init,
+        redirect: 'error',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+        ...(signal ? { signal } : {}),
+      });
+      if (response.redirected || (response.status >= 300 && response.status < 400)) {
+        await response.body?.cancel().catch(() => undefined);
+        throw new Error('provider-redirect-refused');
+      }
+      const bytes = await readSdkResponseBytes(
+        response,
+        options.maxResponseBytes ?? MAX_LLM_RESPONSE_BYTES
+      );
+      return new Response(
+        response.status === 204 || response.status === 205 || response.status === 304
+          ? null
+          : bytes,
+        {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        }
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
 }

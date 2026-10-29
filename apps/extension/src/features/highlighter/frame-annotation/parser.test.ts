@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import {
   createFrameAnnotationSnapshot,
   parseFrameAnnotationSnapshot,
@@ -10,251 +10,297 @@ import { createDefaultHighlighterSettings } from '../style/defaults';
 import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import type { StepBadgeSettings } from '@sniptale/runtime-contracts/highlighter/step-badge';
 
-describe('frame annotation snapshot boundary', () => {
-  it('round-trips the versioned visual state without page or editor runtime metadata', () => {
+it.each(['callout', 'step-badge'] as const)(
+  'preserves the standalone %s kind across the snapshot boundary',
+  (annotationKind) => {
     const snapshot = createFrameAnnotationSnapshot(
       {
-        id: 'frame-1',
-        x: 10,
-        y: 20,
-        width: 300,
-        height: 180,
-        effectMode: 'focus',
-        focusSettings: { opacity: 0.65, showBorder: true },
+        id: `standalone-${annotationKind}`,
+        annotationKind,
+        x: 120,
+        y: 80,
+        width: 1,
+        height: 1,
+        ...(annotationKind === 'callout'
+          ? { callout: createDefaultFrameCallout() }
+          : { stepBadge: createDefaultFrameStepBadge() }),
       },
-      4
+      2
     );
 
     expect(
       parseSerializedFrameAnnotationSnapshot(serializeFrameAnnotationSnapshot(snapshot))
     ).toEqual(snapshot);
-    expect(snapshot).not.toHaveProperty('pagePlacement');
-    expect(snapshot).not.toHaveProperty('linkedElementSelector');
-  });
+    if (snapshot.stepBadge)
+      expect(snapshot.stepBadge.style).toMatchObject({
+        sizeSource: 'custom',
+        backgroundColorSource: 'custom',
+        textColorSource: 'custom',
+      });
+    if (snapshot.callout)
+      expect(snapshot.callout.style.colorBindings).toMatchObject({
+        accent: 'custom',
+        connector: 'custom',
+        surfaceBackground: 'custom',
+        surfaceBorder: 'custom',
+      });
+  }
+);
 
-  it('round-trips up to four additional callouts and rejects oversized collections', () => {
-    const callout = createDefaultFrameCallout();
-    const snapshot = createFrameAnnotationSnapshot(
-      {
-        id: 'frame-with-callouts',
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 80,
-        callout,
-        additionalCallouts: Array.from({ length: 4 }, () => structuredClone(callout)),
-      },
-      0
-    );
-    expect(parseFrameAnnotationSnapshot(snapshot)).toEqual(snapshot);
-    expect(
-      parseFrameAnnotationSnapshot({
-        ...snapshot,
-        additionalCallouts: [...snapshot.additionalCallouts!, structuredClone(callout)],
-      })
-    ).toBeNull();
-    expect(parseFrameAnnotationSnapshot({ ...snapshot, callout: undefined })).toBeNull();
-  });
+it('rejects an unknown standalone kind without changing legacy frame snapshots', () => {
+  const legacy = createFrameAnnotationSnapshot(
+    { id: 'legacy-frame', x: 0, y: 0, width: 100, height: 80 },
+    0
+  );
 
-  it('round-trips bounded inward and outward step-badge offsets', () => {
-    const stepBadge: StepBadgeSettings = {
-      ...createDefaultFrameStepBadge(),
-      manualPlacement: { normalOffset: -32, position: 0.4, side: 'right', tangentialOffset: 24 },
-    };
-    const snapshot = createFrameAnnotationSnapshot(
-      { id: 'frame-with-offset-badge', x: 0, y: 0, width: 100, height: 80, stepBadge },
-      0
-    );
+  expect(parseFrameAnnotationSnapshot(legacy)).toEqual(legacy);
+  expect(parseFrameAnnotationSnapshot({ ...legacy, annotationKind: 'unknown' })).toBeNull();
+  expect(parseFrameAnnotationSnapshot({ ...legacy, annotationKind: null })).toBeNull();
+});
 
-    expect(parseFrameAnnotationSnapshot(snapshot)).toEqual(snapshot);
-    expect(
-      parseFrameAnnotationSnapshot({
-        ...snapshot,
-        stepBadge: {
-          ...stepBadge,
-          manualPlacement: { normalOffset: 49, position: 0.4, side: 'right' },
-        },
-      })
-    ).toBeNull();
-  });
+it('round-trips the versioned visual state without page or editor runtime metadata', () => {
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-1',
+      x: 10,
+      y: 20,
+      width: 300,
+      height: 180,
+      effectMode: 'focus',
+      focusSettings: { opacity: 0.65, showBorder: true },
+    },
+    4
+  );
 
-  it('normalizes duplicate callout instance ids to stable collision-free identities', () => {
-    const callout = { ...createDefaultFrameCallout(), instanceId: 'duplicate' };
-    const snapshot = createFrameAnnotationSnapshot(
-      {
-        id: 'frame-duplicates',
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 80,
-        callout,
-        additionalCallouts: [{ ...callout }, { ...callout }],
-      },
-      0
-    );
-    const parsed = parseFrameAnnotationSnapshot({
+  expect(
+    parseSerializedFrameAnnotationSnapshot(serializeFrameAnnotationSnapshot(snapshot))
+  ).toEqual(snapshot);
+  expect(snapshot).not.toHaveProperty('pagePlacement');
+  expect(snapshot).not.toHaveProperty('linkedElementSelector');
+});
+
+it('round-trips up to four additional callouts and rejects oversized collections', () => {
+  const callout = createDefaultFrameCallout();
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-with-callouts',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 80,
+      callout,
+      additionalCallouts: Array.from({ length: 4 }, () => structuredClone(callout)),
+    },
+    0
+  );
+  expect(parseFrameAnnotationSnapshot(snapshot)).toEqual(snapshot);
+  expect(
+    parseFrameAnnotationSnapshot({
       ...snapshot,
+      additionalCallouts: [...snapshot.additionalCallouts!, structuredClone(callout)],
+    })
+  ).toBeNull();
+  expect(parseFrameAnnotationSnapshot({ ...snapshot, callout: undefined })).toBeNull();
+});
+
+it('round-trips bounded inward and outward step-badge offsets', () => {
+  const stepBadge: StepBadgeSettings = {
+    ...createDefaultFrameStepBadge(),
+    manualPlacement: { normalOffset: -32, position: 0.4, side: 'right', tangentialOffset: 24 },
+  };
+  const snapshot = createFrameAnnotationSnapshot(
+    { id: 'frame-with-offset-badge', x: 0, y: 0, width: 100, height: 80, stepBadge },
+    0
+  );
+
+  expect(parseFrameAnnotationSnapshot(snapshot)).toEqual(snapshot);
+  expect(
+    parseFrameAnnotationSnapshot({
+      ...snapshot,
+      stepBadge: {
+        ...stepBadge,
+        manualPlacement: { normalOffset: 49, position: 0.4, side: 'right' },
+      },
+    })
+  ).toBeNull();
+});
+
+it('normalizes duplicate callout instance ids to stable collision-free identities', () => {
+  const callout = { ...createDefaultFrameCallout(), instanceId: 'duplicate' };
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-duplicates',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 80,
       callout,
       additionalCallouts: [{ ...callout }, { ...callout }],
-    });
-    const ids = [parsed?.callout, ...(parsed?.additionalCallouts ?? [])].map(
-      (item) => item?.instanceId
-    );
-
-    expect(ids).toEqual(['duplicate', 'frame-duplicates:callout:1', 'frame-duplicates:callout:2']);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(
-      parseSerializedFrameAnnotationSnapshot(serializeFrameAnnotationSnapshot(parsed!))
-    ).toEqual(parsed);
+    },
+    0
+  );
+  const parsed = parseFrameAnnotationSnapshot({
+    ...snapshot,
+    callout,
+    additionalCallouts: [{ ...callout }, { ...callout }],
   });
+  const ids = [parsed?.callout, ...(parsed?.additionalCallouts ?? [])].map(
+    (item) => item?.instanceId
+  );
 
-  it('rejects unknown versions, invalid geometry, cycles, and unbounded metadata', () => {
-    const valid = createFrameAnnotationSnapshot(
-      { id: 'frame-1', x: 0, y: 0, width: 10, height: 10 },
-      0
-    );
-    expect(parseFrameAnnotationSnapshot({ ...valid, version: 2 })).toBeNull();
-    expect(parseFrameAnnotationSnapshot({ ...valid, width: -1 })).toBeNull();
-    expect(parseFrameAnnotationSnapshot({ ...valid, x: Number.NaN })).toBeNull();
+  expect(ids).toEqual(['duplicate', 'frame-duplicates:callout:1', 'frame-duplicates:callout:2']);
+  expect(new Set(ids).size).toBe(ids.length);
+  expect(parseSerializedFrameAnnotationSnapshot(serializeFrameAnnotationSnapshot(parsed!))).toEqual(
+    parsed
+  );
+});
 
-    const cyclic: Record<string, unknown> = { ...valid };
-    cyclic['callout'] = cyclic;
-    expect(parseFrameAnnotationSnapshot(cyclic)).toBeNull();
-    expect(parseSerializedFrameAnnotationSnapshot('{')).toBeNull();
-  });
+it('rejects unknown versions, invalid geometry, cycles, and unbounded metadata', () => {
+  const valid = createFrameAnnotationSnapshot(
+    { id: 'frame-1', x: 0, y: 0, width: 10, height: 10 },
+    0
+  );
+  expect(parseFrameAnnotationSnapshot({ ...valid, version: 2 })).toBeNull();
+  expect(parseFrameAnnotationSnapshot({ ...valid, width: -1 })).toBeNull();
+  expect(parseFrameAnnotationSnapshot({ ...valid, x: Number.NaN })).toBeNull();
 
-  it('normalizes ordering and protects the serialized boundary size', () => {
-    const snapshot = createFrameAnnotationSnapshot(
-      { id: 'frame-1', x: 0, y: 0, width: 10, height: 10 },
-      3.8
-    );
-    expect(snapshot.ordering).toBe(3);
-    expect(parseSerializedFrameAnnotationSnapshot('x'.repeat(1_000_001))).toBeNull();
-  });
+  const cyclic: Record<string, unknown> = { ...valid };
+  cyclic['callout'] = cyclic;
+  expect(parseFrameAnnotationSnapshot(cyclic)).toBeNull();
+  expect(parseSerializedFrameAnnotationSnapshot('{')).toBeNull();
+});
 
-  it('rejects malformed nested settings and network-bearing custom CSS', () => {
-    const valid = createFrameAnnotationSnapshot(
-      { id: 'frame-1', x: 0, y: 0, width: 10, height: 10 },
-      0
-    );
-    expect(parseFrameAnnotationSnapshot({ ...valid, blurSettings: 'blur(4px)' })).toBeNull();
-    expect(
-      parseFrameAnnotationSnapshot({
-        ...valid,
-        borderSettings: { customCss: 'background:url(https://example.com/pixel)' },
-      })
-    ).toBeNull();
-    expect(
-      parseFrameAnnotationSnapshot({
-        ...valid,
-        borderSettings: { customCss: 'background: u\\72l(https://example.com/pixel)' },
-      })
-    ).toBeNull();
-    expect(
-      parseFrameAnnotationSnapshot({
-        ...valid,
-        borderSettings: { customCss: 'color: v\\61r(--page-color)' },
-      })
-    ).toBeNull();
-    expect(
-      parseFrameAnnotationSnapshot({
-        ...valid,
-        borderSettings: { customCss: 'position: fixed' },
-      })
-    ).toBeNull();
-    expect(
-      parseFrameAnnotationSnapshot({
-        ...valid,
-        stepBadge: {
-          ...createDefaultFrameStepBadge(),
-          style: { ...createDefaultFrameStepBadge().style, customCss: '[badge]\nwidth: 200px;' },
-        },
-      })
-    ).toBeNull();
-    const callout = createDefaultFrameCallout();
-    expect(
-      parseFrameAnnotationSnapshot({
-        ...valid,
-        callout: {
-          ...callout,
-          style: { ...callout.style, customCss: '[card]\nposition: fixed;' },
-        },
-      })
-    ).toBeNull();
-  });
+it('normalizes ordering and protects the serialized boundary size', () => {
+  const snapshot = createFrameAnnotationSnapshot(
+    { id: 'frame-1', x: 0, y: 0, width: 10, height: 10 },
+    3.8
+  );
+  expect(snapshot.ordering).toBe(3);
+  expect(parseSerializedFrameAnnotationSnapshot('x'.repeat(1_000_001))).toBeNull();
+});
 
-  it('validates linked frame template ids at the snapshot boundary', () => {
-    const defaults = createDefaultHighlighterSettings();
-    const borderSettings = projectBorderPresetToAppliedSettings(defaults.borderPresets[0]!);
-    const valid = createFrameAnnotationSnapshot(
-      { id: 'linked-frame', x: 0, y: 0, width: 100, height: 80, borderSettings },
-      0
-    );
-    expect(parseFrameAnnotationSnapshot(valid)).toEqual({
+it('rejects malformed nested settings and network-bearing custom CSS', () => {
+  const valid = createFrameAnnotationSnapshot(
+    { id: 'frame-1', x: 0, y: 0, width: 10, height: 10 },
+    0
+  );
+  expect(parseFrameAnnotationSnapshot({ ...valid, blurSettings: 'blur(4px)' })).toBeNull();
+  expect(
+    parseFrameAnnotationSnapshot({
       ...valid,
-      borderSettings: { ...valid.borderSettings!, color: '#f97316' },
-    });
-
-    for (const linkedTemplates of [
-      'callout',
-      { calloutPresetId: 17, stepBadgePresetId: null },
-      { calloutPresetId: null, stepBadgePresetId: {} },
-      { calloutPresetId: 'x'.repeat(257), stepBadgePresetId: null },
-      { calloutPresetId: null },
-    ]) {
-      expect(
-        parseFrameAnnotationSnapshot({
-          ...valid,
-          borderSettings: {
-            ...valid.borderSettings,
-            effects: { ...valid.borderSettings!.effects, linkedTemplates },
-          },
-        })
-      ).toBeNull();
-    }
-  });
-
-  it('accepts the complete canonical badge and callout visual settings', () => {
-    const snapshot = createFrameAnnotationSnapshot(
-      {
-        id: 'frame-1',
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 80,
-        stepBadge: createDefaultFrameStepBadge(),
-        callout: createDefaultFrameCallout(),
+      borderSettings: { customCss: 'background:url(https://example.com/pixel)' },
+    })
+  ).toBeNull();
+  expect(
+    parseFrameAnnotationSnapshot({
+      ...valid,
+      borderSettings: { customCss: 'background: u\\72l(https://example.com/pixel)' },
+    })
+  ).toBeNull();
+  expect(
+    parseFrameAnnotationSnapshot({
+      ...valid,
+      borderSettings: { customCss: 'color: v\\61r(--page-color)' },
+    })
+  ).toBeNull();
+  expect(
+    parseFrameAnnotationSnapshot({
+      ...valid,
+      borderSettings: { customCss: 'position: fixed' },
+    })
+  ).toBeNull();
+  expect(
+    parseFrameAnnotationSnapshot({
+      ...valid,
+      stepBadge: {
+        ...createDefaultFrameStepBadge(),
+        style: { ...createDefaultFrameStepBadge().style, customCss: '[badge]\nwidth: 200px;' },
       },
-      0
-    );
-    expect(parseFrameAnnotationSnapshot(snapshot)).toEqual(snapshot);
+    })
+  ).toBeNull();
+  const callout = createDefaultFrameCallout();
+  expect(
+    parseFrameAnnotationSnapshot({
+      ...valid,
+      callout: {
+        ...callout,
+        style: { ...callout.style, customCss: '[card]\nposition: fixed;' },
+      },
+    })
+  ).toBeNull();
+});
+
+it('validates linked frame template ids at the snapshot boundary', () => {
+  const defaults = createDefaultHighlighterSettings();
+  const borderSettings = projectBorderPresetToAppliedSettings(defaults.borderPresets[0]!);
+  const valid = createFrameAnnotationSnapshot(
+    { id: 'linked-frame', x: 0, y: 0, width: 100, height: 80, borderSettings },
+    0
+  );
+  expect(parseFrameAnnotationSnapshot(valid)).toEqual({
+    ...valid,
+    borderSettings: { ...valid.borderSettings!, color: '#f97316' },
   });
 
-  it.each([
-    ['connector', 'color'],
-    ['accentEdge', 'color'],
-    ['surface', 'shadowColor'],
-  ] as const)('rejects direct and escaped resource-bearing callout %s.%s', (section, field) => {
-    const valid = createFrameAnnotationSnapshot(
-      {
-        id: 'frame-1',
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 80,
-        callout: createDefaultFrameCallout(),
-      },
-      0
-    );
-    for (const unsafe of [
-      'url(https://attacker.example/pixel)',
-      'u\\72l(https://attacker.example/pixel)',
-      'image-set("https://attacker.example/pixel" 1x)',
-      'v\\61r(--page-color)',
-    ]) {
-      const callout = structuredClone(valid.callout!);
-      Object.assign(callout.style[section], { [field]: unsafe });
-      expect(parseFrameAnnotationSnapshot({ ...valid, callout })).toBeNull();
-    }
-  });
+  for (const linkedTemplates of [
+    'callout',
+    { calloutPresetId: 17, stepBadgePresetId: null },
+    { calloutPresetId: null, stepBadgePresetId: {} },
+    { calloutPresetId: 'x'.repeat(257), stepBadgePresetId: null },
+    { calloutPresetId: null },
+  ]) {
+    expect(
+      parseFrameAnnotationSnapshot({
+        ...valid,
+        borderSettings: {
+          ...valid.borderSettings,
+          effects: { ...valid.borderSettings!.effects, linkedTemplates },
+        },
+      })
+    ).toBeNull();
+  }
+});
+
+it('accepts the complete canonical badge and callout visual settings', () => {
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-1',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 80,
+      stepBadge: createDefaultFrameStepBadge(),
+      callout: createDefaultFrameCallout(),
+    },
+    0
+  );
+  expect(parseFrameAnnotationSnapshot(snapshot)).toEqual(snapshot);
+});
+
+it.each([
+  ['connector', 'color'],
+  ['accentEdge', 'color'],
+  ['surface', 'shadowColor'],
+] as const)('rejects direct and escaped resource-bearing callout %s.%s', (section, field) => {
+  const valid = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-1',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 80,
+      callout: createDefaultFrameCallout(),
+    },
+    0
+  );
+  for (const unsafe of [
+    'url(https://attacker.example/pixel)',
+    'u\\72l(https://attacker.example/pixel)',
+    'image-set("https://attacker.example/pixel" 1x)',
+    'v\\61r(--page-color)',
+  ]) {
+    const callout = structuredClone(valid.callout!);
+    Object.assign(callout.style[section], { [field]: unsafe });
+    expect(parseFrameAnnotationSnapshot({ ...valid, callout })).toBeNull();
+  }
 });

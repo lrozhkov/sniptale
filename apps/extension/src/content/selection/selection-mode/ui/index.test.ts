@@ -120,6 +120,12 @@ function createFinalElementOptions(visual: ResolvedBorderPresetVisual) {
     getMaxSelectionHeight: () => 800,
     getMaxSelectionWidth: () => 1200,
     getCaptureAction: () => 'download_default' as const,
+    getCapturePreferences: () => ({
+      imageFormat: 'png' as const,
+      imageQuality: 100,
+      compactMenus: true,
+    }),
+    onImageFormatChange: vi.fn(),
     getSelection: () => ({ x: 0, y: 0, width: 100, height: 100 }),
     minSelectionSize: 100,
     onAdjustPadding: vi.fn(),

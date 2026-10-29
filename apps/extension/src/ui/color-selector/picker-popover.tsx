@@ -1,8 +1,9 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { getColorAlpha, replaceColorChannels } from '@sniptale/foundation/color';
 import { translate } from '../../platform/i18n';
 import { PickerFooter } from './picker-sections';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
+import { ColorCatalogToggle } from './catalog-panel';
 import { ColorEditorPanel } from './editor-panel';
 import { ColorSelectorSwatchSection } from './swatch-section';
 import type { useEyedropper } from '@sniptale/ui/color-selector/popover-state';
@@ -16,6 +17,8 @@ const PANEL_CLASS_NAME = [
 
 type ColorSelectorPickerPopoverProps = {
   compact?: boolean | undefined;
+  catalogMode?: boolean | undefined;
+  onCatalogModeChange?: ((enabled: boolean) => void) | undefined;
   originalColor?: string | undefined;
   onToggleCompact?: (() => void) | undefined;
   utilities?: ReactNode;
@@ -25,6 +28,7 @@ type ColorSelectorPickerPopoverProps = {
   eyedropper: ReturnType<typeof useEyedropper>;
   formatMode: ColorSelectorFormatMode;
   palette?: readonly string[];
+  paletteNames?: Readonly<Record<string, string>> | undefined;
   recentColors?: readonly string[];
   title?: string | undefined;
   onApply: () => void;
@@ -35,6 +39,9 @@ type ColorSelectorPickerPopoverProps = {
 };
 
 export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProps) {
+  const [localCatalogMode, setLocalCatalogMode] = useState(false);
+  const catalogMode = props.catalogMode ?? localCatalogMode;
+  const setCatalogMode = props.onCatalogModeChange ?? setLocalCatalogMode;
   const panelRef = useRef<HTMLDivElement>(null);
   const originalColor = useRef(props.originalColor ?? props.color);
   return (
@@ -46,13 +53,18 @@ export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProp
         event.currentTarget.dataset['keyboard'] = 'false';
       }}
       onKeyDownCapture={(event) => {
-        event.currentTarget.dataset['keyboard'] = 'true';
+        if (event.key === 'Tab') event.currentTarget.dataset['keyboard'] = 'true';
       }}
     >
-      <div className="sniptale-color-picker-scroll min-h-0 space-y-3 overflow-y-auto overflow-x-hidden">
+      <div
+        data-color-picker-body="true"
+        data-color-search={catalogMode}
+        className="sniptale-color-picker-scroll min-h-0 space-y-3 overflow-y-auto overflow-x-hidden"
+      >
         {props.palette?.length ? (
           <div data-ui="shared.ui.color-selector.picker-palette">
             <ColorSelectorSwatchSection
+              names={props.paletteNames}
               colors={props.palette.slice(0, 10)}
               label=""
               showLabel={false}
@@ -77,7 +89,12 @@ export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProp
             onSelect={props.onColorChange}
           />
         ) : null}
-        <ColorEditorPanel {...props} originalColor={originalColor.current} />
+        <ColorEditorPanel
+          {...props}
+          catalogMode={catalogMode}
+          onCatalogExit={() => setCatalogMode(false)}
+          originalColor={originalColor.current}
+        />
       </div>
       <PickerFooter
         onApply={() => {
@@ -93,7 +110,15 @@ export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProp
         onCancel={props.onCancel}
         compact={props.compact}
         onToggleCompact={props.onToggleCompact}
-        utilities={props.utilities}
+        utilities={
+          <>
+            <ColorCatalogToggle
+              active={catalogMode}
+              onToggle={() => setCatalogMode(!catalogMode)}
+            />
+            {props.utilities}
+          </>
+        }
       />
     </div>
   );

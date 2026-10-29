@@ -1,0 +1,37 @@
+WebDAV evidence: .tmp/webdav-provider-runs/2026-10-29T09-29-36.123Z-7e58d5
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Stopping
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Stopped
+ Container sniptale-webdav-e2e-df018ec8c5-redis-1  Starting
+ Container sniptale-webdav-e2e-df018ec8c5-db-1  Starting
+ Container sniptale-webdav-e2e-df018ec8c5-db-1  Started
+ Container sniptale-webdav-e2e-df018ec8c5-redis-1  Started
+ Container sniptale-webdav-e2e-df018ec8c5-db-1  Waiting
+ Container sniptale-webdav-e2e-df018ec8c5-redis-1  Waiting
+ Container sniptale-webdav-e2e-df018ec8c5-db-1  Healthy
+ Container sniptale-webdav-e2e-df018ec8c5-redis-1  Healthy
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Starting
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Started
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Waiting
+ Container sniptale-webdav-e2e-df018ec8c5-db-1  Waiting
+ Container sniptale-webdav-e2e-df018ec8c5-redis-1  Waiting
+ Container sniptale-webdav-e2e-df018ec8c5-redis-1  Healthy
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Healthy
+ Container sniptale-webdav-e2e-df018ec8c5-db-1  Healthy
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Restarting
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Started
+
+Running 2 tests using 1 worker
+
+(node:171970) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tooling/test/e2e/providers/webdav.spec.ts:985:1 › causal revisions and deletion cross WebDAV without echo or losing independently readable originals (23.3s)
+  ✓  2 tooling/test/e2e/providers/webdav.spec.ts:1203:1 › soft Trash and restore retain a shared original and its project across browsers (23.3s)
+
+  2 passed (48.8s)
+
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Stopping
+ Container sniptale-webdav-e2e-df018ec8c5-app-1  Stopped
+ Container sniptale-webdav-e2e-df018ec8c5-redis-1  Stopping
+ Container sniptale-webdav-e2e-df018ec8c5-db-1  Stopping
+ Container sniptale-webdav-e2e-df018ec8c5-redis-1  Stopped
+ Container sniptale-webdav-e2e-df018ec8c5-db-1  Stopped

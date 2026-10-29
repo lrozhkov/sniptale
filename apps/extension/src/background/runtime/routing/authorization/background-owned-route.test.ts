@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { SyncProductCommand } from '../../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import type { AiEgressAuthority } from '../../../../features/ai/egress-authority';
 import { resetAISecretUnlockRequestsForTests } from '../../../ai/settings/secret-unlock-route';
 import { resetLlmSessionTokensForTests } from '../../../ai/llm/session-tokens';
@@ -64,9 +65,9 @@ it('preauthorizes AI settings mutations only from the settings page', () => {
     prompt: 'Prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   };
-  const defaultModelMessage = {
-    defaultModelId: 'model-1',
-    operation: 'save-default-model',
+  const scenarioPromptMessage = {
+    prompt: 'Scenario prompt',
+    operation: 'save-scenario-editor-prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   };
 
@@ -82,11 +83,11 @@ it('preauthorizes AI settings mutations only from the settings page', () => {
   expect(
     authorizeIPCMessage({
       kind: 'background-owned',
-      message: defaultModelMessage,
+      message: scenarioPromptMessage,
       sender: sender({ url: SETTINGS_URL }),
     })
   ).toEqual({ authorized: true });
-  expect(hasPreauthorizedAiSettingsMutationMessage(defaultModelMessage)).toBe(true);
+  expect(hasPreauthorizedAiSettingsMutationMessage(scenarioPromptMessage)).toBe(true);
 });
 
 it('authorizes read-only AI settings queries without granting mutation authority', () => {
@@ -112,18 +113,18 @@ it('authorizes read-only AI settings queries without granting mutation authority
   expect(hasPreauthorizedAiSettingsMutationMessage(queryMessage)).toBe(false);
 });
 
-it('rejects content AI default-model mutation and capability requests', () => {
+it('rejects content AI scenario-prompt mutation and capability requests', () => {
   const contentSender = sender({ tabId: 7, url: CONTENT_URL });
-  const defaultModelMessage = {
-    defaultModelId: 'model-1',
-    operation: 'save-default-model',
+  const scenarioPromptMessage = {
+    prompt: 'Scenario prompt',
+    operation: 'save-scenario-editor-prompt',
     type: MessageType.AI_SETTINGS_MUTATION,
   };
 
   expect(
     authorizeIPCMessage({
       kind: 'background-owned',
-      message: defaultModelMessage,
+      message: scenarioPromptMessage,
       sender: contentSender,
     })
   ).toEqual({ authorized: false, reason: 'Unauthorized AI settings mutation sender' });
@@ -252,4 +253,208 @@ it('authorizes local data erasure only from the owned settings page', () => {
       sender: sender({ documentId: 'doc-1', frameId: 0, tabId: 7, url: CONTENT_URL }),
     })
   ).toEqual({ authorized: false, reason: 'Unauthorized local data erasure sender' });
+});
+
+const productRequestId = '11111111-1111-4111-8111-111111111111';
+const productGallery = 'chrome-extension://test/apps/extension/src/gallery/index.html';
+const productCreate = {
+  kind: 'workspace-create' as const,
+  parentUrl: 'https://dav.test/root/',
+  accountId: 'alice',
+  authentication: { kind: 'bearer' as const, accessToken: 'private-token' },
+};
+const productReplica = {
+  kind: 'replica-prepare' as const,
+  selection: {
+    rootKind: 'video-project' as const,
+    rootId: 'project',
+    operationId: 'operation',
+    sourceDigest: 'a'.repeat(64),
+  },
+};
+
+function authorizeProduct(
+  command: SyncProductCommand,
+  productSender: chrome.runtime.MessageSender
+) {
+  return authorizeIPCMessage({
+    kind: 'background-owned',
+    message: { type: MessageType.SYNC_PRODUCT_COMMAND, requestId: productRequestId, command },
+    sender: productSender,
+  });
+}
+
+it('authorizes product commands only for the document that owns each verb', () => {
+  expect(authorizeProduct(productCreate, sender({ url: SETTINGS_URL }))).toEqual({
+    authorized: true,
+  });
+  expect(authorizeProduct(productReplica, sender({ url: productGallery }))).toEqual({
+    authorized: true,
+  });
+  for (const productSender of [sender({ url: SETTINGS_URL }), sender({ url: productGallery })]) {
+    expect(authorizeProduct({ kind: 'status' }, productSender)).toEqual({ authorized: true });
+    expect(
+      authorizeProduct({ kind: 'catalog-refresh', bypassCache: false }, productSender)
+    ).toEqual({ authorized: true });
+  }
+  expect(authorizeProduct(productCreate, sender({ url: productGallery }))).toEqual({
+    authorized: false,
+    reason: 'Sync product command refused',
+  });
+  expect(authorizeProduct(productReplica, sender({ url: SETTINGS_URL }))).toEqual({
+    authorized: false,
+    reason: 'Sync product command refused',
+  });
+});
+
+it('rejects malformed product commands and untrusted or inactive product documents', () => {
+  const senders: chrome.runtime.MessageSender[] = [
+    sender({ url: CONTENT_URL, frameId: 0, tabId: 7 }),
+    sender({ url: productGallery, frameId: 1 }),
+    sender({ url: `${SETTINGS_URL}?aiUnlock=1` }),
+    { ...sender({ url: SETTINGS_URL }), documentLifecycle: 'cached' },
+  ];
+  for (const productSender of senders) {
+    expect(authorizeProduct({ kind: 'status' }, productSender)).toEqual({
+      authorized: false,
+      reason: 'Sync product command refused',
+    });
+  }
+  expect(
+    authorizeProduct(
+      {
+        ...productReplica,
+        selection: { ...productReplica.selection, sourceDigest: 'invalid' },
+      },
+      sender({ url: productGallery })
+    )
+  ).toEqual({
+    authorized: false,
+    reason: 'Sync product command refused',
+  });
+});
+
+it.each([CONTENT_URL, 'chrome-extension://test/apps/extension/src/video-editor/index.html'])(
+  'admits bounded picker maintenance without granting provider-edit authority for %s',
+  (url) => {
+    const maintenance = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'refresh-managed-catalogs',
+    };
+    const providerCheck = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'refresh-provider-catalog',
+      providerId: 'provider',
+    };
+    const contentSender = sender({ url, ...(url === CONTENT_URL ? { tabId: 41 } : {}) });
+    expect(
+      authorizeIPCMessage({ kind: 'background-owned', message: maintenance, sender: contentSender })
+    ).toEqual({ authorized: true });
+    expect(
+      authorizeIPCMessage({
+        kind: 'background-owned',
+        message: providerCheck,
+        sender: contentSender,
+      }).authorized
+    ).toBe(false);
+    expect(
+      authorizeIPCMessage({
+        kind: 'background-owned',
+        message: maintenance,
+        sender: sender({ url: SETTINGS_URL + '?aiUnlock=1', tabId: 41 }),
+      }).authorized
+    ).toBe(false);
+    expect(
+      authorizeIPCMessage({
+        kind: 'background-owned',
+        message: maintenance,
+        sender: sender({ url: CONTENT_URL }),
+      }).authorized
+    ).toBe(false);
+  }
+);
+
+it.each([
+  ['https://example.test/page', 41, 'page-edit', true],
+  ['https://example.test/page', 41, 'gallery-speech', false],
+  [
+    'chrome-extension://test/apps/extension/src/gallery/index.html',
+    undefined,
+    'gallery-speech',
+    true,
+  ],
+  ['chrome-extension://test/apps/extension/src/gallery/index.html', 41, 'page-edit', false],
+  [
+    'chrome-extension://test/apps/extension/src/video-editor/index.html',
+    undefined,
+    'video-transcription',
+    true,
+  ],
+  [
+    'chrome-extension://test/apps/extension/src/video-editor/index.html',
+    41,
+    'scenario-edit',
+    false,
+  ],
+  [
+    'chrome-extension://test/apps/extension/src/scenario-editor/index.html',
+    undefined,
+    'scenario-edit',
+    true,
+  ],
+  [
+    'chrome-extension://test/apps/extension/src/settings/index.html?aiUnlock=1',
+    41,
+    'page-edit',
+    false,
+  ],
+] as const)(
+  'scopes scenario selection reads and writes to %s and %s for %s',
+  (url, tabId, scenario, allowed) => {
+    const selection = {
+      scenario,
+      modelId: 'model',
+      providerId: 'provider',
+      modelCode: 'exact-code',
+      destinationBinding: VALID_CONTENT_HASH,
+      source: 'explicit',
+    };
+    const mutation = {
+      type: MessageType.AI_SETTINGS_MUTATION,
+      operation: 'remember-scenario-selection',
+      selection,
+    };
+    const query = {
+      type: MessageType.AI_SETTINGS_QUERY,
+      operation: 'read-scenario-selection',
+      scenario,
+    };
+    const actor = sender({ url, ...(tabId === undefined ? {} : { tabId }) });
+    expect(
+      authorizeIPCMessage({ kind: 'background-owned', message: mutation, sender: actor }).authorized
+    ).toBe(allowed);
+    expect(
+      authorizeIPCMessage({ kind: 'background-owned', message: query, sender: actor }).authorized
+    ).toBe(allowed);
+  }
+);
+
+it.each([
+  [SETTINGS_URL, true],
+  [CONTENT_URL, false],
+  [POPUP_URL, false],
+  ['chrome-extension://test/apps/extension/src/gallery/index.html', false],
+  [`${SETTINGS_URL}?aiUnlock=1`, false],
+])('restricts provider enabled patches to ordinary Settings: %s', (url, allowed) => {
+  const message = {
+    type: MessageType.AI_SETTINGS_MUTATION,
+    operation: 'set-provider-enabled',
+    providerId: 'provider',
+    providerIncarnation: 'incarnation',
+    enabled: false,
+  };
+  expect(
+    authorizeIPCMessage({ kind: 'background-owned', message, sender: sender({ url }) }).authorized
+  ).toBe(allowed);
+  expect(hasPreauthorizedAiSettingsMutationMessage(message)).toBe(allowed);
 });

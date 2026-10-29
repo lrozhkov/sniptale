@@ -1,3 +1,4 @@
+import { resolveStandaloneCalloutSettings } from '../../../../features/highlighter/frame-annotation/model';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { CalloutVisualStyle } from '@sniptale/runtime-contracts/highlighter/callout';
 import type { FrameData } from '../../../../features/highlighter/contracts';
@@ -44,11 +45,24 @@ export function createFrameCalloutChangedHandler({
           !frame.callout
         ) {
           const newCallout = resolveFrameCalloutTemplate(fallback, frame.borderSettings);
-          return { ...frame, callout: newCallout };
+          return {
+            ...frame,
+            callout:
+              frame.annotationKind === undefined
+                ? newCallout
+                : resolveStandaloneCalloutSettings(newCallout),
+          };
         }
         const callout = getFrameCallout(frame, calloutIndex);
         if (callout && settings.enabled !== false) {
-          return setFrameCallout(frame, calloutIndex, applyCalloutSettingsPatch(callout, settings));
+          const nextCallout = applyCalloutSettingsPatch(callout, settings);
+          return setFrameCallout(
+            frame,
+            calloutIndex,
+            frame.annotationKind === undefined
+              ? nextCallout
+              : resolveStandaloneCalloutSettings(nextCallout)
+          );
         }
         if (settings.enabled === false && callout) {
           return setFrameCallout(
@@ -87,7 +101,13 @@ export function createCalloutPopoverSettingsHandler({
           return frame;
         }
         const nextCallout = applyCalloutSettingsPatch(callout, settings);
-        return setFrameCallout(frame, calloutIndex, nextCallout);
+        return setFrameCallout(
+          frame,
+          calloutIndex,
+          frame.annotationKind === undefined
+            ? nextCallout
+            : resolveStandaloneCalloutSettings(nextCallout)
+        );
       })
     );
   };
