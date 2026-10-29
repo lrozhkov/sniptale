@@ -44,12 +44,12 @@
       "rule": "js/xss-through-dom"
     },
     {
-      "contentHash": "c3fac8359c6c1faa61427d17c599fd0f86227190056af9454085a4c8071ade3c",
-      "debtId": "noise.codeql.presentation-retry-identity",
-      "file": "apps/extension/src/editor/document/session-autosave/presentation.ts",
-      "line": 117,
-      "messageHash": "ab704472dfda4512f9a07fa483bf0830055e1c51afa89b60bd2f814b2babd973",
-      "rule": "js/missing-await"
+      "contentHash": "c11f5e8642bc7b5ea33876c41156f39b50243248b9cda048cdedec845110ca13",
+      "file": "apps/extension/src/background/ai/settings/managed-catalog.ts",
+      "line": 270,
+      "messageHash": "e65f923a68b7d7a94adcd0de39f1b44b843f51359d25743ef19ad4384b4ab6e2",
+      "rule": "js/missing-await",
+      "debtId": "noise.codeql.catalog-refresh-flight-identity"
     }
   ]
 }
