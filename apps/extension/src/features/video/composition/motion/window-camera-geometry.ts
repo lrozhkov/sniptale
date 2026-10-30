@@ -178,6 +178,21 @@ export function createWindowCameraGeometry(input: {
       }
     : { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 };
   const windowWeight = input.windowWeight;
+  const projections = new Map<string, QuickEditHomography>();
+  const projectionAt = (progress: number, scale: number) => {
+    const key = `${progress}:${scale}`;
+    let projection = projections.get(key);
+    if (!projection) {
+      projection = quickEditPlaneProjection(
+        input.window,
+        { ...input.window, width: input.window.width * scale, height: input.window.height * scale },
+        interpolateQuickEditSpatial(null, region, progress)
+      );
+      projections.set(key, projection);
+      if (projections.size > 32) projections.delete(projections.keys().next().value ?? '');
+    }
+    return projection;
+  };
   const outputPlane = (time: number) => {
     const plane = input.intervalPlane?.(time, time);
     const transition = plane?.planeTransition;
@@ -263,6 +278,7 @@ export function createWindowCameraGeometry(input: {
     return 1 + (targetScale - 1) * Math.max(0, Math.min(...values));
   };
   return {
+    supportsObservationBounds: true,
     viewport: { ...input.output },
     window: { width: input.window.width, height: input.window.height },
     breaks: [
@@ -326,7 +342,6 @@ export function createWindowCameraGeometry(input: {
       if (!frame.actual) return domain;
       const progress = phaseValue(frame.time);
       if (progress <= 1e-12) return domain;
-      const spatial = interpolateQuickEditSpatial(null, region, progress);
       const scale = 1 + (targetScale - 1) * progress;
       const native = {
         x: input.video.x + frame.actual.x * input.video.width,
@@ -335,18 +350,7 @@ export function createWindowCameraGeometry(input: {
       if (windowWeight !== 'window' && hasQuickEditPerspective(region.perspective)) return null;
       const point =
         windowWeight === 'window'
-          ? projectQuickEditPoint(
-              quickEditPlaneProjection(
-                input.window,
-                {
-                  ...input.window,
-                  width: input.window.width * scale,
-                  height: input.window.height * scale,
-                },
-                spatial
-              ),
-              native
-            )
+          ? projectQuickEditPoint(projectionAt(progress, scale), native)
           : {
               x: input.window.x + scale * (native.x - input.window.x),
               y: input.window.y + scale * (native.y - input.window.y),
@@ -376,15 +380,12 @@ export function createWindowCameraGeometry(input: {
     },
     preferredPan(frame, targetScale) {
       const { outputCenter } = outputPlane(frame.time);
-      const spatial = interpolateQuickEditSpatial(null, region, 1);
       const basePoint = {
         x: input.video.x + frame.x * input.video.width,
         y: input.video.y + frame.y * input.video.height,
       };
       if (windowWeight === 'content') {
-        const inverse = invertQuickEditProjection(
-          quickEditPlaneProjection(input.window, input.window, spatial)
-        );
+        const inverse = invertQuickEditProjection(projectionAt(1, 1));
         const desired =
           inverse &&
           projectQuickEditPoint(inverse, { x: input.output.width / 2, y: input.output.height / 2 });
@@ -395,15 +396,7 @@ export function createWindowCameraGeometry(input: {
             }
           : { x: 0, y: 0 };
       }
-      const target = {
-        ...input.window,
-        width: input.window.width * targetScale,
-        height: input.window.height * targetScale,
-      };
-      const projected = projectQuickEditPoint(
-        quickEditPlaneProjection(input.window, target, spatial),
-        basePoint
-      );
+      const projected = projectQuickEditPoint(projectionAt(1, targetScale), basePoint);
       return projected
         ? {
             x: projected.x - (outputCenter?.x ?? input.output.width / 2),
@@ -411,7 +404,7 @@ export function createWindowCameraGeometry(input: {
           }
         : { x: 0, y: 0 };
     },
-    clearanceBounds({ start, end, targetScale, pan, actual }) {
+    clearanceBounds({ start, end, targetScale, pan, actual, actualIsBounds }) {
       const current = interval(start, end, targetScale);
       if (!current) return null;
       let bounds = boundQuickEditCameraProjection({
@@ -433,7 +426,11 @@ export function createWindowCameraGeometry(input: {
         const endpoint = boundQuickEditCameraProjection({
           ...edge,
           pan,
-          ...(point ? { actual: { from: point, to: point } } : {}),
+          ...(actualIsBounds && actual
+            ? { actual }
+            : point
+              ? { actual: { from: point, to: point } }
+              : {}),
         });
         if (!endpoint) return null;
         bounds = mergeWindowProjectionBounds(bounds, endpoint);

@@ -65,10 +65,56 @@ function reviewCameraObservationTimes(
   return [...times].sort((a, b) => a - b);
 }
 
+type ObservationCacheEntry = {
+  key: string;
+  observed: CursorFocusPath['segments'] | undefined;
+  frames: readonly FollowCursorFrame[];
+};
+const observationFrames = new WeakMap<CursorFocusPath['segments'], ObservationCacheEntry[]>();
+
 /** Retain native observation runs over a camera interval or a link gap. */
 export function reviewCameraPlanObservations(region: QuickEditZoomRegion): FollowCursorFrame[] {
   const context = region.cursorFocus;
   if (!context) return [];
+  const key = JSON.stringify({
+    start: region.start,
+    end: region.end,
+    smoothing: context.path.smoothing,
+    observedSmoothing: context.observed?.smoothing,
+    timeMap: context.timeMap,
+  });
+  const entries = observationFrames.get(context.path.segments) ?? [];
+  let retained = entries.find(
+    (entry) => entry.key === key && entry.observed === context.observed?.segments
+  );
+  if (!retained) {
+    retained = {
+      key,
+      observed: context.observed?.segments,
+      frames: deriveCameraPlanObservations(region, context),
+    };
+    entries.push(retained);
+    if (entries.length > 8) entries.shift();
+    observationFrames.set(context.path.segments, entries);
+  }
+  const scene = context.scene;
+  const crop = scene?.canvas?.crop;
+  return crop && scene
+    ? cropCameraObservations(
+        retained.frames,
+        fitQuickEditSourceCrop(scene.source, scene.canvas!, crop)
+      )
+    : retained.frames.map((frame) => ({
+        ...frame,
+        ...(frame.actual ? { actual: { ...frame.actual } } : {}),
+      }));
+}
+
+/** Native path segments are immutable. Scene geometry is applied after source-clock derivation. */
+function deriveCameraPlanObservations(
+  region: QuickEditZoomRegion,
+  context: NonNullable<QuickEditZoomRegion['cursorFocus']>
+) {
   const runs = context.timeMap?.filter((run) => run.kind !== 'cut') ?? [
     {
       resultStart: region.start,
@@ -123,11 +169,7 @@ export function reviewCameraPlanObservations(region: QuickEditZoomRegion): Follo
       });
     }
   }
-  const scene = context.scene;
-  const crop = scene?.canvas?.crop;
-  return crop && scene
-    ? cropCameraObservations(frames, fitQuickEditSourceCrop(scene.source, scene.canvas!, crop))
-    : frames;
+  return frames;
 }
 
 /** Admit native facts and sparse authoring against the exact consuming renderer geometry. */

@@ -309,3 +309,120 @@ it('reuses the camera plan as time advances and replaces it after geometry or tr
   };
   expect(resolveReviewSceneCameraPlan([changed], changed, scene)).not.toBe(plan);
 });
+
+it('retains immutable source-clock observation work across geometry and policy revisions', async () => {
+  const { reviewCameraPlanObservations } = await import('./cursor-focus-path');
+  const path = deriveReviewCursorFocusPath(facts, source, true);
+  let reads = 0;
+  for (const segment of path.segments)
+    for (const key of segment.keys) {
+      const time = key.time;
+      Object.defineProperty(key, 'time', {
+        get() {
+          reads++;
+          return time;
+        },
+      });
+    }
+  const region: QuickEditZoomRegion = {
+    id: 'observations',
+    start: 0,
+    end: 4,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    cursorFocus: { path, observed: path, scene: { source, background: { enabled: false } } },
+  };
+  const first = reviewCameraPlanObservations(region);
+  reads = 0;
+  const changed = {
+    ...region,
+    cursorFocus: {
+      ...region.cursorFocus!,
+      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('fast') }),
+      scene: {
+        source,
+        background: { enabled: false as const },
+        canvas: { width: 720, height: 720 },
+      },
+    },
+  };
+  const again = reviewCameraPlanObservations(changed);
+  expect(again).toEqual(first);
+  expect(reads).toBe(0);
+  expect(again).not.toBe(first);
+  again[0]!.x = -10;
+  again[0]!.actual!.x = -10;
+  expect(reviewCameraPlanObservations(region)).toEqual(first);
+  reads = 0;
+  reviewCameraPlanObservations({ ...region, end: 3 });
+  expect(reads).toBeGreaterThan(0);
+  reads = 0;
+  reviewCameraPlanObservations({
+    ...region,
+    cursorFocus: { ...region.cursorFocus!, path: { ...path, smoothing: 0.9 } },
+  });
+  expect(reads).toBeGreaterThan(0);
+  reads = 0;
+  reviewCameraPlanObservations({
+    ...region,
+    cursorFocus: {
+      ...region.cursorFocus!,
+      timeMap: [
+        { kind: 'speed', sourceStart: 0, sourceEnd: 4, resultStart: 0, resultEnd: 2, rate: 2 },
+      ],
+    },
+  });
+  expect(reads).toBeGreaterThan(0);
+});
+
+it('applies current crop and path revisions after retained observation derivation', async () => {
+  const { reviewCameraPlanObservations } = await import('./cursor-focus-path');
+  const path = deriveReviewCursorFocusPath(facts, source, true);
+  const region: QuickEditZoomRegion = {
+    id: 'crop-observations',
+    start: 0,
+    end: 4,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    cursorFocus: { path, observed: path, scene: { source, background: { enabled: false } } },
+  };
+  const original = reviewCameraPlanObservations(region);
+  const authored = structuredClone(path);
+  authored.segments[0]!.keys[1]!.x = 0.4;
+  const observed = structuredClone(path);
+  observed.segments[0]!.keys[1]!.x = 0.6;
+  const variants: QuickEditZoomRegion[] = [
+    { ...region, cursorFocus: { ...region.cursorFocus!, path: authored } },
+    { ...region, cursorFocus: { ...region.cursorFocus!, observed } },
+    ...[0, 0.5].map((x) => ({
+      ...region,
+      cursorFocus: {
+        ...region.cursorFocus!,
+        scene: {
+          source,
+          background: { enabled: false as const },
+          canvas: { width: 100, height: 100, crop: { x, y: 0.2, width: 0.5, height: 0.5 } },
+        },
+      },
+    })),
+    {
+      ...region,
+      cursorFocus: {
+        ...region.cursorFocus!,
+        scene: {
+          source: { ...source, width: 200 },
+          background: { enabled: false },
+          canvas: { width: 100, height: 100, crop: { x: 0, y: 0.2, width: 0.5, height: 0.5 } },
+        },
+      },
+    },
+  ];
+  for (const candidate of variants) {
+    const actual = reviewCameraPlanObservations(candidate);
+    expect(actual).toEqual(reviewCameraPlanObservations(structuredClone(candidate)));
+    expect(actual).not.toEqual(original);
+  }
+  expect(reviewCameraPlanObservations(region)).toEqual(original);
+});
