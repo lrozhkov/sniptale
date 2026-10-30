@@ -150,10 +150,13 @@ export function applyReviewTextRewrite(
       document.fragments.find((entry) => entry.id === id)!
     );
     const first = sources[0]!;
-    const { words: _words, origin: _origin, origins: _origins, ...base } = first;
+    const { words: _words, sourceAnchor, origin: _origin, origins: _origins, ...base } = first;
     const origins = collectOrigins(sources);
     return {
       ...base,
+      ...(!basis.context.changeIntervals && !basis.context.resegment && sourceAnchor
+        ? { sourceAnchor: { duration: sourceAnchor.duration, spans: sourceAnchor.spans } }
+        : {}),
       id: createId(),
       text: fragment.text,
       originalText: sources.map((entry) => entry.text).join('\n'),

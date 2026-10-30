@@ -1054,4 +1054,23 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       );
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 31, to: 32 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 46,
+    toDatabaseVersion: 47,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+        'Text placement stores are unavailable.'
+      );
+    },
+  },
 ];

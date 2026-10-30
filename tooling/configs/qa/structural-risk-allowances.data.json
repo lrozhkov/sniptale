@@ -193,10 +193,10 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The changed case adds a complete border payload to the existing canonical workspace snapshot. One private fixture and serialized queue prove quota refusal, retry, stale rejection, history and reopen. Camera, crop and border share the same transaction protocol. Main and independent read-only structural diagnosis inspected this exact scope and classified Keep. Final independent architecture review must assess it.",
+      "reason": "tool-noise: The native text case uses the existing private store fixture and serialized transaction queue. It proves quota rollback, retry, parallel revision conflict, Undo/Redo and reopen through the same workspace writer. It adds no fixture receiver, resource lifetime or production authority. Source inspection shows unchanged signature, owner groups and structural score. Keep the shared transaction proof. Final independent architecture review must inspect this exact classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, state receiver, resource lifetime, recovery, parser or selection authority. Remove when the analyzer recognizes this cohesive registry or proof boundary.",
-      "reviewDate": "2026-10-25",
-      "astHash": "6a780b1409d1616c2f7d5be85b53da856377d23d162c99524c98b013284a51dd",
+      "reviewDate": "2026-10-30",
+      "astHash": "27f9596b452898584ed54b0724f24a5a73438bea8db56cd40e803c112900189c",
       "signatureHash": "aa2976033c2c32dd68794adf3434898c3439caf4654ba2a7868bdb8d490eb52f"
     },
     {
@@ -512,10 +512,10 @@
       "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: This owner admits and serializes native workspace transactions. Capture and monotonic revision allocation now participate in those same transactions. Archive identity admission, archive creation and default replacement retain one commit authority. Source admission, history storage, physical cleanup and sync capture retain named collaborators. Main source inspection and independent read-only topology diagnosis established this cohesive boundary. Final architecture review must inspect this exact classification. Recording telemetry joins the existing transaction participant list so native recording review capture reads one atomic source snapshot. Independent source diagnosis confirms unchanged authority, signature and structural score.",
+      "reason": "tool-noise: The workspace transaction owner adds preserveTextAnchors to its existing commit-time edit policy. Source admission, serialized revision checks, history storage, publication and rollback remain in the same existing transaction. No new writer, receiver, effect or recovery lifetime enters this file. Source inspection shows unchanged signature, owner groups and structural score. Keep the existing mutation authority. Final independent architecture review must inspect this exact classification.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state, writer, runtime, resource lifetime, or recovery authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-10-28",
-      "astHash": "b456e6168391b5b319ab9a5fcaea9f7a1e59386e4c67c75631c4a187f961225c",
+      "reviewDate": "2026-10-30",
+      "astHash": "0434bbf5dc4b52cdfb44e163ca65b80f4cfb0c9f3576a2c2dc2f31b114717d24",
       "signatureHash": "06d04771104d223c5a23a98aae8116dfb12029f7febbe8b3685d0a321b7a71b7"
     },
     {
@@ -1447,10 +1447,10 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The chronological migration registry adds DB45-to-46 creation and validation of asset_residency. Existing upgrade execution owns ordering, abort and contract publication. The added descriptor creates no independent runtime owner. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
+      "reason": "tool-noise: The chronological registry adds one metadata-only DB46-to-47 text-placement contract. The descriptor checks existing workspace, history and draft stores through requireMigrationStores. Existing upgrade execution retains ordering, abort and contract publication. Source inspection shows unchanged owners, effects and signature. Keep this cohesive registry. Final independent architecture review must inspect this exact classification.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-29",
-      "astHash": "5a833df6db3a5043b0194426e2e32a85ff1d2d89ae304e1a4d015c6583f990a5",
+      "reviewDate": "2026-10-30",
+      "astHash": "41c614a8604e8e4c34256fcc134f0e0d84adb8658717064dd6f4301d48f862d9",
       "signatureHash": "07c774e9a0b3f74167f16d2ba52e7b0fa3c0fe23d1d97eda8352dd7c8c08b5a4"
     },
     {
@@ -1744,11 +1744,11 @@
       "file": "apps/extension/src/features/video/review/project-audio.ts",
       "symbol": "planReviewProjectAudio",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This pure operation admits one normalized audio result or one refusal. Snapshot provenance, source takes and result clips share the same resource identity checks. Asset maps and cloned records remain local. No writer, acquisition lifetime or session authority applies. Main inspected this exact body. Independent architecture review must assess this classification.",
+      "reason": "tool-noise: This pure audio conversion operation resolves an accepted text snapshot to its current converted text document. Immutable snapshot content and binding retain their existing admission. The optional fragment map adds no writer, resource acquisition, publication, effect or state authority. Source inspection shows the same conversion result, owner groups and structural score. Keep this cohesive planner. Final independent architecture review must inspect this exact classification.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result or recovery. Remove when analysis models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "d39c53a244eb0a943b7913001f355bf17135f718797d39b61164ed74ab3c45cc",
-      "signatureHash": "bc22836d5a85284f60c217e171f444b47316aa62cdad2e4ae41f33be543377ca"
+      "reviewDate": "2026-10-30",
+      "astHash": "0cf9951848215eb26675407a5a4f802be6044e81cf88284809dadfc283c4944b",
+      "signatureHash": "d2e72ceaad16554c71e824dc640d81dd971ca85e591a7095f91605b2a7ff455d"
     },
     {
       "rule": "structural-function-risk",

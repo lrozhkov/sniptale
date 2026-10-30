@@ -1,3 +1,4 @@
+import { projectAnchoredReviewText } from './text-timing';
 import { mapReviewAnchor } from './timeline';
 import type { ReviewTimeSegment } from './time-segment';
 import type { ReviewTextFragment } from './text-document';
@@ -7,6 +8,20 @@ export function projectReviewTextFragment(
   fragment: ReviewTextFragment,
   segments: readonly ReviewTimeSegment[]
 ) {
+  if (fragment.sourceAnchor) {
+    const slices = projectAnchoredReviewText(fragment, segments);
+    const ranges = slices.flatMap((slice) => {
+      const start = Math.max(fragment.start, slice.start);
+      const end = Math.min(fragment.end, slice.end);
+      return end > start ? [{ start, end }] : [];
+    });
+    const visible = ranges.reduce((total, range) => total + range.end - range.start, 0);
+    return {
+      excludedFromResult: ranges.length === 0,
+      partiallyExcluded: visible + 1e-7 < fragment.sourceAnchor.duration,
+      ranges,
+    };
+  }
   if (fragment.timeDomain === 'source') {
     const projected = mapReviewAnchor(
       { kind: 'range', start: fragment.start, end: fragment.end },

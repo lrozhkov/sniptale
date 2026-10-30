@@ -338,6 +338,8 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       value['preserveVoiceoverAnchors'] !== true
     )
       return null;
+    if (value['preserveTextAnchors'] !== undefined && value['preserveTextAnchors'] !== true)
+      return null;
     if (
       (value['normalizeVoiceoverTempo'] !== undefined &&
         value['normalizeVoiceoverTempo'] !== true) ||
@@ -354,6 +356,7 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       ...(value['preserveVoiceoverAnchors'] === true
         ? { preserveVoiceoverAnchors: true as const }
         : {}),
+      ...(value['preserveTextAnchors'] === true ? { preserveTextAnchors: true as const } : {}),
       ...(value['normalizeVoiceoverTempo'] === true
         ? { normalizeVoiceoverTempo: true as const }
         : {}),

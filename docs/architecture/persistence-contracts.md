@@ -1101,3 +1101,13 @@ The ready journal contains JSON metadata and exact immutable file references. Ef
 The transaction repeats profile, causal, dependency and native revision checks. It publishes project rows, private sources, sidecars and the receipt atomically. A failed transaction preserves the predecessor and permits an exact retry. A matching completed receipt permits replay without staging files or another native revision.
 
 Outgoing preparation reuses existing file references for originals and saved exports. It stages only portable objects without a native file binding. Prepared claims retain those temporary files until publication or recovery permits release. This change adds no store, queue, journal domain or transfer platform. Production activation and safe unload remain separate release gates.
+
+## Review text placement during video edits
+
+New Cut and Speed operations record `preserveTextAnchors`. Historical operations without this flag retain their recorded behavior.
+
+Advanced schema27 admits optional `sourceAnchor` on result-domain text fragments. Native duration, complete source spans, and native word offsets use the existing voiceover timing rules. Video edits derive current result intervals without changing text revisions or accepted voice snapshots. Cuts retain hidden intervals for later recovery. Explicit text moves, trims, splits, and merges establish new placement from the current intervals.
+
+The text document owns these anchors. Descriptive provenance owns no timing authority or audio lease. Malformed anchors reject the operation without partial publication. Preview, captions, and subtitle export use the same projection. Gallery-to-Montage conversion retains current slices as ordinary Native text and retains fully excluded text with a zero result limit.
+
+Physical database47 and mediaLibrary32 admit this contract through a metadata-only46→47 migration. The migration preserves existing workspaces, history, recovery, and immutable objects. Earlier applications refuse the newer database before writing. Reading older supported projects does not create anchors or write a migration.

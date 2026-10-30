@@ -1,3 +1,4 @@
+import { parseVoiceoverAnchors } from './voiceover-validation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { parseReviewSpeechPhrase, parseReviewSpeechProfile } from './speech-validation';
@@ -75,6 +76,27 @@ function parseOrigin(value: unknown): ReviewTextOrigin | null {
   };
 }
 
+/** Native placement retains complete coverage through cuts and validates its own word clock. */
+function parseTextAnchor(value: unknown): ReviewTextFragment['sourceAnchor'] | null {
+  if (!isRecord(value) || !time(value['duration']) || value['duration'] <= 0) return null;
+  const rawSpans = value['spans'];
+  if (!Array.isArray(rawSpans) || !isRecord(rawSpans[0]) || !time(rawSpans[0]['start']))
+    return null;
+  const spans = parseVoiceoverAnchors(rawSpans, rawSpans[0]['start'], value['duration']);
+  const phrase = parseReviewSpeechPhrase({
+    id: 'native-text',
+    start: 0,
+    end: value['duration'],
+    text: '',
+    originalText: '',
+    revision: 0,
+    alignment: 'range',
+    ...(value['words'] === undefined ? {} : { words: value['words'] }),
+  });
+  if (!spans || !phrase) return null;
+  return { duration: value['duration'], spans, ...(phrase.words ? { words: phrase.words } : {}) };
+}
+
 /** Standalone text permits overlaps and mixed clocks, while retaining bounded immutable provenance. */
 function parseReviewTextFragment(value: unknown): ReviewTextFragment | null {
   if (
@@ -86,6 +108,9 @@ function parseReviewTextFragment(value: unknown): ReviewTextFragment | null {
     (value['variantId'] !== undefined && !identity(value['variantId']))
   )
     return null;
+  const sourceAnchor =
+    value['sourceAnchor'] === undefined ? undefined : parseTextAnchor(value['sourceAnchor']);
+  if (sourceAnchor === null || (sourceAnchor && value['timeDomain'] !== 'result')) return null;
   const phrase = parseReviewSpeechPhrase(value);
   const style = value['style'] === undefined ? undefined : parseReviewCaptionStyle(value['style']);
   const origin = value['origin'] === undefined ? undefined : parseOrigin(value['origin']);
@@ -121,6 +146,7 @@ function parseReviewTextFragment(value: unknown): ReviewTextFragment | null {
   }
   return {
     ...phrase,
+    ...(sourceAnchor ? { sourceAnchor } : {}),
     timeDomain: value['timeDomain'],
     timingRevision: value['timingRevision'],
     showInVideo: value['showInVideo'],
@@ -146,14 +172,17 @@ export function parseReviewTextDocument(value: unknown): ReviewTextDocument | nu
   const ids = new Set<string>();
   let words = 0;
   let textUnits = 0;
+  let anchors = 0;
   for (const raw of value['fragments']) {
     const fragment = parseReviewTextFragment(raw);
     if (!fragment || ids.has(fragment.id)) return null;
     ids.add(fragment.id);
     words +=
-      (fragment.words?.length ?? 0) +
+      Math.max(fragment.words?.length ?? 0, fragment.sourceAnchor?.words?.length ?? 0) +
       (fragment.origin?.words?.length ?? 0) +
       (fragment.origins?.reduce((total, origin) => total + (origin.words?.length ?? 0), 0) ?? 0);
+    anchors += fragment.sourceAnchor?.spans.length ?? 0;
+    if (anchors > 40_000) return null;
     textUnits += fragment.text.length + fragment.originalText.length;
     if (words > 40_000 || textUnits > 2_000_000) return null;
     fragments.push(fragment);

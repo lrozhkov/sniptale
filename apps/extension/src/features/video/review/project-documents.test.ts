@@ -262,3 +262,35 @@ it('does not expose a partial mapping when allocation fails', () => {
   expect(args).toEqual(before);
   expect(planReviewProjectDocuments(args).textDocuments).toHaveLength(2);
 });
+
+it('converts native-duration text slices and excludes hidden text without retaining Gallery anchors', async () => {
+  const { retimeReviewTextDocument } = await import('./text-timing');
+  const args = fixture();
+  const authored: ReviewTextDocument = {
+    version: 1,
+    fragments: [fragment('anchored', 2, 5, 'result'), fragment('excluded', 3.1, 3.8, 'result')],
+  };
+  const map = buildReviewTimeMap(8, args.edits);
+  args.text = retimeReviewTextDocument(
+    authored,
+    buildReviewTimeMap(8, []),
+    map,
+    null,
+    args.edits[1]!
+  );
+  const plan = planReviewProjectDocuments(args);
+  const native = project(args, plan);
+  expect(isExportReadyVideoProject(native)).toBe(true);
+  const entry = plan.textDocuments.find((document) => document.binding.kind === 'project')!;
+  expect(entry.document.fragments.every((value) => !value.sourceAnchor)).toBe(true);
+  for (const original of args.text.fragments) {
+    const retained = entry.document.fragments.filter(
+      (value) => value.id === original.id || value.id.endsWith(`:${original.id}`)
+    );
+    expect(
+      retained.flatMap((value) => projectVideoProjectTextFragment(native, entry, value).ranges)
+    ).toEqual(projectReviewTextFragment(original, map).ranges);
+    expect(plan.textDocumentIds.fragments.get(original.id)).toBe(entry.id);
+  }
+  expect(entry.resultEndLimits).toEqual([{ fragmentId: 'excluded', end: 0 }]);
+});

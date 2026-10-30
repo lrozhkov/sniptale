@@ -1,5 +1,24 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-text-source-placement',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-text.ts',
+    reason:
+      'Text track gestures and hidden Cut placement exercise the mounted text editor and its source projection.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/original-speech-track.text.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-text.test.ts',
+      'apps/extension/src/gallery/video-review/text-panel.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-text-track-source-gestures',
+    productionFile: 'apps/extension/src/gallery/video-review/original-speech-track.tsx',
+    reason:
+      'The mounted text track proves source placement, drag admission, cancellation and explicit timing changes.',
+    testFiles: ['apps/extension/src/gallery/video-review/original-speech-track.text.test.tsx'],
+  },
+
+  {
     owner: 'sync-captured-root-portable-consumers',
     productionFile: 'apps/extension/src/workflows/sync-transfer/captured-root.ts',
     reason:

@@ -120,7 +120,18 @@ function fixture(timeDomain: 'source' | 'result' = 'source') {
   });
   const commit = vi.fn<Dependencies['commitVideoWorkspace']>(async (args) => {
     if (!saved) throw new Error('missing');
-    const operation = parseReviewOperation(args.operation, saved.workspace.source.duration);
+    const parsed = parseReviewOperation(args.operation, saved.workspace.source.duration);
+    const operation =
+      parsed?.target === 'edit'
+        ? {
+            ...parsed,
+            preserveFocusAnchors: true as const,
+            preserveUnderCuts: true as const,
+            preserveVoiceoverAnchors: true as const,
+            normalizeVoiceoverTempo: true as const,
+            preserveTextAnchors: true as const,
+          }
+        : parsed;
     if (!operation || args.expectedRevision !== saved.workspace.revision)
       throw new Error('conflict');
     const document = replayReviewHistory(
@@ -255,7 +266,8 @@ describe('durable AI text workflow', () => {
         text: 'Edited',
         start: 1,
         end: 2,
-        timeDomain: 'source',
+        timeDomain: 'result',
+        sourceAnchor: { duration: 1, spans: [{ start: 1, end: 2, offset: 0, duration: 1 }] },
         origin: before.advancedContent.text!.fragments[0]!.origin,
       });
       expect(

@@ -597,3 +597,23 @@ it('adds only due indexing without rewriting version 44 rows or immutable bytes'
     toDatabaseVersion: 45,
   });
 });
+
+it('admits native text anchors without rewriting workspaces, history, recovery or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 46
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 47
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 32 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 47)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    stores: ['video_workspaces', 'video_workspace_history', 'video_workspace_drafts'],
+    domainVersions: [{ domainId: 'mediaLibrary', from: 31, to: 32 }],
+  });
+});

@@ -37,7 +37,7 @@ function fixture(timeDomain: 'source' | 'result' = 'result') {
   return session;
 }
 
-it('projects a partially cut source phrase through Speed without changing the text clock', async () => {
+it('retains native text duration through Cut and Speed when capturing a new take', async () => {
   const session = fixture('source');
   for (const edit of [
     { id: 'cut', kind: 'cut' as const, start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
@@ -57,7 +57,12 @@ it('projects a partially cut source phrase through Speed without changing the te
   expect(basis).toMatchObject({
     resultStart: 0,
     resultDuration: 4,
-    fragment: { start: 1, end: 4, timeDomain: 'source' },
+    fragment: {
+      start: 0,
+      end: 2,
+      timeDomain: 'result',
+      sourceAnchor: { duration: 3, spans: [{ start: 1, end: 4, offset: 0, duration: 3 }] },
+    },
   });
   expect(session.getSnapshot().dirty).toBe(true);
 });

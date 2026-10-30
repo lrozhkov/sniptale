@@ -618,6 +618,7 @@ function prepareCommittedOperation(
           preserveFocusAnchors: true as const,
           preserveUnderCuts: true as const,
           preserveVoiceoverAnchors: true as const,
+          preserveTextAnchors: true as const,
           normalizeVoiceoverTempo: true as const,
         }
       : parsed;
