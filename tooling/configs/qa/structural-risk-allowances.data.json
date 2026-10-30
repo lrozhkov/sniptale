@@ -271,10 +271,10 @@
       "symbol": "useReviewAnnotationEffects",
       "owner": "extension:gallery:video-review",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent writer, queue, resource, gesture, recovery authority or fixture lifecycle. Remove when the analyzer models this cohesive boundary. Fresh complete-candidate architecture review must validate this classification.",
-      "astHash": "5c98d5d412ba07f28e87922e737d569c46b1b53ce1a307e40d9aa0a1546d16ad",
+      "astHash": "e16835cac529181100360c9e838dd9ad764cb82c7c431882423ca0bac3fd8efe",
       "signatureHash": "349ce5baa868ad5597c6e89dbdc69124b461033b8430575ae2cac5a0ae80700c",
       "reason": "tool-noise: The enabled command uses the existing execute admission, pending/failure and cancellation lifetime. It delegates master publication to session.setTrackControl and adds no resource owner or writer. Independent read-only track_controls_structural_diagnosis inspected this boundary. Final complete-candidate architecture review must validate this classification.",
-      "reviewDate": "2026-10-15"
+      "reviewDate": "2026-10-30"
     },
     {
       "rule": "structural-file-risk",

@@ -14,6 +14,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     page,
   }, info) => {
     const host = await startHostServer();
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
     const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
     const dialog = page.locator('dialog');
     const button = (key: Parameters<typeof translate>[0]) =>
@@ -60,7 +62,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         await page.mouse.move(x, y);
         const beforePixels = await pixels();
         await page.mouse.down();
-        await page.mouse.move(x - 24, y - 8, { steps: 12 });
+        await page.mouse.move(x - 24, y - 8, { steps: surface === 'stage' ? 160 : 12 });
         await expect.poll(pixels).not.toBe(beforePixels);
         // A draft must not enter history before the pointer is released.
         expect((await persistedFocus(page))!.transform).toEqual(before);
@@ -89,6 +91,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .click();
       await expect.poll(async () => (await persistedFocus(page))?.transform).toEqual(saved);
       await expect(preview).toHaveAttribute('data-status', 'ready');
+      expect(pageErrors).toEqual([]);
     } finally {
       await page.close();
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
