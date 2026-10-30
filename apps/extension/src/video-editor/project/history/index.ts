@@ -1,46 +1,73 @@
+import { selectHistoryRetentionWindow } from '@sniptale/foundation/history/retention';
 import type { VideoEditorSelection } from '../../contracts/selection';
-import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import type { VideoProject } from '../../../features/video/project/types';
 import type {
   VideoEditorProjectHistoryError,
   VideoEditorProjectHistoryTransactionLease,
 } from '../../contracts/commands/history';
+import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 import {
-  EDITOR_HISTORY_LIMITS,
-  selectEditorSnapshotWindow,
-} from '../../../features/editor-history/policy';
+  applyVideoProjectHistoryChange,
+  createVideoProjectHistoryChange,
+  type VideoProjectHistoryChange,
+} from './project-change';
 
 /** Maximum number of project-edit actions retained for undo in the active editor session. */
 export const VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT = EDITOR_HISTORY_LIMITS.maxActions;
 
-function retainProjectHistory(
-  history: VideoEditorProjectHistoryState,
-  current: VideoEditorHistorySnapshot
-) {
-  const snapshots = [...history.past, current, ...history.future];
-  const window = selectEditorSnapshotWindow(snapshots, history.past.length);
-  return {
-    ...history,
-    past: snapshots.slice(window.start, history.past.length),
-    future: snapshots.slice(history.past.length + 1, window.end + 1),
-  };
+interface VideoEditorHistoryEntry {
+  projectId: string;
+  change: VideoProjectHistoryChange;
+  selection: VideoEditorSelection;
+}
+const entryBytes = new WeakMap<VideoEditorHistoryEntry, number>();
+
+function measureEntry(entry: VideoEditorHistoryEntry): number {
+  const cached = entryBytes.get(entry);
+  if (cached !== undefined) return cached;
+  const serialized = JSON.stringify(entry);
+  const bytes =
+    serialized.length > EDITOR_HISTORY_LIMITS.maxBytes
+      ? EDITOR_HISTORY_LIMITS.maxBytes + 1
+      : new TextEncoder().encode(serialized).byteLength;
+  entryBytes.set(entry, bytes);
+  return bytes;
 }
 
-interface VideoEditorHistorySnapshot {
-  project: VideoProject;
-  selection: VideoEditorSelection;
+/** Current content stays outside the operation budget. Clone a new change only if retained. */
+function retainProjectHistory(
+  history: VideoEditorProjectHistoryState,
+  captured: VideoEditorHistoryEntry
+): VideoEditorProjectHistoryState {
+  const entries = [...history.past, ...history.future];
+  const window = selectHistoryRetentionWindow(
+    entries.map((entry) => ({ actions: 1, bytes: measureEntry(entry) })),
+    history.past.length,
+    EDITOR_HISTORY_LIMITS
+  );
+  const retained = entries.slice(window.start, window.end);
+  if (retained.includes(captured)) {
+    const owned = structuredClone(captured);
+    entryBytes.set(owned, measureEntry(captured));
+    retained[retained.indexOf(captured)] = owned;
+  }
+  return {
+    ...history,
+    past: retained.slice(0, window.cursor),
+    future: retained.slice(window.cursor),
+  };
 }
 
 export interface VideoEditorProjectHistoryState {
   projectId: string | null;
-  past: VideoEditorHistorySnapshot[];
-  future: VideoEditorHistorySnapshot[];
+  past: VideoEditorHistoryEntry[];
+  future: VideoEditorHistoryEntry[];
   error: VideoEditorProjectHistoryError | null;
   transaction: VideoEditorProjectHistoryTransaction | null;
 }
 
 interface VideoEditorProjectHistoryTransaction {
-  before: VideoEditorHistorySnapshot | null;
+  before: { project: VideoProject; selection: VideoEditorSelection } | null;
   changed: boolean;
   lease: VideoEditorProjectHistoryTransactionLease;
   projectId: string;
@@ -69,16 +96,21 @@ export function beginVideoEditorProjectHistoryTransaction(
   selection: VideoEditorSelection = { kind: 'scene' }
 ): VideoEditorProjectHistoryState {
   if (history.transaction) return history;
-  if (history.projectId !== currentProject.id) {
+  if (history.projectId !== currentProject.id)
     return failedHistory(currentProject.id, 'projectMismatch');
-  }
-
   try {
+    const before = structuredClone({ project: currentProject, selection });
+    // Blob bytes are immutable; keep their identity across the isolated transaction metadata.
+    currentProject.effectSnapshots?.forEach((snapshot, index) => {
+      snapshot.assets.forEach((asset, assetIndex) => {
+        before.project.effectSnapshots![index]!.assets[assetIndex]!.blob = asset.blob;
+      });
+    });
     return {
       ...history,
       error: null,
       transaction: {
-        before: structuredClone({ project: currentProject, selection }),
+        before,
         changed: false,
         lease: Symbol('video-editor-project-history-transaction'),
         projectId: currentProject.id,
@@ -95,32 +127,16 @@ export function endVideoEditorProjectHistoryTransaction(
 ): VideoEditorProjectHistoryState {
   const transaction = history.transaction;
   if (!transaction) return history;
-  if (history.projectId !== currentProject.id || transaction.projectId !== currentProject.id) {
+  if (history.projectId !== currentProject.id || transaction.projectId !== currentProject.id)
     return failedHistory(currentProject.id, 'projectMismatch');
-  }
-  if (!transaction.changed || !transaction.before) {
-    return { ...history, transaction: null };
-  }
-  if (areVideoProjectsHistoryEquivalent(transaction.before.project, currentProject)) {
-    return { ...history, transaction: null };
-  }
-
-  return retainProjectHistory(
-    {
-      projectId: currentProject.id,
-      past: [...history.past, transaction.before].slice(-VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT),
-      future: [],
-      error: null,
-      transaction: null,
-    },
-    { project: currentProject, selection: transaction.before.selection }
+  const closed = { ...history, transaction: null };
+  if (!transaction.changed || !transaction.before) return closed;
+  return recordVideoEditorProjectHistory(
+    closed,
+    transaction.before.project,
+    currentProject,
+    transaction.before.selection
   );
-}
-
-function areVideoProjectsHistoryEquivalent(left: VideoProject, right: VideoProject): boolean {
-  const { updatedAt: _leftUpdatedAt, ...leftContent } = left;
-  const { updatedAt: _rightUpdatedAt, ...rightContent } = right;
-  return JSON.stringify(leftContent) === JSON.stringify(rightContent);
 }
 
 export function recordVideoEditorProjectHistory(
@@ -129,37 +145,67 @@ export function recordVideoEditorProjectHistory(
   nextProject: VideoProject,
   selection: VideoEditorSelection = { kind: 'scene' }
 ): VideoEditorProjectHistoryState {
-  if (currentProject.id !== nextProject.id || history.projectId !== currentProject.id) {
+  if (currentProject.id !== nextProject.id || history.projectId !== currentProject.id)
     return failedHistory(nextProject.id, 'projectMismatch');
-  }
-
   if (history.transaction) {
-    if (history.transaction.projectId !== currentProject.id) {
+    if (history.transaction.projectId !== currentProject.id)
       return failedHistory(nextProject.id, 'projectMismatch');
-    }
     return history.transaction.changed
       ? history
       : { ...history, transaction: { ...history.transaction, changed: true } };
   }
-
   try {
-    const before = { project: currentProject, selection };
-    const retained = retainProjectHistory(
+    const change = createVideoProjectHistoryChange(currentProject, nextProject);
+    if (!change) return history;
+    const before = { projectId: currentProject.id, change, selection };
+    return retainProjectHistory(
       {
         projectId: currentProject.id,
-        past: [...history.past, before].slice(-VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT),
+        past: [...history.past, before],
         future: [],
         error: null,
         transaction: null,
       },
-      { project: nextProject, selection }
+      before
     );
-    if (retained.past.at(-1) === before) {
-      retained.past[retained.past.length - 1] = structuredClone(before);
-    }
-    return retained;
   } catch {
     return failedHistory(nextProject.id, 'snapshotFailed');
+  }
+}
+
+function moveProjectHistory(
+  history: VideoEditorProjectHistoryState,
+  currentProject: VideoProject,
+  selection: VideoEditorSelection,
+  direction: 'undo' | 'redo'
+): VideoEditorProjectHistoryTransition | null {
+  if (history.transaction) return null;
+  const target = direction === 'undo' ? history.past.at(-1) : history.future[0];
+  if (!target) return null;
+  if (history.projectId !== currentProject.id || target.projectId !== currentProject.id)
+    return { status: 'failed', history: failedHistory(currentProject.id, 'projectMismatch') };
+  try {
+    const project = applyVideoProjectHistoryChange(currentProject, target.change);
+    const change = createVideoProjectHistoryChange(currentProject, project);
+    if (!change) throw new Error('History change is empty.');
+    const inverse = { projectId: currentProject.id, change, selection };
+    return {
+      status: 'applied',
+      history: retainProjectHistory(
+        {
+          projectId: currentProject.id,
+          past: direction === 'undo' ? history.past.slice(0, -1) : [...history.past, inverse],
+          future: direction === 'undo' ? [inverse, ...history.future] : history.future.slice(1),
+          error: null,
+          transaction: null,
+        },
+        inverse
+      ),
+      project,
+      selection: structuredClone(target.selection),
+    };
+  } catch {
+    return { status: 'failed', history: failedHistory(currentProject.id, 'snapshotFailed') };
   }
 }
 
@@ -168,42 +214,7 @@ export function undoVideoEditorProjectHistory(
   currentProject: VideoProject,
   selection: VideoEditorSelection = { kind: 'scene' }
 ): VideoEditorProjectHistoryTransition | null {
-  if (history.transaction) return null;
-  if (history.past.length === 0) return null;
-  if (history.projectId !== currentProject.id) {
-    return {
-      status: 'failed',
-      history: failedHistory(currentProject.id, 'projectMismatch'),
-    };
-  }
-
-  const target = history.past.at(-1);
-  if (!target || target.project.id !== currentProject.id) {
-    return {
-      status: 'failed',
-      history: failedHistory(currentProject.id, 'projectMismatch'),
-    };
-  }
-
-  try {
-    return {
-      status: 'applied',
-      history: retainProjectHistory(
-        {
-          projectId: currentProject.id,
-          past: history.past.slice(0, -1),
-          future: [structuredClone({ project: currentProject, selection }), ...history.future],
-          error: null,
-          transaction: null,
-        },
-        target
-      ),
-      project: applyVideoProjectMutationPatch(structuredClone(target.project), {}),
-      selection: structuredClone(target.selection),
-    };
-  } catch {
-    return { status: 'failed', history: failedHistory(currentProject.id, 'snapshotFailed') };
-  }
+  return moveProjectHistory(history, currentProject, selection, 'undo');
 }
 
 export function redoVideoEditorProjectHistory(
@@ -211,44 +222,7 @@ export function redoVideoEditorProjectHistory(
   currentProject: VideoProject,
   selection: VideoEditorSelection = { kind: 'scene' }
 ): VideoEditorProjectHistoryTransition | null {
-  if (history.transaction) return null;
-  if (history.future.length === 0) return null;
-  if (history.projectId !== currentProject.id) {
-    return {
-      status: 'failed',
-      history: failedHistory(currentProject.id, 'projectMismatch'),
-    };
-  }
-
-  const [target, ...remainingFuture] = history.future;
-  if (!target || target.project.id !== currentProject.id) {
-    return {
-      status: 'failed',
-      history: failedHistory(currentProject.id, 'projectMismatch'),
-    };
-  }
-
-  try {
-    return {
-      status: 'applied',
-      history: retainProjectHistory(
-        {
-          projectId: currentProject.id,
-          past: [...history.past, structuredClone({ project: currentProject, selection })].slice(
-            -VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT
-          ),
-          future: remainingFuture,
-          error: null,
-          transaction: null,
-        },
-        target
-      ),
-      project: applyVideoProjectMutationPatch(structuredClone(target.project), {}),
-      selection: structuredClone(target.selection),
-    };
-  } catch {
-    return { status: 'failed', history: failedHistory(currentProject.id, 'snapshotFailed') };
-  }
+  return moveProjectHistory(history, currentProject, selection, 'redo');
 }
 
 function failedHistory(
