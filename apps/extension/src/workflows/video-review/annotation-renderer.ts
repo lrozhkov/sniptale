@@ -196,11 +196,16 @@ export async function createReviewAnnotationRenderer(
     dispose();
     throw error;
   }
-  const describe = (time: number, density: Record<Plane, Size>, fps: number) => {
+  const describe = (
+    time: number,
+    density: Record<Plane, Size>,
+    fps: number,
+    instances?: readonly ReviewAnnotationEffect[]
+  ) => {
     if (disposed || !captured) throw new Error('Annotation renderer is disposed.');
     const current = captured;
     if (!current.lane.enabled) return [];
-    return [...current.lane.instances]
+    return [...(instances ?? current.lane.instances)]
       .sort((a, b) => a.order - b.order)
       .flatMap((instance) => {
         if (!instance.enabled) return [];
@@ -226,10 +231,16 @@ export async function createReviewAnnotationRenderer(
     counters: ledger.snapshot,
     dispose,
     /** Caller retains this batch only until painting; release closes every bitmap exactly once. */
-    async render(time: number, density: Record<Plane, Size>, fps: number, signal: AbortSignal) {
+    async render(
+      time: number,
+      density: Record<Plane, Size>,
+      fps: number,
+      signal: AbortSignal,
+      instances?: readonly ReviewAnnotationEffect[]
+    ) {
       signal.throwIfAborted();
       if (active) throw new Error('Annotation bitmap batch is already admitted.');
-      const planned = describe(time, density, fps);
+      const planned = describe(time, density, fps, instances);
       active = true;
       const frameReservations: { release(): void }[] = [];
       let frames: EffectRuntimeRenderedFrameMap | undefined;
@@ -242,11 +253,7 @@ export async function createReviewAnnotationRenderer(
         releases.delete(release);
         active = false;
       };
-      const abort = () => {
-        executor?.dispose();
-        executor = undefined;
-      };
-      signal.addEventListener('abort', abort, { once: true });
+      // A cancelled frame releases its late output; the prepared owner retains the sandbox.
       releases.add(release);
       try {
         for (const { plan } of planned)
@@ -295,8 +302,6 @@ export async function createReviewAnnotationRenderer(
       } catch (error) {
         release();
         throw error;
-      } finally {
-        signal.removeEventListener('abort', abort);
       }
     },
   };

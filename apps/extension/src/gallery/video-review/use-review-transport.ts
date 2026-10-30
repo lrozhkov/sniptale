@@ -84,6 +84,7 @@ export function useReviewTransport(args: {
     playing: playing && !args.silent,
     silent: args.silent ?? false,
     outputTime: timeline.sceneOutputTime,
+    sourceToResult: timeline.toOutputTime,
     seekRevision,
     originalAudio: args.originalAudio,
     voiceover: args.voiceover,

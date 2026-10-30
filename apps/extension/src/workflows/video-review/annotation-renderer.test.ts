@@ -375,6 +375,11 @@ it.each(['abort', 'dispose'] as const)(
     await rejected;
     expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
     expect(renderer.counters().liveRasterResources).toBe(0);
+    expect(f.executor.dispose).toHaveBeenCalledTimes(kind === 'abort' ? 0 : 1);
+    if (kind === 'abort') {
+      (await renderer.render(6, density, 30, f.deps.signal)).release();
+      expect(f.deps.createExecutor).toHaveBeenCalledOnce();
+    }
     renderer.dispose();
     expect(f.managed()).toBe(0);
   }
@@ -524,4 +529,29 @@ it('keeps Gallery annotation phase and anchors in ordinary Native cut and rate i
       ).toBe(false);
     }
   }
+});
+
+it('updates callout anchor controls and body geometry without replacing verified resources', async () => {
+  const f = await fixture(['callout']);
+  const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
+  (await renderer.render(6, density, 30, f.deps.signal)).release();
+  const original = f.executor.renderFrame.mock.calls[0]![0].controls;
+  const instances = structuredClone(f.scene.lane.instances);
+  const instance = instances[0]!;
+  instance.transform.x += 0.1;
+  instance.transform.width *= 0.8;
+  instance.transform.rotation += 0.2;
+  const anchor = Object.values(instance.anchors!)[0]!;
+  anchor.x = 0.9;
+  const batch = await renderer.render(6, density, 30, f.deps.signal, instances);
+  expect(f.executor.renderFrame.mock.calls[1]![0].controls).not.toEqual(original);
+  expect(batch.entries[0]!.instance).toEqual(instance);
+  batch.release();
+  expect(renderer.describe(6, density, 30)[0]!.instance.transform).toEqual(
+    f.scene.lane.instances[0]!.transform
+  );
+  expect(f.deps.createExecutor).toHaveBeenCalledOnce();
+  expect(f.executor.dispose).not.toHaveBeenCalled();
+  renderer.dispose();
+  expect(f.managed()).toBe(0);
 });

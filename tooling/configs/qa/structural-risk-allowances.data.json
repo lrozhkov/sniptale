@@ -426,8 +426,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: This file tests one preview renderer with one shared resource fixture. The added case checks snapshot isolation and reuse during a neighboring geometry refresh. Existing setup and cleanup own all fake leases. The candidate adds no production owner or durable writer. A split would duplicate that fixture or add a forwarding helper. A fresh architecture review must check this exact classification.",
       "removalCondition": "Remove this entry when the AST or signature changes. Reassess any new owner, writer, state receiver, resource lifetime, or recovery policy. Remove this entry when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-29",
-      "astHash": "f883f4554e59c994b0de5146aee13d46aa5ab77475edf73729981f157e9d355e",
+      "reviewDate": "2026-10-30",
+      "astHash": "bba316e5ed7ed20f58c3c87e934097379fc383e524a79b407d9ba789089c50ff",
       "signatureHash": "db3098e942fda1cc0f25d863fb49281d664a5781b0becec4106d7d95505aa614"
     },
     {
@@ -2439,8 +2439,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One renderer owns one prepared scene and its admitted resources. The candidate retains one window raster inside the existing asset lifetime. It adds isolated snapshots that reuse immutable cursor paths. No new runtime, writer, or resource authority enters this file. Cache replacement and disposal use the same asset owner. A fresh architecture review must check this exact classification.",
       "removalCondition": "Remove this entry when the AST or signature changes. Reassess any new owner, writer, state receiver, resource lifetime, or recovery policy. Remove this entry when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-29",
-      "astHash": "0d69ee2f6d9191b21b99e2c4e114ad477a3e19103b99440e25ae99c3f928348c",
+      "reviewDate": "2026-10-30",
+      "astHash": "f69d2c54a52ad162e1a3fc5abf4d5d68876264e3ae68d827fdc564be352e8e48",
       "signatureHash": "38d8e0404cb22879aca3ea6e5acb3534b88fb487073431b97888e84de884312c"
     },
     {
@@ -3234,6 +3234,17 @@
       "reviewDate": "2026-10-28",
       "astHash": "474a5f79ffa28b471e345c29d923ac2702f4a31873996913b21362329b44dccf",
       "signatureHash": "a5862144e94f8138df1a63d57fe224b924d30f6e9ba423e165911b926efaaad4"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/preview-presentation.ts",
+      "symbol": "createReviewPreviewPresentation",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One scheduler owns one active frame, one pending description, and its cadence. The completed frame stays in that transaction until publication or cancellation. Preparation, capture, publication, and cleanup share one generation and AbortController. The outer body has eighteen statements and one cyclomatic path. A split would distribute the same lease and cancellation authority. Independent architecture review must check this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive scheduler. Independent architecture review must check this classification.",
+      "reviewDate": "2026-10-30",
+      "astHash": "e8b92412bd6b89685299cc9417b82362863997cc3fef757c23863ae4f566a474",
+      "signatureHash": "ec40dae1374f57359d2066465a45eceb2af3ee9b69f9cd6a3b4752503139cb35"
     }
   ]
 }

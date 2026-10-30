@@ -1085,7 +1085,7 @@ it('refreshes captions without disposing camera-independent resources', async ()
   renderer.dispose();
 });
 
-it('retains effect resources for camera edits and invalidates changed effect inputs', async () => {
+it('retains effect resources across camera and annotation edits while painting current inputs', async () => {
   const f = await annotationsFixture();
   const { resources } = setup();
   const createExecutor = vi.fn(() => f.executor);
@@ -1102,7 +1102,26 @@ it('retains effect resources for camera edits and invalidates changed effect inp
   expect(f.executor.dispose).not.toHaveBeenCalled();
   const changed = structuredClone(nextScene);
   changed.annotationEffects!.lane.instances[0]!.transform.x = 0.4;
-  await renderer.prepare(changed, dimensions, new AbortController().signal);
+  const moved = await renderer.prepare(changed, dimensions, new AbortController().signal);
+  expect(f.executor.dispose).not.toHaveBeenCalled();
+  (await renderer.render(moved, frame())).release();
+  expect(io.overlays.mock.lastCall![0].annotationFrames[0].instance.transform.x).toBe(0.4);
+  expect(createExecutor).toHaveBeenCalledOnce();
+  const edited = structuredClone(changed);
+  const instance = edited.annotationEffects!.lane.instances[0]!;
+  instance.transform.width *= 0.75;
+  instance.transform.rotation = 0.3;
+  instance.controls['title'] = 'Live title';
+  const resized = await renderer.prepare(edited, dimensions, new AbortController().signal);
+  (await renderer.render(resized, frame())).release();
+  expect(f.executor.renderFrame.mock.calls.at(-2)![0].controls['title']).toBe('Live title');
+  expect(io.overlays.mock.lastCall![0].annotationFrames[0].instance.transform).toEqual(
+    instance.transform
+  );
+  expect(createExecutor).toHaveBeenCalledOnce();
+  const disabled = structuredClone(edited);
+  disabled.annotationEffects!.lane.instances[0]!.enabled = false;
+  await renderer.prepare(disabled, dimensions, new AbortController().signal);
   expect(f.executor.dispose).toHaveBeenCalledOnce();
   renderer.dispose();
   expect(f.executor.dispose).toHaveBeenCalledOnce();
