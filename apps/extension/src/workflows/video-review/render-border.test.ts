@@ -323,3 +323,112 @@ it('rasterizes transformed border and reveal paths once in destination device pi
   expect(mask.context.setTransform).toHaveBeenCalledWith(transform);
   expect(destination.context.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
 });
+
+it.each(['solid', 'dashed', 'dotted'] as const)(
+  'paints a complete %s contour without full-frame compositor surfaces',
+  (style) => {
+    const p = managedCompositor();
+    const context = {
+      ...p.destination.context,
+      filter: 'none',
+      canvas: output,
+      shadowColor: 'rgba(0, 0, 0, 0)',
+      rect: vi.fn(),
+      getTransform: () => ({ isIdentity: true }),
+    };
+    drawSceneBorders(target(context), output, [{ ...frame, style }], undefined, p.resources);
+    expect(p.canvas).not.toHaveBeenCalled();
+    expect(p.createElement).not.toHaveBeenCalled();
+    expect(context.stroke).toHaveBeenCalledOnce();
+    expect(context.drawImage).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  'filter',
+  'shadow',
+  'composite',
+  'explicit-transform',
+  'inherited-transform',
+  'smaller-output',
+  'shorter-output',
+  'reveal',
+] as const)('retains the isolated compositor for %s', (mode) => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    rect: vi.fn(),
+    getTransform: () => ({ isIdentity: mode !== 'inherited-transform' }),
+  };
+  if (mode === 'filter') context.filter = 'blur(2px)';
+  if (mode === 'shadow') context.shadowColor = '#000000';
+  if (mode === 'composite') context.globalCompositeOperation = 'xor';
+  if (mode === 'smaller-output') context.canvas = { width: 240, height: 160 };
+  if (mode === 'shorter-output') context.canvas = { width: 120, height: 160 };
+  drawSceneBorders(
+    target(context),
+    output,
+    [{ ...frame, style: 'dashed', end: mode === 'reveal' ? 0.5 : 1 }],
+    undefined,
+    p.resources,
+    mode === 'explicit-transform' ? {} : undefined
+  );
+  expect(p.canvas).toHaveBeenCalledTimes(2);
+  expect(p.layerRelease).toHaveBeenCalledOnce();
+  expect(p.maskRelease).toHaveBeenCalledOnce();
+});
+
+it('restores the destination when a direct stroke fails without acquiring resources', () => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    rect: vi.fn(),
+    getTransform: () => ({ isIdentity: true }),
+  };
+  context.stroke.mockImplementation(() => {
+    throw new Error('stroke refused');
+  });
+  expect(() => drawSceneBorders(target(context), output, [frame], undefined, p.resources)).toThrow(
+    'stroke refused'
+  );
+  expect(context.restore).toHaveBeenCalledOnce();
+  expect(p.canvas).not.toHaveBeenCalled();
+});
+
+it('clips visible direct strokes and applies caller opacity without painting invisible frames', () => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    getTransform: () => ({ isIdentity: true }),
+  };
+  context.globalAlpha = 0.25;
+  const alphas: number[] = [];
+  context.stroke.mockImplementation(() => {
+    alphas.push(context.globalAlpha);
+  });
+  drawSceneBorders(
+    target(context),
+    output,
+    [
+      { ...frame, opacity: 0 },
+      { ...frame, opacity: 0.4 },
+      { ...frame, opacity: 0.8 },
+    ],
+    { rect: { x: 20, y: 10, width: 80, height: 60 }, radius: 8 },
+    p.resources
+  );
+  expect(alphas).toEqual([0.1, 0.2]);
+  expect(context.roundRect).toHaveBeenCalledWith(20, 10, 80, 60, 8);
+  expect(context.clip).toHaveBeenCalledOnce();
+  expect(context.restore).toHaveBeenCalledOnce();
+  expect(p.canvas).not.toHaveBeenCalled();
+});

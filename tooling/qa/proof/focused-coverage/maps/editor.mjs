@@ -122,6 +122,7 @@ and cancellation behavior.',
       'apps/extension/src/workflows/video-review/render-border.test.ts',
       'apps/extension/src/workflows/video-review/render-export-focus.test.ts',
       'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+      'apps/extension/src/features/video/composition/scene-border.test.ts',
     ],
   },
   {

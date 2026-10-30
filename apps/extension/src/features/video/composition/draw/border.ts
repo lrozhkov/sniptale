@@ -16,6 +16,19 @@ export function drawSceneBorders(
   transform?: DOMMatrix2DInit
 ) {
   if (!frames.length) return;
+  if (
+    context.globalCompositeOperation === 'source-over' &&
+    context.filter === 'none' &&
+    context.shadowColor === 'rgba(0, 0, 0, 0)' &&
+    !transform &&
+    context.getTransform().isIdentity &&
+    context.canvas.width === output.width &&
+    context.canvas.height === output.height &&
+    frames.every((frame) => frame.end - frame.start >= 1 - 1e-9)
+  ) {
+    paintCompleteBorders(context, frames, clip);
+    return;
+  }
   const layerLease = acquireBorderSurface('border-layer', output, resources);
   let maskLease: RenderCanvasLease | undefined;
   try {
@@ -27,6 +40,33 @@ export function drawSceneBorders(
     } finally {
       layerLease.release();
     }
+  }
+}
+
+/** Full contours need no reveal mask; preserve the old raster footprint and caller state. */
+function paintCompleteBorders(
+  context: CanvasRenderingContext2D,
+  frames: readonly SceneBorderFrame[],
+  clip: { rect: QuickEditBorder['area']; radius: number } | undefined
+) {
+  const opacity = context.globalAlpha;
+  context.save();
+  try {
+    if (clip) {
+      context.beginPath();
+      context.roundRect(clip.rect.x, clip.rect.y, clip.rect.width, clip.rect.height, clip.radius);
+      context.clip();
+    }
+    context.lineJoin = 'miter';
+    context.miterLimit = 10;
+    for (const frame of frames) {
+      if (!frame.opacity) continue;
+      configureBorderStroke(context, frame, 1);
+      context.globalAlpha = opacity * frame.opacity;
+      context.stroke(new Path2D(frame.path));
+    }
+  } finally {
+    context.restore();
   }
 }
 
