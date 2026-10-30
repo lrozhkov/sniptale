@@ -269,6 +269,43 @@ for (const [index, size] of [
       await expect
         .poll(async () => (await read()).motionRegions![0]!.spotlight!.area.width)
         .toBe(0.4);
+      const beforeLensMove = structuredClone((await read()).motionRegions![0]!.spotlight!.area);
+      const lensArea = page.locator('[data-preview-stage-focus-area]');
+      const lensBounds = (await lensArea.boundingBox())!;
+      const stageBounds = (await page.locator('[data-preview-stage-canvas]').boundingBox())!;
+      await page.mouse.move(
+        lensBounds.x + lensBounds.width / 2,
+        lensBounds.y + lensBounds.height / 2
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        stageBounds.x + stageBounds.width + 100,
+        stageBounds.y + stageBounds.height + 100,
+        { steps: 5 }
+      );
+      await page.screenshot({
+        path: info.outputPath('native-circle-overshoot-draft.png'),
+        fullPage: false,
+      });
+      await page.mouse.up();
+      await expect
+        .poll(async () => {
+          const area = (await read()).motionRegions![0]!.spotlight!.area;
+          return Math.max(area.width, area.height);
+        })
+        .toBe(0.4);
+      await expect(diameter).toHaveValue('40');
+      const moved = (await lensArea.boundingBox())!;
+      expect(Math.abs(moved.width - lensBounds.width)).toBeLessThan(1);
+      expect(Math.abs(moved.height - lensBounds.height)).toBeLessThan(1);
+      await page.screenshot({
+        path: info.outputPath('native-circle-overshoot-committed.png'),
+        fullPage: false,
+      });
+      await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+      await expect
+        .poll(async () => (await read()).motionRegions![0]!.spotlight!.area)
+        .toEqual(beforeLensMove);
       await chooseInspectorValue(
         page,
         inspector,

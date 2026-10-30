@@ -1,3 +1,4 @@
+import { createQuickEditBorder } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import {
   createReviewAnnotationGeometry,
   convertReviewAnnotationAttachment,
@@ -287,7 +288,7 @@ export async function performanceProbe() {
 }
 
 /** Compare prepared preview with the existing export scene/overlay painters and a plain-frame witness. */
-export async function parityProbe() {
+export async function parityProbe(combinedBorders = false) {
   const defs = await definitions();
   const sample = source();
   const size = { width: 960, height: 540 };
@@ -321,6 +322,28 @@ export async function parityProbe() {
             : {}),
         },
       ];
+    if (combinedBorders) {
+      scene.zoomRegions = [
+        ...scene.zoomRegions,
+        ...(['solid', 'dashed', 'dotted'] as const).map((style, index) => ({
+          ...createQuickEditZoomRegion({ id: `combined-${style}`, at: 0, duration: 8, endMax: 8 }),
+          enter: {
+            type: style === 'solid' ? ('linear' as const) : ('none' as const),
+            duration: style === 'solid' ? 4 : 0,
+          },
+          exit: { type: 'none' as const, duration: 0 },
+          border: {
+            ...createQuickEditBorder(),
+            style,
+            reveal: 'draw' as const,
+            loop: true,
+            segmentPercent: 35,
+            color: '#ff880080',
+            area: { x: 0.2 + index * 0.06, y: 0.15 + index * 0.06, width: 0.4, height: 0.4 },
+          },
+        })),
+      ];
+    }
     if (clock === 'cut-speed')
       scene.annotationEffects!.segments = [
         { sourceStart: 0, sourceEnd: 2, resultStart: 0, resultEnd: 2, kind: 'keep', rate: 1 },
