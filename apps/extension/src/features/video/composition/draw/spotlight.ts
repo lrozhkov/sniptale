@@ -289,15 +289,26 @@ function paintMaskTile(
       frame.projection
     )
   );
-  const protections = frames.map((frame) =>
-    coverage(
-      frame.protectionOpening ?? frame.opening,
-      frame.protectionRadius ?? frame.radius,
+  const protections = frames.map((frame, index) => {
+    const rect = frame.protectionOpening ?? frame.opening;
+    const corner = frame.protectionRadius ?? frame.radius;
+    // Equal geometry also makes opening-clip expansion zero; projection and clipping are shared.
+    if (
+      rect.x === frame.opening.x &&
+      rect.y === frame.opening.y &&
+      rect.width === frame.opening.width &&
+      rect.height === frame.opening.height &&
+      corner === frame.radius
+    )
+      return openings[index]!;
+    return coverage(
+      rect,
+      corner,
       frame.clip,
       sceneSpotlightNeedsClip(frame, frame.clip),
       frame.projection
-    )
-  );
+    );
+  });
   const dimPixels = dim.createImageData(tile.width, tile.height),
     blurPixels = blur.createImageData(tile.width, tile.height);
   const protection = (members: readonly number[], pixel: number) => {

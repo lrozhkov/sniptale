@@ -182,7 +182,7 @@ test('tiled spotlight masks match the untiled reference at every pixel', async (
   }, bundle.outputFiles[0]!.text);
   await writeFile(info.outputPath('spotlight-mask-parity.json'), JSON.stringify(results, null, 2));
   await page.screenshot({ path: info.outputPath('spotlight-mask-parity.png'), fullPage: false });
-  expect(results).toHaveLength(22);
+  expect(results).toHaveLength(28);
   for (const result of results) {
     const evidence = JSON.stringify(result);
     expect(result.radius, evidence).toBe(result.expectedRadius);

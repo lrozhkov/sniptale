@@ -187,7 +187,10 @@ function spotlight(value: PreviewRenderAllocationInput['scene']['spotlight']): {
         'spotlight.coverage',
         frameCount === 1
           ? integer(3 * pixels(tile) * 4)
-          : sum([integer((2 * frameCount + 2) * pixels(tile) * 4), integer((frameCount + 1) * 8)])
+          : sum([
+              integer((2 * frameCount + 2) * pixels(tile) * 4),
+              integer((3 * frameCount + 1) * 8),
+            ])
       ),
     ],
     composite:
