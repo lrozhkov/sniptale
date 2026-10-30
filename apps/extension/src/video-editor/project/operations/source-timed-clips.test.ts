@@ -1,3 +1,4 @@
+import { materializeVideoProjectCursorSourceObservations } from '../../../features/video/project/cursor-source-observations';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { VideoTrackKind } from '../../../features/video/project/types';
 import { expect, it } from 'vitest';
@@ -626,4 +627,46 @@ it.each(['motion', 'background'])('preserves captured cursor identity after a %s
   expect(next.cursorTrack).toBe(track);
   expect(next.cursorTrack?.samples).toBe(track.samples);
   expect(next.cursorTrack?.sourceObservations).toBe(track.sourceObservations);
+});
+
+it('does not reproject captured coordinates after a focus smoothing edit retains all sources', () => {
+  const project = createAnchoredInteractionProject();
+  project.cursorTrack!.sourceObservations = [
+    {
+      recordingId: 'recording-1',
+      sourceInstanceId: 'instance-anchor-clip',
+      samples: [0, 2, 4].map((time) => ({
+        id: `raw-${time}`,
+        time,
+        x: 0.5,
+        y: 0.5,
+        visible: true,
+        recordingPoint: { x: 0.5, y: 0.5 },
+      })),
+    },
+  ];
+  project.cursorTrack = materializeVideoProjectCursorSourceObservations(project);
+  const raw = project.cursorTrack!.sourceObservations![0]!.samples[0]!;
+  let reads = 0;
+  Object.defineProperty(raw, 'x', {
+    enumerable: true,
+    get: () => {
+      reads += 1;
+      return 0.5;
+    },
+  });
+  const result = reconcileRecordingInteractionAnchors(project, {
+    ...project,
+    cursorFocusPath: {
+      version: 1,
+      smoothing: 0.3,
+      sensitivity: 0.6,
+      mode: 'follow',
+      gapPolicy: 'hold',
+      segments: [],
+    },
+  });
+  expect(reads).toBe(0);
+  expect(result.cursorTrack).toBe(project.cursorTrack);
+  expect(result.cursorFocusPath?.smoothing).toBe(0.3);
 });
