@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand';
+import type { VideoProject } from '../../features/video/project/types';
 import { hydrateVideoProject } from '../../features/video/project/hydration';
 import { getDefaultExportSettings } from '../../features/video/project/timeline';
 import { resolveInitialVideoEditorSelection } from '../project/selection/model';
@@ -15,6 +16,41 @@ import { recordVideoEditorProjectHistory } from '../project/history';
 
 type VideoEditorStoreSet = Parameters<StateCreator<VideoEditorState>>[0];
 type RecordingTelemetryState = Parameters<VideoEditorState['setRecordingTelemetry']>[0];
+
+function hydrateProjectUpdate(current: VideoProject, proposed: VideoProject): VideoProject {
+  if (
+    !current.cursorTrack ||
+    current.id !== proposed.id ||
+    current.cursorTrack !== proposed.cursorTrack ||
+    current.clips !== proposed.clips ||
+    current.assets !== proposed.assets ||
+    current.source !== proposed.source ||
+    current.baseRecordingId !== proposed.baseRecordingId
+  )
+    return hydrateVideoProject(proposed);
+
+  // Materialization can introduce samples without the optional override. Their next
+  // hydration must still admit the explicit null before this branch can be reused.
+  if (current.cursorTrack.samples.some((sample) => sample.skinOverride === undefined))
+    return hydrateVideoProject(proposed);
+
+  // Captured cursor facts depend on the admitted source graph, not scene settings.
+  const hydrated = hydrateVideoProject({ ...proposed, cursorTrack: null });
+  if (
+    JSON.stringify(hydrated.clips) !== JSON.stringify(current.clips) ||
+    JSON.stringify(hydrated.assets) !== JSON.stringify(current.assets) ||
+    JSON.stringify(hydrated.source) !== JSON.stringify(current.source)
+  )
+    return hydrateVideoProject(proposed);
+
+  return {
+    ...hydrated,
+    clips: current.clips,
+    assets: current.assets,
+    source: current.source,
+    cursorTrack: current.cursorTrack,
+  };
+}
 
 export function createProjectStateActions(set: VideoEditorStoreSet) {
   return {
@@ -86,9 +122,10 @@ export function createProjectStateActions(set: VideoEditorStoreSet) {
     updateProject: (updater: Parameters<VideoEditorState['updateProject']>[0]) =>
       set((state): Partial<VideoEditorState> => {
         if (!state.project) return {};
-        const updatedProject = updater(state.project);
+        const current = state.project;
+        const updatedProject = updater(current);
         if (updatedProject === state.project) return {};
-        return applyProjectUpdate(state, () => hydrateVideoProject(updatedProject));
+        return applyProjectUpdate(state, () => hydrateProjectUpdate(current, updatedProject));
       }),
     syncProjectRevision: (
       expectedProject: Parameters<VideoEditorState['syncProjectRevision']>[0],

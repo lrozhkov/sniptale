@@ -41,6 +41,17 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   {
+    owner: 'video-editor-project-state-admission',
+    productionFile: 'apps/extension/src/video-editor/state/project-actions.ts',
+    reason:
+      'Project admission serves scene updates, source-range commands and saved revision synchronization.',
+    testFiles: [
+      'apps/extension/src/video-editor/state/project-actions.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/source-range-history.test.ts',
+      'apps/extension/src/video-editor/runtime/session/auto-save.test.tsx',
+    ],
+  },
+  {
     owner: 'shared-scene-plane-projection',
     productionFile:
       'apps/extension/src/features/video/composition/motion/spatial-projection-bounds.ts',
