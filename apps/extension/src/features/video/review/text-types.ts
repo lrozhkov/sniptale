@@ -40,7 +40,7 @@ export interface ReviewTextFragment extends ReviewSpeechPhrase {
   /** Native text placement uses the voiceover timing rules; provenance remains descriptive. */
   sourceAnchor?: {
     duration: number;
-    spans: import('./advanced/types').QuickEditVoiceoverAnchor[];
+    spans: import('./time-segment').QuickEditVoiceoverAnchor[];
     /** Word seconds relative to the retained native text interval. */
     words?: ReviewSpeechWord[];
   };

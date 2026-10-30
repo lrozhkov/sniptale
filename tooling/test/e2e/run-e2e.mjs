@@ -42,6 +42,7 @@ const E2E_BUILD_DIRS = {
 };
 
 const SUITES = {
+  'preview-performance': ['tooling/test/e2e/preview-performance'],
   smoke: SMOKE_SPECS,
   critical: CRITICAL_SPECS,
   security: SECURITY_SPECS,
@@ -57,7 +58,16 @@ export function parseE2eOptions(argv = []) {
     );
   }
 
+  const performance = suite === 'preview-performance';
+  if (!performance && (parsed.values.case || parsed.values.list))
+    throw new Error('--case and --list require --suite preview-performance');
+  if (parsed.values.case && !/^[a-zA-Z0-9 :_.-]{1,160}$/u.test(parsed.values.case))
+    throw new Error(
+      '--case must be a performance test name (letters, digits, spaces, colon, dot, dash or underscore)'
+    );
+
   return {
+    ...(performance ? { case: parsed.values.case, list: parsed.values.list ?? false } : {}),
     headed: parsed.values.headed ?? false,
     suite,
     specs: SUITES[suite],
@@ -65,8 +75,10 @@ export function parseE2eOptions(argv = []) {
   };
 }
 
-function shouldUseXvfb({ headed }, { requiresDisplay }) {
-  return !headed && requiresDisplay && process.platform === 'linux' && !process.env.DISPLAY;
+function shouldUseXvfb({ headed, list }, { requiresDisplay }) {
+  return (
+    !list && !headed && requiresDisplay && process.platform === 'linux' && !process.env.DISPLAY
+  );
 }
 
 function createE2eEnv({ headed }, { requiresDisplay }) {
@@ -103,6 +115,8 @@ function buildScriptsForSuite(suite) {
 }
 
 function playwrightWavesForSuite(suite, specs) {
+  if (suite === 'preview-performance')
+    return [{ buildDir: E2E_BUILD_DIRS.test, requiresDisplay: true, specs, workers: 1 }];
   if (suite === 'security') {
     return [{ buildDir: E2E_BUILD_DIRS.security, requiresDisplay: true, specs, workers: 1 }];
   }
@@ -140,13 +154,13 @@ export function runE2e({
 } = {}) {
   const options = parseE2eOptions(argv);
   if (options.help) return { help: true, helpText: options.helpText, options, steps: [] };
-  if (options.headed && process.platform === 'linux' && !process.env.DISPLAY) {
+  if (options.headed && !options.list && process.platform === 'linux' && !process.env.DISPLAY) {
     throw new Error('Headed e2e requires DISPLAY. Start an X server or run a headless suite.');
   }
 
   const buildStep = timeSyncStep(() => {
     const results = [];
-    for (const script of buildScriptsForSuite(options.suite)) {
+    for (const script of options.list ? [] : buildScriptsForSuite(options.suite)) {
       const result = buildRunner(['run', script], { stdio: 'pipe' });
       results.push(result);
       if (result.status !== 0) break;
@@ -171,16 +185,32 @@ export function runE2e({
         'playwright',
         '--',
         'test',
+        ...(options.suite === 'preview-performance'
+          ? ['--config=tooling/test/e2e/preview-performance.config.ts']
+          : []),
+        ...(options.list ? ['--list'] : []),
+        ...(options.case ? ['--grep', `(?:^| )${options.case.replaceAll('.', '\\.')}$`] : []),
         ...(wave.workers ? [`--workers=${wave.workers}`] : []),
         ...wave.specs,
       ];
       const env = {
         ...createE2eEnv(options, wave),
         SNIPTALE_EXTENSION_BUILD_DIR: wave.buildDir,
+        ...(options.suite === 'preview-performance'
+          ? {
+              SNIPTALE_PREVIEW_PERFORMANCE_EDITORS:
+                process.env.SNIPTALE_PREVIEW_PERFORMANCE_EDITORS ?? 'gallery,native',
+              SNIPTALE_PREVIEW_PERFORMANCE_CASES:
+                process.env.SNIPTALE_PREVIEW_PERFORMANCE_CASES ?? 'all',
+              SNIPTALE_PREVIEW_PERFORMANCE_MODES:
+                process.env.SNIPTALE_PREVIEW_PERFORMANCE_MODES ?? 'manual1080p30',
+            }
+          : {}),
       };
       const result = shouldUseXvfb(options, wave)
         ? commandRunner('xvfb-run', ['-a', 'npm', ...playwrightArgs], { env, stdio: 'pipe' })
         : commandRunner('npm', playwrightArgs, { env, stdio: 'pipe' });
+      if (options.list && result.stdout) process.stdout.write(result.stdout);
       results.push(result);
       if (result.status !== 0) break;
     }

@@ -204,3 +204,82 @@ it('isolates every browser E2E build from the canonical product dist directory',
   expect(viteSource).not.toContain("'dist-security-e2e'");
   expect(viteSource).not.toContain("'dist-release-e2e'");
 });
+
+it('keeps performance opt-in and forwards an individual case with one worker', () => {
+  expect(parseE2eOptions(['--suite', 'all']).specs).not.toContain(
+    'tooling/test/e2e/preview-performance.spec.ts'
+  );
+  expect(playwrightConfig.testIgnore).toContain('**/preview-performance*.spec.ts');
+  const commands: string[][] = [];
+  const builds: string[][] = [];
+  runE2e({
+    argv: ['--suite', 'preview-performance', '--case', 'quick preview native: plain', '--list'],
+    buildRunner: (args) => {
+      builds.push(args);
+      return { status: 0 };
+    },
+    commandRunner: (_command, args) => {
+      commands.push(args);
+      return { status: 0 };
+    },
+  });
+  expect(builds).toEqual([]);
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toEqual(
+    expect.arrayContaining([
+      '--workers=1',
+      '--list',
+      '--grep',
+      '(?:^| )quick preview native: plain$',
+      '--config=tooling/test/e2e/preview-performance.config.ts',
+    ])
+  );
+  expect(() => parseE2eOptions(['--suite', 'critical', '--case', 'plain'])).toThrow(
+    /require --suite preview-performance/u
+  );
+});
+
+it('treats a dot in a selected performance test name as a literal', () => {
+  let grep: string | undefined;
+  runE2e({
+    argv: ['--suite', 'preview-performance', '--case', 'sample.case'],
+    buildRunner: () => ({ status: 0 }),
+    commandRunner: (_command, args) => {
+      grep = args[args.indexOf('--grep') + 1];
+      return { status: 0 };
+    },
+  });
+  expect(grep).toBe(String.raw`(?:^| )sample\.case$`);
+});
+
+it('lists optional cases without a display server or an artifact build', () => {
+  const commands: string[] = [];
+  const result = runE2e({
+    argv: ['--suite', 'preview-performance', '--list', '--headed'],
+    buildRunner: () => {
+      throw new Error('List must not build');
+    },
+    commandRunner: (command) => {
+      commands.push(command);
+      return { status: 0 };
+    },
+  });
+  expect(result.steps.map((step) => step.status)).toEqual(['ok', 'ok']);
+  expect(commands).toEqual(['npm']);
+});
+
+it('selects only the named performance case when catalog names overlap', () => {
+  let grep = '';
+  const title = 'full editor manual1080p30: annotation';
+  runE2e({
+    argv: ['--suite', 'preview-performance', '--case', title, '--list'],
+    commandRunner: (_command, args) => {
+      grep = args[args.indexOf('--grep') + 1]!;
+      return { status: 0 };
+    },
+  });
+  const matches = new RegExp(grep, 'u');
+  expect(matches.test(`preview-performance.spec.ts ${title}`)).toBe(true);
+  for (const suffix of ['-border', '-drag', '-border-drag'])
+    expect(matches.test(`preview-performance.spec.ts ${title}${suffix}`)).toBe(false);
+});

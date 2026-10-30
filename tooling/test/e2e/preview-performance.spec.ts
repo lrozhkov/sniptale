@@ -1,13 +1,18 @@
-import { createQuickEditSpotlight } from '../../../apps/extension/src/features/video/project/scene/focus-appearance';
+import { resolveBrowserViewport } from './support/browser-viewport';
+import { computeQuickEditSceneSize } from '../../../apps/extension/src/features/video/review/advanced/scene';
+import {
+  openFullPerformanceEditor,
+  measureFullEditorPlayback,
+  measurePerformanceDrag,
+} from './support/preview-performance-editors';
 import { replaceNativeReviewWorkspace } from './support/native-review-workspace';
 import { chromium, expect, test as base, type Page, type ConsoleMessage } from '@playwright/test';
+import { previewPerformanceSummary } from './support/preview-performance-report';
 import { writeFile } from 'node:fs/promises';
 import { translate } from '../../../apps/extension/src/platform/i18n';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-import { createQuickEditZoomRegion } from '../../../apps/extension/src/features/video/review/advanced/zoom';
 
 import { createQuickEditWatermark } from '../../../apps/extension/src/features/video/project/scene/watermark';
-import type { QuickEditZoomRegion } from '../../../apps/extension/src/features/video/review/advanced/types';
 import { inspectVideoWorkspace } from '../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import {
   replayReviewHistory,
@@ -63,8 +68,16 @@ const test =
 const fullscreenMeasurement = process.env['SNIPTALE_PREVIEW_PERFORMANCE_FULLSCREEN'] === '1';
 const cameraDiagnostic = process.env['SNIPTALE_PREVIEW_PERFORMANCE_CAMERA_DIAGNOSTIC'] === '1';
 
-const recipes = ['plain', 'advanced', 'spotlight', 'motion-spatial', 'webcam', 'combined'] as const;
-type Recipe = (typeof recipes)[number];
+import {
+  recipes,
+  performanceScenario,
+  sceneRegions,
+  performanceAnnotations,
+  performanceBackground,
+  performanceFeedback,
+  seedPerformanceFeedback,
+  type Recipe,
+} from './support/preview-performance-scenarios';
 type Fixture = Awaited<ReturnType<typeof provisionQuickPreviewPerformanceFixture>>;
 const requested = (process.env['SNIPTALE_PREVIEW_PERFORMANCE_CASES'] ?? 'plain').split(',');
 const selected = requested.includes('all')
@@ -77,10 +90,12 @@ if (
   throw new Error(`SNIPTALE_PREVIEW_PERFORMANCE_CASES must contain: ${recipes.join(',')} or all`);
 }
 const detailed = process.env['SNIPTALE_PREVIEW_PERFORMANCE_DETAILED'] === '1';
-const modeNames = ['native', 'manual720p30'] as const;
+const modeNames = ['native', 'manual720p30', 'manual1080p30'] as const;
 const requestedModes = (process.env['SNIPTALE_PREVIEW_PERFORMANCE_MODES'] ?? 'native').split(',');
 if (requestedModes.some((mode) => !modeNames.some((known) => known === mode)))
-  throw new Error('SNIPTALE_PREVIEW_PERFORMANCE_MODES must contain native or manual720p30');
+  throw new Error(
+    'SNIPTALE_PREVIEW_PERFORMANCE_MODES must contain native, manual720p30 or manual1080p30'
+  );
 const selectedModes = modeNames.filter((mode) => requestedModes.includes(mode));
 const sourceProfiles = [
   { name: '720p30', width: 1280, height: 720, fps: 30 },
@@ -95,9 +110,23 @@ const sourceProfile = sourceProfiles.find(
 );
 if (!sourceProfile) throw new Error('Unsupported SNIPTALE_PREVIEW_PERFORMANCE_SOURCE');
 
-const repetitions = 3;
-const warmupMs = 5_000;
-const sampleMs = 30_000;
+const requestedEditors = (process.env['SNIPTALE_PREVIEW_PERFORMANCE_EDITORS'] ?? 'gallery').split(
+  ','
+);
+const editors = ['gallery', 'native'] as const;
+if (requestedEditors.some((name) => !editors.some((editor) => editor === name)))
+  throw new Error('SNIPTALE_PREVIEW_PERFORMANCE_EDITORS must contain gallery or native');
+const selectedEditors = editors.filter((editor) => requestedEditors.includes(editor));
+
+const qualification = process.env['SNIPTALE_PREVIEW_PERFORMANCE_PROTOCOL'] === 'qualification';
+if (
+  process.env['SNIPTALE_PREVIEW_PERFORMANCE_PROTOCOL'] &&
+  !['measurement', 'qualification'].includes(process.env['SNIPTALE_PREVIEW_PERFORMANCE_PROTOCOL'])
+)
+  throw new Error('SNIPTALE_PREVIEW_PERFORMANCE_PROTOCOL must be measurement or qualification');
+const repetitions = qualification ? 1 : 3;
+const warmupMs = qualification ? 2000 : 5000;
+const sampleMs = qualification ? 3000 : 30000;
 function percentiles(values: number[]) {
   const sorted = values.filter(Number.isFinite).toSorted((a, b) => a - b);
   const at = (fraction: number) =>
@@ -105,17 +134,18 @@ function percentiles(values: number[]) {
   return { count: sorted.length, p50: at(0.5), p95: at(0.95) };
 }
 
+const previewViewport = resolveBrowserViewport();
 const stageVideo = '[data-ui="gallery.videoReview.stage"] video';
 const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
 const needsCamera = (recipe: Recipe) => recipe === 'webcam' || recipe === 'combined';
 
 test.use({
-  viewport: { width: 1920, height: 900 },
+  viewport: previewViewport,
   deviceScaleFactor: 1,
   trace: 'off',
   video: 'off',
 });
-test.describe.configure({ mode: 'serial', retries: 0 });
+test.describe.configure({ mode: 'default', retries: 0 });
 let fixture: Fixture;
 test.beforeAll(async ({}, info) => {
   test.setTimeout(20 * 60_000);
@@ -128,15 +158,19 @@ test.beforeAll(async ({}, info) => {
   expect(fixture.duration).toBeGreaterThanOrEqual(39.9);
 });
 
-async function openEditor(page: Page, camera: boolean) {
-  await page
-    .getByRole('button', {
-      name: camera ? 'Screen or window: Screen' : 'beta-v1.webm',
-      exact: true,
-    })
-    .first()
-    .click();
-  await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+async function openEditor(page: Page) {
+  const enter = page.locator('[data-ui="gallery.videoReview.enter"]');
+  const choice = page.locator('[data-ui="gallery.videoReview.modeChoice.basic"]');
+  await expect
+    .poll(
+      async () =>
+        (await choice.isVisible()) ||
+        (await enter.isVisible()) ||
+        (await page.locator(stageVideo).count()) === 1
+    )
+    .toBe(true);
+  if (await choice.isVisible()) await choice.click();
+  if (await enter.isVisible()) await enter.click();
   await expect(page.locator(stageVideo)).toHaveCount(1);
   await expect
     .poll(() => page.locator(stageVideo).evaluate((video: HTMLVideoElement) => video.readyState))
@@ -214,63 +248,6 @@ async function seedCameraSource(page: Page, source: Fixture) {
   );
 }
 
-function sceneRegions(recipe: Recipe): QuickEditZoomRegion[] {
-  const regions: QuickEditZoomRegion[] = [];
-  if (recipe === 'spotlight' || recipe === 'combined')
-    regions.push({
-      ...createQuickEditZoomRegion({
-        id: 'performance-spotlight',
-        at: 0,
-        duration: 40,
-        endMax: 40,
-      }),
-      spotlight: {
-        ...createQuickEditSpotlight(),
-        effect: 'blur',
-        blur: 24,
-        area: { x: 0.15, y: 0.2, width: 0.4, height: 0.4 },
-      },
-      enter: { type: 'none', duration: 0 },
-      exit: { type: 'none', duration: 0 },
-    });
-  if (recipe === 'motion-spatial' || recipe === 'combined') {
-    // Consecutive transition spans exercise motion across the entire timed window, not only a startup animation.
-    for (let index = 0; index < 10; index++)
-      regions.push({
-        ...createQuickEditZoomRegion({
-          id: `performance-motion-${index}`,
-          at: index * 4,
-          duration: 4,
-          endMax: 40,
-        }),
-        transform: { scale: 1.4, centerX: index % 2 ? 0.6 : 0.4, centerY: 0.5 },
-        perspective: {
-          enabled: true,
-          rotateX: 20,
-          rotateY: index % 2 ? 35 : -35,
-          rotateZ: 8,
-          strength: 0.7,
-        },
-        depthOfField: {
-          enabled: true,
-          mode: 'area',
-          x: 0.5,
-          y: 0.5,
-          width: 0.2,
-          softness: 0.25,
-          strength: 0.6,
-        },
-        motionBlur: {
-          enter: { enabled: true, strength: 0.5 },
-          exit: { enabled: true, strength: 0.5 },
-        },
-        enter: { type: 'ease-in-out', duration: 2 },
-        exit: { type: 'ease-in-out', duration: 2 },
-      });
-  }
-  return regions;
-}
-
 /** Validate and persist a normal authored history operation after normal source/camera acquisition. */
 async function installRecipe(page: Page, recipe: Recipe) {
   const stored = await readWebcamWorkspace(page);
@@ -287,23 +264,25 @@ async function installRecipe(page: Page, recipe: Recipe) {
     return {
       recipe,
       advancedContent: before,
+      sceneSize: computeQuickEditSceneSize({ source: stored.source, ...before }),
       camera: needsCamera(recipe)
         ? `second ${sourceProfile.name} decoder; same fixture, zero offset`
         : null,
     };
-  const decorated = recipe === 'motion-spatial' || recipe === 'combined';
+  const background = performanceBackground(recipe);
+  const annotations = await performanceAnnotations(recipe, sourceProfile);
+  const feedback = performanceFeedback(recipe, sourceProfile);
   const watermark = createQuickEditWatermark('Preview benchmark');
   const after = {
     ...before,
-    ...(decorated
+    canvas: { width: sourceProfile.width, height: sourceProfile.height },
+    ...(feedback
+      ? { keyAnimations: feedback.keyAnimations, clickAnimations: feedback.clickAnimations }
+      : {}),
+    ...(annotations ? { annotationEffects: annotations.lane } : {}),
+    ...(background ? { background } : {}),
+    ...(performanceScenario(recipe).header
       ? {
-          background: {
-            enabled: true,
-            type: 'solid' as const,
-            color: '#778899ff',
-            zoomBehavior: 'follow-video' as const,
-            layout: { padding: 8, cornerRadius: 12, shadow: { color: '#000000ff', intensity: 50 } },
-          },
           windowHeader: {
             ...DEFAULT_WINDOW_HEADER,
             kind: 'browser' as const,
@@ -330,6 +309,9 @@ async function installRecipe(page: Page, recipe: Recipe) {
   const inspected = inspectVideoWorkspace({
     ...stored,
     revision: stored.revision + 1,
+    ...(annotations
+      ? { effectSnapshots: [...(stored.effectSnapshots ?? []), annotations.snapshot] }
+      : {}),
     updatedAt: Date.now(),
     history,
     cursor: history.length,
@@ -343,6 +325,7 @@ async function installRecipe(page: Page, recipe: Recipe) {
   return {
     recipe,
     advancedContent: after,
+    sceneSize: computeQuickEditSceneSize({ source: stored.source, ...after }),
     camera: needsCamera(recipe)
       ? `second ${sourceProfile.name} decoder; same fixture, zero offset`
       : null,
@@ -357,9 +340,9 @@ async function selectPreviewMode(page: Page, mode: (typeof modeNames)[number]) {
   await panel
     .getByRole('button', { name: label('gallery.videoReview.previewReset'), exact: true })
     .click();
-  if (mode === 'manual720p30') {
+  if (mode !== 'native') {
     for (const [key, option] of [
-      ['gallery.videoReview.previewResolution', '720p'],
+      ['gallery.videoReview.previewResolution', mode === 'manual1080p30' ? '1080p' : '720p'],
       ['gallery.videoReview.previewFrameRate', '≤ 30 FPS'],
     ] as const) {
       await panel.getByRole('button', { name: label(key), exact: true }).click();
@@ -380,306 +363,469 @@ async function selectPreviewMode(page: Page, mode: (typeof modeNames)[number]) {
   await gear.click();
 }
 
-for (const recipe of selected)
-  for (const mode of selectedModes)
-    test(`quick preview ${mode}: ${recipe}`, async ({ page }, info) => {
-      test.setTimeout(5 * 60_000);
-      page.setDefaultTimeout(15_000);
-      const host = await startHostServer();
-      let mediaDiagnostic:
-        | Awaited<ReturnType<typeof installQuickPreviewMediaDiagnostic>>
-        | undefined;
-      let consoleErrorCount = 0;
-      const pageErrorNames: string[] = [];
-      let pageErrorOverflow = false;
-      const onConsole = (message: ConsoleMessage) => {
-        if (message.type() === 'error') consoleErrorCount++;
-      };
-      const onPageError = (error: Error) => {
-        if (pageErrorNames.length >= 100) {
-          pageErrorOverflow = true;
-          return;
-        }
-        const allowed = [
-          'Error',
-          'TypeError',
-          'RangeError',
-          'ReferenceError',
-          'SyntaxError',
-          'AbortError',
-          'NotSupportedError',
-          'InvalidStateError',
-          'SecurityError',
-        ];
-        pageErrorNames.push(allowed.includes(error.name) ? error.name : 'OtherError');
-      };
-      page.on('console', onConsole);
-      page.on('pageerror', onPageError);
-      const dialog = page.locator('[data-ui="gallery.videoReview.dialog"]');
-      const control = (key: Parameters<typeof translate>[0]) =>
-        dialog.getByRole('button', { name: label(key), exact: true });
-      try {
-        await applyHarnessBootstrap(page, {
-          preserveMediaLibrary: true,
-          storage: {
-            'sniptale-locale-preference': 'en',
-            'sniptale-theme-preference': 'dark',
-          },
-        });
-        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=dark`);
-        await page.locator('[data-ui="gallery.page.root"]').waitFor();
-        if (needsCamera(recipe)) await seedCameraSource(page, fixture);
-        else
-          await seedReviewVideo(
-            page,
-            `${sourceProfile.name}.webm`,
-            { width: fixture.width, height: fixture.height, duration: fixture.duration },
-            false,
-            false,
-            { bytes: fixture.bytes, mimeType: 'video/webm' }
-          );
-        await page.reload();
-        if (cameraDiagnostic && recipe === 'plain')
-          mediaDiagnostic = await installQuickPreviewMediaDiagnostic(page);
-        await openEditor(page, needsCamera(recipe));
-        if (recipe !== 'plain') await control('gallery.videoReview.advancedEditing').click();
-        if (needsCamera(recipe)) {
-          await control('gallery.videoReview.webcam').click();
-          await expect(
-            dialog.locator('[data-ui="gallery.videoReview.webcamOverlay"] canvas')
-          ).toBeVisible();
-          await expect
-            .poll(async () => {
-              const row = await readWebcamWorkspace(page);
-              return (
-                !!row &&
-                !!replayReviewHistory(
-                  row.history,
-                  row.cursor,
-                  row.source,
-                  reviewAdvancedContentBaseline(row.advanced)
-                ).advancedContent.webcam
-              );
-            })
-            .toBe(true);
-        }
-        let recipeEvidence: unknown = { recipe, mode: 'basic' };
-        if (recipe !== 'plain') {
-          await expect
-            .poll(async () => (await readWebcamWorkspace(page))?.advanced.ui.mode)
-            .toBe('advanced');
-          recipeEvidence = await installRecipe(page, recipe);
-          await page.reload();
-          if (cameraDiagnostic) mediaDiagnostic = await installQuickPreviewMediaDiagnostic(page);
-          await openEditor(page, needsCamera(recipe));
-        }
-        if (mediaDiagnostic) {
-          await mediaDiagnostic.start();
-          try {
-            await selectPreviewMode(page, mode);
-          } finally {
-            const startup = await mediaDiagnostic.end();
-            await writeFile(
-              info.outputPath('camera-startup-diagnostic.json'),
-              JSON.stringify(startup, null, 2)
-            );
+for (const editor of selectedEditors)
+  for (const recipe of selected)
+    for (const mode of selectedModes)
+      test(`${editor === 'gallery' ? 'quick preview' : 'full editor'} ${mode}: ${recipe}`, async ({
+        page,
+      }, info) => {
+        test.skip(
+          editor === 'gallery' &&
+            mode === 'native' &&
+            performanceScenario(recipe).operation === 'drag',
+          'Canvas drag measurements require a manual composition preview'
+        );
+        test.setTimeout(5 * 60_000);
+        page.setDefaultTimeout(15_000);
+        const host = await startHostServer();
+        let mediaDiagnostic:
+          | Awaited<ReturnType<typeof installQuickPreviewMediaDiagnostic>>
+          | undefined;
+        let consoleErrorCount = 0;
+        const pageErrorNames: string[] = [];
+        let pageErrorOverflow = false;
+        const onConsole = (message: ConsoleMessage) => {
+          if (message.type() === 'error') consoleErrorCount++;
+        };
+        const onPageError = (error: Error) => {
+          if (pageErrorNames.length >= 100) {
+            pageErrorOverflow = true;
+            return;
           }
-        } else await selectPreviewMode(page, mode);
-        const video = page.locator(stageVideo);
-        expect(
-          await video.evaluate((node: HTMLVideoElement) => [node.videoWidth, node.videoHeight])
-        ).toEqual([fixture.width, fixture.height]);
-        if (fullscreenMeasurement) {
-          const source = await video.elementHandle();
-          if (!source) throw new Error('Fullscreen source video unavailable');
-          try {
-            await page.locator('[data-ui="gallery.videoReview.fullscreen"]').click();
+          const allowed = [
+            'Error',
+            'TypeError',
+            'RangeError',
+            'ReferenceError',
+            'SyntaxError',
+            'AbortError',
+            'NotSupportedError',
+            'InvalidStateError',
+            'SecurityError',
+          ];
+          pageErrorNames.push(allowed.includes(error.name) ? error.name : 'OtherError');
+        };
+        page.on('console', onConsole);
+        page.on('pageerror', onPageError);
+        const dialog = page.locator('[data-ui="gallery.videoReview.dialog"]');
+        const control = (key: Parameters<typeof translate>[0]) =>
+          dialog.getByRole('button', { name: label(key), exact: true });
+        try {
+          await applyHarnessBootstrap(page, {
+            preserveMediaLibrary: true,
+            storage: {
+              'sniptale-locale-preference': 'en',
+              'sniptale-theme-preference': 'dark',
+              sniptale_video_editor_preview_preferences: {
+                rasterPreset: mode === 'manual720p30' ? '720p' : '1080p',
+                frameRate: '30',
+                showFrameRate: false,
+                mode: 'live',
+                zoom: 'fit',
+              },
+            },
+          });
+          await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=dark`);
+          await page.locator('[data-ui="gallery.page.root"]').waitFor();
+          if (needsCamera(recipe)) await seedCameraSource(page, fixture);
+          else
+            await seedReviewVideo(
+              page,
+              `${sourceProfile.name}.webm`,
+              { width: fixture.width, height: fixture.height, duration: fixture.duration },
+              false,
+              false,
+              { bytes: fixture.bytes, mimeType: 'video/webm' }
+            );
+          await seedPerformanceFeedback(page, recipe, sourceProfile);
+          await page.removeLocatorHandler(
+            page.locator('[data-ui="gallery.videoReview.modeChoice"]')
+          );
+          await page.goto(
+            `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent('recording:beta-v1-recording')}&mode=edit&theme=dark`
+          );
+          if (cameraDiagnostic && recipe === 'plain')
+            mediaDiagnostic = await installQuickPreviewMediaDiagnostic(page);
+          await openEditor(page);
+          if (recipe !== 'plain') await control('gallery.videoReview.advancedEditing').click();
+          if (needsCamera(recipe)) {
+            await control('gallery.videoReview.webcam').click();
+            await expect(
+              dialog.locator('[data-ui="gallery.videoReview.webcamOverlay"] canvas')
+            ).toBeVisible();
+            await expect
+              .poll(async () => {
+                const row = await readWebcamWorkspace(page);
+                return (
+                  !!row &&
+                  !!replayReviewHistory(
+                    row.history,
+                    row.cursor,
+                    row.source,
+                    reviewAdvancedContentBaseline(row.advanced)
+                  ).advancedContent.webcam
+                );
+              })
+              .toBe(true);
+          }
+          let recipeEvidence: unknown = { recipe, mode: 'basic' };
+          let sceneSize = { width: fixture.width, height: fixture.height };
+          if (recipe !== 'plain') {
+            await expect
+              .poll(async () => (await readWebcamWorkspace(page))?.advanced.ui.mode)
+              .toBe('advanced');
+            const installed = await installRecipe(page, recipe);
+            recipeEvidence = installed;
+            sceneSize = installed.sceneSize;
+            await page.goto(
+              `${host.origin}${GALLERY_HARNESS_PATH}?mediaId=${encodeURIComponent('recording:beta-v1-recording')}&mode=edit&theme=dark`
+            );
+            if (cameraDiagnostic) mediaDiagnostic = await installQuickPreviewMediaDiagnostic(page);
+            await expect(page.locator(stageVideo)).toHaveCount(1);
             await expect
               .poll(() =>
-                source.evaluate(
-                  (node) => !!document.fullscreenElement?.contains(node) && node.isConnected
-                )
+                page.locator(stageVideo).evaluate((node: HTMLVideoElement) => node.readyState)
               )
-              .toBe(true);
-            await expect(video).toHaveCount(1);
-            if (mode === 'manual720p30')
-              await expect(
-                page.locator(
-                  '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
-                )
-              ).toBeVisible();
-          } finally {
-            await source.dispose();
+              .toBeGreaterThanOrEqual(2);
           }
-        }
-        const presentationViewport = await page.evaluate(() => {
-          const stage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
-          const canvas = stage?.querySelector<HTMLCanvasElement>(
-            '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
-          );
-          const bounds = stage?.getBoundingClientRect();
-          const output = canvas?.getBoundingClientRect();
-          return {
-            cssViewport: { width: window.innerWidth, height: window.innerHeight },
-            dpr: window.devicePixelRatio,
-            fullscreen: !!document.fullscreenElement,
-            fullscreenOwnsStage: !!stage && !!document.fullscreenElement?.contains(stage),
-            stage: bounds ? { width: bounds.width, height: bounds.height } : null,
-            output: output ? { width: output.width, height: output.height } : null,
-            backing: canvas ? { width: canvas.width, height: canvas.height } : null,
-          };
-        });
-        if (fullscreenMeasurement)
-          await page.screenshot({
-            path: info.outputPath('fullscreen-ready.png'),
-            fullPage: false,
-          });
-        const environment = await captureQuickPreviewPerformanceEnvironment(page);
-        await writeFile(
-          info.outputPath('environment.json'),
-          JSON.stringify(
-            {
-              environment,
-              browserConnection: cdpEndpoint ? 'external-loopback-cdp' : 'playwright-managed',
-              fixture: fixture.manifest,
-              recipe: recipeEvidence,
-              selectedRecipes: selected,
-              mode,
-              sourceProfile,
-              preferences:
-                mode === 'native'
-                  ? { raster: 'current', frameRate: 'current' }
-                  : { raster: '720p', frameRate: 30 },
+          if (mediaDiagnostic) {
+            await mediaDiagnostic.start();
+            try {
+              await selectPreviewMode(page, mode);
+            } finally {
+              const startup = await mediaDiagnostic.end();
+              await writeFile(
+                info.outputPath('camera-startup-diagnostic.json'),
+                JSON.stringify(startup, null, 2)
+              );
+            }
+          } else await selectPreviewMode(page, mode);
+          const video = page.locator(stageVideo);
+          expect(
+            await video.evaluate((node: HTMLVideoElement) => [node.videoWidth, node.videoHeight])
+          ).toEqual([fixture.width, fixture.height]);
+          if (editor === 'native') {
+            const project = await openFullPerformanceEditor(page, host.origin);
+            expect([project.width, project.height]).toEqual([sceneSize.width, sceneSize.height]);
+            if (performanceScenario(recipe).operation === 'drag') {
+              await measurePerformanceDrag(page, info, {
+                editor,
+                recipe,
+                sourceProfile,
+                composition: sceneSize,
+                fixtureManifest: fixture.manifest,
+                purpose: qualification ? 'qualification' : 'measurement',
+                runtimeErrors: () => ({
+                  consoleErrorCount,
+                  pageErrorNames: [...pageErrorNames],
+                  pageErrorOverflow,
+                }),
+                target: performanceScenario(recipe).annotations
+                  ? 'annotation'
+                  : recipe === 'border-drag'
+                    ? 'border'
+                    : 'lens',
+              });
+              return;
+            }
+            await measureFullEditorPlayback(page, info, {
+              recipe,
               repetitions,
               warmupMs,
               sampleMs,
-              detailed,
-              cameraDiagnostic,
-              fullscreenMeasurement,
-              presentationViewport,
-              viewport: { width: 1920, height: 900, dpr: 1 },
-              limitations: [
-                'Native video FPS is not composed-overlay FPS.',
-                'Manual cadence observes canvas DOM publication, not GPU scanout; observer may ' +
-                  'coalesce synchronous swaps.',
-                'Same-file camera is workload evidence, not independent A/V synchronization proof.',
-              ],
-            },
-            null,
-            2
-          )
-        );
-        for (let repeat = 0; repeat < repetitions; repeat++) {
-          await video.evaluate((node: HTMLVideoElement) => {
-            node.pause();
-            node.currentTime = 0;
+              sourceProfile,
+              mode,
+              runtimeErrors: () => ({
+                consoleErrorCount,
+                pageErrorNames: [...pageErrorNames],
+                pageErrorOverflow,
+              }),
+              composition: sceneSize,
+              fixtureManifest: fixture.manifest,
+            });
+            return;
+          }
+          if (performanceScenario(recipe).operation === 'drag') {
+            await measurePerformanceDrag(page, info, {
+              editor,
+              recipe,
+              sourceProfile,
+              composition: sceneSize,
+              fixtureManifest: fixture.manifest,
+              purpose: qualification ? 'qualification' : 'measurement',
+              runtimeErrors: () => ({
+                consoleErrorCount,
+                pageErrorNames: [...pageErrorNames],
+                pageErrorOverflow,
+              }),
+              target: performanceScenario(recipe).annotations
+                ? 'annotation'
+                : recipe === 'border-drag'
+                  ? 'border'
+                  : 'lens',
+            });
+            return;
+          }
+          if (fullscreenMeasurement) {
+            const source = await video.elementHandle();
+            if (!source) throw new Error('Fullscreen source video unavailable');
+            try {
+              await page.locator('[data-ui="gallery.videoReview.fullscreen"]').click();
+              await expect
+                .poll(() =>
+                  source.evaluate(
+                    (node) => !!document.fullscreenElement?.contains(node) && node.isConnected
+                  )
+                )
+                .toBe(true);
+              await expect(video).toHaveCount(1);
+              if (mode !== 'native')
+                await expect(
+                  page.locator(
+                    '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+                  )
+                ).toBeVisible();
+            } finally {
+              await source.dispose();
+            }
+          }
+          const presentationViewport = await page.evaluate(() => {
+            const stage = document.querySelector('[data-ui="gallery.videoReview.stage"]');
+            const canvas = stage?.querySelector<HTMLCanvasElement>(
+              '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+            );
+            const bounds = stage?.getBoundingClientRect();
+            const output = canvas?.getBoundingClientRect();
+            return {
+              cssViewport: { width: window.innerWidth, height: window.innerHeight },
+              dpr: window.devicePixelRatio,
+              fullscreen: !!document.fullscreenElement,
+              fullscreenOwnsStage: !!stage && !!document.fullscreenElement?.contains(stage),
+              stage: bounds ? { width: bounds.width, height: bounds.height } : null,
+              output: output ? { width: output.width, height: output.height } : null,
+              backing: canvas ? { width: canvas.width, height: canvas.height } : null,
+            };
           });
-          await expect
-            .poll(() =>
-              video.evaluate((node: HTMLVideoElement) => !node.seeking && node.currentTime < 0.05)
-            )
-            .toBe(true);
           if (fullscreenMeasurement)
-            await page
-              .locator('[data-ui="gallery.videoReview.fullscreenTransport"]')
-              .getByRole('button', { name: label('gallery.videoReview.play'), exact: true })
-              .click();
-          else await control('gallery.videoReview.play').click();
-          await page.waitForTimeout(warmupMs);
-          const started = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
-          consoleErrorCount = 0;
-          pageErrorNames.length = 0;
-          pageErrorOverflow = false;
-          await mediaDiagnostic?.start();
-          const probe = await startQuickPreviewPerformanceProbe(page, {
-            sampleId: `${mode}-${recipe}-${repeat + 1}`,
-            detailed,
-            labels: {
-              loading: label('gallery.videoReview.previewLoading'),
-              failed: label('gallery.videoReview.previewFailed'),
-              retry: label('gallery.videoReview.retry'),
-            },
-          });
-          await page.waitForTimeout(sampleMs);
-          const metrics = await probe.end();
-          const mediaDiagnosticResult = await mediaDiagnostic?.end();
-          const ended = await video.evaluate((node: HTMLVideoElement) => ({
-            time: node.currentTime,
-            ended: node.ended,
-            paused: node.paused,
-          }));
-          await video.evaluate((node: HTMLVideoElement) => node.pause());
+            await page.screenshot({
+              path: info.outputPath('fullscreen-ready.png'),
+              fullPage: false,
+            });
+          const environment = await captureQuickPreviewPerformanceEnvironment(page);
           await writeFile(
-            info.outputPath(`sample-${repeat + 1}.json`),
+            info.outputPath('environment.json'),
             JSON.stringify(
               {
-                started,
-                ended,
-                metrics,
-                errors: { consoleErrorCount, pageErrorNames, pageErrorOverflow },
-                ...(mediaDiagnosticResult ? { mediaDiagnostic: mediaDiagnosticResult } : {}),
-                nativeCallbackIntervalMs: percentiles(
-                  metrics.frames
-                    .slice(1)
-                    .map((frame, index) => frame.now - metrics.frames[index]!.now)
-                ),
-                rafJankIntervalMs: percentiles(metrics.rafIntervals),
-                composedPublicationIntervalMs: percentiles(
-                  metrics.composedPublication.samples
-                    .slice(1)
-                    .map(
-                      (sample, index) =>
-                        sample.now - metrics.composedPublication.samples[index]!.now
-                    )
-                ),
+                environment,
+                browserConnection: cdpEndpoint ? 'external-loopback-cdp' : 'playwright-managed',
+                fixture: fixture.manifest,
+                recipe: recipeEvidence,
+                selectedRecipes: selected,
+                mode,
+                sourceProfile,
+                preferences:
+                  mode === 'native'
+                    ? { raster: 'current', frameRate: 'current' }
+                    : { raster: mode === 'manual1080p30' ? '1080p' : '720p', frameRate: 30 },
+                repetitions,
+                warmupMs,
+                sampleMs,
+                detailed,
+                cameraDiagnostic,
+                fullscreenMeasurement,
+                presentationViewport,
+                viewport: { ...previewViewport, dpr: 1 },
+                limitations: [
+                  'Native video FPS is not composed-overlay FPS.',
+                  'Manual cadence observes canvas DOM publication, not GPU scanout; observer may ' +
+                    'coalesce synchronous swaps.',
+                  'Same-file camera is workload evidence, not independent A/V synchronization proof.',
+                ],
               },
               null,
               2
             )
           );
-          expect(
-            metrics.measurementIdentity.valid,
-            'Measurement stage/video/publication host identity changed'
-          ).toBe(true);
-          if (mode === 'manual720p30') {
-            expect(metrics.composedPublication.samples.length).toBeGreaterThan(0);
+          for (let repeat = 0; repeat < repetitions; repeat++) {
+            await video.evaluate((node: HTMLVideoElement) => {
+              node.pause();
+              node.currentTime = 0;
+            });
+            await expect
+              .poll(() =>
+                video.evaluate((node: HTMLVideoElement) => !node.seeking && node.currentTime < 0.05)
+              )
+              .toBe(true);
+            if (fullscreenMeasurement)
+              await page
+                .locator('[data-ui="gallery.videoReview.fullscreenTransport"]')
+                .getByRole('button', { name: label('gallery.videoReview.play'), exact: true })
+                .click();
+            else await control('gallery.videoReview.play').click();
+            await page.waitForTimeout(warmupMs);
+            const started = await video.evaluate((node: HTMLVideoElement) => node.currentTime);
+            consoleErrorCount = 0;
+            pageErrorNames.length = 0;
+            pageErrorOverflow = false;
+            await mediaDiagnostic?.start();
+            const probe = await startQuickPreviewPerformanceProbe(page, {
+              sampleId: `${mode}-${recipe}-${repeat + 1}`,
+              detailed,
+              labels: {
+                loading: label('gallery.videoReview.previewLoading'),
+                failed: label('gallery.videoReview.previewFailed'),
+                retry: label('gallery.videoReview.retry'),
+              },
+            });
+            await page.waitForTimeout(sampleMs);
+            const metrics = await probe.end();
+            // Use the measurement boundary: report serialization can outlast the source tail.
+            const ended = { time: metrics.mediaEnd, ended: metrics.ended, paused: metrics.paused };
+            await video.evaluate((node: HTMLVideoElement) => node.pause());
+            const rasterValid =
+              mode === 'native'
+                ? metrics.composedPublication.samples.length === 0
+                : metrics.previewStatus.start.canvasVisible &&
+                  metrics.previewStatus.end.canvasVisible &&
+                  metrics.composedPublication.samples.every(
+                    (sample) =>
+                      sample.width > 0 && sample.height === (mode === 'manual1080p30' ? 1080 : 720)
+                  );
+            await info.attach('preview-performance-sample', {
+              contentType: 'application/json',
+              body: Buffer.from(
+                JSON.stringify({
+                  editor: 'gallery',
+                  recipe,
+                  mode,
+                  repeat: repeat + 1,
+                  sourceProfile,
+                  composition: sceneSize,
+                  protocol: {
+                    repetitions,
+                    warmupMs,
+                    sampleMs,
+                    purpose: qualification ? 'qualification' : 'measurement',
+                  },
+                  environment,
+                  presentationViewport,
+                  ...previewPerformanceSummary(metrics, mode !== 'native'),
+                  valid:
+                    previewPerformanceSummary(metrics, mode !== 'native').valid &&
+                    pageErrorNames.length === 0 &&
+                    !pageErrorOverflow &&
+                    metrics.visibility === 'visible' &&
+                    !metrics.paused &&
+                    !metrics.ended &&
+                    metrics.mediaEnd > started &&
+                    metrics.durationMs >= sampleMs - 50 &&
+                    rasterValid &&
+                    metrics.frames.every(
+                      (frame, index, frames) =>
+                        index === 0 || frame.mediaTime >= frames[index - 1]!.mediaTime
+                    ),
+                  errors: {
+                    consoleErrorCount,
+                    pageErrorNames: [...pageErrorNames],
+                    pageErrorOverflow,
+                  },
+                })
+              ),
+            });
+            const mediaDiagnosticResult = await mediaDiagnostic?.end();
+            await writeFile(
+              info.outputPath(`sample-${repeat + 1}.json`),
+              JSON.stringify(
+                {
+                  started,
+                  ended,
+                  metrics,
+                  errors: { consoleErrorCount, pageErrorNames, pageErrorOverflow },
+                  ...(mediaDiagnosticResult ? { mediaDiagnostic: mediaDiagnosticResult } : {}),
+                  nativeCallbackIntervalMs: percentiles(
+                    metrics.frames
+                      .slice(1)
+                      .map((frame, index) => frame.now - metrics.frames[index]!.now)
+                  ),
+                  rafJankIntervalMs: percentiles(metrics.rafIntervals),
+                  composedPublicationIntervalMs: percentiles(
+                    metrics.composedPublication.samples
+                      .slice(1)
+                      .map(
+                        (sample, index) =>
+                          sample.now - metrics.composedPublication.samples[index]!.now
+                      )
+                  ),
+                },
+                null,
+                2
+              )
+            );
             expect(
-              metrics.composedPublication.samples.every(
-                (sample) =>
-                  sample.width > 0 &&
-                  sample.height > 0 &&
-                  Math.min(sample.width, sample.height) <= 720
+              pageErrorNames,
+              'Uncaught application errors invalidate performance measurements'
+            ).toEqual([]);
+            expect(
+              metrics.measurementIdentity.valid,
+              'Measurement stage/video/publication host identity changed'
+            ).toBe(true);
+            if (mode !== 'native') {
+              expect(
+                metrics.previewStatus.start.phase,
+                'Preview failed before the measurement window'
+              ).not.toBe('failed');
+              expect(
+                metrics.previewStatus.end.phase,
+                'Preview failed during the measurement window'
+              ).not.toBe('failed');
+              expect(metrics.previewStatus.start.canvasVisible).toBe(true);
+              expect(metrics.previewStatus.end.canvasVisible).toBe(true);
+              expect(
+                metrics.composedPublication.samples.every(
+                  (sample) =>
+                    sample.width > 0 &&
+                    sample.height > 0 &&
+                    sample.height === (mode === 'manual1080p30' ? 1080 : 720)
+                )
+              ).toBe(true);
+            } else expect(metrics.composedPublication.samples).toHaveLength(0);
+            expect(metrics.expired).toBe(false);
+            expect(metrics.overflow).toBe(false);
+            expect(metrics.durationMs).toBeGreaterThanOrEqual(sampleMs - 50);
+            expect(
+              metrics.frames.every(
+                (frame, index, frames) =>
+                  index === 0 || frame.mediaTime >= frames[index - 1]!.mediaTime
               )
             ).toBe(true);
-          } else expect(metrics.composedPublication.samples).toHaveLength(0);
-          expect(metrics.expired).toBe(false);
-          expect(metrics.overflow).toBe(false);
-          expect(metrics.durationMs).toBeGreaterThanOrEqual(sampleMs - 50);
-          expect(
-            metrics.frames.every(
-              (frame, index, frames) =>
-                index === 0 || frame.mediaTime >= frames[index - 1]!.mediaTime
-            )
-          ).toBe(true);
-          expect(ended.ended).toBe(false);
-          expect(ended.paused).toBe(false);
-          expect(ended.time).toBeGreaterThan(started);
-          await page.screenshot({
-            path: info.outputPath(`sample-${repeat + 1}.png`),
-            fullPage: false,
-          });
-        }
-      } finally {
-        page.off('console', onConsole);
-        page.off('pageerror', onPageError);
-        try {
-          await mediaDiagnostic?.dispose();
+            expect(ended.ended).toBe(false);
+            expect(ended.paused).toBe(false);
+            expect(ended.time).toBeGreaterThan(started);
+            await page.screenshot({
+              path: info.outputPath(`sample-${repeat + 1}.png`),
+              fullPage: false,
+            });
+          }
+        } catch (error) {
+          await page
+            .screenshot({ path: info.outputPath('scenario-failed.png'), fullPage: false })
+            .catch(() => undefined);
+          await writeFile(
+            info.outputPath('scenario-errors.json'),
+            JSON.stringify({ consoleErrorCount, pageErrorNames, pageErrorOverflow }, null, 2)
+          ).catch(() => undefined);
+          throw error;
         } finally {
-          await page.close();
+          page.off('console', onConsole);
+          page.off('pageerror', onPageError);
+          try {
+            await mediaDiagnostic?.dispose();
+          } finally {
+            await page.close();
+          }
+          await new Promise<void>((resolve) => host.server.close(() => resolve()));
         }
-        await new Promise<void>((resolve) => host.server.close(() => resolve()));
-      }
-    });
+      });
 
 test('publication probe counts completed front changes and excludes unpublished draws', async ({
   page,
