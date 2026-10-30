@@ -9,6 +9,11 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewStageBinding } from './stage-binding';
+import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
+import {
+  DEFAULT_CAMERA_DEPTH,
+  DEFAULT_CAMERA_PERSPECTIVE,
+} from '../../features/video/project/motion/spatial';
 import type { ReviewStage } from './stage';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 
@@ -226,3 +231,92 @@ it('retains applied camera regions while the transport advances without a select
     vi.unstubAllGlobals();
   }
 });
+
+it.each(['plain', 'crop', 'spatial', 'spatial-neighbor'] as const)(
+  'keeps playback topology unchanged while a paused manual camera is positioned (%s)',
+  (variant) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const root = createRoot(document.createElement('div'));
+    const selected = createQuickEditZoomRegion({ id: 'manual', at: 0, duration: 4 });
+    selected.transform = { scale: 2, centerX: 0.5, centerY: 0.5 };
+    const following = createQuickEditZoomRegion({ id: 'following', at: 5, duration: 4 });
+    following.followCursor = true;
+    if (variant === 'spatial') {
+      selected.perspective = { ...DEFAULT_CAMERA_PERSPECTIVE, enabled: true, rotateY: 20 };
+      selected.depthOfField = { ...DEFAULT_CAMERA_DEPTH, enabled: true };
+    }
+    if (variant === 'spatial-neighbor') {
+      following.start = selected.end;
+      following.perspective = { ...DEFAULT_CAMERA_PERSPECTIVE, enabled: true, rotateX: 15 };
+    }
+    const regions = [selected, following];
+    const props: Parameters<typeof ReviewStageBinding>[0] = {
+      url: 'blob:source',
+      source: { duration: 10, width: 640, height: 360, mimeType: 'video/webm', size: 1000 },
+      video: { current: null },
+      drawing: false,
+      region: undefined,
+      zoomRegions: regions,
+      background: { enabled: false },
+      ...(variant === 'crop'
+        ? { canvas: { width: 640, height: 360, crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 } } }
+        : {}),
+      outputTime: 2,
+      time: 2,
+      comments: [],
+      annotations: [],
+      canvasComments: {
+        selectedId: null,
+        onSelect: vi.fn(),
+        onPatch: vi.fn(async () => {}),
+        setGeometry: vi.fn(),
+      },
+      overlaysVisible: true,
+      busy: false,
+      onRegion: vi.fn(),
+      onReady: vi.fn(),
+      onTime: vi.fn(),
+      onPlaying: vi.fn(),
+      onError: vi.fn(),
+    };
+    try {
+      for (const centerX of [0.4, 0.3, 0.2]) {
+        const draft = { ...selected, transform: { ...selected.transform, centerX } };
+        act(() =>
+          root.render(
+            <ReviewStageBinding
+              {...props}
+              zoomOverlay={{
+                region: draft,
+                onPreview: vi.fn(),
+                onChange: vi.fn(),
+                onInteract: vi.fn(),
+              }}
+            />
+          )
+        );
+        const displayed = [
+          {
+            ...draft,
+            enter: { type: 'none' as const, duration: 0 },
+            exit: { type: 'none' as const, duration: 0 },
+          },
+          following,
+        ];
+        expect(scene?.camera).toEqual(
+          evaluateQuickEditCameraAtTime(displayed, 2, {
+            source: props.source,
+            canvas: props.canvas,
+            background: props.background,
+          })
+        );
+        expect(scene?.focus?.regions[0]!.transform).toBe(selected.transform);
+        expect(scene?.focus?.regions[1]).toBe(following);
+        expect(regions[0]!.transform.centerX).toBe(0.5);
+      }
+    } finally {
+      act(() => root.unmount());
+      vi.unstubAllGlobals();
+    }
+  }
+);
