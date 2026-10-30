@@ -283,6 +283,7 @@ function areaRasterKey(
 type ZoomPaintCache = {
   painted: {
     key: string;
+    lens: boolean;
     frame: ZoomCanvasProps['frame'];
     header: ZoomCanvasProps['headerImage'];
   } | null;
@@ -307,7 +308,6 @@ function zoomPaintKey(props: ZoomCanvasProps, canvas: HTMLCanvasElement, retry: 
       canvas,
       retry
     );
-  if (!props.lensFrames?.length) return null;
   return JSON.stringify([
     props.background,
     props.layout,
@@ -335,7 +335,8 @@ function restoreZoomPaint(
   )
     return false;
   if (props.view === 'area') return true;
-  if (!cache.lensBase || !props.lensFrames?.length) return false;
+  if (!props.lensFrames?.length) return !cache.painted.lens;
+  if (!cache.lensBase) return false;
   context.drawImage(cache.lensBase, 0, 0);
   drawSceneSpotlights(context, canvas, null, props.lensFrames);
   return true;
@@ -412,7 +413,12 @@ function useZoomCanvasPaint(
         if (cacheLensBase) captureZoomLensBase(canvas, cache.current);
         if (props.lensFrames?.length) drawSceneSpotlights(context, canvas, null, props.lensFrames);
         if (key !== null)
-          cache.current.painted = { key, frame: props.frame, header: props.headerImage };
+          cache.current.painted = {
+            key,
+            lens: !!props.lensFrames?.length,
+            frame: props.frame,
+            header: props.headerImage,
+          };
       } catch {
         context.clearRect(0, 0, canvas.width, canvas.height);
         setFailure(true);
