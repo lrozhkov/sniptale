@@ -396,9 +396,8 @@ function useZoomCanvasPaint(
         paintZoomPreview(context, {
           spatialRenderer: renderer.current ?? undefined,
           background: props.background,
-          accent:
-            getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() ||
-            '#4f7cff',
+          // Canvas controls are disabled; the DOM overlay owns their themed color.
+          accent: '#4f7cff',
           camera: props.camera,
           cornerRadius: props.cornerRadius,
           previewScale: props.previewScale ?? 1,

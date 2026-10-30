@@ -7,6 +7,7 @@ import { computeQuickEditSceneLayout } from '../../features/video/review/advance
 
 it('retains the Area raster while moving its focus and redraws changed raster inputs', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const computedStyle = vi.spyOn(globalThis, 'getComputedStyle');
   const drawImage = vi.fn();
   const context = {
     drawImage,
@@ -49,6 +50,7 @@ it('retains the Area raster while moving its focus and redraws changed raster in
   try {
     await render();
     expect(drawImage).toHaveBeenCalledOnce();
+    expect(computedStyle).not.toHaveBeenCalled();
     const before = host.querySelector('.review-focus-frame')?.getAttribute('style');
     props = { ...props, camera: { ...props.camera, centerX: 0.7 } };
     await render();
@@ -127,6 +129,7 @@ it('retains the Area raster while moving its focus and redraws changed raster in
   } finally {
     await act(async () => root.unmount());
     getContext.mockRestore();
+    computedStyle.mockRestore();
     vi.unstubAllGlobals();
   }
 });
