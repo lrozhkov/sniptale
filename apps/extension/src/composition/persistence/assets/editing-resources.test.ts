@@ -736,3 +736,59 @@ it.each(['recording', 'owner', 'ref', 'size', 'mimeType', 'identity', 'group'] a
     await expect(f.media(media.id)).resolves.toEqual({ refs: [ref], inlineMediaIds: [] });
   }
 );
+
+it.each(['recording', 'project-asset'] as const)(
+  'admits decoder MIME parameters for %s video metadata without changing the original binding',
+  async (kind) => {
+    const f = fixture();
+    const montage = createVideoProjectEntryWithMediaClip();
+    const asset = montage.project.assets[0]!;
+    const original = 'video/mp4';
+    let expectedRef;
+    if (kind === 'recording') {
+      const recording = { ...betaV1Fixture.records.recordings[0], mimeType: original };
+      const media = { ...betaV1Fixture.records.media_library[0], mimeType: original };
+      expectedRef = { ...betaV1Fixture.records.asset_refs[0], mimeType: original };
+      f.seed('recordings', recording.id, recording);
+      f.seed('media_library', media.id, media);
+      f.seed('asset_refs', expectedRef.assetId, expectedRef);
+      f.owner('recording', recording.id, expectedRef.assetId);
+      asset.source = { kind: 'recording', recordingId: recording.id };
+      asset.metadata.size = recording.size;
+    } else {
+      const entry = f.asset('decoder-video', original);
+      expectedRef = reference(entry.assetId, original, entry.size);
+      asset.source = { kind: 'project-asset', projectAssetId: entry.id };
+      asset.metadata.size = entry.size;
+    }
+    asset.metadata.mimeType = 'video/mp4; codecs="avc1.64002a, mp4a.40.2"';
+    f.seed('video_projects', montage.id, montage);
+    const before = structuredClone(f.rows);
+    for (const purpose of ['editing', 'backup'] as const) {
+      await expect(
+        collectNativeEditingResources(
+          f.tx(),
+          { rootKind: 'video-project', rootId: montage.id },
+          purpose
+        )
+      ).resolves.toEqual({ refs: [expectedRef], inlineMediaIds: [] });
+    }
+    expect(f.rows).toEqual(before);
+
+    for (const mismatch of ['container', 'size'] as const) {
+      const incompatible = structuredClone(montage);
+      if (mismatch === 'container')
+        incompatible.project.assets[0]!.metadata.mimeType = 'video/webm';
+      else incompatible.project.assets[0]!.metadata.size += 1;
+      f.seed('video_projects', montage.id, incompatible);
+      const refused = structuredClone(f.rows);
+      await expect(f.project(montage.id)).rejects.toThrow('unavailable');
+      expect(f.rows).toEqual(refused);
+      f.seed('video_projects', montage.id, montage);
+      await expect(f.project(montage.id)).resolves.toEqual({
+        refs: [expectedRef],
+        inlineMediaIds: [],
+      });
+    }
+  }
+);
