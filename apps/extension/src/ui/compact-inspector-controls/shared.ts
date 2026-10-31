@@ -5,7 +5,17 @@ export function cx(...values: Array<string | false | null | undefined>): string 
   return values.filter(Boolean).join(' ');
 }
 
-export type CompactInspectorUnit = 'px' | '%' | 'deg' | 's' | 'ms' | 'ratio' | 'count' | 'x' | '';
+export type CompactInspectorUnit =
+  | 'px'
+  | '%'
+  | 'deg'
+  | 's'
+  | 'ms'
+  | 'hz'
+  | 'ratio'
+  | 'count'
+  | 'x'
+  | '';
 
 export type CompactInspectorNumericScrub = {
   min: number;
@@ -29,6 +39,7 @@ export function clampNumber(value: number, min?: number, max?: number): number {
 }
 
 export function resolveCompactUnitLabel(unit: CompactInspectorUnit = ''): string {
+  if (unit === 'hz') return translate('common.units.hz');
   if (unit === 'count') return translate('common.units.count');
   if (unit === 'ratio') return '×';
   return unit === 'deg' ? '°' : unit;

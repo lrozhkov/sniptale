@@ -14,6 +14,7 @@ vi.mock('./integrity', async (importOriginal) => ({
 
 import { prepareEffectBundleBackupRestore } from './backup-restore';
 import { parseEffectBundleCatalogEntry } from './entry';
+import { readRetainedTitleCatalogEntry } from './fixture.test-support';
 
 const metadata = {
   createdAt: 1,
@@ -200,3 +201,23 @@ it.each(['valid', 'resource', 'source', 'closure'] as const)(
     }
   }
 );
+
+it('restores a retained title through actual integrity checks without changing source bytes', async () => {
+  const catalog = await readRetainedTitleCatalogEntry();
+  const original = structuredClone(catalog);
+  const { assertEffectBundleCatalogIntegrity } =
+    await vi.importActual<typeof import('./integrity')>('./integrity');
+  mocks.integrity.mockImplementation(assertEffectBundleCatalogIntegrity);
+  const { assets: resources, ...entry } = catalog;
+  const target = store();
+
+  const publish = await prepareEffectBundleBackupRestore({ assets: resources, entry });
+  expect(target.put).not.toHaveBeenCalled();
+  await publish({ store: target, strategy: 'replace' });
+  expect(target.put).toHaveBeenCalledWith(original);
+  const restored = parseEffectBundleCatalogEntry(target.put.mock.calls[0]?.[0]);
+  if (!restored) throw new Error('Missing retained catalog');
+  await expect(assertEffectBundleCatalogIntegrity(restored)).resolves.toBeUndefined();
+  expect(restored.documents[0]!.source).toBe(original.documents[0]!.source);
+  expect(catalog).toEqual(original);
+});

@@ -23,8 +23,8 @@
       "id": "sniptale-title",
       "path": "effects/annotations/sniptale-title/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "aa80499e9083d34bb9ea6f5d5ff047798ea76cd53c2584e8a9d5a93b8810c05e",
-      "byteLength": 19187
+      "sha256": "aa4af94791fc8f548f16ba6b3635d3aff4fb0dda4149f89dd94fe095f5201343",
+      "byteLength": 19165
     },
     {
       "id": "sniptale-chapters",
@@ -37,8 +37,8 @@
       "id": "sniptale-callout",
       "path": "effects/annotations/sniptale-callout/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "e32d48bda404acfb58756595529a74b4c4481d208067139ee1c7e7cddf421e3f",
-      "byteLength": 42962
+      "sha256": "3eb73320f21ef7c685f51d9880c3036e585512db429364d7eecf111559d1d8a0",
+      "byteLength": 42937
     },
     {
       "id": "sniptale-frame",
@@ -58,106 +58,106 @@
       "id": "sniptale-spotlight",
       "path": "effects/effects/sniptale-spotlight/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "2af353fa1f2a3addf4b54edd0c93d0a623434deed66425804d08da37233d5024",
-      "byteLength": 18825
+      "sha256": "6fcaa2b33681205db228b373773d1ad91efbcf1b3ade1cb0f7e049b46c68b689",
+      "byteLength": 18949
     },
     {
       "id": "sniptale-frosted",
       "path": "effects/effects/sniptale-frosted/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "b5b47a1012d19796f2ac784e078f915dcdb5a39128c2924a0ef52ab193aedcef",
-      "byteLength": 53220
+      "sha256": "af5f12890e0b41958db9732b2a826dffba706bbf5b28c69087fe85a54f88468a",
+      "byteLength": 53347
     },
     {
       "id": "sniptale-transition-dissolve",
       "path": "effects/transitions/sniptale-transition-dissolve/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "e9058ef9ead7b62c15976fe343d69ee20ffb90887b0cb078a33cbd4cb9310d98",
-      "byteLength": 2439
+      "sha256": "1aa800266b76ce5303e51c9121610e80d7e589b51b57b52d2ab6d5d97854af5a",
+      "byteLength": 2456
     },
     {
       "id": "sniptale-transition-blur",
       "path": "effects/transitions/sniptale-transition-blur/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "900c0ef6b71d5ad3e00e28364112e5a0eb1b0520dc4ce8dcd3a095b0939492bc",
-      "byteLength": 89050
+      "sha256": "0219f91466992b82f879612cfa77e74467545e9af050f7ae654b3b04024c5c49",
+      "byteLength": 89087
     },
     {
       "id": "sniptale-transition-zoom",
       "path": "effects/transitions/sniptale-transition-zoom/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "b30f13c6b083ae76c8c5906e398a6cb70e00d7d5c91e17f0b6c3ad297384cfa1",
-      "byteLength": 5763
+      "sha256": "cddd0c8c6e4bfca0179cffa19b0be47db1cb483c92b9073d7a3ab74b5dc44565",
+      "byteLength": 5831
     },
     {
       "id": "sniptale-transition-push",
       "path": "effects/transitions/sniptale-transition-push/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "66f08a8ba2e4182057cb0536c9b739255860aa8ed962168cd13ff709402455e4",
-      "byteLength": 7066
+      "sha256": "f978a844f34a6b4b011e25df958cc4e0aaf26c1def0c35b9ead0a08a7f18017d",
+      "byteLength": 7083
     },
     {
       "id": "sniptale-transition-split",
       "path": "effects/transitions/sniptale-transition-split/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "b0ae054aa5b147b88800de4f1a5252ca291176e89fa85dfa1712b9737f8d6460",
-      "byteLength": 7440
+      "sha256": "7359363de3685cfe9c89982a5cdbdeceb8a6165710f4f33cc888baaf64bf6b92",
+      "byteLength": 7474
     },
     {
       "id": "sniptale-transition-light-leak",
       "path": "effects/transitions/sniptale-transition-light-leak/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "7b3f11a1d6da1244f70baf782a472c1bed9a87e1cd9e5f31d52a6ec0a4748a52",
-      "byteLength": 6131
+      "sha256": "82d2948fb5e21e1487a02dbd9b9f56034533c567fcbe8f9fe364ae00b5e2a92e",
+      "byteLength": 6165
     },
     {
       "id": "sniptale-video-push-in",
       "path": "effects/effects/sniptale-video-push-in/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "8d013ececd42a3c5dc23801be75760043054257a8484b203c5b708af0ca292de",
-      "byteLength": 4816
+      "sha256": "9540a6ad0e8bd1b329509dcf857431cc0caeb69a0df9d0d61ee3b37026852107",
+      "byteLength": 4884
     },
     {
       "id": "sniptale-video-bloom",
       "path": "effects/effects/sniptale-video-bloom/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "af9cd20d2fd5291ecd85a0420643ec487f6d3bdc2b24703246293a922473dbe1",
-      "byteLength": 7221
+      "sha256": "ac8d8cfe0e8c2fd4c12773ef4f81316ade28163ea9c0e836ea411502827b4054",
+      "byteLength": 7306
     },
     {
       "id": "sniptale-video-warm",
       "path": "effects/effects/sniptale-video-warm/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "d493e4852207785a0b15ec1c0888560b9d6e99cecd8dabfcc38014bbd793b3b1",
-      "byteLength": 5917
+      "sha256": "8fba04549bd1e7a8e2d66e5f0487b62b4cef0f8493670fe0ac270deb0632c1e3",
+      "byteLength": 5999
     },
     {
       "id": "sniptale-video-grain",
       "path": "effects/effects/sniptale-video-grain/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "0aab09afdb38f874ee71eb7cbf02efae7a99540d5613c5f2795f6dccf9adbae9",
-      "byteLength": 71815
+      "sha256": "6914e1b76856ad5baf878cffd5d2da1630ac342905e91d5818010a6eb044e565",
+      "byteLength": 71908
     },
     {
       "id": "sniptale-video-vignette",
       "path": "effects/effects/sniptale-video-vignette/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "a9c91fc3606f9a5781752c508ce347ee26d52d7bb9e8368a91ff019ae4bba6d9",
-      "byteLength": 7618
+      "sha256": "eb6ef7840262793d30914070fe29c575ad954ae9eaf8bbca39cfa185a7eb30fa",
+      "byteLength": 7734
     },
     {
       "id": "sniptale-video-light-drift",
       "path": "effects/effects/sniptale-video-light-drift/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "b3a14aa8d3229313c8f41b18fbdc3cb1191b3ecfd3a803a6cee22ba34ee1d165",
-      "byteLength": 9138
+      "sha256": "ef49ee261ff4c81e9e386d73337d45ab91d7d62b3b3968be8f929e3ed006237d",
+      "byteLength": 9237
     },
     {
       "id": "sniptale-video-blur",
       "path": "effects/effects/sniptale-video-blur/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "5b65041f4151c1c45e09863c264dcb3d63c466e8d8919f3b18b93948d3730ef2",
-      "byteLength": 37170
+      "sha256": "a922bdbd28d79c037def25d866cf07ed6ead116e813151f7fe99754f4c2192c0",
+      "byteLength": 37255
     }
   ],
   "assets": []

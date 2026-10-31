@@ -6,7 +6,7 @@ vi.mock('./preferences', async (original) => ({
 import { runWithExclusivePersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { expect, it, vi } from 'vitest';
 import { createEffectCatalogEntry } from './catalog-builder';
-import { readValidBundleArtifact } from './fixture.test-support';
+import { readRetainedTitleCatalogEntry, readValidBundleArtifact } from './fixture.test-support';
 import { assertEffectBundleCatalogIntegrity } from './integrity';
 import {
   encodeEffectSettingsEntry,
@@ -182,4 +182,21 @@ it('merges preference inventories by source identity with one explicit conflict 
         decision === 'keep-local' ? [a, b, same] : [row(a.packId, true), row(b.packId, true), same],
     });
   }
+});
+
+it('roundtrips retained title source through settings JSON and actual restore integrity', async () => {
+  const entry = await readRetainedTitleCatalogEntry();
+  const original = structuredClone(entry);
+  const portable = await encodeEffectSettingsEntry(entry);
+  const restored = decodeEffectSettingsEntry(JSON.parse(JSON.stringify(portable)));
+  expect(restored.documents).toEqual(original.documents);
+  expect(restored.sourceSha256).toBe(original.sourceSha256);
+  expect(restored.retainedByteLength).toBe(original.retainedByteLength);
+  await expect(assertEffectBundleCatalogIntegrity(restored)).resolves.toBeUndefined();
+  await runWithExclusivePersistenceMutationPermit(async (permit) => {
+    const plan = await prepareEffectSettingsMutation({ items: [portable] }, permit);
+    await plan.commit();
+    expect(storeMocks.put).toHaveBeenCalledWith(restored);
+  });
+  expect(entry).toEqual(original);
 });

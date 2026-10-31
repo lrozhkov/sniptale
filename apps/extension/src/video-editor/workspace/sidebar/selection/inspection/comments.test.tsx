@@ -265,3 +265,12 @@ it('adds source notes in source time after rate and placement changes, including
   click('videoEditor.sidebar.commentAddNote');
   expect(entry().annotations[2]!.anchor).toEqual({ kind: 'point', time: 0 });
 });
+
+it('presents comment deletion in the established actions category', () => {
+  mount();
+  click('videoEditor.sidebar.commentAddNote');
+  const actions = host.querySelector('nav button[aria-label="videoEditor.sidebar.actionsTitle"]')!;
+  expect(actions.querySelector('.lucide-ellipsis')).not.toBeNull();
+  click('videoEditor.sidebar.actionsTitle');
+  expect(host.textContent).toContain('gallery.videoReview.deleteComment');
+});

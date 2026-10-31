@@ -1360,7 +1360,7 @@
           "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
         },
         "unit": {
-          "enum": ["px", "percent", "s", "ms", "deg", "ratio", "count"]
+          "enum": ["px", "percent", "s", "ms", "deg", "ratio", "count", "hz"]
         },
         "presentation": {
           "enum": [
@@ -1420,7 +1420,20 @@
             "settings",
             "sliders",
             "check",
-            "x"
+            "x",
+            "drawing",
+            "tracing",
+            "path",
+            "easing",
+            "motion",
+            "mask",
+            "focus",
+            "lens",
+            "crop",
+            "composition",
+            "baseline",
+            "decoration",
+            "texture"
           ]
         },
         "order": {
@@ -1483,7 +1496,20 @@
                   "settings",
                   "sliders",
                   "check",
-                  "x"
+                  "x",
+                  "drawing",
+                  "tracing",
+                  "path",
+                  "easing",
+                  "motion",
+                  "mask",
+                  "focus",
+                  "lens",
+                  "crop",
+                  "composition",
+                  "baseline",
+                  "decoration",
+                  "texture"
                 ]
               },
               "label": { "$ref": "#/$defs/localeText" }
@@ -3392,7 +3418,20 @@
               "settings",
               "sliders",
               "check",
-              "x"
+              "x",
+              "drawing",
+              "tracing",
+              "path",
+              "easing",
+              "motion",
+              "mask",
+              "focus",
+              "lens",
+              "crop",
+              "composition",
+              "baseline",
+              "decoration",
+              "texture"
             ]
           },
           "collapsed": { "type": "boolean" }

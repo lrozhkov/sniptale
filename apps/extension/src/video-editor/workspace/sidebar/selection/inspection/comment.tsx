@@ -82,7 +82,7 @@ export function InspectCommentPanel({
           },
           {
             id: 'actions',
-            semantic: 'advanced',
+            semantic: 'actions',
             label: translate('videoEditor.sidebar.actionsTitle'),
             content: (
               <InspectorActionButton

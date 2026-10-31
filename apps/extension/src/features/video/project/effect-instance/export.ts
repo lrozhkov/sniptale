@@ -29,7 +29,9 @@ function materializeInstanceDocument(
   instance: VideoProjectEffectInstance,
   snapshot: VideoProjectEffectSnapshot
 ): EffectV1Document {
-  const document = parseEffectV1Source(snapshot.source).document;
+  const document = parseEffectV1Source(snapshot.source, {
+    presentationPolicy: 'retained',
+  }).document;
   if (!document) throw new Error('Invalid effect snapshot');
   const host = project.clips.find(
     (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
@@ -66,7 +68,8 @@ async function packageEffectDocument(
     delete declaration.svgText;
     declaration.path = file.path;
   }
-  if (!validateEffectV1Document(document).ok) throw new Error('Invalid exported effect');
+  if (!validateEffectV1Document(document, { presentationPolicy: 'retained' }).ok)
+    throw new Error('Invalid exported effect');
   const source = JSON.stringify(document, null, 2);
   const basename = `effect-${document.id.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 100)}`;
   if (!files.length)

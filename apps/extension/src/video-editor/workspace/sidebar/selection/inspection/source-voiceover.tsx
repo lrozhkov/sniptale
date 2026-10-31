@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Copy, Trash2, AudioLines, LocateFixed } from 'lucide-react';
+import { Copy, Trash2, FileAudio, LocateFixed } from 'lucide-react';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import { isProjectSourceVoiceoverEditable } from '../../../../../features/video/project/source-voiceover';
 import {
@@ -211,7 +211,7 @@ export function SourceVoiceoverTimingFields(props: {
       <InspectorDetails
         label={translate('videoEditor.sidebar.sourceVoiceoverFile')}
         preferenceId="source-voiceover.audio-file"
-        icon={AudioLines}
+        icon={FileAudio}
         initiallyOpen
       >
         {row(

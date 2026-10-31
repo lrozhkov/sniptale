@@ -1,3 +1,4 @@
+import { validateEffectV1ControlGroupIcons } from './control-group-icons.js';
 import { validateEffectV1ControlGroups } from './control-groups.js';
 import { validateEffectV1EditorRegion } from '../editor-region/validation.js';
 import { validateEffectV1ControlPresets } from './control-presets';
@@ -33,7 +34,15 @@ import {
 } from './shared.js';
 import { EFFECT_V1_ROOT_KEYS } from './root-keys.js';
 
-export function parseEffectV1Source(source: string): EffectV1ValidationResult {
+export type EffectV1ValidationOptions = {
+  /** Retained replay preserves legacy presentation metadata; structural/security errors remain errors. */
+  presentationPolicy?: 'authoring' | 'retained';
+};
+
+export function parseEffectV1Source(
+  source: string,
+  options: EffectV1ValidationOptions = {}
+): EffectV1ValidationResult {
   if (typeof source !== 'string' || source.trim() === '') {
     return finishEffectV1Validation([
       {
@@ -46,7 +55,7 @@ export function parseEffectV1Source(source: string): EffectV1ValidationResult {
     ]);
   }
   try {
-    return validateEffectV1Document(JSON.parse(source));
+    return validateEffectV1Document(JSON.parse(source), options);
   } catch (error) {
     return finishEffectV1Validation([
       {
@@ -61,11 +70,17 @@ export function parseEffectV1Source(source: string): EffectV1ValidationResult {
   }
 }
 
-export function validateEffectV1Document(input: unknown): EffectV1ValidationResult {
-  return validateEffectV1DocumentInternal(input);
+export function validateEffectV1Document(
+  input: unknown,
+  options: EffectV1ValidationOptions = {}
+): EffectV1ValidationResult {
+  return validateEffectV1DocumentInternal(input, options);
 }
 
-function validateEffectV1DocumentInternal(input: unknown): EffectV1ValidationResult {
+function validateEffectV1DocumentInternal(
+  input: unknown,
+  options: EffectV1ValidationOptions
+): EffectV1ValidationResult {
   const report = createEffectV1Diagnostics();
   if (!isRecord(input)) {
     report.error('ROOT_TYPE', '$', 'Expected one JSON object.');
@@ -81,6 +96,14 @@ function validateEffectV1DocumentInternal(input: unknown): EffectV1ValidationRes
   validateEffectV1Clips(input['clips'], layers, scenes, Number(input['duration']), report);
   validateEffectV1ControlGroups(input['controlGroups'], report);
   const controlIds = validateEffectV1Controls(input['controls'], report, input['controlGroups']);
+  const iconReport: Pick<EffectV1DiagnosticReporter, 'error'> =
+    options.presentationPolicy === 'retained'
+      ? {
+          error: (code, path, message, suggestion) =>
+            report.warning(code, path, message, suggestion),
+        }
+      : report;
+  validateEffectV1ControlGroupIcons(input['controlGroups'], input['controls'], iconReport);
   validateEffectV1ControlPresets(input, report);
   validateEffectV1EditorRegion(input, report);
   validateEffectV1ObjectLayout(input['objectLayout'], input['kind'], input['controls'], report);

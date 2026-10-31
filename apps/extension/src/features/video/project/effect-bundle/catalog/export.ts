@@ -15,7 +15,9 @@ export async function exportEffectCatalog(
   const documents = await Promise.all(
     catalog.documents.map(async (entry, index) => {
       if (!entry.source) throw new Error('Catalog document is not loaded');
-      const document = parseEffectV1Source(entry.source).document;
+      const document = parseEffectV1Source(entry.source, {
+        presentationPolicy: 'retained',
+      }).document;
       if (!document) throw new Error('Invalid catalog document');
       for (const declaration of document.assets) {
         const reference = entry.assets.find((asset) => asset.id === declaration.id);
@@ -25,7 +27,8 @@ export async function exportEffectCatalog(
         delete declaration.svgText;
         declaration.path = file.path;
       }
-      if (!validateEffectV1Document(document).ok) throw new Error('Invalid exported document');
+      if (!validateEffectV1Document(document, { presentationPolicy: 'retained' }).ok)
+        throw new Error('Invalid exported document');
       const source = JSON.stringify(document);
       const bytes = new TextEncoder().encode(source);
       return {

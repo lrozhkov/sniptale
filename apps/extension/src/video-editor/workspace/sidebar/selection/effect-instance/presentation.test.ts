@@ -46,3 +46,10 @@ it('uses authored enum labels and never guesses options from numeric ranges', ()
     { value: '1', label: 'Two' },
   ]);
 });
+it('preserves animation group identities for existing inspector preferences', () => {
+  const doc = document();
+  doc.controls = [{ id: 'entry', kind: 'number', defaultValue: 20, group: 'animation' }];
+  const [section] = getEffectControlSections(doc);
+  expect(section?.id).toBe('animation');
+  expect(section?.semantic).toBe('animation');
+});

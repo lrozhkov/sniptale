@@ -1,3 +1,4 @@
+import { CircleDot, Waypoints } from 'lucide-react';
 import { listProjectOriginalAudioTargets } from '../../../../../features/video/project/timeline/original-audio';
 import { ProjectSourceAudioEditor } from '../inputs/source-audio';
 import { SceneEdgesFields } from './scene-edges';
@@ -143,6 +144,7 @@ function createSceneGroups(
     createSceneObjectTracksGroup(props, objectTracks),
     {
       id: 'cursor-path',
+      icon: Waypoints,
       semantic: 'tracking' as const,
       label: translate('videoEditor.sidebar.cursorFocusPathTitle'),
       content: <InspectCursorPathSettings project={props.project} />,
@@ -156,6 +158,7 @@ function createSceneObjectTracksGroup(
 ) {
   return {
     id: 'object-tracks',
+    icon: CircleDot,
     semantic: 'tracking' as const,
     label: translate('videoEditor.sidebar.inspectorGroupObjectTracks'),
     visible: objectTracks.length > 0,

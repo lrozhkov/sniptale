@@ -51,6 +51,8 @@ export type ReviewInspectorSection = {
   id: string;
   label: string;
   icon: LucideIcon;
+  /** Null omits a secondary disclosure icon; category navigation retains its meaningful icon. */
+  disclosureIcon?: LucideIcon | null;
   content: ReactNode;
 };
 
@@ -109,12 +111,12 @@ export function ReviewInspectorSections({
           .filter((column) => column.length > 0)
           .map((column, index) => (
             <div className="review-inspector-section-column" key={index}>
-              {column.map(({ id, label, icon, content }) => (
+              {column.map(({ id, label, icon, disclosureIcon, content }) => (
                 <section key={id} data-section={id} className="review-inspector-section">
                   <ReviewDetails
                     preferenceId={`section:${id}`}
                     label={label}
-                    icon={icon}
+                    {...(disclosureIcon === null ? {} : { icon: disclosureIcon ?? icon })}
                     level="section"
                     initiallyOpen
                   >

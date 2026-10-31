@@ -20,7 +20,9 @@ export function getEffectInstanceLabel(project: VideoProject, instanceId: string
   if (!snapshot) return translate('videoEditor.effectsLibrary.unavailableEffect');
   let label = labels.get(snapshot);
   if (!label) {
-    label = parseEffectV1Source(snapshot.source).document?.label ?? {};
+    label =
+      parseEffectV1Source(snapshot.source, { presentationPolicy: 'retained' }).document?.label ??
+      {};
     labels.set(snapshot, label);
   }
   return (

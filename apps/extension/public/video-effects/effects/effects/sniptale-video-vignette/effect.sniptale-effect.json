@@ -17,71 +17,76 @@
       "id": "strength",
       "kind": "number",
       "label": {
-        "ru": "Интенсивность (%)",
-        "en": "Intensity (%)"
+        "ru": "Интенсивность",
+        "en": "Intensity"
       },
       "defaultValue": 30,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "processing",
-      "order": 0
+      "order": 0,
+      "unit": "percent"
     },
     {
       "id": "edge",
       "kind": "number",
       "label": {
-        "ru": "Плавный вход/выход (%)",
-        "en": "Soft edges (% duration)"
+        "ru": "Длительность появления и исчезновения",
+        "en": "Fade duration"
       },
       "defaultValue": 8,
       "min": 0,
       "max": 40,
       "step": 1,
       "group": "animation",
-      "order": 1
+      "order": 1,
+      "unit": "percent"
     },
     {
       "id": "spread",
       "kind": "number",
       "label": {
-        "ru": "Светлая область (%)",
-        "en": "Clear center (%)"
+        "ru": "Светлая область",
+        "en": "Clear center"
       },
       "defaultValue": 45,
       "min": 15,
       "max": 80,
       "step": 1,
       "group": "processing",
-      "order": 2
+      "order": 2,
+      "unit": "percent"
     },
     {
       "id": "focusX",
       "kind": "number",
       "label": {
-        "ru": "Центр X (%)",
-        "en": "Center X (%)"
+        "ru": "Центр X",
+        "en": "Center X"
       },
       "defaultValue": 50,
       "min": 20,
       "max": 80,
       "step": 1,
       "group": "geometry",
-      "order": 3
+      "order": 3,
+      "unit": "percent"
     },
     {
       "id": "focusY",
       "kind": "number",
       "label": {
-        "ru": "Центр Y (%)",
-        "en": "Center Y (%)"
+        "ru": "Центр Y",
+        "en": "Center Y"
       },
       "defaultValue": 50,
       "min": 20,
       "max": 80,
       "step": 1,
       "group": "geometry",
-      "order": 4
+      "order": 4,
+      "unit": "percent"
     }
   ],
   "layers": [],

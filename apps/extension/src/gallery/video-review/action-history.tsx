@@ -337,6 +337,13 @@ function HistoryAnimationFields(props: {
         ]
       : []),
   ];
+  const disclosureIcons = new Set<(typeof sections)[number]['icon']>();
+  const displayedSections = sections.map((section) => {
+    if (!mixed) return section;
+    if (disclosureIcons.has(section.icon)) return { ...section, disclosureIcon: null };
+    disclosureIcons.add(section.icon);
+    return section;
+  });
   return (
     <div
       className="min-w-0"
@@ -350,8 +357,8 @@ function HistoryAnimationFields(props: {
     >
       <ReviewInspectorSections
         sections={[
-          ...sections.filter((section) => !section.id.endsWith(':actions')),
-          ...sections.filter((section) => section.id.endsWith(':actions')),
+          ...displayedSections.filter((section) => !section.id.endsWith(':actions')),
+          ...displayedSections.filter((section) => section.id.endsWith(':actions')),
         ]}
       />
     </div>

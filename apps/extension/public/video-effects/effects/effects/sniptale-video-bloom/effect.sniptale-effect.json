@@ -17,29 +17,31 @@
       "id": "strength",
       "kind": "number",
       "label": {
-        "ru": "Интенсивность (%)",
-        "en": "Intensity (%)"
+        "ru": "Интенсивность",
+        "en": "Intensity"
       },
       "defaultValue": 30,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "processing",
-      "order": 0
+      "order": 0,
+      "unit": "percent"
     },
     {
       "id": "edge",
       "kind": "number",
       "label": {
-        "ru": "Плавный вход/выход (%)",
-        "en": "Soft edges (% duration)"
+        "ru": "Длительность появления и исчезновения",
+        "en": "Fade duration"
       },
       "defaultValue": 8,
       "min": 0,
       "max": 40,
       "step": 1,
       "group": "animation",
-      "order": 1
+      "order": 1,
+      "unit": "percent"
     },
     {
       "id": "radius",
@@ -53,7 +55,8 @@
       "max": 20,
       "step": 1,
       "group": "processing",
-      "order": 2
+      "order": 2,
+      "unit": "px"
     }
   ],
   "layers": [],

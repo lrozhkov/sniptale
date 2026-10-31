@@ -1,19 +1,34 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useMemo, type ReactNode } from 'react';
 import {
   resolveEffectV1ControlGroup,
+  resolveEffectV1ControlGroupIcons,
+  type EffectV1ControlIcon,
   type ControlDefinition,
   type EffectV1Document,
   type EffectV1ControlGroup,
 } from '@sniptale/runtime-contracts/effect-v1';
 
 /** Render admitted metadata; editor adapters own disclosure preferences and all mutations. */
-export function EffectControlTree(props: {
+type TreeProps = {
   document: EffectV1Document;
   parentId: string;
   controls: readonly ControlDefinition[];
   renderControl(control: ControlDefinition): ReactNode;
   renderGroup(group: EffectV1ControlGroup, children: ReactNode): ReactNode;
-}) {
+};
+
+/** Resolve retained display icons without changing the saved document. */
+export function EffectControlTree(props: TreeProps) {
+  const icons = useMemo(
+    () => resolveEffectV1ControlGroupIcons(props.document.controlGroups, props.document.controls),
+    [props.document]
+  );
+  return <EffectControlBranch {...props} icons={icons} />;
+}
+
+function EffectControlBranch(
+  props: TreeProps & { icons: ReadonlyMap<number, EffectV1ControlIcon> }
+) {
   const groups = props.document.controlGroups ?? [];
   const parents = new Map(groups.map((group) => [group.id, group.parentId]));
   const parent = (control: ControlDefinition) =>
@@ -42,8 +57,16 @@ export function EffectControlTree(props: {
       .map((group) => ({
         key: `group:${group.id}`,
         order: group.order ?? 0,
-        content: () =>
-          props.renderGroup(group, <EffectControlTree {...props} parentId={group.id} />),
+        content: () => {
+          const presented = { ...group };
+          delete presented.icon;
+          const icon = props.icons.get(groups.indexOf(group));
+          if (icon) presented.icon = icon;
+          return props.renderGroup(
+            presented,
+            <EffectControlBranch {...props} parentId={group.id} />
+          );
+        },
       })),
   ].sort((left, right) => left.order - right.order);
   return (

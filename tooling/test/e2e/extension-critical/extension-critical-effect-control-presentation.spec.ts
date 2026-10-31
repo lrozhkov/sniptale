@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -107,6 +109,11 @@ async function checkNativeParameters(
   await page.locator(`[data-project-timeline-clip="${clip.id}"]`).click();
   if (!(await page.getByRole('textbox', { name: entryLabel, exact: true }).isVisible()))
     await page.getByRole('button', { name: animation, exact: true }).click();
+  const categoryIcons = await page
+    .locator('[data-ui="video-editor.inspector.categories"] nav button svg')
+    .evaluateAll((icons) => icons.map((icon) => icon.getAttribute('class')));
+  expect(categoryIcons.length).toBeGreaterThan(1);
+  expect(new Set(categoryIcons).size).toBe(categoryIcons.length);
   const nativeEntry = page.getByRole('textbox', { name: entryLabel, exact: true });
   await expect(nativeEntry).toHaveValue('30');
   await nativeEntry.fill('35');
@@ -138,6 +145,112 @@ async function checkNativeParameters(
     await page.getByRole('button', { name: animation, exact: true }).click();
   await expect(page.getByRole('textbox', { name: entryLabel, exact: true })).toHaveValue('35');
   expect((await readNativeVideoProject(page))?.effectSnapshots?.[0]?.source).toBe(snapshot?.source);
+}
+
+async function checkRetainedTitle(page: Page, origin: string, locale: 'ru' | 'en', info: TestInfo) {
+  const project = await readNativeVideoProject(page);
+  const clip = project?.clips.find((item) => item.type === 'EFFECT');
+  if (!project || !clip) throw new Error('Missing persisted project');
+  const source = readFileSync(
+    'apps/extension/src/features/video/project/effect-bundle/fixtures/retained/title.sniptale-effect.json',
+    'utf8'
+  );
+  const sha256 = createHash('sha256').update(source).digest('hex');
+  // Stop the editor writer before seeding historical data. The transaction orders prior writes.
+  await page.goto(`${origin}/manifest.json`);
+  await page.evaluate(
+    async ({ id, source, sha256 }) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('sniptale-db');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const transaction = db.transaction('video_projects', 'readwrite');
+          transaction.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          transaction.onerror = () => {
+            db.close();
+            reject(transaction.error);
+          };
+          transaction.onabort = () => {
+            db.close();
+            reject(transaction.error);
+          };
+          const store = transaction.objectStore('video_projects');
+          const read = store.getAll();
+          read.onsuccess = () => {
+            const row = read.result.find((row) => row.project?.id === id);
+            const instance = row?.project.effectInstances?.[0];
+            const snapshot = row?.project.effectSnapshots?.[0];
+            if (!row || !instance || !snapshot) {
+              transaction.abort();
+              return;
+            }
+            row.project.effectSnapshots = [
+              {
+                ...snapshot,
+                id: `effect:${sha256}`,
+                documentId: 'sniptale-title',
+                source,
+                sha256,
+                retainedByteLength: new TextEncoder().encode(source).byteLength,
+                assets: [],
+              },
+            ];
+            instance.snapshotId = `effect:${sha256}`;
+            instance.controls = {};
+            delete instance.sceneAnchors;
+            store.put(row);
+          };
+        };
+      }),
+    { id: project.id, source, sha256 }
+  );
+  await page.goto(
+    `${origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${encodeURIComponent(project.id)}`
+  );
+  await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+  await page.locator(`[data-project-timeline-clip="${clip.id}"]`).click();
+  await page
+    .getByRole('button', {
+      name: translate('videoEditor.effectsLibrary.objectText', locale),
+      exact: true,
+    })
+    .click();
+  const heading = page.locator('[data-effect-control-group="heading"]');
+  await expect(heading).toBeVisible();
+  await expect(
+    heading.locator('xpath=ancestor::details[1]').locator('summary svg.lucide-type')
+  ).toHaveCount(0);
+  const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+  await playhead.press('Home');
+  for (let frame = 0; frame < 60; frame++) await playhead.press('ArrowRight');
+  expect((await readNativeVideoProject(page))?.effectSnapshots?.[0]?.source).toBe(source);
+  await expect
+    .poll(
+      () =>
+        page.locator('[data-preview-stage-canvas]').evaluate((canvas: HTMLCanvasElement) => {
+          const context = canvas.getContext('2d');
+          if (!context || !canvas.width || !canvas.height) return false;
+          let colored = 0;
+          for (let row = 1; row < 5; row++)
+            for (let column = 1; column < 7; column++) {
+              const pixel = context.getImageData(
+                Math.floor((column * canvas.width) / 8),
+                Math.floor((row * canvas.height) / 6),
+                1,
+                1
+              ).data;
+              if (pixel[0]! + pixel[1]! + pixel[2]! > 80) colored++;
+            }
+          return colored >= 4;
+        }),
+      { message: 'Decoded video and retained effect must be visible before capture' }
+    )
+    .toBe(true);
+  await page.screenshot({ path: info.outputPath('native-retained-title.png'), fullPage: false });
 }
 
 for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
@@ -188,6 +301,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await page.goto(nativeUrl);
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
       await checkNativeParameters(page, host.origin, locale, info);
+      await checkRetainedTitle(page, host.origin, locale, info);
       expect(errors).toEqual([]);
     } finally {
       await new Promise<void>((resolve, reject) =>

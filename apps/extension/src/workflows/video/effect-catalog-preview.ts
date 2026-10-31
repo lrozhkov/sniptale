@@ -29,7 +29,7 @@ export async function renderEffectCatalogPreview(
     ...(entry.previewPresetId ? { previewPresetId: entry.previewPresetId } : {}),
   };
   if (!entry.source) throw new Error('Missing effect source');
-  const parsed = parseEffectV1Source(entry.source).document;
+  const parsed = parseEffectV1Source(entry.source, { presentationPolicy: 'retained' }).document;
   if (!parsed) throw new Error('Invalid preview document');
   const time = progress * parsed.duration;
   const controls = applyInitialEffectPreset(

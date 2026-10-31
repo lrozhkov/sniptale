@@ -335,3 +335,10 @@ it('shows one visibility control for a recording sample and retains separate ord
   clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
   expect(container!.querySelectorAll(selector)).toHaveLength(1);
 });
+
+it('uses distinct icons for simultaneous inspector categories', () => {
+  renderInspectPanel(createProps());
+  const icons = [...container!.querySelectorAll('nav button svg')].map((icon) => icon.innerHTML);
+  expect(icons.length).toBeGreaterThan(1);
+  expect(new Set(icons).size).toBe(icons.length);
+});

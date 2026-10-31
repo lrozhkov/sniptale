@@ -203,3 +203,39 @@ it('uses ordinary parameter rows without an icon column even when retained metad
     host.querySelector('[data-effect-control-id="mode"] input[aria-label="Mode"]')
   ).not.toBeNull();
 });
+
+it('omits conflicting retained disclosure icons without modifying saved metadata', () => {
+  const source = JSON.parse(
+    readFileSync(
+      'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+      'utf8'
+    )
+  );
+  source.controlGroups[0].icon = 'type';
+  const saved = JSON.stringify(source);
+  const parsed = parseEffectV1Source(saved, { presentationPolicy: 'retained' });
+  if (!parsed.document) throw new Error('Missing retained title');
+  act(() =>
+    root.render(
+      <EffectControlTree
+        document={parsed.document!}
+        parentId="content"
+        controls={parsed.document!.controls}
+        renderControl={(control) => <input aria-label={control.id} />}
+        renderGroup={(group, children) => (
+          <details open>
+            <summary>
+              {group.icon ? <span data-icon={group.icon} /> : null}
+              {group.label.en}
+            </summary>
+            {children}
+          </details>
+        )}
+      />
+    )
+  );
+  expect(host.querySelector('summary')).not.toBeNull();
+  expect(host.querySelector('summary [data-icon]')).toBeNull();
+  expect(host.querySelector('input[aria-label="title"]')).not.toBeNull();
+  expect(JSON.stringify(parsed.document)).toBe(saved);
+});

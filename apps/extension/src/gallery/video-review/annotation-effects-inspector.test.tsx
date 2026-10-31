@@ -506,3 +506,13 @@ it('keeps an unbounded auto number as an ordinary field without forcing a slider
   expect(input('Custom range').value).toBe('50');
   expect(host.querySelector('input[aria-label="Custom range range"]')).toBeNull();
 });
+
+it('keeps a custom group from repeating the host placement icon', () => {
+  const value = fixture('callout');
+  value.document.controlGroups![0]!.icon = 'move';
+  const source = JSON.stringify(value.document);
+  expect(validateEffectV1Document(value.document).ok).toBe(true);
+  render(value, source);
+  expect(host.querySelectorAll('summary svg.lucide-move')).toHaveLength(1);
+  expect(host.querySelector('[data-effect-control-group="tracing"] input')).not.toBeNull();
+});

@@ -17,6 +17,7 @@ export const EFFECT_V1_CONTROL_UNITS = [
   'deg',
   'ratio',
   'count',
+  'hz',
 ] as const;
 export const EFFECT_V1_CONTROL_PRESENTATIONS = [
   'auto',
@@ -74,7 +75,30 @@ export const EFFECT_V1_CONTROL_ICONS = [
   'sliders',
   'check',
   'x',
+  'drawing',
+  'tracing',
+  'path',
+  'easing',
+  'motion',
+  'mask',
+  'focus',
+  'lens',
+  'crop',
+  'composition',
+  'baseline',
+  'decoration',
+  'texture',
 ] as const;
+export const EFFECT_V1_CONTROL_ROOT_ICONS = {
+  content: 'text',
+  typography: 'type',
+  appearance: 'palette',
+  geometry: 'shape',
+  processing: 'sliders',
+  animation: 'play',
+  advanced: 'settings',
+} as const satisfies Record<EffectV1SemanticControlGroup, EffectV1ControlIcon>;
+
 export const EFFECT_V1_CONTROL_GROUP_LIMIT = 64;
 export const EFFECT_V1_CONTROL_GROUP_DEPTH = 4;
 

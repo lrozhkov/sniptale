@@ -167,7 +167,7 @@ function createWorkerDocument(request: EffectRuntimeRenderRequest) {
       return { ...metadata, path: `runtime-assets/asset-${index}` };
     }),
   };
-  const validation = validateEffectV1Document(document);
+  const validation = validateEffectV1Document(document, { presentationPolicy: 'retained' });
   if (!validation.ok || !validation.document) {
     throw new EffectRuntimePreparationError('inputRejected');
   }

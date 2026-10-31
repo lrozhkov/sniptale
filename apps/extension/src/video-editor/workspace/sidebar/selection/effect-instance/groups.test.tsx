@@ -375,3 +375,62 @@ it('keeps target-effect parameters out of global navigation and disclosures inde
   expect(disclosures[1]!.querySelector('input')).not.toBeNull();
   expect(disclosures[1]!.textContent).toContain('Радиус размытия');
 });
+
+it.each(['move', 'sparkles'] as const)(
+  'keeps nested %s from repeating the surrounding host groups',
+  async (icon) => {
+    const { readFileSync } = await import('node:fs');
+    const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
+    const parsed = parseEffectV1Source(
+      readFileSync(
+        'apps/extension/public/video-effects/effects/annotations/sniptale-callout/effect.sniptale-effect.json',
+        'utf8'
+      )
+    );
+    if (!parsed.document) throw new Error('Missing callout');
+    parsed.document.controlGroups![0]!.icon = icon;
+    const source = JSON.stringify(parsed.document);
+    expect(parseEffectV1Source(source).ok).toBe(true);
+    const project = createEmptyVideoProject();
+    project.effectSnapshots = [
+      {
+        id: 'snapshot',
+        documentId: parsed.document.id,
+        kind: 'standalone',
+        assets: [],
+        retainedByteLength: new TextEncoder().encode(source).byteLength,
+        schemaVersion: 'sniptale.effect.v1',
+        sha256: '0'.repeat(64),
+        source,
+      },
+    ];
+    project.effectInstances = [
+      {
+        id: 'custom',
+        snapshotId: 'snapshot',
+        kind: 'standalone',
+        enabled: true,
+        controls: {},
+        duration: 3,
+        playbackRate: 1,
+        startTime: 0,
+        target: { kind: 'scene' },
+      },
+    ];
+    act(() =>
+      root.render(
+        createEffectInstanceGroups({
+          project,
+          instanceId: 'custom',
+          target: { kind: 'scene' },
+          onUpdateEffectInstance: vi.fn(),
+          onDeleteEffectInstance: vi.fn(),
+          onDuplicateEffectInstance: vi.fn(() => null),
+          onMoveEffectInstance: vi.fn(),
+        }).map((group) => <div key={group.id}>{group.content}</div>)
+      )
+    );
+    expect(container.querySelectorAll(`summary svg.lucide-${icon}`)).toHaveLength(0);
+    expect(container.querySelector('[data-effect-control-group="tracing"] input')).not.toBeNull();
+  }
+);

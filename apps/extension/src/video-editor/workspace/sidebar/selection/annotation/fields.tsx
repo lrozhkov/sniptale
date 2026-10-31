@@ -1,3 +1,4 @@
+import { LayoutTemplate, Package } from 'lucide-react';
 import {
   type AnnotationFieldsSectionProps,
   renderAnnotationAppearanceFields,
@@ -66,6 +67,7 @@ function createLegacyAnnotationGroups(
   return [
     {
       id: 'general',
+      icon: LayoutTemplate,
       semantic: 'content' as const,
       label: translate('videoEditor.sidebar.inspectorGroupGeneral'),
       defaultActive: true,
@@ -155,6 +157,7 @@ function createModernAnnotationGroups(
   return [
     {
       id: 'basic',
+      icon: Package,
       semantic: 'info' as const,
       label: translate('videoEditor.sidebar.annotationInspectorSectionBasic'),
       content: <ModernAnnotationSummary packLabel={packLabel} template={template} />,

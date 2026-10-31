@@ -1776,7 +1776,6 @@
         "en": "Line tracing",
         "ru": "Прорисовка линии"
       },
-      "icon": "pointer",
       "order": 10,
       "collapsed": false
     }

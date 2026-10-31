@@ -42,7 +42,7 @@ describe('EffectV1 locked ZIP artifact corpus', () => {
     expect(EXACT_SDK_COMMIT_PROVENANCE_CHECK.run).toEqual(expect.any(Function));
   });
 
-  it('verifies the complete source manifest and canonical schema', () => {
+  it('verifies the complete historical source manifest and both SDK schema locks', () => {
     const directory = new URL('../../fixtures/corpus/', import.meta.url);
     const sums = readFileSync(new URL('SHA256SUMS', directory), 'utf8').trim().split('\n');
     expect(sums).toHaveLength(17);
@@ -70,11 +70,26 @@ describe('EffectV1 locked ZIP artifact corpus', () => {
     expect(readFileSync(new URL('sniptale-effect-v1.schema.json', directory))).toEqual(
       readFileSync(
         new URL(
-          '../../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/sniptale-effect-v1.schema.json',
+          '../../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/' +
+            'presentation/schema-4f52a70.json',
           import.meta.url
         )
       )
     );
+    const currentSchema = readFileSync(
+      new URL(
+        '../../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/sniptale-effect-v1.schema.json',
+        import.meta.url
+      )
+    );
+    expect(createHash('sha256').update(currentSchema).digest('hex')).toBe(
+      'f7c864dccf506496a83061735e96e575ccd2574d8a2088978c6b9076dd4546c7'
+    );
+    expect(
+      createHash('sha256')
+        .update(readFileSync(new URL('sniptale-effect-v1.schema.json', directory)))
+        .digest('hex')
+    ).toBe('1e9b31f34f1e480720051640010a028cd58e564945c37a587063af6e56db61bf');
   });
 
   it.each(EFFECT_BUNDLE_CORPUS)('$artifact', async (testCase) => {

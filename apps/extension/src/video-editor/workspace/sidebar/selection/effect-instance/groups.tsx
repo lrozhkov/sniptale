@@ -1,6 +1,9 @@
 import { EffectControl } from './control-field';
 import { EffectControlTree } from '../../../../../ui/effect-control-presentation/groups';
-import { effectControlIcons } from '../../../../../ui/effect-control-presentation/icons';
+import {
+  effectControlIcons,
+  effectControlRootIcon,
+} from '../../../../../ui/effect-control-presentation/icons';
 import { InspectorActionButton } from '../shared/actions';
 import {
   useVideoEditorEffectEditingPort,
@@ -175,7 +178,14 @@ export function createEffectInstanceGroups(
             {content}
           </>
         );
-      else groups.push({ id, semantic: section.semantic, label: section.label, content });
+      else
+        groups.push({
+          id,
+          semantic: section.semantic,
+          label: section.label,
+          icon: effectControlRootIcon(section.id),
+          content,
+        });
     }
   }
   const order = [
@@ -369,11 +379,14 @@ function EffectInstanceControls(
       controls={controls}
       renderControl={renderControl}
       renderGroup={(group, children) => (
+        // The host owns Move and Sparkles; nested groups retain their labels.
         <InspectorDetails
           preferenceId={`effect-group:${document.id}:${group.id}`}
           label={readLocaleText(group.label)}
           initiallyOpen={!group.collapsed}
-          {...(group.icon ? { icon: effectControlIcons[group.icon] } : {})}
+          {...(group.icon && group.icon !== 'move' && group.icon !== 'sparkles'
+            ? { icon: effectControlIcons[group.icon] }
+            : {})}
         >
           {children}
         </InspectorDetails>

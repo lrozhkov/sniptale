@@ -52,7 +52,9 @@ function parseDocumentRef(value: unknown): WorkerRequestEnvelope['documentRef'] 
     return null;
   }
   if (!('document' in value)) return { id: value['id'] };
-  const validation = validateEffectV1Document(value['document']);
+  const validation = validateEffectV1Document(value['document'], {
+    presentationPolicy: 'retained',
+  });
   return validation.ok && validation.document
     ? { document: validation.document, id: value['id'] }
     : null;

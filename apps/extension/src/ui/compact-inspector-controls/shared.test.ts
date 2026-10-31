@@ -3,7 +3,15 @@ import { parseCompactNumber, resolveCompactUnitLabel } from './shared';
 const locale = vi.hoisted(() => ({ value: 'en' }));
 vi.mock('../../platform/i18n', () => ({
   translate: (key: string) =>
-    key === 'common.units.count' ? (locale.value === 'ru' ? 'шт.' : 'items') : key,
+    key === 'common.units.count'
+      ? locale.value === 'ru'
+        ? 'шт.'
+        : 'items'
+      : key === 'common.units.hz'
+        ? locale.value === 'ru'
+          ? 'Гц'
+          : 'Hz'
+        : key,
 }));
 it('keeps numeric units outside raw values, including localized counts and multipliers', () => {
   for (const [unit, label] of [
@@ -11,6 +19,7 @@ it('keeps numeric units outside raw values, including localized counts and multi
     ['px', 'px'],
     ['s', 's'],
     ['ms', 'ms'],
+    ['hz', 'Hz'],
     ['deg', '°'],
     ['ratio', '×'],
     ['count', 'items'],
@@ -20,6 +29,8 @@ it('keeps numeric units outside raw values, including localized counts and multi
     expect(parseCompactNumber(`20 ${label}`, compact)).toBe(20);
   }
   locale.value = 'ru';
+  expect(resolveCompactUnitLabel('hz')).toBe('Гц');
+  expect(parseCompactNumber('20 Гц', 'hz')).toBe(20);
   expect(resolveCompactUnitLabel('count')).toBe('шт.');
   expect(parseCompactNumber('20 шт.', 'count')).toBe(20);
 });

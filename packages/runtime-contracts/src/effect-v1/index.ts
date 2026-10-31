@@ -67,6 +67,7 @@ export {
 
 export {
   EFFECT_V1_CONTROL_GROUPS,
+  EFFECT_V1_CONTROL_ROOT_ICONS,
   EFFECT_V1_CONTROL_UNITS,
   EFFECT_V1_CONTROL_PRESENTATIONS,
   EFFECT_V1_CONTROL_ICONS,
@@ -82,3 +83,6 @@ export type {
   EffectV1ControlIcon,
   EffectV1ControlGroup,
 } from './model/control-presentation.js';
+
+export { resolveEffectV1ControlGroupIcons } from './model/control-group-icons.js';
+export type { EffectV1ValidationOptions } from './validation/index.js';

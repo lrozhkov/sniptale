@@ -15,7 +15,7 @@ export function readEffectPresentationDocument(source: string): ParsedPresentati
     documents.set(source, cached);
     return cached;
   }
-  const parsed = parseEffectV1Source(source);
+  const parsed = parseEffectV1Source(source, { presentationPolicy: 'retained' });
   freezePresentationValue(parsed);
   const bytes = source.length * 2;
   if (bytes > MAX_SOURCE_BYTES) return parsed;

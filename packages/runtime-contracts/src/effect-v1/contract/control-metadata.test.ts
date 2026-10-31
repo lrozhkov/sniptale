@@ -13,7 +13,11 @@ import {
 } from '../index';
 
 it.each(corpus.cases)('matches the frozen SDK metadata case $id', (entry) => {
-  const result = validateEffectV1Document(entry.document);
+  const options =
+    'validationOptions' in entry && entry.validationOptions?.presentationPolicy === 'retained'
+      ? { presentationPolicy: 'retained' as const }
+      : undefined;
+  const result = validateEffectV1Document(entry.document, options);
   expect(result.ok).toBe(entry.actual.accepted);
   expect(result.diagnostics.map(({ severity, code, path }) => ({ severity, code, path }))).toEqual(
     entry.actual.diagnostics
@@ -87,4 +91,24 @@ it('refuses ambiguous, cyclic and missing custom group chains', () => {
     [{ id: 'a', parentId: 'missing' }],
   ])
     expect(resolveEffectV1ControlGroup('a', groups)).toBeNull();
+});
+
+it('retained presentation warnings cannot admit executable payloads', () => {
+  const entry = corpus.cases.find((item) => item.id === 'group-icon-used-root');
+  if (!entry) throw new Error('Missing conflicting icon fixture');
+  const document = structuredClone(entry.document);
+  const before = JSON.stringify(document);
+  const result = validateEffectV1Document(
+    { ...document, source: 'evil()' },
+    { presentationPolicy: 'retained' }
+  );
+  expect(result.ok).toBe(false);
+  expect(result.document).toBeUndefined();
+  expect(result.diagnostics).toContainEqual(
+    expect.objectContaining({ code: 'EXECUTABLE_FIELD_FORBIDDEN', severity: 'error' })
+  );
+  expect(result.diagnostics).toContainEqual(
+    expect.objectContaining({ code: 'CONTROL_GROUP_ICON_DUPLICATE', severity: 'warning' })
+  );
+  expect(JSON.stringify(document)).toBe(before);
 });

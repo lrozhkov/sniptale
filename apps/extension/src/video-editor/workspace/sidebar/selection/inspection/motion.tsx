@@ -1,3 +1,4 @@
+import { Crosshair } from 'lucide-react';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { isCameraMotionRegion } from '../../../../../features/video/project/motion/normalization';
 import {
@@ -145,6 +146,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'spatial-reference',
+            icon: Crosshair,
             visible:
               isCameraMotionRegion(motionRegion) &&
               motionRegion.sourceBinding?.coordinateSpace !== 'source-window',

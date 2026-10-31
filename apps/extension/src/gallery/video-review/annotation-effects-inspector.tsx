@@ -5,23 +5,13 @@ import {
   effectControlSliderRange,
 } from '../../ui/effect-control-presentation/controls';
 import { EffectControlTree } from '../../ui/effect-control-presentation/groups';
-import { effectControlIcons } from '../../ui/effect-control-presentation/icons';
+import {
+  effectControlIcons,
+  effectControlRootIcon,
+} from '../../ui/effect-control-presentation/icons';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { useMemo, useRef, type KeyboardEvent } from 'react';
-import {
-  CaseSensitive,
-  Clock3,
-  Copy,
-  Move,
-  Palette,
-  Paintbrush,
-  Settings2,
-  Shapes,
-  SlidersHorizontal,
-  Trash2,
-  Type,
-  Waves,
-} from 'lucide-react';
+import { Clock3, Copy, Move, LayoutTemplate, Trash2 } from 'lucide-react';
 import {
   applyEffectV1ControlPreset,
   resolveEffectLocaleText,
@@ -61,16 +51,6 @@ import {
   annotationPlacementScrub,
 } from './annotation-effects-numeric';
 import { reviewAnnotationPresetId } from './annotation-effects-presets';
-
-const SDK_SECTION_ICONS = {
-  content: Type,
-  typography: CaseSensitive,
-  appearance: Paintbrush,
-  geometry: Shapes,
-  processing: SlidersHorizontal,
-  animation: Waves,
-  advanced: Settings2,
-} as const;
 
 type Editor = ReturnType<typeof useReviewAnnotationEffects>;
 type Patch = Partial<Omit<ReviewAnnotationEffect, 'id' | 'snapshotId' | 'order'>>;
@@ -314,7 +294,7 @@ function AnnotationParameters(
           {
             id: 'presets',
             label: translate('gallery.videoReview.annotationPresets'),
-            icon: Palette,
+            icon: LayoutTemplate,
             content: (
               <AnnotationPreset
                 document={document}
@@ -431,7 +411,7 @@ function annotationSdkSections(props: {
   return EFFECT_V1_CONTROL_GROUPS.filter((group) => groups.has(group)).map((group) => ({
     id: `sdk:${group}`,
     label: label(group),
-    icon: SDK_SECTION_ICONS[group],
+    icon: effectControlRootIcon(group),
     content: (
       <div className="flex min-w-0 flex-col gap-2">
         <EffectControlTree
@@ -439,11 +419,14 @@ function annotationSdkSections(props: {
           parentId={group}
           controls={groups.get(group) ?? []}
           renderGroup={(definition, children) => (
+            // Placement already owns Move; nested group icons are optional.
             <ReviewDetails
               preferenceId={`effect-group:${document.id}:${definition.id}`}
               label={resolveEffectLocaleText(definition.label, locale)}
               initiallyOpen={!definition.collapsed}
-              {...(definition.icon ? { icon: effectControlIcons[definition.icon] } : {})}
+              {...(definition.icon && definition.icon !== 'move'
+                ? { icon: effectControlIcons[definition.icon] }
+                : {})}
             >
               {children}
             </ReviewDetails>
