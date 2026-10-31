@@ -64,7 +64,12 @@ function throwIfAborted(signal: AbortSignal): void {
 }
 
 function waitForImage(image: HTMLImageElement, signal: AbortSignal): Promise<void> {
-  if (image.complete && image.naturalWidth > 0) return Promise.resolve();
+  throwIfAborted(signal);
+  if (image.complete) {
+    return image.naturalWidth > 0
+      ? Promise.resolve()
+      : Promise.reject(new Error('Preview media could not be decoded'));
+  }
   return waitForMediaEvent(image, ['load'], signal);
 }
 
