@@ -1,0 +1,87 @@
+{
+  "source": "Verified clean SDK presentation handoff",
+  "baseCommit": "4f52a70f26b3e0e8fd69630aafc5b37fcea73bf4",
+  "cleanCommit": true,
+  "manifestSha256": "a82e6d50b9d15d3293ff662949a80689b0327e5b35fc1b3858c24bad0cc13972",
+  "schemaSha256": "1e9b31f34f1e480720051640010a028cd58e564945c37a587063af6e56db61bf",
+  "paritySha256": "b96c1c0d40b233be87000eec56538bf8279d43f6de47fb9c062e65a1a6ac59f0",
+  "files": [
+    {
+      "path": "src/sdk/locale-types.ts",
+      "sha256": "986429a325bf2f10daf07933d491a3619c7e6d74ae52aa4d497541eddc14f93f"
+    },
+    {
+      "path": "src/sdk/types.ts",
+      "sha256": "34021a4f555ec4439151de391fa68834f0b4da274a1204c13262869e4fcec1f9"
+    },
+    {
+      "path": "src/sdk/effect-v1/types.ts",
+      "sha256": "ce23dab5c24fc6654f73b3a9313e90f54807eb373e0ccf7bc619d1039d22185c"
+    },
+    {
+      "path": "src/sdk/effect-v1/index.ts",
+      "sha256": "2795c8b7226b8616e615fd7ecb55fc64c13600560ce7e4adef3ef5c3f84097a2"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-presentation-model.ts",
+      "sha256": "f1a130413c037690ce28a8c16a06190091368bc7193836078c8f1760a8b63709"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-groups-validation.ts",
+      "sha256": "19cd0c2ae6280212297207c0116ac3ca4a0deb627e6d0d8eb4749484350e7cdf"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-metadata-validation.ts",
+      "sha256": "45fe2ed74bb8af42b05cee9d5703e365275f0cf72632f280baf28e16cf75b24e"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-presentation.ts",
+      "sha256": "089301bc9d3f52946720f06e377141859a3a790963bbfcf7aeeb87bd6e5d2cd2"
+    },
+    {
+      "path": "src/sdk/effect-v1/scene-validation.ts",
+      "sha256": "668009d85f90c630eb5d8560fdd73720a5e675e318847c1eb804ace8ce80d3fd"
+    },
+    {
+      "path": "src/sdk/effect-v1/validation.ts",
+      "sha256": "17d54454756f85b292fca5a9445e40491526f20c17b3235e0b8bf2f8d429dc2b"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-presets-validation.ts",
+      "sha256": "a4c07f78bc81d8e584dbd3edcafd065d053ee20717fd6152ea4c7cde1c4df7e8"
+    },
+    {
+      "path": "src/sdk/effect-v1/schema-control-presentation.ts",
+      "sha256": "95aff544da234fc684753dfdb5d907293db9009fdfe98072c8de5a4bb1b5bf30"
+    },
+    {
+      "path": "src/sdk/effect-v1/schema-control.ts",
+      "sha256": "7db5571f244ae01c6f20846a741f9e16f39a5c3c572e8f67230f8fee13d8327d"
+    },
+    {
+      "path": "src/sdk/effect-v1/schema.ts",
+      "sha256": "0123d179b20b3130e21ff990d55fb0a6fe8b0290ff318f71b7716dd7908b8af3"
+    },
+    {
+      "path": "src/sdk/effect-v1/normalization.ts",
+      "sha256": "a9e30a6ec6305c80b6ff9de17a60225973afc5d7cf431760de604f74641e5a43"
+    },
+    {
+      "path": "src/apps/viewer/effect-file/builder.ts",
+      "sha256": "c9fcebee766eb125ec8e5dc0767206e4ae98fdf78e9d6f35111a9c9a93acb58e"
+    },
+    {
+      "path": "schemas/sniptale-effect-v1.schema.json",
+      "sha256": "1e9b31f34f1e480720051640010a028cd58e564945c37a587063af6e56db61bf"
+    },
+    {
+      "path": "tooling/test/fixtures/control-presentation.ts",
+      "sha256": "6d0422b03894c5cba7067836f6a9d1643ebe90cd75ecaaea7be8b1afea5102b7"
+    },
+    {
+      "path": "tests/effect-v1-control-metadata.test.ts",
+      "sha256": "d60ae045458178c409ff4b868f31bda950589d42de01c8312b3c62aef05a9136"
+    }
+  ],
+  "handoffManifestSha256": "f0e6278135a15dac10cd43baf90e876678c28399fae8f9037d1ba70b488cd3f4"
+}

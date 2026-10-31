@@ -6,7 +6,7 @@ import { parseEffectV1Source, normalizeEffectV1ToTemplate } from '../index';
 it('admits the supplied collection with its complete layout metadata and locked source bytes', () => {
   expect(lock.files).toHaveLength(21);
   const schema = readFileSync(
-    new URL('../fixtures/sniptale-effect-v1.schema.json', import.meta.url)
+    new URL('../fixtures/collection/sniptale-effect-v1.schema.json', import.meta.url)
   );
   expect(createHash('sha256').update(schema).digest('hex')).toBe(lock.schemaSha256);
   let layouts = 0;

@@ -4,7 +4,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
+  validateEffectV1Document,
   resolveEffectLocaleText,
+  resolveEffectV1ControlGroup,
   resolveEffectV1ControlDefault,
 } from '@sniptale/runtime-contracts/effect-v1';
 import { getCurrentLocale, translate } from '../../platform/i18n';
@@ -147,7 +149,10 @@ it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
         ).not.toBeNull();
     }
     const expected = new Set(
-      value.document.controls.map((control) => `sdk:${control.group ?? 'parameters'}`)
+      value.document.controls.map(
+        (control) =>
+          `sdk:${resolveEffectV1ControlGroup(control.group, value.document.controlGroups) ?? 'advanced'}`
+      )
     );
     for (const group of expected)
       expect(host.querySelector(`[data-section="${group}"]`)).not.toBeNull();
@@ -298,7 +303,7 @@ it('disables reflected attachment conversion and restores it when valid geometry
 });
 
 it('retains the SDK type of numeric select options and their localized labels', async () => {
-  const value = fixture('callout');
+  const value = fixture('chapters');
   render(value);
   const control = value.document.controls.find((item) => item.options?.length)!;
   const trigger = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -420,13 +425,14 @@ it('derives the preset label from accepted controls across rerender and reopenin
   expect(value.editor.change).not.toHaveBeenCalled();
 });
 
-it('preserves admitted unbounded SDK fields without inventing a range', () => {
+it('preserves admitted unbounded auto fields without inventing a range', () => {
   const value = fixture('callout');
   const document = structuredClone(value.document);
   const control = document.controls.find((item) => item.id === 'font');
   if (!control || control.kind !== 'number') throw new Error('Missing numeric fixture');
   delete control.min;
   delete control.max;
+  control.presentation = 'auto';
   render(value, JSON.stringify(document));
   const label = resolveEffectLocaleText(control.label, getCurrentLocale());
   expect(input(label)).not.toBeNull();
@@ -448,4 +454,55 @@ it('keeps bound anchors and scale dimensions disabled without geometry, while pl
   );
   render(value, value.source, true);
   expect(host.querySelectorAll('input[type="range"]')).toHaveLength(0);
+});
+
+const explicitSliderCases: Array<{
+  bounds: { min?: number; max?: number };
+  value: number;
+  low: string;
+  high: string;
+}> = [
+  { bounds: {}, value: 50, low: '0', high: '100' },
+  { bounds: { min: 500 }, value: 550, low: '500', high: '600' },
+  { bounds: { max: -500 }, value: -550, low: '-600', high: '-500' },
+];
+function rangeFixture(
+  bounds: { min?: number; max?: number },
+  value: number,
+  presentation: 'slider' | 'auto'
+) {
+  const fixtureValue = fixture('frame');
+  const document = structuredClone(fixtureValue.document);
+  const control = document.controls.find((item) => item.id === 'line');
+  if (!control || control.kind !== 'number') throw new Error('Missing numeric fixture');
+  delete document.controlPresets;
+  delete document.defaultControlPresetId;
+  delete control.min;
+  delete control.max;
+  control.label = { en: 'Custom range' };
+  control.defaultValue = value;
+  control.presentation = presentation;
+  Object.assign(control, bounds);
+  fixtureValue.instance.controls['line'] = value;
+  const source = JSON.stringify(document);
+  expect(validateEffectV1Document(document).diagnostics).toEqual([]);
+  expect(readReviewAnnotationEffectDocument(source)).not.toBeNull();
+  return { fixtureValue, source };
+}
+it.each(explicitSliderCases)(
+  'honors explicit imported sliders with partial bounds $bounds',
+  ({ bounds, value, low, high }) => {
+    const fixture = rangeFixture(bounds, value, 'slider');
+    render(fixture.fixtureValue, fixture.source);
+    const slider = input('Custom range range');
+    expect([slider.min, slider.max, slider.value]).toEqual([low, high, String(value)]);
+    expect(input('Custom range').value).toBe(String(value));
+    expect(fixture.fixtureValue.editor.change).not.toHaveBeenCalled();
+  }
+);
+it('keeps an unbounded auto number as an ordinary field without forcing a slider', () => {
+  const fixture = rangeFixture({}, 50, 'auto');
+  render(fixture.fixtureValue, fixture.source);
+  expect(input('Custom range').value).toBe('50');
+  expect(host.querySelector('input[aria-label="Custom range range"]')).toBeNull();
 });

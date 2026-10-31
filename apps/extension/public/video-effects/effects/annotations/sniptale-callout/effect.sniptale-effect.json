@@ -22,7 +22,8 @@
       },
       "defaultValue": "#fb923c",
       "group": "appearance",
-      "order": 0
+      "order": 0,
+      "presentation": "color"
     },
     {
       "id": "surface",
@@ -33,7 +34,8 @@
       },
       "defaultValue": "#171a20",
       "group": "appearance",
-      "order": 1
+      "order": 1,
+      "presentation": "color"
     },
     {
       "id": "ink",
@@ -44,21 +46,24 @@
       },
       "defaultValue": "#fafafa",
       "group": "appearance",
-      "order": 2
+      "order": 2,
+      "presentation": "color"
     },
     {
       "id": "entry",
       "kind": "number",
       "label": {
-        "ru": "Вход (% длительности)",
-        "en": "Entrance (% duration)"
+        "en": "Entrance duration",
+        "ru": "Длительность входа"
       },
       "defaultValue": 24,
       "min": 5,
       "max": 40,
       "step": 1,
       "group": "animation",
-      "order": 3
+      "order": 3,
+      "unit": "percent",
+      "presentation": "slider"
     },
     {
       "id": "font",
@@ -72,7 +77,9 @@
       "max": 32,
       "step": 1,
       "group": "typography",
-      "order": 4
+      "order": 4,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "bodyFont",
@@ -86,7 +93,9 @@
       "max": 24,
       "step": 1,
       "group": "typography",
-      "order": 5
+      "order": 5,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "title",
@@ -101,7 +110,8 @@
       "localizedDefaultValue": {
         "ru": "Важная деталь",
         "en": "An important detail"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "subtitle",
@@ -116,7 +126,8 @@
       "localizedDefaultValue": {
         "ru": "Начните с этой области",
         "en": "Start with this area"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "anchorX",
@@ -130,7 +141,9 @@
       "max": 1000000,
       "step": 1,
       "group": "geometry",
-      "order": 8
+      "order": 8,
+      "unit": "px",
+      "presentation": "auto"
     },
     {
       "id": "anchorY",
@@ -144,7 +157,9 @@
       "max": 1000000,
       "step": 1,
       "group": "geometry",
-      "order": 9
+      "order": 9,
+      "unit": "px",
+      "presentation": "auto"
     },
     {
       "id": "sequence",
@@ -157,7 +172,7 @@
       "min": 0,
       "max": 2,
       "step": 1,
-      "group": "animation",
+      "group": "tracing",
       "order": 10,
       "options": [
         {
@@ -181,35 +196,40 @@
             "en": "Together"
           }
         }
-      ]
+      ],
+      "presentation": "segmented"
     },
     {
       "id": "traceShare",
       "kind": "number",
       "label": {
-        "ru": "Доля времени на линию (%)",
-        "en": "Trace share of entrance (%)"
+        "en": "Entrance time for line",
+        "ru": "Время входа на линию"
       },
       "defaultValue": 60,
       "min": 30,
       "max": 85,
       "step": 1,
-      "group": "animation",
-      "order": 11
+      "group": "tracing",
+      "order": 11,
+      "unit": "percent",
+      "presentation": "slider"
     },
     {
       "id": "spark",
       "kind": "number",
       "label": {
-        "ru": "Свечение бегущей точки (%)",
-        "en": "Tracing head glow (%)"
+        "en": "Tracing head glow",
+        "ru": "Свечение бегущей точки"
       },
       "defaultValue": 60,
       "min": 0,
       "max": 100,
       "step": 1,
-      "group": "animation",
-      "order": 12
+      "group": "tracing",
+      "order": 12,
+      "unit": "percent",
+      "presentation": "slider"
     }
   ],
   "layers": [],
@@ -1747,5 +1767,18 @@
       }
     }
   ],
-  "defaultControlPresetId": "sniptale-orange-dark"
+  "defaultControlPresetId": "sniptale-orange-dark",
+  "controlGroups": [
+    {
+      "id": "tracing",
+      "parentId": "animation",
+      "label": {
+        "en": "Line tracing",
+        "ru": "Прорисовка линии"
+      },
+      "icon": "pointer",
+      "order": 10,
+      "collapsed": false
+    }
+  ]
 }

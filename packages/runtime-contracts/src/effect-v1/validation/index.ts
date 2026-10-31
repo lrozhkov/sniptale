@@ -1,3 +1,4 @@
+import { validateEffectV1ControlGroups } from './control-groups.js';
 import { validateEffectV1EditorRegion } from '../editor-region/validation.js';
 import { validateEffectV1ControlPresets } from './control-presets';
 import { validateEffectV1ObjectLayout } from '../object-layout/validation.js';
@@ -78,7 +79,8 @@ function validateEffectV1DocumentInternal(input: unknown): EffectV1ValidationRes
   const layers = validateEffectV1Layers(input['layers'], assets, report);
   const scenes = validateEffectV1Scenes(input['scenes'], Number(input['duration']), report);
   validateEffectV1Clips(input['clips'], layers, scenes, Number(input['duration']), report);
-  const controlIds = validateEffectV1Controls(input['controls'], report);
+  validateEffectV1ControlGroups(input['controlGroups'], report);
+  const controlIds = validateEffectV1Controls(input['controls'], report, input['controlGroups']);
   validateEffectV1ControlPresets(input, report);
   validateEffectV1EditorRegion(input, report);
   validateEffectV1ObjectLayout(input['objectLayout'], input['kind'], input['controls'], report);

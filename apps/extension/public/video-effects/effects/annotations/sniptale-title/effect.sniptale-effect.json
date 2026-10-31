@@ -22,7 +22,8 @@
       },
       "defaultValue": "#fb923c",
       "group": "appearance",
-      "order": 0
+      "order": 0,
+      "presentation": "color"
     },
     {
       "id": "surface",
@@ -33,7 +34,8 @@
       },
       "defaultValue": "#171a20",
       "group": "appearance",
-      "order": 1
+      "order": 1,
+      "presentation": "color"
     },
     {
       "id": "ink",
@@ -44,21 +46,24 @@
       },
       "defaultValue": "#fafafa",
       "group": "appearance",
-      "order": 2
+      "order": 2,
+      "presentation": "color"
     },
     {
       "id": "entry",
       "kind": "number",
       "label": {
-        "ru": "Вход (% длительности)",
-        "en": "Entrance (% duration)"
+        "en": "Entrance duration",
+        "ru": "Длительность входа"
       },
       "defaultValue": 18,
       "min": 5,
       "max": 40,
       "step": 1,
       "group": "animation",
-      "order": 3
+      "order": 3,
+      "unit": "percent",
+      "presentation": "slider"
     },
     {
       "id": "font",
@@ -72,7 +77,9 @@
       "max": 76,
       "step": 1,
       "group": "typography",
-      "order": 4
+      "order": 4,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "bodyFont",
@@ -86,7 +93,9 @@
       "max": 26,
       "step": 1,
       "group": "typography",
-      "order": 5
+      "order": 5,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "eyebrow",
@@ -101,37 +110,40 @@
       "localizedDefaultValue": {
         "ru": "ИСТОРИИ SNIPTALE",
         "en": "SNIPTALE STORIES"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "title",
       "kind": "text",
       "label": {
-        "ru": "Заголовок · строка 1",
-        "en": "Heading · line 1"
+        "en": "Line 1",
+        "ru": "Строка 1"
       },
       "defaultValue": "Покажите главное",
-      "group": "content",
+      "group": "heading",
       "order": 7,
       "localizedDefaultValue": {
         "ru": "Покажите главное",
         "en": "Show what matters"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "line2",
       "kind": "text",
       "label": {
-        "ru": "Заголовок · строка 2",
-        "en": "Heading · line 2"
+        "en": "Line 2",
+        "ru": "Строка 2"
       },
       "defaultValue": "Без лишних слов",
-      "group": "content",
+      "group": "heading",
       "order": 8,
       "localizedDefaultValue": {
         "ru": "Без лишних слов",
         "en": "Let the story speak"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "subtitle",
@@ -146,21 +158,24 @@
       "localizedDefaultValue": {
         "ru": "От первой идеи — до готовой истории",
         "en": "From the first idea to the finished story"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "backplate",
       "kind": "number",
       "label": {
-        "ru": "Подложка (%)",
-        "en": "Backplate (%)"
+        "en": "Backplate opacity",
+        "ru": "Непрозрачность подложки"
       },
       "defaultValue": 0,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "appearance",
-      "order": 10
+      "order": 10,
+      "unit": "percent",
+      "presentation": "slider"
     }
   ],
   "layers": [],
@@ -738,5 +753,18 @@
       }
     }
   ],
-  "defaultControlPresetId": "sniptale-orange-dark"
+  "defaultControlPresetId": "sniptale-orange-dark",
+  "controlGroups": [
+    {
+      "id": "heading",
+      "parentId": "content",
+      "label": {
+        "en": "Heading",
+        "ru": "Заголовок"
+      },
+      "icon": "type",
+      "order": 7,
+      "collapsed": false
+    }
+  ]
 }

@@ -11,3 +11,7 @@ tooling/configs/
 packages/runtime-contracts/src/effect-v1/fixtures/sniptale-effect-v1.schema.json
 packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json
 *.md
+packages/runtime-contracts/src/effect-v1/fixtures/presentation/parity.json
+packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-effect-v1.schema.json
+apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/expectations.json
+apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/sniptale-effect-v1.schema.json

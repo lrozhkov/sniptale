@@ -1,3 +1,4 @@
+import type { CompactInspectorUnit } from '../../ui/compact-inspector-controls/shared';
 import { useRef } from 'react';
 import { NumericRow, type NumericRowProps } from '../../ui/compact-inspector-controls';
 type Scrub = NonNullable<NumericRowProps['scrub']>;
@@ -18,7 +19,8 @@ export function AnnotationNumeric(props: {
   min?: number | undefined;
   max?: number | undefined;
   step?: number | undefined;
-  unit?: 's' | '%' | 'deg' | undefined;
+  unit?: CompactInspectorUnit | undefined;
+  revealScrub?: boolean | undefined;
   scrub?: Scrub | undefined;
 }) {
   const active = useRef(false);
@@ -73,6 +75,7 @@ export function AnnotationNumeric(props: {
         step={props.step}
         precision={2}
         unit={props.unit}
+        revealScrub={props.revealScrub ?? false}
         scrub={active.current ? frozen.current : props.scrub}
         onPreviewValue={preview}
         onCommitValue={(value) => {

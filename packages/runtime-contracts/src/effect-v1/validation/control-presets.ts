@@ -1,3 +1,4 @@
+import { resolveEffectV1ControlGroup } from '../model/control-presentation.js';
 import { isRecord, rejectUnknownKeys, requireIdentifier, validateLocaleText } from './shared.js';
 const PRESET_KEYS = new Set(['id', 'label', 'theme', 'style', 'values']);
 const NAMED_KEYS = new Set(['id', 'label']);
@@ -69,7 +70,7 @@ export function validateEffectV1ControlPresets(
 }
 
 export function inspectControlPresetValues(
-  document: { controls?: unknown; objectLayout?: unknown },
+  document: { controls?: unknown; objectLayout?: unknown; controlGroups?: unknown },
   values: unknown,
   path: string,
   report: Report
@@ -99,10 +100,11 @@ export function inspectControlPresetValues(
       );
       continue;
     }
+    const semanticGroup = resolveEffectV1ControlGroup(control['group'], document.controlGroups);
     if (
       control['kind'] === 'text' ||
-      typeof control['group'] !== 'string' ||
-      !VISUAL_GROUPS.has(control['group']) ||
+      semanticGroup === null ||
+      !VISUAL_GROUPS.has(semanticGroup) ||
       protectedIds.has(id)
     ) {
       report.error(

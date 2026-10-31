@@ -169,6 +169,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/effect-catalog-preview.test.tsx`
 - `apps/extension/src/ui/effect-catalog-preview.tsx`
 - `apps/extension/src/ui/effect-catalog.css`
+- `apps/extension/src/ui/effect-control-presentation`
 - `apps/extension/src/ui/focus-appearance`
 - `apps/extension/src/ui/glass-select`
 - `apps/extension/src/ui/gradient-preset-grid`

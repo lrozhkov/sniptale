@@ -1,0 +1,4365 @@
+{
+  "cases": [
+    {
+      "id": "nested-metadata",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": true,
+      "actual": {
+        "accepted": true,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "unit-id",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "points",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_UNIT",
+        "path": "$.controls[0].unit"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_UNIT",
+            "path": "$.controls[0].unit"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unit-kind",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ],
+            "unit": "px"
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_UNIT",
+        "path": "$.controls[1].unit"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_UNIT",
+            "path": "$.controls[1].unit"
+          }
+        ]
+      }
+    },
+    {
+      "id": "presentation-id",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "code",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_PRESENTATION",
+        "path": "$.controls[0].presentation"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_PRESENTATION",
+            "path": "$.controls[0].presentation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "presentation-kind",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "text",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_PRESENTATION_KIND",
+        "path": "$.controls[0].presentation"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_PRESENTATION_KIND",
+            "path": "$.controls[0].presentation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "presentation-missing-options",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "dropdown",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_PRESENTATION_OPTIONS",
+        "path": "$.controls[0].presentation"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_PRESENTATION_OPTIONS",
+            "path": "$.controls[0].presentation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "presentation-with-options",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            },
+            "options": [
+              {
+                "value": 20,
+                "label": {
+                  "en": "20"
+                }
+              },
+              {
+                "value": 40,
+                "label": {
+                  "en": "40"
+                }
+              }
+            ]
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_PRESENTATION_OPTIONS",
+        "path": "$.controls[0].presentation"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_PRESENTATION_OPTIONS",
+            "path": "$.controls[0].presentation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "segmented-limit",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "segmented",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "Option 0"
+                }
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Option 1"
+                }
+              },
+              {
+                "value": "C",
+                "label": {
+                  "en": "Option 2"
+                }
+              },
+              {
+                "value": "D",
+                "label": {
+                  "en": "Option 3"
+                }
+              },
+              {
+                "value": "E",
+                "label": {
+                  "en": "Option 4"
+                }
+              },
+              {
+                "value": "F",
+                "label": {
+                  "en": "Option 5"
+                }
+              },
+              {
+                "value": "G",
+                "label": {
+                  "en": "Option 6"
+                }
+              },
+              {
+                "value": "H",
+                "label": {
+                  "en": "Option 7"
+                }
+              },
+              {
+                "value": "I",
+                "label": {
+                  "en": "Option 8"
+                }
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_PRESENTATION_OPTIONS",
+        "path": "$.controls[1].presentation"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_PRESENTATION_OPTIONS",
+            "path": "$.controls[1].presentation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "toggle-limit",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "toggle",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              },
+              {
+                "value": "C",
+                "label": {
+                  "en": "Third"
+                }
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_PRESENTATION_OPTIONS",
+        "path": "$.controls[1].presentation"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_PRESENTATION_OPTIONS",
+            "path": "$.controls[1].presentation"
+          }
+        ]
+      }
+    },
+    {
+      "id": "control-icon",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "raw-svg",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_ICON",
+        "path": "$.controls[0].icon"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_ICON",
+            "path": "$.controls[0].icon"
+          }
+        ]
+      }
+    },
+    {
+      "id": "option-icon",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "<svg/>"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_ICON",
+        "path": "$.controls[1].options[0].icon"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_ICON",
+            "path": "$.controls[1].options[0].icon"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-icon",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "lucide:code",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_ICON",
+        "path": "$.controlGroups[0].icon"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_ICON",
+            "path": "$.controlGroups[0].icon"
+          }
+        ]
+      }
+    },
+    {
+      "id": "groups-type",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": null
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUPS",
+        "path": "$.controlGroups"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUPS",
+            "path": "$.controlGroups"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "groups-limit",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "group-0",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-1",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-2",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-3",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-4",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-5",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-6",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-7",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-8",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-9",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-10",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-11",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-12",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-13",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-14",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-15",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-16",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-17",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-18",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-19",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-20",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-21",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-22",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-23",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-24",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-25",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-26",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-27",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-28",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-29",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-30",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-31",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-32",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-33",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-34",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-35",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-36",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-37",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-38",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-39",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-40",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-41",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-42",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-43",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-44",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-45",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-46",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-47",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-48",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-49",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-50",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-51",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-52",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-53",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-54",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-55",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-56",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-57",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-58",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-59",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-60",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-61",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-62",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-63",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          },
+          {
+            "id": "group-64",
+            "parentId": "appearance",
+            "label": {
+              "en": "Group"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUPS",
+        "path": "$.controlGroups"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUPS",
+            "path": "$.controlGroups"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-type",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          null
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUP",
+        "path": "$.controlGroups[0]"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP",
+            "path": "$.controlGroups[0]"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-reserved",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "appearance",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUP_RESERVED",
+        "path": "$.controlGroups[0].id"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_RESERVED",
+            "path": "$.controlGroups[0].id"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_PARENT",
+            "path": "$.controlGroups[1].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_PARENT",
+            "path": "$.controlGroups[2].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-duplicate",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          },
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUP_DUPLICATE",
+        "path": "$.controlGroups[3].id"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_DUPLICATE",
+            "path": "$.controlGroups[3].id"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-parent",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "missing",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUP_PARENT",
+        "path": "$.controlGroups[0].parentId"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_PARENT",
+            "path": "$.controlGroups[0].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_PARENT",
+            "path": "$.controlGroups[1].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_PARENT",
+            "path": "$.controlGroups[2].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-cycle",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "detail",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUP_CYCLE",
+        "path": "$.controlGroups[0].parentId"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_CYCLE",
+            "path": "$.controlGroups[0].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_CYCLE",
+            "path": "$.controlGroups[1].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_CYCLE",
+            "path": "$.controlGroups[2].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-depth",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "extra",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          },
+          {
+            "id": "extra",
+            "parentId": "detail",
+            "label": {
+              "en": "Extra"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUP_DEPTH",
+        "path": "$.controlGroups[3].parentId"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_DEPTH",
+            "path": "$.controlGroups[3].parentId"
+          },
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-label",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Группа"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "LOCALE_EN_REQUIRED",
+        "path": "$.controlGroups[0].label.en"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "LOCALE_EN_REQUIRED",
+            "path": "$.controlGroups[0].label.en"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-order",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": -1,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_ORDER",
+        "path": "$.controlGroups[0].order"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_ORDER",
+            "path": "$.controlGroups[0].order"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-collapsed",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "detail",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": "yes"
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUP_COLLAPSED",
+        "path": "$.controlGroups[0].collapsed"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_COLLAPSED",
+            "path": "$.controlGroups[0].collapsed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "group-reference",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "unknown",
+            "unit": "px",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        },
+        "controlGroups": [
+          {
+            "id": "paint",
+            "parentId": "appearance",
+            "label": {
+              "ru": "Оформление",
+              "en": "Paint"
+            },
+            "icon": "palette",
+            "order": 0,
+            "collapsed": false
+          },
+          {
+            "id": "fill",
+            "parentId": "paint",
+            "label": {
+              "ru": "Заливка",
+              "en": "Fill"
+            },
+            "icon": "fill"
+          },
+          {
+            "id": "detail",
+            "parentId": "fill",
+            "label": {
+              "ru": "Детали",
+              "en": "Detail"
+            }
+          }
+        ]
+      },
+      "accepted": false,
+      "diagnostic": {
+        "severity": "error",
+        "code": "CONTROL_GROUP_REFERENCE",
+        "path": "$.controls[0].group"
+      },
+      "actual": {
+        "accepted": false,
+        "diagnostics": [
+          {
+            "severity": "error",
+            "code": "CONTROL_GROUP_REFERENCE",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    },
+    {
+      "id": "legacy-no-groups-or-unit",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "appearance",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        }
+      },
+      "accepted": true,
+      "actual": {
+        "accepted": true,
+        "diagnostics": []
+      }
+    },
+    {
+      "id": "legacy-unknown-group",
+      "document": {
+        "assets": [],
+        "clips": [],
+        "controls": [
+          {
+            "id": "amount",
+            "kind": "number",
+            "defaultValue": 20,
+            "min": 1,
+            "max": 100,
+            "step": 1,
+            "group": "future",
+            "presentation": "slider",
+            "icon": "width",
+            "label": {
+              "ru": "Ширина",
+              "en": "Width"
+            }
+          },
+          {
+            "id": "mode",
+            "kind": "text",
+            "defaultValue": "A",
+            "group": "content",
+            "presentation": "dropdown",
+            "icon": "text",
+            "options": [
+              {
+                "value": "A",
+                "label": {
+                  "en": "First"
+                },
+                "icon": "check"
+              },
+              {
+                "value": "B",
+                "label": {
+                  "en": "Second"
+                },
+                "icon": "x"
+              }
+            ]
+          }
+        ],
+        "description": {
+          "en": "Neutral standalone contract fixture.",
+          "ru": "Нейтральная проверка контракта standalone."
+        },
+        "duration": 2,
+        "id": "neutral-standalone",
+        "kind": "standalone",
+        "label": {
+          "en": "Neutral standalone",
+          "ru": "Нейтральный standalone"
+        },
+        "layers": [],
+        "program": {
+          "commands": [
+            {
+              "color": "#101820",
+              "op": "clear"
+            },
+            {
+              "op": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 0,
+              "width": {
+                "op": "read",
+                "path": "controls.amount"
+              },
+              "height": 20,
+              "fill": "#fff"
+            },
+            {
+              "op": "text",
+              "text": {
+                "op": "read",
+                "path": "controls.mode"
+              },
+              "x": 0,
+              "y": 30,
+              "fill": "#fff"
+            }
+          ],
+          "kind": "graph",
+          "version": 1
+        },
+        "scenes": [
+          {
+            "duration": 2,
+            "id": "main",
+            "start": 0
+          }
+        ],
+        "schemaVersion": "sniptale.effect.v1",
+        "timeline": {
+          "phases": [],
+          "tracks": []
+        }
+      },
+      "accepted": true,
+      "diagnostic": {
+        "severity": "warning",
+        "code": "CONTROL_GROUP_UNKNOWN",
+        "path": "$.controls[0].group"
+      },
+      "actual": {
+        "accepted": true,
+        "diagnostics": [
+          {
+            "severity": "warning",
+            "code": "CONTROL_GROUP_UNKNOWN",
+            "path": "$.controls[0].group"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const commonMessages = defineMessageSource({
+  units: { count: { ru: 'шт.', en: 'items' } },
   actions: {
     details: {
       ru: 'Подробнее',

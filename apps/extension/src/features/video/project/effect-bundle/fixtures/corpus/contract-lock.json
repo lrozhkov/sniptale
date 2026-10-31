@@ -1,0 +1,9 @@
+{
+  "bundleEngine": "sniptale.bundle.engine2",
+  "bundleManifest": "sniptale.bundle.v1",
+  "corpusVersion": "0.1.0",
+  "effectSchema": "sniptale.effect.v1",
+  "effectSdkCommit": "4f52a70f26b3e0e8fd69630aafc5b37fcea73bf4",
+  "engineVersion": "2.0",
+  "formatVersion": "sniptale.bundle-corpus.v1"
+}

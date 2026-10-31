@@ -22,7 +22,8 @@
       },
       "defaultValue": "#fb923c",
       "group": "appearance",
-      "order": 0
+      "order": 0,
+      "presentation": "color"
     },
     {
       "id": "surface",
@@ -33,7 +34,8 @@
       },
       "defaultValue": "#171a20",
       "group": "appearance",
-      "order": 1
+      "order": 1,
+      "presentation": "color"
     },
     {
       "id": "ink",
@@ -44,21 +46,24 @@
       },
       "defaultValue": "#fafafa",
       "group": "appearance",
-      "order": 2
+      "order": 2,
+      "presentation": "color"
     },
     {
       "id": "entry",
       "kind": "number",
       "label": {
-        "ru": "Вход (% длительности)",
-        "en": "Entrance (% duration)"
+        "en": "Entrance duration",
+        "ru": "Длительность входа"
       },
       "defaultValue": 18,
       "min": 5,
       "max": 40,
       "step": 1,
       "group": "animation",
-      "order": 3
+      "order": 3,
+      "unit": "percent",
+      "presentation": "slider"
     },
     {
       "id": "font",
@@ -72,7 +77,9 @@
       "max": 40,
       "step": 1,
       "group": "typography",
-      "order": 4
+      "order": 4,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "bodyFont",
@@ -86,7 +93,9 @@
       "max": 24,
       "step": 1,
       "group": "typography",
-      "order": 5
+      "order": 5,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "title",
@@ -101,7 +110,8 @@
       "localizedDefaultValue": {
         "ru": "Анна Смирнова",
         "en": "Anna Smirnova"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "name2",
@@ -112,7 +122,8 @@
       },
       "defaultValue": "",
       "group": "content",
-      "order": 7
+      "order": 7,
+      "presentation": "text"
     },
     {
       "id": "subtitle",
@@ -127,7 +138,8 @@
       "localizedDefaultValue": {
         "ru": "Дизайнер продукта",
         "en": "Product designer"
-      }
+      },
+      "presentation": "text"
     }
   ],
   "layers": [],

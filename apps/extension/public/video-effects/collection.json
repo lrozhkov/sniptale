@@ -16,43 +16,43 @@
       "id": "sniptale-lower-third",
       "path": "effects/annotations/sniptale-lower-third/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "7c95edf538d422a340badd1d0a19cde11f8169b6decaf0e9558f3e77f097bc00",
-      "byteLength": 18064
+      "sha256": "da492f315d5df26e55ccb333a050043f81886931768801a83edf1b3c775dfad8",
+      "byteLength": 18402
     },
     {
       "id": "sniptale-title",
       "path": "effects/annotations/sniptale-title/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "c9f7e52782633cf373619e42855dcf4716fc9d6ba4ac88b0028aea0df007e379",
-      "byteLength": 18558
+      "sha256": "aa80499e9083d34bb9ea6f5d5ff047798ea76cd53c2584e8a9d5a93b8810c05e",
+      "byteLength": 19187
     },
     {
       "id": "sniptale-chapters",
       "path": "effects/annotations/sniptale-chapters/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "02fd16aec02696892a462fad5671f7be116b210af4ce2c8380901390211d4895",
-      "byteLength": 165068
+      "sha256": "1081cca9203877206e5ed2699f3566aed98bfc5c34dd824946e427739f6c40be",
+      "byteLength": 166011
     },
     {
       "id": "sniptale-callout",
       "path": "effects/annotations/sniptale-callout/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "638c3b30852c5018f841f9ed0c22aeb94d10ce7bfc02adb15a1574a580f11ca7",
-      "byteLength": 42165
+      "sha256": "e32d48bda404acfb58756595529a74b4c4481d208067139ee1c7e7cddf421e3f",
+      "byteLength": 42962
     },
     {
       "id": "sniptale-frame",
       "path": "effects/annotations/sniptale-frame/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "fc90b0aff0d75515f1664a24b258eedce83955dc3608cbd41f2b3b5c3ae951a4",
-      "byteLength": 11642
+      "sha256": "7e6a586875582042518639dd39e7a8e4713413955b594d2c98cf2f954944c2e2",
+      "byteLength": 11807
     },
     {
       "id": "sniptale-corners",
       "path": "effects/annotations/sniptale-corners/effect.sniptale-effect.json",
       "schemaVersion": "sniptale.effect.v1",
-      "sha256": "e9e3004f9bbb42119b81abb1f6d2ac5e7493be582e87110e77ce0a9a0e18c317",
-      "byteLength": 49327
+      "sha256": "361a9a19f464fc407d2120407456d874b92d464a0d3630c511b0f4138de3e13a",
+      "byteLength": 49544
     },
     {
       "id": "sniptale-spotlight",

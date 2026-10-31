@@ -1,5 +1,6 @@
 import {
   resolveEffectLocaleText,
+  resolveEffectV1ControlGroup,
   type EffectV1Document,
   type ControlDefinition,
 } from '@sniptale/runtime-contracts/effect-v1';
@@ -15,10 +16,9 @@ export function getEffectControlSections(document: EffectV1Document) {
     ['appearance', 'objectAppearance'],
     ['geometry', 'objectGeometry'],
     ['processing', 'objectProcessing'],
-    ['animation', 'objectAnimation'],
+    ['animation', 'effectAnimation'],
     ['advanced', 'objectAdvanced'],
   ] as const;
-  const known = new Set<string>(groups.map(([id]) => id));
   const controls = document.controls.filter((control) => !axes.has(control.id));
   return groups
     .map(([id, key]) => ({
@@ -29,7 +29,8 @@ export function getEffectControlSections(document: EffectV1Document) {
       controls: controls
         .filter(
           (control) =>
-            (control.group && known.has(control.group) ? control.group : 'advanced') === id
+            (resolveEffectV1ControlGroup(control.group, document.controlGroups) ?? 'advanced') ===
+            id
         )
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     }))
