@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import type { RecordingActionEvent } from '../../features/video/project/types';
 
-import { parseNativeAppInboundMessage } from './index';
+import { parseNativeAppInboundMessage, estimateNativeMessageJsonUtf8Bytes } from './index';
 
 it('accepts safe shortcut labels and bounded telemetry records', () => {
   expect(
@@ -44,7 +44,7 @@ function createRecordingStopped() {
   return {
     chunkCount: 1,
     controllerLeaseId: 'lease-1',
-    durationMs: 1000,
+    durationMs: 50_000,
     filename: 'recording.mp4',
     fps: 30,
     height: 720,
@@ -133,3 +133,181 @@ it.each([{ x: 1.01, y: 0.5 }, { x: -1, y: 0 }, { x: 0.5 }, { x: '0.5', y: 0.5 }]
     ).toMatchObject({ ok: false });
   }
 );
+
+function createCursorTelemetry(count: number) {
+  return {
+    actionEvents: [],
+    signals: [],
+    viewport: { width: 1280, height: 800, scrollX: 0, scrollY: 0, devicePixelRatio: 1 },
+    cursorTrack: {
+      captureMode: 'screen',
+      skin: { color: '#fff', hidden: false, scale: 1, shadow: true },
+      samples: Array.from({ length: count }, (_, index) => ({
+        id: `native-cursor-${index}`,
+        time: index * 10,
+        x: index % 1280,
+        y: index % 800,
+        visible: true,
+      })),
+    },
+  };
+}
+
+it.each([256, 257, 4096])('accepts %i valid native cursor samples', (count) => {
+  const message = { ...createRecordingStopped(), telemetry: createCursorTelemetry(count) };
+  expect(parseNativeAppInboundMessage(message)).toEqual({ ok: true, value: message });
+});
+
+it('rejects 4097 cursor samples', () => {
+  expect(
+    parseNativeAppInboundMessage({
+      ...createRecordingStopped(),
+      telemetry: createCursorTelemetry(4097),
+    })
+  ).toMatchObject({ ok: false, reason: 'malformed-message' });
+});
+
+it.each([
+  { unknownField: 1 },
+  { url: 'safe' },
+  { id: 'https://example.invalid/' },
+  { id: 'x'.repeat(121) },
+  { visible: 'true' },
+  { time: -1 },
+  { x: NaN },
+  { recordingPoint: { x: 2, y: 0 } },
+  { recordingPoint: { x: 0, y: 0, extra: 1 } },
+  { observationClockId: 3 },
+  { captureSegment: 0.5 },
+  { observation: 'unverified' },
+  { interpolation: 'unverified' },
+  { interpolationRange: { start: 0.8, end: 0.2 } },
+  { skinOverride: { color: '#fff', hidden: false, scale: 'large', shadow: true } },
+  { sourceAnchor: { kind: 'other', recordingId: 'r', sourceClipId: 's', sourceTime: 0 } },
+  { timeBasis: 'wall-clock' },
+])('rejects invalid fields at the final cursor sample: %j', (patch) => {
+  const telemetry = createCursorTelemetry(4096);
+  const samples = telemetry.cursorTrack.samples.map((sample, index) =>
+    index === 4095 ? { ...sample, ...patch } : sample
+  );
+  expect(
+    parseNativeAppInboundMessage({
+      ...createRecordingStopped(),
+      telemetry: { ...telemetry, cursorTrack: { ...telemetry.cursorTrack, samples } },
+    })
+  ).toMatchObject({ ok: false, reason: 'malformed-message' });
+});
+
+it('retains supported optional fields at the final sample', () => {
+  const telemetry = createCursorTelemetry(4096);
+  const samples = telemetry.cursorTrack.samples.map((sample, index) =>
+    index === 4095
+      ? {
+          ...sample,
+          recordingPoint: { x: 0.5, y: 0.5 },
+          observationClockId: 'clock-1',
+          captureSegment: 1,
+          observation: 'observed',
+          interpolation: 'LINEAR',
+          interpolationRange: { start: 0.2, end: 0.8 },
+          skinOverride: {
+            color: '#fff',
+            hidden: false,
+            scale: 1,
+            shadow: true,
+            animationPreset: 'NONE',
+            preset: 'ARROW',
+          },
+          sourceAnchor: {
+            kind: 'recording-source',
+            recordingId: 'r',
+            sourceClipId: 's',
+            sourceTime: 1,
+          },
+          timeBasis: 'project',
+        }
+      : sample
+  );
+  const message = {
+    ...createRecordingStopped(),
+    telemetry: { ...telemetry, cursorTrack: { ...telemetry.cursorTrack, samples } },
+  };
+  expect(parseNativeAppInboundMessage(message)).toEqual({ ok: true, value: message });
+});
+
+it('preserves generic privacy array, depth, node and key limits', () => {
+  let deep: Record<string, unknown> = {};
+  for (let index = 0; index < 9; index++) deep = { nested: deep };
+  const invalid = [
+    { values: Array.from({ length: 257 }, () => 1) },
+    deep,
+    {
+      values: Array.from({ length: 256 }, () =>
+        Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`v${i}`, 1]))
+      ),
+    },
+    Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`v${i}`, 1])),
+  ];
+  for (const data of invalid) {
+    const message = createRecordingStopped();
+    expect(
+      parseNativeAppInboundMessage({
+        ...message,
+        telemetry: {
+          ...message.telemetry,
+          actionEvents: [{ ...createSafeKeyEvent('Enter'), data }],
+        },
+      })
+    ).toMatchObject({ ok: false, reason: 'malformed-message' });
+    const telemetry = createCursorTelemetry(1);
+    expect(
+      parseNativeAppInboundMessage({
+        ...message,
+        telemetry: { ...telemetry, cursorTrack: { ...telemetry.cursorTrack, metadata: data } },
+      })
+    ).toMatchObject({ ok: false, reason: 'malformed-message' });
+    expect(
+      parseNativeAppInboundMessage({
+        ...message,
+        telemetry: {
+          ...telemetry,
+          cursorTrack: {
+            ...telemetry.cursorTrack,
+            skin: { ...telemetry.cursorTrack.skin, metadata: data },
+          },
+        },
+      })
+    ).toMatchObject({ ok: false, reason: 'malformed-message' });
+  }
+});
+
+it('retains the native wire byte budget for schema-valid cursor samples', () => {
+  const telemetry = createCursorTelemetry(4096);
+  const samples = telemetry.cursorTrack.samples.map((sample, index) => ({
+    ...sample,
+    id: 'x'.repeat(75) + String(index).padStart(5, '0'),
+    observationClockId: 'c'.repeat(80),
+  }));
+  const message = {
+    ...createRecordingStopped(),
+    telemetry: { ...telemetry, cursorTrack: { ...telemetry.cursorTrack, samples } },
+  };
+  const bytes = estimateNativeMessageJsonUtf8Bytes(message);
+  expect(bytes).toBeGreaterThan(921600);
+  expect(bytes).toBeLessThanOrEqual(1048576);
+  expect(parseNativeAppInboundMessage(message, bytes)).toMatchObject({
+    ok: false,
+    reason: 'oversized-payload',
+  });
+});
+
+it('keeps the generic 256-element metadata boundary valid', () => {
+  const message = createRecordingStopped();
+  const telemetry = {
+    ...message.telemetry,
+    actionEvents: [
+      { ...createSafeKeyEvent('Enter'), data: { values: Array.from({ length: 256 }, () => 1) } },
+    ],
+  };
+  expect(parseNativeAppInboundMessage({ ...message, telemetry })).toMatchObject({ ok: true });
+});

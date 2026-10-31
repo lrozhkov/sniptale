@@ -307,3 +307,73 @@ it('keeps completed recording tombstones from replaying commits after cleanup', 
   expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
   expect(mocks.openVideoEditorPageMock).toHaveBeenCalledTimes(1);
 });
+
+it('admits 4096 wire cursor samples and saves MP4 plus seconds exactly once', async () => {
+  const { parseNativeAppInboundMessage } = await import('../../../contracts/native-app');
+  const bytes = new TextEncoder().encode('mp4-cursor-source-bytes');
+  const stopped = await createRecordingStopped(bytes);
+  stopped.durationMs = 40960;
+  stopped.telemetry = {
+    actionEvents: [],
+    signals: [],
+    viewport: { width: 1280, height: 720, scrollX: 0, scrollY: 0, devicePixelRatio: 1 },
+    cursorTrack: {
+      captureMode: 'separate',
+      skin: {
+        color: '#fff',
+        hidden: false,
+        scale: 1,
+        shadow: true,
+        animationPreset: 'NONE',
+        preset: 'ARROW',
+      },
+      samples: Array.from({ length: 4096 }, (_, index) => ({
+        id: `native-cursor-${index}`,
+        time: index * 10,
+        x: index % 1280,
+        y: index % 720,
+        visible: true,
+      })),
+    },
+  };
+  const parsed = parseNativeAppInboundMessage(stopped);
+  expect(parsed.ok).toBe(true);
+  if (!parsed.ok || parsed.value.type !== 'app.recording.stopped')
+    throw new Error('Native recording rejected');
+  const { createNativeAppIngestionController } = await import('./controller');
+  const controller = createNativeAppIngestionController({
+    getCurrentControllerLeaseId: () => 'lease-1',
+  });
+  await controller.handleRecordingStopped(parsed.value);
+  const chunk = await createRecordingChunk(bytes);
+  expect(await controller.handleRecordingChunk(chunk)).toEqual([
+    expect.objectContaining({
+      type: 'extension.recording.ack',
+      receipt: { durable: true, sha256: stopped.sha256, totalBytes: bytes.byteLength },
+    }),
+  ]);
+  expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+  const blob: unknown = mocks.recordingSaveMock.mock.calls[0]?.[1];
+  expect(blob).toBeInstanceOf(Blob);
+  if (!(blob instanceof Blob)) throw new Error('Missing saved MP4 blob');
+  expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes);
+  expect(mocks.telemetrySaveMock).toHaveBeenCalledTimes(1);
+  expect(mocks.telemetrySaveMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      provenance: expect.objectContaining({ timeUnit: 'seconds' }),
+      cursorTrack: expect.objectContaining({
+        samples: expect.arrayContaining([
+          expect.objectContaining({ id: 'native-cursor-4095', time: 40.95 }),
+        ]),
+      }),
+    })
+  );
+  const { parseRecordingTelemetryEntry } =
+    await import('../../../composition/persistence/recordings/telemetry.guards');
+  const savedTelemetry = parseRecordingTelemetryEntry(mocks.telemetrySaveMock.mock.calls[0]?.[0]);
+  expect(savedTelemetry?.cursorTrack?.samples).toHaveLength(4096);
+  expect(stopped.telemetry.cursorTrack?.samples[4095]?.time).toBe(40950);
+  await controller.handleRecordingChunk(chunk);
+  expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+  expect(mocks.telemetrySaveMock).toHaveBeenCalledTimes(1);
+});
