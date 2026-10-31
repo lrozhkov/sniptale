@@ -47,7 +47,12 @@ export interface NativeRequestedQualitySettings {
 }
 
 export interface NativeSettingsWarning {
-  code: NativeCapabilityUnavailableReason | 'clamped' | 'unsupported-capability' | 'unknown';
+  code:
+    | NativeCapabilityUnavailableReason
+    | 'clamped'
+    | 'deferred-evaluation'
+    | 'unsupported-capability'
+    | 'unknown';
   field?: string;
   message?: string;
 }

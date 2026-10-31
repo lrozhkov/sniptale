@@ -156,6 +156,13 @@ it('preserves the consent state and permits retry after a trust write failure', 
 it('accepts Desktop settings only on the selected lease and never pushes extension settings', async () => {
   const ctx = setup(createNativeStorage());
   await selected(ctx);
+  const warnings = [
+    {
+      code: 'deferred-evaluation',
+      field: 'video.effectiveQuality',
+      message: 'recording quality evaluation is deferred until source geometry is known',
+    },
+  ];
   const snapshot = {
     type: 'app.settings.accepted',
     protocolVersion: 2,
@@ -166,12 +173,18 @@ it('accepts Desktop settings only on the selected lease and never pushes extensi
     effectiveSettings: {
       screenshots: nativeSettingsFixture.screenshots,
       video: nativeSettingsFixture.video,
-      warnings: [],
+      warnings,
     },
-    warnings: [],
+    warnings,
   };
   ctx.port.emitMessage(snapshot);
-  expect((await ctx.service.getStatus()).settingsRevision).toBe('desktop-revision');
+  expect(await ctx.service.getStatus()).toMatchObject({
+    connectionState: 'connected',
+    settingsRevision: 'desktop-revision',
+    warnings,
+    effectiveSettings: { warnings },
+  });
+  expect(ctx.port.disconnect).not.toHaveBeenCalled();
   ctx.port.emitMessage({ ...snapshot, controllerLeaseId: 'stale', revision: 'stale-revision' });
   expect((await ctx.service.getStatus()).settingsRevision).toBe('desktop-revision');
   expect(ctx.port.postMessage).not.toHaveBeenCalledWith(

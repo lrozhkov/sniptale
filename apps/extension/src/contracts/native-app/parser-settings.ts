@@ -25,7 +25,7 @@ const nativeAudioModes = new Set(['microphone', 'system', 'mixed']);
 const nativeHardwareAcceleration = new Set(['prefer', 'force-software']);
 const nativeQualityLevels = new Set<string>(Object.values(VideoQuality));
 const nativeEffectiveEncoders = new Set(['hardware', 'software']);
-const settingsWarningCodes = new Set([...appErrorCodes, 'clamped']);
+const settingsWarningCodes = new Set([...appErrorCodes, 'clamped', 'deferred-evaluation']);
 
 function isNativeFrameRate(value: unknown): boolean {
   return nativeFrameRates.has(value);
