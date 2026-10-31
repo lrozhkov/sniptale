@@ -178,6 +178,8 @@ it.each([true, false])(
       includeAiProviderSecrets: false,
       preservePreferences,
     });
+    expect(plan.local).toContain('sniptale.nativeApp.trustedClient');
+    expect(plan.session).toContain('sniptale.nativeApp.autoConnectPaused');
     expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('sync_connection');
     if (preservePreferences) expect(plan.local).not.toContain('sniptale-theme-preference');
     else expect(plan.local).toContain('sniptale-theme-preference');

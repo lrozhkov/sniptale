@@ -1,7 +1,6 @@
 import type { NativeAppInboundMessage } from '../../../contracts/native-app';
 import type { NativeAppRuntimeStatus } from '../../../contracts/native-app/runtime';
 import { applyNativeLeaseStatus } from './status-updates';
-import type { NativeSettingsSyncTracker } from './settings-sync-state';
 import { getNativeIngestionAuthorityGeneration } from '../../capture/native-app/lifecycle-gate';
 import { NativeInvocationReplayGuard } from './service-invocations';
 import type { NativeControllerAcquireReason } from './service-types';
@@ -48,7 +47,10 @@ export class NativeServiceAuthorityState {
   ownsLease(status: NativeAppRuntimeStatus, message: { controllerLeaseId: string }): boolean {
     return (
       this.handshakeAccepted &&
+      status.connectionState === 'connected' &&
       status.controllerLease?.status === 'granted' &&
+      status.controllerLease.selectionStatus === 'selected' &&
+      status.controllerLease.expiresAtEpochMs > Date.now() &&
       this.controllerLeaseGeneration === getNativeIngestionAuthorityGeneration() &&
       status.controllerLease.controllerLeaseId === message.controllerLeaseId
     );
@@ -79,7 +81,6 @@ export function applyNativeControllerLeaseAuthority(args: {
   extensionId: string;
   handshakeAccepted: boolean;
   message: ControllerLeaseMessage;
-  settingsSync: NativeSettingsSyncTracker;
   status: NativeAppRuntimeStatus;
   warn: (message: string) => void;
 }):
@@ -89,12 +90,11 @@ export function applyNativeControllerLeaseAuthority(args: {
     args.warn('Rejected native controller lease before accepted handshake');
     return { accepted: false };
   }
-  if (args.message.status === 'granted' && !isLeaseForCurrentConnection(args)) {
+  if (!isLeaseForCurrentConnection(args) || args.message.expiresAtEpochMs <= Date.now()) {
     args.warn('Rejected native controller lease for another connection');
     return { accepted: false };
   }
 
-  args.settingsSync.invalidate();
   return {
     accepted: true,
     resumeLeaseId: args.message.status === 'granted' ? args.message.controllerLeaseId : null,

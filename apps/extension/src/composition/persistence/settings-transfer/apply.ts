@@ -314,37 +314,7 @@ function applyVideoWrites(context: WriteBuildContext): void {
     if (video['outputProfile'] !== undefined)
       nextVideo.outputProfile = video['outputProfile'] as typeof nextVideo.outputProfile;
   }
-  const native = data('system.native');
-  if (native) {
-    const currentNative = nextVideo.native!;
-    const capture = asRecord(native['capture']);
-    const captureVideo = asRecord(capture?.['video']);
-    nextVideo.native = {
-      ...currentNative,
-      ...(capture?.['screenshots'] === undefined
-        ? {}
-        : { screenshots: capture['screenshots'] as typeof currentNative.screenshots }),
-      ...(native['tray'] === undefined
-        ? {}
-        : { trayActions: native['tray'] as typeof currentNative.trayActions }),
-      video: {
-        ...currentNative.video,
-        ...(captureVideo?.['advanced'] === undefined
-          ? {}
-          : { advanced: captureVideo['advanced'] as typeof currentNative.video.advanced }),
-        ...(captureVideo?.['codec'] === undefined
-          ? {}
-          : { codec: captureVideo['codec'] as typeof currentNative.video.codec }),
-        ...(captureVideo?.['enabled'] === undefined
-          ? {}
-          : { enabled: captureVideo['enabled'] as boolean }),
-        ...(native['telemetry'] === undefined
-          ? {}
-          : { telemetry: native['telemetry'] as typeof currentNative.video.telemetry }),
-      },
-    };
-  }
-  if (video || native) localWrites['sniptale_video_settings'] = nextVideo;
+  if (video) localWrites['sniptale_video_settings'] = nextVideo;
 }
 
 function applyStyleWrites(context: WriteBuildContext): void {

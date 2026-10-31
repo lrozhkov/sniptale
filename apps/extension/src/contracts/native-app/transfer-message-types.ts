@@ -53,7 +53,14 @@ export interface AppScreenshotCommitMessage {
   captureId: string;
 }
 
+export interface NativeDurableMediaReceipt {
+  durable: true;
+  sha256: string;
+  totalBytes: number;
+}
+
 export interface ExtensionScreenshotAckMessage {
+  receipt: NativeDurableMediaReceipt;
   type: 'extension.screenshot.ack';
   protocolVersion: number;
   controllerLeaseId: string;
@@ -140,6 +147,7 @@ export interface AppRecordingChunkMessage {
 }
 
 export interface ExtensionRecordingAckMessage {
+  receipt: NativeDurableMediaReceipt;
   type: 'extension.recording.ack';
   protocolVersion: number;
   controllerLeaseId: string;

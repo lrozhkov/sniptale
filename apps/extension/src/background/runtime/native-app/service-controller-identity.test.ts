@@ -49,7 +49,7 @@ beforeEach(() => {
   installChromeRuntimeInfo();
 });
 
-it('posts acquire with browser identity and a persisted profile key before settings sync', async () => {
+it('posts acquire with browser identity and a persisted profile key without pushing settings', async () => {
   const port = createNativeTestPort();
   const storage = createNativeStorage();
   const { createNativeAppRuntimeService } = await import('./service');
@@ -76,12 +76,13 @@ it('posts acquire with browser identity and a persisted profile key before setti
   );
 
   port.emitMessage(createNativeLease());
-  await expect(waitForNativePost(port, 'extension.settings.sync')).resolves.toEqual(
-    expect.objectContaining({ controllerLeaseId: 'lease-1' })
+  expect(port.postMessage).not.toHaveBeenCalledWith(
+    expect.objectContaining({ type: 'extension.settings.sync' })
   );
+  expect((await service.getStatus()).controllerLease?.controllerLeaseId).toBe('lease-1');
 });
 
-it('reuses the same profile key for reconnect and takeover acquire requests', async () => {
+it('reuses the same profile key for reconnect acquire requests', async () => {
   const firstPort = createNativeTestPort();
   const secondPort = createNativeTestPort();
   const connectNative = vi
@@ -102,18 +103,14 @@ it('reuses the same profile key for reconnect and takeover acquire requests', as
   firstPort.emitMessage(createNativeHello());
   const firstAcquire = await waitForNativePost(firstPort, 'extension.controller.acquire');
 
-  service.reconnect();
+  await service.reconnect();
   secondPort.emitMessage(createNativeHello());
   const reconnectAcquire = await waitForNativePost(secondPort, 'extension.controller.acquire');
 
   secondPort.emitMessage(createNativeLease());
-  service.takeController();
-  const takeoverAcquire = await waitForNativePost(secondPort, 'extension.controller.acquire', 2);
-
-  expect([firstAcquire, reconnectAcquire, takeoverAcquire]).toEqual([
+  expect([firstAcquire, reconnectAcquire]).toEqual([
     expect.objectContaining({ profileKey: 'profile:stable', reason: 'initial-connect' }),
     expect.objectContaining({ profileKey: 'profile:stable', reason: 'initial-connect' }),
-    expect.objectContaining({ profileKey: 'profile:stable', reason: 'user-requested-takeover' }),
   ]);
 });
 
@@ -128,9 +125,8 @@ it('does not post stale acquire when profile-key resolution finishes after recon
   const storage = createNativeStorage({
     'sniptale.nativeApp.controllerProfileKey': 'profile:fresh',
   });
-  storage.local.get
-    .mockReturnValueOnce(pendingRead.promise)
-    .mockResolvedValue({ 'sniptale.nativeApp.controllerProfileKey': 'profile:fresh' });
+  const trustedValues = await storage.local.get();
+  storage.local.get.mockReturnValueOnce(pendingRead.promise).mockResolvedValue(trustedValues);
   const { createNativeAppRuntimeService } = await import('./service');
   const service = createNativeAppRuntimeService({
     connectNative,
@@ -140,7 +136,7 @@ it('does not post stale acquire when profile-key resolution finishes after recon
 
   service.connect();
   firstPort.emitMessage(createNativeHello());
-  service.reconnect();
+  await service.reconnect();
   secondPort.emitMessage(createNativeHello());
   pendingRead.resolve({ 'sniptale.nativeApp.controllerProfileKey': 'profile:stale' });
 

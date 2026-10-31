@@ -1,4 +1,5 @@
 import {
+  NATIVE_APP_PROTOCOL_VERSION,
   NATIVE_HOST_TO_EXTENSION_MAX_MESSAGE_BYTES,
   NATIVE_MESSAGE_TARGET_MAX_JSON_UTF8_BYTES,
 } from '@sniptale/runtime-contracts/native-app/constants';
@@ -39,6 +40,12 @@ export function parseNativeAppInboundMessage(
     return fail('malformed-message', 'Native message root must be an object with type');
   }
 
+  if (
+    typeof input['protocolVersion'] === 'number' &&
+    input['protocolVersion'] !== NATIVE_APP_PROTOCOL_VERSION
+  ) {
+    return fail('unsupported-version', 'Unsupported native app protocol version');
+  }
   return validateMessageByType(input);
 }
 

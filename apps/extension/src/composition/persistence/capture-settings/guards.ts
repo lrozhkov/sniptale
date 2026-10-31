@@ -21,7 +21,6 @@ import {
 } from '@sniptale/runtime-contracts/video/types/microphone-processing';
 import { isBoolean, isNumber, isRecord, isString } from '../infrastructure/guards/primitives';
 import { INVALID_FIELD, type ParsedFieldValue } from './field-parser';
-import { parseOptionalNativeSettings } from './native-guards';
 
 interface ParsedVideoSettingsStorageValue {
   hasInvalidRoot: boolean;
@@ -235,7 +234,6 @@ const VIDEO_SETTINGS_FIELD_PARSERS = [
   ['controlledCursorCaptureEnabled', parseOptionalBoolean],
   ['recordingSurface', parseOptionalRecordingSurface],
   ['webcamPresentation', parseOptionalWebcamPresentation],
-  ['native', parseOptionalNativeSettings],
 ] as const satisfies ReadonlyArray<
   readonly [
     keyof VideoRecordingSettings,

@@ -8,15 +8,6 @@ import {
 } from 'react';
 
 import type { TranslationKey } from '../../../../platform/i18n';
-import {
-  loadVideoSettings,
-  mutateVideoSettings,
-} from '../../../../composition/persistence/capture-settings';
-import type {
-  NativeCaptureSettings,
-  VideoRecordingSettings,
-} from '@sniptale/runtime-contracts/video/types/types';
-import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { createNativeAppRuntimeClient } from '../../../runtime/native-app-client';
 import { settingsRuntimeMessagingTransport } from '../../../runtime/messaging';
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
@@ -31,7 +22,6 @@ type NativeAppSectionState = {
   error: string | null;
   loading: boolean;
   permissionGranted: boolean | null;
-  settings: VideoRecordingSettings;
   status: NativeAppRuntimeStatus | null;
 };
 type SetNativeAppSectionState = Dispatch<SetStateAction<NativeAppSectionState>>;
@@ -39,21 +29,15 @@ type RequestGuard = {
   isCurrent(): boolean;
 };
 
-const defaultSettings = DEFAULT_VIDEO_SETTINGS;
 const nativeStatusRefreshAttempts = 3;
 const nativeStatusRefreshDelayMs = 250;
 const nativeAppRuntimeClient = createNativeAppRuntimeClient(settingsRuntimeMessagingTransport);
-
-function getNativeSettings(settings: VideoRecordingSettings): NativeCaptureSettings {
-  return settings.native ?? (defaultSettings.native as NativeCaptureSettings);
-}
 
 function createInitialState(): NativeAppSectionState {
   return {
     error: null,
     loading: true,
     permissionGranted: null,
-    settings: defaultSettings,
     status: null,
   };
 }
@@ -72,22 +56,17 @@ function applyRuntimeResponse(
       ? null
       : normalizeNativeAppError(response.error ?? null, 'settings.nativeApp.actionError'),
     loading: false,
-    settings: response.settings ? { ...state.settings, native: response.settings } : state.settings,
     status: response.status ?? state.status,
   };
 }
 
 async function loadSectionState(): Promise<NativeAppSectionState> {
-  const [settings, permissionGranted] = await Promise.all([
-    loadVideoSettings(),
-    browserPermissions.contains({ permissions: ['nativeMessaging'] }),
-  ]);
+  const permissionGranted = await browserPermissions.contains({ permissions: ['nativeMessaging'] });
   if (!permissionGranted) {
     return {
       error: null,
       loading: false,
       permissionGranted: false,
-      settings,
       status: null,
     };
   }
@@ -98,7 +77,6 @@ async function loadSectionState(): Promise<NativeAppSectionState> {
       : normalizeNativeAppError(runtime.error ?? null, 'settings.nativeApp.loadError'),
     loading: false,
     permissionGranted: true,
-    settings,
     status: runtime.status ?? null,
   };
 }
@@ -163,38 +141,6 @@ async function refreshSectionState(args: {
   }
 }
 
-async function updateNativeSettings(args: {
-  guard: RequestGuard;
-  native: NativeCaptureSettings;
-  setState: SetNativeAppSectionState;
-  settings: VideoRecordingSettings;
-}): Promise<void> {
-  const nextSettings = { ...args.settings, native: args.native };
-  args.setState((current) => ({ ...current, error: null, settings: nextSettings }));
-  try {
-    const persistedSettings = await mutateVideoSettings((current) => ({
-      ...current,
-      native: args.native,
-    }));
-    const response = await nativeAppRuntimeClient.mutate('sync-settings');
-    if (!args.guard.isCurrent()) {
-      return;
-    }
-    args.setState((current) =>
-      applyRuntimeResponse({ ...current, settings: persistedSettings }, response)
-    );
-  } catch (error) {
-    if (!args.guard.isCurrent()) {
-      return;
-    }
-    args.setState((current) => ({
-      ...current,
-      error: getErrorMessage(error, 'settings.nativeApp.actionError'),
-      settings: args.settings,
-    }));
-  }
-}
-
 function waitForNativeStatusRefresh(): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, nativeStatusRefreshDelayMs);
@@ -219,11 +165,12 @@ async function refreshTransientReconnectStatus(
 async function runRuntimeAction(args: {
   guard: RequestGuard;
   operation: NativeRuntimeOperation;
+  clientId?: string;
   setState: SetNativeAppSectionState;
 }): Promise<void> {
   args.setState((current) => ({ ...current, error: null }));
   try {
-    const response = await nativeAppRuntimeClient.mutate(args.operation);
+    const response = await nativeAppRuntimeClient.mutate(args.operation, args.clientId);
     const resolved =
       args.operation === 'reconnect' ? await refreshTransientReconnectStatus(response) : response;
     if (!args.guard.isCurrent()) {
@@ -273,21 +220,46 @@ export function useNativeAppSectionController() {
     };
   }, [createRequestGuard]);
 
+  useEffect(() => {
+    let disposed = false;
+    let polling = false;
+    const timer = setInterval(async () => {
+      if (polling || state.permissionGranted !== true) return;
+      polling = true;
+      const generation = requestGenerationRef.current;
+      try {
+        const response = await nativeAppRuntimeClient.query();
+        if (!disposed && generation === requestGenerationRef.current) {
+          setState((current) =>
+            response.success
+              ? { ...current, status: response.status ?? current.status }
+              : applyRuntimeResponse(current, response)
+          );
+        }
+      } catch {
+        // The next status request can recover from a transient runtime disconnect.
+      } finally {
+        polling = false;
+      }
+    }, 1000);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+    };
+  }, [state.permissionGranted]);
+
   return {
     error: state.error,
-    handleRuntimeAction: (operation: NativeRuntimeOperation) =>
-      runRuntimeAction({ guard: createRequestGuard(), operation, setState }),
+    handleRuntimeAction: (operation: NativeRuntimeOperation, clientId?: string) =>
+      runRuntimeAction({
+        guard: createRequestGuard(),
+        operation,
+        setState,
+        ...(clientId ? { clientId } : {}),
+      }),
     loading: state.loading,
-    nativeSettings: getNativeSettings(state.settings),
     permissionGranted: state.permissionGranted,
     requestPermission: () => requestNativeAppPermission({ guard: createRequestGuard(), setState }),
     status: state.status,
-    updateNativeSettings: (native: NativeCaptureSettings) =>
-      updateNativeSettings({
-        guard: createRequestGuard(),
-        native,
-        setState,
-        settings: state.settings,
-      }),
   };
 }

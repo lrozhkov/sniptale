@@ -36,14 +36,14 @@ function createControlMessages() {
       actionId: 'open-settings',
       controllerLeaseId: 'lease-1',
       invocationId: 'invoke-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
       requestedAtEpochMs: 1,
       type: 'app.tray.actionRequested',
     },
     {
       controllerLeaseId: 'lease-1',
       invocationId: 'open-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
       requestedAtEpochMs: 1,
       section: 'native-app',
       type: 'app.openSettings.requested',
@@ -53,7 +53,7 @@ function createControlMessages() {
       commandId: 'screenshot-1',
       controllerLeaseId: 'lease-1',
       operation: 'screenshot',
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: 'app.command.accepted',
     },
   ];
@@ -82,7 +82,7 @@ function createScreenshotStart() {
     mimeType: 'image/png',
     mode: 'screen',
     openEditor: true,
-    protocolVersion: 1,
+    protocolVersion: 2,
     sha256: '0'.repeat(64),
     totalBytes: 3,
     type: 'app.screenshot.start',
@@ -94,7 +94,7 @@ function createScreenshotCommit() {
   return {
     captureId: 'capture-1',
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.commit',
   };
 }
@@ -117,7 +117,7 @@ function createRecordingStarted() {
       encoder: 'hardware',
       warnings: [],
     },
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     requestedQuality,
     requestedSettingsRevision: 'settings-1',
@@ -138,7 +138,7 @@ function createRecordingProgress() {
     bytesWritten: 3,
     controllerLeaseId: 'lease-1',
     durationMs: 10,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     status: 'recording',
     type: 'app.recording.progress',
@@ -155,7 +155,7 @@ function createRecordingStopped() {
     height: 720,
     mimeType: 'video/mp4',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     sha256: '0'.repeat(64),
     telemetry: { actionEvents: [], cursorTrack: null, signals: [], viewport: null },
@@ -173,7 +173,7 @@ function createRecordingChunk() {
     chunkRawBytes: 3,
     chunkSha256: '0'.repeat(64),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     type: 'app.recording.chunk',
   };
@@ -186,7 +186,39 @@ function createOperationFailed() {
     occurredAtEpochMs: 1,
     operation: 'screenshot',
     phase: 'capture',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.operation.failed',
   };
 }
+
+it('accepts signed desktop region origins on monitors left or above the primary display', () => {
+  for (const [x, y] of [
+    [-1920, -1080],
+    [-2147483648, 2147483647],
+  ]) {
+    const message = {
+      ...createRecordingStarted(),
+      source: { mode: 'region', region: { x, y, width: 1280, height: 720 } },
+    };
+    expect(parseNativeAppInboundMessage(message)).toMatchObject({ ok: true });
+  }
+});
+
+it('rejects nonintegral or out-of-range desktop region origins and invalid extents', () => {
+  const base = { x: -1920, y: -1080, width: 1280, height: 720 };
+  for (const region of [
+    { ...base, x: -2147483649 },
+    { ...base, y: 2147483648 },
+    { ...base, x: -0.5 },
+    { ...base, y: Number.NaN },
+    { ...base, width: 0 },
+    { ...base, height: -1 },
+  ]) {
+    expect(
+      parseNativeAppInboundMessage({
+        ...createRecordingStarted(),
+        source: { mode: 'region', region },
+      })
+    ).toMatchObject({ ok: false });
+  }
+});

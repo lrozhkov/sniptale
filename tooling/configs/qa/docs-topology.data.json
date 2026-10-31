@@ -4,6 +4,7 @@
   "activeDocuments": [
     "docs/architecture/code-organization.md",
     "docs/architecture/i18n-architecture.md",
+    "docs/architecture/native-app-integration.md",
     "docs/architecture/parser-architecture.md",
     "docs/architecture/persistence-contracts.md",
     "docs/architecture/platform-patterns-and-tradeoffs.md",

@@ -4,7 +4,7 @@ import { parseSettingsTransferDomains, SettingsTransferDomainError } from './dom
 
 describe('settings transfer registry', () => {
   it('covers every frozen visible Settings domain once', () => {
-    expect(new Set(SETTINGS_TRANSFER_DOMAIN_IDS).size).toBe(25);
+    expect(new Set(SETTINGS_TRANSFER_DOMAIN_IDS).size).toBe(24);
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('styles.surfaces');
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('styles.gradients');
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).not.toContain('access.capture-assets');
@@ -15,7 +15,7 @@ describe('settings transfer registry', () => {
     expect(byId.get('ai.providers.api-keys')).toBe('secret');
     expect(byId.get('ai.providers.security-binding')).toBe('secret');
     expect(byId.get('system.voice.microphone')).toBe('device-bound');
-    expect(byId.get('system.native.connection')).toBe('action/status');
+    expect(byId.has('system.native')).toBe(false);
   });
 
   it('rejects retired Web Snapshot resource settings instead of importing them', () => {
@@ -68,7 +68,7 @@ describe('settings transfer registry', () => {
     }
   });
 
-  it('rejects popup and native nested unknown or device-bound fields', () => {
+  it('rejects unknown popup fields and discards retired Desktop settings', () => {
     expect(() =>
       parseSettingsTransferDomains({
         'interface.preferences': {
@@ -77,14 +77,14 @@ describe('settings transfer registry', () => {
         },
       })
     ).toThrow(SettingsTransferDomainError);
-    expect(() =>
+    expect(
       parseSettingsTransferDomains({
         'system.native': {
           schemaVersion: 1,
           data: { capture: { video: { webcamDeviceId: 'camera-canary' } } },
         },
       })
-    ).toThrow(SettingsTransferDomainError);
+    ).toEqual({});
   });
 });
 
@@ -115,4 +115,15 @@ it('classifies page launcher and quick-action placements as one transferable int
     classification: 'transferable',
     kind: 'scalar',
   });
+});
+
+it('preserves browser preferences from an older complete backup without importing Desktop settings', () => {
+  const input = {
+    'system.native': { schemaVersion: 1, data: { capture: { video: { enabled: true } } } },
+    'interface.preferences': { schemaVersion: 1, data: { theme: 'dark', locale: 'en' } },
+  };
+  expect(parseSettingsTransferDomains(input)).toEqual({
+    'interface.preferences': input['interface.preferences'],
+  });
+  expect(input['system.native'].data.capture.video.enabled).toBe(true);
 });

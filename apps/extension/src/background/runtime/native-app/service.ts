@@ -1,5 +1,9 @@
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
-import type { NativeAppOutboundMessage } from '../../../contracts/native-app';
+import type {
+  AppHelloMessage,
+  NativeAppInboundMessage,
+  NativeAppOutboundMessage,
+} from '../../../contracts/native-app';
 import { cleanupStaleNativeTransferSessions } from '../../capture/native-app/persistence/staging';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createNativeAppIngestionController } from '../../capture/native-app/controller';
@@ -11,17 +15,23 @@ import {
 } from './service-default-deps';
 import { NativeHeartbeatController } from './service-heartbeat';
 import { dispatchNativeRuntimeMessage } from './service-message-dispatch';
-import { syncNativeSettings } from './service-settings-sync';
+import {
+  isNativeAppTrusted,
+  trustNativeAppClient,
+  forgetNativeAppClient,
+  isNativeAppAutoConnectPaused,
+  setNativeAppAutoConnectPaused,
+} from '../../../composition/persistence/native-app-trust';
+import { applyNativeHelloAuthority } from './service-hello';
 import { postNativeControllerAcquire } from './service-controller-acquire';
 import { parseNativeRuntimeMessage } from './service-message-parser';
-import { subscribeNativeQuickActionSettingsSync } from './service-quick-action-sync';
 import { openNativeRuntimePort } from './service-port';
 import type {
   NativeAppRuntimeService,
   NativeAppRuntimeServiceDeps,
   NativeControllerAcquireReason,
 } from './service-types';
-import { createNativeSettingsSyncTracker } from './settings-sync-state';
+import type { NativeAppRuntimeStatus } from '../../../contracts/native-app/runtime';
 import { createInitialNativeAppRuntimeStatus } from './status';
 import { clearNativeAuthorityStatus } from './status-updates';
 import { NativeServiceAuthorityState } from './service-authority';
@@ -29,43 +39,62 @@ import { NativeServiceAuthorityState } from './service-authority';
 const logger = createLogger({ namespace: 'BackgroundNativeAppRuntime' });
 
 class Controller implements NativeAppRuntimeService {
+  private intentGeneration = 0;
   private connectionId = createNativeConnectionId();
   private readonly authority = new NativeServiceAuthorityState();
   private port: chrome.runtime.Port | null = null;
+  private leaseTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingHello: AppHelloMessage | null = null;
+  private pendingQuitHello: AppHelloMessage | null = null;
   private readonly deps: ResolvedNativeRuntimeServiceDeps;
   private readonly heartbeat = new NativeHeartbeatController({
-    getHandshakeAccepted: () => this.authority.getHandshakeAccepted(),
+    getHandshakeAccepted: () => this.pendingHello !== null,
     post: (message) => this.post(message),
     reconnect: () => this.reconnectAfterStaleHeartbeat(),
+    handshakeTimedOut: () => {
+      this.disconnect('error');
+      this.status = applyNativeStartupError(
+        this.status,
+        new Error('Native app handshake timed out')
+      );
+    },
   });
   private readonly ingestion;
-  private readonly settingsSync = createNativeSettingsSyncTracker();
-  private status;
-  private unsubscribeQuickSync: (() => void) | null = null;
+  private status: NativeAppRuntimeStatus;
   private readonly warn = (message: string) => logger.warn(message);
 
   constructor(deps: ResolvedNativeRuntimeServiceDeps) {
     this.deps = deps;
     this.status = createInitialNativeAppRuntimeStatus(deps.hostName);
     this.ingestion = createNativeAppIngestionController({
-      getCurrentControllerLeaseId: () => this.status.controllerLease?.controllerLeaseId ?? null,
+      getCurrentControllerLeaseId: () => {
+        const lease = this.status.controllerLease;
+        return lease && this.ownsLease(lease) ? lease.controllerLeaseId : null;
+      },
     });
   }
 
-  connect(reason: NativeControllerAcquireReason = 'initial-connect'): void {
+  async canAutoConnect(): Promise<boolean> {
+    return !(await isNativeAppAutoConnectPaused(this.deps.storage.session));
+  }
+
+  connect(
+    reason: NativeControllerAcquireReason = 'initial-connect',
+    connectionIntent: 'user-requested' | 'automatic' = 'automatic'
+  ): void {
     if (this.port) {
       return;
     }
-    this.startQuickActionSyncListener();
     this.clearAuthority('connecting');
     this.connectionId = createNativeConnectionId();
     void cleanupStaleNativeTransferSessions();
     try {
-      this.openPort(reason);
+      this.openPort(reason, connectionIntent);
     } catch (error) {
       this.port = null;
       this.clearAuthority('missing-host');
       this.status = applyNativeStartupError(this.status, error);
+      this.scheduleReconnect();
     }
   }
 
@@ -77,35 +106,57 @@ class Controller implements NativeAppRuntimeService {
     this.disconnect('not-connected');
   }
 
-  reconnect(): void {
-    this.port?.disconnect();
-    this.port = null;
-    this.connect('initial-connect');
+  async reconnect(): Promise<void> {
+    this.disconnect('not-connected');
+    const generation = this.intentGeneration;
+    if (
+      !(await setNativeAppAutoConnectPaused(
+        this.deps.storage.session,
+        false,
+        () => generation === this.intentGeneration
+      ))
+    )
+      return;
+    this.heartbeat.resetRetries();
+    this.connect('initial-connect', 'user-requested');
   }
 
   quiesceForPrivacyErasure(): void {
     this.disconnect('not-connected');
   }
 
-  syncSettings = async (): Promise<void> => {
-    await this.sync();
-  };
-
-  takeController(): void {
-    if (!this.port) {
-      this.connect('user-requested-takeover');
-      return;
+  async trustClient(clientId: string): Promise<void> {
+    const hello = this.pendingHello;
+    const port = this.port;
+    if (
+      !hello ||
+      hello.appIdentity.clientId !== clientId ||
+      this.status.connectionState !== 'trust-required'
+    ) {
+      throw new Error('Desktop identity changed. Check the connection again.');
     }
-    if (!this.authority.getHandshakeAccepted()) {
-      this.authority.setPendingReason('user-requested-takeover');
-      return;
-    }
-    this.acquire('user-requested-takeover');
+    const isCurrent = () => this.port === port && this.pendingHello === hello;
+    const saved = await trustNativeAppClient({
+      storage: this.deps.storage.local,
+      hostName: this.deps.hostName,
+      clientId,
+      isCurrent,
+    });
+    if (saved && isCurrent()) this.dispatch(hello);
   }
 
-  private openPort(reason: NativeControllerAcquireReason): void {
+  async forgetClient(): Promise<void> {
+    this.disconnect('not-connected');
+    await forgetNativeAppClient(this.deps.storage.local);
+  }
+
+  private openPort(
+    reason: NativeControllerAcquireReason,
+    connectionIntent: 'user-requested' | 'automatic'
+  ): void {
     this.port = openNativeRuntimePort({
       connectNative: this.deps.connectNative,
+      connectionIntent,
       handleDisconnect: (port) => this.handleDisconnect(port),
       handleMessage: this.handleMessage,
       hostName: this.deps.hostName,
@@ -118,6 +169,7 @@ class Controller implements NativeAppRuntimeService {
   }
 
   private disconnect(nextState: Parameters<typeof clearNativeAuthorityStatus>[1]): void {
+    this.intentGeneration += 1;
     const activePort = this.port;
     this.port = null;
     try {
@@ -133,33 +185,75 @@ class Controller implements NativeAppRuntimeService {
       return;
     }
     const lastError = runtimeInfo.getLastError();
+    const pendingQuit = this.pendingQuitHello;
     this.port = null;
     this.clearAuthority(lastError?.message?.includes('policy') ? 'policy-denied' : 'missing-host');
     this.status = applyNativeDisconnectError(this.status, lastError);
-  }
-
-  private clearAuthority(nextState: Parameters<typeof clearNativeAuthorityStatus>[1]): void {
-    this.authority.clear();
-    this.heartbeat.stop();
-    this.settingsSync.invalidate();
-    this.status = clearNativeAuthorityStatus(this.status, nextState);
-  }
-
-  private startQuickActionSyncListener(): void {
-    if (this.unsubscribeQuickSync) {
+    if (pendingQuit) {
+      // Resolve the installation pin before accepting Quit or retrying this closed bridge.
+      this.pendingHello = pendingQuit;
+      this.pendingQuitHello = pendingQuit;
       return;
     }
-    this.unsubscribeQuickSync = subscribeNativeQuickActionSettingsSync({
-      storage: this.deps.storage,
-      sync: () => this.sync(),
+    if (this.status.connectionState !== 'policy-denied') this.scheduleReconnect();
+  }
+
+  private scheduleReconnect(): void {
+    if (this.heartbeat.scheduleReconnect()) {
+      this.status = { ...this.status, connectionState: 'reconnecting' };
+    } else {
+      this.status = applyNativeStartupError(
+        { ...this.status, connectionState: 'error' },
+        new Error('Native app reconnect attempts exhausted')
+      );
+    }
+  }
+
+  private handleUserQuit(): void {
+    if (!this.authority.getHandshakeAccepted()) return;
+    this.disconnect('not-connected');
+    const generation = this.intentGeneration;
+    void setNativeAppAutoConnectPaused(
+      this.deps.storage.session,
+      true,
+      () => generation === this.intentGeneration
+    ).catch((error: unknown) => {
+      if (generation === this.intentGeneration)
+        this.status = applyNativeStartupError({ ...this.status, connectionState: 'error' }, error);
     });
   }
 
+  private clearAuthority(nextState: Parameters<typeof clearNativeAuthorityStatus>[1]): void {
+    this.pendingHello = null;
+    this.pendingQuitHello = null;
+    this.authority.clear();
+    if (this.leaseTimer !== null) clearTimeout(this.leaseTimer);
+    this.leaseTimer = null;
+    this.heartbeat.stop();
+    this.status = clearNativeAuthorityStatus(this.status, nextState);
+  }
+
   private post = (message: NativeAppOutboundMessage): void => {
-    this.port?.postMessage(message);
+    const activePort = this.port;
+    try {
+      activePort?.postMessage(message);
+    } catch (error) {
+      if (activePort && activePort === this.port) {
+        this.handleDisconnect(activePort);
+        this.status = applyNativeStartupError(this.status, error);
+      }
+    }
   };
 
   private acquire(reason: NativeControllerAcquireReason): void {
+    if (this.leaseTimer !== null) clearTimeout(this.leaseTimer);
+    this.leaseTimer = setTimeout(() => {
+      this.disconnect('error');
+      this.status = applyNativeStartupError(
+        this.status,
+        new Error('Native app handshake timed out')
+      );
+    }, 15_000);
     void postNativeControllerAcquire({
       connectionId: this.connectionId,
       extensionId: chrome.runtime.id,
@@ -175,22 +269,8 @@ class Controller implements NativeAppRuntimeService {
   }
 
   private reconnectAfterStaleHeartbeat(): void {
-    this.port?.disconnect();
-    this.port = null;
+    this.disconnect('not-connected');
     this.connect('stale-controller-recovery');
-  }
-
-  private async sync(): Promise<void> {
-    await syncNativeSettings({
-      getCapabilities: () => this.status.capabilities,
-      getLease: () => this.status.controllerLease,
-      hasGrantedLease: this.ownsLease,
-      post: this.post,
-      settingsSync: this.settingsSync,
-      updateStatus: (patch) => {
-        this.status = { ...this.status, ...patch };
-      },
-    });
   }
 
   private ownsLease = (message: { controllerLeaseId: string }): boolean => {
@@ -211,11 +291,82 @@ class Controller implements NativeAppRuntimeService {
     });
     this.status = parsed.status;
     if (!parsed.message) {
+      const failure = this.status;
+      this.disconnect(failure.connectionState);
+      this.status = failure;
       return;
     }
+    if (parsed.message.type === 'app.connection.closed') {
+      if (this.authority.getHandshakeAccepted()) this.handleUserQuit();
+      else this.pendingQuitHello = this.pendingHello;
+      return;
+    }
+    if (parsed.message.type === 'app.hello') {
+      void this.receiveHello(parsed.message, messagePort);
+      return;
+    }
+    if (
+      parsed.message.type === 'app.pong' &&
+      this.pendingHello &&
+      !this.authority.getHandshakeAccepted()
+    ) {
+      this.heartbeat.notePong();
+      return;
+    }
+    this.dispatch(parsed.message);
+  };
+
+  private async receiveHello(hello: AppHelloMessage, port: chrome.runtime.Port): Promise<void> {
+    const pendingReason = this.authority.getPendingReason();
+    this.authority.clear();
+    this.authority.setPendingReason(pendingReason);
+    this.pendingHello = null;
+    this.pendingQuitHello = null;
+    const next = applyNativeHelloAuthority({
+      message: hello,
+      pendingReason: null,
+      status: this.status,
+    });
+    this.status = next.status;
+    if (!next.handshakeAccepted) {
+      this.disconnect(next.status.connectionState);
+      this.status = next.status;
+      return;
+    }
+    this.pendingHello = hello;
+    this.status = { ...this.status, connectionState: 'trust-required', controllerLease: null };
+    try {
+      const trusted = await isNativeAppTrusted(
+        this.deps.storage.local,
+        this.deps.hostName,
+        hello.appIdentity.clientId
+      );
+      if (this.pendingHello !== hello) return;
+      const closedWithQuit = this.port === null && this.pendingQuitHello === hello;
+      if (this.port !== port && !closedWithQuit) return;
+      if (trusted && this.pendingQuitHello === hello) {
+        this.authority.setHandshakeAccepted(true);
+        this.handleUserQuit();
+      } else if (closedWithQuit) {
+        this.clearAuthority('missing-host');
+        this.scheduleReconnect();
+      } else if (trusted) this.dispatch(hello);
+    } catch (error) {
+      if (this.pendingHello === hello) {
+        this.disconnect('error');
+        this.status = applyNativeStartupError(this.status, error);
+      }
+    }
+  }
+
+  private dispatch(message: NativeAppInboundMessage): void {
+    const messagePort = this.port;
     dispatchNativeRuntimeMessage(
       {
         acceptLeaseGeneration: () => {
+          if (this.leaseTimer !== null) clearTimeout(this.leaseTimer);
+          this.leaseTimer = null;
+          this.heartbeat.resetRetries();
           this.authority.acceptLeaseGeneration();
         },
         acquire: (reason) => this.acquire(reason),
@@ -232,20 +383,22 @@ class Controller implements NativeAppRuntimeService {
           this.heartbeat.notePong();
         },
         ownsLease: this.ownsLease,
-        post: this.post,
+        post: (response) => {
+          if (messagePort !== this.port) return;
+          if ('controllerLeaseId' in response && !this.ownsLease(response)) return;
+          this.post(response);
+        },
         setHandshakeAccepted: (accepted) => {
           this.authority.setHandshakeAccepted(accepted);
         },
         setStatus: (status) => {
           this.status = status;
         },
-        settingsSync: this.settingsSync,
-        sync: () => this.sync(),
         warn: this.warn,
       },
-      parsed.message
+      message
     );
-  };
+  }
 }
 
 export function createNativeAppRuntimeService(

@@ -1,3 +1,5 @@
+import { isNativeAppIdentity } from '../../../native-app/parser-platform';
+import { isControllerLease } from '../../../native-app/parser-status';
 // policyStateIds: [] - runtime native-app contract guards use static enum tables only.
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
@@ -14,7 +16,6 @@ import {
   isString,
 } from '../../validators/index';
 import {
-  isNativeCaptureSettings,
   isNativeEffectiveSettings,
   isNativeSettingsWarnings,
 } from '../../../native-app/parser-settings';
@@ -23,8 +24,11 @@ type PartialRuntimeRegistry = Partial<
   MessageContractRegistry<RuntimeRequestByType, RuntimeResponseByType>
 >;
 
-const nativeAppOperations = new Set(['reconnect', 'take-controller', 'sync-settings']);
+const nativeAppOperations = new Set(['reconnect', 'trust-client', 'forget-client']);
 const connectionStates = new Set([
+  'reconnecting',
+  'trust-required',
+  'selection-required',
   'not-connected',
   'connecting',
   'connected',
@@ -38,7 +42,6 @@ const connectionStates = new Set([
   'repair-required',
   'error',
 ]);
-const leaseStatuses = new Set(['granted', 'owned-by-other-profile', 'rejected']);
 
 function isNativeAppOperation(value: unknown): boolean {
   return isString(value) && nativeAppOperations.has(value);
@@ -98,22 +101,6 @@ function isNativeAppStatus(value: unknown): boolean {
     (value['lastError'] === null || isNativeAppError(value['lastError'])) &&
     (value['settingsRevision'] === null || isString(value['settingsRevision'])) &&
     isNativeInstall(value['install'])
-  );
-}
-
-function isNativeControllerLease(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    isNumber(value['protocolVersion']) &&
-    isString(value['controllerLeaseId']) &&
-    isRecord(value['controller']) &&
-    isString(value['controller']['extensionId']) &&
-    isString(value['controller']['browserFamily']) &&
-    isString(value['controller']['profileKey']) &&
-    isString(value['controller']['connectionId']) &&
-    isNumber(value['expiresAtEpochMs']) &&
-    isString(value['status']) &&
-    leaseStatuses.has(value['status'])
   );
 }
 
@@ -177,11 +164,13 @@ function isNativeTrayShortcutPriority(value: unknown): boolean {
 function isNativeRuntimeStatus(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['appIdentity'] === null || isNativeAppIdentity(value['appIdentity'])) &&
     (value['appStatus'] === null || isNativeAppStatus(value['appStatus'])) &&
     (value['capabilities'] === null || isNativeCapabilities(value['capabilities'])) &&
     isString(value['connectionState']) &&
     connectionStates.has(value['connectionState']) &&
-    (value['controllerLease'] === null || isNativeControllerLease(value['controllerLease'])) &&
+    (value['controllerLease'] === null ||
+      (isRecord(value['controllerLease']) && isControllerLease(value['controllerLease']))) &&
     (value['effectiveSettings'] === null ||
       isNativeEffectiveSettings(value['effectiveSettings'])) &&
     (value['error'] === null || isNativeAppError(value['error'])) &&
@@ -207,7 +196,7 @@ export const runtimeNativeAppMessageContracts = {
     parseResponse: createGuardParser(
       'runtime NATIVE_APP_QUERY response',
       createRuntimeResponseGuard({
-        optional: { settings: isNativeCaptureSettings, status: isNativeRuntimeStatus },
+        optional: { status: isNativeRuntimeStatus },
       })
     ),
   },
@@ -217,12 +206,13 @@ export const runtimeNativeAppMessageContracts = {
       createMessageGuard({
         type: MessageType.NATIVE_APP_MUTATION,
         required: { operation: isNativeAppOperation, requestId: isString },
+        optional: { clientId: (value) => isString(value) && /^[a-f0-9]{64}$/.test(value) },
       })
     ),
     parseResponse: createGuardParser(
       'runtime NATIVE_APP_MUTATION response',
       createRuntimeResponseGuard({
-        optional: { settings: isNativeCaptureSettings, status: isNativeRuntimeStatus },
+        optional: { status: isNativeRuntimeStatus },
       })
     ),
   },

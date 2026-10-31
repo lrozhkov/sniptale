@@ -186,6 +186,7 @@ export async function handleNativeScreenshotCommit(
 
   return [
     {
+      receipt: { durable: true, sha256: session.sha256, totalBytes: session.totalBytes },
       assetId: entry.id,
       captureId: message.captureId,
       controllerLeaseId: message.controllerLeaseId,

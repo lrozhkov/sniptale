@@ -164,7 +164,7 @@ beforeEach(() => {
 
 it('reads every visible domain while removing secret and device-bound state', async () => {
   const snapshot = await readSettingsTransferSnapshot();
-  expect(Object.keys(snapshot.domains)).toHaveLength(25);
+  expect(Object.keys(snapshot.domains)).toHaveLength(24);
   expect(snapshot.domains['ai.providers']?.data).toEqual({
     items: [
       {

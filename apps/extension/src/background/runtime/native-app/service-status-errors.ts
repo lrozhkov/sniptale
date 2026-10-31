@@ -21,7 +21,7 @@ export function applyNativeParseErrorStatus(
 ): NativeAppRuntimeStatus {
   return {
     ...status,
-    connectionState: 'error',
+    connectionState: error.reason === 'unsupported-version' ? 'incompatible-protocol' : 'error',
     error: {
       code: error.reason,
       message: error.error,

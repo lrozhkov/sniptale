@@ -13,7 +13,7 @@ it('dispatches recoverable operation failures without changing connection state'
     occurredAtEpochMs: 1,
     operation: 'screenshot',
     phase: 'transfer-channel',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.operation.failed',
   });
 
@@ -48,14 +48,7 @@ function createContext() {
     setStatus: vi.fn((next: NativeAppRuntimeStatus) => {
       status = next;
     }),
-    settingsSync: {
-      acceptRevision: vi.fn(),
-      invalidate: vi.fn(),
-      isCurrent: vi.fn(),
-      nextSequence: vi.fn(),
-      setPendingRevision: vi.fn(),
-    },
-    sync: vi.fn(async () => undefined),
+
     warn: vi.fn(),
   };
 }
@@ -74,6 +67,7 @@ function createIngestion(): NativeAppIngestionController {
 
 function createStatus(): NativeAppRuntimeStatus {
   return {
+    appIdentity: null,
     appStatus: null,
     capabilities: null,
     connectionState: 'connected',

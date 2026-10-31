@@ -10,6 +10,7 @@ export function openNativeRuntimePort(args: {
   handleMessage: (message: unknown, port: chrome.runtime.Port) => void;
   hostName: string;
   reason: NativeControllerAcquireReason;
+  connectionIntent: 'user-requested' | 'automatic';
   setPendingReason: (reason: NativeControllerAcquireReason) => void;
 }): chrome.runtime.Port {
   const port = args.connectNative(args.hostName);
@@ -17,6 +18,7 @@ export function openNativeRuntimePort(args: {
   port.onDisconnect.addListener(() => args.handleDisconnect(port));
   port.postMessage(
     createNativeHelloMessage({
+      connectionIntent: args.connectionIntent,
       extensionId: chrome.runtime.id,
       extensionVersion: runtimeInfo.getManifest().version ?? MIN_SUPPORTED_EXTENSION_VERSION,
     })

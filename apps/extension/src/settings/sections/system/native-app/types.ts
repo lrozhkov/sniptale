@@ -1,1 +1,1 @@
-export type NativeRuntimeOperation = 'reconnect' | 'sync-settings' | 'take-controller';
+export type { NativeAppMutationOperation as NativeRuntimeOperation } from '../../../../contracts/native-app/runtime';

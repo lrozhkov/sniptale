@@ -212,6 +212,7 @@ export async function handleNativeRecordingChunk(
       controllerLeaseId: message.controllerLeaseId,
       protocolVersion: message.protocolVersion,
       recordingId: message.recordingId,
+      receipt: { durable: true, sha256: updated.sha256, totalBytes: updated.totalBytes },
       type: 'extension.recording.ack',
     },
   ];

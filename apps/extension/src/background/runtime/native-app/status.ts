@@ -2,6 +2,7 @@ import type { NativeAppRuntimeStatus } from '../../../contracts/native-app/runti
 
 export function createInitialNativeAppRuntimeStatus(hostName: string): NativeAppRuntimeStatus {
   return {
+    appIdentity: null,
     appStatus: null,
     capabilities: null,
     connectionState: 'not-connected',

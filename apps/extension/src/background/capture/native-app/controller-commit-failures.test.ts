@@ -93,7 +93,7 @@ async function createRecordingStopped(bytes: Uint8Array): Promise<AppRecordingSt
     height: 720,
     mimeType: 'video/mp4',
     openEditor: true,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     sha256: await sha256Hex(bytes),
     telemetry: { actionEvents: [], cursorTrack: null, signals: [], viewport: null },
@@ -111,7 +111,7 @@ async function createRecordingChunk(bytes: Uint8Array): Promise<AppRecordingChun
     chunkRawBytes: bytes.byteLength,
     chunkSha256: await sha256Hex(bytes),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     type: 'app.recording.chunk',
   };
@@ -173,7 +173,13 @@ it('acks recording commits when telemetry or editor opening fails after durable 
   mocks.editorFails = true;
 
   await expect(controller.handleRecordingChunk(await createRecordingChunk(bytes))).resolves.toEqual(
-    [expect.objectContaining({ recordingId: 'recording-1', type: 'extension.recording.ack' })]
+    [
+      expect.objectContaining({
+        recordingId: 'recording-1',
+        type: 'extension.recording.ack',
+        receipt: { durable: true, sha256: await sha256Hex(bytes), totalBytes: bytes.byteLength },
+      }),
+    ]
   );
   expect(mocks.recordingSaveMock).toHaveBeenCalled();
   expect(mocks.telemetrySaveMock).toHaveBeenCalled();

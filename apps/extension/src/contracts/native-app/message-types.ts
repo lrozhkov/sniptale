@@ -1,4 +1,5 @@
 import type {
+  AppConnectionClosedMessage,
   AppControllerLeaseMessage,
   AppHelloMessage,
   AppPongMessage,
@@ -6,16 +7,12 @@ import type {
   ExtensionControllerAcquireMessage,
   ExtensionHelloMessage,
   ExtensionPingMessage,
-  ExtensionSettingsSyncMessage,
 } from '@sniptale/runtime-contracts/native-app/handshake-message-types';
 import type {
   AppCommandAcceptedMessage,
   AppOpenSettingsRequestedMessage,
   AppOperationFailedMessage,
   AppTrayActionRequestedMessage,
-  ExtensionRecordingControlCommandMessage,
-  ExtensionRecordingStartCommandMessage,
-  ExtensionScreenshotCaptureCommandMessage,
   ExtensionTrayActionResultMessage,
 } from './control-message-types';
 import type {
@@ -39,6 +36,7 @@ export type * from '@sniptale/runtime-contracts/native-app/handshake-message-typ
 export type * from './transfer-message-types';
 
 export type NativeAppInboundMessage =
+  | AppConnectionClosedMessage
   | AppHelloMessage
   | AppControllerLeaseMessage
   | AppSettingsAcceptedMessage
@@ -58,12 +56,8 @@ export type NativeAppInboundMessage =
 export type NativeAppOutboundMessage =
   | ExtensionHelloMessage
   | ExtensionControllerAcquireMessage
-  | ExtensionSettingsSyncMessage
   | ExtensionPingMessage
   | ExtensionTrayActionResultMessage
-  | ExtensionScreenshotCaptureCommandMessage
-  | ExtensionRecordingStartCommandMessage
-  | ExtensionRecordingControlCommandMessage
   | ExtensionScreenshotAckMessage
   | ExtensionScreenshotChunkRequestMessage
   | ExtensionScreenshotRejectMessage

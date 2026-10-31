@@ -112,7 +112,7 @@ async function createScreenshotStart(bytes: Uint8Array): Promise<AppScreenshotSt
     mimeType: 'image/png',
     mode: 'screen',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     sha256: await sha256Hex(bytes),
     totalBytes: bytes.byteLength,
     type: 'app.screenshot.start',
@@ -129,7 +129,7 @@ async function createScreenshotChunk(bytes: Uint8Array): Promise<AppScreenshotCh
     chunkRawBytes: bytes.byteLength,
     chunkSha256: await sha256Hex(bytes),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.chunk',
   };
 }
@@ -144,7 +144,7 @@ async function createRecordingStopped(bytes: Uint8Array): Promise<AppRecordingSt
     height: 720,
     mimeType: 'video/mp4',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     sha256: await sha256Hex(bytes),
     telemetry: null,

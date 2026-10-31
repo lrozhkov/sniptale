@@ -3,6 +3,34 @@ import { settingsNativeAppTrayMessages } from './native-app-tray';
 
 export const settingsNativeAppMessages = defineMessageSource({
   ...settingsNativeAppTrayMessages,
+  incompatibleProtocolHelp: {
+    ru: 'Версии протокола Desktop и расширения различаются. Обновите приложение и расширение, затем проверьте подключение.',
+    en: 'Desktop and the extension use different protocol versions. Update both and check the connection.',
+  },
+  connectionStateReconnecting: { ru: 'Повторное подключение', en: 'Reconnecting' },
+  reconnectExhausted: {
+    ru: 'Не удалось восстановить подключение к Desktop. Запустите приложение и проверьте подключение.',
+    en: 'Could not reconnect to Desktop. Start the app and check the connection.',
+  },
+  desktopSettingsOnly: {
+    ru: 'Запись, горячие клавиши, данные курсора и место сохранения настраиваются в Desktop. Выберите браузер для получения файлов в приложении.',
+    en: 'Configure recording, hotkeys, cursor data, and save locations in Desktop. Select the receiving browser in the app.',
+  },
+  trustClient: { ru: 'Доверять приложению', en: 'Trust this app' },
+  forgetClient: { ru: 'Отозвать доверие', en: 'Forget this app' },
+  trustDescription: {
+    ru: 'Подтвердите подключение установленного приложения. Доверие сохранится после перезапуска. Идентификатор установки:',
+    en: 'Confirm the installed app connection. Trust remains after restart. Installation identity:',
+  },
+  connectionStateTrustRequired: { ru: 'Нужно подтверждение', en: 'Trust required' },
+  connectionStateSelectionRequired: {
+    ru: 'Выберите браузер в Desktop',
+    en: 'Select a browser in Desktop',
+  },
+  handshakeTimeout: {
+    ru: 'Desktop не ответил. Запустите приложение и проверьте подключение ещё раз.',
+    en: 'Desktop did not respond. Start the app and check the connection again.',
+  },
   title: {
     ru: 'Приложение Sniptale',
     en: 'Sniptale app',
@@ -16,8 +44,8 @@ export const settingsNativeAppMessages = defineMessageSource({
     en: 'Allow access to the Sniptale app',
   },
   permissionRequiredDescription: {
-    ru: 'Подключение, захват, команды и данные действий скрыты, пока вы явно не разрешите расширению связь с установленным приложением.',
-    en: 'Connection, capture, commands, and action data stay hidden until you explicitly allow the extension to communicate with the installed app.',
+    ru: 'Разрешите расширению связь с установленным Desktop, чтобы подключить его и принимать файлы.',
+    en: 'Allow the extension to communicate with the installed Desktop app to connect and receive files.',
   },
   permissionEnable: {
     ru: 'Разрешить доступ',
@@ -104,8 +132,8 @@ export const settingsNativeAppMessages = defineMessageSource({
     en: 'Use this browser',
   },
   controlledByOtherProfile: {
-    ru: 'Сейчас управляется другим браузером или профилем.',
-    en: 'Currently controlled by another browser or profile.',
+    ru: 'Выберите этот браузер или профиль получателем в Desktop.',
+    en: 'Select this browser or profile as the destination in Desktop.',
   },
   warnings: {
     ru: 'Предупреждения',

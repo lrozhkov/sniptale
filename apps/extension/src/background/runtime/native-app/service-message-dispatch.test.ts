@@ -42,7 +42,6 @@ it('dispatches hello and accepted leases through authority state transitions', a
   dispatchNativeRuntimeMessage(ctx, createNativeLease());
   await Promise.resolve();
   expect(ctx.acceptLeaseGeneration).toHaveBeenCalledOnce();
-  expect(ctx.sync).toHaveBeenCalledTimes(1);
   expect(ctx.ingestion.resumePendingTransfers).toHaveBeenCalledWith('lease-1');
   expect(ctx.post).toHaveBeenCalledWith(
     expect.objectContaining({ type: 'extension.recording.ack' })
@@ -53,9 +52,10 @@ it('dispatches settings, pong, open-settings, and early statuses', () => {
   const ctx = createContext();
 
   dispatchNativeRuntimeMessage(ctx, createSettingsAccepted('stale-revision'));
-  expect(ctx.warn).toHaveBeenCalledWith('Settings revision');
+  expect(ctx.setStatus).toHaveBeenCalledWith(
+    expect.objectContaining({ settingsRevision: 'stale-revision' })
+  );
 
-  ctx.settingsSync.acceptRevision = vi.fn(() => true);
   dispatchNativeRuntimeMessage(ctx, createSettingsAccepted('settings-revision-1'));
   expect(ctx.setStatus).toHaveBeenCalledWith(
     expect.objectContaining({ settingsRevision: 'settings-revision-1' })
@@ -141,14 +141,7 @@ function createContext(
     setStatus: vi.fn((next: NativeAppRuntimeStatus) => {
       status = next;
     }),
-    settingsSync: {
-      acceptRevision: vi.fn(() => false),
-      invalidate: vi.fn(),
-      isCurrent: vi.fn(() => true),
-      nextSequence: vi.fn(() => 1),
-      setPendingRevision: vi.fn(),
-    },
-    sync: vi.fn(async () => undefined),
+
     warn: vi.fn(),
   };
   return ctx;
@@ -169,14 +162,16 @@ function createIngestion(): NativeAppIngestionController {
 function createRecordingAck(): NativeIngestionOutboundMessage {
   return {
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     type: 'extension.recording.ack',
+    receipt: { durable: true, sha256: 'a'.repeat(64), totalBytes: 1 },
   };
 }
 
 function createStatus(): NativeAppRuntimeStatus {
   return {
+    appIdentity: null,
     appStatus: null,
     capabilities: null,
     connectionState: 'connected',
@@ -234,7 +229,7 @@ function createSettingsAccepted(
       },
       warnings: [],
     },
-    protocolVersion: 1,
+    protocolVersion: 2,
     revision,
     schemaVersion: 1,
     type: 'app.settings.accepted',
@@ -252,7 +247,7 @@ function createPong() {
       settingsRevision: null,
     },
     nonce: 'nonce-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     sentAtEpochMs: 1,
     type: 'app.pong',
   } as const;
@@ -262,7 +257,7 @@ function createOpenSettingsRequest() {
   return {
     controllerLeaseId: 'lease-1',
     invocationId: 'open-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     requestedAtEpochMs: 1,
     section: 'native-app',
     type: 'app.openSettings.requested',
@@ -274,7 +269,7 @@ function createRecordingProgress() {
     bytesWritten: 3,
     controllerLeaseId: 'lease-1',
     durationMs: 10,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     status: 'recording',
     type: 'app.recording.progress',
@@ -287,7 +282,7 @@ function createCommandAccepted(controllerLeaseId: string) {
     commandId: 'command-1',
     controllerLeaseId,
     operation: 'screenshot',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.command.accepted',
   } as const;
 }
@@ -297,7 +292,7 @@ function createTrayActionRequest(controllerLeaseId: string) {
     actionId: 'open-settings',
     controllerLeaseId,
     invocationId: 'tray-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     requestedAtEpochMs: 1,
     type: 'app.tray.actionRequested',
   } as const;
@@ -311,7 +306,7 @@ function createRecordingChunk() {
     chunkRawBytes: 3,
     chunkSha256: '0'.repeat(64),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     type: 'app.recording.chunk',
   } as const;

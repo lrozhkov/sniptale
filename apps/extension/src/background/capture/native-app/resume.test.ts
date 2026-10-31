@@ -27,7 +27,7 @@ it('requests the first missing recording chunk for the active lease only', async
     {
       chunkIndex: 1,
       controllerLeaseId: 'lease-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
       recordingId: 'recording-1',
       type: 'extension.recording.chunkRequest',
     },

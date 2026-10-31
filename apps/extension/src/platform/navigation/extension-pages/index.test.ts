@@ -185,11 +185,11 @@ describe('extension page settings helpers', () => {
     browserTabsQueryMock.mockResolvedValueOnce([{ id: 7, windowId: 9 }]);
     const { openSettingsPage } = await import('./index');
 
-    await openSettingsPage({ route: { section: 'native-app', view: 'commands' } });
+    await openSettingsPage({ route: { section: 'native-app', view: 'connection' } });
 
     expect(browserTabsUpdateMock).toHaveBeenCalledWith(7, {
       active: true,
-      url: 'chrome-extension://test/apps/extension/src/settings/index.html?section=native-app&view=commands',
+      url: 'chrome-extension://test/apps/extension/src/settings/index.html?section=native-app&view=connection',
     });
     expect(browserWindowsUpdateMock).toHaveBeenCalledWith(9, { focused: true });
     expect(browserTabsCreateMock).not.toHaveBeenCalled();

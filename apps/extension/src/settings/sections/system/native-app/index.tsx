@@ -2,14 +2,9 @@ import { Cable, ShieldAlert } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 import { translate } from '../../../../platform/i18n';
-import {
-  settingsSectionClassName,
-  settingsPanelClassName,
-  SettingsSubpageTabs,
-} from '../../../section-surface';
+import { settingsSectionClassName, settingsPanelClassName } from '../../../section-surface';
 import { useNativeAppSectionController } from './controller';
 import { NativeConnectionView } from './connection';
-import { NativeSettingsView } from './views';
 
 const permissionGateClassName = [
   'rounded-[4px] border p-3',
@@ -38,12 +33,6 @@ function NativeAppErrorPanel({ error }: { error: string | null }) {
       <p>{error}</p>
     </div>
   );
-}
-
-type NativeAppView = 'connection' | 'capture' | 'commands' | 'telemetry';
-
-function resolveView(view?: string): NativeAppView {
-  return view === 'capture' || view === 'commands' || view === 'telemetry' ? view : 'connection';
 }
 
 function NativeAppPermissionGate(props: { loading: boolean; onEnable: () => void }) {
@@ -80,9 +69,8 @@ function NativeAppPermissionGate(props: { loading: boolean; onEnable: () => void
   );
 }
 
-export function NativeAppSection(props: { onViewChange?: (view: string) => void; view?: string }) {
+export function NativeAppSection(_props: { onViewChange?: (view: string) => void; view?: string }) {
   const controller = useNativeAppSectionController();
-  const view = resolveView(props.view);
 
   if (controller.permissionGranted !== true) {
     return (
@@ -100,36 +88,16 @@ export function NativeAppSection(props: { onViewChange?: (view: string) => void;
 
   return (
     <section className={settingsSectionClassName}>
-      <SettingsSubpageTabs
-        activeId={view}
-        ariaLabel={translate('settings.navigation.nativeApp')}
-        items={[
-          { id: 'connection', label: translate('settings.navigation.views.connection') },
-          { id: 'capture', label: translate('settings.navigation.views.capture') },
-          { id: 'commands', label: translate('settings.navigation.views.commands') },
-          { id: 'telemetry', label: translate('settings.navigation.views.telemetry') },
-        ]}
-        onChange={props.onViewChange}
-      />
       <NativeAppErrorPanel error={controller.error} />
-      {view === 'connection' ? (
-        <NativeConnectionView
-          status={controller.status}
-          onAction={(operation) => {
-            void controller.handleRuntimeAction(operation);
-          }}
-        />
-      ) : (
-        <NativeSettingsView
-          view={view}
-          capabilities={controller.status?.capabilities ?? null}
-          disabled={controller.loading}
-          settings={controller.nativeSettings}
-          onChange={(native) => {
-            void controller.updateNativeSettings(native);
-          }}
-        />
-      )}
+      <NativeConnectionView
+        status={controller.status}
+        onAction={(operation) => {
+          void controller.handleRuntimeAction(operation, controller.status?.appIdentity?.clientId);
+        }}
+      />
+      <p className="text-[13px] leading-[18px] text-[var(--sniptale-color-text-secondary)]">
+        {translate('settings.nativeApp.desktopSettingsOnly')}
+      </p>
       <p className="text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
         {translate('settings.nativeApp.privacyCopy')}
       </p>

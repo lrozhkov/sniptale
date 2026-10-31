@@ -88,7 +88,7 @@ async function createRecordingStopped(bytes: Uint8Array): Promise<AppRecordingSt
     height: 720,
     mimeType: 'video/mp4',
     openEditor: true,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     sha256: await sha256Hex(bytes),
     telemetry: null,
@@ -113,7 +113,7 @@ function createRecordingStarted(): AppRecordingStartedMessage {
       videoBitrateMbpsOverride: null,
       warnings: [],
     },
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     requestedQuality: {
       audioBitrateKbps: 160,
@@ -143,7 +143,7 @@ async function createRecordingChunk(bytes: Uint8Array): Promise<AppRecordingChun
     chunkRawBytes: bytes.byteLength,
     chunkSha256: await sha256Hex(bytes),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     type: 'app.recording.chunk',
   };
@@ -174,7 +174,13 @@ it('requests chunks, saves complete recordings, opens editor, and acks', async (
     expect.objectContaining({ chunkIndex: 0, type: 'extension.recording.chunkRequest' }),
   ]);
   await expect(controller.handleRecordingChunk(await createRecordingChunk(bytes))).resolves.toEqual(
-    [expect.objectContaining({ recordingId: 'recording-1', type: 'extension.recording.ack' })]
+    [
+      expect.objectContaining({
+        recordingId: 'recording-1',
+        type: 'extension.recording.ack',
+        receipt: { durable: true, sha256: await sha256Hex(bytes), totalBytes: bytes.byteLength },
+      }),
+    ]
   );
   expect(mocks.recordingSaveMock).toHaveBeenCalledWith(
     'recording-1',
@@ -258,7 +264,13 @@ it('does not let replayed recording starts overwrite active transfer sessions', 
   await controller.handleRecordingStopped(await createRecordingStopped(bytes));
   await expect(controller.handleRecordingStarted(createRecordingStarted())).resolves.toEqual([]);
   await expect(controller.handleRecordingChunk(await createRecordingChunk(bytes))).resolves.toEqual(
-    [expect.objectContaining({ recordingId: 'recording-1', type: 'extension.recording.ack' })]
+    [
+      expect.objectContaining({
+        recordingId: 'recording-1',
+        type: 'extension.recording.ack',
+        receipt: { durable: true, sha256: await sha256Hex(bytes), totalBytes: bytes.byteLength },
+      }),
+    ]
   );
 });
 
@@ -274,7 +286,11 @@ it('keeps completed recording tombstones from replaying commits after cleanup', 
   await controller.handleRecordingStarted(createRecordingStarted());
   await controller.handleRecordingStopped(stopped);
   await expect(controller.handleRecordingChunk(chunk)).resolves.toEqual([
-    expect.objectContaining({ recordingId: 'recording-1', type: 'extension.recording.ack' }),
+    expect.objectContaining({
+      recordingId: 'recording-1',
+      type: 'extension.recording.ack',
+      receipt: { durable: true, sha256: await sha256Hex(bytes), totalBytes: bytes.byteLength },
+    }),
   ]);
 
   await expect(controller.handleRecordingStarted(createRecordingStarted())).resolves.toEqual([]);

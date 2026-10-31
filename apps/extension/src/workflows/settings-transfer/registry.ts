@@ -178,12 +178,6 @@ export const SETTINGS_TRANSFER_REGISTRY = [
     field('system.voice', 'mode'),
     field('system.voice', 'microphone', { classification: 'device-bound' }),
   ]),
-  ...domain('system.native', [
-    field('system.native', 'capture'),
-    field('system.native', 'tray'),
-    field('system.native', 'telemetry'),
-    field('system.native', 'connection', { classification: 'action/status' }),
-  ]),
 ] as const satisfies readonly SettingsTransferRegistryNode[];
 
 export const SETTINGS_TRANSFER_REGISTRY_BY_ID = new Map(

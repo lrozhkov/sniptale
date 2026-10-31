@@ -1,24 +1,38 @@
 import { vi } from 'vitest';
 
-export function createNativeStorage(initialValues: Record<string, unknown> = {}) {
-  const values = { ...initialValues };
+export function createNativeStorage(initialValues: Record<string, unknown> = {}, trusted = true) {
+  const values: Record<string, unknown> = {
+    ...(trusted
+      ? {
+          'sniptale.nativeApp.trustedClient': {
+            hostName: 'com.sniptale.native_host',
+            clientId: 'a'.repeat(64),
+            trustVersion: 1,
+          },
+        }
+      : {}),
+    ...initialValues,
+  };
   return {
     canObserveChanges: vi.fn(() => false),
-    local: {
-      get: vi.fn(async (keys?: string | string[] | Record<string, unknown> | null) =>
-        readStorageValues(values, keys)
-      ),
-      isAvailable: vi.fn(() => true),
-      remove: vi.fn(async (keys: string | string[]) => {
-        for (const key of Array.isArray(keys) ? keys : [keys]) {
-          delete values[key];
-        }
-      }),
-      set: vi.fn(async (items: Record<string, unknown>) => {
-        Object.assign(values, items);
-      }),
-    },
+    local: createStorageArea(values),
+    session: createStorageArea({}),
     subscribeToChanges: vi.fn(() => () => undefined),
+  };
+}
+
+function createStorageArea(values: Record<string, unknown>) {
+  return {
+    get: vi.fn(async (keys?: string | string[] | Record<string, unknown> | null) =>
+      readStorageValues(values, keys)
+    ),
+    isAvailable: vi.fn(() => true),
+    remove: vi.fn(async (keys: string | string[]) => {
+      for (const key of Array.isArray(keys) ? keys : [keys]) delete values[key];
+    }),
+    set: vi.fn(async (items: Record<string, unknown>) => {
+      Object.assign(values, items);
+    }),
   };
 }
 

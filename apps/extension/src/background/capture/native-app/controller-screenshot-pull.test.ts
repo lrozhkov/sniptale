@@ -86,7 +86,7 @@ async function createScreenshotStart(
     mimeType: 'image/png',
     mode: 'screen',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     sha256: await sha256Hex(bytes),
     totalBytes: bytes.byteLength,
     type: 'app.screenshot.start',
@@ -107,7 +107,7 @@ async function createScreenshotChunk(args: {
     chunkRawBytes: args.bytes.byteLength,
     chunkSha256: await sha256Hex(args.bytes),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.chunk',
   };
 }
@@ -137,7 +137,7 @@ it('requests the first screenshot chunk when a transfer starts', async () => {
       captureId: 'capture-1',
       chunkIndex: 0,
       controllerLeaseId: 'lease-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: 'extension.screenshot.chunkRequest',
     },
   ]);
@@ -230,7 +230,7 @@ it('rejects screenshot commits before every chunk has been staged', async () => 
     controller.handleScreenshotCommit({
       captureId: 'capture-1',
       controllerLeaseId: 'lease-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: 'app.screenshot.commit',
     })
   ).resolves.toEqual([

@@ -1,6 +1,5 @@
 // Types shared across video recording contracts, messages, and annotations.
 
-import type { NativeCaptureSettings } from './native-settings';
 import type { VideoOutputProfile } from './output-profile';
 import type { VideoRecordingProfile } from './quality-profiles';
 
@@ -326,7 +325,6 @@ export interface VideoRecordingSettings {
   controlledCursorCaptureEnabled?: boolean;
   recordingSurface?: VideoRecordingSurfaceSettings;
   webcamPresentation?: WebcamPresentationSettings;
-  native?: NativeCaptureSettings;
 }
 
 export interface VideoRecordingLiveMediaState {

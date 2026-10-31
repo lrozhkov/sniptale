@@ -32,7 +32,7 @@ export const SETTINGS_SECTION_VIEWS = {
   'ai-connections': ['integrations', 'chrome-ai', 'security'],
   'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
   'voice-input': [],
-  'native-app': ['connection', 'capture', 'commands', 'telemetry'],
+  'native-app': ['connection'],
   'access-data': ['permissions', 'required-permissions', 'privacy'],
   'settings-transfer': [],
   'events-logs': [],
@@ -65,7 +65,7 @@ export type SettingsRoute =
     }
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }
   | { section: 'ai-prompts'; view?: 'templates' | 'scenario-templates' | 'prompts' }
-  | { section: 'native-app'; view?: 'connection' | 'capture' | 'commands' | 'telemetry' }
+  | { section: 'native-app'; view?: 'connection' }
   | { section: 'access-data'; view?: 'permissions' | 'required-permissions' | 'privacy' };
 
 type SettingsRouteResolution = {
@@ -112,10 +112,10 @@ const LEGACY_ROUTES: Readonly<Record<LegacySettingsSection, SettingsRoute>> = {
   quickactions: { section: 'quick-actions' },
   'voice-input': { section: 'voice-input' },
   'native-app': { section: 'native-app', view: 'connection' },
-  'native-hotkeys': { section: 'native-app', view: 'commands' },
-  'native-screenshots': { section: 'native-app', view: 'capture' },
-  'native-video': { section: 'native-app', view: 'capture' },
-  'native-telemetry': { section: 'native-app', view: 'telemetry' },
+  'native-hotkeys': { section: 'native-app', view: 'connection' },
+  'native-screenshots': { section: 'native-app', view: 'connection' },
+  'native-video': { section: 'native-app', view: 'connection' },
+  'native-telemetry': { section: 'native-app', view: 'connection' },
   templates: { section: 'ai-prompts', view: 'templates' },
   permissions: { section: 'access-data', view: 'permissions' },
   privacy: { section: 'access-data', view: 'privacy' },

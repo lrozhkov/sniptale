@@ -169,20 +169,6 @@ export async function readSettingsTransferSnapshot(
       language: settings.voiceInput?.language ?? 'ru-RU',
       mode: settings.voiceInput?.mode ?? 'local-first',
     }),
-    'system.native': payload({
-      capture: video.native
-        ? {
-            screenshots: video.native.screenshots,
-            video: {
-              advanced: video.native.video.advanced,
-              codec: video.native.video.codec,
-              enabled: video.native.video.enabled,
-            },
-          }
-        : undefined,
-      tray: video.native?.trayActions,
-      telemetry: video.native?.video.telemetry,
-    }),
   };
 
   const locale: AppLocale = preferences[LOCALE_STORAGE_KEY] === 'en' ? 'en' : 'ru';

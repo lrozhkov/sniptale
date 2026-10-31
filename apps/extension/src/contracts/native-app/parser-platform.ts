@@ -148,6 +148,8 @@ function isNumberArray(value: unknown, maxLength: number): boolean {
 export function isAppHello(value: Record<string, unknown>): boolean {
   return (
     hasProtocolVersion(value) &&
+    isNativeAppIdentity(value['appIdentity']) &&
+    value['settingsAuthority'] === 'desktop' &&
     isPositiveInteger(value['settingsSchemaVersion']) &&
     isString(value['minExtensionVersion']) &&
     isNumberArray(value['supportedProtocolVersions'], 8) &&
@@ -156,5 +158,17 @@ export function isAppHello(value: Record<string, unknown>): boolean {
     isPlatform(value['platform']) &&
     isInstallState(value['install']) &&
     isCapabilities(value['capabilities'])
+  );
+}
+
+/** Checks the stable installation identity presented by the Native Messaging host. */
+export function isNativeAppIdentity(
+  value: unknown
+): value is { clientId: string; trustVersion: 1 } {
+  return (
+    isRecord(value) &&
+    typeof value['clientId'] === 'string' &&
+    /^[a-f0-9]{64}$/.test(value['clientId']) &&
+    value['trustVersion'] === 1
   );
 }

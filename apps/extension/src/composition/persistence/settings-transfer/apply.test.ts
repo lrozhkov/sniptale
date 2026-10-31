@@ -544,14 +544,6 @@ function allDomainFixtures(): Record<string, SettingsTransferDomainPayload> {
         outputProfile: video.outputProfile,
       },
     },
-    'system.native': {
-      schemaVersion: 1,
-      data: {
-        capture: { screenshots: video.native?.screenshots, video: video.native?.video },
-        tray: video.native?.trayActions,
-        telemetry: video.native?.video.telemetry,
-      },
-    },
     'styles.borders': { schemaVersion: 1, data: { borderPresets: [] } },
     'styles.callouts': { schemaVersion: 1, data: resolveStoredCalloutPresetCatalog({}) },
     'styles.numbering': { schemaVersion: 1, data: resolveStoredStepBadgePresetCatalog({}) },

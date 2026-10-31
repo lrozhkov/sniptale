@@ -59,14 +59,16 @@ function createCapabilities() {
 
 function createHello(kind: 'windows' | 'macos' | 'linux' = 'windows') {
   return {
+    appIdentity: { clientId: 'a'.repeat(64), trustVersion: 1 },
+    settingsAuthority: 'desktop',
     appInstanceId: 'app-1',
     capabilities: createCapabilities(),
     install: createInstallState(kind),
     minExtensionVersion: '0.1.0',
     platform: { arch: 'x64', kind, version: '11' },
-    protocolVersion: 1,
+    protocolVersion: 2,
     settingsSchemaVersion: 1,
-    supportedProtocolVersions: [1],
+    supportedProtocolVersions: [2],
     supportedSettingsSchemaVersions: [1],
     type: 'app.hello',
   };
@@ -82,7 +84,7 @@ function createRecordingStopped() {
     height: 720,
     mimeType: 'video/mp4',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     sha256: '0'.repeat(64),
     telemetry: {
@@ -218,9 +220,9 @@ it('rejects malformed roots, unsafe ids, and oversized JSON payloads', () => {
 });
 
 it('rejects non-negotiated protocol versions before dispatch', () => {
-  expect(parseNativeAppInboundMessage({ ...createHello(), protocolVersion: 2 })).toMatchObject({
+  expect(parseNativeAppInboundMessage({ ...createHello(), protocolVersion: 1 })).toMatchObject({
     ok: false,
-    reason: 'malformed-message',
+    reason: 'unsupported-version',
   });
 });
 
@@ -241,7 +243,7 @@ it('validates bounded screenshot chunk metadata before ingestion allocates paylo
       chunkRawBytes: 3,
       chunkSha256: '0'.repeat(64),
       controllerLeaseId: 'lease-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: 'app.screenshot.chunk',
     })
   ).toMatchObject({ ok: true });
@@ -255,7 +257,7 @@ it('validates bounded screenshot chunk metadata before ingestion allocates paylo
       chunkRawBytes: 3,
       chunkSha256: '0'.repeat(64),
       controllerLeaseId: 'lease-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
       type: 'app.screenshot.chunk',
     })
   ).toMatchObject({ ok: false, reason: 'malformed-message' });

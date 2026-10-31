@@ -26,10 +26,10 @@ describe('settings native app runtime client', () => {
     const { createNativeAppRuntimeClient } = await import('./index');
     const client = createNativeAppRuntimeClient({ sendRuntimeMessage: mocks.sendRuntimeMessage });
 
-    await client.mutate('sync-settings');
+    await client.mutate('forget-client');
     expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        operation: 'sync-settings',
+        operation: 'forget-client',
         type: MessageType.NATIVE_APP_MUTATION,
       })
     );

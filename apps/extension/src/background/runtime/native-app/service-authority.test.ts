@@ -52,32 +52,12 @@ async function createServiceWithPort() {
   return { port, service };
 }
 
-it('queues user-requested takeover until hello is accepted', async () => {
-  const { port, service } = await createServiceWithPort();
-
-  service.takeController();
-
-  expect(port.postMessage).toHaveBeenCalledWith(
-    expect.objectContaining({ type: 'extension.hello' })
-  );
-  expect(port.postMessage).not.toHaveBeenCalledWith(
-    expect.objectContaining({ type: 'extension.controller.acquire' })
-  );
-
-  port.emitMessage(createNativeHello());
-  await expect(waitForNativePost(port, 'extension.controller.acquire')).resolves.toEqual(
-    expect.objectContaining({
-      reason: 'user-requested-takeover',
-      type: 'extension.controller.acquire',
-    })
-  );
-});
-
 it('rejects granted leases for another extension connection before sync or resume', async () => {
   const { port, service } = await createServiceWithPort();
 
   service.connect();
   port.emitMessage(createNativeHello());
+  await waitForNativePost(port, 'extension.controller.acquire');
   for (const controller of [
     { ...createNativeLease().controller, connectionId: 'other-connection' },
     { ...createNativeLease().controller, extensionId: 'other-extension' },
@@ -108,7 +88,7 @@ it('ignores non-hello status messages before an accepted handshake', async () =>
       settingsRevision: null,
     },
     nonce: 'nonce-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     sentAtEpochMs: Date.now(),
     type: 'app.pong',
   });
@@ -118,12 +98,13 @@ it('ignores non-hello status messages before an accepted handshake', async () =>
     occurredAtEpochMs: Date.now(),
     operation: 'screenshot',
     phase: 'capture',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.operation.failed',
   });
 
   await expect(service.getStatus()).resolves.toEqual(
     expect.objectContaining({
+      appIdentity: null,
       appStatus: null,
       connectionState: 'connecting',
       error: null,

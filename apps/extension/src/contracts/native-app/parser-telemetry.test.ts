@@ -50,7 +50,7 @@ function createRecordingStopped() {
     height: 720,
     mimeType: 'video/mp4',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     sha256: '0'.repeat(64),
     telemetry: {

@@ -137,8 +137,8 @@ export const settingsNavigationMessages = defineMessageSource({
       en: 'Test and configure voice input for annotations and editors.',
     },
     nativeApp: {
-      ru: 'Настройте подключение, захват и команды приложения Sniptale.',
-      en: 'Configure connection, capture, and commands for the Sniptale app.',
+      ru: 'Подключите Desktop и подтвердите доверие к установленному приложению.',
+      en: 'Connect Desktop and confirm trust in the installed app.',
     },
     accessData: {
       ru: 'Управляйте разрешениями, конфиденциальностью и локальными данными.',

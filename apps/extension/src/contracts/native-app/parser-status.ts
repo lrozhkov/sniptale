@@ -13,6 +13,7 @@ import {
 } from './parser-shared';
 import { isInstallState } from './parser-platform';
 import type {
+  AppConnectionClosedMessage,
   NativeAppError,
   NativeAppStatus,
   NativeControllerIdentity,
@@ -44,7 +45,14 @@ export function isControllerLease(value: Record<string, unknown>): boolean {
     hasLease(value) &&
     isControllerIdentity(value['controller']) &&
     isPositiveInteger(value['expiresAtEpochMs']) &&
-    isEnumValue(value['status'], leaseStatuses)
+    isEnumValue(value['status'], leaseStatuses) &&
+    isEnumValue(
+      value['selectionStatus'],
+      new Set(['selected', 'available', 'selection-required'])
+    ) &&
+    (value['status'] === 'granted'
+      ? value['selectionStatus'] === 'selected'
+      : value['selectionStatus'] !== 'selected')
   );
 }
 
@@ -106,5 +114,16 @@ export function isPong(value: Record<string, unknown>): boolean {
     isAsciiId(value['nonce']) &&
     isPositiveInteger(value['sentAtEpochMs']) &&
     isAppStatus(value['appStatus'])
+  );
+}
+
+/** Checks the intentional exit signal independently of target selection. */
+export function isConnectionClosed(
+  value: Record<string, unknown>
+): value is Record<string, unknown> & AppConnectionClosedMessage {
+  return (
+    hasProtocolVersion(value) &&
+    value['type'] === 'app.connection.closed' &&
+    value['reason'] === 'user-quit'
   );
 }

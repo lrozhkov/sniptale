@@ -1,11 +1,11 @@
+import { nativeSettingsFixture } from './settings.test-support';
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { parseNativeAppInboundMessage } from './index';
 import { isNativeCaptureSettings, isNativeEffectiveSettings } from './parser-settings';
 
 function createSettingsAccepted() {
-  const native = DEFAULT_VIDEO_SETTINGS.native;
+  const native = nativeSettingsFixture;
   if (!native) {
     throw new Error('Native video defaults are required for native app parser tests');
   }
@@ -17,7 +17,7 @@ function createSettingsAccepted() {
       ...native,
       warnings: [],
     },
-    protocolVersion: 1,
+    protocolVersion: 2,
     revision: 'settings-revision-1',
     schemaVersion: 1,
     type: 'app.settings.accepted',
@@ -62,7 +62,7 @@ describe('native app effective settings parser', () => {
 
 describe('native app requested settings parser', () => {
   it('validates requested native settings and rejects malformed tray actions', () => {
-    const native = DEFAULT_VIDEO_SETTINGS.native;
+    const native = nativeSettingsFixture;
     if (!native) {
       throw new Error('Native defaults are required for native app parser tests');
     }

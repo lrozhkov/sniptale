@@ -1,3 +1,4 @@
+import { nativeSettingsFixture } from '../../../contracts/native-app/settings.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
@@ -8,7 +9,6 @@ import {
   createNativeTestPort,
   installChromeRuntimeInfo,
   waitForNativePost,
-  waitForNativeSettingsSync,
 } from './service.test-support';
 import { createNativeStorage } from './service-storage.test-support';
 
@@ -91,15 +91,15 @@ async function createConnectedService() {
 async function acceptNativeSettings(
   port: ReturnType<typeof createNativeTestPort>
 ): Promise<string> {
-  const settingsSync = await waitForNativeSettingsSync(port);
+  const settingsSync = { revision: 'desktop-revision', schemaVersion: 1 };
   port.emitMessage({
     acceptedAtEpochMs: Date.now(),
     controllerLeaseId: 'lease-1',
     effectiveSettings: {
-      ...DEFAULT_VIDEO_SETTINGS.native,
+      ...nativeSettingsFixture,
       warnings: [],
     },
-    protocolVersion: 1,
+    protocolVersion: 2,
     revision: settingsSync.revision,
     schemaVersion: settingsSync.schemaVersion,
     type: 'app.settings.accepted',
@@ -114,7 +114,7 @@ function emitScreenshotFailure(port: ReturnType<typeof createNativeTestPort>): v
     commandId: 'screenshot-1',
     controllerLeaseId: 'lease-1',
     operation: 'screenshot',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.command.accepted',
   });
   port.emitMessage({
@@ -124,7 +124,7 @@ function emitScreenshotFailure(port: ReturnType<typeof createNativeTestPort>): v
     operation: 'screenshot',
     operationId: 'screenshot-1',
     phase: 'transfer-channel',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.operation.failed',
   });
 }

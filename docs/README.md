@@ -29,6 +29,7 @@ This index lists current active documents and their authority.
 
 - [Repository overview](architecture/repository-overview.md) is the canonical source map.
 - [Code organization](architecture/code-organization.md) owns source placement, dependencies, and public surfaces.
+- [Desktop connection protocol](architecture/native-app-integration.md) owns native settings authority, installation trust, destination leases, media receipts, and integration proof.
 - [Runtime contexts](architecture/runtime-contexts.md) documents runtime entrypoints that machine policy owns. The runtime contexts document owns coordination boundaries.
 - [Scenario viewing from Library](architecture/scenario-library-viewing.md) records decisions before implementation about the viewer, content source, and opening flow for guides and tours.
 - [Shared topology](architecture/shared-topology.md) owns package and app-core residency.

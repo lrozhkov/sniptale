@@ -7,9 +7,10 @@ function createIngestion(): NativeAppIngestionController {
     handleRecordingChunk: vi.fn(async () => [
       {
         controllerLeaseId: 'lease-1',
-        protocolVersion: 1,
+        protocolVersion: 2,
         recordingId: 'r1',
         type: 'extension.recording.ack',
+        receipt: { durable: true, sha256: 'a'.repeat(64), totalBytes: 1 },
       } as const,
     ]),
     handleRecordingStarted: vi.fn(async () => []),
@@ -84,7 +85,7 @@ function createRecordingChunkMessage() {
     chunkRawBytes: 0,
     chunkSha256: '0'.repeat(64),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'r1',
     type: 'app.recording.chunk',
   } as const;
@@ -111,7 +112,7 @@ function createScreenshotStartMessage() {
     mimeType: 'image/png',
     mode: 'screen',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     sha256: '0'.repeat(64),
     totalBytes: 3,
     type: 'app.screenshot.start',
@@ -128,7 +129,7 @@ function createScreenshotChunkMessage() {
     chunkRawBytes: 3,
     chunkSha256: '0'.repeat(64),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.chunk',
   } as const;
 }
@@ -137,7 +138,7 @@ function createScreenshotCommitMessage() {
   return {
     captureId: 'capture-1',
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.commit',
   } as const;
 }
@@ -152,7 +153,7 @@ function createRecordingStoppedMessage() {
     height: 720,
     mimeType: 'video/mp4',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'r1',
     sha256: '0'.repeat(64),
     telemetry: null,
