@@ -1262,13 +1262,19 @@ it('retries a frozen capture after physical install and failed copy settlement w
   );
 });
 
-it.each([false, true])(
-  'encodes a frozen project with its unloaded saved export after project deletion=%s',
-  async (deleted) => {
+it.each([
+  { deleted: false, mimeType: 'image/png' },
+  { deleted: true, mimeType: 'image/png' },
+  { deleted: false, mimeType: 'video/webm;codecs=vp8' },
+  { deleted: true, mimeType: 'video/webm;codecs=vp8' },
+])(
+  'encodes a frozen project with its unloaded $mimeType saved export after project deletion=$deleted',
+  async ({ deleted, mimeType }) => {
     const f = await fixture();
     const exportedRef: AssetRef = {
       ...f.ref,
       assetId: 'project-retained-export',
+      mimeType,
       location: { kind: 'opfs', objectKey: 'objects/project-retained-export' },
     };
     const project = createVideoProjectEntryWithMediaClip({ id: 'frozen-project' });

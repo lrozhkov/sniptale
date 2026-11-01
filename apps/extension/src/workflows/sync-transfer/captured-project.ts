@@ -106,7 +106,7 @@ export async function encodeCapturedProjectRoot(
       !ref ||
       !descriptor ||
       descriptor.size !== ref.size ||
-      descriptor.mimeType !== ref.mimeType ||
+      descriptor.mimeType !== ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
       (object
         ? object.blob.size !== ref.size || object.blob.type !== ref.mimeType
         : !retained ||

@@ -120,7 +120,7 @@ export async function encodeCapturedImageRoot(value: CapturedImageRows) {
       !ref ||
       !object ||
       object.ref.size !== ref.size ||
-      object.ref.mimeType !== ref.mimeType ||
+      object.ref.mimeType !== ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
       object.blob.size !== ref.size ||
       object.blob.type !== ref.mimeType
     )

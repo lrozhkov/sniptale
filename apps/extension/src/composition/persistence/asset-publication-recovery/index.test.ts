@@ -779,3 +779,17 @@ it('queries only each discovered object for writing-cleanup admission', async ()
   await recoverPendingAssetPublications();
   expect(mocks.physicalAuthority).toHaveBeenCalledTimes(2);
 });
+
+it.each(['invalid', 'mismatch'] as const)(
+  'preserves writing evidence for %s native authority',
+  async (state) => {
+    mocks.physicalAuthority.mockResolvedValue(() => state);
+    mocks.collectWriting.mockImplementationOnce(
+      async (_options, isRetained: (id: string) => Promise<boolean | null>) => {
+        expect(await isRetained('uncertain')).toBeNull();
+        return 0;
+      }
+    );
+    await recoverPendingAssetPublications();
+  }
+);

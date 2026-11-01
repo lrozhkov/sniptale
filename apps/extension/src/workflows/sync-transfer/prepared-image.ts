@@ -96,6 +96,12 @@ export function validatePortableImageRows(
   envelope: MediaHubBackupRootEnvelope,
   metadata: PortableMediaMetadata
 ): void {
+  const original = envelope.objects.find((object) => object.objectId === metadata.originalObjectId);
+  if (
+    !original ||
+    original.mimeType !== metadata.entry.mimeType.split(';', 1)[0]!.trim().toLowerCase()
+  )
+    throw new Error('Portable image MIME declaration differs from its original.');
   const refs = new Map(
     envelope.objects.map((object, index) => {
       const assetId = `portable-image-${index}`;
@@ -108,7 +114,10 @@ export function validatePortableImageRows(
             kind: 'opfs' as const,
             objectKey: `objects/${assetId}`,
           },
-          mimeType: object.mimeType,
+          mimeType:
+            object.objectId === metadata.originalObjectId
+              ? metadata.entry.mimeType
+              : object.mimeType,
           size: object.size,
           sha256: null,
         },

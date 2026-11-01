@@ -10,6 +10,7 @@ import {
 import * as stores from '../../composition/persistence/infrastructure/indexed-db/core.stores';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
 import { buildScenarioProjectRootInventory } from '../media-hub-backup/v6/inventory/scenario-projects';
+import { parsePortableScenarioProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
 import type { AssetRef } from '../../composition/persistence/assets/contracts';
 
 /** Reuse the existing backup inventory with one immutable, canonically admitted native snapshot. */
@@ -97,6 +98,39 @@ export async function encodeCapturedScenarioRoot(value: CapturedScenarioRows) {
     throw new Error('Captured Scenario differs from its inventory.');
   const { objects, metadata } = await loadCapturedInventory(roots[0]!);
   const envelope = createCapturedRootEnvelope(roots[0]!, { metadata, objects });
+  const portable = parsePortableScenarioProjectMetadata(metadata);
+  const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
   const bindings: { objectId: string; ref: AssetRef }[] = [];
+  const bind = (objectId: string, assetId: string | undefined) => {
+    const ref = assetId ? refs.get(assetId) : undefined;
+    const object = objects.find((item) => item.ref.objectId === objectId);
+    if (
+      !ref ||
+      !object ||
+      object.ref.size !== ref.size ||
+      object.ref.mimeType !== ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
+      object.blob.size !== ref.size ||
+      object.blob.type !== ref.mimeType
+    )
+      throw new Error('Captured Scenario object differs from its native reference.');
+    const previous = bindings.find((item) => item.objectId === objectId);
+    if (previous && previous.ref.assetId !== ref.assetId)
+      throw new Error('Captured Scenario object has conflicting native references.');
+    if (!previous) bindings.push({ objectId, ref });
+  };
+  for (const asset of portable.assets)
+    bind(asset.objectId, rows.assets.find((item) => item.id === asset.entry.id)?.assetId);
+  for (const document of portable.stepDocuments) {
+    const native = rows.documents.find((item) => item.stepId === document.stepId);
+    for (const [index, asset] of document.document.assets.entries()) {
+      const source = native?.document.assets[index];
+      if (!source || source.role !== asset.role)
+        throw new Error('Captured Scenario document resource differs from its native slot.');
+      bind(asset.objectId, source.assetId);
+    }
+  }
+  for (const output of portable.exports)
+    if (output.html)
+      bind(output.html.objectId, rows.exports.find((item) => item.id === output.id)?.html?.assetId);
   return { envelope, objects, dependencies: rows.mediaDependencies ?? [], bindings };
 }

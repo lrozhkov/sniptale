@@ -1,3 +1,4 @@
+import type { createPublishedOutgoingRetirement } from '../../workflows/sync-transfer/outgoing-retirement';
 import { readCurrentExecutionConnection } from './connection-admission';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { releaseNativeEditingRoot } from '../../workflows/sync-transfer/native-cache';
@@ -140,7 +141,8 @@ export function createSyncProductExecution(
   hasOriginPermission: (origin: string) => Promise<boolean>,
   onLibraryChanged: () => void = () => undefined,
   onQueueAvailable: (operationId: string) => void = () => undefined,
-  automatic?: ReturnType<typeof createAutomaticCatalogSync>
+  automatic?: ReturnType<typeof createAutomaticCatalogSync>,
+  retirement?: ReturnType<typeof createPublishedOutgoingRetirement>
 ) {
   const selection = structuredClone({ scope: input.scope, authorization: input.authorization });
   const work = structuredClone(input.work);
@@ -296,6 +298,10 @@ export function createSyncProductExecution(
         if (connection.workspace)
           await verifySyncWorkspaceIdentity(remote, connection.workspace, signal);
         await current();
+        if (work.kind === 'automatic-sync' && retirement) {
+          await retirement.run({ ...selection, remote, signal });
+          await current();
+        }
         const catalog =
           work.kind === 'native-prepare' || work.kind === 'backup-prepare'
             ? null

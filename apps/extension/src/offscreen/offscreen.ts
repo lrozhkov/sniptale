@@ -1,3 +1,4 @@
+import { createPublishedOutgoingRetirement } from '../workflows/sync-transfer/outgoing-retirement';
 import { createAutomaticCatalogSync } from '../workflows/sync-transfer/automatic';
 import { createMediaHubEventPublisher } from '../features/media-hub/events';
 import { createSyncProductExecution } from './sync-connection/product-execution';
@@ -42,6 +43,7 @@ if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1
   const messaging = createRuntimeMessagingTransport();
   const libraryEvents = createMediaHubEventPublisher();
   const automatic = createAutomaticCatalogSync();
+  const retirement = createPublishedOutgoingRetirement();
   globalThis.addEventListener('pagehide', () => libraryEvents.dispose(), { once: true });
   const executor = createSyncConnectionExecutor({
     onSettled: publishSyncProductSettled,
@@ -76,7 +78,8 @@ if (offscreenStartupId && offscreenUrl.searchParams.get('privacyErasure') !== '1
         },
         () => libraryEvents.publishLibraryChanged('sync', []),
         (operationId) => publishSyncProductSettled(operationId, 'queue'),
-        automatic
+        automatic,
+        retirement
       ),
     createExecution: (input) =>
       createSyncQueueExecution(input, async (origin) => {

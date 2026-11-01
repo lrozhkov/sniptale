@@ -18,8 +18,15 @@ import type {
   AssetReadyJournal,
 } from '../../../../composition/persistence/assets';
 import { assertPortableJson } from '../codec';
+import { stageArchiveRootObjects } from '../staging';
+import { parsePortableMediaMetadata } from '../root-codecs/media';
 
-const mocks = vi.hoisted(() => ({ checkpoint: vi.fn(), runMutation: vi.fn(), db: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  checkpoint: vi.fn(),
+  runMutation: vi.fn(),
+  db: vi.fn(),
+  createWriter: vi.fn(),
+}));
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
   ...(await original<
     typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
@@ -30,6 +37,8 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', as
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   appendCommittedArchiveRootInTransaction: mocks.checkpoint,
+  assertAssetWriteAdmission: vi.fn(),
+  createAssetObjectWriter: mocks.createWriter,
   readAssetFile: vi.fn(
     async (_ref, filename: string) => new File(['source'], filename, { type: 'image/png' })
   ),
@@ -862,3 +871,71 @@ it('retires an unloaded inline copy atomically when archive Replace publishes ne
   });
   expect(f.fixture.rows.get('asset_residency')!.has(oldCopy.id)).toBe(false);
 });
+
+it.each(['video/webm;codecs=vp8', 'audio/webm;codecs=opus'])(
+  'captures restored native %s after archive staging',
+  async (mimeType) => {
+    const { fixture, input } = await restoredOriginalFixture();
+    const metadata = parsePortableMediaMetadata(input.envelope.metadata);
+    const entry = {
+      ...metadata.entry,
+      kind: mimeType.startsWith('video/') ? ('video' as const) : ('audio' as const),
+      mimeType,
+    };
+    const portable = { ...metadata, entry, projectAsset: { ...metadata.projectAsset!, mimeType } };
+    assertPortableJson(portable);
+    input.envelope.metadata = portable;
+    const descriptor = {
+      objectId: 'original',
+      path: 'Video/source.webm',
+      filename: 'source.webm',
+      mimeType: mimeType.split(';')[0]!,
+      size: 6,
+    };
+    const envelope = { ...input.envelope, objects: [descriptor] };
+    const originalRef = input.staged[0]!.ref;
+    mocks.createWriter.mockImplementation(async ({ mimeType }: { mimeType: string }) => ({
+      assetId: originalRef.assetId,
+      append: vi.fn(),
+      abort: vi.fn(),
+      finalize: async () => ({ ref: { ...originalRef, mimeType } }),
+    }));
+    const staged = await stageArchiveRootObjects({
+      envelope,
+      reader: {
+        close: vi.fn(),
+        entries: () => [],
+        entry: () => ({
+          ...descriptor,
+          compressedSize: 6,
+          crc32: 0,
+          directory: false,
+          text: vi.fn(),
+          async pipeTo(stream: WritableStream<Uint8Array>) {
+            const writer = stream.getWriter();
+            await writer.write(new TextEncoder().encode('source'));
+            await writer.close();
+          },
+        }),
+      },
+    });
+    await mediaLibraryRootPublisher.publish({ ...input, envelope, staged });
+    const captures = [...fixture.rows.get('sync_capture')!.values()]
+      .map(parseSyncCaptureRecord)
+      .filter((row) => row?.kind === 'sync-operation');
+    expect(captures).toHaveLength(1);
+    expect(captures[0]).toMatchObject({
+      phase: 'native',
+      origin: 'local-restore',
+      change: {
+        kind: 'media',
+        rows: {
+          media: { mimeType },
+          projectAsset: { mimeType },
+          ref: { mimeType, assetId: originalRef.assetId },
+        },
+      },
+    });
+    expect(envelope.objects[0]!.mimeType).toBe(mimeType.split(';')[0]);
+  }
+);

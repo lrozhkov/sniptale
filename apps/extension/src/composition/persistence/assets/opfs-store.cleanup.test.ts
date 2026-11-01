@@ -5,6 +5,7 @@ import {
   writeReadyJournal,
   deleteReadyJournal,
   releaseAssetReadyProtection,
+  settleAssetWritingMarkers,
 } from './opfs-store';
 import {
   runWithDurableAssetLifecycleLock,
@@ -156,7 +157,7 @@ it('retains ready bytes and removes only the stale marker after unlink failed', 
   await expect(f.writing.getFileHandle('asset-0')).rejects.toMatchObject({ name: 'NotFoundError' });
 });
 
-it('keeps the native claim after journal deletion and rereads authority on retry', async () => {
+it('retires the stale marker after journal deletion while preserving native bytes', async () => {
   const f = await fixture(1, 0);
   vi.spyOn(f.writing, 'removeEntry').mockRejectedValueOnce(
     new DOMException('unlink', 'NoModificationAllowedError')
@@ -173,13 +174,16 @@ it('keeps the native claim after journal deletion and rereads authority on retry
   ).toBe(0);
   expect(claim).toHaveBeenCalledExactlyOnceWith('asset-0');
   expect(await (await (await f.objects.getFileHandle('asset-0')).getFile()).text()).toBe('body');
+  await expect(f.writing.getFileHandle('asset-0')).rejects.toMatchObject({ name: 'NotFoundError' });
   claim.mockResolvedValue(false);
   expect(
     await runWithDurableAssetLifecycleLock((permit) =>
       collectQuiescentWritingObjects(f.options, claim, permit)
     )
-  ).toBe(1);
-  expect(enumerate).toHaveBeenCalledTimes(2);
+  ).toBe(0);
+  expect(enumerate).toHaveBeenCalledOnce();
+  expect(claim).toHaveBeenCalledOnce();
+  expect(await (await (await f.objects.getFileHandle('asset-0')).getFile()).text()).toBe('body');
 });
 
 it('queues a competing publication until the lifecycle cleanup pass finishes', async () => {
@@ -301,4 +305,62 @@ it('readmits an expired permit and protects a recreated identity with a fresh re
   expect(await (await (await f.objects.getFileHandle('asset-0')).getFile()).text()).toBe(
     'new-body'
   );
+});
+
+it('settles selected markers without deleting bytes or ready journal claims', async () => {
+  const f = await fixture(3, 0);
+  await writeFile(f.ready, 'claimed', JSON.stringify(journal('asset-0')));
+  await settleAssetWritingMarkers(['asset-0', 'asset-1'], f.options);
+  for (const id of ['asset-0', 'asset-1']) {
+    await expect(f.writing.getFileHandle(id)).rejects.toMatchObject({ name: 'NotFoundError' });
+    expect(await (await (await f.objects.getFileHandle(id)).getFile()).text()).toBe('body');
+  }
+  await expect(f.writing.getFileHandle('asset-2')).resolves.toBeDefined();
+  await expect(f.ready.getFileHandle('claimed')).resolves.toBeDefined();
+  await expect(
+    settleAssetWritingMarkers(['asset-0', 'missing'], f.options)
+  ).resolves.toBeUndefined();
+});
+
+it('preserves a busy writer marker until a later settlement pass', async () => {
+  const f = await fixture(1, 0);
+  let busy = true;
+  const requestExclusiveLock = vi.fn(
+    async (
+      _name: string,
+      _options: { ifAvailable: boolean },
+      callback: (locked: boolean) => Promise<void>
+    ) => callback(!busy)
+  );
+  const options = { ...f.options, requestExclusiveLock };
+  await settleAssetWritingMarkers(['asset-0'], options);
+  expect(requestExclusiveLock).toHaveBeenCalledWith(
+    'sniptale-asset:asset-0',
+    { ifAvailable: true },
+    expect.any(Function)
+  );
+  await expect(f.writing.getFileHandle('asset-0')).resolves.toBeDefined();
+  busy = false;
+  await settleAssetWritingMarkers(['asset-0'], options);
+  await expect(f.writing.getFileHandle('asset-0')).rejects.toMatchObject({ name: 'NotFoundError' });
+  expect(await (await (await f.objects.getFileHandle('asset-0')).getFile()).text()).toBe('body');
+});
+
+it('retries explicit marker settlement after unlink failure without deleting durable bytes', async () => {
+  const f = await fixture(1, 0);
+  vi.spyOn(f.writing, 'removeEntry').mockRejectedValueOnce(
+    new DOMException('unlink', 'NoModificationAllowedError')
+  );
+  await expect(settleAssetWritingMarkers(['asset-0'], f.options)).rejects.toThrow('unlink');
+  await expect(f.writing.getFileHandle('asset-0')).resolves.toBeDefined();
+  expect(await (await (await f.objects.getFileHandle('asset-0')).getFile()).text()).toBe('body');
+  await settleAssetWritingMarkers(['asset-0'], f.options);
+  await expect(f.writing.getFileHandle('asset-0')).rejects.toMatchObject({ name: 'NotFoundError' });
+});
+
+it('preserves bytes and writing evidence when native retention authority is unresolved', async () => {
+  const f = await fixture(1, 0);
+  await collectQuiescentWritingObjects(f.options, async () => null);
+  await expect(f.writing.getFileHandle('asset-0')).resolves.toBeDefined();
+  expect(await (await (await f.objects.getFileHandle('asset-0')).getFile()).text()).toBe('body');
 });

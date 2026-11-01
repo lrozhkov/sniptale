@@ -3,6 +3,7 @@ import { createProjectExportEntry } from '../../composition/persistence/projects
 
 import type { AssetRef } from '../../composition/persistence/assets';
 
+import { encodeCapturedVideoReviewRoot } from './captured-review';
 import { encodeCapturedPortableRoot } from './captured-root';
 import {
   parsePortableSyncRoot,
@@ -113,6 +114,72 @@ function reviewRows(archived: boolean): CapturedVideoReviewRows {
     privateReviews: [],
   };
 }
+
+it('binds parameterized native review source MIME and refuses a changed reader MIME', async () => {
+  const rows = reviewRows(false);
+  const mimeType = 'video/webm;codecs=vp8';
+  rows.source.ref.mimeType = mimeType;
+  rows.source.media.mimeType = mimeType;
+  if (!('projectAsset' in rows.source)) throw new Error('Expected project asset source.');
+  rows.source.projectAsset.mimeType = mimeType;
+  rows.review.workspace.source.mimeType = mimeType;
+  const encoded = await encodeCapturedVideoReviewRoot(rows);
+  const binding = encoded.bindings.find(({ ref }) => ref.assetId === rows.source.ref.assetId)!;
+  expect(binding.ref).toEqual(rows.source.ref);
+  await parsePortableSyncRoot(encoded.envelope, encoded.reviewSourceMediaId);
+  const local = admission();
+  local.dependencies = [
+    {
+      entry: rows.source.media,
+      ref: rows.source.ref,
+      expectedGeneration: 1,
+      expectedBasis: ['source-op'],
+    },
+  ];
+  await preparePortableReplica({
+    envelope: encoded.envelope,
+    reviewSourceMediaId: encoded.reviewSourceMediaId,
+    verifiedObjects: new Map(
+      encoded.objects.map(({ ref: object }) => [
+        object.objectId,
+        object.objectId === binding.objectId
+          ? rows.source.ref
+          : { ...ref(`received-${object.objectId}`), size: object.size, mimeType: object.mimeType },
+      ])
+    ),
+    senderDependencies: [{ mediaId: rows.source.media.id, basis: ['source-op'] }],
+    admission: local,
+  });
+  const conflicting = { ...rows.source.ref, mimeType: 'video/webm;codecs=vp9' };
+  await expect(
+    preparePortableReplica({
+      envelope: encoded.envelope,
+      reviewSourceMediaId: encoded.reviewSourceMediaId,
+      verifiedObjects: new Map(
+        encoded.objects.map(({ ref: object }) => [
+          object.objectId,
+          object.objectId === binding.objectId
+            ? conflicting
+            : {
+                ...ref(`received-${object.objectId}`),
+                size: object.size,
+                mimeType: object.mimeType,
+              },
+        ])
+      ),
+      senderDependencies: [{ mediaId: rows.source.media.id, basis: ['source-op'] }],
+      admission: local,
+    })
+  ).rejects.toThrow('binding');
+  const object = encoded.objects.find(({ ref }) => ref.objectId === binding.objectId)!;
+  expect(object.ref.mimeType).toBe('video/webm');
+  expect(object.blob.type).toBe(mimeType);
+  io.read.mockImplementationOnce(
+    async (ref: AssetRef, filename: string) =>
+      new File([new Uint8Array(ref.size)], filename, { type: 'video/mp4' })
+  );
+  await expect(encodeCapturedVideoReviewRoot(rows)).rejects.toThrow('native reference');
+});
 
 it.each([false, true])(
   'preserves the complete nested private closure through real encoding and replica preparation (cycle=%s)',

@@ -376,7 +376,7 @@ async function admitNativeRetainedExports(
       encodedEntry['mimeType'] !== exported.mimeType ||
       encodedEntry['size'] !== exported.size ||
       descriptor['size'] !== ref.size ||
-      descriptor['mimeType'] !== ref.mimeType ||
+      descriptor['mimeType'] !== ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
       (ref.sha256 !== null && ref.sha256 !== digest['sha256'])
     )
       return refused();

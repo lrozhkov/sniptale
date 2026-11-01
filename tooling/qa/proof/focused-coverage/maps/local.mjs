@@ -1,5 +1,63 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'archive-native-mime-consumers',
+    productionFile:
+      'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/object-inventory.ts',
+    reason:
+      'Typed MIME declarations affect backup staging, restore capture and verified sync replicas.',
+    testFiles: [
+      'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/object-inventory.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/staging.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.capture.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore-lifecycle.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming-project.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+    ],
+  },
+  {
+    owner: 'asset-writing-handoff-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/assets/opfs-store.ts',
+    reason:
+      'Writer handoff and marker recovery affect native sources, saved exports, archives, downloads and publication rollback.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/assets/opfs-store.test.ts',
+      'apps/extension/src/composition/persistence/assets/opfs-store.cleanup.test.ts',
+      'apps/extension/src/composition/persistence/assets/operations.test.ts',
+      'apps/extension/src/composition/persistence/asset-publication-recovery/index.test.ts',
+      'apps/extension/src/composition/persistence/asset-publication-recovery/maintenance.integration.test.ts',
+      'apps/extension/src/composition/persistence/projects/asset-publication.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.exports.test.ts',
+      'apps/extension/src/composition/persistence/recordings/batch.test.ts',
+      'apps/extension/src/composition/persistence/recordings/staging/coordinator.test.ts',
+      'apps/extension/src/composition/persistence/scenario/store/audio-import.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/export-artifacts.test.ts',
+      'apps/extension/src/composition/persistence/web-snapshots/records.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/staging.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore-lifecycle.test.ts',
+      'apps/extension/src/background/capture/page-package/job/storage.test.ts',
+      'apps/extension/src/background/capture/page-package/job/download.test.ts',
+    ],
+  },
+  {
+    owner: 'outgoing-asset-handoff-consumers',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/outgoing.ts',
+    reason:
+      'Outgoing handoff must preserve frozen sources, native reuse, parameterized MIME, replica recovery and publication failure semantics.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/outgoing.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-image.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-scenario.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-project.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/outgoing.test.ts',
+    ],
+  },
+  {
     owner: 'sync-image-shared-binary-consumers',
     productionFile: 'apps/extension/src/workflows/sync-transfer/captured-image.ts',
     reason:

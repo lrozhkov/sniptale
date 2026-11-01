@@ -458,6 +458,9 @@ export async function releasePublishedOperationPins(
   const db = await initDB();
   signal?.throwIfAborted();
   const selected = expected.objects.filter((object) => object.pinned);
+  // A probe avoids downloading retained media while a reader already prevents cleanup.
+  // Native admission reacquires the gate after verification and remains authoritative.
+  if (!(await tryAssetResourceCleanup(async () => true))) return { released: [], intent: null };
   for (const object of selected) await verifyRemote(structuredClone(object));
   return runWithPersistenceMutationTransition(() =>
     runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {

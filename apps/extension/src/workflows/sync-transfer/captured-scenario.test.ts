@@ -334,6 +334,96 @@ it.each(['guide', 'tour'] as const)(
   }
 );
 
+it.each(['guide', 'tour'] as const)(
+  'binds exact native files for %s without staging copies',
+  async (mode) => {
+    const rows = await acceptedRows(mode);
+    const document = rows.documents[0]!.document;
+    document.frame.backgroundImage = { ...document.sourceImage };
+    document.assets.push({ ...document.sourceImage, role: 'frame-background' });
+    const before = structuredClone(rows);
+    const portable = await encodeCapturedScenarioRoot(rows);
+    const parsed = await parsePortableSyncRoot(portable.envelope);
+    if (parsed.kind !== 'scenario-project') throw new Error('Expected portable Scenario.');
+    const bound = new Map(portable.bindings.map(({ objectId, ref }) => [objectId, ref]));
+    for (const asset of parsed.metadata.assets) {
+      const native = rows.assets.find((item) => item.id === asset.entry.id)!;
+      expect(bound.get(asset.objectId)).toEqual(
+        rows.refs.find((ref) => ref.assetId === native.assetId)
+      );
+    }
+    for (const asset of parsed.metadata.stepDocuments[0]!.document.assets)
+      expect(bound.get(asset.objectId)).toEqual(rows.refs[0]);
+    const html = parsed.metadata.exports[0]!.html!;
+    expect(bound.get(html.objectId)).toEqual(rows.refs[2]);
+    expect(bound.get(html.objectId)?.mimeType).toBe('text/html;charset=utf-8');
+    expect(portable.bindings).toHaveLength(4);
+    expect(bound.has(parsed.metadata.historyObjectId!)).toBe(false);
+    expect(bound.has(parsed.metadata.thumbnail!.objectId)).toBe(false);
+    for (const object of portable.objects) {
+      const ref = bound.get(object.ref.objectId);
+      if (ref) expect(await object.blob.text()).toBe(await io.files.get(ref.assetId)!.text());
+    }
+    const repeated = await encodeCapturedScenarioRoot(rows);
+    expect(repeated.bindings).toEqual(portable.bindings);
+    expect(repeated.envelope).toEqual(portable.envelope);
+    expect(rows).toEqual(before);
+    expect(io.live).not.toHaveBeenCalled();
+  }
+);
+
+it('detaches native bindings before asynchronous reads', async () => {
+  const rows = await acceptedRows();
+  let resume!: () => void;
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    resume = resolve;
+  });
+  const reading = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const originalRead = io.read.getMockImplementation()!;
+  io.read.mockImplementationOnce(async (...args: [AssetRef, string]) => {
+    started();
+    await gate;
+    return originalRead(...args);
+  });
+  const pending = encodeCapturedScenarioRoot(rows);
+  await reading;
+  rows.refs[0]!.assetId = 'replacement';
+  rows.assets[0]!.assetId = 'replacement';
+  resume();
+  const encoded = await pending;
+  expect(encoded.bindings.some(({ ref }) => ref.assetId === 'physical-current')).toBe(true);
+  expect(encoded.bindings.some(({ ref }) => ref.assetId === 'replacement')).toBe(false);
+});
+
+it.each(['size', 'mime'] as const)(
+  'rejects a native reader result with mismatched %s',
+  async (field) => {
+    const rows = await acceptedRows();
+    io.read.mockImplementationOnce(
+      async (ref: AssetRef, filename: string) =>
+        new File([field === 'size' ? 'wrong size' : io.files.get(ref.assetId)!], filename, {
+          type: field === 'mime' ? 'audio/mpeg' : ref.mimeType,
+        })
+    );
+    await expect(encodeCapturedScenarioRoot(rows)).rejects.toThrow('native reference');
+  }
+);
+
+it('refuses unavailable or changed native bytes and permits retry', async () => {
+  const rows = await acceptedRows();
+  const native = io.files.get('physical-current')!;
+  io.files.delete('physical-current');
+  await expect(encodeCapturedScenarioRoot(rows)).rejects.toThrow();
+  io.files.set('physical-current', new Blob(['wrong'], { type: 'audio/mpeg' }));
+  await expect(encodeCapturedScenarioRoot(rows)).rejects.toThrow();
+  io.files.set('physical-current', native);
+  const encoded = await encodeCapturedScenarioRoot(rows);
+  expect(encoded.bindings.some(({ ref }) => ref.assetId === 'physical-current')).toBe(true);
+});
+
 it.each(['temporary', 'step-template'] as const)(
   'prepares a %s Scenario prerequisite',
   async (kind) => {

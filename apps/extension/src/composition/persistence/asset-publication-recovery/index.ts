@@ -551,7 +551,8 @@ async function recoverPublications(
                 undefined,
                 lifecyclePermit
               );
-              return authority(assetId) !== 'unowned';
+              const state = authority(assetId);
+              return state === 'invalid' || state === 'mismatch' ? null : state !== 'unowned';
             },
             lifecyclePermit
           );

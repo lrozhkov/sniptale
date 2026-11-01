@@ -27,6 +27,7 @@ function createRoleInventory(
   const objects = new Map(envelope.objects.map((object) => [object.objectId, object]));
   const shared = new Map(sharedObjects.map((object) => [object.path, object]));
   const required = new Set<string>();
+  const nativeMimeTypes = new Map<string, string>();
   const pointer = (id: string) => {
     const object = objects.get(id);
     if (!object) throw new Error('Media backup typed resource is missing.');
@@ -42,6 +43,10 @@ function createRoleInventory(
       object.size !== size
     )
       throw new Error('Media backup typed resource size or MIME does not match.');
+    const previous = nativeMimeTypes.get(id);
+    if (previous !== undefined && previous !== mime)
+      throw new Error('Media backup native MIME declarations conflict.');
+    nativeMimeTypes.set(id, mime);
     if (digest !== undefined) {
       if (
         typeof digest !== 'string' ||
@@ -67,7 +72,7 @@ function createRoleInventory(
     });
     for (const asset of value.assets) pointer(asset.objectId);
   };
-  return { required, pointer, body, presentation, document };
+  return { required, nativeMimeTypes, pointer, body, presentation, document };
 }
 type RoleInventory = ReturnType<typeof createRoleInventory>;
 
@@ -152,11 +157,11 @@ function collectVideoRoles(
 }
 
 /** Typed roles bind the exact inventory. A null reader defers history bytes to verified preparation. */
-export async function assertArchiveRootObjectInventory(
+async function collectTypedInventory(
   envelope: MediaHubBackupRootEnvelope,
   reader: ArchiveReader | null,
   sharedObjects: readonly MediaHubBackupSharedObject[]
-): Promise<void> {
+) {
   const inventory = createRoleInventory(envelope, sharedObjects);
   const descriptor = envelope.descriptor;
   if (descriptor.rootKind === 'media' && descriptor.mediaSubtype === 'effect-bundle') {
@@ -176,4 +181,22 @@ export async function assertArchiveRootObjectInventory(
   }
   if (inventory.required.size !== envelope.objects.length)
     throw new Error('Media backup typed resource inventory contains unused objects.');
+  return inventory;
+}
+
+/** Validates typed roles and the exact inventory without changing authored metadata. */
+export async function assertArchiveRootObjectInventory(
+  envelope: MediaHubBackupRootEnvelope,
+  reader: ArchiveReader | null,
+  sharedObjects: readonly MediaHubBackupSharedObject[]
+): Promise<void> {
+  await collectTypedInventory(envelope, reader, sharedObjects);
+}
+
+/** Restores full native MIME declarations for newly staged refs from admitted typed roles. */
+export async function collectArchiveNativeMimeTypes(
+  envelope: MediaHubBackupRootEnvelope
+): Promise<ReadonlyMap<string, string>> {
+  const inventory = await collectTypedInventory(structuredClone(envelope), null, []);
+  return inventory.nativeMimeTypes;
 }

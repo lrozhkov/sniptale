@@ -22,6 +22,7 @@ const io = vi.hoisted(() => ({
   read: vi.fn(),
   discard: vi.fn(),
   release: vi.fn(),
+  settle: vi.fn(),
   canonical: null as CapturedChange | null,
   accepted: null as PreparedOutgoingOperation | null,
   refuse: false,
@@ -40,6 +41,7 @@ vi.mock('../../composition/persistence/assets', async (original) => ({
     );
   },
   releaseAssetReadyProtection: io.release,
+  settleAssetWritingMarkers: io.settle,
 }));
 vi.mock('../../composition/persistence/sync-capture/outgoing', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/sync-capture/outgoing')>()),
@@ -166,6 +168,105 @@ function imageRows(): CapturedImageRows {
     ],
   };
 }
+it('binds parameterized native image document MIME and refuses a changed reader MIME', async () => {
+  const rows = imageRows();
+  const mimeType = 'image/png;charset=utf-8';
+  rows.refs[0]!.mimeType = mimeType;
+  io.read.mockImplementation(
+    async (_ref: AssetRef, filename: string) => new File(['document'], filename, { type: mimeType })
+  );
+  const encoded = await encodeCapturedImageRoot(rows);
+  expect(encoded.bindings).toHaveLength(1);
+  expect(encoded.bindings[0]!.ref).toEqual(rows.refs[0]);
+  const { parsePortableSyncRoot } = await import('./prepared-root');
+  await parsePortableSyncRoot(encoded.envelope);
+  await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: new Map(
+      encoded.objects.map(({ ref }) => [
+        ref.objectId,
+        {
+          ...rows.refs[0]!,
+          assetId: `received-${ref.objectId}`,
+          location: { kind: 'opfs' as const, objectKey: `objects/received-${ref.objectId}` },
+          size: ref.size,
+          mimeType: ref.mimeType,
+        },
+      ])
+    ),
+    senderDependencies: [],
+    admission: {
+      operationId: 'mime-image',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  const object = encoded.objects.find(({ ref }) => ref.objectId === encoded.bindings[0]!.objectId)!;
+  expect(object.ref.mimeType).toBe('image/png');
+  expect(object.blob.type).toBe(mimeType);
+  expect(await object.blob.text()).toBe('document');
+  io.read.mockImplementationOnce(
+    async (_ref: AssetRef, filename: string) =>
+      new File(['document'], filename, { type: 'image/jpeg' })
+  );
+  await expect(encodeCapturedImageRoot(rows)).rejects.toThrow('native reference');
+});
+
+it('restores parameterized image original MIME from its typed portable declaration', async () => {
+  const rows = imageRows();
+  const mimeType = 'image/png;charset=utf-8';
+  rows.media.mimeType = mimeType;
+  rows.media.blob = new Blob(['original'], { type: mimeType });
+  rows.workspace = null;
+  rows.presentation = null;
+  rows.refs = [];
+  const encoded = await encodeCapturedImageRoot(rows);
+  const { parsePortableSyncRoot } = await import('./prepared-root');
+  await parsePortableSyncRoot(encoded.envelope);
+  const object = encoded.envelope.objects[0]!;
+  const staged: AssetRef = {
+    assetId: 'received-original',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/received-original' },
+    size: object.size,
+    mimeType: object.mimeType,
+    sha256: null,
+  };
+  const args = {
+    envelope: encoded.envelope,
+    verifiedObjects: new Map([[object.objectId, staged]]),
+    senderDependencies: [],
+    admission: {
+      operationId: 'mime-original',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  };
+  const payload = await preparePortableReplica(args);
+  if (payload.kind !== 'image') throw new Error('Expected image replica.');
+  expect(payload.input.media.mimeType).toBe(mimeType);
+  expect(payload.input.originalRef.mimeType).toBe(mimeType);
+  expect(staged.mimeType).toBe('image/png');
+  await expect(
+    preparePortableReplica({
+      ...args,
+      verifiedObjects: new Map([[object.objectId, { ...staged, mimeType: 'image/jpeg' }]]),
+    })
+  ).rejects.toThrow('binding');
+});
+
 it('encodes the retained image after a later native edit', async () => {
   const rows = imageRows();
   let release!: () => void;
@@ -478,4 +579,22 @@ it('preserves distinct workspace roles and canvas pointers when equal native ass
     { objectId: document.sourceImage.objectId, ref: rows.refs[0] },
   ]);
   expect(encoded.objects).toHaveLength(4);
+});
+
+it('hands off only committed transport markers and preserves accepted bytes after unlink failure', async () => {
+  io.canonical = nativeImageCapture();
+  io.settle.mockImplementationOnce(async () => {
+    expect(io.accepted).not.toBeNull();
+    expect(io.release).toHaveBeenCalledOnce();
+    throw new Error('Marker unlink refused');
+  });
+  await expect(prepareCapturedOutgoing(io.canonical)).rejects.toThrow('Marker unlink refused');
+  expect(io.discard).not.toHaveBeenCalled();
+  expect(io.bytes.size).toBe(3);
+  expect(io.accepted).not.toBeNull();
+  expect(io.settle.mock.calls[0]![0]).not.toContain('document-source');
+  io.release.mockClear();
+  await expect(prepareCapturedOutgoing(io.canonical)).resolves.toEqual(io.accepted);
+  expect(io.release).not.toHaveBeenCalled();
+  expect(io.settle).toHaveBeenCalledTimes(2);
 });

@@ -22,6 +22,7 @@ import {
   MissingAssetObjectError,
   AssetObjectSizeMismatchError,
   releaseAssetReadyProtection,
+  settleAssetWritingMarkers,
   runWithDurableAssetOperation,
   readAssetFile,
 } from '../../composition/persistence/assets';
@@ -161,6 +162,9 @@ async function settleTransportCopies(
   );
   // Native prepared claims now own these bytes. Release only this preparation's writer leases.
   await releaseAssetReadyProtection(
+    staged.filter((object) => kept.has(object.ref.assetId)).map((object) => object.ref.assetId)
+  );
+  await settleAssetWritingMarkers(
     staged.filter((object) => kept.has(object.ref.assetId)).map((object) => object.ref.assetId)
   );
   const failures = results.flatMap((result) =>
@@ -359,7 +363,7 @@ export async function prepareCapturedOutgoing(
   if (existing) {
     await parseSyncOperationText(existing.recordText);
     const accepted = await commitPreparedOutgoingOperation(parsed, existing);
-    await releaseAssetReadyProtection(accepted.objects.map((object) => object.ref.assetId));
+    await settleAssetWritingMarkers(accepted.objects.map((object) => object.ref.assetId));
     return accepted;
   }
   check(parsed.phase === 'native');
@@ -425,7 +429,10 @@ async function readDispatchSources(
           (item) => item.objectId === object.objectId && item.sha256 === object.sha256
         )
     );
-    check(expected.size === object.ref.size && expected.mimeType === object.ref.mimeType);
+    check(
+      expected.size === object.ref.size &&
+        expected.mimeType === object.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase()
+    );
     const file = await readAssetFile(object.ref, expected.filename);
     check(file.size === expected.size && (await hashFile(file, signal)) === object.sha256);
     files.push({ objectId: object.objectId, file, sha256: object.sha256, expected });
@@ -556,7 +563,7 @@ async function readRetainedCandidates(
         objectId: candidate.objectId,
         filename: candidate.filename,
         size: candidate.ref.size,
-        mimeType: candidate.ref.mimeType,
+        mimeType: candidate.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase(),
       },
       digest: { objectId: candidate.objectId, sha256: candidate.sha256 },
       binding: { objectId: candidate.objectId, remoteKey: candidate.remoteKey },

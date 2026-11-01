@@ -39,6 +39,7 @@ export {
   AssetObjectSizeMismatchError,
   readAssetFile,
   releaseAssetReadyProtection,
+  settleAssetWritingMarkers,
   runWithAssetObjectLockIfAvailable,
   writeBlobToAsset,
   writeReadyJournal,

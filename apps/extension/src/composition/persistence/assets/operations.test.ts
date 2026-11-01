@@ -691,10 +691,11 @@ it('preserves pins while an editor resource reader prevents cleanup', async () =
       ) => operation(null),
     },
   });
+  const verify = vi.fn(async () => undefined);
   expect(
-    (await releasePublishedOperationPins(f.publication, f.authorization, async () => undefined))
-      .released
+    (await releasePublishedOperationPins(f.publication, f.authorization, verify)).released
   ).toEqual([]);
+  expect(verify).not.toHaveBeenCalled();
   expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
   expect(f.table('asset_operations').size).toBe(0);
   expect(mocks.deleteObject).not.toHaveBeenCalled();
@@ -724,4 +725,30 @@ it('keeps bytes and intent while the ready claim index is incomplete', async () 
   expect(mocks.deleteObject).not.toHaveBeenCalled();
   expect(harness.db.delete).not.toHaveBeenCalled();
   expect(harness.db.getAll).not.toHaveBeenCalled();
+});
+
+it('rechecks reader protection when an editor opens after the advisory precheck', async () => {
+  const f = publicationReleaseFixture();
+  let busy = false;
+  installPersistenceLockManagerForTests({
+    request: async (_name, _options, operation) => operation({}),
+  });
+  vi.stubGlobal('navigator', {
+    locks: {
+      request: async (
+        _name: string,
+        _options: unknown,
+        action: (lock: object | null) => Promise<unknown>
+      ) => action(busy ? null : {}),
+    },
+  });
+  const verify = vi.fn(async () => {
+    busy = true;
+  });
+  expect(
+    (await releasePublishedOperationPins(f.publication, f.authorization, verify)).released
+  ).toEqual([]);
+  expect(verify).toHaveBeenCalledOnce();
+  expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
 });

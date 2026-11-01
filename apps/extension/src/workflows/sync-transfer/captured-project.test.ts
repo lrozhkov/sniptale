@@ -268,6 +268,69 @@ it('uses backup project inventory and binds exact native originals without copyi
   expect(result.envelope.descriptor.totalBytes).toBe(2048);
 });
 
+it('binds parameterized WebM sources and exports without changing native MIME', async () => {
+  const rows = projectRows();
+  const mimeType = 'video/webm;codecs=vp8';
+  for (const entry of [...rows.assets, ...rows.exports]) entry.mimeType = mimeType;
+  for (const ref of rows.refs) ref.mimeType = mimeType;
+  for (const asset of rows.project.project.assets) asset.metadata.mimeType = mimeType;
+  const encoded = await encodeCapturedProjectRoot(rows);
+  expect(encoded.bindings.map(({ ref }) => ref)).toEqual(rows.refs);
+  await parsePortableSyncRoot(encoded.envelope);
+  const received = await preparePortableReplica({
+    envelope: encoded.envelope,
+    deferredExports: new Map([
+      [
+        rows.exports[0]!.id,
+        { ref: rows.refs[1]!, remote: { key: 'remote/export', sha256: 'b'.repeat(64) } },
+      ],
+    ]),
+    verifiedObjects: new Map(
+      encoded.objects.map(({ ref }) => [
+        ref.objectId,
+        {
+          ...rows.refs[0]!,
+          assetId: `received-${ref.objectId}`,
+          location: { kind: 'opfs' as const, objectKey: `objects/received-${ref.objectId}` },
+          size: ref.size,
+          mimeType: ref.mimeType,
+        },
+      ])
+    ),
+    senderDependencies: [],
+    admission: {
+      operationId: 'mime-project',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  if (received.kind !== 'video-project') throw new Error('Expected project replica.');
+  expect(received.input.root.assets[0]!.entry.mimeType).toBe(mimeType);
+  expect(received.input.root.assets[0]!.ref.mimeType).toBe(mimeType);
+  expect(received.input.root.exports![0]!.entry.mimeType).toBe(mimeType);
+  expect(received.input.root.exports![0]!.ref.mimeType).toBe(mimeType);
+  for (const object of encoded.objects) {
+    expect(object.ref.mimeType).toBe('video/webm');
+    expect(object.blob.type).toBe(mimeType);
+    expect(object.blob).toBe(
+      io.files.get(
+        encoded.bindings.find(({ objectId }) => objectId === object.ref.objectId)!.ref.assetId
+      )
+    );
+  }
+  io.read.mockImplementationOnce(
+    async (ref: AssetRef, filename: string) =>
+      new File([new Uint8Array(ref.size)], filename, { type: 'video/mp4' })
+  );
+  await expect(encodeCapturedProjectRoot(rows)).rejects.toThrow('native reference');
+});
+
 it('detaches the complete project before the first asynchronous source read', async () => {
   const rows = projectRows();
   let entered!: () => void;

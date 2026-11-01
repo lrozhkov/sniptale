@@ -1,3 +1,4 @@
+import { parseSyncCaptureRecord } from './guards';
 import { collectSyncCaptureClaims } from './claims';
 import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -168,6 +169,7 @@ import {
   commitVerifiedOutgoingResult,
   loadVerifiedOutgoingResult,
   parseVerifiedOutgoingResult,
+  discoverPublishedOutgoingRetirement,
 } from './outgoing-results';
 
 async function ready() {
@@ -356,4 +358,141 @@ it('parses compact receipts independently of property order and refuses invalid 
   await expect(loadVerifiedOutgoingResult('', 3, 'op')).rejects.toThrow('Invalid');
   await expect(loadVerifiedOutgoingResult('space', 0, 'op')).rejects.toThrow('Invalid');
   expect(io.database).not.toHaveBeenCalled();
+});
+
+async function retirementFixture() {
+  const f = await ready();
+  await commitVerifiedOutgoingResult(f.accepted, f.first);
+  const authorization = { incarnation: FIRST, revision: 1 };
+  const scope = { spaceId: 'space', connectionGeneration: 3, profileCreatedAt: 1 };
+  f.table('sync_connection').set('connection', {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding: {
+      ...scope,
+      provider: 'webdav',
+      rootUrl: 'https://dav.test/root/',
+      accountId: 'account',
+    },
+    identity: authorization,
+    phase: 'active',
+    updateNonce: null,
+    credentialId: SECOND,
+  });
+  vi.stubGlobal('IDBKeyRange', {
+    only: (value: IDBValidKey) => ({ lower: value, upper: value }),
+    lowerBound: (lower: IDBValidKey, lowerOpen: boolean) => ({ lower, lowerOpen }),
+  });
+  const transaction = f.database.transaction;
+  const reads = vi.fn();
+  vi.spyOn(f.database, 'transaction').mockImplementation((stores, mode) => {
+    const tx = transaction(stores, mode);
+    return {
+      ...tx,
+      objectStore(name: string) {
+        const store = tx.objectStore(name);
+        return {
+          ...store,
+          getKey: async (key: IDBValidKey) =>
+            (await store.get(key)) === undefined ? undefined : key,
+          getAllKeys: async (query?: IDBValidKey | IDBKeyRange, count?: number) => {
+            reads(name, count);
+            return store.getAllKeys(query, count);
+          },
+        };
+      },
+    };
+  });
+  const published = parseSyncCaptureRecord(f.table('sync_capture').get(f.capture.key));
+  if (!published || published.kind !== 'sync-operation' || published.phase !== 'published')
+    throw new Error('Missing published fixture.');
+  const seed = (key: string, overrides: Record<string, unknown> = {}) => {
+    f.table('sync_capture').set(key, {
+      ...structuredClone(published),
+      key,
+      operationId: key,
+      ...overrides,
+    });
+  };
+  f.table('sync_capture').delete(f.capture.key);
+  const input = { scope, authorization, afterKey: null, signal: new AbortController().signal };
+  return { ...f, seed, input, reads };
+}
+it('discovers old published pins while skipping malformed, foreign and native-only records', async () => {
+  const f = await retirementFixture();
+  f.table('sync_capture').set('00-invalid', { kind: 'sync-operation', phase: 'published' });
+  f.seed('01-foreign', { connectionGeneration: 2 });
+  f.seed('02-other-profile', { profileCreatedAt: 2 });
+  f.seed('03-other-space', { spaceId: 'foreign' });
+  f.seed('04-owned');
+  f.table('asset_refs').set('body', f.accepted.objects[0]!.ref);
+  const remoteRef = {
+    ...f.accepted.objects[0]!.ref,
+    assetId: 'transport',
+    location: { kind: 'opfs', objectKey: 'objects/transport' },
+  };
+  const objects = [
+    {
+      ...f.accepted.objects[0]!,
+      ref: remoteRef,
+      remoteKey: 'Originals/transport.png',
+      pinned: true,
+    },
+  ];
+  f.seed('05-published', { objects });
+  expect(await discoverPublishedOutgoingRetirement(f.input)).toEqual({
+    operationIds: ['05-published'],
+    afterKey: null,
+    scanned: 7,
+  });
+  expect(f.reads).toHaveBeenCalledWith('sync_capture', 64);
+});
+it('selects at most two operations and resumes at the last processed key', async () => {
+  const f = await retirementFixture();
+  f.seed('a');
+  f.seed('b');
+  f.seed('c');
+  const first = await discoverPublishedOutgoingRetirement(f.input);
+  expect(first).toEqual({ operationIds: ['a', 'b'], afterKey: 'b', scanned: 2 });
+  expect(
+    await discoverPublishedOutgoingRetirement({ ...f.input, afterKey: first.afterKey })
+  ).toEqual({ operationIds: ['c'], afterKey: null, scanned: 2 });
+});
+it('bounds malformed native traversal to64 keys and reaches later published work', async () => {
+  const f = await retirementFixture();
+  for (let index = 0; index < 64; index++)
+    f.table('sync_capture').set(`a-${String(index).padStart(2, '0')}`, { invalid: true });
+  f.seed('b-published');
+  const first = await discoverPublishedOutgoingRetirement(f.input);
+  expect(first).toEqual({ operationIds: [], afterKey: 'a-63', scanned: 64 });
+  expect(
+    await discoverPublishedOutgoingRetirement({ ...f.input, afterKey: first.afterKey })
+  ).toEqual({ operationIds: ['b-published'], afterKey: null, scanned: 2 });
+});
+it.each(['media', 'video-project', 'video-review', 'scenario-project'] as const)(
+  'includes published transport for%s roots',
+  async (rootKind) => {
+    const f = await retirementFixture();
+    f.seed('published', { rootKind, rootKey: captureRootKey('space', rootKind, f.capture.rootId) });
+    expect((await discoverPublishedOutgoingRetirement(f.input)).operationIds).toEqual([
+      'published',
+    ]);
+  }
+);
+it('refuses delayed discovery after connection replacement or profile change', async () => {
+  const f = await retirementFixture();
+  f.seed('published');
+  await expect(
+    discoverPublishedOutgoingRetirement({
+      ...f.input,
+      authorization: { ...f.input.authorization, revision: 2 },
+    })
+  ).rejects.toThrow('admission refused');
+  await expect(
+    discoverPublishedOutgoingRetirement({
+      ...f.input,
+      scope: { ...f.input.scope, profileCreatedAt: 2 },
+    })
+  ).rejects.toThrow('admission refused');
 });

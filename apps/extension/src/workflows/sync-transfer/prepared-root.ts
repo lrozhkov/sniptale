@@ -48,7 +48,10 @@ import {
   parsePortableMediaMetadata,
   preparePortableMediaOriginal,
 } from '../media-hub-backup/v6/root-codecs/media';
-import { assertArchiveRootObjectInventory } from '../media-hub-backup/v6/root-codecs/object-inventory';
+import {
+  assertArchiveRootObjectInventory,
+  collectArchiveNativeMimeTypes,
+} from '../media-hub-backup/v6/root-codecs/object-inventory';
 import {
   decodePortableVideoProjectAssetRefs,
   parsePortableVideoProjectMetadata,
@@ -619,7 +622,11 @@ async function prepareVideoRoot(
           if (!deferred) throw new Error('Retained export binding is missing.');
           const entry =
             deferred.retainedEntry ??
-            parseProjectExportEntry({ ...item.entry, assetId: deferred.ref.assetId });
+            parseProjectExportEntry({
+              ...item.entry,
+              assetId: deferred.ref.assetId,
+              mimeType: item.entry.mimeType ?? 'video/webm',
+            });
           if (!entry) throw new Error('Retained export metadata is invalid.');
           const videoReview =
             !deferred.retainedEntry && item.videoReview
@@ -721,12 +728,30 @@ export async function preparePortableReplica(args: {
     local.dependencies.length > captureProfileBounds(parsed.kind).rows
   )
     throw new Error('Portable dependency inventory exceeds its profile.');
+  const declarations = await collectArchiveNativeMimeTypes(parsed.envelope);
+  const borrowedAssetIds = new Set([
+    ...local.dependencies.map((item) => item.ref.assetId),
+    ...(local.rootDependencies ?? []).flatMap((item) =>
+      item.children.map((child) => child.ref.assetId)
+    ),
+  ]);
   const refFor = (id: string) => {
     const ref = parseAssetRef(objects.get(id));
     const object = parsed.envelope.objects.find((item) => item.objectId === id);
-    if (!ref || !object || ref.size !== object.size || ref.mimeType !== object.mimeType)
+    const declared = declarations.get(id);
+    if (
+      !ref ||
+      !object ||
+      ref.size !== object.size ||
+      ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() !== object.mimeType ||
+      (declared !== undefined &&
+        ref.mimeType !== declared &&
+        (ref.mimeType !== object.mimeType || borrowedAssetIds.has(ref.assetId)))
+    )
       throw new Error('Verified portable object binding is missing or inconsistent.');
-    return ref;
+    return declared === undefined || declared === ref.mimeType
+      ? ref
+      : { ...ref, mimeType: declared };
   };
   if (
     (local.authorization !== undefined && !parseSyncConnectionIdentity(local.authorization)) ||

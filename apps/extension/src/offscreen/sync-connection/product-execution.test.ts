@@ -853,3 +853,39 @@ it('logs a fixed failure code and preserves success when the diagnostic sink thr
     containment: 'contained',
   });
 });
+
+it('retries published transport retirement before an unrelated catalog refresh fails', async () => {
+  const retire = { run: vi.fn().mockResolvedValue({ attempted: 1, released: 1, deferred: 0 }) };
+  const automatic = { run: vi.fn() };
+  mocks.refresh.mockRejectedValueOnce(new Error('catalog unavailable'));
+  const execution = createSyncProductExecution(
+    { ...scopeBinding(), work: { kind: 'automatic-sync' }, signal: new AbortController().signal },
+    async () => true,
+    undefined,
+    undefined,
+    automatic,
+    retire
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'failed',
+    containment: 'contained',
+  });
+  expect(retire.run).toHaveBeenCalledOnce();
+  expect(retire.run.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.refresh.mock.invocationCallOrder[0]!
+  );
+  expect(mocks.close).toHaveBeenCalled();
+});
+it('does not start retirement after current connection admission fails', async () => {
+  const retire = { run: vi.fn() };
+  mocks.connection.mockResolvedValueOnce(null);
+  await createSyncProductExecution(
+    { ...scopeBinding(), work: { kind: 'automatic-sync' }, signal: new AbortController().signal },
+    async () => true,
+    undefined,
+    undefined,
+    { run: vi.fn() },
+    retire
+  ).run();
+  expect(retire.run).not.toHaveBeenCalled();
+});

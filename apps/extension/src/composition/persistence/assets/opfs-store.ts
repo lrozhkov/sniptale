@@ -619,6 +619,25 @@ export async function runWithAssetObjectLockIfAvailable<T>(
   return result;
 }
 
+/**
+ * Retires writing markers after the caller commits durable native, journal, or prepared claims.
+ * Busy writers keep their markers for retry. This operation releases no leases or asset bytes.
+ */
+export async function settleAssetWritingMarkers(
+  assetIds: readonly string[],
+  options: AssetOpfsOptions = {}
+): Promise<void> {
+  const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
+  if (!writing) return;
+  for (const assetId of assetIds) {
+    await runWithAssetObjectLockIfAvailable(
+      assetId,
+      () => removeIfPresent(writing, assetId),
+      options
+    );
+  }
+}
+
 export async function listAssetObjectIds(options: AssetOpfsOptions = {}): Promise<string[]> {
   const objects = await getAssetDirectory(options, OBJECTS_DIRECTORY_NAME, false);
   if (!objects) return [];
@@ -700,7 +719,7 @@ export async function discardPreparedAsset(
  */
 export async function collectQuiescentWritingObjects(
   options: AssetOpfsOptions = {},
-  isRetained: (assetId: string) => Promise<boolean> = async () => false,
+  isRetained: (assetId: string) => Promise<boolean | null> = async () => false,
   lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<number> {
   const readReadyAssetIds = async () =>
@@ -721,7 +740,7 @@ export async function collectQuiescentWritingObjects(
 
 async function collectWritingObjects(
   options: AssetOpfsOptions,
-  isRetained: (assetId: string) => Promise<boolean>,
+  isRetained: (assetId: string) => Promise<boolean | null>,
   readReadyAssetIds: () => Promise<ReadonlySet<string>>
 ): Promise<number> {
   const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
@@ -748,7 +767,12 @@ async function collectWritingObjects(
         return;
       }
       // Marker unlink can fail after a ready journal commits; native claims remain authoritative.
-      if (await isRetained(assetId)) return;
+      const retained = await isRetained(assetId);
+      if (retained === null) return;
+      if (retained) {
+        await removeIfPresent(writing, assetId);
+        return;
+      }
       await deleteAssetObject(assetId, options);
       await removeIfPresent(writing, assetId);
       removed += 1;

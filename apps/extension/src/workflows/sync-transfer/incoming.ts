@@ -121,7 +121,12 @@ async function checkedPredecessorOriginal(
     (item) => item.objectId === parsed.metadata.originalObjectId
   );
   check(object && digest);
-  if (!ref || ref.size !== object.size || ref.mimeType !== object.mimeType) return null;
+  if (
+    !ref ||
+    ref.size !== object.size ||
+    ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() !== object.mimeType
+  )
+    return null;
   let file: File;
   try {
     file = await readAssetFile(ref, object.filename);
@@ -136,7 +141,7 @@ async function checkedPredecessorOriginal(
   }
   signal.throwIfAborted();
   return file.size === object.size &&
-    file.type === object.mimeType &&
+    file.type === ref.mimeType &&
     (await hashFile(file, signal)) === digest.sha256
     ? [object.objectId, ref]
     : null;
@@ -307,7 +312,7 @@ async function scenarioPredecessorOriginals(
         !object ||
         !digest ||
         predecessor.ref.size !== object.size ||
-        predecessor.ref.mimeType !== object.mimeType
+        predecessor.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() !== object.mimeType
       )
         continue;
       matches.push({ object, ref: predecessor.ref, sha256: digest.sha256 });
@@ -337,7 +342,7 @@ async function retainScenarioPredecessors(
     args.signal.throwIfAborted();
     if (
       file.size === object.size &&
-      file.type === object.mimeType &&
+      file.type === ref.mimeType &&
       (await hashFile(file, args.signal)) === sha256
     )
       borrowedRefs.set(object.objectId, ref);
@@ -380,7 +385,7 @@ async function checkReplicaDependencies(
       object &&
         digest &&
         dependency.ref.size === object.size &&
-        dependency.ref.mimeType === object.mimeType
+        dependency.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() === object.mimeType
     );
     check(
       (await hashFile(await readAssetFile(dependency.ref, object.filename), args.signal)) ===
@@ -429,7 +434,7 @@ function retainReviewDependencyObjects(
         original &&
         originalDigest &&
         primary.ref.size === original.size &&
-        primary.ref.mimeType === original.mimeType &&
+        primary.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() === original.mimeType &&
         primary.sha256 === originalDigest.sha256
     );
     borrowedRefs.set(parsed.metadata.originalObjectId, primary.ref);
@@ -441,7 +446,7 @@ function retainReviewDependencyObjects(
         asset.libraryMediaId,
         asset.objectId
       );
-      check(dependency.ref.mimeType === object.mimeType);
+      check(dependency.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() === object.mimeType);
       borrowedRefs.set(asset.objectId, dependency.ref);
     }
   }
@@ -520,7 +525,10 @@ async function prepareStagedReplica(
       // A changed reuse decision needs a fresh closure, never extra or missing staged resources.
       check(Boolean(retained) === preparation.retainedExportIds.has(item.entry.id));
       if (retained) {
-        check(retained.ref.size === object.size && retained.ref.mimeType === object.mimeType);
+        check(
+          retained.ref.size === object.size &&
+            retained.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() === object.mimeType
+        );
         try {
           const file = await readAssetFile(retained.ref, object.filename);
           check(file.size === object.size && (await hashFile(file, signal)) === digest.sha256);
@@ -540,13 +548,16 @@ async function prepareStagedReplica(
           );
         }
       }
+      const mimeType = item.entry.mimeType ?? 'video/webm';
+      check(mimeType.split(';', 1)[0]!.trim().toLowerCase() === object.mimeType);
+      if (retained) check(retained.ref.mimeType === mimeType);
       const assetId = retained?.ref.assetId ?? crypto.randomUUID();
       const ref = retained?.ref ?? {
         assetId,
         createdAt: Date.now(),
         location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
         size: object.size,
-        mimeType: object.mimeType,
+        mimeType,
         sha256: digest.sha256,
       };
       deferredExports.set(item.entry.id, {

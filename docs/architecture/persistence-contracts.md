@@ -816,6 +816,14 @@ The first accepted encoding wins. Every caller uses the returned accepted value.
 
 A refused preparation preserves the native snapshot and claims. Repeated preparation returns accepted bytes without reading a newer live source. Reads perform no writes. Preparation does not authorize source release.
 
+After durable preparation commits, its claims protect accepted transport files. The workflow releases only its own new writer leases. It then removes obsolete writing markers under available object locks. Repeated preparation can settle markers without releasing leases on borrowed native files. A failed marker removal preserves accepted files and claims for retry.
+
+Portable object descriptors use base MIME types. Native metadata can retain codec or charset parameters. A verified receiving boundary restores those parameters from typed metadata when it creates native references. Borrowed references retain their exact admitted identity.
+
+Descriptor comparisons use the base type. Native row and reference comparisons retain their exact type. A different base type, size or digest still refuses admission.
+
+Startup recovery removes obsolete writing markers when valid durable claims retain their files. Unresolved or inconsistent retention evidence preserves both markers and bytes. An active writer retains its marker. This maintenance preserves retained files.
+
 ## Durable physical dispatch attempts
 
 The sync persistence owner stores immutable attempt identities, digests, remote manifest keys and object mappings in sync_outbox. Attempts contain no portable or manifest text. The dispatcher reconstructs exact manifest text in memory from the accepted preparation and canonical wire encoder.
@@ -923,6 +931,10 @@ Eligible pin removal and the intent for physical removal commit in one transacti
 Physical failure retains the durable intent for existing recovery. Concurrent edits, replacement enrollment or changed immutable bindings refuse delayed release. Unknown prototype records make destructive retention authority invalid and preserve bytes.
 
 This command releases only native bytes without local owners. Remote-only residency for an active media or project owner requires the later hydration contract. This stage does not remove current project files or add remote garbage collection.
+
+Automatic sync retries retirement through its existing connection and request lifetime before catalog refresh. Each pass scans at most 64 native keys and selects at most two published operations with potentially ownerless pinned files. Canonical native references exclude operations with no eligible transport candidates. Discovery grants no deletion authority. Existing release admission checks current retention again.
+
+The advisory cursor advances past failed or protected candidates and wraps at the end. A replacement connection resets the cursor. Runtime restart begins traversal again. The cursor does not promise progress across repeated runtime restarts. No new queue, store, index or network command owns this maintenance.
 
 ## Native sync connection authorization
 
