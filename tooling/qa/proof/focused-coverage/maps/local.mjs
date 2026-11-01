@@ -1,5 +1,31 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'sync-image-shared-binary-consumers',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/captured-image.ts',
+    reason:
+      'Shared image objects require frozen-source admission, concurrent preparation, deletion recovery, dispatch retry and native replica validation.',
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/captured-image.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/outgoing.test.ts',
+      'apps/extension/src/workflows/sync-transfer/outgoing.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-image.test.ts',
+      'apps/extension/src/workflows/sync-transfer/wire-record.test.ts',
+    ],
+  },
+  {
+    owner: 'image-document-shared-asset-publication',
+    productionFile: 'apps/extension/src/composition/persistence/document-assets/codec.ts',
+    reason:
+      'Shared document assets require role ownership, publication rollback, concurrent saves, purged-root refusal and recovery validation.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/document-assets/codec.test.ts',
+      'apps/extension/src/composition/persistence/document-assets/ownership.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.reused-assets.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.root-lifecycle.test.ts',
+    ],
+  },
+  {
     owner: 'review-text-source-placement',
     productionFile: 'apps/extension/src/gallery/video-review/use-review-text.ts',
     reason:

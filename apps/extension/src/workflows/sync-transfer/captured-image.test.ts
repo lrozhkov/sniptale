@@ -329,7 +329,11 @@ it('prepares authoritative image bytes instead of a caller replacement Blob', as
   expect(bodies).toContain('original');
   expect(bodies).not.toContain('forgery!');
   expect(prepared.objects).toHaveLength(4);
-  expect(io.release).toHaveBeenCalledWith(prepared.objects.map((object) => object.ref.assetId));
+  expect(io.release).toHaveBeenCalledWith(
+    prepared.objects
+      .filter((object) => object.ref.assetId !== 'document-source')
+      .map((object) => object.ref.assetId)
+  );
 });
 it('retains native image data after preparation refusal and permits exact retry', async () => {
   io.canonical = nativeImageCapture();
@@ -343,7 +347,7 @@ it('retains native image data after preparation refusal and permits exact retry'
   const prepared = await prepareCapturedOutgoing(before);
   expect(prepared.objects).toHaveLength(4);
   expect(await prepareCapturedOutgoing(before)).toEqual(prepared);
-  expect(io.bytes.size).toBe(4);
+  expect(io.bytes.size).toBe(3);
 });
 it('keeps the first image preparation and releases competing transport copies', async () => {
   io.canonical = nativeImageCapture();
@@ -352,11 +356,15 @@ it('keeps the first image preparation and releases competing transport copies', 
     prepareCapturedOutgoing(io.canonical),
   ]);
   expect(results[0]).toEqual(results[1]);
-  expect(io.staged).toHaveLength(8);
+  expect(io.staged).toHaveLength(6);
   expect(new Set(io.bytes.keys())).toEqual(
-    new Set(results[0]!.objects.map((object) => object.ref.assetId))
+    new Set(
+      results[0]!.objects
+        .filter((object) => object.ref.assetId !== 'document-source')
+        .map((object) => object.ref.assetId)
+    )
   );
-  expect(io.discard).toHaveBeenCalledTimes(4);
+  expect(io.discard).toHaveBeenCalledTimes(3);
 });
 
 it('publishes backup image object names through a safe DAV path without changing original metadata', async () => {
@@ -373,4 +381,101 @@ it('publishes backup image object names through a safe DAV path without changing
   expect(attempt.objects.every((object) => !/[?:]/u.test(object.remoteKey))).toBe(true);
   const metadata = parsePortableMediaMetadata(JSON.parse(prepared.recordText).envelope.metadata);
   expect(metadata.entry.filename).toBe('original: screenshot?.png');
+});
+
+it('reuses the frozen workspace source without creating or releasing a transport copy', async () => {
+  const rows = imageRows();
+  io.canonical = nativeImageCapture(rows);
+  const prepared = await prepareCapturedOutgoing(io.canonical);
+  const source = prepared.objects.find((object) => object.ref.assetId === 'document-source');
+  expect(source?.ref).toEqual(rows.refs[0]);
+  expect(io.staged).toHaveLength(3);
+  expect(io.discard).not.toHaveBeenCalledWith('document-source');
+  expect(io.release.mock.calls.flat(2)).not.toContain('document-source');
+  expect(await prepareCapturedOutgoing(io.canonical)).toEqual(prepared);
+  expect(io.staged).toHaveLength(3);
+});
+
+it('shares identical original, workspace and preview bytes through one portable object', async () => {
+  const rows = imageRows();
+  rows.media.blob = new Blob(['document'], { type: 'image/png' });
+  rows.presentation!.previewBlob = new Blob(['document'], { type: 'image/png' });
+  const encoded = await encodeCapturedImageRoot(rows);
+  const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+  expect(encoded.objects).toHaveLength(2);
+  expect(metadata.originalObjectId).toBe(metadata.workspace!.document.sourceImage.objectId);
+  expect(metadata.originalObjectId).toBe(metadata.presentation!.previewObjectId);
+  expect(encoded.bindings).toEqual([{ objectId: metadata.originalObjectId, ref: rows.refs[0] }]);
+  const refs = new Map(
+    encoded.objects.map((object, index) => [
+      object.ref.objectId,
+      {
+        assetId: `shared-${index}`,
+        createdAt: 1,
+        location: { kind: 'opfs' as const, objectKey: `objects/shared-${index}` },
+        mimeType: object.ref.mimeType,
+        size: object.ref.size,
+        sha256: null,
+      },
+    ])
+  );
+  const payload = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: refs,
+    senderDependencies: [],
+    admission: {
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      operationId: 'remote-image',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  if (payload.kind !== 'image') throw new Error('Expected image replica.');
+  expect(payload.input.originalRef.assetId).toBe(payload.input.documentRefs[0]!.assetId);
+  expect(payload.input.presentation!.previewRef).toEqual(payload.input.originalRef);
+  expect(payload.input.media.filename).toBe(rows.media.filename);
+});
+
+it.each(['content', 'mime'] as const)('keeps different %s objects separate', async (difference) => {
+  const rows = imageRows();
+  rows.media.blob = new Blob(['document'], { type: 'image/png' });
+  rows.presentation!.previewBlob = new Blob([difference === 'content' ? 'documenT' : 'document'], {
+    type: difference === 'mime' ? 'image/webp' : 'image/png',
+  });
+  const encoded = await encodeCapturedImageRoot(rows);
+  const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+  expect(encoded.objects).toHaveLength(3);
+  expect(metadata.originalObjectId).toBe(metadata.workspace!.document.sourceImage.objectId);
+  expect(metadata.presentation!.previewObjectId).not.toBe(metadata.originalObjectId);
+});
+
+it('preserves distinct workspace roles and canvas pointers when equal native assets share one object', async () => {
+  const rows = imageRows();
+  rows.workspace!.document.assets.push({
+    assetId: 'other-source',
+    role: 'canvas:$.objects[0].src',
+  });
+  rows.workspace!.document.canvasJson = JSON.stringify({
+    objects: [{ type: 'image', src: 'sniptale-asset:other-source' }],
+  });
+  rows.refs.push({
+    ...rows.refs[0]!,
+    assetId: 'other-source',
+    location: { kind: 'opfs', objectKey: 'objects/other-source' },
+  });
+  const encoded = await encodeCapturedImageRoot(rows);
+  const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+  const document = metadata.workspace!.document;
+  expect(document.assets).toHaveLength(2);
+  expect(new Set(document.assets.map((asset) => asset.objectId)).size).toBe(1);
+  expect(document.canvasJson).toContain(`sniptale-object:${document.sourceImage.objectId}`);
+  expect(encoded.bindings).toEqual([
+    { objectId: document.sourceImage.objectId, ref: rows.refs[0] },
+  ]);
+  expect(encoded.objects).toHaveLength(4);
 });

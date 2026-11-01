@@ -1,3 +1,7 @@
+import { hashSyncText } from './wire-record';
+import { SyncRemoteError } from './remote-store';
+import { SyncWorkspaceError } from './workspace';
+import { SyncCatalogError } from './catalog';
 import { hasUnloadedNativeEditingRoot } from './native-residency';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
@@ -11,12 +15,74 @@ import {
 import { applyCatalogDeletion } from './incoming';
 import { receiveSelectedCatalogRoot } from './incoming-selected';
 import { syncCatalogRootKey } from './catalog-graph';
-import { hashSyncText } from './wire-record';
 import type { scanSyncCatalog } from './catalog';
 import type { SyncRemoteStore } from './remote-store';
 
 type Catalog = Awaited<ReturnType<typeof scanSyncCatalog>>;
 const logger = createLogger({ namespace: 'SyncIncoming' });
+
+type DiagnosticReason =
+  | SyncRemoteError['code']
+  | SyncWorkspaceError['code']
+  | SyncCatalogError['code']
+  | 'unexpected';
+
+function event(
+  state: 'applied' | 'deferred',
+  stage: 'basis' | 'deletion' | 'residency' | 'apply',
+  reason: DiagnosticReason | 'none' | 'basis-changed' | 'unloaded'
+): void {
+  try {
+    const message = `sync.incoming.${state} stage=${stage} reason=${reason}`;
+    if (state === 'deferred') logger.warn(message);
+    else logger.info(message);
+  } catch {
+    /* Diagnostics cannot change incoming publication or continuation. */
+  }
+}
+
+function diagnosticReason(error: unknown): DiagnosticReason {
+  try {
+    if (
+      !(
+        error instanceof SyncRemoteError ||
+        error instanceof SyncWorkspaceError ||
+        error instanceof SyncCatalogError
+      )
+    )
+      return 'unexpected';
+    const code = error.code;
+    switch (code) {
+      case 'invalid-configuration':
+      case 'invalid-key':
+      case 'invalid-response':
+      case 'unsupported-cursor':
+      case 'metadata-limit':
+      case 'cancelled':
+      case 'authentication':
+      case 'access-denied':
+      case 'missing':
+      case 'collision':
+      case 'storage-full':
+      case 'temporary':
+      case 'transport':
+      case 'invalid-binding':
+      case 'marker-missing':
+      case 'invalid-marker':
+      case 'unsupported-format':
+      case 'binding-mismatch':
+      case 'workspace-changed':
+      case 'unavailable':
+      case 'invalid-space':
+      case 'pagination-cycle':
+        return code;
+      default:
+        return 'unexpected';
+    }
+  } catch {
+    return 'unexpected';
+  }
+}
 
 function descendsFrom(catalog: Catalog, head: string, basis: readonly string[]): boolean {
   if (basis.length !== 1) return false;
@@ -89,6 +155,8 @@ export function createAutomaticCatalogSync() {
           result.remaining = true;
           return result;
         }
+        let stage: 'basis' | 'deletion' | 'residency' | 'apply' = 'basis';
+        let refusal: 'basis-changed' | null = null;
         try {
           if (source.operation.kind === 'delete') {
             const admission = await loadCatalogReplicaAdmission({
@@ -101,8 +169,11 @@ export function createAutomaticCatalogSync() {
             if (
               admission.expectedLocalGeneration !== local.generation ||
               JSON.stringify(admission.expectedBasis) !== JSON.stringify(local.basis)
-            )
+            ) {
+              refusal = 'basis-changed';
               throw new Error('Incoming native basis changed.');
+            }
+            stage = 'deletion';
             await applyCatalogDeletion({
               catalog,
               rootKind: root.rootKind,
@@ -111,13 +182,16 @@ export function createAutomaticCatalogSync() {
               signal: args.signal,
             });
           } else {
+            stage = 'residency';
             if (
               await hasUnloadedNativeEditingRoot({ rootKind: root.rootKind, rootId: root.rootId })
             ) {
+              event('deferred', 'residency', 'unloaded');
               result.deferred++;
               afterRootKey = key;
               continue;
             }
+            stage = 'apply';
             await receiveSelectedCatalogRoot({
               ...selected,
               remote: args.remote,
@@ -133,15 +207,11 @@ export function createAutomaticCatalogSync() {
             });
           }
           result.applied += 1;
-          logger.info('Sync incoming operation applied', {
-            rootRef: hashSyncText(JSON.stringify([selected.scope.spaceId, key])),
-          });
-        } catch {
+          event('applied', stage, 'none');
+        } catch (error) {
           args.signal.throwIfAborted();
           result.deferred += 1;
-          logger.warn('Sync incoming operation deferred', {
-            rootRef: hashSyncText(JSON.stringify([selected.scope.spaceId, key])),
-          });
+          event('deferred', stage, refusal ?? diagnosticReason(error));
         }
         afterRootKey = key;
       }

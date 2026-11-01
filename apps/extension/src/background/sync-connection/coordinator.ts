@@ -77,8 +77,25 @@ export interface SyncConnectionCoordinatorDependencies {
   createChallenge(): string;
 }
 
-function refused(): never {
-  throw new Error('Sync coordinator operation refused');
+/** Fixed owner refusal codes contain no connection or executor identity. */
+export class SyncConnectionCoordinatorError extends Error {
+  constructor(
+    readonly code:
+      | 'coordinator-refused'
+      | 'privacy-exclusion'
+      | 'generation-changed'
+      | 'selection-changed'
+      | 'executor-unavailable'
+      | 'binding-changed'
+      | 'receipt-invalid' = 'coordinator-refused'
+  ) {
+    super('Sync coordinator operation refused');
+    this.name = 'SyncConnectionCoordinatorError';
+  }
+}
+
+function refused(code: SyncConnectionCoordinatorError['code'] = 'coordinator-refused'): never {
+  throw new SyncConnectionCoordinatorError(code);
 }
 function matches(metadata: SyncConnectionMetadata | null, selection: StartSelection): boolean {
   return (
@@ -410,15 +427,15 @@ class SyncConnectionCoordinator {
 
   start(input: StartSelection): Promise<ExecutorReceipt> {
     const release = this.#exclusion.acquirePermit();
-    if (!release) return Promise.reject(new Error('Sync coordinator operation refused'));
+    if (!release) return Promise.reject(new SyncConnectionCoordinatorError('privacy-exclusion'));
     const generation = this.#exclusion.getGeneration();
     const selection = structuredClone(input);
     const checkGeneration = () => {
-      if (generation !== this.#exclusion.getGeneration()) refused();
+      if (generation !== this.#exclusion.getGeneration()) refused('generation-changed');
     };
     return this.#enqueue(async () => {
       checkGeneration();
-      if (!matches(await this.#deps.loadConnection(), selection)) refused();
+      if (!matches(await this.#deps.loadConnection(), selection)) refused('selection-changed');
       const snapshot = await this.#ensureObserved(checkGeneration);
       if (
         !snapshot ||
@@ -426,20 +443,20 @@ class SyncConnectionCoordinator {
         snapshot.phase === 'failed' ||
         snapshot.workspace?.state === 'running'
       )
-        refused();
+        refused('executor-unavailable');
       const metadata = await this.#deps.loadConnection();
       checkGeneration();
       if (
         !matches(metadata, selection) ||
         (snapshot.phase !== 'stopped' && !boundToCurrent(snapshot, metadata))
       )
-        refused();
+        refused('binding-changed');
       const receipt = await this.#deps.startExecutor({ ...selection, ...target(snapshot) });
       if (
         receipt.executorId !== snapshot.executorId ||
         receipt.executorRevision < snapshot.executorRevision
       )
-        refused();
+        refused('receipt-invalid');
       return receipt;
     }).finally(release);
   }

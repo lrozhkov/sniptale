@@ -107,14 +107,20 @@ describe('sync lifecycle coordinator', () => {
       challenge: 'old',
       snapshot: f.snapshot,
     }));
-    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+      code: 'coordinator-refused',
+      message: 'Sync coordinator operation refused',
+    });
     expect(f.deps.startExecutor).not.toHaveBeenCalled();
     f.deps.inspectExecutor.mockImplementation(async (_id, challenge) => ({
       kind: 'present',
       challenge,
       snapshot: { ...f.snapshot, offscreenStartupId: 'old' },
     }));
-    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+      code: 'coordinator-refused',
+      message: 'Sync coordinator operation refused',
+    });
   });
 
   it('reserves erasure synchronously and prevents late Start after held Inspect', async () => {
@@ -127,10 +133,16 @@ describe('sync lifecycle coordinator', () => {
       return { kind: 'present', challenge, snapshot: f.snapshot };
     });
     const start = f.coordinator.start(f.selection);
-    const refusedStart = expect(start).rejects.toThrow('refused');
+    const refusedStart = expect(start).rejects.toMatchObject({
+      code: 'generation-changed',
+      message: 'Sync coordinator operation refused',
+    });
     await entered.promise;
     const reservation = f.coordinator.reserveErasure();
-    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+      code: 'privacy-exclusion',
+      message: 'Sync coordinator operation refused',
+    });
     const drain = reservation.quiesce();
     held.resolve();
     await refusedStart;
@@ -248,7 +260,10 @@ describe('sync lifecycle coordinator', () => {
       f.metadata.identity = { ...f.metadata.identity, revision: 2 };
       return 'startup';
     });
-    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+      code: 'binding-changed',
+      message: 'Sync coordinator operation refused',
+    });
     expect(f.deps.startExecutor).not.toHaveBeenCalled();
   });
 });
@@ -863,4 +878,27 @@ it('reads a fully stopped executor after local-only retirement without admitting
   await expect(f.coordinator.inspect()).resolves.toEqual(f.snapshot);
   await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
   expect(f.deps.startExecutor).not.toHaveBeenCalled();
+});
+
+it.each([
+  'selection-changed',
+  'executor-unavailable',
+  'binding-changed',
+  'receipt-invalid',
+] as const)('preserves refusal behavior with the finite %s start reason', async (code) => {
+  const f = fixture();
+  if (code === 'selection-changed') f.metadata.phase = 'paused';
+  if (code === 'executor-unavailable') f.snapshot.phase = 'failed';
+  if (code === 'binding-changed')
+    f.snapshot.binding = {
+      scope: { ...f.selection.scope, connectionGeneration: 2 },
+      authorization: f.selection.authorization,
+    };
+  if (code === 'receipt-invalid')
+    f.deps.startExecutor.mockResolvedValue({ executorId: 'replaced', executorRevision: 4 });
+  await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+    code,
+    message: 'Sync coordinator operation refused',
+  });
+  expect(f.deps.startExecutor).toHaveBeenCalledTimes(code === 'receipt-invalid' ? 1 : 0);
 });

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
   createMediaLibraryEntry,
@@ -35,12 +35,26 @@ vi.mock('../assets', async (original) => ({
   listReadyJournals: vi.fn().mockResolvedValue([]),
 }));
 beforeEach(() => {
+  // Node shares native Web Locks across workers. Each in-memory database needs its own scope.
+  const locks = navigator.locks;
+  const prefix = `image-replica-fixture:${crypto.randomUUID()}:`;
+  vi.stubGlobal('navigator', {
+    locks: new Proxy(locks, {
+      get(target, property) {
+        if (property !== 'request') return Reflect.get(target, property, target);
+        return (name: string, ...args: unknown[]) =>
+          Reflect.apply(target.request, target, [prefix + name, ...args]);
+      },
+    }),
+  });
   vi.clearAllMocks();
   io.read.mockImplementation(
     async (ref: { size: number; mimeType: string }, filename: string) =>
       new File([new Uint8Array(ref.size)], filename, { type: ref.mimeType })
   );
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 function setup() {
   let fail = false;

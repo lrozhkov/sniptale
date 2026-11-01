@@ -72,7 +72,7 @@ async function stageDataUrl(
   runtimeAssetsByUrl: Map<string, AssetRef>,
   reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>
 ): Promise<PersistedEditorAssetPointer> {
-  const reusable = reusableAssetsByRuntimeUrl?.get(binaryUrl);
+  const reusable = runtimeAssetsByUrl.get(binaryUrl) ?? reusableAssetsByRuntimeUrl?.get(binaryUrl);
   if (reusable) {
     refsById.set(reusable.assetId, reusable);
     runtimeAssetsByUrl.set(binaryUrl, reusable);

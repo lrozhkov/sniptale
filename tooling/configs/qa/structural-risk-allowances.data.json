@@ -2854,11 +2854,11 @@
       "file": "apps/extension/src/background/sync-connection/retry-wakeup.ts",
       "symbol": "createSyncQueueRetryWakeup",
       "rule": "structural-function-risk",
-      "owner": "background/sync-connection/retry-wakeup",
-      "reason": "tool-noise: This factory owns one disposable retry scheduler. Nested callbacks share its pending work, subscriptions and disposal. The body contains seven top-level statements and cyclomatic complexity one. A split would distribute the same scheduler lifetime. Independent topology planning review approved Keep.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess a new scheduler, state authority, durable writer or resource lifetime. Remove when the analyzer models this closure. The final architecture reviewer must inspect this classification.",
-      "reviewDate": "2026-10-28",
-      "astHash": "23f1af18e7f9016ff7bc9fc4ca89873211b24f7810f179a3ddc9cec891623c75",
+      "owner": "extension:background:sync-connection",
+      "reason": "tool-noise: One disposable scheduler owns pending work, subscriptions and disposal. Its callbacks share that lifetime. The new context records only the current diagnostic stage for each pass. The factory has seven top-level statements and cyclomatic complexity one. A split would distribute the same scheduler lifetime. Main inspected the exact diff. The final architecture reviewer must check this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new scheduler, writer, receiver, admission rule or resource lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-01",
+      "astHash": "55065895e4db769f6223eed48b1e96fcfedc57ea54400c49f70765d6e690d80f",
       "signatureHash": "d2607876084f31f53efb254ee0cfb706f84f11268a6e1f85a2060e4552560eb6"
     },
     {
@@ -2877,10 +2877,10 @@
       "file": "apps/extension/src/background/sync-connection/coordinator.test.ts",
       "symbol": "<file>",
       "owner": "extension:background:sync-connection",
-      "reason": "tool-noise: One coordinator fixture proves revoke, containment, local-only completion and refusal retry. Added tests share its executor receiver. No second harness or production authority appears. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-29",
-      "astHash": "32da83a27f6f529e259369daaf5186125ebc3494d5e32063a5008943270db0ba",
+      "reason": "tool-noise: One coordinator fixture tests executor admission, privacy exclusion and refusal recovery. New assertions check finite refusal codes in that same fixture. The change adds no writer, receiver or resource lifetime. Main inspected the exact diff. The final architecture reviewer must check this classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new scheduler, writer, receiver, admission rule or resource lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-01",
+      "astHash": "ade53a984ebb19f8e526d3c3ce46ec7553175f57e9e8bbd485efde7a63790364",
       "signatureHash": "d07ad3ddc9448dc9805d23117a2ea839a6f0db417195d6b05e9821aee32a8e3c"
     },
     {
@@ -3234,6 +3234,17 @@
       "reviewDate": "2026-10-30",
       "astHash": "e8b92412bd6b89685299cc9417b82362863997cc3fef757c23863ae4f566a474",
       "signatureHash": "ec40dae1374f57359d2066465a45eceb2af3ee9b69f9cd6a3b4752503139cb35"
+    },
+    {
+      "file": "apps/extension/src/background/sync-connection/retry-wakeup.test.ts",
+      "symbol": "<file>",
+      "rule": "structural-file-risk",
+      "reason": "tool-noise: One retry scheduler fixture tests wakeups, dispatch, refusal continuation and diagnostic privacy. New tests use the same dependencies and executor receiver. The diagnostic observer test checks the existing logger sink. No second scheduler, writer or resource lifetime appears. Main inspected the exact diff. The final architecture reviewer must check this classification.",
+      "owner": "extension:background:sync-connection",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new scheduler, writer, receiver, admission rule or resource lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-01",
+      "astHash": "20d5b394a84552f03f7c4fbc0faa42868c652553ca019588d306c37d17c6b997",
+      "signatureHash": "2cecb67cb4227d1f10a9773ea5f624b9d23965b431a0bbcf2158e43cd4cbc603"
     }
   ]
 }
