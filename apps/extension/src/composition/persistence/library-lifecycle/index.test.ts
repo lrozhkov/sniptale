@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
+import { createMediaLibraryEntry } from '../projects/index.storage.test-support';
+import type { MediaLibraryEntry } from '../media-library/contracts';
 
 vi.mock('./project-retention', () => ({
   repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
@@ -130,31 +133,41 @@ beforeEach(() => {
   persistenceMocks.runWithIndexedDbMutation.mockResolvedValue('moved');
 });
 
+function useCleanupFixture(media: MediaLibraryEntry[]) {
+  const fixture = createReviewWorkspaceStoreFixture(() => false);
+  for (const rows of fixture.rows.values()) rows.clear();
+  for (const entry of media) fixture.rows.get('media_library')!.set(entry.id, entry);
+  persistenceMocks.listMediaLibrary.mockResolvedValue(media);
+  persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (operation) =>
+    operation(fixture.database)
+  );
+}
+
 describe('library lifecycle cleanup and usage', () => {
   it('cleans only expired temporary records with separate video retention', async () => {
     const day = 24 * 60 * 60 * 1000;
     const now = 100 * day;
-    persistenceMocks.listMediaLibrary.mockResolvedValue([
-      {
+    useCleanupFixture([
+      createMediaLibraryEntry({
         id: 'draft-image',
         lifecycle: createLibraryLifecycle('temporary', now - 31 * day),
         source: { kind: 'screenshot' },
-      },
-      {
+      }),
+      createMediaLibraryEntry({
         id: 'fresh-image',
         lifecycle: createLibraryLifecycle('temporary', now - day),
         source: { kind: 'screenshot' },
-      },
-      {
+      }),
+      createMediaLibraryEntry({
         id: 'draft-video',
         lifecycle: createLibraryLifecycle('temporary', now - 8 * day),
         source: { kind: 'recording', recordingId: 'recording-1' },
-      },
-      {
+      }),
+      createMediaLibraryEntry({
         id: 'library-image',
         lifecycle: createLibraryLifecycle('library', now - 90 * day),
         source: { kind: 'screenshot' },
-      },
+      }),
     ]);
     persistenceMocks.listVideoProjectEntries.mockResolvedValue([
       createVideoProjectEntry(
@@ -183,12 +196,12 @@ describe('library lifecycle cleanup and usage', () => {
   });
 
   it('keeps drafts when cleanup is disabled unless deletion is explicitly requested', async () => {
-    persistenceMocks.listMediaLibrary.mockResolvedValue([
-      {
+    useCleanupFixture([
+      createMediaLibraryEntry({
         id: 'media-1',
         lifecycle: createLibraryLifecycle('temporary', 1),
         source: { kind: 'screenshot' },
-      },
+      }),
     ]);
     const policy = { ...DEFAULT_LOCAL_STORAGE_POLICY, cleanupEnabled: false };
 

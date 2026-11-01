@@ -599,11 +599,11 @@ it('reports committed Trash moves after a later failure and retries without coun
   let writes = 0;
   let fail = true;
   const fixture = createReviewWorkspaceStoreFixture(
-    (store) => store === 'media_library' && ++writes === 2 && fail
+    (store) => store === 'media_library' && ++writes === 66 && fail
   );
   fixture.rows.get('media_library')!.clear();
   fixture.rows.get('recordings')!.clear();
-  const entries = ['first', 'second', 'third'].map((id) => {
+  const entries = Array.from({ length: 67 }, (_, index) => `root-${index}`).map((id) => {
     const lifecycle = createLibraryLifecycle('temporary', 1);
     const media = {
       ...betaV1Fixture.records.media_library[0]!,
@@ -625,17 +625,23 @@ it('reports committed Trash moves after a later failure and retries without coun
   );
   const args = { now: 1 + 7 * day, policy: DEFAULT_LOCAL_STORAGE_POLICY };
   await expect(cleanupDrafts(args)).rejects.toMatchObject({
-    result: { movedCount: 1, movedIds: [entries[0]!.id], retainedCount: 0 },
+    result: {
+      movedCount: 64,
+      movedIds: entries.slice(0, 64).map((entry) => entry.id),
+      retainedCount: 0,
+    },
     cause: { name: 'QuotaExceededError' },
   });
   expect(fixture.rows.get('media_library')!.get(entries[0]!.id)).toMatchObject({
     lifecycle: { trashedAt: args.now },
   });
-  expect(fixture.rows.get('media_library')!.get(entries[2]!.id)).toEqual(entries[2]);
+  expect(fixture.rows.get('media_library')!.get(entries[64]!.id)).toEqual(entries[64]);
+  expect(fixture.rows.get('media_library')!.get(entries[65]!.id)).toEqual(entries[65]);
+  expect(fixture.rows.get('media_library')!.get(entries[66]!.id)).toEqual(entries[66]);
   fail = false;
   await expect(cleanupDrafts(args)).resolves.toEqual({
-    movedCount: 2,
-    movedIds: entries.slice(1).map((entry) => entry.id),
+    movedCount: 3,
+    movedIds: entries.slice(64).map((entry) => entry.id),
     retainedCount: 0,
   });
 });
