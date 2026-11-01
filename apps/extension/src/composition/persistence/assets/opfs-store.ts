@@ -10,6 +10,8 @@ import type {
 import { parseAssetReadyJournal } from './guards';
 import {
   acquirePersistenceMutationTransition,
+  runWithDurableAssetLifecycleLock,
+  type DurableAssetLifecyclePermit,
   isActivePersistenceMutationTransitionPermit,
   type PersistenceMutationTransitionLease,
   type PersistenceMutationTransitionPermit,
@@ -608,9 +610,35 @@ export async function discardPreparedAsset(
   }
 }
 
+/**
+ * With a lifecycle permit, reuse one ready-claim snapshot for this cleanup pass.
+ * Without a permit, read current ready claims for each available writing marker.
+ */
 export async function collectQuiescentWritingObjects(
   options: AssetOpfsOptions = {},
-  isRetained: (assetId: string) => Promise<boolean> = async () => false
+  isRetained: (assetId: string) => Promise<boolean> = async () => false,
+  lifecyclePermit?: DurableAssetLifecyclePermit
+): Promise<number> {
+  const readReadyAssetIds = async () =>
+    new Set(
+      (await listReadyJournals(options)).flatMap((journal) =>
+        journal.assetRefs.map((ref) => ref.assetId)
+      )
+    );
+  if (!lifecyclePermit) return collectWritingObjects(options, isRetained, readReadyAssetIds);
+  return runWithDurableAssetLifecycleLock(() => {
+    let readyAssetIds: ReturnType<typeof readReadyAssetIds> | undefined;
+    return collectWritingObjects(options, isRetained, () => {
+      readyAssetIds ??= readReadyAssetIds();
+      return readyAssetIds;
+    });
+  }, lifecyclePermit);
+}
+
+async function collectWritingObjects(
+  options: AssetOpfsOptions,
+  isRetained: (assetId: string) => Promise<boolean>,
+  readReadyAssetIds: () => Promise<ReadonlySet<string>>
 ): Promise<number> {
   const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
   if (!writing) return 0;
@@ -630,11 +658,7 @@ export async function collectQuiescentWritingObjects(
         if (readErrorName(error) === 'NotFoundError') return;
         throw error;
       }
-      const readyAssetIds = new Set(
-        (await listReadyJournals(options)).flatMap((journal) =>
-          journal.assetRefs.map((ref) => ref.assetId)
-        )
-      );
+      const readyAssetIds = await readReadyAssetIds();
       if (readyAssetIds.has(assetId)) {
         await removeIfPresent(writing, assetId);
         return;

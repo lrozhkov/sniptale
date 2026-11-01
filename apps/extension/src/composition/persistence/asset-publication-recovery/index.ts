@@ -540,13 +540,17 @@ async function recoverPublications(
   return runStorageStartupPhase('asset-recovery', () =>
     runWithDurableAssetOperationRecovery(permit, async () => {
       await runStorageStartupPhase('asset-writing-cleanup', () =>
-        runWithDurableAssetLifecycleLock(async () => {
+        runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
           // Publication holds this same lifecycle lock, so one lazy snapshot covers this cleanup batch.
           let authority: ReturnType<typeof readPhysicalDeleteAuthority> | undefined;
-          return collectQuiescentWritingObjects({}, async (assetId) => {
-            authority ??= readPhysicalDeleteAuthority();
-            return (await authority)(assetId) !== 'unowned';
-          });
+          return collectQuiescentWritingObjects(
+            {},
+            async (assetId) => {
+              authority ??= readPhysicalDeleteAuthority();
+              return (await authority)(assetId) !== 'unowned';
+            },
+            lifecyclePermit
+          );
         })
       );
       await runStorageStartupPhase('asset-backup-recovery', () =>

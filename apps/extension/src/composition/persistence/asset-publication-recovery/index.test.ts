@@ -761,7 +761,8 @@ it('uses one existing native retention projection for a writing-cleanup batch', 
     id === 'retained' ? 'adopted' : 'unowned'
   );
   mocks.collectWriting.mockImplementationOnce(
-    async (_options, isRetained: (id: string) => Promise<boolean>) => {
+    async (_options, isRetained: (id: string) => Promise<boolean>, lifecyclePermit: unknown) => {
+      expect(lifecyclePermit).toBeDefined();
       expect(mocks.physicalAuthority).not.toHaveBeenCalled();
       expect(await isRetained('retained')).toBe(true);
       expect(await isRetained('abandoned')).toBe(false);
