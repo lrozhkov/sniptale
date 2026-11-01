@@ -1,6 +1,10 @@
 // policyStateIds: [] - command field tables are immutable contract validation policy.
 import { validateNumericExpression } from './values.js';
-import type { EffectV1DiagnosticReporter, EffectV1Record } from '../validation/shared.js';
+import {
+  type EffectV1DiagnosticReporter,
+  type EffectV1Record,
+  isRecord,
+} from '../validation/shared.js';
 
 const REQUIRED_FIELDS: Record<string, readonly string[]> = {
   clip: ['commands', 'height', 'width', 'x', 'y'],
@@ -32,6 +36,7 @@ const NUMERIC_FIELDS = new Set([
   'maxWidth',
   'progress',
   'radius',
+  'reveal',
   'rotation',
   'scaleX',
   'scaleY',
@@ -70,6 +75,26 @@ export function validateCommandFields(
     if (command[field] !== undefined) {
       validateNumericExpression(command[field], `${path}.${field}`, report);
     }
+  }
+  for (const field of ['text', 'fontFamily', 'fontWeight']) {
+    const value = command[field];
+    if (
+      value !== undefined &&
+      value !== null &&
+      typeof value !== 'string' &&
+      typeof value !== 'boolean' &&
+      !(typeof value === 'number' && Number.isFinite(value)) &&
+      !(isRecord(value) && typeof value['op'] === 'string')
+    ) {
+      report.error(
+        'COMMAND_EXPRESSION',
+        `${path}.${field}`,
+        'Expected a scalar literal or a declared expression.'
+      );
+    }
+  }
+  if (command['caret'] !== undefined && typeof command['caret'] !== 'boolean') {
+    report.error('COMMAND_BOOLEAN', `${path}.caret`, 'Expected a boolean.');
   }
   for (const [field, values] of Object.entries(ENUM_FIELDS)) {
     if (command[field] !== undefined && !values.has(String(command[field]))) {

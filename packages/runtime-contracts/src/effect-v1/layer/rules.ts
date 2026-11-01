@@ -45,6 +45,18 @@ export const LAYER_KEYS = new Set([
   'y',
 ]);
 
+export const LAYER_STRING_KEYS = [
+  'blendMode',
+  'color',
+  'fill',
+  'fontFamily',
+  'name',
+  'partOrder',
+  'stroke',
+  'svgPartMode',
+  'text',
+];
+
 export const LAYER_NUMBER_KEYS = [
   'anchorX',
   'anchorY',
