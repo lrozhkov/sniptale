@@ -105,25 +105,25 @@ function createEffectRuntimeFrameResourceScope(
   state: CompositionResourceState
 ): EffectRuntimeFrameResourceScope {
   let aggregatePixels = 0;
-  const charge = (width: unknown, height: unknown): void => {
+  const admitRaster = (width: unknown, height: unknown, chargeAggregate = true): (() => void) => {
     const pixels = assertEffectRasterDimensions(width, height);
     if (
-      aggregatePixels + pixels >
-      EFFECT_RUNTIME_RESOURCE_LIMITS.maxAggregateCanvasPixelsPerFrame
+      chargeAggregate &&
+      aggregatePixels + pixels > EFFECT_RUNTIME_RESOURCE_LIMITS.maxAggregateCanvasPixelsPerFrame
     ) {
       throw new EffectRuntimeResourceError();
     }
-    aggregatePixels += pixels;
+    const release = reserveEffectRuntimeRaster(state, width, height);
+    if (chargeAggregate) aggregatePixels += pixels;
+    return release;
   };
   return {
     allocateCanvas(width, height) {
-      charge(width, height);
-      return reserveEffectRuntimeRaster(state, width, height);
+      return admitRaster(width, height);
     },
     retainBitmap(bitmap, chargeAggregate = true) {
       if (bitmapReleases.has(bitmap)) throw new EffectRuntimeResourceError();
-      if (chargeAggregate) charge(bitmap.width, bitmap.height);
-      bitmapReleases.set(bitmap, reserveEffectRuntimeRaster(state, bitmap.width, bitmap.height));
+      bitmapReleases.set(bitmap, admitRaster(bitmap.width, bitmap.height, chargeAggregate));
     },
     snapshot: () => ({ aggregatePixels, ...state }),
   };
