@@ -72,9 +72,9 @@ function fixture(count: number, failure: (storeName?: string) => boolean = () =>
       vi.spyOn(tx, 'objectStore').mockImplementation((name) => {
         const store = objectStore(name);
         const getAll = store.getAll;
-        store.getAll = async () => {
-          reads(name);
-          return getAll();
+        store.getAll = async (query, count) => {
+          reads(name, count);
+          return getAll(query, count);
         };
         return store;
       });
@@ -339,4 +339,37 @@ it('preserves the existing retention match for a legacy empty base-recording loc
     movedIds: [],
     retainedCount: 1,
   });
+});
+
+it('retains a reference in a late bounded video page and refuses malformed late evidence', async () => {
+  vi.stubGlobal('IDBKeyRange', {
+    lowerBound: (lower: IDBValidKey, lowerOpen: boolean) => ({ lower, lowerOpen }),
+  });
+  try {
+    const f = fixture(2);
+    const videos = f.rows.get('video_projects')!;
+    for (let index = 0; index < 1025; index++) {
+      const id = `video-${String(index).padStart(4, '0')}`;
+      videos.set(id, createVideoProjectEntryWithMediaClip({ id }));
+    }
+    const reference = createVideoProjectEntryWithMediaClip({ id: 'video-1024' });
+    reference.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.media[0]!.id };
+    videos.set(reference.id, reference);
+    const result = await cleanupDrafts(args);
+    expect(result).toMatchObject({ movedIds: [f.media[1]!.id], retainedCount: 1 });
+    expect(f.reads.mock.calls.filter(([name]) => name === 'video_projects')).toEqual([
+      ['video_projects', 512],
+      ['video_projects', 512],
+      ['video_projects', 512],
+    ]);
+    const retained = fixture(1);
+    for (const [id, value] of videos) retained.rows.get('video_projects')!.set(id, value);
+    retained.rows.get('video_projects')!.set('video-1024', { id: 'video-1024' });
+    await expect(cleanupDrafts(args)).resolves.toMatchObject({ movedCount: 0, retainedCount: 1 });
+    expect(retained.rows.get('media_library')!.get(retained.media[0]!.id)).toEqual(
+      retained.media[0]
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

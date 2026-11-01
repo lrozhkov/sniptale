@@ -129,7 +129,12 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
           };
           return {
             get: async (key: IDBValidKey) => structuredClone(store.get(keyOf(key))),
-            getAll: async () => structuredClone([...store.values()]),
+            getAll: async (query?: IDBValidKey | IDBKeyRange, count?: number) =>
+              structuredClone(
+                query === undefined && count === undefined
+                  ? [...store.values()]
+                  : fixturePrimaryKeys(store, query, count).map((key) => store.get(keyOf(key)))
+              ),
             getAllKeys: async (query?: IDBValidKey | IDBKeyRange, count?: number) =>
               fixturePrimaryKeys(store, query, count),
             count: async () => store.size,

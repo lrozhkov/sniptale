@@ -1,3 +1,4 @@
+import { visitIndexedDbStoreRows } from '../infrastructure/indexed-db/read-primitives';
 import { runWithLibraryTrashMutation } from './trash';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 import { recoverScenarioAssetPublications } from '../scenario/aggregate-mutations';
@@ -203,11 +204,11 @@ async function readExpiryVideoReferences(tx: IndexedDbWriteTransaction) {
     recordingIds: new Set<string>(),
     projectAssetIds: new Set<string>(),
   };
-  for (const raw of await tx.objectStore(VIDEO_PROJECTS_STORE).getAll()) {
+  await visitIndexedDbStoreRows(tx.objectStore(VIDEO_PROJECTS_STORE), (raw) => {
     const envelope = parseVideoDependencyEnvelope(raw);
     if (!envelope) {
       refs.unknownReferences = true;
-      break;
+      return false;
     }
     if (envelope.baseRecordingId !== null) refs.recordingIds.add(envelope.baseRecordingId);
     if (envelope.source.kind === 'recording') refs.recordingIds.add(envelope.source.recordingId);
@@ -218,7 +219,8 @@ async function readExpiryVideoReferences(tx: IndexedDbWriteTransaction) {
         else if (ref.kind === 'project-asset') refs.projectAssetIds.add(ref.id);
       }
     }
-  }
+    return true;
+  });
   return refs;
 }
 
