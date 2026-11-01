@@ -485,6 +485,45 @@ it('keeps recording graph originals that have no authored media clip', async () 
   );
 });
 
+it.each([
+  ['video/mp4; codecs="avc1.640028"', 0, true],
+  ['video/mp4; codecs="avc1.640028"', 1, false],
+  ['video/webm', 0, false],
+  ['audio/mp4', 0, false],
+] as const)(
+  'checks a Native recording project with inspected MIME %s and size delta %s',
+  async (mimeType, sizeDelta, accepted) => {
+    const f = fixture();
+    const recording = { ...betaV1Fixture.records.recordings[0], mimeType: 'video/mp4' };
+    const media = { ...betaV1Fixture.records.media_library[0], mimeType: 'video/mp4' };
+    const ref = { ...betaV1Fixture.records.asset_refs[0], mimeType: 'video/mp4' };
+    f.seed('recordings', recording.id, recording);
+    f.seed('media_library', media.id, media);
+    f.seed('asset_refs', ref.assetId, ref);
+    f.owner('recording', recording.id, ref.assetId);
+    const entry = createVideoProjectEntryWithMediaClip();
+    const asset = entry.project.assets[0]!;
+    asset.type = VideoProjectAssetType.RECORDING;
+    asset.source = { kind: 'recording', recordingId: recording.id };
+    asset.metadata.mimeType = mimeType;
+    asset.metadata.size = recording.size + sizeDelta;
+    f.seed('video_projects', entry.id, entry);
+    const before = structuredClone(f.rows);
+    if (accepted)
+      expect((await f.project(entry.id)).refs.map((item) => item.assetId)).toEqual([ref.assetId]);
+    else {
+      await expect(f.project(entry.id)).rejects.toThrow('unavailable');
+      asset.metadata.mimeType = 'video/mp4; codecs="avc1.640028"';
+      asset.metadata.size = recording.size;
+      f.seed('video_projects', entry.id, entry);
+      await expect(f.project(entry.id)).resolves.toMatchObject({ refs: [ref] });
+      asset.metadata.mimeType = mimeType;
+      asset.metadata.size = recording.size + sizeDelta;
+    }
+    expect(f.rows).toEqual(before);
+  }
+);
+
 it('deduplicates borrowed Scenario originals and retains the current Library image workspace', async () => {
   const f = fixture();
   f.image('photo', 'stored-asset');

@@ -324,7 +324,9 @@ class EditingResourceProjection {
           break;
       }
       requireResource(
-        binding.size === asset.metadata.size && binding.mimeType === asset.metadata.mimeType
+        binding.size === asset.metadata.size &&
+          (binding.mimeType === asset.metadata.mimeType ||
+            sameReviewVideoContainer(asset.metadata.mimeType, binding.mimeType))
       );
     }
   }
