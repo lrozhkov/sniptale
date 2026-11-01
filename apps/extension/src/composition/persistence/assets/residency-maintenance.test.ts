@@ -25,6 +25,8 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   initDB: io.db,
 }));
 beforeEach(() => {
+  // Node shares native locks across workers with unrelated storage fixtures.
+  vi.stubGlobal('navigator', {});
   vi.stubGlobal('IDBKeyRange', {
     bound: (lower: string, upper: string, lowerOpen = false, upperOpen = false) => ({
       lower,

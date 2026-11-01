@@ -1,4 +1,5 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { createRetentionDatabaseFixture } from './retention-authority.test-support';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AssetReadyJournal, AssetRef, PhysicalDeleteAssetOperation } from './contracts';
 
 const storage = vi.hoisted(() => ({
@@ -41,19 +42,7 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
     effect({
       get: async (_store: string, assetId: string) =>
         storage.refs.has(assetId) ? createRef(assetId) : undefined,
-      getAll: async (store: string) =>
-        store === 'asset_operations'
-          ? [...storage.operations.values()]
-          : store === 'asset_refs'
-            ? [...storage.refs].map(createRef)
-            : store === 'asset_owners'
-              ? [...storage.owners].map(([ownerId, assetId]) => ({
-                  assetId,
-                  ownerId,
-                  ownerKind: 'recording',
-                  role: 'body',
-                }))
-              : [],
+      ...createRetentionDatabaseFixture(async (store) => readFaultRows(store)),
       delete: async (_store: string, operationId: string) => {
         if (storage.deleteOperationFailures > 0) {
           storage.deleteOperationFailures -= 1;
@@ -73,6 +62,21 @@ vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from './operations';
 import { createAssetPublicationJournal, publishReadyJournalWithRetry } from './publication';
 import { recoverStandaloneAssetPublications } from './recovery';
+
+function readFaultRows(store: string): unknown[] {
+  return store === 'asset_operations'
+    ? [...storage.operations.values()]
+    : store === 'asset_refs'
+      ? [...storage.refs].map(createRef)
+      : store === 'asset_owners'
+        ? [...storage.owners].map(([ownerId, assetId]) => ({
+            assetId,
+            ownerId,
+            ownerKind: 'recording',
+            role: 'body',
+          }))
+        : [];
+}
 
 const SEED_COUNT = 64;
 const TRANSITIONS_PER_SEED = 40;
@@ -237,7 +241,12 @@ async function deleteWithInterruption(ownerId: string, interruption: Interruptio
   }
 }
 
-beforeEach(resetStorage);
+beforeEach(() => {
+  // This model has an isolated store; another worker must not defer its recovery.
+  vi.stubGlobal('navigator', {});
+  resetStorage();
+});
+afterEach(() => vi.unstubAllGlobals());
 
 it('converges publication and physical deletion across 64 seeded interruption histories', async () => {
   for (let seed = 1; seed <= SEED_COUNT; seed += 1) {

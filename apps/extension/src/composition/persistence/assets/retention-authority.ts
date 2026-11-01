@@ -9,7 +9,7 @@ import {
   parsePhysicalDeleteAssetOperation,
   parseArchiveRestoreSession,
 } from './guards';
-import type { AssetOperation, AssetOwner, AssetRef, ArchiveRestoreSession } from './contracts';
+import type { AssetOwner, AssetRef, ArchiveRestoreSession } from './contracts';
 import { collectBackupRollbackAssetIds } from './retention-claims';
 import {
   SYNC_CAPTURE_STORE,
@@ -57,9 +57,9 @@ export async function collectDurableAssetSnapshot(
       collectDurableAssetSnapshot(connection, signal)
     );
   signal?.throwIfAborted();
-  const refsResult = parseRows(await db.getAll(ASSET_REFS_STORE), parseAssetRef);
-  const ownersResult = parseRows(await db.getAll(ASSET_OWNERS_STORE), parseAssetOwner);
-  const operationsResult = parseAssetOperations(await db.getAll(ASSET_OPERATIONS_STORE));
+  const refsResult = await parseRows(db, ASSET_REFS_STORE, parseAssetRef, signal);
+  const ownersResult = await parseRows(db, ASSET_OWNERS_STORE, parseAssetOwner, signal);
+  const operationsResult = await readAssetOperationClaims(db, signal);
   for (const [store, valid] of [
     [ASSET_REFS_STORE, refsResult.valid],
     [ASSET_OWNERS_STORE, ownersResult.valid],
@@ -151,7 +151,7 @@ export async function collectDurableAssetSnapshot(
       publishedProjectAssetIds.add(entry.source.projectAssetId);
     return projectMediaOwners(entry);
   });
-  const captureClaims = collectSyncCaptureClaims(await db.getAll(SYNC_CAPTURE_STORE));
+  const captureClaims = await readSyncCaptureClaims(db, signal);
   if (!captureClaims.valid) logger.debug(`Retention validation failed: ${SYNC_CAPTURE_STORE}`);
   authorityValid = authorityValid && captureClaims.valid;
   return {
@@ -162,16 +162,29 @@ export async function collectDurableAssetSnapshot(
     expectedOwnerAssets: new Map(expectedOwners.map((owner) => [ownerKey(owner), owner.assetId])),
     expectedOwners,
     owners: ownersResult.entries,
-    operationIds: new Set([
-      ...operationsResult.archiveSessions.map((operation) => operation.operationId),
-      ...operationsResult.backupOperations.map((operation) => operation.operationId),
-    ]),
-    protectedRollbackAssetIds: new Set(
-      operationsResult.backupOperations.flatMap(collectBackupRollbackAssetIds)
-    ),
+    operationIds: operationsResult.operationIds,
+    protectedRollbackAssetIds: operationsResult.protectedRollbackAssetIds,
     publishedProjectAssetIds,
     refs: refsResult.entries,
   };
+}
+
+async function readSyncCaptureClaims(
+  db: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
+  signal?: AbortSignal
+): Promise<ReturnType<typeof collectSyncCaptureClaims>> {
+  const assetIds = new Set<string>();
+  const valid = await visitDurableRows(
+    db,
+    SYNC_CAPTURE_STORE,
+    (raw) => {
+      const claims = collectSyncCaptureClaims([raw]);
+      for (const assetId of claims.assetIds) assetIds.add(assetId);
+      return claims.valid;
+    },
+    signal
+  );
+  return { valid, assetIds };
 }
 
 function projectMediaOwners(entry: MediaLibraryEntry): AssetOwner[] {
@@ -187,7 +200,7 @@ function projectMediaOwners(entry: MediaLibraryEntry): AssetOwner[] {
     : [];
 }
 
-/** Release parsed canvases/manifests immediately; yield between bounded groups of rows. */
+/** Keep one store snapshot while releasing raw payloads after each bounded request. */
 async function visitDurableRows(
   db: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
   store: string,
@@ -195,20 +208,43 @@ async function visitDurableRows(
   signal?: AbortSignal
 ): Promise<boolean> {
   signal?.throwIfAborted();
-  const rows: unknown = await db.getAll(store);
-  if (!Array.isArray(rows)) return false;
-  let valid = true;
-  for (let index = 0; index < rows.length; index++) {
-    if (index % 8 === 0) {
-      // Supported Chrome provides scheduler.yield; background timers can stall the lifecycle hold.
-      if (typeof scheduler !== 'undefined') await scheduler.yield();
-      else await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  const tx = db.transaction([store], 'readonly');
+  const completed = tx.done;
+  void completed.catch(() => undefined);
+  try {
+    const source = tx.objectStore(store);
+    let range: IDBKeyRange | undefined;
+    let offset = 0;
+    let valid = true;
+    while (true) {
+      // Native request tasks yield without timers that can commit or stall this transaction.
+      const [keys, rows]: [IDBValidKey[], unknown[]] = await Promise.all([
+        source.getAllKeys(range, 64),
+        source.getAll(range, 64),
+      ]);
+      signal?.throwIfAborted();
+      for (const row of rows) {
+        const accepted = visit(row, offset);
+        offset += 1;
+        valid = valid && accepted;
+      }
+      if (keys.length < 64) break;
+      const lastKey = keys.at(-1);
+      if (lastKey === undefined) break;
+      range = IDBKeyRange.lowerBound(lastKey, true);
     }
+    await completed;
     signal?.throwIfAborted();
-    const accepted = visit(rows[index], index);
-    valid = valid && accepted;
+    return valid;
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      // A completed or natively aborted transaction needs no second abort.
+    }
+    await completed.catch(() => undefined);
+    throw error;
   }
-  return valid;
 }
 
 function findEmbeddedBinaryRows(raw: unknown, owner: string, offset = 0): string[] {
@@ -241,34 +277,65 @@ function findEmbeddedBinaryRows(raw: unknown, owner: string, offset = 0): string
   return findings;
 }
 
-function parseAssetOperations(raw: unknown): {
-  backupOperations: AssetOperation[];
+async function readAssetOperationClaims(
+  db: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
+  signal?: AbortSignal
+): Promise<{
+  operationIds: Set<string>;
+  protectedRollbackAssetIds: Set<string>;
   archiveSessions: ArchiveRestoreSession[];
   valid: boolean;
-} {
-  if (!Array.isArray(raw)) return { archiveSessions: [], backupOperations: [], valid: false };
-  const parsed = raw.map((value) => ({
-    archive: parseArchiveRestoreSession(value),
-    backup: parseBackupAssetOperation(value),
-    physicalDelete: parsePhysicalDeleteAssetOperation(value),
-  }));
+}> {
+  const archiveSessions: ArchiveRestoreSession[] = [];
+  const backupOperationIds = new Set<string>();
+  const protectedRollbackAssetIds = new Set<string>();
+  const valid = await visitDurableRows(
+    db,
+    ASSET_OPERATIONS_STORE,
+    (raw) => {
+      const archive = parseArchiveRestoreSession(raw);
+      const backup = parseBackupAssetOperation(raw);
+      const physicalDelete = parsePhysicalDeleteAssetOperation(raw);
+      if (archive) archiveSessions.push(archive);
+      if (backup) {
+        backupOperationIds.add(backup.operationId);
+        for (const assetId of collectBackupRollbackAssetIds(backup))
+          protectedRollbackAssetIds.add(assetId);
+      }
+      return archive !== null || backup !== null || physicalDelete !== null;
+    },
+    signal
+  );
   return {
-    archiveSessions: parsed.flatMap(({ archive }) => (archive ? [archive] : [])),
-    backupOperations: parsed.flatMap(({ backup }) => (backup ? [backup] : [])),
-    valid: parsed.every(
-      ({ archive, backup, physicalDelete }) =>
-        archive !== null || backup !== null || physicalDelete !== null
-    ),
+    archiveSessions,
+    operationIds: new Set([
+      ...archiveSessions.map((operation) => operation.operationId),
+      ...backupOperationIds,
+    ]),
+    protectedRollbackAssetIds,
+    valid,
   };
 }
 
-function parseRows<T>(
-  raw: unknown,
-  parse: (value: unknown) => T | null
-): { entries: T[]; valid: boolean } {
-  if (!Array.isArray(raw)) return { entries: [], valid: false };
-  const parsed = raw.map(parse);
-  return { entries: parsed.filter(isPresent), valid: parsed.every(isPresent) };
+async function parseRows<T>(
+  db: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
+  store: string,
+  parse: (value: unknown) => T | null,
+  signal?: AbortSignal
+): Promise<{ entries: T[]; valid: boolean }> {
+  const entries: T[] = [];
+  const valid = await visitDurableRows(
+    db,
+    store,
+    (raw) => {
+      const entry = parse(raw);
+      if (entry === null) return false;
+      entries.push(entry);
+      return true;
+    },
+    signal
+  );
+  return { entries, valid };
 }
 
 function ownerKey(owner: AssetOwner): string {
@@ -281,8 +348,4 @@ function ownerKeyParts(ownerKind: string, ownerId: string, role: string): string
 
 function createExpectedOwner(ownerKind: string, ownerId: string, assetId: string): AssetOwner {
   return { assetId, ownerId, ownerKind, role: 'body' };
-}
-
-function isPresent<T>(value: T | null): value is T {
-  return value !== null;
 }

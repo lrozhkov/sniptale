@@ -1,3 +1,5 @@
+import { createRetentionDatabaseFixture } from './retention-authority.test-support';
+import { EXPECTED_STORES } from '../infrastructure/indexed-db/core';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import type { PublishedCaptureOperation } from '../sync-capture/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -88,7 +90,11 @@ function installMutationHarness(current: unknown = operation) {
     getAll: vi.fn(async (_store: string): Promise<unknown[]> => []),
     add: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
-    transaction: vi.fn(() => ({ done: Promise.resolve(), objectStore: () => store })),
+    transaction: vi.fn((names: string[], mode: string) =>
+      mode === 'readonly'
+        ? createRetentionDatabaseFixture(db.getAll).transaction(names)
+        : { done: Promise.resolve(), objectStore: () => store }
+    ),
   };
   mocks.runMutation.mockImplementation(async (callback) => callback(db));
   return { db, put, store };
@@ -523,6 +529,8 @@ function publicationReleaseFixture() {
   const fixture = createReviewWorkspaceStoreFixture(
     (name) => refuseIntent && name === 'asset_operations'
   );
+  for (const name of EXPECTED_STORES)
+    if (!fixture.rows.has(name)) fixture.rows.set(name, new Map());
   const table = (name: string) => fixture.rows.get(name)!;
   const ref = {
     assetId: 'published-file',
@@ -604,7 +612,6 @@ function publicationReleaseFixture() {
   );
   const database = {
     ...fixture.database,
-    getAll: async (name: string) => structuredClone([...(fixture.rows.get(name)?.values() ?? [])]),
     delete: async (name: string, key: string) => {
       table(name).delete(key);
     },

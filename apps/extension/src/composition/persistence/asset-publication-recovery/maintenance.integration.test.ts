@@ -1,3 +1,4 @@
+import { createRetentionDatabaseFixture } from '../assets/retention-authority.test-support';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AssetReadyJournal, PhysicalDeleteAssetOperation } from '../assets/contracts';
 import type { PersistenceLockManager } from '../infrastructure/mutation-barrier';
@@ -6,6 +7,7 @@ import type { PersistenceLockManager } from '../infrastructure/mutation-barrier'
 // durable intent creation and physical-delete completion are the production participants.
 const storage = vi.hoisted(() => ({
   reads: 0,
+  beforeReadPage: vi.fn(),
   readStores: new Set<string>(),
   rows: new Map<string, unknown[]>(),
   intents: new Map<string, PhysicalDeleteAssetOperation>(),
@@ -17,27 +19,31 @@ const storage = vi.hoisted(() => ({
 }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
-  initDB: async () => ({
-    getAllKeys: async (store: string) =>
-      (storage.rows.get(store) ?? []).map((row) =>
-        typeof row === 'object' && row !== null && 'assetId' in row ? row.assetId : ''
-      ),
-    getAll: async (store: string) => {
+  initDB: async () => {
+    const database = createRetentionDatabaseFixture(async (store: string) => {
       storage.reads += 1;
       storage.readStores.add(store);
       return store === 'asset_operations'
         ? [...storage.intents.values(), ...(storage.rows.get(store) ?? [])]
         : (storage.rows.get(store) ?? []);
-    },
-    put: async (store: string, operation: PhysicalDeleteAssetOperation) => {
-      if (store !== 'asset_operations') throw new Error('Unexpected test write');
-      storage.intents.set(operation.operationId, operation);
-    },
-    delete: async (store: string, id: string) => {
-      if (store !== 'asset_operations') throw new Error('Unexpected test deletion');
-      storage.intents.delete(id);
-    },
-  }),
+    });
+    database.pages.mockImplementation(storage.beforeReadPage);
+    return {
+      ...database,
+      getAllKeys: async (store: string) =>
+        (storage.rows.get(store) ?? []).map((row) =>
+          typeof row === 'object' && row !== null && 'assetId' in row ? row.assetId : ''
+        ),
+      put: async (store: string, operation: PhysicalDeleteAssetOperation) => {
+        if (store !== 'asset_operations') throw new Error('Unexpected test write');
+        storage.intents.set(operation.operationId, operation);
+      },
+      delete: async (store: string, id: string) => {
+        if (store !== 'asset_operations') throw new Error('Unexpected test deletion');
+        storage.intents.delete(id);
+      },
+    };
+  },
 }));
 vi.mock('../assets/opfs-store', async (original) => ({
   ...(await original<typeof import('../assets/opfs-store')>()),
@@ -244,10 +250,12 @@ it('cancels during cooperative validation without committing deletion intent', a
     }))
   );
   const controller = new AbortController();
-  const work = collectOrphanAssetObjectsDuringIdle(controller.signal);
-  await vi.waitFor(() => expect(storage.reads).toBeGreaterThanOrEqual(4));
-  controller.abort();
-  await expect(work).rejects.toMatchObject({ name: 'AbortError' });
+  storage.beforeReadPage.mockImplementation((store: string) => {
+    if (store === 'recordings') controller.abort();
+  });
+  await expect(collectOrphanAssetObjectsDuringIdle(controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
   expect(storage.deleteObject).not.toHaveBeenCalled();
   expect(storage.intents.size).toBe(0);
 });

@@ -1,3 +1,5 @@
+import { createDbHarness, createRef, createWebSnapshotCompensation } from './index.test-support';
+import { createRetentionDatabaseFixture } from '../assets/retention-authority.test-support';
 import { createMediaLibraryEntry } from '../projects/index.test-support';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -474,52 +476,6 @@ it('never deletes a referenced object while cleaning a committed multi-object ar
   expect(mocks.deleteJournal).toHaveBeenCalledWith('committed-journal');
 });
 
-function createDbHarness(
-  operations: Array<AssetOperation | ArchiveRestoreSession | PhysicalDeleteAssetOperation>
-) {
-  const stores = new Map<string, Map<string, unknown>>();
-  const key = (value: unknown) => JSON.stringify(value);
-  const put = (storeName: string, entryKey: unknown, value: unknown) => {
-    let store = stores.get(storeName);
-    if (!store) {
-      store = new Map();
-      stores.set(storeName, store);
-    }
-    store.set(key(entryKey), value);
-  };
-  for (const operation of operations) put('asset_operations', operation.operationId, operation);
-  const deriveKey = (storeName: string, value: Record<string, unknown>) => {
-    if (storeName === 'asset_operations') return value['operationId'];
-    if (storeName === 'asset_refs') return value['assetId'];
-    if (storeName === 'asset_owners') {
-      return [value['ownerKind'], value['ownerId'], value['role']];
-    }
-    if (storeName === 'recording_telemetry') return value['recordingId'];
-    return value['id'];
-  };
-  const objectStore = (storeName: string) => ({
-    getAll: async () => [...(stores.get(storeName)?.values() ?? [])],
-    delete: async (entryKey: unknown) => stores.get(storeName)?.delete(key(entryKey)),
-    get: async (entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
-    put: async (value: Record<string, unknown>) =>
-      put(storeName, deriveKey(storeName, value), value),
-  });
-  const db = {
-    put: async (storeName: string, value: Record<string, unknown>) =>
-      put(storeName, deriveKey(storeName, value), value),
-    delete: async (storeName: string, entryKey: unknown) =>
-      stores.get(storeName)?.delete(key(entryKey)),
-    get: async (storeName: string, entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
-    getAll: async (storeName: string) => [...(stores.get(storeName)?.values() ?? [])],
-    transaction: vi.fn(() => ({ done: Promise.resolve(), objectStore })),
-  };
-  return {
-    db,
-    get: (storeName: string, entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
-    put,
-  };
-}
-
 it.each(['additional-owner', 'changed-source', 'scenario-consumer'] as const)(
   'preserves a legacy compensation receipt after its source was adopted: %s',
   async (adoption) => {
@@ -606,34 +562,6 @@ it('retains a committed legacy delete receipt while obsolete bytes still have an
   );
 });
 
-function createRef(assetId: string) {
-  return {
-    assetId,
-    createdAt: 1,
-    location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
-    mimeType: 'application/octet-stream',
-    sha256: null,
-    size: 3,
-  };
-}
-
-function createWebSnapshotCompensation(
-  assetId: string,
-  ownerRole: string,
-  previousRecords: Record<string, unknown>
-): AssetOperation['compensations'][number] {
-  return {
-    assetId,
-    journalId: 'journal-web-snapshot',
-    nextMediaId: 'snapshot-1',
-    nextOwnerId: 'snapshot-1',
-    nextWebSnapshotId: 'snapshot-1',
-    ownerKind: 'web-snapshot',
-    ownerRole,
-    previousRecords,
-  };
-}
-
 it('preserves every object in an ambiguous multi-object legacy journal', async () => {
   const harness = createDbHarness([]);
   harness.put('asset_owners', ['recording', 'adopted', 'body'], {
@@ -706,7 +634,9 @@ it('preserves a legacy compensation receipt with an invalid previous byte owner'
 
 it('replays pending publications without discovering or collecting orphan objects', async () => {
   const { recoverPendingAssetPublications } = await import('./index');
-  mocks.runMutation.mockImplementation(async (effect) => effect({ getAll: async () => [] }));
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect(createRetentionDatabaseFixture(async () => []))
+  );
   await recoverPendingAssetPublications();
   expect(mocks.recoverStandalone).toHaveBeenCalled();
   expect(mocks.objects).not.toHaveBeenCalled();
@@ -824,7 +754,9 @@ it('selects the registered replica adapter and continues after a deferred replic
 });
 
 it('uses one existing native retention projection for a writing-cleanup batch', async () => {
-  mocks.runMutation.mockImplementation(async (effect) => effect({ getAll: async () => [] }));
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect(createRetentionDatabaseFixture(async () => []))
+  );
   mocks.physicalAuthority.mockResolvedValue((id: string) =>
     id === 'retained' ? 'adopted' : 'unowned'
   );

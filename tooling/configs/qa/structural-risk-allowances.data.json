@@ -2786,17 +2786,6 @@
     },
     {
       "rule": "structural-file-risk",
-      "file": "apps/extension/src/composition/persistence/asset-publication-recovery/index.test.ts",
-      "symbol": "<file>",
-      "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One recovery entrypoint fixture adds writing-marker cleanup proof and one native retention projection per batch. Existing reset and mock lifetimes remain shared. Main inspection and independent read-only diagnosis support Keep. Fresh final architecture review must inspect this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new writer, lock or transaction owner, request lifetime, fixture authority, privileged effect or independent contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-10-29",
-      "astHash": "ab80e457742e543d48665a727404889d313d281c0f3e092b5f29474085b46202",
-      "signatureHash": "0ece55c51959c99f26c9a34d41fd6f591a383d1de0c56ee9ebefb3d6950ef887"
-    },
-    {
-      "rule": "structural-file-risk",
       "file": "apps/extension/src/composition/persistence/remote-connection/workspace-allocation.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
