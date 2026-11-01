@@ -1,10 +1,16 @@
+import { VideoProjectApplyConflictError } from './apply-video-project.contracts';
+import type {
+  ApplyPreparedVideoProjectRevisionInput,
+  HydratedProjectInput,
+  PreparedVideoProjectDependency,
+} from './apply-video-project.contracts';
+export type { ApplyPreparedVideoProjectRevisionInput } from './apply-video-project.contracts';
 import { readCaptureRootState } from './guards';
 import { isCaptureReplicaPredecessor } from './guards';
 import { readAppliedCaptureReceipt } from './guards';
 import {
   parsePreparedScenarioProjectDependencies,
   verifyScenarioProjectDependenciesInTransaction,
-  type PreparedScenarioProjectDependency,
 } from './scenario-dependencies';
 import {
   parseSyncConnectionIdentity,
@@ -23,7 +29,6 @@ import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import {
   hydratePreparedVideoProjectReplicaRoot,
   parsePreparedVideoProjectReplicaRoot,
-  type PreparedVideoProjectReplicaRoot,
 } from './prepared-project';
 import type { IDBPTransaction } from 'idb';
 import type {
@@ -41,6 +46,7 @@ import {
   ASSET_REFS_STORE,
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
+  PROJECT_EXPORT_INPUTS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -59,8 +65,7 @@ import {
   publishPreparedVideoProjectSidecarsInTransaction,
   type PreparedVideoProjectRevision,
 } from '../projects/revision-publication';
-import { parseAssetRef, parseAssetOwner, type AssetRef } from '../assets';
-import type { MediaLibraryEntry } from '../media-library/contracts';
+import { parseAssetRef, parseAssetOwner } from '../assets';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import {
@@ -170,47 +175,6 @@ async function prepareApplicationProvenance(
   if (!parseSyncCaptureRecord(state) || !parseSyncCaptureRecord(receipt))
     throw new Error('Invalid project application provenance.');
   return { state, receipt };
-}
-
-interface PreparedVideoProjectDependency {
-  entry: MediaLibraryEntry;
-  ref: AssetRef;
-  expectedGeneration: number;
-  expectedBasis: readonly string[];
-}
-
-export interface ApplyPreparedVideoProjectRevisionInput {
-  authorization?: SyncConnectionIdentity;
-  root: PreparedVideoProjectReplicaRoot;
-  operationId: string;
-  sourceDigest: string;
-  connectionGeneration: number;
-  spaceId: string;
-  profileCreatedAt: number;
-  expectedBasis: readonly string[];
-  expectedLocalGeneration: number;
-  expectedWorkspaceRevision: number | null;
-  dependencies: readonly PreparedVideoProjectDependency[];
-  rootDependencies?: readonly PreparedScenarioProjectDependency[];
-}
-
-type HydratedProjectInput = Omit<ApplyPreparedVideoProjectRevisionInput, 'root'> & {
-  root: Awaited<ReturnType<typeof hydratePreparedVideoProjectReplicaRoot>>;
-};
-
-class VideoProjectApplyConflictError extends Error {
-  constructor(
-    readonly code:
-      | 'invalid-input'
-      | 'unsupported-project'
-      | 'profile-changed'
-      | 'project-changed'
-      | 'dependency-changed'
-      | 'pending-local-change'
-  ) {
-    super(`Prepared project application refused: ${code}.`);
-    this.name = 'VideoProjectApplyConflictError';
-  }
 }
 
 function preparedAssets(root: PreparedVideoProjectRevision) {
@@ -786,6 +750,7 @@ export async function applyPreparedVideoProjectRevision(
         VIDEO_PROJECT_REVISIONS_STORE,
         STORE_NAME,
         VIDEO_PROJECTS_STORE,
+        PROJECT_EXPORT_INPUTS_STORE,
         PROJECT_ASSETS_STORE,
         PROJECT_EXPORTS_STORE,
         MEDIA_LIBRARY_STORE,

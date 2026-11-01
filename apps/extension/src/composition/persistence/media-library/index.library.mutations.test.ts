@@ -14,6 +14,7 @@ const dbMocks = vi.hoisted(() => ({
   objectStoreDeleteMock: vi.fn(),
   putMock: vi.fn(),
   listReadyJournalsMock: vi.fn(),
+  readClaimsMock: vi.fn(),
   txDoneMock: vi.fn(),
 }));
 vi.mock('./usage', () => ({
@@ -22,6 +23,12 @@ vi.mock('./usage', () => ({
 vi.mock('./delete-cascade.recovery', () => ({ recoverMediaSourcePublications: vi.fn() }));
 vi.mock('./delete-cascade', () => ({
   deleteMediaAssetWithProjectCascade: dbMocks.deleteCascadeMock,
+}));
+
+vi.mock('../assets/opfs-store', async (importOriginal) => ({
+  ...(await importOriginal()),
+  readAssetReadyPublicationClaims: dbMocks.readClaimsMock,
+  listReadyJournals: dbMocks.listReadyJournalsMock,
 }));
 
 vi.mock('../assets', async (importOriginal) => ({
@@ -136,13 +143,16 @@ function mockDeleteMediaLibraryAssetEntries() {
 
 function expectDeleteMediaLibraryAssetCleanup() {
   for (const id of ['recording', 'export', 'asset', 'screenshot']) {
-    expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith(id, []);
+    expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith(id, [], expect.any(Object));
   }
   expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  dbMocks.readClaimsMock
+    .mockReset()
+    .mockResolvedValue({ valid: true, pending: false, journals: [] });
   dbMocks.txDoneMock.mockResolvedValue(undefined);
   dbMocks.objectStoreGetMock.mockResolvedValue(undefined);
   dbMocks.initDBMock.mockResolvedValue(createDb());
@@ -285,9 +295,8 @@ describe('media-library-db.library mutations', () => {
 });
 
 it('refuses permanent deletion while an image workspace publication still owns pending bytes', async () => {
-  dbMocks.listReadyJournalsMock.mockResolvedValueOnce([
-    { domain: 'image-workspace', payload: { aggregateId: 'pending-image' } },
-  ]);
+  dbMocks.getMock.mockResolvedValueOnce(undefined);
+  dbMocks.readClaimsMock.mockResolvedValueOnce({ valid: true, pending: true, journals: [] });
   await expect(deleteMediaLibraryAsset('pending-image')).rejects.toMatchObject({
     assetId: 'pending-image',
     stage: 'linked-source-cleanup',
@@ -308,5 +317,51 @@ it.each<MediaLibraryEntry['source']>([
   dbMocks.getMock.mockResolvedValue(createMediaEntry({ id: 'linked', source }));
   dbMocks.listMediaAssetProjectUsageMock.mockResolvedValueOnce(usage);
   await deleteMediaLibraryAsset('linked', { expectedUsage: usage });
-  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith('linked', usage);
+  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith('linked', usage, expect.any(Object));
+});
+
+it.each([
+  { domain: 'image-workspace', payload: { aggregateId: 'missing' } },
+  { domain: 'sync-replica', payload: { kind: 'image', input: { media: { id: 'missing' } } } },
+])('checks selected pending $domain claims when the Library root is missing', async (journal) => {
+  dbMocks.getMock.mockResolvedValueOnce(undefined);
+  dbMocks.readClaimsMock.mockResolvedValueOnce({
+    valid: true,
+    pending: false,
+    journals: [journal],
+  });
+  await expect(deleteMediaLibraryAsset('missing')).rejects.toMatchObject({
+    cause: expect.objectContaining({ reason: 'pending-publication' }),
+  });
+  expect(dbMocks.readClaimsMock).toHaveBeenCalledWith({ id: 'missing' }, expect.any(Object));
+  expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
+  expect(dbMocks.listReadyJournalsMock).not.toHaveBeenCalled();
+});
+
+it('passes the exact current source to claim lookup and excludes unrelated publications', async () => {
+  const entry = createMediaEntry({ id: 'recording:rec-1' });
+  dbMocks.getMock.mockResolvedValueOnce(entry);
+  dbMocks.listMediaAssetProjectUsageMock.mockResolvedValueOnce([]);
+  dbMocks.readClaimsMock.mockResolvedValueOnce({
+    valid: true,
+    pending: false,
+    journals: [{ domain: 'image-workspace', payload: { aggregateId: 'unrelated' } }],
+  });
+  await deleteMediaLibraryAsset(entry.id);
+  expect(dbMocks.readClaimsMock).toHaveBeenCalledWith(
+    expect.objectContaining({ id: entry.id, source: entry.source }),
+    expect.any(Object)
+  );
+  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith(entry.id, [], expect.any(Object));
+  expect(dbMocks.listReadyJournalsMock).not.toHaveBeenCalled();
+});
+
+it('refuses invalid claim bindings without mutating the Library root', async () => {
+  dbMocks.getMock.mockResolvedValueOnce(createMediaEntry());
+  dbMocks.readClaimsMock.mockResolvedValueOnce({ valid: false, pending: false, journals: [] });
+  await expect(deleteMediaLibraryAsset('recording:rec-1')).rejects.toMatchObject({
+    cause: expect.objectContaining({ reason: 'pending-publication' }),
+  });
+  expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
+  expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
 });

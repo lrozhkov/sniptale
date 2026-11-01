@@ -3,7 +3,15 @@ type UpgradeStoreSchema = {
   put(value: unknown): unknown;
 };
 
+interface UpgradeCursor {
+  readonly value: unknown;
+  update(value: unknown): Promise<unknown>;
+  continue(): Promise<UpgradeCursor | null>;
+}
+
 type UpgradeObjectStore = {
+  openCursor?(): Promise<UpgradeCursor | null>;
+  index?(name: string): { getAll(query: IDBValidKey): Promise<unknown[]> };
   createIndex?: (name: string, keyPath: string | string[], options?: IDBIndexParameters) => unknown;
   clear(): unknown;
   delete(key: IDBValidKey): unknown;

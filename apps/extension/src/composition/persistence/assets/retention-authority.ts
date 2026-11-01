@@ -1,7 +1,6 @@
+import { projectRetentionRow } from './retention-index-projection';
 import { collectSyncCaptureClaims } from '../sync-capture/claims';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import type { MediaLibraryEntry } from '../media-library/contracts';
 import {
   parseAssetOwner,
   parseAssetRef,
@@ -27,12 +26,6 @@ import {
   MEDIA_LIBRARY_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
-import { parseRecordingEntry } from '../recordings/index.guards';
-import { parseScenarioAssetEntry, parseScenarioExportEntry } from '../scenario/read-guards';
-import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
-import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents/index.guards';
-import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 
 const logger = createLogger({ namespace: 'AssetRetention' });
 
@@ -71,86 +64,39 @@ export async function collectDurableAssetSnapshot(
   const expectedOwners: AssetOwner[] = [];
   const embeddedBinaryMetadata: string[] = [];
   const publishedProjectAssetIds = new Set<string>();
-  const owned = async <T>(
-    store: string,
-    parse: (raw: unknown) => T | null,
-    project: (entry: T) => AssetOwner[],
-    embeddedOwner?: string
-  ) => {
+  for (const store of [
+    STORE_NAME,
+    PROJECT_ASSETS_STORE,
+    PROJECT_EXPORTS_STORE,
+    SCENARIO_ASSETS_STORE,
+    SCENARIO_EXPORTS_STORE,
+    IMAGE_WORKSPACES_STORE,
+    SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
+    WEB_SNAPSHOTS_STORE,
+    MEDIA_LIBRARY_STORE,
+  ]) {
+    const embeddedOwner =
+      store === IMAGE_WORKSPACES_STORE
+        ? 'image-workspace'
+        : store === SCENARIO_STEP_EDITOR_DOCUMENTS_STORE
+          ? 'scenario-editor-document'
+          : undefined;
     const valid = await visitDurableRows(
       db,
       store,
       (raw, index) => {
         if (embeddedOwner)
           embeddedBinaryMetadata.push(...findEmbeddedBinaryRows([raw], embeddedOwner, index));
-        const entry = parse(raw);
-        if (!entry) return false;
-        expectedOwners.push(...project(entry));
-        return true;
+        const projection = projectRetentionRow(store, raw);
+        expectedOwners.push(...projection.owners);
+        for (const id of projection.publishedProjectAssetIds) publishedProjectAssetIds.add(id);
+        return projection.valid;
       },
       signal
     );
     if (!valid) logger.debug(`Retention validation failed: ${store}`);
-    authorityValid = authorityValid && valid;
-  };
-  await owned(STORE_NAME, parseRecordingEntry, (entry) => [
-    createExpectedOwner('recording', entry.id, entry.assetId),
-  ]);
-  await owned(PROJECT_ASSETS_STORE, parseProjectAssetEntry, (entry) => [
-    createExpectedOwner('project-asset', entry.id, entry.assetId),
-  ]);
-  await owned(PROJECT_EXPORTS_STORE, parseProjectExportEntry, (entry) => [
-    createExpectedOwner('project-export', entry.id, entry.assetId),
-  ]);
-  await owned(SCENARIO_ASSETS_STORE, parseScenarioAssetEntry, (entry) => [
-    createExpectedOwner('scenario-asset', entry.id, entry.assetId),
-  ]);
-  await owned(SCENARIO_EXPORTS_STORE, parseScenarioExportEntry, (entry) =>
-    entry.html ? [createExpectedOwner('scenario-export', entry.id, entry.html.assetId)] : []
-  );
-  await owned(
-    IMAGE_WORKSPACES_STORE,
-    parseImageWorkspaceEntry,
-    (entry) =>
-      entry.document.assets.map((asset) => ({
-        assetId: asset.assetId,
-        ownerId: entry.aggregateId,
-        ownerKind: 'image-workspace',
-        role: asset.role,
-      })),
-    'image-workspace'
-  );
-  await owned(
-    SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
-    parseScenarioStepEditorDocumentEntry,
-    (entry) =>
-      entry.document.assets.map((asset) => ({
-        assetId: asset.assetId,
-        ownerId: entry.stepId,
-        ownerKind: 'scenario-editor-document',
-        role: asset.role,
-      })),
-    'scenario-editor-document'
-  );
-  await owned(WEB_SNAPSHOTS_STORE, parseStoredWebSnapshotRecord, (entry) => [
-    {
-      assetId: entry.packageAssetId,
-      ownerId: entry.id,
-      ownerKind: 'web-snapshot',
-      role: 'package',
-    },
-    {
-      assetId: entry.screenshotAssetId,
-      ownerId: entry.id,
-      ownerKind: 'web-snapshot',
-      role: 'screenshot',
-    },
-  ]);
-  await owned(MEDIA_LIBRARY_STORE, parseMediaLibraryEntry, (entry) => {
-    if (entry.source.kind === 'project-asset')
-      publishedProjectAssetIds.add(entry.source.projectAssetId);
-    return projectMediaOwners(entry);
-  });
+    authorityValid &&= valid;
+  }
   const captureClaims = await readSyncCaptureClaims(db, signal);
   if (!captureClaims.valid) logger.debug(`Retention validation failed: ${SYNC_CAPTURE_STORE}`);
   authorityValid = authorityValid && captureClaims.valid;
@@ -185,19 +131,6 @@ async function readSyncCaptureClaims(
     signal
   );
   return { valid, assetIds };
-}
-
-function projectMediaOwners(entry: MediaLibraryEntry): AssetOwner[] {
-  return entry.source.kind === 'stored-asset'
-    ? [
-        {
-          assetId: entry.source.assetId,
-          ownerId: entry.id,
-          ownerKind: 'media-library',
-          role: 'source',
-        },
-      ]
-    : [];
 }
 
 /** Keep one store snapshot while releasing raw payloads after each bounded request. */
@@ -344,8 +277,4 @@ function ownerKey(owner: AssetOwner): string {
 
 function ownerKeyParts(ownerKind: string, ownerId: string, role: string): string {
   return `${ownerKind}\u0000${ownerId}\u0000${role}`;
-}
-
-function createExpectedOwner(ownerKind: string, ownerId: string, assetId: string): AssetOwner {
-  return { assetId, ownerId, ownerKind, role: 'body' };
 }

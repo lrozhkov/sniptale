@@ -1,3 +1,4 @@
+import { enableScenarioDeletionReadGuard } from './aggregate-mutations.test-support';
 import {
   stores,
   getStore,
@@ -6,7 +7,7 @@ import {
   createAsset,
   createDocument,
 } from './aggregate-mutations.test-support';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createGuideProject,
   createGuideStep,
@@ -786,3 +787,5 @@ it('protects tour-only image/audio/edit resources across saved history and prune
   expect(await pruneScenarioResources(project.id)).toBe(3);
   expect(getStore('scenario_assets').has('audio')).toBe(false);
 });
+
+beforeEach(enableScenarioDeletionReadGuard);

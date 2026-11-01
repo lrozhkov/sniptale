@@ -1,5 +1,8 @@
-import { vi } from 'vitest';
-import { createRetentionDatabaseFixture } from '../assets/retention-authority.test-support';
+import { vi, type Mock } from 'vitest';
+import {
+  createRetentionDatabaseFixture,
+  createTargetAssetDatabaseFixture,
+} from '../assets/retention-authority.test-support';
 import type {
   AssetOperation,
   ArchiveRestoreSession,
@@ -36,18 +39,30 @@ export function createDbHarness(
     put: async (value: Record<string, unknown>) =>
       put(storeName, deriveKey(storeName, value), value),
   });
-  const db = {
+  type HarnessTransaction =
+    | ReturnType<ReturnType<typeof createRetentionDatabaseFixture>['transaction']>
+    | ReturnType<ReturnType<typeof createTargetAssetDatabaseFixture>['transaction']>
+    | { done: Promise<void>; objectStore: typeof objectStore };
+  const readRows = async (storeName: string) => [...(stores.get(storeName)?.values() ?? [])];
+  const db: {
+    put(storeName: string, value: Record<string, unknown>): Promise<void>;
+    delete(storeName: string, entryKey: unknown): Promise<boolean | undefined>;
+    get(storeName: string, entryKey: unknown): Promise<unknown>;
+    getAll(storeName: string): Promise<unknown[]>;
+    transaction: Mock<(names: string[], mode: string) => HarnessTransaction>;
+  } = {
     put: async (storeName: string, value: Record<string, unknown>) =>
       put(storeName, deriveKey(storeName, value), value),
     delete: async (storeName: string, entryKey: unknown) =>
       stores.get(storeName)?.delete(key(entryKey)),
     get: async (storeName: string, entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
-    getAll: async (storeName: string) => [...(stores.get(storeName)?.values() ?? [])],
-    transaction: vi.fn((names: string[], mode: string) =>
-      mode === 'readonly'
-        ? createRetentionDatabaseFixture(db.getAll).transaction(names)
-        : { done: Promise.resolve(), objectStore }
-    ),
+    getAll: readRows,
+    transaction: vi.fn<(names: string[], mode: string) => HarnessTransaction>((names, mode) => {
+      if (mode !== 'readonly') return { done: Promise.resolve(), objectStore };
+      if (names.length > 1)
+        return createTargetAssetDatabaseFixture(db.getAll).transaction(names, 'readonly');
+      return createRetentionDatabaseFixture(db.getAll).transaction(names);
+    }),
   };
   return {
     db,

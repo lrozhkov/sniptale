@@ -202,9 +202,12 @@ describe('shared db core initDB cache', () => {
     const first = module.initDB();
     const second = module.initDB();
 
-    expect(await first).toBe(await second);
+    const prepared = await first;
+    expect(prepared).toBe(await second);
+    await prepared.get(STORE_NAME, 'recording');
+    expect(completeDb.get).toHaveBeenCalledWith(STORE_NAME, 'recording');
     expect(dbMocks.openDB).toHaveBeenCalledTimes(1);
-    expect(module.capturePreparedDatabase()).toBe(completeDb);
+    expect(module.capturePreparedDatabase()).toBe(await module.initDB());
   });
 });
 
@@ -243,7 +246,9 @@ describe('shared db core initDB schema mismatch', () => {
 
     const module = await importDbModule();
     await expect(module.initDB()).rejects.toThrow('IndexedDB schema mismatch');
-    await expect(module.initDB()).resolves.toBe(completeDb);
+    const recovered = await module.initDB();
+    expect(await module.initDB()).toBe(recovered);
+    expect(module.capturePreparedDatabase()).toBe(recovered);
     expect(dbMocks.openDB).toHaveBeenCalledTimes(2);
   });
 });
@@ -297,14 +302,16 @@ describe('shared db core initDB recovery', () => {
     dbMocks.openDB.mockResolvedValueOnce(firstDb).mockResolvedValueOnce(secondDb);
 
     const module = await importDbModule();
-    await module.initDB();
+    const firstPrepared = await module.initDB();
 
     const firstCallOptions = dbMocks.openDB.mock.calls[0]?.[2];
-    expect(module.capturePreparedDatabase()).toBe(firstDb);
+    expect(module.capturePreparedDatabase()).toBe(firstPrepared);
     firstCallOptions.terminated();
     expect(module.capturePreparedDatabase()).toBeNull();
-    await module.initDB();
-    expect(module.capturePreparedDatabase()).toBe(secondDb);
+    const secondPrepared = await module.initDB();
+    expect(secondPrepared).not.toBe(firstPrepared);
+    expect(module.capturePreparedDatabase()).toBe(secondPrepared);
+    expect(await module.initDB()).toBe(secondPrepared);
     expect(dbMocks.openDB).toHaveBeenCalledTimes(2);
 
     vi.resetModules();
@@ -313,7 +320,9 @@ describe('shared db core initDB recovery', () => {
 
     const afterFailure = await import('./core');
     await expect(afterFailure.initDB()).rejects.toThrow('open failed');
-    await expect(afterFailure.initDB()).resolves.toBe(secondDb);
+    const afterFailurePrepared = await afterFailure.initDB();
+    expect(await afterFailure.initDB()).toBe(afterFailurePrepared);
+    expect(afterFailure.capturePreparedDatabase()).toBe(afterFailurePrepared);
   });
 
   it(
@@ -328,17 +337,20 @@ describe('shared db core initDB recovery', () => {
     dbMocks.openDB.mockResolvedValueOnce(firstDb).mockResolvedValueOnce(secondDb);
 
     const module = await importDbModule();
-    await module.initDB();
+    const firstPrepared = await module.initDB();
 
     const firstOpenOptions = dbMocks.openDB.mock.calls[0]?.[2];
-    expect(module.capturePreparedDatabase()).toBe(firstDb);
+    expect(module.capturePreparedDatabase()).toBe(firstPrepared);
     firstOpenOptions.blocked();
     firstOpenOptions.blocking();
+    expect(firstDb.close).toHaveBeenCalledOnce();
     expect(module.capturePreparedDatabase()).toBeNull();
     firstOpenOptions.terminated();
 
-    await module.initDB();
-    expect(module.capturePreparedDatabase()).toBe(secondDb);
+    const secondPrepared = await module.initDB();
+    expect(secondPrepared).not.toBe(firstPrepared);
+    expect(module.capturePreparedDatabase()).toBe(secondPrepared);
+    expect(await module.initDB()).toBe(secondPrepared);
     expect(dbMocks.openDB).toHaveBeenCalledTimes(2);
   });
 });
@@ -360,7 +372,7 @@ describe('shared db core privacy erasure', () => {
 
     const module = await importDbModule();
     await module.initDB();
-    expect(module.capturePreparedDatabase()).toBe(completeDb);
+    expect(module.capturePreparedDatabase()).toBe(await module.initDB());
     await module.eraseSniptaleDatabaseForPrivacyErasure();
     expect(module.capturePreparedDatabase()).toBeNull();
 

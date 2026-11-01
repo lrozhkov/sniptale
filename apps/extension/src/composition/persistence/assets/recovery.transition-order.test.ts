@@ -271,6 +271,7 @@ async function importFreshModules() {
   const barrier = await import('../infrastructure/mutation-barrier');
   const core = await import('../infrastructure/indexed-db/core');
   const opfsStore = await import('./opfs-store');
+  vi.spyOn(opfsStore, 'prepareAssetReadyClaimIndex').mockResolvedValue(undefined);
   vi.spyOn(opfsStore, 'listReadyJournals').mockImplementation(mocks.listReadyJournals);
   vi.spyOn(opfsStore, 'deleteReadyJournal').mockImplementation(mocks.deleteReadyJournal);
   vi.spyOn(opfsStore, 'collectQuiescentWritingObjects').mockImplementation(mocks.collectQuiescent);

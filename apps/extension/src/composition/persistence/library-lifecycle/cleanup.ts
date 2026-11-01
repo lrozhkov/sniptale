@@ -1,9 +1,8 @@
-import { visitIndexedDbStoreRows } from '../infrastructure/indexed-db/read-primitives';
+import { readDeletionDependencyRows } from '../media-library/deletion-index';
 import { runWithLibraryTrashMutation } from './trash';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 import { recoverScenarioAssetPublications } from '../scenario/aggregate-mutations';
 import { recoverMediaSourcePublications } from '../media-library/delete-cascade.recovery';
-import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { createMaintenanceLog } from './maintenance-log';
 import {
   VIDEO_WORKSPACES_STORE,
@@ -29,14 +28,11 @@ import { createProjectAssetMediaId } from '../../../features/media-hub/media-id'
 import { getDraftRetentionMs } from './policy';
 import { collectVideoProjectReferences } from './references';
 import {
-  mediaDependencyTarget,
   scenarioChildIsUnrelated,
-  parseVideoDependencyEnvelope,
-  videoSourceReferences,
-  reviewReferencesForMedia,
+  videoEntryIsUnrelated,
+  reviewWorkspaceUsesMedia,
 } from '../media-library/dependencies';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
-import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import { repairLinkedRecordingLifecycles } from './project-recordings';
 import { repairTemporaryProjectLifecycles } from './project-retention';
 import { recoverRecordingAssetPublications } from '../recordings/asset-publication';
@@ -166,81 +162,22 @@ export async function cleanupDrafts(args: {
 
 /** Reuse evidence only inside one transaction that prevents reference writers from committing. */
 function createExpiryRetentionReader(tx: IndexedDbWriteTransaction) {
-  let projectAssets: unknown[] | undefined;
-  let children: unknown[] | undefined;
-  let videos: Awaited<ReturnType<typeof readExpiryVideoReferences>> | undefined;
-  let workspaces: Awaited<ReturnType<typeof readExpiryWorkspaceReferences>> | undefined;
   return async (current: MediaLibraryEntry): Promise<boolean> => {
     if ((await tx.objectStore(IMAGE_WORKSPACES_STORE).get(current.id)) !== undefined) return true;
-    projectAssets ??= await tx.objectStore(PROJECT_ASSETS_STORE).getAll();
-    const target = mediaDependencyTarget(current, projectAssets);
-    if (target.privateProjectAssetIds?.size) return true;
-    children ??= await tx.objectStore(SCENARIO_ASSETS_STORE).getAll();
-    if (children.some((raw) => !scenarioChildIsUnrelated(raw, target))) return true;
-    videos ??= await readExpiryVideoReferences(tx);
-    if (
-      videos.unknownReferences ||
-      videos.libraryIds.has(current.id) ||
-      (current.source.kind === 'recording' &&
-        videos.recordingIds.has(current.source.recordingId)) ||
-      (current.source.kind === 'project-asset' &&
-        videos.projectAssetIds.has(current.source.projectAssetId))
-    )
+    const matches = await readDeletionDependencyRows(tx, current);
+    if (matches.target.privateProjectAssetIds?.size) return true;
+    if (matches.children.some((raw) => !scenarioChildIsUnrelated(raw, matches.target))) return true;
+    if (matches.videos.some((raw) => !videoEntryIsUnrelated(raw, matches.target, new Set())))
       return true;
-    workspaces ??= await readExpiryWorkspaceReferences(tx);
-    const workspaceReferences = workspaces.references;
-    return (
-      workspaces.unknownReferences ||
-      workspaces.primaryMediaIds.has(current.id) ||
-      [...reviewReferencesForMedia(target)].some((ref) => workspaceReferences.has(ref))
-    );
+    return matches.reviews.some((raw) => {
+      const workspace = parseVideoWorkspace(raw);
+      return (
+        !workspace ||
+        workspace.aggregateId === current.id ||
+        reviewWorkspaceUsesMedia(workspace, matches.target)
+      );
+    });
   };
-}
-
-async function readExpiryVideoReferences(tx: IndexedDbWriteTransaction) {
-  const refs = {
-    unknownReferences: false,
-    libraryIds: new Set<string>(),
-    recordingIds: new Set<string>(),
-    projectAssetIds: new Set<string>(),
-  };
-  await visitIndexedDbStoreRows(tx.objectStore(VIDEO_PROJECTS_STORE), (raw) => {
-    const envelope = parseVideoDependencyEnvelope(raw);
-    if (!envelope) {
-      refs.unknownReferences = true;
-      return false;
-    }
-    if (envelope.baseRecordingId !== null) refs.recordingIds.add(envelope.baseRecordingId);
-    if (envelope.source.kind === 'recording') refs.recordingIds.add(envelope.source.recordingId);
-    for (const source of envelope.sources) {
-      for (const ref of videoSourceReferences(source)) {
-        if (ref.kind === 'library-asset') refs.libraryIds.add(ref.id);
-        else if (ref.kind === 'recording') refs.recordingIds.add(ref.id);
-        else if (ref.kind === 'project-asset') refs.projectAssetIds.add(ref.id);
-      }
-    }
-    return true;
-  });
-  return refs;
-}
-
-async function readExpiryWorkspaceReferences(tx: IndexedDbWriteTransaction) {
-  const refs = {
-    unknownReferences: false,
-    primaryMediaIds: new Set<string>(),
-    references: new Set<string>(),
-  };
-  for (const raw of await readAllWorkspaceStorage(tx)) {
-    const workspace = parseVideoWorkspace(raw);
-    if (!workspace) {
-      refs.unknownReferences = true;
-      break;
-    }
-    refs.primaryMediaIds.add(workspace.aggregateId);
-    refs.primaryMediaIds.add(workspace.sourceMediaId ?? workspace.aggregateId);
-    for (const ref of collectReviewAssetReferences(workspace)) refs.references.add(ref);
-  }
-  return refs;
 }
 
 async function moveExpiredMediaBatchToTrash(

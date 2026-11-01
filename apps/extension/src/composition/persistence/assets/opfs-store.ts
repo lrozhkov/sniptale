@@ -1,3 +1,13 @@
+import type { ReadyPublicationTarget } from './ready-media-claims';
+import {
+  beginReadyClaimPublication,
+  finishReadyClaimPublication,
+  prepareReadyClaimIndex,
+  readTargetReadyClaims,
+  readTargetReadyMediaClaims,
+  removeReadyJournalClaims,
+} from './ready-claim-index';
+import { collectReadyJournalAssetIds } from './retention-claims';
 // policyStateIds: video-recording-control-lease, persistent-data-erasure-lease - active
 // recording writers hold exclusive object locks, and privacy erasure invalidates their local state.
 import type {
@@ -456,10 +466,14 @@ export async function writeReadyJournal(
   journal: AssetReadyJournal,
   options: AssetOpfsOptions = {}
 ): Promise<void> {
-  const ready = await getAssetDirectory(options, READY_DIRECTORY_NAME, true);
-  if (!ready) throw new Error('Unable to create asset ready directory.');
+  const previousReady = await getAssetDirectory(options, READY_DIRECTORY_NAME, false);
+  const ready = previousReady ?? (await getAssetDirectory(options, READY_DIRECTORY_NAME, true));
+  const root = await getAssetRoot(options, true);
+  if (!ready || !root) throw new Error('Unable to create asset ready directory.');
+  const complete = await beginReadyClaimPublication(root, journal, previousReady === null);
   await writeTextFile(ready, journal.journalId, JSON.stringify(journal));
-  journal.assetRefs.forEach((ref) => readyProtectedAssetIds.add(ref.assetId));
+  if (complete) await finishReadyClaimPublication(root);
+  collectReadyJournalAssetIds(journal).forEach((id) => readyProtectedAssetIds.add(id));
   const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
   if (writing) {
     await Promise.all(
@@ -477,6 +491,76 @@ export async function deleteReadyJournal(
 ): Promise<void> {
   const ready = await getAssetDirectory(options, READY_DIRECTORY_NAME, false);
   if (ready) await removeIfPresent(ready, journalId);
+  const root = await getAssetRoot(options, false);
+  if (root) await removeReadyJournalClaims(root, journalId);
+}
+
+/** Explicit global recovery owns legacy ready-index preparation. */
+export function prepareAssetReadyClaimIndex(
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  options: AssetOpfsOptions = {}
+): Promise<void> {
+  return runWithDurableAssetLifecycleLock(async () => {
+    const root = await getAssetRoot(options, true);
+    if (!root) throw new Error('Asset root is unavailable.');
+    await prepareReadyClaimIndex(
+      root,
+      await getAssetDirectory(options, READY_DIRECTORY_NAME, false)
+    );
+  }, lifecyclePermit);
+}
+
+/** Candidate admission reads no global journal list and keeps the caller's lifecycle hold. */
+export function readAssetReadyClaims(
+  assetIds: Iterable<string>,
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  options: AssetOpfsOptions = {}
+) {
+  return runWithDurableAssetLifecycleLock(async () => {
+    const root = await getAssetRoot(options, false);
+    if (!root) return { valid: true, assetIds: new Set<string>(), journals: [] };
+    return readTargetReadyClaims(
+      root,
+      await getAssetDirectory(options, READY_DIRECTORY_NAME, false),
+      assetIds
+    );
+  }, lifecyclePermit);
+}
+
+/** Logical source admission reads only selected aliases under the caller's lifecycle hold. */
+export function readAssetReadyPublicationClaims(
+  target: ReadyPublicationTarget,
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  options: AssetOpfsOptions = {}
+) {
+  return runWithDurableAssetLifecycleLock(async () => {
+    const root = await getAssetRoot(options, false);
+    if (!root) return { valid: true, pending: false, journals: [] };
+    return readTargetReadyMediaClaims(
+      root,
+      await getAssetDirectory(options, READY_DIRECTORY_NAME, false),
+      target
+    );
+  }, lifecyclePermit);
+}
+
+/** Current writing protection is a point lookup for each selected immutable object. */
+export async function readWritingAssetIds(
+  assetIds: Iterable<string>,
+  options: AssetOpfsOptions = {}
+): Promise<string[]> {
+  const directory = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
+  if (!directory) return [];
+  const retained: string[] = [];
+  for (const assetId of new Set(assetIds)) {
+    try {
+      await directory.getFileHandle(assetId);
+      retained.push(assetId);
+    } catch (error) {
+      if (readErrorName(error) !== 'NotFoundError') throw error;
+    }
+  }
+  return retained;
 }
 
 export async function listReadyJournals(

@@ -27,6 +27,11 @@ vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   initDB: nativeOwnerMocks.initDB,
 }));
 
+vi.mock('../assets/opfs-store', async (original) => ({
+  ...(await original<typeof import('../assets/opfs-store')>()),
+  readAssetReadyPublicationClaims: async () => ({ valid: true, pending: false, journals: [] }),
+}));
+
 vi.mock('../projects/asset-publication', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../projects/asset-publication')>()),
   // Empty graphs have no OPFS publication recovery; native save/capture/freezer stay real.

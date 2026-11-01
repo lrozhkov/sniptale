@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   completePhysicalDelete: vi.fn(),
   collectWriting: vi.fn(),
   physicalAuthority: vi.fn(),
+  prepareReadyIndex: vi.fn(),
+  readyClaims: vi.fn(),
   deleteObject: vi.fn(),
   deleteJournal: vi.fn(),
   journals: vi.fn(),
@@ -26,6 +28,9 @@ vi.mock('../assets/opfs-store', async (importOriginal) => ({
   deleteReadyJournal: mocks.deleteJournal,
   deleteAssetObject: mocks.deleteObject,
   listReadyJournals: mocks.journals,
+  prepareAssetReadyClaimIndex: mocks.prepareReadyIndex,
+  readAssetReadyClaims: mocks.readyClaims,
+  readWritingAssetIds: mocks.writing,
 }));
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
@@ -68,6 +73,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.completePhysicalDelete.mockResolvedValue(undefined);
   mocks.collectWriting.mockResolvedValue(0);
+  mocks.prepareReadyIndex.mockResolvedValue(undefined);
+  mocks.readyClaims.mockResolvedValue({ valid: true, assetIds: new Set(), journals: [] });
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.deleteJournal.mockResolvedValue(undefined);
   mocks.journals.mockResolvedValue([]);
@@ -753,7 +760,7 @@ it('selects the registered replica adapter and continues after a deferred replic
   expect(mocks.deleteJournal.mock.calls).toEqual([['recording']]);
 });
 
-it('uses one existing native retention projection for a writing-cleanup batch', async () => {
+it('queries only each discovered object for writing-cleanup admission', async () => {
   mocks.runMutation.mockImplementation(async (effect) =>
     effect(createRetentionDatabaseFixture(async () => []))
   );
@@ -770,5 +777,5 @@ it('uses one existing native retention projection for a writing-cleanup batch', 
     }
   );
   await recoverPendingAssetPublications();
-  expect(mocks.physicalAuthority).toHaveBeenCalledOnce();
+  expect(mocks.physicalAuthority).toHaveBeenCalledTimes(2);
 });

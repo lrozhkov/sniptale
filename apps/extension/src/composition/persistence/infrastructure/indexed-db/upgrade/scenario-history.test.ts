@@ -15,11 +15,20 @@ import {
 import { betaV18Fixture } from '../fixtures/beta-v18';
 import { DATABASE_MIGRATIONS } from '../schema-contracts';
 import { handleDatabaseUpgrade } from './core';
+import {
+  REFERENCE_INDEX_STORES,
+  ROW_REFERENCE_FIELD,
+  ROW_REFERENCE_INDEX,
+} from '../row-index-contract';
 
-it('adds only an empty scenario history store before publishing the current contract', () => {
+it('adds empty scenario history and DB48 reference indexes before publishing current contracts', async () => {
   const names = new Set<string>(betaV18Fixture.stores);
   const createIndex = vi.fn();
   const put = vi.fn();
+  const getAll = vi.fn(() => {
+    throw new Error('Upgrade must use native cursor backfill');
+  });
+  const openCursor = vi.fn().mockResolvedValue(null);
   const tx = {
     abort: vi.fn(),
     objectStore: vi.fn(() => ({
@@ -27,7 +36,9 @@ it('adds only an empty scenario history store before publishing the current cont
       put,
       clear: vi.fn(),
       delete: vi.fn(),
-      getAll: vi.fn(),
+      getAll,
+      openCursor,
+      index: vi.fn(),
     })),
   };
   const db = {
@@ -72,10 +83,30 @@ it('adds only an empty scenario history store before publishing the current cont
       ],
       { unique: false },
     ],
+    ...REFERENCE_INDEX_STORES.map(() => [
+      ROW_REFERENCE_INDEX,
+      ROW_REFERENCE_FIELD,
+      { multiEntry: true },
+    ]),
+    ['recoveryId', 'recoveryId'],
   ]);
-  expect(tx.objectStore.mock.calls).toEqual([[SYNC_OUTBOX_STORE], ['schema_contracts']]);
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 8 });
+  await vi.waitFor(() =>
+    expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 1)
+  );
+  expect(tx.objectStore.mock.calls).toEqual([
+    [SYNC_OUTBOX_STORE],
+    ...REFERENCE_INDEX_STORES.map((name) => [name]),
+    [RECORDING_RECOVERY_SESSIONS_STORE],
+    [REFERENCE_INDEX_STORES[0]],
+    ['schema_contracts'],
+    ...REFERENCE_INDEX_STORES.slice(1).map((name) => [name]),
+    ['video_workspaces'],
+    ['video_workspace_history'],
+  ]);
+  expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[]]));
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 9 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(getAll).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
 });
 

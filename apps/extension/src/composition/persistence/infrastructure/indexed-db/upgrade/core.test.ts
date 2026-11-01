@@ -12,6 +12,11 @@ import {
   type DatabaseMigrationDescriptor,
 } from '../schema-contracts.ts';
 import { executeDatabaseUpgrade, handleDatabaseUpgrade } from './core.ts';
+import {
+  REFERENCE_INDEX_STORES,
+  ROW_REFERENCE_FIELD,
+  ROW_REFERENCE_INDEX,
+} from '../row-index-contract';
 
 function createUpgradeHarness() {
   const stores = new Map<
@@ -50,10 +55,23 @@ it('creates the complete current beta schema and persists every domain contract'
 
   expect(harness.db.createObjectStore.mock.calls.map(([name]) => name)).toEqual(EXPECTED_STORES);
   for (const [storeName, expectedIndexes] of Object.entries(EXPECTED_INDEXES)) {
-    expect(harness.stores.get(storeName)?.createIndex.mock.calls.map(([name]) => name)).toEqual(
-      expectedIndexes
+    expect(
+      [
+        ...(harness.stores.get(storeName)?.createIndex.mock.calls.map(([name]) => name) ?? []),
+      ].sort()
+    ).toEqual([...expectedIndexes].sort());
+  }
+  for (const storeName of REFERENCE_INDEX_STORES) {
+    expect(harness.stores.get(storeName)?.createIndex).toHaveBeenCalledWith(
+      ROW_REFERENCE_INDEX,
+      ROW_REFERENCE_FIELD,
+      { multiEntry: true }
     );
   }
+  expect(harness.stores.get('recording_recovery_sessions')?.createIndex).toHaveBeenCalledWith(
+    'recoveryId',
+    'recoveryId'
+  );
   expect(harness.db.createObjectStore).toHaveBeenCalledWith('video_project_revisions', {
     keyPath: 'projectId',
   });

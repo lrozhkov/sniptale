@@ -1,3 +1,8 @@
+import {
+  runWithDurableAssetLifecycleLock,
+  runWithPersistenceMutationTransition,
+} from '../infrastructure/mutation-barrier';
+import { recoverSelectedAssetPublications } from '../assets/recovery';
 import { deleteUnreferencedMediaSource } from '../media-library/delete-cascade';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
 import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
@@ -18,6 +23,7 @@ import type { HydratedProjectExportEntry, StoredProjectExportEntry } from './con
 import { parseProjectExportEntry } from './read-guards';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import {
+  projectExportPublicationAdapter,
   PROJECT_EXPORT_PUBLICATION_DOMAIN,
   publishProjectExportJournal,
   recoverProjectMediaPublications,
@@ -123,14 +129,28 @@ export async function listAllProjectExports(): Promise<StoredProjectExportEntry[
 }
 
 export async function deleteProjectExport(id: string): Promise<void> {
-  await recoverProjectMediaPublications();
   const db = await initDB();
-  const raw: unknown = await db.get(PROJECT_EXPORTS_STORE, id);
-  if (raw === undefined) return;
-  const entry = parseProjectExportEntry(raw);
-  if (!entry || entry.id !== id) throw new MediaAssetDeletionBlockedError('source-unavailable');
-  await deleteUnreferencedMediaSource({
-    id: createProjectExportMediaId(id),
-    source: { kind: 'project-export', exportId: id, projectId: entry.projectId },
-  });
+  await runWithPersistenceMutationTransition((transitionPermit) =>
+    runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+      await recoverSelectedAssetPublications(
+        [projectExportPublicationAdapter],
+        {
+          id: createProjectExportMediaId(id),
+          source: { kind: 'project-export', exportId: id },
+        },
+        { transitionPermit, lifecyclePermit }
+      );
+      const raw: unknown = await db.get(PROJECT_EXPORTS_STORE, id);
+      if (raw === undefined) return;
+      const entry = parseProjectExportEntry(raw);
+      if (!entry || entry.id !== id) throw new MediaAssetDeletionBlockedError('source-unavailable');
+      await deleteUnreferencedMediaSource(
+        {
+          id: createProjectExportMediaId(id),
+          source: { kind: 'project-export', exportId: id, projectId: entry.projectId },
+        },
+        { transitionPermit, lifecyclePermit }
+      );
+    })
+  );
 }

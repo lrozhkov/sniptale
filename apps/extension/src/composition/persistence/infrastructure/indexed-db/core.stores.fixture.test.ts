@@ -65,6 +65,8 @@ it('keeps every released migration aligned with its immutable source and target 
       abort: vi.fn(),
       objectStore: (name: string) => ({
         createIndex: createIndex(name),
+        openCursor: async () => null,
+        index: () => ({ getAll: async () => [] }),
         clear: mutateRows,
         delete: mutateRows,
         getAll: vi.fn(),
@@ -414,14 +416,14 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   expect(
     PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
   ).toMatchObject({
-    schemaVersion: 9,
+    schemaVersion: 10,
     stores: expect.arrayContaining([
       { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
     ]),
   });
   expect(PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'syncCapture')).toEqual({
     domainId: 'syncCapture',
-    schemaVersion: 6,
+    schemaVersion: 7,
     stores: [
       { storeName: 'sync_capture', dataClass: 'durable-authority' },
       { storeName: 'sync_outbox', dataClass: 'durable-authority' },

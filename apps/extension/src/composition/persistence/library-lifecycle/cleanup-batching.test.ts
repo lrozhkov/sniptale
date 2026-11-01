@@ -85,7 +85,7 @@ function fixture(count: number, failure: (storeName?: string) => boolean = () =>
   return { ...owner, media, reads, transactions };
 }
 
-it('reads each dependency store once per bounded group of expired roots', async () => {
+it('admits bounded groups of expired roots without global dependency reads', async () => {
   const f = fixture(129);
   await expect(cleanupDrafts(args)).resolves.toEqual({
     movedCount: 129,
@@ -100,7 +100,7 @@ it('reads each dependency store once per bounded group of expired roots', async 
     'video_workspaces',
     'video_workspace_history',
   ]) {
-    expect(f.reads.mock.calls.filter(([name]) => name === store)).toHaveLength(3);
+    expect(f.reads.mock.calls.filter(([name]) => name === store)).toHaveLength(0);
   }
   expect(f.rows.get('asset_operations')!.size).toBe(0);
   for (const row of f.media)
@@ -341,7 +341,7 @@ it('preserves the existing retention match for a legacy empty base-recording loc
   });
 });
 
-it('retains a reference in a late bounded video page and refuses malformed late evidence', async () => {
+it('finds a reference among unrelated videos and refuses malformed evidence without scanning pages', async () => {
   vi.stubGlobal('IDBKeyRange', {
     lowerBound: (lower: IDBValidKey, lowerOpen: boolean) => ({ lower, lowerOpen }),
   });
@@ -357,11 +357,7 @@ it('retains a reference in a late bounded video page and refuses malformed late 
     videos.set(reference.id, reference);
     const result = await cleanupDrafts(args);
     expect(result).toMatchObject({ movedIds: [f.media[1]!.id], retainedCount: 1 });
-    expect(f.reads.mock.calls.filter(([name]) => name === 'video_projects')).toEqual([
-      ['video_projects', 512],
-      ['video_projects', 512],
-      ['video_projects', 512],
-    ]);
+    expect(f.reads.mock.calls.filter(([name]) => name === 'video_projects')).toEqual([]);
     const retained = fixture(1);
     for (const [id, value] of videos) retained.rows.get('video_projects')!.set(id, value);
     retained.rows.get('video_projects')!.set('video-1024', { id: 'video-1024' });
@@ -371,5 +367,22 @@ it('retains a reference in a late bounded video page and refuses malformed late 
     );
   } finally {
     vi.unstubAllGlobals();
+  }
+});
+
+it('admits expired candidates without reading every dependency document', async () => {
+  const f = fixture(2);
+  await expect(cleanupDrafts(args)).resolves.toMatchObject({ movedCount: 2, retainedCount: 0 });
+  for (const store of [
+    'project_assets',
+    'scenario_assets',
+    'video_projects',
+    'video_workspaces',
+    'video_workspace_history',
+  ]) {
+    expect(
+      f.reads.mock.calls.filter(([name]) => name === store),
+      store
+    ).toHaveLength(0);
   }
 });

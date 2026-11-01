@@ -68,7 +68,7 @@ interface StoredSchemaContract {
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
     domainId: 'syncCapture',
-    schemaVersion: 6,
+    schemaVersion: 7,
     stores: [
       { storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' },
       { storeName: SYNC_OUTBOX_STORE, dataClass: 'durable-authority' },
@@ -83,7 +83,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'recordings',
-    schemaVersion: 3,
+    schemaVersion: 4,
     stores: [
       { storeName: STORE_NAME, dataClass: 'durable-authority' },
       { storeName: RECORDING_TELEMETRY_STORE, dataClass: 'durable-authority' },
@@ -93,7 +93,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 32,
+    schemaVersion: 33,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -106,7 +106,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'assetGraph',
-    schemaVersion: 4,
+    schemaVersion: 5,
     stores: [
       { storeName: ASSET_REFS_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_RESIDENCY_STORE, dataClass: 'durable-authority' },
@@ -116,7 +116,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 9,
+    schemaVersion: 10,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
@@ -127,7 +127,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 8,
+    schemaVersion: 9,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
@@ -140,7 +140,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'snapshots',
-    schemaVersion: 1,
+    schemaVersion: 2,
     stores: [{ storeName: WEB_SNAPSHOTS_STORE, dataClass: 'durable-authority' }],
   },
   {

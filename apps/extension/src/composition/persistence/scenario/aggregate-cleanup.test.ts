@@ -1,4 +1,5 @@
-import { expect, it, vi } from 'vitest';
+import { enableScenarioDeletionReadGuard } from './aggregate-mutations.test-support';
+import { beforeEach, expect, it, vi } from 'vitest';
 import {
   getStore,
   createAsset,
@@ -385,3 +386,5 @@ it.each(['missing-bytes', 'invalid-library', 'unknown-video'] as const)(
     expect(getStore('project_assets').size).toBe(0);
   }
 );
+
+beforeEach(enableScenarioDeletionReadGuard);

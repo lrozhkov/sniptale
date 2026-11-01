@@ -1,4 +1,5 @@
-import { createRetentionDatabaseFixture } from './retention-authority.test-support';
+import { collectReadyJournalAssetIds } from './retention-claims';
+import { createTargetAssetDatabaseFixture } from './retention-authority.test-support';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AssetReadyJournal, AssetRef, PhysicalDeleteAssetOperation } from './contracts';
 
@@ -31,6 +32,13 @@ vi.mock('./opfs-store', async (importOriginal) => ({
     storage.journals.delete(journalId);
   }),
   listReadyJournals: vi.fn(async () => [...storage.journals.values()]),
+  readAssetReadyClaims: async () => ({
+    valid: true,
+    journals: [...storage.journals.values()],
+    assetIds: new Set([...storage.journals.values()].flatMap(collectReadyJournalAssetIds)),
+  }),
+  readWritingAssetIds: async (ids: Iterable<string>) =>
+    [...ids].filter((id) => storage.writing.has(id)),
   releaseAssetPublicationTransitions: vi.fn(async () => undefined),
   writeReadyJournal: vi.fn(async (journal: AssetReadyJournal) => {
     storage.journals.set(journal.journalId, journal);
@@ -42,7 +50,7 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
     effect({
       get: async (_store: string, assetId: string) =>
         storage.refs.has(assetId) ? createRef(assetId) : undefined,
-      ...createRetentionDatabaseFixture(async (store) => readFaultRows(store)),
+      ...createTargetAssetDatabaseFixture(async (store) => readFaultRows(store)),
       delete: async (_store: string, operationId: string) => {
         if (storage.deleteOperationFailures > 0) {
           storage.deleteOperationFailures -= 1;

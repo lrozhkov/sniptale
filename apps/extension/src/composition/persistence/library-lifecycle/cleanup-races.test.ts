@@ -181,6 +181,7 @@ it.each([
             name === 'media_library' ? media : name === 'recordings' ? recording : undefined
           ),
           getAll: vi.fn(async () => []),
+          index: () => ({ getAll: async () => [] }),
         })),
       })),
     })

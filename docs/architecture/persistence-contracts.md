@@ -256,13 +256,21 @@ Derived document keys include current and retained history/recovery references a
 
 Native indexes remove entries atomically on removal.
 
-Version 9 adds the indexes without rewriting project documents during versionchange. Gallery cooperatively backfills legacy document keys after rendering in bounded key batches, acquiring a mutation permit only for each current-row rewrite. The marker `indexed:v1` and indexed counts identify incomplete coverage. The inspector reports unavailable until completion, never a false empty list. Selected-material queries read only matching identity aliases and documents.
+Version 9 adds the indexes without rewriting project documents during versionchange. Gallery cooperatively backfills legacy document keys after rendering in bounded key batches, acquiring a mutation permit only for each current-row rewrite. The marker `indexed:v2` and indexed counts identify incomplete coverage. The inspector reports unavailable until completion, never a false empty list. Selected-material queries read only matching identity aliases and documents.
 
-This advisory index never authorizes deletion, retention or source release.
+These advisory usage indexes never authorize deletion, retention or source release.
 
 An accepted external source cannot remain temporary. Montage, scenario and quick-edit commits promote referenced Library origins and recording mirrors in the consuming transaction. This includes retained history/recovery references and admitted ready sources. Preparing or rejecting an attachment does not promote it. Opening a standalone editor sidecar alone does not constitute an external use.
 
-Project documents and resource children own links. `media-library/dependencies.ts` derives the same identity projection for warnings, confirmed purge, automatic retention and private-source release. No cached counter or persisted reverse index authorizes deletion. Admit newly added locators against their source rows in the consuming transaction. This includes frozen scenario origins and quick-edit current, history and recovery references.
+Project documents and resource children own links. `media-library/dependencies.ts` derives the same identity projection for warnings, confirmed purge, automatic retention and private-source release. No cached counter or independent relationship table authorizes deletion. Native row indexes select source records within the destructive transaction. Admit newly added locators against their source rows in the consuming transaction. This includes frozen scenario origins and quick-edit current, history and recovery references.
+
+Physical version 48 adds `retentionReferenceKeys` to each store that can retain an asset or a media identity. Each source row stores these private keys in `__sniptaleRetentionIndexV1`. The admitted database adapter derives these keys on every native source write. It removes imported key values before derivation. The read adapter removes only that reserved field from portable documents.
+
+Versionchange populates every existing row before it publishes the new schema. Unknown reference envelopes receive explicit keys that prevent affected destructive operations. Selected-source queries use exact identity keys and include unknown evidence. Scenario locators include parent origins and child identities. Parent removal selects both. Child replacement selects only the affected children. They do not enumerate unrelated source documents or count complete stores. Explicit migration, inventory and recovery can enumerate stores. Recording recovery removal uses the native `recoveryId` index for related session headers.
+
+A native index can prove absence only with the admitted schema and complete coverage of canonical writers. The destructive owner admits source hits and immutable bindings in its own transaction. A failed migration preserves the previous schema and source rows. A failed source write cannot commit a separate index update.
+
+The workspace owner admits heads with their own history in the same transaction. A direct history write remains unknown until a head write admits its complete snapshot. An orphan history row retains its unknown marker. Valid head admission clears markers from its retained history, including rows from earlier transactions. History removal invalidates its head until the next admitted head write. The adapter preserves native request order, transaction completion and rollback.
 
 Quick-edit attachment before publication may use a matching standalone ready journal sampled under the existing lifecycle lock before the transaction.
 
@@ -282,9 +290,19 @@ Publication intent is explicit. Source writers own ready journals, expected-sour
 
 Ordinary immutable-source replacement protects external consumers.
 
+Ready claims use `ready-claims-v1` under the existing OPFS asset root. Asset aliases retain outer refs and nested shared document refs. Logical aliases select media identities, source identities and export owners. A manifest retains the union of all physical and logical claims made by its journal. Capability `3` covers both claim types and owner selection. Earlier capability values cannot prove absence. Publication removes `complete` before it writes manifests, aliases and the ready journal. Publication restores `complete` only after those writes finish.
+
+If prior coverage is unknown, explicit startup recovery must establish completeness. The first publication can establish completeness when both the ready directory and prior claim index were absent. Only `NotFoundError` establishes that absence. Candidate lookup refuses incomplete coverage without a global rebuild. The caller holds the existing lifecycle permit through admission and byte removal.
+
+Explicit preparation refuses malformed nonempty journals, manifests and identity bindings. Zero-byte handles retain the existing uncommitted-file meaning. Preparation includes orphan manifests and publishes `complete` last. An alias without a ready journal still retains its asset and logical identity. Preparation gives legacy orphan manifests an unknown logical claim. Cleanup removes the journal first and the manifest after all aliases. Failed cleanup preserves remaining aliases and the manifest for retry.
+
+Source deletion replays only selected journals. Parent deletion selects related export owners and current private sources. It refreshes the selection after replay and revalidates private identities in the deletion transaction. Missing Library rows still require media-ID admission. Mutation transition and lifecycle permits cover replay, logical removal and physical completion. Deferred, unresolved and workflow-owned journals retain their claims.
+
 Compound parent/child writes, byte ownership, sidecars, revisions and journal checkpoints commit together. A logical exception after a successful IndexedDB request must abort and drain the transaction. Physical I/O follows commit and cannot roll it back. Failed deletion retains durable intent for retry.
 
-`assets/retention-authority.ts` provides the read-only source/document ownership projection shared by physical replay and orphan audit. Before I/O, the physical owner rechecks actual/projected owners, ready document/resource claims and unresolved rollback receipts under the lifecycle lock with an explicit reusable permit. Missing refs/owners do not remove retained metadata claims. Inconsistent or invalid authority preserves bytes and intent. Known adopted objects remain.
+`assets/retention-index-projection.ts` defines ownership claims for source documents. `assets/retention-index.ts` reads claims for selected asset IDs. `assets/retention-authority.ts` enumerates claims for explicit audits.
+
+Before I/O, the physical owner rechecks actual/projected owners, ready document/resource claims and unresolved rollback receipts under the lifecycle lock with an explicit reusable permit. Missing refs/owners do not remove retained metadata claims. Inconsistent or invalid authority preserves bytes and intent. Known adopted objects remain.
 
 Pre-ready discard and quiescent writing cleanup stay in the object adapter. Post-ready cancellation uses durable intent.
 

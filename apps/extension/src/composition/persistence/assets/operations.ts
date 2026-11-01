@@ -11,7 +11,7 @@ import type { MaintenanceLogCode } from '../library-lifecycle/maintenance-log-mo
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { ASSET_OPERATIONS_STORE, initDB } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { deleteAssetObject, listReadyJournals, listWritingAssetIds } from './opfs-store';
+import { deleteAssetObject, readAssetReadyClaims, readWritingAssetIds } from './opfs-store';
 import {
   runWithDurableAssetLifecycleLock,
   runWithPersistenceMutationTransition,
@@ -26,8 +26,7 @@ import type {
   ArchiveRestoreSession,
   ArchiveRestoreStrategy,
 } from './contracts';
-import { collectDurableAssetSnapshot } from './retention-authority';
-import { readyJournalClaimsAsset } from './retention-claims';
+import { collectTargetAssetSnapshot } from './retention-index';
 export { collectBackupRollbackAssetIds, readyJournalClaimsAsset } from './retention-claims';
 import { mergeArchiveRestoreChildIdMap } from './restore-child-ids';
 import { releaseExpiredPrivateSources } from './private-source-retention';
@@ -74,7 +73,13 @@ export async function completePhysicalDeleteOperations(
   if (!operations.length) return;
   if (!(await tryAssetResourceCleanup(async () => true))) return;
   await initDB();
-  await runWithDurableAssetLifecycleLock(async () => {
+  await runWithDurableAssetLifecycleLock(async (activePermit) => {
+    const candidates = new Set(
+      operations.flatMap((operation) => [
+        ...operation.assetIds,
+        ...(operation.privateSources ?? []).map((source) => source.expectedAssetId),
+      ])
+    );
     let authority: Awaited<ReturnType<typeof readPhysicalDeleteAuthority>> | undefined;
     for (const operation of operations) {
       // Probe only: never hold the reader gate across nested retirement or metadata mutation.
@@ -83,9 +88,18 @@ export async function completePhysicalDeleteOperations(
       if (operation.privateSources?.length) {
         admitted =
           (await tryAssetResourceCleanup(async () => {
-            const snapshot = await collectDurableAssetSnapshot();
-            const journals = await listReadyJournals();
-            return releaseExpiredPrivateSources(operation, snapshot, journals);
+            const ids = (operation.privateSources ?? []).map((source) => source.expectedAssetId);
+            const snapshot = await runWithIndexedDbMutation((db) =>
+              collectTargetAssetSnapshot(db, ids)
+            );
+            const ready = await readAssetReadyClaims(ids, activePermit);
+            if (!ready.valid) return operation;
+            return releaseExpiredPrivateSources(
+              operation,
+              snapshot,
+              ready.journals,
+              ready.assetIds
+            );
           })) ?? operation;
         // Logical mutation invalidates a previous projection; a busy reader needs no graph scan.
         authority = undefined;
@@ -94,7 +108,12 @@ export async function completePhysicalDeleteOperations(
         if (!admitted.privateSources?.length) await finishPhysicalDelete(admitted, [], false);
         continue;
       }
-      authority ??= await readPhysicalDeleteAuthority();
+      for (const id of admitted.assetIds)
+        if (!candidates.has(id)) {
+          candidates.add(id);
+          authority = undefined;
+        }
+      authority ??= await readPhysicalDeleteAuthority([...candidates], undefined, activePermit);
       const currentAuthority = authority;
       const unowned = admitted.assetIds.filter((id) => currentAuthority(id) === 'unowned');
       const retained = admitted.assetIds.filter(
@@ -114,9 +133,9 @@ export async function deleteOrphanAssetObjectBatch(
   lifecyclePermit: DurableAssetLifecyclePermit
 ): Promise<void> {
   if (!candidates.length || signal.aborted) return;
-  await runWithDurableAssetLifecycleLock(async () => {
-    const authority = await readPhysicalDeleteAuthority(signal);
-    const writing = new Set(await listWritingAssetIds());
+  await runWithDurableAssetLifecycleLock(async (activePermit) => {
+    const authority = await readPhysicalDeleteAuthority(candidates, signal, activePermit);
+    const writing = new Set(await readWritingAssetIds(candidates));
     reportRetainedAssets(candidates, authority);
     if (signal.aborted) return;
     const ids = candidates.filter((id) => authority(id) === 'unowned' && !writing.has(id));
@@ -132,26 +151,33 @@ export async function deleteOrphanAssetObjectBatch(
 }
 
 /** Read the current native retention authority before a caller removes physical bytes. */
-export async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
+export async function readPhysicalDeleteAuthority(
+  assetIds: readonly string[],
+  signal?: AbortSignal,
+  lifecyclePermit?: DurableAssetLifecyclePermit
+) {
+  const candidates = new Set(assetIds);
   const snapshot = await runWithIndexedDbMutation((db) =>
     runStorageStartupPhase('asset-retention-snapshot', () =>
-      collectDurableAssetSnapshot(db, signal)
+      collectTargetAssetSnapshot(db, candidates, signal)
     )
   );
-  const journals = await runStorageStartupPhase('asset-ready-journal-list', listReadyJournals);
+  const ready = await runStorageStartupPhase('asset-ready-journal-list', () =>
+    readAssetReadyClaims(candidates, lifecyclePermit)
+  );
   const refs = new Set(snapshot.refs.map((entry) => entry.assetId));
   const owners = new Set(snapshot.owners.map((entry) => entry.assetId));
   const projected = new Set(snapshot.expectedOwners.map((entry) => entry.assetId));
   return (
     id: string
   ): 'unowned' | 'adopted' | 'invalid' | 'mismatch' | 'referenced' | 'rollback' | 'publication' => {
-    if (!snapshot.authorityValid) return 'invalid';
+    if (!candidates.has(id) || !snapshot.authorityValid || !ready.valid) return 'invalid';
     if (refs.has(id) !== owners.has(id)) return 'mismatch';
     if (owners.has(id)) return 'adopted';
     if (projected.has(id)) return 'referenced';
     if (snapshot.protectedRollbackAssetIds.has(id)) return 'rollback';
     if (snapshot.protectedSyncCaptureAssetIds.has(id)) return 'publication';
-    if (journals.some((journal) => readyJournalClaimsAsset(journal, id))) return 'publication';
+    if (ready.assetIds.has(id)) return 'publication';
     return 'unowned';
   };
 }
@@ -437,10 +463,12 @@ export async function releasePublishedOperationPins(
     runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
       signal?.throwIfAborted();
       const released = await tryAssetResourceCleanup(async () => {
-        const snapshot = await collectDurableAssetSnapshot(db);
-        const journals = await listReadyJournals();
-        const writing = new Set(await listWritingAssetIds());
-        if (!snapshot.authorityValid) throw new Error('Invalid asset retention authority.');
+        const ids = selected.map((object) => object.ref.assetId);
+        const snapshot = await collectTargetAssetSnapshot(db, ids, signal);
+        const ready = await readAssetReadyClaims(ids, lifecyclePermit);
+        const writing = new Set(await readWritingAssetIds(ids));
+        if (!snapshot.authorityValid || !ready.valid)
+          throw new Error('Invalid asset retention authority.');
         const eligible = selected.filter(
           ({ ref }) =>
             !snapshot.refs.some((entry) => entry.assetId === ref.assetId) &&
@@ -448,7 +476,7 @@ export async function releasePublishedOperationPins(
             !snapshot.expectedOwners.some((entry) => entry.assetId === ref.assetId) &&
             !snapshot.protectedRollbackAssetIds.has(ref.assetId) &&
             !writing.has(ref.assetId) &&
-            !journals.some((journal) => readyJournalClaimsAsset(journal, ref.assetId))
+            !ready.assetIds.has(ref.assetId)
         );
         if (!eligible.length) return { released: [], intent: null };
         const assetIds = [...new Set(eligible.map((object) => object.ref.assetId))];

@@ -14,7 +14,6 @@ import {
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
-import { recoverMediaSourcePublications } from './delete-cascade.recovery';
 import {
   initDB,
   ASSET_REFS_STORE,
@@ -35,7 +34,11 @@ import type { MediaAssetProjectUsage } from './usage';
 import { deleteMediaAssetWithProjectCascade } from './delete-cascade';
 import { mediaHasPendingPublication } from './delete-cascade.sources';
 import { MediaAssetDeletionBlockedError } from './deletion-errors';
-import { listReadyJournals } from '../assets';
+import { readAssetReadyPublicationClaims } from '../assets/opfs-store';
+import {
+  runWithDurableAssetLifecycleLock,
+  runWithPersistenceMutationTransition,
+} from '../infrastructure/mutation-barrier';
 
 export { syncLegacyMediaLibrary } from './index.legacy-sync.ts';
 
@@ -206,42 +209,27 @@ export async function deleteMediaLibraryAsset(
   assetId: string,
   options: { expectedUsage?: readonly MediaAssetProjectUsage[] } = {}
 ): Promise<void> {
-  const readyJournals = await listReadyJournals();
-  const pendingWorkspacePublication = readyJournals.some((journal) =>
-    mediaHasPendingPublication(journal, { id: assetId })
-  );
-  if (pendingWorkspacePublication) {
-    throw new MediaLibraryDeleteError(
-      assetId,
-      'linked-source-cleanup',
-      new MediaAssetDeletionBlockedError('pending-publication')
-    );
-  }
   const db = await initDB();
-  const entry = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
-
-  if (!entry) {
-    return;
-  }
-
-  if (readyJournals.some((journal) => mediaHasPendingPublication(journal, entry)))
-    throw new MediaLibraryDeleteError(
-      assetId,
-      'linked-source-cleanup',
-      new MediaAssetDeletionBlockedError('pending-publication')
-    );
-
-  const consumers = await listMediaAssetProjectUsage(assetId);
-  if (consumers.length > 0 && !options.expectedUsage) {
-    throw new MediaLibraryDeleteError(
-      assetId,
-      'linked-source-cleanup',
-      new Error('The media asset is still used by projects.')
-    );
-  }
   try {
-    await recoverMediaSourcePublications(entry);
-    await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? []);
+    await runWithPersistenceMutationTransition(() =>
+      runWithDurableAssetLifecycleLock(async (permit) => {
+        const entry = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
+        // Missing roots still have pending image/sync media-ID claims that can publish later.
+        const target = entry ?? { id: assetId };
+        const claims = await readAssetReadyPublicationClaims(target, permit);
+        if (
+          !claims.valid ||
+          claims.pending ||
+          claims.journals.some((journal) => mediaHasPendingPublication(journal, target))
+        )
+          throw new MediaAssetDeletionBlockedError('pending-publication');
+        if (!entry) return;
+        const consumers = await listMediaAssetProjectUsage(assetId);
+        if (consumers.length > 0 && !options.expectedUsage)
+          throw new Error('The media asset is still used by projects.');
+        await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? [], permit);
+      })
+    );
   } catch (error) {
     throw new MediaLibraryDeleteError(assetId, 'linked-source-cleanup', error);
   }

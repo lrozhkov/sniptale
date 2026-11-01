@@ -1,15 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
+  resetProjectsDbMocks,
+  projectFacadeAssetOverrides,
+  projectFacadeEntryMapping,
+  createAnnotationPublicationJournal,
+  createAnnotationResourceInput,
+  createAnnotationResourceClaim,
   createProjectAssetEntry,
   createProjectExportEntry,
   createVideoProject,
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
 } from './index.test-support.ts';
-import type { ProjectAssetEntry, ProjectExportEntry } from './contracts';
 const projectsDbMocks = vi.hoisted(() => ({
   deleteUnreferenced: vi.fn(),
+  selectedRecovery: vi.fn(),
+  readyClaims: vi.fn(),
   assertAssetWriteAdmissionMock: vi.fn(),
   buildProjectAssetMediaEntryMock: vi.fn(),
   buildProjectExportMediaEntryMock: vi.fn(),
@@ -39,9 +46,15 @@ const projectsDbMocks = vi.hoisted(() => ({
   releaseReadyMock: vi.fn(),
 }));
 
+vi.mock('../assets/recovery', async (original) => ({
+  ...(await original<typeof import('../assets/recovery')>()),
+  recoverSelectedAssetPublications: projectsDbMocks.selectedRecovery,
+}));
+
 vi.mock('../assets/opfs-store', async (original) => ({
   ...(await original<typeof import('../assets/opfs-store')>()),
   releaseAssetPublicationTransitions: projectsDbMocks.releaseTransitionsMock,
+  readAssetReadyPublicationClaims: projectsDbMocks.readyClaims,
 }));
 
 vi.mock('../media-library/delete-cascade', () => ({
@@ -50,15 +63,7 @@ vi.mock('../media-library/delete-cascade', () => ({
 
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal()),
-  assertAssetWriteAdmission: projectsDbMocks.assertAssetWriteAdmissionMock,
-  createAssetPublicationJournal: projectsDbMocks.createAssetPublicationJournalMock,
-  completePhysicalDeleteOperation: projectsDbMocks.completePhysicalDeleteOperationMock,
-  publishReadyJournalWithRetry: projectsDbMocks.publishReadyJournalWithRetryMock,
-  readAssetFile: projectsDbMocks.readAssetFileMock,
-  releaseAssetReadyProtection: projectsDbMocks.releaseReadyMock,
-  listReadyJournals: projectsDbMocks.readyJournalsMock,
-  cancelAssetPublication: projectsDbMocks.cancelPublicationMock,
-  writeBlobToAsset: projectsDbMocks.writeBlobToAssetMock,
+  ...projectFacadeAssetOverrides(projectsDbMocks),
 }));
 
 vi.mock('./asset-publication', async (importOriginal) => ({
@@ -68,21 +73,12 @@ vi.mock('./asset-publication', async (importOriginal) => ({
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal()),
-  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
-  MEDIA_LIBRARY_STORE: 'media_library',
-  PROJECT_ASSETS_STORE: 'project_assets',
-  PROJECT_EXPORTS_STORE: 'project_exports',
-  VIDEO_PROJECTS_STORE: 'video_projects',
   initDB: projectsDbMocks.initDBMock,
 }));
 
 vi.mock('../media-library/entry-mapping', async (importOriginal) => ({
   ...(await importOriginal()),
-  buildProjectAssetMediaEntry: projectsDbMocks.buildProjectAssetMediaEntryMock,
-  buildProjectExportMediaEntry: projectsDbMocks.buildProjectExportMediaEntryMock,
-  buildRecordingMediaEntry: projectsDbMocks.buildRecordingMediaEntryMock,
-  createProjectAssetMediaId: projectsDbMocks.createProjectAssetMediaIdMock,
-  createRecordingMediaId: projectsDbMocks.createRecordingMediaIdMock,
+  ...projectFacadeEntryMapping(projectsDbMocks),
 }));
 
 vi.mock('../recordings/index', async (importOriginal) => ({
@@ -94,101 +90,6 @@ vi.mock('../../../features/media-hub/events', async (importOriginal) => ({
   ...(await importOriginal()),
   publishMediaHubLibraryChanged: projectsDbMocks.publishMediaHubLibraryChangedMock,
 }));
-
-function createDb() {
-  return {
-    get: projectsDbMocks.dbGetMock,
-    getAll: projectsDbMocks.dbGetAllMock,
-    getAllFromIndex: projectsDbMocks.dbGetAllFromIndexMock,
-    put: projectsDbMocks.dbPutMock,
-    transaction: vi.fn(() => ({
-      done: Promise.resolve(),
-      objectStore: vi.fn((name: string) =>
-        name === 'sync_capture' || name === 'video_project_revisions'
-          ? { get: async () => undefined, put: async () => undefined }
-          : {
-              delete: projectsDbMocks.txDeleteMock,
-              get: projectsDbMocks.txGetMock,
-              getAll: projectsDbMocks.txGetAllMock,
-              index: vi.fn(() => ({
-                count: vi.fn().mockResolvedValue(0),
-                getAll: async () => [],
-                getAllKeys: async () => [],
-              })),
-              put: projectsDbMocks.txPutMock,
-            }
-      ),
-    })),
-  };
-}
-
-function resetProjectsDbMocks() {
-  vi.clearAllMocks();
-  projectsDbMocks.dbGetMock.mockReset();
-  projectsDbMocks.initDBMock.mockResolvedValue(createDb());
-  projectsDbMocks.assertAssetWriteAdmissionMock.mockResolvedValue(undefined);
-  projectsDbMocks.releaseTransitionsMock.mockReset().mockResolvedValue(undefined);
-  projectsDbMocks.readyJournalsMock.mockReset().mockResolvedValue([]);
-  projectsDbMocks.cancelPublicationMock.mockReset().mockResolvedValue(undefined);
-  projectsDbMocks.releaseReadyMock.mockReset().mockResolvedValue(undefined);
-  projectsDbMocks.recoverProjectMediaPublicationsMock.mockResolvedValue(undefined);
-  projectsDbMocks.writeBlobToAssetMock.mockImplementation(async (blob: Blob) => ({
-    ref: {
-      assetId: 'asset-object-1',
-      createdAt: 1,
-      location: { kind: 'opfs', objectKey: 'objects/asset-object-1' },
-      mimeType: blob.type || 'application/octet-stream',
-      sha256: null,
-      size: blob.size,
-    },
-  }));
-  projectsDbMocks.createAssetPublicationJournalMock.mockResolvedValue({ journalId: 'journal-1' });
-  projectsDbMocks.completePhysicalDeleteOperationMock.mockResolvedValue(undefined);
-  projectsDbMocks.publishReadyJournalWithRetryMock.mockResolvedValue(undefined);
-  projectsDbMocks.readAssetFileMock.mockResolvedValue(
-    new File(['asset'], 'asset.bin', { type: 'application/octet-stream' })
-  );
-  projectsDbMocks.buildProjectAssetMediaEntryMock.mockImplementation(
-    (entry: ProjectAssetEntry) => ({
-      ...createMediaLibraryEntry(),
-      id: `project-asset:${entry.id}`,
-      mimeType: entry.mimeType,
-    })
-  );
-  projectsDbMocks.buildProjectExportMediaEntryMock.mockImplementation(
-    (entry: ProjectExportEntry) => ({
-      ...createMediaLibraryEntry({
-        filename: entry.filename,
-        id: `export:${entry.id}`,
-        kind: 'export',
-        mimeType: entry.mimeType ?? 'video/webm',
-        originalFilename: entry.filename,
-        size: entry.size,
-        source: {
-          kind: 'project-export',
-          exportId: entry.id,
-          projectId: entry.projectId,
-        },
-      }),
-    })
-  );
-  projectsDbMocks.buildRecordingMediaEntryMock.mockImplementation((entry) =>
-    createMediaLibraryEntry({
-      filename: entry.filename,
-      id: `recording:${entry.id}`,
-      kind: 'recording',
-      originalFilename: entry.filename,
-      size: entry.size,
-      source: { kind: 'recording', recordingId: entry.id },
-    })
-  );
-  projectsDbMocks.createProjectAssetMediaIdMock.mockImplementation(
-    (id: string) => `project-asset:${id}`
-  );
-  projectsDbMocks.createRecordingMediaIdMock.mockImplementation((id: string) => `recording:${id}`);
-  projectsDbMocks.getRecordingMock.mockResolvedValue(undefined);
-  projectsDbMocks.txGetAllMock.mockResolvedValue([]);
-}
 
 async function importProjectsDbModule() {
   vi.resetModules();
@@ -253,7 +154,7 @@ async function verifyProjectReadListAndDelete() {
 }
 
 describe('projects-db video project flows', () => {
-  beforeEach(resetProjectsDbMocks);
+  beforeEach(() => resetProjectsDbMocks(projectsDbMocks));
 
   it(
     'saves projects with preserved createdAt and refreshed updatedAt',
@@ -408,7 +309,7 @@ describe('projects-db video project flows', () => {
 });
 
 describe('projects-db asset save and read flows', () => {
-  beforeEach(resetProjectsDbMocks);
+  beforeEach(() => resetProjectsDbMocks(projectsDbMocks));
 
   it.each(['audio-mime', 'public', 'empty-review', 'clip-claim'] as const)(
     'rejects an invalid private resource before staging bytes: %s',
@@ -569,7 +470,7 @@ describe('projects-db asset save and read flows', () => {
 });
 
 describe('projects-db asset listing flows', () => {
-  beforeEach(resetProjectsDbMocks);
+  beforeEach(() => resetProjectsDbMocks(projectsDbMocks));
 
   it('lists and deletes project assets using media-library filenames when available', async () => {
     const { deleteProjectAsset, listProjectAssets } = await importProjectsDbModule();
@@ -614,7 +515,7 @@ describe('projects-db asset listing flows', () => {
 
   it('does not delete a project asset while a retained publication journal cannot replay', async () => {
     const { deleteProjectAsset } = await importProjectsDbModule();
-    projectsDbMocks.recoverProjectMediaPublicationsMock.mockRejectedValueOnce(
+    projectsDbMocks.selectedRecovery.mockRejectedValueOnce(
       new Error('ready journal replay failed')
     );
 
@@ -625,7 +526,7 @@ describe('projects-db asset listing flows', () => {
 });
 
 describe('projects-db export flows', () => {
-  beforeEach(resetProjectsDbMocks);
+  beforeEach(() => resetProjectsDbMocks(projectsDbMocks));
 
   it('saves, reads, lists and deletes direct project export assets', async () => {
     const {
@@ -676,16 +577,19 @@ describe('projects-db export flows', () => {
     projectsDbMocks.dbGetMock.mockResolvedValueOnce(exportEntry);
     await deleteProjectExport('export-1');
 
-    expect(projectsDbMocks.deleteUnreferenced).toHaveBeenCalledWith({
-      id: 'export:export-1',
-      source: { kind: 'project-export', exportId: 'export-1', projectId: exportEntry.projectId },
-    });
+    expect(projectsDbMocks.deleteUnreferenced).toHaveBeenCalledWith(
+      {
+        id: 'export:export-1',
+        source: { kind: 'project-export', exportId: 'export-1', projectId: exportEntry.projectId },
+      },
+      { transitionPermit: expect.any(Object), lifecyclePermit: expect.any(Object) }
+    );
     expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('recording:recording-1');
   });
 });
 
 describe('prepared scene resources', () => {
-  beforeEach(resetProjectsDbMocks);
+  beforeEach(() => resetProjectsDbMocks(projectsDbMocks));
   it('protects exact video slot claims and refuses Library binding through the upload writer', async () => {
     const { prepareProjectAsset } = await importProjectsDbModule();
     const claim = {
@@ -731,26 +635,12 @@ describe('prepared scene resources', () => {
 });
 
 describe('prepared annotation resources', () => {
-  beforeEach(resetProjectsDbMocks);
-  const claim = {
-    aggregateId: 'review',
-    sourceAssetId: 'source',
-    snapshotId: `effect:${'a'.repeat(64)}`,
-    resourceId: 'mark',
-    sha256: 'b'.repeat(64),
-  };
+  beforeEach(() => resetProjectsDbMocks(projectsDbMocks));
+  const claim = createAnnotationResourceClaim();
 
   it('reads its retained private physical ref without publishing and rejects reads outside that lease', async () => {
     const { prepareProjectAsset } = await importProjectsDbModule();
-    const prepared = await prepareProjectAsset(
-      new Blob(['image'], { type: 'image/png' }),
-      'image/png',
-      'mark.png',
-      'mark',
-      1,
-      undefined,
-      { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
-    );
+    const prepared = await prepareProjectAsset(...createAnnotationResourceInput(claim));
     const signal = new AbortController().signal;
     await expect(prepared.readForSession!(signal)).rejects.toThrow('retention is unavailable');
     expect(projectsDbMocks.readAssetFileMock).not.toHaveBeenCalled();
@@ -769,15 +659,7 @@ describe('prepared annotation resources', () => {
     'cannot return stale private bytes after %s during a physical read',
     async (outcome) => {
       const { prepareProjectAsset } = await importProjectsDbModule();
-      const prepared = await prepareProjectAsset(
-        new Blob(['image'], { type: 'image/png' }),
-        'image/png',
-        'mark.png',
-        'mark',
-        1,
-        undefined,
-        { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
-      );
+      const prepared = await prepareProjectAsset(...createAnnotationResourceInput(claim));
       const release = await prepared.retainForSession();
       const controller = new AbortController();
       projectsDbMocks.readAssetFileMock.mockImplementationOnce(async () => {
@@ -801,35 +683,9 @@ describe('prepared annotation resources', () => {
     'terminal cancellation does not recreate an erased journal, retained=%s',
     async (retained) => {
       const { prepareProjectAsset } = await importProjectsDbModule();
-      const prepared = await prepareProjectAsset(
-        new Blob(['image'], { type: 'image/png' }),
-        'image/png',
-        'mark.png',
-        'mark',
-        1,
-        undefined,
-        { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
-      );
+      const prepared = await prepareProjectAsset(...createAnnotationResourceInput(claim));
       const release = await prepared.retainForSession();
-      const journal = {
-        journalId: 'journal-1',
-        domain: 'project-assets',
-        createdAt: 1,
-        assetRefs: [prepared.ref],
-        payload: {
-          entry: {
-            id: 'mark',
-            assetId: prepared.ref.assetId,
-            mimeType: 'image/png',
-            size: prepared.ref.size,
-            createdAt: 1,
-          },
-          filename: 'mark.png',
-          expectedAssetId: null,
-          publishToLibrary: false,
-          requiredReviewAnnotationEffect: claim,
-        },
-      };
+      const journal = createAnnotationPublicationJournal(prepared.ref, claim);
       projectsDbMocks.readyJournalsMock.mockResolvedValue(retained ? [journal] : []);
       try {
         await prepared.cancel();
@@ -856,15 +712,7 @@ describe('prepared annotation resources', () => {
   it('protects before releasing the global gate and defers recovery until session release', async () => {
     const { prepareProjectAsset } = await importProjectsDbModule();
     const { tryVoiceoverAttachmentLock } = await import('./voiceover-publication-lock');
-    const prepared = await prepareProjectAsset(
-      new Blob(['image'], { type: 'image/png' }),
-      'image/png',
-      'mark.png',
-      'mark',
-      1,
-      undefined,
-      { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
-    );
+    const prepared = await prepareProjectAsset(...createAnnotationResourceInput(claim));
     const release = await prepared.retainForSession();
     try {
       expect(projectsDbMocks.createAssetPublicationJournalMock).toHaveBeenCalledWith(
@@ -900,15 +748,7 @@ describe('prepared annotation resources', () => {
   it('releases an acquired attachment lease after failed protection and permits explicit retry', async () => {
     const { prepareProjectAsset } = await importProjectsDbModule();
     const { tryVoiceoverAttachmentLock } = await import('./voiceover-publication-lock');
-    const prepared = await prepareProjectAsset(
-      new Blob(['image'], { type: 'image/png' }),
-      'image/png',
-      'mark.png',
-      'mark',
-      1,
-      undefined,
-      { publishToLibrary: false, requiredReviewAnnotationEffect: claim }
-    );
+    const prepared = await prepareProjectAsset(...createAnnotationResourceInput(claim));
     projectsDbMocks.createAssetPublicationJournalMock.mockRejectedValueOnce(
       new Error('journal failed')
     );

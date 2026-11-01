@@ -1,3 +1,4 @@
+import { prepareAssetReadyClaimIndex } from '../assets/opfs-store';
 import { syncReplicaPublicationAdapter } from '../sync-capture/replica-publication';
 import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
@@ -541,13 +542,16 @@ async function recoverPublications(
     runWithDurableAssetOperationRecovery(permit, async () => {
       await runStorageStartupPhase('asset-writing-cleanup', () =>
         runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
-          // Publication holds this same lifecycle lock, so one lazy snapshot covers this cleanup batch.
-          let authority: ReturnType<typeof readPhysicalDeleteAuthority> | undefined;
+          await prepareAssetReadyClaimIndex(lifecyclePermit);
           return collectQuiescentWritingObjects(
             {},
             async (assetId) => {
-              authority ??= readPhysicalDeleteAuthority();
-              return (await authority)(assetId) !== 'unowned';
+              const authority = await readPhysicalDeleteAuthority(
+                [assetId],
+                undefined,
+                lifecyclePermit
+              );
+              return authority(assetId) !== 'unowned';
             },
             lifecyclePermit
           );

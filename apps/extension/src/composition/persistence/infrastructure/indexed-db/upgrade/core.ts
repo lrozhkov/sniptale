@@ -1,4 +1,9 @@
 import {
+  REFERENCE_INDEX_STORES,
+  ROW_REFERENCE_INDEX,
+  ROW_REFERENCE_FIELD,
+} from '../row-index-contract';
+import {
   VOICE_INPUT_HISTORY_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
@@ -57,6 +62,8 @@ function createStore(
   indexes: readonly string[] = []
 ): void {
   const store = db.createObjectStore(name, { keyPath });
+  if (REFERENCE_INDEX_STORES.some((indexed) => indexed === name))
+    store.createIndex(ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true });
   for (const index of indexes) {
     if (index === 'usageReferenceKeys') store.createIndex(index, index, { multiEntry: true });
     else store.createIndex(index, index);
@@ -116,7 +123,7 @@ function assertSynchronousMigrationStep(result: unknown, step: 'migrate' | 'vali
 function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, STORE_NAME, 'id', ['createdAt']);
   createStore(db, RECORDING_TELEMETRY_STORE, 'recordingId', ['updatedAt']);
-  createStore(db, RECORDING_RECOVERY_SESSIONS_STORE, 'id', ['createdAt']);
+  createStore(db, RECORDING_RECOVERY_SESSIONS_STORE, 'id', ['createdAt', 'recoveryId']);
   createStore(db, RECORDING_RECOVERY_BLOCKS_STORE, ['id', 'index'], ['id']);
   createStore(db, DIAGNOSTICS_META_STORE, 'recordingId');
   createStore(db, DIAGNOSTICS_EVENTS_STORE, ['recordingId', 'chunkIndex'], ['recordingId']);

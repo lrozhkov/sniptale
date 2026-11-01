@@ -1,6 +1,7 @@
-import { createRetentionDatabaseFixture } from './retention-authority.test-support';
-import { EXPECTED_STORES } from '../infrastructure/indexed-db/core';
-import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
+import {
+  createTargetAssetDatabaseFixture,
+  createPublicationReleaseFixture,
+} from './retention-authority.test-support';
 import type { PublishedCaptureOperation } from '../sync-capture/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   initDB: vi.fn(),
   runMutation: vi.fn(),
   journals: vi.fn(),
+  ready: vi.fn(),
   writing: vi.fn(),
   log: vi.fn(),
 }));
@@ -33,8 +35,11 @@ vi.mock('./opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./opfs-store')>()),
   deleteAssetObject: mocks.deleteObject,
   listReadyJournals: mocks.journals,
-  listWritingAssetIds: mocks.writing,
+  readWritingAssetIds: mocks.writing,
+  readAssetReadyClaims: mocks.ready,
 }));
+
+import { readyJournalClaimsAsset } from './retention-claims';
 
 import {
   releasePublishedOperationPins,
@@ -75,6 +80,16 @@ beforeEach(() => {
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
+  mocks.ready.mockImplementation(async (ids: Iterable<string>) => {
+    const journals: import('./contracts').AssetReadyJournal[] = await mocks.journals();
+    return {
+      valid: true,
+      journals,
+      assetIds: new Set(
+        [...ids].filter((id) => journals.some((journal) => readyJournalClaimsAsset(journal, id)))
+      ),
+    };
+  });
 });
 
 afterEach(() => {
@@ -84,20 +99,23 @@ afterEach(() => {
 
 function installMutationHarness(current: unknown = operation) {
   const put = vi.fn().mockResolvedValue(undefined);
+  const sourceRows = vi.fn(async (_store: string): Promise<unknown[]> => []);
   const store = { get: vi.fn().mockResolvedValue(current), put };
   const db = {
     get: vi.fn(async (): Promise<unknown> => undefined),
-    getAll: vi.fn(async (_store: string): Promise<unknown[]> => []),
+    getAll: vi.fn(async (_store: string): Promise<unknown[]> => {
+      throw new Error('Global physical retention scan forbidden');
+    }),
     add: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     transaction: vi.fn((names: string[], mode: string) =>
       mode === 'readonly'
-        ? createRetentionDatabaseFixture(db.getAll).transaction(names)
+        ? createTargetAssetDatabaseFixture(sourceRows).transaction(names, 'readonly')
         : { done: Promise.resolve(), objectStore: () => store }
     ),
   };
   mocks.runMutation.mockImplementation(async (callback) => callback(db));
-  return { db, put, store };
+  return { db, put, store, sourceRows };
 }
 
 describe('durable asset operations', () => {
@@ -130,7 +148,7 @@ describe('durable asset operations', () => {
           size: 3,
           sha256: null,
         };
-        harness.db.getAll.mockImplementation(async (store: string) =>
+        harness.sourceRows.mockImplementation(async (store: string) =>
           store === 'asset_refs'
             ? [ref]
             : store === 'asset_owners'
@@ -342,7 +360,7 @@ it.each(['obsolete', 'receipt'] as const)(
             ]
           : [],
     };
-    harness.db.getAll.mockImplementation(async (store) =>
+    harness.sourceRows.mockImplementation(async (store) =>
       store === 'asset_operations' ? [backup] : []
     );
     const intent = buildPhysicalDeleteOperation(['rollback-byte']);
@@ -354,7 +372,7 @@ it.each(['obsolete', 'receipt'] as const)(
 
 it('defers physical deletion when durable operation authority is invalid', async () => {
   const harness = installMutationHarness();
-  harness.db.getAll.mockImplementation(async (store) =>
+  harness.sourceRows.mockImplementation(async (store) =>
     store === 'asset_operations'
       ? [{ kind: 'backup-restore', obsoleteAssetIds: ['rollback-byte'] }]
       : []
@@ -370,7 +388,7 @@ it.each(['recording', 'invalid-source'] as const)(
   async (kind) => {
     const harness = installMutationHarness();
     const intent = buildPhysicalDeleteOperation(['shared']);
-    harness.db.getAll.mockImplementation(async (store: string) =>
+    harness.sourceRows.mockImplementation(async (store: string) =>
       store === 'recordings'
         ? [
             kind === 'recording'
@@ -397,7 +415,7 @@ it('reads retention once for an entire physical-delete operation', async () => {
   await completePhysicalDeleteOperation(
     buildPhysicalDeleteOperation(Array.from({ length: 32 }, (_, i) => `asset-${i}`))
   );
-  expect(db.getAll).toHaveBeenCalledTimes(13);
+  expect(db.getAll).not.toHaveBeenCalled();
   expect(mocks.deleteObject).toHaveBeenCalledTimes(32);
 });
 
@@ -417,7 +435,7 @@ it('retains the failing and unprocessed intents after a partial replay batch', a
   expect(mocks.log).toHaveBeenCalledWith(
     expect.objectContaining({ code: 'deleted', counts: { deleted: 1 } })
   );
-  expect(db.getAll).toHaveBeenCalledTimes(13);
+  expect(db.getAll).not.toHaveBeenCalled();
   expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-a']]);
   expect(mocks.deleteObject.mock.calls).toEqual([['a'], ['b']]);
 });
@@ -473,8 +491,8 @@ it('retains physical-delete intent without scanning while an editor is open, the
 });
 
 it('keeps projected targets pending while completing unrelated intents in the same batch', async () => {
-  const { db } = installMutationHarness();
-  db.getAll.mockImplementation(async (store: string) =>
+  const { db, sourceRows } = installMutationHarness();
+  sourceRows.mockImplementation(async (store: string) =>
     store === 'recordings'
       ? [
           {
@@ -494,7 +512,7 @@ it('keeps projected targets pending while completing unrelated intents in the sa
       operationId: `delete-${id}`,
     }))
   );
-  expect(db.getAll).toHaveBeenCalledTimes(13);
+  expect(db.getAll).not.toHaveBeenCalled();
   expect(mocks.deleteObject.mock.calls).toEqual([['unowned']]);
   expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-unowned']]);
   expect(mocks.log).toHaveBeenCalledWith(
@@ -525,109 +543,10 @@ it.each(['complete', 'writing', 'cancel-before', 'cancel-after-intent'] as const
 );
 
 function publicationReleaseFixture() {
-  let refuseIntent = false;
-  const fixture = createReviewWorkspaceStoreFixture(
-    (name) => refuseIntent && name === 'asset_operations'
-  );
-  for (const name of EXPECTED_STORES)
-    if (!fixture.rows.has(name)) fixture.rows.set(name, new Map());
-  const table = (name: string) => fixture.rows.get(name)!;
-  const ref = {
-    assetId: 'published-file',
-    createdAt: 1,
-    location: { kind: 'opfs' as const, objectKey: 'objects/published-file' },
-    mimeType: 'image/png',
-    sha256: 'a'.repeat(64),
-    size: 3,
-  };
-  const publication: PublishedCaptureOperation = {
-    version: 1,
-    kind: 'sync-operation',
-    phase: 'published',
-    key: '["change","operation"]',
-    createdAt: 1,
-    spaceId: 'space',
-    connectionGeneration: 3,
-    profileCreatedAt: 1,
-    rootKind: 'media',
-    rootId: 'old',
-    rootKey: JSON.stringify(['space', 'media', 'old']),
-    generation: 1,
-    operationId: 'operation',
-    basis: [],
-    origin: 'local-edit',
-    publicationId: null,
-    sourceSha256: 'b'.repeat(64),
-    source: { changeKind: 'media', label: 'old.png' },
-    publication: {
-      kind: 'verified',
-      acceptedAt: 2,
-      preparedSha256: 'c'.repeat(64),
-      attemptId: '11111111-1111-4111-8111-111111111111',
-      recordKey: 'records/manifest.json',
-      recordSha256: 'd'.repeat(64),
-    },
-    objects: [
-      {
-        objectId: 'body',
-        ref,
-        filename: 'old.png',
-        sha256: 'a'.repeat(64),
-        remoteKey: 'Files/published/old.png',
-        pinned: true,
-      },
-    ],
-  };
-  const authorization = { incarnation: '22222222-2222-4222-8222-222222222222', revision: 1 };
-  table('sync_capture').set('profile', {
-    version: 1,
-    kind: 'profile',
-    key: 'profile',
-    createdAt: 1,
-    enabled: true,
-    spaceId: 'space',
-    connectionGeneration: 3,
-  });
-  table('sync_capture').set(publication.key, publication);
-  table('sync_connection').set('connection', {
-    version: 1,
-    kind: 'sync-connection',
-    key: 'connection',
-    binding: {
-      spaceId: 'space',
-      connectionGeneration: 3,
-      profileCreatedAt: 1,
-      provider: 'webdav',
-      rootUrl: 'https://dav.example.test/root/',
-      accountId: 'user',
-    },
-    identity: authorization,
-    phase: 'active',
-    updateNonce: null,
-    credentialId: '33333333-3333-4333-8333-333333333333',
-  });
-  let intentNumber = 0;
-  vi.mocked(crypto.randomUUID).mockImplementation(
-    () => `00000000-0000-4000-8000-${String(++intentNumber).padStart(12, '0')}`
-  );
-  const database = {
-    ...fixture.database,
-    delete: async (name: string, key: string) => {
-      table(name).delete(key);
-    },
-  };
-  mocks.initDB.mockResolvedValue(database);
-  mocks.runMutation.mockImplementation(async (callback) => callback(database));
-  return {
-    ...fixture,
-    table,
-    publication,
-    authorization,
-    ref,
-    refuseIntent(value: boolean) {
-      refuseIntent = value;
-    },
-  };
+  const fixture = createPublicationReleaseFixture();
+  mocks.initDB.mockResolvedValue(fixture.database);
+  mocks.runMutation.mockImplementation(async (callback) => callback(fixture.database));
+  return fixture;
 }
 
 it('verifies remote bytes before ownerless pin retirement and canonical deletion', async () => {
@@ -796,4 +715,13 @@ it('keeps privacy erasure outside published pin retirement until physical cleanu
   await erasure;
   expect(f.table('sync_capture').size).toBe(0);
   expect(isPersistenceMutationTransitionHeld()).toBe(false);
+});
+
+it('keeps bytes and intent while the ready claim index is incomplete', async () => {
+  const harness = installMutationHarness();
+  mocks.ready.mockResolvedValueOnce({ valid: false, assetIds: new Set(), journals: [] });
+  await completePhysicalDeleteOperation(buildPhysicalDeleteOperation(['uncertain']));
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+  expect(harness.db.delete).not.toHaveBeenCalled();
+  expect(harness.db.getAll).not.toHaveBeenCalled();
 });

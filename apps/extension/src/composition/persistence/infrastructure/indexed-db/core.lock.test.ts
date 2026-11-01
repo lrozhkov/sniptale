@@ -37,7 +37,10 @@ it('does not accept a forged mutation permit as an initialization bypass', async
 
   releaseErasure();
   await erasure;
-  await expect(initialization).resolves.toBe(database);
+  const prepared = await initialization;
+  expect(module.capturePreparedDatabase()).toBe(prepared);
+  expect(await module.initDB()).toBe(prepared);
+  expect(openDB).toHaveBeenCalledOnce();
 });
 
 it('rejects cold admission under a staged lease and admits after it is released', async () => {

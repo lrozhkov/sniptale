@@ -251,8 +251,10 @@ it('fails closed for malformed persisted video project rows', async () => {
     expect.objectContaining({ id: 'nested-project', unavailableReason: 'invalid' }),
   ]);
 
-  await deleteVideoProject('project-1');
-  expect(mocks.txDelete).toHaveBeenCalledWith('project-1');
+  await expect(deleteVideoProject('project-1')).rejects.toMatchObject({
+    reason: 'source-unavailable',
+  });
+  expect(mocks.txDelete).not.toHaveBeenCalled();
   expect(mocks.txDelete).not.toHaveBeenCalledWith('project-asset:asset-1');
 });
 

@@ -167,7 +167,7 @@ it('keeps shared bytes and the other exact owner after releasing a private repre
   expect(rows.get('asset_refs')!.get('bytes')).toEqual(ref);
 });
 
-it('does not delete a replacement binding or schedule its unrelated bytes', async () => {
+it('retains a recreated source binding after an earlier retirement intent', async () => {
   rows.get('project_assets')!.set('private', { ...source, assetId: 'replacement' });
   expect(await retire()).toMatchObject({ assetIds: [], privateSources: [] });
   expect(rows.get('project_assets')!.get('private')).toMatchObject({ assetId: 'replacement' });
