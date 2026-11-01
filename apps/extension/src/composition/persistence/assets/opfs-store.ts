@@ -20,6 +20,7 @@ export const LEGACY_RECORDING_STAGING_DIRECTORY_NAME = 'sniptale-recording-stagi
 const OBJECTS_DIRECTORY_NAME = 'objects';
 const WRITING_DIRECTORY_NAME = 'writing';
 const READY_DIRECTORY_NAME = 'ready';
+const ROOT_ABSENCE_PROBE_ENTRY_LIMIT = 64;
 
 export interface AssetOpfsOptions {
   createId?: () => string;
@@ -147,12 +148,29 @@ async function removeIfPresent(
   }
 }
 
+async function confirmsAbsentAssetRoot(origin: FileSystemDirectoryHandle): Promise<boolean> {
+  let count = 0;
+  try {
+    for await (const [name] of origin.entries()) {
+      if (name === ASSET_ROOT_DIRECTORY_NAME || ++count >= ROOT_ABSENCE_PROBE_ENTRY_LIMIT)
+        return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function getAssetRoot(options: AssetOpfsOptions, create: boolean) {
   const origin = await (options.getOriginRoot ?? defaultGetOriginRoot)();
   try {
     return await origin.getDirectoryHandle(ASSET_ROOT_DIRECTORY_NAME, { create });
   } catch (error) {
     if (!create && readErrorName(error) === 'NotFoundError') return null;
+    // Edge workers can report AbortError for a missing directory. Only a complete
+    // bounded name scan can establish absence; existing entries and IO errors still fail.
+    if (!create && readErrorName(error) === 'AbortError' && (await confirmsAbsentAssetRoot(origin)))
+      return null;
     throw error;
   }
 }
