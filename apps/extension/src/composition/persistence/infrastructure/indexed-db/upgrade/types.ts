@@ -12,6 +12,7 @@ type UpgradeObjectStore = {
 };
 
 export type UpgradeTransaction = {
+  readonly done?: Promise<unknown>;
   abort(): void;
   objectStore(name: string): UpgradeObjectStore;
 };

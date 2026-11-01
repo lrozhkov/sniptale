@@ -79,6 +79,9 @@ export function executeDatabaseUpgrade(
   transaction: UpgradeTransaction,
   migrations: readonly DatabaseMigrationDescriptor[]
 ): void {
+  // The open request reports upgrade failure.
+  // Observe its transaction and requests to prevent duplicate unhandled rejections.
+  void transaction.done?.catch(() => undefined);
   if (oldVersion === 0) {
     createBetaBaseline(db);
     return;
@@ -96,7 +99,8 @@ export function executeDatabaseUpgrade(
       assertSynchronousMigrationStep(migration.validate(db, transaction), 'validate');
     }
     const contracts = transaction.objectStore(SCHEMA_CONTRACTS_STORE);
-    for (const contract of CURRENT_SCHEMA_CONTRACTS) contracts.put(contract);
+    for (const contract of CURRENT_SCHEMA_CONTRACTS)
+      void Promise.resolve(contracts.put(contract)).catch(() => undefined);
   } catch (error) {
     transaction.abort();
     throw error;
@@ -168,5 +172,6 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, SYNC_CONNECTION_STORE, 'key');
   createStore(db, ASSET_RESIDENCY_STORE, 'id');
   const contracts = db.createObjectStore(SCHEMA_CONTRACTS_STORE, { keyPath: 'domainId' });
-  for (const contract of CURRENT_SCHEMA_CONTRACTS) contracts.put(contract);
+  for (const contract of CURRENT_SCHEMA_CONTRACTS)
+    void Promise.resolve(contracts.put(contract)).catch(() => undefined);
 }

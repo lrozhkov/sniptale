@@ -1,3 +1,4 @@
+import { setImmediate as nextEventTurn } from 'node:timers/promises';
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
@@ -253,3 +254,45 @@ it('aborts failed outgoing store creation and permits retry without source mutat
     'Sync outbox store is unavailable.'
   );
 });
+
+it.each([0, 1])(
+  'observes rejected schema requests and transaction completion from source %s',
+  async (source) => {
+    const harness = createUpgradeHarness();
+    const requests: Array<ReturnType<typeof Promise.withResolvers<unknown>>> = [];
+    const completion = Promise.withResolvers<void>();
+    const transaction = Object.assign(harness.transaction, { done: completion.promise });
+    const queueRequest = () => {
+      const request = Promise.withResolvers<unknown>();
+      requests.push(request);
+      return request.promise;
+    };
+    const createStore = harness.db.createObjectStore.getMockImplementation()!;
+    harness.db.createObjectStore.mockImplementation((name) => {
+      const store = createStore(name);
+      store.put.mockImplementation(queueRequest);
+      return store;
+    });
+    transaction.objectStore.mockReturnValue({ put: queueRequest });
+    const unhandled: unknown[] = [];
+    const observe = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', observe);
+    try {
+      expect(
+        executeDatabaseUpgrade(harness.db, source, source === 0 ? DB_VERSION : 2, transaction, [
+          createMigration(),
+        ])
+      ).toBeUndefined();
+      expect(requests).toHaveLength(CURRENT_SCHEMA_CONTRACTS.length);
+      const error = new DOMException('Interrupted versionchange', 'AbortError');
+      requests.forEach((request) => request.reject(error));
+      completion.reject(error);
+      await nextEventTurn();
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', observe);
+    }
+  }
+);
