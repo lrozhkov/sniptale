@@ -41,6 +41,7 @@ afterEach(() => {
   owners.splice(0).forEach((owner) => owner.dispose());
   videos.length = 0;
   vi.restoreAllMocks();
+  vi.useRealTimers();
   document.body.replaceChildren();
 });
 function clip(id: string, startTime = 0, sourceStart = 0): VideoProjectVideoClip {
@@ -182,3 +183,95 @@ it('releases every pooled slot once, including slots absent from the last frame'
   }
   await expect(f.render(0.25)).rejects.toMatchObject({ name: 'AbortError' });
 });
+
+async function controlledSeekFixture() {
+  const f = fixture([clip('slow-seek')]);
+  await f.render(0);
+  const video = videos[0]!;
+  const state = { seeking: false, time: 0 };
+  Object.defineProperties(video, {
+    currentTime: {
+      configurable: true,
+      get: () => state.time,
+      set: (value: number) => {
+        state.time = value;
+        state.seeking = true;
+      },
+    },
+    seeking: { configurable: true, get: () => state.seeking },
+  });
+  scene.mockClear();
+  return { ...f, video, state };
+}
+
+it('accepts a decoded seek after the former two-second deadline', async () => {
+  vi.useFakeTimers();
+  const f = await controlledSeekFixture();
+  let settled = false;
+  const result = f.render(0.5).then(
+    (canvas) => {
+      settled = true;
+      return canvas;
+    },
+    (error: unknown) => {
+      settled = true;
+      return error;
+    }
+  );
+  await vi.advanceTimersByTimeAsync(2_600);
+  expect(settled).toBe(false);
+  expect(scene).not.toHaveBeenCalled();
+  f.state.seeking = false;
+  f.video.dispatchEvent(new Event('seeked'));
+  await expect(result).resolves.toBe(f.owner.canvas);
+  expect(scene).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('bounds a stalled seek at five seconds and permits a later decoded retry', async () => {
+  vi.useFakeTimers();
+  const f = await controlledSeekFixture();
+  let settled = false;
+  const result = f.render(0.5).catch((error: unknown) => {
+    settled = true;
+    return error;
+  });
+  await vi.advanceTimersByTimeAsync(4_999);
+  expect(settled).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await expect(result).resolves.toEqual(new Error('Preview media timed out'));
+  expect(vi.getTimerCount()).toBe(0);
+  f.state.seeking = false;
+  await expect(f.render(0.5)).resolves.toBe(f.owner.canvas);
+});
+
+it.each(['abort', 'error'] as const)(
+  'cleans up a slow seek immediately after %s',
+  async (outcome) => {
+    vi.useFakeTimers();
+    const f = await controlledSeekFixture();
+    const controller = new AbortController();
+    const add = vi.spyOn(f.video, 'addEventListener');
+    const remove = vi.spyOn(f.video, 'removeEventListener');
+    const removeAbort = vi.spyOn(controller.signal, 'removeEventListener');
+    let settled = false;
+    const result = f.owner.renderFrame(0.5, controller.signal).catch((error: unknown) => {
+      settled = true;
+      return error;
+    });
+    await vi.advanceTimersByTimeAsync(2_600);
+    expect(settled).toBe(false);
+    if (outcome === 'abort') controller.abort();
+    else f.video.dispatchEvent(new Event('error'));
+    await expect(result).resolves.toMatchObject(
+      outcome === 'abort'
+        ? { name: 'AbortError' }
+        : { message: 'Preview media could not be decoded' }
+    );
+    for (const [name, listener] of add.mock.calls)
+      expect(remove).toHaveBeenCalledWith(name, listener);
+    expect(removeAbort).toHaveBeenCalledWith('abort', expect.any(Function));
+    expect(vi.getTimerCount()).toBe(0);
+    expect(scene).not.toHaveBeenCalled();
+  }
+);

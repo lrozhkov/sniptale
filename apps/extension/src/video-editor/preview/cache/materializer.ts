@@ -36,7 +36,9 @@ import { renderPreviewScene } from '../stage/scene/render-preview';
 import { createVideoProjectCaptionRenderer } from '../../../workflows/video-review/project-captions';
 import type { VideoEditorPreviewRasterSize } from '../stage/sizing/raster';
 
-const FRAME_SOURCE_TIMEOUT_MS = 2_000;
+const MEDIA_LOAD_TIMEOUT_MS = 2_000;
+// Long-GOP UHD seeks exceeded two seconds in Chromium. Cancellation still interrupts this bounded wait.
+const VIDEO_SEEK_TIMEOUT_MS = 5_000;
 const MEDIA_READY_FOR_CURRENT_FRAME = 2;
 
 export interface VideoPreviewFrameMaterializer {
@@ -87,7 +89,7 @@ function waitForMediaEvent(
   return new Promise((resolve, reject) => {
     const timeoutId = window.setTimeout(
       () => settle(new Error('Preview media timed out')),
-      FRAME_SOURCE_TIMEOUT_MS
+      MEDIA_LOAD_TIMEOUT_MS
     );
     const cleanup = () => {
       window.clearTimeout(timeoutId);
@@ -132,7 +134,7 @@ function seekVideoToDecodedTime(
   return new Promise((resolve, reject) => {
     const timeoutId = window.setTimeout(
       () => settle(new Error('Preview media timed out')),
-      FRAME_SOURCE_TIMEOUT_MS
+      VIDEO_SEEK_TIMEOUT_MS
     );
     const pollId = window.setInterval(checkReady, 16);
     const cleanup = () => {
