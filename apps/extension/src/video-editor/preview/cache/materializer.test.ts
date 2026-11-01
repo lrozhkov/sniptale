@@ -153,9 +153,8 @@ it('materializes a paused video when an intra-frame seek completes without a see
     project,
     rasterSize: { height: 360, width: 640 },
   });
-  expect(document.querySelector('video')?.isConnected).toBe(true);
-
   const pending = materializer.renderFrame(1 / project.fps, new AbortController().signal);
+  expect(document.querySelector('video')?.isConnected).toBe(true);
   await vi.advanceTimersByTimeAsync(2_000);
 
   await expect(pending).resolves.toBe(materializer.canvas);
@@ -251,12 +250,13 @@ it('reuses the decoded source and media element for camera-only redraws', async 
     assetUrls: { 'asset-1': 'blob:source' },
     rasterSize: { width: 480, height: 270 },
   });
-  const video = document.querySelector('video')!;
-  const seek = vi.spyOn(video, 'currentTime', 'set');
   const signal = new AbortController().signal;
   const first = materializer.renderFrame(0.25, signal);
   await vi.advanceTimersByTimeAsync(120);
   await first;
+  const video = document.querySelector('video')!;
+  expect(video.currentTime).toBe(0.25);
+  const seek = vi.spyOn(video, 'currentTime', 'set');
   const cameraOverride = {
     scale: 0.5,
     focusPoint: { x: 960, y: 540 },
@@ -268,7 +268,7 @@ it('reuses the decoded source and media element for camera-only redraws', async 
     viewportHeight: 2160,
   };
   await materializer.renderFrame(0.25, signal, cameraOverride);
-  expect(seek).toHaveBeenCalledTimes(1);
+  expect(seek).not.toHaveBeenCalled();
   expect(document.querySelectorAll('video')).toHaveLength(1);
   expect(renderPreviewScene).toHaveBeenLastCalledWith(expect.objectContaining({ cameraOverride }));
   materializer.dispose();

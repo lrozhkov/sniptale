@@ -63,6 +63,7 @@ interface VideoPreviewMaterializerState {
   effectRuntime: ReturnType<typeof createVideoEditorEffectRuntime> | null;
   imageBank: Record<string, HTMLImageElement>;
   videoRefs: Record<string, HTMLVideoElement | null>;
+  videoSlots: { assetId: string; src: string; video: HTMLVideoElement }[];
 }
 
 function throwIfAborted(signal: AbortSignal): void {
@@ -243,7 +244,7 @@ export function createVideoPreviewFrameMaterializer(params: {
   let busy = false;
   const joinPlans = resolveVideoProjectCompositionJoinPlans(params.project);
   const { canvas, stage } = createMaterializerSurface(params.ownerDocument, params.rasterSize);
-  const state = createMaterializerMediaState(params, stage);
+  const state = createMaterializerMediaState(params);
   let presentation = joinPlans.length
     ? createMaterializedJoinPresentation(params, state, canvas, stage, joinPlans)
     : null;
@@ -473,8 +474,7 @@ function createMaterializedJoinPresentation(
 }
 
 function createMaterializerMediaState(
-  params: Parameters<typeof createVideoPreviewFrameMaterializer>[0],
-  stage: HTMLDivElement
+  params: Parameters<typeof createVideoPreviewFrameMaterializer>[0]
 ): VideoPreviewMaterializerState {
   const state: VideoPreviewMaterializerState = {
     disposed: false,
@@ -486,22 +486,8 @@ function createMaterializerMediaState(
     effectRuntime: null,
     imageBank: {},
     videoRefs: {},
+    videoSlots: [],
   };
-  for (const clip of params.project.clips.filter(isVideoClip)) {
-    const src = params.assetUrls[clip.assetId];
-    if (!src) continue;
-    const video = params.ownerDocument.createElement('video');
-    Object.assign(video, {
-      defaultMuted: true,
-      muted: true,
-      playsInline: true,
-      preload: 'auto',
-      src,
-    });
-    video.style.cssText = 'position:absolute;width:1px;height:1px;pointer-events:none';
-    stage.append(video);
-    state.videoRefs[clip.id] = video;
-  }
   for (const asset of params.project.assets) {
     const src = params.assetUrls[asset.id];
     if (!src || asset.type !== 'IMAGE') continue;
@@ -528,12 +514,14 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
     state.stagingCanvas.height = 0;
   }
   state.stagingCanvas = null;
-  Object.values(state.videoRefs).forEach((video) => {
-    video?.pause();
-    video?.removeAttribute('src');
-    video?.load();
-    video?.remove();
+  state.videoSlots.forEach(({ video }) => {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    video.remove();
   });
+  state.videoSlots = [];
+  state.videoRefs = {};
   state.effectRuntime?.dispose();
   state.playbackSampler?.dispose();
   state.playbackSampler = null;
@@ -577,8 +565,8 @@ async function renderMaterializedFrame(
       decodedVideoFrames = sampled.media;
     }
     assertActive();
-    if (!decodedVideoFrames)
-      await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
+    if (!decodedVideoFrames) await prepareMaterializedVideos(params, state, stage, time, signal);
+    else state.videoRefs = {};
     assertActive();
     const drawn = await renderPreviewScene({
       sampleFps: params.sampleFps ?? params.project.fps,
@@ -633,17 +621,62 @@ async function renderMaterializedFrame(
 }
 
 async function prepareMaterializedVideos(
-  project: VideoProject,
-  videoRefs: Record<string, HTMLVideoElement | null>,
+  params: Parameters<typeof createVideoPreviewFrameMaterializer>[0],
+  state: VideoPreviewMaterializerState,
+  stage: HTMLDivElement,
   time: number,
   signal: AbortSignal
 ): Promise<void> {
+  const project = params.project;
   const activeVideos = project.clips
     .filter(isVideoClip)
     .filter((clip) => isClipActiveAtTime(clip, time) && hasCameraMediaAt(project, clip, time));
-  for (const clip of activeVideos) {
-    const video = videoRefs[clip.id];
-    if (!video) throw new Error(`Preview video source is unavailable for clip ${clip.id}`);
+  const sources = activeVideos.map((clip) => {
+    const src = params.assetUrls[clip.assetId];
+    if (!src) throw new Error(`Preview video source is unavailable for clip ${clip.id}`);
+    return { clip, src };
+  });
+  const used = new Set<HTMLVideoElement>();
+  const refs: VideoPreviewMaterializerState['videoRefs'] = {};
+  // Reserve surviving clips before new clips can reuse their source slots.
+  for (const { clip, src } of sources) {
+    const prior = state.videoRefs[clip.id];
+    const slot = state.videoSlots.find(
+      (entry) => entry.video === prior && entry.assetId === clip.assetId && entry.src === src
+    );
+    if (slot) {
+      refs[clip.id] = slot.video;
+      used.add(slot.video);
+    }
+  }
+  for (const { clip, src } of sources) {
+    if (refs[clip.id]) continue;
+    let slot =
+      state.videoSlots.find(
+        (entry) => !used.has(entry.video) && entry.assetId === clip.assetId && entry.src === src
+      ) ?? state.videoSlots.find((entry) => !used.has(entry.video));
+    if (!slot) {
+      const video = params.ownerDocument.createElement('video');
+      Object.assign(video, { defaultMuted: true, muted: true, playsInline: true, preload: 'auto' });
+      video.style.cssText = 'position:absolute;width:1px;height:1px;pointer-events:none';
+      stage.append(video);
+      slot = { assetId: clip.assetId, src, video };
+      video.src = src;
+      state.videoSlots.push(slot);
+    } else if (slot.src !== src) {
+      slot.video.pause();
+      slot.video.src = src;
+    }
+    slot.assetId = clip.assetId;
+    slot.src = src;
+    refs[clip.id] = slot.video;
+    used.add(slot.video);
+  }
+  state.videoRefs = refs;
+  for (const { clip } of sources) {
+    throwIfAborted(signal);
+    if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
+    const video = refs[clip.id]!;
     video.pause();
     await waitForDecodedVideoFrame(video, getVideoClipSourceTime(clip, time), project.fps, signal);
   }
