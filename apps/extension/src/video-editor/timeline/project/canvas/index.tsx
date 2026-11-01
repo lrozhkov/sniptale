@@ -1,3 +1,7 @@
+import { useTimelineRecordingEvents } from './recording-events';
+import { translate, useAppLocale } from '../../../../platform/i18n';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import type { VideoEditorRecordingActionObservation } from '../../../contracts/recording-events';
 import { TimelineEffectDraftContext } from '../effect-lanes/segment';
 import { getTimelineHistoryLayout } from '../effect-lanes/history-layout';
 import { ProjectTimelineCursorLane } from '../effect-lanes/cursor-lane';
@@ -88,7 +92,11 @@ interface ProjectTimelineCanvasProps {
   onSelectHistorySpan?: (
     target: import('../../../contracts/commands/timeline').VideoEditorTypingSpanTarget
   ) => void;
-  onSelectActionOccurrence: (eventId: string, clipId: string | null) => void;
+  onSelectActionOccurrence: (
+    eventId: string,
+    clipId: string | null,
+    observedAction?: VideoEditorRecordingActionObservation
+  ) => void;
   onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSelectCursorSegment: (sampleId: string) => void;
   onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => void;
@@ -128,6 +136,7 @@ function resolveTimelinePlayheadHeight(params: {
 }
 
 export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
+  useAppLocale();
   const model = useProjectTimelineCanvasModel(props);
   const effectDraft = useContext(TimelineEffectDraftContext);
 
@@ -135,6 +144,7 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
     <div
       ref={props.timelineRef}
       data-ui="video-editor.timeline.canvas-scroll"
+      aria-busy={model.history.status === 'loading'}
       tabIndex={-1}
       onPointerDownCapture={focusTimelineWorkingSurface}
       className="relative isolate min-w-0 overflow-auto outline-none"
@@ -151,8 +161,36 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
         model.publishPreviewViewport();
       }}
     >
+      {model.history.status !== 'ready' && (
+        <div
+          className="sticky left-0 top-0 z-30 h-0"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <div
+            role="status"
+            className={[
+              'absolute left-1 top-1 flex max-w-[calc(100%-8px)] items-center gap-2 rounded border',
+              'border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
+              'px-2 py-1 text-xs text-[var(--sniptale-color-text-secondary)]',
+            ].join(' ')}
+          >
+            {model.history.status === 'failed' ? (
+              <>
+                <span>{translate('videoEditor.timeline.historyReadFailed')}</span>
+                <ProductActionButton compact tone="secondary" onClick={model.history.retry}>
+                  {translate('common.actions.retry')}
+                </ProductActionButton>
+              </>
+            ) : (
+              translate('common.states.loading')
+            )}
+          </div>
+        </div>
+      )}
       <ProjectTimelineCanvasContent
         {...props}
+        project={model.history.project}
         cursorLaneVisible={model.cursorLaneVisible}
         telemetryLaneVisible={model.telemetryLaneVisible}
         hoverTime={model.hoverPreview.hoverTime}
@@ -174,6 +212,11 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
 
 function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
   const [viewport, setViewport] = useState({ startTime: 0, endTime: 0 });
+  const history = useTimelineRecordingEvents(
+    props.project,
+    props.projection ?? viewport,
+    props.pixelsPerSecond
+  );
   const onViewportChange = props.onTimelinePreviewViewportChange;
   const publishViewport = useCallback(
     (next: TimelinePreviewViewport) => {
@@ -219,6 +262,7 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
     startTime: props.projection?.startTime,
   });
   return {
+    history,
     cursorLaneVisible,
     hoverPreview,
     playheadHeight,

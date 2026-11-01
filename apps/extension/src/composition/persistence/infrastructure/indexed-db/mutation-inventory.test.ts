@@ -20,6 +20,8 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
+  // Facts update only the source store's admitted caller transaction.
+  'apps/extension/src/composition/persistence/recordings/recording-events/facts.ts',
   // Recording publication writes only its caller's admitted transaction.
   'apps/extension/src/composition/persistence/recordings/recovery/publication.ts',
   // Recovery and cascade owners acquire mutation admission before requesting strict transactions.

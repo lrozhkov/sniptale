@@ -1,3 +1,4 @@
+import eventsFixture from '../../features/video/project/recording-events/fixtures.json';
 import { expect, it } from 'vitest';
 
 import {
@@ -271,3 +272,76 @@ it('exposes native parser helper predicates for route owners', () => {
   expect(isNativeSafeFilename('../recording.mp4')).toBe(false);
   expect(isNativeTrayActionKind('open-settings')).toBe(true);
 });
+
+it('validates independent top-level recording history descriptors and preserves legacy absence', () => {
+  const stopped = createRecordingStopped();
+  const cursorTrajectory = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: 'a'.repeat(32),
+    state: 'complete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalSamples: 1,
+    totalBytes: 1000,
+    streamSha256: 'b'.repeat(64),
+  };
+  const recordingEvents = eventsFixture.descriptor;
+  for (const attachments of [
+    {},
+    { cursorTrajectory },
+    { recordingEvents },
+    { cursorTrajectory, recordingEvents },
+  ]) {
+    const input = { ...stopped, ...attachments };
+    expect(parseNativeAppInboundMessage(input)).toEqual({ ok: true, value: input });
+  }
+  for (const attachments of [
+    { cursorTrajectory: { ...cursorTrajectory, totalRecords: 513 } },
+    { cursorTrajectory: { ...cursorTrajectory, privateWriter: 'private' } },
+    { cursorTrajectory: null },
+    { recordingEvents: { ...recordingEvents, eventStreamId: 'bad' } },
+    { recordingEvents: { ...recordingEvents, totalRecords: 0 } },
+    { recordingEvents: null },
+  ])
+    expect(parseNativeAppInboundMessage({ ...stopped, ...attachments }).ok).toBe(false);
+});
+
+it.each(['cursor', 'events'] as const)(
+  'admits exact optional Desktop %s capabilities and rejects unsupported shapes',
+  (kind) => {
+    const hello = createHello();
+    const key = kind === 'cursor' ? 'attachments' : 'eventAttachments';
+    const formatsKey = kind === 'cursor' ? 'cursorTrajectoryFormats' : 'recordingEventFormats';
+    const format = kind === 'cursor' ? 'cursor-trajectory-v1' : 'recording-events-v1';
+    const capabilities = {
+      [formatsKey]: [format],
+      maxBlockBytes: 65536,
+      maxBlockRecords: 512,
+      maxChunkRawBytes: 32768,
+      maxManifestEntries: 32,
+    };
+    const message = { ...hello, capabilities: { ...hello.capabilities, [key]: capabilities } };
+    expect(parseNativeAppInboundMessage(message)).toMatchObject({ ok: true });
+    for (const invalid of [
+      null,
+      [],
+      { ...capabilities, extra: true },
+      { ...capabilities, [formatsKey]: ['unknown-v2'] },
+      { ...capabilities, maxBlockBytes: 131072 },
+      { ...capabilities, maxBlockRecords: 1024 },
+      { ...capabilities, maxChunkRawBytes: 65536 },
+      { ...capabilities, maxManifestEntries: 4096 },
+    ]) {
+      expect(
+        parseNativeAppInboundMessage({
+          ...hello,
+          capabilities: { ...hello.capabilities, [key]: invalid },
+        })
+      ).toMatchObject({ ok: false });
+    }
+  }
+);

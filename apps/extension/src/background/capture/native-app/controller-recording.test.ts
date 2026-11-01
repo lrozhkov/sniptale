@@ -1,3 +1,6 @@
+import eventsFixture from '../../../features/video/project/recording-events/fixtures.json';
+import { isRecordingEventsDescriptor } from '../../../features/video/project/recording-events/records';
+import type { NativeIngestionOutboundMessage } from './ingestion-types';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import type {
@@ -8,11 +11,39 @@ import type {
 import type { NativeTransferChunkEntry, NativeTransferSessionEntry } from './persistence/contracts';
 
 const mocks = vi.hoisted(() => ({
+  historyResume:
+    vi.fn<(recordingId: string, lease: string) => Promise<NativeIngestionOutboundMessage[]>>(),
+  videoReceipt: vi.fn(),
+  ownedReceipts: new Map<string, { durable: true; sha256: string; totalBytes: number }>(),
   chunks: new Map<string, NativeTransferChunkEntry>(),
   openVideoEditorPageMock: vi.fn(),
   recordingSaveMock: vi.fn(),
   sessions: new Map<string, NativeTransferSessionEntry>(),
   telemetrySaveMock: vi.fn(),
+}));
+
+vi.mock(
+  '../../../composition/persistence/recordings/native-history/store',
+  async (importOriginal) => {
+    const original =
+      await importOriginal<
+        typeof import('../../../composition/persistence/recordings/native-history/store')
+      >();
+    return {
+      ...original,
+      createNativeRecordingHistoryStore: () => ({
+        ...original.createNativeRecordingHistoryStore(),
+        videoReceipt: mocks.videoReceipt,
+      }),
+    };
+  }
+);
+
+vi.mock('./history-ingestion', () => ({
+  createNativeRecordingHistoryIngestion: () => ({
+    resume: mocks.historyResume,
+    handle: vi.fn(async () => []),
+  }),
 }));
 
 vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) => ({
@@ -153,7 +184,20 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.chunks.clear();
   mocks.sessions.clear();
-  mocks.recordingSaveMock.mockResolvedValue(undefined);
+  mocks.historyResume.mockResolvedValue([]);
+  mocks.ownedReceipts.clear();
+  mocks.videoReceipt.mockImplementation(async (id: string) => {
+    const receipt = mocks.ownedReceipts.get(id);
+    if (!receipt) throw new Error('missing');
+    return receipt;
+  });
+  mocks.recordingSaveMock.mockImplementation(async (id: string, blob: Blob) => {
+    mocks.ownedReceipts.set(id, {
+      durable: true,
+      sha256: await sha256Hex(new Uint8Array(await blob.arrayBuffer())),
+      totalBytes: blob.size,
+    });
+  });
   mocks.telemetrySaveMock.mockResolvedValue(undefined);
   vi.stubGlobal('atob', (value: string) => Buffer.from(value, 'base64').toString('binary'));
   vi.stubGlobal('navigator', {
@@ -274,7 +318,7 @@ it('does not let replayed recording starts overwrite active transfer sessions', 
   );
 });
 
-it('keeps completed recording tombstones from replaying commits after cleanup', async () => {
+it('recovers lost video receipts without replaying completed commits', async () => {
   const bytes = new TextEncoder().encode('mp4-bytes');
   const stopped = await createRecordingStopped(bytes);
   const chunk = await createRecordingChunk(bytes);
@@ -295,10 +339,16 @@ it('keeps completed recording tombstones from replaying commits after cleanup', 
 
   await expect(controller.handleRecordingStarted(createRecordingStarted())).resolves.toEqual([]);
   await expect(controller.handleRecordingStopped(stopped)).resolves.toEqual([
-    expect.objectContaining({ reason: 'duplicate-or-replay', type: 'extension.recording.reject' }),
+    expect.objectContaining({
+      type: 'extension.recording.ack',
+      receipt: { durable: true, sha256: stopped.sha256, totalBytes: stopped.totalBytes },
+    }),
   ]);
   await expect(controller.handleRecordingChunk(chunk)).resolves.toEqual([
-    expect.objectContaining({ reason: 'duplicate-or-replay', type: 'extension.recording.reject' }),
+    expect.objectContaining({
+      type: 'extension.recording.ack',
+      receipt: { durable: true, sha256: stopped.sha256, totalBytes: stopped.totalBytes },
+    }),
   ]);
 
   expect(mocks.sessions.get('recording-1')).toEqual(
@@ -376,4 +426,106 @@ it('admits 4096 wire cursor samples and saves MP4 plus seconds exactly once', as
   await controller.handleRecordingChunk(chunk);
   expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
   expect(mocks.telemetrySaveMock).toHaveBeenCalledTimes(1);
+});
+
+it(
+  'persists the offered descriptor, defers automatic editor opening and keeps the video ' +
+    'receipt when optional history admission fails',
+  async () => {
+    if (!isRecordingEventsDescriptor(eventsFixture.descriptor)) throw new Error('Invalid fixture.');
+    const { createNativeAppIngestionController } = await import('./controller');
+    const controller = createNativeAppIngestionController({
+      getCurrentControllerLeaseId: () => 'lease-1',
+      isHistoryEnabled: () => true,
+    });
+    const bytes = new TextEncoder().encode('mp4-with-history');
+    const stopped = {
+      ...(await createRecordingStopped(bytes)),
+      recordingEvents: eventsFixture.descriptor,
+    };
+    await controller.handleRecordingStopped(stopped);
+    expect(mocks.sessions.get('recording-1')?.metadata.recordingEvents).toEqual(
+      eventsFixture.descriptor
+    );
+    mocks.historyResume.mockRejectedValueOnce(new Error('history-storage-failed'));
+    expect(await controller.handleRecordingChunk(await createRecordingChunk(bytes))).toEqual([
+      expect.objectContaining({ type: 'extension.recording.ack' }),
+    ]);
+    expect(mocks.sessions.get('recording-1')).toMatchObject({
+      kind: 'recording-complete',
+      metadata: { recordingEvents: eventsFixture.descriptor },
+    });
+    expect(mocks.openVideoEditorPageMock).not.toHaveBeenCalled();
+    expect(mocks.historyResume).toHaveBeenCalledExactlyOnceWith('recording-1', 'lease-1');
+  }
+);
+
+it('never deletes an existing history recovery parent when a stopped replay uses a new lease', async () => {
+  const { createNativeAppIngestionController } = await import('./controller');
+  const bytes = new TextEncoder().encode('mp4-history-parent');
+  const stopped = await createRecordingStopped(bytes);
+  const original = createNativeAppIngestionController({
+    getCurrentControllerLeaseId: () => 'lease-1',
+  });
+  await original.handleRecordingStopped(stopped);
+  const staged = mocks.sessions.get(stopped.recordingId)!;
+  const recoveryParent = {
+    ...staged,
+    kind: 'recording-complete' as const,
+    metadata: { ...staged.metadata, history: { operationId: 'accepted-history' } },
+  };
+  mocks.sessions.set(stopped.recordingId, recoveryParent);
+  const next = createNativeAppIngestionController({
+    getCurrentControllerLeaseId: () => 'lease-2',
+    isHistoryEnabled: () => true,
+  });
+  await next.handleRecordingStopped({ ...stopped, controllerLeaseId: 'lease-2' });
+  expect(mocks.sessions.get(stopped.recordingId)).toEqual(recoveryParent);
+});
+
+it('recovers the completed video on a new lease and rejects changed source facts without deleting it', async () => {
+  const bytes = new TextEncoder().encode('committed-video');
+  const stopped = await createRecordingStopped(bytes);
+  const { createNativeAppIngestionController } = await import('./controller');
+  const first = createNativeAppIngestionController({
+    getCurrentControllerLeaseId: () => 'lease-1',
+  });
+  await first.handleRecordingStopped(stopped);
+  await first.handleRecordingChunk(await createRecordingChunk(bytes));
+  const next = createNativeAppIngestionController({ getCurrentControllerLeaseId: () => 'lease-2' });
+  const replay = { ...stopped, controllerLeaseId: 'lease-2' };
+  expect(await next.handleRecordingStopped(replay)).toEqual([
+    expect.objectContaining({ type: 'extension.recording.ack', controllerLeaseId: 'lease-2' }),
+  ]);
+  for (const mismatch of [{ sha256: 'f'.repeat(64) }, { totalBytes: 1 }, { width: 1 }])
+    expect(await next.handleRecordingStopped({ ...replay, ...mismatch })).toEqual([]);
+  expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+  expect(mocks.sessions.get(stopped.recordingId)?.kind).toBe('recording-complete');
+});
+it('recovers the receipt on bootstrap without another Native stopped announcement and rechecks the lease', async () => {
+  const bytes = new TextEncoder().encode('bootstrap-receipt');
+  const stopped = await createRecordingStopped(bytes);
+  const { createNativeAppIngestionController } = await import('./controller');
+  let lease = 'lease-1';
+  const controller = createNativeAppIngestionController({
+    getCurrentControllerLeaseId: () => lease,
+  });
+  await controller.handleRecordingStopped(stopped);
+  await controller.handleRecordingChunk(await createRecordingChunk(bytes));
+  const parent = mocks.sessions.get(stopped.recordingId)!;
+  mocks.sessions.set(stopped.recordingId, { ...parent, totalBytes: 0 });
+  expect(await controller.resumePendingTransfers(lease)).toEqual([
+    expect.objectContaining({ type: 'extension.recording.ack' }),
+  ]);
+  const pending = Promise.withResolvers<{ durable: true; sha256: string; totalBytes: number }>();
+  const entered = Promise.withResolvers<void>();
+  mocks.videoReceipt.mockImplementationOnce(() => {
+    entered.resolve();
+    return pending.promise;
+  });
+  const recovery = controller.handleRecordingStopped(stopped);
+  await entered.promise;
+  lease = 'lease-2';
+  pending.resolve({ durable: true, sha256: stopped.sha256, totalBytes: stopped.totalBytes });
+  expect(await recovery).toEqual([]);
 });

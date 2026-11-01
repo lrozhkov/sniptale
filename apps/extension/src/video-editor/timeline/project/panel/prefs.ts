@@ -48,7 +48,10 @@ export function useProjectTimelinePanelPrefs(
 
   return {
     cursorLaneVisible:
-      (project.cursorTrack?.samples.length ?? 0) > 0 &&
+      ((project.cursorTrack?.samples.length ?? 0) > 0 ||
+        project.cursorTrack?.sourceObservations?.some(
+          (group) => (group.trajectory?.totalSamples ?? 0) > 0
+        ) === true) &&
       prefs.collapsedTelemetryLaneVisible &&
       prefs.collapsedCursorLaneVisible,
     prefs,

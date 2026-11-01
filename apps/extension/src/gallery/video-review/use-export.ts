@@ -450,13 +450,21 @@ function reviewExportInputPlan(
   const ranges = fragment
     ? mapReviewAnchor({ kind: 'range', start: fragment.start, end: fragment.end }, fullMap).ranges
     : null;
-  const actionAudioPresent = hasQuickEditActionAudio(
-    { plan: actionPlan, offset: 0, busGain: 1 },
-    {
-      start: ranges?.[0]?.start ?? (fragment ? actionPlan.duration : 0),
-      end: ranges?.at(-1)?.end ?? actionPlan.duration,
-    }
-  );
+  const actionAudioPresent =
+    !!(
+      telemetry?.recordingEvents?.totalBlocks &&
+      resolveQuickEditEffectiveFeatures(advanced).actionsApplied &&
+      advanced.actionAudio?.some(
+        (setting) => setting.enabled && setting.presetId !== null && setting.volume > 0
+      )
+    ) ||
+    hasQuickEditActionAudio(
+      { plan: actionPlan, offset: 0, busGain: 1 },
+      {
+        start: ranges?.[0]?.start ?? (fragment ? actionPlan.duration : 0),
+        end: ranges?.at(-1)?.end ?? actionPlan.duration,
+      }
+    );
   return configuredReviewExportPlan({
     includeBookends: !selection,
     index,

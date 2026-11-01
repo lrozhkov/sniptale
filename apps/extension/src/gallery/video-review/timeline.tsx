@@ -2,7 +2,7 @@ import { ReviewTrackVisibilityButton } from './track-row';
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { Fragment, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { REVIEW_TRACK_ORDER } from './track-order';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import {
@@ -34,6 +34,8 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = ReviewCursorTimelineInteractions & {
+  onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
+  cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
   actionsEnabled?: boolean | undefined;
   onToggleActions?: (() => void) | undefined;
@@ -108,6 +110,20 @@ export function ReviewTimeline(props: TimelineProps) {
       width,
     }
   );
+  const { onHistoryRange, duration } = props;
+  const reportHistoryRange = useCallback(() => {
+    if (!onHistoryRange) return;
+    const start = Math.max(
+      0,
+      Math.min(
+        duration,
+        ((viewport.current?.scrollLeft ?? 0) / Math.max(1, width * zoom)) * duration
+      )
+    );
+    const end = Math.max(start, Math.min(duration, start + duration / zoom));
+    onHistoryRange({ start, end });
+  }, [onHistoryRange, duration, width, zoom, viewport]);
+  useEffect(() => reportHistoryRange(), [reportHistoryRange]);
   const ruler = useReviewRulerRange({
     ...props,
     range: props.playbackRange ?? null,
@@ -179,6 +195,7 @@ export function ReviewTimeline(props: TimelineProps) {
           onScroll={() => {
             follow.onScroll();
             hover.clear();
+            reportHistoryRange();
           }}
           {...follow.interaction}
           className={`w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain
@@ -313,6 +330,7 @@ function ReviewTimelineEvents(
     | 'onToggleActions'
     | 'keyAnimations'
     | 'clickAnimations'
+    | 'cursorArchiveAvailable'
   > & { width: number; zoom: number }
 ) {
   const [animatedOnly, setAnimatedOnly] = useState(false);
@@ -324,7 +342,7 @@ function ReviewTimelineEvents(
     ? props.markers.filter((marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id))
     : props.markers;
   return props.actionsTrackVisible !== false &&
-    (props.markers.length || props.onAddCursorFocusKey) ? (
+    (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable) ? (
     <ReviewTrackRow
       track="actions"
       muted={props.actionsEnabled === false}
@@ -362,6 +380,14 @@ function ReviewTimelineEvents(
       }
     >
       <div className="min-h-7" data-ui="gallery.videoReview.historyTrack">
+        {props.cursorArchiveAvailable ? (
+          <div
+            data-ui="gallery.videoReview.archivedCursorHistory"
+            className="text-xs text-[var(--sniptale-color-text-secondary)]"
+          >
+            {translate('gallery.videoReview.recordingCursorArchived')}
+          </div>
+        ) : null}
         <ReviewTelemetryStrip
           captureCapabilities={props.captureCapabilities}
           markers={markers}

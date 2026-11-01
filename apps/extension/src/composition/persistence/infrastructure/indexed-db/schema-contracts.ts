@@ -26,6 +26,9 @@ import {
   RECORDING_TELEMETRY_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
+  RECORDING_CURSOR_TRAJECTORIES_STORE,
+  RECORDING_CURSOR_BLOCKS_STORE,
+  RECORDING_EVENTS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
@@ -83,12 +86,15 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'recordings',
-    schemaVersion: 3,
+    schemaVersion: 5,
     stores: [
       { storeName: STORE_NAME, dataClass: 'durable-authority' },
       { storeName: RECORDING_TELEMETRY_STORE, dataClass: 'durable-authority' },
       { storeName: RECORDING_RECOVERY_SESSIONS_STORE, dataClass: 'durable-authority' },
       { storeName: RECORDING_RECOVERY_BLOCKS_STORE, dataClass: 'durable-authority' },
+      { storeName: RECORDING_CURSOR_TRAJECTORIES_STORE, dataClass: 'durable-authority' },
+      { storeName: RECORDING_CURSOR_BLOCKS_STORE, dataClass: 'durable-authority' },
+      { storeName: RECORDING_EVENTS_STORE, dataClass: 'durable-authority' },
     ],
   },
   {

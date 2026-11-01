@@ -1,3 +1,7 @@
+import type { CursorTrajectoryDescriptor } from '../cursor-trajectory/types';
+import type { RecordingEventsDescriptor } from '../recording-events/types';
+import { applyVideoProjectMutationPatch } from '../mutation';
+import { normalizeVideoProjectCursorSkin } from '../cursor';
 import {
   createRecordingAudioClip,
   createRecordingBaseClip,
@@ -23,6 +27,8 @@ import { resolveVideoProjectCameraTrackOrder } from '../camera/track-order';
 
 export type CreateVideoProjectFromRecordingOptions = {
   recordingId: string;
+  cursorTrajectory?: CursorTrajectoryDescriptor;
+  recordingEvents?: RecordingEventsDescriptor;
   filename: string;
   width: number;
   height: number;
@@ -73,35 +79,90 @@ export function createRecordingVideoProject(
     sidecarTracks: tracks.sidecarTracks,
   });
   const project = createRecordingProjectDocument({
-    sourceNormalizedActionEvents: options.sourceNormalizedActionEvents ?? [],
+    sourceNormalizedActionEvents: options.recordingEvents
+      ? []
+      : (options.sourceNormalizedActionEvents ?? []),
     asset,
     clips,
-    cursorTrack: options.cursorTrack ?? null,
+    cursorTrack:
+      options.cursorTrajectory && options.cursorTrack
+        ? {
+            captureMode: options.cursorTrack.captureMode,
+            skin: structuredClone(options.cursorTrack.skin),
+            samples: [],
+          }
+        : (options.cursorTrack ?? null),
     motionRegions: options.motionRegions ?? [],
     options,
     sidecarAssets,
     tracks: tracks.allTracks.filter((track) => clips.some((clip) => clip.trackId === track.id)),
   });
   const sourceClip = clips.find((clip) => clip.type === 'VIDEO' && clip.assetId === asset.id);
-  if (
-    !sourceClip ||
-    sourceClip.type !== 'VIDEO' ||
-    !sourceClip.sourceInstanceId ||
-    (options.recordingSignals === undefined && options.sourceNormalizedActionEvents === undefined)
-  )
+  if (!sourceClip || sourceClip.type !== 'VIDEO' || !sourceClip.sourceInstanceId) {
+    if (options.cursorTrajectory || options.recordingEvents)
+      throw new Error('Recording observation source is unavailable.');
     return project;
-  return {
-    ...project,
-    version: 3,
-    actionFeedback: [
-      {
-        recordingId: options.recordingId,
-        sourceInstanceId: sourceClip.sourceInstanceId,
-        settings: [],
-        signals: structuredClone(options.recordingSignals ?? []),
-      },
-    ],
+  }
+  const feedback =
+    options.recordingSignals !== undefined || options.sourceNormalizedActionEvents !== undefined;
+  const result: VideoProject = feedback
+    ? {
+        ...project,
+        version: 3,
+        actionFeedback: [
+          {
+            recordingId: options.recordingId,
+            sourceInstanceId: sourceClip.sourceInstanceId,
+            settings: [],
+            signals: structuredClone(options.recordingSignals ?? []),
+          },
+        ],
+      }
+    : project;
+  if (!options.cursorTrajectory && !options.recordingEvents) return result;
+  const track = result.cursorTrack ?? {
+    captureMode: 'embedded-fallback' as const,
+    samples: [],
+    skin: { ...normalizeVideoProjectCursorSkin(undefined), hidden: true },
   };
+  return applyVideoProjectMutationPatch(result, {
+    ...(options.recordingEvents
+      ? {
+          actionEvents: [],
+          actionFeedback: [
+            {
+              ...(result.actionFeedback?.find(
+                (group) =>
+                  group.recordingId === options.recordingId &&
+                  group.sourceInstanceId === sourceClip.sourceInstanceId
+              ) ?? {
+                recordingId: options.recordingId,
+                sourceInstanceId: sourceClip.sourceInstanceId,
+                settings: [],
+              }),
+              signals: [],
+              events: structuredClone(options.recordingEvents),
+            },
+          ],
+        }
+      : {}),
+    ...(options.cursorTrajectory
+      ? {
+          cursorTrack: {
+            ...track,
+            samples: [],
+            sourceObservations: [
+              {
+                recordingId: options.recordingId,
+                sourceInstanceId: sourceClip.sourceInstanceId,
+                samples: [],
+                trajectory: structuredClone(options.cursorTrajectory),
+              },
+            ],
+          },
+        }
+      : {}),
+  });
 }
 
 function createDefaultProjectTracks(deps: RecordingProjectFactoryDeps): {

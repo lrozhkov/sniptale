@@ -581,3 +581,60 @@ it('decodes planned presentation frames in one stream at the exact mapped clocks
   expect(io.times).toEqual([0.1, 0.2, 0.3]);
   expect(io.samples.every((sample) => sample.close.mock.calls.length === 1)).toBe(true);
 });
+
+it(
+  'prepares archived frame facts on the global output clock and passes the same reader ' +
+    'to endpoint drawing',
+  async () => {
+    const args = fixture();
+    const recordingHistory = {
+      read: vi.fn(
+        async (
+          _source: number,
+          _result: number,
+          _output: { width: number; height: number; frameDuration: number },
+          _signal?: AbortSignal
+        ) => ({
+          telemetry: {
+            recordingId: 'recording',
+            createdAt: 1,
+            updatedAt: 1,
+            captureMode: null,
+            viewport: null,
+            cursorTrack: null,
+            actionEvents: [],
+            signals: [],
+          },
+          effective: args.effective,
+          keyCues: [],
+          clickCues: [],
+        })
+      ),
+      dispose: vi.fn(),
+    };
+    const owner = await open({ ...args, recordingHistory });
+    const output = await owner.render(candidate(1));
+    expect(recordingHistory.read.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      [0, 7],
+      [1, 8],
+    ]);
+    expect(io.render.mock.calls.at(-1)![0]).toMatchObject({
+      recordingHistory,
+      resultTime: 8,
+      sourceTime: 1,
+    });
+    output.release();
+    owner.dispose();
+    expect(recordingHistory.dispose).not.toHaveBeenCalled();
+  }
+);
+it('closes the decoder when the first archived frame fails admission', async () => {
+  const recordingHistory = {
+    read: vi.fn(async () => {
+      throw new Error('history-unavailable');
+    }),
+    dispose: vi.fn(),
+  };
+  await expect(open({ ...fixture(), recordingHistory })).rejects.toThrow('history-unavailable');
+  expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+});

@@ -1,3 +1,4 @@
+import { readArchiveRootObjectSource } from '../media-hub-backup/v6/object-source.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createMediaLibraryEntry } from '../../composition/persistence/projects/index.test-support';
 import { createPersistedEditorDocumentFixture } from '../../composition/persistence/document-assets/test-support';
@@ -191,7 +192,9 @@ it('encodes the retained image after a later native edit', async () => {
   release();
   const result = await pending;
   expect(JSON.stringify(result.envelope.metadata)).not.toContain('later-');
-  const bodies = await Promise.all(result.objects.map((object) => object.blob.text()));
+  const bodies = await Promise.all(
+    result.objects.map(async (object) => (await readArchiveRootObjectSource(object)).text())
+  );
   expect(bodies).toEqual(expect.arrayContaining(['original', 'document', 'preview', 'thumbnail']));
   expect(result.dependencies).toEqual([]);
   expect(io.read).toHaveBeenCalledTimes(1);

@@ -1,3 +1,4 @@
+import type { RecordingEventCadence } from '../project/recording-events/types';
 import { buildHistoryCursorRuns } from './cursor-history';
 import { groupHistoryScrollActions } from './scroll-history';
 import type { RecordingKeyboardRhythmBlock } from '../project/types/interaction';
@@ -17,6 +18,56 @@ interface ReviewTelemetryInput {
   cursorTrack: VideoProjectCursorTrack | null;
 }
 
+interface PreparedReviewRecordingWindow {
+  readonly markers: readonly ReviewTelemetryMarker[];
+  readonly cursorEndSeconds?: number;
+}
+const recordingWindowKey = Symbol('review-recording-history-window');
+interface ReviewWindowInput extends Pick<ReviewTelemetryInput, 'cursorTrack' | 'signals'> {
+  readonly [recordingWindowKey]?: PreparedReviewRecordingWindow;
+}
+/** These view facts are disposable and add no serialized workspace fields. */
+export function attachReviewRecordingWindow<T extends ReviewTelemetryInput>(
+  input: T,
+  window: PreparedReviewRecordingWindow
+): T {
+  return { ...input, [recordingWindowKey]: window };
+}
+/** A partial cursor window cannot imply observations through the end of the video. */
+export function reviewRecordingWindow(
+  input: Pick<ReviewTelemetryInput, 'cursorTrack' | 'signals'> | null
+): PreparedReviewRecordingWindow | undefined {
+  const value: ReviewWindowInput | null = input;
+  return value?.[recordingWindowKey];
+}
+
+/** Explicit legacy double-click metadata changes presentation only; capture facts remain intact. */
+function projectDoubleClickActions(
+  actions: readonly RecordingActionEvent[]
+): RecordingActionEvent[] {
+  const result: RecordingActionEvent[] = [];
+  for (const action of actions) {
+    const previous = result.at(-1);
+    if (
+      previous?.kind === 'CLICK' &&
+      action.kind === 'CLICK' &&
+      previous.data['clickCount'] === 1 &&
+      action.data['clickCount'] === 2 &&
+      previous.data['gestureId'] === undefined &&
+      action.data['gestureId'] === undefined &&
+      typeof action.data['targetId'] === 'string' &&
+      action.data['targetId'].length > 0 &&
+      previous.data['targetId'] === action.data['targetId'] &&
+      previous.data['button'] === action.data['button'] &&
+      previous.data['observationClockId'] === action.data['observationClockId'] &&
+      previous.data['captureSegment'] === action.data['captureSegment']
+    ) {
+      result[result.length - 1] = { ...previous, data: { ...previous.data, clickCount: 2 } };
+    } else result.push(action);
+  }
+  return result;
+}
+
 /** Audio templates consume bounded facts, never recorded wording or event-count guesses. */
 type ReviewActionSoundDescriptor =
   | { family: 'mouse' }
@@ -33,6 +84,10 @@ export interface ReviewTelemetryMarker {
   observed?: boolean;
   keyboardHold?: boolean;
   mouseButton?: number;
+  recordingCadence?: {
+    onsets: readonly RecordingEventCadence[];
+    repeats: readonly RecordingEventCadence[];
+  };
   keyboardRhythm?: RecordingKeyboardRhythmBlock[];
   keyboardRepeats?: RecordingKeyboardRhythmBlock[];
   keyboardAttack?: { id: string; time: number };
@@ -59,6 +114,24 @@ export function projectReviewTelemetry(
   duration: number,
   includeCursor = false
 ) {
+  const prepared = reviewRecordingWindow(input);
+  if (prepared) {
+    const markers = [...structuredClone(prepared.markers)];
+    if (includeCursor) {
+      const cursorOnly = projectReviewTelemetry(
+        {
+          actionEvents: [],
+          signals: input.signals.filter((signal) => signal.kind === 'cursor-idle'),
+          cursorTrack: input.cursorTrack,
+        },
+        Math.min(duration, prepared.cursorEndSeconds ?? duration),
+        true
+      );
+      markers.push(...cursorOnly.markers.filter((marker) => marker.ref.kind === 'cursor'));
+    }
+    markers.sort((a, b) => a.start - b.start || a.ref.id.localeCompare(b.ref.id));
+    return { markers, warnings: 0 };
+  }
   const markers: ReviewTelemetryMarker[] = [];
   const warnings = 0;
   const add = reviewMarkerWriter(markers, duration);
@@ -78,7 +151,7 @@ export function projectReviewTelemetry(
         : []
     )
     .sort((a, b) => a.time - b.time);
-  for (const event of groupHistoryScrollActions(actions)) {
+  for (const event of groupHistoryScrollActions(projectDoubleClickActions(actions))) {
     const gesture = recordedGesture(event);
     const keyboardOnset = event.kind === 'KEY' ? event.data['keyboardOnsetTime'] : undefined;
     const observedKeyboard =

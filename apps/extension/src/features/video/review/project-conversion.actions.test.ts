@@ -1,3 +1,6 @@
+import eventsFixture from '../project/recording-events/fixtures.json';
+import { isRecordingEventsDescriptor } from '../project/recording-events/records';
+import { applyVideoProjectMutationPatch } from '../project/mutation';
 import { expect, it } from 'vitest';
 import { buildReviewTimeMap } from './timeline';
 import { parseHydratableVideoProject } from '../project/validation/root';
@@ -227,4 +230,30 @@ it('creates an ordinary feedback group for captured events even when the seed ha
   expect(getVideoProjectClickStyle(result.project, result.project.actionEvents[0]!)?.effect).toBe(
     'off'
   );
+});
+
+it('preserves the original event stream descriptor without materializing its facts during promotion', () => {
+  if (!isRecordingEventsDescriptor(eventsFixture.descriptor)) throw new Error('Invalid fixture.');
+  const input = fixture();
+  const clip = input.seed.clips.find((clip) => clip.type === 'VIDEO');
+  if (!clip || clip.type !== 'VIDEO' || !clip.sourceInstanceId) throw new Error('Missing source.');
+  input.seed = applyVideoProjectMutationPatch(input.seed, {
+    actionFeedback: [
+      {
+        recordingId: 'recording',
+        sourceInstanceId: clip.sourceInstanceId,
+        settings: [],
+        signals: [],
+        events: eventsFixture.descriptor,
+      },
+    ],
+  });
+  const plan = planReviewProjectConversion(input);
+  expect(plan.status).toBe('prepared');
+  if (plan.status !== 'prepared') throw new Error('Compact event transfer was refused.');
+  const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(plan.project)));
+  expect(reopened?.actionFeedback?.[0]?.events).toEqual(eventsFixture.descriptor);
+  expect(reopened?.actionFeedback?.[0]?.sourceInstanceId).toBe(plan.timeline.sourceInstanceId);
+  expect(reopened?.actionEvents).toEqual([]);
+  expect(reopened?.actionFeedback?.[0]?.signals).toEqual([]);
 });

@@ -29,6 +29,57 @@ function pushCompletedSignal(
   signal: CursorIdleTelemetrySignal | TypingTelemetrySignal,
   timestampMs: number
 ) {
+  if (state.eventSource) {
+    const endTimeUs = Math.round(
+      (signal.kind === 'typing'
+        ? signal.endTime
+        : Math.max(signal.startTime, getElapsedSeconds(state, timestampMs))) * 1000000
+    );
+    const point =
+      signal.point &&
+      signal.point.x >= 0 &&
+      signal.point.x <= window.innerWidth &&
+      signal.point.y >= 0 &&
+      signal.point.y <= window.innerHeight
+        ? { x: signal.point.x / window.innerWidth, y: signal.point.y / window.innerHeight }
+        : null;
+    state.eventSource.emit(
+      {
+        sourceClockId: signal.data.observationClockId,
+        observationTimeSeconds: getElapsedSeconds(state, timestampMs),
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio,
+          visualViewportScale: window.visualViewport?.scale ?? 1,
+          visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
+          visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
+        },
+      },
+      {
+        kind: 'signal',
+        signal: {
+          id: signal.id,
+          startTimeUs: Math.round(signal.startTime * 1000000),
+          endTimeUs,
+          point,
+          ...(signal.kind === 'typing'
+            ? {
+                kind: 'typing',
+                data: {
+                  eventCount: signal.data.eventCount,
+                  activity: 'input',
+                  privacy: 'normal',
+                  groupId: null,
+                  continuationOf: null,
+                },
+              }
+            : { kind: 'cursor-idle', data: { source: 'browser-cursor' } }),
+        },
+      }
+    );
+    return;
+  }
   const data =
     signal.kind === RecordingTelemetrySignalKind.TYPING
       ? {
@@ -97,9 +148,9 @@ function resolveKeyboardShortcutLabel(event: KeyboardEvent): string {
   return parts.join('+');
 }
 
-export function shouldRecordKeyboardShortcut(event: KeyboardEvent): boolean {
+export function shouldRecordKeyboardShortcut(event: KeyboardEvent, includeRepeat = false): boolean {
   if (
-    event.repeat ||
+    (event.repeat && !includeRepeat) ||
     event.isComposing ||
     event.getModifierState?.('AltGraph') ||
     ['Control', 'Meta', 'Alt', 'AltGraph', 'Shift', 'Dead', 'Process', 'Unidentified', ''].includes(
@@ -189,6 +240,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
     state.typingSignal !== null &&
     state.typingTarget === inputTarget &&
     lastEventTimeMs !== null &&
+    state.typingSignal.data.eventCount < Number.MAX_SAFE_INTEGER &&
     timestampMs - lastEventTimeMs < TYPING_MERGE_GAP_MS
   ) {
     state.typingSignal = {
@@ -299,6 +351,40 @@ export function finalizeTelemetrySignals(state: TelemetryState): void {
 /** Conservative whole-second activity coverage excludes private controls from idle automation. */
 export function recordProtectedActivity(state: TelemetryState, timestampMs: number): void {
   const startTime = Math.floor(getElapsedSeconds(state, timestampMs));
+  if (state.eventSource) {
+    state.eventSource.emit(
+      {
+        sourceClockId: state.observationClock.id,
+        observationTimeSeconds: startTime,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio,
+          visualViewportScale: window.visualViewport?.scale ?? 1,
+          visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
+          visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
+        },
+      },
+      {
+        kind: 'signal',
+        signal: {
+          id: crypto.randomUUID(),
+          kind: 'typing',
+          startTimeUs: startTime * 1000000,
+          endTimeUs: (startTime + 1) * 1000000,
+          point: null,
+          data: {
+            eventCount: null,
+            activity: 'input',
+            privacy: 'protected',
+            groupId: null,
+            continuationOf: null,
+          },
+        },
+      }
+    );
+    return;
+  }
   const previous = state.signals.at(-1);
   if (
     previous?.data['privacy'] === 'protected' &&

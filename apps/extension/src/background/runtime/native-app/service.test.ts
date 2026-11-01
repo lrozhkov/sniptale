@@ -24,6 +24,7 @@ vi.mock('../../capture/native-app/persistence/staging', async (original) => ({
 vi.mock('../../capture/native-app/controller', () => ({
   createNativeAppIngestionController: () => ({
     resumePendingTransfers: mocks.resume,
+    resumePendingHistoryTransfers: vi.fn(async () => []),
     handleScreenshotStart: mocks.ingest,
   }),
 }));

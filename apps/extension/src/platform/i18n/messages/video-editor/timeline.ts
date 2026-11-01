@@ -3,6 +3,10 @@ import { videoEditorTimelineAutoTransformMessages } from './timeline-auto-transf
 import { videoEditorTimelineLaneMessages } from './timeline-lanes';
 
 export const videoEditorTimelineMessages = defineMessageSource({
+  historyReadFailed: {
+    ru: 'Не удалось прочитать историю действий.',
+    en: 'Could not read action history.',
+  },
   historyLaneShort: { ru: 'История', en: 'History' },
   hideClipNames: { ru: 'Скрывать названия фрагментов', en: 'Hide clip names' },
   framingConnection: { ru: 'Переход', en: 'Transition' },

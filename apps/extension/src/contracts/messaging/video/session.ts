@@ -16,6 +16,7 @@ import type {
   RuntimeOffscreenBeginRecordingMessage,
   RuntimeOffscreenStartRecordingMessage,
   RuntimeOffscreenStopRecordingMessage,
+  RuntimeOffscreenRecordingObservationsMessage,
   RuntimeOffscreenUpdateSettingsMessage,
   RuntimeRecordingDurationUpdatedMessage,
   RuntimeRecordingStartFailedMessage,
@@ -157,6 +158,7 @@ export type RuntimeVideoSessionRequestByType = {
   [VideoMessageType.OFFSCREEN_SOURCE_READY]: RuntimeOffscreenSourceReadyMessage;
   [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeOffscreenBeginRecordingMessage;
   [VideoMessageType.OFFSCREEN_STOP_RECORDING]: RuntimeOffscreenStopRecordingMessage;
+  [VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS]: RuntimeOffscreenRecordingObservationsMessage;
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: {
     type: typeof VideoMessageType.OFFSCREEN_PAUSE_RECORDING;
     capabilityToken: string;

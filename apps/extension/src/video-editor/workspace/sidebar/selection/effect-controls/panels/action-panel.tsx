@@ -39,7 +39,7 @@ export function InspectActionPanel(props: ActionProps) {
   const occurrence = props.selectedActionOccurrence;
   if (!occurrence) return <SelectionEmptyState />;
   const event = occurrence.event;
-  const presentations = resolveVideoProjectActionPresentations(props.project);
+  const presentations = resolveVideoProjectActionPresentations(props.project, [event]);
   const resolved = presentations.find(
     (row) =>
       row.occurrence.eventId === occurrence.eventId && row.occurrence.clipId === occurrence.clipId
@@ -132,6 +132,7 @@ export function InspectActionPanel(props: ActionProps) {
                         label: translate('gallery.videoReview.actionAudio'),
                         content: (
                           <ActionFeedbackFields
+                            recordedAction={resolved.event}
                             project={props.project}
                             recordingId={event.anchor.recordingId}
                             sourceInstanceId={event.anchor.sourceInstanceId}
@@ -237,6 +238,7 @@ function sourceKeyGroups(
       label: translate('gallery.videoReview.actionAudio'),
       content: (
         <ActionFeedbackFields
+          recordedAction={resolved.event}
           project={props.project}
           recordingId={anchor.recordingId}
           sourceInstanceId={anchor.sourceInstanceId}
@@ -278,6 +280,7 @@ function actionVisualGroups({
         label: translate('gallery.videoReview.clickAppearance'),
         content: (
           <ActionFeedbackFields
+            recordedAction={resolved.event}
             project={props.project}
             recordingId={anchor.recordingId}
             sourceInstanceId={anchor.sourceInstanceId}
@@ -295,6 +298,7 @@ function actionVisualGroups({
         label: translate('gallery.videoReview.clickTiming'),
         content: (
           <ActionFeedbackFields
+            recordedAction={resolved.event}
             project={props.project}
             recordingId={anchor.recordingId}
             sourceInstanceId={anchor.sourceInstanceId}
@@ -331,6 +335,7 @@ function actionVisualGroups({
         label: translate('gallery.videoReview.clickAppearance'),
         content: (
           <ActionFeedbackFields
+            recordedAction={resolved.event}
             project={props.project}
             recordingId={event.anchor.recordingId}
             sourceInstanceId={event.anchor.sourceInstanceId}
@@ -414,6 +419,7 @@ function ActionPlacementFields({
       />
       {sharedClick && event.anchor.kind === 'recording-source' ? (
         <ActionFeedbackFields
+          recordedAction={resolved.event}
           project={props.project}
           recordingId={event.anchor.recordingId}
           sourceInstanceId={event.anchor.sourceInstanceId}
@@ -600,6 +606,7 @@ function ActionAppearanceFields({
       ) : null}
       {(gesture || click) && event.anchor.kind === 'recording-source' ? (
         <ActionFeedbackFields
+          recordedAction={resolved.event}
           project={props.project}
           recordingId={event.anchor.recordingId}
           sourceInstanceId={event.anchor.sourceInstanceId}

@@ -15,6 +15,8 @@ const io = vi.hoisted(() => ({
   prepare: vi.fn(),
   publish: vi.fn(),
   cancel: vi.fn(),
+  retire: vi.fn(),
+  retireEvents: vi.fn(),
   nativeReady: vi.fn(),
   nativePrepare: vi.fn(),
   connection: vi.fn(),
@@ -39,6 +41,12 @@ vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
 }));
 vi.mock('../../composition/persistence/remote-connection/store', () => ({
   loadSyncConnection: io.connection,
+}));
+vi.mock('../../composition/persistence/recordings/cursor-trajectory/staging', () => ({
+  retireJournalCursorTrajectoryStages: io.retire,
+}));
+vi.mock('../../composition/persistence/recordings/recording-events/staging', () => ({
+  retireJournalRecordingEventStages: io.retireEvents,
 }));
 vi.mock('./native-residency', () => ({
   isNativeEditingRootReady: io.nativeReady,
@@ -206,6 +214,8 @@ beforeEach(() => {
     io.events.push(`commit:${journal.journalId}`);
   });
   io.cancel.mockResolvedValue(undefined);
+  io.retire.mockResolvedValue(undefined);
+  io.retireEvents.mockResolvedValue(undefined);
 });
 
 it('commits dependencies before reading parent native admission and returns the pinned native root', async () => {
@@ -535,4 +545,30 @@ it('refuses changed connection identity before preparing a received dependency',
   expect(io.nativePrepare).not.toHaveBeenCalled();
   expect(io.publish).not.toHaveBeenCalled();
   expect(io.reading).toBe(false);
+});
+
+it('keeps the ready claim when private cursor stage cleanup fails during cancellation', async () => {
+  const f = fixture();
+  io.publish.mockImplementationOnce(async () => {
+    f.controller.abort();
+    throw new Error('Publication interrupted.');
+  });
+  io.retire.mockRejectedValueOnce(new Error('Private stage cleanup refused.'));
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('Private stage cleanup refused.');
+  expect(io.retire).toHaveBeenCalledWith('source');
+  expect(io.cancel).not.toHaveBeenCalled();
+  expect(io.prepare).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the ready claim when private event stage cleanup fails during cancellation', async () => {
+  const f = fixture();
+  io.publish.mockImplementationOnce(async () => {
+    f.controller.abort();
+    throw new Error('Publication interrupted.');
+  });
+  io.retireEvents.mockRejectedValueOnce(new Error('Private events cleanup refused.'));
+  await expect(receiveSelectedCatalogRoot(f)).rejects.toThrow('Private events cleanup refused.');
+  expect(io.retireEvents).toHaveBeenCalledWith('source');
+  expect(io.cancel).not.toHaveBeenCalled();
+  expect(io.prepare).toHaveBeenCalledTimes(1);
 });

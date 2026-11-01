@@ -1,3 +1,5 @@
+import { applyVideoProjectMutationPatch } from '../project/mutation';
+import type { CursorTrajectoryDescriptor } from '../project/cursor-trajectory/types';
 import { expect, it } from 'vitest';
 import { normalizeVideoProjectCursorSkin } from '../project/cursor';
 import {
@@ -423,3 +425,71 @@ it('preserves post-media raw facts and edited focus through conversion and reope
     expect(sample.time).toBeLessThanOrEqual(clip.startTime + clip.duration);
   }
 });
+
+it.each(['recording', 'project-asset'] as const)(
+  'preserves compact cursor history through Quick Edit promotion and reopen for %s',
+  (kind) => {
+    const input = fixture();
+    const clip = input.seed.clips.find((clip) => clip.type === 'VIDEO');
+    if (!clip || clip.type !== 'VIDEO' || !clip.sourceInstanceId)
+      throw new Error('Missing source.');
+    if (kind === 'project-asset')
+      input.seed.assets[0]!.source = {
+        kind,
+        projectAssetId: 'retained',
+        originRecordingId: 'recording',
+      };
+    const descriptor: CursorTrajectoryDescriptor = {
+      format: 'cursor-trajectory-v1',
+      formatVersion: 1,
+      algorithm: 'sed-window-v1',
+      encoding: 'json-ascii-int-v1',
+      trajectoryId: 'a'.repeat(32),
+      state: 'complete',
+      finalized: true,
+      totalBlocks: 100,
+      totalRecords: 6000,
+      totalSamples: 5998,
+      totalBytes: 1000000,
+      streamSha256: 'b'.repeat(64),
+    };
+    input.seed = applyVideoProjectMutationPatch(input.seed, {
+      cursorTrack: {
+        captureMode: 'embedded-fallback',
+        skin: normalizeVideoProjectCursorSkin(undefined),
+        samples: [],
+        sourceObservations: [
+          {
+            recordingId: 'recording',
+            sourceInstanceId: clip.sourceInstanceId,
+            samples: [],
+            trajectory: descriptor,
+          },
+        ],
+      },
+    });
+    const before = structuredClone(input);
+    const plan = planReviewProjectConversion(input);
+    expect(plan.status).toBe('prepared');
+    if (plan.status !== 'prepared') throw new Error('Compact cursor transfer was refused.');
+    const reopened = parseHydratableVideoProject(JSON.parse(JSON.stringify(plan.project)));
+    expect(reopened?.cursorTrack?.sourceObservations).toEqual([
+      {
+        recordingId: 'recording',
+        sourceInstanceId: plan.timeline.sourceInstanceId,
+        samples: [],
+        trajectory: descriptor,
+      },
+    ]);
+    expect(reopened?.cursorTrack?.samples).toEqual([]);
+    expect(input).toEqual(before);
+    const wrongSource = structuredClone(input);
+    wrongSource.seed.cursorTrack!.sourceObservations![0]!.recordingId = 'another-recording';
+    expect(planReviewProjectConversion(wrongSource).status).toBe('blocked');
+    const extraGroup = structuredClone(input);
+    extraGroup.seed.cursorTrack!.sourceObservations!.push(
+      structuredClone(extraGroup.seed.cursorTrack!.sourceObservations![0]!)
+    );
+    expect(planReviewProjectConversion(extraGroup).status).toBe('blocked');
+  }
+);

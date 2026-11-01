@@ -1,5 +1,6 @@
 import type {
   ArchiveObjectRef,
+  ArchiveStreamSource,
   ArchiveRootDescriptor,
 } from '../../../composition/archive-transfer';
 import type { MediaHubBackupLayout } from './layout';
@@ -23,10 +24,12 @@ export const MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER = [
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
-export interface ArchiveRootObjectSource {
-  blob: Blob;
+export type ArchiveRootObjectSource = {
   ref: MediaHubBackupRootEnvelope['objects'][number];
-}
+} & (
+  | { blob: Blob; open?: never }
+  | { blob?: never; open(signal?: AbortSignal): Promise<ArchiveStreamSource> }
+);
 
 export interface ArchiveRootPayload {
   metadata: JsonValue;

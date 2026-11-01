@@ -1,3 +1,10 @@
+import { retireNativeRecordingHistoryInTransaction } from '../recordings/native-history/retirement';
+import { retireRecordingEventSourcesInTransaction } from '../recordings/recording-events/retirement';
+import { RECORDING_EVENTS_SNAPSHOT_ROLE } from '../recordings/recording-events/contracts';
+import { retireRecordingCursorTrajectoriesInTransaction } from '../recordings/cursor-trajectory/retirement';
+import { RECORDING_CURSOR_SNAPSHOT_ROLE } from '../recordings/cursor-trajectory/contracts';
+import { parseAssetOwner } from '../assets/guards';
+import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
 import { parseMediaLibraryEntry } from './read-guards';
 import { parsePreparedVideoReviewReplicaRoot } from '../sync-capture/prepared-review';
 import { parseCapturedMediaRows } from '../sync-capture/guards';
@@ -82,7 +89,46 @@ export async function releaseMediaSource(
   switch (media.source.kind) {
     case 'screenshot':
       return;
-    case 'recording':
+    case 'recording': {
+      await retireNativeRecordingHistoryInTransaction(tx, media.source.recordingId);
+      const telemetry = parseRecordingTelemetryEntry(
+        await tx.objectStore(RECORDING_TELEMETRY_STORE).get(media.source.recordingId)
+      );
+      await retireRecordingCursorTrajectoriesInTransaction(
+        tx,
+        media.source.recordingId,
+        telemetry?.cursorTrajectory?.trajectoryId
+      );
+      await retireRecordingEventSourcesInTransaction(
+        tx,
+        media.source.recordingId,
+        telemetry?.recordingEvents?.eventStreamId
+      );
+      for (const role of [RECORDING_CURSOR_SNAPSHOT_ROLE, RECORDING_EVENTS_SNAPSHOT_ROLE]) {
+        const snapshotOwner: unknown = await tx.objectStore(ASSET_OWNERS_STORE).get!([
+          'recording',
+          media.source.recordingId,
+          role,
+        ]);
+        if (snapshotOwner !== undefined) {
+          const owner = parseAssetOwner(snapshotOwner);
+          if (
+            !owner ||
+            owner.ownerId !== media.source.recordingId ||
+            owner.ownerKind !== 'recording' ||
+            owner.role !== role
+          )
+            throw new MediaAssetDeletionBlockedError('unsupported-source');
+          await releaseAssetOwner({
+            tx,
+            physicalDelete,
+            assetId: owner.assetId,
+            ownerKind: owner.ownerKind,
+            ownerId: owner.ownerId,
+            role: owner.role,
+          });
+        }
+      }
       await releaseBodyRecord({
         tx,
         physicalDelete,
@@ -95,6 +141,7 @@ export async function releaseMediaSource(
       if (!options.retainRecordingRecovery)
         await deleteRecoveryInTransaction(tx, media.source.recordingId);
       return;
+    }
     case 'project-asset':
       return releaseBodyRecord({
         tx,

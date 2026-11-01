@@ -702,3 +702,71 @@ it('retains a nested private review while its parent publication is pending', as
   io.journals.mockResolvedValue([]);
   expect(await applyCatalogDeletionNative(deletion)).toEqual({ status: 'applied', generation: 1 });
 });
+
+it.each([
+  ['recording:orphan', 'recordings', 'orphan'],
+  ['recording:orphan', 'recording_telemetry', 'orphan'],
+  ['project-asset:orphan', 'project_assets', 'orphan'],
+  ['export:orphan', 'project_exports', 'orphan'],
+  ['absent', 'web_snapshots', 'absent'],
+  ['absent', 'image_workspaces', 'absent'],
+  ['absent', 'video_workspaces', 'absent'],
+  ['absent', 'video_workspace_drafts', 'absent'],
+  ['absent', 'thumbnails', 'absent'],
+])(
+  'refuses an absent %s root while its %s source evidence survives',
+  async (rootId, store, key) => {
+    const f = await setup();
+    f.table(store).set(key, { id: key, source: 'retained' });
+    const before = structuredClone(f.nativeRows);
+    await expect(
+      applyCatalogDeletionNative({
+        ...f.input,
+        rootId,
+        expectedLocalGeneration: 0,
+        expectedBasis: [],
+        expectedWorkspaceRevision: null,
+      })
+    ).rejects.toThrow('Incoming deletion refused');
+    expect(f.nativeRows).toEqual(before);
+    expect(io.cleanup).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['disabled', 'disconnected', 'malformed'])(
+  'preserves source history when the capture profile is %s',
+  async (state) => {
+    const f = await setup();
+    f.table('sync_capture').set('profile', {
+      version: 1,
+      kind: 'profile',
+      key: 'profile',
+      createdAt: 1,
+      enabled: state !== 'disabled',
+      spaceId: 'space',
+      connectionGeneration: state === 'disconnected' ? 4 : state === 'malformed' ? -1 : 3,
+    });
+    const before = structuredClone(f.nativeRows);
+    await expect(applyCatalogDeletionNative(f.input)).rejects.toThrow('Incoming deletion refused');
+    expect(f.nativeRows).toEqual(before);
+    expect(io.cleanup).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  { domain: 'sync-replica', payload: null },
+  { domain: 'sync-replica', payload: { kind: 'video-project', input: null } },
+  { domain: 'sync-replica', payload: { kind: 'video-project', input: { root: {} } } },
+  { domain: 'sync-replica', payload: { kind: 'video-project', input: { root: { entry: {} } } } },
+  { domain: 'sync-replica', payload: { kind: 'video-review', input: { root: {} } } },
+])(
+  'refuses project deletion while an unreadable ready publication retains its predecessor',
+  async (journal) => {
+    const f = await setup('video-project');
+    io.journals.mockResolvedValue([journal]);
+    const before = structuredClone(f.nativeRows);
+    await expect(applyCatalogDeletionNative(f.input)).rejects.toThrow('Incoming deletion refused');
+    expect(f.nativeRows).toEqual(before);
+    expect(io.cleanup).not.toHaveBeenCalled();
+  }
+);

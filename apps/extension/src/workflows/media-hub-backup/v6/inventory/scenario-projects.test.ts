@@ -1,3 +1,4 @@
+import { readArchiveRootObjectSource } from '../object-source.test-support';
 import { expect, it, vi } from 'vitest';
 const read = vi.hoisted(() => vi.fn());
 vi.mock('../../../../composition/persistence/assets', async (original) => ({
@@ -55,8 +56,8 @@ it('exports large saved history as a separate bounded object without inflating r
   expect(metadata.entry).not.toHaveProperty('history');
   const object = envelope.objects.find((item) => item.ref.objectId === metadata.historyObjectId);
   if (!object) throw new Error('Missing history object');
-  expect(object.blob.size).toBeGreaterThan(MAX_ROOT_METADATA_BYTES);
-  const history: unknown = JSON.parse(await object.blob.text());
+  expect((await readArchiveRootObjectSource(object)).size).toBeGreaterThan(MAX_ROOT_METADATA_BYTES);
+  const history: unknown = JSON.parse(await (await readArchiveRootObjectSource(object)).text());
   expect(history).toHaveLength(20);
   expect(object.ref.mimeType).toBe('application/json');
 });
@@ -117,7 +118,7 @@ it.each(['guide', 'tour'] as const)(
     expect(exported).toMatchObject({ filename: 'renamed.html', html: { mode } });
     expect(JSON.stringify(metadata)).not.toContain('local-body');
     expect(metadata.exports.find((item) => item.id === 'legacy')).not.toHaveProperty('html');
-    expect(await object.blob.text()).toBe(await blob.text());
+    expect(await (await readArchiveRootObjectSource(object)).text()).toBe(await blob.text());
     expect(object.ref.path).toContain('/Exports/renamed.html');
     expect(read).toHaveBeenCalledWith(ref, 'renamed.html');
   }

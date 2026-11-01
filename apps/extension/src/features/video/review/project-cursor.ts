@@ -1,3 +1,4 @@
+import { hasValidVideoProjectCursorSourceObservations } from '../project/cursor-source-observations';
 import { isCursorTrack } from '../project/validation/interaction';
 import { isRecord } from '../project/validation/primitives';
 import type {
@@ -15,7 +16,48 @@ export function planReviewProjectCursor(args: {
 }): { status: 'prepared'; track: VideoProjectCursorTrack | null } | { status: 'blocked' } {
   const track = args.seed.cursorTrack;
   if (track === null) return { status: 'prepared', track: null };
+  if (
+    !isRecord(track) ||
+    Object.keys(track).some(
+      (key) => !['captureMode', 'skin', 'samples', 'sourceObservations'].includes(key)
+    )
+  )
+    return { status: 'blocked' };
   const recordingId = args.recordingId;
+  if (track.sourceObservations !== undefined) {
+    const groups = track.sourceObservations;
+    if (
+      !recordingId ||
+      !isCursorTrack(track) ||
+      track.samples.length !== 0 ||
+      groups.length !== 1 ||
+      !hasValidVideoProjectCursorSourceObservations(args.seed)
+    )
+      return { status: 'blocked' };
+    const group = groups[0];
+    if (
+      !group ||
+      Object.keys(group).some(
+        (key) => !['recordingId', 'sourceInstanceId', 'samples', 'trajectory'].includes(key)
+      ) ||
+      !group.trajectory ||
+      group.samples.length !== 0 ||
+      group.recordingId !== recordingId ||
+      group.sourceInstanceId !== args.video.sourceInstanceId
+    )
+      return { status: 'blocked' };
+    return {
+      status: 'prepared',
+      track: {
+        ...structuredClone(track),
+        skin: { ...structuredClone(track.skin), hidden: true },
+        sourceObservations: [
+          { ...structuredClone(group), sourceInstanceId: args.sourceInstanceId },
+        ],
+      },
+    };
+  }
+
   if (
     !isRecord(track) ||
     !Array.isArray(track.samples) ||

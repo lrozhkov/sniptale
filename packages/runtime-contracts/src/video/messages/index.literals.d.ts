@@ -54,6 +54,8 @@ declare module './index' {
       typeof import('./index').VideoMessageType.OFFSCREEN_BEGIN_RECORDING;
     type OFFSCREEN_STOP_RECORDING =
       typeof import('./index').VideoMessageType.OFFSCREEN_STOP_RECORDING;
+    type OFFSCREEN_RECORDING_OBSERVATIONS =
+      typeof import('./index').VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS;
     type OFFSCREEN_GET_RECORDING_CLOCK_TIMING =
       typeof import('./index').VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING;
     type OFFSCREEN_PAUSE_RECORDING =

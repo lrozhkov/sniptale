@@ -1,3 +1,4 @@
+import type { VideoEditorRecordingActionObservation } from '../../../contracts/recording-events';
 import { motionFocusAreaScale } from '../../../../features/video/project/motion/focus-area';
 import { VideoMotionFocusMode } from '../../../../features/video/project/types';
 import type { VideoProjectMotionRegion } from '../../../../features/video/project/types';
@@ -32,7 +33,11 @@ export function ProjectTimelineEffectCanvasRows(
   props: UtilityLaneProps & {
     cursorLaneVisible?: boolean;
     selection?: import('../../../contracts/selection').VideoEditorSelection;
-    onSelectActionOccurrence?: (eventId: string, clipId: string | null) => void;
+    onSelectActionOccurrence?: (
+      eventId: string,
+      clipId: string | null,
+      observedAction?: VideoEditorRecordingActionObservation
+    ) => void;
     onSelectCursorSegment?: (sampleId: string) => void;
     onSelectMotionRegion?: (motionRegionId: string, part?: 'connection') => void;
     onSelectObjectTrack?: (objectTrackId: string) => void;

@@ -1,3 +1,10 @@
+import type { PortableRecordingEventsAttachment } from '../root-codecs/recording-events';
+import { portableRecordingTelemetry } from '../root-codecs/cursor-trajectory';
+import {
+  openStoredCursorTrajectoryStream,
+  type CursorTrajectoryArchiveStore,
+} from '../cursor-trajectory';
+import type { PortableCursorTrajectoryAttachment } from '../root-codecs/cursor-trajectory';
 import type { MediaHubBackupRootPreparation } from '../contracts';
 import { readWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
 import {
@@ -142,6 +149,7 @@ function mediaObjectDirectory(
 
 interface MediaObjectCollector {
   add(blob: Blob, filename: string, mimeType?: string, directory?: readonly string[]): string;
+  addStream: ReturnType<typeof createObjectCollector>['addStreamObject'];
   objects: ArchiveRootObjectSource[];
   sizeOf(objectId: string): number;
 }
@@ -160,6 +168,7 @@ function createMediaObjectCollector(
         directory
       );
     },
+    addStream: collector.addStreamObject,
     objects: collector.objects,
     sizeOf(objectId) {
       const object = collector.objects.find((candidate) => candidate.ref.objectId === objectId);
@@ -172,6 +181,7 @@ function createMediaObjectCollector(
 async function buildRecordingSource(args: {
   collector: MediaObjectCollector;
   db: MediaInventoryDatabase;
+  cursorStore?: CursorTrajectoryArchiveStore;
   entry: MediaLibraryEntry;
   options: MediaHubBackupExportOptions;
   recording: StoredRecordingEntry;
@@ -194,14 +204,71 @@ async function buildRecordingSource(args: {
         }
       : {}),
   };
-  const telemetry = args.options.includeTelemetry
+  const rawTelemetry = args.options.includeTelemetry
     ? parseRecordingTelemetryEntry(await args.db.get(RECORDING_TELEMETRY_STORE, stored.id))
     : null;
+  const telemetry = rawTelemetry ? portableRecordingTelemetry(rawTelemetry) : null;
+  let cursorAttachment: PortableCursorTrajectoryAttachment | undefined;
+  const descriptor = telemetry?.cursorTrajectory;
+  const snapshot = rawTelemetry?.cursorTrajectorySnapshot;
+  if (descriptor && snapshot) {
+    const file = await readAssetFile(snapshot.ref, `${stored.id}-cursor.bin`);
+    cursorAttachment = {
+      recordingId: stored.id,
+      sourceRecordingId: snapshot.sourceRecordingId,
+      width: snapshot.width,
+      height: snapshot.height,
+      descriptor,
+      objectId: args.collector.add(file, `${stored.id}-cursor.bin`, 'application/octet-stream'),
+    };
+  } else if (descriptor && descriptor.totalBlocks > 0) {
+    const store = args.cursorStore;
+    if (!store) throw new Error('Cursor trajectory export requires its frozen source.');
+    const head = await store.getHead({
+      recordingId: stored.id,
+      trajectoryId: descriptor.trajectoryId,
+    });
+    if (!head || !head.finalized || head.stagingJournalId !== undefined)
+      throw new Error('Cursor trajectory export source is unavailable.');
+    const attachment: PortableCursorTrajectoryAttachment = {
+      recordingId: stored.id,
+      sourceRecordingId: head.sourceRecordingId,
+      width: head.width,
+      height: head.height,
+      descriptor,
+      objectId: args.collector.addStream(
+        descriptor.totalBytes + descriptor.totalBlocks * 4,
+        `${stored.id}-cursor.bin`,
+        'application/octet-stream',
+        async (signal) => {
+          signal?.throwIfAborted();
+          return openStoredCursorTrajectoryStream(store, attachment, head.writerGeneration);
+        }
+      ),
+    };
+    cursorAttachment = attachment;
+  }
+  let eventsAttachment: PortableRecordingEventsAttachment | undefined;
+  const eventsDescriptor = telemetry?.recordingEvents;
+  const eventsSnapshot = rawTelemetry?.recordingEventsSnapshot;
+  if (eventsDescriptor && eventsDescriptor.totalBlocks > 0) {
+    if (!eventsSnapshot)
+      throw new Error('Recording events export requires its immutable snapshot.');
+    const file = await readAssetFile(eventsSnapshot.ref, `${stored.id}-events.bin`);
+    eventsAttachment = {
+      recordingId: stored.id,
+      sourceRecordingId: eventsSnapshot.sourceRecordingId,
+      descriptor: eventsDescriptor,
+      objectId: args.collector.add(file, `${stored.id}-events.bin`, 'application/octet-stream'),
+    };
+  }
   return {
     originalObjectId,
     recording: {
       entry: portableRecording,
       ...(telemetry ? { telemetry } : {}),
+      ...(cursorAttachment ? { cursorAttachment } : {}),
+      ...(eventsAttachment ? { eventsAttachment } : {}),
     } satisfies NonNullable<PortableMediaMetadata['recording']>,
   };
 }
@@ -259,6 +326,7 @@ async function buildMediaSource(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   collector: MediaObjectCollector;
   db: MediaInventoryDatabase;
+  cursorStore?: CursorTrajectoryArchiveStore;
   entry: MediaLibraryEntry;
   options: MediaHubBackupExportOptions;
 }): Promise<
@@ -475,6 +543,7 @@ async function buildMediaRoot(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   sourceMediaId?: string;
   db: MediaInventoryDatabase;
+  cursorStore?: CursorTrajectoryArchiveStore;
   item: MediaLibraryItem;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
@@ -494,6 +563,7 @@ async function buildMediaRoot(args: {
   const source = await buildMediaSource({
     collector,
     db: args.db,
+    ...(args.cursorStore ? { cursorStore: args.cursorStore } : {}),
     entry,
     options: args.options,
     expectedReview:
@@ -559,6 +629,12 @@ async function buildMediaRoot(args: {
       metadata.recording = {
         ...metadata.recording,
         entry: { ...metadata.recording.entry, id: localId },
+        ...(metadata.recording.cursorAttachment
+          ? { cursorAttachment: { ...metadata.recording.cursorAttachment, recordingId: localId } }
+          : {}),
+        ...(metadata.recording.eventsAttachment
+          ? { eventsAttachment: { ...metadata.recording.eventsAttachment, recordingId: localId } }
+          : {}),
         ...(metadata.recording.telemetry
           ? { telemetry: { ...metadata.recording.telemetry, recordingId: localId } }
           : {}),
@@ -616,6 +692,7 @@ export async function buildMediaRootInventory(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   reviewWorkspaceHeads?: readonly unknown[];
   db: MediaInventoryDatabase;
+  cursorStore?: CursorTrajectoryArchiveStore;
   items: MediaLibraryItem[];
   coveredProjectMediaIds?: ReadonlySet<string>;
   options: MediaHubBackupExportOptions;

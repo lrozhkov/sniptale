@@ -1,3 +1,4 @@
+import type { RecordingProjectActionAudioSource } from '../../../../workflows/video-review/recording-action-audio';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import {
   iterateReviewActionAudioCues,
@@ -13,6 +14,7 @@ export function createProjectActionAudioRuntime() {
   const runtime = new ProjectActionAudioRuntime();
   return {
     sync: runtime.sync.bind(runtime),
+    prepare: runtime.prepare.bind(runtime),
     audition: runtime.audition.bind(runtime),
     close: runtime.close.bind(runtime),
     reset: runtime.reset.bind(runtime),
@@ -25,6 +27,13 @@ class ProjectActionAudioRuntime {
   private currentPlan: ReviewActionAudioPlan | null = null;
   private incomingPlan: ReviewActionAudioPlan | null = null;
   private planSignature = '';
+  private recordingSource: RecordingProjectActionAudioSource | null = null;
+  private windowRead: {
+    source: RecordingProjectActionAudioSource;
+    start: number;
+    end: number;
+    promise: Promise<ReviewActionAudioPlan>;
+  } | null = null;
   private controller = new AbortController();
   private context: AudioContext | null = null;
   private output: GainNode | null = null;
@@ -71,21 +80,25 @@ class ProjectActionAudioRuntime {
     this.output = null;
     if (previous && previous.state !== 'closed') await previous.close();
   };
-  private revisePlan = (plan: ReviewActionAudioPlan) => {
-    if (plan !== this.incomingPlan) {
-      this.incomingPlan = plan;
-      const signature = JSON.stringify(plan);
-      if (signature !== this.planSignature) {
-        this.stop();
-        void this.closePlan().catch(() => undefined);
-        if (this.disposed) return;
-        this.planSignature = signature;
-        this.currentPlan = plan;
-        this.controller = new AbortController();
-      }
+  private revisePlan = (
+    plan: ReviewActionAudioPlan,
+    recordingSource: RecordingProjectActionAudioSource | null = null
+  ) => {
+    if (recordingSource && recordingSource === this.recordingSource) return;
+    if (plan === this.incomingPlan && recordingSource === this.recordingSource) return;
+    this.incomingPlan = plan;
+    const signature = recordingSource ? '' : JSON.stringify(plan);
+    if (recordingSource !== this.recordingSource || signature !== this.planSignature) {
+      this.stop();
+      void this.closePlan().catch(() => undefined);
+      if (this.disposed) return;
+      this.recordingSource = recordingSource;
+      this.planSignature = signature;
+      this.currentPlan = plan;
+      this.controller = new AbortController();
     }
   };
-  private ensureGraph = (plan: ReviewActionAudioPlan) => {
+  private ensureGraph = (plan: ReviewActionAudioPlan, requestSignal?: AbortSignal) => {
     if (!this.context) {
       this.context = new AudioContext({ sampleRate: 44100, latencyHint: 'interactive' });
       const graph = this.context;
@@ -97,7 +110,12 @@ class ProjectActionAudioRuntime {
         fetch,
         decode: (bytes) => graph.decodeAudioData(bytes),
       });
-      this.ready = admitReviewActionAudioPlan(plan, this.controller.signal);
+      const signal = requestSignal
+        ? AbortSignal.any([requestSignal, this.controller.signal])
+        : this.controller.signal;
+      this.ready = this.recordingSource
+        ? this.recordingSource.admit(signal)
+        : admitReviewActionAudioPlan(plan, signal);
     }
   };
   private scheduleCue = async (
@@ -173,19 +191,85 @@ class ProjectActionAudioRuntime {
     this.scheduled.set(cue.id, cue.end);
     return true;
   };
+  private async recordingWindow(
+    source: RecordingProjectActionAudioSource
+  ): Promise<ReviewActionAudioPlan | null> {
+    for (;;) {
+      if (this.disposed || this.recordingSource !== source || this.controller.signal.aborted)
+        return null;
+      if (this.desiredTime < 0 || this.desiredTime >= source.duration)
+        return { duration: source.duration, descriptors: [] };
+      let request = this.windowRead;
+      if (request?.source !== source) {
+        const start = Math.floor(Math.max(0, this.desiredTime));
+        const end = Math.min(source.duration, start + 2);
+        request = {
+          source,
+          start,
+          end,
+          promise: source.readWindow({ start, end }, this.controller.signal),
+        };
+        this.windowRead = request;
+        const owned = request;
+        const release = () => {
+          if (this.windowRead === owned) this.windowRead = null;
+        };
+        void request.promise.then(release, release);
+      }
+      const plan = await request.promise;
+      if (this.disposed || this.recordingSource !== source || this.controller.signal.aborted)
+        return null;
+      if (
+        this.desiredTime >= request.start &&
+        Math.min(source.duration, this.desiredTime + 0.35) <= request.end
+      )
+        return plan;
+    }
+  }
+  /** Playback admission and fixed catalog preload finish before the play clock starts. */
+  async prepare(
+    args: { plan: ReviewActionAudioPlan; recordingSource?: RecordingProjectActionAudioSource },
+    signal: AbortSignal
+  ): Promise<void> {
+    signal.throwIfAborted();
+    if (this.disposed) return;
+    this.revisePlan(args.plan, args.recordingSource ?? null);
+    const plan = this.currentPlan!;
+    if (!plan.descriptors.length && !this.recordingSource) return;
+    this.ensureGraph(plan, signal);
+    const controller = this.controller;
+    const reader = this.source!;
+    try {
+      const admission = await this.ready!;
+      signal.throwIfAborted();
+      controller.signal.throwIfAborted();
+      for (const sample of admission.sampleIds) {
+        await reader.read(sample);
+        signal.throwIfAborted();
+        controller.signal.throwIfAborted();
+      }
+    } catch (error) {
+      if (signal.aborted && this.controller === controller) {
+        await this.closePlan();
+        if (this.controller === controller) this.controller = new AbortController();
+      }
+      throw error;
+    }
+  }
   async sync(args: {
     plan: ReviewActionAudioPlan;
+    recordingSource?: RecordingProjectActionAudioSource;
     currentTime: number;
     isPlaying: boolean;
     outputGain?: number;
   }) {
     if (this.disposed) return;
-    this.revisePlan(args.plan);
+    this.revisePlan(args.plan, args.recordingSource ?? null);
     const plan = this.currentPlan!;
     const priorPlaying = this.playing;
     this.playing = args.isPlaying;
     this.desiredTime = args.currentTime;
-    if (!this.playing || !plan.descriptors.length) {
+    if (!this.playing || (!plan.descriptors.length && !this.recordingSource)) {
       this.stop();
       return;
     }
@@ -209,10 +293,21 @@ class ProjectActionAudioRuntime {
     await Promise.all(this.pending.values());
     if (this.disposed || revision !== this.generation || !this.playing || this.currentPlan !== plan)
       return;
+    const windowPlan = this.recordingSource
+      ? await this.recordingWindow(this.recordingSource)
+      : plan;
+    if (
+      !windowPlan ||
+      this.disposed ||
+      revision !== this.generation ||
+      !this.playing ||
+      this.currentPlan !== plan
+    )
+      return;
     const start = this.desiredTime,
       end = Math.min(plan.duration, start + 0.35);
     for (const [id, tail] of this.scheduled) if (tail <= start) this.scheduled.delete(id);
-    for (const batch of iterateReviewActionAudioCues(plan, { start, end }))
+    for (const batch of iterateReviewActionAudioCues(windowPlan, { start, end }))
       for (const cue of batch) {
         if (
           !(await this.scheduleCue(cue, {
@@ -230,14 +325,27 @@ class ProjectActionAudioRuntime {
     if (this.failed.size) throw this.failed.values().next().value;
   }
   /** One audition prepares native samples before its bounded playback and then closes its graph. */
-  async audition(plan: ReviewActionAudioPlan, signal: AbortSignal): Promise<void> {
+  async audition(
+    plan: ReviewActionAudioPlan,
+    signal: AbortSignal,
+    recordingSource?: RecordingProjectActionAudioSource
+  ): Promise<void> {
     signal.throwIfAborted();
     if (this.disposed) return;
-    const first = iterateReviewActionAudioCues(plan, { start: 0, end: plan.duration }).next();
-    if (first.done || !first.value.length) return;
-    const start = first.value[0]!.start;
+    let first: number | null;
+    if (recordingSource) first = (await recordingSource.admit(signal)).firstCueTime;
+    else {
+      const firstBatch = iterateReviewActionAudioCues(plan, {
+        start: 0,
+        end: plan.duration,
+      }).next();
+      first = firstBatch.done ? null : (firstBatch.value[0]?.start ?? null);
+    }
+    signal.throwIfAborted();
+    if (first === null || this.disposed) return;
+    const start = first;
     const end = Math.min(plan.duration, start + 2);
-    this.revisePlan(plan);
+    this.revisePlan(plan, recordingSource ?? null);
     this.ensureGraph(plan);
     const graph = this.context!;
     const source = this.source!;
@@ -257,7 +365,12 @@ class ProjectActionAudioRuntime {
       this.playing = true;
       this.anchorTime = start;
       this.anchorClock = graph.currentTime + lead;
-      await this.sync({ plan, currentTime: start, isPlaying: true });
+      await this.sync({
+        plan,
+        ...(recordingSource ? { recordingSource } : {}),
+        currentTime: start,
+        isPlaying: true,
+      });
       const audioStart = this.anchorClock;
       const deadline = performance.now() + (end - start + lead) * 1000;
       while (!this.disposed && performance.now() < deadline) {
@@ -266,7 +379,12 @@ class ProjectActionAudioRuntime {
         if (this.disposed) return;
         const currentTime = Math.max(start, start + graph.currentTime - audioStart);
         if (currentTime >= end) break;
-        await this.sync({ plan, currentTime, isPlaying: true });
+        await this.sync({
+          plan,
+          ...(recordingSource ? { recordingSource } : {}),
+          currentTime,
+          isPlaying: true,
+        });
       }
     } finally {
       signal.removeEventListener('abort', stop);

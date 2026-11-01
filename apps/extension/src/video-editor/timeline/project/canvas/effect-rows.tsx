@@ -1,3 +1,4 @@
+import type { VideoEditorRecordingActionObservation } from '../../../contracts/recording-events';
 import type { TimelineProjection } from '../interaction-state/projection';
 import type { MutableRefObject } from 'react';
 import type { VideoProject } from '../../../../features/video/project/types';
@@ -16,7 +17,11 @@ export function ProjectTimelineCanvasEffectRows(props: {
   onBeginEffectRangeSelection: React.PointerEventHandler<HTMLDivElement>;
   onAddMotionRegion: (startTime?: number) => void;
   onResizeMotionRegion: (motionRegionId: string, startTime: number, duration: number) => void;
-  onSelectActionOccurrence: (eventId: string, clipId: string | null) => void;
+  onSelectActionOccurrence: (
+    eventId: string,
+    clipId: string | null,
+    observedAction?: VideoEditorRecordingActionObservation
+  ) => void;
   onSelectCursorSegment: (sampleId: string) => void;
   onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => void;
   onConnectMotionRegions?: ((fromRegionId: string, toRegionId: string) => void) | undefined;

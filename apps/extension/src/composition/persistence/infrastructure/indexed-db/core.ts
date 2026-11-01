@@ -428,3 +428,8 @@ export function subscribeToDbTermination(listener: DbTerminationListener): () =>
     state.dbTerminationListeners.delete(listener);
   };
 }
+
+/** Uses the database key order for bounded compound-index pagination. */
+export function compareIndexedDbKeys(first: IDBValidKey, second: IDBValidKey): number {
+  return indexedDB.cmp(first, second);
+}

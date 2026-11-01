@@ -1,3 +1,4 @@
+import { openArchiveRootObjectSource } from '../media-hub-backup/v6/object-source';
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import { sanitizeArchivePathSegment } from '../../composition/archive-transfer';
 import {
@@ -56,6 +57,7 @@ import {
   type parseSyncAttemptText,
   parseSyncOperationText,
   isSyncObjectRemoteKey,
+  syncOperationVersionForRoot,
 } from './wire-record';
 
 function check(condition: unknown): asserts condition {
@@ -81,7 +83,7 @@ function preparationDraft(
 ) {
   const recordText = JSON.stringify({
     format: 'sniptale-sync-operation',
-    version: 1,
+    version: syncOperationVersionForRoot(portable?.envelope ?? null),
     spaceId: capture.spaceId,
     operationId: capture.operationId,
     rootKind: capture.rootKind,
@@ -182,12 +184,15 @@ async function prepareNativeOutgoing(
       : await encodeCapturedPortableRoot(capture, deferredExports);
   const digests = new Map<string, string>();
   for (const object of portable?.objects ?? [])
-    digests.set(object.ref.objectId, await hashFile(object.blob));
+    digests.set(
+      object.ref.objectId,
+      await digestBackupObject(await openArchiveRootObjectSource(object))
+    );
   let staged: StagedArchiveObject[] = [];
   let accepted: PreparedOutgoingOperation;
   try {
     if (portable) {
-      const sources = new Map(portable.objects.map((object) => [object.ref.objectId, object.blob]));
+      const sources = new Map(portable.objects.map((object) => [object.ref.objectId, object]));
       const unbound = portable.envelope.objects.filter(
         (object) => !portable.bindings.some((binding) => binding.objectId === object.objectId)
       );
@@ -199,11 +204,9 @@ async function prepareNativeOutgoing(
             unbound.map((object) => [object.objectId, digests.get(object.objectId)!])
           ),
           readObject: async (object) => {
-            const blob = sources.get(object.objectId);
-            check(blob);
-            return {
-              pipeTo: (sink, signal) => blob.stream().pipeTo(sink, signal ? { signal } : {}),
-            };
+            const source = sources.get(object.objectId);
+            check(source);
+            return openArchiveRootObjectSource(source);
           },
         });
     }

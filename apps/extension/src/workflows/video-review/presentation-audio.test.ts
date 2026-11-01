@@ -539,3 +539,26 @@ it('keeps ordinary voiceover and authored source gain in main audio before the s
   const clipped = await collect(args);
   expect(clipped.left).toEqual(full.slice(7000, 10000));
 });
+
+it(
+  'keeps globally admitted archive audio in the main sequence when inline cues and ' +
+    'original audio are absent',
+  async () => {
+    const args = request({ duration: 0.2 });
+    args.main.track = null;
+    const source = { duration: 0.2, admit: vi.fn(), readWindow: vi.fn(), dispose: vi.fn() };
+    args.main.exportAudio = {
+      entries: [],
+      buffers: new Map(),
+      originalVolume: 1,
+      originalMuted: true,
+      recordingAction: { source, offset: 0, busGain: 1 },
+    };
+    await collect(args);
+    expect(
+      vi
+        .mocked(renderReviewAudio)
+        .mock.calls.some((call) => call[4]?.recordingAction?.source === source)
+    ).toBe(true);
+  }
+);

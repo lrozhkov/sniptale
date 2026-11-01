@@ -239,6 +239,8 @@ function ReviewEditor({
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              onHistoryRange={state.setHistoryRange}
+              cursorArchiveAvailable={state.cursorArchiveAvailable}
               annotationEffects={state.annotationEffects}
               annotationToolCancellation={state.annotationToolCancellation}
               effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}

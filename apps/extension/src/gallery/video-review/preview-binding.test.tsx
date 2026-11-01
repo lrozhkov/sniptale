@@ -623,3 +623,45 @@ it('forwards inspector draft interaction to the preview and clears it after canc
   expect(stage().preview?.interacting).toBe(false);
   expect(state.zoom.change).not.toHaveBeenCalled();
 });
+
+it('shows a retryable history failure while keeping the existing video transport available', async () => {
+  const retry = vi.fn();
+  state.history = { telemetry: null, pending: false, failed: true, incomplete: false, retry };
+  await render();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'gallery.videoReview.recordingHistoryFailed'
+  );
+  const button = [...host.querySelectorAll('button')].find((node) =>
+    node.textContent?.includes('gallery.videoReview.retry')
+  );
+  expect(button).toBeDefined();
+  await act(async () => button!.click());
+  expect(retry).toHaveBeenCalledOnce();
+  expect(frame().disabled).toBe(false);
+  state.history = { ...state.history, failed: false, pending: true };
+  await render();
+  expect(host.querySelector('[role="status"]')?.textContent).toContain(
+    'gallery.videoReview.recordingHistoryLoading'
+  );
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
+it(
+  'reports incomplete retained history after loading without blocking video or inventing ' +
+    'a retry failure',
+  async () => {
+    state.history = {
+      telemetry: null,
+      failed: false,
+      pending: false,
+      incomplete: true,
+      retry: vi.fn(),
+    };
+    await render();
+    expect(host.querySelector('[role="status"]')?.textContent).toContain(
+      'gallery.videoReview.recordingHistoryIncomplete'
+    );
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(frame().disabled).toBe(false);
+  }
+);

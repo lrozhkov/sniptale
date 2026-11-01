@@ -1,7 +1,7 @@
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 46;
+export const DB_VERSION = 48;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -12,6 +12,9 @@ export const STORE_NAME = 'recordings';
 export const RECORDING_RECOVERY_SESSIONS_STORE = 'recording_recovery_sessions';
 export const RECORDING_RECOVERY_BLOCKS_STORE = 'recording_recovery_blocks';
 export const RECORDING_TELEMETRY_STORE = 'recording_telemetry';
+export const RECORDING_CURSOR_TRAJECTORIES_STORE = 'recording_cursor_trajectories';
+export const RECORDING_CURSOR_BLOCKS_STORE = 'recording_cursor_blocks';
+export const RECORDING_EVENTS_STORE = 'recording_events';
 export const DIAGNOSTICS_META_STORE = 'diagnostics_meta';
 export const DIAGNOSTICS_EVENTS_STORE = 'diagnostics_events';
 export const VIDEO_PROJECTS_STORE = 'video_projects';
@@ -92,6 +95,9 @@ export const EXPECTED_STORES = [
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
   ASSET_RESIDENCY_STORE,
+  RECORDING_CURSOR_TRAJECTORIES_STORE,
+  RECORDING_CURSOR_BLOCKS_STORE,
+  RECORDING_EVENTS_STORE,
   SCHEMA_CONTRACTS_STORE,
 ] as const;
 
@@ -137,5 +143,8 @@ export const EXPECTED_INDEXES = {
   [SYNC_CATALOG_CACHE_STORE]: [],
   [SYNC_CONNECTION_STORE]: [],
   [ASSET_RESIDENCY_STORE]: [],
+  [RECORDING_CURSOR_TRAJECTORIES_STORE]: ['recordingId'],
+  [RECORDING_CURSOR_BLOCKS_STORE]: ['trajectory', 'time'],
+  [RECORDING_EVENTS_STORE]: ['kind', 'timeBuckets'],
   [SCHEMA_CONTRACTS_STORE]: [],
 } as const satisfies Record<(typeof EXPECTED_STORES)[number], readonly string[]>;

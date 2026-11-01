@@ -1,7 +1,8 @@
+import { reviewRecordingWindow } from '../telemetry';
 import { cropWindowCameraObservations as cropCameraObservations } from '../../composition/motion/window-camera-geometry';
 import { resolveAuthoredCursorFocusPath } from '../../project/cursor-focus-path/authoring';
 import {
-  deriveRecordedCursorFocusPath as deriveReviewCursorFocusPath,
+  deriveRecordedCursorFocusPath,
   type RecordedCursorFacts,
 } from '../../project/cursor-focus-path/recorded';
 import type { CursorFocusPath } from '../../project/cursor-focus-path/types';
@@ -22,7 +23,21 @@ import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
 import { fitQuickEditSourceCrop } from './canvas';
 
 export type ReviewCursorFacts = RecordedCursorFacts;
-export { deriveReviewCursorFocusPath };
+/** Derived focus uses only the observations present in the disposable source window. */
+export function deriveReviewCursorFocusPath(
+  facts: Parameters<typeof deriveRecordedCursorFocusPath>[0],
+  source: Parameters<typeof deriveRecordedCursorFocusPath>[1],
+  observed = false,
+  retainedKeyId?: string
+) {
+  const end = reviewRecordingWindow(facts)?.cursorEndSeconds;
+  return deriveRecordedCursorFocusPath(
+    facts,
+    end === undefined ? source : { ...source, duration: Math.min(source.duration, end) },
+    observed,
+    retainedKeyId
+  );
+}
 
 export function evaluateReviewCursorFocus(path: CursorFocusPath, sourceTime: number) {
   for (const segment of path.segments) {

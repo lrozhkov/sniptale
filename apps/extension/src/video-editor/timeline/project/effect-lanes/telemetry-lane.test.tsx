@@ -1,3 +1,12 @@
+import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
+import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
+import { prepareRecordingEventsProject } from '../../../../features/video/project/recording-events/project-window';
+import { decodeRecordingEventsBlock } from '../../../../features/video/project/recording-events/blocks';
+import { isRecordingEventsDescriptor } from '../../../../features/video/project/recording-events/records';
+import fixtureData from '../../../../features/video/project/recording-events/fixtures.json';
+import { recordingEventProjectActions } from '../../../../features/video/project/recording-events/project-facts';
+import { resolveRecordingActionOccurrences } from '../../../project/operations/recording-events-selection';
+import { resolveTypingSpanSource } from '../../../project/state/clip-timeline/source-range';
 // @vitest-environment jsdom
 
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
@@ -683,4 +692,108 @@ it('keeps every typing instance and held command accessible when their entire hi
   expect(chooser).not.toBeNull();
   act(() => chooser.click());
   expect(document.querySelectorAll('[role="option"]')).toHaveLength(3);
+});
+
+it('passes the canonical streamed action through actual marker selection and drag admission', async () => {
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [],
+    recordingSignals: [],
+  });
+  const events = fixtureData.descriptor;
+  const block = decodeRecordingEventsBlock(new TextEncoder().encode(fixtureData.blocks[0]!.utf8));
+  if (!isRecordingEventsDescriptor(events) || !block) throw new Error('Invalid test fixture.');
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+  });
+  const prepared = await prepareRecordingEventsProject(project, { start: 0, end: 1 }, async () => ({
+    writerGeneration: 'generation',
+    records: block.records.filter((record) => record.kind === 'action'),
+  }));
+  const event = recordingEventProjectActions(prepared)[0]!;
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const select = vi.fn();
+  const begin = vi.fn();
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={prepared}
+        recordingTelemetry={[]}
+        pixelsPerSecond={100}
+        onSeek={vi.fn()}
+        onSelectActionOccurrence={select}
+        onBeginEffectInteraction={begin}
+      />
+    )
+  );
+  const marker = container.querySelector<HTMLButtonElement>('[data-action-id]')!;
+  expect(marker).not.toBeNull();
+  act(() => marker.click());
+  expect(select).toHaveBeenCalledWith(
+    event.id,
+    clip.id,
+    expect.objectContaining({ streamSha256: events.streamSha256, record: { ...block.records[1] } })
+  );
+  const observed = select.mock.calls[0]![2];
+  expect(resolveRecordingActionOccurrences(project, observed)[0]?.event.id).toBe(event.id);
+  act(() => marker.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })));
+  expect(begin).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ observedAction: observed })
+  );
+  expect(project.actionEvents).toEqual([]);
+});
+
+it('passes a streamed typing interval to the source-range owner without legacy telemetry', async () => {
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [],
+    recordingSignals: [],
+  });
+  const events = fixtureData.descriptor;
+  const block = decodeRecordingEventsBlock(new TextEncoder().encode(fixtureData.blocks[0]!.utf8));
+  if (!isRecordingEventsDescriptor(events) || !block) throw new Error('Invalid test fixture.');
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+  });
+  const prepared = await prepareRecordingEventsProject(project, { start: 0, end: 1 }, async () => ({
+    writerGeneration: 'generation',
+    records: block.records.flatMap((record) =>
+      record.kind === 'signal' && record.signal.kind === 'typing' ? [record] : []
+    ),
+  }));
+  const select = vi.fn();
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={prepared}
+        recordingTelemetry={[]}
+        pixelsPerSecond={1000}
+        onSeek={vi.fn()}
+        onSelectHistorySpan={select}
+      />
+    )
+  );
+  const marker = container.querySelector<HTMLButtonElement>('[data-history-span-kind="typing"]')!;
+  expect(marker).not.toBeNull();
+  act(() => marker.click());
+  expect(select).toHaveBeenCalledOnce();
+  expect(
+    resolveTypingSpanSource(project, [], select.mock.calls[0]![0])?.signal.data['eventCount']
+  ).toBe(3);
+  expect(project.actionFeedback![0]!.signals).toEqual([]);
 });

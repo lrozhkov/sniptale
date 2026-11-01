@@ -39,6 +39,7 @@ vi.mock('./opfs-store', async (importOriginal) => ({
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: vi.fn(async (effect) =>
     effect({
+      getAllFromIndex: async () => [],
       get: async (_store: string, assetId: string) =>
         storage.refs.has(assetId) ? createRef(assetId) : undefined,
       getAll: async (store: string) =>

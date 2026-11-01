@@ -1,3 +1,6 @@
+import { projectRecordingEventSignal } from '../../../../features/video/project/recording-events/project-facts';
+import { recordingActionObservation } from '../../../project/operations/recording-events-selection';
+import type { VideoEditorRecordingActionObservation } from '../../../contracts/recording-events';
 import type { clusterHistoryIntervals } from './history-clusters';
 import type { TimelineEffectDragTarget } from '../types';
 import { TimelineEffectDraftContext } from './segment';
@@ -41,7 +44,7 @@ import type {
   VideoProject,
   VideoProjectActionEvent,
 } from '../../../../features/video/project/types';
-import { buildTimelineTelemetryLaneData } from '../../../project/operations/telemetry-lane';
+import { buildProjectTimelineTelemetryLaneData } from '../../../project/operations/telemetry-lane';
 import { TIMELINE_OBJECT_MARKER_PROPS } from '../canvas/hover-preview';
 import {
   getTelemetryLaneIcon,
@@ -394,7 +397,13 @@ interface TimelineHistoryLaneProps {
     | undefined;
   onSelectHistorySpan?: ((target: VideoEditorTypingSpanTarget) => void) | undefined;
   onSeek: (time: number) => void;
-  onSelectActionOccurrence?: ((eventId: string, clipId: string | null) => void) | undefined;
+  onSelectActionOccurrence?:
+    | ((
+        eventId: string,
+        clipId: string | null,
+        observedAction?: VideoEditorRecordingActionObservation
+      ) => void)
+    | undefined;
   selection?: VideoEditorSelection | undefined;
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
@@ -411,13 +420,8 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
   );
   const spans = useMemo(
     () =>
-      props.recordingTelemetry.flatMap((telemetry) =>
-        buildTimelineTelemetryLaneData(props.project, telemetry.recordingId, telemetry)
-          .spans.filter((span) => span.kind === 'typing')
-          .map((span) => ({
-            ...span,
-            id: JSON.stringify([telemetry.recordingId, span.id]),
-          }))
+      buildProjectTimelineTelemetryLaneData(props.project, props.recordingTelemetry).spans.filter(
+        (span) => span.kind === 'typing'
       ),
     [props.project, props.recordingTelemetry]
   );
@@ -443,6 +447,7 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
       sourceInstanceId: span.sourceInstanceId,
       signalId: span.signalId,
       clipId: span.clipId,
+      ...(span.observedSignal ? { observedSignal: span.observedSignal } : {}),
     });
   };
   const typingSelected = (span: (typeof spans)[number]) =>
@@ -457,7 +462,14 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
       selectTyping(id);
       return;
     }
-    props.onSelectActionOccurrence?.(item.occurrence.eventId, item.occurrence.clipId);
+    const observedAction = recordingActionObservation(props.project, item.event);
+    if (observedAction)
+      props.onSelectActionOccurrence?.(
+        item.occurrence.eventId,
+        item.occurrence.clipId,
+        observedAction
+      );
+    else props.onSelectActionOccurrence?.(item.occurrence.eventId, item.occurrence.clipId);
   };
   const selectedId =
     props.selection?.kind === 'action-occurrence'
@@ -524,11 +536,19 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
         selectedId={selectedId}
         select={select}
         begin={(event, item) => {
-          props.onSelectActionOccurrence?.(item.occurrence.eventId, item.occurrence.clipId);
+          const observedAction = recordingActionObservation(props.project, item.event);
+          if (observedAction)
+            props.onSelectActionOccurrence?.(
+              item.occurrence.eventId,
+              item.occurrence.clipId,
+              observedAction
+            );
+          else props.onSelectActionOccurrence?.(item.occurrence.eventId, item.occurrence.clipId);
           if (getVideoProjectUtilityLanes(props.project).actions.locked) return;
           const { minimumTime, maximumTime } = historyTimeBounds(item, props.project);
           props.onBeginEffectInteraction?.(event, {
             kind: 'action',
+            ...(observedAction ? { observedAction } : {}),
             eventId: item.occurrence.eventId,
             clipId: item.occurrence.clipId,
             segmentId: JSON.stringify([item.occurrence.eventId, item.occurrence.clipId]),
@@ -562,11 +582,13 @@ function ActionHistoryMarkers({
     item: ResolvedVideoProjectActionPresentation
   ) => void;
   groups: (ReturnType<typeof clusterHistoryIntervals>[number] & { top: number })[];
-  spansById: Map<string, ReturnType<typeof buildTimelineTelemetryLaneData>['spans'][number]>;
+  spansById: Map<string, ReturnType<typeof buildProjectTimelineTelemetryLaneData>['spans'][number]>;
   typingSelected: (
-    span: ReturnType<typeof buildTimelineTelemetryLaneData>['spans'][number]
+    span: ReturnType<typeof buildProjectTimelineTelemetryLaneData>['spans'][number]
   ) => boolean;
-  spanLabel: (span: ReturnType<typeof buildTimelineTelemetryLaneData>['spans'][number]) => string;
+  spanLabel: (
+    span: ReturnType<typeof buildProjectTimelineTelemetryLaneData>['spans'][number]
+  ) => string;
   spanProps: TimelineHistoryLaneProps;
   actionLeft: Map<string, number>;
   actionWidths: Map<string, number>;
@@ -699,12 +721,14 @@ function historyClusterStyle(width = 40): CSSProperties & Record<`--${string}`, 
 
 function typingSpanLabel(
   project: VideoProject,
-  span: ReturnType<typeof buildTimelineTelemetryLaneData>['spans'][number],
+  span: ReturnType<typeof buildProjectTimelineTelemetryLaneData>['spans'][number],
   telemetry: readonly RecordingTelemetryEntry[]
 ) {
-  const signal = telemetry
-    .find((entry) => entry.recordingId === span.recordingId)
-    ?.signals.find((signal) => signal.id === span.signalId);
+  const signal = span.observedSignal
+    ? projectRecordingEventSignal(span.observedSignal.record)
+    : telemetry
+        .find((entry) => entry.recordingId === span.recordingId)
+        ?.signals.find((signal) => signal.id === span.signalId);
   const targetName = signal?.data['targetName'];
   const clip = project.clips.find((item) => item.id === span.clipId);
   const track = project.tracks.find((item) => item.id === clip?.trackId);

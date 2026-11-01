@@ -99,6 +99,7 @@ export interface AssetPublicationAdapter {
   domain: string;
   publish(
     journal: AssetReadyJournal,
-    lifecyclePermit?: import('../infrastructure/mutation-barrier').DurableAssetLifecyclePermit
+    lifecyclePermit?: import('../infrastructure/mutation-barrier').DurableAssetLifecyclePermit,
+    transitionPermit?: import('../infrastructure/mutation-barrier').PersistenceMutationTransitionPermit
   ): Promise<void | 'defer'>;
 }

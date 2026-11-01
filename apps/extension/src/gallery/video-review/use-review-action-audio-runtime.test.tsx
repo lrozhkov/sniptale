@@ -6,6 +6,8 @@ import { FakeEngine, renderRuntime } from './review-audio-runtime.test-support';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import {
   buildReviewActionAudioPlan,
+  reviewActionAudioAdmission,
+  iterateReviewActionAudioCues,
   ReviewActionAudioUnavailable,
 } from '../../features/video/review/action-audio';
 let root: Root;
@@ -373,4 +375,97 @@ it('schedules prepared action cues while an external music asset is still loadin
   expect(engine.scheduled.length).toBeGreaterThan(0);
   expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 100 });
   await act(async () => release(new Blob()));
+});
+
+function archiveAudioSource() {
+  const plan = typingActionPlan();
+  const state = reviewActionAudioAdmission(plan);
+  let admission;
+  for (;;) {
+    const next = state.next();
+    if (next.done) {
+      admission = next.value;
+      break;
+    }
+  }
+  return {
+    duration: 60,
+    admit: vi.fn(async () => ({ ...admission!, busGain: 0.25, firstCueTime: 0 })),
+    readWindow: vi.fn(
+      async (_range: { start: number; end: number }, _signal?: AbortSignal) => plan
+    ),
+    dispose: vi.fn(),
+  };
+}
+it('uses globally admitted archive audio at a late seek when the inline plan is empty', async () => {
+  const engine = new FakeEngine();
+  const source = archiveAudioSource();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    outputTime: 45,
+    recordingActionSource: source,
+    actionPlan: { duration: 60, descriptors: [] },
+    createActionSource: () => ({ read: async () => actionBuffer(), dispose() {} }),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+  expect(source.admit).toHaveBeenCalledOnce();
+  expect(source.readWindow).not.toHaveBeenCalled();
+  await act(async () => root.render(<f.Harness playing />));
+  await vi.waitFor(() => expect(engine.scheduled.length).toBeGreaterThan(0));
+  expect(source.readWindow).toHaveBeenCalledWith({ start: 45, end: 47 }, expect.any(AbortSignal));
+  expect(source.admit).toHaveBeenCalledOnce();
+  const first = [
+    ...iterateReviewActionAudioCues(typingActionPlan(), { start: 45, end: 47 }),
+  ].flat()[0]!;
+  expect(engine.scheduled[0]!.schedule).toMatchObject({
+    envelope: [
+      [expect.any(Number), first.volume * 0.25],
+      [expect.any(Number), first.volume * 0.25],
+    ],
+  });
+});
+it('serializes pending archive windows across a seek and suppresses the stale window', async () => {
+  const engine = new FakeEngine();
+  const source = archiveAudioSource();
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<ReturnType<typeof typingActionPlan>>();
+  source.readWindow.mockImplementationOnce(async () => {
+    entered.resolve();
+    return release.promise;
+  });
+  const f = renderRuntime({
+    playing: true,
+    createEngine: () => engine,
+    outputTime: 45,
+    recordingActionSource: source,
+    actionPlan: { duration: 60, descriptors: [] },
+    createActionSource: () => ({ read: async () => actionBuffer(), dispose() {} }),
+  });
+  await act(async () => {
+    root.render(<f.Harness />);
+  });
+  await entered.promise;
+  await act(async () => root.render(<f.Harness outputTime={48} seekRevision={1} />));
+  expect(source.readWindow).toHaveBeenCalledTimes(1);
+  expect(engine.scheduled).toHaveLength(0);
+  await act(async () => release.resolve(typingActionPlan()));
+  await vi.waitFor(() => expect(engine.scheduled.length).toBeGreaterThan(0));
+  expect(source.readWindow).toHaveBeenCalledTimes(2);
+  expect(source.readWindow.mock.calls[1]![0]).toEqual({ start: 48, end: 50 });
+});
+it('refuses playback after archive admission fails without reading or discarding the source', async () => {
+  const source = archiveAudioSource();
+  source.admit.mockRejectedValueOnce(new ReviewActionAudioUnavailable('voice-limit'));
+  const failed = vi.fn();
+  const f = renderRuntime({
+    createEngine: () => new FakeEngine(),
+    recordingActionSource: source,
+    onFailure: failed,
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(false));
+  expect(failed).toHaveBeenCalledWith('voice-limit');
+  expect(source.readWindow).not.toHaveBeenCalled();
+  expect(source.dispose).not.toHaveBeenCalled();
 });

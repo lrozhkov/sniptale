@@ -429,6 +429,7 @@ function projectRecordingFeedback(args: {
       ? {
           actionFeedback: [
             {
+              ...structuredClone(args.seed.actionFeedback?.[0] ?? {}),
               recordingId: args.recordingId,
               sourceInstanceId: args.sourceInstanceId,
               signals: structuredClone(args.seed.actionFeedback?.[0]?.signals ?? []),

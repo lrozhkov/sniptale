@@ -1,3 +1,5 @@
+import { buildReviewActionAudioPlan } from '../../features/video/review/action-audio';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { quickEditAudioSourceKey } from '../../features/video/review/advanced/audio-plan';
 import { readFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
@@ -779,3 +781,63 @@ it.each([...[0.5, 1, 2, 4].map((rate) => ({ rate, overlay: true })), { rate: 1, 
     }
   }
 );
+
+it('reads archived action cues once per PCM window on the global fragment clock with the admitted gain', async () => {
+  const fixture = await audioFixture();
+  try {
+    const action = buildReviewActionAudioPlan({
+      applied: true,
+      segments: buildReviewTimeMap(60, []),
+      markers: [
+        { ref: { kind: 'action', id: 'click' }, eventType: 'CLICK', start: 45.5, end: 45.5 },
+      ],
+      settings: [
+        {
+          ref: { kind: 'action', id: 'click' },
+          enabled: true,
+          presetId: 'mouse-classic-v1',
+          volume: 0.4,
+          offset: 0,
+        },
+      ],
+    });
+    const source = {
+      duration: 60,
+      admit: vi.fn(),
+      readWindow: vi.fn(
+        async (_range: { start: number; end: number }, _signal?: AbortSignal) => action
+      ),
+      dispose: vi.fn(),
+    };
+    const buffer = new TestAudioBuffer({ numberOfChannels: 1, length: 7995, sampleRate: 44100 });
+    for await (const _sample of renderReviewAudio(
+      null,
+      { sourceStart: 45, sourceEnd: 47, resultStart: 0, resultEnd: 2, rate: 1, kind: 'keep' },
+      true,
+      new AbortController().signal,
+      {
+        entries: [],
+        buffers: new Map([
+          [
+            quickEditAudioSourceKey({ kind: 'bundled', sampleId: 'mouse-click-v1' }),
+            buffer as unknown as AudioBuffer,
+          ],
+        ]),
+        originalVolume: 1,
+        originalMuted: true,
+        recordingAction: { source, offset: 45, bounds: { start: 45.1, end: 46.9 }, busGain: 0.5 },
+      }
+    )) {
+      // Drain the rendered packets before checking source window requests.
+    }
+    expect(source.readWindow.mock.calls.map((call) => call[0])).toEqual([
+      { start: 45.1, end: 46 },
+      { start: 46, end: 46.9 },
+    ]);
+    expect(fixture.windows).toHaveLength(2);
+    expect(fixture.windows[0]!.gains![0]!.gain.readonlyPoints[0]![1]).toBeCloseTo(0.2, 12);
+    expect(source.dispose).not.toHaveBeenCalled();
+  } finally {
+    fixture.cleanup();
+  }
+});

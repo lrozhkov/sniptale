@@ -1,4 +1,6 @@
+import { betaV48Fixture } from './beta-v48';
 import { betaV46Fixture } from './beta-v46';
+import { betaV47Fixture } from './beta-v47';
 import { betaV45Fixture } from './beta-v45';
 import { betaV44Fixture } from './beta-v44';
 import { betaV43Fixture } from './beta-v43';
@@ -106,4 +108,6 @@ export const SUPPORTED_BETA_DATABASE_FIXTURES: readonly BetaDatabaseFixtureContr
   betaV44Fixture,
   betaV45Fixture,
   betaV46Fixture,
+  betaV47Fixture,
+  betaV48Fixture,
 ];

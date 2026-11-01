@@ -1,3 +1,10 @@
+import { createVideoProjectFromRecording } from '../../../features/video/project/factories/creation';
+import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
+import { prepareRecordingEventsProject } from '../../../features/video/project/recording-events/project-window';
+import { decodeRecordingEventsBlock } from '../../../features/video/project/recording-events/blocks';
+import { isRecordingEventsDescriptor } from '../../../features/video/project/recording-events/records';
+import fixtureData from '../../../features/video/project/recording-events/fixtures.json';
+import { resolveTypingSpanSource } from '../state/clip-timeline/source-range';
 import { expect, it } from 'vitest';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import {
@@ -5,7 +12,10 @@ import {
   createProject,
   createVideoClip,
 } from '../../../features/video/project/timeline/project-meta.test.helpers';
-import { buildTimelineTelemetryLaneData } from './telemetry-lane';
+import {
+  buildTimelineTelemetryLaneData,
+  buildProjectTimelineTelemetryLaneData,
+} from './telemetry-lane';
 
 function telemetry(): RecordingTelemetryEntry {
   return {
@@ -133,3 +143,57 @@ it('rejects missing source identity and a foreign sidecar', () => {
     })
   ).toEqual({ spans: [] });
 });
+
+it(
+  'projects streamed intervals without legacy metadata and preserves a selected fact ' +
+    'after the window is gone',
+  async () => {
+    const base = createVideoProjectFromRecording({
+      recordingId: 'recording',
+      filename: 'source.webm',
+      width: 640,
+      height: 360,
+      duration: 10,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: false,
+      sourceNormalizedActionEvents: [],
+      recordingSignals: [],
+    });
+    const events = fixtureData.descriptor;
+    const block = decodeRecordingEventsBlock(new TextEncoder().encode(fixtureData.blocks[0]!.utf8));
+    if (!isRecordingEventsDescriptor(events) || !block) throw new Error('Invalid test fixture.');
+    const project = applyVideoProjectMutationPatch(base, {
+      actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+    });
+    const prepared = await prepareRecordingEventsProject(
+      project,
+      { start: 0, end: 1 },
+      async () => ({
+        writerGeneration: 'generation',
+        records: block.records.filter((record) => record.kind === 'signal'),
+      })
+    );
+    const spans = buildProjectTimelineTelemetryLaneData(prepared, []).spans;
+    const span = spans.find((span) => span.signalId === 'typing-1')!;
+    expect(span).toMatchObject({
+      startTime: 0.05,
+      endTime: 0.07,
+      observedSignal: { streamSha256: events.streamSha256 },
+    });
+    expect(resolveTypingSpanSource(project, [], span)?.signal.data['eventCount']).toBe(3);
+    expect(buildProjectTimelineTelemetryLaneData(project, []).spans).toEqual([]);
+    expect(project.actionEvents).toEqual([]);
+    expect(project.actionFeedback![0]!.signals).toEqual([]);
+    const legacy = telemetry();
+    legacy.recordingId = 'recording';
+    legacy.signals = [
+      { id: 'old-inline', kind: 'typing', startTime: 1, endTime: 4, point: null, data: {} },
+    ];
+    expect(
+      buildProjectTimelineTelemetryLaneData(prepared, [legacy]).spans.some(
+        (span) => span.signalId === 'old-inline'
+      )
+    ).toBe(false);
+  }
+);

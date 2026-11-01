@@ -97,13 +97,25 @@ function isProjectSource(value: unknown): boolean {
   return true;
 }
 
-function isActionEventCollection(value: unknown): boolean {
+function isActionEventCollection(value: unknown, feedback: unknown): boolean {
+  const streamed = new Set(
+    Array.isArray(feedback)
+      ? feedback.flatMap((group: unknown) =>
+          isRecord(group) && group['events'] !== undefined
+            ? [JSON.stringify([group['recordingId'], group['sourceInstanceId']])]
+            : []
+        )
+      : []
+  );
   if (!Array.isArray(value)) return false;
   let authoredCount = 0;
   return value.every((event) => {
     if (!isActionEvent(event) || !isRecord(event) || !isRecord(event['anchor'])) return false;
     // Captured source facts retain the source telemetry collection admission.
-    if (event['anchor']['kind'] === 'recording-source') return true;
+    if (event['anchor']['kind'] === 'recording-source')
+      return !streamed.has(
+        JSON.stringify([event['anchor']['recordingId'], event['anchor']['sourceInstanceId']])
+      );
     authoredCount += 1;
     return authoredCount <= MAX_VIDEO_PROJECT_ITEMS;
   });
@@ -160,8 +172,19 @@ function minimumClipSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 48) &&
+    isBoundedNumber(version, 2, 50) &&
     Number.isInteger(version) &&
+    (version >= 50 ||
+      !Array.isArray(value['actionFeedback']) ||
+      value['actionFeedback'].every(
+        (group: unknown) => !isRecord(group) || group['events'] === undefined
+      )) &&
+    (version >= 49 ||
+      !isRecord(value['cursorTrack']) ||
+      !Array.isArray(value['cursorTrack']['sourceObservations']) ||
+      value['cursorTrack']['sourceObservations'].every(
+        (group: unknown) => !isRecord(group) || group['trajectory'] === undefined
+      )) &&
     (version >= 48 ||
       !Array.isArray(value['motionRegions']) ||
       value['motionRegions'].every(
@@ -356,7 +379,7 @@ function isHydratableProjectShape(value: unknown, effectMode: 'native' | 'metada
     parseVideoProjectActionFeedback(value['actionFeedback']) !== null &&
     (value['cursorFocusPath'] === undefined ||
       parseCursorFocusPath(value['cursorFocusPath']) !== null) &&
-    isActionEventCollection(value['actionEvents']) &&
+    isActionEventCollection(value['actionEvents'], value['actionFeedback']) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
     (value['watermarkSource'] === undefined ||
@@ -421,6 +444,22 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
 }
 
 function hasValidInteractionAnchorReferences(project: VideoProject): boolean {
+  if (
+    project.actionFeedback?.some(
+      (group) =>
+        group.events &&
+        !project.clips.some((clip) => {
+          if (clip.type !== 'VIDEO' || clip.sourceInstanceId !== group.sourceInstanceId)
+            return false;
+          const asset = project.assets.find((entry) => entry.id === clip.assetId);
+          return asset?.source.kind === 'recording'
+            ? asset.source.recordingId === group.recordingId
+            : asset?.source.kind === 'project-asset' &&
+                asset.source.originRecordingId === group.recordingId;
+        })
+    )
+  )
+    return false;
   if (
     project.cursorTrack?.samples.some(
       (sample) => sample.sourceAnchor && sample.timeBasis === 'project'

@@ -1,3 +1,4 @@
+import type { NativeHistoryOutboundMessage } from '../../../contracts/native-app/attachment-message-types';
 import type {
   ExtensionRecordingAckMessage,
   ExtensionRecordingChunkRequestMessage,
@@ -8,6 +9,7 @@ import type {
 } from '../../../contracts/native-app';
 
 export type NativeIngestionOutboundMessage =
+  | NativeHistoryOutboundMessage
   | ExtensionScreenshotAckMessage
   | ExtensionScreenshotChunkRequestMessage
   | ExtensionScreenshotRejectMessage
@@ -16,5 +18,6 @@ export type NativeIngestionOutboundMessage =
   | ExtensionRecordingRejectMessage;
 
 export interface NativeAppIngestionControllerDeps {
+  isHistoryEnabled?: (kind: 'cursor' | 'events') => boolean;
   getCurrentControllerLeaseId?: () => string | null;
 }

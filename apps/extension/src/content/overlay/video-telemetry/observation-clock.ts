@@ -8,6 +8,7 @@ import type {
 export function createObservationClock(timeOriginMs = performance.timeOrigin) {
   const documentId = crypto.randomUUID();
   const clock: RecordingObservationClock = { version: 1, domain: 'observation', segments: [] };
+  const revisions = new Map<string, number>();
   return {
     get id(): string {
       return clock.segments.at(-1)?.id ?? documentId;
@@ -34,7 +35,30 @@ export function createObservationClock(timeOriginMs = performance.timeOrigin) {
           ? {}
           : { maximumUncertaintyMs: anchor.maximumUncertaintyMs }),
       };
+      revisions.set(segment.id, anchor.revision);
       if (anchor.phase === 'paused') segment.mediaEndSeconds = anchor.mediaTimeSeconds;
+    },
+    /** Queued input keeps its original phase when calibration or Resume arrives later. */
+    projectAt(segmentId: string, observationTime: number) {
+      const segment = clock.segments.find((candidate) => candidate.id === segmentId);
+      if (!segment) throw new Error('Unknown observation clock phase');
+      const start = segment.mapping
+        ? segment.mapping.mediaTimeSeconds +
+          (timeOriginMs + segment.startedAtTimestampMs - segment.mapping.captureEpochMs) / 1000
+        : segment.mediaStartEstimateSeconds;
+      const seconds = Math.max(0, start + observationTime - segment.observationStartSeconds);
+      return {
+        activeTimeUs: Math.round(Math.min(seconds, segment.mediaEndSeconds ?? seconds) * 1_000_000),
+        clockRevision: revisions.get(segment.id) ?? 0,
+        clock: {
+          source: 'dom-event-time' as const,
+          timestampQuantumUs: null,
+          resolutionBoundUs: null,
+          mappingUncertaintyUs: segment.mapping
+            ? Math.ceil(segment.mapping.uncertaintyMs * 1000)
+            : null,
+        },
+      };
     },
     estimateAt(observationTime: number): number {
       const segment = clock.segments.at(-1);

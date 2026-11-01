@@ -1,3 +1,7 @@
+import {
+  isPortableRecordingEventsAttachment,
+  type PortableRecordingEventsAttachment,
+} from './recording-events';
 import { sameReviewVideoContainer } from '../../../../features/video/review/validation';
 import type {
   MediaLibraryEntry,
@@ -28,6 +32,10 @@ import { collectReviewAssetReferences } from '../../../../composition/persistenc
 import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import { parseRecordingTelemetryEntry } from '../../../../composition/persistence/recordings/telemetry.guards';
 import { createRecordingMediaId } from '../../../../features/media-hub/media-id';
+import {
+  isPortableCursorTrajectoryAttachment,
+  type PortableCursorTrajectoryAttachment,
+} from './cursor-trajectory';
 
 interface PortableMediaReviewAsset {
   entry: Omit<StoredProjectAssetEntry, 'assetId'>;
@@ -67,6 +75,8 @@ export interface PortableMediaMetadata {
   recording?: {
     entry: Omit<StoredRecordingEntry, 'assetId'>;
     telemetry?: RecordingTelemetryEntry;
+    cursorAttachment?: PortableCursorTrajectoryAttachment;
+    eventsAttachment?: PortableRecordingEventsAttachment;
   };
   webSnapshot?: {
     entry: Omit<StoredWebSnapshotRecord, 'packageAssetId' | 'screenshotAssetId'>;
@@ -296,15 +306,55 @@ function parsePortableRecording(value: unknown): PortableMediaMetadata['recordin
   const recording = parseRecordingEntry({ ...value['entry'], assetId: 'portable' });
   if (!recording) return null;
   const rawTelemetry = value['telemetry'];
+  if (
+    isRecord(rawTelemetry) &&
+    (Object.hasOwn(rawTelemetry, 'cursorTrajectorySnapshot') ||
+      Object.hasOwn(rawTelemetry, 'recordingEventsSnapshot'))
+  )
+    return null;
   const telemetry =
     rawTelemetry === undefined ? undefined : parseRecordingTelemetryEntry(rawTelemetry);
   if (rawTelemetry !== undefined && (!telemetry || telemetry.recordingId !== recording.id)) {
     return null;
   }
+  const attachment: unknown = value['cursorAttachment'];
+  const descriptor = telemetry?.cursorTrajectory;
+  if (attachment !== undefined) {
+    if (
+      !isPortableCursorTrajectoryAttachment(attachment) ||
+      attachment.recordingId !== recording.id ||
+      !descriptor ||
+      Object.entries(descriptor).some(
+        ([key, item]) =>
+          !Object.entries(attachment.descriptor).some(
+            ([other, actual]) => other === key && actual === item
+          )
+      )
+    )
+      return null;
+  } else if (descriptor && descriptor.totalBlocks > 0) return null;
+  const eventsAttachment: unknown = value['eventsAttachment'];
+  const eventsDescriptor = telemetry?.recordingEvents;
+  if (eventsAttachment !== undefined) {
+    if (
+      !isPortableRecordingEventsAttachment(eventsAttachment) ||
+      eventsAttachment.recordingId !== recording.id ||
+      !eventsDescriptor ||
+      Object.entries(eventsDescriptor).some(
+        ([key, item]) =>
+          !Object.entries(eventsAttachment.descriptor).some(
+            ([other, actual]) => other === key && actual === item
+          )
+      )
+    )
+      return null;
+  } else if (eventsDescriptor && eventsDescriptor.totalBlocks > 0) return null;
   const { assetId: _localId, ...portable } = recording;
   return {
     entry: portable,
     ...(telemetry ? { telemetry } : {}),
+    ...(isPortableCursorTrajectoryAttachment(attachment) ? { cursorAttachment: attachment } : {}),
+    ...(isPortableRecordingEventsAttachment(eventsAttachment) ? { eventsAttachment } : {}),
   };
 }
 

@@ -89,7 +89,8 @@ export async function encodeCapturedPortableRoot(
     const bindings: { objectId: string; ref: AssetRef }[] = [];
     const bind = async (objectId: string, ref: AssetRef, checkBytes = false) => {
       const object = objects.find((item) => item.ref.objectId === objectId);
-      if (!object || object.blob.size !== ref.size || object.blob.type !== ref.mimeType) {
+      const blob = object?.blob;
+      if (!blob || blob.size !== ref.size || blob.type !== ref.mimeType) {
         if (checkBytes) return;
         throw new Error('Captured media differs from its native reference.');
       }
@@ -109,13 +110,31 @@ export async function encodeCapturedPortableRoot(
             reader.releaseLock();
           }
         };
-        if ((await digest(native)) !== (await digest(object.blob))) return;
+        if ((await digest(native)) !== (await digest(blob))) return;
       }
       bindings.push({ objectId, ref });
     };
     await bind(portable.originalObjectId, rows.ref, 'webSnapshot' in rows);
     if ('screenshotRef' in rows && portable.webSnapshot)
       await bind(portable.webSnapshot.screenshotObjectId, rows.screenshotRef);
+    if (
+      'recording' in rows &&
+      rows.telemetry?.cursorTrajectorySnapshot &&
+      portable.recording?.cursorAttachment
+    )
+      await bind(
+        portable.recording.cursorAttachment.objectId,
+        rows.telemetry.cursorTrajectorySnapshot.ref
+      );
+    if (
+      'recording' in rows &&
+      rows.telemetry?.recordingEventsSnapshot &&
+      portable.recording?.eventsAttachment
+    )
+      await bind(
+        portable.recording.eventsAttachment.objectId,
+        rows.telemetry.recordingEventsSnapshot.ref
+      );
     await parsePortableSyncRoot(envelope);
     return {
       envelope,

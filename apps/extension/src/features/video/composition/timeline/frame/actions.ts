@@ -1,3 +1,4 @@
+import { recordingEventProjectActions } from '../../../project/recording-events/project-facts';
 import { resolveCursorSourcePointMapping } from './cursor';
 import { getVideoClipPresentationTime } from '../../../project/timeline/rate';
 import { REVIEW_KEY_VIEWPORT_WIDTH } from '../../../project/action-feedback/key-animation';
@@ -102,7 +103,7 @@ export function resolveVideoCompositionActions(
   for (const feedback of evaluateProjectGestureFeedback(project, currentTime)) {
     const clip = project.clips.find((clip) => clip.id === feedback.clipId);
     const instanceId = clip?.type === 'VIDEO' ? clip.sourceInstanceId : null;
-    const event = project.actionEvents.find(
+    const event = recordingEventProjectActions(project).find(
       (event) =>
         event.anchor.kind === 'recording-source' &&
         event.anchor.sourceEventId === feedback.eventId &&

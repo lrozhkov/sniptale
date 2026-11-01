@@ -1,5 +1,5 @@
 import { projectVideoProjectCommentAnchor } from '../../features/video/project/comments/projection';
-import { resolveVideoProjectActionOccurrences } from '../../features/video/project/action-occurrences';
+import { resolveRecordingActionOccurrences } from '../project/operations/recording-events-selection';
 import { clampTimelineScale } from '../contracts/timeline-scale';
 import type { StateCreator } from 'zustand';
 import { clampNumber } from '../../features/video/project/hydration';
@@ -51,7 +51,7 @@ export function createSelectionStateActions(set: VideoEditorStoreSet) {
         )
           return state;
         return {
-          selection: { kind: VideoEditorSelectionKind.HISTORY_SPAN, ...target },
+          selection: { kind: VideoEditorSelectionKind.HISTORY_SPAN, ...structuredClone(target) },
           selectedTrackId: null,
           placementMode: null,
         };
@@ -231,11 +231,11 @@ function createSelectObjectTrackAction(
 function createSelectActionOccurrenceAction(
   set: VideoEditorStoreSet
 ): VideoEditorState['selectActionOccurrence'] {
-  return (eventId, clipId) =>
+  return (eventId, clipId, observedAction) =>
     set((state): Partial<VideoEditorState> => {
       if (
         !state.project ||
-        !resolveVideoProjectActionOccurrences(state.project).some(
+        !resolveRecordingActionOccurrences(state.project, observedAction).some(
           (item) => item.eventId === eventId && item.clipId === clipId
         )
       )
@@ -244,6 +244,7 @@ function createSelectActionOccurrenceAction(
         kind: VideoEditorSelectionKind.ACTION_OCCURRENCE,
         eventId,
         clipId,
+        ...(observedAction ? { observedAction: structuredClone(observedAction) } : {}),
       } as const;
 
       return {

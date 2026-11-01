@@ -1,3 +1,4 @@
+import type { RecordingProjectActionAudioSource } from './recording-action-audio';
 import type { ReviewAudioClipInput } from './audio-clip-source';
 import type { QuickEditOriginalAudioRange } from '../../features/video/review/advanced/types';
 import { createTempoProcessor } from '../../features/video/audio/tempo';
@@ -24,6 +25,12 @@ export interface ReviewExportClipPlan {
   entries: readonly QuickEditAudioPlanEntry[];
   /** Compact globally admitted action cues; never expands a whole typing interval. */
   action?: QuickEditActionAudioSchedule;
+  recordingAction?: {
+    source: RecordingProjectActionAudioSource;
+    offset: number;
+    bounds?: { start: number; end: number };
+    busGain: number;
+  };
   buffers: ReadonlyMap<string, ReviewAudioClipInput>;
   /** Releases job-owned decoder inputs; supplied AudioBuffer plans have no resources. */
   dispose?(): void;
@@ -206,10 +213,25 @@ async function scheduleClipWindows(
 ) {
   const { frame, count } = args;
   const plan = args.exportAudio;
-  if (!plan || (!plan.entries.length && !plan.action)) return;
+  if (!plan || (!plan.entries.length && !plan.action && !plan.recordingAction)) return;
   const outStart = frame / outputRate;
   const outEnd = (frame + count) / outputRate;
-  for (const entry of clipWindowEntries(plan, { start: outStart, end: outEnd })) {
+  let windowPlan = plan;
+  if (plan.recordingAction) {
+    const { source, offset, bounds, busGain } = plan.recordingAction;
+    const start = Math.max(0, outStart + offset, bounds?.start ?? 0);
+    const end = Math.min(source.duration, outEnd + offset, bounds?.end ?? source.duration);
+    const action =
+      end > start
+        ? await source.readWindow({ start, end }, args.signal)
+        : { duration: source.duration, descriptors: [] };
+    args.signal.throwIfAborted();
+    windowPlan = {
+      ...plan,
+      action: { plan: action, offset, busGain, ...(bounds ? { bounds } : {}) },
+    };
+  }
+  for (const entry of clipWindowEntries(windowPlan, { start: outStart, end: outEnd })) {
     const audibleFrom = Math.max(outStart, entry.timelineStart);
     const audibleTo = Math.min(outEnd, entry.timelineStart + entry.duration);
     if (audibleTo <= audibleFrom) continue;

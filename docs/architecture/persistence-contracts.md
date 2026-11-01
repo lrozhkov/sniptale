@@ -1101,3 +1101,47 @@ The ready journal contains JSON metadata and exact immutable file references. Ef
 The transaction repeats profile, causal, dependency and native revision checks. It publishes project rows, private sources, sidecars and the receipt atomically. A failed transaction preserves the predecessor and permits an exact retry. A matching completed receipt permits replay without staging files or another native revision.
 
 Outgoing preparation reuses existing file references for originals and saved exports. It stages only portable objects without a native file binding. Prepared claims retain those temporary files until publication or recovery permits release. This change adds no store, queue, journal domain or transfer platform. Production activation and safe unload remain separate release gates.
+
+## Cursor trajectory blocks
+
+Physical database version 47 adds `recording_cursor_trajectories` and `recording_cursor_blocks`. The recordings domain uses contract version 4. The additive 46→47 migration creates empty stores. It preserves released rows, media files and immutable objects.
+
+The recordings owner appends canonical `cursor-trajectory-v1` blocks. Each block contains at most 512 records and 65536 bytes. Manifest pages contain at most 32 entries. The owner does not retain the complete trajectory in memory.
+
+One transaction publishes each block and its updated head. An identical retry preserves the original block. A conflicting duplicate fails without replacement. A failed transaction preserves the committed prefix.
+
+The owner issues a private writer generation. Retirement retains a tombstone and deletes the owned blocks in one transaction. Retirement can precede the first writer. A delayed begin or append cannot recreate the retired trajectory.
+
+Explicit restore requires retirement and issues a new writer generation. Restore can retain the original recording and trajectory identifiers. Previous writer generations cannot append after restore. Global erasure includes both stores through the database registry.
+
+The local recording key can change during restore. Canonical blocks retain their source recording identifier and original bytes.
+
+Finalization reads the contiguous prefix through a bounded cursor. It checks block hashes, prefix hashes, canonical bytes, geometry and complete stream counts. It then compares the head revision before commit. Concurrent changes require a retry. Finalization failure preserves the blocks.
+
+A finalized head cannot accept another block. Identical append and finalization retries remain idempotent. Read operations do not repair or change data. Media receipt and trajectory receipt remain separate contracts.
+
+Montage schema 49 admits a finalized trajectory descriptor in a source observation group. The group retains its recording and source instance identifiers. Its inline samples array must be empty. Earlier declared schemas refuse the descriptor. A mutation retains schema 49 after descriptor removal.
+
+Legacy groups continue to materialize their inline source observations. Descriptor groups retain source facts in the recordings stores. Hydration and source edits do not expand the complete trajectory or replace source-bound authored cursor keys. Authored keys keep the existing manual item budget.
+
+## Recording event blocks
+
+Physical database version 48 adds `recording_events`. The recordings domain uses contract version 5. The additive 47→48 migration creates an empty store. It preserves previous rows and immutable files.
+
+The compound key contains `recordingId`, `eventStreamId`, `kind` and `entryId`. Row kinds separate stream heads, original blocks and derived event facts. The `kind` index permits compact head reads without loading historical blocks. The `timeBuckets` index uses multiple entries for event intervals.
+
+Event intervals can overlap or arrive after newer timestamps. The interval index uses exact dyadic ranges in nonnegative safe integer microseconds. One interval requires at most 106 ranges. One time query requires at most 54 index ranges. The first matching range identifies one result without an accumulated set of event identifiers.
+
+Original block bytes remain the source authority. The interval index does not replace, sort or reduce recorded history. Runtime publication and capability activation require the event writer and its consumer proof.
+
+Source-wide retirement also writes a compact `root-fence` row. The row prevents a delayed begin with an unknown stream identifier from recreating deleted history. Default begin never adopts an existing writer generation. Explicit restore remains the admitted operation for identity reuse.
+
+## Recovery of history publication
+
+Before immutable history file preparation, the recordings owner writes a prepare intent in the existing `recording-cursor-snapshot` journal domain. The intent contains compact telemetry, source generations and the expected metadata hash. It contains no file claims. The transition gate covers intent creation, preparation and publication. Cold database admission precedes that gate.
+
+Preparation failure preserves the intent, original blocks and video. Cleanup deletes only copies from the failed preparation attempt. Recovery checks source generations and the metadata hash before another attempt. Deletion or replacement makes the old intent superseded.
+
+Successful preparation creates the existing ready journal with verified file references. The existing transaction publishes metadata, file owners, source links and the frozen capture together. The owner deletes the prepare intent after publication. A crash can leave both journals. Metadata and generation checks prevent duplicate publication or replacement of newer facts.
+
+Recovery passes its active transition and lifecycle permits to the preparation owner. The OPFS writer reuses that transition permit. A queued erasure cannot cause preparation to wait behind its own outer transition gate.

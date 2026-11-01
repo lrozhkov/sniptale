@@ -47,7 +47,9 @@ it('creates the complete current beta schema and persists every domain contract'
 
   handleDatabaseUpgrade(harness.db, 0, DB_VERSION, harness.transaction);
 
-  expect(harness.db.createObjectStore.mock.calls.map(([name]) => name)).toEqual(EXPECTED_STORES);
+  expect(harness.db.createObjectStore.mock.calls.map(([name]) => name).sort()).toEqual(
+    [...EXPECTED_STORES].sort()
+  );
   for (const [storeName, expectedIndexes] of Object.entries(EXPECTED_INDEXES)) {
     expect(harness.stores.get(storeName)?.createIndex.mock.calls.map(([name]) => name)).toEqual(
       expectedIndexes

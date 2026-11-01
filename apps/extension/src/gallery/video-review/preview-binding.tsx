@@ -42,6 +42,7 @@ type PreviewState = Pick<
   | 'onMediaError'
   | 'recovering'
 > & {
+  history?: EditorState['history'];
   setCursorFocusPath?: EditorState['setCursorFocusPath'];
   selectCursorFocusKey?: EditorState['selectCursorFocusKey'];
   cursorFocusPath?: EditorState['cursorFocusPath'];
@@ -111,6 +112,28 @@ export function ReviewPreviewBinding({
       aria-busy={state.recovering}
       className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3"
     >
+      {state.history?.failed || state.history?.pending || state.history?.incomplete ? (
+        <div
+          role={state.history.failed ? 'alert' : 'status'}
+          className="flex items-center gap-2 text-xs"
+        >
+          <span>
+            {translate(
+              state.history.failed
+                ? 'gallery.videoReview.recordingHistoryFailed'
+                : state.history.pending
+                  ? 'gallery.videoReview.recordingHistoryLoading'
+                  : 'gallery.videoReview.recordingHistoryIncomplete'
+            )}
+          </span>
+          {state.history.failed ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.retry')}
+              onClick={state.history.retry}
+            />
+          ) : null}
+        </div>
+      ) : null}
       {state.webcam.failed || state.webcam.pending ? (
         <div
           role={state.webcam.failed ? 'alert' : 'status'}
@@ -224,7 +247,11 @@ function ReviewPreviewStage({
   return (
     <ReviewStageBinding
       {...captionPreview}
-      cursorPath={reviewCursorPathOverlayBinding(state, resource.telemetry, sceneEditable)}
+      cursorPath={reviewCursorPathOverlayBinding(
+        state,
+        state.history?.telemetry ?? resource.telemetry,
+        sceneEditable
+      )}
       annotationEffects={
         features.annotationEffects
           ? {

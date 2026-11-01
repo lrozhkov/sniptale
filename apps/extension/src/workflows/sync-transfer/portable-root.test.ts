@@ -1,3 +1,4 @@
+import { readArchiveRootObjectSource } from '../media-hub-backup/v6/object-source.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
@@ -435,7 +436,9 @@ it.each(['video/webm', 'image/png'])(
     };
     const encoded = await encodeCapturedPortableRoot(capture({ kind: 'media', rows }));
     expect(encoded.objects).toHaveLength(1);
-    expect(encoded.objects[0]?.blob.type).toBe(mimeType);
+    expect(encoded.objects[0] && (await readArchiveRootObjectSource(encoded.objects[0])).type).toBe(
+      mimeType
+    );
     const prepared = await preparePortableReplica({
       envelope: encoded.envelope,
       verifiedObjects: new Map(encoded.bindings.map((binding) => [binding.objectId, binding.ref])),

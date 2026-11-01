@@ -1,3 +1,5 @@
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { readFileSync } from 'node:fs';
 import {
@@ -1417,5 +1419,72 @@ it('retains isolated native camera snapshots across a neighboring geometry refre
   expect(io.overlays.mock.lastCall![0].regions[0].cursorFocus).toBe(previous);
   first.release();
   second.release();
+  renderer.dispose();
+});
+
+it('reads archive history for both dissolve endpoint clocks before drawing their independent cameras', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const prepared = await renderer.prepare(scene(), dimensions, new AbortController().signal);
+  const read = vi.fn(
+    async (
+      sourceTime: number,
+      _result: number,
+      _output: { width: number; height: number; frameDuration: number },
+      _signal?: AbortSignal
+    ) => ({
+      telemetry: {
+        recordingId: 'recording',
+        createdAt: 1,
+        updatedAt: 1,
+        captureMode: null,
+        viewport: null,
+        cursorTrack: null,
+        actionEvents: [],
+        signals: [],
+      },
+      effective: {
+        ...resolveQuickEditEffectiveState(createQuickEditAdvancedState()),
+        zoomRegions: [
+          {
+            ...createQuickEditZoomRegion({ id: 'archived', at: 0, duration: 20 }),
+            transform: { scale: sourceTime < 4 ? 2 : 3, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'none' as const, duration: 0 },
+            exit: { type: 'none' as const, duration: 0 },
+          },
+        ],
+      },
+      keyCues: [],
+      clickCues: [],
+    })
+  );
+  const blend = reviewCutTransitionAt(2, [
+    {
+      id: 'cut',
+      type: 'dissolve',
+      seam: 2,
+      before: 0.5,
+      after: 0.5,
+      left: { start: 0, end: 2 },
+      right: { start: 4, end: 6 },
+    },
+  ])!;
+  const output = await renderer.render(prepared, {
+    ...frame(),
+    resultTime: 2,
+    sourceTime: 4,
+    recordingHistory: { read, dispose() {} },
+    transition: {
+      blend,
+      frames: {
+        left: { timestamp: 1.9, draw: vi.fn(), close: vi.fn() },
+        right: { timestamp: 4, draw: vi.fn(), close: vi.fn() },
+      },
+    },
+  });
+  expect(read.mock.calls.map((call) => call[0])).toEqual([4, 1.9, 4]);
+  expect(io.frame.mock.calls.map((call) => call[1].cameraScale)).toEqual([2, 3]);
+  output.release();
+  prepared.release();
   renderer.dispose();
 });

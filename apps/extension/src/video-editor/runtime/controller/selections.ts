@@ -1,3 +1,4 @@
+import { resolveRecordingActionOccurrences } from '../../project/operations/recording-events-selection';
 import { resolveProjectCursorFocusSamples } from '../../../features/video/project/cursor-focus-path/projection';
 import { useMemo } from 'react';
 import { getProjectTransitionById } from '../../../features/video/project/transition/project';
@@ -9,10 +10,7 @@ import type {
   VideoProjectTrack,
   VideoProjectTransition,
 } from '../../../features/video/project/types/index';
-import {
-  resolveVideoProjectActionOccurrences,
-  type VideoProjectActionOccurrence,
-} from '../../../features/video/project/action-occurrences';
+import { type VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type { VideoObjectTrack } from '../../../features/video/project/object-tracks';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import {
@@ -65,7 +63,7 @@ function useSelectedActionOccurrence(
     () =>
       selection.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE
         ? project
-          ? (resolveVideoProjectActionOccurrences(project).find(
+          ? (resolveRecordingActionOccurrences(project, selection.observedAction).find(
               (item) => item.eventId === selection.eventId && item.clipId === selection.clipId
             ) ?? null)
           : null

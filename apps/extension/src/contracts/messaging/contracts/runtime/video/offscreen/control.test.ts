@@ -202,3 +202,51 @@ it('retains valid static recording geometry and rejects malformed stop geometry'
     ).toThrow();
   }
 });
+
+it('admits exactly one bounded observation format and binds its recording identity', () => {
+  const clock = {
+    source: 'dom-event-time',
+    timestampQuantumUs: null,
+    resolutionBoundUs: null,
+    mappingUncertaintyUs: null,
+  };
+  const packet = {
+    version: 1,
+    recordingId: 'r',
+    batchSequence: 0,
+    sourceClockId: 'phase',
+    clockRevision: 0,
+    clock,
+    viewport: {
+      width: 1280,
+      height: 720,
+      devicePixelRatio: 1,
+      visualViewportScale: 1,
+      visualViewportOffsetX: 0,
+      visualViewportOffsetY: 0,
+    },
+    records: [
+      { kind: 'segment', recordSeq: 0, segmentId: 0, activeTimeUs: 0, clock, reason: 'start' },
+    ],
+  };
+  const request = {
+    type: VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
+    capabilityToken: 'synthetic-capability',
+    recordingId: 'r',
+    generation: 1,
+    streamInstanceId: 's',
+    nativeDocumentId: 'native-document',
+    eventPacket: packet,
+  };
+  const parse =
+    runtimeVideoOffscreenControlMessageContracts[VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS]
+      .parseRequest;
+  expect(parse(request)).toEqual(request);
+  expect(() => parse({ ...request, eventPacket: undefined })).toThrow();
+  expect(() => parse({ ...request, recordingId: 'foreign' })).toThrow();
+  expect(() => parse({ ...request, cursorPacket: packet })).toThrow();
+  expect(() => parse({ ...request, capabilityToken: undefined })).toThrow();
+  expect(() =>
+    parse({ ...request, eventPacket: { ...packet, claimedDocumentId: 'foreign' } })
+  ).toThrow();
+});

@@ -54,3 +54,29 @@ it('keeps the exception fail-closed when installed dependencies are unavailable'
 
   expect(findNobleSha2Pattern(rules)).toBe('(?!)');
 });
+
+it('admits only the declared installed fake IndexedDB types export', async () => {
+  const workspaceRoot = createTempRoot('dependency-rules-indexed-db-types-');
+  const types = path.resolve(path.dirname(require.resolve('fake-indexeddb')), '../../types.d.ts');
+  fs.symlinkSync(
+    path.join(process.cwd(), 'node_modules'),
+    path.join(workspaceRoot, 'node_modules')
+  );
+  const rules = await withCwd(workspaceRoot, () => loadRules());
+  const pattern = rules.find((candidate) => candidate.name === 'no-non-package-json')?.to
+    ?.pathNot?.[1];
+  const relativeTypes = path.relative(workspaceRoot, types).split(path.sep).join('/');
+  expect(pattern).toBe(`^${escapeRegex(relativeTypes)}$`);
+  expect(new RegExp(pattern!).test('node_modules/fake-indexeddb/other.d.ts')).toBe(false);
+  expect(new RegExp(pattern!).test('packages/hostile/node_modules/fake-indexeddb/types.d.ts')).toBe(
+    false
+  );
+});
+
+it('keeps the fake IndexedDB export exception closed without an installed package', async () => {
+  const workspaceRoot = createTempRoot('dependency-rules-indexed-db-missing-');
+  const rules = await withCwd(workspaceRoot, () => loadRules());
+  expect(
+    rules.find((candidate) => candidate.name === 'no-non-package-json')?.to?.pathNot?.[1]
+  ).toBe('(?!)');
+});

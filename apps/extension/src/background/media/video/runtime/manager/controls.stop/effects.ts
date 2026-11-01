@@ -1,4 +1,7 @@
 import { mergeTelemetrySnapshots } from '../../../session-state/controlled-cursor';
+import { createVideoProjectCursorTrack } from '../../../../../../features/video/project/defaults';
+import type { RecordingEventsDescriptor } from '../../../../../../features/video/project/recording-events/types';
+import type { CursorTrajectoryDescriptor } from '../../../../../../features/video/project/cursor-trajectory/types';
 import type {
   RecordingPointTransform,
   RecordingActionEvent,
@@ -43,6 +46,8 @@ type StopContext = {
 type StopTelemetryOptions = {
   discard?: boolean;
   recordingPointTransform?: Promise<RecordingPointTransform | null>;
+  cursorTrajectory?: Promise<CursorTrajectoryDescriptor | null>;
+  recordingEvents?: Promise<RecordingEventsDescriptor | null>;
 };
 
 let pendingStopSideEffects: Promise<void> = Promise.resolve();
@@ -110,12 +115,50 @@ function collectAndPersistTelemetry(
       () => undefined
     ),
     persisted: (async () => {
-      const telemetry = await collection;
+      const collectedTelemetry = await collection;
       const transform = await (options.recordingPointTransform ?? Promise.resolve(null));
-      if (!recordingId || telemetry === null || options.discard) return;
+      const cursorTrajectory = await (options.cursorTrajectory ?? Promise.resolve(null));
+      const recordingEvents = await (options.recordingEvents ?? Promise.resolve(null));
+      if (
+        !recordingId ||
+        (collectedTelemetry === null && !cursorTrajectory && !recordingEvents) ||
+        options.discard
+      )
+        return;
+      const telemetry: NonNullable<ReturnType<typeof getControlledCursorTelemetry>> =
+        collectedTelemetry ?? {
+          viewport: null,
+          cursorTrack: null,
+          actionEvents: [],
+          signals:
+            recordingEvents && recordingEvents.totalBlocks > 0
+              ? []
+              : [
+                  {
+                    id: 'browser-event-history-unavailable',
+                    kind: 'static-frame',
+                    startTime: 0,
+                    endTime: 0,
+                    point: null,
+                    data: {
+                      source: 'recording-events',
+                      code: 'source-unavailable',
+                      severity: 'warning',
+                    },
+                  },
+                ],
+        };
+      const cursorTrack = cursorTrajectory
+        ? createVideoProjectCursorTrack(cursorMode)
+        : resolveRecordingCursorPoints(telemetry, transform);
+      if (cursorTrajectory && cursorTrack)
+        cursorTrack.skin.hidden =
+          !captureEnabled || cursorMode === VideoCursorCaptureMode.EMBEDDED_FALLBACK;
       const timestamp = Date.now();
       await saveRecordingTelemetrySafely({
         recordingId,
+        ...(cursorTrajectory ? { cursorTrajectory: structuredClone(cursorTrajectory) } : {}),
+        ...(recordingEvents ? { recordingEvents: structuredClone(recordingEvents) } : {}),
         ...(telemetry.observationClock
           ? { observationClock: structuredClone(telemetry.observationClock) }
           : {}),
@@ -126,7 +169,7 @@ function collectAndPersistTelemetry(
         captureMode: mode,
         displaySurface,
         viewport: telemetry.viewport,
-        cursorTrack: resolveRecordingCursorPoints(telemetry, transform),
+        cursorTrack,
         actionEvents: resolveRecordingActionPoints(telemetry, transform),
         signals: telemetry.signals.map((signal) => ({
           ...signal,

@@ -1,5 +1,6 @@
 import type { CameraPerspective, CameraDepthOfField, CameraSpatialRect } from '../motion/spatial';
 import type { MotionBlurPhases } from '../motion/blur';
+import type { CursorTrajectoryDescriptor } from '../cursor-trajectory/types';
 export const VideoProjectSourceKind = {
   MANUAL: 'manual',
   RECORDING: 'recording',
@@ -161,6 +162,7 @@ export interface VideoProjectCursorSourceObservations {
   recordingId: string;
   sourceInstanceId: string;
   samples: VideoProjectCursorSample[];
+  trajectory?: CursorTrajectoryDescriptor;
 }
 
 export interface VideoProjectCursorTrack {

@@ -1,5 +1,7 @@
+import { sha256 as createHash } from '@noble/hashes/sha2.js';
 import { parseRootEnvelope } from './codec';
 import { digestBackupObject } from './shared-objects';
+import { openArchiveRootObjectSource } from './object-source';
 import { sharedRootEnvelopeValue } from './shared-object-envelope';
 import type {
   ArchiveRootObjectSource,
@@ -31,17 +33,10 @@ export async function prepareSharedBackupExport(
     const aliases = new Map<string, string>();
     const objects: ArchiveRootObjectSource[] = [];
     for (const [index, object] of payload.objects.entries()) {
-      const blob = object.blob;
+      const source = await openArchiveRootObjectSource(object, signal);
       const ref = envelope.objects[index]!;
-      if (blob.size !== ref.size) throw new Error('Media backup object source size changed.');
-      const sha256 = await digestBackupObject(
-        {
-          size: blob.size,
-          pipeTo: (writable, abort) =>
-            blob.stream().pipeTo(writable, abort ? { signal: abort } : {}),
-        },
-        signal
-      );
+      if (source.size !== ref.size) throw new Error('Media backup object source size changed.');
+      const sha256 = await digestBackupObject(source, signal);
       const mimeType = ref.mimeType.toLowerCase();
       const key = `${sha256}:${ref.size}:${mimeType}`;
       const existing = content.get(key);
@@ -49,7 +44,51 @@ export async function prepareSharedBackupExport(
         aliases.set(ref.objectId, existing.id);
         shared.set(existing.id, existing);
       } else {
-        objects.push({ blob, ref });
+        if (object.open) {
+          objects.push({
+            ref,
+            open: async (signal) => {
+              const loaded = await openArchiveRootObjectSource(object, signal);
+              return {
+                size: loaded.size,
+                async pipeTo(sink, abort) {
+                  const writer = sink.getWriter();
+                  const digest = createHash.create();
+                  let bytes = 0;
+                  try {
+                    await loaded.pipeTo(
+                      new WritableStream<Uint8Array>({
+                        async write(chunk) {
+                          abort?.throwIfAborted();
+                          if (!(chunk instanceof Uint8Array))
+                            throw new Error('Media backup object source emitted invalid bytes.');
+                          bytes += chunk.byteLength;
+                          if (!Number.isSafeInteger(bytes) || bytes > ref.size)
+                            throw new Error('Media backup object source size changed.');
+                          digest.update(chunk);
+                          await writer.write(chunk);
+                        },
+                      }),
+                      abort
+                    );
+                    abort?.throwIfAborted();
+                    const actual = Array.from(digest.digest(), (byte) =>
+                      byte.toString(16).padStart(2, '0')
+                    ).join('');
+                    if (bytes !== ref.size || actual !== sha256)
+                      throw new Error('Media backup object source content changed.');
+                    await writer.close();
+                  } catch (error) {
+                    await writer.abort(error).catch(() => undefined);
+                    throw error;
+                  } finally {
+                    writer.releaseLock();
+                  }
+                },
+              };
+            },
+          });
+        } else objects.push(object);
         if (!existing)
           content.set(key, {
             id: `shared-${String(content.size + 1).padStart(6, '0')}`,

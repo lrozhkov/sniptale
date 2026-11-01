@@ -101,7 +101,13 @@ function isNativeMediaMessage(message: NativeAppInboundMessage): message is Nati
     message.type === 'app.screenshot.chunk' ||
     message.type === 'app.screenshot.commit' ||
     message.type === 'app.recording.stopped' ||
-    message.type === 'app.recording.chunk'
+    message.type === 'app.recording.chunk' ||
+    message.type === 'app.recording.attachment.manifest' ||
+    message.type === 'app.recording.attachment.chunk' ||
+    message.type === 'app.recording.attachment.available' ||
+    message.type === 'app.recording.events.manifest' ||
+    message.type === 'app.recording.events.chunk' ||
+    message.type === 'app.recording.events.available'
   );
 }
 
@@ -142,6 +148,11 @@ function handleLease(
   if (next.resumeLeaseId) {
     postNativeResponses(
       ctx.ingestion.resumePendingTransfers(next.resumeLeaseId),
+      ctx.post,
+      ctx.warn
+    );
+    postNativeResponses(
+      ctx.ingestion.resumePendingHistoryTransfers(next.resumeLeaseId, true),
       ctx.post,
       ctx.warn
     );

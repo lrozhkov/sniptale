@@ -1,3 +1,4 @@
+import { readArchiveRootObjectSource } from './object-source.test-support';
 import { encodePortableTour, decodePortableTour } from './root-codecs/scenario-tour';
 import {
   createTourDocument,
@@ -338,13 +339,13 @@ it('rejects duplicate, foreign and wrong-MIME transport references before stagin
       return object
         ? {
             path,
-            size: object.blob.size,
-            compressedSize: object.blob.size,
+            size: object.ref.size,
+            compressedSize: object.ref.size,
             crc32: 0,
             directory: false,
-            text: () => object.blob.text(),
+            text: async () => (await readArchiveRootObjectSource(object)).text(),
             pipeTo: async (destination: WritableStream<Uint8Array>) =>
-              object.blob.stream().pipeTo(destination),
+              (await readArchiveRootObjectSource(object)).stream().pipeTo(destination),
           }
         : null;
     },
@@ -392,9 +393,12 @@ it('rejects duplicate, foreign and wrong-MIME transport references before stagin
   await expect(decodeBackupMetadata(reader, base, abort.signal)).rejects.toMatchObject({
     name: 'AbortError',
   });
-  for (const object of payload.objects) {
+  for (const [index, object] of payload.objects.entries()) {
     if (object.ref.mimeType === 'image/png')
-      object.blob = new Blob(['x'.repeat(object.blob.size)], { type: 'image/png' });
+      payload.objects[index] = {
+        ref: object.ref,
+        blob: new Blob(['x'.repeat(object.ref.size)], { type: 'image/png' }),
+      };
   }
   await expect(decodeBackupMetadata(reader, base)).rejects.toMatchObject({
     reason: 'resource-invalid',

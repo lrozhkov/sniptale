@@ -19,6 +19,7 @@ import {
   MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
   isSharedBackupLayout,
   assertReviewProjectLayout,
+  assertCursorAttachmentLayout,
 } from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertBackupByteBudget } from './errors';
@@ -175,6 +176,7 @@ async function inspectRoot(args: {
   assertBackupByteBudget(args.state.expandedBytes, MAX_EXPANDED_ARCHIVE_METADATA_BYTES, 'read');
   assertArchiveRootMetadataIdentity(args.descriptor, decoded.envelope.metadata);
   assertReviewProjectLayout(decoded.envelope.metadata, args.manifest.layout);
+  assertCursorAttachmentLayout(decoded.envelope.metadata, args.manifest.layout);
   if (isSharedBackupLayout(args.manifest.layout))
     await assertArchiveRootObjectInventory(
       decoded.envelope,

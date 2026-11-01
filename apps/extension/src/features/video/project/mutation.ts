@@ -150,6 +150,14 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  if ((patch.actionFeedback ?? project.actionFeedback)?.some((group) => group.events !== undefined))
+    return 50;
+  if (
+    (patch.cursorTrack ?? project.cursorTrack)?.sourceObservations?.some(
+      (group) => group.trajectory !== undefined
+    )
+  )
+    return 49;
   if (
     (patch.textDocuments ?? project.textDocuments)?.some(
       (entry) => entry.resultEndLimits !== undefined

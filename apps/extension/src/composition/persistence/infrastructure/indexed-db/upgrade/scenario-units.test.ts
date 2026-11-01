@@ -49,6 +49,9 @@ it('adds only an empty indexed unit store before publishing the current scenario
     [SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' }],
     [SYNC_CONNECTION_STORE, { keyPath: 'key' }],
     [ASSET_RESIDENCY_STORE, { keyPath: 'id' }],
+    ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
+    ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
+    ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],
@@ -69,6 +72,11 @@ it('adds only an empty indexed unit store before publishing the current scenario
       ],
       { unique: false },
     ],
+    ['recordingId', 'recordingId'],
+    ['trajectory', ['recordingId', 'trajectoryId']],
+    ['time', ['recordingId', 'trajectoryId', 'startTimeUs', 'sequence']],
+    ['kind', 'kind'],
+    ['timeBuckets', 'timeBuckets', { multiEntry: true }],
   ]);
   expect(tx.objectStore.mock.calls).toEqual([[SYNC_OUTBOX_STORE], ['schema_contracts']]);
   expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 8 });

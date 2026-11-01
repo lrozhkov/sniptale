@@ -384,11 +384,40 @@ function prepareMediaRows(
     return rows;
   }
   if (parsed.metadata.recording) {
+    const attachment = parsed.metadata.recording.cursorAttachment;
+    const cursorTrajectorySnapshot = attachment
+      ? {
+          ref: refFor(attachment.objectId),
+          sourceRecordingId: attachment.sourceRecordingId,
+          width: attachment.width,
+          height: attachment.height,
+        }
+      : undefined;
+    if (attachment && cursorTrajectorySnapshot?.ref.sha256 !== attachment.descriptor.streamSha256)
+      throw new Error('Portable cursor trajectory digest differs from its source.');
+    const eventsAttachment = parsed.metadata.recording.eventsAttachment;
+    const recordingEventsSnapshot = eventsAttachment
+      ? {
+          ref: refFor(eventsAttachment.objectId),
+          sourceRecordingId: eventsAttachment.sourceRecordingId,
+        }
+      : undefined;
+    if (
+      eventsAttachment &&
+      recordingEventsSnapshot?.ref.sha256 !== eventsAttachment.descriptor.streamSha256
+    )
+      throw new Error('Portable recording events digest differs from its source.');
     const rows = parseCapturedMediaRows({
       media,
       ref,
       recording: { ...parsed.metadata.recording.entry, assetId: ref.assetId },
-      telemetry: parsed.metadata.recording.telemetry ?? null,
+      telemetry: parsed.metadata.recording.telemetry
+        ? {
+            ...parsed.metadata.recording.telemetry,
+            ...(cursorTrajectorySnapshot ? { cursorTrajectorySnapshot } : {}),
+            ...(recordingEventsSnapshot ? { recordingEventsSnapshot } : {}),
+          }
+        : null,
     });
     if (!rows) throw new Error('Unsupported portable recording original.');
     return rows;

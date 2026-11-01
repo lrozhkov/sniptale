@@ -60,7 +60,7 @@ export type PreviewStageInteractionHandler = (
 export type PreviewStageVideoRefs = React.MutableRefObject<Record<string, HTMLVideoElement | null>>;
 export type PreviewStageAudioRefs = React.MutableRefObject<Record<string, HTMLAudioElement | null>>;
 
-export type PreviewEffectRuntimeSource = 'audio' | 'visual';
+export type PreviewEffectRuntimeSource = 'audio' | 'visual' | 'recording-history';
 
 export interface PreviewEffectRuntimeFeedback {
   failed: boolean;

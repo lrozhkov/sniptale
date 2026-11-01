@@ -1,3 +1,5 @@
+import { retireJournalRecordingEventStages } from '../../composition/persistence/recordings/recording-events/staging';
+import { retireJournalCursorTrajectoryStages } from '../../composition/persistence/recordings/cursor-trajectory/staging';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 import { loadSyncConnection } from '../../composition/persistence/remote-connection/store';
@@ -227,16 +229,22 @@ export async function receiveSelectedCatalogRoot(args: {
       try {
         await publishReadyJournalWithRetry(journal, async (ready, permit) => {
           // Cancellation and publication use the same lifecycle exclusion as startup replay.
-          if (args.signal.aborted && !(await receipt()))
+          if (args.signal.aborted && !(await receipt())) {
+            await retireJournalCursorTrajectoryStages(ready.journalId);
+            await retireJournalRecordingEventStages(ready.journalId);
             throw new SupersededAssetPublicationError();
+          }
           await publishPreparedReplicaJournal(ready, permit);
         });
       } catch (error) {
         if (!args.signal.aborted) throw error;
         const committed = await runWithDurableAssetLifecycleLock(async (permit) => {
           if (await receipt()) return true;
-          if (!(error instanceof SupersededAssetPublicationError))
+          if (!(error instanceof SupersededAssetPublicationError)) {
+            await retireJournalCursorTrajectoryStages(journal.journalId);
+            await retireJournalRecordingEventStages(journal.journalId);
             await cancelAssetPublication(journal, permit);
+          }
           return false;
         });
         if (!committed) args.signal.throwIfAborted();

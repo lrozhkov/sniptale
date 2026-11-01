@@ -1,3 +1,5 @@
+import type { CursorTrajectoryDescriptor } from '../../features/video/project/cursor-trajectory/types';
+import type { RecordingEventsDescriptor } from '../../features/video/project/recording-events/types';
 import type {
   NativeCaptureMode,
   NativeRecordingMode,
@@ -110,6 +112,8 @@ export interface AppRecordingProgressMessage {
 
 export interface AppRecordingStoppedMessage {
   type: 'app.recording.stopped';
+  cursorTrajectory?: CursorTrajectoryDescriptor;
+  recordingEvents?: RecordingEventsDescriptor;
   protocolVersion: number;
   controllerLeaseId: string;
   recordingId: string;

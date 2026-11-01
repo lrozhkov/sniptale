@@ -233,10 +233,10 @@ export function runWithPersistenceMutationTransition<T>(
 
 export function runWithPersistenceMutationTransitionRecovery<T>(
   permit: PersistenceMutationTransitionPermit | undefined,
-  operation: () => T | Promise<T>
+  operation: (permit: PersistenceMutationTransitionPermit) => T | Promise<T>
 ): Promise<T> {
   if (permit && activePersistenceMutationTransitionPermits.has(permit)) {
-    return Promise.resolve().then(operation);
+    return Promise.resolve().then(() => operation(permit));
   }
   return runWithPersistenceMutationTransition(operation);
 }

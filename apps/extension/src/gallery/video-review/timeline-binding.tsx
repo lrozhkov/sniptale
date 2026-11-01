@@ -58,6 +58,8 @@ type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
 type TimelineBindingProps = {
+  onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
+  cursorArchiveAvailable?: boolean | undefined;
   navigationRevision?: number | undefined;
   annotationEffects?: ReturnType<typeof useReviewAnnotationEffects>;
   effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
@@ -299,6 +301,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       }}
     >
       <ReviewTimeline
+        onHistoryRange={props.onHistoryRange}
+        cursorArchiveAvailable={props.cursorArchiveAvailable}
         trackOrder={trackOrder.order}
         actionsTrackVisible={
           (features.mode === 'advanced' && configuring) || features.actionsTrackVisible

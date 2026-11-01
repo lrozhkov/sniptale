@@ -1,4 +1,6 @@
+import { createRecordingEventsRenderer } from '../../../workflows/video-review/recording-events';
 import { createCompositionCutSampleSource } from '../../../workflows/video-review/decoded-video-sample';
+import { createRecordingCursorTrajectoryRenderer } from '../../../workflows/video-review/cursor-trajectory';
 import type { VideoCompositionFrameSource } from '../../../features/video/composition/draw/media-source';
 import { hasCameraMediaAt } from '../../../features/video/project/camera/animation';
 import { createCompositionJoinEndpoints } from '../../../features/video/composition/canvas/join-endpoints';
@@ -53,6 +55,8 @@ interface VideoPreviewMaterializerState {
   spatialRenderer: ReviewSpatialRenderer | null;
   stagingCanvas: HTMLCanvasElement | null;
   captionRenderer: ReturnType<typeof createVideoProjectCaptionRenderer>;
+  cursorTrajectoryRenderer: ReturnType<typeof createRecordingCursorTrajectoryRenderer>;
+  recordingEventsRenderer: ReturnType<typeof createRecordingEventsRenderer>;
   watermarkRenderer: ReturnType<typeof createVideoProjectWatermarkRenderer>;
   effectRuntime: ReturnType<typeof createVideoEditorEffectRuntime> | null;
   imageBank: Record<string, HTMLImageElement>;
@@ -471,6 +475,8 @@ function createMaterializerMediaState(
     spatialRenderer: null,
     stagingCanvas: null,
     captionRenderer: createVideoProjectCaptionRenderer(),
+    cursorTrajectoryRenderer: createRecordingCursorTrajectoryRenderer(),
+    recordingEventsRenderer: createRecordingEventsRenderer(),
     watermarkRenderer: createVideoProjectWatermarkRenderer(loadVideoEditorAssetBlob),
     effectRuntime: null,
     imageBank: {},
@@ -527,6 +533,8 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
   state.playbackSampler?.dispose();
   state.playbackSampler = null;
   state.captionRenderer.clear();
+  state.cursorTrajectoryRenderer.clear();
+  state.recordingEventsRenderer.clear();
   state.watermarkRenderer.clear();
   state.effectRuntime = null;
   stage.remove();
@@ -571,6 +579,14 @@ async function renderMaterializedFrame(
     if (!decodedVideoFrames)
       await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
     assertActive();
+    const eventsProject = await state.recordingEventsRenderer.prepare(
+      params.project,
+      { start: time, end: time },
+      signal
+    );
+    assertActive();
+    const renderProject = await state.cursorTrajectoryRenderer.prepare(eventsProject, time);
+    assertActive();
     const drawn = await renderPreviewScene({
       sampleFps: params.sampleFps ?? params.project.fps,
       ...(sceneEdges === 'omit' ? { sceneEdges } : {}),
@@ -604,7 +620,7 @@ async function renderMaterializedFrame(
       },
       imageBank: state.imageBank,
       previewRasterSize: params.rasterSize,
-      project: params.project,
+      project: renderProject,
       signal,
       stage,
       videoRefs: { current: state.videoRefs },

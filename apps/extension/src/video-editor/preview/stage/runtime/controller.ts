@@ -1,3 +1,4 @@
+import { useRecordingEventsProject } from './recording-events';
 import { resolveVideoEditorPreviewFrameRate } from '../../../../features/video/preview/preferences';
 import { resolveCameraCanvasTransform } from './camera-transform';
 import React, { useEffect, useMemo, useRef } from 'react';
@@ -15,6 +16,7 @@ import { usePreviewStagePresentationTime } from './presentation';
 import { usePreviewStageTransientTransform } from './transform-preview';
 import { usePreviewSessionExactFrameCache } from './cache-session';
 import { useActivePreviewClips } from './index';
+import { useCursorTrajectoryProject } from './cursor-trajectory';
 import {
   createPreviewStageInteraction,
   getPreviewStageSelection,
@@ -130,18 +132,21 @@ function usePreviewCompositionProject(project: VideoProject): VideoProject {
 export function usePreviewStageRuntime(params: PreviewStageProps) {
   const project = usePreviewCompositionProject(params.project);
   const { presentation, transient } = usePreviewStageTimeline({ ...params, project });
+  const effectRuntimeFeedback = usePreviewEffectRuntimeFeedback();
+  const eventsProject = useRecordingEventsProject(
+    transient.previewProject,
+    transient.currentTime,
+    effectRuntimeFeedback
+  );
+  const cursorProject = useCursorTrajectoryProject(eventsProject, transient.currentTime);
   const previewProject = useMemo(
     () => ({
-      ...transient.previewProject,
-      fps: resolveVideoEditorPreviewFrameRate(
-        transient.previewProject.fps,
-        params.previewFrameRate
-      ),
+      ...cursorProject,
+      fps: resolveVideoEditorPreviewFrameRate(cursorProject.fps, params.previewFrameRate),
     }),
-    [transient.previewProject, params.previewFrameRate]
+    [cursorProject, params.previewFrameRate]
   );
   const renderGenerationRef = useRef(0);
-  const effectRuntimeFeedback = usePreviewEffectRuntimeFeedback();
   const previewExactFrameCache = usePreviewSessionExactFrameCache();
   const surface = usePreviewStageSurfaceState({
     currentTime: transient.currentTime,
@@ -150,7 +155,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     onSelectClip: params.onSelectClip,
     onUpdateClipTransform: params.onUpdateClipTransform,
     previewZoom: params.previewZoom,
-    project: transient.previewProject,
+    project: cursorProject,
     selectedClipId: params.selectedClipId,
     selectedEffectInstanceId: params.selectedEffectInstanceId,
   });
@@ -171,6 +176,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     previewMode: params.previewMode,
     previewRasterSize,
     project: previewProject,
+    recordingProject: transient.previewProject,
     renderGenerationRef,
     registerPreviewRuntime: params.registerPreviewRuntime,
   });

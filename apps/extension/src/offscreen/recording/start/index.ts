@@ -31,10 +31,15 @@ type StartRecordingParams = {
 
 export async function startRecording(
   params: StartRecordingParams,
-  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>,
+  initializeCursor?: (
+    width: number,
+    height: number,
+    observation: NonNullable<typeof recordingContext.recordingPointObservation>
+  ) => Promise<void>
 ): Promise<void> {
   try {
-    await startRecordingInternal(params, messaging);
+    await startRecordingInternal(params, messaging, initializeCursor);
   } catch (error) {
     throw handleRecordingStartError(error, params.recordingId, {
       generation: params.generation,
@@ -53,7 +58,12 @@ function isStillStarting(recordingId: string): boolean {
 
 async function startRecordingInternal(
   params: StartRecordingParams,
-  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>
+  messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>,
+  initializeCursor?: (
+    width: number,
+    height: number,
+    observation: NonNullable<typeof recordingContext.recordingPointObservation>
+  ) => Promise<void>
 ) {
   const recordingId = initializeRecordingSession(params);
   const prepared = await prepareRecordingStream({
@@ -122,6 +132,17 @@ async function startRecordingInternal(
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
   });
   releaseCountdownCameraPreparation(sourceBinding);
+  if (
+    (params.captureMode ?? RecordingCaptureMode.TAB) === RecordingCaptureMode.TAB ||
+    params.captureMode === RecordingCaptureMode.TAB_CROP
+  ) {
+    const { width, height } = prepared.trackSettings;
+    if (width && height) await initializeCursor?.(width, height, pointObservation);
+  }
+  if (!isStillStarting(recordingId)) {
+    cleanupResources();
+    return;
+  }
   await finalizeRecordingBootstrap({
     filenameSession,
     resolvedRecordingId: recordingId,

@@ -4,7 +4,7 @@ function escapeRegex(source) {
   return source.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
 }
 
-function resolveInstalledDependencyPattern(specifier) {
+function resolveInstalledDependencyPattern(specifier, relativeExport) {
   let installedPath;
   try {
     installedPath = require.resolve(specifier, { paths: [process.cwd()] });
@@ -12,6 +12,7 @@ function resolveInstalledDependencyPattern(specifier) {
     if (error?.code === 'MODULE_NOT_FOUND') return '(?!)';
     throw error;
   }
+  if (relativeExport) installedPath = path.resolve(path.dirname(installedPath), relativeExport);
   const repositoryRelativePath = path
     .relative(process.cwd(), installedPath)
     .split(path.sep)
@@ -20,6 +21,11 @@ function resolveInstalledDependencyPattern(specifier) {
 }
 
 const NOBLE_SHA2_PATH_PATTERN = resolveInstalledDependencyPattern('@noble/hashes/sha2.js');
+// The pinned package declares this exact root types export; the graph reports it as npm-unknown.
+const FAKE_INDEXED_DB_TYPES_PATH_PATTERN = resolveInstalledDependencyPattern(
+  'fake-indexeddb',
+  '../../types.d.ts'
+);
 
 module.exports = [
   {
@@ -100,7 +106,7 @@ module.exports = [
     },
     to: {
       dependencyTypes: ['npm-no-pkg', 'npm-unknown'],
-      pathNot: [NOBLE_SHA2_PATH_PATTERN],
+      pathNot: [NOBLE_SHA2_PATH_PATTERN, FAKE_INDEXED_DB_TYPES_PATH_PATTERN],
     },
   },
   {

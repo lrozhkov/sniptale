@@ -1,3 +1,4 @@
+import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
 import { expect, it } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
@@ -333,4 +334,161 @@ it('refuses surplus physical mappings for an ordinary root', async () => {
     remoteKey: attempt.objects[0]!.remoteKey,
   }));
   await expect(parseSyncAttemptText(JSON.stringify({ ...physical, objects }))).rejects.toThrow();
+});
+
+function cursorOperation() {
+  const base = operation();
+  const descriptor = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: 'a'.repeat(32),
+    state: 'complete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalSamples: 1,
+    totalBytes: 512,
+    streamSha256: 'b'.repeat(64),
+  };
+  const envelope = parseRootEnvelope({
+    descriptor: {
+      rootKind: 'media',
+      mediaSubtype: 'library-item',
+      rootId: 'recording:source',
+      metadataPath: 'Metadata/sync-root.json',
+      objectCount: 2,
+      totalBytes: 519,
+    },
+    metadata: {
+      entry: createMediaLibraryEntry({
+        id: 'recording:source',
+        source: { kind: 'recording', recordingId: 'source' },
+        kind: 'recording',
+        filename: 'source.webm',
+        originalFilename: 'source.webm',
+        mimeType: 'video/webm',
+        size: 3,
+      }),
+      originalObjectId: 'video',
+      recording: {
+        entry: {
+          id: 'source',
+          createdAt: 1,
+          filename: 'source.webm',
+          mimeType: 'video/webm',
+          size: 3,
+        },
+        telemetry: {
+          recordingId: 'source',
+          createdAt: 1,
+          updatedAt: 1,
+          captureMode: null,
+          viewport: null,
+          cursorTrack: null,
+          actionEvents: [],
+          signals: [],
+          cursorTrajectory: descriptor,
+        },
+        cursorAttachment: {
+          recordingId: 'source',
+          sourceRecordingId: 'canonical',
+          width: 160,
+          height: 90,
+          descriptor,
+          objectId: 'cursor',
+        },
+      },
+    },
+    objects: [
+      {
+        objectId: 'video',
+        filename: 'source.webm',
+        path: '_sniptale/assets/video/source.webm',
+        mimeType: 'video/webm',
+        size: 3,
+      },
+      {
+        objectId: 'cursor',
+        filename: 'cursor.bin',
+        path: '_sniptale/assets/cursor/cursor.bin',
+        mimeType: 'application/octet-stream',
+        size: 516,
+      },
+    ],
+  });
+  return {
+    ...base,
+    version: 2,
+    rootId: envelope.descriptor.rootId,
+    envelope,
+    objects: [
+      { objectId: 'video', sha256: 'a'.repeat(64) },
+      { objectId: 'cursor', sha256: descriptor.streamSha256 },
+    ],
+  };
+}
+
+it('requires logical version 2 for typed history roots while retaining physical version 1', async () => {
+  const value = cursorOperation();
+  expect(await parseSyncOperationText(JSON.stringify(value))).toEqual(value);
+  const physical = await createSyncAttempt(JSON.stringify(value), id1);
+  const received = await parseSyncAttemptText(physical.recordText);
+  expect(received.operation.version).toBe(2);
+  expect(JSON.parse(physical.recordText).version).toBe(1);
+  await expect(parseSyncOperationText(JSON.stringify({ ...value, version: 1 }))).rejects.toThrow();
+  await expect(parseSyncOperationText(JSON.stringify({ ...value, version: 3 }))).rejects.toThrow();
+  await expect(
+    parseSyncOperationText(JSON.stringify({ ...operation(), version: 2 }))
+  ).rejects.toThrow();
+  await expect(
+    parseSyncOperationText(JSON.stringify({ ...operation(true), version: 2 }))
+  ).rejects.toThrow();
+});
+
+it('refuses a physical hash that contradicts the cursor stream descriptor before admission', async () => {
+  const value = cursorOperation();
+  value.objects[1]!.sha256 = 'c'.repeat(64);
+  await expect(parseSyncOperationText(JSON.stringify(value))).rejects.toThrow();
+});
+
+it('requires v2 and the original stream hash for an events-only recording', async () => {
+  const base = cursorOperation();
+  const metadata = parsePortableMediaMetadata(base.envelope.metadata);
+  if (!metadata.recording?.telemetry) throw new Error('Missing recording fixture.');
+  delete metadata.recording.cursorAttachment;
+  delete metadata.recording.telemetry.cursorTrajectory;
+  const descriptor = {
+    format: 'recording-events-v1' as const,
+    formatVersion: 1 as const,
+    algorithm: 'lossless-v1' as const,
+    encoding: 'json-utf8-v1' as const,
+    eventStreamId: 'd'.repeat(32),
+    state: 'incomplete' as const,
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalBytes: 512,
+    streamSha256: 'e'.repeat(64),
+  };
+  metadata.recording.telemetry.recordingEvents = descriptor;
+  metadata.recording.eventsAttachment = {
+    recordingId: metadata.recording.entry.id,
+    sourceRecordingId: 'canonical',
+    descriptor,
+    objectId: 'cursor',
+  };
+  const value = {
+    ...base,
+    envelope: { ...base.envelope, metadata },
+    objects: base.objects.map((object) =>
+      object.objectId === 'cursor' ? { ...object, sha256: descriptor.streamSha256 } : object
+    ),
+  };
+  expect(await parseSyncOperationText(JSON.stringify(value))).toEqual(value);
+  await expect(parseSyncOperationText(JSON.stringify({ ...value, version: 1 }))).rejects.toThrow();
+  await expect(
+    parseSyncOperationText(JSON.stringify({ ...value, objects: base.objects }))
+  ).rejects.toThrow();
 });

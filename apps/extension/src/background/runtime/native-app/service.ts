@@ -1,3 +1,9 @@
+import { createNativeHistoryRetry } from './service-history-retry';
+import {
+  NATIVE_CURSOR_TRAJECTORY_ENABLED,
+  NATIVE_RECORDING_EVENTS_ENABLED,
+  supportsNativeRecordingHistory,
+} from './outbound';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import type {
   AppHelloMessage,
@@ -59,6 +65,28 @@ class Controller implements NativeAppRuntimeService {
       );
     },
   });
+  private readonly historyRetry = createNativeHistoryRetry({
+    target: () => {
+      const lease = this.status.controllerLease;
+      if (
+        !this.port ||
+        !lease ||
+        !this.ownsLease(lease) ||
+        (!this.historyEnabled('cursor') && !this.historyEnabled('events'))
+      )
+        return null;
+      return { connectionId: this.connectionId, controllerLeaseId: lease.controllerLeaseId };
+    },
+    resume: (lease) => this.ingestion.resumePendingHistoryTransfers(lease),
+    post: (message) => this.post(message),
+    warn: () => this.warn('Native history retry remains pending'),
+  });
+  private historyEnabled(kind: 'cursor' | 'events') {
+    return (
+      (kind === 'cursor' ? NATIVE_CURSOR_TRAJECTORY_ENABLED : NATIVE_RECORDING_EVENTS_ENABLED) &&
+      supportsNativeRecordingHistory(this.status.capabilities, kind)
+    );
+  }
   private readonly ingestion;
   private status: NativeAppRuntimeStatus;
   private readonly warn = (message: string) => logger.warn(message);
@@ -67,6 +95,7 @@ class Controller implements NativeAppRuntimeService {
     this.deps = deps;
     this.status = createInitialNativeAppRuntimeStatus(deps.hostName);
     this.ingestion = createNativeAppIngestionController({
+      isHistoryEnabled: (kind) => this.historyEnabled(kind),
       getCurrentControllerLeaseId: () => {
         const lease = this.status.controllerLease;
         return lease && this.ownsLease(lease) ? lease.controllerLeaseId : null;
@@ -230,6 +259,7 @@ class Controller implements NativeAppRuntimeService {
     if (this.leaseTimer !== null) clearTimeout(this.leaseTimer);
     this.leaseTimer = null;
     this.heartbeat.stop();
+    this.historyRetry.stop();
     this.status = clearNativeAuthorityStatus(this.status, nextState);
   }
 
@@ -368,6 +398,7 @@ class Controller implements NativeAppRuntimeService {
           this.leaseTimer = null;
           this.heartbeat.resetRetries();
           this.authority.acceptLeaseGeneration();
+          this.historyRetry.start();
         },
         acquire: (reason) => this.acquire(reason),
         clearPendingReason: () => {

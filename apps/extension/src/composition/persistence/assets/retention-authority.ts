@@ -1,3 +1,10 @@
+import { isRecordingEventsHead } from '../recordings/recording-events/guards';
+import { RECORDING_EVENTS_SNAPSHOT_ROLE } from '../recordings/recording-events/contracts';
+import { RECORDING_EVENTS_STORE } from '../infrastructure/indexed-db/core.stores';
+import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { isCursorTrajectoryHead } from '../recordings/cursor-trajectory/guards';
+import { RECORDING_CURSOR_SNAPSHOT_ROLE } from '../recordings/cursor-trajectory/contracts';
+import { RECORDING_CURSOR_TRAJECTORIES_STORE } from '../infrastructure/indexed-db/core.stores';
 import { collectSyncCaptureClaims } from '../sync-capture/claims';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -96,6 +103,40 @@ export async function collectDurableAssetSnapshot(
   await owned(STORE_NAME, parseRecordingEntry, (entry) => [
     createExpectedOwner('recording', entry.id, entry.assetId),
   ]);
+  const snapshotHeadsValid = await visitDurableRows(
+    db,
+    RECORDING_CURSOR_TRAJECTORIES_STORE,
+    (raw) => {
+      if (!isPlainRecord(raw) || raw['snapshotAssetId'] === undefined) return true;
+      if (!isCursorTrajectoryHead(raw)) return false;
+      if (!raw.retired && raw.snapshotAssetId !== undefined)
+        expectedOwners.push({
+          ownerKind: 'recording',
+          ownerId: raw.recordingId,
+          role: RECORDING_CURSOR_SNAPSHOT_ROLE,
+          assetId: raw.snapshotAssetId,
+        });
+      return true;
+    },
+    signal
+  );
+  if (!snapshotHeadsValid)
+    logger.debug(`Retention validation failed: ${RECORDING_CURSOR_TRAJECTORIES_STORE}`);
+  authorityValid &&= snapshotHeadsValid;
+  const eventHeads: unknown = await db.getAllFromIndex(RECORDING_EVENTS_STORE, 'kind', 'head');
+  if (!Array.isArray(eventHeads)) authorityValid = false;
+  else
+    for (const raw of eventHeads) {
+      signal?.throwIfAborted();
+      if (!isRecordingEventsHead(raw)) authorityValid = false;
+      else if (!raw.retired && raw.snapshotAssetId !== undefined)
+        expectedOwners.push({
+          ownerKind: 'recording',
+          ownerId: raw.recordingId,
+          role: RECORDING_EVENTS_SNAPSHOT_ROLE,
+          assetId: raw.snapshotAssetId,
+        });
+    }
   await owned(PROJECT_ASSETS_STORE, parseProjectAssetEntry, (entry) => [
     createExpectedOwner('project-asset', entry.id, entry.assetId),
   ]);

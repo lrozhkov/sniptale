@@ -1,3 +1,4 @@
+import type { ReviewRecordingRenderSource } from './recording-render';
 import { createPresentationDecoder } from './presentation-decoder';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink, type InputAudioTrack } from 'mediabunny';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
@@ -30,6 +31,7 @@ type SampleSink = ReturnType<typeof createReviewDecodedSampleSink>;
 type Camera = Awaited<ReturnType<typeof createReviewWebcamRenderer>>;
 
 export interface ReviewPresentationMainInput {
+  recordingHistory?: ReviewRecordingRenderSource;
   file: Blob;
   index: ReviewMediaIndex;
   edits: readonly ReviewEdit[];
@@ -218,6 +220,20 @@ class PresentationMain {
       this.camera = camera;
     }
     signal.throwIfAborted();
+    if (this.args.recordingHistory) {
+      const history = await this.args.recordingHistory.read(
+        this.segments[0]!.sourceStart,
+        this.args.fragmentOffset,
+        { ...this.args.dimensions.backing, frameDuration: 1 / (this.args.fps ?? 30) },
+        signal
+      );
+      this.scene = {
+        ...this.scene,
+        zoomRegions: history.effective.zoomRegions,
+        keys: history.keyCues,
+        clicks: history.clickCues,
+      };
+    }
     if (effective.captions) {
       this.scene = { ...this.scene, webcamDuration: this.camera?.duration };
       if (this.args.fragmentOffset > 0 && !this.args.captionTimeMap)
@@ -318,6 +334,20 @@ class PresentationMain {
     let prepared: Awaited<ReturnType<Renderer['prepare']>> | undefined;
     try {
       signal.throwIfAborted();
+      if (this.args.recordingHistory) {
+        const history = await this.args.recordingHistory.read(
+          this.sourceTime,
+          this.resultTime,
+          { ...this.args.dimensions.backing, frameDuration: 1 / (this.args.fps ?? 30) },
+          signal
+        );
+        this.scene = {
+          ...this.scene!,
+          zoomRegions: history.effective.zoomRegions,
+          keys: history.keyCues,
+          clicks: history.clickCues,
+        };
+      }
       prepared = await this.renderer.prepare(this.scene!, this.args.dimensions, signal);
       signal.throwIfAborted();
       this.assets = prepared.allocationAssets;
@@ -347,6 +377,7 @@ class PresentationMain {
           this.resources.bytes('main-transition', this.transitionBytes[0] + this.transitionBytes[1])
         );
       const frame: Frame = {
+        ...(this.args.recordingHistory ? { recordingHistory: this.args.recordingHistory } : {}),
         generation,
         fps: this.args.fps ?? this.args.index.frameRate ?? 30,
         sourceTime: this.sourceTime,

@@ -7,6 +7,10 @@ import { clearLegacyControlledCursorArtifacts } from './artifacts';
 import { createRecordingTextCursor } from './text-cursor';
 import { recordTelemetryPauseBoundary } from './events';
 import type { TelemetryState } from './types';
+import { createRecordingEventSource } from './event-source';
+import type { RecordingEventObservationPacket } from '../../../contracts/video/event-observations';
+import { createCursorObservationSource } from './cursor-source';
+import type { RecordingCursorObservationPacket } from '../../../contracts/video/cursor-observations';
 import {
   isRecordingFrameClockAnchor,
   matchesRecordingFrameClockBinding,
@@ -18,17 +22,24 @@ import {
   removeViewportObserver,
   observeViewportGeometry,
   buildViewportSnapshot,
+  buildRecordingViewportGeometry,
   createInitialState,
   removeListeners,
   resetTelemetryState,
 } from './state';
 
 interface VideoTelemetryController {
-  disable: () => RecordingTelemetrySnapshot | null;
+  disable: (reason?: 'stop' | 'observation') => RecordingTelemetrySnapshot | null;
+  flushCursor: () => Promise<boolean>;
+  flushEvents: () => Promise<boolean>;
+  waitForEventsCalibration: (work: Promise<unknown>) => void;
+  waitForCursorCalibration: (work: Promise<unknown>) => void;
   enable: (
     recordingId: string | null,
     offsetSeconds?: number,
-    frameClock?: RecordingFrameClockAnchor | null
+    frameClock?: RecordingFrameClockAnchor | null,
+    cursorTrajectoryMode?: 'blocks',
+    recordingEventsMode?: 'blocks'
   ) => void;
   updateClock: (recordingId: string, anchor: RecordingFrameClockAnchor) => void;
   isEnabled: () => boolean;
@@ -180,15 +191,44 @@ function resumeTelemetryState(
   state.pointerStationaryStartedAtMs = state.pointerStationaryPosition
     ? state.segmentStartedAtTimestamp
     : null;
+  state.eventSource?.open(
+    {
+      sourceClockId: state.observationClock.id,
+      observationTimeSeconds: state.accumulatedDurationMs / 1000,
+      viewport: buildRecordingViewportGeometry(),
+    },
+    'resume'
+  );
   attachListeners(state);
   if (!state.viewportObserver) attachViewportObserver(state);
   observeViewportGeometry(state);
 }
 
-function disableEnabledTelemetryState(state: TelemetryState): RecordingTelemetrySnapshot {
+function disableEnabledTelemetryState(
+  state: TelemetryState,
+  reason: 'stop' | 'observation'
+): RecordingTelemetrySnapshot {
   clearLegacyControlledCursorArtifacts();
   try {
-    if (!state.isPaused) recordTelemetryPauseBoundary(state);
+    if (!state.isPaused) recordTelemetryPauseBoundary(state, undefined, reason);
+    else {
+      state.cursorSource?.boundary(
+        {
+          sourceClockId: state.observationClock.id,
+          observationTimeSeconds: state.accumulatedDurationMs / 1000,
+          viewport: buildRecordingViewportGeometry(),
+        },
+        reason
+      );
+      state.eventSource?.boundary(
+        {
+          sourceClockId: state.observationClock.id,
+          observationTimeSeconds: state.accumulatedDurationMs / 1000,
+          viewport: buildRecordingViewportGeometry(),
+        },
+        reason === 'stop' ? 'stop' : 'visibility'
+      );
+    }
   } finally {
     removeListeners(state);
     removeViewportObserver(state);
@@ -214,7 +254,7 @@ function disableEnabledTelemetryState(state: TelemetryState): RecordingTelemetry
     },
     viewport: state.viewport,
     viewportObservation: state.viewportObservation ?? null,
-    cursorTrack: structuredClone(state.cursorTrack),
+    cursorTrack: state.cursorSource ? null : structuredClone(state.cursorTrack),
     actionEvents: structuredClone(normalizeRecordingActions(state.actionEvents)),
     signals: structuredClone(normalizeRecordingSignals(state.signals)).map((signal) => ({
       ...signal,
@@ -224,7 +264,10 @@ function disableEnabledTelemetryState(state: TelemetryState): RecordingTelemetry
   };
 }
 
-function disableTelemetryState(state: TelemetryState): RecordingTelemetrySnapshot | null {
+function disableTelemetryState(
+  state: TelemetryState,
+  reason: 'stop' | 'observation'
+): RecordingTelemetrySnapshot | null {
   clearLegacyControlledCursorArtifacts();
   if (!state.isEnabled) {
     removeViewportObserver(state);
@@ -232,32 +275,81 @@ function disableTelemetryState(state: TelemetryState): RecordingTelemetrySnapsho
     return null;
   }
 
-  return disableEnabledTelemetryState(state);
+  return disableEnabledTelemetryState(state, reason);
 }
 
 export function createVideoTelemetryController(
   deps: {
     publish?: (recordingId: string, snapshot: RecordingTelemetrySnapshot) => void;
+    publishCursor?: (packet: RecordingCursorObservationPacket) => Promise<void>;
+    publishEvents?: (packet: RecordingEventObservationPacket) => Promise<void>;
   } = {}
 ): VideoTelemetryController {
   const state = createInitialState();
   const textCursor = createRecordingTextCursor();
-  const disable = () => {
-    window.removeEventListener('pagehide', disable);
+  const pagehide = () => {
+    disable('observation');
+    void state.cursorSource?.flush();
+    void state.eventSource?.flush();
+  };
+  const disable = (reason: 'stop' | 'observation' = 'stop') => {
+    window.removeEventListener('pagehide', pagehide);
     textCursor.stop();
-    const snapshot = disableTelemetryState(state);
+    const snapshot = disableTelemetryState(state, reason);
+    state.cursorSource?.close();
+    state.eventSource?.close();
     if (snapshot && state.recordingId) deps.publish?.(state.recordingId, snapshot);
     return snapshot;
   };
 
   return {
-    enable: (recordingId, offsetSeconds, frameClock) => {
+    enable: (recordingId, offsetSeconds, frameClock, cursorTrajectoryMode, recordingEventsMode) => {
       textCursor.stop();
+      const existing = state.isEnabled && state.recordingId === recordingId;
       enableTelemetryState(state, recordingId, offsetSeconds, frameClock);
-      if (state.isEnabled) window.addEventListener('pagehide', disable);
+      if (state.recordingId !== recordingId) return;
+      if (!existing) {
+        state.cursorSource?.close();
+        state.cursorSource = null;
+        state.eventSource?.close();
+        state.eventSource = null;
+      }
+      if (!existing && state.isEnabled && recordingId && cursorTrajectoryMode === 'blocks') {
+        const send = deps.publishCursor;
+        if (!send) throw new Error('Cursor trajectory transport is unavailable');
+        const observationClock = state.observationClock;
+        state.cursorSource = createCursorObservationSource({
+          recordingId,
+          project: (moment) =>
+            observationClock.projectAt(moment.sourceClockId, moment.observationTimeSeconds),
+          send,
+        });
+      }
+      if (!existing && state.isEnabled && recordingId && recordingEventsMode === 'blocks') {
+        const send = deps.publishEvents;
+        if (!send) throw new Error('Recording events transport is unavailable');
+        const observationClock = state.observationClock;
+        state.eventSource = createRecordingEventSource({
+          recordingId,
+          project: (moment) =>
+            observationClock.projectAt(moment.sourceClockId, moment.observationTimeSeconds),
+          send,
+        });
+        if (!state.isPaused)
+          state.eventSource.open({
+            sourceClockId: observationClock.id,
+            observationTimeSeconds: state.accumulatedDurationMs / 1000,
+            viewport: buildRecordingViewportGeometry(),
+          });
+      }
+      if (state.isEnabled) window.addEventListener('pagehide', pagehide);
       if (state.isEnabled && !state.isPaused) textCursor.start();
     },
     disable,
+    flushCursor: () => state.cursorSource?.flush() ?? Promise.resolve(true),
+    flushEvents: () => state.eventSource?.flush() ?? Promise.resolve(true),
+    waitForEventsCalibration: (work) => state.eventSource?.waitForCalibration(work),
+    waitForCursorCalibration: (work) => state.cursorSource?.waitForCalibration(work),
     updateClock: (recordingId, anchor) => updateTelemetryClock(state, recordingId, anchor),
     isEnabled: () => state.isEnabled,
     pause: (frameClock) => {

@@ -839,3 +839,101 @@ it('refuses snapshot replacement until an active frame settles', async () => {
   expect(f.owner.updateProject({ ...f.project, backgroundColor: '#00ff00' })).toBe(true);
   f.owner.dispose();
 });
+
+it('passes prepared recording facts to the scene and clears their reader with the materializer', async () => {
+  const eventsOwner = await import('../../../workflows/video-review/recording-events');
+  const { attachRecordingEventGroups, recordingEventProjectActions } =
+    await import('../../../features/video/project/recording-events/project-facts');
+  const clear = vi.fn();
+  const project = createEmptyVideoProject('Events frame');
+  project.duration = 1;
+  const descriptor = {
+    format: 'recording-events-v1' as const,
+    formatVersion: 1 as const,
+    algorithm: 'lossless-v1' as const,
+    encoding: 'json-utf8-v1' as const,
+    eventStreamId: 'a'.repeat(32),
+    state: 'complete' as const,
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalBytes: 1000,
+    streamSha256: 'b'.repeat(64),
+  };
+  project.actionFeedback = [
+    {
+      recordingId: 'source',
+      sourceInstanceId: 'instance',
+      events: descriptor,
+      settings: [],
+      signals: [],
+    },
+  ];
+  const prepared = attachRecordingEventGroups(project, { start: 0, end: 1 }, [
+    {
+      recordingId: 'source',
+      sourceInstanceId: 'instance',
+      eventStreamId: 'a'.repeat(32),
+      descriptor,
+      writerGeneration: 'generation',
+      signals: [],
+      cadence: new Map(),
+      actions: [
+        {
+          id: 'captured',
+          kind: 'KEY',
+          label: 'Ctrl+S',
+          data: {},
+          point: null,
+          capturedDuration: 0,
+          anchor: {
+            kind: 'recording-source',
+            recordingId: 'source',
+            sourceInstanceId: 'instance',
+            sourceEventId: 'key',
+            sourceTime: 0,
+          },
+        },
+      ],
+    },
+  ]);
+  const prepare = vi.fn(async () => prepared);
+  vi.spyOn(eventsOwner, 'createRecordingEventsRenderer').mockReturnValue({ prepare, clear });
+  const materializer = createVideoPreviewFrameMaterializer({
+    ownerDocument: document,
+    project,
+    assetUrls: {},
+    rasterSize: { height: 360, width: 640 },
+  });
+  await materializer.renderFrame(0.1, new AbortController().signal);
+  expect(prepare).toHaveBeenCalledWith(project, { start: 0.1, end: 0.1 }, expect.any(AbortSignal));
+  const sceneProject = renderPreviewScene.mock.calls.at(-1)?.[0].project;
+  expect(
+    sceneProject && recordingEventProjectActions(sceneProject).map((event) => event.id)
+  ).toEqual(['captured']);
+  expect(JSON.stringify(sceneProject)).toBe(JSON.stringify(project));
+  materializer.dispose();
+  expect(clear).toHaveBeenCalledOnce();
+});
+
+it('fails an exact frame when recording history cannot be prepared', async () => {
+  const eventsOwner = await import('../../../workflows/video-review/recording-events');
+  const error = new Error('Recording history is unavailable');
+  vi.spyOn(eventsOwner, 'createRecordingEventsRenderer').mockReturnValue({
+    prepare: vi.fn(async () => {
+      throw error;
+    }),
+    clear: vi.fn(),
+  });
+  const project = createEmptyVideoProject('Unavailable history');
+  project.duration = 1;
+  const materializer = createVideoPreviewFrameMaterializer({
+    ownerDocument: document,
+    project,
+    assetUrls: {},
+    rasterSize: { height: 360, width: 640 },
+  });
+  await expect(materializer.renderFrame(0.1, new AbortController().signal)).rejects.toBe(error);
+  expect(renderPreviewScene).not.toHaveBeenCalled();
+  materializer.dispose();
+});

@@ -1,6 +1,16 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewPreviewMessages = defineMessageSource({
+  recordingHistoryIncomplete: {
+    ru: 'История записи неполная',
+    en: 'Recording history is incomplete',
+  },
+  recordingCursorArchived: { ru: 'История курсора в архиве', en: 'Archived cursor history' },
+  recordingHistoryLoading: { ru: 'Загрузка истории записи', en: 'Loading recording history' },
+  recordingHistoryFailed: {
+    ru: 'Не удалось прочитать историю записи',
+    en: 'Could not read recording history',
+  },
   previewUpdating: { ru: 'Обновление превью', en: 'Updating preview' },
   previewLoading: { ru: 'Подготовка превью', en: 'Preparing preview' },
   previewFailed: { ru: 'Не удалось отобразить превью', en: 'Could not render preview' },

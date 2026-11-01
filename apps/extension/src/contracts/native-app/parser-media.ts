@@ -1,3 +1,5 @@
+import { isCursorTrajectoryDescriptor } from '../../features/video/project/cursor-trajectory/records';
+import { isRecordingEventsDescriptor } from '../../features/video/project/recording-events/records';
 // policyStateIds: [] - native media parsers use static enum tables only.
 import {
   NATIVE_CHUNK_MAX_BASE64_CHARS,
@@ -165,6 +167,10 @@ export function isRecordingStopped(value: Record<string, unknown>): boolean {
     isPositiveInteger(value['chunkCount']) &&
     isSha256(value['sha256']) &&
     isNativeTelemetrySnapshot(value['telemetry']) &&
+    (value['cursorTrajectory'] === undefined ||
+      isCursorTrajectoryDescriptor(value['cursorTrajectory'])) &&
+    (value['recordingEvents'] === undefined ||
+      isRecordingEventsDescriptor(value['recordingEvents'])) &&
     isBoolean(value['openEditor'])
   );
 }

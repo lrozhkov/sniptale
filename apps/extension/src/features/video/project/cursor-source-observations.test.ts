@@ -6,6 +6,7 @@ import { applyVideoProjectMutationPatch } from './mutation';
 import { isExportReadyVideoProject } from './validation/root';
 import { materializeVideoProjectCursorSourceObservations } from './cursor-source-observations';
 import type { VideoProject, VideoProjectCursorSample } from './types';
+import type { CursorTrajectoryDescriptor } from './cursor-trajectory/types';
 
 function fixture(samples?: VideoProjectCursorSample[]) {
   const project = createVideoProjectFromRecording({
@@ -61,6 +62,126 @@ function fixture(samples?: VideoProjectCursorSample[]) {
     },
   });
 }
+
+function compactFixture() {
+  const project = fixture([]);
+  if (!project.cursorTrack) throw new Error('Missing cursor track.');
+  const trajectory: CursorTrajectoryDescriptor = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: '0123456789abcdef0123456789abcdef',
+    state: 'complete',
+    finalized: true,
+    totalBlocks: 10000,
+    totalRecords: 1000000,
+    totalSamples: 900000,
+    totalBytes: 50000000,
+    streamSha256: 'a'.repeat(64),
+  };
+  return applyVideoProjectMutationPatch(project, {
+    cursorTrack: {
+      ...project.cursorTrack,
+      sourceObservations: [
+        { recordingId: 'recording', sourceInstanceId: 'instance', samples: [], trajectory },
+      ],
+    },
+  });
+}
+
+it('stores a compact finalized trajectory reference only in schema 49 and retains the fence', () => {
+  const project = compactFixture();
+  expect(project.version).toBe(49);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(isExportReadyVideoProject(JSON.parse(JSON.stringify(project)))).toBe(true);
+  expect(isExportReadyVideoProject({ ...project, version: 48 })).toBe(false);
+  expect(JSON.stringify(project).length).toBeLessThan(10000);
+  if (!project.cursorTrack) throw new Error('Missing cursor track.');
+  const removed = applyVideoProjectMutationPatch(project, {
+    cursorTrack: { ...project.cursorTrack, sourceObservations: [] },
+  });
+  expect(removed.version).toBe(49);
+});
+
+it('refuses conflicting inline observations, unfinalized references and malformed descriptors', () => {
+  const project = compactFixture();
+  const track = project.cursorTrack;
+  const group = track?.sourceObservations?.[0];
+  if (!track || !group || !group.trajectory) throw new Error('Missing reference.');
+  for (const changed of [
+    { ...group, samples: [{ id: 'conflicting', time: 0, x: 0, y: 0, visible: true }] },
+    { ...group, trajectory: { ...group.trajectory, finalized: false } },
+    { ...group, trajectory: { ...group.trajectory, totalBlocks: -1 } },
+    { ...group, trajectory: { ...group.trajectory, privatePath: 'local' } },
+  ])
+    expect(
+      isExportReadyVideoProject({
+        ...project,
+        cursorTrack: { ...track, sourceObservations: [changed] },
+      })
+    ).toBe(false);
+});
+
+it('keeps source-bound authored keys while hydrating a compact trajectory group', () => {
+  const project = compactFixture();
+  const clip = project.clips[0];
+  if (!clip || !project.cursorTrack) throw new Error('Missing source.');
+  const authored: VideoProjectCursorSample = {
+    id: 'authored',
+    time: 2.5,
+    x: 320,
+    y: 180,
+    visible: true,
+    sourceAnchor: {
+      kind: 'recording-source',
+      recordingId: 'recording',
+      sourceClipId: clip.id,
+      sourceTime: 4,
+    },
+  };
+  project.cursorTrack.samples.push(authored);
+  const before = structuredClone(project);
+  const track = materializeVideoProjectCursorSourceObservations(project);
+  expect(track).toEqual(before.cursorTrack);
+  expect(project).toEqual(before);
+  expect(isExportReadyVideoProject({ ...project, cursorTrack: track })).toBe(true);
+  expect(
+    isExportReadyVideoProject({
+      ...project,
+      cursorTrack: {
+        ...track,
+        samples: Array.from({ length: 5001 }, (_, i) => ({ ...authored, id: `key-${i}` })),
+      },
+    })
+  ).toBe(false);
+});
+
+it('retains the original compact source across clip cuts, rates and a JSON history roundtrip', () => {
+  const project = compactFixture();
+  const clip = project.clips[0];
+  if (!clip || clip.type !== 'VIDEO') throw new Error('Missing video source.');
+  const changed = applyVideoProjectMutationPatch(project, {
+    clips: [
+      { ...clip, id: 'left', sourceDuration: 1, duration: 0.5 },
+      {
+        ...clip,
+        id: 'right',
+        startTime: 2.5,
+        sourceStart: 4,
+        sourceDuration: 1,
+        playbackRate: 4,
+        duration: 0.25,
+      },
+    ],
+  });
+  const restored: unknown = JSON.parse(JSON.stringify(changed));
+  expect(isExportReadyVideoProject(restored)).toBe(true);
+  expect(changed.cursorTrack?.sourceObservations).toEqual(project.cursorTrack?.sourceObservations);
+  expect(materializeVideoProjectCursorSourceObservations(changed)?.sourceObservations).toEqual(
+    project.cursorTrack?.sourceObservations
+  );
+});
 
 it('materializes linear captured boundaries at the clip rate while retaining complete source facts', () => {
   const project = fixture();

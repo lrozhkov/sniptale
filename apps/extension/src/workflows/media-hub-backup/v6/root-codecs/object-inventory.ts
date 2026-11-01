@@ -76,6 +76,17 @@ function collectMediaRoles(
   { body, pointer, document, presentation }: RoleInventory
 ) {
   body(metadata.originalObjectId, metadata.entry.mimeType, metadata.entry.size);
+  for (const attachment of [
+    metadata.recording?.cursorAttachment,
+    metadata.recording?.eventsAttachment,
+  ])
+    if (attachment)
+      body(
+        attachment.objectId,
+        'application/octet-stream',
+        attachment.descriptor.totalBytes + attachment.descriptor.totalBlocks * 4,
+        attachment.descriptor.streamSha256
+      );
   for (const asset of metadata.reviewAssets ?? [])
     body(asset.objectId, asset.entry.mimeType, asset.entry.size);
   if (metadata.thumbnail) pointer(metadata.thumbnail.objectId);

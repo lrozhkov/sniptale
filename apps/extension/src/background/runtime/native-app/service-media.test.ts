@@ -1,9 +1,13 @@
+import eventsFixture from '../../../features/video/project/recording-events/fixtures.json';
+import { parseNativeHistoryInboundMessage } from '../../../contracts/native-app/parser-attachments';
 import { expect, it, vi } from 'vitest';
 
 import type { NativeAppIngestionController } from '../../capture/native-app/controller';
 
 function createIngestion(): NativeAppIngestionController {
   return {
+    handleHistory: vi.fn(async () => []),
+    resumePendingHistoryTransfers: vi.fn(async () => []),
     handleRecordingChunk: vi.fn(async () => [
       {
         controllerLeaseId: 'lease-1',
@@ -162,3 +166,112 @@ function createRecordingStoppedMessage() {
     width: 1280,
   } as const;
 }
+
+it('routes all negotiated history forms through the video lease check before ingestion', async () => {
+  const ingestion = createIngestion();
+  const { dispatchNativeMediaMessage } = await import('./service-media');
+  const descriptor = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: 'a'.repeat(32),
+    state: 'complete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalSamples: 1,
+    totalBytes: 100,
+    streamSha256: 'b'.repeat(64),
+  };
+  const identity = {
+    protocolVersion: 2,
+    controllerLeaseId: 'lease-1',
+    recordingId: eventsFixture.recordingId,
+  };
+  const chunk = {
+    requestId: 'request',
+    sequence: 0,
+    blockBytes: 3,
+    blockSha256: 'c'.repeat(64),
+    chunkIndex: 0,
+    chunkCount: 1,
+    chunkByteOffset: 0,
+    chunkRawBytes: 3,
+    chunkSha256: 'd'.repeat(64),
+    base64: 'AQID',
+  };
+  const cursor = { ...identity, trajectoryId: descriptor.trajectoryId };
+  const events = { ...identity, eventStreamId: eventsFixture.eventStreamId };
+  const messages = [
+    {
+      ...cursor,
+      type: 'app.recording.attachment.available',
+      videoSha256: 'd'.repeat(64),
+      descriptor,
+    },
+    {
+      ...cursor,
+      type: 'app.recording.attachment.manifest',
+      requestId: 'request',
+      descriptor,
+      fromSequence: 0,
+      nextSequence: null,
+      entries: [
+        {
+          sequence: 0,
+          startTimeUs: 0,
+          endTimeUs: 1000,
+          recordCount: 3,
+          sampleCount: 1,
+          byteLength: 100,
+          blockSha256: 'c'.repeat(64),
+          prefixSha256: descriptor.streamSha256,
+        },
+      ],
+    },
+    { ...cursor, type: 'app.recording.attachment.chunk', ...chunk },
+    {
+      ...events,
+      type: 'app.recording.events.available',
+      videoSha256: 'd'.repeat(64),
+      descriptor: eventsFixture.descriptor,
+    },
+    {
+      ...events,
+      type: 'app.recording.events.manifest',
+      requestId: 'request',
+      descriptor: eventsFixture.descriptor,
+      fromSequence: 0,
+      nextSequence: null,
+      entries: eventsFixture.manifest,
+    },
+    { ...events, type: 'app.recording.events.chunk', ...chunk },
+  ];
+  for (const raw of messages) {
+    const parsed = parseNativeHistoryInboundMessage(raw);
+    if (!parsed.ok) throw new Error(parsed.error);
+    const post = vi.fn();
+    const warn = vi.fn();
+    vi.mocked(ingestion.handleHistory).mockClear();
+    dispatchNativeMediaMessage({
+      hasGrantedLease: () => false,
+      ingestion,
+      message: parsed.value,
+      postResponses: post,
+      warn,
+    });
+    expect(ingestion.handleHistory).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledExactlyOnceWith(`Rejected stale native ${parsed.value.type}`);
+    dispatchNativeMediaMessage({
+      hasGrantedLease: () => true,
+      ingestion,
+      message: parsed.value,
+      postResponses: post,
+      warn,
+    });
+    expect(ingestion.handleHistory).toHaveBeenCalledExactlyOnceWith(parsed.value);
+    expect(post).toHaveBeenCalledOnce();
+  }
+});

@@ -1,4 +1,6 @@
 import { translate } from '../../../../platform/i18n';
+import type { RecordingEventsDescriptor } from '../../../../features/video/project/recording-events/types';
+import type { CursorTrajectoryDescriptor } from '../../../../features/video/project/cursor-trajectory/types';
 import type { VideoRecordingControlLease } from '../../../storage/video/recording-control-lease';
 import type { VideoRecordingRuntimeState } from '@sniptale/runtime-contracts/video/types/types';
 import { setVideoRecordingTabId } from '../session-state';
@@ -192,7 +194,9 @@ function isRecordingStartCancellable(): boolean {
 async function sendStopSignals(
   discard: boolean,
   failureLogging: StopFailureLogging = 'detailed',
-  onGeometry?: (transform: RecordingPointTransform | null) => void
+  onGeometry?: (transform: RecordingPointTransform | null) => void,
+  onCursor?: (descriptor: CursorTrajectoryDescriptor | null) => void,
+  onEvents?: (descriptor: RecordingEventsDescriptor | null) => void
 ): Promise<RecordingStopResult> {
   const recordingId = getVideoRecordingId();
   const previousState = getVideoRecordingRuntimeState();
@@ -240,6 +244,8 @@ async function sendStopSignals(
     );
     terminalError = acknowledgement.terminalError;
     onGeometry?.(acknowledgement.recordingPointTransform);
+    onCursor?.(acknowledgement.cursorTrajectory ?? null);
+    onEvents?.(acknowledgement.recordingEvents ?? null);
   } catch (error) {
     return reconcileStopDeliveryFailure(recordingId, previousState, failureLogging, error);
   }
@@ -423,12 +429,33 @@ async function completeStopWithTelemetry(
   const recordingPointTransform = new Promise<RecordingPointTransform | null>((resolve) => {
     settleGeometry = resolve;
   });
+  let settleCursor: (descriptor: CursorTrajectoryDescriptor | null) => void = () => undefined;
+  const cursorTrajectory = new Promise<CursorTrajectoryDescriptor | null>((resolve) => {
+    settleCursor = resolve;
+  });
+  let settleEvents: (descriptor: RecordingEventsDescriptor | null) => void = () => undefined;
+  const recordingEvents = new Promise<RecordingEventsDescriptor | null>((resolve) => {
+    settleEvents = resolve;
+  });
   try {
-    void runStopSideEffects(context, failureLogging, { discard, recordingPointTransform });
+    void runStopSideEffects(context, failureLogging, {
+      discard,
+      recordingPointTransform,
+      cursorTrajectory,
+      recordingEvents,
+    });
     if (context.shouldResetImmediately) return await completeEarlyStop();
-    return await sendStopSignals(discard, failureLogging, settleGeometry);
+    return await sendStopSignals(
+      discard,
+      failureLogging,
+      settleGeometry,
+      settleCursor,
+      settleEvents
+    );
   } finally {
     settleGeometry(null);
+    settleCursor(null);
+    settleEvents(null);
   }
 }
 

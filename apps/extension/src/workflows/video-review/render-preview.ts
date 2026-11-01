@@ -1,3 +1,4 @@
+import type { ReviewRecordingRenderSource } from './recording-render';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { reviewWatermarkAssets } from './asset-bytes';
 import {
@@ -80,6 +81,7 @@ type Drawable = {
   ): void;
 };
 type Frame = {
+  recordingHistory?: ReviewRecordingRenderSource;
   fps?: number;
   generation: number;
   sourceTime: number;
@@ -419,8 +421,22 @@ async function drawPreparedFrame(
   signal: AbortSignal,
   admit: (frame: Frame, bitmaps: readonly Size[]) => void
 ) {
-  const request = sceneRequest(prepared, frame);
-  const { scene, dimensions } = prepared;
+  const history = await frame.recordingHistory?.read(
+    frame.sourceTime,
+    frame.resultTime,
+    { ...prepared.dimensions.backing, frameDuration: 1 / (frame.fps ?? 30) },
+    signal
+  );
+  const scene = history
+    ? {
+        ...prepared.scene,
+        zoomRegions: history.effective.zoomRegions,
+        clicks: history.clickCues,
+        keys: history.keyCues,
+      }
+    : prepared.scene;
+  const request = sceneRequest({ ...prepared, scene }, frame);
+  const { dimensions } = prepared;
   const { context, canvas } = output;
   let transition: RenderCanvasLease | undefined;
   try {
@@ -446,7 +462,21 @@ async function drawPreparedFrame(
       frame: Frame,
       sample: Drawable
     ) => {
-      const request = sceneRequest(prepared, frame);
+      const history = await frame.recordingHistory?.read(
+        frame.sourceTime,
+        frame.resultTime,
+        { ...dimensions.backing, frameDuration: 1 / (frame.fps ?? 30) },
+        signal
+      );
+      const scene = history
+        ? {
+            ...prepared.scene,
+            zoomRegions: history.effective.zoomRegions,
+            clicks: history.clickCues,
+            keys: history.keyCues,
+          }
+        : prepared.scene;
+      const request = sceneRequest({ ...prepared, scene }, frame);
       if (request.layout.spatial && !assets.spatial)
         throw new Error('Preview spatial preparation is unavailable.');
       const drawScene = {

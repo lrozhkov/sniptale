@@ -54,6 +54,7 @@ export type VideoEditorSelection =
       kind: typeof VideoEditorSelectionKind.ACTION_OCCURRENCE;
       eventId: string;
       clipId: string | null;
+      observedAction?: import('./recording-events').VideoEditorRecordingActionObservation;
     }
   | {
       kind: typeof VideoEditorSelectionKind.MOTION_REGION;

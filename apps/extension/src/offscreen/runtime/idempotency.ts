@@ -50,6 +50,11 @@ const MAX_RETAINED_KEYS = 500;
 const executedCommandKeys = new Map<string, CommandEntry>();
 
 const idempotencyPolicyByType = {
+  [VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS]: {
+    idempotent: false,
+    reason:
+      'The recording writer validates batch sequence and identical retries without retaining full history',
+  },
   [MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND]: {
     idempotent: false,
     reason:

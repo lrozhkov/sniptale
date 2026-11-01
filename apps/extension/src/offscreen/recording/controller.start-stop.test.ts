@@ -16,8 +16,39 @@ const {
   cleanupResourcesMock: vi.fn(),
   retryPendingPostRecordResultMock: vi.fn(),
   sendRuntimeMessageBestEffortMock: vi.fn(),
-  startRecordingImplMock: vi.fn(),
+  startRecordingImplMock: vi.fn<typeof import('./start/index').startRecording>(),
   stopActiveSidecarRecordersWithFlushMock: vi.fn(),
+}));
+
+const eventsMocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  append: vi.fn(),
+  finish: vi.fn(),
+  discard: vi.fn(),
+}));
+vi.mock('./recording-events/writer', () => ({
+  createBrowserRecordingEventsWriter: eventsMocks.create,
+}));
+const cursorMocks = vi.hoisted(() => ({ append: vi.fn() }));
+vi.mock('./cursor-trajectory/writer', () => ({
+  createBrowserCursorTrajectoryWriter: async () => ({
+    append: cursorMocks.append,
+    discard: vi.fn(),
+    finish: async () => ({
+      format: 'cursor-trajectory-v1',
+      formatVersion: 1,
+      algorithm: 'sed-window-v1',
+      encoding: 'json-ascii-int-v1',
+      trajectoryId: 'a'.repeat(32),
+      state: 'unavailable',
+      finalized: true,
+      totalBlocks: 0,
+      totalRecords: 0,
+      totalSamples: 0,
+      totalBytes: 0,
+      streamSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    }),
+  }),
 }));
 
 vi.mock('./start/index', () => ({
@@ -182,7 +213,7 @@ beforeEach(async () => {
   recordingContext.videoStream = null;
   stopActiveSidecarRecordersWithFlushMock.mockResolvedValue(undefined);
   retryPendingPostRecordResultMock.mockResolvedValue(false);
-});
+}, 45000);
 
 it('waits for a delayed start and terminates activation before acknowledging stop', async () => {
   let completeStart!: () => void;
@@ -537,7 +568,8 @@ it('reconciles a committed result with a lost response before accepting the next
   );
   expect(startRecordingImplMock).toHaveBeenLastCalledWith(
     nextParams,
-    expect.objectContaining({ sendRuntimeMessage: expect.any(Function) })
+    expect.objectContaining({ sendRuntimeMessage: expect.any(Function) }),
+    expect.any(Function)
   );
   expect(sendRuntimeMessageBestEffortMock).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -809,4 +841,130 @@ it('releases a failed admission so a subsequent start can retry', async () => {
   ).rejects.toThrow('storage failed');
   await controller.startRecording(createStartParams());
   expect(startRecordingImplMock).toHaveBeenCalledOnce();
+});
+
+it.each([false, true])(
+  'initializes an event writer once for parallel first packets and finalizes its bound source; discard=%s',
+  async (discard) => {
+    const descriptor = {
+      format: 'recording-events-v1',
+      formatVersion: 1,
+      algorithm: 'lossless-v1',
+      encoding: 'json-utf8-v1',
+      eventStreamId: 'd'.repeat(32),
+      state: 'incomplete',
+      finalized: true,
+      totalBlocks: 1,
+      totalRecords: 1,
+      totalBytes: 100,
+      streamSha256: 'a'.repeat(64),
+    };
+    eventsMocks.append.mockResolvedValue(undefined);
+    eventsMocks.finish.mockResolvedValue(descriptor);
+    eventsMocks.discard.mockResolvedValue(undefined);
+    let initialize!: () => void;
+    const writer = {
+      append: eventsMocks.append,
+      finish: eventsMocks.finish,
+      discard: eventsMocks.discard,
+    };
+    eventsMocks.create.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          initialize = () => resolve(writer);
+        })
+    );
+    const { recorder, stop: stopRecorder } = createActiveRecorderFixture();
+    startRecordingImplMock.mockImplementationOnce(async (_params, _transport, onGeometry) => {
+      recordingContext.beginRecordingSession('recording-delayed', 1);
+      recordingContext.bindStreamInstance(sourceBinding);
+      bindArtifactSession(recorder);
+      recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
+      await onGeometry?.(1280, 720, {
+        stable: true,
+        sawFrame: true,
+        transform: null,
+        frameShape: null,
+      });
+    });
+    await controller.startRecording(createStartParams());
+    expect(eventsMocks.create).not.toHaveBeenCalled();
+    const first = controller.appendRecordingEventObservations(sourceBinding, { packet: 1 }, 'doc');
+    const second = controller.appendRecordingEventObservations(sourceBinding, { packet: 2 }, 'doc');
+    expect(eventsMocks.create).toHaveBeenCalledTimes(1);
+    initialize();
+    await Promise.all([first, second]);
+    expect(eventsMocks.append.mock.calls).toEqual([
+      [{ packet: 1 }, 'doc'],
+      [{ packet: 2 }, 'doc'],
+    ]);
+    await expect(
+      controller.appendRecordingEventObservations({ ...sourceBinding, generation: 0 }, {}, 'doc')
+    ).rejects.toThrow('Stale');
+    const stopped = controller.stopRecording(sourceBinding, discard);
+    await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
+    recordingContext.stopRecordingResolve?.();
+    const outcome = await stopped;
+    if (discard) {
+      expect(outcome).not.toHaveProperty('recordingEvents');
+      expect(eventsMocks.discard).toHaveBeenCalledOnce();
+    } else {
+      expect(outcome).toMatchObject({ result: 'stopped', recordingEvents: descriptor });
+      expect(eventsMocks.finish).toHaveBeenCalledWith({
+        waitForSourceStop: true,
+        stoppedWhilePaused: false,
+      });
+    }
+  }
+);
+
+it('refuses event and cursor packets until capture geometry creates their source writers', async () => {
+  const { recorder, stop: stopRecorder } = createActiveRecorderFixture();
+  startRecordingImplMock.mockImplementationOnce(async () => {
+    recordingContext.beginRecordingSession('recording-delayed', 1);
+    recordingContext.bindStreamInstance(sourceBinding);
+    bindArtifactSession(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
+  });
+  await controller.startRecording(createStartParams());
+  await expect(
+    controller.appendRecordingEventObservations(sourceBinding, { packet: 1 }, 'doc')
+  ).rejects.toThrow('Event recording source is unavailable');
+  await expect(
+    controller.appendRecordingCursorObservations(sourceBinding, { packet: 1 }, 'doc')
+  ).rejects.toThrow('Cursor recording source is unavailable');
+  expect(eventsMocks.create).not.toHaveBeenCalled();
+  const stopped = controller.stopRecording(sourceBinding, true);
+  await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
+  recordingContext.stopRecordingResolve?.();
+  expect(await stopped).toMatchObject({ result: 'stopped' });
+});
+
+it('admits cursor packets only while their calibrated recording source remains active', async () => {
+  const { recorder, stop: stopRecorder } = createActiveRecorderFixture();
+  startRecordingImplMock.mockImplementationOnce(async (_params, _transport, onGeometry) => {
+    recordingContext.beginRecordingSession('recording-delayed', 1);
+    recordingContext.bindStreamInstance(sourceBinding);
+    bindArtifactSession(recorder);
+    recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
+    await onGeometry?.(1280, 720, {
+      stable: true,
+      sawFrame: true,
+      transform: null,
+      frameShape: null,
+    });
+  });
+  await controller.startRecording(createStartParams());
+  await expect(
+    controller.appendRecordingCursorObservations(sourceBinding, { packet: 1 }, 'doc')
+  ).resolves.toBeUndefined();
+  expect(cursorMocks.append).toHaveBeenCalledExactlyOnceWith({ packet: 1 }, 'doc');
+  const stopped = controller.stopRecording(sourceBinding, true);
+  await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
+  recordingContext.stopRecordingResolve?.();
+  expect(await stopped).toMatchObject({ result: 'stopped' });
+  await expect(
+    controller.appendRecordingCursorObservations(sourceBinding, { packet: 2 }, 'doc')
+  ).rejects.toThrow('Cursor recording source is unavailable');
+  expect(cursorMocks.append).toHaveBeenCalledTimes(1);
 });

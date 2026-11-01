@@ -19,6 +19,7 @@ export const handledOffscreenRuntimeMessageTypes = [
   VideoMessageType.OFFSCREEN_READINESS_PROBE,
   VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
   VideoMessageType.OFFSCREEN_STOP_RECORDING,
+  VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
   VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING,
   VideoMessageType.OFFSCREEN_PAUSE_RECORDING,
   VideoMessageType.OFFSCREEN_RESUME_RECORDING,

@@ -1,0 +1,228 @@
+{
+  "fixtureVersion": 1,
+  "format": "recording-events-v1",
+  "cases": [
+    {
+      "name": "known-release",
+      "accepted": true,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "6d22c587d3513b502833b4e3649a818e4f0675d7b248261adeaf09cdf5e08516"
+    },
+    {
+      "name": "unknown-onset-release",
+      "accepted": true,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":null,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":null,\"privacy\":\"normal\",\"repeatCount\":5,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "3dfa30c4b928e2469e64fa62364f9bb285ce33130659e9c8c16a9dd5f8b675ef"
+    },
+    {
+      "name": "lost-before-public-stop",
+      "accepted": true,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"lost\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3000000,\"pressDurationUs\":null,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":null},\"endTimeUs\":3000000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "64c12e1c04d979816af3b27e588af989f4dc036c0ad9f65eab0b9e1ffac54871"
+    },
+    {
+      "name": "unknown-onset-loss",
+      "accepted": true,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"lost\",\"downTimeUs\":null,\"lastObservedTimeUs\":3000000,\"pressDurationUs\":null,\"privacy\":\"normal\",\"repeatCount\":5,\"upTimeUs\":null},\"endTimeUs\":3000000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "64d907c8150eed7d0b247ea68b373f05fd72e16915b90763bcd7b70bfe9e5e4e"
+    },
+    {
+      "name": "released-edge-unknown-time",
+      "accepted": true,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3000000,\"pressDurationUs\":null,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":null},\"endTimeUs\":3000000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "ca468068c6f45cb759f52a08fc90deab8dc563ca98aa7b3fb40e523d4d45ca3e"
+    },
+    {
+      "name": "cancelled-at-last-input",
+      "accepted": true,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"cancelled\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3000000,\"pressDurationUs\":null,\"privacy\":\"normal\",\"repeatCount\":0,\"upTimeUs\":null},\"endTimeUs\":3000000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "c5df6d02a00836b1086844fe4e781b9f226ecadf2566af4feb0135dbb073f3d6"
+    },
+    {
+      "name": "nullable-known-pair-metadata",
+      "accepted": true,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":null,\"pressDurationUs\":null,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "8a7ce6f9610e86e4cfc9dc28aa69a0c276895f68a96e07d0cb373dd5ed274a66"
+    },
+    {
+      "name": "forbidden-protected",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"protected\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "0607eb15a7a31646fa535092a7df9c2e35a5448791b78f430f39c25dac3f326b"
+    },
+    {
+      "name": "forbidden-unknown",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"unknown\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "4a1aa0bf34197f854379b270027e2d8c3f9ebdde43fa7b3ddb58bd6cd8fa363e"
+    },
+    {
+      "name": "forbidden-completion-observed",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"observed\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "83dc5d6a712b89446c541c15af40310db4614585aeab66ea69e551412c449ceb"
+    },
+    {
+      "name": "forbidden-completion-semantic",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"semantic\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "e0b35b0e9132f42b4d0e0d91accddc52d2ea0fbd6c73eda9cb89d8087ca24177"
+    },
+    {
+      "name": "forbidden-completion-unknown",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"unknown\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "84e6eba6d35d4e56eebd1b0b0c8cc49f189b1772f20bf8864f7f2499c0e69716"
+    },
+    {
+      "name": "missing-privacy",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "e22536ba9df04d5a3cbbed6d2537e1b62c74f8347e8e5b1832f9e1c3e8cd709a"
+    },
+    {
+      "name": "missing-downtimeus",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "e4fa3ba9138589568acde67b28a67bbf8e5bcc5d265d5b749f7d708d997938d5"
+    },
+    {
+      "name": "missing-uptimeus",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "65b772cfa20f149b0ab04bb3739603775476b51eb1efa24e8d6d9b1c8221a793"
+    },
+    {
+      "name": "missing-pressdurationus",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "cbdc515ef3b33736b335a9ddb38040b8b01634371eb1389e837f4c039b4bd326"
+    },
+    {
+      "name": "missing-lastobservedtimeus",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "c56519fd5a40c3e6031b01fb06a3065e624422e33a669080c17d3d3ff6a8c427"
+    },
+    {
+      "name": "missing-repeatcount",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "095a0c9aecfe52c2f79ecbeccec3b090fbcfe7156203d885079f45ec753c8519"
+    },
+    {
+      "name": "missing-completion",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "fe1a9a43e38740751a2ab83b4dfd6fc96f9ea4b71eaefb8934b43283b4dc331b"
+    },
+    {
+      "name": "forbidden-label",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"label\":\"forbidden\",\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "fc69b5c5abbfe602731e322ccee521599137064c513d831f1cb9ddce685af108"
+    },
+    {
+      "name": "forbidden-key",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"key\":\"forbidden\",\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "6ef028bd8832172c265791ea1d274633774fc4652fc564c91b1309e10d764a43"
+    },
+    {
+      "name": "forbidden-groupid",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"groupId\":\"forbidden\",\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "b835b0f8a92ad3f604528deb86d0c6a57f2e47a9df3985c0df6b67b96020e6e7"
+    },
+    {
+      "name": "forbidden-targetid",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"targetId\":\"forbidden\",\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "6a45567c748a21465542ed5d2b76d5677d7fe79e506e6e12f3b213846dbc1c2f"
+    },
+    {
+      "name": "wrong-duration",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "7c730e90f314f1e2c81259348f025ae673cdd42d0568be68902f38858d023556"
+    },
+    {
+      "name": "duration-without-down",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":null,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "8a85588d4468e38e3d7778f20c4b19fcce64bb2058405758142e9aedc4e7ca09"
+    },
+    {
+      "name": "duration-without-up",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":null},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "7eaff9e4b59e5d6a87a8bc9ad097bab2f8834aac5762a587d93605282a0234f2"
+    },
+    {
+      "name": "wrong-down-boundary",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000001,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "5e9fc8dffd99f3ec1593e5551a7707afaaf06f2d43c919659de82ce281d4f9ee"
+    },
+    {
+      "name": "wrong-up-boundary",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200001},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "b1761b0ddca6477bc25c5a4a7b3ef19cabc86bbb0bab2844fbd0eb13f60548d9"
+    },
+    {
+      "name": "wrong-last-input",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":9000000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "e108ebd0d8f243223e87d8b2d944e4cf8c989a2523612079d056e8f4099a4f7d"
+    },
+    {
+      "name": "negative-repeat",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":-1,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "caf8d7c78306de3f4f752864a7dc2505e787b374dca73c9bda05656d4ea00ec0"
+    },
+    {
+      "name": "overflow-repeat",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":9007199254740992,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "692a9cea2c0ebea4d8dcda7d078575dce3e76e877a285ea54e989f34136e25da"
+    },
+    {
+      "name": "fractional-repeat",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":1.5,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "438e6b5bf6b84ac39dfb094a1a9df854dd092af0f5bd9b77c08c456242b07d3c"
+    },
+    {
+      "name": "stop-must-not-extend-lost-input",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"lost\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3000000,\"pressDurationUs\":null,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":null},\"endTimeUs\":9000000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "5f97dd32ee2c9a4167c121ac1d0cbf0ad60cc4619b501e558ec78c48078e075e"
+    },
+    {
+      "name": "forbidden-point",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":{\"x\":0.5,\"y\":0.5},\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "cac91a24fdf2e18eb6347e0722228d74af6822cea6d39722dfb44f322213cb54"
+    },
+    {
+      "name": "exponent-repeat",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7e0,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "e709d464afc6a591094e99400f6a6951d17496e90b1922dff48acce68c5387ad"
+    },
+    {
+      "name": "fractional-time",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000.0,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":7,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "b4082732e33ee46b10dd5f6918369d9825b724392406a4581cbcbd60c9564119"
+    },
+    {
+      "name": "negative-zero-repeat",
+      "accepted": false,
+      "utf8": "{\"endTimeUs\":9000000,\"eventStreamId\":\"dddddddddddddddddddddddddddddddd\",\"formatVersion\":1,\"recordingId\":\"keyboard-hold-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":null,\"resolutionBoundUs\":null,\"source\":\"dom-event-time\",\"timestampQuantumUs\":null},\"kind\":\"segment\",\"reason\":\"start\",\"recordSeq\":0,\"segmentId\":0},{\"activeTimeUs\":9000000,\"kind\":\"signal\",\"recordSeq\":1,\"segmentId\":0,\"signal\":{\"data\":{\"completion\":\"released\",\"downTimeUs\":2000000,\"lastObservedTimeUs\":3200000,\"pressDurationUs\":1200000,\"privacy\":\"normal\",\"repeatCount\":-0,\"upTimeUs\":3200000},\"endTimeUs\":3200000,\"id\":\"anonymous-hold-1\",\"kind\":\"keyboard-hold\",\"point\":null,\"startTimeUs\":2000000}},{\"activeTimeUs\":9000000,\"kind\":\"boundary\",\"reason\":\"stop\",\"recordSeq\":2,\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0}",
+      "sha256": "1da89465241a8d5dc6aeec6fe91224b838a5e6974fede0bfe9fac6bc6bb6caca"
+    }
+  ]
+}

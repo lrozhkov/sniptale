@@ -1,3 +1,4 @@
+import type { RecordingEventAction } from '../../../features/video/project/recording-events/types';
 import type { RecordingTelemetrySnapshot } from '../../../contracts/messaging/contracts/response-types';
 
 export type TelemetryListeners = {
@@ -59,6 +60,8 @@ export type KeyboardHeldState = {
 };
 
 export type TelemetryState = {
+  eventSource: ReturnType<typeof import('./event-source').createRecordingEventSource> | null;
+  cursorSource: ReturnType<typeof import('./cursor-source').createCursorObservationSource> | null;
   observationClock: ReturnType<typeof import('./observation-clock').createObservationClock>;
   recordingId: string | null;
   frameClock:
@@ -68,17 +71,41 @@ export type TelemetryState = {
   clockRevision: number;
   observationAvailable: boolean;
   mediaResumeEstimateSeconds: number;
+  releasedGestures: Map<
+    number,
+    {
+      action: RecordingTelemetrySnapshot['actionEvents'][number];
+      target: Element | null;
+      viewport: import('../../../features/video/project/types').RecordingViewportGeometry;
+      sourceClockId: string;
+      upViewport?: import('../../../features/video/project/types').RecordingViewportGeometry;
+    }
+  >;
   gestures: Map<
     number,
     {
       action: RecordingTelemetrySnapshot['actionEvents'][number];
       pointerId: number | null;
       downTimestampMs: number;
+      viewport: import('../../../features/video/project/types').RecordingViewportGeometry;
+      sourceClockId: string;
       target: Element | null;
     }
   >;
   keyboard: {
+    unknownContextReported: boolean;
     held: Map<string, KeyboardHeldState>;
+    streamed: Map<
+      string,
+      {
+        action: Extract<RecordingEventAction, { kind: 'KEY' }> | null;
+        downTimeUs: number | null;
+        firstObservedTimeUs: number;
+        lastObservedTimeUs: number;
+        repeatCount: number;
+        repeats: number[];
+      }
+    >;
     modifiers: { label: string; downTime: number; consumed: boolean } | null;
     target: Element | null;
     times: number[];

@@ -23,6 +23,9 @@ import {
   RECORDING_TELEMETRY_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
+  RECORDING_CURSOR_TRAJECTORIES_STORE,
+  RECORDING_CURSOR_BLOCKS_STORE,
+  RECORDING_EVENTS_STORE,
 } from './core.stores.ts';
 
 /** Checks this released descriptor's required stores without reading or changing source data. */
@@ -1051,6 +1054,57 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         db,
         [ASSET_RESIDENCY_STORE],
         'Asset residency store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'recordings', from: 3, to: 4 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 46,
+    toDatabaseVersion: 47,
+    risk: 'additive',
+    stores: [RECORDING_CURSOR_TRAJECTORIES_STORE, RECORDING_CURSOR_BLOCKS_STORE],
+    migrate(db) {
+      db.createObjectStore(RECORDING_CURSOR_TRAJECTORIES_STORE, {
+        keyPath: ['recordingId', 'trajectoryId'],
+      }).createIndex('recordingId', 'recordingId');
+      const blocks = db.createObjectStore(RECORDING_CURSOR_BLOCKS_STORE, {
+        keyPath: ['recordingId', 'trajectoryId', 'sequence'],
+      });
+      blocks.createIndex('trajectory', ['recordingId', 'trajectoryId']);
+      blocks.createIndex('time', ['recordingId', 'trajectoryId', 'startTimeUs', 'sequence']);
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [RECORDING_CURSOR_TRAJECTORIES_STORE, RECORDING_CURSOR_BLOCKS_STORE],
+        'Cursor trajectory stores are unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'recordings', from: 4, to: 5 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 47,
+    toDatabaseVersion: 48,
+    risk: 'additive',
+    stores: [RECORDING_EVENTS_STORE],
+    migrate(db) {
+      const events = db.createObjectStore(RECORDING_EVENTS_STORE, {
+        keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'],
+      });
+      events.createIndex('kind', 'kind');
+      events.createIndex('timeBuckets', 'timeBuckets', { multiEntry: true });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [RECORDING_EVENTS_STORE],
+        'Recording events store is unavailable.'
       );
     },
   },

@@ -1,3 +1,4 @@
+import { REVIEW_KEY_DEFAULT } from '../../../../../features/video/project/action-feedback/key-animation';
 import { getVideoProjectKeyStyle } from '../../../../../features/video/project/action-feedback/projection';
 import { KeyFeedbackFields } from '../effect-controls/key-feedback-fields';
 import {
@@ -179,10 +180,15 @@ function historyKeyGroups(
   disabled: boolean,
   update: NonNullable<HistoryProps['onUpdateActionPresentation']>
 ): InspectorGroupDefinition<string>[] {
-  const capturedKeys = props.project.actionEvents.flatMap((event) => {
-    const style = getVideoProjectKeyStyle(props.project, event);
-    return style ? [style] : [];
-  });
+  const capturedKeys = [
+    ...props.project.actionEvents.flatMap((event) => {
+      const style = getVideoProjectKeyStyle(props.project, event);
+      return style ? [style] : [];
+    }),
+    ...(props.project.actionFeedback ?? [])
+      .filter((group) => group.events && group.events.totalBlocks > 0)
+      .flatMap((group) => [group.keyDefaults ?? REVIEW_KEY_DEFAULT, ...(group.keyStyles ?? [])]),
+  ];
   const hasLegacyKeys = props.project.actionEvents.some(
     (event) => event.kind === 'KEY' && !getVideoProjectKeyStyle(props.project, event)
   );

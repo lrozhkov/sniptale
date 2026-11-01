@@ -295,3 +295,37 @@ it('retains a single delivered input fact without extending it to the later stop
     { kind: 'typing', startTime: 1, endTime: 1, data: { eventCount: 1 } },
   ]);
 });
+
+it('retains an input count above 65535 and ends the interval at the last real input', () => {
+  const state = createSignalState();
+  for (let index = 0; index < 70000; index++)
+    recordTypingActivity(state, createTypingEvent('input', 1000 + index * 10));
+  vi.spyOn(performance, 'now').mockReturnValue(9000000);
+  finalizeTelemetrySignals(state);
+  expect(state.signals).toHaveLength(1);
+  expect(state.signals[0]).toMatchObject({
+    startTime: 1,
+    endTime: 700.99,
+    data: { eventCount: 70000 },
+  });
+});
+
+it('retains more than 512 completed input intervals and their independent warning', () => {
+  const state = createSignalState();
+  state.signals.push({
+    id: 'warning-prefix',
+    kind: 'static-frame',
+    startTime: 0,
+    endTime: 0,
+    point: null,
+    data: { code: 'source-unavailable', severity: 'warning' },
+  });
+  for (let index = 0; index < 700; index++) {
+    recordTypingActivity(state, createTypingEvent('input', 1000 + index * 2000));
+    finalizeTypingSignal(state, 1001 + index * 2000);
+  }
+  finalizeTelemetrySignals(state);
+  expect(state.signals).toHaveLength(701);
+  expect(state.signals[0]?.id).toBe('warning-prefix');
+  expect(state.signals.slice(1).every((signal) => signal.data['eventCount'] === 1)).toBe(true);
+});

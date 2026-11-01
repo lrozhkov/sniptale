@@ -1,3 +1,4 @@
+import { createRecordingCursorTrajectoryStore } from '../../../../composition/persistence/recordings/cursor-trajectory/store';
 import type { VideoWorkspaceSnapshot } from '../../../../composition/persistence/review-workspaces/contracts';
 import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import {
@@ -41,6 +42,10 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
   });
   const coveredProjectMediaIds = await coveredProjectMedia(videoProjects);
   const media = await buildMediaRootInventory({
+    cursorStore: createRecordingCursorTrajectoryStore({
+      database: async () => db,
+      mintGeneration: () => crypto.randomUUID(),
+    }),
     coveredProjectMediaIds,
     expectedReview: admission.expectedReview,
     reviewWorkspaceHeads: await db.getAll(VIDEO_WORKSPACES_STORE),

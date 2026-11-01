@@ -52,6 +52,23 @@ export type RuntimeOffscreenStopRecordingMessage = RuntimeOffscreenCommandCapabi
   streamInstanceId: string;
 };
 
+export type RuntimeOffscreenRecordingObservationsMessage = RuntimeOffscreenCommandCapability & {
+  type: VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS;
+  recordingId: string;
+  generation: number;
+  streamInstanceId: string;
+  nativeDocumentId: string;
+} & (
+    | {
+        cursorPacket: import('../../video/cursor-observations').RecordingCursorObservationPacket;
+        eventPacket?: never;
+      }
+    | {
+        eventPacket: import('../../video/event-observations').RecordingEventObservationPacket;
+        cursorPacket?: never;
+      }
+  );
+
 export type RuntimeOffscreenBeginRecordingMessage = RuntimeOffscreenCommandCapability & {
   type: VideoMessageType.OFFSCREEN_BEGIN_RECORDING;
   recordingId: string;

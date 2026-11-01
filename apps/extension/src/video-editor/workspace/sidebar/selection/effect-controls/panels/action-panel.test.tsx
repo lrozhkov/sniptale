@@ -1,3 +1,10 @@
+import { createVideoProjectFromRecording } from '../../../../../../features/video/project/factories/creation';
+import { applyVideoProjectMutationPatch } from '../../../../../../features/video/project/mutation';
+import { decodeRecordingEventsBlock } from '../../../../../../features/video/project/recording-events/blocks';
+import { isRecordingEventsDescriptor } from '../../../../../../features/video/project/recording-events/records';
+import fixtureData from '../../../../../../features/video/project/recording-events/fixtures.json';
+import { projectRecordingEventAction } from '../../../../../../features/video/project/recording-events/project-facts';
+import { resolveRecordingActionOccurrences } from '../../../../../project/operations/recording-events-selection';
 // @vitest-environment jsdom
 import { REVIEW_CLICK_DEFAULT } from '../../../../../../features/video/project/action-feedback/validation';
 import { act } from 'react';
@@ -248,4 +255,50 @@ it('disables source position commands when the capture has no point', () => {
   act(() => button('selectPointOnStage').click());
   expect(props.onStartActionPointPlacement).not.toHaveBeenCalled();
   expect(props.project.actionEvents[0]!.point).toBeNull();
+});
+
+it('opens the inspector for a selected canonical action after its timeline window has gone', () => {
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [],
+    recordingSignals: [],
+  });
+  const events = fixtureData.descriptor;
+  const block = decodeRecordingEventsBlock(new TextEncoder().encode(fixtureData.blocks[0]!.utf8));
+  const record = block?.records.find((record) => record.kind === 'action');
+  if (!isRecordingEventsDescriptor(events) || record?.kind !== 'action')
+    throw new Error('Invalid fixture.');
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+  });
+  const group = project.actionFeedback![0]!;
+  const event = projectRecordingEventAction(group, record);
+  const observedAction = {
+    recordingId: group.recordingId,
+    sourceInstanceId: group.sourceInstanceId,
+    eventStreamId: events.eventStreamId,
+    streamSha256: events.streamSha256,
+    record,
+  };
+  const occurrence = resolveRecordingActionOccurrences(project, observedAction)[0]!;
+  const update = vi.fn();
+  const props = {
+    ...fixture(),
+    project,
+    currentTime: 0,
+    selectedActionOccurrence: occurrence,
+    onUpdateActionEventDetails: update,
+  };
+  act(() => root.render(<InspectActionPanel {...props} />));
+  expect(container.querySelector('[data-ui="video-editor.key-feedback-fields"]')).not.toBeNull();
+  expect(container.textContent).toContain('gallery.videoReview.keyCaption');
+  expect(project.actionEvents).toEqual([]);
+  expect(event.id).toBe(occurrence.eventId);
 });

@@ -1,4 +1,9 @@
 import { isRecordingClockTiming } from '../../../../../video/recording-frame-clock';
+import { isRecordingEventObservationPacket } from '../../../../../video/event-observations';
+import type { RuntimeOffscreenRecordingObservationsMessage } from '../../../offscreen-command.types';
+import { isRecordingCursorObservationPacket } from '../../../../../video/cursor-observations';
+import { isRecordingEventsDescriptor } from '../../../../../../features/video/project/recording-events/records';
+import { isCursorTrajectoryDescriptor } from '../../../../../../features/video/project/cursor-trajectory/records';
 import { isRecordingPointTransform } from '../../../../../../features/video/project/validation/recording-telemetry';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers/utils';
@@ -13,6 +18,40 @@ import {
 import type { PartialRuntimeRegistry } from '../../../runtime-message.registry.ts';
 
 export const runtimeVideoOffscreenControlMessageContracts = {
+  [VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS]: {
+    parseRequest: createGuardParser(
+      'runtime OFFSCREEN_RECORDING_OBSERVATIONS message',
+      (value): value is RuntimeOffscreenRecordingObservationsMessage => {
+        const guard = createMessageGuard<
+          VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
+          RuntimeOffscreenRecordingObservationsMessage
+        >({
+          type: VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
+          required: {
+            capabilityToken: isString,
+            recordingId: isString,
+            generation: isNumber,
+            streamInstanceId: isString,
+            nativeDocumentId: isString,
+          },
+          optional: {
+            cursorPacket: isRecordingCursorObservationPacket,
+            eventPacket: isRecordingEventObservationPacket,
+          },
+        });
+        if (!guard(value)) return false;
+        const { cursorPacket, eventPacket } = value;
+        return (
+          (cursorPacket === undefined) !== (eventPacket === undefined) &&
+          (cursorPacket ?? eventPacket)?.recordingId === value.recordingId
+        );
+      }
+    ),
+    parseResponse: createGuardParser(
+      'runtime OFFSCREEN_RECORDING_OBSERVATIONS response',
+      createRuntimeResponseGuard({ required: { result: (value) => value === 'accepted' } })
+    ),
+  },
   [VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING]: {
     parseRequest: createGuardParser(
       'runtime OFFSCREEN_GET_RECORDING_CLOCK_TIMING message',
@@ -90,6 +129,8 @@ export const runtimeVideoOffscreenControlMessageContracts = {
         optional: {
           result: isString,
           recordingPointTransform: (value) => value === null || isRecordingPointTransform(value),
+          cursorTrajectory: isCursorTrajectoryDescriptor,
+          recordingEvents: isRecordingEventsDescriptor,
         },
       })
     ),

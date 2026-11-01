@@ -1,3 +1,4 @@
+import { recordingEventProjectActions } from './recording-events/project-facts';
 import { areVideoClipSourceClocksContinuous } from './timeline/rate';
 import { recordingIdForProjectAsset } from './source-interactions';
 import type { VideoProject, VideoProjectActionEvent, VideoProjectVideoClip } from './types';
@@ -67,7 +68,8 @@ function resolveRuns(clips: readonly VideoProjectVideoClip[]) {
 
 /** Resolve retained points and observed gesture continuations without moving their source anchors. */
 export function resolveVideoProjectActionOccurrences(
-  project: VideoProject
+  project: VideoProject,
+  selectedSourceActions: readonly VideoProjectActionEvent[] = []
 ): VideoProjectActionOccurrence[] {
   const instances = new Map<string, VideoProjectVideoClip[]>();
   for (const clip of project.clips) {
@@ -81,7 +83,24 @@ export function resolveVideoProjectActionOccurrences(
     instances.set(key, group);
   }
   const runs = new Map([...instances].map(([key, clips]) => [key, resolveRuns(clips)]));
-  const occurrences = project.actionEvents.flatMap<VideoProjectActionOccurrence>((event) => {
+  const preparedActions = recordingEventProjectActions(project);
+  const sourceActions = [
+    ...preparedActions.filter(
+      (event) =>
+        !selectedSourceActions.some(
+          (selected) =>
+            selected === event ||
+            (selected.id === event.id &&
+              selected.anchor.kind === 'recording-source' &&
+              event.anchor.kind === 'recording-source' &&
+              selected.anchor.recordingId === event.anchor.recordingId &&
+              selected.anchor.sourceInstanceId === event.anchor.sourceInstanceId &&
+              selected.anchor.sourceEventId === event.anchor.sourceEventId)
+        )
+    ),
+    ...selectedSourceActions,
+  ];
+  const occurrences = sourceActions.flatMap<VideoProjectActionOccurrence>((event) => {
     const anchor = event.anchor;
     if (anchor.kind === 'project') {
       return [

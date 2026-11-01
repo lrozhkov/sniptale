@@ -146,6 +146,7 @@ function createDatabase() {
     getAll: vi.fn(async () => []),
     objectStoreNames,
     transaction: vi.fn((storeName: string) => ({
+      store: { openCursor: vi.fn(async () => null) },
       objectStore: vi.fn(() => ({
         indexNames: EXPECTED_INDEXES[storeName as keyof typeof EXPECTED_INDEXES] ?? [],
         openCursor: vi.fn(async () => null),
@@ -357,6 +358,8 @@ it('keeps the transition gate outermost across full startup publication recovery
     `${PERSISTENCE_LOCK}:shared`,
     `${TRANSITION_LOCK}:shared`,
     `${DURABLE_ASSET_LOCK}:exclusive`,
+    `${PERSISTENCE_LOCK}:shared`,
+    `${TRANSITION_LOCK}:shared`,
   ]);
 });
 

@@ -5,6 +5,8 @@ import { collectCapturedProjectRecordingIds } from './project-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
+import { RECORDING_EVENTS_SNAPSHOT_ROLE } from '../recordings/recording-events/contracts';
+import { RECORDING_CURSOR_SNAPSHOT_ROLE } from '../recordings/cursor-trajectory/contracts';
 import { parseAssetOwner } from '../assets/guards';
 import { sameReviewVideoContainer } from '../../../features/video/review/validation';
 import { readWorkspaceStorage } from '../review-workspaces/storage';
@@ -172,6 +174,32 @@ export async function freezeMediaInTransaction(
       )
     );
     requireSupported(rawTelemetry === undefined || telemetry !== null);
+    for (const [snapshot, role] of [
+      [telemetry?.cursorTrajectorySnapshot, RECORDING_CURSOR_SNAPSHOT_ROLE],
+      [telemetry?.recordingEventsSnapshot, RECORDING_EVENTS_SNAPSHOT_ROLE],
+    ] as const) {
+      if (!snapshot) continue;
+      const snapshotRef = parseAssetRef(
+        await tx.objectStore(ASSET_REFS_STORE).get(snapshot.ref.assetId)
+      );
+      const snapshotOwner = parseAssetOwner(
+        await tx.objectStore(ASSET_OWNERS_STORE).get(['recording', recording.id, role])
+      );
+      requireSupported(
+        snapshotRef !== null &&
+          snapshotRef.assetId === snapshot.ref.assetId &&
+          snapshotRef.sha256 === snapshot.ref.sha256 &&
+          snapshotRef.size === snapshot.ref.size &&
+          snapshotRef.mimeType === snapshot.ref.mimeType &&
+          snapshotRef.location.objectKey === snapshot.ref.location.objectKey &&
+          snapshotRef.createdAt === snapshot.ref.createdAt &&
+          snapshotOwner !== null &&
+          snapshotOwner.assetId === snapshot.ref.assetId &&
+          snapshotOwner.ownerId === recording.id &&
+          snapshotOwner.ownerKind === 'recording' &&
+          snapshotOwner.role === role
+      );
+    }
     rows = parseCapturedMediaRows({ media, recording, ref, telemetry });
   } else {
     requireSupported(media.source.kind === 'project-asset');

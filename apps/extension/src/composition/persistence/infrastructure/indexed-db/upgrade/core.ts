@@ -22,6 +22,9 @@ import {
   RECORDING_TELEMETRY_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
+  RECORDING_CURSOR_TRAJECTORIES_STORE,
+  RECORDING_CURSOR_BLOCKS_STORE,
+  RECORDING_EVENTS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PENDING_ASSETS_STORE,
@@ -114,6 +117,22 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, RECORDING_TELEMETRY_STORE, 'recordingId', ['updatedAt']);
   createStore(db, RECORDING_RECOVERY_SESSIONS_STORE, 'id', ['createdAt']);
   createStore(db, RECORDING_RECOVERY_BLOCKS_STORE, ['id', 'index'], ['id']);
+  createStore(
+    db,
+    RECORDING_CURSOR_TRAJECTORIES_STORE,
+    ['recordingId', 'trajectoryId'],
+    ['recordingId']
+  );
+  const cursorBlocks = db.createObjectStore(RECORDING_CURSOR_BLOCKS_STORE, {
+    keyPath: ['recordingId', 'trajectoryId', 'sequence'],
+  });
+  cursorBlocks.createIndex('trajectory', ['recordingId', 'trajectoryId']);
+  cursorBlocks.createIndex('time', ['recordingId', 'trajectoryId', 'startTimeUs', 'sequence']);
+  const events = db.createObjectStore(RECORDING_EVENTS_STORE, {
+    keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'],
+  });
+  events.createIndex('kind', 'kind');
+  events.createIndex('timeBuckets', 'timeBuckets', { multiEntry: true });
   createStore(db, DIAGNOSTICS_META_STORE, 'recordingId');
   createStore(db, DIAGNOSTICS_EVENTS_STORE, ['recordingId', 'chunkIndex'], ['recordingId']);
   createStore(db, VIDEO_PROJECTS_STORE, 'id', ['updatedAt', 'usageReferenceKeys']);

@@ -39,6 +39,16 @@ export interface RecordingEntry extends StoredRecordingEntry {
 }
 
 export interface RecordingTelemetryEntry {
+  recordingEvents?: import('../../../features/video/project/recording-events/types').RecordingEventsDescriptor;
+  recordingEventsSnapshot?: import('./recording-events/contracts').RecordingEventsSnapshot;
+  /** Immutable local transfer copy. Portable metadata carries an object reference instead. */
+  cursorTrajectorySnapshot?: {
+    ref: import('../assets/contracts').AssetRef;
+    sourceRecordingId: string;
+    width: number;
+    height: number;
+  };
+  cursorTrajectory?: import('../../../features/video/project/cursor-trajectory/types').CursorTrajectoryDescriptor;
   capabilities?: RecordingTelemetryCapabilities;
   observationClock?: RecordingObservationClock;
   /** Captured source clock/coordinates; absence means legacy provenance is unknown. */

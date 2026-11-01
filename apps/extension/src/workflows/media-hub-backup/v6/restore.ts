@@ -1,4 +1,7 @@
+import { retireJournalRecordingEventStages } from '../../../composition/persistence/recordings/recording-events/staging';
 import type { DurableAssetLifecyclePermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
+import { runWithDurableAssetLifecycleLock } from '../../../composition/persistence/infrastructure/mutation-barrier';
+import { retireJournalCursorTrajectoryStages } from '../../../composition/persistence/recordings/cursor-trajectory/staging';
 import { orderLibraryRestoreRoots } from './library-restore-order';
 import { parsePortableMediaMetadata } from './root-codecs/media';
 import {
@@ -39,6 +42,7 @@ import {
   MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT,
   isSharedBackupLayout,
   assertReviewProjectLayout,
+  assertCursorAttachmentLayout,
 } from './layout';
 import { decodeBackupMetadata } from './metadata-transport';
 import { assertArchiveRootObjectInventory } from './root-codecs/object-inventory';
@@ -105,6 +109,14 @@ async function cleanupStaged(staged: readonly StagedArchiveObject[]): Promise<vo
   if (failures.length > 0) throw new AggregateError(failures, 'Archive restore cleanup failed.');
 }
 
+async function cleanupFailedReadyJournal(journal: AssetReadyJournal): Promise<void> {
+  await runWithDurableAssetLifecycleLock(async () => {
+    await retireJournalCursorTrajectoryStages(journal.journalId);
+    await retireJournalRecordingEventStages(journal.journalId);
+    await deleteReadyJournal(journal.journalId);
+  });
+}
+
 async function loadEnvelope(
   reader: Awaited<ReturnType<typeof openArchiveReader>>,
   descriptor: ArchiveRootDescriptor,
@@ -126,6 +138,7 @@ async function loadEnvelope(
       : envelope;
   assertArchiveRootMetadataIdentity(descriptor, decoded.metadata);
   assertReviewProjectLayout(decoded.metadata, manifest.layout);
+  assertCursorAttachmentLayout(decoded.metadata, manifest.layout);
   if (isSharedBackupLayout(manifest.layout))
     await assertArchiveRootObjectInventory(decoded, reader, manifest.sharedObjects ?? []);
   return decoded;
@@ -208,10 +221,18 @@ async function restoreArchiveRoot(args: {
   } catch (error) {
     const current = await readArchiveRestoreSession(session.operationId);
     if (current?.committedRoots.includes(key)) {
-      if (journal) await deleteReadyJournal(journal.journalId).catch(() => undefined);
+      if (journal) await cleanupFailedReadyJournal(journal);
       return current;
     }
-    if (journal) await deleteReadyJournal(journal.journalId).catch(() => undefined);
+    if (journal) {
+      try {
+        await cleanupFailedReadyJournal(journal);
+      } catch (cleanup) {
+        throw new AggregateError([error, cleanup], 'Media backup ready journal cleanup failed.', {
+          cause: cleanup,
+        });
+      }
+    }
     await cleanupStaged(staged).catch((cleanupError: unknown) => {
       throw new AggregateError([error, cleanupError], 'Media backup restore rollback failed.', {
         cause: error,

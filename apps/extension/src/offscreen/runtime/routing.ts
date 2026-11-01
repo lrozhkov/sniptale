@@ -16,6 +16,8 @@ import {
 } from '../recording/setup/desktop-media';
 import {
   getRecordingClockTiming,
+  appendRecordingCursorObservations,
+  appendRecordingEventObservations,
   pauseRecording,
   resumeRecording,
   startRecording,
@@ -128,6 +130,7 @@ export function resolveOffscreenErrorPhase(
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
     case VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING:
+    case VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
@@ -168,6 +171,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.DISPOSE_DESKTOP_MEDIA:
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
     case VideoMessageType.OFFSCREEN_STOP_RECORDING:
+    case VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS:
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
@@ -344,6 +348,20 @@ export async function handleOffscreenRuntimeMessage(
         },
         message.discard ?? false
       );
+    case VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS:
+      if (message.eventPacket)
+        await appendRecordingEventObservations(
+          resolveRecordingSourceBinding(message),
+          message.eventPacket,
+          message.nativeDocumentId
+        );
+      else
+        await appendRecordingCursorObservations(
+          resolveRecordingSourceBinding(message),
+          message.cursorPacket,
+          message.nativeDocumentId
+        );
+      return;
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
       pauseRecording(resolveRecordingSourceBinding(message));
       return;

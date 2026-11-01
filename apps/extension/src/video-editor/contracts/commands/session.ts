@@ -28,7 +28,11 @@ export interface VideoEditorSessionActions {
   selectTransition: (transitionId: string) => void;
   selectCursorSegment: (sampleId: string) => void;
   selectObjectTrack: (objectTrackId: string) => void;
-  selectActionOccurrence: (eventId: string, clipId: string | null) => void;
+  selectActionOccurrence: (
+    eventId: string,
+    clipId: string | null,
+    observedAction?: import('../recording-events').VideoEditorRecordingActionObservation
+  ) => void;
   selectHistoryLane: () => void;
   selectHistorySpan: (target: VideoEditorTypingSpanTarget) => void;
   applyTypingCompression: (

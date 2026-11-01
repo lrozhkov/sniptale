@@ -108,7 +108,7 @@ export async function encodeCapturedProjectRoot(
       descriptor.size !== ref.size ||
       descriptor.mimeType !== ref.mimeType ||
       (object
-        ? object.blob.size !== ref.size || object.blob.type !== ref.mimeType
+        ? !object.blob || object.blob.size !== ref.size || object.blob.type !== ref.mimeType
         : !retained ||
           retained.copy.target.kind !== 'opfs' ||
           JSON.stringify(retained.copy.target.ref) !== JSON.stringify(ref))

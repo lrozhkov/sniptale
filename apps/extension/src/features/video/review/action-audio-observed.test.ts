@@ -1,3 +1,4 @@
+import { encodeRecordingEventCadence } from '../project/recording-events/records';
 import { expect, it } from 'vitest';
 import { buildReviewActionAudioPlan, iterateReviewActionAudioCues } from './action-audio';
 import { buildReviewTimeMap } from './timeline';
@@ -217,3 +218,85 @@ it.each([
     expect(new Set(cues.map((cue) => cue.id)).size).toBe(2);
   }
 );
+
+it('keeps sub-millisecond cadence after 24 hours through rate mapping and query partitions', () => {
+  const times = [86_400_000_001, 86_400_000_101];
+  const marker: ReviewTelemetryMarker = {
+    ref: { kind: 'signal', id: 'exact-typing' },
+    eventType: 'typing',
+    start: 86400,
+    end: 86401,
+    observed: true,
+    recordingCadence: { onsets: [encodeRecordingEventCadence('exact', times)], repeats: [] },
+  };
+  const plan = buildReviewActionAudioPlan({
+    markers: [marker],
+    applied: true,
+    settings: [
+      {
+        ref: { kind: 'signal', id: 'exact-typing' },
+        enabled: true,
+        presetId: 'typing-recorded-v2',
+        volume: 0.5,
+        offset: 0,
+      },
+    ],
+    segments: [
+      {
+        sourceStart: 86400,
+        sourceEnd: 86401,
+        resultStart: 0,
+        resultEnd: 0.5,
+        rate: 2,
+        kind: 'speed',
+      },
+    ],
+  });
+  const all = [...iterateReviewActionAudioCues(plan, { start: 0, end: 0.5 })].flat();
+  expect(all).toHaveLength(2);
+  expect(all[0]!.start).toBeCloseTo((times[0]! / 1_000_000 - 86400) / 2, 12);
+  expect(all[1]!.start - all[0]!.start).toBeCloseTo(0.00005, 10);
+  const divided = [
+    ...iterateReviewActionAudioCues(plan, { start: 0, end: 0.00003 }),
+    ...iterateReviewActionAudioCues(plan, { start: 0.00003, end: 0.5 }),
+  ].flat();
+  expect([...new Map(divided.map((cue) => [cue.id, cue])).values()]).toEqual(all);
+});
+
+it('plays only observed repeats for an unknown keyboard onset and keeps anonymous holds silent', () => {
+  const repeat = encodeRecordingEventCadence('known-repeats', [1_000_001, 1_000_101]);
+  const marker: ReviewTelemetryMarker = {
+    ref: { kind: 'action', id: 'unknown' },
+    eventType: 'KEY',
+    start: 1,
+    end: 2,
+    observed: true,
+    recordingCadence: { onsets: [], repeats: [repeat] },
+  };
+  const plan = buildReviewActionAudioPlan({
+    markers: [marker, { ...marker, ref: { kind: 'signal', id: 'hold' }, keyboardHold: true }],
+    applied: true,
+    settings: [
+      {
+        ref: { kind: 'action', id: 'unknown' },
+        enabled: true,
+        presetId: 'keyboard-recorded-v2',
+        includeRepeats: true,
+        volume: 0.5,
+        offset: 0,
+      },
+      {
+        ref: { kind: 'signal', id: 'hold' },
+        enabled: true,
+        presetId: 'typing-recorded-v2',
+        includeRepeats: true,
+        volume: 0.5,
+        offset: 0,
+      },
+    ],
+    segments: buildReviewTimeMap(8, []),
+  });
+  const cues = [...iterateReviewActionAudioCues(plan, { start: 0, end: 8 })].flat();
+  expect(cues.map((cue) => cue.start)).toEqual([1.000001, 1.000101]);
+  expect(cues.every((cue) => cue.ref.id === 'unknown')).toBe(true);
+});

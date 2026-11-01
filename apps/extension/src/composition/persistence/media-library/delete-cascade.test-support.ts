@@ -50,6 +50,13 @@ export function mediaEntry(): MediaLibraryEntry {
 }
 
 function keyOf(store: string, value: Record<string, unknown>): string {
+  if (store === 'recording_events')
+    return JSON.stringify([
+      value['recordingId'],
+      value['eventStreamId'],
+      value['kind'],
+      value['entryId'],
+    ]);
   if (store === 'recording_recovery_blocks') return JSON.stringify([value['id'], value['index']]);
   if (store === 'scenario_project_units')
     return JSON.stringify([value['projectId'], value['unitId'], value['revision']]);
@@ -151,6 +158,20 @@ beforeEach(() => {
               store.delete(Array.isArray(key) ? JSON.stringify(key) : String(key));
             },
             index: (indexName: string) => ({
+              openCursor: async (key: IDBValidKey) => {
+                const items = [...store.values()].filter(
+                  (value) => isRecord(value) && value[indexName] === key
+                );
+                type Cursor = { value: unknown; continue(): Promise<Cursor | null> };
+                const at = (index: number): Cursor | null =>
+                  index >= items.length
+                    ? null
+                    : {
+                        value: items[index],
+                        continue: async () => at(index + 1),
+                      };
+                return at(0);
+              },
               getAll: async (key: IDBValidKey) =>
                 [...store.values()].filter((value) => isRecord(value) && value[indexName] === key),
               getAllKeys: async (key: IDBValidKey) =>

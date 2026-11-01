@@ -4,6 +4,8 @@ import { resolveProjectExportRange } from '../../features/video/project/export/r
 import type { VideoProject } from '../../features/video/project/types/model';
 import type { VideoProjectExportSettings } from '../../features/video/project/types/export';
 import { createVideoProjectCaptionRenderer } from '../../workflows/video-review/project-captions';
+import { createRecordingCursorTrajectoryRenderer } from '../../workflows/video-review/cursor-trajectory';
+import { createRecordingEventsRenderer } from '../../workflows/video-review/recording-events';
 import {
   renderOffscreenProjectEffectFrames,
   type OffscreenProjectEffectRuntime,
@@ -20,7 +22,12 @@ export interface ProjectCompositionSceneInput {
   captionSampleTime?: number;
   job: Pick<
     ExportJobState,
-    'cancelled' | 'cameraSpatialRenderer' | 'captionRenderer' | 'watermarkRenderer'
+    | 'cancelled'
+    | 'cameraSpatialRenderer'
+    | 'captionRenderer'
+    | 'watermarkRenderer'
+    | 'cursorTrajectoryRenderer'
+    | 'recordingEventsRenderer'
   >;
   loadedImages: LoadedImagesMap;
   clipMediaElements: Parameters<typeof drawProjectFrame>[5];
@@ -41,6 +48,22 @@ export async function renderProjectCompositionScene(
   const assertLive = () => {
     if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
   };
+  assertLive();
+  let renderProject = project;
+  if (project.actionFeedback?.some((group) => group.events)) {
+    job.recordingEventsRenderer ??= createRecordingEventsRenderer();
+    renderProject = await job.recordingEventsRenderer.prepare(
+      project,
+      { start: currentTime, end: currentTime },
+      signal
+    );
+    assertLive();
+  }
+  if (project.cursorTrack?.sourceObservations?.some((group) => group.trajectory))
+    job.cursorTrajectoryRenderer ??= createRecordingCursorTrajectoryRenderer();
+  renderProject = project.cursorTrack?.sourceObservations?.some((group) => group.trajectory)
+    ? await job.cursorTrajectoryRenderer!.prepare(renderProject, currentTime)
+    : renderProject;
   assertLive();
   job.captionRenderer ??= createVideoProjectCaptionRenderer();
   const captions = await job.captionRenderer.prepare(project, settings, signal);
@@ -65,7 +88,7 @@ export async function renderProjectCompositionScene(
     currentTime,
     loadedImages: args.loadedImages,
     ...(ownerDocument ? { ownerDocument } : {}),
-    project,
+    project: renderProject,
     ...(signal ? { signal } : {}),
     spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
   };
@@ -76,7 +99,7 @@ export async function renderProjectCompositionScene(
     assertLive();
     await drawProjectFrame(
       context,
-      project,
+      renderProject,
       settings,
       currentTime,
       args.loadedImages,

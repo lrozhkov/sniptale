@@ -28,6 +28,8 @@ it('sends dedicated controlled cursor bootstrap messages to the recording tab', 
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
     type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
+    cursorTrajectoryMode: 'blocks',
+    recordingEventsMode: 'blocks',
     recordingId: 'recording-1',
     offsetSeconds: 3.5,
   });
@@ -70,6 +72,8 @@ it('transmits explicit unavailable and correlated source clocks without creating
   await enableControlledCursorCapture(7, 'recording-1', 0, null);
   expect(sendTabMessageMock).toHaveBeenLastCalledWith(7, {
     type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
+    cursorTrajectoryMode: 'blocks',
+    recordingEventsMode: 'blocks',
     recordingId: 'recording-1',
     frameClock: null,
   });
@@ -81,8 +85,20 @@ it('transmits explicit unavailable and correlated source clocks without creating
   await enableControlledCursorCapture(7, 'recording-1', 0, frameClock);
   expect(sendTabMessageMock).toHaveBeenLastCalledWith(7, {
     type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
+    cursorTrajectoryMode: 'blocks',
+    recordingEventsMode: 'blocks',
     recordingId: 'recording-1',
     frameClock,
   });
   await expect(disableControlledCursorCapture(7)).resolves.toBeNull();
+});
+
+it('closes a navigation observation without declaring the recording stopped', async () => {
+  await disableControlledCursorCapture(7, 'observation');
+  expect(sendTabMessageMock).toHaveBeenCalledExactlyOnceWith(7, {
+    type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
+    cursorTrajectoryMode: 'blocks',
+    recordingEventsMode: 'blocks',
+    boundaryReason: 'observation',
+  });
 });

@@ -1,5 +1,8 @@
 import { resolveProjectCursorFocusPath } from '../../../features/video/project/cursor-focus-path/projection';
-import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
+import {
+  resolveRecordingActionOccurrences,
+  resolveRecordingSignalObservation,
+} from '../operations/recording-events-selection';
 import { createSceneSelection } from '../selection/model';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import type { VideoEditorProjectState } from './contracts';
@@ -34,7 +37,8 @@ export function resolveSelectionAfterProjectUpdate(
       const clip = project.clips.find((item) => item.id === selection.clipId);
       return clip?.type === 'VIDEO' &&
         clip.sourceInstanceId === selection.sourceInstanceId &&
-        isRecordingSourceTimedClip(project, clip, selection.recordingId)
+        isRecordingSourceTimedClip(project, clip, selection.recordingId) &&
+        (!selection.observedSignal || resolveRecordingSignalObservation(project, selection))
         ? selection
         : { kind: VideoEditorSelectionKind.HISTORY_LANE };
     }
@@ -91,7 +95,7 @@ export function resolveSelectionAfterProjectUpdate(
         ? selection
         : createSceneSelection();
     case VideoEditorSelectionKind.ACTION_OCCURRENCE: {
-      const occurrences = resolveVideoProjectActionOccurrences(project);
+      const occurrences = resolveRecordingActionOccurrences(project, selection.observedAction);
       if (
         occurrences.some(
           (item) => item.eventId === selection.eventId && item.clipId === selection.clipId

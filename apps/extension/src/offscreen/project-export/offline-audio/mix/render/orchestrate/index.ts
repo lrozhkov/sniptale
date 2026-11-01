@@ -26,7 +26,15 @@ export async function renderOfflineAudioMix(
       )
     );
   const actionAudioPresent = actionAudioEnabled
-    ? (
+    ? project.actionFeedback?.some(
+        (group) =>
+          group.events &&
+          group.events.totalBlocks > 0 &&
+          group.settings.some(
+            (setting) => setting.enabled && setting.presetId !== null && setting.volume > 0
+          )
+      ) ||
+      (
         await import('../../../../../../features/video/review/project-action-audio')
       ).buildProjectActionAudioPlan(project).descriptors.length > 0
     : false;

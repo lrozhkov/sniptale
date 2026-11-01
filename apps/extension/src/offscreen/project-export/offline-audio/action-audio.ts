@@ -1,3 +1,4 @@
+import { createRecordingProjectActionAudioSource } from '../../../workflows/video-review/recording-action-audio';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import type { VideoProject } from '../../../features/video/project/types';
 import { buildProjectActionAudioPlan } from '../../../features/video/review/project-action-audio';
@@ -16,7 +17,17 @@ export async function mixProjectActionAudio(
   range?: { start: number; end: number }
 ) {
   const plan = buildProjectActionAudioPlan(project);
-  if (!plan.descriptors.length) return;
+  const recordingSource = project.actionFeedback?.some(
+    (group) =>
+      group.events &&
+      group.events.totalBlocks > 0 &&
+      group.settings.some(
+        (setting) => setting.enabled && setting.presetId !== null && setting.volume > 0
+      )
+  )
+    ? createRecordingProjectActionAudioSource(project)
+    : null;
+  if (!plan.descriptors.length && !recordingSource) return;
   const job = new AbortController();
   const abort = () => job.abort();
   signal?.addEventListener('abort', abort, { once: true });
@@ -33,16 +44,22 @@ export async function mixProjectActionAudio(
       fetch,
       decode: (bytes) => decodingContext.decodeAudioData(bytes),
     });
-    const admission = await admitReviewActionAudioPlan(plan, job.signal);
+    const admission = recordingSource
+      ? await recordingSource.admit(job.signal)
+      : await admitReviewActionAudioPlan(plan, job.signal);
     const bounds = range ?? { start: 0, end: plan.duration };
     const rate = output.sampleRate;
     for (let from = 0; from < output.length; from += rate) {
       job.signal.throwIfAborted();
       const to = Math.min(output.length, from + rate);
-      for (const batch of iterateReviewActionAudioCues(plan, {
+      const window = {
         start: bounds.start + from / rate,
         end: Math.min(bounds.end, bounds.start + to / rate),
-      })) {
+      };
+      const windowPlan = recordingSource
+        ? await recordingSource.readWindow(window, job.signal)
+        : plan;
+      for (const batch of iterateReviewActionAudioCues(windowPlan, window)) {
         for (const cue of batch) {
           const sample = await reader.read(cue.sampleId);
           job.signal.throwIfAborted();
@@ -52,6 +69,7 @@ export async function mixProjectActionAudio(
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
   } finally {
+    recordingSource?.dispose();
     reader?.dispose();
     job.abort();
     signal?.removeEventListener('abort', abort);

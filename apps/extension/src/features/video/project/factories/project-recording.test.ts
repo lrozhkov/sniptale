@@ -1,3 +1,6 @@
+import eventsFixture from '../recording-events/fixtures.json';
+import { isRecordingEventsDescriptor } from '../recording-events/records';
+import type { CursorTrajectoryDescriptor } from '../cursor-trajectory/types';
 import { expect, it } from 'vitest';
 import {
   getVideoProjectActionPresentation,
@@ -394,3 +397,68 @@ it('retains typing-only source cadence independently of linked audio and caller 
     0, 100, 700,
   ]);
 });
+
+it.each([
+  { cursor: true, events: false },
+  { cursor: false, events: true },
+  { cursor: true, events: true },
+])(
+  'constructs compact history bindings for cursor=$cursor events=$events without inline archive facts',
+  ({ cursor, events }) => {
+    if (!isRecordingEventsDescriptor(eventsFixture.descriptor)) throw new Error('Invalid fixture.');
+    const descriptor: CursorTrajectoryDescriptor = {
+      format: 'cursor-trajectory-v1',
+      formatVersion: 1,
+      algorithm: 'sed-window-v1',
+      encoding: 'json-ascii-int-v1',
+      trajectoryId: 'a'.repeat(32),
+      state: 'complete',
+      finalized: true,
+      totalBlocks: 100,
+      totalRecords: 6002,
+      totalSamples: 6000,
+      totalBytes: 1000000,
+      streamSha256: 'b'.repeat(64),
+    };
+    const options = {
+      recordingId: 'recording',
+      filename: 'history.webm',
+      width: 640,
+      height: 360,
+      duration: 12,
+      mimeType: 'video/webm',
+      size: 100,
+      ...(cursor ? { cursorTrajectory: descriptor } : {}),
+      ...(events ? { recordingEvents: eventsFixture.descriptor } : {}),
+    };
+    const before = structuredClone(options);
+    const project = createVideoProjectFromRecording(options);
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const clip = project.clips.find((clip) => clip.type === 'VIDEO');
+    expect(clip?.sourceInstanceId).toBeTruthy();
+    if (cursor) {
+      expect(project.cursorTrack?.samples).toEqual([]);
+      expect(project.cursorTrack?.sourceObservations).toEqual([
+        {
+          recordingId: 'recording',
+          sourceInstanceId: clip?.sourceInstanceId,
+          samples: [],
+          trajectory: descriptor,
+        },
+      ]);
+    }
+    if (events) {
+      expect(project.actionEvents).toEqual([]);
+      expect(project.actionFeedback).toEqual([
+        {
+          recordingId: 'recording',
+          sourceInstanceId: clip?.sourceInstanceId,
+          settings: [],
+          signals: [],
+          events: eventsFixture.descriptor,
+        },
+      ]);
+    }
+    expect(options).toEqual(before);
+  }
+);

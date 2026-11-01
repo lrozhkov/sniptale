@@ -1,4 +1,5 @@
 // policyStateIds: [] - native telemetry parser uses static privacy allowlists only.
+import { isSafeRecordingKeyLabel } from '../../features/video/project/recording-events/records';
 import { isRecordingTelemetrySnapshot } from '../../features/video/project/validation/recording-telemetry';
 import {
   VideoTemporalEasing,
@@ -37,29 +38,6 @@ const cursorSkinKeys = new Set(['animationPreset', 'color', 'hidden', 'preset', 
 const cursorEasingValues = new Set<string>(Object.values(VideoTemporalEasing));
 const cursorAnimationValues = new Set<string>(Object.values(VideoCursorAnimationPreset));
 const cursorVisualValues = new Set<string>(Object.values(VideoCursorVisualPreset));
-const safeShortcutLabels = new Set([
-  'Alt',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'ArrowUp',
-  'Backspace',
-  'Ctrl',
-  'Delete',
-  'End',
-  'Enter',
-  'Escape',
-  'Home',
-  'Meta',
-  'PageDown',
-  'PageUp',
-  'Shift',
-  'Space',
-  'Tab',
-]);
-const safeShortcutPattern =
-  /^((Ctrl|Alt|Shift|Meta)\+){1,3}(Enter|Escape|Tab|Backspace|Delete|ArrowDown|ArrowLeft|ArrowRight|ArrowUp|[A-Z0-9])$/;
-
 function isSafeTelemetryString(value: string): boolean {
   return value.length <= 120 && !unsafeTelemetryStringPattern.test(value);
 }
@@ -168,10 +146,6 @@ function isSafeNativeCursorTrack(
   );
 }
 
-function isSafeKeyLabel(value: unknown): boolean {
-  return isString(value) && (safeShortcutLabels.has(value) || safeShortcutPattern.test(value));
-}
-
 function isNativeTelemetryPrivacySafe(value: NativeRecordingTelemetrySnapshot): boolean {
   return (
     value.actionEvents.every(
@@ -181,7 +155,7 @@ function isNativeTelemetryPrivacySafe(value: NativeRecordingTelemetrySnapshot): 
         isSafeTelemetryString(event.label) &&
         isSafeTelemetryString(event.preset) &&
         isSafeTelemetryRecord(event.data) &&
-        (event.kind !== 'KEY' || isSafeKeyLabel(event.label))
+        (event.kind !== 'KEY' || isSafeRecordingKeyLabel(event.label))
     ) &&
     value.signals.every(
       (signal) =>

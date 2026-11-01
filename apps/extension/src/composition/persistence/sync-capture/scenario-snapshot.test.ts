@@ -1,3 +1,4 @@
+import { readArchiveRootObjectSource } from '../../../workflows/media-hub-backup/v6/object-source.test-support';
 import { expect, it } from 'vitest';
 import { getStore, createAsset, stores } from '../scenario/aggregate-mutations.test-support';
 import { initDB } from '../infrastructure/indexed-db/core';
@@ -246,7 +247,7 @@ it.each([false, true])(
     expect((await parsePortableSyncRoot(portable.envelope)).kind).toBe('video-project');
     expect(portable.dependencies.map((row) => row.mediaId)).toEqual(canonical ? [mediaId] : []);
     expect(portable.objects).toHaveLength(1);
-    expect(portable.objects[0]!.blob.size).toBe(child.size);
+    expect((await readArchiveRootObjectSource(portable.objects[0]!)).size).toBe(child.size);
     expect(portable.bindings).toEqual([
       { objectId: portable.objects[0]!.ref.objectId, ref: assetRef },
     ]);

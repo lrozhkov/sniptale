@@ -1,3 +1,4 @@
+import { resolveRecordingSignalObservation } from '../../operations/recording-events-selection';
 import { mapScopedEffectIntervals } from '../../../../features/video/project/effect-instance/time-map';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type {
@@ -86,9 +87,11 @@ export function resolveTypingSpanSource(
     !isRecordingSourceTimedClip(project, clip, target.recordingId)
   )
     return null;
-  const signal = telemetry
-    .find((entry) => entry.recordingId === target.recordingId)
-    ?.signals.find((item) => item.id === target.signalId && item.kind === 'typing');
+  const signal = target.observedSignal
+    ? resolveRecordingSignalObservation(project, target)
+    : telemetry
+        .find((entry) => entry.recordingId === target.recordingId)
+        ?.signals.find((item) => item.id === target.signalId && item.kind === 'typing');
   if (
     !signal ||
     signal.endTime <= clip.sourceStart ||

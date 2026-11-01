@@ -77,6 +77,7 @@ export const videoEditorTimelineLaneMessages = defineMessageSource({
     ru: 'Наблюдение за курсором недоступно',
     en: 'Cursor observation unavailable',
   },
+  historyCursorArchived: { ru: 'История курсора в архиве', en: 'Archived cursor history' },
   historyCursorUnknown: { ru: 'Покрытие курсора неизвестно', en: 'Cursor coverage unknown' },
   historyCursorEmpty: { ru: 'Нет записанных движений курсора', en: 'No cursor activity recorded' },
   historyCursorGap: { ru: 'Нет наблюдений курсора', en: 'Cursor observation gap' },

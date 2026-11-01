@@ -78,6 +78,69 @@ function createSafeKeyEvent(label: string): RecordingActionEvent {
   };
 }
 
+it.each([
+  ...Array.from({ length: 24 }, (_, index) => `F${index + 1}`),
+  'Ctrl+F5',
+  'Ctrl+Alt+Shift+Meta+A',
+  'Ctrl+Alt+Shift+Meta+F24',
+  'Shift+Tab',
+  'Ctrl+Home',
+  'Alt+Shift',
+  'Insert',
+  'Ctrl+PageDown',
+  'Shift+F24',
+  'Unknown',
+])(
+  'accepts the Desktop sanitizer command label %s without discarding the recording message',
+  (label) => {
+    const input = createRecordingStopped();
+    expect(
+      parseNativeAppInboundMessage({
+        ...input,
+        telemetry: { ...input.telemetry, actionEvents: [createSafeKeyEvent(label)] },
+      }).ok
+    ).toBe(true);
+  }
+);
+
+it.each(['recording-events', 'cursor-trajectory'])(
+  'accepts the exact %s format-unavailable warning so legacy video remains usable',
+  (source) => {
+    const input = createRecordingStopped();
+    expect(
+      parseNativeAppInboundMessage({
+        ...input,
+        telemetry: {
+          ...input.telemetry,
+          signals: [
+            {
+              id: 'native-static-0',
+              kind: 'static-frame',
+              startTime: 0,
+              endTime: 0,
+              point: null,
+              data: { source, code: 'format-unavailable', severity: 'warning' },
+            },
+          ],
+        },
+      })
+    ).toMatchObject({ ok: true });
+  }
+);
+
+it.each(['Shift+A', 'Shift+7', 'F0', 'F25', 'F999', 'Ctrl+typed-phrase'])(
+  'rejects printable typing or unsupported command label %s',
+  (label) => {
+    const input = createRecordingStopped();
+    expect(
+      parseNativeAppInboundMessage({
+        ...input,
+        telemetry: { ...input.telemetry, actionEvents: [createSafeKeyEvent(label)] },
+      }).ok
+    ).toBe(false);
+  }
+);
+
 it('retains raw wire timing and optional metadata without materializing a montage anchor', () => {
   const event: RecordingActionEvent = {
     ...createSafeKeyEvent('Enter'),

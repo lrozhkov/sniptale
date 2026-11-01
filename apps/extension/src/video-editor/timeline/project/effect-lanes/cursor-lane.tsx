@@ -1,6 +1,6 @@
 import { ProjectCursorFocusKeys } from './cursor-focus-keys';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import { buildTimelineTelemetryLaneData } from '../../../project/operations/telemetry-lane';
+import { buildProjectTimelineTelemetryLaneData } from '../../../project/operations/telemetry-lane';
 import { useContext, useMemo } from 'react';
 import { TIMELINE_CURSOR_ROW_HEIGHT } from './history-layout';
 import { projectTimelineInterval, type TimelineProjection } from '../interaction-state/projection';
@@ -65,11 +65,10 @@ export function ProjectTimelineCursorLane(props: {
     [props.project, draft?.cursorSampleTimes]
   );
   const { segments, cursorMetaById } = useMemo(() => {
-    const dwellRanges = (props.recordingTelemetry ?? []).flatMap((entry) =>
-      buildTimelineTelemetryLaneData(displayProject, entry.recordingId, entry).spans.filter(
-        (span) => span.kind === 'cursor-idle'
-      )
-    );
+    const dwellRanges = buildProjectTimelineTelemetryLaneData(
+      displayProject,
+      props.recordingTelemetry ?? []
+    ).spans.filter((span) => span.kind === 'cursor-idle');
     const segments = buildHistoryCursorRuns(
       displayProject.cursorTrack,
       displayProject.duration,
@@ -84,12 +83,18 @@ export function ProjectTimelineCursorLane(props: {
   const known =
     (props.recordingTelemetry?.length ?? 0) > 0 &&
     props.recordingTelemetry!.every((entry) => entry.capabilities?.pointer === 'available');
+  const archived =
+    props.project.cursorTrack?.sourceObservations?.some(
+      (group) => (group.trajectory?.totalSamples ?? 0) > 0
+    ) === true;
   const emptyLabel = translate(
-    unavailable
-      ? 'videoEditor.timeline.historyCursorUnavailable'
-      : known
-        ? 'videoEditor.timeline.historyCursorEmpty'
-        : 'videoEditor.timeline.historyCursorUnknown'
+    archived
+      ? 'videoEditor.timeline.historyCursorArchived'
+      : unavailable
+        ? 'videoEditor.timeline.historyCursorUnavailable'
+        : known
+          ? 'videoEditor.timeline.historyCursorEmpty'
+          : 'videoEditor.timeline.historyCursorUnknown'
   );
   const content = (
     <>

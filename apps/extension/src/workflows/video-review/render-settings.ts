@@ -24,9 +24,17 @@ export { resolveReviewRenderBitrate, resolveReviewVideoEncoderConfig } from './r
 export function assertReviewCameraAdmission(
   args: Pick<
     ReviewFrameExportInput,
-    'advanced' | 'index' | 'edits' | 'fragmentOffset' | 'cursorFacts' | 'renderSettings'
+    | 'advanced'
+    | 'index'
+    | 'edits'
+    | 'fragmentOffset'
+    | 'cursorFacts'
+    | 'renderSettings'
+    | 'recordingHistory'
   >
 ): void {
+  // Archived source coverage is admitted from the prepared facts before each painted frame.
+  if (args.recordingHistory) return;
   const effective = resolveQuickEditEffectiveState(args.advanced, args.cursorFacts);
   if (!effective.zoomRegions.some((region) => region.cursorFocus)) return;
   const duration = buildReviewTimeMap(args.index.duration, args.edits).at(-1)?.resultEnd ?? 0;

@@ -32,6 +32,7 @@ interface PreviewStageMediaRuntimeParams {
   previewMode: VideoEditorPreviewMode;
   previewRasterSize: VideoEditorPreviewRasterSize;
   project: VideoProject;
+  recordingProject?: VideoProject;
   renderGenerationRef: MutableRefObject<number>;
   registerPreviewRuntime: (runtime: PlaybackPreviewRuntime | null) => void;
 }
@@ -107,5 +108,6 @@ function usePreviewMediaSynchronization(
     feedback: params.effectRuntimeFeedback,
     isPlaying: params.isPlaying && !params.mutePreviewAudio,
     project: params.project,
+    ...(params.recordingProject ? { recordingProject: params.recordingProject } : {}),
   });
 }

@@ -67,6 +67,10 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
     ...[
       'video_projects',
       'recording_telemetry',
+      'recording_cursor_trajectories',
+      'recording_cursor_blocks',
+      'recording_events',
+      'native_transfer_sessions',
       'recording_recovery_sessions',
       'recording_recovery_blocks',
       'scenario_assets',
@@ -87,6 +91,14 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
     ['video_workspace_drafts', new Map()],
   ]);
   const database = {
+    getAllFromIndex: async (name: string, index: string, query: IDBValidKey) => {
+      if (index !== 'kind') throw new Error('Unsupported direct fixture index');
+      const store = rows.get(name);
+      if (!store) throw new Error('Unknown fixture store');
+      return structuredClone(
+        [...store.values()].filter((value) => isRecord(value) && value[index] === query)
+      );
+    },
     transaction: (stores: string[], mode: string) => {
       const pending = structuredClone(rows);
       let aborted = false;
@@ -104,24 +116,35 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
             if (failure(name)) throw new DOMException('No space', 'QuotaExceededError');
             if (!isRecord(value)) throw new Error('Invalid fixture row');
             const key =
-              name === 'sync_capture' || name === 'sync_outbox' || name === 'sync_connection'
-                ? value['key']
-                : name === 'video_project_revisions'
-                  ? value['projectId']
-                  : name === 'scenario_project_history'
-                    ? JSON.stringify([value['projectId'], value['revision']])
-                    : name === 'scenario_project_units'
-                      ? JSON.stringify([value['projectId'], value['unitId'], value['revision']])
-                      : name === 'video_workspace_history'
-                        ? JSON.stringify([value['aggregateId'], value['ordinal']])
-                        : name === 'recording_telemetry'
-                          ? value['recordingId']
-                          : name === 'asset_owners'
-                            ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
-                            : (value['aggregateId'] ??
-                              value['id'] ??
-                              value['operationId'] ??
-                              value['assetId']);
+              name === 'recording_events'
+                ? JSON.stringify([
+                    value['recordingId'],
+                    value['eventStreamId'],
+                    value['kind'],
+                    value['entryId'],
+                  ])
+                : name === 'sync_capture' || name === 'sync_outbox' || name === 'sync_connection'
+                  ? value['key']
+                  : name === 'video_project_revisions'
+                    ? value['projectId']
+                    : name === 'scenario_project_history'
+                      ? JSON.stringify([value['projectId'], value['revision']])
+                      : name === 'scenario_project_units'
+                        ? JSON.stringify([value['projectId'], value['unitId'], value['revision']])
+                        : name === 'video_workspace_history'
+                          ? JSON.stringify([value['aggregateId'], value['ordinal']])
+                          : name === 'recording_telemetry'
+                            ? value['recordingId']
+                            : name === 'asset_owners'
+                              ? JSON.stringify([
+                                  value['ownerKind'],
+                                  value['ownerId'],
+                                  value['role'],
+                                ])
+                              : (value['aggregateId'] ??
+                                value['id'] ??
+                                value['operationId'] ??
+                                value['assetId']);
             if (typeof key !== 'string' || !key) throw new Error('Missing test row identity');
             if (add && store.has(key))
               throw new DOMException('Duplicate fixture row', 'ConstraintError');
@@ -140,10 +163,20 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
                 indexName !== 'kind' &&
                 indexName !== 'rootKey' &&
                 indexName !== 'projectId' &&
+                indexName !== 'recordingId' &&
                 indexName !== 'id'
               )
                 throw new Error('Unexpected test index');
               return {
+                openCursor: async (key: IDBValidKey) => {
+                  const items = ownRows(key, indexName).map(([, value]) => structuredClone(value));
+                  type Cursor = { value: unknown; continue(): Promise<Cursor | null> };
+                  const at = (index: number): Cursor | null =>
+                    index >= items.length
+                      ? null
+                      : { value: items[index], continue: async () => at(index + 1) };
+                  return at(0);
+                },
                 count: async (key: IDBValidKey) => ownRows(key, indexName).length,
                 getAll: async (key: IDBValidKey) =>
                   structuredClone(ownRows(key, indexName).map(([, value]) => value)),

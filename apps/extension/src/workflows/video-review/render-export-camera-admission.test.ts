@@ -57,3 +57,19 @@ it.each([false, true])(
     expect(args.advanced).toEqual(before);
   }
 );
+
+it('refuses an unavailable archived frame before encoding it', async () => {
+  const args = argsFixture();
+  const encoded = state.encoded.length;
+  const recordingHistory = {
+    read: vi.fn(async () => {
+      throw new Error('history-source-unavailable');
+    }),
+    dispose: vi.fn(),
+  };
+  await expect(writeReviewFrames({ ...args, recordingHistory })).rejects.toThrow(
+    'history-source-unavailable'
+  );
+  expect(recordingHistory.read).toHaveBeenCalled();
+  expect(state.encoded).toHaveLength(encoded);
+});

@@ -4,6 +4,7 @@ import { encodePortableThumbnail } from '../root-codecs/media';
 import type {
   ArchivePathAllocator,
   ArchiveObjectRef,
+  ArchiveStreamSource,
 } from '../../../../composition/archive-transfer';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import type { ArchiveRootObjectSource } from '../export';
@@ -47,7 +48,18 @@ export function createObjectCollector(rootLabel: string, paths: ArchivePathAlloc
     objects.push({ blob, ref });
     return ref.objectId;
   };
-  return { addObject, addObjectDescriptor, objects, references };
+  const addStreamObject = (
+    size: number,
+    filename: string,
+    mimeType: string,
+    open: (signal?: AbortSignal) => Promise<ArchiveStreamSource>,
+    directory?: readonly string[]
+  ) => {
+    const ref = addObjectDescriptor(size, filename, mimeType, directory);
+    objects.push({ open, ref });
+    return ref.objectId;
+  };
+  return { addObject, addStreamObject, addObjectDescriptor, objects, references };
 }
 
 export async function readInventoryAssetFile(

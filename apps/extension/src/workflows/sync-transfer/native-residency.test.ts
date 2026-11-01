@@ -139,6 +139,12 @@ async function fixture(inline = false) {
       await tx.done;
       return keys;
     },
+    async getAllFromIndex(store: string, index: string, query: IDBValidKey) {
+      const tx = data.database.transaction([store], 'readonly');
+      const values = await tx.objectStore(store).index(index).getAll(query);
+      await tx.done;
+      return values;
+    },
     async getAll(store: string) {
       const tx = data.database.transaction([store], 'readonly');
       const values = await tx.objectStore(store).getAll();

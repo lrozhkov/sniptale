@@ -73,7 +73,17 @@ export type RuntimeVideoSessionResponseByType = {
   [VideoMessageType.OFFSCREEN_START_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_SOURCE_READY]: RuntimeMessageResponse<{ result?: 'ALLOW' | 'DENY' }>;
   [VideoMessageType.OFFSCREEN_BEGIN_RECORDING]: RuntimeRequiredAckResponse;
-  [VideoMessageType.OFFSCREEN_STOP_RECORDING]: RuntimeAckResponse;
+  [VideoMessageType.OFFSCREEN_STOP_RECORDING]:
+    | RuntimeMessageResponse<{
+        result?: string;
+        recordingPointTransform?:
+          | import('../../../features/video/project/types').RecordingPointTransform
+          | null;
+        recordingEvents?: import('../../../features/video/project/recording-events/types').RecordingEventsDescriptor;
+        cursorTrajectory?: import('../../../features/video/project/cursor-trajectory/types').CursorTrajectoryDescriptor;
+      }>
+    | undefined;
+  [VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS]: RuntimeRequiredAckResponse;
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_RESUME_RECORDING]: RuntimeAckResponse;
   [VideoMessageType.OFFSCREEN_UPDATE_SETTINGS]: RuntimeAckResponse;

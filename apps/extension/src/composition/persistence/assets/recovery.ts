@@ -21,14 +21,17 @@ export async function recoverStandaloneAssetPublications(
   // this recovery holds the shared transition gate and the durable asset lifecycle lock,
   // or journal replay would queue the exclusive request behind its own shared hold.
   await initDB();
-  return runWithPersistenceMutationTransitionRecovery(transitionPermit, () =>
-    runWithDurableAssetLifecycleLock((permit) => recoverStandaloneJournals(adapters, permit))
+  return runWithPersistenceMutationTransitionRecovery(transitionPermit, (activeTransition) =>
+    runWithDurableAssetLifecycleLock((permit) =>
+      recoverStandaloneJournals(adapters, permit, activeTransition)
+    )
   );
 }
 
 async function recoverStandaloneJournals(
   adapters: readonly AssetPublicationAdapter[],
-  lifecyclePermit: DurableAssetLifecyclePermit
+  lifecyclePermit: DurableAssetLifecyclePermit,
+  transitionPermit: PersistenceMutationTransitionPermit
 ): Promise<number> {
   const byDomain = new Map(adapters.map((adapter) => [adapter.domain, adapter]));
   let recovered = 0;
@@ -38,7 +41,11 @@ async function recoverStandaloneJournals(
     if (!adapter) continue;
     let result: void | 'defer';
     try {
-      result = await adapter.publish(journal as AssetReadyJournal, lifecyclePermit);
+      result = await adapter.publish(
+        journal as AssetReadyJournal,
+        lifecyclePermit,
+        transitionPermit
+      );
     } catch (error) {
       if (error instanceof UnresolvedAssetPublicationError) continue;
       if (!(error instanceof SupersededAssetPublicationError)) throw error;

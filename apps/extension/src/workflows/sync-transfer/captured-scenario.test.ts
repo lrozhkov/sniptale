@@ -1,3 +1,4 @@
+import { readArchiveRootObjectSource } from '../media-hub-backup/v6/object-source.test-support';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { AssetRef } from '../../composition/persistence/assets/contracts';
@@ -223,7 +224,7 @@ async function wireRoundtrip(rows: CapturedScenarioRows) {
   const objects = await Promise.all(
     portable.objects.map(async (object) => ({
       objectId: object.ref.objectId,
-      sha256: await streamedHash(object.blob),
+      sha256: await streamedHash(await readArchiveRootObjectSource(object)),
     }))
   );
   const text = JSON.stringify({
@@ -248,9 +249,14 @@ async function prepareOwned(rows: CapturedScenarioRows) {
   const { portable, wire, text } = await wireRoundtrip(rows);
   const verified = new Map<string, AssetRef>();
   for (const object of portable.objects) {
-    const staged = new Blob([object.blob], { type: object.ref.mimeType });
+    const staged = new Blob([await readArchiveRootObjectSource(object)], {
+      type: object.ref.mimeType,
+    });
     const ref = retainBytes(`received-${object.ref.objectId}`, staged);
-    verified.set(object.ref.objectId, { ...ref, sha256: await streamedHash(object.blob) });
+    verified.set(object.ref.objectId, {
+      ...ref,
+      sha256: await streamedHash(await readArchiveRootObjectSource(object)),
+    });
   }
   const payload = await preparePortableReplica({
     envelope: wire.envelope,
@@ -284,18 +290,22 @@ it.each(['guide', 'tour'] as const)(
     expect(wire.objects).toHaveLength(portable.objects.length);
     for (const object of portable.objects) {
       expect(wire.objects.find((item) => item.objectId === object.ref.objectId)?.sha256).toBe(
-        await streamedHash(object.blob)
+        await streamedHash(await readArchiveRootObjectSource(object))
       );
     }
     const saved = parsed.metadata.exports.find((item) => item.id === 'saved-html');
     const htmlObject = portable.objects.find((item) => item.ref.objectId === saved?.html?.objectId);
     expect(htmlObject?.ref.filename).toBe(`renamed-${mode}.html`);
     expect(htmlObject?.ref.path).toContain(`/Exports/renamed-${mode}.html`);
-    expect(await htmlObject?.blob.text()).toBe(`<html>Immutable saved ${mode} export</html>`);
+    expect(htmlObject && (await (await readArchiveRootObjectSource(htmlObject)).text())).toBe(
+      `<html>Immutable saved ${mode} export</html>`
+    );
     const current = parsed.metadata.assets.find((item) => item.entry.id === 'current-image');
     const original = portable.objects.find((item) => item.ref.objectId === current?.objectId);
     expect(original?.ref.filename).toMatch(/\.png$/u);
-    expect(await original?.blob.text()).toBe('Current image');
+    expect(original && (await (await readArchiveRootObjectSource(original)).text())).toBe(
+      'Current image'
+    );
     expect(io.read).toHaveBeenCalledWith(
       rows.refs.find((ref) => ref.assetId === 'physical-current'),
       expect.any(String)

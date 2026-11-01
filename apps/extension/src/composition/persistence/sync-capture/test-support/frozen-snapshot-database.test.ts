@@ -1,3 +1,4 @@
+import { readArchiveRootObjectSource } from '../../../../workflows/media-hub-backup/v6/object-source.test-support';
 import { expect, it, vi } from 'vitest';
 import type { CapturedVideoProjectRows } from '../contracts';
 import {
@@ -59,7 +60,11 @@ it('reuses the actual video inventory from frozen native rows and declared empty
   const materialized = await roots[0]!.load();
   expect(JSON.stringify(materialized.metadata)).toContain('Frozen revision N');
   expect(JSON.stringify(materialized.metadata)).not.toContain('Live revision N plus one');
-  expect(materialized.objects.map((object) => object.blob.size)).toEqual([1024, 55]);
+  expect(
+    await Promise.all(
+      materialized.objects.map(async (object) => (await readArchiveRootObjectSource(object)).size)
+    )
+  ).toEqual([1024, 55]);
   await expect(
     readVideoReviewForBackup({
       db: frozen,

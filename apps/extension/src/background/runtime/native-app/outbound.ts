@@ -1,3 +1,4 @@
+import type { NativeAppCapabilities } from '../../../contracts/native-app';
 import {
   MIN_SUPPORTED_NATIVE_APP_VERSION,
   NATIVE_APP_PROTOCOL_VERSION,
@@ -11,6 +12,20 @@ import {
 } from '../../../contracts/native-app';
 import { createNativeCommandId } from './ids';
 
+export const NATIVE_CURSOR_TRAJECTORY_ENABLED = true;
+export const NATIVE_RECORDING_EVENTS_ENABLED = true;
+
+/** Checks the independently offered format after the boundary parser admits its limits. */
+export function supportsNativeRecordingHistory(
+  capabilities: NativeAppCapabilities | null,
+  kind: 'cursor' | 'events'
+): boolean {
+  return kind === 'cursor'
+    ? capabilities?.attachments?.cursorTrajectoryFormats.includes('cursor-trajectory-v1') === true
+    : capabilities?.eventAttachments?.recordingEventFormats.includes('recording-events-v1') ===
+        true;
+}
+
 type ControllerAcquireReason =
   | 'initial-connect'
   | 'user-requested-takeover'
@@ -23,7 +38,12 @@ export function createNativeHelloMessage(args: {
 }): ExtensionHelloMessage {
   return {
     connectionIntent: args.connectionIntent ?? 'automatic',
-    capabilities: ['desktop-settings-v1', 'durable-media-ack-v1'],
+    capabilities: [
+      'desktop-settings-v1',
+      'durable-media-ack-v1',
+      ...(NATIVE_CURSOR_TRAJECTORY_ENABLED ? ['cursor-trajectory-v1' as const] : []),
+      ...(NATIVE_RECORDING_EVENTS_ENABLED ? ['recording-events-v1' as const] : []),
+    ],
     extensionId: args.extensionId,
     extensionVersion: args.extensionVersion,
     minAppVersion: MIN_SUPPORTED_NATIVE_APP_VERSION,

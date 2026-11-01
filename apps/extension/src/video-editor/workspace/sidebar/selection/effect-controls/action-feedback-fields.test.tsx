@@ -1,3 +1,9 @@
+import type { RecordingProjectActionAudioSource } from '../../../../../workflows/video-review/recording-action-audio';
+import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
+import { decodeRecordingEventsBlock } from '../../../../../features/video/project/recording-events/blocks';
+import { isRecordingEventsDescriptor } from '../../../../../features/video/project/recording-events/records';
+import fixtureData from '../../../../../features/video/project/recording-events/fixtures.json';
+import { projectRecordingEventAction } from '../../../../../features/video/project/recording-events/project-facts';
 // @vitest-environment jsdom
 import { REVIEW_CLICK_DEFAULT } from '../../../../../features/video/project/action-feedback/validation';
 import { ReviewActionAudioUnavailable } from '../../../../../features/video/review/action-audio';
@@ -10,7 +16,14 @@ import { ActionFeedbackFields } from './action-feedback-fields';
 const { updateProject, setPlaying, auditionWork, closeAudition, getAuthoredProject } = vi.hoisted(
   () => ({
     getAuthoredProject: vi.fn<() => VideoProject | null>(() => null),
-    auditionWork: vi.fn<(plan: unknown, signal: AbortSignal) => Promise<void>>(),
+    auditionWork:
+      vi.fn<
+        (
+          plan: unknown,
+          signal: AbortSignal,
+          source?: RecordingProjectActionAudioSource
+        ) => Promise<void>
+      >(),
     closeAudition: vi.fn(async () => undefined),
     setPlaying: vi.fn(),
     updateProject: vi.fn<(updater: (project: VideoProject) => VideoProject) => void>(),
@@ -721,5 +734,152 @@ it('resets only the selected authored gesture and keeps source, sound and other 
     act(() => root.unmount());
     host.remove();
     vi.unstubAllGlobals();
+  }
+});
+
+it('initializes authored gesture geometry from the selected stream fact and refuses a stale source', () => {
+  vi.clearAllMocks();
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [],
+    recordingSignals: [],
+  });
+  const events = fixtureData.descriptor;
+  const block = decodeRecordingEventsBlock(new TextEncoder().encode(fixtureData.blocks[0]!.utf8));
+  const record = block?.records.find(
+    (record) => record.kind === 'action' && record.action.kind === 'CLICK'
+  );
+  if (!isRecordingEventsDescriptor(events) || record?.kind !== 'action')
+    throw new Error('Invalid fixture.');
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+  });
+  const group = project.actionFeedback![0]!;
+  const event = projectRecordingEventAction(group, record);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <ActionFeedbackFields
+          project={project}
+          recordedAction={event}
+          recordingId={group.recordingId}
+          sourceInstanceId={group.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: record.action.id }, family: 'mouse' }}
+          disabled={false}
+          visual="gesture"
+          part="visual"
+        />
+      )
+    );
+    const area = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'gallery.videoReview.gesture_area'
+    )!;
+    expect(area).toBeDefined();
+    act(() => area.click());
+    const update = updateProject.mock.lastCall![0];
+    const changed = update(project);
+    expect(changed.actionFeedback![0]!.gestureStyles![0]!.gestureArea).toEqual({
+      x: 0.25,
+      y: 0.75,
+      width: 0.01,
+      height: 0.01,
+    });
+    expect(changed.actionEvents).toEqual([]);
+    expect(record.action.point).toEqual({ x: 0.25, y: 0.75 });
+    const stale = applyVideoProjectMutationPatch(project, {
+      actionFeedback: [{ ...group, events: { ...events, streamSha256: 'c'.repeat(64) } }],
+    });
+    expect(update(stale)).toBe(stale);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+
+it('gives streamed audition its bounded source and disposes it when the inspector changes', async () => {
+  vi.clearAllMocks();
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [],
+    recordingSignals: [],
+  });
+  const events = fixtureData.descriptor;
+  if (!isRecordingEventsDescriptor(events)) throw new Error('Invalid fixture.');
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({
+      ...group,
+      events,
+      settings: [
+        {
+          ref: { kind: 'action', id: 'key-1' },
+          enabled: true,
+          presetId: 'keyboard-recorded-v2',
+          volume: 0.5,
+          offset: 0,
+        },
+      ],
+    })),
+  });
+  const group = project.actionFeedback![0]!;
+  getAuthoredProject.mockImplementation(() => project);
+  const done = Promise.withResolvers<void>();
+  auditionWork.mockImplementationOnce(() => done.promise);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const render = (disabled = false) =>
+    act(() =>
+      root.render(
+        <ActionFeedbackFields
+          project={project}
+          recordingId={group.recordingId}
+          sourceInstanceId={group.sourceInstanceId}
+          target={{ ref: { kind: 'action', id: 'key-1' }, family: 'keyboard', recorded: true }}
+          disabled={disabled}
+        />
+      )
+    );
+  try {
+    render();
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.actionAudioListen"]')!
+        .click()
+    );
+    const call = auditionWork.mock.lastCall!;
+    const source = call[2]!;
+    expect(source).toBeDefined();
+    expect(source.duration).toBe(project.duration);
+    const dispose = vi.spyOn(source, 'dispose');
+    render(true);
+    expect(call[1].aborted).toBe(true);
+    expect(dispose).toHaveBeenCalled();
+    await act(async () => {
+      done.resolve();
+      await done.promise;
+    });
+    expect(updateProject).not.toHaveBeenCalled();
+    expect(project.actionEvents).toEqual([]);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    getAuthoredProject.mockImplementation(() => null);
   }
 });

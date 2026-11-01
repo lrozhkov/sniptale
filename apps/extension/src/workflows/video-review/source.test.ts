@@ -1,3 +1,4 @@
+import eventsFixture from '../../features/video/project/recording-events/fixtures.json';
 import { VideoWorkspaceError } from '../../composition/persistence/review-workspaces/store';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
@@ -299,4 +300,27 @@ it('opens an archived quick project from its original media without changing wor
     'immutable-file'
   );
   expect(loaded.filename).toBe('Previous edit');
+});
+
+it('exposes compact stream bindings for an original recording', async () => {
+  mocks.media.mockResolvedValueOnce({
+    filename: 'original.webm',
+    mimeType: 'video/webm',
+    source: { kind: 'recording', recordingId: 'r' },
+  });
+  mocks.telemetry.mockResolvedValueOnce({
+    recordingId: 'r',
+    captureMode: null,
+    createdAt: 1,
+    updatedAt: 2,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    recordingEvents: eventsFixture.descriptor,
+  });
+  const result = await loadVideoReviewSource('recording:r', new AbortController().signal);
+  expect(result.telemetry?.recordingEvents).toEqual(eventsFixture.descriptor);
+  expect(result.historyProject?.actionFeedback?.[0]?.events).toEqual(eventsFixture.descriptor);
+  expect(result.historyProject?.actionEvents).toEqual([]);
 });

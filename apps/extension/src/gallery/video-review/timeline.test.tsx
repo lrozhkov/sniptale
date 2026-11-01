@@ -792,3 +792,25 @@ it('moves the time label away from the cursor while retaining the visible ruler 
   render(101, 12);
   expect(offset()).toBe('translateX(32px)');
 });
+
+it('reports the actual visible source range after zoom and horizontal scroll', () => {
+  const onHistoryRange = vi.fn();
+  const { host } = renderTimeline({ duration: 100, time: 0, onHistoryRange });
+  expect(onHistoryRange).toHaveBeenLastCalledWith({ start: 0, end: 100 });
+  changeZoom(host, '25');
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  act(() => {
+    viewport.scrollLeft = 400;
+    viewport.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+  expect(onHistoryRange).toHaveBeenLastCalledWith({ start: 25, end: 75 });
+});
+it('keeps an archived cursor row available without inventing motion markers', () => {
+  const { host } = renderTimeline({ markers: [], cursorArchiveAvailable: true });
+  expect(
+    host.querySelector('[data-ui="gallery.videoReview.archivedCursorHistory"]')?.textContent
+  ).toBe('gallery.videoReview.recordingCursorArchived');
+  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).not.toBeNull();
+});

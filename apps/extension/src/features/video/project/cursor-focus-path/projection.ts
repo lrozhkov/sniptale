@@ -1,4 +1,5 @@
 import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
+import { resolvePreparedCursorTrajectoryPosition } from '../cursor-trajectory/project-window';
 import { getSourceTimedClipProjectOffset } from '../timeline/rate';
 import { deriveRecordedCursorFocusPath } from './recorded';
 import {
@@ -143,17 +144,44 @@ export function resolveProjectSourceCursorObservation(
   );
   if (!clip || clip.type !== 'VIDEO') return undefined;
   const group = groups.find((item) => item.sourceInstanceId === clip.sourceInstanceId)!;
-  let segments = sourceObservationPaths.get(project);
-  if (!segments) {
-    segments = deriveSourceObservationFocusSegments(project, undefined, true);
-    sourceObservationPaths.set(project, segments);
-  }
   const sourceTime = clip.playbackWindow
     ? mapProjectTimeToSourcePoint([clip], time, clip.id)?.sourceTime
     : time === clip.startTime + clip.duration
       ? clip.sourceStart + clip.sourceDuration
       : clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1);
   if (sourceTime === undefined) return null;
+  if (group.trajectory) {
+    const point = resolvePreparedCursorTrajectoryPosition(
+      project,
+      group.recordingId,
+      group.trajectory.trajectoryId,
+      sourceTime
+    );
+    return point
+      ? {
+          id: `${group.trajectory.trajectoryId}:${point.observationSeq}`,
+          time,
+          x: point.x * project.width,
+          y: point.y * project.height,
+          visible: true,
+          observation: 'observed',
+          captureSegment: point.segmentId,
+          recordingPoint: { x: point.x, y: point.y },
+          interpolation: 'LINEAR',
+          sourceAnchor: {
+            kind: 'recording-source',
+            recordingId: group.recordingId,
+            sourceClipId: clip.id,
+            sourceTime,
+          },
+        }
+      : null;
+  }
+  let segments = sourceObservationPaths.get(project);
+  if (!segments) {
+    segments = deriveSourceObservationFocusSegments(project, undefined, true);
+    sourceObservationPaths.set(project, segments);
+  }
   for (const [index, segment] of segments.entries()) {
     if (
       segment.binding.kind !== 'recording-source' ||

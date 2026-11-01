@@ -1,3 +1,4 @@
+import type { ReviewRecordingRenderSource } from './recording-render';
 import { ownReviewOutputCancellation } from './render-output-lifetime';
 import { paintReviewExportScene, type ReviewRenderScene } from './render-export-scene';
 import type { ReviewFrameExportInput } from './render-export-input';
@@ -216,6 +217,7 @@ export async function writeReviewFrames(
           zoomRegions: preparation.effective.zoomRegions,
           background: preparation.effective.background,
           keyCues: args.keyCues,
+          ...(args.recordingHistory ? { recordingHistory: args.recordingHistory } : {}),
           clickCues: args.clickCues,
           comments: args.comments ?? [],
           canvas: visual.canvas,
@@ -495,6 +497,7 @@ export async function drainSegmentAudio(args: {
 /** One window's frames: draws the scene and encodes at the fps lattice; returns the count. */
 export async function renderRenderWindowFrames(
   args: ReviewRenderScene & {
+    recordingHistory?: ReviewRecordingRenderSource;
     keyCues?: readonly ReviewKeyCue[] | undefined;
     window: ReviewFrameWindow;
     adaptive?: boolean;
@@ -569,15 +572,33 @@ export async function renderRenderWindowFrames(
       try {
         signal.throwIfAborted();
         const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
-        const draw = (
+        const currentHistory = await args.recordingHistory?.read(
+          window.sourceTimes[frame] ?? window.segment.sourceStart,
+          timestamp + args.fragmentOffset,
+          { width: canvas.width, height: canvas.height, frameDuration: 1 / fps },
+          signal
+        );
+        const draw = async (
           context: CanvasRenderingContext2D,
           canvas: HTMLCanvasElement,
           sample: Pick<ReviewTransitionSample, 'draw'>,
           resultTime: number,
           sourceTime: number
-        ) =>
+        ) => {
+          const history = await args.recordingHistory?.read(
+            sourceTime,
+            resultTime,
+            { width: canvas.width, height: canvas.height, frameDuration: 1 / fps },
+            signal
+          );
           paintReviewExportScene({
-            scene: args,
+            scene: history
+              ? {
+                  ...args,
+                  zoomRegions: history.effective.zoomRegions,
+                  clickCues: history.clickCues,
+                }
+              : args,
             context,
             canvas,
             sample,
@@ -587,6 +608,7 @@ export async function renderRenderWindowFrames(
             scratch,
             blurEnabled,
           });
+        };
         if (blend?.plan.type === 'dissolve') {
           const endpoints = await args.transitionFrames?.load(blend.plan);
           signal.throwIfAborted();
@@ -603,13 +625,13 @@ export async function renderRenderWindowFrames(
           dissolve.height = canvas.height;
           const dissolveContext = dissolve.getContext('2d');
           if (!dissolveContext) throw new Error('Canvas context is unavailable.');
-          paintReviewCutDissolve(
+          await paintReviewCutDissolve(
             context,
             { canvas: dissolve, context: dissolveContext },
             blend.incoming,
             (target, surface, side) => {
               const endpoint = sides[side];
-              draw(
+              return draw(
                 target,
                 surface,
                 { draw: endpoint.sample.draw.bind(endpoint.sample) },
@@ -626,7 +648,7 @@ export async function renderRenderWindowFrames(
             if (!endpoints) throw new QuickEditExportUnavailable(['transition-frames']);
             paintReviewCutTransition(rasterContext, raster, blend, endpoints, sample);
           } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
-          draw(
+          await draw(
             context,
             canvas,
             {
@@ -642,7 +664,12 @@ export async function renderRenderWindowFrames(
           if (cameraFrame.done) throw new QuickEditExportUnavailable(['asset-missing']);
           cameraFrame.value?.draw(context, canvas);
         }
-        drawReviewKeys(context, args.keyCues ?? [], timestamp + args.fragmentOffset, canvas);
+        drawReviewKeys(
+          context,
+          currentHistory?.keyCues ?? args.keyCues ?? [],
+          timestamp + args.fragmentOffset,
+          canvas
+        );
         args.watermark?.draw(context);
         args.captions?.draw(context, timestamp + args.fragmentOffset);
         paintReviewCutBlackout(context, canvas, blend);

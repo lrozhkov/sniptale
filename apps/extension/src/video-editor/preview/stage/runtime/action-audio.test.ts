@@ -2,7 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { webcrypto } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createProjectActionAudioRuntime } from './action-audio';
-import { buildReviewActionAudioPlan } from '../../../../features/video/review/action-audio';
+import {
+  buildReviewActionAudioPlan,
+  iterateReviewActionAudioCues,
+} from '../../../../features/video/review/action-audio';
 import { buildReviewTimeMap } from '../../../../features/video/review/timeline';
 import type { ReviewTelemetryMarker } from '../../../../features/video/review/telemetry';
 
@@ -417,4 +420,186 @@ it('keeps the first audition attack whole when resume advances the native audio 
     12
   );
   expect(graphs[0]!.state).toBe('closed');
+});
+
+it('prepares a recording job before playback and retains native tails across changing cue windows', async () => {
+  const { nodes, graphs } = installAudioGraph();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async (path: string) =>
+        new Response(await readFile(new URL(`../../../../../public/${path}`, import.meta.url)))
+    )
+  );
+  const recordingSource = {
+    duration: 8,
+    admit: vi.fn(async () => ({
+      firstCueTime: 1,
+      maxVoices: 2,
+      busGain: 0.5,
+      sampleIds: ['mouse-click-v1' as const, 'mouse-click-03-v1' as const],
+    })),
+    readWindow: vi.fn(async () => auditionPlan()),
+    dispose: vi.fn(),
+  };
+  const plan = { duration: 8, descriptors: [] };
+  const runtime = createProjectActionAudioRuntime();
+  await runtime.prepare({ plan, recordingSource }, new AbortController().signal);
+  expect(recordingSource.admit).toHaveBeenCalledOnce();
+  expect(nodes).toHaveLength(0);
+  await runtime.sync({ plan, recordingSource, currentTime: 0.9, isPlaying: true });
+  expect(nodes).toHaveLength(1);
+  graphs[0]!.currentTime = 0.11;
+  await runtime.sync({
+    plan: structuredClone(plan),
+    recordingSource,
+    currentTime: 1.01,
+    isPlaying: true,
+  });
+  expect(graphs).toHaveLength(1);
+  expect(graphs[0]!.close).not.toHaveBeenCalled();
+  expect(nodes[0]!.stop).toHaveBeenCalledOnce();
+  expect(nodes).toHaveLength(2);
+  expect(recordingSource.admit).toHaveBeenCalledOnce();
+  expect(graphs[0]!.gains[1]!.gain.setValueAtTime.mock.calls[0]?.[0]).toBe(0.25);
+  await runtime.close();
+});
+
+it('shares one pending recording-window read and skips obsolete attacks after a seek', async () => {
+  const { nodes, graphs } = installAudioGraph();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async (path: string) =>
+        new Response(await readFile(new URL(`../../../../../public/${path}`, import.meta.url)))
+    )
+  );
+  const entered = Promise.withResolvers<void>();
+  const resume = Promise.withResolvers<ReturnType<typeof auditionPlan>>();
+  const readWindow = vi
+    .fn(async () => auditionPlan())
+    .mockImplementationOnce(async () => {
+      entered.resolve();
+      return resume.promise;
+    });
+  const recordingSource = {
+    duration: 8,
+    admit: vi.fn(async () => ({
+      firstCueTime: 1,
+      maxVoices: 1,
+      busGain: 1,
+      sampleIds: ['mouse-click-v1' as const, 'mouse-click-03-v1' as const],
+    })),
+    readWindow,
+    dispose: vi.fn(),
+  };
+  const plan = { duration: 8, descriptors: [] };
+  const runtime = createProjectActionAudioRuntime();
+  await runtime.prepare({ plan, recordingSource }, new AbortController().signal);
+  const first = runtime.sync({ plan, recordingSource, currentTime: 0.9, isPlaying: true });
+  await entered.promise;
+  graphs[0]!.currentTime = 0.05;
+  const second = runtime.sync({ plan, recordingSource, currentTime: 0.95, isPlaying: true });
+  const latest = runtime.sync({ plan, recordingSource, currentTime: 3.9, isPlaying: true });
+  expect(readWindow).toHaveBeenCalledOnce();
+  resume.resolve(auditionPlan());
+  await Promise.all([first, second, latest]);
+  expect(readWindow).toHaveBeenCalledTimes(2);
+  expect(readWindow).toHaveBeenLastCalledWith({ start: 3, end: 5 }, expect.any(AbortSignal));
+  expect(nodes).toHaveLength(0);
+  await runtime.close();
+});
+
+it('does not start playback from a cancelled recording admission and permits a fresh preparation', async () => {
+  const { nodes } = installAudioGraph();
+  const fetchSample = vi.fn(
+    async (path: string) =>
+      new Response(await readFile(new URL(`../../../../../public/${path}`, import.meta.url)))
+  );
+  vi.stubGlobal('fetch', fetchSample);
+  const entered = Promise.withResolvers<void>();
+  const resume = Promise.withResolvers<void>();
+  const result = {
+    firstCueTime: 1,
+    maxVoices: 1,
+    busGain: 1,
+    sampleIds: ['mouse-click-v1' as const],
+  };
+  const recordingSource = {
+    duration: 8,
+    admit: vi
+      .fn(async () => result)
+      .mockImplementationOnce(async () => {
+        entered.resolve();
+        await resume.promise;
+        return result;
+      }),
+    readWindow: vi.fn(async () => auditionPlan()),
+    dispose: vi.fn(),
+  };
+  const plan = { duration: 8, descriptors: [] };
+  const runtime = createProjectActionAudioRuntime();
+  const abort = new AbortController();
+  const pending = runtime.prepare({ plan, recordingSource }, abort.signal);
+  const rejected = expect(pending).rejects.toThrow();
+  await entered.promise;
+  abort.abort();
+  resume.resolve();
+  await rejected;
+  expect(nodes).toHaveLength(0);
+  expect(fetchSample).not.toHaveBeenCalled();
+  await runtime.prepare({ plan, recordingSource }, new AbortController().signal);
+  expect(fetchSample).toHaveBeenCalledOnce();
+  await runtime.close();
+});
+
+it('auditions an empty inline plan through the recording reader at its first real cue', async () => {
+  const controller = new AbortController();
+  const { nodes, graphs } = installAudioGraph(() => controller.abort());
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async (path: string) =>
+        new Response(await readFile(new URL(`../../../../../public/${path}`, import.meta.url)))
+    )
+  );
+  const plan = auditionPlan();
+  const sampleIds = [
+    ...new Set(
+      [...iterateReviewActionAudioCues(plan, { start: 0, end: plan.duration })].flatMap((batch) =>
+        batch.map((cue) => cue.sampleId)
+      )
+    ),
+  ];
+  const source = {
+    duration: plan.duration,
+    admit: vi.fn(async () => ({ firstCueTime: 1, maxVoices: 1, busGain: 1, sampleIds })),
+    readWindow: vi.fn(async () => plan),
+    dispose: vi.fn(),
+  };
+  await createProjectActionAudioRuntime()
+    .audition({ duration: plan.duration, descriptors: [] }, controller.signal, source)
+    .catch(() => undefined);
+  expect(source.readWindow).toHaveBeenCalled();
+  expect(nodes.length).toBeGreaterThan(0);
+  expect(nodes[0]!.start.mock.calls[0]![1]).toBe(0);
+  expect(graphs[0]!.state).toBe('closed');
+});
+
+it('creates no audio graph when the recording has no observed audio cue', async () => {
+  const { graphs, nodes } = installAudioGraph();
+  const source = {
+    duration: 5000,
+    admit: vi.fn(async () => ({ firstCueTime: null, maxVoices: 0, busGain: 1, sampleIds: [] })),
+    readWindow: vi.fn(async () => ({ duration: 5000, descriptors: [] })),
+    dispose: vi.fn(),
+  };
+  await createProjectActionAudioRuntime().audition(
+    { duration: 5000, descriptors: [] },
+    new AbortController().signal,
+    source
+  );
+  expect(graphs).toHaveLength(0);
+  expect(nodes).toHaveLength(0);
+  expect(source.readWindow).not.toHaveBeenCalled();
 });

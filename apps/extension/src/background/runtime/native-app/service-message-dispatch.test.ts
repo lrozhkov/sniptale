@@ -149,6 +149,8 @@ function createContext(
 
 function createIngestion(): NativeAppIngestionController {
   return {
+    handleHistory: vi.fn(async () => []),
+    resumePendingHistoryTransfers: vi.fn(async () => []),
     handleRecordingChunk: vi.fn(async () => []),
     handleRecordingStarted: vi.fn(async () => []),
     handleRecordingStopped: vi.fn(async () => []),

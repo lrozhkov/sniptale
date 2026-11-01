@@ -103,6 +103,7 @@ export type {
   RuntimeOffscreenBeginRecordingMessage,
   RuntimeOffscreenStartRecordingMessage,
   RuntimeOffscreenStopRecordingMessage,
+  RuntimeOffscreenRecordingObservationsMessage,
   RuntimeOffscreenUpdateSettingsMessage,
 } from './offscreen-command.types.ts';
 

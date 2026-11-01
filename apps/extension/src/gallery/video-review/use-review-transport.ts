@@ -1,5 +1,9 @@
 import type { ReviewEdit } from '../../features/video/review/types';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createReviewRecordingActionAudioSource,
+  type RecordingProjectActionAudioSource,
+} from '../../workflows/video-review/recording-action-audio';
 import {
   buildReviewActionAudioPlan,
   type ReviewActionAudioUnavailable,
@@ -79,6 +83,41 @@ export function useReviewTransport(args: {
       timeline.timeMap,
     ]
   );
+  const recordingAudioRequest = useMemo(
+    () =>
+      args.resource.historyProject
+        ? {
+            project: args.resource.historyProject,
+            source,
+            edits: args.edits,
+            settings: args.actionAudio ?? [],
+            applied: args.actionsApplied === true,
+          }
+        : null,
+    [args.resource.historyProject, source, args.edits, args.actionAudio, args.actionsApplied]
+  );
+  const [recordingAudio, setRecordingAudio] = useState<{
+    request: typeof recordingAudioRequest;
+    source: RecordingProjectActionAudioSource | null;
+  } | null>(null);
+  const onFailure = useRef(args.onTransportFailure);
+  onFailure.current = args.onTransportFailure;
+  useEffect(() => {
+    if (!recordingAudioRequest) {
+      setRecordingAudio(null);
+      return;
+    }
+    let source: RecordingProjectActionAudioSource | null = null;
+    try {
+      source = createReviewRecordingActionAudioSource(recordingAudioRequest);
+    } catch {
+      onFailure.current();
+    }
+    setRecordingAudio({ request: recordingAudioRequest, source });
+    return () => source?.dispose();
+  }, [recordingAudioRequest]);
+  const recordingActionSource =
+    recordingAudio?.request === recordingAudioRequest ? recordingAudio?.source : null;
   const actionSoundPreview = useReviewEditorAudioRuntime({
     video,
     playing: playing && !args.silent,
@@ -89,6 +128,7 @@ export function useReviewTransport(args: {
     voiceover: args.voiceover,
     music: args.music,
     actionPlan,
+    ...(recordingActionSource ? { recordingActionSource } : {}),
     sessionKey: session.getSnapshot().snapshot.workspace.aggregateId,
     onFailure: args.onTransportFailure,
     onActionAudioRecovered: args.onActionAudioRecovered,

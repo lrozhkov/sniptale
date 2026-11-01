@@ -1,4 +1,8 @@
 import type { RecordingPointTransform } from '../../../features/video/project/types';
+import type { RecordingEventsDescriptor } from '../../../features/video/project/recording-events/types';
+import { isRecordingEventsDescriptor } from '../../../features/video/project/recording-events/records';
+import type { CursorTrajectoryDescriptor } from '../../../features/video/project/cursor-trajectory/types';
+import { isCursorTrajectoryDescriptor } from '../../../features/video/project/cursor-trajectory/records';
 import { isRecordingPointTransform } from '../../../features/video/project/validation/recording-telemetry';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -12,6 +16,8 @@ export type RecordingSourceBinding = {
 };
 
 type OffscreenRecordingStopAcknowledgement = {
+  cursorTrajectory?: CursorTrajectoryDescriptor;
+  recordingEvents?: RecordingEventsDescriptor;
   terminalError: string | null;
   recordingPointTransform: RecordingPointTransform | null;
 };
@@ -34,7 +40,15 @@ export async function requestBoundOffscreenRecordingStop(
     throw new Error(response?.error ?? 'Offscreen recording stop acknowledgement missing');
   }
   const transform = 'recordingPointTransform' in response ? response.recordingPointTransform : null;
+  const cursor = 'cursorTrajectory' in response ? response.cursorTrajectory : null;
+  const events = 'recordingEvents' in response ? response.recordingEvents : null;
   return {
+    ...(!discard && response.result !== 'terminal-failure' && isRecordingEventsDescriptor(events)
+      ? { recordingEvents: structuredClone(events) }
+      : {}),
+    ...(!discard && response.result !== 'terminal-failure' && isCursorTrajectoryDescriptor(cursor)
+      ? { cursorTrajectory: structuredClone(cursor) }
+      : {}),
     recordingPointTransform:
       !discard && response.result !== 'terminal-failure' && isRecordingPointTransform(transform)
         ? transform

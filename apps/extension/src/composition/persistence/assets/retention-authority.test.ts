@@ -14,7 +14,7 @@ vi.mock('@sniptale/platform/observability/logger', () => ({
 }));
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: async (operation: (db: unknown) => Promise<unknown>) =>
-    operation(await mocks.db()),
+    operation({ getAllFromIndex: async () => [], ...(await mocks.db()) }),
 }));
 
 it('finishes retention validation without waiting for background-tab timers', async () => {
@@ -66,7 +66,8 @@ it('yields while validating many rows and returns only their retention projectio
     const snapshot = await collectDurableAssetSnapshot();
     expect(snapshot.authorityValid).toBe(true);
     expect(snapshot.expectedOwners).toHaveLength(1000);
-    expect(getAll).toHaveBeenCalledTimes(13);
+    expect(getAll).toHaveBeenCalledTimes(14);
+    expect(getAll).not.toHaveBeenCalledWith('recording_telemetry');
     expect(ticks).toBeGreaterThan(10);
     expect(snapshot).not.toHaveProperty('recordings');
   } finally {
@@ -261,4 +262,93 @@ it('cancels before opening source stores', async () => {
   abort.abort();
   await expect(collectDurableAssetSnapshot(undefined, abort.signal)).rejects.toThrow();
   expect(getAll).not.toHaveBeenCalled();
+});
+
+it('projects snapshot ownership from compact heads without reading event history', async () => {
+  const head = {
+    recordingId: 'recording-one',
+    trajectoryId: 'a'.repeat(32),
+    sourceRecordingId: 'canonical',
+    writerGeneration: 'generation-one',
+    revision: 1,
+    width: 160,
+    height: 90,
+    retired: false,
+    finalized: true,
+    state: 'complete',
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalSamples: 1,
+    totalBytes: 512,
+    streamSha256: 'b'.repeat(64),
+    activeSegment: null,
+    lastObservationSeq: 0,
+    lastSegmentId: 0,
+    lastTimeUs: 2000,
+    snapshotAssetId: 'cursor-file',
+  };
+  const getAll = vi.fn(async (store: string) =>
+    store === 'recording_cursor_trajectories' ? [head] : []
+  );
+  mocks.db.mockResolvedValue({ getAll });
+  const snapshot = await collectDurableAssetSnapshot();
+  expect(snapshot.authorityValid).toBe(true);
+  expect(snapshot.expectedOwners).toEqual([
+    {
+      ownerKind: 'recording',
+      ownerId: head.recordingId,
+      role: 'cursor-trajectory',
+      assetId: head.snapshotAssetId,
+    },
+  ]);
+  expect(getAll).not.toHaveBeenCalledWith('recording_telemetry');
+  head.retired = true;
+  expect((await collectDurableAssetSnapshot()).expectedOwners).toEqual([]);
+  head.retired = false;
+  head.snapshotAssetId = '';
+  expect((await collectDurableAssetSnapshot()).authorityValid).toBe(false);
+});
+
+it('projects event snapshot ownership from the head index without reading mixed history rows', async () => {
+  const head = {
+    recordingId: 'event-recording',
+    eventStreamId: 'b'.repeat(32),
+    sourceRecordingId: 'canonical',
+    writerGeneration: 'source-generation',
+    kind: 'head',
+    entryId: 0,
+    revision: 1,
+    retired: false,
+    finalized: true,
+    state: 'incomplete',
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalBytes: 512,
+    streamSha256: 'd'.repeat(64),
+    activeSegment: null,
+    lastSegmentId: 0,
+    hasGap: true,
+    activeInputs: 0,
+    snapshotAssetId: 'events-file',
+  };
+  const getAll = vi.fn(async () => []);
+  const getAllFromIndex = vi.fn(async () => [head]);
+  mocks.db.mockResolvedValue({ getAll, getAllFromIndex });
+  const snapshot = await collectDurableAssetSnapshot();
+  expect(snapshot.authorityValid).toBe(true);
+  expect(snapshot.expectedOwners).toEqual([
+    {
+      ownerKind: 'recording',
+      ownerId: head.recordingId,
+      role: 'recording-events',
+      assetId: head.snapshotAssetId,
+    },
+  ]);
+  expect(getAllFromIndex).toHaveBeenCalledWith('recording_events', 'kind', 'head');
+  expect(getAll).not.toHaveBeenCalledWith('recording_events');
+  head.retired = true;
+  expect((await collectDurableAssetSnapshot()).expectedOwners).toEqual([]);
+  head.retired = false;
+  head.snapshotAssetId = '';
+  expect((await collectDurableAssetSnapshot()).authorityValid).toBe(false);
 });

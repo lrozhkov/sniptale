@@ -1,4 +1,8 @@
 import type {
+  NativeHistoryInboundMessage,
+  NativeHistoryOutboundMessage,
+} from './attachment-message-types';
+import type {
   AppConnectionClosedMessage,
   AppControllerLeaseMessage,
   AppHelloMessage,
@@ -31,11 +35,13 @@ import type {
   ExtensionScreenshotRejectMessage,
 } from './transfer-message-types';
 
+export type * from './attachment-message-types';
 export type * from './control-message-types';
 export type * from '@sniptale/runtime-contracts/native-app/handshake-message-types';
 export type * from './transfer-message-types';
 
 export type NativeAppInboundMessage =
+  | NativeHistoryInboundMessage
   | AppConnectionClosedMessage
   | AppHelloMessage
   | AppControllerLeaseMessage
@@ -54,6 +60,7 @@ export type NativeAppInboundMessage =
   | AppOperationFailedMessage;
 
 export type NativeAppOutboundMessage =
+  | NativeHistoryOutboundMessage
   | ExtensionHelloMessage
   | ExtensionControllerAcquireMessage
   | ExtensionPingMessage

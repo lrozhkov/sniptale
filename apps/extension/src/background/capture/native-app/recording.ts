@@ -1,3 +1,4 @@
+import { createNativeRecordingHistoryStore } from '../../../composition/persistence/recordings/native-history/store';
 import type {
   AppRecordingChunkMessage,
   AppRecordingStartedMessage,
@@ -93,17 +94,67 @@ async function saveRecordingCommit(session: NativeTransferSessionEntry, blob: Bl
   return true;
 }
 
-async function finishRecordingCommit(session: NativeTransferSessionEntry): Promise<boolean> {
+async function finishRecordingCommit(
+  session: NativeTransferSessionEntry,
+  deps: NativeAppIngestionControllerDeps
+): Promise<boolean> {
   const markedComplete = await tryNativeCommitStep(async () => {
     await completeNativeTransferSession(createRecordingCompleteSession(session));
   });
   if (!markedComplete.ok) {
     return false;
   }
-  if (session.metadata.openEditor) {
+  if (
+    session.metadata.openEditor &&
+    !(
+      (deps.isHistoryEnabled?.('cursor') && session.metadata.cursorTrajectory) ||
+      (deps.isHistoryEnabled?.('events') && session.metadata.recordingEvents)
+    )
+  ) {
     await runNativeBestEffort(() => openVideoEditorPage(null, session.id));
   }
   return true;
+}
+
+/** A completed transfer can lose its wire ACK after the durable commit. */
+export async function recoverNativeVideoReceipt(
+  deps: NativeAppIngestionControllerDeps,
+  message: Pick<
+    AppRecordingStoppedMessage,
+    'controllerLeaseId' | 'protocolVersion' | 'recordingId'
+  > &
+    Partial<Pick<AppRecordingStoppedMessage, 'sha256' | 'totalBytes' | 'width' | 'height'>>
+): Promise<NativeIngestionOutboundMessage[]> {
+  if (!isCurrentLease(deps, message.controllerLeaseId)) return [];
+  try {
+    const parent = await getNativeTransferSession(message.recordingId);
+    if (
+      parent?.kind !== 'recording-complete' ||
+      (message.sha256 !== undefined && message.sha256 !== parent.sha256) ||
+      (message.width !== undefined && message.width !== parent.metadata.width) ||
+      (message.height !== undefined && message.height !== parent.metadata.height)
+    )
+      return [];
+    const receipt = await createNativeRecordingHistoryStore().videoReceipt(message.recordingId);
+    if (
+      !isCurrentLease(deps, message.controllerLeaseId) ||
+      receipt.sha256 !== parent.sha256 ||
+      (parent.totalBytes !== 0 && receipt.totalBytes !== parent.totalBytes) ||
+      (message.totalBytes !== undefined && message.totalBytes !== receipt.totalBytes)
+    )
+      return [];
+    return [
+      {
+        type: 'extension.recording.ack',
+        protocolVersion: 2,
+        controllerLeaseId: message.controllerLeaseId,
+        recordingId: message.recordingId,
+        receipt,
+      },
+    ];
+  } catch {
+    return [];
+  }
 }
 
 export async function handleNativeRecordingStopped(
@@ -114,14 +165,17 @@ export async function handleNativeRecordingStopped(
     return [recordingReject(message, 'stale-controller-lease')];
   }
   try {
+    const existing = await getNativeTransferSession(message.recordingId);
+    if (existing?.kind === 'recording-complete') {
+      return recoverNativeVideoReceipt(deps, message);
+    }
     if (!(await hasEnoughNativeStorageBudget(message.totalBytes))) {
       return [recordingReject(message, 'quota-exceeded')];
     }
-    const existing = await getNativeTransferSession(message.recordingId);
     if (existing && existing.controllerLeaseId !== message.controllerLeaseId) {
+      if (existing.metadata.history !== undefined)
+        return [recordingReject(message, 'stale-controller-lease')];
       await deleteNativeTransferSession(message.recordingId);
-    } else if (existing?.kind === 'recording-complete') {
-      return [recordingReject(message, 'duplicate-or-replay')];
     } else if (existing && existing.kind === 'recording') {
       const nextMissingChunk = getNextMissingChunkIndex(existing);
       return nextMissingChunk === null
@@ -174,7 +228,7 @@ export async function handleNativeRecordingChunk(
 ): Promise<NativeIngestionOutboundMessage[]> {
   const session = await getNativeTransferSession(message.recordingId);
   if (session?.kind === 'recording-complete') {
-    return [recordingReject(message, 'duplicate-or-replay')];
+    return recoverNativeVideoReceipt(deps, message);
   }
   if (!session || session.kind !== 'recording') {
     return [recordingReject(message, 'malformed-message')];
@@ -203,9 +257,10 @@ export async function handleNativeRecordingChunk(
   if (!(await saveRecordingCommit(updated, verified.blob))) {
     return [recordingReject(message, 'storage-failed')];
   }
-  if (!(await finishRecordingCommit(updated))) {
+  if (!(await finishRecordingCommit(updated, deps))) {
     return [recordingReject(message, 'storage-failed')];
   }
+  if (!isCurrentLease(deps, message.controllerLeaseId)) return [];
 
   return [
     {

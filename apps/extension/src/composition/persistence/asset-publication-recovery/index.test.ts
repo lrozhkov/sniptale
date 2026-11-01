@@ -1,7 +1,10 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { createMediaLibraryEntry } from '../projects/index.test-support';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  retireCursorStages: vi.fn(),
+  retireEventStages: vi.fn(),
   completePhysicalDelete: vi.fn(),
   collectWriting: vi.fn(),
   physicalAuthority: vi.fn(),
@@ -11,7 +14,19 @@ const mocks = vi.hoisted(() => ({
   objects: vi.fn(),
   writing: vi.fn(),
   recoverStandalone: vi.fn(),
+  recoverNative: vi.fn(),
   runMutation: vi.fn(),
+}));
+
+vi.mock('../recordings/native-history/recovery', () => ({
+  recoverNativeRecordingHistories: mocks.recoverNative,
+}));
+
+vi.mock('../recordings/recording-events/staging', () => ({
+  retireJournalRecordingEventStages: mocks.retireEventStages,
+}));
+vi.mock('../recordings/cursor-trajectory/staging', () => ({
+  retireJournalCursorTrajectoryStages: mocks.retireCursorStages,
 }));
 
 vi.mock('../assets/operations', async (importOriginal) => ({
@@ -63,7 +78,18 @@ import type {
 afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
+  vi.stubGlobal('navigator', {
+    locks: {
+      request: async (
+        _name: string,
+        _options: unknown,
+        operation: (lock: object) => Promise<unknown>
+      ) => operation({}),
+    },
+  });
   vi.clearAllMocks();
+  mocks.retireCursorStages.mockResolvedValue(undefined);
+  mocks.retireEventStages.mockResolvedValue(undefined);
   mocks.completePhysicalDelete.mockResolvedValue(undefined);
   mocks.collectWriting.mockResolvedValue(0);
   mocks.deleteObject.mockResolvedValue(undefined);
@@ -72,6 +98,7 @@ beforeEach(() => {
   mocks.objects.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.recoverStandalone.mockResolvedValue(0);
+  mocks.recoverNative.mockResolvedValue(0);
 });
 
 it('retries durable physical-delete operations on startup and relays offscreen outcomes', async () => {
@@ -426,6 +453,10 @@ it('keeps a crashed archive session resumable while removing only its uncommitte
     expect.objectContaining({ assetIds: expect.arrayContaining(['uncommitted-object']) }),
     expect.any(Object)
   );
+  expect(mocks.retireCursorStages).toHaveBeenCalledExactlyOnceWith('archive-journal');
+  expect(mocks.retireCursorStages.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.deleteJournal.mock.invocationCallOrder[0]!
+  );
   expect(mocks.deleteJournal).toHaveBeenCalledWith('archive-journal');
   expect(harness.get('asset_operations', session.operationId)).toMatchObject({
     currentRoot: null,
@@ -511,6 +542,10 @@ function createDbHarness(
       stores.get(storeName)?.delete(key(entryKey)),
     get: async (storeName: string, entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
     getAll: async (storeName: string) => [...(stores.get(storeName)?.values() ?? [])],
+    getAllFromIndex: async (storeName: string, indexName: string, value: unknown) =>
+      [...(stores.get(storeName)?.values() ?? [])].filter(
+        (row) => isRecord(row) && row[indexName] === value
+      ),
     transaction: vi.fn(() => ({ done: Promise.resolve(), objectStore })),
   };
   return {
@@ -706,7 +741,9 @@ it('preserves a legacy compensation receipt with an invalid previous byte owner'
 
 it('replays pending publications without discovering or collecting orphan objects', async () => {
   const { recoverPendingAssetPublications } = await import('./index');
-  mocks.runMutation.mockImplementation(async (effect) => effect({ getAll: async () => [] }));
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({ getAll: async () => [], getAllFromIndex: async () => [] })
+  );
   await recoverPendingAssetPublications();
   expect(mocks.recoverStandalone).toHaveBeenCalled();
   expect(mocks.objects).not.toHaveBeenCalled();
@@ -818,13 +855,16 @@ it('selects the registered replica adapter and continues after a deferred replic
   await expect(recoverPendingAssetPublications()).resolves.toBe(1);
   expect(recordingAssetPublicationAdapter.publish).toHaveBeenCalledWith(
     recording,
+    expect.anything(),
     expect.anything()
   );
   expect(mocks.deleteJournal.mock.calls).toEqual([['recording']]);
 });
 
 it('uses one existing native retention projection for a writing-cleanup batch', async () => {
-  mocks.runMutation.mockImplementation(async (effect) => effect({ getAll: async () => [] }));
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({ getAll: async () => [], getAllFromIndex: async () => [] })
+  );
   mocks.physicalAuthority.mockResolvedValue((id: string) =>
     id === 'retained' ? 'adopted' : 'unowned'
   );
@@ -838,4 +878,58 @@ it('uses one existing native retention projection for a writing-cleanup batch', 
   );
   await recoverPendingAssetPublications();
   expect(mocks.physicalAuthority).toHaveBeenCalledOnce();
+});
+
+it.each(['cursor', 'events'] as const)(
+  'preserves an interrupted archive journal if private %s cleanup cannot commit',
+  async (format) => {
+    const session: ArchiveRestoreSession = {
+      archiveFingerprint: 'a'.repeat(64),
+      childIdMap: {},
+      committedRoots: [],
+      conflictedRoots: [],
+      createdAt: 1,
+      currentRoot: 'media:library-item:one',
+      kind: 'archive-restore-session',
+      operationId: 'archive-restore',
+      rootIdMap: {},
+      skippedRoots: [],
+      status: 'pending',
+      strategy: 'duplicate',
+      updatedAt: 2,
+    };
+    const harness = createDbHarness([session]);
+    mocks.journals.mockResolvedValue([
+      {
+        assetRefs: [createRef('uncommitted-object')],
+        createdAt: 1,
+        domain: 'archive-restore-root',
+        journalId: 'archive-journal',
+        operationId: session.operationId,
+        payload: { rootKey: session.currentRoot },
+      },
+    ]);
+    mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+    const cleanup = format === 'cursor' ? mocks.retireCursorStages : mocks.retireEventStages;
+    cleanup.mockRejectedValueOnce(new Error('Private history cleanup refused'));
+    await expect(recoverAssetPublications()).rejects.toThrow('Private history cleanup refused');
+    expect(mocks.deleteJournal).not.toHaveBeenCalled();
+    expect(mocks.completePhysicalDelete).not.toHaveBeenCalled();
+    expect(harness.get('asset_operations', session.operationId)).toMatchObject({
+      currentRoot: session.currentRoot,
+      status: 'pending',
+    });
+  }
+);
+
+it('recovers accepted Native parents after standalone journals on the interactive recovery path', async () => {
+  const harness = createDbHarness([]);
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  mocks.recoverStandalone.mockResolvedValue(2);
+  mocks.recoverNative.mockResolvedValue(1);
+  await expect(recoverPendingAssetPublications()).resolves.toBe(3);
+  expect(mocks.recoverNative).toHaveBeenCalledOnce();
+  expect(mocks.recoverStandalone.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.recoverNative.mock.invocationCallOrder[0]!
+  );
 });

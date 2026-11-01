@@ -7,6 +7,8 @@ import type { RecordingFrameClockAnchor } from '../../../contracts/video/recordi
 
 export function createInitialState(): TelemetryState {
   return {
+    eventSource: null,
+    cursorSource: null,
     observationClock: createObservationClock(),
     recordingId: null,
     frameClock: undefined,
@@ -15,7 +17,16 @@ export function createInitialState(): TelemetryState {
     observationAvailable: true,
     mediaResumeEstimateSeconds: 0,
     gestures: new Map(),
-    keyboard: { held: new Map(), modifiers: null, target: null, times: [], repeats: [] },
+    releasedGestures: new Map(),
+    keyboard: {
+      unknownContextReported: false,
+      held: new Map(),
+      streamed: new Map(),
+      modifiers: null,
+      target: null,
+      times: [],
+      repeats: [],
+    },
     accumulatedDurationMs: 0,
     actionEvents: [],
     cursorIdleSignal: null,
@@ -110,7 +121,16 @@ export function resetTelemetryState(
   state.observationAvailable = true;
   state.mediaResumeEstimateSeconds = frameClock?.mediaTimeSeconds ?? 0;
   state.gestures.clear();
-  state.keyboard = { held: new Map(), modifiers: null, target: null, times: [], repeats: [] };
+  state.releasedGestures.clear();
+  state.keyboard = {
+    unknownContextReported: false,
+    held: new Map(),
+    streamed: new Map(),
+    modifiers: null,
+    target: null,
+    times: [],
+    repeats: [],
+  };
   state.accumulatedDurationMs = 0;
   state.actionEvents = [];
   state.cursorIdleSignal = null;
@@ -162,7 +182,7 @@ export function attachListeners(state: TelemetryState): void {
   state.idleTimerId = window.setInterval(() => tickCursorIdleTelemetry(state), 250);
 }
 
-function buildRecordingViewportGeometry() {
+export function buildRecordingViewportGeometry() {
   return {
     width: window.innerWidth,
     height: window.innerHeight,

@@ -1,3 +1,7 @@
+import * as recordingRender from './recording-render';
+import { createVideoProjectFromRecording } from '../../features/video/project/factories/creation';
+import eventsFixture from '../../features/video/project/recording-events/fixtures.json';
+import { isRecordingEventsDescriptor } from '../../features/video/project/recording-events/records';
 import * as sceneCamera from '../../features/video/review/advanced/scene';
 import { quickEditAudioSourceKey } from '../../features/video/review/advanced/audio-plan';
 import { createReviewExportFixture as fixture } from './export-lifecycle.test-support';
@@ -664,5 +668,74 @@ it.each([false, true])(
       })
     );
     expect(args.snapshot).toEqual(before);
+  }
+);
+
+it.each(['success', 'failure'] as const)(
+  'passes one archived visual reader to export and disposes it after %s',
+  async (outcome) => {
+    if (!isRecordingEventsDescriptor(eventsFixture.descriptor)) throw new Error('Invalid fixture.');
+    const { args, deps, writer } = fixture();
+    const advanced = args.snapshot.workspace.advanced;
+    advanced.ui.mode = 'advanced';
+    advanced.ui.tracks.zoom = true;
+    advanced.zoom = {
+      enabled: true,
+      regions: [createQuickEditZoomRegion({ id: 'visual', at: 0, endMax: 4 })],
+    };
+    args.index = { ...args.index, processedVideoCodec: 'vp9', frameRate: 30 };
+    const original = await deps.loadVideoReviewSource();
+    const historyProject = createVideoProjectFromRecording({
+      ...original.source,
+      recordingId: eventsFixture.recordingId,
+      filename: 'source.webm',
+      recordingEvents: eventsFixture.descriptor,
+    });
+    deps.loadVideoReviewSource.mockResolvedValue({
+      ...original,
+      historyProject,
+      telemetry: {
+        recordingId: eventsFixture.recordingId,
+        createdAt: 1,
+        updatedAt: 1,
+        captureMode: null,
+        viewport: null,
+        cursorTrack: null,
+        actionEvents: [],
+        signals: [],
+        recordingEvents: eventsFixture.descriptor,
+      },
+    });
+    const recordingHistory = {
+      read: vi.fn(async () => {
+        throw new Error('unused');
+      }),
+      dispose: vi.fn(),
+    };
+    const create = vi
+      .spyOn(recordingRender, 'createReviewRecordingRenderSource')
+      .mockReturnValue(recordingHistory);
+    const render = vi.fn(
+      async (_input: Parameters<typeof import('./render-export').writeReviewFrames>[0]) => {
+        if (outcome === 'failure') throw new Error('history-render-failed');
+        return { videoPackets: 90, audioPackets: 0, resultDuration: 4, audioRanges: [] };
+      }
+    );
+    try {
+      const exported = exportReviewedVideo(args, { ...deps, writeReviewFrames: render });
+      if (outcome === 'success') await exported;
+      else await expect(exported).rejects.toThrow('history-render-failed');
+      expect(render.mock.calls[0]![0].recordingHistory).toBe(recordingHistory);
+      expect(recordingHistory.dispose).toHaveBeenCalledOnce();
+      expect(create.mock.calls[0]![0].edits).toEqual([
+        expect.objectContaining({ kind: 'cut', start: 2, end: 4 }),
+      ]);
+      if (outcome === 'failure') {
+        expect(writer.abort).toHaveBeenCalledOnce();
+        expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+      }
+    } finally {
+      create.mockRestore();
+    }
   }
 );

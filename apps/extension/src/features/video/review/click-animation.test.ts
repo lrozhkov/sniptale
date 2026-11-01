@@ -147,6 +147,22 @@ it('semantic double click produces one identity/effect without changing captured
   expect(input).toEqual(copy);
 });
 
+it('retains independent rapid same-target clicks in presentation unless double-click metadata proves grouping', () => {
+  const actionEvents = [0, 1].map((index) => ({
+    id: `press-${index}`,
+    kind: 'CLICK' as const,
+    time: 1 + index * 0.1,
+    duration: 0,
+    point: { x: 30, y: 40 },
+    recordingPoint: { x: 0.3, y: 0.4 },
+    label: '',
+    data: { targetId: 'button' },
+    preset: 'NONE' as const,
+  }));
+  const projected = projectReviewTelemetry({ cursorTrack: null, signals: [], actionEvents }, 8);
+  expect(projected.markers.map((marker) => marker.ref.id)).toEqual(['press-0', 'press-1']);
+});
+
 it('undo/redo and baseline restore click settings; hidden lane suppresses export without losing settings', () => {
   const before = createQuickEditAdvancedContent();
   const after = { ...before, clickAnimations: animations };

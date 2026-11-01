@@ -23,7 +23,12 @@ type RecordingSourceBinding = {
 };
 
 export type RecordingStopOutcome =
-  | { result: 'stopped'; recordingPointTransform?: RecordingPointTransform | null }
+  | {
+      result: 'stopped';
+      recordingPointTransform?: RecordingPointTransform | null;
+      recordingEvents?: import('../../../features/video/project/recording-events/types').RecordingEventsDescriptor;
+      cursorTrajectory?: import('../../../features/video/project/cursor-trajectory/types').CursorTrajectoryDescriptor;
+    }
   | { error: string; result: 'terminal-failure' };
 
 interface StopRequestHandlers {

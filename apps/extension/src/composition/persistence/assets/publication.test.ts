@@ -46,10 +46,11 @@ import {
   UnresolvedAssetPublicationError,
 } from './publication';
 import { recoverStandaloneAssetPublications } from './recovery';
-import type { AssetReadyJournal } from './contracts';
+import type { AssetReadyJournal, AssetPublicationAdapter } from './contracts';
 import {
   isActivePersistenceMutationTransitionPermit,
   runWithPersistenceMutationTransition,
+  runWithPersistenceMutationTransitionRecovery,
   runWithPersistentDataErasureBarrier,
 } from '../infrastructure/mutation-barrier';
 
@@ -236,7 +237,7 @@ it('replays only standalone journals with a registered domain adapter', async ()
   ).resolves.toBe(1);
 
   expect(publish).toHaveBeenCalledOnce();
-  expect(publish).toHaveBeenCalledWith(standalone, expect.any(Object));
+  expect(publish).toHaveBeenCalledWith(standalone, expect.any(Object), expect.any(Object));
   expect(deleteReadyJournalMock).toHaveBeenCalledWith('journal-1');
   expect(deleteReadyJournalMock).not.toHaveBeenCalledWith('workflow');
 });
@@ -353,4 +354,39 @@ it('creates a ready claim inside its caller lifecycle permit without reacquiring
     });
     expect(writeReadyJournalMock).toHaveBeenCalledWith(journal);
   });
+});
+
+it('forwards active recovery permits to preparation when erasure is already queued', async () => {
+  const journal = createJournal();
+  listReadyJournalsMock.mockResolvedValue([journal]);
+  const admitted = Promise.withResolvers<void>();
+  const resume = Promise.withResolvers<void>();
+  const childPublished = vi.fn(async () => undefined);
+  const adapter: AssetPublicationAdapter = {
+    domain: journal.domain,
+    async publish(_journal, lifecyclePermit, transitionPermit) {
+      expect(isActivePersistenceMutationTransitionPermit(transitionPermit)).toBe(true);
+      admitted.resolve();
+      await resume.promise;
+      await runWithPersistenceMutationTransitionRecovery(transitionPermit, async (active) => {
+        expect(active).toBe(transitionPermit);
+        await publishReadyJournalWithRetry(
+          createJournal({ journalId: 'prepared-child' }),
+          childPublished,
+          lifecyclePermit
+        );
+      });
+    },
+  };
+  const recovery = recoverStandaloneAssetPublications([adapter]);
+  await admitted.promise;
+  const erase = vi.fn();
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await Promise.resolve();
+  expect(erase).not.toHaveBeenCalled();
+  resume.resolve();
+  await expect(recovery).resolves.toBe(1);
+  await erasure;
+  expect(childPublished).toHaveBeenCalledOnce();
+  expect(erase).toHaveBeenCalledOnce();
 });

@@ -112,6 +112,10 @@ export function cleanupJob(job: ProjectExportRuntimeState): void {
   delete job.watermarkRenderer;
   job.captionRenderer?.clear();
   delete job.captionRenderer;
+  job.cursorTrajectoryRenderer?.clear();
+  delete job.cursorTrajectoryRenderer;
+  job.recordingEventsRenderer?.clear();
+  delete job.recordingEventsRenderer;
   for (const audioNode of job.clipAudioNodes.values()) {
     audioNode.source.disconnect();
     audioNode.gain.disconnect();

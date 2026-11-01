@@ -60,6 +60,7 @@ export async function encodeCapturedVideoReviewRoot(value: CapturedVideoReviewRo
     if (
       !ref ||
       !object ||
+      !object.blob ||
       object.ref.size !== ref.size ||
       object.ref.mimeType !== ref.mimeType ||
       object.blob.size !== ref.size ||

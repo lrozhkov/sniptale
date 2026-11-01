@@ -9,7 +9,11 @@ import type {
 export interface ExtensionHelloMessage {
   type: 'extension.hello';
   connectionIntent: 'user-requested' | 'automatic';
-  capabilities: ['desktop-settings-v1', 'durable-media-ack-v1'];
+  capabilities: [
+    'desktop-settings-v1',
+    'durable-media-ack-v1',
+    ...Array<'cursor-trajectory-v1' | 'recording-events-v1'>,
+  ];
   protocolVersion: number;
   settingsSchemaVersion: number;
   extensionVersion: string;

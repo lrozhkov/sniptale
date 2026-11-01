@@ -8,6 +8,9 @@ import type { MediaHubBackupRootInventoryItem } from './contracts';
 import { parseBackupRootEnvelope } from './shared-object-envelope';
 import { decodeBackupMetadata } from './metadata-transport';
 import { prepareSharedBackupExport } from './shared-object-export';
+import { readArchiveRootObjectSource } from './object-source.test-support';
+import { openArchiveRootObjectSource } from './object-source';
+import { digestBackupObject } from './shared-objects';
 
 function roots(): MediaHubBackupRootInventoryItem[] {
   const original = new Blob(['original image'], { type: 'image/png' });
@@ -85,6 +88,60 @@ function roots(): MediaHubBackupRootInventoryItem[] {
     },
   }));
 }
+
+it('hashes lazy sources without retaining the materialized history blobs in the prepared plan', async () => {
+  const originals = roots();
+  const lazy: MediaHubBackupRootInventoryItem[] = originals.map((root) => ({
+    ...root,
+    load: async () => {
+      const payload = await root.load();
+      return {
+        ...payload,
+        objects: payload.objects.map((object) => ({
+          ref: object.ref,
+          open: async (signal?: AbortSignal) => openArchiveRootObjectSource(object, signal),
+        })),
+      };
+    },
+  }));
+  const prepared = await prepareSharedBackupExport(lazy);
+  expect(prepared.sharedObjects).toHaveLength(1);
+  const sources = prepared.roots.flatMap((root) => root.objects);
+  expect(sources.length).toBeGreaterThan(0);
+  expect(
+    sources.every((object) => object.blob === undefined && typeof object.open === 'function')
+  ).toBe(true);
+  for (const source of sources)
+    expect((await openArchiveRootObjectSource(source)).size).toBe(source.ref.size);
+});
+
+it('refuses same-size lazy source replacement after shared-content hashing', async () => {
+  const root = roots()[0];
+  if (!root) throw new Error('Missing root.');
+  const payload = await root.load();
+  let changed = false;
+  const lazy: MediaHubBackupRootInventoryItem = {
+    ...root,
+    load: async () => ({
+      ...payload,
+      objects: payload.objects.map((object) => ({
+        ref: object.ref,
+        open: async (signal?: AbortSignal) =>
+          openArchiveRootObjectSource(
+            changed ? { ref: object.ref, blob: new Blob(['x'.repeat(object.ref.size)]) } : object,
+            signal
+          ),
+      })),
+    }),
+  };
+  const prepared = await prepareSharedBackupExport([lazy]);
+  changed = true;
+  const source = prepared.roots[0]?.objects[0];
+  if (!source) throw new Error('Missing lazy source.');
+  await expect(digestBackupObject(await openArchiveRootObjectSource(source))).rejects.toThrow(
+    'content changed'
+  );
+});
 
 async function archive(layout: 'library-folders-v2' | 'library-folders-v3' = 'library-folders-v3') {
   const sink = createArchiveMemorySink();
@@ -178,7 +235,7 @@ it.each([
     if (kind === 'duplicate') table.push({ ...row });
     if (kind === 'unused') table.push({ ...row, id: 'unused', path: 'Screenshots/two.png' });
     if (kind === 'legacy-table') manifest['layout'] = 'library-folders-v2';
-    if (kind === 'future') manifest['layout'] = 'library-folders-v5';
+    if (kind === 'future') manifest['layout'] = 'library-folders-v6';
     return manifest;
   });
   await expect(inspectMediaHubBackupV6(file)).rejects.toThrow();
@@ -212,10 +269,11 @@ it.each(['bytes', 'mime'] as const)(
     item.load = async () => {
       const payload = await load();
       const service = payload.objects[1]!;
+      const original = await readArchiveRootObjectSource(service);
       const blob =
         kind === 'bytes'
-          ? new Blob([new Uint8Array(service.blob.size).fill(1)], { type: service.blob.type })
-          : new Blob([service.blob], { type: 'image/svg+xml' });
+          ? new Blob([new Uint8Array(original.size).fill(1)], { type: original.type })
+          : new Blob([original], { type: 'image/svg+xml' });
       return {
         ...payload,
         objects: [payload.objects[0]!, { blob, ref: { ...service.ref, mimeType: blob.type } }],

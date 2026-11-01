@@ -1,4 +1,8 @@
+import { recoverNativeRecordingHistories } from '../recordings/native-history/recovery';
+import { retireJournalRecordingEventStages } from '../recordings/recording-events/staging';
 import { syncReplicaPublicationAdapter } from '../sync-capture/replica-publication';
+import { recordingCursorTrajectoryPublicationAdapter } from '../recordings/telemetry';
+import { retireJournalCursorTrajectoryStages } from '../recordings/cursor-trajectory/staging';
 import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
 import {
@@ -468,6 +472,10 @@ async function recoverBackupRestoreOperations(
         archiveSessionsWithAmbiguousJournals.add(archiveSession.operationId);
         continue;
       }
+      if (journal.domain === 'archive-restore-root') {
+        await retireJournalCursorTrajectoryStages(journal.journalId);
+        await retireJournalRecordingEventStages(journal.journalId);
+      }
       await cancelAssetPublication(journal, lifecyclePermit);
       continue;
     }
@@ -484,6 +492,10 @@ async function recoverBackupRestoreOperations(
       return false;
     });
     if (!referenced) {
+      if (journal.domain === 'archive-restore-root') {
+        await retireJournalCursorTrajectoryStages(journal.journalId);
+        await retireJournalRecordingEventStages(journal.journalId);
+      }
       await cancelAssetPublication(journal, lifecyclePermit);
     }
   }
@@ -556,6 +568,7 @@ async function recoverPublications(
         recoverStandaloneAssetPublications(
           [
             recordingAssetPublicationAdapter,
+            recordingCursorTrajectoryPublicationAdapter,
             projectAssetPublicationAdapter,
             projectExportPublicationAdapter,
             scenarioAssetPublicationAdapter,
@@ -567,8 +580,9 @@ async function recoverPublications(
           transitionPermit
         )
       );
+      const nativeRecovered = await recoverNativeRecordingHistories(transitionPermit);
       if (collectOrphans) await collectOrphanAssetObjects();
-      return recovered;
+      return recovered + nativeRecovered;
     })
   );
 }
