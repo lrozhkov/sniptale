@@ -1,5 +1,5 @@
 import { ReviewButton } from './controls';
-import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../workflows/video-review/spatial-render-session';
 import { translate } from '../../platform/i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -60,7 +60,7 @@ function MotionBlurCanvas(
   const canvas = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);
-  const renderer = useRef<ReturnType<typeof createReviewSpatialRenderer> | null>(null);
+  const renderer = useRef<ReturnType<typeof createReviewSpatialSession> | null>(null);
   const spatialEnabled = !!props.camera.spatial;
   useLayoutEffect(() => {
     if (!spatialEnabled) {
@@ -68,7 +68,7 @@ function MotionBlurCanvas(
       return;
     }
     try {
-      renderer.current = createReviewSpatialRenderer(() => setFailed(true));
+      renderer.current = createReviewSpatialSession(() => setFailed(true));
       setFailed(false);
     } catch {
       setFailed(true);

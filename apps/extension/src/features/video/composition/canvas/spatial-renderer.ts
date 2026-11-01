@@ -80,7 +80,7 @@ function validateSpatialDraw(gl: WebGLRenderingContext, args: ReviewSpatialDrawR
 }
 
 /** Compile the shader pipeline before the session admits surfaces or draw requests. */
-function prepareSpatialPipeline(gl: WebGLRenderingContext, resources?: RenderResources) {
+function prepareSpatialPipeline(gl: WebGLRenderingContext, resources: RenderResources) {
   const compile = (type: number, source: string) => {
     const shader = gl.createShader(type);
     if (!shader) throw new Error('Perspective shader is unavailable.');
@@ -199,16 +199,14 @@ function setSpatialFrameUniforms(
   );
 }
 
-/** One explicit GPU owner per preview/export session; callers dispose on close or cancellation. */
+/** Owns one GPU context and its admitted resources. The caller owns the supplied ledger. */
 export function createReviewSpatialRenderer(
-  onContextLost?: () => void,
-  resources?: RenderResources
+  onContextLost: (() => void) | undefined,
+  resources: RenderResources
 ) {
   const canvas = document.createElement('canvas');
-  if (resources) {
-    canvas.width = 0;
-    canvas.height = 0;
-  }
+  canvas.width = 0;
+  canvas.height = 0;
   const leases = new Map<string, RenderCanvasLease>();
   let drawingBuffer: { release(): void } | undefined;
   let arrays: { release(): void } | undefined;
@@ -228,17 +226,12 @@ export function createReviewSpatialRenderer(
   if (!gl) throw new Error('Perspective renderer is unavailable.');
   try {
     // CPU vertex/matrix arrays plus the explicit GL vertex-buffer storage.
-    arrays = resources?.bytes('spatial-vertex-and-matrices', 48 + 48 + 36);
+    arrays = resources.bytes('spatial-vertex-and-matrices', 48 + 48 + 36);
     const { program, buffer, position, textures, uniform } = prepareSpatialPipeline(gl, resources);
-    const surfaces = {
-      exposure: resources ? null : document.createElement('canvas'),
-      plane: resources ? null : document.createElement('canvas'),
-      overlay: resources ? null : document.createElement('canvas'),
-    };
     let disposed = false;
     const lost = () => {
       if (!disposed) {
-        if (resources) dispose();
+        dispose();
         onContextLost?.();
       }
     };
@@ -251,15 +244,9 @@ export function createReviewSpatialRenderer(
       gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
       gl.getExtension('WEBGL_lose_context')?.loseContext();
-      canvas.width = resources ? 0 : 1;
-      canvas.height = resources ? 0 : 1;
+      canvas.width = 0;
+      canvas.height = 0;
       releaseManaged();
-      for (const surface of Object.values(surfaces)) {
-        if (surface) {
-          surface.width = 1;
-          surface.height = 1;
-        }
-      }
     };
     return {
       /** Admit all dimensions before a caller allocates either capture or output surfaces. */
@@ -274,35 +261,23 @@ export function createReviewSpatialRenderer(
       surface(kind: 'plane' | 'overlay' | 'exposure', width: number, height: number) {
         if (disposed || gl.isContextLost()) throw new Error('Perspective context was lost.');
         validateSpatialSize(gl, kind === 'exposure' ? 'output' : 'source', { width, height });
-        if (resources) {
-          try {
-            let lease = leases.get(kind);
-            if (lease && (lease.canvas.width !== width || lease.canvas.height !== height)) {
-              lease.release();
-              leases.delete(kind);
-              lease = undefined;
-            }
-            if (!lease) {
-              lease = resources.canvas(`spatial-${kind}`, { width, height });
-              leases.set(kind, lease);
-            }
-            lease.context.clearRect(0, 0, width, height);
-            return { canvas: lease.canvas, context: lease.context };
-          } catch (error) {
-            dispose();
-            throw error;
+        try {
+          let lease = leases.get(kind);
+          if (lease && (lease.canvas.width !== width || lease.canvas.height !== height)) {
+            lease.release();
+            leases.delete(kind);
+            lease = undefined;
           }
+          if (!lease) {
+            lease = resources.canvas(`spatial-${kind}`, { width, height });
+            leases.set(kind, lease);
+          }
+          lease.context.clearRect(0, 0, width, height);
+          return { canvas: lease.canvas, context: lease.context };
+        } catch (error) {
+          dispose();
+          throw error;
         }
-        const surface = surfaces[kind];
-        if (!surface) throw new Error('Perspective surface is unavailable.');
-        if (surface.width !== width || surface.height !== height) {
-          surface.width = width;
-          surface.height = height;
-        }
-        const context = surface.getContext('2d');
-        if (!context) throw new Error('Perspective surface is unavailable.');
-        context.clearRect(0, 0, width, height);
-        return { canvas: surface, context };
       },
       /** Projects a transparent base scene; background and viewport overlays stay outside this pass. */
       draw(context: CanvasRenderingContext2D, args: ReviewSpatialDrawRequest) {
@@ -317,16 +292,14 @@ export function createReviewSpatialRenderer(
           )
             throw new Error('Depth renderer precision is unavailable.');
           if (canvas.width !== output.width || canvas.height !== output.height) {
-            if (resources) {
-              canvas.width = 0;
-              canvas.height = 0;
-              drawingBuffer?.release();
-              drawingBuffer = undefined;
-              drawingBuffer = resources.bytes(
-                'spatial-drawing-buffer',
-                output.width * output.height * 4
-              );
-            }
+            canvas.width = 0;
+            canvas.height = 0;
+            drawingBuffer?.release();
+            drawingBuffer = undefined;
+            drawingBuffer = resources.bytes(
+              'spatial-drawing-buffer',
+              output.width * output.height * 4
+            );
             canvas.width = output.width;
             canvas.height = output.height;
           }
@@ -359,7 +332,7 @@ export function createReviewSpatialRenderer(
           if (gl.getError() !== gl.NO_ERROR) throw new Error('Perspective rendering failed.');
           context.drawImage(canvas, 0, 0);
         } catch (error) {
-          if (resources) dispose();
+          dispose();
           throw error;
         }
       },
@@ -368,8 +341,8 @@ export function createReviewSpatialRenderer(
   } catch (error) {
     releaseManaged();
     gl.getExtension('WEBGL_lose_context')?.loseContext();
-    canvas.width = 1;
-    canvas.height = 1;
+    canvas.width = 0;
+    canvas.height = 0;
     throw error;
   }
 }

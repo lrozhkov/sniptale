@@ -3,10 +3,8 @@ import {
   type VideoProjectWatermarkRenderer,
 } from '../../features/video/composition/canvas/project-watermark';
 import { loadBlobForAsset } from './media-loading/blob';
-import {
-  createReviewSpatialRenderer,
-  type ReviewSpatialRenderer,
-} from '../../features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../workflows/video-review/spatial-render-session';
+import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoProjectExportPhase } from '../../features/video/project/types';
@@ -82,7 +80,7 @@ export function getProjectExportSpatialRenderer(
 ): ReviewSpatialRenderer {
   if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
   if (job.cameraSpatialRenderer) return job.cameraSpatialRenderer;
-  const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+  const renderer: ReviewSpatialRenderer = createReviewSpatialSession(() => {
     if (job.cameraSpatialRenderer !== renderer) return;
     delete job.cameraSpatialRenderer;
     renderer.dispose();

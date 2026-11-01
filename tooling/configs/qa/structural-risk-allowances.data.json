@@ -2426,10 +2426,10 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: This test file checks one materializer and its media lifetime. The added cases prove compatible updates, invalidation, cancellation, retry, and disposal. Mock counters represent the resources of that same materializer. The line increase adds proof without adding a product authority. Independent architecture review must assess this exact classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive owner. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-23",
-      "astHash": "ec4ec0c3b00326e5966318ef1ca8fc1e2774683023232720ce2368b86e438495",
+      "reason": "tool-noise: This file tests one materializer and its resource lifetime. One new assertion checks the required resource manager. Owners, effects, state, signature, and cohesion stay the same. The assertion adds no product authority or recovery policy. Independent architecture review must assess this exact classification before closeout.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive test owner. Independent architecture review must check this classification.",
+      "reviewDate": "2026-11-01",
+      "astHash": "db8574786919b7d6575b8cd2fe735e339818b79b69d21538d835b4774bffbee8",
       "signatureHash": "4c8eeba057dbcff011b043bf63e24861df6871d3c7521ee9d316e8a9aa8aa335"
     },
     {

@@ -1,6 +1,6 @@
 import { ReviewButton } from './controls';
 import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
-import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../workflows/video-review/spatial-render-session';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ReviewFocusFrame, useFocusFrameHover } from './focus-area-frame';
 import { useReviewCameraGesture } from './camera-gesture';
@@ -355,7 +355,7 @@ function useZoomCanvasPaint(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   props: ZoomCanvasProps
 ) {
-  const renderer = useRef<ReturnType<typeof createReviewSpatialRenderer> | null>(null);
+  const renderer = useRef<ReturnType<typeof createReviewSpatialSession> | null>(null);
   const cache = useRef<ZoomPaintCache>({ painted: null, lensBase: null });
   const [spatialFailure, setFailure] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -372,7 +372,7 @@ function useZoomCanvasPaint(
       return;
     }
     try {
-      renderer.current = createReviewSpatialRenderer(() => setFailure(true));
+      renderer.current = createReviewSpatialSession(() => setFailure(true));
       setFailure(false);
     } catch {
       setFailure(true);

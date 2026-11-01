@@ -3,7 +3,7 @@ import { createPreviewRenderResources } from '../../../../apps/extension/src/wor
 import { resolvePreviewRenderAllocation } from '../../../../apps/extension/src/workflows/video-review/preview-render-allocation';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import { drawReviewSceneOverlays } from '../../../../apps/extension/src/workflows/video-review/render-scene-overlays';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../../../apps/extension/src/workflows/video-review/spatial-render-session';
 import {
   loadReviewWindowHeader,
   reviewWindowHeaderUrl,
@@ -94,7 +94,7 @@ async function reference(scene: Scene, frame: Frame, backing: { width: number; h
       )
     : null;
   const spatial = scene.zoomRegions.some((region) => region.perspective?.enabled)
-    ? createReviewSpatialRenderer()
+    ? createReviewSpatialSession()
     : undefined;
   const paint = (
     target: CanvasRenderingContext2D,

@@ -15,10 +15,8 @@ import {
 import { createPreviewRenderResources } from '../../../workflows/video-review/preview-render-resources';
 import { createVideoProjectWatermarkRenderer } from '../../../features/video/composition/canvas/project-watermark';
 import { loadVideoEditorAssetBlob } from '../../runtime/session/asset-urls';
-import {
-  createReviewSpatialRenderer,
-  type ReviewSpatialRenderer,
-} from '../../../features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../../workflows/video-review/spatial-render-session';
+import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import {
   projectWindowHeaderImages,
   windowHeaderImageKey,
@@ -581,7 +579,7 @@ async function renderMaterializedFrame(
       spatialRenderer: () => {
         assertActive();
         if (state.spatialRenderer) return state.spatialRenderer;
-        const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+        const renderer: ReviewSpatialRenderer = createReviewSpatialSession(() => {
           if (state.spatialRenderer !== renderer) return;
           state.spatialRenderer = null;
           renderer.dispose();

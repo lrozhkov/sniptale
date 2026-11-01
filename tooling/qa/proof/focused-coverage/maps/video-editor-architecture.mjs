@@ -39,7 +39,35 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
   ],
 }));
 
+const spatialResourceMappings = [
+  'apps/extension/src/features/video/composition/canvas/spatial-renderer.ts',
+  'apps/extension/src/workflows/video-review/preview-render-allocation.ts',
+  'apps/extension/src/workflows/video-review/spatial-render-session.ts',
+  'apps/extension/src/workflows/video-review/spatial-render-allocation.ts',
+].map((productionFile) => ({
+  owner: 'review-spatial-resource-admission',
+  productionFile,
+  reason:
+    'Spatial admission serves managed GPU storage and its preview, framing, and export consumers.',
+  testFiles: [
+    'apps/extension/src/features/video/composition/canvas/spatial-renderer.test.ts',
+    'apps/extension/src/workflows/video-review/spatial-render-session.test.ts',
+    'apps/extension/src/workflows/video-review/preview-render-allocation.test.ts',
+    'apps/extension/src/workflows/video-review/preview-render-resources.test.ts',
+    'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+    'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+    'apps/extension/src/offscreen/project-export/runtime.test.ts',
+    'apps/extension/src/gallery/video-review/motion-blur-recovery.test.tsx',
+    'apps/extension/src/workflows/video-review/render-export.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview-performance.test.ts',
+    'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview.cache-admission.test.ts',
+  ],
+}));
+
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
+  ...spatialResourceMappings,
   {
     owner: 'video-editor-project-state-admission',
     productionFile: 'apps/extension/src/video-editor/state/project-actions.ts',

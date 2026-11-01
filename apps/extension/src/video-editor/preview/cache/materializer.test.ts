@@ -326,6 +326,7 @@ it('owns lazy reusable GPU and staging resources and ignores stale context-loss 
   expect(renderers[1]!.dispose).toHaveBeenCalledOnce();
   expect(staging.width).toBe(0);
   expect(staging.height).toBe(0);
+  expect(spatial.create.mock.calls[0]?.[1]).toBeDefined();
 });
 
 it('refuses delayed resource factories after abort or disposal without creating GPU or effects', async () => {

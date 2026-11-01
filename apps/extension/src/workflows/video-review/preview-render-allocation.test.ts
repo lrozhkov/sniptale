@@ -1,3 +1,4 @@
+import { calculateSpatialRenderAllocations } from './spatial-render-allocation';
 // @vitest-environment jsdom
 import { createGradientPaint } from '@sniptale/foundation/paint';
 import { createCanvasComment } from '../../features/video/review/comments';
@@ -570,5 +571,20 @@ it.each([2, 3, 10])(
       vi.unstubAllGlobals();
     }
     expect(resources.counters.managedBytes).toBe(0);
+  }
+);
+
+it.each([true, false])(
+  'shares exact odd spatial storage with the preview graph for half-float=%s',
+  (halfFloat) => {
+    const spatial = { plane: { width: 5, height: 3 }, output: { width: 7, height: 5 }, halfFloat };
+    const declarations = calculateSpatialRenderAllocations(spatial);
+    expect(declarations).toHaveLength(14);
+    const bytes = declarations.reduce((total, entry) => total + entry.bytes, 0);
+    expect(bytes).toBe(halfFloat ? 840 : 788);
+    expect(declarations.reduce((total, entry) => total + entry.canvases, 0)).toBe(3);
+    const graph = input();
+    graph.scene.spatial = spatial;
+    expect(phase(calculatePreviewRenderAllocation(graph), 'scene').bytes).toBe(1200 + bytes);
   }
 );
