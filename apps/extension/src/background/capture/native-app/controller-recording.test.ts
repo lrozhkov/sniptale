@@ -20,7 +20,24 @@ const mocks = vi.hoisted(() => ({
   recordingSaveMock: vi.fn(),
   sessions: new Map<string, NativeTransferSessionEntry>(),
   telemetrySaveMock: vi.fn(),
+  getRecording: vi.fn(),
+  owner: vi.fn(),
 }));
+
+vi.mock('../../../composition/persistence/recordings/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/recordings/index')>()),
+  getRecording: mocks.getRecording,
+}));
+
+vi.mock(
+  '../../../composition/persistence/infrastructure/indexed-db/core',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/infrastructure/indexed-db/core')
+    >()),
+    initDB: async () => ({ get: mocks.owner }),
+  })
+);
 
 vi.mock(
   '../../../composition/persistence/recordings/native-history/store',
@@ -199,6 +216,8 @@ beforeEach(() => {
     });
   });
   mocks.telemetrySaveMock.mockResolvedValue(undefined);
+  mocks.getRecording.mockResolvedValue(undefined);
+  mocks.owner.mockReset();
   vi.stubGlobal('atob', (value: string) => Buffer.from(value, 'base64').toString('binary'));
   vi.stubGlobal('navigator', {
     storage: { estimate: vi.fn().mockResolvedValue({ quota: 10_000, usage: 0 }) },
@@ -295,6 +314,164 @@ it('reuses existing recording sessions when chunks are still missing', async () 
   ).resolves.toEqual([
     expect.objectContaining({ chunkIndex: 0, type: 'extension.recording.chunkRequest' }),
   ]);
+});
+
+it.each(['stopped', 'resume'] as const)(
+  'finishes retained complete chunks through %s after a failed save',
+  async (retry) => {
+    const bytes = new TextEncoder().encode('retained-video');
+    const stopped = await createRecordingStopped(bytes);
+    const { createNativeAppIngestionController } = await import('./controller');
+    const controller = createNativeAppIngestionController({
+      getCurrentControllerLeaseId: () => 'lease-1',
+    });
+    await controller.handleRecordingStopped(stopped);
+    mocks.recordingSaveMock.mockRejectedValueOnce(new Error('save failed'));
+    expect(await controller.handleRecordingChunk(await createRecordingChunk(bytes))).toContainEqual(
+      expect.objectContaining({ type: 'extension.recording.reject', reason: 'storage-failed' })
+    );
+    expect(mocks.chunks.size).toBe(1);
+    const result = await (retry === 'stopped'
+      ? controller.handleRecordingStopped(stopped)
+      : controller.resumePendingTransfers('lease-1'));
+    expect(result).toContainEqual(expect.objectContaining({ type: 'extension.recording.ack' }));
+    expect(mocks.sessions.get(stopped.recordingId)?.kind).toBe('recording-complete');
+    expect(mocks.chunks.size).toBe(0);
+    await controller.handleRecordingStopped(stopped);
+    expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(2);
+  }
+);
+
+it('serializes a resume behind the same recording commit and refuses a stale lease', async () => {
+  const bytes = new TextEncoder().encode('serialized-video');
+  const stopped = await createRecordingStopped(bytes);
+  let lease = 'lease-1';
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const { createNativeAppIngestionController } = await import('./controller');
+  const controller = createNativeAppIngestionController({
+    getCurrentControllerLeaseId: () => lease,
+  });
+  await controller.handleRecordingStopped(stopped);
+  mocks.recordingSaveMock.mockImplementationOnce(async () => {
+    entered();
+    await held;
+    throw new Error('interrupted save');
+  });
+  const chunk = controller.handleRecordingChunk(await createRecordingChunk(bytes));
+  await started;
+  const resumed = controller.resumePendingTransfers('lease-1');
+  await Promise.resolve();
+  expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+  lease = 'lease-2';
+  release();
+  await chunk;
+  expect(await resumed).toEqual([]);
+  expect(mocks.sessions.get(stopped.recordingId)?.kind).toBe('recording');
+  expect(mocks.chunks.size).toBe(1);
+  expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+});
+
+it('serializes concurrent stopped and reconnect retries of retained chunks into one save', async () => {
+  const bytes = new TextEncoder().encode('parallel-retained-retry');
+  const stopped = await createRecordingStopped(bytes);
+  const { createNativeAppIngestionController } = await import('./controller');
+  const controller = createNativeAppIngestionController({
+    getCurrentControllerLeaseId: () => 'lease-1',
+  });
+  await controller.handleRecordingStopped(stopped);
+  mocks.recordingSaveMock.mockRejectedValueOnce(new Error('interrupted'));
+  await controller.handleRecordingChunk(await createRecordingChunk(bytes));
+  mocks.recordingSaveMock.mockClear();
+  const results = await Promise.all([
+    controller.handleRecordingStopped(stopped),
+    controller.resumePendingTransfers('lease-1'),
+    controller.handleRecordingStopped(stopped),
+  ]);
+  for (const result of results)
+    expect(result).toContainEqual(expect.objectContaining({ type: 'extension.recording.ack' }));
+  expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+});
+
+it.each(['valid', 'wrong-owner', 'wrong-body', 'unavailable-body'] as const)(
+  'reuses a saved source after interrupted completion only with %s binding',
+  async (binding) => {
+    const bytes = new TextEncoder().encode('published-before-interruption');
+    const stopped = await createRecordingStopped(bytes);
+    const { createNativeAppIngestionController } = await import('./controller');
+    const { completeNativeTransferSession } = await import('./persistence/staging');
+    const controller = createNativeAppIngestionController({
+      getCurrentControllerLeaseId: () => 'lease-1',
+      isHistoryEnabled: () => true,
+    });
+    await controller.handleRecordingStopped(stopped);
+    vi.mocked(completeNativeTransferSession).mockRejectedValueOnce(new Error('worker interrupted'));
+    expect(await controller.handleRecordingChunk(await createRecordingChunk(bytes))).toContainEqual(
+      expect.objectContaining({ type: 'extension.recording.reject', reason: 'storage-failed' })
+    );
+    mocks.getRecording.mockResolvedValue({
+      assetId: 'original-asset',
+      id: stopped.recordingId,
+      size: stopped.totalBytes,
+      mimeType: 'video/mp4',
+      file: new Blob([binding === 'wrong-body' ? new Uint8Array(bytes.length) : bytes], {
+        type: 'video/mp4',
+      }),
+    });
+    mocks.owner.mockResolvedValue({
+      ownerKind: 'recording',
+      ownerId: stopped.recordingId,
+      role: 'body',
+      assetId: binding === 'wrong-owner' ? 'foreign-asset' : 'original-asset',
+    });
+    if (binding === 'unavailable-body') mocks.getRecording.mockResolvedValue(undefined);
+    const result = await controller.resumePendingTransfers('lease-1');
+    expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+    if (binding === 'valid') {
+      expect(result).toContainEqual(expect.objectContaining({ type: 'extension.recording.ack' }));
+      expect(mocks.historyResume).toHaveBeenCalledWith(stopped.recordingId, 'lease-1');
+      await controller.resumePendingTransfers('lease-1');
+      expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+    } else {
+      expect(result).toContainEqual(
+        expect.objectContaining({ type: 'extension.recording.reject', reason: 'storage-failed' })
+      );
+      expect(mocks.chunks.size).toBe(1);
+      expect(mocks.sessions.get(stopped.recordingId)?.kind).toBe('recording');
+      expect(mocks.historyResume).not.toHaveBeenCalled();
+    }
+  }
+);
+
+it('refuses a changed completion offer and retires corrupt staged bytes without an acknowledgement', async () => {
+  const bytes = new TextEncoder().encode('retained-verification');
+  const stopped = await createRecordingStopped(bytes);
+  const { createNativeAppIngestionController } = await import('./controller');
+  const controller = createNativeAppIngestionController({
+    getCurrentControllerLeaseId: () => 'lease-1',
+  });
+  await controller.handleRecordingStopped(stopped);
+  mocks.recordingSaveMock.mockRejectedValueOnce(new Error('save failed'));
+  await controller.handleRecordingChunk(await createRecordingChunk(bytes));
+  expect(
+    await controller.handleRecordingStopped({ ...stopped, sha256: '0'.repeat(64) })
+  ).toContainEqual(
+    expect.objectContaining({ type: 'extension.recording.reject', reason: 'duplicate-or-replay' })
+  );
+  const chunk = mocks.chunks.get(`${stopped.recordingId}:0`)!;
+  chunk.blob = new Blob([new Uint8Array(bytes.length)]);
+  expect(await controller.resumePendingTransfers('lease-1')).toContainEqual(
+    expect.objectContaining({ type: 'extension.recording.reject', reason: 'hash-mismatch' })
+  );
+  expect(mocks.recordingSaveMock).toHaveBeenCalledTimes(1);
+  expect(mocks.chunks.size).toBe(0);
+  expect(mocks.sessions.has(stopped.recordingId)).toBe(false);
 });
 
 it('does not let replayed recording starts overwrite active transfer sessions', async () => {

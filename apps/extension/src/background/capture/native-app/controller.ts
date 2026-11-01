@@ -74,6 +74,26 @@ export function createNativeAppIngestionController(
     return queue.run(key, task).finally(release);
   }
 
+  async function resumeHistoryAfterVideo(
+    recordingId: string,
+    lease: string,
+    responses: NativeIngestionOutboundMessage[]
+  ) {
+    if (
+      (deps.isHistoryEnabled?.('cursor') || deps.isHistoryEnabled?.('events')) &&
+      responses.some((response) => response.type === 'extension.recording.ack')
+    ) {
+      try {
+        responses.push(...(await history.resume(recordingId, lease)));
+      } catch {
+        /* Video receipt remains independent from optional histories. */
+      }
+    }
+    return isCurrentLease(deps, lease)
+      ? responses
+      : responses.filter((response) => response.type === 'extension.recording.reject');
+  }
+
   return {
     handleHistory(message) {
       return runAdmitted(message.recordingId, async () => {
@@ -126,33 +146,34 @@ export function createNativeAppIngestionController(
       return runAdmitted(message.captureId, () => handleNativeScreenshotCommit(deps, message));
     },
     handleRecordingStopped(message) {
-      return runAdmitted(message.recordingId, () => handleNativeRecordingStopped(deps, message));
+      return runAdmitted(message.recordingId, async () =>
+        resumeHistoryAfterVideo(
+          message.recordingId,
+          message.controllerLeaseId,
+          await handleNativeRecordingStopped(deps, message)
+        )
+      );
     },
     handleRecordingStarted(message) {
       return runAdmitted(message.recordingId, () => handleNativeRecordingStarted(deps, message));
     },
     handleRecordingChunk(message) {
-      return runAdmitted(message.recordingId, async () => {
-        const responses = await handleNativeRecordingChunk(deps, message);
-        if (
-          (deps.isHistoryEnabled?.('cursor') || deps.isHistoryEnabled?.('events')) &&
-          responses.some((response) => response.type === 'extension.recording.ack')
-        ) {
-          try {
-            responses.push(
-              ...(await history.resume(message.recordingId, message.controllerLeaseId))
-            );
-          } catch {
-            /* Video receipt remains independent from optional histories. */
-          }
-        }
-        return responses;
-      });
+      return runAdmitted(message.recordingId, async () =>
+        resumeHistoryAfterVideo(
+          message.recordingId,
+          message.controllerLeaseId,
+          await handleNativeRecordingChunk(deps, message)
+        )
+      );
     },
     resumePendingTransfers(controllerLeaseId) {
-      return runAdmitted(controllerLeaseId, () =>
-        createNativeTransferResumeRequests(controllerLeaseId, deps)
-      );
+      const release = acquireNativeIngestionPermit();
+      if (!release) return Promise.resolve([]);
+      return createNativeTransferResumeRequests(controllerLeaseId, deps, (recordingId, task) =>
+        queue.run(recordingId, async () =>
+          resumeHistoryAfterVideo(recordingId, controllerLeaseId, await task())
+        )
+      ).finally(release);
     },
   };
 }

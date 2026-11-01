@@ -18,6 +18,37 @@ const mocks = vi.hoisted(() => ({
   tombstoneFails: false,
 }));
 
+vi.mock('../../../composition/persistence/recordings/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/recordings/index')>()),
+  getRecording: async () => undefined,
+}));
+
+vi.mock(
+  '../../../composition/persistence/infrastructure/indexed-db/core',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/infrastructure/indexed-db/core')
+    >()),
+    initDB: async () => ({ get: async () => undefined }),
+  })
+);
+
+vi.mock(
+  '../../../composition/persistence/recordings/native-history/store',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/recordings/native-history/store')
+    >()),
+    createNativeRecordingHistoryStore: () => ({
+      videoReceipt: async (id: string) => {
+        const parent = mocks.sessions.get(id);
+        if (parent?.kind !== 'recording-complete') throw new Error('not committed');
+        return { durable: true, sha256: parent.sha256, totalBytes: parent.totalBytes };
+      },
+    }),
+  })
+);
+
 vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/navigation/extension-pages')>()),
   openVideoEditorPage: mocks.openVideoEditorPageMock,

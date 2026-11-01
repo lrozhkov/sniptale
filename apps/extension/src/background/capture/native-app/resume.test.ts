@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./persistence/staging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./persistence/staging')>()),
   listNativeTransferSessions: mocks.listNativeTransferSessions,
+  getNativeTransferSession: async (id: string) =>
+    (await mocks.listNativeTransferSessions()).find((session: { id: string }) => session.id === id),
 }));
 
 import { createNativeTransferResumeRequests } from './resume';
@@ -17,9 +19,8 @@ beforeEach(() => {
 
 it('requests the first missing recording chunk for the active lease only', async () => {
   mocks.listNativeTransferSessions.mockResolvedValue([
-    createSession({ controllerLeaseId: 'other-lease' }),
-    createSession({ kind: 'screenshot' }),
-    createSession({ id: 'complete-recording', receivedChunkIndexes: [0, 1] }),
+    createSession({ id: 'other', controllerLeaseId: 'other-lease' }),
+    createSession({ id: 'screen', kind: 'screenshot' }),
     createSession({ receivedChunkIndexes: [0] }),
   ]);
 
