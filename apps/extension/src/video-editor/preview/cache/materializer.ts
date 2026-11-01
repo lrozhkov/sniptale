@@ -19,8 +19,14 @@ import {
   createReviewSpatialRenderer,
   type ReviewSpatialRenderer,
 } from '../../../features/video/composition/canvas/spatial-renderer';
-import { projectWindowHeaderImages } from '../../../features/video/composition/draw/window-header';
-import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
+import {
+  projectWindowHeaderImages,
+  windowHeaderImageKey,
+} from '../../../features/video/composition/draw/window-header';
+import type {
+  VideoCompositionCameraState,
+  VideoCompositionFrame,
+} from '../../../features/video/composition/types';
 import {
   getVideoClipSourceTime,
   isClipActiveAtTime,
@@ -571,8 +577,6 @@ async function renderMaterializedFrame(
       decodedVideoFrames = sampled.media;
     }
     assertActive();
-    await Promise.all(Object.values(state.imageBank).map((image) => waitForImage(image, signal)));
-    assertActive();
     if (!decodedVideoFrames)
       await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
     assertActive();
@@ -608,6 +612,7 @@ async function renderMaterializedFrame(
         return state.effectRuntime.executor;
       },
       imageBank: state.imageBank,
+      prepareImages: (frames) => prepareMaterializedImages(state.imageBank, frames, signal),
       previewRasterSize: params.rasterSize,
       project: params.project,
       signal,
@@ -642,4 +647,30 @@ async function prepareMaterializedVideos(
     video.pause();
     await waitForDecodedVideoFrame(video, getVideoClipSourceTime(clip, time), project.fps, signal);
   }
+}
+
+async function prepareMaterializedImages(
+  imageBank: Record<string, HTMLImageElement>,
+  frames: readonly VideoCompositionFrame[],
+  signal: AbortSignal
+): Promise<void> {
+  const keys = new Set<string>();
+  for (const frame of frames) {
+    for (const layer of [...frame.visualLayers, ...frame.effectInputLayers]) {
+      if (layer.kind === 'image') keys.add(layer.clip.assetId);
+      if (layer.kind === 'shape' && layer.clip.embeddedAsset)
+        keys.add(layer.clip.embeddedAsset.assetId);
+      if (
+        (layer.kind === 'image' || (layer.kind === 'video' && layer.trackRole !== 'CAMERA')) &&
+        layer.clip.windowHeader
+      )
+        keys.add(windowHeaderImageKey(layer.clipId, layer.clip.windowHeader));
+    }
+  }
+  await Promise.all(
+    [...keys].map((key) => {
+      const image = imageBank[key];
+      return image ? waitForImage(image, signal) : undefined;
+    })
+  );
 }

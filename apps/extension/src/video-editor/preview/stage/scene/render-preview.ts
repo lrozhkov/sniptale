@@ -23,7 +23,10 @@ import {
 import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
 import { drawSpatialSceneOverlays } from '../../../../features/video/composition/draw/spatial';
 import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
-import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
+import type {
+  VideoCompositionCameraState,
+  VideoCompositionFrame,
+} from '../../../../features/video/composition/types';
 import {
   createEffectRuntimeDrawState,
   drawCompositionVisualLayer,
@@ -154,6 +157,8 @@ type PreviewSceneParams = {
   /** Complete borrowed source map for composition endpoint sampling. */
   assetUrls?: Record<string, string>;
   imageBank: Record<string, HTMLImageElement>;
+  /** The media owner prepares dependencies from this same plan before any raster work. */
+  prepareImages?: (frames: readonly VideoCompositionFrame[]) => Promise<void>;
   effectRuntimeExecutor?: PreviewEffectRuntimeExecutorInput;
   isPlaybackFrame?: boolean;
   previewRasterSize?: VideoEditorPreviewRasterSize;
@@ -211,6 +216,13 @@ async function renderPreparedPreviewScene(
   for (const video of videos) video.addEventListener('seeking', invalidate);
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   try {
+    if (params.prepareImages) {
+      await params.prepareImages([
+        renderPasses.overlayFrame,
+        ...renderPasses.visualPasses.map((pass) => pass.frame),
+      ]);
+      params.signal?.throwIfAborted();
+    }
     const captions = await (params.captionRenderer ?? createVideoProjectCaptionRenderer()).prepare(
       params.project,
       params.project,
