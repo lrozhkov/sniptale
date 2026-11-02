@@ -1,5 +1,6 @@
 import { normalizeMediabunny } from './tooling/ci/mediabunny/normalize.mjs';
 import { fileURLToPath } from 'node:url';
+import { i18nCatalogs } from './apps/extension/build/i18n-catalogs.ts';
 import { tourPlayerScript } from './apps/extension/build/tour-player-script.ts';
 import { defineConfig } from 'vitest/config';
 
@@ -170,7 +171,7 @@ function resolveCanonicalCoverageExclude() {
 }
 
 export default defineConfig({
-  plugins: [tourPlayerScript()],
+  plugins: [i18nCatalogs(fileURLToPath(new URL('.', import.meta.url))), tourPlayerScript()],
   test: {
     css: { include: [/\.css\?raw$/u] },
     include: resolveSuiteInclude(),

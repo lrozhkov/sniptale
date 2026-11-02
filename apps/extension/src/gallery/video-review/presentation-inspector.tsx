@@ -1,3 +1,4 @@
+import type { TranslationDictionary } from '../../platform/i18n/types';
 import { PresentationMediaFields } from '../../ui/presentation-media-fields';
 import { PresentationFadeFields } from '../../ui/presentation-fade-fields';
 import { FolderOpen, Library, LogIn, LogOut, Play, RotateCcw } from 'lucide-react';
@@ -19,8 +20,10 @@ type Settings = QuickEditPresentationSettings;
 type SlotName = 'intro' | 'outro';
 type Slot = Settings[SlotName];
 type Mode = Slot['mode'];
-type Message =
-  keyof typeof import('../../platform/i18n/messages/gallery/video-review-presentation').galleryVideoReviewPresentationMessages;
+type Message = Extract<
+  keyof TranslationDictionary['gallery']['videoReview'],
+  `presentation${string}`
+>;
 const label = (key: Message) => translate(`gallery.videoReview.${key}`);
 
 /** Acquisition and pending empty-slot selection remain with the scene controller. */

@@ -905,17 +905,6 @@
     },
     {
       "rule": "structural-file-risk",
-      "file": "apps/extension/src/platform/i18n/messages/gallery/video-review.ts",
-      "symbol": "<file>",
-      "owner": "extension:app-core:platform",
-      "reason": "tool-noise: This candidate adds two paired RU and EN labels for the timed lens mode and placement. The file remains static locale data with no state, effects, dependency edges, or runtime authority. Its existing catalog is cohesive. Splitting these messages would fragment that catalog. Independent architecture review must check this exact classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess executable behavior, mutable state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Fresh complete-candidate architecture review must check this classification.",
-      "reviewDate": "2026-10-24",
-      "astHash": "a12fbb17ab308f32e5e4fad48faaf849a0cbca1e44f8a8cc426f470cef016a29",
-      "signatureHash": "401666a2c5baa7b93761dc388924bab5516dc4c098271f424f4811eccf1344ef"
-    },
-    {
-      "rule": "structural-file-risk",
       "file": "apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.image-framing.test.tsx",
       "symbol": "<file>",
       "owner": "extension:scenario-editor:page-shell",

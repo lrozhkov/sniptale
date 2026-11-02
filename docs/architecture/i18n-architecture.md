@@ -1,24 +1,56 @@
 # i18n architecture
 
-Sniptale ships Russian and English. `packages/platform/src/i18n/config.ts` owns locale identifiers, Intl tags, display names, and the fallback locale. On first installation, the background install owner stores English only if no preference exists. It checks and writes under the existing exclusive persistence permit. A delayed install callback must preserve a user choice or restored preference. The initializer releases the permit before hydration. On update, it preserves the stored locale.
+Sniptale ships Russian and English. `packages/platform/src/i18n/config.ts` owns locale identifiers, Intl tags, and the fallback locale. Product catalogs own localized language names. The fallback locale remains Russian.
+
+On first installation, the background install owner stores English only if no preference exists. It checks and writes under the existing exclusive persistence permit. A delayed install callback must preserve a user choice or restored preference. The initializer releases the permit before hydration. On update, it preserves the stored locale.
 
 ## Owners
 
-- `packages/platform/src/i18n/**` owns pure locale configuration and formatting in the package.
-- `apps/extension/src/platform/i18n/messages/**` owns product messages. Each message leaf contains its locale variants.
-- `apps/extension/src/platform/i18n/dictionaries.ts` builds runtime dictionaries.
-- `apps/extension/src/platform/i18n/types.ts` derives translation keys and contracts.
+- `apps/extension/src/platform/i18n/catalogs/` owns one authored JSON catalog per locale.
+- `catalogs/en.json` defines the message structure and key order.
+- `apps/extension/src/platform/i18n/types.ts` derives translation keys and dictionary types from the English catalog.
+- `apps/extension/src/platform/i18n/dictionaries.ts` supplies full runtime catalogs.
+- `apps/extension/src/platform/i18n/catalog-reader.ts` owns synchronous lookup and fallback behavior.
+- `apps/extension/src/platform/i18n/catalog-subsets.ts` declares compact message selections.
+- `apps/extension/build/i18n-catalogs.ts` creates compact catalogs during the build.
 - `apps/extension/src/platform/i18n/locale/state.ts` owns locale preference policy, events, and subscriptions.
 - `apps/extension/src/composition/persistence/infrastructure/preference-service` owns raw browser-storage operations for these preferences.
 - `apps/extension/src/platform/i18n/locale/hook.ts` owns the React locale subscription.
 - `apps/extension/src/platform/i18n/index.ts` is the app runtime API.
 - `apps/extension/src/background/runtime/routing/runtime-wiring/install.ts` owns locale initialization on first installation.
+- `packages/platform/src/i18n/**` owns pure locale configuration and formatting in the package.
 
-## Change rules
+## Catalog contract
 
-Put product copy in message section modules. Use shared formatters for dates, numbers, and lists that depend on the locale. Subscribe adopted React surfaces through the locale seam. Add both shipped translations for each new or changed message that the user sees.
+Keep product copy in the app catalogs. Packages must not import these catalogs. Product consumers use the existing i18n API and typed keys.
 
-If you add a locale, update the registry and every message leaf. For that locale, update dictionary and key proof, formatter proof, preference behavior, and affected surface tests.
+All catalogs contain the same nested structure and keys. Each message value is a string. The catalog guard rejects duplicate, missing, and extra keys. It also checks locale registration and value types.
+
+Each catalog uses the English key order. Use two spaces for indentation, LF line endings, and one final newline. Do not add empty lines. Each message occupies one physical line, regardless of its length. The same key occupies the same physical line in every catalog.
+
+Represent a newline inside a message with the JSON escape `\n`. Preserve the decoded text. Different translations can contain different numbers of newlines inside their values.
+
+Catalogs have no line-width limit. The existing `npm run format:write` command applies their canonical format. Other files retain the ordinary formatter rules. Check mode reports differences without writing files. Formatting must not add translations or remove unknown keys.
+
+Add all shipped translations for each new or changed message. If you add a locale, update the registry and add its complete catalog. Update dictionary, formatter, preference, and affected surface proof.
+
+## Runtime boundaries
+
+Translation remains synchronous. Full catalogs serve the app API. Separate build projections serve the initial popup shell, popup screens, and content shim. These projections contain no additional authored translations.
+
+Keep the initial popup shell independent of the full popup translator. Keep the content shim independent of React and the full app i18n runtime. Check emitted dependencies when message selections change.
+
+Use shared formatters for dates, numbers, and lists that depend on the locale. Subscribe adopted React surfaces through the locale seam.
+
+## QA
+
+The existing i18n guard checks catalog structure and canonical formatting. Catalog changes must trigger this check even when no TypeScript file changes.
+
+Catalog-only changes select exact product tests through `productionDataFiles` in the existing owner map. Register each new locale catalog in that mapping. Changes to `catalogs/en.json` also trigger typecheck proof for the key contract. Code coverage rules remain unchanged.
+
+Usage analysis reports candidate unused keys and unresolved dynamic lookups. Test references do not establish product use. An unresolved dynamic lookup does not prove the absence of product use. Do not remove keys automatically.
+
+Keep usage analysis lightweight. Reuse existing source snapshots and AST traversal. Do not create a separate full TypeScript program or scan sources once per locale. Measure added cost before mandatory use. Scoped results must not claim complete evidence after a consumer changes or disappears.
 
 ## Document and window titles
 

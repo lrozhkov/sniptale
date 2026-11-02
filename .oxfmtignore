@@ -23,3 +23,6 @@ apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/sniptale
 
 # Immutable historical SDK schema, independently pinned by corpus and contract proof.
 packages/runtime-contracts/src/effect-v1/fixtures/presentation/schema-4f52a70.json
+
+# Locale catalogs use the QA canonical serializer through format:write.
+apps/extension/src/platform/i18n/catalogs/*.json

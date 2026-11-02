@@ -3,8 +3,7 @@ import { GalleryThumbnails, TvMinimalPlay } from 'lucide-react';
 import { Icon } from '@iconify/react';
 import toolsIcon from '@iconify-icons/tabler/tools';
 import worldDownIcon from '@iconify-icons/tabler/world-down';
-import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
-import { commonMessages } from '../../../platform/i18n/messages/common';
+import { readPopupShellTranslation } from '../../../platform/i18n/popup-shell';
 import type { AppLocale } from '../../../platform/i18n/types';
 import type { PopupPage } from '../navigation/actions';
 import { preloadPopupPage } from '../startup/resource';
@@ -144,8 +143,8 @@ function PopupNavigation({
           onPointerEnter={() => preload(candidate)}
           onPointerDown={() => preload(candidate)}
           onClick={() => void route.navigate(candidate)}
-          data-popup-hint={popupTabsMessages[candidate][locale]}
-          aria-label={popupTabsMessages[candidate][locale]}
+          data-popup-hint={readPopupShellTranslation(locale, `popup.tabs.${candidate}`)}
+          aria-label={readPopupShellTranslation(locale, `popup.tabs.${candidate}`)}
         >
           {candidate === 'menu' ? (
             icon
@@ -177,9 +176,9 @@ function PopupRouteError({
       data-ui="popup.app.route-error"
       role="alert"
     >
-      <span>{commonMessages.bootstrap.errorTitle[locale]}</span>
+      <span>{readPopupShellTranslation(locale, 'common.bootstrap.errorTitle')}</span>
       <button type="button" onClick={onRetry}>
-        {commonMessages.actions.retry[locale]}
+        {readPopupShellTranslation(locale, 'common.actions.retry')}
       </button>
     </section>
   );

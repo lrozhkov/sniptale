@@ -199,7 +199,7 @@ it('accepts policy-bound privileged capability stores with declared policy ids',
   ).toEqual([]);
 });
 
-it('distinguishes immutable queue dictionaries from mutable or spoofed authority state', async () => {
+it('accepts immutable queue arrays and rejects runtime factory calls', async () => {
   const root = createTempRoot('architecture-guardrails-immutable-queue-');
   writeRuntimeTopology(root);
   writePolicyStateRegistry(root);
@@ -210,19 +210,10 @@ it('distinguishes immutable queue dictionaries from mutable or spoofed authority
       false,
     ],
     [
-      'platform/i18n/messages/settings/sync-queue.ts',
+      'platform/i18n/catalog-metadata.ts',
       [
-        "import { defineMessageSource } from '../source';",
-        "export const queueMessages = defineMessageSource({ title: { en: 'Queue', ru: 'Очередь' } });",
-      ].join(' '),
-      false,
-    ],
-    [
-      'platform/i18n/messages/settings/spoofed-owner.ts',
-      [
-        "import { defineMessageSource } from '../../../../../../../fake/" +
-          "apps/extension/src/platform/i18n/messages/source';",
-        "const queueMessages = defineMessageSource({ en: 'Queue' });",
+        "import { defineCatalogMetadata } from './catalog-contract';",
+        "export const queueMessages = defineCatalogMetadata({ en: 'Queue', ru: 'Очередь' });",
       ].join(' '),
       true,
     ],
@@ -233,18 +224,10 @@ it('distinguishes immutable queue dictionaries from mutable or spoofed authority
       true,
     ],
     [
-      'platform/i18n/messages/settings/spoof.ts',
+      'platform/i18n/dynamic-metadata.ts',
       [
-        "import { defineMessageSource } from './spoof-source';",
-        "const queueMessages = defineMessageSource({ en: 'Queue' });",
-      ].join(' '),
-      true,
-    ],
-    [
-      'platform/i18n/messages/settings/dynamic.ts',
-      [
-        "import { defineMessageSource } from '../source';",
-        'const queueMessages = defineMessageSource({ en: runtimeLabel });',
+        "import { defineCatalogMetadata } from './catalog-contract';",
+        'const queueMessages = defineCatalogMetadata({ en: runtimeLabel });',
       ].join(' '),
       true,
     ],

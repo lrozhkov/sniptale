@@ -4,7 +4,8 @@ import {
   normalizePageLaunchPreferences,
   type PageLaunchPreferences,
 } from '../../../contracts/page-launch';
-import { sharedDefaultsMessages } from '../../../platform/i18n/messages/shared/defaults';
+import { readContentShimTranslation } from '../../../platform/i18n/content-shim';
+import type { TranslationKey } from '../../../platform/i18n/types';
 import type { ShimQuickAction } from './quick-actions';
 
 export interface ShimPagePresentation {
@@ -12,18 +13,22 @@ export interface ShimPagePresentation {
   locale: AppLocale;
   theme: 'light' | 'dark' | 'system';
 }
-const bundledNames: Readonly<Record<string, Readonly<Record<AppLocale, string>> | undefined>> = {
-  'default-visible-download': sharedDefaultsMessages.quickActionVisibleDownload,
-  'default-full-page-download': sharedDefaultsMessages.quickActionFullPageDownload,
-  'default-selection-download': sharedDefaultsMessages.quickActionSelectionDownload,
-  'default-visible-copy': sharedDefaultsMessages.quickActionVisibleCopy,
-  'default-visible-edit': sharedDefaultsMessages.quickActionVisibleEdit,
-  'default-desktop-capture': sharedDefaultsMessages.quickActionDesktopDownload,
-  'default-visible-library': sharedDefaultsMessages.quickActionVisibleLibrary,
+const bundledNames: Readonly<
+  Record<string, Extract<TranslationKey, `shared.defaults.${string}`> | undefined>
+> = {
+  'default-visible-download': 'shared.defaults.quickActionVisibleDownload',
+  'default-full-page-download': 'shared.defaults.quickActionFullPageDownload',
+  'default-selection-download': 'shared.defaults.quickActionSelectionDownload',
+  'default-visible-copy': 'shared.defaults.quickActionVisibleCopy',
+  'default-visible-edit': 'shared.defaults.quickActionVisibleEdit',
+  'default-desktop-capture': 'shared.defaults.quickActionDesktopDownload',
+  'default-visible-library': 'shared.defaults.quickActionVisibleLibrary',
 };
 export function getShimQuickActionName(action: ShimQuickAction, locale: AppLocale): string {
   const bundled = bundledNames[action.bundledId ?? ''] ?? bundledNames[action.id];
-  return bundled && action.customized !== true ? bundled[locale] : action.name?.trim() || action.id;
+  return bundled && action.customized !== true
+    ? readContentShimTranslation(locale, bundled)
+    : action.name?.trim() || action.id;
 }
 export function createShimPreferencesLoader(browser: ContentRuntimeShimBrowserAdapter) {
   return async (): Promise<ShimPagePresentation> => {

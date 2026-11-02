@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewPreviewInspector } from './preview-inspector';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
-import { galleryVideoReviewPreviewMessages } from '../../platform/i18n/messages/gallery/video-review-preview';
+import { getDictionary } from '../../platform/i18n';
 
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -107,8 +107,17 @@ it('shows current defaults and actual raster, commits local settings and offers 
 });
 
 it('provides both shipped translations for each preview label', () => {
-  for (const message of Object.values(galleryVideoReviewPreviewMessages)) {
-    expect(message.ru.trim()).not.toBe('');
-    expect(message.en.trim()).not.toBe('');
+  for (const locale of ['en', 'ru'] as const) {
+    const messages = getDictionary(locale).gallery.videoReview;
+    for (const [key, message] of Object.entries(messages)) {
+      if (
+        key.startsWith('preview') ||
+        key.startsWith('recordingHistory') ||
+        key === 'recordingCursorArchived' ||
+        key.startsWith('workspaceColor')
+      ) {
+        expect(message.trim()).not.toBe('');
+      }
+    }
   }
 });

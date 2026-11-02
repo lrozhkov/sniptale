@@ -1,4 +1,4 @@
-import { popupCommonMessages } from '../../../../platform/i18n/messages/popup/common';
+import { translate } from '../../../../platform/i18n';
 import { Blocks, Settings2 } from 'lucide-react';
 import type { AppLocale } from '../../../../platform/i18n';
 import { getSharedPreviewCopy } from '../../support/common';
@@ -40,7 +40,7 @@ export function buildPopupFooterSharedPreviews(locale: AppLocale): DesignSystemV
       <PopupFooter
         onOpenGithub={() => undefined}
         onOpenSettings={() => undefined}
-        status={<span role="status">{popupCommonMessages.syncWaiting[locale]}</span>}
+        status={<span role="status">{translate('popup.common.syncWaiting', locale)}</span>}
       />
     ),
   ];

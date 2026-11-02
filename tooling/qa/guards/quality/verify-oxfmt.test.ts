@@ -1,5 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
+
+import { createTempRoot, writeFile } from '../../test-support/test-helpers';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +17,51 @@ function commandResult(status: number, stdout = '', stderr = '') {
 }
 
 describe('QA Oxfmt wrapper', () => {
+  it('routes locale catalogs through canonical check/write and reconciles all languages', () => {
+    const root = createTempRoot('format-i18n-');
+    const en = 'apps/extension/src/platform/i18n/catalogs/en.json';
+    const ru = 'apps/extension/src/platform/i18n/catalogs/ru.json';
+    writeFile(
+      root,
+      'packages/platform/src/i18n/config.ts',
+      'const LOCALE_REGISTRY = {en:{},ru:{}} as const;'
+    );
+    writeFile(root, en, '{"done":"Done","long":"' + 'x'.repeat(2000) + '"}');
+    writeFile(root, ru, '{"long":"Длинный","done":"Готово"}');
+    const runner = vi.fn(() => commandResult(0));
+    expect(runFormatterCheck([en], runner, { root }).failures).toEqual([en, ru]);
+    expect(runner).not.toHaveBeenCalled();
+    expect(fs.readFileSync(path.join(root, ru), 'utf8')).toBe('{"long":"Длинный","done":"Готово"}');
+    expect(runFormatterWrite([en], runner, { root }).writtenFiles).toEqual([en, ru]);
+    expect(runFormatterCheck([en], runner, { root }).failures).toEqual([]);
+    expect(fs.readFileSync(path.join(root, en), 'utf8').split('\n')[2]?.length).toBeGreaterThan(
+      2000
+    );
+    runFormatterCheck(['apps/extension/src/platform/i18n/other.json'], runner, { root });
+    expect(runner).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps catalog formatting active during repository-wide checks', () => {
+    const root = createTempRoot('format-i18n-repo-');
+    const en = 'apps/extension/src/platform/i18n/catalogs/en.json';
+    const ru = 'apps/extension/src/platform/i18n/catalogs/ru.json';
+    writeFile(
+      root,
+      'packages/platform/src/i18n/config.ts',
+      'const LOCALE_REGISTRY = {en:{},ru:{}} as const;'
+    );
+    writeFile(root, en, '{"done":"Done"}');
+    writeFile(root, ru, '{"done":"Готово"}');
+    const runner = vi.fn(() => commandResult(0));
+    expect(
+      runFormatterCheck([en, ru, 'ordinary.ts'], runner, { root, repositoryWide: true }).failures
+    ).toEqual([en, ru]);
+    expect(runner.mock.calls[0]?.[1]).toEqual(expect.arrayContaining(['--list-different', '.']));
+    expect(fs.readFileSync('.oxfmtignore', 'utf8')).toContain(
+      'apps/extension/src/platform/i18n/catalogs/*.json'
+    );
+  });
+
   it('rejects installed version drift before invoking the formatter', () => {
     const evidence = fs.readFileSync('tooling/configs/qa/formatter-migration.data.json', 'utf8');
     const read = vi

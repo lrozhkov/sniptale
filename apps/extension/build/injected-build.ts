@@ -1,3 +1,4 @@
+import { esbuildI18nCatalogs } from './i18n-catalogs.ts';
 import { readFile } from 'node:fs/promises';
 import { join, resolve as resolvePath } from 'node:path';
 import type { Plugin } from 'vite';
@@ -85,6 +86,7 @@ export function buildContentRuntime(mode: string): Plugin {
         outfile: runtimeOutputPath,
         platform: 'browser',
         plugins: [
+          esbuildI18nCatalogs(repositoryRoot),
           createReleaseSafeDependencyAliasPlugin(repositoryRoot),
           createInlineCssTextPlugin(appRoot),
         ],
@@ -131,7 +133,10 @@ export function buildContentRuntimeShim(mode: string): Plugin {
         minify: mode === 'release',
         outfile: shimOutputPath,
         platform: 'browser',
-        plugins: [createReleaseSafeDependencyAliasPlugin(repositoryRoot)],
+        plugins: [
+          esbuildI18nCatalogs(repositoryRoot),
+          createReleaseSafeDependencyAliasPlugin(repositoryRoot),
+        ],
         sourcemap: shouldEmitBuildSourcemaps(mode),
         target: [CHROME_BUILD_TARGET],
       });

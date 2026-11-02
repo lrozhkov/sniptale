@@ -1,5 +1,29 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'i18n-catalog-data-proof',
+    productionDataFiles: [
+      'apps/extension/src/platform/i18n/catalogs/en.json',
+      'apps/extension/src/platform/i18n/catalogs/ru.json',
+    ],
+    allowCrossOwner: true,
+    reason:
+      'Catalog data defines typed keys, fallback lookup, translated copy, and compact runtime selections.',
+    testFiles: [
+      'apps/extension/src/platform/i18n/catalog-reader.test.ts',
+      'apps/extension/src/platform/i18n/catalog-types.test.ts',
+      'apps/extension/src/platform/i18n/dictionaries.test.ts',
+      'apps/extension/src/platform/i18n/index.test.ts',
+      'apps/extension/src/platform/i18n/popup.test.ts',
+      'apps/extension/src/platform/i18n/highlighter-messages.test.ts',
+      'apps/extension/src/platform/i18n/editor-canvas-messages.test.ts',
+      'apps/extension/src/platform/i18n/editor-scene-messages.test.ts',
+      'apps/extension/src/platform/i18n/editor-toolbar-layer-messages.test.ts',
+      'apps/extension/src/platform/i18n/editor-compact-shape-messages.test.ts',
+      'apps/extension/src/content/runtime/shim/preferences.test.ts',
+      'apps/extension/src/content/runtime/shim/launcher.test.ts',
+    ],
+  },
+  {
     owner: 'archive-native-mime-consumers',
     productionFile:
       'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/object-inventory.ts',

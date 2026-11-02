@@ -575,3 +575,80 @@ it.each([
     'apps/extension/src/workflows/video-review/watermark-image.test.ts',
   ]);
 });
+
+it.each(['en', 'ru'])('selects exact product proof for the %s catalog data', async (locale) => {
+  const module = await importOwnerMap();
+  const files = module.resolveMappedCoverageOwnerTests(
+    `apps/extension/src/platform/i18n/catalogs/${locale}.json`
+  );
+  expect(files).toHaveLength(12);
+  expect(files).toContain('apps/extension/src/platform/i18n/catalog-reader.test.ts');
+  expect(files).toContain('apps/extension/src/content/runtime/shim/launcher.test.ts');
+  expect(files.every((file) => file.startsWith('apps/extension/src/'))).toBe(true);
+  expect(
+    module.resolveMappedCoverageOwnerTests('apps/extension/src/platform/i18n/catalogs/de.json')
+  ).toEqual([]);
+});
+
+it.each([
+  { paths: [], rule: 'focused-coverage-owner-mapping-data-files' },
+  { paths: ['data/en.json', 'data/en.json'], rule: 'focused-coverage-owner-mapping-data-files' },
+  { paths: ['data/missing.json'], rule: 'focused-coverage-owner-mapping-missing-data-file' },
+  { paths: ['data/*.json'], rule: 'focused-coverage-owner-mapping-data-path' },
+  { paths: ['data/en.ts'], rule: 'focused-coverage-owner-mapping-data-path' },
+  { paths: ['data/../en.json'], rule: 'focused-coverage-owner-mapping-data-path' },
+])('rejects invalid data proof targets: $paths', async ({ paths, rule }) => {
+  const root = createTempRoot('focused-data-target-');
+  writeFile(root, 'data/en.json', '{}');
+  writeFile(root, 'data/en.ts', 'export const value = 1;');
+  writeFile(root, 'data/owner.test.ts', 'export const test = 1;');
+  const violations = await withCwd(root, async () => {
+    const module = await importOwnerMap();
+    return module.collectFocusedCoverageOwnerMappingViolations({
+      mappings: [
+        {
+          owner: 'catalog-data',
+          productionDataFiles: paths,
+          allowMissingProductionTarget: true,
+          reason: 'Exact data proof does not bypass missing input validation.',
+          testFiles: ['data/owner.test.ts'],
+        },
+      ],
+    });
+  });
+  expect(violations).toContainEqual(expect.objectContaining({ rule }));
+});
+
+it('requires exactly one mapping target kind without treating JSON as covered code', async () => {
+  const root = createTempRoot('focused-data-target-kind-');
+  writeFile(root, 'data/en.json', '{}');
+  writeFile(root, 'data/owner.test.ts', 'export const test = 1;');
+  const results = await withCwd(root, async () => {
+    const module = await importOwnerMap();
+    const base = {
+      owner: 'catalog-data',
+      reason: 'Data proof stays distinct from code coverage eligibility.',
+      testFiles: ['data/owner.test.ts'],
+    };
+    return {
+      data: module.collectFocusedCoverageOwnerMappingViolations({
+        mappings: [{ ...base, productionDataFiles: ['data/en.json'] }],
+      }),
+      ambiguous: module.collectFocusedCoverageOwnerMappingViolations({
+        mappings: [
+          { ...base, productionDataFiles: ['data/en.json'], productionFile: 'data/en.json' },
+        ],
+      }),
+      code: module.collectFocusedCoverageOwnerMappingViolations({
+        mappings: [{ ...base, productionFile: 'data/en.json' }],
+      }),
+    };
+  });
+  expect(results.data).toEqual([]);
+  expect(results.ambiguous).toContainEqual(
+    expect.objectContaining({ rule: 'focused-coverage-owner-mapping-target' })
+  );
+  expect(results.code).toContainEqual(
+    expect.objectContaining({ rule: 'focused-coverage-owner-mapping-non-coverage-production-file' })
+  );
+});

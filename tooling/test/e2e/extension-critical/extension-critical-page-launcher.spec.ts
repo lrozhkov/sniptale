@@ -276,6 +276,15 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await chrome.storage.sync.set({
           sniptale_settings: {
             ...result['sniptale_settings'],
+            contentToolbar: {
+              ...result['sniptale_settings']?.contentToolbar,
+              pageControls: {
+                ...result['sniptale_settings']?.contentToolbar?.pageControls,
+                'capture-delay': true,
+                'capture-size': true,
+                'quick-actions': true,
+              },
+            },
             pageLaunch: {
               enabled: true,
               hoverOnly: false,

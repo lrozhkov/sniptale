@@ -39,7 +39,7 @@ vi.mock('./frame', () => ({
 
 import { BackupExportModalContent } from './backup-export-content';
 import type { BackupExportModalProps } from './types';
-import { galleryBackupExportModalMessages } from '../../../platform/i18n/messages/gallery/backup-export-modal';
+import { getResolvedDictionaries } from '../../../platform/i18n/dictionaries';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -321,9 +321,9 @@ it.each(['en', 'ru'] as const)(
   async (locale) => {
     translateMock.mockImplementation((key: string) =>
       key === 'gallery.backupExportModal.remotePreparation'
-        ? galleryBackupExportModalMessages.remotePreparation[locale]
+        ? getResolvedDictionaries()[locale].gallery.backupExportModal.remotePreparation
         : key === 'gallery.backupExportModal.nativePreparation'
-          ? galleryBackupExportModalMessages.nativePreparation[locale]
+          ? getResolvedDictionaries()[locale].gallery.backupExportModal.nativePreparation
           : key
     );
     const selected = {

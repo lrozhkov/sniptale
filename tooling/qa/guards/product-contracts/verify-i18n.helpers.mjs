@@ -12,7 +12,9 @@ const LIVE_RUNTIME_PATTERNS = [
 
 const FULL_SCAN_TRIGGER_PATTERNS = [
   /^apps\/extension\/src\/platform\/i18n\//u,
-  /^tooling\/qa\/guards\/product-contracts\/verify-i18n(?:\.helpers|\.test)?\.[cm]?[jt]sx?$/u,
+  /^tooling\/qa\/guards\/product-contracts\/verify-i18n(?:\.helpers|\.catalogs|\.test)?\.[cm]?[jt]sx?$/u,
+  /^tooling\/qa\/guards\/product-contracts\/i18n-catalog-format(?:\.test)?\.[cm]?[jt]sx?$/u,
+  /^packages\/platform\/src\/i18n\/config\.ts$/u,
   /^tooling\/qa\/composition\/checkpoint\/focused(?:-triggered\/helpers|\/config)\.mjs$/u,
 ];
 

@@ -35,27 +35,7 @@ function isTopLevelMapOrSet(declaration) {
   );
 }
 
-function isLiteralData(node) {
-  if (ts.isStringLiteral(node) || ts.isNumericLiteral(node)) return true;
-  if (
-    [ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(
-      node.kind
-    )
-  )
-    return true;
-  if (ts.isArrayLiteralExpression(node)) return node.elements.every(isLiteralData);
-  return (
-    ts.isObjectLiteralExpression(node) &&
-    node.properties.every(
-      (property) =>
-        ts.isPropertyAssignment(property) &&
-        !ts.isComputedPropertyName(property.name) &&
-        isLiteralData(property.initializer)
-    )
-  );
-}
-
-function isImmutableDeclarationData(declaration, statement, sourceFile) {
+function isImmutableDeclarationData(declaration, statement) {
   if (!(statement.declarationList.flags & ts.NodeFlags.Const) || !declaration.initializer)
     return false;
   const type = declaration.type;
@@ -75,45 +55,7 @@ function isImmutableDeclarationData(declaration, statement, sourceFile) {
     )
   )
     return true;
-  const call = declaration.initializer;
-  if (
-    !ts.isCallExpression(call) ||
-    !ts.isIdentifier(call.expression) ||
-    call.arguments.length !== 1 ||
-    !ts.isObjectLiteralExpression(call.arguments[0]) ||
-    !isLiteralData(call.arguments[0])
-  )
-    return false;
-  return sourceFile.statements.some((item) => {
-    if (
-      !ts.isImportDeclaration(item) ||
-      !ts.isStringLiteral(item.moduleSpecifier) ||
-      item.importClause?.isTypeOnly
-    )
-      return false;
-    const sourcePath = path.posix.normalize(sourceFile.fileName.replaceAll('\\', '/'));
-    const appRoot = 'apps/extension/src/';
-    const relativeApp = sourcePath.startsWith(appRoot);
-    const appIndex = relativeApp ? 0 : sourcePath.indexOf(`/${appRoot}`);
-    if (appIndex < 0) return false;
-    const rootPrefix = relativeApp ? '' : sourcePath.slice(0, appIndex + 1);
-    const expected = `${rootPrefix}apps/extension/src/platform/i18n/messages/source`;
-    const resolved = path.posix
-      .normalize(path.posix.join(path.posix.dirname(sourcePath), item.moduleSpecifier.text))
-      .replace(/\.ts$/u, '');
-    if (resolved !== expected) return false;
-    const bindings = item.importClause?.namedBindings;
-    return (
-      bindings &&
-      ts.isNamedImports(bindings) &&
-      bindings.elements.some(
-        (binding) =>
-          !binding.isTypeOnly &&
-          binding.name.text === call.expression.text &&
-          (binding.propertyName?.text ?? binding.name.text) === 'defineMessageSource'
-      )
-    );
-  });
+  return false;
 }
 
 export function collectTopLevelAuthorityStateReasons(sourceFile) {
@@ -125,7 +67,7 @@ export function collectTopLevelAuthorityStateReasons(sourceFile) {
       if (
         ts.isIdentifier(declaration.name) &&
         MUTATION_QUEUE_NAME_PATTERN.test(declaration.name.text) &&
-        !isImmutableDeclarationData(declaration, statement, sourceFile)
+        !isImmutableDeclarationData(declaration, statement)
       ) {
         reasons.add('mutation-queue-name');
       }

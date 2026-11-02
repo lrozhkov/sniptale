@@ -10,6 +10,7 @@ import ts from 'typescript';
 
 import { isExecutedAsScript } from '../../runtime/process/shared-cli.mjs';
 import { getSourceSnapshot } from '../../analysis/source/source-snapshot.mjs';
+import { readI18nCatalogs } from './verify-i18n.catalogs.mjs';
 import {
   collectLiveProductI18nFiles,
   getObjectProperty,
@@ -168,7 +169,7 @@ function collectProgressObjectFailure(relativeFile, sourceFile, node) {
   ];
 }
 
-export function collectFileFailures(relativeFile, { root = repoRoot } = {}) {
+export function collectFileFailures(relativeFile, { root = repoRoot, usage = null } = {}) {
   if (!isLiveProductI18nFile(relativeFile)) {
     return [];
   }
@@ -178,10 +179,32 @@ export function collectFileFailures(relativeFile, { root = repoRoot } = {}) {
     return [`${relativeFile} is missing`];
   }
 
-  const sourceFile = getSourceSnapshot({ filePath: absoluteFile }).sourceFile;
+  const sourceFile = getSourceSnapshot({
+    filePath: absoluteFile,
+    text: fs.readFileSync(absoluteFile, 'utf8'),
+  }).sourceFile;
   const failures = [];
 
   function visit(node) {
+    if (usage) {
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+        if (usage.keys.has(node.text)) usage.references.add(node.text);
+      } else if (ts.isTemplateExpression(node)) {
+        const prefix = node.head.text;
+        const suffix = node.templateSpans.at(-1)?.literal.text ?? '';
+        if (prefix.includes('.')) usage.patterns.add(JSON.stringify([prefix, suffix]));
+      }
+      if (
+        isTranslateCall(node) &&
+        node.arguments[0] &&
+        !ts.isStringLiteral(node.arguments[0]) &&
+        !ts.isNoSubstitutionTemplateLiteral(node.arguments[0])
+      ) {
+        usage.unresolved.push(
+          `${relativeFile}:${getViolationLine(sourceFile, node)} uses a dynamic translation key`
+        );
+      }
+    }
     if (
       ts.isJsxText(node) ||
       (ts.isJsxExpression(node) && isUserFacingJsxExpression(node, sourceFile))
@@ -215,16 +238,67 @@ export function collectFileFailures(relativeFile, { root = repoRoot } = {}) {
   return [...new Set(failures)];
 }
 
-export function runI18nCheck({ files = null, root = repoRoot } = {}) {
-  const scopedFiles = files ?? collectLiveProductI18nFiles(root);
+function catalogKeys(node, prefix = '', result = new Set()) {
+  for (const [key, value] of Object.entries(node)) {
+    const full = prefix ? `${prefix}.${key}` : key;
+    if (typeof value === 'string') result.add(full);
+    else catalogKeys(value, full, result);
+  }
+  return result;
+}
 
-  return scopedFiles
-    .filter((file) => isLiveProductI18nFile(file))
-    .flatMap((relativeFile) => collectFileFailures(relativeFile, { root }));
+/** Collect failures and conservative usage diagnostics in the existing source walk. */
+export function runI18nReport({ files = null, root = repoRoot, collectUsage = true } = {}) {
+  const hasCatalogOwner =
+    fs.existsSync(path.join(root, 'packages/platform/src/i18n/config.ts')) ||
+    fs.existsSync(path.join(root, 'apps/extension/src/platform/i18n/catalogs'));
+  const catalogResult = hasCatalogOwner
+    ? readI18nCatalogs({ root, checkFormat: true })
+    : { catalogs: {}, failures: [] };
+  const usage = {
+    keys: catalogKeys(catalogResult.catalogs.en ?? {}),
+    references: new Set(),
+    patterns: new Set(),
+    unresolved: [],
+  };
+  const scopedFiles = files ?? collectLiveProductI18nFiles(root);
+  const failures = [
+    ...catalogResult.failures,
+    ...scopedFiles
+      .filter((file) => isLiveProductI18nFile(file) && fs.existsSync(path.join(root, file)))
+      .flatMap((relativeFile) =>
+        collectFileFailures(relativeFile, { root, usage: collectUsage ? usage : null })
+      ),
+  ];
+  const patterns = [...usage.patterns].map((pattern) => JSON.parse(pattern));
+  const candidates =
+    files === null && collectUsage
+      ? [...usage.keys]
+          .filter(
+            (key) =>
+              !usage.references.has(key) &&
+              !patterns.some(([prefix, suffix]) => key.startsWith(prefix) && key.endsWith(suffix))
+          )
+          .sort()
+      : [];
+  return {
+    failures,
+    usage: { complete: files === null && collectUsage, candidates, unresolved: usage.unresolved },
+  };
+}
+
+export function runI18nCheck(options = {}) {
+  return runI18nReport(options).failures;
 }
 
 if (isExecutedAsScript(import.meta.url)) {
-  const failures = runI18nCheck();
+  const { failures, usage } = runI18nReport();
+  console.log(
+    `i18n usage advisory: ${usage.candidates.length} unreferenced candidates; ${usage.unresolved.length} unresolved dynamic accesses`
+  );
+  if (usage.candidates.length > 0)
+    console.log(`Candidates (not proof of dead keys): ${usage.candidates.join(', ')}`);
+  for (const diagnostic of usage.unresolved) console.log(diagnostic);
 
   if (failures.length > 0) {
     console.error('i18n guardrail violations found:\n');

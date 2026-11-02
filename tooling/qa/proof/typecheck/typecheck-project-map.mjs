@@ -39,6 +39,7 @@ const BROAD_SHARED_PREFIXES = [
   'packages/ui/src/',
 ];
 const FULL_TYPECHECK_TRIGGER_FILES = new Set([
+  'apps/extension/src/platform/i18n/catalogs/en.json',
   'package.json',
   'package-lock.json',
   'tsconfig.json',

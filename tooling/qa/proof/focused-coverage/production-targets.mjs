@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { fromRelativePath } from '../../analysis/repository/shared-paths.mjs';
 import { PRODUCT_SOURCE_ROOTS } from '../../policy/quality/quality.config.mjs';
@@ -107,9 +108,53 @@ function collectProductionPrefixViolations(mapping) {
   return [];
 }
 
+function collectProductionDataViolations(mapping) {
+  const files = mapping.productionDataFiles;
+  if (files == null) return [];
+  if (!Array.isArray(files) || files.length === 0 || new Set(files).size !== files.length) {
+    return [
+      createMappingViolation(
+        'focused-coverage-owner-mapping-data-files',
+        '<unknown>',
+        'Mapped data files must form a nonempty array of unique exact JSON paths.'
+      ),
+    ];
+  }
+  return files.flatMap((file) => {
+    if (
+      typeof file !== 'string' ||
+      !file.endsWith('.json') ||
+      file.includes('\\') ||
+      /[?*[\]{}]/u.test(file) ||
+      path.posix.isAbsolute(file) ||
+      path.posix.normalize(file) !== file ||
+      file.startsWith('../')
+    ) {
+      return [
+        createMappingViolation(
+          'focused-coverage-owner-mapping-data-path',
+          typeof file === 'string' ? file : '<unknown>',
+          'Mapped data requires an exact repository-relative JSON file path.'
+        ),
+      ];
+    }
+    const absolute = fromRelativePath(file);
+    return fs.existsSync(absolute) && fs.statSync(absolute).isFile()
+      ? []
+      : [
+          createMappingViolation(
+            'focused-coverage-owner-mapping-missing-data-file',
+            file,
+            'Mapped data file does not exist.'
+          ),
+        ];
+  });
+}
+
 export function collectMappingProductionTargetViolations(mapping) {
   return [
     ...collectProductionFileViolations(mapping),
     ...collectProductionPrefixViolations(mapping),
+    ...collectProductionDataViolations(mapping),
   ];
 }
