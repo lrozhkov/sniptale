@@ -1,6 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { SUPPORTED_BETA_DATABASE_FIXTURES } from './fixtures';
+import { nativeAppV47Fixture } from './fixtures/native-app-v47';
+import { nativeAppV48Fixture } from './fixtures/native-app-v48';
 import { DB_NAME, DB_VERSION, EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores.ts';
 import {
   CURRENT_SCHEMA_CONTRACTS,
@@ -109,7 +111,11 @@ it('pins the complete released beta fixture to the database and domain registrie
     ({ databaseVersion }) => databaseVersion
   );
   expect(fixtureVersions).toEqual(Array.from({ length: DB_VERSION }, (_value, index) => index + 1));
-  for (const fixture of SUPPORTED_BETA_DATABASE_FIXTURES) {
+  for (const fixture of [
+    ...SUPPORTED_BETA_DATABASE_FIXTURES,
+    nativeAppV47Fixture,
+    nativeAppV48Fixture,
+  ]) {
     const { expectedDigest, ...digestInput } = fixture;
     const actualDigest = createHash('sha256').update(canonicalize(digestInput)).digest('hex');
     expect(actualDigest, `Database ${fixture.databaseVersion} digest ${actualDigest}`).toBe(
