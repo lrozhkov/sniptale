@@ -1,3 +1,4 @@
+import { settingsSecretProtectionMessages } from './secret-protection';
 import { settingsSyncConnectionMessages } from './sync-connection';
 import { settingsSyncQueueMessages } from './sync-queue';
 import { eventsLogsMessages } from './events-logs';
@@ -20,6 +21,7 @@ import { settingsStorageDraftsMessages } from './storage-drafts';
 import { settingsTransferMessages } from './transfer';
 
 export const settingsMessages = defineMessageSource({
+  secretProtection: settingsSecretProtectionMessages,
   syncConnection: settingsSyncConnectionMessages,
   syncQueue: settingsSyncQueueMessages,
   eventsLogs: eventsLogsMessages,

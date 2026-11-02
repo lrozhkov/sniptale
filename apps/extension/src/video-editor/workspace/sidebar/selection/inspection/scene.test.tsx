@@ -349,3 +349,10 @@ it('hides source audio for an unplaced material and exposes retained dormant doc
   renderInspectPanel(props);
   expect(container?.querySelector(category)).not.toBeNull();
 });
+
+it('uses distinct icons for simultaneous inspector categories', () => {
+  renderInspectPanel(createProps());
+  const icons = [...container!.querySelectorAll('nav button svg')].map((icon) => icon.innerHTML);
+  expect(icons.length).toBeGreaterThan(1);
+  expect(new Set(icons).size).toBe(icons.length);
+});

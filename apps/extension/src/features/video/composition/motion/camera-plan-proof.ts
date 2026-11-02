@@ -29,12 +29,16 @@ export interface CameraProjectionProof {
 /** The renderer owns source projection, clipping, nominal zoom phases, and physical screen motion. */
 export interface CameraProofGeometry {
   breaks: readonly number[];
+  /** The geometry can bound every point in the rectangle defined by actual.from and actual.to. */
+  supportsObservationBounds?: boolean;
   clearanceBounds(input: {
     start: number;
     end: number;
     segmentId: string;
     pan: CameraPanBounds;
     actual?: { from: CameraPanPoint; to: CameraPanPoint };
+    /** Actual endpoints describe a rectangular observation hull instead of one linear observation. */
+    actualIsBounds?: boolean;
     targetScale: number;
     preservePointer?: boolean;
   }): CameraProjectionProof | null;
@@ -218,6 +222,65 @@ function observationBound(
   return low;
 }
 
+type CameraProofCell = { start: number; end: number; depth: number; coarse?: boolean };
+
+/** Try bounded groups first. An inconclusive group retains the original detailed cells. */
+function cameraObservationBlocks(
+  span: CameraPlanSpan,
+  observations: readonly CameraActualObservation[],
+  breaks: readonly number[]
+): CameraProofCell[] {
+  const covered = observations.filter(({ time }) => time > span.start && time < span.end);
+  const boundaries = [
+    ...new Set([
+      span.start,
+      span.end,
+      ...breaks.filter((time) => time > span.start && time < span.end),
+      ...covered.filter((_point, index) => index % 64 === 0).map(({ time }) => time),
+    ]),
+  ].sort((a, b) => a - b);
+  if (boundaries.length === 1)
+    return [{ start: span.start, end: span.end, depth: 0, coarse: true }];
+  return boundaries.slice(0, -1).map((start, index) => ({
+    start,
+    end: boundaries[index + 1]!,
+    depth: 0,
+    coarse: true,
+  }));
+}
+
+function cameraObservationHull(
+  observations: readonly CameraActualObservation[],
+  start: number,
+  end: number
+) {
+  const left = observationBound(observations, start, true) - 1;
+  const right = observationBound(observations, end, false);
+  const from = observations[left]?.actual,
+    to = observations[right]?.actual;
+  if (!from || !to) return undefined;
+  // Whole neighboring samples also bound both partially covered interpolation edges.
+  let minX = Math.min(from.x, to.x),
+    maxX = Math.max(from.x, to.x);
+  let minY = Math.min(from.y, to.y),
+    maxY = Math.max(from.y, to.y);
+  // Include every interior point, including repeated timestamps. Never infer a hull from its temporal endpoints alone.
+  for (
+    let index = Math.max(0, observationBound(observations, start, false));
+    index < observations.length;
+    index++
+  ) {
+    const point = observations[index]!;
+    if (point.time > end) break;
+    if (!point.actual) return undefined;
+    minX = Math.min(minX, point.actual.x);
+    maxX = Math.max(maxX, point.actual.x);
+    minY = Math.min(minY, point.actual.y);
+    maxY = Math.max(maxY, point.actual.y);
+  }
+  return { from: { x: minX, y: minY }, to: { x: maxX, y: maxY } };
+}
+
 export function proveCameraPlan(input: CameraPlanProofInput): CameraPlanProofResult {
   const tolerance = input.pixelTolerance ?? 0.5;
   const confirmed = compactObservationHolds(input.observations);
@@ -228,7 +291,11 @@ export function proveCameraPlan(input: CameraPlanProofInput): CameraPlanProofRes
   for (const span of input.spans) {
     const segment = segments.get(span.segmentId);
     const observations = segment?.points ?? [];
-    const intervals = cameraProofCells(span, observations, input.geometry.breaks);
+    const coarse =
+      input.geometry.supportsObservationBounds && segment?.ordered && observations.length >= 64;
+    const intervals: CameraProofCell[] = coarse
+      ? cameraObservationBlocks(span, observations, input.geometry.breaks)
+      : cameraProofCells(span, observations, input.geometry.breaks);
     while (intervals.length) {
       const cell = intervals.pop()!;
       if (--remaining < 0) return { status: 'conflict', reason: 'unproven', time: cell.start };
@@ -239,25 +306,39 @@ export function proveCameraPlan(input: CameraPlanProofInput): CameraPlanProofRes
       const right = segment?.ordered
         ? observations[observationBound(observations, cell.end, false)]
         : observations.find(({ time }) => time >= cell.end);
-      const actual = actualInterval(left, right, cell.start, cell.end);
+      const actual = cell.coarse
+        ? cameraObservationHull(observations, cell.start, cell.end)
+        : actualInterval(left, right, cell.start, cell.end);
+      if (cell.coarse && !actual) {
+        intervals.push(
+          ...cameraProofCells(
+            { ...span, start: cell.start, end: cell.end },
+            observations,
+            input.geometry.breaks
+          )
+        );
+        continue;
+      }
+      const pan = panBounds(span, cell.start, cell.end);
       const bounds = input.geometry.clearanceBounds({
         start: cell.start,
         end: cell.end,
         segmentId: span.segmentId,
-        pan: panBounds(span, cell.start, cell.end),
+        pan,
         ...(input.preservePointer && actual ? { actual } : {}),
+        ...(cell.coarse ? { actualIsBounds: true } : {}),
         targetScale: input.targetScale,
         preservePointer: input.preservePointer,
       });
       const projection = classifyProjection(input, bounds, actual, tolerance);
-      if (projection.reason)
+      if (projection.reason && !cell.coarse)
         return { status: 'conflict', reason: projection.reason, time: cell.start };
       const projectionProven = projection.proven;
       const dynamics = input.geometry.motionBounds({
         start: cell.start,
         end: cell.end,
         ...(span.kind === 'transition' ? { trajectory: span.trajectory } : {}),
-        pan: panBounds(span, cell.start, cell.end),
+        pan,
         targetScale: input.targetScale,
       });
       const limits = input.limitsAt?.(cell.start, cell.end) ?? input.limits;
@@ -267,6 +348,16 @@ export function proveCameraPlan(input: CameraPlanProofInput): CameraPlanProofRes
           (key) => Number.isFinite(dynamics[key]) && dynamics[key] <= limits[key] * (1 + 1e-6)
         );
       if (projectionProven && dynamicsProven) continue;
+      if (cell.coarse) {
+        intervals.push(
+          ...cameraProofCells(
+            { ...span, start: cell.start, end: cell.end },
+            observations,
+            input.geometry.breaks
+          )
+        );
+        continue;
+      }
       if (cell.depth >= 16 || cell.start === cell.end)
         return {
           status: 'conflict',

@@ -1,3 +1,10 @@
+import { classifySyncTransferFailure } from '../../workflows/sync-transfer/automatic';
+import { SecretProtectionLockedError } from '../../composition/persistence/secret-protection/model';
+import type {
+  materializeDueSyncCheckpoints,
+  SyncCheckpointScheduleObservation,
+} from '../../composition/persistence/sync-capture/checkpoint-schedule';
+import { SyncConnectionCoordinatorError } from './coordinator';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type {
@@ -25,7 +32,9 @@ const logger = createLogger({ namespace: 'SyncQueueRetry' });
 /** Native scheduling and the existing coordinator retain all durable admission authority. */
 export interface SyncQueueRetryWakeupDependencies {
   loadConnection(): Promise<SyncConnectionMetadata | null>;
+  canDispatch?(): Promise<boolean>;
   reconcileCaptures: typeof reconcileSyncQueueCaptures;
+  flushCheckpoints?: typeof materializeDueSyncCheckpoints;
   refreshIncoming?: () => Promise<void>;
   discoverInitialRoots?(
     scope: SyncQueueScope,
@@ -50,13 +59,105 @@ export interface SyncQueueRetryWakeupDependencies {
   subscribeQueueSettled?(listener: () => void): () => void;
 }
 
+type DiagnosticReason =
+  | SyncConnectionCoordinatorError['code']
+  | ReturnType<typeof classifySyncTransferFailure>
+  | 'secrets-locked'
+  | 'unexpected';
+
+type RetryStage =
+  | 'alarm-get'
+  | 'alarm-create'
+  | 'connection-load'
+  | 'initial-discovery'
+  | 'checkpoint-capture'
+  | 'capture-enqueue'
+  | 'incoming-refresh'
+  | 'schedule-load'
+  | 'schedule-initialize'
+  | 'discovery'
+  | 'dispatch-inspect'
+  | 'dispatch-defer'
+  | 'dispatch-recover'
+  | 'dispatch-start';
+interface RetryContext {
+  stage: RetryStage;
+}
+function warnDeferred(
+  stage: RetryStage,
+  reason: DiagnosticReason | 'refused' | 'unsupported-roots'
+): void {
+  try {
+    logger.warn(`sync.retry.deferred stage=${stage} reason=${reason}`);
+  } catch {
+    /* Diagnostics cannot change scheduling or retained native work. */
+  }
+}
+
+function reportCheckpoint(observation: SyncCheckpointScheduleObservation): void {
+  try {
+    if (observation.phase === 'preparing') {
+      logger.info('sync.checkpoint.preparing');
+      return;
+    }
+    const c = observation.counts;
+    const fields = [
+      `capturedRoots=${c.capturedRoots}`,
+      `acknowledgedRoots=${c.acknowledgedRoots}`,
+      `deadlineWaitingRoots=${c.deadlineWaitingRoots}`,
+      `scopeMismatchRoots=${c.scopeMismatchRoots}`,
+      `invalidPendingRoots=${c.invalidPendingRoots}`,
+      `revisionChangedRoots=${c.revisionChangedRoots}`,
+      `predecessorWaitingRoots=${c.predecessorWaitingRoots}`,
+      `admissionRefusedRoots=${c.admissionRefusedRoots}`,
+      `captureFailedRoots=${c.captureFailedRoots}`,
+      `deferredRoots=${c.deferredRoots}`,
+      `publicationBusyPasses=${c.publicationBusyPasses}`,
+      `progressChangedPasses=${c.progressChangedPasses}`,
+      `admissionRefusedPasses=${c.admissionRefusedPasses}`,
+      `failedPasses=${c.failedPasses}`,
+    ].join(' ');
+    logger.info(`sync.checkpoint.settled ${fields}`);
+  } catch {
+    /* Diagnostics cannot change scheduling or retained native work. */
+  }
+}
+
+function diagnosticReason(error: unknown): DiagnosticReason {
+  try {
+    if (error instanceof SecretProtectionLockedError) return 'secrets-locked';
+    if (error instanceof SyncConnectionCoordinatorError) {
+      const code = error.code;
+      switch (code) {
+        case 'coordinator-refused':
+        case 'privacy-exclusion':
+        case 'generation-changed':
+        case 'selection-changed':
+        case 'executor-unavailable':
+        case 'binding-changed':
+        case 'receipt-invalid':
+          return code;
+        default:
+          return 'unexpected';
+      }
+    }
+    return classifySyncTransferFailure(error);
+  } catch {
+    return 'unexpected';
+  }
+}
+
 /** Register a bounded wake-up pass. Disposal preserves the alarm and native work for restart. */
 export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencies) {
   let disposed = false;
   let pending: Promise<void> | null = null;
   let followupPending = false;
 
-  async function dispatch(candidate: SyncQueueDueCandidate): Promise<boolean> {
+  async function dispatch(
+    candidate: SyncQueueDueCandidate,
+    context: RetryContext
+  ): Promise<boolean> {
+    context.stage = 'dispatch-inspect';
     const snapshot = await deps.coordinator.inspect();
     if (disposed) return false;
     if (
@@ -65,7 +166,10 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
       )
     ) {
       // Start acknowledges before native admission. Preserve that pending claim's due time.
-      if (candidate.status === 'running') await deps.deferDue(candidate);
+      if (candidate.status === 'running') {
+        context.stage = 'dispatch-defer';
+        await deps.deferDue(candidate);
+      }
       return false;
     }
     const slotsFull =
@@ -78,19 +182,25 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
         snapshot.workspace?.state === 'running' ||
         snapshot.jobs.filter((job) => job.state === 'running').length >= 2)
     ) {
+      context.stage = 'dispatch-defer';
       await deps.deferDue(candidate);
       return false;
     }
     if (candidate.status === 'running') {
+      context.stage = 'dispatch-recover';
       const result = await deps.recoverInterrupted(
         candidate.scope,
         candidate.operationId,
         candidate.revision
       );
-      if (!disposed && result.status === 'busy') await deps.deferDue(candidate);
+      if (!disposed && result.status === 'busy') {
+        context.stage = 'dispatch-defer';
+        await deps.deferDue(candidate);
+      }
       // Recovery records a new native deadline. This obsolete candidate cannot start that run.
       return true;
     }
+    context.stage = 'dispatch-start';
     await deps.coordinator.start({
       scope: candidate.scope,
       authorization: candidate.authorization,
@@ -101,12 +211,15 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
   }
 
   async function initialize(
-    connection: SyncConnectionMetadata
+    connection: SyncConnectionMetadata,
+    context: RetryContext
   ): Promise<SyncQueueScheduleProgress | null> {
     const { spaceId, connectionGeneration, profileCreatedAt } = connection.binding;
     const scope = { spaceId, connectionGeneration, profileCreatedAt };
+    context.stage = 'schedule-load';
     let progress = await deps.loadProgress(scope, connection.identity);
     for (let page = 0; page < 2 && !disposed && !progress?.complete; page++) {
+      context.stage = 'schedule-initialize';
       progress = await deps.initializePage(
         scope,
         connection.identity,
@@ -117,12 +230,16 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
     return progress;
   }
 
-  async function pass(): Promise<void> {
+  async function pass(context: RetryContext): Promise<void> {
     const alarm = await deps.getAlarm(ALARM);
     if (disposed) return;
-    if (!isRecord(alarm) || alarm['periodInMinutes'] !== 1)
+    if (!isRecord(alarm) || alarm['periodInMinutes'] !== 1) {
+      context.stage = 'alarm-create';
       await deps.createAlarm(ALARM, { periodInMinutes: 1 });
+    }
     if (disposed) return;
+    context.stage = 'connection-load';
+    if (deps.canDispatch && !(await deps.canDispatch())) return;
     const connection = await deps.loadConnection();
     if (disposed) return;
     if (!connection || connection.phase !== 'active') return;
@@ -134,49 +251,68 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
         const initial = await deps.discoverInitialRoots?.(scope, connection.identity);
         if (disposed) return;
         initialRemaining = initial?.remaining ?? false;
-        if (initial && initial.refused > 0)
-          logger.warn('Sync initial discovery contains unsupported roots');
+        if (initial && initial.refused > 0) warnDeferred('initial-discovery', 'unsupported-roots');
         if (
           initial?.remaining &&
           initial.refused === 0 &&
           (initial.captured + initial.existing > 0 || initial.advanced === true)
         )
           followupPending = true;
-      } catch {
-        logger.warn('Sync initial discovery deferred');
+      } catch (error) {
+        warnDeferred('initial-discovery', diagnosticReason(error));
+      }
+      if (disposed) return;
+      let checkpointReported = false;
+      try {
+        const checkpoints = await deps.flushCheckpoints?.(
+          scope,
+          connection.identity,
+          (observation) => {
+            if (disposed) return;
+            if (observation.phase === 'settled') checkpointReported = true;
+            reportCheckpoint(observation);
+          }
+        );
+        if (disposed) return;
+        if (checkpoints?.remaining && checkpoints.advanced) followupPending = true;
+        if (checkpoints && checkpoints.refused > 0 && !checkpointReported)
+          warnDeferred('checkpoint-capture', 'refused');
+      } catch (error) {
+        if (!checkpointReported) warnDeferred('checkpoint-capture', diagnosticReason(error));
       }
       if (disposed) return;
       try {
         const result = await deps.reconcileCaptures(scope, connection.identity);
-        if (result.refused > 0) logger.warn('Sync capture enqueue deferred');
-      } catch {
+        if (result.refused > 0) warnDeferred('capture-enqueue', 'refused');
+      } catch (error) {
         // Committed queued work retains independent native admission after discovery failure.
-        logger.warn('Sync capture enqueue deferred');
+        warnDeferred('capture-enqueue', diagnosticReason(error));
       }
     }
     if (disposed) return;
     if (!initialRemaining && deps.refreshIncoming) {
       try {
         await deps.refreshIncoming();
-      } catch {
-        logger.warn('Sync incoming refresh deferred');
+      } catch (error) {
+        warnDeferred('incoming-refresh', diagnosticReason(error));
       }
     }
     if (disposed) return;
-    await initialize(connection);
+    await initialize(connection, context);
     if (disposed) return;
     let dispatches = 0;
     for (let page = 0; page < 2 && !disposed; page++) {
+      context.stage = 'discovery';
       const result = await deps.discoverDue(scope, connection.identity, 16);
       for (const candidate of result.candidates) {
         if (disposed) return;
         if (dispatches >= 2) break;
         // A refused candidate cannot suppress later entries in the durable discovery cursor.
         try {
-          if (await dispatch(candidate)) dispatches++;
-        } catch {
+          if (await dispatch(candidate, context)) dispatches++;
+        } catch (error) {
           dispatches++;
-          logger.warn('Sync queue retry deferred');
+          warnDeferred(context.stage, diagnosticReason(error));
         }
       }
       if (result.progress.dueAfter === null) return;
@@ -186,8 +322,9 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
   function run(): Promise<void> {
     if (disposed) return Promise.resolve();
     if (pending) return pending;
-    pending = pass()
-      .catch(() => logger.warn('Sync queue retry deferred'))
+    const context: RetryContext = { stage: 'alarm-get' };
+    pending = pass(context)
+      .catch((error: unknown) => warnDeferred(context.stage, diagnosticReason(error)))
       .finally(() => {
         pending = null;
         if (followupPending && !disposed) {

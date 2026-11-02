@@ -337,3 +337,20 @@ it.each(['address', 'credential', 'incarnation'] as const)(
     );
   }
 );
+
+it('reads the actual shared session and participation when Settings reloads', async () => {
+  const status = {
+    isEnabled: true,
+    isUnlocked: true,
+    mode: 'passphrase' as const,
+    participants: { ai: true, webdav: true },
+  };
+  const protection = { readStatus: vi.fn(async () => status) };
+  const response = await resolveAISettingsQueryResponse(
+    { type: 'AI_SETTINGS_QUERY', operation: 'read-settings-page-runtime-data' },
+    protection
+  );
+  expect(response.settingsRuntimeData?.secretProtectionStatus).toEqual(status);
+  expect(protection.readStatus).toHaveBeenCalledOnce();
+  expect(storageMocks.loadAISecretProtectionStatus).not.toHaveBeenCalled();
+});

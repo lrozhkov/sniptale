@@ -1,38 +1,37 @@
-import {
-  isRecord,
-  rejectUnknownKeys,
-  requireIdentifier,
-  validateLocaleText,
-  type EffectV1Record,
-  type EffectV1DiagnosticReporter,
-} from './shared.js';
+import { resolveEffectV1ControlGroup } from '../model/control-presentation.js';
+import { validateEffectV1ControlIcon } from './control-groups.js';
+import { validateEffectV1ControlMetadata } from './control-metadata.js';
+import { isRecord, rejectUnknownKeys, requireIdentifier, validateLocaleText } from './shared.js';
 
-const GROUPS = new Set([
-  'content',
-  'typography',
-  'appearance',
-  'geometry',
-  'processing',
-  'animation',
-  'advanced',
-]);
-const OPTION_KEYS = new Set(['value', 'label']);
+const OPTION_KEYS = new Set(['value', 'label', 'icon']);
 
 export function validateControlPresentation(
-  control: EffectV1Record,
+  control: Record<string, unknown>,
   path: string,
-  report: EffectV1DiagnosticReporter
+  report: {
+    error(code: string, path: string, message: string): void;
+    warning(code: string, path: string, message: string): void;
+  },
+  controlGroups?: unknown
 ): void {
   if (
     control['group'] !== undefined &&
     requireIdentifier(control['group'], `${path}.group`, report) &&
-    !GROUPS.has(control['group'])
+    resolveEffectV1ControlGroup(control['group'], controlGroups) === null
   ) {
-    report.warning(
-      'CONTROL_GROUP_UNKNOWN',
-      `${path}.group`,
-      'Unknown control group is presented in Advanced.'
-    );
+    if (controlGroups === undefined) {
+      report.warning(
+        'CONTROL_GROUP_UNKNOWN',
+        `${path}.group`,
+        'Unknown control group is presented in Advanced.'
+      );
+    } else {
+      report.error(
+        'CONTROL_GROUP_REFERENCE',
+        `${path}.group`,
+        'Control group must reference a semantic root or declared custom group.'
+      );
+    }
   }
   if (
     control['order'] !== undefined &&
@@ -42,14 +41,16 @@ export function validateControlPresentation(
   ) {
     report.error('CONTROL_ORDER', `${path}.order`, 'Expected a non-negative safe integer.');
   }
+  validateEffectV1ControlMetadata(control, path, report);
   const localizedDefault = control['localizedDefaultValue'];
   if (localizedDefault !== undefined) {
-    if (control['kind'] !== 'text')
+    if (control['kind'] !== 'text') {
       report.error(
         'CONTROL_LOCALIZED_DEFAULT_KIND',
         `${path}.localizedDefaultValue`,
-        'Localized defaults require a text control.'
+        'Localized defaults are only valid for text controls.'
       );
+    }
     validateLocaleText(localizedDefault, `${path}.localizedDefaultValue`, false, report);
   }
   const options = control['options'];
@@ -75,6 +76,7 @@ export function validateControlPresentation(
       return;
     }
     rejectUnknownKeys(option, OPTION_KEYS, optionPath, report);
+    validateEffectV1ControlIcon(option['icon'], `${optionPath}.icon`, report);
     validateLocaleText(option['label'], `${optionPath}.label`, false, report);
     const value = option['value'];
     const valid =
@@ -100,14 +102,15 @@ export function validateControlPresentation(
       );
     values.add(value);
   });
-  if (control['kind'] === 'text' && isRecord(localizedDefault)) {
-    for (const [locale, text] of Object.entries(localizedDefault)) {
-      if (typeof text === 'string' && text.trim() && !values.has(text))
+  if (isRecord(localizedDefault)) {
+    for (const [locale, value] of Object.entries(localizedDefault)) {
+      if (typeof value === 'string' && value.trim() && !values.has(value)) {
         report.error(
           'CONTROL_OPTION_LOCALIZED_DEFAULT',
           `${path}.localizedDefaultValue.${locale}`,
           'Localized default must be one of the options.'
         );
+      }
     }
   }
   if (!values.has(control['defaultValue'] as number | string))

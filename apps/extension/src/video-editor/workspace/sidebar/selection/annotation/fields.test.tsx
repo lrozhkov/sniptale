@@ -1,3 +1,4 @@
+import { InspectorGroupedPanel } from '../grouped-inspector';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -178,4 +179,31 @@ it('defaults modern annotation editing to Content and classifies template metada
   expect(markup).toContain('data-section="content"');
   expect(markup).toContain('videoEditor.sidebar.annotationHeadlineLabel');
   expect(markup).not.toContain('videoEditor.sidebar.annotationTemplateThemeLabel');
+});
+
+it('distinguishes the legacy annotation summary from content in the category rail', () => {
+  const markup = renderToStaticMarkup(<AnnotationFields {...createProps()} />);
+  const rail = markup.match(/<nav\b[\s\S]*?<\/nav>/)?.[0] ?? '';
+  const icons = [...rail.matchAll(/<svg\b[^>]*>([\s\S]*?)<\/svg>/g)].map((match) => match[1]);
+  expect(icons.length).toBeGreaterThan(1);
+  expect(new Set(icons).size).toBe(icons.length);
+});
+
+it('distinguishes modern template metadata from the enclosing clip summary', () => {
+  const props = createModernProps(
+    APPLE_GLASS_ANNOTATION_PACK,
+    APPLE_GLASS_ANNOTATION_PACK.templates.callout[0]!
+  );
+  const markup = renderToStaticMarkup(
+    <InspectorGroupedPanel
+      groups={[
+        { id: 'info', semantic: 'info', label: 'Clip summary', content: null },
+        ...createAnnotationGroups(props, true),
+      ]}
+    />
+  );
+  const rail = markup.match(/<nav\b[\s\S]*?<\/nav>/)?.[0] ?? '';
+  const icons = [...rail.matchAll(/<svg\b[^>]*>([\s\S]*?)<\/svg>/g)].map((match) => match[1]);
+  expect(icons.length).toBeGreaterThan(1);
+  expect(new Set(icons).size).toBe(icons.length);
 });

@@ -52,6 +52,7 @@
     "docs/tooling/ci-cd.md",
     "docs/tooling/code-quality.md",
     "docs/tooling/operator-handbook.md",
+    "docs/tooling/preview-performance.md",
     "docs/tooling/repo-root-inventory.md",
     "docs/tooling/web-snapshot-smoke.md",
     "docs/tooling/webdav-e2e.md",

@@ -408,7 +408,7 @@ it('rebinds a later portable private source without overwriting the predecessor 
   expect(second.input.root.entry.project.clips).toEqual(first.input.root.entry.project.clips);
 });
 
-it.each(['video/webm', 'image/png'])(
+it.each(['video/webm', 'video/webm;codecs=vp8', 'image/png'])(
   'round-trips an independent %s created export through the existing backup codec',
   async (mimeType) => {
     const original = { ...ref('export-bytes'), mimeType };

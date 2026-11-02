@@ -1519,25 +1519,25 @@
       "targetAction": "Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception."
     },
     {
-      "id": "noise.codeql.webdav-metadata-transformer",
+      "id": "noise.codeql.transform-stream-webdav",
       "classification": "tool-noise",
-      "owner": "sync-transfer",
-      "risk": "Removing the transformer would remove stream validation. The exception must stay limited to this exact source, location, rule and message.",
-      "reason": "The pinned CodeQL extern web/streamsapi.js:43 declares TransformStream with no parameters. The pinned TypeScript DOM declaration accepts a transformer object. This call passes one transformer argument. webdav.test.ts bounds streamed metadata, including absent and misleading content-length headers. The 148 focused archive, WebDAV and residency-copy tests passed.",
-      "removalCondition": "Remove when the pinned CodeQL extern declares the constructor parameters or this exact transformer call changes.",
+      "owner": "sync-transfer-webdav",
+      "risk": "Removing this transformer would remove byte-limit or source-integrity enforcement.",
+      "reason": "The CodeQL streamsapi.js extern declares TransformStream with zero parameters. The standard constructor accepts the transformer argument used here. Existing stream tests exercise its callbacks and rejection paths.",
+      "removalCondition": "Remove when CodeQL models the standard transformer parameter or this exact constructor call changes.",
       "reviewBy": "2027-05-02",
       "source": {
         "kind": "codeql",
-        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/webdav.ts:280:2a5a41ec32b8455a58f2e55e1650a6aeba5457133cc67466116b14a6793a4583:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/webdav.ts:288:199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
       },
       "scope": {
-        "contentHash": "2a5a41ec32b8455a58f2e55e1650a6aeba5457133cc67466116b14a6793a4583",
+        "contentHash": "199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4",
         "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
-        "line": 280,
+        "line": 288,
         "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
         "rule": "js/superfluous-trailing-arguments"
       },
-      "targetAction": "Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception."
+      "targetAction": "Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking."
     }
   ]
 }

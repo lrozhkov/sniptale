@@ -74,7 +74,9 @@ for (const locale of ['ru', 'en'] as const) {
           },
         });
       });
-      const url = `chrome-extension://${extensionId}/apps/extension/src/settings/index.html?section=native-app&view=capture`;
+      const url =
+        `chrome-extension://${extensionId}/apps/extension/src/settings/index.html` +
+        '?section=native-app&view=capture';
       await page.goto(url);
       await page.evaluate(async (selectedLocale) => {
         localStorage.setItem('sniptale-locale-preference', selectedLocale);

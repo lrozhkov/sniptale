@@ -109,3 +109,26 @@ export function parseSyncWorkspaceMarker(input: unknown): SyncWorkspaceIdentity 
   if (encoded.text !== input) return invalid();
   return encoded.identity;
 }
+
+/** Accept one decoded workspace child name without URL normalization. */
+export function isSyncWorkspaceDiscoveryName(name: unknown): name is string {
+  if (typeof name !== 'string') return false;
+  if (
+    !name ||
+    name === '.' ||
+    name === '..' ||
+    /[\\/?#:]/u.test(name) ||
+    Array.from(name).some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 0x1f || code === 0x7f;
+    }) ||
+    /%(?:25)*(?:2e|2f|5c|0[0-9a-f]|1[0-9a-f]|7f)/iu.test(name)
+  )
+    return false;
+  try {
+    encodeURIComponent(name);
+    return true;
+  } catch {
+    return false;
+  }
+}

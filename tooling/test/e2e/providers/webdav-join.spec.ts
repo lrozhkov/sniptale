@@ -81,6 +81,7 @@ test('a second browser joins populated metadata and enrolls without downloading 
     );
     expect(enrolled.code).toBe('success');
     expect(enrolled.connection?.workspace).toEqual(checked.identity);
+    expect(enrolled.connection?.storagePolicy).toEqual({ version: 1, mode: 'on-demand' });
     const beforeRestart = await browser.page.evaluate(() =>
       window.webdavTransferHarness.connection.restore()
     );

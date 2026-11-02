@@ -1,11 +1,22 @@
+import { SecretProtectionView } from '../../../secret-protection/view';
+import { useSettingsSecretProtection } from '../../../secret-protection/context';
 import { translate } from '../../../../platform/i18n';
 import { SettingsSubpageTabs } from '../../../section-surface';
 import { PermissionsSection } from './permissions';
 import { PrivacySection } from './privacy';
 
+function ProtectionConfiguration() {
+  const state = useSettingsSecretProtection();
+  return <SecretProtectionView state={state} />;
+}
+
 export function AccessDataSection(props: { onViewChange?: (view: string) => void; view?: string }) {
   const view =
-    props.view === 'privacy' || props.view === 'required-permissions' ? props.view : 'permissions';
+    props.view === 'secret-protection' ||
+    props.view === 'privacy' ||
+    props.view === 'required-permissions'
+      ? props.view
+      : 'permissions';
   return (
     <div className="space-y-5">
       <SettingsSubpageTabs
@@ -18,10 +29,16 @@ export function AccessDataSection(props: { onViewChange?: (view: string) => void
             label: translate('settings.permissions.requiredGrantsTitle'),
           },
           { id: 'privacy', label: translate('settings.navigation.views.privacy') },
+          {
+            id: 'secret-protection',
+            label: translate('settings.navigation.views.secretProtection'),
+          },
         ]}
         onChange={props.onViewChange}
       />
-      {view === 'privacy' ? (
+      {view === 'secret-protection' ? (
+        <ProtectionConfiguration />
+      ) : view === 'privacy' ? (
         <PrivacySection />
       ) : (
         <PermissionsSection view={view === 'required-permissions' ? 'required' : 'optional'} />

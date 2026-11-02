@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   assertEffectDecodedAudio,
@@ -81,5 +81,76 @@ describe('EffectV1 retained runtime resource limits', () => {
       liveDecodedRasterBytes: 0,
       liveRasterResources: 0,
     });
+  });
+});
+
+describe('EffectV1 atomic raster admission', () => {
+  it.each([
+    ['canvas', 'count', 8, 1, 1],
+    ['bitmap', 'count', 8, 1, 1],
+    ['canvas', 'bytes', 4, 3840, 2160],
+    ['bitmap', 'bytes', 4, 3840, 2160],
+  ] as const)(
+    'preserves both ledgers when %s admission exceeds live %s',
+    (kind, _limit, count, width, height) => {
+      const ledger = createEffectRuntimeCompositionResourceLedger();
+      const occupied = ledger.createFrameScope();
+      const releases = Array.from({ length: count }, () => occupied.allocateCanvas(width, height));
+      const frame = ledger.createFrameScope();
+      const bitmap = { close: vi.fn(), width: 1024, height: 1024 } as ImageBitmap;
+      const reserve = () => {
+        if (kind === 'canvas') return frame.allocateCanvas(bitmap.width, bitmap.height);
+        frame.retainBitmap(bitmap);
+        return () => closeEffectRuntimeBitmap(bitmap);
+      };
+      const before = frame.snapshot();
+      expect(() => reserve()).toThrow(EffectRuntimeResourceError);
+      expect(frame.snapshot()).toEqual(before);
+      expect(bitmap.close).not.toHaveBeenCalled();
+      releases[0]!();
+      const release = reserve();
+      expect(frame.snapshot().aggregatePixels).toBe(1024 * 1024);
+      release();
+      release();
+      releases.forEach((free) => free());
+      expect(ledger.snapshot()).toEqual({ liveDecodedRasterBytes: 0, liveRasterResources: 0 });
+      expect(frame.snapshot().aggregatePixels).toBe(1024 * 1024);
+    }
+  );
+
+  it.each(['canvas', 'bitmap'] as const)(
+    'leaves live resources unchanged when %s exceeds the frame aggregate',
+    (kind) => {
+      const ledger = createEffectRuntimeCompositionResourceLedger();
+      const frame = ledger.createFrameScope();
+      for (let index = 0; index < 4; index += 1) frame.allocateCanvas(3840, 2160)();
+      const before = frame.snapshot();
+      const bitmap = { close: vi.fn(), width: 1, height: 1 } as ImageBitmap;
+      expect(() => {
+        if (kind === 'canvas') frame.allocateCanvas(1, 1);
+        else frame.retainBitmap(bitmap);
+      }).toThrow(EffectRuntimeResourceError);
+      expect(frame.snapshot()).toEqual(before);
+      expect(bitmap.close).not.toHaveBeenCalled();
+    }
+  );
+
+  it('retains an already charged bitmap without charging the frame twice', () => {
+    const ledger = createEffectRuntimeCompositionResourceLedger();
+    const frame = ledger.createFrameScope();
+    for (let index = 0; index < 4; index += 1) frame.allocateCanvas(3840, 2160)();
+    const bitmap = { close: vi.fn(), width: 20, height: 10 } as ImageBitmap;
+    frame.retainBitmap(bitmap, false);
+    expect(frame.snapshot()).toEqual({
+      aggregatePixels: EFFECT_RUNTIME_RESOURCE_LIMITS.maxAggregateCanvasPixelsPerFrame,
+      liveDecodedRasterBytes: 800,
+      liveRasterResources: 1,
+    });
+    const before = frame.snapshot();
+    expect(() => frame.retainBitmap(bitmap, false)).toThrow(EffectRuntimeResourceError);
+    expect(frame.snapshot()).toEqual(before);
+    closeEffectRuntimeBitmap(bitmap);
+    expect(ledger.snapshot()).toEqual({ liveDecodedRasterBytes: 0, liveRasterResources: 0 });
+    expect(bitmap.close).toHaveBeenCalledOnce();
   });
 });

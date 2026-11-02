@@ -1,6 +1,5 @@
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import type { ChromeAiAvailability } from '@sniptale/platform/browser/chrome-ai';
-import type { AISecretProtectionStatusPayload } from '../../../../../contracts/messaging/ai-settings-runtime';
 
 type ProviderModalState = { open: boolean; provider?: AIProvider | null };
 type ModelModalState = { open: boolean; model?: AIModel | null; initialProviderId?: string };
@@ -22,37 +21,6 @@ interface AiProvidersChromeAiState {
   testStatus: 'idle' | 'running' | 'success' | 'error';
 }
 
-export type AiSecretProtectionDialogMode = 'enable' | 'unlock' | 'disable' | 'change' | 'reset';
-
-interface AiSecretProtectionDialogState {
-  mode: AiSecretProtectionDialogMode;
-  error: string | null;
-  isSubmitting: boolean;
-}
-
-interface AiSecretProtectionState {
-  dialog: AiSecretProtectionDialogState | null;
-  ensureUnlocked: () => Promise<void>;
-  handleChangeSubmit: (params: {
-    currentPassphrase: string;
-    nextPassphrase: string;
-    confirmPassphrase: string;
-  }) => Promise<void>;
-  handleCloseDialog: () => void;
-  handleDisableSubmit: (passphrase: string) => Promise<void>;
-  handleEnableSubmit: (params: { passphrase: string; confirmPassphrase: string }) => Promise<void>;
-  handleLockNow: () => Promise<void>;
-  handleOpenChangeDialog: () => void;
-  handleOpenDisableDialog: () => void;
-  handleOpenEnableDialog: () => void;
-  handleOpenResetDialog: () => void;
-  handleOpenUnlockDialog: () => void;
-  handleResetConfirm: () => Promise<void>;
-  handleUnlockSubmit: (passphrase: string) => Promise<void>;
-  isBusy: boolean;
-  status: AISecretProtectionStatusPayload;
-}
-
 interface AiProvidersModalsState {
   provider: ProviderModalState;
   model: ModelModalState;
@@ -72,7 +40,7 @@ export interface AiProvidersSectionState {
     moveModel: (modelId: string, beforeModelId: string | null) => Promise<boolean>;
   };
   chromeAi: AiProvidersChromeAiState;
-  secretProtection: AiSecretProtectionState;
+  secretProtection: { ensureUnlocked: () => Promise<void> };
   providers: AIProvider[];
   models: AIModel[];
   catalogModels: AIModel[];

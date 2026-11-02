@@ -1,3 +1,4 @@
+import { MAX_CAPTURE_ROWS } from './contracts';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   EFFECT_BUNDLE_CORPUS,
@@ -327,3 +328,51 @@ it('keeps a deferred saved export out of physical staging claims and hydration r
   expect(hydrated.exports?.[0]?.ref).toEqual(ref);
   expect(io.read.mock.calls.some(([read]) => read.assetId === ref.assetId)).toBe(false);
 });
+
+it.each([
+  '',
+  '../foreign',
+  'objects//file',
+  'objects/./file',
+  'objects/../file',
+  'objects/file?query',
+  'objects/file#fragment',
+  'objects/file:stream',
+  'objects\\file',
+  'objects/\u0001file',
+  'objects/\u007ffile',
+  'a'.repeat(2049),
+])('refuses deferred project export key %j before physical reads', async (key) => {
+  const { root } = await setup();
+  const ref: AssetRef = {
+    assetId: 'deferred-invalid-key',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/deferred-invalid-key' },
+    size: 100,
+    mimeType: 'video/webm',
+    sha256: 'b'.repeat(64),
+  };
+  const entry = createProjectExportEntry({
+    id: 'deferred-invalid-key',
+    projectId: root.entry.id,
+    assetId: ref.assetId,
+    size: ref.size,
+    mimeType: ref.mimeType,
+  });
+  root.exports = [{ entry, ref, remote: { key, sha256: ref.sha256! } }];
+  expect(() => parsePreparedVideoProjectReplicaRoot(root)).toThrow('invalid');
+  expect(io.read).not.toHaveBeenCalled();
+});
+
+it.each(['assets', 'exports'] as const)(
+  'refuses malformed or oversized prepared %s collections before physical reads',
+  async (slot) => {
+    const { root } = await setup();
+    for (const value of [{}, [null], Array.from({ length: MAX_CAPTURE_ROWS + 1 }, () => ({}))]) {
+      expect(() => parsePreparedVideoProjectReplicaRoot({ ...root, [slot]: value })).toThrow(
+        'invalid'
+      );
+    }
+    expect(io.read).not.toHaveBeenCalled();
+  }
+);

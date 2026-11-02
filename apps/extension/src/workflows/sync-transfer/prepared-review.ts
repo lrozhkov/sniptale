@@ -97,6 +97,7 @@ export async function preparePortableVideoReviewRoot(args: {
   sourceMediaId: string;
   dependencies: ApplyPreparedVideoProjectRevisionInput['dependencies'];
   expectedLocalGeneration: number;
+  omitPresentation?: boolean;
   refFor: (objectId: string) => AssetRef;
 }): Promise<PreparedVideoReviewReplicaRoot> {
   validatePortableVideoReviewMetadata(args.metadata, args.sourceMediaId);
@@ -196,7 +197,7 @@ export async function preparePortableVideoReviewRoot(args: {
     assetIdMap: assetIds,
   });
   if (aggregateId !== args.sourceMediaId) review.workspace.sourceMediaId = args.sourceMediaId;
-  const thumbnail = args.metadata.thumbnail;
+  const thumbnail = args.omitPresentation ? undefined : args.metadata.thumbnail;
   const root = parsePreparedVideoReviewReplicaRoot({
     review,
     sourceMediaId: args.sourceMediaId,

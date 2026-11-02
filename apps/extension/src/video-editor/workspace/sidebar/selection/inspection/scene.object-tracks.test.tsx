@@ -59,6 +59,8 @@ describe('workspace-sidebar/selection/inspect-scene/object-tracks', () => {
       onDeleteObjectTrack,
       onSelectObjectTrack,
     });
+    const icons = [...container!.querySelectorAll('nav button svg')].map((icon) => icon.innerHTML);
+    expect(new Set(icons).size).toBe(icons.length);
     clickGroup('videoEditor.sidebar.inspectorGroupObjectTracks');
 
     expect(container?.textContent).not.toContain('videoEditor.sidebar.objectTracksTitle');

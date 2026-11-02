@@ -1,11 +1,16 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createMediaLibraryEntry } from '../projects/index.test-support';
+import { createMediaLibraryEntry, createProjectAssetEntry } from '../projects/index.test-support';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
-import { captureImageInTransaction, captureMediaInTransaction } from './capture';
+import {
+  captureImageInTransaction,
+  captureMediaInTransaction,
+  captureRootCheckpointInTransaction,
+} from './capture';
+import { readCheckpointInTransaction } from './checkpoints';
 import { SCENARIO_CAPTURE_STORES } from './scenario-snapshot';
 import {
   createGuideProject,
@@ -20,6 +25,7 @@ import { captureRootKey } from './contracts';
 import {
   parseCapturedImageRows,
   digestCapturedImageRows,
+  digestUnloadedImageReplicaRows,
   readImageReplicaPredecessorInTransaction,
   freezeImageInTransaction,
 } from './image-snapshot';
@@ -90,7 +96,7 @@ function setup() {
     'asset_refs',
     'sync_capture',
   ];
-  async function capture(edited = false) {
+  async function capture(edited = false, checkpoint: 'freeze' | 'defer' = 'freeze') {
     return runWithIndexedDbMutation(async (db) => {
       const tx = db.transaction(stores, 'readwrite');
       try {
@@ -101,7 +107,7 @@ function setup() {
           await tx.objectStore('image_workspaces').put(workspace);
           await tx.objectStore('asset_refs').put(ref);
         }
-        const result = await captureImageInTransaction(tx, media.id);
+        const result = await captureImageInTransaction(tx, media.id, { checkpoint });
         await tx.done;
         return result;
       } catch (error) {
@@ -271,7 +277,7 @@ it('captures stored image originals separately from authored document refs and p
       ],
       'readwrite'
     );
-    const result = await captureMediaInTransaction(tx, media.id);
+    const result = await captureMediaInTransaction(tx, media.id, { checkpoint: 'freeze' });
     await tx.done;
     return result;
   });
@@ -300,7 +306,7 @@ it('captures stored image originals separately from authored document refs and p
         ],
         'readwrite'
       );
-      return captureMediaInTransaction(tx, media.id);
+      return captureMediaInTransaction(tx, media.id, { checkpoint: 'freeze' });
     })
   ).rejects.toThrow('ownership');
 });
@@ -532,9 +538,29 @@ async function guideWithUnloadedScreenshot() {
   return { ...f, entry, body, ownerKey };
 }
 
+async function checkpointGuide(f: Awaited<ReturnType<typeof guideWithUnloadedScreenshot>>) {
+  return runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction([...SCENARIO_CAPTURE_STORES], 'readwrite');
+    try {
+      const pending = await readCheckpointInTransaction(
+        tx,
+        { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 1 },
+        { rootKind: 'scenario-project', rootId: f.entry.id }
+      );
+      if (!pending) throw new Error('Expected the accepted Guide checkpoint.');
+      const result = await captureRootCheckpointInTransaction(tx, pending, { force: true });
+      await tx.done;
+      return result;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
+    }
+  });
+}
+
 it('purges a Guide export with an exact unloaded screenshot dependency without new image bytes', async () => {
   const f = await guideWithUnloadedScreenshot();
   await deleteScenarioExport('html-export');
+  await checkpointGuide(f);
   expect(f.table('scenario_exports').has('html-export')).toBe(false);
   expect(f.table('asset_refs').has(f.body.assetId)).toBe(false);
   expect(f.table('asset_owners').has(f.ownerKey)).toBe(false);
@@ -566,24 +592,293 @@ it('purges a Guide export with an exact unloaded screenshot dependency without n
   ).toHaveLength(1);
 });
 
-it('preserves a refused export purge and permits exact retry after dependency metadata is restored', async () => {
+it('preserves the accepted export purge and retries its refused checkpoint after dependency repair', async () => {
   const f = await guideWithUnloadedScreenshot();
   const original = f.table('media_library').get(f.media.id);
   f.table('media_library').set(f.media.id, { ...f.media, createdAt: f.media.createdAt + 1 });
-  const before = structuredClone(f.rows);
-  const transactions: ReturnType<typeof f.database.transaction>[] = [];
-  io.database.mockResolvedValue({
-    transaction: (stores: string[], mode: string) => {
-      const tx = f.database.transaction(stores, mode);
-      transactions.push(tx);
-      return tx;
-    },
-  });
-  await expect(deleteScenarioExport('html-export')).rejects.toThrow();
-  // Settle the queued native writes, as IndexedDB does after a JavaScript refusal.
-  await Promise.allSettled(transactions.map((tx) => tx.done));
-  expect(f.rows).toEqual(before);
-  f.table('media_library').set(f.media.id, original);
   await deleteScenarioExport('html-export');
   expect(f.table('scenario_exports').has('html-export')).toBe(false);
+  expect(f.table('asset_refs').has(f.body.assetId)).toBe(false);
+  const beforeRefusal = structuredClone(f.rows);
+  await expect(checkpointGuide(f)).rejects.toThrow();
+  expect(f.rows).toEqual(beforeRefusal);
+  f.table('media_library').set(f.media.id, original);
+  const accepted = await checkpointGuide(f);
+  expect(accepted).toMatchObject({
+    phase: 'native',
+    change: { kind: 'scenario-project', rows: { exports: [] } },
+  });
+  expect(f.table('scenario_exports').has('html-export')).toBe(false);
+});
+
+it.each([0, 1])(
+  'freezes only matching image presentation at revision %s without changing native render data',
+  async (presentationRevision) => {
+    const f = setup();
+    const presentation = {
+      aggregateId: f.media.id,
+      aggregateKind: 'image',
+      presentationRevision,
+      thumbnailBlob: new Blob(['thumbnail'], { type: 'image/webp' }),
+      previewBlob: new Blob(['preview'], { type: 'image/png' }),
+      updatedAt: 2,
+    };
+    f.table('sync_capture').set('profile', {
+      version: 1,
+      kind: 'profile',
+      key: 'profile',
+      createdAt: 1,
+      enabled: true,
+      spaceId: 'space',
+      connectionGeneration: 1,
+      checkpointIntervalMs: 300000,
+    });
+    f.table('aggregate_presentations').set(JSON.stringify(['image', f.media.id]), presentation);
+    expect(await f.capture(true, 'defer')).toBeNull();
+    await runWithIndexedDbMutation(async (db) => {
+      const tx = db.transaction(
+        [
+          'media_library',
+          'image_workspaces',
+          'aggregate_presentations',
+          'asset_refs',
+          'sync_capture',
+        ],
+        'readwrite'
+      );
+      try {
+        const root = { rootKind: 'media' as const, rootId: f.media.id };
+        const pending = await readCheckpointInTransaction(
+          tx,
+          { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 1 },
+          root
+        );
+        if (!pending) throw new Error('Expected pending image checkpoint.');
+        const captured = await captureRootCheckpointInTransaction(tx, pending, {
+          now: pending.dueAt,
+        });
+        if (captured?.phase !== 'native' || captured.change.kind !== 'image')
+          throw new Error('Expected image checkpoint.');
+        expect(captured.change.rows.workspace?.revision).toBe(1);
+        expect(captured.change.rows.presentation).toEqual(
+          presentationRevision === 1 ? presentation : null
+        );
+        const state = parseSyncCaptureRecord(
+          await tx.objectStore('sync_capture').get(JSON.stringify(['root-state', captured.rootKey]))
+        );
+        if (!state || state.kind !== 'root-state') throw new Error('Expected native root state.');
+        const predecessor = await readImageReplicaPredecessorInTransaction(tx, f.media.id, state);
+        expect(predecessor.digest).toBe(state.nativeDigest);
+        expect(predecessor.rows.presentation).toEqual(presentation);
+        await tx.done;
+      } catch (error) {
+        return abortIndexedDbMutation(tx, error);
+      }
+    });
+    expect(f.table('aggregate_presentations').get(JSON.stringify(['image', f.media.id]))).toEqual(
+      presentation
+    );
+  }
+);
+
+it.each([false, true])(
+  'hashes a new unloaded presentation as the same full native after-image (previous duplicate=%s)',
+  async (duplicate) => {
+    const f = await unloadedImage(duplicate);
+    const before = await f.read();
+    if (before.unloadedCopy?.target.kind !== 'inline-image')
+      throw new Error('Expected inline copy');
+    const previousTarget = before.unloadedCopy.target;
+    const { duplicatePreview: _duplicatePreview, ...original } = previousTarget;
+    const presentation = {
+      aggregateId: f.media.id,
+      aggregateKind: 'image' as const,
+      presentationRevision: 0,
+      previewBlob: new Blob(['independent-render'], { type: 'image/webp' }),
+      thumbnailBlob: new Blob(['new-thumbnail'], { type: 'image/webp' }),
+      updatedAt: 2,
+    };
+    const after = { ...before.rows, presentation };
+    const readBytes = vi.spyOn(Blob.prototype, 'arrayBuffer');
+    try {
+      const digest = digestUnloadedImageReplicaRows(after, original);
+      expect(digest).toBe(
+        digestCapturedImageRows({
+          ...after,
+          media: { ...after.media, blob: new Blob(['original'], { type: original.blobType }) },
+        })
+      );
+      expect(parseCapturedImageRows(after)).toBeNull();
+      expect(readBytes).not.toHaveBeenCalled();
+      if (duplicate) {
+        expect(() => digestUnloadedImageReplicaRows(after, previousTarget)).toThrow();
+      }
+    } finally {
+      readBytes.mockRestore();
+    }
+  }
+);
+
+it.each(['valid', 'child-id', 'child-ref', 'owner', 'mime', 'size', 'borrowed', 'blob'] as const)(
+  'freezes only the exact imported Image original child ref owner and workspace closure: %s',
+  async (fault) => {
+    const f = setup();
+    const id = 'project-asset:imported-image';
+    const child = createProjectAssetEntry({
+      id: 'imported-image',
+      assetId: f.ref.assetId,
+      size: f.ref.size,
+      mimeType: f.ref.mimeType,
+    });
+    const media = {
+      ...f.media,
+      id,
+      kind: 'image' as const,
+      source: { kind: 'project-asset' as const, projectAssetId: child.id },
+      blob: undefined,
+      workspaceRevision: 1,
+      imageContentState: 'edited' as const,
+    };
+    f.table('media_library').set(id, media);
+    f.table('project_assets').set(child.id, {
+      ...child,
+      ...(fault === 'child-id' ? { id: 'other' } : {}),
+      ...(fault === 'child-ref' ? { assetId: 'other' } : {}),
+      ...(fault === 'mime' ? { mimeType: 'image/jpeg' } : {}),
+      ...(fault === 'size' ? { size: 9 } : {}),
+      ...(fault === 'borrowed' ? { originMediaId: 'foreign' } : {}),
+    });
+    f.table('asset_refs').set(f.ref.assetId, f.ref);
+    f.table('asset_owners').set(JSON.stringify(['project-asset', child.id, 'body']), {
+      assetId: fault === 'owner' ? 'other' : f.ref.assetId,
+      ownerKind: 'project-asset',
+      ownerId: child.id,
+      role: 'body',
+    });
+    f.table('image_workspaces').set(id, { ...f.workspace, aggregateId: id });
+    if (fault === 'blob')
+      f.table('media_library').set(id, {
+        ...media,
+        blob: new Blob(['original'], { type: 'image/png' }),
+      });
+    const before = structuredClone(f.rows);
+    await runWithIndexedDbMutation(async (db) => {
+      const tx = db.transaction(
+        [
+          'media_library',
+          'project_assets',
+          'asset_refs',
+          'asset_owners',
+          'image_workspaces',
+          'aggregate_presentations',
+        ],
+        'readonly'
+      );
+      if (fault === 'valid') {
+        const frozen = await freezeImageInTransaction(tx, id);
+        expect(frozen.projectAsset).toEqual(child);
+        expect(frozen.originalRef).toEqual(f.ref);
+        expect(frozen.workspace?.aggregateId).toBe(id);
+      } else await expect(freezeImageInTransaction(tx, id)).rejects.toThrow();
+      await tx.done;
+    });
+    expect(f.rows).toEqual(before);
+  }
+);
+
+it('rebases a clean imported Image presentation cache without creating authored work', async () => {
+  const f = setup();
+  const id = 'project-asset:cache-import';
+  const child = createProjectAssetEntry({
+    id: 'cache-import',
+    assetId: f.ref.assetId,
+    mimeType: f.ref.mimeType,
+    size: f.ref.size,
+  });
+  const { blob: _blob, ...base } = f.media;
+  const media = {
+    ...base,
+    id,
+    source: { kind: 'project-asset' as const, projectAssetId: child.id },
+    workspaceRevision: 1,
+    imageContentState: 'edited' as const,
+  };
+  f.table('media_library').set(id, media);
+  f.table('project_assets').set(child.id, child);
+  f.table('asset_refs').set(f.ref.assetId, f.ref);
+  f.table('asset_owners').set(JSON.stringify(['project-asset', child.id, 'body']), {
+    ownerKind: 'project-asset',
+    ownerId: child.id,
+    role: 'body',
+    assetId: f.ref.assetId,
+  });
+  f.table('image_workspaces').set(id, { ...f.workspace, aggregateId: id });
+  const database = {
+    ...f.database,
+    transaction(stores: string[], mode: string) {
+      const tx = f.database.transaction(stores, mode);
+      return {
+        ...tx,
+        get done() {
+          return tx.done;
+        },
+        objectStore(name: string) {
+          const store = tx.objectStore(name);
+          return name === 'aggregate_presentations'
+            ? {
+                ...store,
+                get: (key: IDBValidKey) =>
+                  store.get(
+                    Array.isArray(key) && key[0] === 'image' && typeof key[1] === 'string'
+                      ? key[1]
+                      : key
+                  ),
+              }
+            : store;
+        },
+      };
+    },
+  };
+  io.database.mockResolvedValue(database);
+  const stores = [
+    'sync_capture',
+    'media_library',
+    'project_assets',
+    'asset_refs',
+    'asset_owners',
+    'image_workspaces',
+    'aggregate_presentations',
+  ];
+  await runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction(stores, 'readwrite');
+    await captureImageInTransaction(tx, id, { checkpoint: 'freeze' });
+    await tx.done;
+  });
+  const rootKey = captureRootKey('space', 'media', id);
+  const stateKey = JSON.stringify(['root-state', rootKey]);
+  const before = parseSyncCaptureRecord(f.table('sync_capture').get(stateKey));
+  if (before?.kind !== 'root-state') throw new Error('Expected native Image state');
+  const captureRows = structuredClone(f.table('sync_capture'));
+  const { commitImagePresentation } = await import('../image-aggregates/mutations');
+  await commitImagePresentation({
+    aggregateId: id,
+    expectedWorkspaceRevision: 1,
+    previewBlob: new Blob(['rendered'], { type: 'image/png' }),
+    thumbnailBlob: new Blob(['thumb'], { type: 'image/png' }),
+  });
+  await runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction(stores, 'readonly');
+    const rows = await freezeImageInTransaction(tx, id);
+    await tx.done;
+    expect(rows.presentation?.previewBlob).toBeInstanceOf(Blob);
+    expect(f.table('sync_capture').get(stateKey)).toEqual({
+      ...before,
+      nativeDigest: digestCapturedImageRows(rows),
+    });
+    expect(digestCapturedImageRows(rows)).not.toBe(before.nativeDigest);
+  });
+  captureRows.delete(stateKey);
+  const after = structuredClone(f.table('sync_capture'));
+  after.delete(stateKey);
+  expect(after).toEqual(captureRows);
 });

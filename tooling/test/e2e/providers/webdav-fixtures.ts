@@ -119,6 +119,7 @@ export async function openProvider(
     viewport?: { width: number; height: number };
     offline?: boolean;
     harness?: boolean;
+    headlessScreen?: { width: number; height: number };
   } = {}
 ) {
   const loaded = await launchExtensionBrowser({
@@ -126,6 +127,7 @@ export async function openProvider(
     userDataDir: info.outputPath(name),
     viewport: options.viewport ?? { width: 1280, height: 560 },
     ignoreHTTPSErrors: true,
+    ...(options.headlessScreen ? { headlessScreen: options.headlessScreen } : {}),
   });
   try {
     if (options.offline) await loaded.context.setOffline(true);

@@ -132,7 +132,7 @@ it.each([
     own.map((_, i) => ({
       opening: { x: 0, y: 0, width: 1, height: 1 },
       radius: 0,
-      protectionOpening: { x: 0, y: 0, width: 1, height: 1 },
+      protectionOpening: { x: 0.25, y: 0, width: 1, height: 1 },
       protectionRadius: 0,
       presence: presence[i]!,
       dim: dim[i]!,
@@ -285,13 +285,13 @@ function managedMasks(failRole?: string) {
   return { resources, released, allocations, writes, readbacks, fill };
 }
 const maskFrames = [0.8, 0.5].map((dim) => ({
-  opening: { x: 0, y: 0, width: 9, height: 3 },
+  opening: { x: dim === 0.8 ? 0 : 6, y: 0, width: dim === 0.8 ? 4 : 3, height: 3 },
   radius: 0,
   dim,
   blur: 6,
 }));
 
-it('uses global raster coverage with bounded tile readbacks and releases masks explicitly', () => {
+it('shares identical opening/protection coverage within each tile and releases masks explicitly', () => {
   vi.stubGlobal('Path2D', class {});
   const owner = managedMasks();
   const masks = createSceneSpotlightMasks(
@@ -300,7 +300,8 @@ it('uses global raster coverage with bounded tile readbacks and releases masks e
     owner.resources
   );
   expect(owner.allocations).toContainEqual({ role: 'spotlight.hole', width: 9, height: 3 });
-  expect(owner.readbacks).toHaveLength(36);
+  expect(owner.readbacks).toHaveLength(18);
+  expect(owner.fill).toHaveBeenCalledTimes(18);
   expect(owner.readbacks.every((read) => read.width === 3 && read.height === 1)).toBe(true);
   expect(new Set(owner.readbacks.map((read) => `${read.x}:${read.y}`)).size).toBe(9);
   for (const write of owner.writes.filter((write) => write.role === 'spotlight.dim'))
@@ -453,6 +454,7 @@ it('uses each window attachment for its opening and protection without sharing a
   };
   const layers = [10, 30].map((x) => ({
     opening: { x: 0, y: 0, width: 9, height: 3 },
+    protectionOpening: { x: 0, y: 0, width: 8, height: 3 },
     radius: 0,
     dim: 0.5,
     blur: 0,
@@ -463,8 +465,8 @@ it('uses each window attachment for its opening and protection without sharing a
   expect(owner.fill.mock.calls.map(([path]) => path.points[0])).toEqual([
     { x: 19, y: 0 },
     { x: 39, y: 0 },
-    { x: 19, y: 0 },
-    { x: 39, y: 0 },
+    { x: 18, y: 0 },
+    { x: 38, y: 0 },
   ]);
   expect(clips.map((path) => path.points[0])).toEqual([
     { x: 15, y: 0 },

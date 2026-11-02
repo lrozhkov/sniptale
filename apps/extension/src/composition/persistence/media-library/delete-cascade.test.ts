@@ -1,6 +1,11 @@
 import { createSceneGradientBackground } from '../../../features/video/project/scene/background-gradient';
 import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
-import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
+import {
+  readReviewWorkspaceFixture,
+  createCascadeReviewWorkspace,
+  readCascadeVideoProject,
+  forbidGlobalDeletionReads,
+} from './delete-cascade.test-support';
 import { expect, it } from 'vitest';
 import { harness, mediaId, physicalId, mediaEntry, rows } from './delete-cascade.test-support';
 import {
@@ -21,9 +26,7 @@ import {
 import { workspaceStorageHead, workspaceStorageRows } from '../review-workspaces/storage-format';
 
 it('atomically removes placements, library metadata and the last physical owner', async () => {
-  const project = [...rows.get('video_projects')!.values()][0] as ReturnType<
-    typeof createVideoProjectEntryWithMediaClip
-  >;
+  const project = readCascadeVideoProject();
   await deleteMediaAssetWithProjectCascade(mediaId, [
     { id: project.id, kind: 'video', name: project.project.name, primary: false },
   ]);
@@ -78,9 +81,7 @@ it('keeps the committed deletion intent when physical cleanup must retry', async
 });
 
 it('refuses to delete a recording required as a video primary source', async () => {
-  const project = [...rows.get('video_projects')!.values()][0] as ReturnType<
-    typeof createVideoProjectEntryWithMediaClip
-  >;
+  const project = readCascadeVideoProject();
   project.project.baseRecordingId = 'recording-1';
   rows.get('video_projects')!.set(project.id, project);
   rows.get('media_library')!.set(mediaId, {
@@ -135,23 +136,7 @@ it.each([
     }
     rows.set(
       'video_workspaces',
-      new Map([
-        [
-          'recording:other',
-          {
-            aggregateId: 'recording:other',
-            formatVersion: 1,
-            sourceAssetId: 'primary-physical',
-            source: { duration: 2, width: 640, height: 360, size: 4, mimeType: 'video/webm' },
-            revision: 1,
-            cursor: 0,
-            history: [],
-            advanced,
-            createdAt: 1,
-            updatedAt: 1,
-          },
-        ],
-      ])
+      new Map([['recording:other', createCascadeReviewWorkspace(advanced)]])
     );
     if (formatVersion === 2) {
       const previous = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
@@ -796,4 +781,12 @@ it('purges dormant whole source voice documents atomically with their source Lib
   expect(rows.get('media_library')?.has(mediaId)).toBe(false);
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
   expect(harness.complete).toHaveBeenCalledOnce();
+});
+
+it('deletes one source without enumerating unrelated project stores', async () => {
+  rows.get('video_projects')!.clear();
+  await forbidGlobalDeletionReads();
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).resolves.toBeUndefined();
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(harness.complete).toHaveBeenCalledTimes(1);
 });

@@ -341,3 +341,19 @@ export function getCurrentVideoEditorExportStateSnapshot() {
 export function getCurrentVideoEditorExportJobId(): string | null {
   return useVideoEditorStore.getState().exportState.jobId;
 }
+
+/** Observe authored action boundaries synchronously, before the next project mutation. */
+export function subscribeVideoEditorProjectHistory(
+  listener: (snapshot: { projectId: string | null; lease: symbol | null }) => void
+): () => void {
+  const snapshot = (state: VideoEditorState) => ({
+    projectId: state.project?.id ?? null,
+    lease: state.projectHistory.transaction?.lease ?? null,
+  });
+  listener(snapshot(useVideoEditorStore.getState()));
+  return useVideoEditorStore.subscribe((state, previous) => {
+    const next = snapshot(state);
+    const before = snapshot(previous);
+    if (next.projectId !== before.projectId || next.lease !== before.lease) listener(next);
+  });
+}

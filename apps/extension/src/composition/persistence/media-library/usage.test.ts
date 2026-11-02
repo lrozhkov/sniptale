@@ -1,3 +1,4 @@
+import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { createGuideProject } from '../../../features/scenario/project/public';
@@ -39,12 +40,16 @@ let childRows: unknown[];
 let reviewRows: unknown[];
 let video = createVideoProjectEntryWithMediaClip();
 let extraMedia: MediaLibraryEntry | null;
+let snapshotCount = 0;
+const globalReads = vi.fn();
 
 beforeEach(() => {
   mocks.initDB.mockReset();
   mocks.videos.mockReset();
   mocks.scenarios.mockReset();
   extraMedia = null;
+  snapshotCount = 0;
+  globalReads.mockClear();
   media = {
     id: 'project-asset:original',
     kind: 'image',
@@ -78,20 +83,42 @@ beforeEach(() => {
     },
   ];
   reviewRows = [];
-  mocks.initDB.mockResolvedValue({
-    transaction: () => ({
-      objectStore: (store: string) => ({
-        getAll: async () => (store === 'video_workspaces' ? reviewRows : []),
-      }),
-      done: Promise.resolve(),
-    }),
-    get: async (_store: string, id: string) => (id === media.id ? media : undefined),
-    getAll: async (store: string) => {
-      if (store === 'media_library') return extraMedia ? [media, extraMedia] : [media];
-      if (store === 'scenario_assets') return childRows;
-      if (store === 'video_workspaces') return reviewRows;
-      return [];
-    },
+  mocks.initDB.mockImplementation(async () => {
+    const fixture = createReviewWorkspaceStoreFixture(() => false);
+    for (const rows of fixture.rows.values()) rows.clear();
+    const mediaRows = extraMedia ? [media, extraMedia] : [media];
+    for (const row of mediaRows) fixture.rows.get('media_library')!.set(row.id, row);
+    for (const row of await mocks.videos()) fixture.rows.get('video_projects')!.set(row.id, row);
+    for (const row of await mocks.scenarios())
+      fixture.rows.get('scenario_projects')!.set(row.id, row);
+    for (const row of childRows)
+      if (typeof row === 'object' && row !== null && 'id' in row && typeof row.id === 'string')
+        fixture.rows.get('scenario_assets')!.set(row.id, row);
+    for (const row of reviewRows)
+      if (
+        typeof row === 'object' &&
+        row !== null &&
+        'aggregateId' in row &&
+        typeof row.aggregateId === 'string'
+      )
+        fixture.rows.get('video_workspaces')!.set(row.aggregateId, row);
+    const transaction = fixture.database.transaction.bind(fixture.database);
+    return {
+      transaction: (stores: string[], mode: string) => {
+        snapshotCount++;
+        const tx = transaction(stores, mode);
+        const objectStore = tx.objectStore.bind(tx);
+        tx.objectStore = (name: string) => {
+          const source = objectStore(name);
+          source.getAll = async () => {
+            globalReads(name);
+            throw new Error('Global warning scan forbidden');
+          };
+          return source;
+        };
+        return tx;
+      },
+    };
   });
   video = createVideoProjectEntryWithMediaClip();
   video.project.assets[0]!.source = { kind: 'library-asset', mediaId: media.id };
@@ -203,32 +230,15 @@ it('reports video and borrowed scenario consumers of one library source', async 
   expect(usage).toHaveLength(2);
 });
 
-it('loads the full graph once for a batch instead of once per selected file', async () => {
+it('uses one selected-source snapshot for a batch without reading unrelated documents', async () => {
   extraMedia = {
     ...media,
     id: 'second',
     source: { kind: 'project-asset', projectAssetId: 'second' },
   };
-  const getAll = vi.fn(async (store: string) => {
-    if (store === 'media_library') return [media, extraMedia];
-    if (store === 'scenario_assets') return childRows;
-    if (store === 'video_workspaces') return reviewRows;
-    return [];
-  });
-  mocks.initDB.mockResolvedValue({
-    get: async (_store: string, id: string) => (id === media.id ? media : extraMedia),
-    getAll,
-    transaction: () => ({
-      objectStore: (store: string) => ({ getAll: () => getAll(store) }),
-      done: Promise.resolve(),
-    }),
-  });
   const previous = await Promise.all([media.id, extraMedia.id].map(listMediaAssetProjectUsage));
-  expect(mocks.videos).toHaveBeenCalledTimes(2);
-  expect(getAll).toHaveBeenCalledTimes(10);
-  mocks.videos.mockClear();
-  mocks.scenarios.mockClear();
-  getAll.mockClear();
+  expect(snapshotCount).toBe(2);
+  snapshotCount = 0;
   const batch = await listMediaAssetProjectUsageBatch([
     media.id,
     extraMedia.id,
@@ -242,9 +252,8 @@ it('loads the full graph once for a batch instead of once per selected file', as
       ['missing', []],
     ])
   );
-  expect(mocks.videos).toHaveBeenCalledOnce();
-  expect(mocks.scenarios).toHaveBeenCalledOnce();
-  expect(getAll).toHaveBeenCalledTimes(5);
+  expect(snapshotCount).toBe(1);
+  expect(globalReads).not.toHaveBeenCalled();
 });
 
 it('reads each deletion preparation freshly without trusting an advisory index', async () => {

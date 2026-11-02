@@ -8,8 +8,18 @@ import {
   remote,
   resetOutgoingFixture,
 } from './outgoing.test-support';
+import * as nativeOutgoing from '../../composition/persistence/sync-capture/outgoing';
+import { MissingAssetObjectError } from '../../composition/persistence/assets';
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+} from '../../composition/persistence/assets/residency-records';
+import { captureRootKey } from '../../composition/persistence/sync-capture/contracts';
+import { createGuideProject } from '../../features/scenario/project/factories';
+import { createScenarioProjectEntry } from '../../composition/persistence/scenario/projects/entry';
 import type { AssetRef } from '../../composition/persistence/assets';
-import { parseSyncAttemptText } from './wire-record';
+import { hashSyncText, parseSyncAttemptText, parseSyncOperationText } from './wire-record';
+import { parsePortableSyncRoot } from './prepared-root';
 import { dispatchPreparedOutgoing, prepareCapturedOutgoing } from './outgoing';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
 
@@ -139,44 +149,52 @@ it('retains explicit restore provenance and causal parents in the frozen logical
   expect(JSON.parse(prepared.recordText)).toMatchObject({ kind: 'restore', parents: value.basis });
 });
 
-it('reuses unchanged files for a metadata-only revision without media GET or PUT', async () => {
-  const firstCapture = capture();
-  const firstPrepared = await prepareCapturedOutgoing(createNativeCapture(firstCapture));
-  const dav = remote();
-  const first = await dispatchPreparedOutgoing(
-    'space',
-    'operation',
-    dav.adapter,
-    new AbortController().signal
-  );
-  const nextCapture = capture();
-  nextCapture.key = 'capture-next';
-  nextCapture.operationId = 'operation-next';
-  nextCapture.generation = 2;
-  nextCapture.basis = ['operation'];
-  expect(nextCapture.change.kind).toBe('media');
-  if (nextCapture.change.kind === 'media')
-    nextCapture.change.rows.media.sourceTitle = 'Updated title';
-  const nextPrepared = await prepareCapturedOutgoing(createNativeCapture(nextCapture));
-  const previousReads = dav.reads.length;
-  const previousWrites = dav.writes.length;
-  const next = await dispatchPreparedOutgoing(
-    'space',
-    'operation-next',
-    dav.adapter,
-    new AbortController().signal
-  );
-  expect(dav.reads.slice(previousReads).filter((key) => key.startsWith('Files/'))).toEqual([]);
-  expect(dav.writes.slice(previousWrites).filter((key) => key.startsWith('Files/'))).toEqual([]);
-  expect(nextPrepared.recordText).not.toBe(firstPrepared.recordText);
-  expect(next.recordKey).not.toBe(first.recordKey);
-  expect(next.objects[0]?.remoteKey).toBe(first.objects[0]?.remoteKey);
-  expect(dav.writes.filter((key) => key.startsWith('Files/'))).toHaveLength(1);
-  expect(
-    (await parseSyncAttemptText(await dav.objects.get(next.recordKey)!.text())).operation
-      .operationId
-  ).toBe('operation-next');
-});
+it.each(['image/png', 'image/png;charset=utf-8'])(
+  'reuses unchanged %s files for a metadata-only revision without media GET or PUT',
+  async (mimeType) => {
+    const firstCapture = capture();
+    if (firstCapture.change.kind !== 'media' || !('projectAsset' in firstCapture.change.rows))
+      throw new Error('Expected project asset source.');
+    firstCapture.change.rows.media.mimeType = mimeType;
+    firstCapture.change.rows.projectAsset.mimeType = mimeType;
+    firstCapture.change.rows.ref.mimeType = mimeType;
+    const firstPrepared = await prepareCapturedOutgoing(createNativeCapture(firstCapture));
+    const dav = remote();
+    const first = await dispatchPreparedOutgoing(
+      'space',
+      'operation',
+      dav.adapter,
+      new AbortController().signal
+    );
+    const nextCapture = structuredClone(firstCapture);
+    nextCapture.key = 'capture-next';
+    nextCapture.operationId = 'operation-next';
+    nextCapture.generation = 2;
+    nextCapture.basis = ['operation'];
+    expect(nextCapture.change.kind).toBe('media');
+    if (nextCapture.change.kind === 'media')
+      nextCapture.change.rows.media.sourceTitle = 'Updated title';
+    const nextPrepared = await prepareCapturedOutgoing(createNativeCapture(nextCapture));
+    const previousReads = dav.reads.length;
+    const previousWrites = dav.writes.length;
+    const next = await dispatchPreparedOutgoing(
+      'space',
+      'operation-next',
+      dav.adapter,
+      new AbortController().signal
+    );
+    expect(dav.reads.slice(previousReads).filter((key) => key.startsWith('Files/'))).toEqual([]);
+    expect(dav.writes.slice(previousWrites).filter((key) => key.startsWith('Files/'))).toEqual([]);
+    expect(nextPrepared.recordText).not.toBe(firstPrepared.recordText);
+    expect(next.recordKey).not.toBe(first.recordKey);
+    expect(next.objects[0]?.remoteKey).toBe(first.objects[0]?.remoteKey);
+    expect(dav.writes.filter((key) => key.startsWith('Files/'))).toHaveLength(1);
+    expect(
+      (await parseSyncAttemptText(await dav.objects.get(next.recordKey)!.text())).operation
+        .operationId
+    ).toBe('operation-next');
+  }
+);
 
 it('reuses unchanged originals and exports while changed export bytes get a fresh path', async () => {
   const captured = projectCapture();
@@ -445,4 +463,227 @@ it('refuses completed mappings from a foreign namespace before remote reuse chec
   expect(fresh.objects[0]!.remoteKey).not.toBe(foreignKey);
   expect(dav.reads).not.toContain(foreignKey);
   expect(dav.stats).not.toContain(foreignKey);
+});
+
+it('dispatches a native MIME with parameters through its normalized portable descriptor', async () => {
+  const prepared = await prepareCapturedOutgoing(capture());
+  prepared.objects[0]!.ref.mimeType = 'image/png;charset=utf-8';
+  io.prepared.set(prepared.operationId, prepared);
+  const dav = remote();
+  const attempt = await dispatchPreparedOutgoing(
+    'space',
+    'operation',
+    dav.adapter,
+    new AbortController().signal
+  );
+  expect(dav.writes).toContain(attempt.recordKey);
+  expect(
+    (await parseSyncAttemptText(await dav.objects.get(attempt.recordKey)!.text())).operation
+      .envelope!.objects[0]!.mimeType
+  ).toBe('image/png');
+});
+
+function scenarioWithUnloadedExport() {
+  const base = capture();
+  const body = new Blob(['<html>Original historical body</html>'], {
+    type: 'text/html;charset=utf-8',
+  });
+  const ref: AssetRef = {
+    assetId: 'html-only',
+    createdAt: 1,
+    size: body.size,
+    mimeType: body.type,
+    sha256: hashSyncText('<html>Original historical body</html>'),
+    location: { kind: 'opfs', objectKey: 'objects/html-only' },
+  };
+  const entry = createScenarioProjectEntry({
+    project: createGuideProject('Edited guide', 'scenario', 1),
+    existing: undefined,
+    updatedAt: 2,
+  });
+  const frozen = createNativeCapture({
+    ...base,
+    rootId: entry.id,
+    rootKind: 'scenario-project',
+    rootKey: captureRootKey('space', 'scenario-project', entry.id),
+    change: {
+      kind: 'scenario-project',
+      rows: {
+        entry,
+        assets: [],
+        documents: [],
+        exports: [
+          {
+            id: 'saved-html',
+            projectId: entry.id,
+            filename: 'Renamed by user.html',
+            format: 'html',
+            createdAt: 1,
+            size: ref.size,
+            html: { mode: 'guide', assetId: ref.assetId },
+          },
+        ],
+        refs: [ref],
+        media: [],
+        mediaDependencies: [],
+        thumbnails: [],
+        presentation: null,
+      },
+    },
+  });
+  const copy: AssetResidencyCopy = {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId({ kind: 'opfs', ref }),
+    revision: 1,
+    operationId: 'incoming-original',
+    phase: 'unloaded',
+    lastUsedAt: 1,
+    target: { kind: 'opfs', ref },
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'user',
+        spaceId: 'space',
+        profileCreatedAt: 1,
+        connectionGeneration: 1,
+      },
+      key: `Files/${hashSyncText('space')}/00000000-0000-0000-0000-000000000001/accepted-html/original.html`,
+      sha256: ref.sha256!,
+    },
+  };
+  const load = vi.spyOn(nativeOutgoing, 'loadNativeOutgoingRecoveryCopy').mockResolvedValue(copy);
+  io.read.mockImplementation(async (candidate: AssetRef) => {
+    throw new MissingAssetObjectError(candidate.assetId);
+  });
+  const dav = remote();
+  dav.objects.set(copy.remote.key, body);
+  const recovery = {
+    remote: dav.adapter,
+    authorization: { incarnation: 'connection', revision: 1 },
+    signal: new AbortController().signal,
+  };
+  return { frozen, ref, copy, load, dav, recovery };
+}
+
+it(
+  'prepares a renamed unloaded Scenario HTML export without a GET and keeps exact ' +
+    'historical SHA and native capture',
+  async () => {
+    const { frozen, ref, copy, load, dav, recovery } = scenarioWithUnloadedExport();
+    const before = structuredClone(frozen);
+    const prepared = await prepareCapturedOutgoing(frozen, recovery);
+    const logical = await parseSyncOperationText(prepared.recordText);
+    const portable = await parsePortableSyncRoot(logical.envelope);
+    if (portable.kind !== 'scenario-project') throw new Error('Expected Scenario.');
+    expect(portable.metadata.exports[0]).toMatchObject({
+      filename: 'Renamed by user.html',
+      html: { mode: 'guide' },
+    });
+    const objectId = portable.metadata.exports[0]!.html!.objectId;
+    expect(portable.envelope.objects).toEqual([
+      expect.objectContaining({
+        objectId,
+        filename: 'original.html',
+        size: ref.size,
+        mimeType: 'text/html',
+      }),
+    ]);
+    expect(logical.objects).toEqual([{ objectId, sha256: copy.remote.sha256 }]);
+    expect(prepared.objects).toEqual([]);
+    expect(prepared.retainedObjects).toEqual([{ objectId, remoteKey: copy.remote.key }]);
+    expect(load).toHaveBeenCalledExactlyOnceWith({
+      capture: frozen,
+      ref,
+      authorization: recovery.authorization,
+    });
+    expect(dav.reads).toEqual([]);
+    expect(dav.writes).toEqual([]);
+    expect(frozen).toEqual(before);
+    expect(frozen.sourceSha256).toBe(before.sourceSha256);
+  }
+);
+
+it(
+  'restarts and retries retained Scenario publication without reading or replacing ' +
+    'the unloaded historical body',
+  async () => {
+    const { frozen, copy, dav, recovery } = scenarioWithUnloadedExport();
+    const prepared = await prepareCapturedOutgoing(frozen, recovery);
+    const originalBody = dav.objects.get(copy.remote.key);
+    dav.lose();
+    await expect(
+      dispatchPreparedOutgoing('space', frozen.operationId, dav.adapter, recovery.signal)
+    ).rejects.toThrow('Lost response');
+    vi.resetModules();
+    const restarted = await import('./outgoing');
+    io.read.mockClear();
+    expect(await restarted.prepareCapturedOutgoing(frozen, recovery)).toEqual(prepared);
+    const attempt = await restarted.dispatchPreparedOutgoing(
+      'space',
+      frozen.operationId,
+      dav.adapter,
+      recovery.signal
+    );
+    expect(attempt.objects[0]?.remoteKey).toBe(copy.remote.key);
+    expect(dav.reads).not.toContain(copy.remote.key);
+    expect(dav.writes.filter((key) => key.startsWith('Files/'))).toEqual([]);
+    expect(dav.objects.get(copy.remote.key)).toBe(originalBody);
+    expect(io.read).not.toHaveBeenCalled();
+    expect(
+      (await parseSyncAttemptText(await dav.objects.get(attempt.recordKey)!.text())).operation
+        .objects
+    ).toEqual([{ objectId: attempt.objects[0]!.objectId, sha256: copy.remote.sha256 }]);
+  }
+);
+
+it('refuses a foreign retained Scenario copy before any GET or prepared write', async () => {
+  const { frozen, copy, load, dav, recovery } = scenarioWithUnloadedExport();
+  load.mockResolvedValue({
+    ...copy,
+    remote: {
+      ...copy.remote,
+      key: copy.remote.key.replace(hashSyncText('space'), hashSyncText('foreign')),
+    },
+  });
+  await expect(prepareCapturedOutgoing(frozen, recovery)).rejects.toThrow('Invalid outgoing');
+  expect(dav.reads).toEqual([]);
+  expect(io.prepared.size).toBe(0);
+});
+
+it(
+  'propagates exact native capture or authorization refusal before touching the ' +
+    'remote historical body and permits retry',
+  async () => {
+    const { frozen, copy, load, dav, recovery } = scenarioWithUnloadedExport();
+    load.mockRejectedValueOnce(new Error('Native outgoing capture changed.'));
+    await expect(prepareCapturedOutgoing(frozen, recovery)).rejects.toThrow(
+      'Native outgoing capture changed'
+    );
+    expect(dav.reads).toEqual([]);
+    expect(io.prepared.size).toBe(0);
+    load.mockResolvedValue(copy);
+    await expect(prepareCapturedOutgoing(frozen, recovery)).resolves.toHaveProperty(
+      'retainedObjects'
+    );
+    expect(dav.reads).toEqual([]);
+  }
+);
+
+it('refuses a corrupt known native SHA before preparation can read or write remote bytes', async () => {
+  const source = capture();
+  if (source.change.kind !== 'media') throw new Error('Expected native media fixture.');
+  source.change.rows.ref.sha256 = '0'.repeat(64);
+  const frozen = createNativeCapture(source);
+  const dav = remote();
+  await expect(
+    prepareCapturedOutgoing(frozen, {
+      remote: dav.adapter,
+      signal: new AbortController().signal,
+    })
+  ).rejects.toThrow('Invalid outgoing sync evidence');
+  expect(dav.reads).toEqual([]);
+  expect(dav.writes).toEqual([]);
+  expect(io.prepared.size).toBe(0);
 });

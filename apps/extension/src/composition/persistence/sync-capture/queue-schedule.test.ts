@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { SyncConnectionIdentity } from '../remote-connection/model';
 import {
+  resumeSecretLockedSyncQueuePage,
   initializeSyncQueueSchedulePage,
   loadSyncQueueScheduleProgress,
   discoverDueSyncQueueOperations,
@@ -693,4 +694,156 @@ it('includes every native key at the deadline and stops before a fractional futu
   expect(second.progress.dueAfter).toBeNull();
   expect([...f.table('sync_outbox').values()]).toContainEqual(malformed);
   expect(f.table('sync_outbox').get(future.key)).toEqual(future);
+});
+
+it('requeues only locked failures for the checked current connection after explicit unlock', async () => {
+  const f = fixture();
+  const locked = f.operation('locked', {
+    status: 'failed',
+    failureCode: 'secrets-locked',
+    nextDueAt: null,
+  });
+  const authentication = f.operation('authentication', {
+    status: 'failed',
+    failureCode: 'authentication',
+    nextDueAt: null,
+  });
+  const paused = f.operation('paused', {
+    status: 'paused',
+    failureCode: 'secrets-locked',
+    nextDueAt: null,
+  });
+  const foreign = f.operation('foreign', {
+    status: 'failed',
+    failureCode: 'secrets-locked',
+    nextDueAt: null,
+    authorization: { ...authorization, incarnation: '99999999-9999-4999-8999-999999999999' },
+  });
+  const result = await resumeSecretLockedSyncQueuePage(scope, authorization);
+  expect(result).toMatchObject({ complete: true, resumed: 1 });
+  expect(f.table('sync_outbox').get(locked.key)).toMatchObject({
+    status: 'queued',
+    failureCode: null,
+    nextDueAt: 100_000,
+    revision: 2,
+  });
+  for (const untouched of [authentication, paused, foreign])
+    expect(f.table('sync_outbox').get(untouched.key)).toEqual(untouched);
+  expect(f.captureRead.mock.calls.every(([key]) => key === 'profile')).toBe(true);
+});
+
+it('resumes every locked failure through bounded pages without scanning capture payloads', async () => {
+  const f = fixture();
+  for (let i = 0; i < 11; i++)
+    f.operation(`locked-${String(i).padStart(2, '0')}`, {
+      status: 'failed',
+      failureCode: 'secrets-locked',
+      nextDueAt: null,
+    });
+  let afterKey: string | null = null;
+  let resumed = 0;
+  let pages = 0;
+  for (;;) {
+    f.scanned.mockClear();
+    const page = await resumeSecretLockedSyncQueuePage(scope, authorization, afterKey, 3);
+    expect(page.scanned).toBeLessThanOrEqual(3);
+    expect(f.scanned.mock.calls.length).toBeLessThanOrEqual(4);
+    resumed += page.resumed;
+    pages++;
+    if (page.complete) break;
+    expect(page.afterKey).not.toBe(afterKey);
+    afterKey = page.afterKey;
+  }
+  expect(resumed).toBe(11);
+  expect(pages).toBe(4);
+});
+
+it('keeps user pauses while making locked failures eligible for later explicit resume', async () => {
+  const f = fixture();
+  const row = f.operation('locked', {
+    status: 'failed',
+    failureCode: 'secrets-locked',
+    nextDueAt: null,
+  });
+  const current = { ...authorization, revision: 2 };
+  f.table('sync_connection').set('connection', {
+    ...f.connection,
+    identity: current,
+    phase: 'paused',
+  });
+  f.table('sync_outbox').set(queueConnectionKey(scope), {
+    ...scope,
+    version: 1,
+    kind: 'queue-connection',
+    key: queueConnectionKey(scope),
+    revision: 0,
+    paused: true,
+    scheduleProgress: null,
+    eventSequence: 0,
+    pendingTransitions: [],
+    droppedTransitions: 0,
+  });
+  await expect(resumeSecretLockedSyncQueuePage(scope, current)).resolves.toMatchObject({
+    resumed: 1,
+  });
+  expect(f.table('sync_connection').get('connection')).toMatchObject({
+    phase: 'paused',
+    identity: current,
+  });
+  expect(f.table('sync_outbox').get(queueConnectionKey(scope))).toMatchObject({ paused: true });
+  expect(f.table('sync_outbox').get(row.key)).toMatchObject({
+    status: 'queued',
+    authorization: current,
+  });
+  const resumed = { ...current, revision: 3 };
+  f.table('sync_connection').set('connection', {
+    ...f.connection,
+    identity: resumed,
+    phase: 'active',
+  });
+  const queue = parseSyncQueueConnection(f.table('sync_outbox').get(queueConnectionKey(scope)));
+  if (!queue) throw new Error('Missing queue pause fixture');
+  f.table('sync_outbox').set(queue.key, { ...queue, paused: false });
+  const result = await discoverDueSyncQueueOperations(scope, resumed);
+  expect(result.candidates.map((candidate) => candidate.operationId)).toEqual(['locked']);
+});
+
+it('rejects delayed unlock resume after connection recreation', async () => {
+  const f = fixture();
+  const row = f.operation('locked', {
+    status: 'failed',
+    failureCode: 'secrets-locked',
+    nextDueAt: null,
+  });
+  const gate = delayNextPermit();
+  const pending = resumeSecretLockedSyncQueuePage(scope, authorization);
+  const refused = expect(pending).rejects.toThrow('Sync queue unlock selection changed');
+  f.table('sync_connection').set('connection', {
+    ...f.connection,
+    identity: { ...authorization, incarnation: '99999999-9999-4999-8999-999999999999' },
+  });
+  gate.release();
+  await refused;
+  expect(f.table('sync_outbox').get(row.key)).toEqual(row);
+});
+
+it('preserves locked failures when unlock resume storage publication fails and permits retry', async () => {
+  const f = fixture();
+  const row = f.operation('locked', {
+    status: 'failed',
+    failureCode: 'secrets-locked',
+    nextDueAt: null,
+  });
+  f.failWrites(true);
+  await expect(resumeSecretLockedSyncQueuePage(scope, authorization)).rejects.toMatchObject({
+    name: 'QuotaExceededError',
+  });
+  expect(f.table('sync_outbox').get(row.key)).toEqual(row);
+  f.failWrites(false);
+  await expect(resumeSecretLockedSyncQueuePage(scope, authorization)).resolves.toMatchObject({
+    resumed: 1,
+  });
+  await expect(resumeSecretLockedSyncQueuePage(scope, authorization)).resolves.toMatchObject({
+    resumed: 0,
+  });
 });

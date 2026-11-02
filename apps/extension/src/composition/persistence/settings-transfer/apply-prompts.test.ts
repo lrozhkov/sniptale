@@ -3,7 +3,8 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { emptySummary } from '../../../workflows/settings-transfer/planner';
 import { applySettingsTransferDomains } from './apply';
 const mocks = vi.hoisted(() => ({ localGet: vi.fn(), localSet: vi.fn(), localRemove: vi.fn() }));
-vi.mock('../infrastructure/browser-storage', () => ({
+vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/browser-storage')>()),
   browserStorage: {
     local: { get: mocks.localGet, set: mocks.localSet, remove: mocks.localRemove },
     sync: { get: async () => ({}), set: vi.fn(), remove: vi.fn() },

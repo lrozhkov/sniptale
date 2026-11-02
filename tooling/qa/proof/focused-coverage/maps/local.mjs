@@ -1,5 +1,108 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'archive-native-mime-consumers',
+    productionFile:
+      'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/object-inventory.ts',
+    reason:
+      'Typed MIME declarations affect backup staging, restore capture and verified sync replicas.',
+    testFiles: [
+      'apps/extension/src/workflows/media-hub-backup/v6/root-codecs/object-inventory.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/staging.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media.capture.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore-lifecycle.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-root.test.ts',
+      'apps/extension/src/workflows/sync-transfer/portable-review.test.ts',
+      'apps/extension/src/workflows/sync-transfer/incoming-project.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+    ],
+  },
+  {
+    owner: 'asset-writing-handoff-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/assets/opfs-store.ts',
+    reason: `Writer handoff and marker recovery affect native sources, saved exports, archives, downloads and
+publication rollback.`,
+    testFiles: [
+      'apps/extension/src/composition/persistence/assets/opfs-store.test.ts',
+      'apps/extension/src/composition/persistence/assets/opfs-store.cleanup.test.ts',
+      'apps/extension/src/composition/persistence/assets/operations.test.ts',
+      'apps/extension/src/composition/persistence/asset-publication-recovery/index.test.ts',
+      'apps/extension/src/composition/persistence/asset-publication-recovery/maintenance.integration.test.ts',
+      'apps/extension/src/composition/persistence/projects/asset-publication.test.ts',
+      'apps/extension/src/composition/persistence/projects/index.exports.test.ts',
+      'apps/extension/src/composition/persistence/recordings/batch.test.ts',
+      'apps/extension/src/composition/persistence/recordings/staging/coordinator.test.ts',
+      'apps/extension/src/composition/persistence/scenario/store/audio-import.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/export-artifacts.test.ts',
+      'apps/extension/src/composition/persistence/web-snapshots/records.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/staging.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore.test.ts',
+      'apps/extension/src/workflows/media-hub-backup/v6/restore-lifecycle.test.ts',
+      'apps/extension/src/background/capture/page-package/job/storage.test.ts',
+      'apps/extension/src/background/capture/page-package/job/download.test.ts',
+    ],
+  },
+  {
+    owner: 'outgoing-asset-handoff-consumers',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/outgoing.ts',
+    reason: `Outgoing handoff must preserve frozen sources, native reuse, parameterized MIME, replica
+recovery and publication failure semantics.`,
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/outgoing.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-image.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-scenario.test.ts',
+      'apps/extension/src/workflows/sync-transfer/captured-project.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/outgoing.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-image-shared-binary-consumers',
+    productionFile: 'apps/extension/src/workflows/sync-transfer/captured-image.ts',
+    reason: `Shared image objects require frozen-source admission, concurrent preparation, deletion recovery,
+dispatch retry and native replica validation.`,
+    testFiles: [
+      'apps/extension/src/workflows/sync-transfer/captured-image.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/outgoing.test.ts',
+      'apps/extension/src/workflows/sync-transfer/outgoing.test.ts',
+      'apps/extension/src/composition/persistence/sync-capture/apply-image.test.ts',
+      'apps/extension/src/workflows/sync-transfer/wire-record.test.ts',
+    ],
+  },
+  {
+    owner: 'image-document-shared-asset-publication',
+    productionFile: 'apps/extension/src/composition/persistence/document-assets/codec.ts',
+    reason: `Shared document assets require role ownership, publication rollback, concurrent saves,
+purged-root refusal and recovery validation.`,
+    testFiles: [
+      'apps/extension/src/composition/persistence/document-assets/codec.test.ts',
+      'apps/extension/src/composition/persistence/document-assets/ownership.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.reused-assets.test.ts',
+      'apps/extension/src/composition/persistence/image-aggregates/mutations.root-lifecycle.test.ts',
+    ],
+  },
+  {
+    owner: 'review-text-source-placement',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-text.ts',
+    reason:
+      'Text track gestures and hidden Cut placement exercise the mounted text editor and its source projection.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/original-speech-track.text.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-text.test.ts',
+      'apps/extension/src/gallery/video-review/text-panel.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-text-track-source-gestures',
+    productionFile: 'apps/extension/src/gallery/video-review/original-speech-track.tsx',
+    reason:
+      'The mounted text track proves source placement, drag admission, cancellation and explicit timing changes.',
+    testFiles: ['apps/extension/src/gallery/video-review/original-speech-track.text.test.tsx'],
+  },
+
+  {
     owner: 'sync-captured-root-portable-consumers',
     productionFile: 'apps/extension/src/workflows/sync-transfer/captured-root.ts',
     reason:
@@ -946,28 +1049,32 @@ unchanged project admission.',
     testFiles: ['apps/extension/src/offscreen/runtime/entrypoint.test.ts'],
   },
   {
-    owner: 'ai-secret-unlock-request-store',
+    owner: 'common-secret-unlock-request-store',
     productionFile:
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.ts',
     exclusive: true,
     allowCrossOwner: true,
     reason: 'Secret-unlock records require storage lifecycle and protected-provider route proof.',
     testFiles: [
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.test.ts',
       'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.lifecycle.test.ts',
+      'apps/extension/src/background/ai/settings/authorization/secret-unlock.test.ts',
     ],
   },
   {
-    owner: 'ai-secret-unlock-request-parser',
+    owner: 'common-secret-unlock-request-parser',
     productionFile:
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.parser.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.parser.ts',
     exclusive: true,
     allowCrossOwner: true,
     reason:
       'Secret-unlock admission requires storage lifecycle and protected-provider route proof.',
     testFiles: [
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.test.ts',
       'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.lifecycle.test.ts',
+      'apps/extension/src/background/ai/settings/authorization/secret-unlock.test.ts',
     ],
   },
   {

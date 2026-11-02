@@ -303,3 +303,19 @@ it('distinguishes captured and added keyboard groups when both event families ex
     container.querySelector('[aria-label="videoEditor.sidebar.historyShowKeys"]')
   ).not.toBeNull();
 });
+
+it('distinguishes simultaneous captured timing and mixed keyboard categories', () => {
+  const project = capturedKeyProject();
+  project.actionFeedback![0]!.keyStyles = patchReviewKeys([], ['key'], { enabled: true });
+  project.actionEvents.push({
+    ...project.actionEvents[0]!,
+    id: 'manual-key',
+    anchor: { kind: 'project', time: 1 },
+  });
+  act(() =>
+    root.render(<InspectHistoryLanePanel project={project} onUpdateActionPresentation={vi.fn()} />)
+  );
+  const icons = [...container.querySelectorAll('nav button svg')].map((icon) => icon.innerHTML);
+  expect(icons.length).toBeGreaterThan(1);
+  expect(new Set(icons).size).toBe(icons.length);
+});

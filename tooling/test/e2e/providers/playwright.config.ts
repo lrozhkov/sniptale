@@ -13,6 +13,8 @@ export default defineConfig({
     'webdav.spec.ts',
     'webdav-library.spec.ts',
     'webdav-review.spec.ts',
+    'webdav-checkpoints.spec.ts',
+    'webdav-popup.spec.ts',
     'webdav-queue.spec.ts',
     'webdav-connection.spec.ts',
     'webdav-workspace.spec.ts',

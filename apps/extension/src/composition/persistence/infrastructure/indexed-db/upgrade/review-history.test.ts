@@ -1,3 +1,4 @@
+import { SYNC_QUEUE_SUMMARY_INDEXES } from '../sync-queue-index-migration';
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
@@ -7,6 +8,7 @@ import {
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
+  SECRET_PROTECTION_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -16,11 +18,20 @@ import {
 import { betaV17Fixture } from '../fixtures/beta-v17';
 import { CURRENT_SCHEMA_CONTRACTS, DATABASE_MIGRATIONS } from '../schema-contracts';
 import { handleDatabaseUpgrade } from './core';
+import {
+  REFERENCE_INDEX_STORES,
+  ROW_REFERENCE_FIELD,
+  ROW_REFERENCE_INDEX,
+} from '../row-index-contract';
 
-it('adds only empty indexed history stores and publishes the current contracts after validation', () => {
+it('adds empty history stores and DB48 reference indexes before publishing current contracts', async () => {
   const names = new Set<string>(betaV17Fixture.stores);
   const indexes = vi.fn();
   const puts = vi.fn();
+  const getAll = vi.fn(() => {
+    throw new Error('Upgrade must use native cursor backfill');
+  });
+  const openCursor = vi.fn().mockResolvedValue(null);
   const tx = {
     abort: vi.fn(),
     objectStore: vi.fn(() => ({
@@ -28,7 +39,9 @@ it('adds only empty indexed history stores and publishes the current contracts a
       put: puts,
       clear: vi.fn(),
       delete: vi.fn(),
-      getAll: vi.fn(),
+      getAll,
+      openCursor,
+      index: vi.fn(),
     })),
   };
   const db = {
@@ -53,6 +66,7 @@ it('adds only empty indexed history stores and publishes the current contracts a
     [SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' }],
     [SYNC_CONNECTION_STORE, { keyPath: 'key' }],
     [ASSET_RESIDENCY_STORE, { keyPath: 'id' }],
+    [SECRET_PROTECTION_STORE, { keyPath: 'key' }],
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
@@ -78,15 +92,47 @@ it('adds only empty indexed history stores and publishes the current contracts a
       ],
       { unique: false },
     ],
+    ...REFERENCE_INDEX_STORES.map(() => [
+      ROW_REFERENCE_INDEX,
+      ROW_REFERENCE_FIELD,
+      { multiEntry: true },
+    ]),
+    ['recoveryId', 'recoveryId'],
+    ...SYNC_QUEUE_SUMMARY_INDEXES.map(({ indexName, keyPath }) => [
+      indexName,
+      [...keyPath],
+      { unique: false },
+    ]),
     ['recordingId', 'recordingId'],
+    ['snapshotAssetId', 'snapshotAssetId'],
     ['trajectory', ['recordingId', 'trajectoryId']],
     ['time', ['recordingId', 'trajectoryId', 'startTimeUs', 'sequence']],
     ['kind', 'kind'],
     ['timeBuckets', 'timeBuckets', { multiEntry: true }],
+    ['snapshotAssetId', 'snapshotAssetId'],
   ]);
-  expect(tx.objectStore.mock.calls).toEqual([[SYNC_OUTBOX_STORE], ['schema_contracts']]);
+  await vi.waitFor(() =>
+    expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 1)
+  );
+  expect(tx.objectStore.mock.calls).toEqual([
+    [SYNC_OUTBOX_STORE],
+    ...REFERENCE_INDEX_STORES.map((name) => [name]),
+    [RECORDING_RECOVERY_SESSIONS_STORE],
+    [REFERENCE_INDEX_STORES[0]],
+    [SYNC_CAPTURE_STORE],
+    [SYNC_OUTBOX_STORE],
+    ['recording_cursor_trajectories'],
+    ['recordings'],
+    ['recording_events'],
+    ['schema_contracts'],
+    ...REFERENCE_INDEX_STORES.slice(1).map((name) => [name]),
+    ['video_workspaces'],
+    ['video_workspace_history'],
+  ]);
+  expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[]]));
   expect(puts.mock.calls.map(([contract]) => contract)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(getAll).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
 });
 

@@ -510,7 +510,9 @@ async function drawPreparedFrame(
           height: dimensions.backing.height / dimensions.canonical.height,
         },
       };
-      const plans = assets.annotations?.describe(frame.resultTime, density, frame.fps ?? 30) ?? [];
+      const instances = scene.annotationEffects?.lane.instances;
+      const plans =
+        assets.annotations?.describe(frame.resultTime, density, frame.fps ?? 30, instances) ?? [];
       admit(
         frame,
         plans.map(({ plan }) => plan.renderDimensions)
@@ -519,7 +521,8 @@ async function drawPreparedFrame(
         frame.resultTime,
         density,
         frame.fps ?? 30,
-        signal
+        signal,
+        instances
       );
       try {
         signal.throwIfAborted();

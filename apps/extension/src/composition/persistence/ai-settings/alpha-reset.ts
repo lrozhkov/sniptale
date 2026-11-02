@@ -1,7 +1,6 @@
 import { browserStorage } from '../infrastructure/browser-storage';
 import { runWithExclusivePersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { resetVoiceInputModelReferences } from '../settings';
-import { clearAISecretPassphraseMemory } from './secret-protection.store';
 import {
   AI_CHROME_ENABLED_KEY,
   AI_DEFAULT_MODEL_KEY,
@@ -11,9 +10,6 @@ import {
   AI_PROVIDERS_KEY,
   AI_PROVIDER_SECRETS_KEY,
   AI_SCENARIO_SELECTIONS_KEY,
-  AI_SECRET_PROTECTION_KEY,
-  AI_SECRET_PROTECTION_TRANSITION_KEY,
-  AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY,
   AI_SETTINGS_RESET_NOTICE_KEY,
   AI_STORAGE_MIGRATION_PHASE_KEY,
   AI_STORAGE_RESET_PHASE_KEY,
@@ -49,19 +45,13 @@ export function resetIncompatibleAISettings(): Promise<void> {
       },
       permit
     );
-    clearAISecretPassphraseMemory();
     await resetVoiceInputModelReferences(permit);
-    await browserStorage.session.remove(
-      [AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY, AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY],
-      permit
-    );
+    await browserStorage.session.remove(AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY, permit);
     await browserStorage.local.remove(
       [
         AI_DEFAULT_MODEL_KEY,
         AI_PROVIDER_SECRETS_KEY,
         AI_LOCAL_SECRET_KEY_STORAGE_KEY,
-        AI_SECRET_PROTECTION_KEY,
-        AI_SECRET_PROTECTION_TRANSITION_KEY,
         AI_STORAGE_MIGRATION_PHASE_KEY,
         LEGACY_AI_MASTER_KEY_STORAGE_KEY,
       ],

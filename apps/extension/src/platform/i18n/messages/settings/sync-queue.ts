@@ -19,8 +19,13 @@ export const settingsSyncQueueMessages = defineMessageSource({
     en: 'Current operations could not be read. Refresh the queue before cancellation.',
   },
   jobKind: {
+    'library-backup-prepare': {
+      ru: 'Подготовить резервную копию Библиотеки',
+      en: 'Prepare Library backup',
+    },
     'replica-prepare': { ru: 'Получение проекта с сервера', en: 'Download server project' },
     'native-prepare': { ru: 'Получение файлов для работы', en: 'Download files for editing' },
+    'scenario-export-prepare': { ru: 'Загрузить сохранённый HTML', en: 'Download saved HTML' },
     'backup-prepare': { ru: 'Получение файлов для копии', en: 'Download files for backup' },
     'native-release': { ru: 'Освобождение локального места', en: 'Free local space' },
     'cache-trim': { ru: 'Освобождение места по бюджету', en: 'Apply local storage budget' },
@@ -35,7 +40,37 @@ export const settingsSyncQueueMessages = defineMessageSource({
     failed: { ru: 'Ошибка', en: 'Failed' },
     interrupted: { ru: 'Прервано', en: 'Interrupted' },
   },
-  refresh: { ru: 'Обновить с начала', en: 'Refresh from start' },
+  refresh: { ru: 'Обновить', en: 'Refresh' },
+  filterLabel: { ru: 'Показать операции', en: 'Show operations' },
+  filters: {
+    all: { ru: 'Все', en: 'All' },
+    problems: { ru: 'Проблемы', en: 'Problems' },
+    actionRequired: { ru: 'Требуют действия', en: 'Action required' },
+  },
+  operationsUnit: { ru: 'операции', en: 'operations' },
+  pendingRoots: { ru: 'Объекты с изменениями к отправке', en: 'Changed items awaiting upload' },
+  nextCheckpoint: { ru: 'Ближайшая контрольная точка', en: 'Next checkpoint' },
+  checkpointSettings: { ru: 'Интервал и отправка сейчас', en: 'Upload interval and send now' },
+  automaticRetry: { ru: 'Автоматический повтор', en: 'Automatic retry' },
+  connectionReplaced: {
+    ru: 'Подключение изменилось. Старую отправку можно отменить.',
+    en: 'The connection changed. The old upload can be cancelled.',
+  },
+  repairConnection: { ru: 'Проверить подключение и доступ', en: 'Check connection and access' },
+  repairSecurity: { ru: 'Разблокировать общую защиту', en: 'Unlock shared protection' },
+  completedPage: {
+    ru: 'Завершённые операции на этой странице',
+    en: 'Completed operations on this page',
+  },
+  searchContinues: {
+    ru: 'В проверенной части совпадений нет. Продолжите поиск по очереди.',
+    en: 'No matches in the checked portion. Continue searching the queue.',
+  },
+  continueSearch: { ru: 'Продолжить поиск', en: 'Continue search' },
+  noMatches: { ru: 'В этом фильтре нет операций.', en: 'No operations match this filter.' },
+  showAll: { ru: 'Показать все операции', en: 'Show all operations' },
+  firstPage: { ru: 'К началу очереди', en: 'Back to the start' },
+  help: { ru: 'Как работает очередь', en: 'How the queue works' },
   next: { ru: 'Следующая страница', en: 'Next page' },
   loading: { ru: 'Загрузка очереди…', en: 'Loading queue…' },
   unconfigured: {
@@ -79,7 +114,7 @@ export const settingsSyncQueueMessages = defineMessageSource({
     en: 'The transfer outcome is unknown. Cancellation does not confirm that the server file is absent.',
   },
   media: { ru: 'Файл', en: 'File' },
-  project: { ru: 'Видеопроект', en: 'Video project' },
+  project: { ru: 'Проект', en: 'Project' },
   tombstone: { ru: 'Удаление записи', en: 'Record deletion' },
   status: {
     queued: { ru: 'В очереди', en: 'Queued' },
@@ -106,6 +141,10 @@ export const settingsSyncQueueMessages = defineMessageSource({
     cancel: { ru: 'Отменить операцию', en: 'Cancel operation' },
   },
   failure: {
+    'secrets-locked': {
+      ru: 'Секреты заблокированы. Разблокируйте общую сессию для продолжения.',
+      en: 'Secrets are locked. Unlock the shared session to continue.',
+    },
     unavailable: {
       ru: 'Необходимые данные недоступны. Проверьте подключение и повторите исходное действие.',
       en: 'Required data is unavailable. Check the connection and repeat the original action.',

@@ -1,3 +1,4 @@
+import { calculateSpatialRenderAllocations } from './spatial-render-allocation';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
 import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
 import {
@@ -125,31 +126,7 @@ function gradient(size: Size | null): Allocation[] {
       ]
     : [];
 }
-function spatial(value: PreviewRenderAllocationInput['scene']['spatial']): Allocation[] {
-  if (!value) return [];
-  const { output, plane, halfFloat } = value;
-  const result = [
-    canvas('spatial-plane', plane),
-    ...['exposure', 'overlay'].map((role) => canvas(`spatial-${role}`, output)),
-  ];
-  result.push(
-    bytes('spatial-drawing-buffer', pixels(output) * 4),
-    bytes('spatial-vertex-and-matrices', 132),
-    bytes('spatial-level-sizes', 64)
-  );
-  let { width, height } = plane;
-  for (let level = 0; level < 8; level++) {
-    result.push(
-      bytes(
-        `spatial-texture-${level}`,
-        pixels({ width, height }) * (level > 0 && halfFloat ? 8 : 4)
-      )
-    );
-    width = Math.max(1, Math.ceil(width / 2));
-    height = Math.max(1, Math.ceil(height / 2));
-  }
-  return result;
-}
+
 function phase(name: string, allocations: Allocation[]) {
   return {
     name,
@@ -187,7 +164,10 @@ function spotlight(value: PreviewRenderAllocationInput['scene']['spotlight']): {
         'spotlight.coverage',
         frameCount === 1
           ? integer(3 * pixels(tile) * 4)
-          : sum([integer((2 * frameCount + 2) * pixels(tile) * 4), integer((frameCount + 1) * 8)])
+          : sum([
+              integer((2 * frameCount + 2) * pixels(tile) * 4),
+              integer((3 * frameCount + 1) * 8),
+            ])
       ),
     ],
     composite:
@@ -278,7 +258,7 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
     ...admitted,
     ...assets,
     ...optionalCanvas('preview-transition-source', input.scene.transitionRaster),
-    ...spatial(input.scene.spatial),
+    ...calculateSpatialRenderAllocations(input.scene.spatial),
     ...(input.scene.annotationBitmaps?.flatMap((size) =>
       bitmap('annotation-output-bitmap', size)
     ) ?? []),

@@ -547,6 +547,67 @@ it('refuses changed connection identity before preparing a received dependency',
   expect(io.reading).toBe(false);
 });
 
+it('passes private binary admission to the selected preparation owner', async () => {
+  const f = fixture(false);
+  await receiveSelectedCatalogRoot({ ...f, binaryAdmission: 'resident' });
+  expect(io.prepare).toHaveBeenCalledWith(expect.objectContaining({ binaryAdmission: 'resident' }));
+});
+it('does not hydrate an unloaded received dependency under private resident binary admission', async () => {
+  const f = fixture();
+  io.receipt.mockResolvedValue(true);
+  io.nativeReady.mockResolvedValue(false);
+  await expect(receiveSelectedCatalogRoot({ ...f, binaryAdmission: 'resident' })).rejects.toThrow(
+    'resident dependencies'
+  );
+  expect(io.nativePrepare).not.toHaveBeenCalled();
+});
+
+it('shares one allowance across the selected dependency closure', async () => {
+  const f = fixture();
+  const allowance = { reserveObject: vi.fn() };
+  await receiveSelectedCatalogRoot({ ...f, downloadAllowance: allowance });
+  expect(io.prepare).toHaveBeenCalledTimes(2);
+  for (const [args] of io.prepare.mock.calls) expect(args.downloadAllowance).toBe(allowance);
+});
+it('charges receipt-replayed unloaded dependency preparation to the same allowance', async () => {
+  const f = fixture();
+  const allowance = { reserveObject: vi.fn() };
+  io.receipt.mockImplementation(async ({ rootId }) => rootId === 'source');
+  io.nativeReady.mockResolvedValue(false);
+  await receiveSelectedCatalogRoot({ ...f, downloadAllowance: allowance });
+  expect(io.nativePrepare).toHaveBeenCalledWith(
+    expect.objectContaining({ downloadAllowance: allowance })
+  );
+  expect(io.prepare).toHaveBeenCalledWith(
+    expect.objectContaining({ downloadAllowance: allowance, rootId: 'parent' })
+  );
+});
+it('preserves a committed child when later aggregate admission refuses the parent', async () => {
+  const f = fixture();
+  let reserved = 0;
+  const allowance = {
+    reserveObject: () => {
+      if (++reserved > 1) throw new Error('Selected download allowance exceeded');
+    },
+  };
+  io.prepare.mockImplementation(async (args) => {
+    args.downloadAllowance?.reserveObject(1);
+    return {
+      journalId: args.rootId,
+      assetRefs: [],
+      createdAt: 1,
+      domain: 'sync-replica',
+      payload: null,
+    };
+  });
+  await expect(receiveSelectedCatalogRoot({ ...f, downloadAllowance: allowance })).rejects.toThrow(
+    'allowance exceeded'
+  );
+  expect(io.publish).toHaveBeenCalledTimes(1);
+  expect(io.publish.mock.calls[0]?.[0].journalId).toBe('source');
+  expect(io.cancel).not.toHaveBeenCalled();
+});
+
 it('keeps the ready claim when private cursor stage cleanup fails during cancellation', async () => {
   const f = fixture();
   io.publish.mockImplementationOnce(async () => {

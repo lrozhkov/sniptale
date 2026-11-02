@@ -23,7 +23,7 @@ export async function saveEffectPresetPreferences(
   const document = verified.documents.find((item) => item.id === documentId);
   if (!document?.source || document.sha256 !== sourceSha256)
     throw new Error('Effect catalog changed');
-  const parsed = parseEffectV1Source(document.source).document;
+  const parsed = parseEffectV1Source(document.source, { presentationPolicy: 'retained' }).document;
   const stored = parseStoredEffectPresetPreferences(preferences);
   if (!parsed || !stored) throw new Error('Invalid effect presets');
   await mutateEffectCatalogPreference(packId, (current) => {

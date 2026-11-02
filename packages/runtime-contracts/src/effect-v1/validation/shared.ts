@@ -81,8 +81,8 @@ export function validateRange(
   path: string,
   report: EffectV1DiagnosticReporter
 ): void {
-  const start = Number(startValue);
-  const itemDuration = Number(durationValue);
+  const start = typeof startValue === 'number' ? startValue : NaN;
+  const itemDuration = typeof durationValue === 'number' ? durationValue : NaN;
   if (!Number.isFinite(start) || start < 0) {
     report.error('RANGE_START', `${path}.start`, 'Expected a non-negative start.');
   }

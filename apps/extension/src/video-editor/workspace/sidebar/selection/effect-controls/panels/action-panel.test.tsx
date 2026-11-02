@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { createVideoProjectFromRecording } from '../../../../../../features/video/project/factories/creation';
 import { applyVideoProjectMutationPatch } from '../../../../../../features/video/project/mutation';
 import { decodeRecordingEventsBlock } from '../../../../../../features/video/project/recording-events/blocks';
@@ -5,7 +6,6 @@ import { isRecordingEventsDescriptor } from '../../../../../../features/video/pr
 import fixtureData from '../../../../../../features/video/project/recording-events/fixtures.json';
 import { projectRecordingEventAction } from '../../../../../../features/video/project/recording-events/project-facts';
 import { resolveRecordingActionOccurrences } from '../../../../../project/operations/recording-events-selection';
-// @vitest-environment jsdom
 import { REVIEW_CLICK_DEFAULT } from '../../../../../../features/video/project/action-feedback/validation';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

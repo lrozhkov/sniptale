@@ -43,7 +43,8 @@ function storageArea(area: 'sync' | 'local') {
     },
   };
 }
-vi.mock('../infrastructure/browser-storage', () => ({
+vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/browser-storage')>()),
   browserStorage: { sync: storageArea('sync'), local: storageArea('local') },
 }));
 vi.mock('../effect-bundles', async (original) => ({

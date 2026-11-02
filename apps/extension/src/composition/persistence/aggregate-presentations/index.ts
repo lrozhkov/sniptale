@@ -1,4 +1,5 @@
-import { captureScenarioProjectInTransaction } from '../sync-capture/capture';
+import { commitScenarioPresentationCacheInTransaction } from '../sync-capture/presentation';
+import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { readScenarioStorage } from '../scenario/storage';
 import {
@@ -68,29 +69,36 @@ export async function commitProjectAggregatePresentation(args: {
       ],
       'readwrite'
     );
-    const rawRoot: unknown =
-      args.ref.kind === 'scenario'
-        ? (await readScenarioStorage(tx, args.ref.id)).logical
-        : await tx.objectStore(rootStoreName).get(args.ref.id);
-    const root =
-      args.ref.kind === 'scenario'
-        ? parseScenarioProjectEntry(rawRoot)
-        : parseVideoProjectEntry(rawRoot);
-    if (!root) throw new Error(`Stored ${args.ref.kind} ${args.ref.id} was not found.`);
-    if ((root.workspaceRevision ?? 0) !== args.expectedWorkspaceRevision) {
-      throw new Error(`Stored ${args.ref.kind} ${args.ref.id} changed during preview rendering.`);
+    try {
+      const rawRoot: unknown =
+        args.ref.kind === 'scenario'
+          ? (await readScenarioStorage(tx, args.ref.id)).logical
+          : await tx.objectStore(rootStoreName).get(args.ref.id);
+      const root =
+        args.ref.kind === 'scenario'
+          ? parseScenarioProjectEntry(rawRoot)
+          : parseVideoProjectEntry(rawRoot);
+      if (!root) throw new Error(`Stored ${args.ref.kind} ${args.ref.id} was not found.`);
+      if ((root.workspaceRevision ?? 0) !== args.expectedWorkspaceRevision) {
+        throw new Error(`Stored ${args.ref.kind} ${args.ref.id} changed during preview rendering.`);
+      }
+      const entry: AggregatePresentationEntry = {
+        aggregateId: args.ref.id,
+        aggregateKind: args.ref.kind,
+        presentationRevision: args.expectedWorkspaceRevision,
+        ...(args.previewBlob ? { previewBlob: args.previewBlob } : {}),
+        thumbnailBlob: args.thumbnailBlob,
+        updatedAt: Date.now(),
+      };
+      if (args.ref.kind === 'scenario') {
+        await commitScenarioPresentationCacheInTransaction(tx, entry);
+      } else {
+        await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).put(entry);
+      }
+      await tx.done;
+      return entry;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
     }
-    const entry: AggregatePresentationEntry = {
-      aggregateId: args.ref.id,
-      aggregateKind: args.ref.kind,
-      presentationRevision: args.expectedWorkspaceRevision,
-      ...(args.previewBlob ? { previewBlob: args.previewBlob } : {}),
-      thumbnailBlob: args.thumbnailBlob,
-      updatedAt: Date.now(),
-    };
-    await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).put(entry);
-    if (args.ref.kind === 'scenario') await captureScenarioProjectInTransaction(tx, args.ref.id);
-    await tx.done;
-    return entry;
   });
 }

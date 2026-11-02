@@ -8,6 +8,18 @@ import {
   isSyncProductSenderAllowed,
   routeSyncProductCommand,
 } from './product-route';
+const checkpoints = vi.hoisted(() => ({
+  read: vi.fn(),
+  interval: vi.fn(),
+  flush: vi.fn(),
+  exit: vi.fn(),
+}));
+vi.mock('../../composition/persistence/sync-capture/checkpoint-commands', () => ({
+  readSyncCheckpointInterval: checkpoints.read,
+  updateSyncCheckpointInterval: checkpoints.interval,
+  requestSyncCheckpointFlush: checkpoints.flush,
+  requestSyncCheckpointExit: checkpoints.exit,
+}));
 const cache = vi.hoisted(() => ({ status: vi.fn(), root: vi.fn(), budget: vi.fn(), pin: vi.fn() }));
 vi.mock('../../workflows/sync-transfer/native-cache-policy', () => ({
   readNativeCacheStatus: cache.status,
@@ -248,7 +260,7 @@ function productAnswer(
   });
 }
 
-it.each(['workspace-create', 'workspace-join'] as const)(
+it.each(['workspace-create', 'workspace-discover'] as const)(
   'starts %s with the planned native source and returns only acceptance',
   async (kind) => {
     const coordinator = routeCoordinator();
@@ -261,7 +273,13 @@ it.each(['workspace-create', 'workspace-join'] as const)(
     const command =
       kind === 'workspace-create'
         ? { kind, parentUrl: endpoint, accountId: 'alice', authentication: routeAuthentication }
-        : { kind, rootUrl: endpoint, accountId: 'alice', authentication: routeAuthentication };
+        : {
+            kind,
+            rootUrl: endpoint,
+            accountId: 'alice',
+            authentication: routeAuthentication,
+            previous: null,
+          };
     await expect(productAnswer(coordinator, command)).resolves.toEqual({
       success: true,
       result: { kind: 'accepted', requestId: routeRequestId },
@@ -269,12 +287,13 @@ it.each(['workspace-create', 'workspace-join'] as const)(
     expect(plan).toHaveBeenCalledExactlyOnceWith(
       kind === 'workspace-create'
         ? { kind: 'allocation', parentUrl: endpoint, accountId: 'alice' }
-        : { kind: 'join', rootUrl: endpoint, accountId: 'alice' }
+        : { kind: 'join', rootUrl: endpoint, accountId: 'alice', previous: null }
     );
     expect(start).toHaveBeenCalledExactlyOnceWith({
       source: routeSource,
       authentication: routeAuthentication,
       requestId: routeRequestId,
+      ...(kind === 'workspace-discover' ? { operation: 'discover' } : {}),
     });
     expect(plan).toHaveBeenCalledBefore(start);
   }
@@ -320,11 +339,13 @@ it('retries the exact selected source and enrolls without creating another works
   await expect(
     productAnswer(coordinator, {
       kind: 'workspace-enroll',
+      storagePolicy: { version: 1, mode: 'on-demand' },
       source: routeSource,
       authentication: routeAuthentication,
     })
   ).resolves.toEqual({ success: true, result: { kind: 'enrolled' } });
   expect(enroll).toHaveBeenCalledExactlyOnceWith({
+    storagePolicy: { version: 1, mode: 'on-demand' },
     source: routeSource,
     authentication: routeAuthentication,
   });
@@ -339,8 +360,19 @@ it('projects native status into the exact credential-free response contract', as
     success: true,
     result: { kind: 'status', status: empty },
   });
-  const connection = { phase: 'paused', rootUrl: 'https://dav.test/root/', accountId: 'alice' };
-  const workspace = { ...connection, phase: 'ready', source: routeSource };
+  const expected = { incarnation: routeRequestId, revision: 1 };
+  const connection = {
+    expected,
+    phase: 'paused',
+    rootUrl: 'https://dav.test/root/',
+    accountId: 'alice',
+  };
+  const workspace = {
+    rootUrl: connection.rootUrl,
+    accountId: connection.accountId,
+    phase: 'ready',
+    source: routeSource,
+  };
   const workspaceJob = {
     requestId: routeRequestId,
     sourceKind: 'allocation' as const,
@@ -351,6 +383,7 @@ it('projects native status into the exact credential-free response contract', as
   };
   nativeStatus.connection.mockResolvedValue({
     phase: connection.phase,
+    identity: expected,
     binding: connection,
     credentialId: 'private-reference',
   });
@@ -456,6 +489,7 @@ it('wakes initial capture only after committed enrollment and contains a missed 
   configureSyncProductRoute(coordinator, wake);
   const command = {
     kind: 'workspace-enroll' as const,
+    storagePolicy: { version: 1 as const, mode: 'on-demand' as const },
     source: routeSource,
     authentication: routeAuthentication,
   };
@@ -627,4 +661,554 @@ it('allows Settings to prepare an absent catalog root only with native-preservat
     )
   ).toBe(true);
   expect(isSyncProductSenderAllowed({ kind: 'replica-prepare', selection }, settings)).toBe(false);
+});
+
+it('preserves a shared locked command refusal through the product boundary', async () => {
+  const { SecretProtectionLockedError } =
+    await import('../../composition/persistence/secret-protection/model');
+  const coordinator = routeCoordinator();
+  vi.spyOn(coordinator, 'productCommand').mockRejectedValueOnce(new SecretProtectionLockedError());
+  const response = await productAnswer(coordinator, {
+    kind: 'catalog-refresh',
+    bypassCache: false,
+  });
+  expect(response).toEqual({ success: false, error: 'secrets-locked' });
+  expect(parseSyncProductResponse(response)).toEqual(response);
+});
+
+describe('checkpoint product admission', () => {
+  it('restricts local policy and flush commands to ordinary Settings', () => {
+    for (const command of [
+      { kind: 'checkpoint-policy' },
+      { kind: 'checkpoint-flush' },
+      { kind: 'checkpoint-interval', intervalMs: 300000 },
+    ] satisfies SyncProductCommand[]) {
+      expect(isSyncProductSenderAllowed(command, settings)).toBe(true);
+      for (const sender of [
+        gallery,
+        { url: 'https://host.test' },
+        { ...settings, frameId: 1 },
+        { ...settings, url: `${settings.url}?aiUnlock=1` },
+      ])
+        expect(isSyncProductSenderAllowed(command, sender)).toBe(false);
+    }
+  });
+  it('uses current native scope and identity, then wakes only after the durable command', async () => {
+    const coordinator = routeCoordinator();
+    const binding = { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 1 };
+    const identity = { incarnation: routeRequestId, revision: 1 };
+    nativeStatus.connection.mockResolvedValue({ binding, identity });
+    checkpoints.read.mockResolvedValue(300000);
+    checkpoints.interval.mockResolvedValue({ intervalMs: 60000, updated: 2 });
+    checkpoints.flush.mockResolvedValue({ updated: 2, alreadyDue: 1 });
+    const wake = vi.fn(() => {
+      throw new Error('Missed advisory wakeup');
+    });
+    configureSyncProductRoute(coordinator, wake);
+    await expect(productAnswer(coordinator, { kind: 'checkpoint-policy' })).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-policy', intervalMs: 300000 },
+    });
+    expect(checkpoints.read).toHaveBeenLastCalledWith(binding);
+    expect(wake).not.toHaveBeenCalled();
+    await expect(
+      productAnswer(coordinator, { kind: 'checkpoint-interval', intervalMs: 60000 })
+    ).resolves.toEqual({ success: true, result: { kind: 'checkpoint-policy', intervalMs: 60000 } });
+    expect(checkpoints.interval).toHaveBeenLastCalledWith(binding, 60000);
+    await expect(productAnswer(coordinator, { kind: 'checkpoint-flush' })).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-flushed', updated: 2, alreadyDue: 1 },
+    });
+    expect(checkpoints.flush).toHaveBeenLastCalledWith(binding, identity);
+    expect(wake).toHaveBeenCalledTimes(2);
+    checkpoints.flush.mockRejectedValueOnce(new Error('Native admission refused'));
+    await expect(productAnswer(coordinator, { kind: 'checkpoint-flush' })).resolves.toEqual({
+      success: false,
+      error: 'Sync product command refused',
+    });
+    expect(wake).toHaveBeenCalledTimes(2);
+    nativeStatus.connection.mockResolvedValue(null);
+    await expect(productAnswer(coordinator, { kind: 'checkpoint-flush' })).resolves.toEqual({
+      success: false,
+      error: 'Sync product command refused',
+    });
+  });
+});
+
+describe('due-only checkpoint wake admission', () => {
+  const command = { kind: 'checkpoint-wake' } as const;
+  it('admits only active top-level product documents', () => {
+    for (const sender of [
+      settings,
+      gallery,
+      ...['editor', 'scenario-editor', 'video-editor'].map((page) => ({
+        url: `chrome-extension://test/apps/extension/src/${page}/index.html`,
+        frameId: 0,
+      })),
+    ]) {
+      expect(isSyncProductSenderAllowed(command, sender)).toBe(true);
+      expect(isSyncProductSenderAllowed(command, { ...sender, frameId: 1 })).toBe(false);
+      expect(isSyncProductSenderAllowed(command, { ...sender, documentLifecycle: 'cached' })).toBe(
+        false
+      );
+      expect(isSyncProductSenderAllowed(command, { url: sender.url })).toBe(false);
+    }
+    for (const sender of [
+      { url: 'https://host.test', frameId: 0 },
+      { ...settings, url: `${settings.url}?aiUnlock=1` },
+      { ...gallery, url: gallery.url.replace('//test/', '//other/') },
+      { frameId: 0 },
+    ])
+      expect(isSyncProductSenderAllowed(command, sender)).toBe(false);
+  });
+  it('only requests the configured retry wake without native policy or product execution', async () => {
+    const coordinator = routeCoordinator();
+    const product = vi.spyOn(coordinator, 'productCommand');
+    const wake = vi.fn();
+    configureSyncProductRoute(coordinator, wake);
+    nativeStatus.connection.mockClear();
+    checkpoints.read.mockClear();
+    checkpoints.interval.mockClear();
+    checkpoints.flush.mockClear();
+    await expect(productAnswer(coordinator, command, gallery)).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-woken' },
+    });
+    expect(wake).toHaveBeenCalledOnce();
+    expect(nativeStatus.connection).not.toHaveBeenCalled();
+    expect(checkpoints.read).not.toHaveBeenCalled();
+    expect(checkpoints.interval).not.toHaveBeenCalled();
+    expect(checkpoints.flush).not.toHaveBeenCalled();
+    expect(product).not.toHaveBeenCalled();
+  });
+  it('does not wake a replacement coordinator and preserves alarm recovery after missed callbacks', async () => {
+    const previous = routeCoordinator();
+    const current = routeCoordinator();
+    const wake = vi.fn(() => {
+      throw new Error('Missed wake');
+    });
+    configureSyncProductRoute(current, wake);
+    await expect(productAnswer(previous, command)).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-woken' },
+    });
+    expect(wake).not.toHaveBeenCalled();
+    await expect(productAnswer(current, command)).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-woken' },
+    });
+    expect(wake).toHaveBeenCalledOnce();
+    configureSyncProductRoute(current);
+    await expect(productAnswer(current, command)).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-woken' },
+    });
+  });
+});
+
+it('refuses an unconfigured checkpoint wake without claiming publication or starting work', () => {
+  const response = vi.fn();
+  expect(
+    routeSyncProductCommand(
+      {
+        type: MessageType.SYNC_PRODUCT_COMMAND,
+        requestId: routeRequestId,
+        command: { kind: 'checkpoint-wake' },
+      },
+      settings,
+      response,
+      null
+    )
+  ).toBe(true);
+  expect(response).toHaveBeenCalledWith({ success: false, error: 'Sync product command refused' });
+});
+
+describe('exact checkpoint exit admission', () => {
+  const receipt = { rootKind: 'media' as const, rootId: 'image', revision: routeRequestId };
+  const image = { url: 'chrome-extension://test/apps/extension/src/editor/index.html', frameId: 0 };
+  it('binds exit root families to active top-level document owners', () => {
+    const owners = [
+      { sender: image, kinds: ['media'] },
+      {
+        sender: {
+          url: 'chrome-extension://test/apps/extension/src/video-editor/index.html',
+          frameId: 0,
+        },
+        kinds: ['video-project'],
+      },
+      {
+        sender: {
+          url: 'chrome-extension://test/apps/extension/src/scenario-editor/index.html',
+          frameId: 0,
+        },
+        kinds: ['scenario-project'],
+      },
+      { sender: gallery, kinds: ['media', 'video-review'] },
+    ];
+    for (const { sender, kinds } of owners) {
+      for (const rootKind of [
+        'media',
+        'video-project',
+        'scenario-project',
+        'video-review',
+      ] as const) {
+        const command: SyncProductCommand = {
+          kind: 'checkpoint-exit',
+          receipt: { ...receipt, rootKind },
+        };
+        expect(isSyncProductSenderAllowed(command, sender)).toBe(kinds.includes(rootKind));
+        expect(isSyncProductSenderAllowed(command, { ...sender, frameId: 1 })).toBe(false);
+        expect(isSyncProductSenderAllowed(command, { url: sender.url })).toBe(false);
+        expect(
+          isSyncProductSenderAllowed(command, { ...sender, documentLifecycle: 'cached' })
+        ).toBe(false);
+      }
+    }
+    for (const sender of [
+      settings,
+      { ...settings, url: `${settings.url}?aiUnlock=1` },
+      { url: 'https://host.test', frameId: 0 },
+      { ...image, url: image.url.replace('//test/', '//other/') },
+    ])
+      expect(isSyncProductSenderAllowed({ kind: 'checkpoint-exit', receipt }, sender)).toBe(false);
+  });
+  it('derives current exit authority and wakes only after durable intent', async () => {
+    const coordinator = routeCoordinator();
+    const binding = { spaceId: 'current-space', profileCreatedAt: 4, connectionGeneration: 7 };
+    const identity = { incarnation: routeRequestId, revision: 9 };
+    nativeStatus.connection.mockResolvedValue({ binding, identity });
+    let finish!: (value: { outcome: 'requested' }) => void;
+    const durable = new Promise<{ outcome: 'requested' }>((resolve) => {
+      finish = resolve;
+    });
+    checkpoints.exit.mockReturnValueOnce(durable);
+    const wake = vi.fn(() => {
+      throw new Error('Missed advisory wake');
+    });
+    configureSyncProductRoute(coordinator, wake);
+    const result = productAnswer(coordinator, { kind: 'checkpoint-exit', receipt }, image);
+    await Promise.resolve();
+    expect(checkpoints.exit).toHaveBeenLastCalledWith(binding, identity, receipt);
+    expect(wake).not.toHaveBeenCalled();
+    finish({ outcome: 'requested' });
+    await expect(result).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-exit', outcome: 'requested' },
+    });
+    expect(wake).toHaveBeenCalledOnce();
+  });
+  it('preserves paused exit intent without product or network execution', async () => {
+    const coordinator = routeCoordinator();
+    const binding = { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 1 };
+    const identity = { incarnation: routeRequestId, revision: 1 };
+    nativeStatus.connection.mockResolvedValue({ binding, identity, phase: 'paused' });
+    checkpoints.exit.mockResolvedValueOnce({ outcome: 'already-due' });
+    const product = vi.spyOn(coordinator, 'productCommand');
+    const wake = vi.fn();
+    configureSyncProductRoute(coordinator, wake);
+    await expect(
+      productAnswer(coordinator, { kind: 'checkpoint-exit', receipt }, image)
+    ).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-exit', outcome: 'already-due' },
+    });
+    expect(checkpoints.exit).toHaveBeenLastCalledWith(binding, identity, receipt);
+    expect(product).not.toHaveBeenCalled();
+    expect(wake).toHaveBeenCalledOnce();
+  });
+  it('does not wake for stale missing or unconfigured exit intent', async () => {
+    const coordinator = routeCoordinator();
+    const wake = vi.fn();
+    configureSyncProductRoute(coordinator, wake);
+    const binding = { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 1 };
+    const identity = { incarnation: routeRequestId, revision: 1 };
+    nativeStatus.connection.mockResolvedValue({ binding, identity });
+    checkpoints.flush.mockClear();
+    checkpoints.exit.mockClear();
+    for (const outcome of ['stale', 'not-pending'] as const) {
+      checkpoints.exit.mockResolvedValueOnce({ outcome });
+      await expect(
+        productAnswer(coordinator, { kind: 'checkpoint-exit', receipt }, image)
+      ).resolves.toEqual({ success: true, result: { kind: 'checkpoint-exit', outcome } });
+    }
+    nativeStatus.connection.mockResolvedValue(null);
+    await expect(
+      productAnswer(coordinator, { kind: 'checkpoint-exit', receipt }, image)
+    ).resolves.toEqual({
+      success: true,
+      result: { kind: 'checkpoint-exit', outcome: 'unconfigured' },
+    });
+    expect(checkpoints.exit).toHaveBeenCalledTimes(2);
+    expect(checkpoints.flush).not.toHaveBeenCalled();
+    expect(wake).not.toHaveBeenCalled();
+  });
+  it('does not wake a replacement coordinator or a failed native intent', async () => {
+    const old = routeCoordinator();
+    const current = routeCoordinator();
+    const wake = vi.fn();
+    configureSyncProductRoute(current, wake);
+    nativeStatus.connection.mockResolvedValue({
+      binding: { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 1 },
+      identity: { incarnation: routeRequestId, revision: 1 },
+    });
+    checkpoints.exit.mockResolvedValueOnce({ outcome: 'requested' });
+    await expect(
+      productAnswer(old, { kind: 'checkpoint-exit', receipt }, image)
+    ).resolves.toMatchObject({ success: true });
+    checkpoints.exit.mockRejectedValueOnce(new Error('Native intent refused'));
+    await expect(
+      productAnswer(current, { kind: 'checkpoint-exit', receipt }, image)
+    ).resolves.toEqual({ success: false, error: 'Sync product command refused' });
+    expect(wake).not.toHaveBeenCalled();
+  });
+});
+
+it('refuses exit ingress from Settings and wrong editor families before native reads', async () => {
+  const coordinator = routeCoordinator();
+  const command: SyncProductCommand = {
+    kind: 'checkpoint-exit',
+    receipt: { rootKind: 'video-review', rootId: 'review', revision: routeRequestId },
+  };
+  nativeStatus.connection.mockClear();
+  checkpoints.exit.mockClear();
+  for (const sender of [
+    settings,
+    { ...gallery, frameId: 1 },
+    { url: 'chrome-extension://test/apps/extension/src/editor/index.html', frameId: 0 },
+    { url: 'https://host.test', frameId: 0 },
+  ])
+    await expect(productAnswer(coordinator, command, sender)).resolves.toEqual({
+      success: false,
+      error: 'Sync product command refused',
+    });
+  expect(nativeStatus.connection).not.toHaveBeenCalled();
+  expect(checkpoints.exit).not.toHaveBeenCalled();
+});
+it('admits only runtime status and manual flush from an exact popup document', () => {
+  vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+  try {
+    const popup = {
+      id: 'test',
+      documentId: 'popup-document',
+      frameId: 0,
+      documentLifecycle: 'active' as const,
+      url: 'chrome-extension://test/apps/extension/src/popup/index.html',
+    };
+    expect(isSyncProductSenderAllowed({ kind: 'runtime-status' }, popup)).toBe(true);
+    expect(isSyncProductSenderAllowed({ kind: 'checkpoint-flush' }, popup)).toBe(true);
+    for (const command of [
+      { kind: 'status' },
+      { kind: 'checkpoint-wake' },
+      { kind: 'checkpoint-policy' },
+      { kind: 'cache-status' },
+      { kind: 'catalog-refresh', bypassCache: false },
+    ] as const)
+      expect(isSyncProductSenderAllowed(command, popup)).toBe(false);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('refuses popup lookalikes and privileged verbs before invoking the observer', async () => {
+  vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+  try {
+    const coordinator = routeCoordinator();
+    const read = vi.fn();
+    configureSyncProductRoute(coordinator, undefined, read);
+    const popup = {
+      id: 'test',
+      documentId: 'popup-document',
+      frameId: 0,
+      url: 'chrome-extension://test/apps/extension/src/popup/index.html',
+    };
+    for (const candidate of [
+      { ...popup, id: 'other' },
+      { ...popup, tab: { id: 1 } as chrome.tabs.Tab },
+      { ...popup, frameId: 1 },
+      { ...popup, documentLifecycle: 'cached' as const },
+      { ...popup, url: popup.url + '?fake=1' },
+      { ...popup, url: popup.url + '#fake' },
+      settings,
+    ])
+      expect(isSyncProductSenderAllowed({ kind: 'runtime-status' }, candidate)).toBe(false);
+    expect(read).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+it('returns only the configured readonly projection and refuses stale observer completion', async () => {
+  vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+  try {
+    const coordinator = routeCoordinator();
+    const popup = {
+      id: 'test',
+      documentId: 'popup-document',
+      frameId: 0,
+      url: 'chrome-extension://test/apps/extension/src/popup/index.html',
+    };
+    const status = {
+      configuration: 'unconfigured' as const,
+      connection: null,
+      localPublication: 'unknown' as const,
+      activity: 'unknown' as const,
+      remote: { knowledge: 'unknown' as const },
+      protection: 'unknown' as const,
+      issue: null,
+      repair: null,
+    };
+    const read = vi.fn(async () => status);
+    configureSyncProductRoute(coordinator, undefined, read);
+    const product = vi.spyOn(coordinator, 'productCommand');
+    nativeStatus.connection.mockClear();
+    checkpoints.flush.mockClear();
+    expect(await productAnswer(coordinator, { kind: 'runtime-status' }, popup)).toEqual({
+      success: true,
+      result: { kind: 'runtime-status', status },
+    });
+    expect(product).not.toHaveBeenCalled();
+    expect(nativeStatus.connection).not.toHaveBeenCalled();
+    expect(checkpoints.flush).not.toHaveBeenCalled();
+    let complete: ((value: typeof status) => void) | undefined;
+    read.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        })
+    );
+    const pending = productAnswer(coordinator, { kind: 'runtime-status' }, popup);
+    configureSyncProductRoute(routeCoordinator());
+    if (!complete) throw new Error('Observer not entered');
+    complete(status);
+    expect(await pending).toEqual({ success: false, error: 'Sync product command refused' });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('admits the observed native action popup without optional document or frame fields', () => {
+  vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+  try {
+    const popup = {
+      id: 'test',
+      url: 'chrome-extension://test/apps/extension/src/popup/index.html',
+    };
+    expect(isSyncProductSenderAllowed({ kind: 'runtime-status' }, popup)).toBe(true);
+    expect(isSyncProductSenderAllowed({ kind: 'checkpoint-flush' }, popup)).toBe(true);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('routes selected JOIN with the exact discovery identity before starting preparation', async () => {
+  const coordinator = routeCoordinator();
+  const source = { kind: 'join' as const, identity: routeSource.identity };
+  const expected = {
+    spaceId: routeRequestId,
+    bootstrapId: routeRequestId,
+    fingerprint: 'a'.repeat(64),
+  };
+  const select = vi.spyOn(coordinator, 'selectWorkspace').mockResolvedValue(source);
+  const start = vi
+    .spyOn(coordinator, 'startWorkspace')
+    .mockResolvedValue({ executorId: routeRequestId, executorRevision: 1 });
+  await expect(
+    productAnswer(coordinator, {
+      kind: 'workspace-join',
+      source,
+      prefix: 'Workspace/',
+      expected,
+      authentication: routeAuthentication,
+    })
+  ).resolves.toEqual({ success: true, result: { kind: 'accepted', requestId: routeRequestId } });
+  expect(select).toHaveBeenCalledExactlyOnceWith({ source, prefix: 'Workspace/', expected });
+  expect(select).toHaveBeenCalledBefore(start);
+  expect(start).toHaveBeenCalledExactlyOnceWith({
+    source,
+    authentication: routeAuthentication,
+    requestId: routeRequestId,
+  });
+  expect(
+    isSyncProductSenderAllowed(
+      {
+        kind: 'workspace-discover',
+        rootUrl: 'https://dav.test/',
+        accountId: 'alice',
+        authentication: routeAuthentication,
+        previous: null,
+      },
+      gallery
+    )
+  ).toBe(false);
+});
+
+it('starts saved Scenario HTML only from Gallery while preserving Settings job control', () => {
+  const command: SyncProductCommand = {
+    kind: 'scenario-export-prepare',
+    projectId: 'scenario',
+    exportId: 'saved-html',
+  };
+  expect(isSyncProductSenderAllowed(command, gallery)).toBe(true);
+  for (const sender of [
+    settings,
+    { url: 'chrome-extension://test/apps/extension/src/scenario-editor/index.html', frameId: 0 },
+    { url: 'chrome-extension://test/apps/extension/src/editor/index.html', frameId: 0 },
+    { id: 'test', url: 'chrome-extension://test/apps/extension/src/popup/index.html' },
+  ])
+    expect(isSyncProductSenderAllowed(command, sender)).toBe(false);
+  expect(isSyncProductSenderAllowed({ kind: 'inspect', requestId: routeRequestId }, settings)).toBe(
+    true
+  );
+  expect(isSyncProductSenderAllowed({ kind: 'cancel', requestId: routeRequestId }, settings)).toBe(
+    true
+  );
+});
+
+it('starts the whole Library batch only from Gallery and permits Settings observation only', () => {
+  const command: SyncProductCommand = {
+    kind: 'library-backup-prepare',
+    expected: { incarnation: routeRequestId, revision: 1 },
+    options: {
+      includeDrafts: false,
+      includeSourceMetadata: true,
+      includeTelemetry: true,
+      includeWebSnapshots: true,
+      scope: 'all',
+    },
+  };
+  expect(isSyncProductSenderAllowed(command, gallery)).toBe(true);
+  for (const candidate of [
+    settings,
+    { url: 'chrome-extension://test/apps/extension/src/editor/index.html', frameId: 0 },
+    { url: 'chrome-extension://test/apps/extension/src/scenario-editor/index.html', frameId: 0 },
+    { url: 'chrome-extension://test/apps/extension/src/video-editor/index.html', frameId: 0 },
+    { id: 'test', url: 'chrome-extension://test/apps/extension/src/popup/index.html' },
+  ])
+    expect(isSyncProductSenderAllowed(command, candidate)).toBe(false);
+  expect(isSyncProductSenderAllowed({ kind: 'inspect', requestId: routeRequestId }, settings)).toBe(
+    true
+  );
+  expect(isSyncProductSenderAllowed({ kind: 'cancel', requestId: routeRequestId }, settings)).toBe(
+    true
+  );
+});
+
+it('limits connection credential replacement to canonical top-level Settings', () => {
+  const command = {
+    kind: 'connection-authentication' as const,
+    expected: { incarnation: routeRequestId, revision: 1 },
+    authentication: routeAuthentication,
+  };
+  expect(isSyncProductSenderAllowed(command, settings)).toBe(true);
+  expect(isSyncProductSenderAllowed(command, gallery)).toBe(false);
+  expect(isSyncProductSenderAllowed(command, { ...settings, frameId: 1 })).toBe(false);
+});
+
+it('limits native connection resume to canonical Settings', () => {
+  const command = {
+    kind: 'connection-resume' as const,
+    expected: { incarnation: routeRequestId, revision: 1 },
+  };
+  expect(isSyncProductSenderAllowed(command, settings)).toBe(true);
+  expect(isSyncProductSenderAllowed(command, gallery)).toBe(false);
+  expect(isSyncProductSenderAllowed(command, { ...settings, frameId: 1 })).toBe(false);
 });

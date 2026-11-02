@@ -699,7 +699,7 @@ test('background camera modes match Gallery pixels and keep a second video indep
       import { getFittedMediaContentFrame } from './apps/extension/src/features/video/composition/draw/fitted-media';
       import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
       import { shouldLockVisualLayerToViewport } from './apps/extension/src/features/video/composition/motion/layer-camera';
-      import { createReviewSpatialRenderer } from './apps/extension/src/features/video/composition/canvas/spatial-renderer';
+      import { createReviewSpatialSession as createReviewSpatialRenderer } from './apps/extension/src/workflows/video-review/spatial-render-session';
       import { drawSpatialCompositionGroup } from './apps/extension/src/features/video/composition/draw/spatial';
       import { drawReviewSceneOverlays } from './apps/extension/src/workflows/video-review/render-scene-overlays';
       import { createQuickEditBorder, createQuickEditSpotlight } from './apps/extension/src/features/video/project/scene/focus-appearance';
@@ -1223,7 +1223,7 @@ test('source scene masks retain Gallery border and click order through perspecti
           import {drawCompositionVisualLayer} from './apps/extension/src/features/video/composition/draw/visual';
           import {drawCompositionSceneSpotlights} from './apps/extension/src/features/video/composition/draw/project-spotlight';
           import {drawSpatialCompositionGroup} from './apps/extension/src/features/video/composition/draw/spatial';
-          import {createReviewSpatialRenderer} from './apps/extension/src/features/video/composition/canvas/spatial-renderer';
+          import {createReviewSpatialSession as createReviewSpatialRenderer} from './apps/extension/src/workflows/video-review/spatial-render-session';
           export async function probe() {
             const results = [];
             const source = document.createElement('canvas'); source.width = 640; source.height = 360;

@@ -14,6 +14,7 @@ import { runWithAssetResourceRead } from '../../composition/persistence/assets/r
 import { parseMediaLibraryEntry } from '../../composition/persistence/media-library/read-guards';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import { readEnabledCaptureProfile } from '../../composition/persistence/sync-capture/capture';
+import { readCheckpointInTransaction } from '../../composition/persistence/sync-capture/checkpoints';
 import type { SyncCaptureRootState } from '../../composition/persistence/sync-capture/contracts';
 import {
   readNativeCacheSettings,
@@ -29,6 +30,7 @@ interface Candidate {
   size: number;
   lastUsedAt: number;
   pinned: boolean;
+  pending: boolean;
   root: NativeEditingRoot | null;
 }
 const ROOT_STORES = {
@@ -108,6 +110,7 @@ async function inventory(db: Database, index?: CatalogCopyIndex) {
         residentBytes,
         lastUsedAt: ref.createdAt,
         pinned: false,
+        pending: false,
         root: null,
       });
     }
@@ -123,6 +126,7 @@ async function inventory(db: Database, index?: CatalogCopyIndex) {
         residentBytes: media.blob?.size ?? null,
         lastUsedAt: media.createdAt,
         pinned: false,
+        pending: false,
         root: null,
       });
     }
@@ -132,7 +136,17 @@ async function inventory(db: Database, index?: CatalogCopyIndex) {
     for (const state of await nativeStates(db)) {
       if (state.deleted || state.spaceId !== profile?.spaceId || !(await exists(db, state)))
         continue;
+      const pendingTx = db.transaction([stores.SYNC_CAPTURE_STORE], 'readonly');
+      const pending = profile
+        ? await readCheckpointInTransaction(
+            pendingTx,
+            { ...profile, profileCreatedAt: profile.createdAt },
+            state
+          )
+        : null;
+      await pendingTx.done;
       const acknowledged =
+        !pending &&
         !!index &&
         state.basis.length > 0 &&
         state.basis.every((id) => {
@@ -143,6 +157,7 @@ async function inventory(db: Database, index?: CatalogCopyIndex) {
         const item = records.get(id);
         if (!item) continue;
         item.lastUsedAt = Math.max(item.lastUsedAt, state.createdAt);
+        item.pending ||= pending !== null;
         if (acknowledged && !item.root)
           item.root = { rootKind: state.rootKind, rootId: state.rootId };
       }
@@ -215,7 +230,7 @@ export async function trimNativeCache(
     args.signal.throwIfAborted();
     if (remaining <= settings.budgetBytes) break;
     if (candidate.residentBytes === null) continue;
-    if (candidate.pinned || !candidate.root) {
+    if (candidate.pinned || candidate.pending || !candidate.root) {
       result.protected++;
       continue;
     }

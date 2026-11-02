@@ -77,7 +77,21 @@ function reader(chunks: string[], reportedSize = chunks.join('').length): Archiv
 }
 
 function envelope(objects = [object]) {
-  return { descriptor, metadata: {}, objects };
+  return {
+    descriptor,
+    metadata: {
+      entry: {
+        id: 'one',
+        tags: [],
+        source: { kind: 'screenshot' },
+        mimeType: objects[0]!.mimeType,
+        size: objects[0]!.size,
+      },
+      originalObjectId: objects[0]!.objectId,
+      ...(objects[1] ? { thumbnail: { objectId: objects[1].objectId } } : {}),
+    },
+    objects,
+  };
 }
 
 describe('media backup v6 root staging', () => {
@@ -311,4 +325,28 @@ it('keeps digest and writer state independent across concurrent root staging', a
   expect(mocks.createWriter).toHaveBeenCalledTimes(2);
   expect(mocks.finalize).toHaveBeenCalledTimes(2);
   expect(mocks.abort).not.toHaveBeenCalled();
+});
+
+it.each(['video/webm;codecs=vp8', 'audio/webm;codecs=opus'])(
+  'stages declared native %s without changing its wire descriptor',
+  async (mimeType) => {
+    const input = envelope([{ ...object, mimeType: mimeType.split(';')[0]! }]);
+    input.metadata.entry.mimeType = mimeType;
+    const before = structuredClone(input);
+    await stageArchiveRootObjects({ envelope: input, reader: reader(['media']) });
+    expect(mocks.createWriter).toHaveBeenCalledWith({ mimeType }, {});
+    expect(input).toEqual(before);
+  }
+);
+
+it('detaches native declarations and object selection before asynchronous staging admission', async () => {
+  const input = envelope([{ ...object, mimeType: 'video/webm' }]);
+  input.metadata.entry.mimeType = 'video/webm;codecs=vp8';
+  const operation = stageArchiveRootObjects({ envelope: input, reader: reader(['media']) });
+  input.metadata.entry.mimeType = 'audio/webm;codecs=opus';
+  input.objects[0]!.mimeType = 'audio/webm';
+  input.objects[0]!.size = 100;
+  await operation;
+  expect(mocks.admission).toHaveBeenCalledWith(5);
+  expect(mocks.createWriter).toHaveBeenCalledWith({ mimeType: 'video/webm;codecs=vp8' }, {});
 });

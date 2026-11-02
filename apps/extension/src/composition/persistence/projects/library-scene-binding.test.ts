@@ -1,3 +1,6 @@
+import { projectRowReferenceKeys } from '../assets/retention-index-projection';
+import { ROW_REFERENCE_INDEX } from '../infrastructure/indexed-db/row-index-contract';
+import { collectReadyJournalAssetIds } from '../assets/retention-claims';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { AssetReadyJournal, AssetRef } from '../assets/contracts';
@@ -25,6 +28,18 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
 vi.mock('../assets/opfs-store', async (original) => ({
   ...(await original<typeof import('../assets/opfs-store')>()),
   listReadyJournals: async () => [...harness.journals.values()],
+  readAssetReadyClaims: async (ids: Iterable<string>) => {
+    const selected = new Set(ids);
+    const journals = [...harness.journals.values()].filter((journal) =>
+      collectReadyJournalAssetIds(journal).some((id) => selected.has(id))
+    );
+    return {
+      valid: true,
+      journals,
+      assetIds: new Set(journals.flatMap(collectReadyJournalAssetIds)),
+    };
+  },
+  readWritingAssetIds: async () => [],
   writeReadyJournal: async (journal: AssetReadyJournal) => {
     harness.journals.set(journal.journalId, structuredClone(journal));
   },
@@ -124,18 +139,31 @@ beforeEach(() => {
               entries.delete(typeof key === 'string' ? key : JSON.stringify(key));
             },
             index: (indexName: string) => ({
+              getKey: async (key: string) =>
+                [...entries].find(([, value]) =>
+                  projectRowReferenceKeys(name, value).includes(key)
+                )?.[0],
               count: async (key: string) =>
-                [...entries.values()].filter((value) => isRecord(value) && value[indexName] === key)
-                  .length,
+                [...entries.values()].filter((value) =>
+                  indexName === ROW_REFERENCE_INDEX
+                    ? projectRowReferenceKeys(name, value).includes(key)
+                    : isRecord(value) && value[indexName] === key
+                ).length,
               getAll: async (key: string) =>
                 structuredClone(
-                  [...entries.values()].filter(
-                    (value) => isRecord(value) && value[indexName] === key
+                  [...entries.values()].filter((value) =>
+                    indexName === ROW_REFERENCE_INDEX
+                      ? projectRowReferenceKeys(name, value).includes(key)
+                      : isRecord(value) && value[indexName] === key
                   )
                 ),
               getAllKeys: async (key: string) =>
                 [...entries]
-                  .filter(([, value]) => isRecord(value) && value[indexName] === key)
+                  .filter(([, value]) =>
+                    indexName === ROW_REFERENCE_INDEX
+                      ? projectRowReferenceKeys(name, value).includes(key)
+                      : isRecord(value) && value[indexName] === key
+                  )
                   .map(([storedKey, value]) =>
                     isRecord(value) &&
                     typeof value['aggregateId'] === 'string' &&

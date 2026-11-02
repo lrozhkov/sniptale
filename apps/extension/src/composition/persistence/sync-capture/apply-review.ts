@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from './checkpoints';
 import { isCaptureDependencyVersion } from './guards';
 import { readAppliedCaptureReceipt } from './guards';
 import { isCaptureReplicaHeader } from './guards';
@@ -241,6 +242,8 @@ async function profile(tx: ReadTx, input: ApplyPreparedVideoReviewReplicaInput, 
 }
 async function ownPredecessor(tx: WriteTx, input: ApplyPreparedVideoReviewReplicaInput) {
   const id = input.root.review.workspace.aggregateId;
+  if (await readCheckpointInTransaction(tx, input, { rootKind: 'video-review', rootId: id }))
+    refused();
   const stored = await readWorkspaceStorage(tx, id);
   const rawDraft: unknown = await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(id);
   const workspace = stored.logical === undefined ? null : parseVideoWorkspace(stored.logical);
@@ -301,6 +304,13 @@ async function ownPredecessor(tx: WriteTx, input: ApplyPreparedVideoReviewReplic
 }
 async function admitDependencies(tx: WriteTx, input: ApplyPreparedVideoReviewReplicaInput) {
   for (const dependency of input.dependencies) {
+    if (
+      await readCheckpointInTransaction(tx, input, {
+        rootKind: 'media',
+        rootId: dependency.entry.id,
+      })
+    )
+      refused();
     const key = captureRootKey(input.spaceId, 'media', dependency.entry.id);
     const parsed = parseSyncCaptureRecord(
       await tx.objectStore(SYNC_CAPTURE_STORE).get(JSON.stringify(['root-state', key]))

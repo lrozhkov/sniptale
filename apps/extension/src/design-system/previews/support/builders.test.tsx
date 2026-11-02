@@ -166,6 +166,7 @@ function verifiesPopupFooterPreviews() {
     'shared.ui.popup-footer-action.default',
     'shared.ui.popup-footer-action.compact',
     'shared.ui.popup-footer.default',
+    'shared.ui.popup-footer.status',
   ]);
 
   const footerActions = childElements(

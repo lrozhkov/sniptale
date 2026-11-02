@@ -1,3 +1,8 @@
+import type { AISecretUnlockSyncPort } from '../../ai/settings/secret-unlock-route';
+import type { SecretProtectionService } from '../../../composition/persistence/secret-protection/model';
+import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
+import type { AiSettingsMutationMessage } from '../../../contracts/messaging/ai-settings-runtime';
+import type { createVoiceInputCoordinator } from '../../voice-input/coordinator';
 import { ScenarioSessionService } from '../../scenario/session-service';
 import type { WebSnapshotViewerPorts } from '../../capture/page-preparation/viewer-ports';
 import type { ViewportOwnerState, ViewportState } from '../../routing-contracts/tab-mode-state';
@@ -18,6 +23,22 @@ type DisposableBackgroundRuntimeState = {
    * Worker-local guards and ports are invalid after restart and must not survive startup.
    */
   captureGuardState: { isCapturing: boolean };
+  secretProtection?: SecretProtectionService;
+  secretUnlockSync?: AISecretUnlockSyncPort;
+  aiSettingsMutator?: (
+    message: Exclude<AiSettingsMutationMessage, { operation: 'read-secret-protection-status' }>
+  ) => Promise<void>;
+  syncCredentialRoute?: (
+    message: unknown,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: ResponseSender
+  ) => boolean;
+  syncOriginPermissionRoute?: (
+    message: unknown,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: ResponseSender
+  ) => boolean;
+  voiceInputRuntime?: ReturnType<typeof createVoiceInputCoordinator>;
   webSnapshotViewerPorts?: WebSnapshotViewerPorts;
 };
 

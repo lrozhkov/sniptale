@@ -38,7 +38,13 @@ function parseTextDocument(value: unknown): VideoProjectTextDocument | null {
   const document = parseReviewTextDocument(value['document']);
   const captions =
     value['captions'] === undefined ? undefined : parseReviewCaptionSettings(value['captions']);
-  if (!binding || !document || captions === null) return null;
+  if (
+    !binding ||
+    !document ||
+    captions === null ||
+    document.fragments.some((fragment) => fragment.sourceAnchor)
+  )
+    return null;
   const durationMode = value['durationMode'];
   if (
     durationMode !== undefined &&

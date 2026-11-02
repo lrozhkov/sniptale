@@ -60,12 +60,12 @@
       "rule": "js/superfluous-trailing-arguments"
     },
     {
-      "contentHash": "2a5a41ec32b8455a58f2e55e1650a6aeba5457133cc67466116b14a6793a4583",
-      "debtId": "noise.codeql.webdav-metadata-transformer",
+      "contentHash": "199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4",
       "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
-      "line": 280,
+      "line": 288,
       "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-      "rule": "js/superfluous-trailing-arguments"
+      "rule": "js/superfluous-trailing-arguments",
+      "debtId": "noise.codeql.transform-stream-webdav"
     }
   ]
 }

@@ -478,3 +478,41 @@ it('roundtrips an advanced gradient background through raster assets and legacy 
   expect(restored.canvasJson).toContain('data:image/png;base64,');
   expect(restored.canvasJson).toContain('sniptaleBackgroundGradient');
 });
+
+it('writes a repeated runtime source once while preserving all document roles', async () => {
+  const document = createEditorDocumentFixture();
+  document.frame.backgroundImageData = document.sourceImageData;
+  document.canvasJson = JSON.stringify({
+    objects: [{ type: 'image', src: document.sourceImageData }],
+  });
+  const prepared = await preparePersistedEditorDocument(document);
+  expect(mocks.writeBlobToAsset).toHaveBeenCalledTimes(1);
+  expect(prepared.objects).toHaveLength(1);
+  expect(prepared.refs).toHaveLength(1);
+  expect(prepared.document.assets.map((asset) => asset.role)).toEqual([
+    'source-image',
+    'frame-background',
+    'canvas:$.objects[0].src',
+  ]);
+  expect(new Set(prepared.document.assets.map((asset) => asset.assetId)).size).toBe(1);
+  expect(parsePersistedEditorDocument(prepared.document)).toEqual(prepared.document);
+});
+
+it('discards a shared staged source once after a later slot fails and permits retry', async () => {
+  const document = createEditorDocumentFixture();
+  document.frame.backgroundImageData = document.sourceImageData;
+  document.canvasJson = JSON.stringify({
+    objects: [{ type: 'image', src: 'data:image/png;base64,b3RoZXI=' }],
+  });
+  const write = mocks.writeBlobToAsset.getMockImplementation()!;
+  const failure = new Error('quota exhausted');
+  mocks.writeBlobToAsset.mockImplementationOnce(write).mockRejectedValueOnce(failure);
+  await expect(preparePersistedEditorDocument(document)).rejects.toBe(failure);
+  expect(mocks.discardPreparedAsset).toHaveBeenCalledExactlyOnceWith('asset-1');
+  const retried = await preparePersistedEditorDocument(document);
+  expect(retried.objects).toHaveLength(2);
+  expect(retried.document.sourceImage.assetId).toBe(
+    retried.document.frame.backgroundImage!.assetId
+  );
+  expect(retried.refs.every((ref) => ref.assetId !== 'asset-1')).toBe(true);
+});

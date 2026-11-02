@@ -23,27 +23,34 @@ export function collectBackupRollbackAssetIds(operation: AssetOperation): string
   return [...ids];
 }
 
+/** Include prepared shared refs whose new owner has not committed yet. */
+export function collectReadyJournalAssetIds(
+  journal: import('./contracts').AssetReadyJournal
+): string[] {
+  const ids = new Set(journal.assetRefs.map((ref) => ref.assetId));
+  const add = (rows: unknown) => {
+    if (!Array.isArray(rows)) return;
+    for (const row of rows)
+      if (isRecord(row) && typeof row['assetId'] === 'string') ids.add(row['assetId']);
+  };
+  const payload = journal.payload;
+  if (!isRecord(payload)) return [...ids];
+  if (journal.domain === 'image-workspace') add(payload['refs']);
+  const children = payload['children'];
+  if (isRecord(children)) {
+    add(children['assetPuts']);
+    if (Array.isArray(children['editorDocumentPuts']))
+      for (const row of children['editorDocumentPuts']) {
+        if (isRecord(row)) add(row['assetRefs']);
+      }
+  }
+  return [...ids];
+}
+
 /** Prepared shared document refs also retain bytes before their new owner is committed. */
 export function readyJournalClaimsAsset(
   journal: import('./contracts').AssetReadyJournal,
   assetId: string
 ): boolean {
-  if (journal.assetRefs.some((ref) => ref.assetId === assetId)) return true;
-  const payload = journal.payload;
-  if (!isRecord(payload)) return false;
-  if (journal.domain === 'image-workspace' && Array.isArray(payload['refs']))
-    return payload['refs'].some((ref) => isRecord(ref) && ref['assetId'] === assetId);
-  const children = payload['children'];
-  if (!isRecord(children)) return false;
-  return (
-    (Array.isArray(children['assetPuts']) &&
-      children['assetPuts'].some((entry) => isRecord(entry) && entry['assetId'] === assetId)) ||
-    (Array.isArray(children['editorDocumentPuts']) &&
-      children['editorDocumentPuts'].some(
-        (entry) =>
-          isRecord(entry) &&
-          Array.isArray(entry['assetRefs']) &&
-          entry['assetRefs'].some((ref) => isRecord(ref) && ref['assetId'] === assetId)
-      ))
-  );
+  return collectReadyJournalAssetIds(journal).includes(assetId);
 }

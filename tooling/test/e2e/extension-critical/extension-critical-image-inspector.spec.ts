@@ -70,7 +70,10 @@ for (const variant of [
       expect(await status.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
       const statusLabel = status.locator(':scope > span').first();
       expect(await statusLabel.evaluate((node) => node.clientWidth >= node.scrollWidth)).toBe(true);
-      await expect(status.locator(':scope > span').last()).toHaveAttribute('title', longName);
+      await expect(status.getByText(longName, { exact: true })).toHaveAttribute('title', longName);
+      await expect(
+        parameters.locator('[data-section="transformations"] summary svg.lucide-move')
+      ).toHaveCount(0);
       for (const key of [
         'editor.layerEffects.rotateLeft',
         'editor.layerEffects.rotateRight',
@@ -78,6 +81,10 @@ for (const variant of [
         await parameters.getByRole('button', { name: label(key), exact: true }).click();
         await expect(parameters).toBeVisible();
       }
+      await page.screenshot({
+        path: testInfo.outputPath('image-transform-inspector.png'),
+        fullPage: false,
+      });
       await ui('editor.floating.layer-effects-panel.back').click();
       await expect(parameters).toBeHidden();
       await ui('editor.floating.view-controls.workspace').click();

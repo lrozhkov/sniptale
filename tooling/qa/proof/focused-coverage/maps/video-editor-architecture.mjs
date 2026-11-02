@@ -39,7 +39,46 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
   ],
 }));
 
+const spatialResourceMappings = [
+  'apps/extension/src/features/video/composition/canvas/spatial-renderer.ts',
+  'apps/extension/src/workflows/video-review/preview-render-allocation.ts',
+  'apps/extension/src/workflows/video-review/spatial-render-session.ts',
+  'apps/extension/src/workflows/video-review/spatial-render-allocation.ts',
+].map((productionFile) => ({
+  owner: 'review-spatial-resource-admission',
+  productionFile,
+  reason:
+    'Spatial admission serves managed GPU storage and its preview, framing, and export consumers.',
+  testFiles: [
+    'apps/extension/src/features/video/composition/canvas/spatial-renderer.test.ts',
+    'apps/extension/src/workflows/video-review/spatial-render-session.test.ts',
+    'apps/extension/src/workflows/video-review/preview-render-allocation.test.ts',
+    'apps/extension/src/workflows/video-review/preview-render-resources.test.ts',
+    'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+    'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+    'apps/extension/src/offscreen/project-export/runtime.test.ts',
+    'apps/extension/src/gallery/video-review/motion-blur-recovery.test.tsx',
+    'apps/extension/src/workflows/video-review/render-export.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview-performance.test.ts',
+    'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview.cache-admission.test.ts',
+  ],
+}));
+
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
+  ...spatialResourceMappings,
+  {
+    owner: 'video-editor-project-state-admission',
+    productionFile: 'apps/extension/src/video-editor/state/project-actions.ts',
+    reason:
+      'Project admission serves scene updates, source-range commands and saved revision synchronization.',
+    testFiles: [
+      'apps/extension/src/video-editor/state/project-actions.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/source-range-history.test.ts',
+      'apps/extension/src/video-editor/runtime/session/auto-save.test.tsx',
+    ],
+  },
   {
     owner: 'shared-scene-plane-projection',
     productionFile:
@@ -527,14 +566,23 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     owner: 'video-editor-preview-cache-runtime',
     productionPrefix: 'apps/extension/src/video-editor/preview/cache/',
     reason:
-      'Preview revision, exact-frame LRU, materialization, and fragmented AVC preparation have focused cache proof.',
+      'Preview media lifetime, frame readiness, cache generation, and framing consumers have focused proof.',
     testFiles: [
+      'apps/extension/src/video-editor/preview/cache/build-exact.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.images.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.videos.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-lifecycle.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-resume.test.ts',
+      'apps/extension/src/video-editor/preview/cache/strategy.test.ts',
       'apps/extension/src/video-editor/preview/cache/encode.test.ts',
       'apps/extension/src/video-editor/preview/cache/exact-frame-cache.test.ts',
       'apps/extension/src/video-editor/preview/cache/render.test.ts',
       'apps/extension/src/video-editor/preview/cache/revision.test.ts',
       'apps/extension/src/video-editor/preview/cache/runtime.test.ts',
       'apps/extension/src/video-editor/preview/cache/segments.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview-interaction.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx',
     ],
   },
   {

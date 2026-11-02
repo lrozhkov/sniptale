@@ -70,14 +70,17 @@ describe('settings page section registry', () => {
       container = null;
     }
   });
-  it('preloads and resolves route views through composition owners', async () => {
-    await render(
-      <Suspense fallback="loading">
-        {renderSettingsRouteContent({ section: 'access-data', view: 'privacy' }, vi.fn())}
-      </Suspense>
-    );
-    expect(container?.textContent).toBe('access:privacy');
-  });
+  it.each(['privacy', 'secret-protection'] as const)(
+    'resolves the %s view through the AccessData composition owner',
+    async (view) => {
+      await render(
+        <Suspense fallback="loading">
+          {renderSettingsRouteContent({ section: 'access-data', view }, vi.fn())}
+        </Suspense>
+      );
+      expect(container?.textContent).toBe(`access:${view}`);
+    }
+  );
   it('preloads every deferred owner once and reuses the completed preload', async () => {
     const firstPreload = preloadDeferredSettingsSections();
     const secondPreload = preloadDeferredSettingsSections();
@@ -85,4 +88,28 @@ describe('settings page section registry', () => {
     await expect(firstPreload).resolves.toBeUndefined();
     expect(preloadDeferredSettingsSections()).toBe(firstPreload);
   }, 15_000);
+});
+
+it('passes queue-only filter state and its route callback to the Saving boundary', () => {
+  const onQueueFilterChange = vi.fn();
+  const element = renderSettingsRouteContent(
+    { section: 'saving', view: 'queue', queueFilter: 'action-required' },
+    vi.fn(),
+    onQueueFilterChange
+  );
+  expect(isValidElement(element)).toBe(true);
+  if (!isValidElement(element)) return;
+  expect(element.props).toMatchObject({
+    view: 'queue',
+    queueFilter: 'action-required',
+    onQueueFilterChange,
+  });
+  const connection = renderSettingsRouteContent(
+    { section: 'saving', view: 'connection' },
+    vi.fn(),
+    onQueueFilterChange
+  );
+  if (!isValidElement(connection)) throw new Error('Missing section element.');
+  expect(connection.props).not.toHaveProperty('queueFilter');
+  expect(connection.props).not.toHaveProperty('onQueueFilterChange');
 });

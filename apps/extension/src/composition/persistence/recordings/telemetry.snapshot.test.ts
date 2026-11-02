@@ -13,6 +13,11 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { createCursorTrajectoryBlockPacker } from '../../../features/video/project/cursor-trajectory/blocks';
 import { installPersistenceLockManagerForTests } from '../infrastructure/mutation-barrier';
 import { handleDatabaseUpgrade } from '../infrastructure/indexed-db/upgrade/core';
+import { withIndexedRowProjections } from '../infrastructure/indexed-db/indexed-row-projections';
+import {
+  ROW_REFERENCE_INDEX,
+  rowReferenceKey,
+} from '../infrastructure/indexed-db/row-index-contract';
 import {
   DB_VERSION,
   RECORDING_TELEMETRY_STORE,
@@ -99,7 +104,9 @@ afterEach(async () => {
 
 async function fixture() {
   const name = `telemetry-snapshot-${++sequence}`;
-  const db = await openDB(name, DB_VERSION, { upgrade: handleDatabaseUpgrade });
+  const db = withIndexedRowProjections(
+    await openDB(name, DB_VERSION, { upgrade: handleDatabaseUpgrade })
+  );
   database = db;
   databases.push({ db, name });
   const harness = createHarness();
@@ -399,11 +406,22 @@ it('refuses one competing preparation and preserves the current owner and facts 
   expect(await listAssetObjectIds()).toEqual([snapshot.ref.assetId]);
 });
 
+async function expectIndexedFrozenCapture(db: IDBPDatabase, assetId: string) {
+  const captures = await db.getAllFromIndex(
+    SYNC_CAPTURE_STORE,
+    ROW_REFERENCE_INDEX,
+    rowReferenceKey('asset', assetId)
+  );
+  expect(captures.length).toBeGreaterThan(0);
+  expect(collectSyncCaptureClaims(captures).assetIds.has(assetId)).toBe(true);
+}
+
 it('releases live history on telemetry deletion while retaining its frozen transfer bytes', async () => {
   const { db, store, identity, entry } = await fixture();
   await saveRecordingTelemetry(entry);
   const snapshot = (await getRecordingTelemetry(identity.recordingId))?.cursorTrajectorySnapshot;
   if (!snapshot) throw new Error('Snapshot is missing.');
+  await expectIndexedFrozenCapture(db, snapshot.ref.assetId);
   await deleteRecordingTelemetry(identity.recordingId);
   expect(await store.getHead(identity)).toBeNull();
   expect(await getRecordingTelemetry(identity.recordingId)).toBeUndefined();
@@ -417,6 +435,7 @@ it('releases live history on telemetry deletion while retaining its frozen trans
   expect(
     collectSyncCaptureClaims(await db.getAll(SYNC_CAPTURE_STORE)).assetIds.has(snapshot.ref.assetId)
   ).toBe(true);
+  await expectIndexedFrozenCapture(db, snapshot.ref.assetId);
   expect((await readAssetFile(snapshot.ref, 'retained-cursor.bin')).size).toBe(snapshot.ref.size);
   expect((await db.get(STORE_NAME, identity.recordingId))?.assetId).toBe('source-video');
   expect(
@@ -634,6 +653,8 @@ it('releases both history owners on delete while frozen capture pins both files'
   const saved = await getRecordingTelemetry(identity.recordingId);
   if (!saved?.recordingEventsSnapshot || !saved.cursorTrajectorySnapshot)
     throw new Error('Missing snapshots.');
+  for (const snapshot of [saved.cursorTrajectorySnapshot, saved.recordingEventsSnapshot])
+    await expectIndexedFrozenCapture(db, snapshot.ref.assetId);
   await deleteRecordingTelemetry(identity.recordingId);
   expect(await getRecordingTelemetry(identity.recordingId)).toBeUndefined();
   expect(await store.getHead(identity)).toBeNull();
@@ -641,6 +662,7 @@ it('releases both history owners on delete while frozen capture pins both files'
   const claims = collectSyncCaptureClaims(await db.getAll(SYNC_CAPTURE_STORE));
   for (const snapshot of [saved.cursorTrajectorySnapshot, saved.recordingEventsSnapshot]) {
     expect(claims.assetIds.has(snapshot.ref.assetId)).toBe(true);
+    await expectIndexedFrozenCapture(db, snapshot.ref.assetId);
     expect((await readAssetFile(snapshot.ref, 'retained.bin')).size).toBe(snapshot.ref.size);
   }
   expect((await db.get(STORE_NAME, identity.recordingId))?.assetId).toBe('source-video');
@@ -684,6 +706,8 @@ it('deletes the Library source and both raw histories while capture retains the 
   const saved = await getRecordingTelemetry(identity.recordingId);
   if (!saved?.recordingEventsSnapshot || !saved.cursorTrajectorySnapshot)
     throw new Error('Missing snapshots.');
+  for (const snapshot of [saved.cursorTrajectorySnapshot, saved.recordingEventsSnapshot])
+    await expectIndexedFrozenCapture(db, snapshot.ref.assetId);
   await deleteMediaAssetWithProjectCascade(`recording:${identity.recordingId}`, []);
   expect(await db.get(STORE_NAME, identity.recordingId)).toBeUndefined();
   expect(await getRecordingTelemetry(identity.recordingId)).toBeUndefined();
@@ -692,6 +716,7 @@ it('deletes the Library source and both raw histories while capture retains the 
   const claims = collectSyncCaptureClaims(await db.getAll(SYNC_CAPTURE_STORE));
   for (const snapshot of [saved.cursorTrajectorySnapshot, saved.recordingEventsSnapshot]) {
     expect(claims.assetIds.has(snapshot.ref.assetId)).toBe(true);
+    await expectIndexedFrozenCapture(db, snapshot.ref.assetId);
     expect((await readAssetFile(snapshot.ref, 'retained.bin')).size).toBe(snapshot.ref.size);
   }
 });

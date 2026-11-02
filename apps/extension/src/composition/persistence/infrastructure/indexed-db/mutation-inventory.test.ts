@@ -18,6 +18,8 @@ const delegatedMutationHelpers = new Set([
   // Validates the caller's active permit before returning its transaction writer.
   'apps/extension/src/composition/persistence/effect-bundles/settings-transfer.ts',
   'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
+  // Installed only by admitted initDB; delegates writes to the caller's native transaction.
+  'apps/extension/src/composition/persistence/infrastructure/indexed-db/indexed-row-projections.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   // Facts update only the source store's admitted caller transaction.
@@ -28,10 +30,14 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/recordings/recovery/transaction.ts',
   // Uses only the caller's transaction under its existing active mutation permit.
   'apps/extension/src/composition/persistence/review-workspaces/storage.ts',
+  // Projects only in the caller's native transaction; has no admission or commit authority.
+  'apps/extension/src/composition/persistence/review-workspaces/index-projection.ts',
   // Reads and writes only the existing caller transaction; caller owns its active permit/commit/abort.
   'apps/extension/src/composition/persistence/scenario/storage.ts',
   // Appends only through the admitted domain transaction; the caller owns permit and commit/abort.
   'apps/extension/src/composition/persistence/sync-capture/capture.ts',
+  // Uses only the caller's admitted transaction; the caller owns commit and abort.
+  'apps/extension/src/composition/persistence/sync-capture/checkpoints.ts',
   // Requires the caller's active mutation permit before its delivery cursor transaction.
   'apps/extension/src/composition/persistence/sync-capture/queue-history.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',

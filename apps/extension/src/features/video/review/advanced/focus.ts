@@ -26,7 +26,7 @@ export function evaluateQuickEditSpotlightAtTime(args: {
   return sampleSceneSpotlight({
     spotlight: reviewLensAtTime(sample.to, args.time),
     window: args.video,
-    extent: { x: 0, y: 0, ...args.output },
+    extent: { x: 0, y: 0, width: args.output.width, height: args.output.height },
     scale: args.scale,
     progress: sample.progress,
     phase: sample.phase === 'exit' ? 'exit' : 'enter',

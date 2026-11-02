@@ -1,3 +1,5 @@
+import { withSecretProtectionWriter } from '../secret-protection/service';
+import { assertSecretProtectionStableInTransaction } from '../secret-protection/transition.store';
 import { connectionText, connectionExact as exact } from './model';
 import type { IDBPTransaction } from 'idb';
 import {
@@ -10,6 +12,7 @@ import { capturePreparedDatabase, initDB } from '../infrastructure/indexed-db/co
 import {
   SYNC_CAPTURE_STORE,
   SYNC_CONNECTION_STORE,
+  SECRET_PROTECTION_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import { runWithPersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { withSyncConnectionAdmissionLock } from './coordination';
@@ -191,24 +194,30 @@ async function mutate(
   // Capture the prepared native handle before waiting. Erasure closes it; never reopen here.
   const db = capturePreparedDatabase();
   if (!db) return refused();
-  const result = await withSyncConnectionAdmissionLock(() =>
-    runWithPersistenceMutationPermit(async () => {
-      const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE], 'readwrite');
-      try {
-        await checkUnenrolled(tx);
-        const allocation = await operation(tx);
-        await tx.done;
-        return allocation;
-      } catch (error) {
+  const result = await withSecretProtectionWriter(() =>
+    withSyncConnectionAdmissionLock(() =>
+      runWithPersistenceMutationPermit(async () => {
+        const tx = db.transaction(
+          [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, SECRET_PROTECTION_STORE],
+          'readwrite'
+        );
         try {
-          tx.abort();
-        } catch {
-          /* Transaction can already be closed. */
+          await assertSecretProtectionStableInTransaction(tx);
+          await checkUnenrolled(tx);
+          const allocation = await operation(tx);
+          await tx.done;
+          return allocation;
+        } catch (error) {
+          try {
+            tx.abort();
+          } catch {
+            /* Transaction can already be closed. */
+          }
+          await tx.done.catch(() => undefined);
+          throw error;
         }
-        await tx.done.catch(() => undefined);
-        throw error;
-      }
-    })
+      })
+    )
   );
   return result;
 }

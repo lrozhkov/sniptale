@@ -1,5 +1,5 @@
-import type { AIProvider } from '../../../contracts/settings';
-import { browserStorage } from '../infrastructure/browser-storage';
+import { SECRET_PROTECTION_PROFILE_KEY } from '../secret-protection/constants';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   createAesGcmKeyMaterial,
   decryptSecret,
@@ -7,231 +7,155 @@ import {
   importAesGcmKey,
   type EncryptedSecretEnvelope,
 } from '@sniptale/platform/security/local-secret-crypto';
+import type { AIProvider } from '../../../contracts/settings';
+import { browserStorage } from '../infrastructure/browser-storage';
+import type {
+  PreparedSecretParticipant,
+  SecretProtectionParticipant,
+} from '../secret-protection/model';
 import {
   AI_LOCAL_SECRET_KEY_STORAGE_KEY,
   AI_PROVIDERS_KEY,
   AI_PROVIDER_SECRETS_KEY,
-  AI_SECRET_PROTECTION_KEY,
 } from './constants';
-import {
-  AISecretPassphraseLockedError,
-  createAISecretPassphraseProtection,
-  deriveAndVerifyAISecretPassphrase,
-  lockStoredAISecretPassphrase,
-  readAISecretProtectionStatus,
-  readStoredAISecretProtection,
-  readUnlockedAISecretPassphraseKey,
-  unlockStoredAISecretPassphrase,
-  cacheUnlockedAISecretPassphraseKey,
-  type AISecretProtectionStatus,
-  type StoredAISecretProtection,
-} from './secret-protection.store.ts';
-import { readStoredProviderMetadata, readStoredProviderSecrets } from './provider-secrets.store.ts';
-import { readStoredSecretKeyMaterial } from './provider-secret-keys.store.ts';
-import {
-  beginStoredAISecretProtectionTransition,
-  finishStoredAISecretProtectionTransitionCleanup,
-} from './secret-protection-transition.store.ts';
+import { parseStoredAIProviders, parseStoredProviderSecretMap } from './guards';
 import { createAIProviderSecretAdditionalData } from './provider-secret-binding';
 
-export type { AISecretProtectionStatus } from './secret-protection.store.ts';
-
-async function decryptStoredSecrets(
-  secrets: Record<string, EncryptedSecretEnvelope>,
-  key: CryptoKey,
-  providers: readonly AIProvider[]
-): Promise<Record<string, string>> {
-  const entries: Array<[string, string]> = await Promise.all(
-    Object.entries(secrets).map(async ([providerId, envelope]) => [
-      providerId,
-      await decryptSecret(
-        envelope,
-        key,
-        createAIProviderSecretAdditionalData(resolveProviderForSecret(providers, providerId))
-      ),
-    ])
-  );
-
-  return Object.fromEntries(entries);
+interface ParticipantSnapshot {
+  providers: AIProvider[];
+  secrets: Record<string, EncryptedSecretEnvelope>;
+  transparentKey: string | null;
 }
 
-async function encryptPlaintextSecrets(
-  secrets: Record<string, string>,
-  key: CryptoKey,
-  providers: readonly AIProvider[]
-): Promise<Record<string, EncryptedSecretEnvelope>> {
-  const entries: Array<[string, EncryptedSecretEnvelope]> = await Promise.all(
-    Object.entries(secrets).map(async ([providerId, secret]) => [
-      providerId,
-      await encryptSecret(
-        secret,
-        key,
-        createAIProviderSecretAdditionalData(resolveProviderForSecret(providers, providerId))
-      ),
-    ])
-  );
-
-  return Object.fromEntries(entries);
+function refused(): never {
+  throw new Error('AI secret participant admission refused');
 }
 
-function resolveProviderForSecret(
-  providers: readonly AIProvider[],
-  providerId: string
-): AIProvider {
-  const provider = providers.find((current) => current.id === providerId);
-  if (!provider) {
-    throw new Error(`AI provider secret ${providerId} has no provider metadata`);
-  }
-
-  return provider;
+function parseSnapshot(value: unknown): ParticipantSnapshot {
+  if (!isRecord(value) || Object.keys(value).length !== 3) return refused();
+  const providers = parseStoredAIProviders(value['providers']);
+  const secrets = parseStoredProviderSecretMap(value['secrets']);
+  const transparentKey = value['transparentKey'];
+  if (
+    providers.hasInvalidRoot ||
+    providers.invalidEntryCount > 0 ||
+    !secrets ||
+    (transparentKey !== null && (typeof transparentKey !== 'string' || !transparentKey))
+  )
+    return refused();
+  return { providers: providers.value, secrets, transparentKey };
 }
 
-function markProvidersMissingSecrets(providers: AIProvider[]): AIProvider[] {
-  return providers.map((provider) => ({ ...provider, hasStoredApiKey: false }));
-}
-
-async function resolveExistingPassphraseProtectionKey(passphrase?: string): Promise<{
-  key: CryptoKey;
-  keyMaterial?: string | undefined;
-  protection: StoredAISecretProtection;
-}> {
-  const protection = await readStoredAISecretProtection();
-  if (!protection) {
-    throw new Error('AI secret passphrase protection is not enabled');
-  }
-
-  if (passphrase !== undefined) {
-    const derived = await deriveAndVerifyAISecretPassphrase(passphrase, protection);
-    return {
-      key: derived.key,
-      keyMaterial: derived.keyMaterial,
-      protection,
-    };
-  }
-
-  const key = await readUnlockedAISecretPassphraseKey();
-  if (!key) {
-    throw new AISecretPassphraseLockedError();
-  }
-
-  return { key, protection };
-}
-
-export async function loadStoredAISecretProtectionStatus(): Promise<AISecretProtectionStatus> {
-  return readAISecretProtectionStatus();
-}
-
-export async function unlockStoredAISecretProtection(passphrase: string): Promise<void> {
-  await unlockStoredAISecretPassphrase(passphrase);
-}
-
-export async function lockStoredAISecretProtection(): Promise<void> {
-  await lockStoredAISecretPassphrase();
-}
-
-export async function enableStoredAISecretPassphraseProtection(passphrase: string): Promise<void> {
-  if (await readStoredAISecretProtection()) {
-    throw new Error('AI secret passphrase protection is already enabled');
-  }
-
-  const [providers, secrets, keyMaterial] = await Promise.all([
-    readStoredProviderMetadata(),
-    readStoredProviderSecrets(),
-    readStoredSecretKeyMaterial(),
-  ]);
-  const hasSecrets = Object.keys(secrets).length > 0;
-  if (hasSecrets && !keyMaterial) {
-    throw new Error('Existing AI provider secrets are missing key material');
-  }
-
-  const plaintextSecrets =
-    hasSecrets && keyMaterial
-      ? await decryptStoredSecrets(secrets, await importAesGcmKey(keyMaterial), providers)
-      : {};
-  const passphraseProtection = await createAISecretPassphraseProtection(passphrase);
-  const nextSecrets = await encryptPlaintextSecrets(
-    plaintextSecrets,
-    passphraseProtection.key,
-    providers
-  );
-
-  await beginStoredAISecretProtectionTransition('pending-enable');
-  await browserStorage.local.set({
-    [AI_LOCAL_SECRET_KEY_STORAGE_KEY]: null,
-    [AI_PROVIDER_SECRETS_KEY]: nextSecrets,
-    [AI_SECRET_PROTECTION_KEY]: passphraseProtection.protection,
-  });
-  await finishStoredAISecretProtectionTransitionCleanup(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
-  await cacheUnlockedAISecretPassphraseKey(passphraseProtection.keyMaterial);
-}
-
-export async function disableStoredAISecretPassphraseProtection(
-  passphrase?: string
-): Promise<void> {
-  const resolvedProtection = await resolveExistingPassphraseProtectionKey(passphrase);
-  const [providers, secrets] = await Promise.all([
-    readStoredProviderMetadata(),
-    readStoredProviderSecrets(),
-  ]);
-  const plaintextSecrets = await decryptStoredSecrets(secrets, resolvedProtection.key, providers);
-  const transparentKey = await createAesGcmKeyMaterial();
-  const nextSecrets = await encryptPlaintextSecrets(
-    plaintextSecrets,
-    transparentKey.key,
-    providers
-  );
-
-  await beginStoredAISecretProtectionTransition('pending-disable');
-  await browserStorage.local.set({
-    [AI_PROVIDER_SECRETS_KEY]: nextSecrets,
-    [AI_LOCAL_SECRET_KEY_STORAGE_KEY]: transparentKey.material,
-    [AI_SECRET_PROTECTION_KEY]: null,
-  });
-  await lockStoredAISecretPassphrase();
-  await finishStoredAISecretProtectionTransitionCleanup(AI_SECRET_PROTECTION_KEY);
-}
-
-export async function changeStoredAISecretPassphraseProtection(params: {
-  currentPassphrase: string;
-  nextPassphrase: string;
-}): Promise<void> {
-  const currentProtection = await resolveExistingPassphraseProtectionKey(params.currentPassphrase);
-  const [providers, secrets] = await Promise.all([
-    readStoredProviderMetadata(),
-    readStoredProviderSecrets(),
-  ]);
-  const plaintextSecrets = await decryptStoredSecrets(secrets, currentProtection.key, providers);
-  const nextProtection = await createAISecretPassphraseProtection(params.nextPassphrase);
-  const nextSecrets = await encryptPlaintextSecrets(
-    plaintextSecrets,
-    nextProtection.key,
-    providers
-  );
-
-  await browserStorage.local.set({
-    [AI_PROVIDER_SECRETS_KEY]: nextSecrets,
-    [AI_SECRET_PROTECTION_KEY]: {
-      ...nextProtection.protection,
-      enabledAt: currentProtection.protection.enabledAt,
-    },
-  });
-  await browserStorage.local.remove(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
-  await cacheUnlockedAISecretPassphraseKey(nextProtection.keyMaterial);
-}
-
-export async function resetStoredAISecretPassphraseProtection(): Promise<void> {
-  const providers = await readStoredProviderMetadata();
-
-  await beginStoredAISecretProtectionTransition('pending-reset');
-  await browserStorage.local.set({
-    [AI_LOCAL_SECRET_KEY_STORAGE_KEY]: null,
-    [AI_PROVIDERS_KEY]: markProvidersMissingSecrets(providers),
-    [AI_PROVIDER_SECRETS_KEY]: {},
-    [AI_SECRET_PROTECTION_KEY]: null,
-  });
-  await lockStoredAISecretPassphrase();
-  await finishStoredAISecretProtectionTransitionCleanup([
-    AI_SECRET_PROTECTION_KEY,
+async function readSnapshot(): Promise<ParticipantSnapshot> {
+  const stored = await browserStorage.local.get([
+    AI_PROVIDERS_KEY,
+    AI_PROVIDER_SECRETS_KEY,
     AI_LOCAL_SECRET_KEY_STORAGE_KEY,
   ]);
+  return parseSnapshot({
+    providers: stored[AI_PROVIDERS_KEY] ?? [],
+    secrets: stored[AI_PROVIDER_SECRETS_KEY] ?? {},
+    transparentKey: stored[AI_LOCAL_SECRET_KEY_STORAGE_KEY] ?? null,
+  });
+}
+
+async function snapshotDigest(snapshot: ParticipantSnapshot): Promise<string> {
+  const bytes = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(JSON.stringify(snapshot))
+  );
+  return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+/** Chrome storage can reorder object keys; decided arrays and every stored value remain exact. */
+function sameSnapshotValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right))
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => sameSnapshotValue(value, right[index]))
+    );
+  if (!isRecord(left) || !isRecord(right)) return false;
+  const keys = Object.keys(left);
+  return (
+    keys.length === Object.keys(right).length &&
+    keys.every((key) => Object.hasOwn(right, key) && sameSnapshotValue(left[key], right[key]))
+  );
+}
+
+async function reencrypt(
+  snapshot: ParticipantSnapshot,
+  sourceKey: CryptoKey,
+  targetKey: CryptoKey
+): Promise<Record<string, EncryptedSecretEnvelope>> {
+  const entries = await Promise.all(
+    Object.entries(snapshot.secrets).map(async ([id, envelope]) => {
+      const provider = snapshot.providers.find((entry) => entry.id === id);
+      if (!provider) return refused();
+      const aad = createAIProviderSecretAdditionalData(provider);
+      const plaintext = await decryptSecret(envelope, sourceKey, aad);
+      return [id, await encryptSecret(plaintext, targetKey, aad)] as const;
+    })
+  );
+  return Object.fromEntries(entries);
+}
+
+/** Prepare domain ciphertext only. The common owner decides and recovers the transition. */
+export function createAISecretProtectionParticipant(): SecretProtectionParticipant {
+  return {
+    id: 'ai',
+    async prepare({ action, sourceKey, targetKey }): Promise<PreparedSecretParticipant> {
+      const source = await readSnapshot();
+      let target: ParticipantSnapshot;
+      if (action === 'reset') {
+        target = {
+          providers: source.providers.map((provider) => ({ ...provider, hasStoredApiKey: false })),
+          secrets: {},
+          transparentKey: null,
+        };
+      } else {
+        const hasSecrets = Object.keys(source.secrets).length > 0;
+        const from =
+          sourceKey ??
+          (source.transparentKey ? await importAesGcmKey(source.transparentKey) : null);
+        if (hasSecrets && !from) return refused();
+        const transparent = action === 'unprotect' ? await createAesGcmKeyMaterial() : null;
+        const to = transparent?.key ?? targetKey;
+        if (!to) return refused();
+        target = {
+          providers: source.providers,
+          secrets: hasSecrets && from ? await reencrypt(source, from, to) : {},
+          transparentKey: transparent?.material ?? null,
+        };
+      }
+      return { payload: { version: 1, sourceDigest: await snapshotDigest(source), target } };
+    },
+    async apply(prepared, _tx, targetProfile): Promise<void> {
+      const payload = prepared.payload;
+      if (
+        !isRecord(payload) ||
+        Object.keys(payload).length !== 3 ||
+        payload['version'] !== 1 ||
+        prepared.nativeKey
+      )
+        return refused();
+      const sourceDigest = payload['sourceDigest'];
+      if (typeof sourceDigest !== 'string' || !/^[a-f0-9]{64}$/u.test(sourceDigest))
+        return refused();
+      const target = parseSnapshot(payload['target']);
+      const current = await readSnapshot();
+      // A decided replay accepts its exact target. A different writer cannot replace its selection.
+      const alreadyApplied = sameSnapshotValue(current, target);
+      if (!alreadyApplied && (await snapshotDigest(current)) !== sourceDigest) return refused();
+      if (alreadyApplied && targetProfile === undefined) return;
+      await browserStorage.local.set({
+        [AI_PROVIDERS_KEY]: target.providers,
+        [AI_PROVIDER_SECRETS_KEY]: target.secrets,
+        [AI_LOCAL_SECRET_KEY_STORAGE_KEY]: target.transparentKey,
+        ...(targetProfile === undefined ? {} : { [SECRET_PROTECTION_PROFILE_KEY]: targetProfile }),
+      });
+    },
+  };
 }

@@ -1,3 +1,8 @@
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+} from '../../composition/persistence/assets/residency-records';
+import { hashSyncText } from './wire-record';
 import { CaptureMode, VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { parseVideoProjectEntry } from '../../composition/persistence/projects/read-guards';
 import { VideoProjectAssetType } from '../../features/video/project/types';
@@ -268,6 +273,69 @@ it('uses backup project inventory and binds exact native originals without copyi
   expect(result.envelope.descriptor.totalBytes).toBe(2048);
 });
 
+it('binds parameterized WebM sources and exports without changing native MIME', async () => {
+  const rows = projectRows();
+  const mimeType = 'video/webm;codecs=vp8';
+  for (const entry of [...rows.assets, ...rows.exports]) entry.mimeType = mimeType;
+  for (const ref of rows.refs) ref.mimeType = mimeType;
+  for (const asset of rows.project.project.assets) asset.metadata.mimeType = mimeType;
+  const encoded = await encodeCapturedProjectRoot(rows);
+  expect(encoded.bindings.map(({ ref }) => ref)).toEqual(rows.refs);
+  await parsePortableSyncRoot(encoded.envelope);
+  const received = await preparePortableReplica({
+    envelope: encoded.envelope,
+    deferredExports: new Map([
+      [
+        rows.exports[0]!.id,
+        { ref: rows.refs[1]!, remote: { key: 'remote/export', sha256: 'b'.repeat(64) } },
+      ],
+    ]),
+    verifiedObjects: new Map(
+      encoded.objects.map(({ ref }) => [
+        ref.objectId,
+        {
+          ...rows.refs[0]!,
+          assetId: `received-${ref.objectId}`,
+          location: { kind: 'opfs' as const, objectKey: `objects/received-${ref.objectId}` },
+          size: ref.size,
+          mimeType: ref.mimeType,
+        },
+      ])
+    ),
+    senderDependencies: [],
+    admission: {
+      operationId: 'mime-project',
+      sourceDigest: 'a'.repeat(64),
+      connectionGeneration: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  if (received.kind !== 'video-project') throw new Error('Expected project replica.');
+  expect(received.input.root.assets[0]!.entry.mimeType).toBe(mimeType);
+  expect(received.input.root.assets[0]!.ref.mimeType).toBe(mimeType);
+  expect(received.input.root.exports![0]!.entry.mimeType).toBe(mimeType);
+  expect(received.input.root.exports![0]!.ref.mimeType).toBe(mimeType);
+  for (const object of encoded.objects) {
+    expect(object.ref.mimeType).toBe('video/webm');
+    expect(object.blob?.type).toBe(mimeType);
+    expect(object.blob).toBe(
+      io.files.get(
+        encoded.bindings.find(({ objectId }) => objectId === object.ref.objectId)!.ref.assetId
+      )
+    );
+  }
+  io.read.mockImplementationOnce(
+    async (ref: AssetRef, filename: string) =>
+      new File([new Uint8Array(ref.size)], filename, { type: 'video/mp4' })
+  );
+  await expect(encodeCapturedProjectRoot(rows)).rejects.toThrow('native reference');
+});
+
 it('detaches the complete project before the first asynchronous source read', async () => {
   const rows = projectRows();
   let entered!: () => void;
@@ -337,6 +405,16 @@ it('keeps effect binary objects unbound while preserving the complete backup sna
     expect(object.ref.size).toBe(asset.byteLength);
     expect(object.ref.filename).not.toContain(':');
   }
+  io.read.mockClear();
+  io.read.mockRejectedValue(new Error('Unloaded Montage bodies must not be read.'));
+  const copies = new Map(
+    rows.refs.map((ref, index) => [ref.assetId, verifiedDeferredCopy(ref, index)])
+  );
+  const retained = await encodeCapturedProjectRoot(rows, copies);
+  expect(retained.objects).toHaveLength(document.assets.length);
+  expect(retained.retainedObjects).toHaveLength(rows.refs.length);
+  expect(retained.envelope.metadata).toEqual(result.envelope.metadata);
+  expect(io.read).not.toHaveBeenCalled();
 });
 
 it('refuses missing dependency evidence and changed native file metadata', async () => {
@@ -665,4 +743,45 @@ it('encodes a frozen Montage export with matching acquisition metadata and exact
   const changed = structuredClone(frozen);
   changed.media[0]!.recordingMetadata = { ...exported.recordingMetadata, actionCount: 5 };
   await expect(encodeCapturedProjectRoot(changed)).rejects.toThrow('Invalid frozen project');
+});
+
+function verifiedDeferredCopy(ref: AssetRef, index = 0): AssetResidencyCopy {
+  return {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId({ kind: 'opfs', ref }),
+    revision: 1,
+    operationId: 'accepted-copy',
+    phase: 'unloaded',
+    lastUsedAt: 1,
+    target: { kind: 'opfs', ref },
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'user',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+      key: `Files/${hashSyncText('space')}/00000000-0000-0000-0000-000000000001/native-${index}/original-${index}.bin`,
+      sha256: ref.sha256 ?? String(index % 10).repeat(64),
+    },
+  };
+}
+
+it('retains frozen Montage editing assets and historical exports using canonical descriptor slots', async () => {
+  const rows = projectRows();
+  const copies = new Map(
+    rows.refs.map((ref, index) => [ref.assetId, verifiedDeferredCopy(ref, index)])
+  );
+  io.read.mockRejectedValue(new Error('Unloaded Montage resource must not be read.'));
+  const encoded = await encodeCapturedProjectRoot(rows, copies);
+  expect(encoded.objects).toEqual([]);
+  expect(encoded.retainedObjects).toHaveLength(rows.refs.length);
+  expect(encoded.bindings.map(({ ref }) => ref.assetId)).toEqual(
+    rows.refs.map((ref) => ref.assetId)
+  );
+  expect(encoded.envelope.descriptor.objectCount).toBe(rows.refs.length);
+  expect(io.read).not.toHaveBeenCalled();
 });

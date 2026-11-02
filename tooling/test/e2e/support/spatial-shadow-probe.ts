@@ -1,3 +1,4 @@
+import { createReviewSpatialSession } from '../../../../apps/extension/src/workflows/video-review/spatial-render-session';
 import { calculatePreviewRenderAllocation } from '../../../../apps/extension/src/workflows/video-review/preview-render-allocation';
 import { createPreviewRenderResources } from '../../../../apps/extension/src/workflows/video-review/preview-render-resources';
 import { reviewSpatialSourceRect } from '../../../../apps/extension/src/workflows/video-review/scene-shadow';
@@ -37,7 +38,7 @@ export function probeSpatialShadowEdge() {
     reference = make(width, height);
   const context = actual.getContext('2d')!,
     target = reference.getContext('2d')!;
-  const renderer = createReviewSpatialRenderer();
+  const renderer = createReviewSpatialSession();
   try {
     drawReviewSceneFrame(context, {
       canvas: actual,
@@ -134,7 +135,7 @@ function paintOversizedShadowReference(args: {
   const target = reference.getContext('2d')!;
   target.fillStyle = '#fff';
   target.fillRect(0, 0, output.width, output.height);
-  const independent = createReviewSpatialRenderer();
+  const independent = createReviewSpatialSession();
   try {
     independent.draw(target, {
       source: plane,

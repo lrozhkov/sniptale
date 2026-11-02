@@ -56,6 +56,8 @@ function failureCode(error: unknown): SyncQueueFailureCode {
   }
   if (error instanceof SyncRemoteError) {
     switch (error.code) {
+      case 'secrets-locked':
+        return 'secrets-locked';
       case 'authentication':
         return 'authentication';
       case 'access-denied':
@@ -218,7 +220,14 @@ export async function runSyncQueueOperation(input: {
           operation: await completeSyncQueueRun(run, { kind: 'verified', result }),
         };
       } catch (error) {
-        return finishFailure(run, signal.aborted ? 'interrupted' : failureCode(error));
+        return finishFailure(
+          run,
+          signal.aborted
+            ? signal.reason instanceof SyncRemoteError && signal.reason.code === 'secrets-locked'
+              ? 'secrets-locked'
+              : 'interrupted'
+            : failureCode(error)
+        );
       }
     }
   );

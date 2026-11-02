@@ -1,4 +1,11 @@
+import {
+  parseSyncWorkspaceIdentity,
+  type SyncWorkspaceIdentity,
+} from '../../contracts/sync-workspace';
+import { isSyncWorkspaceDiscoveryPrefix } from '../../contracts/messaging/contracts/runtime/sync-product';
 import type {
+  SyncExecutorBinding,
+  SyncProductFailureCode,
   SyncProductWork,
   SyncProductExecutorRequest,
   SyncProductResponse,
@@ -7,9 +14,12 @@ import {
   sameConnectionScope,
   sameConnectionBinding,
   parseSyncConnectionIdentity,
+  parseConnectionAuthentication,
   sameSyncConnectionIdentity,
   type SyncConnectionIdentity,
   type SyncConnectionMetadata,
+  type SyncStoragePolicy,
+  parseSyncStoragePolicy,
   type SyncConnectionAuthentication,
   parseSyncWorkspaceSource,
   type SyncWorkspaceSource,
@@ -18,6 +28,15 @@ import type { SyncWorkspaceSelection } from '../../composition/persistence/remot
 import type { SyncQueueScope } from '../../composition/persistence/sync-capture/queue-model';
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { createGenerationTrackedMutationExclusion } from '../mutation-exclusion/gate';
+
+/** Advisory activity excludes private identities and grants no execution authority. */
+export type SyncActivityObservation = {
+  activity: 'idle' | 'running' | 'stopping' | 'unknown';
+  remote:
+    | { knowledge: 'unknown' }
+    | { knowledge: 'observed-pass'; outcome: 'complete' | 'deferred' };
+  failureCode: SyncProductFailureCode | null;
+};
 
 interface ExecutorTarget {
   offscreenStartupId: string;
@@ -34,6 +53,7 @@ interface WorkspaceSelection {
   requestId?: string;
   source: SyncWorkspaceSource;
   authentication: SyncConnectionAuthentication;
+  operation?: 'discover';
 }
 interface ExecutorReceipt {
   executorId: string;
@@ -51,10 +71,17 @@ export interface SyncConnectionCoordinatorDependencies {
   hasOriginPermission(origin: string): Promise<boolean>;
   enrollConnection(
     source: SyncWorkspaceSource,
-    authentication: SyncConnectionAuthentication
+    authentication: SyncConnectionAuthentication,
+    storagePolicy: SyncStoragePolicy
   ): Promise<SyncConnectionMetadata>;
   /** Resolve only after durable revocation commits and its native admission lock releases. */
   revokeConnection(identity: SyncConnectionIdentity): Promise<void>;
+  beginAuthenticationUpdate?(connection: SyncConnectionMetadata): Promise<SyncConnectionMetadata>;
+  commitAuthenticationUpdate?(
+    reservation: SyncConnectionMetadata,
+    authentication: SyncConnectionAuthentication
+  ): Promise<SyncConnectionMetadata>;
+  resumeConnection?(expected: SyncConnectionIdentity): Promise<void>;
   completeLocalOnly?(connection: SyncConnectionMetadata): Promise<'delivered' | 'incomplete'>;
   ensureDocument(): Promise<string>;
   /** Null selects the existing document, including a surviving document after worker restart. */
@@ -64,12 +91,18 @@ export interface SyncConnectionCoordinatorDependencies {
     advisory?: true
   ): Promise<Observation>;
   startExecutor(input: StartSelection & ExecutorTarget): Promise<ExecutorReceipt>;
-  stopExecutor(target: ExecutorTarget): Promise<ExecutorReceipt>;
+  stopExecutor(target: ExecutorTarget & { reason?: 'secrets-locked' }): Promise<ExecutorReceipt>;
   startWorkspaceExecutor(input: WorkspaceSelection & ExecutorTarget): Promise<ExecutorReceipt>;
   createWorkspaceSelection?(
     input:
       | { kind: 'allocation'; parentUrl: string; accountId: string }
-      | { kind: 'join'; rootUrl: string; accountId: string }
+      | {
+          kind: 'join';
+          rootUrl: string;
+          accountId: string;
+          expected: SyncWorkspaceIdentity | null;
+          previous: SyncWorkspaceSource | null;
+        }
   ): Promise<SyncWorkspaceSource>;
   productExecutor?(
     input: ExecutorTarget & { command: SyncProductExecutorRequest['command']; advisory?: true }
@@ -77,8 +110,25 @@ export interface SyncConnectionCoordinatorDependencies {
   createChallenge(): string;
 }
 
-function refused(): never {
-  throw new Error('Sync coordinator operation refused');
+/** Fixed owner refusal codes contain no connection or executor identity. */
+export class SyncConnectionCoordinatorError extends Error {
+  constructor(
+    readonly code:
+      | 'coordinator-refused'
+      | 'privacy-exclusion'
+      | 'generation-changed'
+      | 'selection-changed'
+      | 'executor-unavailable'
+      | 'binding-changed'
+      | 'receipt-invalid' = 'coordinator-refused'
+  ) {
+    super('Sync coordinator operation refused');
+    this.name = 'SyncConnectionCoordinatorError';
+  }
+}
+
+function refused(code: SyncConnectionCoordinatorError['code'] = 'coordinator-refused'): never {
+  throw new SyncConnectionCoordinatorError(code);
 }
 function matches(metadata: SyncConnectionMetadata | null, selection: StartSelection): boolean {
   return (
@@ -138,9 +188,12 @@ class SyncConnectionCoordinator {
       refused();
     return observation.snapshot;
   }
-  async #contain(snapshot: SyncExecutorSnapshot | null): Promise<void> {
+  async #contain(snapshot: SyncExecutorSnapshot | null, reason?: 'secrets-locked'): Promise<void> {
     if (!snapshot) return;
-    const receipt = await this.#deps.stopExecutor(target(snapshot));
+    const receipt = await this.#deps.stopExecutor({
+      ...target(snapshot),
+      ...(reason ? { reason } : {}),
+    });
     if (
       receipt.executorId !== snapshot.executorId ||
       receipt.executorRevision <= snapshot.executorRevision
@@ -247,21 +300,123 @@ class SyncConnectionCoordinator {
   planWorkspace(
     input:
       | { kind: 'allocation'; parentUrl: string; accountId: string }
-      | { kind: 'join'; rootUrl: string; accountId: string }
+      | { kind: 'join'; rootUrl: string; accountId: string; previous: SyncWorkspaceSource | null }
   ): Promise<SyncWorkspaceSource> {
-    const release = this.#exclusion.acquirePermit();
-    if (!release) return Promise.reject(new Error('Sync coordinator operation refused'));
-    const generation = this.#exclusion.getGeneration();
+    const admission = this.#operationPermit();
+    if (!admission) return Promise.reject(new Error('Sync coordinator operation refused'));
     const selected = structuredClone(input);
     return this.#enqueue(async () => {
-      if (generation !== this.#exclusion.getGeneration() || !this.#deps.createWorkspaceSelection)
-        refused();
-      if (await this.#deps.loadConnection()) refused();
-      if (generation !== this.#exclusion.getGeneration()) refused();
-      const source = await this.#deps.createWorkspaceSelection(selected);
-      if (generation !== this.#exclusion.getGeneration()) refused();
+      const check = admission.checkGeneration;
+      check();
+      if (!this.#deps.createWorkspaceSelection || (await this.#deps.loadConnection())) refused();
+      check();
+      if (selected.kind === 'join') {
+        const current = await this.#deps.loadWorkspace();
+        check();
+        if (
+          selected.previous
+            ? !this.#matchesWorkspace(current, selected.previous) ||
+              selected.previous.kind !== 'join'
+            : current !== null
+        )
+          refused();
+        if (selected.previous) {
+          const snapshot = await this.#observe(null);
+          check();
+          if (
+            snapshot?.phase === 'failed' ||
+            snapshot?.phase === 'stopping' ||
+            snapshot?.workspace?.state === 'running' ||
+            snapshot?.jobs.some((job) => job.state === 'running') ||
+            snapshot?.products?.some((job) => job.state === 'running')
+          )
+            refused();
+          await this.#contain(snapshot);
+          check();
+          if (!this.#matchesWorkspace(await this.#deps.loadWorkspace(), selected.previous))
+            refused();
+          check();
+        }
+      }
+      const source = await this.#deps.createWorkspaceSelection(
+        selected.kind === 'join' ? { ...selected, expected: null } : selected
+      );
+      check();
       return source;
-    }).finally(release);
+    }).finally(admission.release);
+  }
+  /** Select only a completed search; native JOIN still validates the selected marker again. */
+  selectWorkspace(input: {
+    source: SyncWorkspaceSource;
+    prefix: string;
+    expected: SyncWorkspaceIdentity;
+  }): Promise<SyncWorkspaceSource> {
+    const detached = structuredClone(input);
+    const source = parseSyncWorkspaceSource(detached.source);
+    const expected = parseSyncWorkspaceIdentity(detached.expected);
+    const admission = this.#operationPermit();
+    if (!admission) return Promise.reject(new Error('Sync coordinator operation refused'));
+    return this.#enqueue(async () => {
+      const check = admission.checkGeneration;
+      check();
+      if (
+        !source ||
+        source.kind !== 'join' ||
+        !expected ||
+        !isSyncWorkspaceDiscoveryPrefix(detached.prefix) ||
+        !this.#deps.createWorkspaceSelection ||
+        (await this.#deps.loadConnection())
+      )
+        refused();
+      const current = await this.#deps.loadWorkspace();
+      check();
+      if (!this.#matchesWorkspace(current, source) || current?.phase !== 'checking') refused();
+      const snapshot = await this.#observe(null);
+      check();
+      const job = snapshot?.workspace;
+      if (
+        !snapshot ||
+        snapshot.phase === 'failed' ||
+        snapshot.phase === 'stopping' ||
+        job?.state !== 'discovered' ||
+        job.sourceKind !== 'join' ||
+        !sameSyncConnectionIdentity(job.discovery.source.identity, source.identity) ||
+        !job.discovery.candidates.some(
+          (candidate) =>
+            candidate.prefix === detached.prefix &&
+            candidate.identity.spaceId === expected.spaceId &&
+            candidate.identity.bootstrapId === expected.bootstrapId &&
+            candidate.identity.fingerprint === expected.fingerprint
+        )
+      )
+        refused();
+      await this.#contain(snapshot);
+      check();
+      const final = await this.#deps.loadWorkspace();
+      check();
+      if (
+        !this.#matchesWorkspace(final, source) ||
+        final?.phase !== 'checking' ||
+        final.bindingKey !== current.bindingKey ||
+        (await this.#deps.loadConnection())
+      )
+        refused();
+      if (!(await this.#deps.hasOriginPermission(new URL(final.rootUrl).origin))) refused();
+      check();
+      const rootUrl =
+        detached.prefix === ''
+          ? final.rootUrl
+          : final.rootUrl + encodeURIComponent(detached.prefix.slice(0, -1)) + '/';
+      const selected = await this.#deps.createWorkspaceSelection({
+        kind: 'join',
+        rootUrl,
+        accountId: final.accountId,
+        expected,
+        previous: source,
+      });
+      check();
+      return selected;
+    }).finally(admission.release);
   }
   async #observeProduct(
     requestId: string,
@@ -285,6 +440,8 @@ class SyncConnectionCoordinator {
         productTarget.kind !== 'catalog-refresh' &&
         productTarget.kind !== 'cache-trim' &&
         productTarget.kind !== 'backup-prepare' &&
+        productTarget.kind !== 'scenario-export-prepare' &&
+        productTarget.kind !== 'library-backup-prepare' &&
         productTarget.kind !== 'replica-prepare' &&
         productTarget.kind !== 'native-prepare' &&
         productTarget.kind !== 'native-release' &&
@@ -332,7 +489,13 @@ class SyncConnectionCoordinator {
     return this.#enqueue(async () => {
       check();
       const metadata = await this.#deps.loadConnection();
-      if (!metadata || metadata.phase !== 'active') refused();
+      if (
+        !metadata ||
+        metadata.phase !== 'active' ||
+        (work.kind === 'library-backup-prepare' &&
+          !sameSyncConnectionIdentity(metadata.identity, work.expected))
+      )
+        refused();
       check();
       const startupId = await this.#deps.ensureDocument();
       check();
@@ -410,15 +573,15 @@ class SyncConnectionCoordinator {
 
   start(input: StartSelection): Promise<ExecutorReceipt> {
     const release = this.#exclusion.acquirePermit();
-    if (!release) return Promise.reject(new Error('Sync coordinator operation refused'));
+    if (!release) return Promise.reject(new SyncConnectionCoordinatorError('privacy-exclusion'));
     const generation = this.#exclusion.getGeneration();
     const selection = structuredClone(input);
     const checkGeneration = () => {
-      if (generation !== this.#exclusion.getGeneration()) refused();
+      if (generation !== this.#exclusion.getGeneration()) refused('generation-changed');
     };
     return this.#enqueue(async () => {
       checkGeneration();
-      if (!matches(await this.#deps.loadConnection(), selection)) refused();
+      if (!matches(await this.#deps.loadConnection(), selection)) refused('selection-changed');
       const snapshot = await this.#ensureObserved(checkGeneration);
       if (
         !snapshot ||
@@ -426,20 +589,20 @@ class SyncConnectionCoordinator {
         snapshot.phase === 'failed' ||
         snapshot.workspace?.state === 'running'
       )
-        refused();
+        refused('executor-unavailable');
       const metadata = await this.#deps.loadConnection();
       checkGeneration();
       if (
         !matches(metadata, selection) ||
         (snapshot.phase !== 'stopped' && !boundToCurrent(snapshot, metadata))
       )
-        refused();
+        refused('binding-changed');
       const receipt = await this.#deps.startExecutor({ ...selection, ...target(snapshot) });
       if (
         receipt.executorId !== snapshot.executorId ||
         receipt.executorRevision < snapshot.executorRevision
       )
-        refused();
+        refused('receipt-invalid');
       return receipt;
     }).finally(release);
   }
@@ -467,6 +630,7 @@ class SyncConnectionCoordinator {
         source,
         authentication,
         ...(input.requestId ? { requestId: input.requestId } : {}),
+        ...(input.operation ? { operation: input.operation } : {}),
         ...target(snapshot),
       });
       if (
@@ -478,7 +642,11 @@ class SyncConnectionCoordinator {
     });
   }
   /** Install native ready evidence only after the previous executor acknowledges containment. */
-  enrollWorkspace(input: WorkspaceSelection): Promise<SyncConnectionMetadata> {
+  enrollWorkspace(
+    input: WorkspaceSelection & { storagePolicy: SyncStoragePolicy }
+  ): Promise<SyncConnectionMetadata> {
+    const storagePolicy = parseSyncStoragePolicy(structuredClone(input.storagePolicy));
+    if (!storagePolicy) return Promise.reject(new Error('Sync coordinator operation refused'));
     return this.#workspaceOperation(input, async (source, authentication, checkGeneration) => {
       const selected = await this.#deps.loadWorkspace();
       if (!source || !this.#matchesWorkspace(selected, source) || selected?.phase !== 'ready')
@@ -502,10 +670,80 @@ class SyncConnectionCoordinator {
       if (!(await this.#deps.hasOriginPermission(new URL(current.rootUrl).origin))) refused();
       checkGeneration();
       if (!authentication) refused();
-      const connection = await this.#deps.enrollConnection(source, authentication);
+      const connection = await this.#deps.enrollConnection(source, authentication, storagePolicy);
       checkGeneration();
       return connection;
     });
+  }
+  #connectionOperation<T>(
+    expected: SyncConnectionIdentity | null,
+    operation: (
+      current: SyncConnectionMetadata,
+      identity: SyncConnectionIdentity,
+      checkGeneration: () => void
+    ) => Promise<T>,
+    finalize?: () => void
+  ): Promise<T> {
+    const admission = this.#operationPermit();
+    if (!admission) return Promise.reject(new Error('Sync coordinator operation refused'));
+    return this.#enqueue(async () => {
+      admission.checkGeneration();
+      const current = await this.#deps.loadConnection();
+      admission.checkGeneration();
+      if (!expected || !current || !sameSyncConnectionIdentity(current.identity, expected))
+        refused();
+      return operation(current, expected, admission.checkGeneration);
+    }).finally(() => {
+      try {
+        finalize?.();
+      } finally {
+        admission.release();
+      }
+    });
+  }
+  /** Resume the native authorization without changing the independent queue pause. */
+  resumeConnection(expectedInput: SyncConnectionIdentity): Promise<void> {
+    const expected = parseSyncConnectionIdentity(structuredClone(expectedInput));
+    return this.#connectionOperation(expected, async (current, identity, checkGeneration) => {
+      if (current.phase !== 'paused' || !this.#deps.resumeConnection) refused();
+      if (!(await this.#deps.hasOriginPermission(new URL(current.binding.rootUrl).origin)))
+        refused();
+      checkGeneration();
+      await this.#contain(await this.#observe(null));
+      checkGeneration();
+      await this.#deps.resumeConnection(identity);
+      checkGeneration();
+    });
+  }
+  /** Replace credentials only for the selected lifetime, after the old executor drains. */
+  updateAuthentication(
+    expectedInput: SyncConnectionIdentity,
+    authenticationInput: SyncConnectionAuthentication
+  ): Promise<void> {
+    const expected = parseSyncConnectionIdentity(structuredClone(expectedInput));
+    let authentication: SyncConnectionAuthentication | null = structuredClone(authenticationInput);
+    return this.#connectionOperation(
+      expected,
+      async (current, _identity, checkGeneration) => {
+        if (!this.#deps.beginAuthenticationUpdate || !this.#deps.commitAuthenticationUpdate)
+          refused();
+        const parsed = parseConnectionAuthentication(authentication, current.binding.accountId);
+        if (
+          !parsed ||
+          !(await this.#deps.hasOriginPermission(new URL(current.binding.rootUrl).origin))
+        )
+          refused();
+        checkGeneration();
+        const reservation = await this.#deps.beginAuthenticationUpdate(current);
+        await this.#contain(await this.#observe(null));
+        checkGeneration();
+        await this.#deps.commitAuthenticationUpdate(reservation, parsed);
+        checkGeneration();
+      },
+      () => {
+        authentication = null;
+      }
+    );
   }
   /** Retire one exact connection only after native revocation and observed executor drain. */
   async localOnly(expectedInput: SyncConnectionIdentity): Promise<'delivered' | 'incomplete'> {
@@ -551,6 +789,89 @@ class SyncConnectionCoordinator {
       exclusion.release();
     }
   }
+  /** Observe an existing executor without native initialization or lifecycle commands. */
+  async observeActivity(expectedInput: SyncExecutorBinding): Promise<SyncActivityObservation> {
+    const unknown: SyncActivityObservation = {
+      activity: 'unknown',
+      remote: { knowledge: 'unknown' },
+      failureCode: null,
+    };
+    const release = this.#exclusion.acquirePermit();
+    if (!release) return unknown;
+    const generation = this.#exclusion.getGeneration();
+    release();
+    const expected = structuredClone(expectedInput);
+    const isCurrent = (snapshot: SyncExecutorSnapshot | null): snapshot is SyncExecutorSnapshot =>
+      generation === this.#exclusion.getGeneration() &&
+      !!snapshot?.binding &&
+      sameConnectionScope(snapshot.binding.scope, expected.scope) &&
+      sameSyncConnectionIdentity(snapshot.binding.authorization, expected.authorization);
+    const activity = (snapshot: SyncExecutorSnapshot): SyncActivityObservation['activity'] => {
+      if (snapshot.phase === 'stopping') return 'stopping';
+      if (snapshot.phase === 'failed') return 'unknown';
+      if (
+        snapshot.jobs.some((job) => job.state === 'running') ||
+        snapshot.workspace?.state === 'running' ||
+        snapshot.products?.some((job) => job.kind !== 'thumbnail-read' && job.state === 'running')
+      )
+        return 'running';
+      return snapshot.phase === 'idle' || snapshot.phase === 'stopped' ? 'idle' : 'unknown';
+    };
+    try {
+      const observed = await this.#observe(null, true);
+      if (!isCurrent(observed)) return unknown;
+      const snapshot = structuredClone(observed);
+      const result: SyncActivityObservation = { ...unknown, activity: activity(snapshot) };
+      if (result.activity === 'unknown' || result.activity === 'stopping') return result;
+      const latest = snapshot.products?.findLast((job) => job.kind === 'automatic-sync');
+      if (latest?.state === 'failed' || latest?.state === 'interrupted')
+        result.failureCode =
+          latest.failureCode ?? (latest.state === 'interrupted' ? 'interrupted' : 'internal');
+      if (result.activity !== 'idle' || latest?.state !== 'ready' || !this.#deps.productExecutor)
+        return result;
+      const response = await this.#deps.productExecutor({
+        ...target(snapshot),
+        command: { kind: 'inspect', operationRequestId: latest.requestId },
+        advisory: true,
+      });
+      if (generation !== this.#exclusion.getGeneration()) return unknown;
+      if (!response.success) return unknown;
+      if (response.result.kind !== 'operation') return result;
+      const { job, completion } = response.result;
+      if (
+        !job ||
+        job.requestId !== latest.requestId ||
+        job.kind !== 'automatic-sync' ||
+        job.state !== latest.state ||
+        completion?.kind !== 'automatic'
+      )
+        return result;
+      const current = await this.#observe(null, true);
+      if (!isCurrent(current)) return unknown;
+      const currentLatest = current.products?.findLast(
+        (candidate) => candidate.kind === 'automatic-sync'
+      );
+      if (
+        current.offscreenStartupId !== snapshot.offscreenStartupId ||
+        current.executorId !== snapshot.executorId ||
+        current.executorRevision !== snapshot.executorRevision ||
+        current.phase !== snapshot.phase ||
+        activity(current) !== 'idle' ||
+        currentLatest?.requestId !== latest.requestId ||
+        currentLatest.state !== latest.state
+      )
+        return unknown;
+      return {
+        ...result,
+        remote: {
+          knowledge: 'observed-pass',
+          outcome: completion.remaining || completion.deferred > 0 ? 'deferred' : 'complete',
+        },
+      };
+    } catch {
+      return unknown;
+    }
+  }
   inspect(): Promise<SyncExecutorSnapshot | null> {
     return this.#enqueue(async () => {
       const snapshot = await this.#observe(null);
@@ -591,6 +912,15 @@ class SyncConnectionCoordinator {
       if (!stopped && !boundToCurrent(snapshot, metadata)) refused();
       return snapshot;
     });
+  }
+  /** Close executor work without changing the user's durable pause selection. */
+  async containForSecretProtection(): Promise<void> {
+    const reservation = this.#exclusion.reserveExclusion();
+    try {
+      await this.#enqueue(async () => this.#contain(await this.#observe(null), 'secrets-locked'));
+    } finally {
+      reservation.release();
+    }
   }
   /** Reserve before entering the privacy queue; release only after that operation settles. */
   reserveErasure() {
@@ -649,13 +979,18 @@ export function createSyncConnectionCoordinator(deps: SyncConnectionCoordinatorD
   return {
     abandonWorkspace: coordinator.abandonWorkspace.bind(coordinator),
     planWorkspace: coordinator.planWorkspace.bind(coordinator),
+    selectWorkspace: coordinator.selectWorkspace.bind(coordinator),
     productCommand: coordinator.productCommand.bind(coordinator),
     start: coordinator.start.bind(coordinator),
     startWorkspace: coordinator.startWorkspace.bind(coordinator),
     enrollWorkspace: coordinator.enrollWorkspace.bind(coordinator),
     inspect: coordinator.inspect.bind(coordinator),
+    observeActivity: coordinator.observeActivity.bind(coordinator),
+    updateAuthentication: coordinator.updateAuthentication.bind(coordinator),
+    resumeConnection: coordinator.resumeConnection.bind(coordinator),
     localOnly: coordinator.localOnly.bind(coordinator),
     reserveErasure: coordinator.reserveErasure.bind(coordinator),
+    containForSecretProtection: coordinator.containForSecretProtection.bind(coordinator),
     permissionsRemoved: coordinator.permissionsRemoved.bind(coordinator),
   };
 }

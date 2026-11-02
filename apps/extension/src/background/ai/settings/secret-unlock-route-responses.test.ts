@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 
-import type { StoredAISecretUnlockRequest } from '../../../composition/persistence/ai-settings/secret-unlock-requests.store.ts';
+import type { StoredAISecretUnlockRequest } from '../../../composition/persistence/secret-protection/secret-unlock-requests.store.ts';
 import {
   createCompletedRestartRequiredResponse,
   createNonPendingUnlockResponse,

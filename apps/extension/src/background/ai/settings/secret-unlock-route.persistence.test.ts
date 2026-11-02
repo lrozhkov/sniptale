@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { AISecretInvalidPassphraseError } from '../../../composition/persistence/ai-settings/secret-protection.store.ts';
+import { SecretProtectionInvalidPassphraseError as AISecretInvalidPassphraseError } from '../../../composition/persistence/secret-protection/model';
 
 const {
   browserStorageSessionGetMock,

@@ -1,3 +1,12 @@
+import { readAssetReadyPublicationClaims } from '../assets/opfs-store';
+import {
+  runWithDurableAssetLifecycleLock,
+  runWithPersistenceMutationTransition,
+  isActivePersistenceMutationTransitionPermit,
+  type PersistenceMutationTransitionPermit,
+  type DurableAssetLifecyclePermit,
+} from '../infrastructure/mutation-barrier';
+import { readDeletionDependencyRows } from './deletion-index';
 import {
   captureDeletionInTransaction,
   captureVideoProjectInTransaction,
@@ -21,6 +30,7 @@ import { removeVideoProjectLibrarySources } from '../../../features/video/projec
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -29,6 +39,7 @@ import {
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  PROJECT_EXPORT_INPUTS_STORE,
   WEB_SNAPSHOTS_STORE,
   RECORDING_TELEMETRY_STORE,
   RECORDING_CURSOR_TRAJECTORIES_STORE,
@@ -47,13 +58,10 @@ import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
+  initDB,
   type IndexedDbWriteTransaction,
 } from '../infrastructure/indexed-db/core';
-import {
-  buildPhysicalDeleteOperation,
-  completePhysicalDeleteOperation,
-  listReadyJournals,
-} from '../assets';
+import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
 import { parseMediaLibraryEntry } from './read-guards';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/read-guards';
@@ -67,10 +75,8 @@ import {
   deleteMediaSidecars,
   releaseMediaSource,
   releaseUnpublishedProjectAssets,
-  mediaHasPendingPublication,
 } from './delete-cascade.sources';
 import {
-  mediaDependencyTarget,
   reviewReferencesForMedia,
   scenarioChildUsesMedia,
   scenarioChildIsUnrelated,
@@ -107,7 +113,8 @@ function assertExpectedUsage(
 /** Commit project detach, library deletion and physical-delete intent as one IDB mutation. */
 export async function deleteMediaAssetWithProjectCascade(
   mediaId: string,
-  expectedUsage: readonly MediaAssetProjectUsage[]
+  expectedUsage: readonly MediaAssetProjectUsage[],
+  lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<void> {
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const scenarioIds = expectedUsage
@@ -119,19 +126,35 @@ export async function deleteMediaAssetWithProjectCascade(
       commitCascadeTransaction(db, mediaId, expectedUsage, physicalDelete)
     )
   );
-  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
+  if (physicalDelete.assetIds.length > 0)
+    await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit);
 }
 
 /** Compensation and service cleanup may release a source only when no retained consumer adopted it. */
-export async function deleteUnreferencedMediaSource(target: MediaDependencyTarget): Promise<void> {
-  await recoverMediaSourcePublications(target);
-  if ((await listReadyJournals()).some((journal) => mediaHasPendingPublication(journal, target)))
-    throw new MediaAssetDeletionBlockedError('pending-publication');
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation((db) =>
-    commitCascadeTransaction(db, target.id, [], physicalDelete, target)
-  );
-  if (physicalDelete.assetIds.length) await completePhysicalDeleteOperation(physicalDelete);
+export async function deleteUnreferencedMediaSource(
+  target: MediaDependencyTarget,
+  options: {
+    transitionPermit?: PersistenceMutationTransitionPermit;
+    lifecyclePermit?: DurableAssetLifecyclePermit;
+  } = {}
+): Promise<void> {
+  await initDB();
+  const remove = (transitionPermit: PersistenceMutationTransitionPermit) =>
+    runWithDurableAssetLifecycleLock(async (permit) => {
+      await recoverMediaSourcePublications(target, { transitionPermit, lifecyclePermit: permit });
+      const claims = await readAssetReadyPublicationClaims(target, permit);
+      if (!claims.valid || claims.pending)
+        throw new MediaAssetDeletionBlockedError('pending-publication');
+      const physicalDelete = buildPhysicalDeleteOperation([]);
+      await runWithIndexedDbMutation((db) =>
+        commitCascadeTransaction(db, target.id, [], physicalDelete, target)
+      );
+      if (physicalDelete.assetIds.length)
+        await completePhysicalDeleteOperation(physicalDelete, permit);
+    }, options.lifecyclePermit);
+  if (isActivePersistenceMutationTransitionPermit(options.transitionPermit))
+    await remove(options.transitionPermit);
+  else await runWithPersistenceMutationTransition(remove);
 }
 
 async function withScenarioLocks(
@@ -173,13 +196,8 @@ async function loadCascadeGraph(
   if (media.id !== mediaId) throw new MediaAssetDeletionBlockedError('source-unavailable');
   if (expectedSource && !sameMediaSource(media.source, expectedSource.source))
     throw new MediaAssetDeletionBlockedError('source-unavailable');
-  const target = mediaDependencyTarget(media, await tx.objectStore(PROJECT_ASSETS_STORE).getAll());
-  const [rawVideo, rawScenario, rawChildren, rawReview] = await Promise.all([
-    tx.objectStore(VIDEO_PROJECTS_STORE).getAll(),
-    createScenarioProjectStore(tx).getAll(),
-    tx.objectStore(SCENARIO_ASSETS_STORE).getAll(),
-    createVideoWorkspaceStore(tx).getAll(),
-  ]);
+  const matches = await readDeletionDependencyRows(tx, media);
+  const { target, videos: rawVideo, children: rawChildren, reviews: rawReview } = matches;
   const children = requireVerifiedGraphEntries(
     rawChildren,
     parseScenarioAssetEntry,
@@ -189,6 +207,9 @@ async function loadCascadeGraph(
   const scenarioChildren = children.filter((child) => scenarioChildUsesMedia(child, target));
   const scenarioChildIds = new Set(scenarioChildren.map((child) => child.id));
   const scenarioIds = new Set(scenarioChildren.map((child) => child.projectId));
+  const rawScenario = await Promise.all(
+    [...scenarioIds].map((id) => createScenarioProjectStore(tx).get(id))
+  );
   const videos = requireVerifiedGraphEntries(
     rawVideo,
     parseVideoProjectEntry,
@@ -312,6 +333,7 @@ async function commitCascadeTransaction(
 ): Promise<void> {
   const tx = createStrictRecordingTransaction(db, [
     SYNC_CAPTURE_STORE,
+    SYNC_OUTBOX_STORE,
     MEDIA_LIBRARY_STORE,
     VIDEO_PROJECTS_STORE,
     SCENARIO_PROJECTS_STORE,
@@ -323,6 +345,7 @@ async function commitCascadeTransaction(
     VIDEO_WORKSPACE_DRAFTS_STORE,
     PROJECT_ASSETS_STORE,
     PROJECT_EXPORTS_STORE,
+    PROJECT_EXPORT_INPUTS_STORE,
     WEB_SNAPSHOTS_STORE,
     STORE_NAME,
     RECORDING_TELEMETRY_STORE,

@@ -1,4 +1,4 @@
-import { BlobReader, BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
+import { writeEffectBundleArchive } from '../effect-bundle/archive-writer';
 import {
   parseEffectV1Source,
   sha256EffectV1Bytes,
@@ -29,7 +29,9 @@ function materializeInstanceDocument(
   instance: VideoProjectEffectInstance,
   snapshot: VideoProjectEffectSnapshot
 ): EffectV1Document {
-  const document = parseEffectV1Source(snapshot.source).document;
+  const document = parseEffectV1Source(snapshot.source, {
+    presentationPolicy: 'retained',
+  }).document;
   if (!document) throw new Error('Invalid effect snapshot');
   const host = project.clips.find(
     (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
@@ -66,7 +68,8 @@ async function packageEffectDocument(
     delete declaration.svgText;
     declaration.path = file.path;
   }
-  if (!validateEffectV1Document(document).ok) throw new Error('Invalid exported effect');
+  if (!validateEffectV1Document(document, { presentationPolicy: 'retained' }).ok)
+    throw new Error('Invalid exported effect');
   const source = JSON.stringify(document, null, 2);
   const basename = `effect-${document.id.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 100)}`;
   if (!files.length)
@@ -76,7 +79,7 @@ async function packageEffectDocument(
     };
   const bytes = new TextEncoder().encode(source);
   const path = 'effects/effect.sniptale-effect.json';
-  const manifest: EffectBundleManifest = {
+  const manifest: Omit<EffectBundleManifest, 'assets'> = {
     manifestVersion: 'sniptale.bundle.v1',
     engineVersion: '2.0',
     packId: basename,
@@ -91,20 +94,9 @@ async function packageEffectDocument(
         sha256: await sha256EffectV1Bytes(bytes),
       },
     ],
-    assets: files.map(({ asset, path }) => ({
-      path,
-      byteLength: asset.byteLength,
-      sha256: asset.sha256,
-      kind: asset.kind,
-      mimeType: asset.mimeType,
-    })),
   };
-  const writer = new ZipWriter(new BlobWriter('application/zip'), {
-    level: 0,
-    bufferedWrite: true,
-  });
-  await writer.add('manifest.json', new TextReader(JSON.stringify(manifest)));
-  await writer.add(path, new TextReader(source));
-  for (const { asset, path } of files) await writer.add(path, new BlobReader(asset.blob));
-  return { blob: await writer.close(), filename: `${basename}.zip` };
+  return {
+    blob: await writeEffectBundleArchive({ manifest, documents: [{ path, source }], files }),
+    filename: `${basename}.zip`,
+  };
 }

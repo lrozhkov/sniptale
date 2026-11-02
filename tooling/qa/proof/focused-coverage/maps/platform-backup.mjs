@@ -18,4 +18,16 @@ export const PLATFORM_BACKUP_OWNER_MAPPINGS = [
   ...MEDIA_HUB_BACKUP_PRIVACY_OWNER_MAPPINGS,
   ...PRIVACY_ERASURE_OWNER_MAPPINGS,
   ...MEDIA_HUB_OWNER_MAPPINGS,
+  {
+    owner: 'common-protection-credential-trace',
+    productionFile: 'packages/platform/src/observability/message-tracer/messaging.ts',
+    allowCrossOwner: true,
+    reason:
+      'The credential bridge must omit every secret-bearing request and response from diagnostic sinks.',
+    testFiles: [
+      'packages/platform/src/observability/message-tracer/messaging.test.ts',
+      'packages/platform/src/observability/diagnostics/sanitizer.test.ts',
+      'apps/extension/src/platform/runtime-messaging/diagnostic-capture.test.ts',
+    ],
+  },
 ];

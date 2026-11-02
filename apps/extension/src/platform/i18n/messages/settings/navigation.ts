@@ -141,8 +141,8 @@ export const settingsNavigationMessages = defineMessageSource({
       en: 'Connect Desktop and confirm trust in the installed app.',
     },
     accessData: {
-      ru: 'Управляйте разрешениями, конфиденциальностью и локальными данными.',
-      en: 'Manage permissions, privacy, and local data.',
+      ru: 'Управляйте разрешениями, общей защитой секретов, конфиденциальностью и локальными данными.',
+      en: 'Manage permissions, shared secret protection, privacy, and local data.',
     },
     settingsTransfer: {
       ru: 'Создавайте резервные копии и переносите выбранные настройки.',
@@ -176,6 +176,7 @@ export const settingsNavigationMessages = defineMessageSource({
     telemetry: { ru: 'История действий', en: 'Action history' },
     permissions: { ru: 'Разрешения', en: 'Permissions' },
     privacy: { ru: 'Конфиденциальность', en: 'Privacy' },
+    secretProtection: { ru: 'Защита секретов', en: 'Secret protection' },
   },
   documentTitle: {
     ru: 'Sniptale — Настройки',

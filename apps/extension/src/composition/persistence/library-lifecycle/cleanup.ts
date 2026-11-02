@@ -1,10 +1,9 @@
+import { readDeletionDependencyRows } from '../media-library/deletion-index';
 import { runWithLibraryTrashMutation } from './trash';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 import { recoverScenarioAssetPublications } from '../scenario/aggregate-mutations';
 import { recoverMediaSourcePublications } from '../media-library/delete-cascade.recovery';
-import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { createMaintenanceLog } from './maintenance-log';
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -17,7 +16,7 @@ import {
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
-import type { initDB } from '../infrastructure/indexed-db/core';
+import type { IndexedDbWriteTransaction } from '../infrastructure/indexed-db/core';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { listMediaLibrary } from '../media-library';
@@ -29,7 +28,6 @@ import { createProjectAssetMediaId } from '../../../features/media-hub/media-id'
 import { getDraftRetentionMs } from './policy';
 import { collectVideoProjectReferences } from './references';
 import {
-  mediaDependencyTarget,
   scenarioChildIsUnrelated,
   videoEntryIsUnrelated,
   reviewWorkspaceUsesMedia,
@@ -42,6 +40,12 @@ import { recoverProjectMediaPublications } from '../projects/asset-publication';
 import { recoverImageWorkspacePublications } from '../image-aggregates/mutations';
 
 const maintenanceLog = createMaintenanceLog();
+const EXPIRY_BATCH_SIZE = 64;
+
+interface ExpiryCandidate {
+  id: string;
+  retention: number | null;
+}
 
 export interface DraftCleanupResult {
   movedCount: number;
@@ -105,6 +109,23 @@ export async function cleanupDrafts(args: {
   }
 
   const includeUnexpired = Boolean(args.includeUnexpired);
+  const candidates: ExpiryCandidate[] = [];
+  const flushCandidates = async () => {
+    if (!candidates.length || args.signal?.aborted) return;
+    const batch = candidates.splice(0);
+    const committed = await runWithLibraryTrashMutation(() =>
+      runWithDurableAssetLifecycleLock(() =>
+        moveExpiredMediaBatchToTrash(
+          batch,
+          () => args.now ?? Date.now(),
+          includeUnexpired,
+          args.signal
+        )
+      )
+    );
+    movedIds.push(...committed.movedIds);
+    retainedCount += committed.retainedCount;
+  };
   for (const [index, entry] of media.entries()) {
     if (args.signal && index % 32 === 0)
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -124,60 +145,49 @@ export async function cleanupDrafts(args: {
     try {
       if (entry.source.kind === 'web-snapshot') await recoverMediaSourcePublications(entry);
       if (args.signal?.aborted) break;
-      const outcome = await runWithLibraryTrashMutation(() =>
-        runWithDurableAssetLifecycleLock(() =>
-          moveExpiredMediaToTrash(
-            entry.id,
-            () => args.now ?? Date.now(),
-            retention,
-            includeUnexpired,
-            args.signal
-          )
-        )
-      );
-      if (outcome === 'moved') movedIds.push(entry.id);
-      else if (outcome === 'retained') retainedCount++;
+      candidates.push({ id: entry.id, retention });
+      if (candidates.length === EXPIRY_BATCH_SIZE) await flushCandidates();
     } catch (cause) {
       throw new DraftCleanupError(result(), cause);
     }
   }
 
+  try {
+    await flushCandidates();
+  } catch (cause) {
+    throw new DraftCleanupError(result(), cause);
+  }
   return result();
 }
 
-type ExpiryTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
-
-/** Check authoritative retention evidence in the caller's fresh lifecycle transaction. */
-async function hasRetainedProjectForExpiry(
-  tx: ExpiryTransaction,
-  current: MediaLibraryEntry
-): Promise<boolean> {
-  if ((await tx.objectStore(IMAGE_WORKSPACES_STORE).get(current.id)) !== undefined) return true;
-  const target = mediaDependencyTarget(
-    current,
-    await tx.objectStore(PROJECT_ASSETS_STORE).getAll()
-  );
-  if (target.privateProjectAssetIds?.size) return true;
-  const rawChildren = await tx.objectStore(SCENARIO_ASSETS_STORE).getAll();
-  if (rawChildren.some((raw) => !scenarioChildIsUnrelated(raw, target))) return true;
-  const videos = await tx.objectStore(VIDEO_PROJECTS_STORE).getAll();
-  if (videos.some((raw) => !videoEntryIsUnrelated(raw, target, new Set()))) return true;
-  return (await readAllWorkspaceStorage(tx)).some((raw) => {
-    if (isRecord(raw) && raw['aggregateId'] === current.id) return true;
-    const workspace = parseVideoWorkspace(raw);
-    return !workspace || reviewWorkspaceUsesMedia(workspace, target);
-  });
+/** Reuse evidence only inside one transaction that prevents reference writers from committing. */
+function createExpiryRetentionReader(tx: IndexedDbWriteTransaction) {
+  return async (current: MediaLibraryEntry): Promise<boolean> => {
+    if ((await tx.objectStore(IMAGE_WORKSPACES_STORE).get(current.id)) !== undefined) return true;
+    const matches = await readDeletionDependencyRows(tx, current);
+    if (matches.target.privateProjectAssetIds?.size) return true;
+    if (matches.children.some((raw) => !scenarioChildIsUnrelated(raw, matches.target))) return true;
+    if (matches.videos.some((raw) => !videoEntryIsUnrelated(raw, matches.target, new Set())))
+      return true;
+    return matches.reviews.some((raw) => {
+      const workspace = parseVideoWorkspace(raw);
+      return (
+        !workspace ||
+        workspace.aggregateId === current.id ||
+        reviewWorkspaceUsesMedia(workspace, matches.target)
+      );
+    });
+  };
 }
 
-async function moveExpiredMediaToTrash(
-  id: string,
+async function moveExpiredMediaBatchToTrash(
+  candidates: readonly ExpiryCandidate[],
   clock: () => number,
-  retention: number | null,
   includeUnexpired: boolean,
   signal?: AbortSignal
-): Promise<'moved' | 'retained' | 'skipped'> {
-  if (signal?.aborted) return 'skipped';
+): Promise<Pick<DraftCleanupResult, 'movedIds' | 'retainedCount'>> {
   return runWithIndexedDbMutation(async (db) => {
+    if (signal?.aborted) return { movedIds: [], retainedCount: 0 };
     const tx = db.transaction(
       [
         MEDIA_LIBRARY_STORE,
@@ -191,51 +201,33 @@ async function moveExpiredMediaToTrash(
       ],
       'readwrite'
     );
+    const hasRetainedProject = createExpiryRetentionReader(tx);
+    const committed: Pick<DraftCleanupResult, 'movedIds' | 'retainedCount'> = {
+      movedIds: [],
+      retainedCount: 0,
+    };
     try {
-      const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
-      const current = parseMediaLibraryEntry(await mediaStore.get(id));
-      if (
-        !current ||
-        current.lifecycle?.storageClass !== 'temporary' ||
-        current.lifecycle.trashedAt !== undefined ||
-        (!includeUnexpired && !isExpired(current.lifecycle.updatedAt, retention, clock()))
-      ) {
-        await tx.done;
-        return 'skipped';
+      for (const candidate of candidates) {
+        if (signal?.aborted) break;
+        const outcome = await moveExpiredMediaToTrash(
+          tx,
+          candidate,
+          clock,
+          includeUnexpired,
+          hasRetainedProject,
+          signal
+        );
+        if (outcome === 'moved') committed.movedIds.push(candidate.id);
+        else if (outcome === 'retained') committed.retainedCount++;
       }
-      if (await hasRetainedProjectForExpiry(tx, current)) {
-        await tx.done;
+      await tx.done;
+      if (committed.retainedCount)
         void maintenanceLog.append({
           operation: 'drafts',
           code: 'in-use',
-          counts: { retained: 1 },
+          counts: { retained: committed.retainedCount },
         });
-        return 'retained';
-      }
-      const recordingStore = tx.objectStore(STORE_NAME);
-      const recording =
-        current.source.kind === 'recording'
-          ? parseRecordingEntry(await recordingStore.get(current.source.recordingId))
-          : null;
-      if (
-        recording &&
-        (recording.lifecycle?.storageClass !== 'temporary' ||
-          (!includeUnexpired && !isExpired(recording.lifecycle.updatedAt, retention, clock())))
-      ) {
-        await tx.done;
-        return 'retained';
-      }
-
-      if (signal?.aborted) {
-        await tx.done;
-        return 'skipped';
-      }
-      await mediaStore.put({
-        ...current,
-        lifecycle: { ...current.lifecycle, trashedAt: clock() },
-      });
-      await tx.done;
-      return 'moved';
+      return committed;
     } catch (error) {
       try {
         tx.abort();
@@ -246,4 +238,38 @@ async function moveExpiredMediaToTrash(
       throw error;
     }
   });
+}
+
+async function moveExpiredMediaToTrash(
+  tx: IndexedDbWriteTransaction,
+  candidate: ExpiryCandidate,
+  clock: () => number,
+  includeUnexpired: boolean,
+  hasRetainedProject: (current: MediaLibraryEntry) => Promise<boolean>,
+  signal?: AbortSignal
+): Promise<'moved' | 'retained' | 'skipped'> {
+  const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+  const current = parseMediaLibraryEntry(await mediaStore.get(candidate.id));
+  if (
+    !current ||
+    current.lifecycle?.storageClass !== 'temporary' ||
+    current.lifecycle.trashedAt !== undefined ||
+    (!includeUnexpired && !isExpired(current.lifecycle.updatedAt, candidate.retention, clock()))
+  )
+    return 'skipped';
+  if (await hasRetainedProject(current)) return 'retained';
+  const recording =
+    current.source.kind === 'recording'
+      ? parseRecordingEntry(await tx.objectStore(STORE_NAME).get(current.source.recordingId))
+      : null;
+  if (
+    recording &&
+    (recording.lifecycle?.storageClass !== 'temporary' ||
+      (!includeUnexpired &&
+        !isExpired(recording.lifecycle.updatedAt, candidate.retention, clock())))
+  )
+    return 'retained';
+  if (signal?.aborted) return 'skipped';
+  await mediaStore.put({ ...current, lifecycle: { ...current.lifecycle, trashedAt: clock() } });
+  return 'moved';
 }

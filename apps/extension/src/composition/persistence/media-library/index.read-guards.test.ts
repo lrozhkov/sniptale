@@ -38,6 +38,15 @@ vi.mock('../web-snapshots', async (importOriginal) => ({
   getWebSnapshotRecord: vi.fn(),
 }));
 
+vi.mock('../assets/opfs-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets/opfs-store')>()),
+  readAssetReadyPublicationClaims: vi.fn(async () => ({
+    valid: true,
+    pending: false,
+    journals: [],
+  })),
+}));
+
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
   listReadyJournals: vi.fn(async () => []),

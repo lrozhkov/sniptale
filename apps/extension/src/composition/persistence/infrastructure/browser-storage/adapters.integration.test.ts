@@ -3,7 +3,7 @@ import { browserContextMenus } from '@sniptale/platform/browser/context-menus';
 import { browserDownloads } from '@sniptale/platform/browser/downloads';
 import { browserPermissions } from '@sniptale/platform/browser/permissions';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
-import { browserStorage } from '../browser-storage';
+import { browserStorage, restoreSelectedStorageKeys } from '../browser-storage';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import {
   createChromeStub,
@@ -79,6 +79,9 @@ describe('browser storage adapters', () => {
     chromeStub.storage.sync.remove.mockImplementation((_keys: unknown, callback: () => void) =>
       callback()
     );
+    chromeStub.storage.sync.get.mockImplementation(
+      (_keys: unknown, callback: (value: unknown) => void) => callback({ demo: 42 })
+    );
     vi.stubGlobal('chrome', chromeStub);
     const requestedLocks: string[] = [];
     const lockManager: PersistenceLockManager = {
@@ -94,10 +97,13 @@ describe('browser storage adapters', () => {
     installPersistenceLockManagerForTests(lockManager);
 
     await runWithPersistenceDomainMutationLock('highlighter-settings', async (permit) => {
-      await browserStorage.sync.set({ demo: 42 }, permit);
-      await browserStorage.sync.remove('demo', permit);
+      await expect(
+        restoreSelectedStorageKeys(browserStorage.sync, ['demo', 'missing'], { demo: 42 }, permit)
+      ).resolves.toBe(true);
     });
 
+    expect(chromeStub.storage.sync.set).toHaveBeenCalledWith({ demo: 42 }, expect.any(Function));
+    expect(chromeStub.storage.sync.remove).toHaveBeenCalledWith(['missing'], expect.any(Function));
     expect(requestedLocks).toEqual([
       'sniptale:persistence:privacy-erasure',
       'sniptale:persistence:privacy-erasure:highlighter-settings',

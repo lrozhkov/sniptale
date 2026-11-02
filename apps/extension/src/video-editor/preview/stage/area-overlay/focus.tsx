@@ -10,6 +10,7 @@ import {
   clampQuickEditSpotlightArea,
   resolveQuickEditLensArea,
   authorQuickEditLensArea,
+  constrainQuickEditLensArea,
   areQuickEditSpotlightAreasEqual,
   resizeQuickEditAspectLockedArea,
   type QuickEditSpotlight,
@@ -145,8 +146,13 @@ function useFocusAreaEditing(
     region.spotlight?.effect === 'magnify' && region.spotlight.lensShape === 'circle'
       ? mapping.window.height / mapping.window.width
       : undefined;
-  const authoredArea = (area: Area) =>
-    region.spotlight ? authorQuickEditLensArea(region.spotlight, area) : area;
+  const authoredArea = (area: Area) => {
+    if (!region.spotlight) return area;
+    const constrained = circleRatio
+      ? constrainQuickEditLensArea(region.spotlight, area, mapping.window)
+      : area;
+    return authorQuickEditLensArea(region.spotlight, constrained);
+  };
   const preview = (next: Area | null) =>
     params.onPreviewMotion?.(
       next && !areQuickEditSpotlightAreasEqual(next, originArea)

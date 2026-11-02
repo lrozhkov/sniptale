@@ -28,7 +28,7 @@ export function parseEffectRuntimeSnapshotDocument(snapshot: {
   } catch {
     throw new EffectRuntimeSnapshotDocumentError();
   }
-  const validation = validateEffectV1Document(input);
+  const validation = validateEffectV1Document(input, { presentationPolicy: 'retained' });
   if (!validation.ok || !validation.document) {
     throw new EffectRuntimeSnapshotDocumentError();
   }

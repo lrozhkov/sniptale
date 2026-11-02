@@ -28,7 +28,7 @@ export async function verifyVideoProjectEffectSnapshotIntegrity(
     } catch {
       fail();
     }
-    const validation = validateEffectV1Document(input);
+    const validation = validateEffectV1Document(input, { presentationPolicy: 'retained' });
     if (!validation.ok || !validation.document || validation.document.id !== snapshot.documentId) {
       fail();
     }

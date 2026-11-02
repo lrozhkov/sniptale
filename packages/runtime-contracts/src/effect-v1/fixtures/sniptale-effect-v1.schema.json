@@ -65,7 +65,7 @@
         "kind": { "enum": ["audio", "image", "svg"] },
         "mimeType": { "type": "string" },
         "path": {
-          "pattern": "^(?!/)(?!.*(?:^|/)..(?:/|$))[^\\\\]+$",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$",
           "type": "string"
         },
         "sha256": { "pattern": "^[a-f0-9]{64}$", "type": "string" },
@@ -1249,6 +1249,68 @@
     "control": {
       "allOf": [
         {
+          "if": { "required": ["unit"] },
+          "then": { "properties": { "kind": { "const": "number" } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "presentation": { "enum": ["dropdown", "segmented", "toggle"] }
+            },
+            "required": ["presentation"]
+          },
+          "then": {
+            "required": ["options"],
+            "properties": { "kind": { "enum": ["number", "text"] } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "presentation": { "enum": ["segmented"] } },
+            "required": ["presentation"]
+          },
+          "then": { "properties": { "options": { "maxItems": 8 } } }
+        },
+        {
+          "if": {
+            "properties": { "presentation": { "enum": ["toggle"] } },
+            "required": ["presentation"]
+          },
+          "then": {
+            "properties": { "options": { "minItems": 2, "maxItems": 2 } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "presentation": { "enum": ["number", "slider"] } },
+            "required": ["presentation"]
+          },
+          "then": {
+            "properties": { "kind": { "const": "number" } },
+            "not": { "required": ["options"] }
+          }
+        },
+        {
+          "if": {
+            "properties": { "presentation": { "enum": ["text", "textarea"] } },
+            "required": ["presentation"]
+          },
+          "then": {
+            "properties": { "kind": { "const": "text" } },
+            "not": { "required": ["options"] }
+          }
+        },
+        {
+          "if": {
+            "properties": { "presentation": { "enum": ["color"] } },
+            "required": ["presentation"]
+          },
+          "then": {
+            "properties": { "kind": { "const": "color" } },
+            "not": { "required": ["options"] }
+          }
+        },
+        {
           "if": {
             "properties": { "kind": { "enum": ["number", "color"] } },
             "required": ["kind"]
@@ -1295,7 +1357,84 @@
       "properties": {
         "group": {
           "type": "string",
-          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$"
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
+        },
+        "unit": {
+          "enum": ["px", "percent", "s", "ms", "deg", "ratio", "count", "hz"]
+        },
+        "presentation": {
+          "enum": [
+            "auto",
+            "number",
+            "slider",
+            "text",
+            "textarea",
+            "dropdown",
+            "segmented",
+            "toggle",
+            "color"
+          ]
+        },
+        "icon": {
+          "enum": [
+            "text",
+            "type",
+            "font-size",
+            "font-weight",
+            "align-left",
+            "align-center",
+            "align-right",
+            "align-justify",
+            "palette",
+            "fill",
+            "stroke",
+            "opacity",
+            "shadow",
+            "blur",
+            "position",
+            "move",
+            "size",
+            "width",
+            "height",
+            "rotation",
+            "scale",
+            "spacing",
+            "corner-radius",
+            "shape",
+            "rectangle",
+            "circle",
+            "pointer",
+            "anchor",
+            "layers",
+            "layout",
+            "list",
+            "grid",
+            "play",
+            "pause",
+            "clock",
+            "timer",
+            "duration",
+            "speed",
+            "repeat",
+            "sparkles",
+            "settings",
+            "sliders",
+            "check",
+            "x",
+            "drawing",
+            "tracing",
+            "path",
+            "easing",
+            "motion",
+            "mask",
+            "focus",
+            "lens",
+            "crop",
+            "composition",
+            "baseline",
+            "decoration",
+            "texture"
+          ]
         },
         "order": {
           "type": "integer",
@@ -1312,6 +1451,67 @@
             "required": ["value", "label"],
             "properties": {
               "value": { "type": ["string", "number"] },
+              "icon": {
+                "enum": [
+                  "text",
+                  "type",
+                  "font-size",
+                  "font-weight",
+                  "align-left",
+                  "align-center",
+                  "align-right",
+                  "align-justify",
+                  "palette",
+                  "fill",
+                  "stroke",
+                  "opacity",
+                  "shadow",
+                  "blur",
+                  "position",
+                  "move",
+                  "size",
+                  "width",
+                  "height",
+                  "rotation",
+                  "scale",
+                  "spacing",
+                  "corner-radius",
+                  "shape",
+                  "rectangle",
+                  "circle",
+                  "pointer",
+                  "anchor",
+                  "layers",
+                  "layout",
+                  "list",
+                  "grid",
+                  "play",
+                  "pause",
+                  "clock",
+                  "timer",
+                  "duration",
+                  "speed",
+                  "repeat",
+                  "sparkles",
+                  "settings",
+                  "sliders",
+                  "check",
+                  "x",
+                  "drawing",
+                  "tracing",
+                  "path",
+                  "easing",
+                  "motion",
+                  "mask",
+                  "focus",
+                  "lens",
+                  "crop",
+                  "composition",
+                  "baseline",
+                  "decoration",
+                  "texture"
+                ]
+              },
               "label": { "$ref": "#/$defs/localeText" }
             }
           }
@@ -3140,6 +3340,104 @@
     },
     "clips": { "items": { "$ref": "#/$defs/clip" }, "type": "array" },
     "controls": { "items": { "$ref": "#/$defs/control" }, "type": "array" },
+    "controlGroups": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "parentId"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+            "not": {
+              "enum": [
+                "content",
+                "typography",
+                "appearance",
+                "geometry",
+                "processing",
+                "animation",
+                "advanced"
+              ]
+            }
+          },
+          "parentId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
+          },
+          "label": { "$ref": "#/$defs/localeText" },
+          "order": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "icon": {
+            "enum": [
+              "text",
+              "type",
+              "font-size",
+              "font-weight",
+              "align-left",
+              "align-center",
+              "align-right",
+              "align-justify",
+              "palette",
+              "fill",
+              "stroke",
+              "opacity",
+              "shadow",
+              "blur",
+              "position",
+              "move",
+              "size",
+              "width",
+              "height",
+              "rotation",
+              "scale",
+              "spacing",
+              "corner-radius",
+              "shape",
+              "rectangle",
+              "circle",
+              "pointer",
+              "anchor",
+              "layers",
+              "layout",
+              "list",
+              "grid",
+              "play",
+              "pause",
+              "clock",
+              "timer",
+              "duration",
+              "speed",
+              "repeat",
+              "sparkles",
+              "settings",
+              "sliders",
+              "check",
+              "x",
+              "drawing",
+              "tracing",
+              "path",
+              "easing",
+              "motion",
+              "mask",
+              "focus",
+              "lens",
+              "crop",
+              "composition",
+              "baseline",
+              "decoration",
+              "texture"
+            ]
+          },
+          "collapsed": { "type": "boolean" }
+        }
+      }
+    },
     "controlPresets": {
       "type": "array",
       "minItems": 1,

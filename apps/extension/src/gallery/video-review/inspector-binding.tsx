@@ -1,3 +1,5 @@
+import { prepareLibraryBackup } from '../../workflows/sync-transfer/retained-library';
+import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import {
   exportMediaHubBackup,
   createMediaHubBackupExportOptions,
@@ -33,7 +35,7 @@ import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio } from './use-review-audio';
 import { reviewErrorMessage } from './feedback';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import type { LoadedReview } from './use-session';
 import type { useReviewEditorState } from './use-editor-state';
@@ -164,8 +166,18 @@ export function ReviewInspectorBinding({
 }) {
   const { editing, snapshot, composer, busy, run } = state;
   const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
-
-  const leave = (done: () => void) => leaveReviewInspector(state, canvasComments, done);
+  const active = useRef(true);
+  const live = useRef({ session: state.session, resource });
+  live.current = { session: state.session, resource };
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  const isCurrent = () =>
+    active.current && live.current.session === state.session && live.current.resource === resource;
+  const leave = (done: () => void) => leaveReviewInspector(state, canvasComments, done, isCurrent);
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
@@ -259,6 +271,9 @@ export function ReviewInspectorBinding({
           void run(async () => {
             await flushReviewTextVoiceBuffers(state, canvasComments);
             const saved = await state.session.saveBuffered();
+            if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
+            const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent, saved);
+            if (!canLeave()) return;
             await openVideoEditorPage(null, null, {
               aggregateId: saved.workspace.aggregateId,
               revision: saved.workspace.revision,
@@ -423,18 +438,21 @@ export async function backupReview(
   await flushReviewTextVoiceBuffers(state, canvasComments);
   const expectedReview = await state.session.saveBuffered();
   try {
-    await exportMediaHubBackup(
-      createMediaHubBackupExportOptions({
-        includeDrafts: true,
-        scope: 'selected',
-        selected: {
-          mediaAssetIds: [expectedReview.workspace.aggregateId],
-          scenarioProjectIds: [],
-          videoProjectIds: [],
-        },
-      }),
-      { expectedReview, requireSelected: true }
-    );
+    const options = createMediaHubBackupExportOptions({
+      includeDrafts: true,
+      scope: 'selected',
+      selected: {
+        mediaAssetIds: [expectedReview.workspace.aggregateId],
+        scenarioProjectIds: [],
+        videoProjectIds: [],
+      },
+    });
+    const prepared = await prepareLibraryBackup(options);
+    await exportMediaHubBackup(options, {
+      expectedReview,
+      requireSelected: true,
+      ...(prepared ? { requirePreparedNative: true } : {}),
+    });
   } catch (error) {
     if (!(error instanceof DOMException && error.name === 'AbortError'))
       state.setMessage(translate('gallery.videoReview.backupFailed'));
@@ -744,14 +762,53 @@ function ReviewSelectionBinding({
 function leaveReviewInspector(
   state: Pick<InspectorState, 'video' | 'run' | 'composer' | 'flushAdvanced' | 'session'>,
   canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>,
-  done: () => void
+  done: () => void,
+  isCurrent: () => boolean
 ) {
   state.video.current?.pause();
   void state.run(async () => {
     await flushReviewTextVoiceBuffers(state, canvasComments);
     await state.session.flush();
-    done();
+    if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
+    const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent);
+    if (canLeave()) done();
   });
+}
+
+/** The continuation rechecks local ownership after advisory IPC, including a rejected request. */
+async function prepareReviewCheckpointExit(
+  session: InspectorState['session'],
+  isCurrent: () => boolean,
+  expected?: InspectorState['snapshot']['snapshot']
+): Promise<() => boolean> {
+  if (!isCurrent()) return () => false;
+  const before = session.getSnapshot();
+  if (before.dirty || before.pending || before.error || (expected && before.snapshot !== expected))
+    return () => false;
+  const selected = session.getCheckpointExitReceipt();
+  if (selected) {
+    try {
+      await createSyncProductClient().requestCheckpointExit(selected);
+    } catch {
+      // The saved native root and its original pending deadline survive an unavailable worker.
+    }
+  }
+  return () => {
+    if (!isCurrent()) return false;
+    const after = session.getSnapshot();
+    const current = session.getCheckpointExitReceipt();
+    return (
+      !after.dirty &&
+      !after.pending &&
+      !after.error &&
+      after.snapshot === before.snapshot &&
+      (selected
+        ? current?.rootKind === selected.rootKind &&
+          current.rootId === selected.rootId &&
+          current.revision === selected.revision
+        : current === null)
+    );
+  };
 }
 
 /** Notes, advanced content and canvas text join the same ordered buffer before explicit API Save. */

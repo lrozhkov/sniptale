@@ -222,6 +222,7 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
           ? Math.min(limit, Math.max(base.start + 0.01, base.end + delta))
           : base.end;
     const next = { ...base, start, end };
+    delete next.sourceAnchor;
     previewRef.current = next;
     setPreview(next);
   };

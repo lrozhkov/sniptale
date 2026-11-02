@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../composition/persistence/secret-protection/model';
 import {
   VOICE_INPUT_TRANSCRIPT_MAX_CHARS,
   isVoiceInputErrorCode,
@@ -61,8 +62,11 @@ interface VoiceProcessingArgs {
   onRawTranscript?(text: string, scope: VoiceHistoryScope): void;
 }
 
-async function transcribeVoiceAudio(args: VoiceTranscriptionInput): Promise<string> {
-  const config = await resolveTranscriptionModelConfig(args.selection, args.signal);
+async function transcribeVoiceAudio(
+  args: VoiceTranscriptionInput,
+  protection?: SecretProtectionPort
+): Promise<string> {
+  const config = await resolveTranscriptionModelConfig(args.selection, args.signal, protection);
   const input = new File(
     [args.input],
     args.input.type === 'audio/wav' ? 'dictation.wav' : 'dictation.webm',
@@ -84,7 +88,11 @@ async function transcribeVoiceAudio(args: VoiceTranscriptionInput): Promise<stri
       : {}),
     beforeSend: async () => {
       args.signal.throwIfAborted();
-      const current = await resolveTranscriptionModelConfig(args.selection, args.signal);
+      const current = await resolveTranscriptionModelConfig(
+        args.selection,
+        args.signal,
+        protection
+      );
       if (JSON.stringify(config) !== JSON.stringify(current)) throw new Error('model-unavailable');
       args.signal.throwIfAborted();
       await args.beforeSend();
@@ -110,12 +118,21 @@ export function getVoiceInputProcessingErrorCode(error: unknown): VoiceInputErro
 /** Processes one admitted recording. The caller owns cancellation, deadlines, and job lifetime. */
 export function createVoiceInputProcessor(deps: {
   history: ProcessingHistory;
+  protection?: SecretProtectionPort;
   loadCorrectionPrompt?: () => Promise<string>;
   transcribe?: (args: VoiceTranscriptionInput) => Promise<string>;
   correct?: typeof correctVoiceTranscript;
 }) {
-  const transcribe = deps.transcribe ?? transcribeVoiceAudio;
-  const correct = deps.correct ?? correctVoiceTranscript;
+  const transcribe =
+    deps.transcribe ??
+    ((args: VoiceTranscriptionInput) => transcribeVoiceAudio(args, deps.protection));
+  const correct =
+    deps.correct ??
+    ((args: Parameters<typeof correctVoiceTranscript>[0]) =>
+      correctVoiceTranscript({
+        ...args,
+        ...(deps.protection ? { protection: deps.protection } : {}),
+      }));
   const loadPrompt = deps.loadCorrectionPrompt ?? loadVoiceInputCorrectionSystemPrompt;
 
   async function recognize(

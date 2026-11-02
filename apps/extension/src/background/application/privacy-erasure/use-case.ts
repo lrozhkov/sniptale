@@ -30,7 +30,7 @@ export class PrivacyErasureUseCase {
   constructor(private readonly ports: PrivacyErasurePorts) {}
 
   execute(request: PrivacyErasureRequest): Promise<LocalExtensionDataErasureResult> {
-    const exclusions = reserveErasureExclusions(this.ports);
+    const exclusions = reserveErasureExclusions(this.ports, request.options);
     const {
       audioExclusion,
       mediaExclusion,
@@ -103,7 +103,10 @@ export class PrivacyErasureUseCase {
   }
 }
 
-function reserveErasureExclusions(ports: PrivacyErasurePorts) {
+function reserveErasureExclusions(
+  ports: PrivacyErasurePorts,
+  options: LocalExtensionDataErasureOptions
+) {
   const reservations: Array<{ release(): void }> = [];
   function reserve<T extends { release(): void }>(reservation: T): T {
     reservations.push(reservation);
@@ -114,7 +117,7 @@ function reserveErasureExclusions(ports: PrivacyErasurePorts) {
   }
   try {
     return {
-      syncExclusion: reserve(ports.sync.reserveErasureExclusion()),
+      syncExclusion: reserve(ports.sync.reserveErasureExclusion(options)),
       audioExclusion: reserve(ports.audioJobs.reserveErasureExclusion()),
       mediaExclusion: reserve(ports.media.reserveErasureExclusion()),
       diagnosticsExclusion: reserve(ports.diagnostics.reserveErasureExclusion()),
@@ -134,7 +137,11 @@ function createCleanupSteps(
   state: BackgroundRuntimeState
 ): readonly CleanupStep[] {
   return [
-    createCleanupStep(() => ports.media.cleanup(), 'media-runtime-state', 'media-cleanup-failed'),
+    createCleanupStep(
+      () => ports.media.cleanup(state),
+      'media-runtime-state',
+      'media-cleanup-failed'
+    ),
     createCleanupStep(
       () => ports.diagnostics.cleanup(),
       'diagnostics-runtime-state',

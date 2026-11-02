@@ -22,7 +22,8 @@
       },
       "defaultValue": "#fb923c",
       "group": "appearance",
-      "order": 0
+      "order": 0,
+      "presentation": "color"
     },
     {
       "id": "surface",
@@ -33,7 +34,8 @@
       },
       "defaultValue": "#16181d",
       "group": "appearance",
-      "order": 1
+      "order": 1,
+      "presentation": "color"
     },
     {
       "id": "line",
@@ -47,21 +49,25 @@
       "max": 8,
       "step": 1,
       "group": "appearance",
-      "order": 2
+      "order": 2,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "entry",
       "kind": "number",
       "label": {
-        "ru": "Вход (% длительности)",
-        "en": "Entrance (% duration)"
+        "en": "Entrance duration",
+        "ru": "Длительность входа"
       },
       "defaultValue": 18,
       "min": 5,
       "max": 40,
       "step": 1,
       "group": "animation",
-      "order": 3
+      "order": 3,
+      "unit": "percent",
+      "presentation": "slider"
     },
     {
       "id": "corner",
@@ -75,7 +81,9 @@
       "max": 64,
       "step": 1,
       "group": "geometry",
-      "order": 4
+      "order": 4,
+      "unit": "px",
+      "presentation": "slider"
     }
   ],
   "layers": [],

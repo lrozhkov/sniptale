@@ -1,3 +1,5 @@
+import { projectRowReferenceKeys } from '../assets/retention-index-projection';
+import { ROW_REFERENCE_INDEX } from '../infrastructure/indexed-db/row-index-contract';
 import { beforeEach, vi } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
@@ -6,6 +8,12 @@ import {
 } from '../../../features/editor/document/constants';
 
 const stores = vi.hoisted(() => new Map<string, Map<string, unknown>>());
+let forbidGlobalVideoReads = false;
+
+/** Scenario mutation suites opt in without restricting unrelated Montage save fixtures. */
+export function enableScenarioDeletionReadGuard(): void {
+  forbidGlobalVideoReads = true;
+}
 
 function getStore(name: string) {
   const store = stores.get(name);
@@ -37,15 +45,21 @@ const db = {
         const objectStore = {
           delete: async (id: unknown) => void getStore(name).delete(normalizeKey(id)),
           get: async (id: unknown) => getStore(name).get(normalizeKey(id)),
-          getAll: async () => [...getStore(name).values()],
-          index: () => ({
+          getAll: async () => {
+            if (forbidGlobalVideoReads && name === 'video_projects')
+              throw new Error('Global video dependency read');
+            return [...getStore(name).values()];
+          },
+          index: (indexName: string) => ({
             count: async (assetId: string) =>
               [...getStore(name).values()].filter(
                 (value) => (value as { assetId?: string }).assetId === assetId
               ).length,
             getAll: async (projectId: string) =>
-              [...getStore(name).values()].filter(
-                (value) => (value as { projectId?: string }).projectId === projectId
+              [...getStore(name).values()].filter((value) =>
+                indexName === ROW_REFERENCE_INDEX
+                  ? projectRowReferenceKeys(name, value).includes(projectId)
+                  : (value as { projectId?: string }).projectId === projectId
               ),
             getAllKeys: async (projectId: string) =>
               [...getStore(name).values()].flatMap((value) =>
@@ -213,13 +227,17 @@ function createDocument(projectId: string, stepId = 'step-1') {
 }
 
 beforeEach(() => {
+  forbidGlobalVideoReads = false;
   stores.clear();
   for (const name of [
     'sync_capture',
+    'sync_outbox',
     'asset_residency',
     'sync_connection',
     'recording_telemetry',
     'project_exports',
+    'project_export_inputs',
+    'video_project_revisions',
     'image_workspaces',
     'video_workspaces',
     'video_workspace_history',

@@ -51,6 +51,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
   let state: ReviewPresentationState<Scene> | null = null;
   let pending: ReviewPresentationState<Scene> | null = null;
   let active: AbortController | null = null;
+  let publication: (() => void) | null = null;
   let tick: number | null = null;
   let epoch = 0;
   let disposed = false;
@@ -58,8 +59,16 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
   let lastPublished = -Infinity;
   let lastAdmitted = -Infinity;
   const current = (version: number) => !disposed && !failed && state?.visible && epoch === version;
+  // Browser frame clocks can round a 30 FPS interval to 33.3 ms.
   const due = (since: number) =>
-    !state?.frameRate || dependencies.now() - since >= 1000 / state.frameRate - 1e-7;
+    !state?.frameRate || dependencies.now() - since >= 1000 / state.frameRate - 0.1;
+  const advanceClock = (since: number) => {
+    const now = dependencies.now();
+    if (!state?.frameRate || !Number.isFinite(since)) return now;
+    const period = 1000 / state.frameRate;
+    // Keep the cadence phase; delivery jitter must not add another period to every frame.
+    return since + Math.max(1, Math.floor((now - since + 0.1) / period)) * period;
+  };
   const cancelTick = () => {
     if (tick !== null) dependencies.cancelTick(tick);
     tick = null;
@@ -70,6 +79,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
     tick = dependencies.requestTick(() => {
       tick = null;
       if (!state?.visible || failed || disposed) return;
+      if (publication && due(lastPublished)) publication();
       if (state.playing) pending = state;
       // A paused request is one-shot: wait until it can publish before consuming it.
       const admissionClock = state.playing || state.interacting ? lastAdmitted : lastPublished;
@@ -85,7 +95,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
     const version = epoch;
     const controller = new AbortController();
     active = controller;
-    lastAdmitted = dependencies.now();
+    lastAdmitted = advanceClock(lastAdmitted);
     const request: ReviewPresentationRequest<Scene> = {
       scene: description.scene,
       generation: description.generation,
@@ -114,11 +124,24 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
       );
       if (!current(version)) return;
       if (!due(lastPublished)) {
-        if (!description.playing) pending = state;
-        return;
+        if (!description.playing && !description.interacting) {
+          pending = state;
+          return;
+        }
+        // Keep the sole completed lease until its publication slot instead of rerendering it.
+        await new Promise<void>((resolve) => {
+          const finish = () => {
+            if (publication === finish) publication = null;
+            controller.signal.removeEventListener('abort', finish);
+            resolve();
+          };
+          publication = finish;
+          controller.signal.addEventListener('abort', finish, { once: true });
+        });
+        if (!current(version)) return;
       }
       dependencies.publish(completed.value, request);
-      if (current(version)) lastPublished = dependencies.now();
+      if (current(version)) lastPublished = advanceClock(lastPublished);
     } catch (error) {
       if (current(version)) {
         failed = true;

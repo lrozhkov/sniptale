@@ -185,3 +185,7 @@ it.each([true, false])(
     else expect(plan.local).toContain('sniptale-theme-preference');
   }
 );
+
+it('includes the common journal and recovery key store in verified local-data erasure', () => {
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('secret_protection');
+});

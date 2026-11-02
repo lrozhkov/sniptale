@@ -239,3 +239,36 @@ it('issues review-text editor tokens through the existing route authorization an
   ).toMatchObject({ authorized: false });
   tokens.resetLlmSessionTokensForTests();
 });
+
+it.each([
+  { ai: false, isUnlocked: false, allowed: true },
+  { ai: true, isUnlocked: false, allowed: false },
+  { ai: true, isUnlocked: true, allowed: true },
+])(
+  'uses AI participation and the actual shared session: $ai / $isUnlocked',
+  async ({ ai, isUnlocked, allowed }) => {
+    const status = {
+      isEnabled: true,
+      isUnlocked,
+      mode: 'passphrase' as const,
+      participants: { ai, webdav: true },
+    };
+    const protection = { readStatus: vi.fn(async () => status) };
+    const sendResponse = vi.fn();
+    const message = {
+      type: MessageType.REQUEST_LLM_SESSION,
+      purpose: 'content-ai-pick',
+      egressAuthority: createContentAuthority(),
+    } as const;
+    routeLlmSessionMessage(
+      message,
+      { tab: { id: 7 } as chrome.tabs.Tab },
+      sendResponse,
+      protection
+    );
+    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+    expect(sendResponse.mock.calls[0]?.[0]).toMatchObject({ success: allowed });
+    expect(loadAISecretProtectionStatusMock).not.toHaveBeenCalled();
+    expect(issueLlmSessionTokenMock).toHaveBeenCalledTimes(allowed ? 1 : 0);
+  }
+);

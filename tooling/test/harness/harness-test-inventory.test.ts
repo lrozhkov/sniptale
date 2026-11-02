@@ -42,3 +42,18 @@ it('keeps the repository harness inventory complete and balances node VM source 
   expect(inventory.nodeVmThreadsFilesA.length).toBeGreaterThan(0);
   expect(inventory.nodeVmThreadsFilesB.length).toBeGreaterThan(0);
 });
+
+it('keeps the canonical archive proof in its exact compatible pool without matching peers', () => {
+  const archive = 'tooling/test/harness/webdav-checkpoints.test.ts';
+  const peer = 'tooling/test/harness/webdav-checkpoints-peer.test.ts';
+  const inventory = classifyHarnessTestFiles({
+    files: [archive, peer].sort(),
+    readFile: () => 'it("archive", () => structuredClone({ metadata: true }));',
+  });
+
+  expect(inventory.forkFiles).toEqual([archive]);
+  expect([...inventory.nodeVmThreadsFilesA, ...inventory.nodeVmThreadsFilesB]).toEqual([peer]);
+  const live = collectHarnessTestInventory();
+  expect(live.forkFiles).toContain(archive);
+  expect([...live.nodeVmThreadsFilesA, ...live.nodeVmThreadsFilesB]).not.toContain(archive);
+});

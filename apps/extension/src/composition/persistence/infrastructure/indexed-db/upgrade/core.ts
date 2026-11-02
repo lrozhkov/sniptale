@@ -1,3 +1,9 @@
+import { installSyncQueueSummaryStoreIndexes } from '../sync-queue-index-migration';
+import {
+  REFERENCE_INDEX_STORES,
+  ROW_REFERENCE_INDEX,
+  ROW_REFERENCE_FIELD,
+} from '../row-index-contract';
 import {
   VOICE_INPUT_HISTORY_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
@@ -38,6 +44,7 @@ import {
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
+  SECRET_PROTECTION_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -60,6 +67,9 @@ function createStore(
   indexes: readonly string[] = []
 ): void {
   const store = db.createObjectStore(name, { keyPath });
+  installSyncQueueSummaryStoreIndexes(name, store);
+  if (REFERENCE_INDEX_STORES.some((indexed) => indexed === name))
+    store.createIndex(ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true });
   for (const index of indexes) {
     if (index === 'usageReferenceKeys') store.createIndex(index, index, { multiEntry: true });
     else store.createIndex(index, index);
@@ -82,6 +92,9 @@ export function executeDatabaseUpgrade(
   transaction: UpgradeTransaction,
   migrations: readonly DatabaseMigrationDescriptor[]
 ): void {
+  // The open request reports upgrade failure.
+  // Observe its transaction and requests to prevent duplicate unhandled rejections.
+  void transaction.done?.catch(() => undefined);
   if (oldVersion === 0) {
     createBetaBaseline(db);
     return;
@@ -99,7 +112,8 @@ export function executeDatabaseUpgrade(
       assertSynchronousMigrationStep(migration.validate(db, transaction), 'validate');
     }
     const contracts = transaction.objectStore(SCHEMA_CONTRACTS_STORE);
-    for (const contract of CURRENT_SCHEMA_CONTRACTS) contracts.put(contract);
+    for (const contract of CURRENT_SCHEMA_CONTRACTS)
+      void Promise.resolve(contracts.put(contract)).catch(() => undefined);
   } catch (error) {
     transaction.abort();
     throw error;
@@ -115,13 +129,13 @@ function assertSynchronousMigrationStep(result: unknown, step: 'migrate' | 'vali
 function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, STORE_NAME, 'id', ['createdAt']);
   createStore(db, RECORDING_TELEMETRY_STORE, 'recordingId', ['updatedAt']);
-  createStore(db, RECORDING_RECOVERY_SESSIONS_STORE, 'id', ['createdAt']);
+  createStore(db, RECORDING_RECOVERY_SESSIONS_STORE, 'id', ['createdAt', 'recoveryId']);
   createStore(db, RECORDING_RECOVERY_BLOCKS_STORE, ['id', 'index'], ['id']);
   createStore(
     db,
     RECORDING_CURSOR_TRAJECTORIES_STORE,
     ['recordingId', 'trajectoryId'],
-    ['recordingId']
+    ['recordingId', 'snapshotAssetId']
   );
   const cursorBlocks = db.createObjectStore(RECORDING_CURSOR_BLOCKS_STORE, {
     keyPath: ['recordingId', 'trajectoryId', 'sequence'],
@@ -131,6 +145,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   const events = db.createObjectStore(RECORDING_EVENTS_STORE, {
     keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'],
   });
+  events.createIndex('snapshotAssetId', 'snapshotAssetId');
   events.createIndex('kind', 'kind');
   events.createIndex('timeBuckets', 'timeBuckets', { multiEntry: true });
   createStore(db, DIAGNOSTICS_META_STORE, 'recordingId');
@@ -171,7 +186,9 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, ASSET_OPERATIONS_STORE, 'operationId', ['status', 'updatedAt']);
   createStore(db, VOICE_INPUT_HISTORY_STORE, 'id');
   createStore(db, SYNC_CAPTURE_STORE, 'key', ['kind', 'rootKey', 'createdAt']);
-  db.createObjectStore(SYNC_OUTBOX_STORE, { keyPath: 'key' }).createIndex(
+  const outbox = db.createObjectStore(SYNC_OUTBOX_STORE, { keyPath: 'key' });
+  installSyncQueueSummaryStoreIndexes(SYNC_OUTBOX_STORE, outbox);
+  outbox.createIndex(
     'syncQueueDue',
     [
       'spaceId',
@@ -186,6 +203,8 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, SYNC_CATALOG_CACHE_STORE, 'key');
   createStore(db, SYNC_CONNECTION_STORE, 'key');
   createStore(db, ASSET_RESIDENCY_STORE, 'id');
+  createStore(db, SECRET_PROTECTION_STORE, 'key');
   const contracts = db.createObjectStore(SCHEMA_CONTRACTS_STORE, { keyPath: 'domainId' });
-  for (const contract of CURRENT_SCHEMA_CONTRACTS) contracts.put(contract);
+  for (const contract of CURRENT_SCHEMA_CONTRACTS)
+    void Promise.resolve(contracts.put(contract)).catch(() => undefined);
 }

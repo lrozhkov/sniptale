@@ -242,7 +242,11 @@ function authorizeSyncConnectionOriginPermission(
   routeEntry: BackgroundOwnedRouteInventoryEntry
 ): IpcAuthorizationResult {
   if (request.sender.tab || !hasOffscreenRuntimeCapability(request.sender)) {
-    return reject('Sync origin permission query refused');
+    return reject(
+      request.message.type === MessageType.SYNC_CONNECTION_CREDENTIAL
+        ? 'Sync credential query refused'
+        : 'Sync origin permission query refused'
+    );
   }
   return authorize(
     createBackgroundOwnedRoutePreauthorization({

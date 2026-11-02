@@ -1,3 +1,5 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { requireCheckpointFixtureProfile } from './webdav-checkpoints';
 import { saveRecordingsBatch } from '../../../apps/extension/src/composition/persistence/recordings/batch';
 import { parseRecordingEntry } from '../../../apps/extension/src/composition/persistence/recordings/index.guards';
 import { saveRecordingTelemetry } from '../../../apps/extension/src/composition/persistence/recordings/telemetry';
@@ -115,17 +117,29 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
   }
   async function seed(
     bytes: number[],
-    sourceKind: 'project-asset' | 'recording' = 'project-asset'
+    sourceKind: 'project-asset' | 'recording' = 'project-asset',
+    options: unknown = {}
   ) {
-    await installExperimentalCaptureProfile({
-      version: 1,
-      kind: 'profile',
-      key: 'profile',
-      createdAt: Date.now(),
-      enabled: true,
-      spaceId,
-      connectionGeneration: 3,
-    });
+    check(
+      isRecord(options) &&
+        Object.keys(options).every((key) => key === 'useExistingProfile') &&
+        (options['useExistingProfile'] === undefined ||
+          typeof options['useExistingProfile'] === 'boolean'),
+      'Invalid review fixture profile choice.'
+    );
+    let selectedSpaceId = spaceId;
+    if (options['useExistingProfile'] === true) {
+      selectedSpaceId = (await requireCheckpointFixtureProfile()).spaceId;
+    } else
+      await installExperimentalCaptureProfile({
+        version: 1,
+        kind: 'profile',
+        key: 'profile',
+        createdAt: Date.now(),
+        enabled: true,
+        spaceId,
+        connectionGeneration: 3,
+      });
     const sourceId = crypto.randomUUID();
     const mediaId = `${sourceKind}:${sourceId}`;
     const createdExportId = sourceKind === 'recording' ? `recording:${crypto.randomUUID()}` : null;
@@ -254,7 +268,7 @@ export function createWebdavReviewHarness(connected: () => SyncRemoteStore) {
       tags: ['provider'],
     });
     return {
-      spaceId,
+      spaceId: selectedSpaceId,
       mediaId,
       archiveId,
       createdExportId,

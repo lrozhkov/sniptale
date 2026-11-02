@@ -53,6 +53,7 @@ let session: ReturnType<typeof createVideoReviewSession>;
 let blocked = false;
 let holdFlush: (() => Promise<void>) | null = null;
 function setup(inspect = false) {
+  const renders = vi.fn();
   const initial = createQuickEditAdvancedState();
   initial.ui.mode = 'advanced';
   initial.annotationEffects = { enabled: true, instances: [structuredClone(instance)] };
@@ -112,6 +113,7 @@ function setup(inspect = false) {
     return id;
   });
   function Harness() {
+    renders();
     const current = useReviewSnapshot(session);
     advanced = useReviewAdvanced(session);
     editor = useReviewAnnotationEffects(
@@ -161,7 +163,7 @@ function setup(inspect = false) {
     locale: 'en',
     plane: { width: 640, height: 360 },
   };
-  return { save, select, pause, acquire, choice, render: () => root.render(<Harness />) };
+  return { save, select, pause, acquire, choice, renders, render: () => root.render(<Harness />) };
 }
 const settle = async (action: () => void) => {
   await act(async () => {
@@ -736,4 +738,57 @@ it('retains picked alpha through actual Apply, canonical Undo/Redo and persisted
     after
   );
   await reopened.dispose();
+});
+
+it('does not schedule another editor render when the stage reports equal geometry', async () => {
+  const { renders, save } = setup();
+  const { createReviewAnnotationGeometry } = await import('./annotation-effects-geometry');
+  const geometry = createReviewAnnotationGeometry({
+    source: { width: 640, height: 360 },
+    output: { width: 640, height: 360 },
+    background: { enabled: false },
+    camera: { scale: 2, centerX: 0.4, centerY: 0.3 },
+  });
+  expect(geometry).not.toBeNull();
+  act(() => editor.setGeometry(geometry));
+  const count = renders.mock.calls.length;
+  for (let i = 0; i < 80; i++) act(() => editor.setGeometry(structuredClone(geometry)));
+  expect(renders).toHaveBeenCalledTimes(count);
+  expect(editor.geometry).toEqual(geometry);
+  expect(save).not.toHaveBeenCalled();
+});
+
+it('publishes changed geometry and readmits the same geometry after a session reset', async () => {
+  const { render } = setup();
+  const { createReviewAnnotationGeometry } = await import('./annotation-effects-geometry');
+  const geometry = (centerX: number) =>
+    createReviewAnnotationGeometry({
+      source: { width: 640, height: 360 },
+      output: { width: 640, height: 360 },
+      background: { enabled: false },
+      camera: { scale: 2, centerX, centerY: 0.3 },
+    });
+  const first = geometry(0.4),
+    changed = geometry(0.6);
+  act(() => {
+    editor.setGeometry(first);
+    editor.setGeometry(changed);
+  });
+  expect(editor.geometry).toEqual(changed);
+  act(() => {
+    editor.setGeometry(first);
+    editor.setGeometry(changed);
+    editor.setGeometry(null);
+  });
+  expect(editor.geometry).toBeNull();
+  act(() => editor.setGeometry(changed));
+  expect(editor.geometry).toEqual(changed);
+  const previous = session;
+  session = createVideoReviewSession(previous.getSnapshot().snapshot);
+  session.setAutosaveEnabled(false);
+  act(render);
+  expect(editor.geometry).toBeNull();
+  act(() => editor.setGeometry(changed));
+  expect(editor.geometry).toEqual(changed);
+  await previous.dispose();
 });

@@ -1,3 +1,16 @@
+import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
+import {
+  MAX_MEDIA_ARCHIVE_ENTRIES,
+  MAX_MEDIA_ARCHIVE_INFLATED_BYTES,
+} from '../../composition/archive-transfer/contracts';
+import { runWithIndexedDbMutation } from '../../composition/persistence/infrastructure/indexed-db/mutation';
+import { abortIndexedDbMutation } from '../../composition/persistence/infrastructure/indexed-db/transaction';
+import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
+import { readCheckpointInTransaction } from '../../composition/persistence/sync-capture/checkpoints';
+import { captureRootCheckpointInTransaction } from '../../composition/persistence/sync-capture/capture';
+import { parseConnectionMetadata } from '../../composition/persistence/remote-connection/model';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { commitImagePresentation } from '../../composition/persistence/image-aggregates/mutations';
 import {
   parseProjectExportEntry,
   parseVideoProjectEntry,
@@ -56,17 +69,23 @@ import {
   type AssetResidencyCopy,
 } from '../../composition/persistence/assets/residency-records';
 import type { AssetRef } from '../../composition/persistence/assets/contracts';
-import { captureRootKey } from '../../composition/persistence/sync-capture/contracts';
+import {
+  captureRootKey,
+  pendingCheckpointKey,
+} from '../../composition/persistence/sync-capture/contracts';
 import {
   freezeImageInTransaction,
   digestCapturedImageRows,
 } from '../../composition/persistence/sync-capture/image-snapshot';
 import {
+  createSyncDownloadAllowance,
   hasUnloadedNativeEditingRoot,
   needsNativeEditingPreparation,
   restoreStagedNativeOriginal,
   isNativeEditingRootReady,
   prepareNativeEditingRoot,
+  prepareNativeScenarioExport,
+  isNativeScenarioExportReady,
 } from './native-residency';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
 
@@ -117,6 +136,21 @@ async function fixture(inline = false) {
   const table = (name: string) => data.rows.get(name)!;
   io.db.mockResolvedValue({
     ...data.database,
+    // Match IndexedDB's presentation compound key while the generic fixture stores aggregateId.
+    transaction(names: string[], mode: string) {
+      const tx = data.database.transaction(names, mode);
+      return {
+        ...tx,
+        objectStore(name: string) {
+          const store = tx.objectStore(name);
+          if (name !== 'aggregate_presentations') return store;
+          return {
+            ...store,
+            get: (key: IDBValidKey) => store.get(Array.isArray(key) ? key[1]! : key),
+          };
+        },
+      };
+    },
     async get(store: string, key: IDBValidKey) {
       const tx = data.database.transaction([store], 'readonly');
       const value = await tx.objectStore(store).get(key);
@@ -254,11 +288,31 @@ async function fixture(inline = false) {
     lastUsedAt: 1,
     remote: {
       binding,
-      key: 'Originals/attempt/Снимок 100%.png',
+      key: `Files/${hashSyncText('space')}/11111111-1111-4111-8111-111111111111/original/Снимок 100%.png`,
       sha256: createHash('sha256').update('abc').digest('hex'),
     },
   };
   table('asset_residency').set(copy.id, copy);
+  const acceptedSource = JSON.stringify({
+    operationId: 'applied',
+    rootKey,
+    generation: 1,
+    original: { sha256: copy.remote.sha256, size: media.size, mimeType: media.mimeType },
+  });
+  const acceptedReceipt = parseSyncCaptureRecord({
+    version: 1,
+    kind: 'applied-operation',
+    key: JSON.stringify(['applied-operation', binding.spaceId, 'applied']),
+    createdAt: 1,
+    spaceId: binding.spaceId,
+    rootKey,
+    operationId: 'applied',
+    sourceDigest: hashSyncText(acceptedSource),
+    generation: 1,
+  });
+  if (!acceptedReceipt || acceptedReceipt.kind !== 'applied-operation')
+    throw new Error('Invalid accepted source receipt fixture');
+  table('sync_capture').set(acceptedReceipt.key, acceptedReceipt);
   const harness = createHarness();
   const assets = new MemoryDirectoryHandle();
   const objects = new MemoryDirectoryHandle();
@@ -313,6 +367,41 @@ async function fixture(inline = false) {
       quotaFailure = false;
     },
   };
+}
+
+async function readPendingNativeRoot(root: {
+  rootKind: 'media' | 'video-project';
+  rootId: string;
+}) {
+  const db = await initDB();
+  const tx = db.transaction(['sync_capture', 'sync_connection'], 'readonly');
+  const connection = parseConnectionMetadata(
+    await tx.objectStore('sync_connection').get('connection')
+  );
+  if (!connection) throw new Error('Expected active native connection');
+  const pending = await readCheckpointInTransaction(tx, connection.binding, root);
+  await tx.done;
+  if (!pending) throw new Error('Expected saved native checkpoint');
+  return pending;
+}
+
+async function materializeNativeRoot(root: {
+  rootKind: 'media' | 'video-project';
+  rootId: string;
+}) {
+  const pending = await readPendingNativeRoot(root);
+  return runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction([...EXPECTED_STORES], 'readwrite');
+    try {
+      const capture = await captureRootCheckpointInTransaction(tx, pending, { force: true });
+      await tx.done;
+      if (!capture || capture.phase !== 'native')
+        throw new Error('Expected materialized native capture');
+      return capture;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
+    }
+  });
 }
 
 it('downloads missing OPFS bytes through real checked staging and restores the original native identity', async () => {
@@ -957,15 +1046,17 @@ it.each([true, false])(
       filename: 'renamed.png',
       tags: ['retained'],
     });
-    const { parseSyncCaptureRecord } =
-      await import('../../composition/persistence/sync-capture/guards');
     const captures = [...f.table('sync_capture').values()].flatMap((value) => {
       const record = parseSyncCaptureRecord(value);
       return record?.kind === 'sync-operation' && record.phase === 'native' ? [record] : [];
     });
-    expect(captures).toHaveLength(1);
+    expect(captures).toEqual([]);
+    await readPendingNativeRoot(f.args.root);
+    expect(f.remote.read).toHaveBeenCalledOnce();
+    const capture = await materializeNativeRoot(f.args.root);
+    expect(f.remote.read).toHaveBeenCalledOnce();
     const { prepareCapturedOutgoing } = await import('./outgoing');
-    const prepared = await prepareCapturedOutgoing(captures[0]!);
+    const prepared = await prepareCapturedOutgoing(capture);
     expect(prepared.objects.some((object) => object.sha256 === f.copy.remote.sha256)).toBe(true);
     expect(f.remote.read).toHaveBeenCalledOnce();
   }
@@ -1106,7 +1197,7 @@ it('includes a project-retained export in the original budget, pin guard and man
 });
 
 it.each([false, true])(
-  'prepares exact frozen outgoing bytes after native source deletion=%s without recreating its rows',
+  'prepares exact verified frozen outgoing descriptors after native source deletion=%s without GET or recreating rows',
   async (deleted) => {
     const f = await fixture();
     const { captureMediaInTransaction } =
@@ -1116,7 +1207,7 @@ it.each([false, true])(
     const { buildPhysicalDeleteOperation } = await import('../../composition/persistence/assets');
     const tx = f.database.transaction([...EXPECTED_STORES], 'readwrite');
     const native = tx as unknown as Parameters<typeof captureMediaInTransaction>[0];
-    const capture = await captureMediaInTransaction(native, f.media.id);
+    const capture = await captureMediaInTransaction(native, f.media.id, { checkpoint: 'freeze' });
     expect(capture).not.toBeNull();
     if (!capture) throw new Error('Expected native capture.');
     if (deleted) {
@@ -1136,20 +1227,23 @@ it.each([false, true])(
       authorization: f.args.authorization,
       signal: f.args.signal,
     });
-    expect(prepared.objects.some((object) => object.sha256 === f.copy.remote.sha256)).toBe(true);
+    expect(prepared.objects).toEqual([]);
+    expect(prepared.retainedObjects).toHaveLength(1);
+    expect(JSON.parse(prepared.recordText)['objects']).toContainEqual({
+      objectId: prepared.retainedObjects?.[0]?.objectId,
+      sha256: f.copy.remote.sha256,
+    });
     expect([f.table('media_library'), f.table('asset_refs'), f.table('asset_owners')]).toEqual(
       beforeDomain
     );
-    expect(await (await (await f.objects.getFileHandle(f.ref.assetId)).getFile()).text()).toBe(
-      'abc'
-    );
-    expect(f.remote.read).toHaveBeenCalledExactlyOnceWith(f.copy.remote.key, f.args.signal);
+    expect(f.objects.entriesByName.size).toBe(0);
+    expect(f.remote.read).not.toHaveBeenCalled();
     await prepareCapturedOutgoing(capture, {
       remote: f.remote,
       authorization: f.args.authorization,
       signal: f.args.signal,
     });
-    expect(f.remote.read).toHaveBeenCalledOnce();
+    expect(f.remote.read).not.toHaveBeenCalled();
   }
 );
 
@@ -1161,7 +1255,7 @@ async function captureUnloadedSource(f: Awaited<ReturnType<typeof fixture>>, del
   const { buildPhysicalDeleteOperation } = await import('../../composition/persistence/assets');
   const tx = f.database.transaction([...EXPECTED_STORES], 'readwrite');
   const native = tx as unknown as Parameters<typeof captureMediaInTransaction>[0];
-  const capture = await captureMediaInTransaction(native, f.media.id);
+  const capture = await captureMediaInTransaction(native, f.media.id, { checkpoint: 'freeze' });
   if (!capture) throw new Error('Expected native capture.');
   if (deleted) {
     await releaseMediaSource(native, f.media, buildPhysicalDeleteOperation([]));
@@ -1204,17 +1298,26 @@ it.each(['capture', 'connection', 'ref', 'copy', 'namespace'] as const)(
 );
 
 it.each(['capture', 'connection', 'ref', 'copy'] as const)(
-  'refuses changed %s during frozen-file download and discards only staging',
+  'refuses changed %s after native copy admission without downloading or installing files',
   async (change) => {
     const f = await fixture();
     const capture = await captureUnloadedSource(f, true);
-    f.remote.read.mockImplementationOnce(async () => {
+    const native = await import('../../composition/persistence/sync-capture/outgoing');
+    const loadCopy = native.loadNativeOutgoingRecoveryCopy;
+    vi.spyOn(native, 'loadNativeOutgoingRecoveryCopy').mockImplementationOnce(async (input) => {
+      const copy = await loadCopy(input);
       if (change === 'capture') f.table('sync_capture').delete(capture.key);
       if (change === 'connection') f.table('sync_connection').delete('connection');
       if (change === 'ref') f.table('asset_refs').set(f.ref.assetId, { ...f.ref, createdAt: 2 });
       if (change === 'copy')
-        f.table('asset_residency').set(f.copy.id, { ...f.copy, operationId: 'replaced-copy' });
-      return new Blob(['abc']).stream();
+        f.table('asset_residency').set(f.copy.id, {
+          ...f.copy,
+          remote: {
+            ...f.copy.remote,
+            key: f.copy.remote.key.replace('/original/', '/replacement/'),
+          },
+        });
+      return copy;
     });
     const { prepareCapturedOutgoing } = await import('./outgoing');
     await expect(
@@ -1224,28 +1327,38 @@ it.each(['capture', 'connection', 'ref', 'copy'] as const)(
         signal: f.args.signal,
       })
     ).rejects.toThrow();
-    expect(f.remote.read).toHaveBeenCalledOnce();
+    expect(f.remote.read).not.toHaveBeenCalled();
     expect(f.objects.entriesByName.size).toBe(0);
     expect(f.table('media_library').has(f.media.id)).toBe(false);
     expect(f.table('asset_owners').size).toBe(0);
   }
 );
 
-it('refuses wrong frozen-file SHA and keeps the retained capture available for retry', async () => {
+it('refuses mismatched frozen-file SHA before GET and retains capture for a verified-copy retry', async () => {
   const f = await fixture();
+  f.ref.sha256 = f.copy.remote.sha256;
+  f.table('asset_refs').set(f.ref.assetId, f.ref);
+  if (f.copy.target.kind !== 'opfs') throw new Error('Expected OPFS fixture.');
+  f.copy.target.ref = f.ref;
+  f.table('asset_residency').set(f.copy.id, f.copy);
   const capture = await captureUnloadedSource(f, true);
-  f.remote.read.mockResolvedValueOnce(new Blob(['bad']).stream());
+  const badCopy = { ...f.copy, remote: { ...f.copy.remote, sha256: '0'.repeat(64) } };
+  f.table('asset_residency').set(f.copy.id, badCopy);
   const before = structuredClone(f.rows);
   const { prepareCapturedOutgoing } = await import('./outgoing');
   const recovery = { remote: f.remote, authorization: f.args.authorization, signal: f.args.signal };
-  await expect(prepareCapturedOutgoing(capture, recovery)).rejects.toThrow('checksum');
+  await expect(prepareCapturedOutgoing(capture, recovery)).rejects.toThrow();
   expect(f.rows).toEqual(before);
   expect(f.objects.entriesByName.size).toBe(0);
+  expect(f.remote.read).not.toHaveBeenCalled();
+  f.table('asset_residency').set(f.copy.id, f.copy);
   const prepared = await prepareCapturedOutgoing(capture, recovery);
-  expect(prepared.objects.some((object) => object.sha256 === f.copy.remote.sha256)).toBe(true);
+  expect(prepared.objects).toEqual([]);
+  expect(prepared.retainedObjects).toHaveLength(1);
+  expect(f.remote.read).not.toHaveBeenCalled();
 });
 
-it('retries a frozen capture after physical install and failed copy settlement without another GET', async () => {
+it('prepares verified frozen descriptors without writing native residency or installing original files', async () => {
   const f = await fixture();
   const capture = await captureUnloadedSource(f, true);
   const beforeDomain = structuredClone([
@@ -1256,25 +1369,32 @@ it('retries a frozen capture after physical install and failed copy settlement w
   const { prepareCapturedOutgoing } = await import('./outgoing');
   const recovery = { remote: f.remote, authorization: f.args.authorization, signal: f.args.signal };
   f.fail();
-  await expect(prepareCapturedOutgoing(capture, recovery)).rejects.toThrow();
-  expect(await (await (await f.objects.getFileHandle(f.ref.assetId)).getFile()).text()).toBe('abc');
+  const prepared = await prepareCapturedOutgoing(capture, recovery);
+  expect(prepared.objects).toEqual([]);
+  expect(prepared.retainedObjects).toHaveLength(1);
+  expect(f.objects.entriesByName.size).toBe(0);
   expect(f.table('asset_residency').get(f.copy.id)).toEqual(f.copy);
   f.allow();
-  const prepared = await prepareCapturedOutgoing(capture, recovery);
-  expect(prepared.objects.some((object) => object.sha256 === f.copy.remote.sha256)).toBe(true);
-  expect(f.remote.read).toHaveBeenCalledOnce();
+  expect(await prepareCapturedOutgoing(capture, recovery)).toEqual(prepared);
+  expect(f.remote.read).not.toHaveBeenCalled();
   expect([f.table('media_library'), f.table('asset_refs'), f.table('asset_owners')]).toEqual(
     beforeDomain
   );
 });
 
-it.each([false, true])(
-  'encodes a frozen project with its unloaded saved export after project deletion=%s',
-  async (deleted) => {
+it.each([
+  { deleted: false, mimeType: 'image/png' },
+  { deleted: true, mimeType: 'image/png' },
+  { deleted: false, mimeType: 'video/webm;codecs=vp8' },
+  { deleted: true, mimeType: 'video/webm;codecs=vp8' },
+])(
+  'encodes a frozen project with its unloaded $mimeType saved export after project deletion=$deleted',
+  async ({ deleted, mimeType }) => {
     const f = await fixture();
     const exportedRef: AssetRef = {
       ...f.ref,
       assetId: 'project-retained-export',
+      mimeType,
       location: { kind: 'opfs', objectKey: 'objects/project-retained-export' },
     };
     const project = createVideoProjectEntryWithMediaClip({ id: 'frozen-project' });
@@ -1312,8 +1432,10 @@ it.each([false, true])(
       await import('../../composition/persistence/sync-capture/capture');
     const tx = f.database.transaction([...EXPECTED_STORES], 'readwrite');
     const native = tx as unknown as Parameters<typeof captureMediaInTransaction>[0];
-    await captureMediaInTransaction(native, f.media.id);
-    const capture = await captureVideoProjectInTransaction(native, project.id);
+    await captureMediaInTransaction(native, f.media.id, { checkpoint: 'freeze' });
+    const capture = await captureVideoProjectInTransaction(native, project.id, {
+      checkpoint: 'freeze',
+    });
     if (!capture || capture.phase !== 'native' || capture.change.kind !== 'video-project')
       throw new Error('Expected project capture.');
     expect(capture.change.rows.exports.map((item) => item.id)).toEqual([entry.id]);
@@ -1347,11 +1469,13 @@ it.each([false, true])(
       authorization: f.args.authorization,
       signal: f.args.signal,
     });
-    expect(
-      prepared.objects.some(
-        (item) => item.ref.assetId === exportedRef.assetId && item.sha256 === copy.remote.sha256
-      )
-    ).toBe(true);
+    expect(prepared.retainedObjects).toHaveLength(1);
+    expect(prepared.objects.some((item) => item.ref.assetId === exportedRef.assetId)).toBe(false);
+    expect(JSON.parse(prepared.recordText)['objects']).toContainEqual({
+      objectId: prepared.retainedObjects?.[0]?.objectId,
+      sha256: copy.remote.sha256,
+    });
+    expect(f.remote.read).not.toHaveBeenCalled();
     expect([
       f.table('video_projects'),
       f.table('project_exports'),
@@ -1372,7 +1496,7 @@ it.each([false, true])(
 );
 
 it.each([true, false])(
-  'retries an owned interrupted zero file and preserves an unknown zero file, marked=%s',
+  'retains verified remote bytes without touching an interrupted zero file, marked=%s',
   async (marked) => {
     const f = await fixture();
     const capture = await captureUnloadedSource(f, true);
@@ -1388,24 +1512,16 @@ it.each([true, false])(
         })
       ).rejects.toThrow('checksum');
     } else await f.objects.getFileHandle(f.ref.assetId, { create: true });
-    expect((await (await f.objects.getFileHandle(f.ref.assetId)).getFile()).size).toBe(0);
     const { prepareCapturedOutgoing } = await import('./outgoing');
-    const pending = prepareCapturedOutgoing(capture, {
+    const prepared = await prepareCapturedOutgoing(capture, {
       remote: f.remote,
       authorization: f.args.authorization,
       signal: f.args.signal,
     });
-    if (marked) {
-      const prepared = await pending;
-      expect(prepared.objects.some((item) => item.sha256 === f.copy.remote.sha256)).toBe(true);
-      expect(await (await (await f.objects.getFileHandle(f.ref.assetId)).getFile()).text()).toBe(
-        'abc'
-      );
-    } else {
-      await expect(pending).rejects.toThrow('Existing asset bytes');
-      expect((await (await f.objects.getFileHandle(f.ref.assetId)).getFile()).size).toBe(0);
-      expect(f.objects.entriesByName.size).toBe(1);
-    }
+    expect(prepared.objects).toEqual([]);
+    expect(prepared.retainedObjects).toHaveLength(1);
+    expect((await (await f.objects.getFileHandle(f.ref.assetId)).getFile()).size).toBe(0);
+    expect(f.remote.read).not.toHaveBeenCalled();
     expect(f.table('media_library').has(f.media.id)).toBe(false);
     expect(f.table('asset_owners').size).toBe(0);
   }
@@ -1482,12 +1598,15 @@ it('drains frozen-file preparation under one transition before queued erasure', 
       return operation();
     },
   });
-  f.remote.read.mockImplementationOnce(async () => {
+  const native = await import('../../composition/persistence/sync-capture/outgoing');
+  const loadCopy = native.loadNativeOutgoingRecoveryCopy;
+  vi.spyOn(native, 'loadNativeOutgoingRecoveryCopy').mockImplementationOnce(async (input) => {
+    const copy = await loadCopy(input);
     erasure = runWithPersistentDataErasureBarrier(async () => {
       erased = true;
     });
     expect(erased).toBe(false);
-    return new Blob(['abc']).stream();
+    return copy;
   });
   try {
     const { prepareCapturedOutgoing } = await import('./outgoing');
@@ -1496,7 +1615,8 @@ it('drains frozen-file preparation under one transition before queued erasure', 
       authorization: f.args.authorization,
       signal: f.args.signal,
     });
-    expect(prepared.objects.some((item) => item.sha256 === f.copy.remote.sha256)).toBe(true);
+    expect(prepared.retainedObjects).toHaveLength(1);
+    expect(f.remote.read).not.toHaveBeenCalled();
     await erasure;
     expect(erased).toBe(true);
     expect(sharedRequests).toBe(1);
@@ -1505,9 +1625,10 @@ it('drains frozen-file preparation under one transition before queued erasure', 
   }
 });
 
-it.each(['temporary', 'busy'] as const)(
-  'queues a delayed retry for frozen-file %s refusal and publishes after explicit retry',
-  async (refusal) => {
+it(
+  'queues a delayed retry for retained-original stat refusal and publishes after ' +
+    'explicit retry without downloading it',
+  async () => {
     const f = await fixture();
     const capture = await captureUnloadedSource(f, true);
     const beforeDomain = structuredClone([
@@ -1529,20 +1650,7 @@ it.each(['temporary', 'busy'] as const)(
     f.remote.write.mockImplementation(async (key, body) => {
       bodies.set(key, body);
     });
-    let busy = refusal === 'busy';
-    if (refusal === 'temporary')
-      f.remote.read.mockRejectedValueOnce(new SyncRemoteError('temporary', 503));
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      storage: navigator.storage,
-      locks: {
-        request: async (
-          name: string,
-          options: LockOptions,
-          operation: (lock: object | null) => unknown
-        ) => operation(busy && options.ifAvailable && name.includes(f.ref.assetId) ? null : {}),
-      },
-    });
+    f.remote.stat.mockRejectedValueOnce(new SyncRemoteError('temporary', 503));
     const { enqueueSyncQueueOperation, commandSyncQueueOperation } =
       await import('../../composition/persistence/sync-capture/queue');
     const { runSyncQueueOperation } = await import('./queue');
@@ -1564,7 +1672,7 @@ it.each(['temporary', 'busy'] as const)(
     expect(refused.operation).toMatchObject({
       status: 'failed',
       failureCode: 'temporary',
-      stage: 'preparing',
+      stage: 'checking',
     });
     expect(refused.operation.nextDueAt).toBeGreaterThan(Date.now());
     expect(f.remote.write).not.toHaveBeenCalled();
@@ -1572,7 +1680,6 @@ it.each(['temporary', 'busy'] as const)(
     expect([f.table('media_library'), f.table('asset_refs'), f.table('asset_owners')]).toEqual(
       beforeDomain
     );
-    busy = false;
     const retry = await commandSyncQueueOperation(
       scope,
       capture.operationId,
@@ -1586,6 +1693,8 @@ it.each(['temporary', 'busy'] as const)(
     expect([f.table('media_library'), f.table('asset_refs'), f.table('asset_owners')]).toEqual(
       beforeDomain
     );
+    expect(f.remote.read.mock.calls.map(([key]) => key)).not.toContain(f.copy.remote.key);
+    expect(f.objects.entriesByName.size).toBe(0);
   }
 );
 
@@ -1892,9 +2001,15 @@ it.each([
       .objectStore('video_projects')
       .put({ ...project, project: { ...project.project, name: 'Saved offline' } });
     const native = tx as unknown as Parameters<typeof captureVideoProjectInTransaction>[0];
-    const capture = await captureVideoProjectInTransaction(native, project.id);
+    expect(await captureVideoProjectInTransaction(native, project.id)).toBeNull();
     await tx.done;
-    if (!capture || capture.phase !== 'native') throw new Error('Expected native offline capture');
+    expect(parseVideoProjectEntry(f.table('video_projects').get(project.id))?.project.name).toBe(
+      'Saved offline'
+    );
+    const pending = await readPendingNativeRoot({ rootKind: 'video-project', rootId: project.id });
+    expect(f.remote.read).not.toHaveBeenCalled();
+    const capture = await materializeNativeRoot({ rootKind: 'video-project', rootId: project.id });
+    expect(pending.rootId).toBe(project.id);
     expect(f.remote.read).not.toHaveBeenCalled();
     const { enqueueSyncQueueOperation, commandSyncQueueOperation } =
       await import('../../composition/persistence/sync-capture/queue');
@@ -1919,20 +2034,14 @@ it.each([
         ).rejects.toThrow('checksum');
       } else await f.objects.getFileHandle(ref.assetId, { create: true });
       expect((await (await f.objects.getFileHandle(ref.assetId)).getFile()).size).toBe(0);
-      const before = structuredClone(f.table('sync_capture'));
-      const pending = prepareCapturedOutgoing(capture, recovery);
-      if (mode === 'unknown-zero') {
-        await expect(pending).rejects.toThrow('Existing asset bytes');
-        expect(f.table('sync_capture')).toEqual(before);
-        expect((await (await f.objects.getFileHandle(ref.assetId)).getFile()).size).toBe(0);
-        expect(f.remote.write).not.toHaveBeenCalled();
-        return;
-      }
-      const prepared = await pending;
-      expect(prepared.objects.some((item) => item.ref.assetId === ref.assetId)).toBe(true);
-      expect((await readAssetFile(ref, exported.filename)).size).toBe(ref.size);
+      const prepared = await prepareCapturedOutgoing(capture, recovery);
+      expect(prepared.objects.some((item) => item.ref.assetId === ref.assetId)).toBe(false);
+      expect((await (await f.objects.getFileHandle(ref.assetId)).getFile()).size).toBe(0);
       const remoteExport = parent.objects.find((item) => item.objectId === 'export')!;
-      expect(f.remote.read.mock.calls.map(([key]) => key)).toContain(remoteExport.remoteKey);
+      expect(prepared.retainedObjects).toContainEqual(
+        expect.objectContaining({ remoteKey: remoteExport.remoteKey })
+      );
+      expect(f.remote.read).not.toHaveBeenCalled();
       const { runSyncQueueOperation } = await import('./queue');
       expect(
         await runSyncQueueOperation({
@@ -1953,6 +2062,8 @@ it.each([
       expect(f.remote.write.mock.calls.map(([key]) => key)).toEqual([
         expect.stringMatching(/^\.sniptale\//u),
       ]);
+      expect(f.remote.read.mock.calls.map(([key]) => key)).not.toContain(remoteExport.remoteKey);
+      expect((await (await f.objects.getFileHandle(ref.assetId)).getFile()).size).toBe(0);
       return;
     }
     if (mode.endsWith('-changed')) {
@@ -1984,6 +2095,9 @@ it.each([
       getFile.mockRestore();
       expect(changed).toBe(true);
       expect(f.table('sync_capture').get(capture.key)).toEqual(capture);
+      expect(parseVideoProjectEntry(f.table('video_projects').get(project.id))?.project.name).toBe(
+        'Saved offline'
+      );
       expect(f.remote.read).not.toHaveBeenCalled();
       expect(f.remote.write).not.toHaveBeenCalled();
       await expect(readAssetFile(ref, exported.filename)).rejects.toThrow();
@@ -2088,3 +2202,703 @@ it.each([
     ]);
   }
 );
+
+function markCachePending(
+  f: Awaited<ReturnType<typeof fixture>>,
+  root: Parameters<typeof releaseNativeEditingRoot>[0]['root'] = f.args.root
+) {
+  const rootKey = captureRootKey(f.args.binding.spaceId, root.rootKind, root.rootId);
+  const checkpoint = {
+    version: 1,
+    kind: 'pending-checkpoint',
+    key: pendingCheckpointKey(rootKey),
+    createdAt: 2,
+    spaceId: f.args.binding.spaceId,
+    profileCreatedAt: f.args.binding.profileCreatedAt,
+    connectionGeneration: f.args.binding.connectionGeneration,
+    ...root,
+    rootKey,
+    revision: '44444444-4444-4444-8444-444444444444',
+    dueAt: 1000,
+  };
+  f.table('sync_capture').set(checkpoint.key, checkpoint);
+  return checkpoint;
+}
+
+it.each([false, true])(
+  'refuses pending native release before remote verification, inline: %s',
+  async (inline) => {
+    const f = await fixture(inline);
+    await prepareNativeEditingRoot(f.args);
+    const checkpoint = markCachePending(f);
+    const before = structuredClone(f.table('asset_residency'));
+    f.remote.read.mockClear();
+    expect(await readNativeCacheRootStatus(f.args.root)).toMatchObject({
+      ready: true,
+      releaseAllowed: false,
+    });
+    await expect(releaseNativeEditingRoot({ ...f.args, index: cacheIndex(f) })).rejects.toThrow(
+      'pending checkpoint'
+    );
+    expect(f.remote.read).not.toHaveBeenCalled();
+    expect(await isNativeEditingRootReady(f.args.root)).toBe(true);
+    expect(f.table('asset_residency')).toEqual(before);
+    expect(f.table('sync_capture').get(checkpoint.key)).toEqual(checkpoint);
+  }
+);
+
+it('keeps pending shared native dependencies outside budget eviction', async () => {
+  const f = await fixture();
+  await prepareNativeEditingRoot(f.args);
+  const index = cacheIndex(f);
+  const borrower = seedCacheMedia(f, f.ref, 'pending-borrower', 'borrower-op', index);
+  markCachePending(f, borrower);
+  await setNativeCacheBudget(0, 0);
+  f.remote.read.mockClear();
+  await expect(trimNativeCache({ ...f.args, index })).resolves.toMatchObject({
+    released: 0,
+    protected: 1,
+    status: { residentBytes: 3, pinnedBytes: 0, overBudgetBytes: 3 },
+  });
+  expect(f.remote.read).not.toHaveBeenCalled();
+  expect(await isNativeEditingRootReady(f.args.root)).toBe(true);
+});
+
+it.each([false, true])(
+  'protects current pending project dependencies created during remote verification, inline: %s',
+  async (inline) => {
+    const f = await fixture(inline);
+    await prepareNativeEditingRoot(f.args);
+    const project = createVideoProjectEntryWithMediaClip({ id: 'new-pending-project' });
+    project.project.assets[0]!.type = VideoProjectAssetType.IMAGE;
+    project.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.media.id };
+    project.project.assets[0]!.metadata = {
+      ...project.project.assets[0]!.metadata,
+      size: f.ref.size,
+      mimeType: f.ref.mimeType,
+      duration: null,
+    };
+    const before = structuredClone(f.table('asset_residency'));
+    f.remote.read.mockImplementationOnce(async () => {
+      // No root-state or immutable capture exists for this newly saved project.
+      f.table('video_projects').set(project.id, project);
+      markCachePending(f, { rootKind: 'video-project', rootId: project.id });
+      return new Blob(['abc']).stream();
+    });
+    await expect(
+      releaseNativeEditingRoot({ ...f.args, index: cacheIndex(f) })
+    ).resolves.toMatchObject({
+      released: 0,
+      protected: 1,
+    });
+    expect(await isNativeEditingRootReady(f.args.root)).toBe(true);
+    expect(f.table('asset_residency')).toEqual(before);
+  }
+);
+
+it('releases a rebased presentation using an existing verified original copy', async () => {
+  const f = await fixture(true);
+  await prepareNativeEditingRoot(f.args);
+  const before = structuredClone(f.table('sync_capture'));
+  io.preparePublication.mockClear();
+  const previewBlob = new Blob(['late-preview'], { type: 'image/png' });
+  await commitImagePresentation({
+    aggregateId: f.media.id,
+    expectedWorkspaceRevision: 0,
+    previewBlob,
+    thumbnailBlob: new Blob(['late-thumbnail'], { type: 'image/png' }),
+  });
+  const rootKey = JSON.stringify(['root-state', captureRootKey('space', 'media', f.media.id)]);
+  const previousState = before.get(rootKey);
+  if (!isRecord(previousState)) throw new Error('Expected accepted native root state');
+  expect(f.table('sync_capture').get(rootKey)).toMatchObject({
+    ...previousState,
+    nativeDigest: expect.any(String),
+  });
+  expect(f.table('sync_capture').get(rootKey)).not.toEqual(before.get(rootKey));
+  expect([...f.table('sync_capture').keys()]).toEqual([...before.keys()]);
+  f.remote.read.mockClear();
+  await expect(
+    releaseNativeEditingRoot({ ...f.args, index: cacheIndex(f) })
+  ).resolves.toMatchObject({
+    released: 1,
+    releasedBytes: 3,
+    unavailable: 0,
+  });
+  expect(f.remote.read).toHaveBeenCalledExactlyOnceWith(f.copy.remote.key, f.args.signal);
+  expect(f.remote.write).not.toHaveBeenCalled();
+  expect(io.preparePublication).not.toHaveBeenCalled();
+  expect(f.table('media_library').get(f.media.id)).not.toHaveProperty('blob');
+  await prepareNativeEditingRoot(f.args);
+  expect(f.table('media_library').get(f.media.id)).toMatchObject({ blob: expect.any(Blob) });
+  expect(await (f.table('media_library').get(f.media.id) as { blob: Blob }).blob.text()).toBe(
+    'abc'
+  );
+  expect([...f.table('aggregate_presentations').values()]).toMatchObject([{ previewBlob }]);
+  expect([...f.table('sync_capture').keys()]).toEqual([...before.keys()]);
+});
+
+it('reserves the native physical GET before remote access through the supplied download allowance', async () => {
+  const f = await fixture();
+  const reserveObject = vi.fn();
+  f.remote.read.mockImplementationOnce(async () => {
+    expect(reserveObject).toHaveBeenCalledExactlyOnceWith(3);
+    return new Blob(['abc']).stream();
+  });
+  expect(
+    await prepareNativeEditingRoot({ ...f.args, downloadAllowance: { reserveObject } })
+  ).toEqual({ downloaded: 1 });
+  expect(reserveObject).toHaveBeenCalledExactlyOnceWith(3);
+});
+
+it('keeps download allowance byte and physical-attempt limits inclusive and action-local', () => {
+  const bytes = createSyncDownloadAllowance({ maxBytes: 3, maxObjects: 4 });
+  bytes.reserveObject(1);
+  bytes.reserveObject(2);
+  expect(() => bytes.reserveObject(1)).toThrow();
+  const objects = createSyncDownloadAllowance({ maxBytes: 3, maxObjects: 2 });
+  objects.reserveObject(0);
+  objects.reserveObject(3);
+  expect(() => objects.reserveObject(0)).toThrow();
+  expect(() =>
+    createSyncDownloadAllowance({ maxBytes: 3, maxObjects: 2 }).reserveObject(3)
+  ).not.toThrow();
+  const overflow = createSyncDownloadAllowance({
+    maxBytes: Number.MAX_SAFE_INTEGER,
+    maxObjects: 2,
+  });
+  overflow.reserveObject(Number.MAX_SAFE_INTEGER);
+  expect(() => overflow.reserveObject(1)).toThrow();
+});
+
+it.each([0, -1, Number.NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, 0.5])(
+  'refuses invalid download allowance limits %s',
+  (value) => {
+    expect(() => createSyncDownloadAllowance({ maxBytes: value, maxObjects: 1 })).toThrow();
+    expect(() => createSyncDownloadAllowance({ maxBytes: 1, maxObjects: value })).toThrow();
+  }
+);
+
+it.each([-1, Number.NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, 0.5])(
+  'refuses invalid download allowance object size %s',
+  (size) => {
+    const allowance = createSyncDownloadAllowance({ maxBytes: 3, maxObjects: 1 });
+    expect(() => allowance.reserveObject(size)).toThrow();
+    expect(() => allowance.reserveObject(3)).not.toThrow();
+  }
+);
+
+it.each([false, true])(
+  'refuses the first disallowed native GET without changing native bytes, inline: %s',
+  async (inline) => {
+    const f = await fixture(inline);
+    const before = structuredClone(f.rows);
+    const allowance = createSyncDownloadAllowance({ maxBytes: 2, maxObjects: 1 });
+    await expect(
+      prepareNativeEditingRoot({ ...f.args, downloadAllowance: allowance })
+    ).rejects.toThrow();
+    expect(f.remote.read).not.toHaveBeenCalled();
+    expect(f.objects.entriesByName.size).toBe(0);
+    expect(f.rows).toEqual(before);
+  }
+);
+
+it.each([
+  { code: 'missing' as const, maxBytes: 3, maxObjects: 2 },
+  { code: 'missing' as const, maxBytes: 6, maxObjects: 1 },
+  { code: 'temporary' as const, maxBytes: 3, maxObjects: 2 },
+  { code: 'temporary' as const, maxBytes: 6, maxObjects: 1 },
+])(
+  'does not refund a $code native GET with byte limit $maxBytes and object limit $maxObjects',
+  async ({ code, maxBytes, maxObjects }) => {
+    const f = await fixture();
+    const before = structuredClone(f.rows);
+    const downloadAllowance = createSyncDownloadAllowance({ maxBytes, maxObjects });
+    f.remote.read.mockRejectedValueOnce(new SyncRemoteError(code));
+    await expect(prepareNativeEditingRoot({ ...f.args, downloadAllowance })).rejects.toMatchObject({
+      code,
+    });
+    expect(f.remote.read).toHaveBeenCalledOnce();
+    await expect(prepareNativeEditingRoot({ ...f.args, downloadAllowance })).rejects.toThrow();
+    expect(f.remote.read).toHaveBeenCalledOnce();
+    expect(f.rows).toEqual(before);
+    expect(f.objects.entriesByName.size).toBe(0);
+    expect(
+      await prepareNativeEditingRoot({
+        ...f.args,
+        downloadAllowance: createSyncDownloadAllowance({ maxBytes, maxObjects }),
+      })
+    ).toEqual({ downloaded: 1 });
+  }
+);
+
+it('does not charge verified local original recovery to the remote download allowance', async () => {
+  const f = await fixture();
+  await prepareNativeEditingRoot(f.args);
+  f.table('asset_residency').set(f.copy.id, f.copy);
+  f.remote.read.mockClear();
+  const reserveObject = vi.fn(() => {
+    throw new Error('No remote download admitted');
+  });
+  expect(
+    await prepareNativeEditingRoot({ ...f.args, downloadAllowance: { reserveObject } })
+  ).toEqual({ downloaded: 0 });
+  expect(reserveObject).not.toHaveBeenCalled();
+  expect(f.remote.read).not.toHaveBeenCalled();
+  expect(await (await (await f.objects.getFileHandle(f.ref.assetId)).getFile()).text()).toBe('abc');
+});
+
+it('preserves staging cleanup and spent allowance when a native progress callback fails', async () => {
+  const f = await fixture();
+  const before = structuredClone(f.rows);
+  const downloadAllowance = createSyncDownloadAllowance({ maxBytes: 3, maxObjects: 1 });
+  await expect(
+    prepareNativeEditingRoot({
+      ...f.args,
+      downloadAllowance,
+      onBytesRead: () => {
+        throw new Error('Progress callback failed');
+      },
+    })
+  ).rejects.toThrow('Progress callback failed');
+  expect(f.objects.entriesByName.size).toBe(0);
+  expect(f.rows).toEqual(before);
+  await expect(prepareNativeEditingRoot({ ...f.args, downloadAllowance })).rejects.toThrow();
+  expect(f.remote.read).toHaveBeenCalledOnce();
+  expect(f.rows).toEqual(before);
+});
+
+it('uses the canonical finite download defaults without allocating binary bodies', () => {
+  const bytes = createSyncDownloadAllowance();
+  bytes.reserveObject(MAX_MEDIA_ARCHIVE_INFLATED_BYTES);
+  expect(() => bytes.reserveObject(1)).toThrow('allowance exceeded');
+  const objects = createSyncDownloadAllowance();
+  for (let index = 0; index < MAX_MEDIA_ARCHIVE_ENTRIES; index++) objects.reserveObject(0);
+  expect(() => objects.reserveObject(0)).toThrow('allowance exceeded');
+});
+
+it('captures action download limits and refuses a supplied reservation callback before native mutation', async () => {
+  const limits = { maxBytes: 3, maxObjects: 1 };
+  const allowance = createSyncDownloadAllowance(limits);
+  limits.maxBytes = 6;
+  limits.maxObjects = 2;
+  allowance.reserveObject(3);
+  expect(() => allowance.reserveObject(0)).toThrow('allowance exceeded');
+  const f = await fixture();
+  const before = structuredClone(f.rows);
+  const reserveObject = vi.fn(() => {
+    throw new Error('Selected action refused download');
+  });
+  await expect(
+    prepareNativeEditingRoot({ ...f.args, downloadAllowance: { reserveObject } })
+  ).rejects.toThrow('Selected action refused download');
+  expect(reserveObject).toHaveBeenCalledExactlyOnceWith(3);
+  expect(f.remote.read).not.toHaveBeenCalled();
+  expect(f.rows).toEqual(before);
+  expect(f.objects.entriesByName.size).toBe(0);
+  expect(await prepareNativeEditingRoot(f.args)).toEqual({ downloaded: 1 });
+});
+
+async function scenarioHtmlFixture() {
+  const f = await fixture();
+  const project = createGuideProject('Saved guide', 'html-project', 10);
+  const step = createGuideStep('Unloaded editing image', 'html-editing-step');
+  step.blocks.push(
+    createGuideImageBlock({
+      id: 'html-editing-block',
+      assetId: 'html-editing-child',
+      width: 10,
+      height: 10,
+      source: { kind: 'import', filename: 'unloaded-editing-image.png' },
+    })
+  );
+  project.items.push(step);
+  f.table('scenario_assets').set('html-editing-child', {
+    id: 'html-editing-child',
+    projectId: project.id,
+    assetId: f.ref.assetId,
+    galleryAssetId: null,
+    mimeType: f.ref.mimeType,
+    size: f.ref.size,
+    width: 10,
+    height: 10,
+    createdAt: 10,
+  });
+  f.table('asset_owners').set(JSON.stringify(['scenario-asset', 'html-editing-child', 'body']), {
+    ownerKind: 'scenario-asset',
+    ownerId: 'html-editing-child',
+    role: 'body',
+    assetId: f.ref.assetId,
+  });
+  f.table('scenario_projects').set(
+    project.id,
+    createScenarioProjectEntry({ project, existing: undefined, updatedAt: 10 })
+  );
+  const ref: AssetRef = {
+    ...f.ref,
+    assetId: 'selected-html',
+    createdAt: 10,
+    mimeType: 'text/html;charset=utf-8',
+    sha256: f.copy.remote.sha256,
+    location: { kind: 'opfs', objectKey: 'objects/selected-html' },
+  };
+  const entry = {
+    id: 'selected-export',
+    projectId: project.id,
+    format: 'html',
+    filename: 'Historical guide.html',
+    createdAt: 11,
+    size: ref.size,
+    html: { mode: 'guide', assetId: ref.assetId },
+  };
+  f.table('scenario_exports').set(entry.id, entry);
+  f.table('asset_refs').set(ref.assetId, ref);
+  f.table('asset_owners').set(JSON.stringify(['scenario-export', entry.id, 'body']), {
+    ownerKind: 'scenario-export',
+    ownerId: entry.id,
+    role: 'body',
+    assetId: ref.assetId,
+  });
+  const copy: AssetResidencyCopy = {
+    ...f.copy,
+    id: assetResidencyCopyId({ kind: 'opfs', ref }),
+    target: { kind: 'opfs', ref },
+    remote: { ...f.copy.remote, key: 'Originals/attempt/historical-guide.html' },
+  };
+  f.table('asset_residency').set(copy.id, copy);
+  const siblingRef: AssetRef = {
+    ...ref,
+    assetId: 'sibling-html',
+    location: { kind: 'opfs', objectKey: 'objects/sibling-html' },
+  };
+  const sibling = {
+    ...entry,
+    id: 'sibling-export',
+    html: { mode: 'tour', assetId: siblingRef.assetId },
+  };
+  f.table('scenario_exports').set(sibling.id, sibling);
+  f.table('asset_refs').set(siblingRef.assetId, siblingRef);
+  f.table('asset_owners').set(JSON.stringify(['scenario-export', sibling.id, 'body']), {
+    ownerKind: 'scenario-export',
+    ownerId: sibling.id,
+    role: 'body',
+    assetId: siblingRef.assetId,
+  });
+  const siblingCopy: AssetResidencyCopy = {
+    ...copy,
+    id: assetResidencyCopyId({ kind: 'opfs', ref: siblingRef }),
+    target: { kind: 'opfs', ref: siblingRef },
+    remote: { ...copy.remote, key: 'Originals/attempt/sibling.html' },
+  };
+  f.table('asset_residency').set(siblingCopy.id, siblingCopy);
+  const args = {
+    projectId: project.id,
+    exportId: entry.id,
+    binding: f.args.binding,
+    authorization: f.args.authorization,
+    remote: f.remote,
+    signal: f.args.signal,
+  };
+  return { ...f, project, entry, ref, copy, siblingRef, siblingCopy, args };
+}
+it('hydrates only the selected historical Scenario HTML body with the real owner and current copy', async () => {
+  const f = await scenarioHtmlFixture();
+  expect(await isNativeScenarioExportReady(f.args)).toBe(false);
+  expect(
+    await isNativeEditingRootReady({ rootKind: 'scenario-project', rootId: f.project.id })
+  ).toBe(false);
+  const before = structuredClone([
+    f.table('scenario_projects'),
+    f.table('scenario_exports'),
+    f.table('asset_refs'),
+    f.table('asset_owners'),
+  ]);
+  expect(await prepareNativeScenarioExport(f.args)).toEqual({ downloaded: 1 });
+  expect(f.remote.read).toHaveBeenCalledExactlyOnceWith(f.copy.remote.key, f.args.signal);
+  expect(await isNativeScenarioExportReady(f.args)).toBe(true);
+  expect(
+    await isNativeEditingRootReady({ rootKind: 'scenario-project', rootId: f.project.id })
+  ).toBe(false);
+  expect(f.objects.entriesByName.has(f.ref.assetId)).toBe(true);
+  expect(f.objects.entriesByName.has(f.siblingRef.assetId)).toBe(false);
+  expect(f.objects.entriesByName.has('original')).toBe(false);
+  expect([
+    f.table('scenario_projects'),
+    f.table('scenario_exports'),
+    f.table('asset_refs'),
+    f.table('asset_owners'),
+  ]).toEqual(before);
+  expect(f.table('asset_residency').get(f.siblingCopy.id)).toMatchObject({ phase: 'unloaded' });
+  expect(await prepareNativeScenarioExport(f.args)).toEqual({ downloaded: 0 });
+  expect(f.remote.read).toHaveBeenCalledTimes(1);
+});
+
+it('reads saved HTML from the compact Scenario head/history/unit representation', async () => {
+  const f = await scenarioHtmlFixture();
+  const { encodeScenarioUnitStorage } =
+    await import('../../composition/persistence/scenario/storage-units');
+  const entry = createScenarioProjectEntry({
+    project: f.project,
+    existing: undefined,
+    updatedAt: 10,
+  });
+  const stored = encodeScenarioUnitStorage(entry, []);
+  f.table('scenario_projects').set(entry.id, stored.head);
+  for (const row of stored.rows)
+    f.table('scenario_project_history').set(JSON.stringify([row.projectId, row.revision]), row);
+  for (const row of stored.units)
+    f.table('scenario_project_units').set(
+      JSON.stringify([row.projectId, row.unitId, row.revision]),
+      row
+    );
+  expect(await prepareNativeScenarioExport(f.args)).toEqual({ downloaded: 1 });
+  expect(await isNativeScenarioExportReady(f.args)).toBe(true);
+  expect(f.remote.read).toHaveBeenCalledExactlyOnceWith(f.copy.remote.key, f.args.signal);
+});
+it('checks resident saved HTML without any GET, connection requirement or metadata repair', async () => {
+  const f = await scenarioHtmlFixture();
+  const writable = await (
+    await f.objects.getFileHandle(f.ref.assetId, { create: true })
+  ).createWritable();
+  await writable.write('abc');
+  await writable.close();
+  f.table('sync_connection').clear();
+  const before = structuredClone(f.rows);
+  expect(await isNativeScenarioExportReady(f.args)).toBe(true);
+  expect(f.rows).toEqual(before);
+  expect(f.remote.read).not.toHaveBeenCalled();
+});
+it.each([
+  'deleted-export',
+  'deleted-parent',
+  'trashed-export',
+  'trashed-parent',
+  'wrong-parent',
+  'non-html-mode',
+  'wrong-owner',
+  'wrong-size',
+  'wrong-mime',
+] as const)('refuses invalid selected Scenario HTML %s before remote access', async (change) => {
+  const f = await scenarioHtmlFixture();
+  if (change === 'deleted-export') f.table('scenario_exports').delete(f.entry.id);
+  if (change === 'deleted-parent') f.table('scenario_projects').delete(f.project.id);
+  if (change === 'trashed-export')
+    f.table('scenario_exports').set(f.entry.id, {
+      ...f.entry,
+      trashState: { trashedAt: 20, updatedAt: 20 },
+    });
+  if (change === 'trashed-parent')
+    f.table('scenario_projects').set(f.project.id, {
+      ...createScenarioProjectEntry({ project: f.project, existing: undefined, updatedAt: 10 }),
+      lifecycle: { storageClass: 'library', savedAt: 10, updatedAt: 20, trashedAt: 20 },
+    });
+  if (change === 'wrong-parent')
+    f.table('scenario_exports').set(f.entry.id, { ...f.entry, projectId: 'other' });
+  if (change === 'non-html-mode')
+    f.table('scenario_exports').set(f.entry.id, {
+      ...f.entry,
+      html: { ...f.entry.html, mode: 'future' },
+    });
+  if (change === 'wrong-owner')
+    f.table('asset_owners').delete(JSON.stringify(['scenario-export', f.entry.id, 'body']));
+  if (change === 'wrong-size') f.table('scenario_exports').set(f.entry.id, { ...f.entry, size: 9 });
+  if (change === 'wrong-mime')
+    f.table('asset_refs').set(f.ref.assetId, { ...f.ref, mimeType: 'image/png' });
+  expect(await isNativeScenarioExportReady(f.args)).toBe(false);
+  await expect(prepareNativeScenarioExport(f.args)).rejects.toThrow('unavailable');
+  expect(f.remote.read).not.toHaveBeenCalled();
+  expect(f.objects.entriesByName.size).toBe(0);
+});
+it.each([
+  'deleted-export',
+  'deleted-parent',
+  'trashed-export',
+  'wrong-parent',
+  'recreated-export',
+  'recreated-parent',
+  'changed-ref',
+  'changed-copy',
+] as const)(
+  'refuses delayed selected HTML restoration after %s and discards staging only',
+  async (change) => {
+    const f = await scenarioHtmlFixture();
+    f.remote.read.mockImplementationOnce(async () => {
+      if (change === 'deleted-export') f.table('scenario_exports').delete(f.entry.id);
+      if (change === 'deleted-parent') f.table('scenario_projects').delete(f.project.id);
+      if (change === 'trashed-export')
+        f.table('scenario_exports').set(f.entry.id, {
+          ...f.entry,
+          trashState: { trashedAt: 20, updatedAt: 20 },
+        });
+      if (change === 'wrong-parent')
+        f.table('scenario_exports').set(f.entry.id, { ...f.entry, projectId: 'other' });
+      if (change === 'recreated-export')
+        f.table('scenario_exports').set(f.entry.id, { ...f.entry, createdAt: 20 });
+      if (change === 'recreated-parent')
+        f.table('scenario_projects').set(f.project.id, {
+          ...createScenarioProjectEntry({ project: f.project, existing: undefined, updatedAt: 10 }),
+          createdAt: 20,
+        });
+      if (change === 'changed-ref')
+        f.table('asset_refs').set(f.ref.assetId, { ...f.ref, createdAt: 20 });
+      if (change === 'changed-copy')
+        f.table('asset_residency').set(f.copy.id, {
+          ...f.copy,
+          revision: f.copy.revision + 1,
+          remote: { ...f.copy.remote, key: 'Originals/replaced.html' },
+        });
+      return new Blob(['abc']).stream();
+    });
+    await expect(prepareNativeScenarioExport(f.args)).rejects.toThrow();
+    expect(f.objects.entriesByName.size).toBe(0);
+    expect(f.table('asset_residency').get(f.siblingCopy.id)).toEqual(f.siblingCopy);
+  }
+);
+it('allows unrelated Scenario autosave and a current filename change while immutable HTML is preparing', async () => {
+  const f = await scenarioHtmlFixture();
+  f.remote.read.mockImplementationOnce(async () => {
+    f.table('scenario_exports').set(f.entry.id, {
+      ...f.entry,
+      filename: 'Renamed historical file.html',
+    });
+    const existing = createScenarioProjectEntry({
+      project: f.project,
+      existing: undefined,
+      updatedAt: 10,
+    });
+    f.table('scenario_projects').set(
+      f.project.id,
+      createScenarioProjectEntry({
+        project: { ...f.project, name: 'Edited guide' },
+        existing,
+        updatedAt: 20,
+        historyPolicy: 'discard',
+      })
+    );
+    return new Blob(['abc']).stream();
+  });
+  expect(await prepareNativeScenarioExport(f.args)).toEqual({ downloaded: 1 });
+  expect(f.table('scenario_exports').get(f.entry.id)).toMatchObject({
+    filename: 'Renamed historical file.html',
+  });
+});
+it(
+  'reserves the selected artifact allowance before GET and refuses an exhausted ' +
+    'allowance without remote IO',
+  async () => {
+    const f = await scenarioHtmlFixture();
+    const reserveObject = vi.fn();
+    f.remote.read.mockImplementationOnce(async () => {
+      expect(reserveObject).toHaveBeenCalledExactlyOnceWith(f.ref.size);
+      return new Blob(['abc']).stream();
+    });
+    expect(
+      await prepareNativeScenarioExport({ ...f.args, downloadAllowance: { reserveObject } })
+    ).toEqual({ downloaded: 1 });
+    const missing = await scenarioHtmlFixture();
+    await expect(
+      prepareNativeScenarioExport({
+        ...missing.args,
+        downloadAllowance: createSyncDownloadAllowance({ maxBytes: 2, maxObjects: 1 }),
+      })
+    ).rejects.toThrow('allowance exceeded');
+    expect(missing.remote.read).not.toHaveBeenCalled();
+    expect(missing.objects.entriesByName.size).toBe(0);
+  }
+);
+it.each(['missing', 'access-denied', 'temporary', 'corrupt', 'wrong-size'] as const)(
+  'preserves unloaded historical HTML after %s and permits an exact retry',
+  async (failure) => {
+    const f = await scenarioHtmlFixture();
+    if (failure === 'corrupt') f.remote.read.mockResolvedValueOnce(new Blob(['bad']).stream());
+    else if (failure === 'wrong-size')
+      f.remote.read.mockResolvedValueOnce(new Blob(['too large']).stream());
+    else f.remote.read.mockRejectedValueOnce(new SyncRemoteError(failure));
+    await expect(prepareNativeScenarioExport(f.args)).rejects.toThrow();
+    expect(f.table('asset_residency').get(f.copy.id)).toEqual(f.copy);
+    expect(f.objects.entriesByName.size).toBe(0);
+    expect(await prepareNativeScenarioExport(f.args)).toEqual({ downloaded: 1 });
+    expect(f.remote.read).toHaveBeenCalledTimes(2);
+  }
+);
+it('does not spend another action allowance on verified local HTML after native settlement rollback', async () => {
+  const f = await scenarioHtmlFixture();
+  f.fail();
+  await expect(prepareNativeScenarioExport(f.args)).rejects.toMatchObject({
+    name: 'QuotaExceededError',
+  });
+  expect(f.table('asset_residency').get(f.copy.id)).toEqual(f.copy);
+  expect(f.objects.entriesByName.has(f.ref.assetId)).toBe(true);
+  f.allow();
+  const reserveObject = vi.fn();
+  expect(
+    await prepareNativeScenarioExport({ ...f.args, downloadAllowance: { reserveObject } })
+  ).toEqual({ downloaded: 0 });
+  expect(reserveObject).not.toHaveBeenCalled();
+  expect(f.remote.read).toHaveBeenCalledTimes(1);
+});
+it('cancels selected HTML staging without retaining partial bytes or changing its unloaded copy', async () => {
+  const f = await scenarioHtmlFixture();
+  const abort = new AbortController();
+  await expect(
+    prepareNativeScenarioExport({
+      ...f.args,
+      signal: abort.signal,
+      onBytesRead: () => abort.abort(),
+    })
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  expect(f.table('asset_residency').get(f.copy.id)).toEqual(f.copy);
+  expect(f.objects.entriesByName.size).toBe(0);
+});
+it.each(['foreign-binding', 'current-connection'] as const)(
+  'refuses selected HTML %s evidence without restoring any body',
+  async (change) => {
+    const f = await scenarioHtmlFixture();
+    if (change === 'foreign-binding')
+      f.table('asset_residency').set(f.copy.id, {
+        ...f.copy,
+        remote: {
+          ...f.copy.remote,
+          binding: { ...f.args.binding, rootUrl: 'https://foreign.example/' },
+        },
+      });
+    else
+      f.remote.read.mockImplementationOnce(async () => {
+        f.table('sync_connection').clear();
+        return new Blob(['abc']).stream();
+      });
+    await expect(prepareNativeScenarioExport(f.args)).rejects.toThrow();
+    expect(f.objects.entriesByName.size).toBe(0);
+    if (change === 'foreign-binding') expect(f.remote.read).not.toHaveBeenCalled();
+  }
+);
+
+it('lets parallel selected HTML writers reuse one completed native identity after a controlled older GET', async () => {
+  const f = await scenarioHtmlFixture();
+  let release!: () => void;
+  let begun!: () => void;
+  const started = new Promise<void>((resolve) => {
+    begun = resolve;
+  });
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  f.remote.read.mockImplementationOnce(async () => {
+    begun();
+    await held;
+    return new Blob(['abc']).stream();
+  });
+  const older = prepareNativeScenarioExport(f.args);
+  await started;
+  expect(await prepareNativeScenarioExport(f.args)).toEqual({ downloaded: 1 });
+  release();
+  expect(await older).toEqual({ downloaded: 1 });
+  expect(f.table('asset_residency').get(f.copy.id)).toMatchObject({
+    phase: 'resident',
+    revision: f.copy.revision + 1,
+  });
+  expect(
+    f.table('asset_owners').get(JSON.stringify(['scenario-export', f.entry.id, 'body']))
+  ).toMatchObject({ assetId: f.ref.assetId });
+  expect(f.objects.entriesByName.has(f.siblingRef.assetId)).toBe(false);
+});

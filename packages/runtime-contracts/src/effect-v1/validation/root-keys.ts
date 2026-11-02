@@ -1,5 +1,6 @@
 // policyStateIds: [] - root fields are an immutable EffectV1 validation allowlist.
 export const EFFECT_V1_ROOT_KEYS = new Set([
+  'controlGroups',
   'assets',
   'clips',
   'controls',

@@ -86,3 +86,53 @@ it('does not replace captured source references for an unrelated appearance edit
   const edited = { ...project, name: 'Appearance edit' };
   expect(reconcileVideoProjectInteractionSources(project, edited)).toEqual({});
 });
+
+it('preserves the captured cursor branch when a focus setting removes no source or sample', () => {
+  const { project } = fixture();
+  const edited = {
+    ...project,
+    cursorFocusPath: {
+      version: 1 as const,
+      smoothing: 0.3,
+      sensitivity: 0.6,
+      mode: 'follow' as const,
+      gapPolicy: 'hold' as const,
+      segments: [],
+    },
+  };
+  expect(reconcileVideoProjectInteractionSources(project, edited).cursorTrack).toBe(
+    project.cursorTrack
+  );
+});
+
+it('still removes orphaned anchored samples when the source graph remains unchanged', () => {
+  const { project } = fixture();
+  const manual = { id: 'manual', time: 1, x: 0.5, y: 0.5, visible: true };
+  project.cursorTrack!.samples = [
+    manual,
+    {
+      ...manual,
+      id: 'orphan',
+      sourceAnchor: {
+        kind: 'recording-source',
+        recordingId: 'recording',
+        sourceClipId: 'missing',
+        sourceTime: 1,
+      },
+    },
+  ];
+  const result = reconcileVideoProjectInteractionSources(project, {
+    ...project,
+    cursorFocusPath: {
+      version: 1,
+      smoothing: 0.3,
+      sensitivity: 0.6,
+      mode: 'follow',
+      gapPolicy: 'hold',
+      segments: [],
+    },
+  });
+  expect(result.cursorTrack).not.toBe(project.cursorTrack);
+  expect(result.cursorTrack?.samples).toEqual([manual]);
+  expect(project.cursorTrack?.samples).toHaveLength(2);
+});

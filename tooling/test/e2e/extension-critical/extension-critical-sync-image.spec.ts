@@ -72,6 +72,176 @@ async function bootstrap(page: Page) {
     editorDispatchBootstrapPayload: false,
   });
 }
+async function publicationAvailable(page: Page) {
+  return page.evaluate(() =>
+    navigator.locks.request(
+      'sniptale:sync:checkpoint-publication',
+      { mode: 'exclusive', ifAvailable: true },
+      (lock) => Boolean(lock)
+    )
+  );
+}
+async function nativeImageRevision(page: Page, rootId: string) {
+  return page.evaluate(async (id) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const request = db
+          .transaction('media_library', 'readonly')
+          .objectStore('media_library')
+          .get(id);
+        request.onsuccess = () =>
+          request.result
+            ? resolve(request.result.workspaceRevision ?? 0)
+            : reject(new Error('The observed image root is missing.'));
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  }, rootId);
+}
+for (const preset of PRIMARY_BROWSER_VIEWPORTS) {
+  test(
+    'real image pencil gesture holds publication until native save acknowledgement ' +
+      `${preset.name}`,
+    async ({}, info) => {
+      test.setTimeout(60_000);
+      const host = await startHostServer();
+      let context: BrowserContext | undefined;
+      try {
+        context = await chromium.launchPersistentContext(info.outputPath('gesture-profile'), {
+          viewport: { ...preset.size },
+          deviceScaleFactor: 1,
+          headless: true,
+        });
+        const page = await context.newPage();
+        await bootstrap(page);
+        await openHarness(page, host.origin);
+        const rootId = 'image-pencil-checkpoint';
+        await page.evaluate((id) => window.syncCaptureHarness.image.seed(id), rootId);
+        await openEditor(page, host.origin, rootId);
+        const saved = page.getByRole('button', { name: 'Автосохранение: Сохранено', exact: true });
+        const observer = await context.newPage();
+        await bootstrap(observer);
+        await openHarness(observer, host.origin);
+        await expect.poll(() => publicationAvailable(observer)).toBe(true);
+        const baselineRevision = await nativeImageRevision(observer, rootId);
+        const baselineObjects = await page.evaluate(
+          () => window.__sniptaleEditorHarness!.getCanvasObjects().length
+        );
+        await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+        const canvas = page.locator('canvas.upper-canvas');
+        await expect(canvas).toBeVisible();
+        const bounds = await canvas.boundingBox();
+        expect(bounds).not.toBeNull();
+        if (!bounds) throw new Error('The drawing canvas has no browser bounds.');
+        const permit = await observer.evaluateHandle(async () => {
+          let release!: () => void;
+          let acquired!: () => void;
+          const ready = new Promise<void>((resolve) => {
+            acquired = resolve;
+          });
+          const held = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          const lifetime = navigator.locks.request(
+            'sniptale:persistence:privacy-erasure',
+            { mode: 'exclusive' },
+            async () => {
+              acquired();
+              await held;
+            }
+          );
+          await ready;
+          return {
+            release: async () => {
+              release();
+              await lifetime;
+            },
+          };
+        });
+        try {
+          await page.mouse.move(bounds.x + bounds.width * 0.35, bounds.y + bounds.height * 0.45);
+          await page.mouse.down();
+          await page.mouse.move(bounds.x + bounds.width * 0.65, bounds.y + bounds.height * 0.6, {
+            steps: 8,
+          });
+          await expect.poll(() => publicationAvailable(observer)).toBe(false);
+          const duringStroke = await publicationAvailable(observer);
+          await page.screenshot({
+            path: info.outputPath('pencil-stroke-active.png'),
+            fullPage: false,
+          });
+          await page.mouse.up();
+          await expect
+            .poll(() =>
+              page.evaluate(() => window.__sniptaleEditorHarness!.getCanvasObjects().length)
+            )
+            .toBe(baselineObjects + 1);
+          await expect
+            .poll(() =>
+              observer.evaluate(async () => {
+                const locks = await navigator.locks.query();
+                return (
+                  locks.pending?.some(
+                    (lock) => lock.name === 'sniptale:persistence:privacy-erasure'
+                  ) ?? false
+                );
+              })
+            )
+            .toBe(true);
+          const afterMouseup = await publicationAvailable(observer);
+          expect(afterMouseup).toBe(false);
+          const blockedRevision = await nativeImageRevision(observer, rootId);
+          expect(blockedRevision).toBe(baselineRevision);
+          await page.screenshot({
+            path: info.outputPath('pencil-native-save-blocked.png'),
+            fullPage: false,
+          });
+          await permit.evaluate((held) => held.release());
+          await expect(saved).toBeVisible();
+          await expect
+            .poll(() => nativeImageRevision(observer, rootId))
+            .toBeGreaterThan(baselineRevision);
+          await expect.poll(() => publicationAvailable(observer)).toBe(true);
+          await page.screenshot({
+            path: info.outputPath('pencil-native-save-acknowledged.png'),
+            fullPage: false,
+          });
+          await writeFile(
+            info.outputPath('pencil-lock-proof.json'),
+            JSON.stringify(
+              {
+                viewport: preset.size,
+                baselineObjects,
+                baselineRevision,
+                blockedRevision,
+                acknowledgedRevision: await nativeImageRevision(observer, rootId),
+                duringStroke,
+                afterMouseup,
+                afterAcknowledgement: await publicationAvailable(observer),
+              },
+              null,
+              2
+            )
+          );
+        } finally {
+          await permit.evaluate((held) => held.release());
+          await permit.dispose();
+        }
+      } finally {
+        await context?.close();
+        host.server.closeAllConnections();
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    }
+  );
+}
 for (const preset of PRIMARY_BROWSER_VIEWPORTS) {
   test(`saved image syncs between browsers, recovers publication and edits again ${preset.name}`, async ({}, info) => {
     test.setTimeout(120_000);
@@ -97,11 +267,81 @@ for (const preset of PRIMARY_BROWSER_VIEWPORTS) {
       await waitForPresentation(page, rootId);
       await page.screenshot({ path: info.outputPath('source-authored.png'), fullPage: false });
       await openHarness(page, host.origin);
+      const authored = await page.evaluate(
+        (id) => window.syncCaptureHarness.image.inspect(id),
+        rootId
+      );
+      expect(authored.pending).not.toBeNull();
+      expect(authored.workspace.document.browserFrame.title).toContain('change-');
+      const predecessorRefusal = await page.evaluate(
+        (id) => window.syncCaptureHarness.image.checkpoint(id),
+        rootId
+      );
+      expect(predecessorRefusal).toMatchObject({
+        outcome: 'refused',
+        pendingRevision: authored.pending?.revision,
+      });
+      expect(
+        (await page.evaluate((id) => window.syncCaptureHarness.image.inspect(id), rootId)).pending
+      ).toEqual(authored.pending);
+      const observer = await source.newPage();
+      await bootstrap(observer);
+      await openHarness(observer, host.origin);
+      const edit = await observer.evaluateHandle(async () => {
+        let acquired!: () => void;
+        let release!: () => void;
+        const ready = new Promise<void>((resolve) => {
+          acquired = resolve;
+        });
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const lifetime = navigator.locks.request(
+          'sniptale:sync:checkpoint-publication',
+          { mode: 'shared' },
+          async () => {
+            acquired();
+            await held;
+          }
+        );
+        await ready;
+        return {
+          release: async () => {
+            release();
+            await lifetime;
+          },
+        };
+      });
+      try {
+        expect(
+          await page.evaluate((id) => window.syncCaptureHarness.image.checkpoint(id), rootId)
+        ).toMatchObject({ outcome: 'busy', pendingRevision: authored.pending?.revision });
+        expect(
+          (await page.evaluate((id) => window.syncCaptureHarness.image.inspect(id), rootId)).pending
+        ).toEqual(authored.pending);
+      } finally {
+        await edit.evaluate((held) => held.release());
+        await edit.dispose();
+        await observer.close();
+      }
       const publication = await page.evaluate(
         (id) => window.syncCaptureHarness.image.publish(id),
         rootId
       );
       expect(publication.sent.length).toBeGreaterThan(1);
+      expect(publication.checkpoint).toMatchObject({
+        outcome: 'captured',
+        pendingRevision: authored.pending?.revision,
+      });
+      expect(publication.native.pending).toBeNull();
+      expect(publication.native.workspace).toEqual(authored.workspace);
+      const repeated = await page.evaluate(
+        (id) => window.syncCaptureHarness.image.publish(id),
+        rootId
+      );
+      expect(repeated.sent).toEqual([]);
+      expect(repeated.checkpoint.outcome).toBe('not-pending');
+      expect(repeated.native.operations).toEqual(publication.native.operations);
       expect(
         publication.native.operations.every((operation) => operation.phase === 'published')
       ).toBe(true);
@@ -132,6 +372,10 @@ for (const preset of PRIMARY_BROWSER_VIEWPORTS) {
       expect(recovered.operations).toEqual([]);
       expect(recovered.presentationRevision).toBe(recovered.revision);
       expect(JSON.stringify(recovered.workspace)).toContain('change-');
+      expect(recovered.workspace.document.browserFrame).toEqual(
+        authored.workspace.document.browserFrame
+      );
+      expect(recovered.pending).toBeNull();
       const replay = await receiver.evaluate(
         ({ id, files }) => window.syncCaptureHarness.image.receive(id, files),
         { id: rootId, files: publication.files }
@@ -224,6 +468,9 @@ for (const preset of PRIMARY_BROWSER_VIEWPORTS) {
         JSON.stringify(
           {
             original,
+            authored,
+            predecessorRefusal,
+            checkpoint: publication.checkpoint,
             source: publication.native,
             staged,
             recovered,

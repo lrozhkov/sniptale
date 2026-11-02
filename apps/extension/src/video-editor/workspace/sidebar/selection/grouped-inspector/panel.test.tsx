@@ -7,6 +7,7 @@ import {
   useWorkspacePreference,
 } from '../../../../runtime/controller/workspace-preferences';
 import { DEFAULT_WORKSPACE_PREFERENCES } from '../../../../persistence/workspace-preferences';
+import { Play } from 'lucide-react';
 import { InspectorGroupedPanel } from './panel';
 import type { InspectorGroupDefinition } from './types';
 it('exposes SDK parameter groups with their semantic icons and independent content', () => {
@@ -29,9 +30,20 @@ it('exposes SDK parameter groups with their semantic icons and independent conte
     label: semantic,
     content: `Settings for ${semantic}`,
   }));
+  groups.push({
+    id: 'effect-animation',
+    semantic: 'animation',
+    label: 'Effect animation',
+    icon: Play,
+    content: 'Effect animation settings',
+  });
   try {
     act(() => root.render(<InspectorGroupedPanel groups={groups} />));
-    expect(host.querySelectorAll('nav button')).toHaveLength(8);
+    expect(host.querySelectorAll('nav button')).toHaveLength(semantics.length + 1);
+    const icons = [...host.querySelectorAll('nav button svg')].map((icon) =>
+      icon.getAttribute('class')
+    );
+    expect(new Set(icons).size).toBe(semantics.length + 1);
     for (const semantic of semantics) {
       const button = host.querySelector<HTMLButtonElement>(`nav button[aria-label="${semantic}"]`)!;
       expect(button.querySelector('svg')).not.toBeNull();

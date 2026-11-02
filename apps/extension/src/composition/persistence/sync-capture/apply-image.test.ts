@@ -1,8 +1,14 @@
+import { digestCapturedMediaRows } from './freeze';
+import { createNativeCapture } from './test-support/frozen-snapshot-database';
+import { initDB } from '../infrastructure/indexed-db/core';
+import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
+import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import { createHash } from 'node:crypto';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
   createMediaLibraryEntry,
+  createProjectAssetEntry,
   createVideoProjectEntryWithMediaClip,
 } from '../projects/index.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
@@ -35,12 +41,26 @@ vi.mock('../assets', async (original) => ({
   listReadyJournals: vi.fn().mockResolvedValue([]),
 }));
 beforeEach(() => {
+  // Node shares native Web Locks across workers. Each in-memory database needs its own scope.
+  const locks = navigator.locks;
+  const prefix = `image-replica-fixture:${crypto.randomUUID()}:`;
+  vi.stubGlobal('navigator', {
+    locks: new Proxy(locks, {
+      get(target, property) {
+        if (property !== 'request') return Reflect.get(target, property, target);
+        return (name: string, ...args: unknown[]) =>
+          Reflect.apply(target.request, target, [prefix + name, ...args]);
+      },
+    }),
+  });
   vi.clearAllMocks();
   io.read.mockImplementation(
     async (ref: { size: number; mimeType: string }, filename: string) =>
       new File([new Uint8Array(ref.size)], filename, { type: ref.mimeType })
   );
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 function setup() {
   let fail = false;
@@ -159,7 +179,7 @@ function setup() {
   };
 }
 
-it('publishes a stored image, captures its opening write, and replays without source staging', async () => {
+it('publishes a stored image, caches its presentation without echo, and replays without source staging', async () => {
   const f = setup();
   f.input.media = {
     ...f.input.media,
@@ -200,23 +220,32 @@ it('publishes a stored image, captures its opening write, and replays without so
   expect(
     f.table('asset_owners').get(JSON.stringify(['media-library', f.input.media.id, 'source']))
   ).toMatchObject({ assetId: f.input.originalRef.assetId });
+  const previousState = parseSyncCaptureRecord(f.table('sync_capture').get(f.stateKey));
   await commitImagePresentation({
     aggregateId: f.input.media.id,
     expectedWorkspaceRevision: 1,
     previewBlob: new Blob(['preview'], { type: 'image/png' }),
     thumbnailBlob: new Blob(['thumbnail'], { type: 'image/png' }),
   });
-  expect([...f.table('sync_capture').values()].map(parseSyncCaptureRecord)).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        kind: 'sync-operation',
-        change: expect.objectContaining({
-          kind: 'image',
-          rows: expect.objectContaining({ originalRef: f.input.originalRef }),
-        }),
-      }),
-    ])
+  expect([...f.table('sync_capture').values()].map(parseSyncCaptureRecord)).not.toEqual(
+    expect.arrayContaining([expect.objectContaining({ kind: 'sync-operation' })])
   );
+  expect([...f.table('sync_capture').values()].map(parseSyncCaptureRecord)).not.toEqual(
+    expect.arrayContaining([expect.objectContaining({ kind: 'pending-checkpoint' })])
+  );
+  expect(f.table('asset_refs').get(f.input.originalRef.assetId)).toEqual(f.input.originalRef);
+  const db = await initDB();
+  const read = db.transaction(
+    ['media_library', 'image_workspaces', 'aggregate_presentations', 'asset_refs', 'asset_owners'],
+    'readonly'
+  );
+  const native = await freezeImageInTransaction(read, f.input.media.id);
+  await read.done;
+  expect(native.originalRef).toEqual(f.input.originalRef);
+  expect(parseSyncCaptureRecord(f.table('sync_capture').get(f.stateKey))).toEqual({
+    ...previousState,
+    nativeDigest: digestCapturedImageRows(native),
+  });
   const before = structuredClone(f.rows);
   io.read.mockRejectedValue(new Error('staging removed'));
   await expect(applyPreparedImageReplica(f.input)).resolves.toEqual({
@@ -480,56 +509,61 @@ it('updates shared image metadata only when original bytes match', async () => {
   expect(f.rows).toEqual(before);
 });
 
-it('keeps revision fences through Trash restore and recreation', async () => {
-  const f = setup();
-  await applyPreparedImageReplica(f.input);
-  const trash = {
-    ...f.input,
-    operationId: 'trash',
-    expectedLocalGeneration: 1,
-    expectedBasis: [f.input.operationId],
-    expectedNativeRevision: 1,
-    media: {
-      ...f.input.media,
-      lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 2 },
-    },
-  };
-  await applyPreparedImageReplica(trash);
-  const restore = {
-    ...f.input,
-    operationId: 'restore',
-    expectedLocalGeneration: 2,
-    expectedBasis: ['trash'],
-    expectedNativeRevision: 2,
-  };
-  await applyPreparedImageReplica(restore);
-  expect(f.table('media_library').get(f.input.media.id)).toMatchObject({ workspaceRevision: 3 });
-  expect(f.table('media_library').get(f.input.media.id)).not.toHaveProperty('lifecycle.trashedAt');
-  await applyCatalogDeletionNative({
-    rootKind: 'media',
-    rootId: f.input.media.id,
-    operationId: 'delete',
-    sourceDigest: 'd'.repeat(64),
-    spaceId: 'space',
-    profileCreatedAt: 1,
-    connectionGeneration: 3,
-    expectedLocalGeneration: 3,
-    expectedBasis: ['restore'],
-    expectedWorkspaceRevision: 3,
-  });
-  await applyPreparedImageReplica({
-    ...f.input,
-    operationId: 'recreate',
-    expectedLocalGeneration: 4,
-    expectedBasis: ['delete'],
-  });
-  expect(f.table('media_library').get(f.input.media.id)).toMatchObject({ workspaceRevision: 4 });
-  const before = structuredClone(f.rows);
-  await expect(
-    applyPreparedImageReplica({ ...restore, operationId: 'delayed-restore' })
-  ).rejects.toThrow();
-  expect(f.rows).toEqual(before);
-});
+it.each([false, true])(
+  'keeps revision fences through Trash restore and recreation, imported=%s',
+  async (imported) => {
+    const f = imported ? importedImageReplicaFixture() : setup();
+    await applyPreparedImageReplica(f.input);
+    const trash = {
+      ...f.input,
+      operationId: 'trash',
+      expectedLocalGeneration: 1,
+      expectedBasis: [f.input.operationId],
+      expectedNativeRevision: 1,
+      media: {
+        ...f.input.media,
+        lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 2 },
+      },
+    };
+    await applyPreparedImageReplica(trash);
+    const restore = {
+      ...f.input,
+      operationId: 'restore',
+      expectedLocalGeneration: 2,
+      expectedBasis: ['trash'],
+      expectedNativeRevision: 2,
+    };
+    await applyPreparedImageReplica(restore);
+    expect(f.table('media_library').get(f.input.media.id)).toMatchObject({ workspaceRevision: 3 });
+    expect(f.table('media_library').get(f.input.media.id)).not.toHaveProperty(
+      'lifecycle.trashedAt'
+    );
+    await applyCatalogDeletionNative({
+      rootKind: 'media',
+      rootId: f.input.media.id,
+      operationId: 'delete',
+      sourceDigest: 'd'.repeat(64),
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 3,
+      expectedLocalGeneration: 3,
+      expectedBasis: ['restore'],
+      expectedWorkspaceRevision: 3,
+    });
+    await applyPreparedImageReplica({
+      ...f.input,
+      operationId: 'recreate',
+      expectedLocalGeneration: 4,
+      expectedBasis: ['delete'],
+    });
+    expect(f.table('media_library').get(f.input.media.id)).toMatchObject({ workspaceRevision: 4 });
+    const before = structuredClone(f.rows);
+    await expect(
+      applyPreparedImageReplica({ ...restore, operationId: 'delayed-restore' })
+    ).rejects.toThrow();
+    expect(f.rows).toEqual(before);
+  }
+);
 
 it('checks authorization before mutation and replays committed results after pause', async () => {
   const f = setup();
@@ -756,5 +790,305 @@ it('applies an unloaded image tombstone without reading originals and retires it
     deleted: true,
     generation: 2,
     nativeRevision: 1,
+  });
+});
+
+it('refuses a pending checkpoint before the first causal image state', async () => {
+  const f = setup();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'media', rootId: f.input.media.id },
+    2
+  );
+  await tx.done;
+  expect(pending).not.toBeNull();
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedImageReplica(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedImageReplica(f.input)).resolves.toMatchObject({ status: 'applied' });
+});
+
+it('refuses pending work with unchanged causal generation and native digest', async () => {
+  const f = setup();
+  await applyPreparedImageReplica(f.input);
+  const next = {
+    ...f.input,
+    operationId: 'pending-successor',
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+    expectedNativeRevision: 1,
+  };
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'media', rootId: f.input.media.id },
+    2
+  );
+  await tx.done;
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedImageReplica(next)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedImageReplica(next)).resolves.toMatchObject({ status: 'applied' });
+});
+
+function importedImageReplicaFixture(legacy = false) {
+  const f = setup();
+  const id = 'project-asset:imported-image';
+  const child = createProjectAssetEntry({
+    id: 'imported-image',
+    assetId: f.input.originalRef.assetId,
+    size: f.input.originalRef.size,
+    mimeType: f.input.originalRef.mimeType,
+  });
+  const rootKey = captureRootKey('space', 'media', id);
+  const stateKey = JSON.stringify(['root-state', rootKey]);
+  const input: ApplyPreparedImageReplicaInput = {
+    ...f.input,
+    media: {
+      ...f.input.media,
+      id,
+      kind: 'image',
+      source: { kind: 'project-asset', projectAssetId: child.id },
+      workspaceRevision: 2,
+      imageContentState: 'edited',
+    },
+    projectAsset: child,
+    presentation: null,
+    workspace: {
+      aggregateId: id,
+      revision: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      sourceTitle: null,
+      sourceUrl: null,
+      document: createPersistedEditorDocumentFixture(
+        createEditorDocumentFixture(),
+        f.input.originalRef.assetId
+      ),
+    },
+    documentRefs: [f.input.originalRef],
+    ...(legacy
+      ? {
+          expectedLocalGeneration: 1,
+          expectedBasis: ['legacy-imported'],
+          expectedNativeRevision: 0,
+        }
+      : {}),
+  };
+  let immutable: unknown;
+  if (legacy) {
+    const media = { ...input.media, workspaceRevision: 0, imageContentState: 'original' as const };
+    const rows = { media, projectAsset: child, ref: input.originalRef };
+    f.table('media_library').set(id, media);
+    f.table('project_assets').set(child.id, child);
+    f.table('asset_refs').set(input.originalRef.assetId, input.originalRef);
+    f.table('asset_owners').set(JSON.stringify(['project-asset', child.id, 'body']), {
+      assetId: child.assetId,
+      ownerKind: 'project-asset',
+      ownerId: child.id,
+      role: 'body',
+    });
+    f.table('sync_capture').set(stateKey, {
+      version: 1,
+      kind: 'root-state',
+      key: stateKey,
+      createdAt: 1,
+      spaceId: 'space',
+      rootKind: 'media',
+      rootId: id,
+      rootKey,
+      generation: 1,
+      basis: ['legacy-imported'],
+      nativeDigest: digestCapturedMediaRows(rows),
+    });
+    const native = createNativeCapture({
+      version: 1,
+      kind: 'sync-operation',
+      key: JSON.stringify(['change', 'legacy-imported']),
+      createdAt: 1,
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 3,
+      rootKind: 'media',
+      rootId: id,
+      rootKey,
+      generation: 1,
+      operationId: 'legacy-imported',
+      basis: [],
+      origin: 'local-edit',
+      publicationId: null,
+      change: { kind: 'media', rows },
+    });
+    const { change: _change, phase: _phase, ...header } = native;
+    immutable = {
+      ...header,
+      phase: 'published',
+      publication: {
+        kind: 'verified',
+        acceptedAt: 1,
+        preparedSha256: 'a'.repeat(64),
+        attemptId: '11111111-1111-4111-8111-111111111111',
+        recordKey: 'records/legacy.json',
+        recordSha256: 'b'.repeat(64),
+      },
+      objects: [],
+    };
+    if (!parseSyncCaptureRecord(immutable)) throw new Error('Invalid legacy capture fixture');
+    f.table('sync_capture').set(native.key, immutable);
+  }
+  return { ...f, input, child, rootKey, stateKey, immutable };
+}
+
+it('applies a causal Image successor over an exact pristine legacy project-asset media predecessor', async () => {
+  const f = importedImageReplicaFixture(true);
+  const previousChild = structuredClone(f.table('project_assets').get(f.child.id));
+  const previousRef = structuredClone(f.table('asset_refs').get(f.input.originalRef.assetId));
+  const previousOwner = structuredClone(
+    f.table('asset_owners').get(JSON.stringify(['project-asset', f.child.id, 'body']))
+  );
+  await expect(applyPreparedImageReplica(f.input)).resolves.toEqual({
+    status: 'applied',
+    generation: 2,
+  });
+  expect(f.table('project_assets').get(f.child.id)).toEqual(previousChild);
+  expect(f.table('asset_refs').get(f.input.originalRef.assetId)).toEqual(previousRef);
+  expect(
+    f.table('asset_owners').get(JSON.stringify(['project-asset', f.child.id, 'body']))
+  ).toEqual(previousOwner);
+  expect(f.table('media_library').get(f.input.media.id)).toMatchObject({
+    source: f.input.media.source,
+    workspaceRevision: 1,
+  });
+  expect(f.table('image_workspaces').get(f.input.media.id)).toMatchObject({
+    document: f.input.workspace?.document,
+  });
+  expect(f.table('sync_capture').get(JSON.stringify(['change', 'legacy-imported']))).toEqual(
+    f.immutable
+  );
+  const before = structuredClone(f.rows);
+  io.read.mockRejectedValue(new Error('staging removed'));
+  await expect(applyPreparedImageReplica(f.input)).resolves.toEqual({
+    status: 'duplicate',
+    generation: 2,
+  });
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses legacy project-asset predecessor with an unsynced local Image workspace', async () => {
+  const f = importedImageReplicaFixture(true);
+  f.table('image_workspaces').set(f.input.media.id, { ...f.input.workspace, revision: 0 });
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedImageReplica(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+});
+
+it('publishes a project-asset Image child workspace and source owners atomically', async () => {
+  const f = importedImageReplicaFixture();
+  await applyPreparedImageReplica(f.input);
+  expect(f.table('project_assets').get(f.child.id)).toEqual(f.child);
+  expect(
+    f.table('asset_owners').get(JSON.stringify(['project-asset', f.child.id, 'body']))
+  ).toMatchObject({ assetId: f.child.assetId });
+  expect(f.table('media_library').get(f.input.media.id)).not.toHaveProperty('blob');
+  const accepted = structuredClone(f.rows);
+  const db = await initDB();
+  const tx = db.transaction(
+    [
+      'sync_capture',
+      'media_library',
+      'project_assets',
+      'asset_refs',
+      'asset_owners',
+      'image_workspaces',
+      'aggregate_presentations',
+    ],
+    'readonly'
+  );
+  const native = await freezeImageInTransaction(tx, f.input.media.id);
+  await tx.done;
+  expect(native.projectAsset).toEqual(f.child);
+  expect(parseSyncCaptureRecord(f.table('sync_capture').get(f.stateKey))).toMatchObject({
+    nativeDigest: digestCapturedImageRows(native),
+    nativeRevision: 1,
+  });
+  expect(f.rows).toEqual(accepted);
+});
+
+it('rolls back imported Image child publication and permits one retry before deletion and recreation', async () => {
+  const f = importedImageReplicaFixture();
+  const before = structuredClone(f.rows);
+  f.fail();
+  await expect(applyPreparedImageReplica(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  f.allow();
+  await expect(applyPreparedImageReplica(f.input)).resolves.toEqual({
+    status: 'applied',
+    generation: 1,
+  });
+  await expect(
+    applyCatalogDeletionNative({
+      rootKind: 'media',
+      rootId: f.input.media.id,
+      operationId: 'imported-delete',
+      sourceDigest: 'd'.repeat(64),
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 3,
+      expectedLocalGeneration: 1,
+      expectedBasis: [f.input.operationId],
+      expectedWorkspaceRevision: 1,
+    })
+  ).resolves.toEqual({ status: 'applied', generation: 2 });
+  expect(f.table('media_library').has(f.input.media.id)).toBe(false);
+  expect(f.table('project_assets').has(f.child.id)).toBe(false);
+  await expect(
+    applyPreparedImageReplica({
+      ...f.input,
+      operationId: 'imported-recreated',
+      expectedLocalGeneration: 2,
+      expectedBasis: ['imported-delete'],
+    })
+  ).resolves.toEqual({ status: 'applied', generation: 3 });
+  expect(f.table('project_assets').get(f.child.id)).toEqual(f.child);
+  const recreated = structuredClone(f.rows);
+  await expect(
+    applyPreparedImageReplica({
+      ...f.input,
+      operationId: 'late-imported',
+      expectedLocalGeneration: 1,
+      expectedBasis: [f.input.operationId],
+      expectedNativeRevision: 1,
+    })
+  ).rejects.toThrow();
+  expect(f.rows).toEqual(recreated);
+});
+
+it('refuses an unrelated existing project-asset child before publishing an imported Image root', async () => {
+  const f = importedImageReplicaFixture();
+  f.table('project_assets').set(f.child.id, { ...f.child, assetId: 'another-source' });
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedImageReplica(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+});
+
+it('preserves Montage borrowed originals while applying imported Image workspace changes', async () => {
+  const f = importedImageReplicaFixture(true);
+  const borrower = createVideoProjectEntryWithMediaClip({ id: 'imported-image-borrower' });
+  borrower.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.input.media.id };
+  f.table('video_projects').set(borrower.id, borrower);
+  await expect(applyPreparedImageReplica(f.input)).resolves.toMatchObject({ status: 'applied' });
+  expect(f.table('video_projects').get(borrower.id)).toEqual(borrower);
+  expect(f.table('project_assets').get(f.child.id)).toEqual(f.child);
+  expect(f.table('media_library').get(f.input.media.id)).toMatchObject({
+    source: f.input.media.source,
   });
 });

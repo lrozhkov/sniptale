@@ -1,4 +1,7 @@
-import { runWithNativePublicationResources } from '../../../workflows/sync-transfer/editing-admission';
+import {
+  runWithNativePublicationResources,
+  ensureScenarioHtmlArtifactAvailable,
+} from '../../../workflows/sync-transfer/editing-admission';
 import { renameQuickEditProject } from '../../../workflows/media-hub/trash';
 import { canOpenGalleryProject } from '../items/types';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
@@ -121,6 +124,10 @@ async function withPreviewItemBlob(
     if (isGalleryScenarioExportItem(previewItem)) {
       const saved = await (saveMetadata?.() ?? persistPreviewMetadata(controller));
       if (saved === null) return;
+      await ensureScenarioHtmlArtifactAvailable({
+        projectId: previewItem.exportEntry.projectId,
+        exportId: previewItem.entityId,
+      });
       const artifact = await readScenarioHtmlArtifact(previewItem.entityId);
       if (!artifact) throw createMissingBlobError(previewItem.filename);
       await effect({ ...previewItem, filename: artifact.entry.filename }, artifact.blob);
@@ -298,10 +305,7 @@ export async function persistPreviewMetadata(
 
   if (isGalleryScenarioExportItem(previewItem) && previewItem.format === 'html') {
     if (nextFilename === baseline.filename) return false;
-    await runWithNativePublicationResources(
-      [{ rootKind: 'scenario-project', rootId: previewItem.exportEntry.projectId }],
-      () => renameScenarioHtmlExportRecord(previewItem.entityId, nextFilename)
-    );
+    await renameScenarioHtmlExportRecord(previewItem.entityId, nextFilename);
     return true;
   }
 

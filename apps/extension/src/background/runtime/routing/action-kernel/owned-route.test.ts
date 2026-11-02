@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createContentAiEgressAuthority } from '../../../../features/ai/egress-authority';
 import { createAiPrivacyProof } from '../../../../features/ai/privacy';
+import { createSecretProtectionService } from '../../../../composition/persistence/secret-protection/service';
 import {
   issueLlmSessionToken,
   resetLlmSessionTokensForTests,
@@ -122,11 +123,23 @@ afterEach(() => {
 it('keeps the channel open while async LLM authorization resolves before dispatch', async () => {
   const { message, sender } = await createAuthorizedMessage({ jsonData: '{"fields":[]}' });
   const action = createAction(message, sender);
+  const protection = createSecretProtectionService({
+    participants: [],
+    containSync: async () => undefined,
+    revokeLeases: () => undefined,
+  });
+  action.context.runtimeState.secretProtection = protection;
 
   expect(routeBackgroundOwnedAction(action)).toEqual({ handled: true, keepChannelOpen: true });
   await vi.waitFor(() => {
-    expect(routeLlmMessageMock).toHaveBeenCalledWith(message, action.context.sendResponse, sender);
+    expect(routeLlmMessageMock).toHaveBeenCalledWith(
+      message,
+      action.context.sendResponse,
+      sender,
+      protection
+    );
   });
+  expect(routeLlmMessageMock.mock.calls[0]?.[3]).toBe(protection);
 });
 
 it('rejects async LLM authorization failures before route dispatch', async () => {

@@ -1,5 +1,6 @@
-import { tabVideoControlledCursorContracts } from '../../../contracts/messaging/tab/contracts/controlled';
 // @vitest-environment jsdom
+
+import { tabVideoControlledCursorContracts } from '../../../contracts/messaging/tab/contracts/controlled';
 
 import { beforeEach, expect, it, vi } from 'vitest';
 

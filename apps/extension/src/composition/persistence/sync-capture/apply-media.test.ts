@@ -1,3 +1,4 @@
+import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import { applyPreparedVideoReviewReplica } from './apply-review';
 import { workspace as reviewTemplate } from '../review-workspaces/backup-restore.test-support';
 import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
@@ -611,4 +612,45 @@ it('checks authorization before mutation and replays committed results after pau
   const committed = structuredClone(f.rows);
   await expect(applyPreparedMediaReplica(f.input)).resolves.toMatchObject({ status: 'duplicate' });
   expect(f.rows).toEqual(committed);
+});
+
+it('refuses a pending checkpoint before the first causal media state', async () => {
+  const f = setup();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'media', rootId: f.input.rows.media.id },
+    2
+  );
+  await tx.done;
+  expect(pending).not.toBeNull();
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedMediaReplica(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedMediaReplica(f.input)).resolves.toMatchObject({ status: 'applied' });
+});
+
+it('refuses pending work with unchanged causal generation and native digest', async () => {
+  const f = setup();
+  await applyPreparedMediaReplica(f.input);
+  const next = successor(f.input);
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'media', rootId: f.input.rows.media.id },
+    2
+  );
+  await tx.done;
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedMediaReplica(next)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedMediaReplica(next)).resolves.toMatchObject({ status: 'applied' });
 });

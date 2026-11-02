@@ -303,15 +303,17 @@ export function BackupExportModalContent({
         </>
       ) : preparation ? (
         <div className="mt-4 space-y-3 text-sm leading-5 text-[var(--sniptale-color-text-secondary)]">
+          <p>
+            {translate('gallery.backupExportModal.scope')}:{' '}
+            <span className="text-[var(--sniptale-color-text-primary)]">
+              {translate(
+                draftOptions.scope === 'selected'
+                  ? 'gallery.backupExportModal.scopeSelected'
+                  : 'gallery.backupExportModal.scopeAll'
+              )}
+            </span>
+          </p>
           <p>{translate('gallery.backupExportModal.remotePreparation')}</p>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-            <dt>{translate('gallery.backupExportModal.remoteRoots')}</dt>
-            <dd className="text-right tabular-nums">{preparation.missing.length}</dd>
-            <dt>{translate('gallery.backupExportModal.remoteSize')}</dt>
-            <dd className="text-right tabular-nums">
-              {formatBytes(preparation.remoteBytesUpperBound, 1)}
-            </dd>
-          </dl>
           <p>{translate('gallery.backupExportModal.nativePreparation')}</p>
         </div>
       ) : null}

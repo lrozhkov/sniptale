@@ -1,3 +1,4 @@
+import type { SecretProtectionAdmissionPermit } from '../secret-protection/model';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
 import {
   isActivePersistenceMutationPermit,
@@ -34,19 +35,14 @@ import {
   upsertStoredAIProviderRecord,
 } from './provider-secrets.store.ts';
 import { removeTransparentKeyIfUnused } from './provider-secret-keys.store.ts';
-import {
-  changeStoredAISecretPassphraseProtection,
-  disableStoredAISecretPassphraseProtection,
-  enableStoredAISecretPassphraseProtection,
-  loadStoredAISecretProtectionStatus,
-  lockStoredAISecretProtection,
-  resetStoredAISecretPassphraseProtection,
-  unlockStoredAISecretProtection,
-  type AISecretProtectionStatus,
-} from './provider-secret-protection.store.ts';
+import type { SecretProtectionService, SecretProtectionStatus } from '../secret-protection/model';
+import { readSecretProtectionProfile } from '../secret-protection/profile.store';
+export type AISecretProtectionStatus = Pick<
+  SecretProtectionStatus,
+  'isEnabled' | 'isUnlocked' | 'mode'
+>;
 
 export type { AIProviderUpsertInput } from './provider-secrets.store.ts';
-export type { AISecretProtectionStatus } from './provider-secret-protection.store.ts';
 export {
   loadStoredAIProviderSecret as loadAIProviderSecret,
   loadStoredAIProviders as loadAIProviders,
@@ -75,10 +71,12 @@ export async function saveAIProviders(providers: AIProvider[]): Promise<void> {
 
 export async function upsertAIProviderRecord(
   input: AIProviderUpsertInput,
-  permit?: PersistenceMutationPermit
+  permit?: PersistenceMutationPermit,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<void> {
   await initializeAiStorageAccess();
-  return upsertStoredAIProviderRecord(input, permit);
+  return upsertStoredAIProviderRecord(input, permit, operationKey, admissionPermit);
 }
 
 export async function deleteAIProviderRecord(providerId: string): Promise<void> {
@@ -111,48 +109,66 @@ export async function deleteAIProviderGraphRecord(
 
 export async function clearAIProviderSecret(
   providerId: string,
-  permit?: PersistenceMutationPermit
+  permit?: PersistenceMutationPermit,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<void> {
   await initializeAiStorageAccess();
-  return clearStoredAIProviderSecret(providerId, permit);
+  return clearStoredAIProviderSecret(providerId, permit, admissionPermit);
 }
 
-export async function loadAISecretProtectionStatus(): Promise<AISecretProtectionStatus> {
-  await initializeAiStorageAccess();
-  return loadStoredAISecretProtectionStatus();
+export async function loadAISecretProtectionStatus(
+  service?: SecretProtectionService
+): Promise<AISecretProtectionStatus> {
+  if (service) return service.readStatus();
+  const profile = await readSecretProtectionProfile();
+  return {
+    isEnabled: profile !== null,
+    isUnlocked: profile === null,
+    mode: profile ? 'passphrase' : 'transparent',
+  };
 }
 
-export async function unlockAISecretProtection(passphrase: string): Promise<void> {
-  await initializeAiStorageAccess();
-  return unlockStoredAISecretProtection(passphrase);
+function requireProtectionService(
+  service: SecretProtectionService | undefined
+): SecretProtectionService {
+  if (!service) throw new Error('Shared secret protection service is required');
+  return service;
 }
 
-export async function lockAISecretProtection(): Promise<void> {
-  await initializeAiStorageAccess();
-  return lockStoredAISecretProtection();
+export async function unlockAISecretProtection(
+  passphrase: string,
+  service?: SecretProtectionService
+): Promise<void> {
+  return requireProtectionService(service).unlock(passphrase);
 }
-
-export async function enableAISecretPassphraseProtection(passphrase: string): Promise<void> {
-  await initializeAiStorageAccess();
-  return enableStoredAISecretPassphraseProtection(passphrase);
+export async function lockAISecretProtection(service?: SecretProtectionService): Promise<void> {
+  return requireProtectionService(service).lock();
 }
-
-export async function disableAISecretPassphraseProtection(passphrase?: string): Promise<void> {
-  await initializeAiStorageAccess();
-  return disableStoredAISecretPassphraseProtection(passphrase);
+export async function enableAISecretPassphraseProtection(
+  passphrase: string,
+  service?: SecretProtectionService
+): Promise<void> {
+  return requireProtectionService(service).enable('ai', passphrase);
 }
-
-export async function changeAISecretPassphraseProtection(params: {
-  currentPassphrase: string;
-  nextPassphrase: string;
-}): Promise<void> {
-  await initializeAiStorageAccess();
-  return changeStoredAISecretPassphraseProtection(params);
+export async function disableAISecretPassphraseProtection(
+  passphrase?: string,
+  service?: SecretProtectionService
+): Promise<void> {
+  return requireProtectionService(service).disable('ai', passphrase);
 }
-
-export async function resetAISecretPassphraseProtection(): Promise<void> {
-  await initializeAiStorageAccess();
-  return resetStoredAISecretPassphraseProtection();
+export async function changeAISecretPassphraseProtection(
+  params: {
+    currentPassphrase: string;
+    nextPassphrase: string;
+  },
+  service?: SecretProtectionService
+): Promise<void> {
+  return requireProtectionService(service).changePassphrase(params);
+}
+export async function resetAISecretPassphraseProtection(
+  service?: SecretProtectionService
+): Promise<void> {
+  return requireProtectionService(service).reset();
 }
 
 export async function loadAIModels(): Promise<AIModel[]> {

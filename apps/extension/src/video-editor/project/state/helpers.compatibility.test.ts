@@ -24,7 +24,7 @@ import {
   ensureTrackForKind,
   isTrackCompatibleWithClip,
 } from './helpers';
-import { resetVideoEditorProjectHistory } from '../history';
+import { resetVideoEditorProjectHistory, undoVideoEditorProjectHistory } from '../history';
 
 function createClip(
   id: string,
@@ -179,5 +179,8 @@ it('records source-anchor reprojection in the same project history action', () =
   expect(update.project?.actionEvents).toEqual(project.actionEvents);
   expect(resolveVideoProjectActionOccurrences(update.project!)[0]?.time).toBe(4);
   expect(update.projectHistory?.past).toHaveLength(1);
-  expect(update.projectHistory?.past[0]?.project.actionEvents).toEqual(project.actionEvents);
+  expect(undoVideoEditorProjectHistory(update.projectHistory!, update.project!)).toMatchObject({
+    status: 'applied',
+    project: { actionEvents: project.actionEvents },
+  });
 });

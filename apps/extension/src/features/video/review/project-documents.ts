@@ -1,3 +1,6 @@
+import { projectReviewTextFragment } from './text-projection';
+import type { ReviewTimeSegment } from './time-segment';
+import type { ReviewTextFragment } from './text-types';
 import type { VideoProjectCommentDocument } from '../project/comments/types';
 import { parseVideoProjectCommentDocuments } from '../project/comments/validation';
 import type { VideoProjectTextDocument } from '../project/text/types';
@@ -12,7 +15,54 @@ import { parseCanvasComment, parseReviewAnnotation } from './validation';
 interface ReviewProjectDocumentsPlan {
   textDocuments: VideoProjectTextDocument[];
   commentDocuments: VideoProjectCommentDocument[];
-  textDocumentIds: { source: string; result: string };
+  textDocumentIds: { source: string; result: string; fragments: ReadonlyMap<string, string> };
+}
+
+/** Conversion freezes the current result slices; Native owns later montage timing. */
+function convertTextPlacements(
+  text: ReviewTextDocument | undefined,
+  timeline: ReviewProjectTimelinePlan
+) {
+  const segments: ReviewTimeSegment[] = [
+    ...timeline.slices.map((slice) => slice.segment),
+    ...timeline.cuts.map((cut) => ({
+      kind: 'cut' as const,
+      rate: 1,
+      sourceStart: cut.edit.start,
+      sourceEnd: cut.edit.end,
+      resultStart: cut.time,
+      resultEnd: cut.time,
+    })),
+  ].sort((a, b) => a.sourceStart - b.sourceStart);
+  const limits: { fragmentId: string; end: number }[] = [];
+  const occupied = new Set(text?.fragments.map((fragment) => fragment.id));
+  const fragments =
+    text?.fragments.flatMap((fragment): ReviewTextFragment[] => {
+      if (!fragment.sourceAnchor) return [fragment];
+      const { sourceAnchor: _anchor, words, ...base } = fragment;
+      const ranges = projectReviewTextFragment(fragment, segments).ranges;
+      if (!ranges.length) {
+        limits.push({ fragmentId: fragment.id, end: 0 });
+        return [{ ...base, ...(words ? { words } : {}) }];
+      }
+      return ranges.map((range, index) => {
+        let id = fragment.id;
+        if (index > 0) {
+          let suffix = index;
+          do {
+            id = `text-slice:${suffix++}:${fragment.id}`.slice(0, 256);
+          } while (occupied.has(id));
+          occupied.add(id);
+        }
+        const retained = words?.flatMap((word) => {
+          const start = Math.max(range.start, word.start);
+          const end = Math.min(range.end, word.end);
+          return end > start ? [{ ...word, start, end }] : [];
+        });
+        return { ...base, ...range, id, ...(retained?.length ? { words: retained } : {}) };
+      });
+    }) ?? [];
+  return { fragments, limits };
 }
 
 /** Maps authored documents without rendering retired notes or truncating excluded text. */
@@ -49,19 +99,28 @@ export function planReviewProjectDocuments(args: {
   const textDocumentIds = {
     source: `${timeline.sourceInstanceId}:text:source`,
     result: `${timeline.sourceInstanceId}:text:result`,
+    fragments: new Map<string, string>(),
   };
+  const converted = convertTextPlacements(text, timeline);
   const drafts: VideoProjectTextDocument[] = [];
   for (const domain of ['source', 'result'] as const) {
-    const fragments = text?.fragments.filter((fragment) => fragment.timeDomain === domain) ?? [];
+    const fragments = converted.fragments.filter((fragment) => fragment.timeDomain === domain);
     const empty =
       domain === 'result' &&
       !text?.fragments.length &&
       (text !== undefined || args.captions !== undefined);
     if (fragments.length === 0 && !empty) continue;
+    for (const fragment of fragments)
+      textDocumentIds.fragments.set(fragment.id, textDocumentIds[domain]);
     drafts.push({
       id: textDocumentIds[domain],
       binding: domain === 'source' ? binding : { kind: 'project' },
-      ...(domain === 'result' ? { durationMode: 'project' as const } : {}),
+      ...(domain === 'result'
+        ? {
+            durationMode: 'project' as const,
+            ...(converted.limits.length ? { resultEndLimits: converted.limits } : {}),
+          }
+        : {}),
       document: { version: 1, fragments },
       ...(args.captions === undefined ? {} : { captions: structuredClone(args.captions) }),
     });

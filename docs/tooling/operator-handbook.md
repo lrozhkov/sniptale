@@ -20,6 +20,7 @@ This document owns public operator commands and external run procedures. Wrapper
 | Debug typecheck, build, and packaging | `npm run release:package-only` |
 | Open the local design reference | `npm run design:reference -- [--port number]` |
 | Run extension smoke | `npm run qa:e2e` |
+| Measure preview performance explicitly | `npm run qa:e2e:preview-performance -- [--case <name>] [--list] [--headed]` |
 | Write a non-blocking topology report | `npm run qa:structural-audit` |
 | Inspect wrapper records | `npm run qa:stats -- [--wrapper <id>] [--task <id>]` |
 | Check dependency freshness without changes | `npm run ci:dependencies:plan` |
@@ -32,6 +33,8 @@ Resource flags are `--cpu N`, `--memory-mib N`, and `--workers N`. Use them only
 Follow the [blocking-wrapper rule](wrapper-summary.md#locks-and-scheduling).
 
 On WSL/Linux, blocking wrappers in different directories wait for the same user's QA slot. Leave the waiting command running. It prints one queue message and continues after admission. Use Ctrl+C to cancel its ticket. A second wrapper in the same directory still reports the existing repository lock.
+
+See [preview performance](preview-performance.md) for optional measurements, profiles, reports, and new scenarios.
 
 ## GitHub operations
 

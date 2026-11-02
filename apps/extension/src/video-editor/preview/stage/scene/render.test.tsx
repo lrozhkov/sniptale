@@ -157,18 +157,26 @@ it('lazily owns preview GPU resources across retry and rejects stale context-los
   await act(async () => {
     root?.render(<RenderHarness retryVersion={1} />);
   });
-  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[0]!.value.dispose
+  ).toHaveBeenCalledOnce();
   const next = factory();
   expect(next).not.toBe(first);
   lost();
-  expect(first.dispose).toHaveBeenCalledOnce();
-  expect(next.dispose).not.toHaveBeenCalled();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[0]!.value.dispose
+  ).toHaveBeenCalledOnce();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[1]!.value.dispose
+  ).not.toHaveBeenCalled();
   expect(factory()).toBe(next);
   await act(async () => {
     root?.unmount();
   });
   root = null;
-  expect(next.dispose).toHaveBeenCalledOnce();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[1]!.value.dispose
+  ).toHaveBeenCalledOnce();
   controller.abort();
   expect(factory).toThrow();
   expect(createReviewSpatialRenderer).toHaveBeenCalledTimes(2);

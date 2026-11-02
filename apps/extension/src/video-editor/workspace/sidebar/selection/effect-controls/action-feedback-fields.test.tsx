@@ -1,10 +1,10 @@
+// @vitest-environment jsdom
 import type { RecordingProjectActionAudioSource } from '../../../../../workflows/video-review/recording-action-audio';
 import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
 import { decodeRecordingEventsBlock } from '../../../../../features/video/project/recording-events/blocks';
 import { isRecordingEventsDescriptor } from '../../../../../features/video/project/recording-events/records';
 import fixtureData from '../../../../../features/video/project/recording-events/fixtures.json';
 import { projectRecordingEventAction } from '../../../../../features/video/project/recording-events/project-facts';
-// @vitest-environment jsdom
 import { REVIEW_CLICK_DEFAULT } from '../../../../../features/video/project/action-feedback/validation';
 import { ReviewActionAudioUnavailable } from '../../../../../features/video/review/action-audio';
 import { act } from 'react';

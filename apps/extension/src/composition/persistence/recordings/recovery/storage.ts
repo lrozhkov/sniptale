@@ -276,7 +276,7 @@ export async function deleteRecoveryInTransaction(
   id: string
 ): Promise<void> {
   if (id === EPOCH_ID) return;
-  const sources: unknown[] = await tx.objectStore(SESSIONS).getAll();
+  const sources: unknown[] = await tx.objectStore(SESSIONS).index('recoveryId').getAll(id);
   const ids = new Set([id]);
   for (const raw of sources) {
     const entry = parseRecoveryRecording(raw);

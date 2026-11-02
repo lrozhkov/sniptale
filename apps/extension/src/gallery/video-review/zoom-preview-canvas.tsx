@@ -1,6 +1,6 @@
 import { ReviewButton } from './controls';
 import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
-import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../workflows/video-review/spatial-render-session';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ReviewFocusFrame, useFocusFrameHover } from './focus-area-frame';
 import { useReviewCameraGesture } from './camera-gesture';
@@ -283,6 +283,7 @@ function areaRasterKey(
 type ZoomPaintCache = {
   painted: {
     key: string;
+    lens: boolean;
     frame: ZoomCanvasProps['frame'];
     header: ZoomCanvasProps['headerImage'];
   } | null;
@@ -307,7 +308,6 @@ function zoomPaintKey(props: ZoomCanvasProps, canvas: HTMLCanvasElement, retry: 
       canvas,
       retry
     );
-  if (!props.lensFrames?.length) return null;
   return JSON.stringify([
     props.background,
     props.layout,
@@ -335,7 +335,8 @@ function restoreZoomPaint(
   )
     return false;
   if (props.view === 'area') return true;
-  if (!cache.lensBase || !props.lensFrames?.length) return false;
+  if (!props.lensFrames?.length) return !cache.painted.lens;
+  if (!cache.lensBase) return false;
   context.drawImage(cache.lensBase, 0, 0);
   drawSceneSpotlights(context, canvas, null, props.lensFrames);
   return true;
@@ -354,7 +355,7 @@ function useZoomCanvasPaint(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   props: ZoomCanvasProps
 ) {
-  const renderer = useRef<ReturnType<typeof createReviewSpatialRenderer> | null>(null);
+  const renderer = useRef<ReturnType<typeof createReviewSpatialSession> | null>(null);
   const cache = useRef<ZoomPaintCache>({ painted: null, lensBase: null });
   const [spatialFailure, setFailure] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -371,7 +372,7 @@ function useZoomCanvasPaint(
       return;
     }
     try {
-      renderer.current = createReviewSpatialRenderer(() => setFailure(true));
+      renderer.current = createReviewSpatialSession(() => setFailure(true));
       setFailure(false);
     } catch {
       setFailure(true);
@@ -395,9 +396,8 @@ function useZoomCanvasPaint(
         paintZoomPreview(context, {
           spatialRenderer: renderer.current ?? undefined,
           background: props.background,
-          accent:
-            getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() ||
-            '#4f7cff',
+          // Canvas controls are disabled; the DOM overlay owns their themed color.
+          accent: '#4f7cff',
           camera: props.camera,
           cornerRadius: props.cornerRadius,
           previewScale: props.previewScale ?? 1,
@@ -412,7 +412,12 @@ function useZoomCanvasPaint(
         if (cacheLensBase) captureZoomLensBase(canvas, cache.current);
         if (props.lensFrames?.length) drawSceneSpotlights(context, canvas, null, props.lensFrames);
         if (key !== null)
-          cache.current.painted = { key, frame: props.frame, header: props.headerImage };
+          cache.current.painted = {
+            key,
+            lens: !!props.lensFrames?.length,
+            frame: props.frame,
+            header: props.headerImage,
+          };
       } catch {
         context.clearRect(0, 0, canvas.width, canvas.height);
         setFailure(true);

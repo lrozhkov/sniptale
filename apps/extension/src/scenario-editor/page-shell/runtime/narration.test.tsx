@@ -309,7 +309,7 @@ it('refuses an old resource callback after a same-id A/B/A document round trip',
   expect(state.project?.name).toBe('Reopened A');
 });
 
-it('discards a pending resource acknowledgement after opening another document', async () => {
+it('refuses a normal document switch during a pending resource mutation and admits it after the ACK', async () => {
   const original = structuredClone(state.project!);
   let finish!: (snapshot: { project: typeof original; workspaceRevision: number }) => void;
   io.attach.mockImplementation(
@@ -329,13 +329,50 @@ it('discards a pending resource acknowledgement after opening another document',
     versions: [{ project: other, revision: 37, savedAt: 1 }],
   });
   await act(async () => state.openExisting(other.id));
+  expect(io.load).toHaveBeenCalledOnce();
+  expect(state.project?.id).toBe(original.id);
+  expect(state.mutationPending).toBe(true);
+  await act(async () => {
+    finish({ project: { ...original, updatedAt: 2 }, workspaceRevision: 2 });
+    expect(await pending).toBe(true);
+  });
+  await act(async () => state.openExisting(other.id));
+  expect(io.load).toHaveBeenLastCalledWith(other.id);
+  expect(state.project?.id).toBe(other.id);
+  expect(state.project?.name).toBe(other.name);
+  expect(state.status).toBe('saved');
+});
+it('discards a pending resource acknowledgement in a replacement document lifetime', async () => {
+  const original = structuredClone(state.project!);
+  let finish!: (snapshot: { project: typeof original; workspaceRevision: number }) => void;
+  io.attach.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  let pending!: Promise<boolean>;
+  await act(async () => {
+    pending = state.commitChange(command());
+  });
+  const other = { ...original, id: 'other', name: 'Other document' };
+  io.list.mockResolvedValue([{ id: other.id, availability: 'available' }]);
+  io.load.mockResolvedValue({
+    currentRevision: 37,
+    versions: [{ project: other, revision: 37, savedAt: 1 }],
+  });
+  await act(async () => root.unmount());
+  window.history.replaceState({}, '', '/?projectId=other');
+  root = createRoot(host);
+  await act(async () => root.render(<Probe />));
   await act(async () => {
     finish({ project: { ...original, name: 'Late old document' }, workspaceRevision: 59 });
     expect(await pending).toBe(false);
   });
   expect(state.project?.id).toBe(other.id);
   expect(state.project?.name).toBe(other.name);
-  expect(state.status).toBe('saved');
+  expect(io.load).toHaveBeenLastCalledWith(other.id);
+  expect(state.status).toBe('ready');
 });
 
 it('loads music-only URLs and releases them when the binding is undone', async () => {

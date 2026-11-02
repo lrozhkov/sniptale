@@ -79,13 +79,40 @@ type ReviewStageBindingProps = {
   onEnded?: (() => void) | undefined;
   onError(): void;
 };
-export function ReviewStageBinding(props: ReviewStageBindingProps) {
-  const image = useReviewBackgroundImage(props.background, props.backgroundPending);
+/** Adapt a selected framing draft to the display camera and stable playback topology. */
+function useReviewStageCamera(
+  props: Pick<
+    ReviewStageBindingProps,
+    | 'zoomOverlay'
+    | 'focusTimeMap'
+    | 'outputTime'
+    | 'preview'
+    | 'zoomRegions'
+    | 'source'
+    | 'canvas'
+    | 'background'
+    | 'windowHeader'
+  >
+) {
   const selected = props.zoomOverlay?.region;
   const projected = selected ? projectReviewFocus([selected], props.focusTimeMap) : [];
   const framing =
     projected.length > 0 &&
     Math.abs(props.outputTime - (projected[0]!.start + projected.at(-1)!.end) / 2) < 0.05;
+  const manualCamera =
+    framing &&
+    !props.preview?.playing &&
+    selected &&
+    !selected.border &&
+    !selected.spotlight &&
+    !selected.followCursor &&
+    projected.every(
+      (target) =>
+        props.zoomRegions.find((region) => region.id === target.id)?.cursorFocus?.path.mode !==
+        'follow'
+    )
+      ? selected.transform
+      : undefined;
   const regions =
     projected.length === 0
       ? props.zoomRegions
@@ -93,7 +120,12 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
           const target = projected.find((item) => item.id === region.id);
           if (!target) return region;
           // Resolved links belong to the complete scene, not the isolated selected projection.
-          const updated = { ...region, ...target };
+          // A framing draft changes the displayed pose, not neighboring playback trajectories.
+          const updated = {
+            ...region,
+            ...target,
+            ...(manualCamera ? { transform: region.transform } : {}),
+          };
           if (!framing) return updated;
           return {
             ...updated,
@@ -120,9 +152,23 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
     prepareReviewCameraPlans(regions, input);
     return input;
   }, [regions, props.source, props.canvas, props.background, props.windowHeader]);
-  const camera: QuickEditCameraTransform = regions.length
-    ? evaluateQuickEditCameraAtTime(regions, props.outputTime, cameraScene)
+  // Evaluate the complete composition with the draft pose, without preparing new playback plans.
+  const displayedRegions = manualCamera
+    ? regions.map((region) =>
+        projected.some((target) => target.id === region.id)
+          ? { ...region, transform: manualCamera }
+          : region
+      )
+    : regions;
+  const camera: QuickEditCameraTransform = displayedRegions.length
+    ? evaluateQuickEditCameraAtTime(displayedRegions, props.outputTime, cameraScene)
     : { scale: 1, centerX: 0.5, centerY: 0.5 };
+  return { camera, regions };
+}
+
+export function ReviewStageBinding(props: ReviewStageBindingProps) {
+  const image = useReviewBackgroundImage(props.background, props.backgroundPending);
+  const { camera, regions } = useReviewStageCamera(props);
   const geometryRef = useRef<{
     output: { width: number; height: number };
     projection?:

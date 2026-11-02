@@ -13,6 +13,7 @@ export type PersistenceDomainId =
   | 'scenarioProjects'
   | 'snapshots'
   | 'syncCapture'
+  | 'secretProtection'
   | 'videoProjects';
 
 type DatabaseMigrationRisk = 'additive' | 'destructive' | 'transforming';

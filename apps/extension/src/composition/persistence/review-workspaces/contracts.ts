@@ -1,3 +1,4 @@
+import type { SyncCheckpointReceipt } from '../sync-capture/checkpoint-contracts';
 import type {
   ReviewAnnotation,
   ReviewOperation,
@@ -55,6 +56,14 @@ export interface VideoWorkspaceDraft {
 }
 
 export interface VideoWorkspaceSnapshot {
+  /** Transient acknowledgement metadata; never part of durable review content. */
+  readonly checkpointReceipt?: SyncCheckpointReceipt;
   workspace: VideoWorkspace;
   draft: VideoWorkspaceDraft | null;
+}
+
+/** Transient exit roles from one freshly committed archive-and-create command. */
+export interface VideoWorkspaceProjectCreationAcknowledgement extends VideoWorkspaceSnapshot {
+  readonly archiveCheckpointReceipt?: SyncCheckpointReceipt;
+  readonly retainedEditorCheckpointReceipt?: SyncCheckpointReceipt;
 }

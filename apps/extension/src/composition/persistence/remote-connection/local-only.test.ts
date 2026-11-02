@@ -44,6 +44,7 @@ const connection: SyncConnectionMetadata = {
   phase: 'paused',
   updateNonce: null,
   credentialId: '10000000-0000-4000-8000-000000000002',
+  storagePolicy: { version: 1, mode: 'on-demand' },
 };
 beforeEach(() => {
   vi.resetAllMocks();

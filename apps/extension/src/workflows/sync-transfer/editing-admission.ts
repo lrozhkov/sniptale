@@ -3,7 +3,11 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { touchNativeCacheRoot } from './native-cache';
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import type { SyncNativeEditingRoot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
-import { isNativeEditingRootReady, needsNativeEditingPreparation } from './native-residency';
+import {
+  isNativeEditingRootReady,
+  needsNativeEditingPreparation,
+  isNativeScenarioExportReady,
+} from './native-residency';
 
 const logger = createLogger({ namespace: 'SyncEditingAdmission' });
 async function used(root: SyncNativeEditingRoot): Promise<void> {
@@ -11,6 +15,25 @@ async function used(root: SyncNativeEditingRoot): Promise<void> {
     await touchNativeCacheRoot(root);
   } catch {
     logger.warn('sync-cache-usage-deferred');
+  }
+}
+
+async function withPreparationCancellation<T>(
+  client: Pick<ReturnType<typeof createSyncProductClient>, 'cancel'>,
+  requestId: string,
+  signal: AbortSignal | undefined,
+  diagnostic: 'backup-preparation-cancel-deferred' | 'scenario-html-preparation-cancel-deferred',
+  operation: () => Promise<T>
+): Promise<T> {
+  const cancel = () => {
+    void client.cancel(requestId).catch(() => logger.warn(diagnostic));
+  };
+  signal?.addEventListener('abort', cancel, { once: true });
+  if (signal?.aborted) cancel();
+  try {
+    return await operation();
+  } finally {
+    signal?.removeEventListener('abort', cancel);
   }
 }
 
@@ -45,28 +68,58 @@ export async function ensureNativeBackupRootAvailable(
   const client = createSyncProductClient();
   const accepted = await client.prepareNativeBackup(root);
   if (accepted.kind !== 'accepted') throw new Error('Native backup preparation refused.');
-  const cancel = () => {
-    void client
-      .cancel(accepted.requestId)
-      .catch(() => logger.warn('backup-preparation-cancel-deferred'));
-  };
-  signal?.addEventListener('abort', cancel, { once: true });
-  if (signal?.aborted) cancel();
-  try {
-    // Keep the reader until the executor settles, even when cancellation is refused.
-    const result = await client.waitForOperation(accepted.requestId);
-    signal?.throwIfAborted();
-    if (
-      result.job?.state !== 'ready' ||
-      result.completion?.kind !== 'native' ||
-      result.completion.root.rootKind !== root.rootKind ||
-      result.completion.root.rootId !== root.rootId ||
-      !(await isNativeEditingRootReady(root, 'backup'))
-    )
-      throw new Error('Native backup resources are unavailable.');
-  } finally {
-    signal?.removeEventListener('abort', cancel);
-  }
+  await withPreparationCancellation(
+    client,
+    accepted.requestId,
+    signal,
+    'backup-preparation-cancel-deferred',
+    async () => {
+      // Keep the reader until the executor settles, even when cancellation is refused.
+      const result = await client.waitForOperation(accepted.requestId);
+      signal?.throwIfAborted();
+      if (
+        result.job?.state !== 'ready' ||
+        result.completion?.kind !== 'native' ||
+        result.completion.root.rootKind !== root.rootKind ||
+        result.completion.root.rootId !== root.rootId ||
+        !(await isNativeEditingRootReady(root, 'backup'))
+      )
+        throw new Error('Native backup resources are unavailable.');
+    }
+  );
+}
+
+/** Saved HTML is an explicit artifact action, not an editor or whole-project backup preparation. */
+export async function ensureScenarioHtmlArtifactAvailable(
+  target: { projectId: string; exportId: string },
+  signal?: AbortSignal
+): Promise<void> {
+  const selected = { ...target };
+  signal?.throwIfAborted();
+  const ready = await isNativeScenarioExportReady(selected);
+  signal?.throwIfAborted();
+  if (ready) return;
+  const client = createSyncProductClient();
+  const accepted = await client.prepareScenarioExport(selected);
+  if (accepted.kind !== 'accepted') throw new Error('Saved Scenario HTML preparation refused.');
+  await withPreparationCancellation(
+    client,
+    accepted.requestId,
+    signal,
+    'scenario-html-preparation-cancel-deferred',
+    async () => {
+      const result = await client.waitForOperation(accepted.requestId);
+      signal?.throwIfAborted();
+      if (
+        result.job?.state !== 'ready' ||
+        result.completion?.kind !== 'scenario-export' ||
+        result.completion.projectId !== selected.projectId ||
+        result.completion.exportId !== selected.exportId ||
+        !(await isNativeScenarioExportReady(selected))
+      )
+        throw new Error('Saved Scenario HTML is unavailable.');
+    }
+  );
 }
 
 /** Keep native publication inputs available until the existing writer settles. */

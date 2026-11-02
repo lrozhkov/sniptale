@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { calculateSpatialRenderAllocations } from './spatial-render-allocation';
 import { createGradientPaint } from '@sniptale/foundation/paint';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
@@ -15,6 +16,7 @@ import {
   type PreviewRenderAllocationInput,
 } from './preview-render-allocation';
 import { createPreviewRenderResources } from './preview-render-resources';
+import { createSceneSpotlightMasks } from '../../features/video/composition/draw/spotlight';
 
 const size = { width: 10, height: 10 };
 function input(): PreviewRenderAllocationInput {
@@ -172,7 +174,7 @@ it.each([false, true])('uses actual odd spatial levels with half-float=%s', (hal
   expect(plan.maximumCanvases).toBe(6);
 });
 
-it('accounts minimum one-pixel spotlight tiles and their prefix array', () => {
+it('accounts minimum spotlight tiles, prefix, group indices and references', () => {
   const graph = input();
   graph.scene.spotlight = {
     backing: { width: 1, height: 1 },
@@ -181,7 +183,7 @@ it('accounts minimum one-pixel spotlight tiles and their prefix array', () => {
     fastPath: false,
   };
   const plan = calculatePreviewRenderAllocation(graph);
-  expect(phase(plan, 'spotlight-coverage').bytes).toBe(1200 + 8 + 4 + 22 * 4 + 11 * 8);
+  expect(phase(plan, 'spotlight-coverage').bytes).toBe(1200 + 8 + 4 + 22 * 4 + 31 * 8);
 });
 
 it('counts the full spotlight path surface while bounding only coverage readback tiles', () => {
@@ -520,3 +522,69 @@ it('derives background cache clamp and scaled blur from actual chosen backing', 
   expect(graph.upperBounds.gradientFallback).toBe(true);
   expect(graph.scene.denseBackgroundGradient).toBeNull();
 });
+
+it.each([2, 3, 10])(
+  'admits the real %s-mask compositor inside its planned coverage peak',
+  (frameCount) => {
+    vi.stubGlobal('Path2D', class {});
+    const graph = input();
+    graph.scene.spotlight = { backing: size, frameCount, blurRadius: 0, fastPath: false };
+    const plan = calculatePreviewRenderAllocation(graph);
+    const resources = createPreviewRenderResources({
+      ...plan,
+      createCanvas: () => {
+        const canvas = document.createElement('canvas');
+        vi.spyOn(canvas, 'getContext').mockReturnValue({
+          clearRect: vi.fn(),
+          save: vi.fn(),
+          restore: vi.fn(),
+          fill: vi.fn(),
+          getImageData: (_x: number, _y: number, width: number, height: number) => ({
+            data: new Uint8ClampedArray(width * height * 4),
+          }),
+          createImageData: (width: number, height: number) => ({
+            data: new Uint8ClampedArray(width * height * 4),
+          }),
+          putImageData: vi.fn(),
+        } as unknown as CanvasRenderingContext2D);
+        return canvas;
+      },
+    });
+    try {
+      const retained = ['front', 'staging', 'source'].map((role) => resources.canvas(role, size));
+      const masks = createSceneSpotlightMasks(
+        size,
+        Array.from({ length: frameCount }, (_, index) => ({
+          opening: { x: index, y: 0, width: 4, height: 4 },
+          radius: 1,
+          dim: 0.5,
+          blur: 0,
+        })),
+        resources
+      );
+      expect(resources.counters.peakManagedBytes).toBe(plan.maximumManagedBytes);
+      expect(() => resources.bytes('overflow', plan.maximumManagedBytes)).toThrow();
+      masks.dispose();
+      for (const lease of retained) lease.release();
+    } finally {
+      resources.dispose();
+      vi.unstubAllGlobals();
+    }
+    expect(resources.counters.managedBytes).toBe(0);
+  }
+);
+
+it.each([true, false])(
+  'shares exact odd spatial storage with the preview graph for half-float=%s',
+  (halfFloat) => {
+    const spatial = { plane: { width: 5, height: 3 }, output: { width: 7, height: 5 }, halfFloat };
+    const declarations = calculateSpatialRenderAllocations(spatial);
+    expect(declarations).toHaveLength(14);
+    const bytes = declarations.reduce((total, entry) => total + entry.bytes, 0);
+    expect(bytes).toBe(halfFloat ? 840 : 788);
+    expect(declarations.reduce((total, entry) => total + entry.canvases, 0)).toBe(3);
+    const graph = input();
+    graph.scene.spatial = spatial;
+    expect(phase(calculatePreviewRenderAllocation(graph), 'scene').bytes).toBe(1200 + bytes);
+  }
+);

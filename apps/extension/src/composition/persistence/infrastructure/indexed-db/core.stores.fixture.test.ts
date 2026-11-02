@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { SUPPORTED_BETA_DATABASE_FIXTURES } from './fixtures';
 import { DB_NAME, DB_VERSION, EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores.ts';
@@ -6,6 +6,8 @@ import {
   CURRENT_SCHEMA_CONTRACTS,
   DATABASE_MIGRATIONS,
   PERSISTENCE_DOMAIN_REGISTRY,
+  buildDatabaseMigrationPlan,
+  parseStoredSchemaContracts,
 } from './schema-contracts.ts';
 
 function canonicalize(value: unknown): string {
@@ -34,6 +36,7 @@ it('admits known-source receipts without rewriting any released rows or object b
 });
 
 it('keeps every released migration aligned with its immutable source and target schemas', async () => {
+  vi.stubGlobal('IDBKeyRange', { bound: (lower: string, upper: string) => ({ lower, upper }) });
   for (const migration of DATABASE_MIGRATIONS) {
     const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
       (fixture) => fixture.databaseVersion === migration.fromDatabaseVersion
@@ -65,6 +68,8 @@ it('keeps every released migration aligned with its immutable source and target 
       abort: vi.fn(),
       objectStore: (name: string) => ({
         createIndex: createIndex(name),
+        openCursor: async () => null,
+        index: () => ({ getAll: async () => [] }),
         clear: mutateRows,
         delete: mutateRows,
         getAll: vi.fn(),
@@ -84,7 +89,13 @@ it('keeps every released migration aligned with its immutable source and target 
     expect(mutateRows).not.toHaveBeenCalled();
     expect(
       await migration.estimateAdditionalBytes({
-        transaction: () => ({ store: { openCursor: async () => null } }),
+        transaction: () => ({
+          store: {
+            openCursor: async () => null,
+            count: async () => 0,
+            index: () => ({ count: async () => 0 }),
+          },
+        }),
       })
     ).toBeGreaterThanOrEqual(64 * 1024);
     expect(() =>
@@ -100,7 +111,8 @@ it('pins the complete released beta fixture to the database and domain registrie
   expect(fixtureVersions).toEqual(Array.from({ length: DB_VERSION }, (_value, index) => index + 1));
   for (const fixture of SUPPORTED_BETA_DATABASE_FIXTURES) {
     const { expectedDigest, ...digestInput } = fixture;
-    expect(createHash('sha256').update(canonicalize(digestInput)).digest('hex')).toBe(
+    const actualDigest = createHash('sha256').update(canonicalize(digestInput)).digest('hex');
+    expect(actualDigest, `Database ${fixture.databaseVersion} digest ${actualDigest}`).toBe(
       expectedDigest
     );
   }
@@ -414,14 +426,14 @@ it('adds empty capture and native revision stores without rewriting version 39 r
   expect(
     PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'videoProjects')
   ).toMatchObject({
-    schemaVersion: 9,
+    schemaVersion: 11,
     stores: expect.arrayContaining([
       { storeName: 'video_project_revisions', dataClass: 'durable-authority' },
     ]),
   });
   expect(PERSISTENCE_DOMAIN_REGISTRY.find((domain) => domain.domainId === 'syncCapture')).toEqual({
     domainId: 'syncCapture',
-    schemaVersion: 6,
+    schemaVersion: 10,
     stores: [
       { storeName: 'sync_capture', dataClass: 'durable-authority' },
       { storeName: 'sync_outbox', dataClass: 'durable-authority' },
@@ -597,3 +609,89 @@ it('adds only due indexing without rewriting version 44 rows or immutable bytes'
     toDatabaseVersion: 45,
   });
 });
+
+it('admits native text anchors without rewriting workspaces, history, recovery or immutable bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 46
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 47
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 32 });
+  expect(DATABASE_MIGRATIONS.find((step) => step.toDatabaseVersion === 47)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    stores: ['video_workspaces', 'video_workspace_history', 'video_workspace_drafts'],
+    domainVersions: [{ domainId: 'mediaLibrary', from: 31, to: 32 }],
+  });
+});
+
+it('admits compact sync checkpoints without changing released rows, stores, indexes or immutable objects', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 48
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 49
+  )!;
+  expect(target).toBeDefined();
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 8 });
+  expect(
+    parseStoredSchemaContracts(
+      Object.entries(source.domainVersions).map(([domainId, schemaVersion]) => ({
+        domainId,
+        schemaVersion,
+      }))
+    )
+  ).toBeNull();
+  expect(buildDatabaseMigrationPlan(49, 48)).toBeNull();
+  expect(DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 48)).toMatchObject({
+    backupCoverage: 'none',
+    risk: 'additive',
+    stores: ['sync_capture', 'sync_outbox', 'sync_connection'],
+    domainVersions: [{ domainId: 'syncCapture', from: 7, to: 8 }],
+    toDatabaseVersion: 49,
+  });
+});
+
+it('adds shared protection without copying or rewriting version 49 credentials and source bytes', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 49
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 50
+  )!;
+  expect(target.records).toEqual({ ...source.records, secret_protection: [] });
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores.filter((name) => name !== 'secret_protection')).toEqual(source.stores);
+  expect(target.indexes).toEqual({ ...source.indexes, secret_protection: [] });
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, secretProtection: 1 });
+});
+
+it('adds only metadata indexes to version 50 while retaining every source row and object digest', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find((row) => row.databaseVersion === 50)!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((row) => row.databaseVersion === 51)!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, syncCapture: 9 });
+  const captureIndexes = source.indexes['sync_capture'];
+  const outboxIndexes = source.indexes['sync_outbox'];
+  if (!Array.isArray(captureIndexes) || !Array.isArray(outboxIndexes))
+    throw new Error('Released version 50 sync index arrays are required.');
+  expect(target.indexes).toEqual({
+    ...source.indexes,
+    sync_capture: [...captureIndexes, 'syncCaptureScopePhase', 'syncPendingScopeDue'],
+    sync_outbox: [...outboxIndexes, 'syncQueueScopeStatus'],
+  });
+  expect(buildDatabaseMigrationPlan(51, 50)).toBeNull();
+});
+
+afterEach(() => vi.unstubAllGlobals());

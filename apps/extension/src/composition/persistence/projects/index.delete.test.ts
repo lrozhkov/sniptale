@@ -1,5 +1,7 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { projectRowReferenceKeys } from '../assets/retention-index-projection';
+import { ROW_REFERENCE_INDEX } from '../infrastructure/indexed-db/row-index-contract';
 import { VideoProjectAssetType } from '../../../features/video/project/types/index';
 import { createMediaLibraryEntry, createVideoProjectEntry } from './index.test-support.ts';
 
@@ -10,10 +12,24 @@ const deleteMocks = vi.hoisted(() => ({
   txDeleteMock: vi.fn(),
   txGetAllMock: vi.fn(),
   txGetMock: vi.fn(),
+  selectedRecoveryMock: vi.fn(),
+  readClaimsMock: vi.fn(),
+  listReadyMock: vi.fn(),
+  indexedRowsMock: vi.fn(),
   recoverProjectMediaPublicationsMock: vi.fn(),
   completePhysicalDeleteOperationMock: vi.fn(),
   txCountMock: vi.fn(),
   txPutMock: vi.fn(),
+}));
+
+vi.mock('../assets/recovery', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverSelectedAssetPublications: deleteMocks.selectedRecoveryMock,
+}));
+vi.mock('../assets/opfs-store', async (importOriginal) => ({
+  ...(await importOriginal()),
+  readAssetReadyPublicationClaims: deleteMocks.readClaimsMock,
+  listReadyJournals: deleteMocks.listReadyMock,
 }));
 
 vi.mock('./asset-publication', async (importOriginal) => ({
@@ -61,6 +77,7 @@ vi.mock('../recordings/index', async (importOriginal) => ({
 
 function createDb() {
   return {
+    get: (_store: string, key: string) => deleteMocks.txGetMock(key),
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
       objectStore: vi.fn((storeName: string) => ({
@@ -75,7 +92,7 @@ function createDb() {
         getAll: deleteMocks.txGetAllMock,
         index: vi.fn(() => ({
           count: deleteMocks.txCountMock,
-          getAll: async () => [],
+          getAll: (key: IDBValidKey) => deleteMocks.indexedRowsMock(storeName, key),
           getAllKeys: async () => [],
         })),
         put:
@@ -92,6 +109,11 @@ beforeEach(() => {
     (id: string) => `project-asset:${id}`
   );
   deleteMocks.txGetAllMock.mockResolvedValue([]);
+  deleteMocks.indexedRowsMock.mockResolvedValue([]);
+  deleteMocks.selectedRecoveryMock.mockReset().mockResolvedValue(0);
+  deleteMocks.readClaimsMock
+    .mockReset()
+    .mockResolvedValue({ valid: true, pending: false, journals: [] });
   deleteMocks.recoverProjectMediaPublicationsMock.mockResolvedValue(undefined);
   deleteMocks.completePhysicalDeleteOperationMock.mockResolvedValue(undefined);
   deleteMocks.txCountMock.mockResolvedValue(0);
@@ -154,11 +176,18 @@ it('preserves shared project-owned assets when another project still references 
     type: VideoProjectAssetType.VIDEO,
   };
 
-  deleteMocks.txGetMock.mockResolvedValue(createVideoProjectEntry({ assets: [sharedAsset] }));
-  deleteMocks.txGetAllMock.mockResolvedValue([
-    createVideoProjectEntry({ assets: [sharedAsset] }),
-    createVideoProjectEntry({ assets: [sharedAsset], id: 'project-2' }, { id: 'project-2' }),
-  ]);
+  deleteMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === 'project-1'
+      ? createVideoProjectEntry({ assets: [sharedAsset] })
+      : key === 'asset-shared'
+        ? { id: key, assetId: 'shared-bytes', createdAt: 1, mimeType: 'video/mp4', size: 10 }
+        : undefined
+  );
+  deleteMocks.indexedRowsMock.mockImplementation(async (store: string) =>
+    store === 'video_projects'
+      ? [createVideoProjectEntry({ assets: [sharedAsset], id: 'project-2' }, { id: 'project-2' })]
+      : []
+  );
 
   await deleteVideoProject('project-1');
 
@@ -283,7 +312,8 @@ it('persists and completes physical deletion after removing the last asset owner
     expect.objectContaining({ assetIds: ['object-final'], kind: 'physical-delete' })
   );
   expect(deleteMocks.completePhysicalDeleteOperationMock).toHaveBeenCalledWith(
-    expect.objectContaining({ assetIds: ['object-final'] })
+    expect.objectContaining({ assetIds: ['object-final'] }),
+    expect.any(Object)
   );
 });
 
@@ -348,11 +378,21 @@ async function installNestedResourceGraph(failRelease = false) {
     index: (indexName: string) => ({
       count: async () => 0,
       getAll: async (key: IDBValidKey) =>
-        [...table(name).values()].filter(isRecord).filter((row) => row[indexName] === key),
+        [...table(name).values()]
+          .filter(isRecord)
+          .filter((row) =>
+            indexName === ROW_REFERENCE_INDEX
+              ? projectRowReferenceKeys(name, row).includes(String(key))
+              : row[indexName] === key
+          ),
       getAllKeys: async (key: IDBValidKey) =>
         [...table(name).values()]
           .filter(isRecord)
-          .filter((row) => row[indexName] === key)
+          .filter((row) =>
+            indexName === ROW_REFERENCE_INDEX
+              ? projectRowReferenceKeys(name, row).includes(String(key))
+              : row[indexName] === key
+          )
           .map((row) => {
             if (typeof row['aggregateId'] !== 'string' || typeof row['ordinal'] !== 'number')
               throw new Error('Invalid history fixture key');
@@ -498,4 +538,143 @@ it('exposes canonical project deletion inside a caller transaction without captu
   expect(deleteMocks.presentationDeleteMock).toHaveBeenCalledWith(['video-project', 'project-1']);
   expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
   expect(deleteMocks.recoverProjectMediaPublicationsMock).not.toHaveBeenCalled();
+});
+
+function selectionProject(projectAssetId: string) {
+  return createVideoProjectEntry({
+    assets: [
+      {
+        createdAt: 1,
+        id: projectAssetId,
+        name: projectAssetId,
+        metadata: {
+          audioPeaks: null,
+          duration: 4,
+          hasAudio: false,
+          height: 720,
+          mimeType: 'video/mp4',
+          size: 10,
+          width: 1280,
+        },
+        source: { kind: 'project-asset', projectAssetId },
+        type: VideoProjectAssetType.VIDEO,
+      },
+    ],
+  });
+}
+
+it('refreshes selected private sources and revalidates them in the deletion transaction', async () => {
+  const { deleteVideoProject } = await import('./index');
+  let current = selectionProject('before');
+  deleteMocks.txGetMock.mockImplementation(async (id: string) =>
+    id === 'project-1' ? current : undefined
+  );
+  deleteMocks.selectedRecoveryMock.mockImplementationOnce(async () => {
+    current = selectionProject('after');
+    return 1;
+  });
+  await deleteVideoProject('project-1');
+  expect(deleteMocks.selectedRecoveryMock.mock.calls.map((call) => call[1])).toEqual([
+    { id: 'project-1', projectAssetIds: ['before'] },
+    { id: 'project-1', projectAssetIds: ['after'] },
+  ]);
+  expect(deleteMocks.readClaimsMock).toHaveBeenCalledWith(
+    { id: 'project-1', projectAssetIds: ['after'] },
+    expect.any(Object)
+  );
+  expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
+  expect(deleteMocks.txGetAllMock).not.toHaveBeenCalled();
+  expect(deleteMocks.recoverProjectMediaPublicationsMock).not.toHaveBeenCalled();
+  expect(deleteMocks.listReadyMock).not.toHaveBeenCalled();
+});
+
+it('refuses a private-source change after claim admission without deleting the parent', async () => {
+  const { deleteVideoProject } = await import('./index');
+  let current = selectionProject('before');
+  deleteMocks.txGetMock.mockImplementation(async (id: string) =>
+    id === 'project-1' ? current : undefined
+  );
+  deleteMocks.readClaimsMock.mockImplementationOnce(async () => {
+    current = selectionProject('replacement');
+    return { valid: true, pending: false, journals: [] };
+  });
+  await expect(deleteVideoProject('project-1')).rejects.toThrow();
+  expect(deleteMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
+});
+
+it.each([
+  { valid: false, pending: false },
+  { valid: true, pending: true },
+])(
+  'refuses parent deletion when selected publication claims cannot be admitted: %j',
+  async (claims) => {
+    const { deleteVideoProject } = await import('./index');
+    deleteMocks.txGetMock.mockResolvedValue(createVideoProjectEntry());
+    deleteMocks.readClaimsMock.mockResolvedValueOnce({ ...claims, journals: [] });
+    await expect(deleteVideoProject('project-1')).rejects.toMatchObject({
+      reason: 'pending-publication',
+    });
+    expect(deleteMocks.txDeleteMock).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses malformed or mismatched parent bindings before publication recovery', async () => {
+  const { deleteVideoProject } = await import('./index');
+  for (const raw of [{ id: 'project-1' }, createVideoProjectEntry({}, { id: 'another-project' })]) {
+    deleteMocks.txGetMock.mockResolvedValue(raw);
+    await expect(deleteVideoProject('project-1')).rejects.toMatchObject({
+      reason: 'source-unavailable',
+    });
+  }
+  expect(deleteMocks.selectedRecoveryMock).not.toHaveBeenCalled();
+  expect(deleteMocks.txDeleteMock).not.toHaveBeenCalled();
+});
+
+it('includes detached export inputs in project mutation and deletion transaction scopes', async () => {
+  const { createProjectMutationStores, createProjectDeletionStores } =
+    await import('./mutation-stores');
+  const db = await deleteMocks.initDBMock();
+  createProjectMutationStores(db);
+  createProjectDeletionStores(db);
+  expect(db.transaction).toHaveBeenCalledTimes(2);
+  for (const call of db.transaction.mock.calls)
+    expect(call).toEqual([expect.arrayContaining(['project_export_inputs']), 'readwrite']);
+});
+
+it('selects only the deleted private source publications when its Library mirror is missing', async () => {
+  const { deleteProjectAsset } = await import('./index');
+  deleteMocks.txGetMock.mockResolvedValue(undefined);
+  await deleteProjectAsset('private-source');
+  const target = {
+    id: 'project-asset:private-source',
+    source: { kind: 'project-asset', projectAssetId: 'private-source' },
+  };
+  expect(deleteMocks.selectedRecoveryMock).toHaveBeenCalledWith(
+    [
+      expect.objectContaining({ domain: 'project-assets' }),
+      expect.objectContaining({ domain: 'project-exports' }),
+    ],
+    target,
+    { transitionPermit: expect.any(Object), lifecyclePermit: expect.any(Object) }
+  );
+  expect(deleteMocks.readClaimsMock).toHaveBeenCalledWith(target, expect.any(Object));
+  expect(deleteMocks.txGetAllMock).not.toHaveBeenCalled();
+  expect(deleteMocks.recoverProjectMediaPublicationsMock).not.toHaveBeenCalled();
+  expect(deleteMocks.listReadyMock).not.toHaveBeenCalled();
+});
+
+it('refuses a private source whose Library mirror binds another identity', async () => {
+  const { deleteProjectAsset } = await import('./index');
+  deleteMocks.txGetMock.mockResolvedValue(
+    createMediaLibraryEntry({
+      id: 'project-asset:private-source',
+      source: { kind: 'project-asset', projectAssetId: 'replacement' },
+    })
+  );
+  await expect(deleteProjectAsset('private-source')).rejects.toMatchObject({
+    reason: 'source-unavailable',
+  });
+  expect(deleteMocks.txDeleteMock).not.toHaveBeenCalled();
+  expect(deleteMocks.completePhysicalDeleteOperationMock).not.toHaveBeenCalled();
 });

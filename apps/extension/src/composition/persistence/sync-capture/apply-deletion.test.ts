@@ -1,3 +1,4 @@
+import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import type { PreparedVideoReviewReplicaRoot } from './prepared-review';
 import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
 import { applyPreparedVideoReviewReplica } from './apply-review';
@@ -770,3 +771,22 @@ it.each([
     expect(io.cleanup).not.toHaveBeenCalled();
   }
 );
+it('refuses incoming deletion while the native root has a pending checkpoint', async () => {
+  const f = await setup();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: f.input.rootKind, rootId: f.input.rootId },
+    2
+  );
+  await tx.done;
+  expect(pending).not.toBeNull();
+  const before = structuredClone(f.nativeRows);
+  await expect(applyCatalogDeletionNative(f.input)).rejects.toThrow();
+  expect(f.nativeRows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyCatalogDeletionNative(f.input)).resolves.toMatchObject({ status: 'applied' });
+});

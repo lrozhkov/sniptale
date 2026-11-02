@@ -33,9 +33,7 @@ function createBuildArgs() {
     reloadData: vi.fn(),
   };
   const chromeAi = { availability: 'available', enabled: false } as never;
-  const secretProtection = {
-    status: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
-  } as never;
+  const secretProtection = { ensureUnlocked: vi.fn().mockResolvedValue(undefined) };
   const modals = { confirmDelete: null, model: { open: false }, provider: { open: false } };
 
   return {
@@ -72,6 +70,7 @@ it('builds the ai providers controller state from owner-local props', () => {
 
   const state = buildAiProvidersSectionControllerState(args);
   expect(state.catalogModels).toBe(args.dataState.selection.models);
+  expect(state.secretProtection).toBe(args.secretProtection);
 
   expect(buildMocks.buildAiProvidersModelOptionsMock).toHaveBeenCalledWith({
     getProviderName,
@@ -80,7 +79,7 @@ it('builds the ai providers controller state from owner-local props', () => {
   expect(state).toMatchObject({
     chromeAi: expect.objectContaining({ availability: 'available' }),
     secretProtection: expect.objectContaining({
-      status: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
+      ensureUnlocked: args.secretProtection.ensureUnlocked,
     }),
     catalogActions: {
       clearProviderSecret: handleClearProviderSecret,

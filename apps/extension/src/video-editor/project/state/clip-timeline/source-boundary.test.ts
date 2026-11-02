@@ -5,7 +5,7 @@ import {
   type VideoProjectVideoClip,
 } from '../../../../features/video/project/types';
 import { setup } from '../insertion/material.test-support';
-import { resetVideoEditorProjectHistory } from '../../history';
+import { resetVideoEditorProjectHistory, undoVideoEditorProjectHistory } from '../../history';
 
 function recording(rate = 1, cameraStart = 2) {
   const { store } = setup();
@@ -64,7 +64,10 @@ it.each([1, 2])(
     });
     expect(clips[1]!.sourceStart).toBe(0);
     expect(clamped.projectHistory.past).toHaveLength(1);
-    expect(clamped.projectHistory.past[0]!.project.clips).toEqual(project.clips);
+    expect(undoVideoEditorProjectHistory(clamped.projectHistory, clamped.project!)).toMatchObject({
+      status: 'applied',
+      project: { clips: project.clips },
+    });
     store.getState().trimClipStart(project.clips[0]!.id, 1.5);
     expect(store.getState().project).toBe(clamped.project);
     expect(store.getState().projectHistory).toBe(clamped.projectHistory);
@@ -84,7 +87,9 @@ it('can expand to exact source zero while keeping both project and source Out fi
   });
   expect(clips[1]!.sourceStart).toBe(0);
   expect(store.getState().projectHistory.past).toHaveLength(1);
-  expect(store.getState().projectHistory.past[0]!.project.clips).toEqual(project.clips);
+  expect(
+    undoVideoEditorProjectHistory(store.getState().projectHistory, store.getState().project!)
+  ).toMatchObject({ status: 'applied', project: { clips: project.clips } });
 });
 
 it('does not constrain a start trim by a linked companion whose start edge is elsewhere', () => {

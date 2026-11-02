@@ -117,17 +117,22 @@ function routeFrameAnnotationRasterAction(action: BackgroundOwnedAction): Action
 function routeSyncConnectionOriginPermissionAction(
   action: BackgroundOwnedAction
 ): ActionResult | null {
-  return keepOpen(
-    routeSyncConnectionOriginPermission(
-      action.message,
-      action.context.sender,
-      action.context.sendResponse
-    )
-  );
+  const { runtimeState, sender, sendResponse } = action.context;
+  if (runtimeState.syncCredentialRoute?.(action.message, sender, sendResponse))
+    return keepOpen(true);
+  if (runtimeState.syncOriginPermissionRoute)
+    return keepOpen(runtimeState.syncOriginPermissionRoute(action.message, sender, sendResponse));
+  return keepOpen(routeSyncConnectionOriginPermission(action.message, sender, sendResponse));
 }
 
 function routeVoiceInputOffscreenEventAction(action: BackgroundOwnedAction): ActionResult | null {
-  return keepOpen(routeVoiceInputOffscreenEvent(action.message, action.context.sendResponse));
+  return keepOpen(
+    routeVoiceInputOffscreenEvent(
+      action.message,
+      action.context.sendResponse,
+      action.context.runtimeState.voiceInputRuntime
+    )
+  );
 }
 
 function routeNativeAppRuntimeAction(action: BackgroundOwnedAction): ActionResult | null {
@@ -138,7 +143,12 @@ function routeNativeAppRuntimeAction(action: BackgroundOwnedAction): ActionResul
 
 function routeLlmSessionAction(action: BackgroundOwnedAction): ActionResult | null {
   return keepOpen(
-    routeLlmSessionMessage(action.message, action.context.sender, action.context.sendResponse)
+    routeLlmSessionMessage(
+      action.message,
+      action.context.sender,
+      action.context.sendResponse,
+      action.context.runtimeState.secretProtection
+    )
   );
 }
 
@@ -151,7 +161,8 @@ function routeAiSettingsQueryAction(
       action.message,
       action.context.sender,
       action.context.sendResponse,
-      routeContext
+      routeContext,
+      action.context.runtimeState.secretProtection
     )
   );
 }
@@ -161,7 +172,9 @@ function routeAiSettingsMutationAction(action: BackgroundOwnedAction): ActionRes
     routeAiSettingsMutationMessage(
       action.message,
       action.context.sender,
-      action.context.sendResponse
+      action.context.sendResponse,
+      action.context.runtimeState.secretProtection,
+      action.context.runtimeState.aiSettingsMutator
     )
   );
 }
@@ -197,7 +210,9 @@ function routeAiSecretUnlockAction(
       action.message,
       action.context.sender,
       action.context.sendResponse,
-      routeContext
+      routeContext,
+      action.context.runtimeState.secretProtection,
+      action.context.runtimeState.secretUnlockSync
     )
   );
 }
@@ -236,7 +251,12 @@ function routeSettingsTransferAction(action: BackgroundOwnedAction): ActionResul
 
 function routeLlmAction(action: BackgroundOwnedAction): ActionResult | null {
   return keepOpen(
-    routeLlmMessage(action.message, action.context.sendResponse, action.context.sender)
+    routeLlmMessage(
+      action.message,
+      action.context.sendResponse,
+      action.context.sender,
+      action.context.runtimeState.secretProtection
+    )
   );
 }
 
@@ -245,7 +265,8 @@ function routeScenarioEditorLlmAction(action: BackgroundOwnedAction): ActionResu
     routeScenarioEditorLlmMessage(
       action.message,
       action.context.sendResponse,
-      action.context.sender
+      action.context.sender,
+      action.context.runtimeState.secretProtection
     )
   );
 }

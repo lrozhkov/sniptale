@@ -39,6 +39,7 @@ vi.mock('../../composition/persistence/assets', async (original) => ({
   readAssetFile: io.read,
   runWithDurableAssetOperation: async (operation: () => Promise<unknown>) => operation(),
   releaseAssetReadyProtection: async () => undefined,
+  settleAssetWritingMarkers: async () => undefined,
 }));
 vi.mock('../../composition/persistence/sync-capture/outgoing', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/sync-capture/outgoing')>()),

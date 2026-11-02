@@ -463,3 +463,124 @@ it('does not announce failed queue work or a published result arriving after Sto
   await stopped;
   expect(onSettled).not.toHaveBeenCalled();
 });
+
+it('retains the exact lock cause while draining an admitted queue execution', async () => {
+  const test = fixture();
+  test.start();
+  await settleWorkflow();
+  const job = test.pending[0]!;
+  const stopped = test.stop({ reason: 'secrets-locked' });
+  expect(job.input.signal.aborted).toBe(true);
+  expect(job.input.signal.reason).toMatchObject({ code: 'secrets-locked' });
+  job.drainage.resolve();
+  job.result.resolve(published);
+  await expect(stopped).resolves.toMatchObject({ success: true });
+  expect(test.inspect()).toMatchObject({
+    phase: 'stopped',
+    jobs: [{ state: 'failed', failureCode: 'secrets-locked' }],
+  });
+});
+
+describe('workspace discovery execution', () => {
+  function discovered(): SyncWorkspaceExecutionResult {
+    return {
+      containment: 'contained',
+      snapshot: {
+        state: 'discovered',
+        failureCode: null,
+        discovery: {
+          source: { kind: 'join', identity: { ...binding.authorization, revision: 2 } },
+          scope: 'exact',
+          complete: true,
+          candidates: [
+            {
+              prefix: '',
+              identity: {
+                spaceId: '55555555-5555-4555-8555-555555555555',
+                bootstrapId: '66666666-6666-4666-8666-666666666666',
+                fingerprint: 'a'.repeat(64),
+              },
+            },
+          ],
+          issues: [],
+        },
+      },
+    };
+  }
+  it('forwards discovery before ACK and publishes its advanced source instead of ready', async () => {
+    const test = fixture();
+    expect(
+      test.startWorkspace({
+        source: { kind: 'join', identity: binding.authorization },
+        operation: 'discover',
+      }).success
+    ).toBe(true);
+    expect(test.createWorkspaceExecution).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'discover' })
+    );
+    expect(
+      test.startWorkspace({ source: { kind: 'join', identity: binding.authorization } }).success
+    ).toBe(false);
+    await settleWorkflow();
+    test.workspacePending[0]!.result.resolve(discovered());
+    await settleWorkflow();
+    expect(test.inspect().workspace).toMatchObject({
+      state: 'discovered',
+      selectionRevision: 2,
+      discovery: { source: { kind: 'join', identity: { ...binding.authorization, revision: 2 } } },
+    });
+    expect(JSON.stringify(test.inspect())).not.toContain('workspace-private-token');
+  });
+  it('refuses allocation discovery before constructing an execution handle', () => {
+    const test = fixture();
+    expect(test.startWorkspace({ operation: 'discover' }).success).toBe(false);
+    expect(test.createWorkspaceExecution).not.toHaveBeenCalled();
+  });
+  it('does not publish a late discovered result after Stop and drains before allowing replacement', async () => {
+    const test = fixture();
+    test.startWorkspace({
+      source: { kind: 'join', identity: binding.authorization },
+      operation: 'discover',
+    });
+    await settleWorkflow();
+    const stopping = test.stop();
+    test.workspacePending[0]!.result.resolve(discovered());
+    await settleWorkflow();
+    expect(test.inspect().workspace?.state).toBe('interrupted');
+    test.workspacePending[0]!.drainage.resolve();
+    await stopping;
+    expect(test.inspect().workspace).not.toHaveProperty('discovery');
+  });
+  it.each(['replacement', 'same-revision', 'unsafe'] as const)(
+    'refuses %s discovery evidence without retaining its payload',
+    async (change) => {
+      const test = fixture();
+      test.startWorkspace({
+        source: { kind: 'join', identity: binding.authorization },
+        operation: 'discover',
+      });
+      await settleWorkflow();
+      const result = discovered();
+      if (result.snapshot.state !== 'discovered') throw new Error('Discovery missing');
+      if (change === 'replacement')
+        result.snapshot.discovery.source.identity.incarnation =
+          '77777777-7777-4777-8777-777777777777';
+      if (change === 'same-revision') result.snapshot.discovery.source.identity.revision = 1;
+      if (change === 'unsafe') result.containment = 'unsafe';
+      test.workspacePending[0]!.result.resolve(result);
+      await settleWorkflow();
+      expect(test.inspect().workspace).toMatchObject({ state: 'failed', failureCode: 'internal' });
+      expect(test.inspect().workspace).not.toHaveProperty('discovery');
+      expect(test.start().success).toBe(false);
+    }
+  );
+  it('refuses discovered evidence returned by a prepare execution', async () => {
+    const test = fixture();
+    test.startWorkspace({ source: { kind: 'join', identity: binding.authorization } });
+    await settleWorkflow();
+    test.workspacePending[0]!.result.resolve(discovered());
+    await settleWorkflow();
+    expect(test.inspect().workspace).toMatchObject({ state: 'failed', failureCode: 'internal' });
+    expect(test.inspect().workspace).not.toHaveProperty('discovery');
+  });
+});

@@ -25,7 +25,9 @@ export async function assertEffectBundleCatalogIntegrity(
     if ((await sha256EffectV1Bytes(bytes)) !== document.sha256) {
       throwIntegrityFailure();
     }
-    const validation = validateEffectV1Document(parseCatalogDocument(bytes));
+    const validation = validateEffectV1Document(parseCatalogDocument(bytes), {
+      presentationPolicy: 'retained',
+    });
     if (
       !validation.ok ||
       validation.document?.id !== document.id ||

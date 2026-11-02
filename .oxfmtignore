@@ -16,3 +16,10 @@ packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conforma
 apps/extension/src/features/video/project/cursor-trajectory/fixtures.json
 apps/extension/src/features/video/project/recording-events/fixtures.json
 apps/extension/src/features/video/project/recording-events/keyboard-hold-fixtures.json
+packages/runtime-contracts/src/effect-v1/fixtures/presentation/parity.json
+packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-effect-v1.schema.json
+apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/expectations.json
+apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/sniptale-effect-v1.schema.json
+
+# Immutable historical SDK schema, independently pinned by corpus and contract proof.
+packages/runtime-contracts/src/effect-v1/fixtures/presentation/schema-4f52a70.json

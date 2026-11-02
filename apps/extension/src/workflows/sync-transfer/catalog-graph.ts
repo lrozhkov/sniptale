@@ -221,7 +221,7 @@ function immutableMediaVersion(operation: SyncOperation): string | null {
       operation.envelope.objects.length !== 1 ||
       operation.objects.length !== 1 ||
       object.size !== entry.size ||
-      object.mimeType !== entry.mimeType ||
+      object.mimeType !== entry.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
       child.size !== entry.size ||
       child.mimeType !== entry.mimeType
     )
@@ -329,7 +329,7 @@ function immutableScenarioChildren(
         !object ||
         !hash ||
         entry.size !== object.size ||
-        entry.mimeType !== object.mimeType
+        entry.mimeType.split(';', 1)[0]!.trim().toLowerCase() !== object.mimeType
       )
         throw new Error('Required Scenario child is unavailable.');
       const {

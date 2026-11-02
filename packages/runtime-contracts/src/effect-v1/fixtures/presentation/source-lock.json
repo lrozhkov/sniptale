@@ -1,0 +1,94 @@
+{
+  "source": "Mirrored contract sources from the verified 49-file immutable SDK semantic/retained snapshot",
+  "baseCommit": "4f52a70f26b3e0e8fd69630aafc5b37fcea73bf4",
+  "cleanCommit": false,
+  "manifestSha256": "9c580f3d7b26d6fd18e8e8ca86e2c970fcd2b6cadd6a1261aedf13656bc63b49",
+  "schemaSha256": "f7c864dccf506496a83061735e96e575ccd2574d8a2088978c6b9076dd4546c7",
+  "paritySha256": "d454a5a3b67541e6ba5a6b3336d15b6f361143dc8442f12546a1cec2a0ea9b99",
+  "files": [
+    {
+      "path": "schemas/sniptale-effect-v1.schema.json",
+      "sha256": "f7c864dccf506496a83061735e96e575ccd2574d8a2088978c6b9076dd4546c7"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-group-icons-validation.ts",
+      "sha256": "9d95786c79dc5169aaa0ca07f3aa5c59aa00898f79462b069bf47444fe4c57ef"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-group-icons.ts",
+      "sha256": "6aa7b7a4b97b23220114405ede6c1d95e0409b6298a37cbe952da8770c8d43a9"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-groups-validation.ts",
+      "sha256": "19cd0c2ae6280212297207c0116ac3ca4a0deb627e6d0d8eb4749484350e7cdf"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-metadata-validation.ts",
+      "sha256": "45fe2ed74bb8af42b05cee9d5703e365275f0cf72632f280baf28e16cf75b24e"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-presentation-model.ts",
+      "sha256": "29d302eea6ff16d704d0eeeba65b7268937292d5051a0a0911e02c8bfd6649c5"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-presentation.ts",
+      "sha256": "089301bc9d3f52946720f06e377141859a3a790963bbfcf7aeeb87bd6e5d2cd2"
+    },
+    {
+      "path": "src/sdk/effect-v1/control-presets-validation.ts",
+      "sha256": "a4c07f78bc81d8e584dbd3edcafd065d053ee20717fd6152ea4c7cde1c4df7e8"
+    },
+    {
+      "path": "src/sdk/effect-v1/index.ts",
+      "sha256": "733e7a30fccc7d0b62476ed47830f2ad64ec4d12ecce65e38a70435380234549"
+    },
+    {
+      "path": "src/sdk/effect-v1/normalization.ts",
+      "sha256": "a9e30a6ec6305c80b6ff9de17a60225973afc5d7cf431760de604f74641e5a43"
+    },
+    {
+      "path": "src/sdk/effect-v1/scene-validation.ts",
+      "sha256": "668009d85f90c630eb5d8560fdd73720a5e675e318847c1eb804ace8ce80d3fd"
+    },
+    {
+      "path": "src/sdk/effect-v1/schema-control-presentation.ts",
+      "sha256": "95aff544da234fc684753dfdb5d907293db9009fdfe98072c8de5a4bb1b5bf30"
+    },
+    {
+      "path": "src/sdk/effect-v1/schema-control.ts",
+      "sha256": "7db5571f244ae01c6f20846a741f9e16f39a5c3c572e8f67230f8fee13d8327d"
+    },
+    {
+      "path": "src/sdk/effect-v1/schema.ts",
+      "sha256": "0123d179b20b3130e21ff990d55fb0a6fe8b0290ff318f71b7716dd7908b8af3"
+    },
+    {
+      "path": "src/sdk/effect-v1/types.ts",
+      "sha256": "ce23dab5c24fc6654f73b3a9313e90f54807eb373e0ccf7bc619d1039d22185c"
+    },
+    {
+      "path": "src/sdk/effect-v1/validation.ts",
+      "sha256": "b183836475d54ab2bcc2bfefd7ee94f01b05bac2959a8b8f8ee02b4d6550bc1a"
+    },
+    {
+      "path": "src/sdk/locale-types.ts",
+      "sha256": "986429a325bf2f10daf07933d491a3619c7e6d74ae52aa4d497541eddc14f93f"
+    },
+    {
+      "path": "src/sdk/types.ts",
+      "sha256": "34021a4f555ec4439151de391fa68834f0b4da274a1204c13262869e4fcec1f9"
+    },
+    {
+      "path": "proof/control-presentation-parity.json",
+      "sha256": "d454a5a3b67541e6ba5a6b3336d15b6f361143dc8442f12546a1cec2a0ea9b99"
+    },
+    {
+      "path": "proof/control-presentation-contract.md",
+      "sha256": "bde2a3a32aa795423a478bf65ab23924b139c0209f276e106162e2fc0bd73abe"
+    },
+    {
+      "path": "icon-glyph-map.json",
+      "sha256": "22ba712bb203db8a69ce2963d9e6e04d72fe9118f6dd9e40f97c6dfbacc559a4"
+    }
+  ]
+}

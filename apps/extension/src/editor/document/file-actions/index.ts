@@ -1,4 +1,5 @@
 import { createOutputFilename } from '../../../workflows/file-naming/index';
+import { flushEditorDocumentForExit } from './checkpoint-exit';
 import { waitForEditorDocumentCanvas } from './canvas-ready';
 import { readFileAsDataUrl, readFileAsText } from './file-reader';
 import { assertEditorSessionFileCanBeRead, parseImportedEditorDocument } from './import-session';
@@ -64,7 +65,10 @@ export async function openEditorImageFromFile(
   await lifecycle.beforeOpen?.();
   if (!lifecycle.beforeOpen && controller.autosaveService) {
     if (!controller.exportDocument) throw new Error('Editor document export is unavailable.');
-    await controller.autosaveService.flushAutosave(controller.exportDocument.bind(controller));
+    const autosave = controller.autosaveService;
+    await flushEditorDocumentForExit(autosave, controller.exportDocument.bind(controller));
+    if (controller.autosaveService !== autosave)
+      throw new Error('Editor document changed during exit.');
   }
   if (!isCurrentEditorDocumentOpenOperation(openToken)) {
     return;
@@ -138,7 +142,9 @@ export async function importEditorSessionFromFile(
   if (autosaveService) {
     if (!controller.exportDocument) throw new Error('Editor document export is unavailable.');
     const getDocument = controller.exportDocument.bind(controller);
-    await autosaveService.flushAutosave(getDocument);
+    await flushEditorDocumentForExit(autosaveService, getDocument);
+    if (controller.autosaveService !== autosaveService)
+      throw new Error('Editor document changed during exit.');
     if (!isCurrentEditorDocumentOpenOperation(openToken)) return;
   }
   await loadEditorSessionDocument(controller, document, openToken, setImageData);

@@ -554,3 +554,10 @@ it('shows and edits link curves through compact choices', () => {
     incomingConnection: { fromRegionId: first.id, easing: VideoTemporalEasing.LINEAR },
   });
 });
+
+it('uses distinct icons for simultaneous inspector categories', () => {
+  renderPanel(createMotionPanelProps());
+  const icons = [...container!.querySelectorAll('nav button svg')].map((icon) => icon.innerHTML);
+  expect(icons.length).toBeGreaterThan(1);
+  expect(new Set(icons).size).toBe(icons.length);
+});

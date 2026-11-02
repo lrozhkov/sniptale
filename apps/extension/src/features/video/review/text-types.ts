@@ -37,6 +37,13 @@ export interface ReviewCaptionSettings {
 /** Words, start and end share the declared clock; revision counts content changes only. */
 export interface ReviewTextFragment extends ReviewSpeechPhrase {
   timeDomain: 'source' | 'result';
+  /** Native text placement uses the voiceover timing rules; provenance remains descriptive. */
+  sourceAnchor?: {
+    duration: number;
+    spans: import('./time-segment').QuickEditVoiceoverAnchor[];
+    /** Word seconds relative to the retained native text interval. */
+    words?: ReviewSpeechWord[];
+  };
   timingRevision: number;
   showInVideo: boolean;
   style?: ReviewCaptionStyle;

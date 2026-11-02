@@ -352,3 +352,12 @@ A distinct periodic alarm wakes retry maintenance. A synchronous browser startup
 A running executor job causes native metadata deferral. Missing execution permits recovery only through the workflow operation lock. Elapsed time cannot establish containment. Failed observation preserves work for a later wake-up.
 
 Automatic execution remains inside the security qualification boundary. This change does not activate production enrollment or unrestricted start ingress.
+
+
+## Shared secret runtime authority
+
+Background constructs one shared secret service with explicit AI and WebDAV participant dependencies. The service owns the only unlocked phrase-derived key. Runtime constructors receive its narrow admission or command ports. Domain adapters preserve native identities, AAD and metadata ownership. No WebDAV consumer imports AI settings as its security authority.
+
+The sync runtime issues worker-bound credential leases outside disposable status snapshots. Offscreen resolves authentication through the trusted background bridge for each HTTP attempt. The final dispatch checks the durable protection epoch under the existing connection admission lock. The background bridge does not acquire that caller-held lock or enter the coordinator queue. Lock and startup recovery stop and drain the existing executor before they report containment. They preserve the separate user pause.
+
+The unlock route accepts a bounded sync purpose from the canonical popup document. Settings submission remains bound to the request identity. After derivation, the common service checks that request before it publishes the unlocked key. The route consumes the exact sync intent before it requests a native checkpoint flush. Cancellation, expiry, replacement and stale native selection refuse that continuation. A normal unlock resumes blocked work without changing checkpoint deadlines.

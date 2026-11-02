@@ -1,5 +1,5 @@
-import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
 // @vitest-environment jsdom
+import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';

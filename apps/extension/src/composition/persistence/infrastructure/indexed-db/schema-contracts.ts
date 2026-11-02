@@ -41,6 +41,7 @@ import {
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
+  SECRET_PROTECTION_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -70,8 +71,13 @@ interface StoredSchemaContract {
 
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
+    domainId: 'secretProtection',
+    schemaVersion: 1,
+    stores: [{ storeName: SECRET_PROTECTION_STORE, dataClass: 'durable-authority' }],
+  },
+  {
     domainId: 'syncCapture',
-    schemaVersion: 6,
+    schemaVersion: 10,
     stores: [
       { storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' },
       { storeName: SYNC_OUTBOX_STORE, dataClass: 'durable-authority' },
@@ -86,7 +92,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'recordings',
-    schemaVersion: 5,
+    schemaVersion: 6,
     stores: [
       { storeName: STORE_NAME, dataClass: 'durable-authority' },
       { storeName: RECORDING_TELEMETRY_STORE, dataClass: 'durable-authority' },
@@ -99,7 +105,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 31,
+    schemaVersion: 34,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -112,7 +118,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'assetGraph',
-    schemaVersion: 4,
+    schemaVersion: 6,
     stores: [
       { storeName: ASSET_REFS_STORE, dataClass: 'durable-authority' },
       { storeName: ASSET_RESIDENCY_STORE, dataClass: 'durable-authority' },
@@ -122,7 +128,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 9,
+    schemaVersion: 11,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: VIDEO_PROJECT_REVISIONS_STORE, dataClass: 'durable-authority' },
@@ -133,7 +139,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 8,
+    schemaVersion: 10,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_PROJECT_HISTORY_STORE, dataClass: 'durable-authority' },
@@ -146,7 +152,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'snapshots',
-    schemaVersion: 1,
+    schemaVersion: 3,
     stores: [{ storeName: WEB_SNAPSHOTS_STORE, dataClass: 'durable-authority' }],
   },
   {

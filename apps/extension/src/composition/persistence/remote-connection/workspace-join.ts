@@ -1,3 +1,5 @@
+import { withSecretProtectionWriter } from '../secret-protection/service';
+import { assertSecretProtectionStableInTransaction } from '../secret-protection/transition.store';
 import { connectionText, connectionExact as exact } from './model';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -10,6 +12,7 @@ import {
   SYNC_CAPTURE_STORE,
   SYNC_CONNECTION_STORE,
   SYNC_OUTBOX_STORE,
+  SECRET_PROTECTION_STORE,
 } from '../infrastructure/indexed-db/core.stores';
 import { runWithPersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { withSyncConnectionAdmissionLock } from './coordination';
@@ -37,7 +40,12 @@ export interface SyncWorkspaceJoin {
   workspace: SyncWorkspaceIdentity | null;
 }
 type JoinTransaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
-const stores = [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, SYNC_OUTBOX_STORE];
+const stores = [
+  SECRET_PROTECTION_STORE,
+  SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
+  SYNC_OUTBOX_STORE,
+];
 function refused(): never {
   throw new Error('Sync workspace join admission refused.');
 }
@@ -131,24 +139,27 @@ async function mutate<T>(
   // Capture before admission waits; erasure closes this handle instead of authorizing a reopen.
   const db = capturePreparedDatabase();
   if (!db) return refused();
-  return withSyncConnectionAdmissionLock(() =>
-    runWithPersistenceMutationPermit(async () => {
-      const tx = db.transaction(stores, 'readwrite');
-      try {
-        await checkUnenrolled(tx);
-        const result = await operation(tx);
-        await tx.done;
-        return result;
-      } catch (error) {
+  return withSecretProtectionWriter(() =>
+    withSyncConnectionAdmissionLock(() =>
+      runWithPersistenceMutationPermit(async () => {
+        const tx = db.transaction(stores, 'readwrite');
         try {
-          tx.abort();
-        } catch {
-          /* Transaction can already be closed. */
+          await assertSecretProtectionStableInTransaction(tx);
+          await checkUnenrolled(tx);
+          const result = await operation(tx);
+          await tx.done;
+          return result;
+        } catch (error) {
+          try {
+            tx.abort();
+          } catch {
+            /* Transaction can already be closed. */
+          }
+          await tx.done.catch(() => undefined);
+          throw error;
         }
-        await tx.done.catch(() => undefined);
-        throw error;
-      }
-    })
+      })
+    )
   );
 }
 /** Select a root before remote reads, replacing only an exact prior JOIN selection. */

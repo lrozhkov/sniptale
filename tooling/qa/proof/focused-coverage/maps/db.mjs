@@ -1,5 +1,48 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'review-attachment-target-retention-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/assets/retention-index.ts',
+    allowCrossOwner: true,
+    reason:
+      'Review attachment cancellation and Library binding use the native target-retention index.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/presentation-attachment.test.ts',
+      'apps/extension/src/workflows/video-review/watermark-image.test.ts',
+    ],
+  },
+  {
+    owner: 'review-attachment-physical-cleanup-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/assets/operations.ts',
+    allowCrossOwner: true,
+    reason:
+      'Review attachment cancellation uses checked physical cleanup and targeted ready claims.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/presentation-attachment.test.ts',
+      'apps/extension/src/workflows/video-review/watermark-image.test.ts',
+    ],
+  },
+  {
+    owner: 'durable-asset-retention-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/assets/retention-authority.ts',
+    allowCrossOwner: true,
+    reason:
+      'Retention authority serves physical deletion, recovery, audit and residency. ' +
+      'These consumers prove failed reads, cancellation, rollback claims and retained sources.',
+    testFiles: [
+      'apps/extension/src/composition/persistence/assets/retention-authority.test.ts',
+      'apps/extension/src/composition/persistence/assets/operations.test.ts',
+      'apps/extension/src/composition/persistence/assets/fault-state-machine.test.ts',
+      'apps/extension/src/composition/persistence/assets/residency-maintenance.test.ts',
+      'apps/extension/src/composition/persistence/assets/residency-maintenance.inline.test.ts',
+      'apps/extension/src/composition/persistence/assets/private-source-retention.test.ts',
+      'apps/extension/src/composition/persistence/asset-publication-recovery/audit.test.ts',
+      'apps/extension/src/composition/persistence/asset-publication-recovery/index.test.ts',
+      'apps/extension/src/composition/persistence/asset-publication-recovery/maintenance.integration.test.ts',
+      'apps/extension/src/composition/persistence/asset-publication-recovery/maintenance.test.ts',
+      'apps/extension/src/workflows/sync-transfer/native-residency.test.ts',
+    ],
+  },
+  {
     owner: 'sync-connection-enrollment-and-retirement',
     productionFile: 'apps/extension/src/composition/persistence/remote-connection/store.ts',
     reason:

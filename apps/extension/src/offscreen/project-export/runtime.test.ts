@@ -297,14 +297,20 @@ it('creates one spatial GPU owner per export job and replaces a lost instance on
   expect(createReviewSpatialRenderer).toHaveBeenCalledOnce();
   const lost = vi.mocked(createReviewSpatialRenderer).mock.calls[0]![0]!;
   lost();
-  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[0]!.value.dispose
+  ).toHaveBeenCalledOnce();
   expect(job).not.toHaveProperty('cameraSpatialRenderer');
   const next = getProjectExportSpatialRenderer(job);
   expect(next).not.toBe(first);
   expect(createReviewSpatialRenderer).toHaveBeenCalledTimes(2);
   lost();
-  expect(first.dispose).toHaveBeenCalledOnce();
-  expect(next.dispose).not.toHaveBeenCalled();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[0]!.value.dispose
+  ).toHaveBeenCalledOnce();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[1]!.value.dispose
+  ).not.toHaveBeenCalled();
   expect(getProjectExportSpatialRenderer(job)).toBe(next);
 });
 

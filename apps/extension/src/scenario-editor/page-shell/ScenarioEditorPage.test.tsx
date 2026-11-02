@@ -327,10 +327,12 @@ it('confirms project deletion and clears the project route only after success', 
   await click('Delete project');
   io.remove.mockRejectedValueOnce(new Error('storage'));
   await click('Delete');
+  await act(async () => vi.advanceTimersByTimeAsync(0));
   expect(container.textContent).toContain('Could not delete the project');
   expect(container.querySelectorAll('article')).toHaveLength(1);
   await click('Delete project');
   await click('Delete');
+  await act(async () => vi.advanceTimersByTimeAsync(0));
   expect(io.remove).toHaveBeenLastCalledWith('guide');
   expect(io.select).toHaveBeenLastCalledWith({ projectId: null });
   expect(container.querySelectorAll('article')).toHaveLength(0);
@@ -374,6 +376,7 @@ it('prevents duplicate copy submissions and ignores page state updates after unm
   await render();
   await click('Duplicate project');
   await click('Duplicate project');
+  await act(async () => vi.advanceTimersByTimeAsync(0));
   expect(io.duplicate).toHaveBeenCalledTimes(1);
   expect(container.querySelector('input')?.disabled).toBe(true);
   await act(async () => root.render(null));

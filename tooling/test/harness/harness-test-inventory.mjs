@@ -12,6 +12,10 @@ const FORK_COMPATIBILITY_FILES = new Set([
   'tooling/qa/wrappers/advisory.test.ts',
   'tooling/qa/guards/product-contracts/react/verify-react-transform.test.ts',
   'tooling/test/harness/vite-injected-build.test.ts',
+  // Native structuredClone returns host-realm records in vmThreads.
+  // This archive proof checks records against the calling realm's Object.prototype.
+  // Remove when vmThreads clones retain the calling realm.
+  'tooling/test/harness/webdav-checkpoints.test.ts',
 ]);
 
 function createIdentity(files) {

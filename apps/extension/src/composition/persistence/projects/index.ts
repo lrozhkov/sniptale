@@ -1,3 +1,5 @@
+import { captureCheckpointReceiptInTransaction } from '../sync-capture/checkpoints';
+import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
 import { allocateVideoProjectRevisionInTransaction } from './revisions';
 import { captureVideoProjectInTransaction } from '../sync-capture/capture';
 import { publishLibraryProjectBindingInTransaction } from './known-library-source';
@@ -8,8 +10,13 @@ import {
   parseProjectAssetAnnotationEffectClaim,
 } from './asset-publication-payload';
 import { retainReviewAttachmentLock } from './voiceover-publication-lock';
+import { readAssetReadyPublicationClaims } from '../assets/opfs-store';
+import { recoverMediaSourcePublications } from '../media-library/delete-cascade.recovery';
 import { releaseAssetPublicationTransitions } from '../assets/opfs-store';
-import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import {
+  runWithDurableAssetLifecycleLock,
+  runWithPersistenceMutationTransition,
+} from '../infrastructure/mutation-barrier';
 import { isValidProjectAssetReviewResource } from './asset-publication-payload';
 import { assertNewProjectSources, promoteProjectSourceLifecycles } from './new-reference-admission';
 import type { VideoProject } from '../../../features/video/project/types';
@@ -23,10 +30,7 @@ import {
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { deleteMediaAssetWithProjectCascade } from '../media-library/delete-cascade';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
-import {
-  mediaHasPendingPublication,
-  releaseUnpublishedProjectAssets,
-} from '../media-library/delete-cascade.sources';
+import { releaseUnpublishedProjectAssets } from '../media-library/delete-cascade.sources';
 import { createProjectDeletionStores, createProjectMutationStores } from './mutation-stores';
 import { collectVideoProjectReferences } from '../library-lifecycle/references';
 import { promoteLinkedRecordingLifecycles } from '../library-lifecycle/project-recordings';
@@ -92,10 +96,15 @@ export { deleteVideoProject } from './index.delete.ts';
 export * from './index.exports.ts';
 export { InvalidVideoProjectError, UnsupportedEngine1VideoProjectError } from './contracts';
 
+/** Transient writer ACK; checkpoint metadata is never part of the stored project entry. */
+export interface VideoProjectSaveResult extends VideoProjectEntry {
+  readonly checkpointReceipt?: SyncCheckpointReceipt;
+}
+
 export async function saveVideoProject(
   project: VideoProject,
   options: SaveVideoProjectOptions = {}
-): Promise<VideoProjectEntry> {
+): Promise<VideoProjectSaveResult> {
   const expectedReviewWorkspace = options.expectedReviewWorkspace
     ? structuredClone(options.expectedReviewWorkspace)
     : undefined;
@@ -169,12 +178,16 @@ export async function saveVideoProject(
       });
       if (physicalDelete.assetIds.length > 0 || physicalDelete.privateSources?.length)
         await assetOperationStore.put(physicalDelete);
-      await captureVideoProjectInTransaction(tx, entry.id);
+      const checkpointReceipt = await captureCheckpointReceiptInTransaction(
+        tx,
+        { rootKind: 'video-project', rootId: entry.id },
+        () => captureVideoProjectInTransaction(tx, entry.id)
+      );
       await tx.done;
       publishMediaHubLibraryChanged(existing ? 'update' : 'create', [
         `video-project:${candidate.id}`,
       ]);
-      return entry;
+      return { ...entry, ...(checkpointReceipt ? { checkpointReceipt } : {}) };
     } catch (error) {
       try {
         tx.abort();
@@ -584,42 +597,52 @@ export async function listProjectAssets(): Promise<
 }
 
 export async function deleteProjectAsset(id: string): Promise<void> {
-  await recoverProjectMediaPublications();
   const db = await initDB();
-  const mediaId = createProjectAssetMediaId(id);
-  const rawMedia: unknown = await db.get(MEDIA_LIBRARY_STORE, mediaId);
-  if (rawMedia !== undefined) {
-    const media = parseMediaLibraryEntry(rawMedia);
-    if (
-      !media ||
-      media.id !== mediaId ||
-      media.source.kind !== 'project-asset' ||
-      media.source.projectAssetId !== id
-    )
-      throw new MediaAssetDeletionBlockedError('source-unavailable');
-    if ((await listReadyJournals()).some((journal) => mediaHasPendingPublication(journal, media)))
-      throw new MediaAssetDeletionBlockedError('pending-publication');
-    await deleteMediaAssetWithProjectCascade(mediaId, []);
-    return;
-  }
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation(async (database) => {
-    const { tx, assetOperationStore } = createProjectDeletionStores(database);
-    try {
-      await releaseUnpublishedProjectAssets(tx, new Set([id]), physicalDelete);
-      if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
-      await tx.done;
-    } catch (error) {
-      try {
-        tx.abort();
-      } catch {
-        /* Transaction may already be closed. */
+  await runWithPersistenceMutationTransition((transitionPermit) =>
+    runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+      const mediaId = createProjectAssetMediaId(id);
+      const target = {
+        id: mediaId,
+        source: { kind: 'project-asset' as const, projectAssetId: id },
+      };
+      await recoverMediaSourcePublications(target, { transitionPermit, lifecyclePermit });
+      const claims = await readAssetReadyPublicationClaims(target, lifecyclePermit);
+      if (!claims.valid || claims.pending)
+        throw new MediaAssetDeletionBlockedError('pending-publication');
+      const rawMedia: unknown = await db.get(MEDIA_LIBRARY_STORE, mediaId);
+      if (rawMedia !== undefined) {
+        const media = parseMediaLibraryEntry(rawMedia);
+        if (
+          !media ||
+          media.id !== mediaId ||
+          media.source.kind !== 'project-asset' ||
+          media.source.projectAssetId !== id
+        )
+          throw new MediaAssetDeletionBlockedError('source-unavailable');
+        await deleteMediaAssetWithProjectCascade(mediaId, [], lifecyclePermit);
+        return;
       }
-      await tx.done.catch(() => undefined);
-      throw error;
-    }
-  });
-  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
+      const physicalDelete = buildPhysicalDeleteOperation([]);
+      await runWithIndexedDbMutation(async (database) => {
+        const { tx, assetOperationStore } = createProjectDeletionStores(database);
+        try {
+          await releaseUnpublishedProjectAssets(tx, new Set([id]), physicalDelete);
+          if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
+          await tx.done;
+        } catch (error) {
+          try {
+            tx.abort();
+          } catch {
+            /* Transaction may already be closed. */
+          }
+          await tx.done.catch(() => undefined);
+          throw error;
+        }
+      });
+      if (physicalDelete.assetIds.length > 0)
+        await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit);
+    })
+  );
 }
 
 export type { ProjectAssetPublicationOptions };

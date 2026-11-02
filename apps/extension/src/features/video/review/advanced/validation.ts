@@ -522,6 +522,8 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
       ? parseReviewAnnotationEffects(raw['annotationEffects'])
       : undefined;
   if (
+    (text?.fragments.some((fragment) => fragment.sourceAnchor) &&
+      !supportsAdvancedSchema(raw['schemaVersion'], 27)) ||
     text === null ||
     captions === null ||
     annotationEffects === null ||
@@ -673,8 +675,8 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25].some(
-      (known) => known >= firstHistorical && version === known
-    )
+    [
+      2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    ].some((known) => known >= firstHistorical && version === known)
   );
 }

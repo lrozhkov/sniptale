@@ -212,3 +212,17 @@ it('excludes templates from ordinary gallery and capture project selection', asy
   ]);
   await expect(listScenarioProjectSummaries()).resolves.toEqual([normal]);
 });
+
+it('preserves the native receipt object through create and save acknowledgement wrappers', async () => {
+  const project = createScenarioStoreProjectFixture();
+  const checkpointReceipt = {
+    rootKind: 'scenario-project',
+    rootId: project.id,
+    revision: '11111111-1111-4111-8111-111111111111',
+  };
+  const acknowledgement = { project, workspaceRevision: 3, checkpointReceipt };
+  saveScenarioProjectMock.mockResolvedValue(acknowledgement);
+  expect(await saveScenarioProjectRecord(project)).toBe(acknowledgement);
+  expect(await createScenarioProjectRecord('Created')).toBe(acknowledgement);
+  expect(project).not.toHaveProperty('checkpointReceipt');
+});

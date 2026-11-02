@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -560,3 +561,70 @@ it('notifies thumbnail consumers only after a completed frame', async () => {
   await renderPreviewScene(job);
   expect(presented).toHaveBeenCalledOnce();
 });
+
+it('prepares images from the exact plan used for all motion-blur passes before painting', async () => {
+  const { job } = setup();
+  job.project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(job.project, 0),
+      scale: 2,
+      motionBlurAmount: 0.75,
+      zoomInDuration: 2,
+    },
+  ];
+  let ready!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const prepareImages = vi.fn(
+    (
+      _frames: readonly import('../../../../features/video/composition/types').VideoCompositionFrame[]
+    ) => gate
+  );
+  const pending = renderPreviewScene({ ...job, prepareImages });
+  expect(prepareImages).toHaveBeenCalledOnce();
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  ready();
+  await pending;
+  const frames = prepareImages.mock.calls[0]![0];
+  const drawn = vi.mocked(drawPreviewVisualPasses).mock.lastCall![0];
+  expect(drawn.passes.length).toBeGreaterThan(1);
+  expect(frames[0]).toBe(drawn.overlayFrame);
+  expect(frames.slice(1)).toEqual(drawn.passes.map((pass) => pass.frame));
+});
+
+it('does not paint when image preparation rejects and permits a later retry', async () => {
+  const { job } = setup();
+  const prepareImages = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('image decode failed'))
+    .mockResolvedValueOnce(undefined);
+  await expect(renderPreviewScene({ ...job, prepareImages })).rejects.toThrow(
+    'image decode failed'
+  );
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  await renderPreviewScene({ ...job, prepareImages });
+  expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'seek'] as const)(
+  'discards a frame invalidated by %s during image preparation',
+  async (event) => {
+    const { job, video } = setup();
+    const controller = new AbortController();
+    let ready!: () => void;
+    const prepareImages = () =>
+      new Promise<void>((resolve) => {
+        ready = resolve;
+      });
+    const pending = renderPreviewScene({ ...job, prepareImages, signal: controller.signal });
+    const outcome = pending.catch((error: unknown) => error);
+    if (event === 'abort') controller.abort();
+    else video.dispatchEvent(new Event('seeking'));
+    ready();
+    expect(await outcome).toEqual(
+      event === 'abort' ? expect.objectContaining({ name: 'AbortError' }) : false
+    );
+    expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  }
+);

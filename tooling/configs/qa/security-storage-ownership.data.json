@@ -34,16 +34,23 @@
     {
       "file": "apps/extension/src/composition/persistence/ai-settings/provider-secret-keys.store.ts",
       "owner": "shared-ai-storage",
-      "justification": "The AI provider secret key helper owns transparent local key lookup and in-memory passphrase-derived key resolution.",
-      "reviewNote": "Transparent local key material may persist only for default obfuscation mode; passphrase-derived key material is in-memory only, and the legacy session key constant exists solely for cleanup and never authorizes persistence.",
+      "justification": "The AI adapter resolves only transparent random local key material or an explicitly admitted operation key.",
+      "reviewNote": "Legacy direct callers fail closed for any shared profile or unresolved transition. No session key or service singleton lives here.",
       "storageWrites": []
     },
     {
-      "file": "apps/extension/src/composition/persistence/ai-settings/secret-protection.store.ts",
-      "owner": "shared-ai-storage",
-      "justification": "The AI passphrase protection seam owns non-secret protection metadata and the in-memory derived-key lifecycle.",
-      "reviewNote": "Passphrase metadata may persist in local storage, but derived decrypt key material and plaintext passphrases must never persist in local, sync, or session storage; the legacy session key is cleanup-only.",
-      "storageWrites": []
+      "file": "apps/extension/src/composition/persistence/secret-protection/profile.store.ts",
+      "owner": "common-secret-protection",
+      "justification": "The common profile owner persists the single legacy-compatible passphrase verifier and KDF metadata.",
+      "reviewNote": "Never persist phrases or derived keys. The legacy AI storage strings and verifier remain unchanged.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "SECRET_PROTECTION_PROFILE_KEY"
+          ]
+        }
+      ]
     },
     {
       "file": "apps/extension/src/composition/persistence/ai-settings/provider-secret-protection.store.ts",
@@ -57,30 +64,30 @@
             "AI_LOCAL_SECRET_KEY_STORAGE_KEY",
             "AI_PROVIDERS_KEY",
             "AI_PROVIDER_SECRETS_KEY",
-            "AI_SECRET_PROTECTION_KEY"
+            "SECRET_PROTECTION_PROFILE_KEY"
           ]
         }
       ]
     },
     {
-      "file": "apps/extension/src/composition/persistence/ai-settings/secret-protection-transition.store.ts",
-      "owner": "shared-ai-storage",
-      "justification": "The protection transition owner persists bounded recovery metadata for encrypted secret-mode changes.",
-      "reviewNote": "Only transition phase metadata may be written; provider credentials and passphrase-derived keys remain forbidden.",
+      "file": "apps/extension/src/composition/persistence/secret-protection/transition.store.ts",
+      "owner": "common-secret-protection",
+      "justification": "The common native transition owner persists exact prepared encrypted targets and a non-exportable random recovery key.",
+      "reviewNote": "The recovery key decrypts target records only. Never include plaintext credentials, source transparent key material, or passphrase-derived keys. Explicit source digests and exact participant identities gate replay. Erasure removes this store.",
       "storageWrites": [
         {
-          "sink": "browserStorage.local.set",
+          "sink": "tx.objectStore(SECRET_PROTECTION_STORE).put",
           "keys": [
-            "AI_SECRET_PROTECTION_TRANSITION_KEY"
+            "SECRET_PROTECTION_STORE"
           ]
         }
       ]
     },
     {
-      "file": "apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.ts",
-      "owner": "shared-ai-storage",
+      "file": "apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.ts",
+      "owner": "common-secret-protection",
       "justification": "The unlock-request owner persists bounded request-status metadata in browser session storage.",
-      "reviewNote": "Only unlock request identifiers and status metadata may be retained; plaintext passphrases, provider credentials, and derived keys are forbidden.",
+      "reviewNote": "Only owner-bound request status and bounded sync selection/consumption metadata may persist. No phrase, credential or derived key enters this record.",
       "storageWrites": [
         {
           "sink": "browserStorage.session.set",
@@ -108,7 +115,7 @@
       "file": "apps/extension/src/composition/persistence/remote-connection/store.ts",
       "owner": "remote-connection",
       "justification": "The native connection owner stores exact lifecycle metadata and context-bound encrypted WebDAV credentials.",
-      "reviewNote": "Persist only validated connection metadata, a non-exportable random AES-GCM CryptoKey and its version 2 encrypted envelope. Never persist plaintext credentials, exported key material or derived headers. Exclude all connection rows from backup, Settings transfer, sync, logs and diagnostics. Verified local-data erasure removes this store even when preferences remain. Transparent local encryption does not protect a compromised browser profile.",
+      "reviewNote": "Persist exact metadata and either a transparent non-exportable random CryptoKey with context-bound envelope or a protected profile-bound envelope without a local key. No plaintext, exported WebDAV key or derived key persists. Native gate and checked writer admission apply to credential writes. Preserve AAD, identity CAS, erasure and export exclusions.",
       "storageWrites": [
         {
           "sink": "tx.objectStore(SYNC_CONNECTION_STORE).put",

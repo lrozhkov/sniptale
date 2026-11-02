@@ -5,7 +5,7 @@ import {
   upsertStoredAISecretUnlockRequest,
   type StoredAISecretUnlockRequest,
   type StoredAISecretUnlockRequestStatus,
-} from '../../../composition/persistence/ai-settings/secret-unlock-requests.store.ts';
+} from '../../../composition/persistence/secret-protection/secret-unlock-requests.store.ts';
 
 export type UnlockRequestMemoryDomain = {
   clear(): void;

@@ -3,8 +3,8 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 vi.mock('./chrome-ai-card', () => ({ AIProvidersChromeAiCard: () => <div>chrome-ai</div> }));
-vi.mock('./secret-protection-card', () => ({
-  AIProvidersSecretProtectionCard: () => <div>secrets</div>,
+vi.mock('../../../../secret-protection/context', () => ({
+  SettingsSecretProtectionParticipantSummary: () => <div>ai-protection-summary</div>,
 }));
 vi.mock('./cards', () => ({ AIProvidersProvidersCard: () => <div>providers</div> }));
 vi.mock('./models-card', () => ({ AIProvidersModelsCard: () => <div>models</div> }));
@@ -12,7 +12,6 @@ vi.mock('./modals', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./modals')>()),
   AIProvidersSectionModals: () => null,
 }));
-vi.mock('./secret-protection-dialog', () => ({ SecretProtectionDialog: () => null }));
 import { AIProvidersSectionContent } from './content';
 import type { AiProvidersSectionState } from '../controller/types';
 import { createMockAiProvidersSectionState } from './test-support';
@@ -22,9 +21,8 @@ function createState(): AiProvidersSectionState {
 }
 
 it.each([
-  ['integrations', ['providers', 'models'], ['chrome-ai', 'secrets']],
-  ['chrome-ai', ['chrome-ai'], ['providers', 'models', 'secrets']],
-  ['security', ['secrets'], ['providers', 'models', 'chrome-ai']],
+  ['integrations', ['providers', 'models', 'ai-protection-summary'], ['chrome-ai']],
+  ['chrome-ai', ['chrome-ai'], ['providers', 'models', 'ai-protection-summary']],
 ] as const)('renders only the %s subpage content', (view, visible, hidden) => {
   const node = document.createElement('div');
   const root = createRoot(node);

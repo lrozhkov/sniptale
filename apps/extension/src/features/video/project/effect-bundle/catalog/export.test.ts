@@ -52,3 +52,32 @@ it('exports a standalone asset-free document as JSON without catalog state', asy
   if (restored.ok)
     expect(restored.artifact.document.document).toEqual(imported.artifact.document.document);
 });
+
+it.each(['raw-json', 'bundle-zip'] as const)(
+  'preserves SDK presentation metadata through %s export and import',
+  async (format) => {
+    const source = readFileSync(
+      'apps/extension/public/video-effects/effects/annotations/sniptale-callout/effect.sniptale-effect.json'
+    );
+    const imported = await importRawEffectDocument(source);
+    if (!imported.ok) throw new Error('Invalid metadata fixture');
+    const catalog = await createEffectCatalogEntry(
+      { kind: 'raw-json', document: imported.artifact },
+      1
+    );
+    const exported = await exportEffectCatalog({ ...catalog, source: format });
+    const bytes = new Uint8Array(await exported.blob.arrayBuffer());
+    const restored =
+      format === 'raw-json'
+        ? await importRawEffectDocument(bytes)
+        : await importEffectBundleZip(bytes);
+    if (!restored.ok) throw new Error(JSON.stringify(restored));
+    const document =
+      'artifact' in restored
+        ? restored.artifact.document.document
+        : restored.bundle.documents[0]?.document;
+    expect(document).toEqual(imported.artifact.document.document);
+    expect(document?.controlGroups?.[0]?.id).toBe('tracing');
+    expect(document?.controls.find((control) => control.id === 'entry')?.unit).toBe('percent');
+  }
+);

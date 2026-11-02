@@ -1,5 +1,9 @@
+import { isCanonicalPopupSenderUrl } from '../../../../platform/navigation/extension-pages/sender-url';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
-import type { AISecretUnlockMessage } from '../../../../contracts/messaging/ai-secret-unlock';
+import type {
+  AISecretUnlockMessage,
+  AISecretUnlockPurpose,
+} from '../../../../contracts/messaging/ai-secret-unlock';
 import { resolveLlmSessionSenderKey } from '../../llm/session-tokens';
 
 const AI_SECRET_UNLOCK_PAGE_PATH = 'apps/extension/src/settings/index.html';
@@ -37,6 +41,30 @@ function isTrustedUnlockPageSender(
   return resolveTrustedUnlockPageRequestId(sender) === requestId;
 }
 
+/** A popup document may own only its explicit sync unlock request. */
+export function resolveSecretUnlockSenderKey(
+  purpose: AISecretUnlockPurpose,
+  sender: chrome.runtime.MessageSender
+): string | null {
+  if (purpose !== 'sync') return resolveLlmSessionSenderKey(purpose, sender);
+  const extensionId = globalThis.chrome?.runtime?.id;
+  if (
+    !extensionId ||
+    sender.id !== extensionId ||
+    sender.tab ||
+    (sender.documentId !== undefined &&
+      (typeof sender.documentId !== 'string' || sender.documentId.length === 0)) ||
+    (sender.frameId !== undefined && sender.frameId !== 0) ||
+    (sender.documentLifecycle !== undefined && sender.documentLifecycle !== 'active') ||
+    !isCanonicalPopupSenderUrl(sender.url)
+  )
+    return null;
+  // Chrome action popups can omit documentId; status then belongs to the canonical popup principal.
+  return sender.documentId
+    ? `sync:popup:document:${sender.documentId}`
+    : `sync:popup:extension:${extensionId}`;
+}
+
 function isUnlockStatusOwner(
   record: UnlockAuthorizationRecord | undefined,
   sender: chrome.runtime.MessageSender
@@ -50,7 +78,8 @@ function isUnlockStatusOwner(
   return (
     record.senderKey === contentSenderKey ||
     record.senderKey === scenarioSenderKey ||
-    record.senderKey === reviewSenderKey
+    record.senderKey === reviewSenderKey ||
+    record.senderKey === resolveSecretUnlockSenderKey('sync', sender)
   );
 }
 
@@ -58,7 +87,8 @@ function isPotentialUnlockStatusOwner(sender: chrome.runtime.MessageSender): boo
   return (
     resolveLlmSessionSenderKey('content-ai-pick', sender) !== null ||
     resolveLlmSessionSenderKey('scenario-editor', sender) !== null ||
-    resolveLlmSessionSenderKey('review-text', sender) !== null
+    resolveLlmSessionSenderKey('review-text', sender) !== null ||
+    resolveSecretUnlockSenderKey('sync', sender) !== null
   );
 }
 
@@ -69,7 +99,7 @@ export function authorizeAISecretUnlockSenderForState(args: {
 }): string | null {
   const { message, sender } = args;
   if (message.operation === 'start') {
-    return resolveLlmSessionSenderKey(message.purpose, sender)
+    return resolveSecretUnlockSenderKey(message.purpose, sender)
       ? null
       : 'Unauthorized AI secret unlock sender';
   }

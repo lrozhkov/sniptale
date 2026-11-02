@@ -18,8 +18,15 @@ import type {
   AssetReadyJournal,
 } from '../../../../composition/persistence/assets';
 import { assertPortableJson } from '../codec';
+import { stageArchiveRootObjects } from '../staging';
+import { parsePortableMediaMetadata } from '../root-codecs/media';
 
-const mocks = vi.hoisted(() => ({ checkpoint: vi.fn(), runMutation: vi.fn(), db: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  checkpoint: vi.fn(),
+  runMutation: vi.fn(),
+  db: vi.fn(),
+  createWriter: vi.fn(),
+}));
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
   ...(await original<
     typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
@@ -30,6 +37,8 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', as
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   appendCommittedArchiveRootInTransaction: mocks.checkpoint,
+  assertAssetWriteAdmission: vi.fn(),
+  createAssetObjectWriter: mocks.createWriter,
   readAssetFile: vi.fn(
     async (_ref, filename: string) => new File(['source'], filename, { type: 'image/png' })
   ),
@@ -198,13 +207,21 @@ it('captures a duplicated restored original before a project borrows its accepte
   const captured = captures[0];
   if (
     captured?.phase !== 'native' ||
-    captured.change.kind !== 'media' ||
-    !('projectAsset' in captured.change.rows)
+    captured.change.kind !== 'image' ||
+    !captured.change.rows.projectAsset
   )
     throw new Error('Restored media capture is missing.');
   expect(captured).toMatchObject({ origin: 'local-restore', generation: 1, basis: [] });
   expect(captured.rootId).not.toBe(entry.id);
-  expect(captured.change.rows.ref).toEqual(input.staged[0]!.ref);
+  expect(captured).toMatchObject({
+    rootKind: 'media',
+    change: { kind: 'image', rows: { media: { id: captured.rootId, workspaceRevision: 1 } } },
+  });
+  expect(fixture.rows.get('media_library')!.get(captured.rootId)).toEqual(
+    captured.change.rows.media
+  );
+  expect(fixture.rows.get('media_library')!.get(entry.id)).toEqual(entry);
+  expect(captured.change.rows.originalRef).toEqual(input.staged[0]!.ref);
   expect(captured.change.rows.projectAsset.id).toBe(
     captured.change.rows.media.source.kind === 'project-asset'
       ? captured.change.rows.media.source.projectAssetId
@@ -218,7 +235,7 @@ it('captures a duplicated restored original before a project borrows its accepte
   const after = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction([...fixture.rows.keys()], 'readwrite');
     await tx.objectStore('video_projects').put(project);
-    const after = await captureVideoProjectInTransaction(tx, project.id);
+    const after = await captureVideoProjectInTransaction(tx, project.id, { checkpoint: 'freeze' });
     await tx.done;
     return after;
   });
@@ -273,14 +290,34 @@ it('skips an existing original without appending a capture under the enabled pro
   expect(fixture.rows.get('media_library')!.size).toBe(2);
 });
 
-it('keeps broad restored media outside the original-only pilot without inventing a causal head', async () => {
-  const { fixture, input } = await restoredOriginalFixture(true, false, 1);
+it('captures a restored project-asset image through its target-local revision and source binding', async () => {
+  const { fixture, input, entry } = await restoredOriginalFixture(true, false, 1);
   await expect(mediaLibraryRootPublisher.publish(input)).resolves.toMatchObject({ imported: true });
-  expect(
-    [...fixture.rows.get('sync_capture')!.values()]
-      .map(parseSyncCaptureRecord)
-      .filter((row) => row?.kind === 'sync-operation')
-  ).toEqual([]);
+  const captures = [...fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .filter((row) => row?.kind === 'sync-operation');
+  expect(captures).toHaveLength(1);
+  const captured = captures[0];
+  if (captured?.phase !== 'native' || captured.change.kind !== 'image')
+    throw new Error('Restored image capture is missing.');
+  expect(captured.rootId).not.toBe(entry.id);
+  expect(captured).toMatchObject({
+    rootKind: 'media',
+    origin: 'local-restore',
+    generation: 1,
+    basis: [],
+    change: {
+      kind: 'image',
+      rows: {
+        media: { id: captured.rootId, workspaceRevision: 1 },
+        originalRef: input.staged[0]!.ref,
+      },
+    },
+  });
+  expect(fixture.rows.get('media_library')!.get(captured.rootId)).toEqual(
+    captured.change.rows.media
+  );
+  expect(fixture.rows.get('media_library')!.get(entry.id)).toEqual(entry);
 });
 
 it.each(['screenshot', 'stored-asset'] as const)(
@@ -494,16 +531,77 @@ it('rebases Replace review and recovery clocks above native and sender revisions
 
 it('restores the same default identity above its native purge fence', async () => {
   const data = await restoredReviewFixture();
+  const id = data.metadata.entry.id;
+  const reviewCaptures = () => data.captures().filter((row) => row?.rootKind === 'video-review');
+  const rootState = () =>
+    [...data.table('sync_capture').values()]
+      .map(parseSyncCaptureRecord)
+      .find(
+        (row) => row?.kind === 'root-state' && row.rootKind === 'video-review' && row.rootId === id
+      );
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction([...data.fixture.rows.keys()], 'readwrite');
-    await captureVideoReviewInTransaction(tx, data.metadata.entry.id);
+    await captureVideoReviewInTransaction(tx, id, { checkpoint: 'freeze' });
     await tx.done;
   });
-  await deleteVideoWorkspaceProject(data.metadata.entry.id, 20);
-  expect(data.table('video_workspaces').has(data.metadata.entry.id)).toBe(false);
+  expect(reviewCaptures()).toHaveLength(1);
+  const initial = reviewCaptures()[0];
+  expect(initial).toMatchObject({
+    rootKind: 'video-review',
+    rootId: id,
+    generation: 1,
+    basis: [],
+    change: { kind: 'video-review', rows: { review: { workspace: { revision: 20 } } } },
+  });
+  expect(rootState()).toMatchObject({
+    rootKind: 'video-review',
+    rootId: id,
+    generation: 1,
+    nativeRevision: 20,
+    basis: [initial?.operationId],
+  });
+  await deleteVideoWorkspaceProject(id, 20);
+  expect(data.table('video_workspaces').has(id)).toBe(false);
+  expect(reviewCaptures()).toHaveLength(2);
+  const tombstone = reviewCaptures()[1];
+  expect(tombstone).toMatchObject({
+    rootKind: 'video-review',
+    rootId: id,
+    generation: 2,
+    basis: [initial?.operationId],
+    change: { kind: 'tombstone' },
+  });
+  expect(rootState()).toMatchObject({
+    rootKind: 'video-review',
+    rootId: id,
+    generation: 2,
+    nativeRevision: 20,
+    deleted: true,
+    basis: [tombstone?.operationId],
+  });
   await mediaLibraryRootPublisher.publish(data.input);
   expect(data.current().revision).toBeGreaterThan(20);
-  expect(data.captures().filter((row) => row?.rootKind === 'video-review')).toHaveLength(3);
+  expect(reviewCaptures()).toHaveLength(3);
+  const restored = reviewCaptures()[2];
+  expect(restored).toMatchObject({
+    rootKind: 'video-review',
+    rootId: id,
+    origin: 'local-restore',
+    generation: 3,
+    basis: [tombstone?.operationId],
+    change: {
+      kind: 'video-review',
+      rows: { review: { workspace: { revision: data.current().revision } } },
+    },
+  });
+  expect(rootState()).toMatchObject({
+    rootKind: 'video-review',
+    rootId: id,
+    generation: 3,
+    nativeRevision: data.current().revision,
+    basis: [restored?.operationId],
+  });
+  expect(rootState()).not.toHaveProperty('deleted');
 });
 
 it('rolls back restored review, draft, source and archive receipt when capture cannot commit', async () => {
@@ -862,3 +960,71 @@ it('retires an unloaded inline copy atomically when archive Replace publishes ne
   });
   expect(f.fixture.rows.get('asset_residency')!.has(oldCopy.id)).toBe(false);
 });
+
+it.each(['video/webm;codecs=vp8', 'audio/webm;codecs=opus'])(
+  'captures restored native %s after archive staging',
+  async (mimeType) => {
+    const { fixture, input } = await restoredOriginalFixture();
+    const metadata = parsePortableMediaMetadata(input.envelope.metadata);
+    const entry = {
+      ...metadata.entry,
+      kind: mimeType.startsWith('video/') ? ('video' as const) : ('audio' as const),
+      mimeType,
+    };
+    const portable = { ...metadata, entry, projectAsset: { ...metadata.projectAsset!, mimeType } };
+    assertPortableJson(portable);
+    input.envelope.metadata = portable;
+    const descriptor = {
+      objectId: 'original',
+      path: 'Video/source.webm',
+      filename: 'source.webm',
+      mimeType: mimeType.split(';')[0]!,
+      size: 6,
+    };
+    const envelope = { ...input.envelope, objects: [descriptor] };
+    const originalRef = input.staged[0]!.ref;
+    mocks.createWriter.mockImplementation(async ({ mimeType }: { mimeType: string }) => ({
+      assetId: originalRef.assetId,
+      append: vi.fn(),
+      abort: vi.fn(),
+      finalize: async () => ({ ref: { ...originalRef, mimeType } }),
+    }));
+    const staged = await stageArchiveRootObjects({
+      envelope,
+      reader: {
+        close: vi.fn(),
+        entries: () => [],
+        entry: () => ({
+          ...descriptor,
+          compressedSize: 6,
+          crc32: 0,
+          directory: false,
+          text: vi.fn(),
+          async pipeTo(stream: WritableStream<Uint8Array>) {
+            const writer = stream.getWriter();
+            await writer.write(new TextEncoder().encode('source'));
+            await writer.close();
+          },
+        }),
+      },
+    });
+    await mediaLibraryRootPublisher.publish({ ...input, envelope, staged });
+    const captures = [...fixture.rows.get('sync_capture')!.values()]
+      .map(parseSyncCaptureRecord)
+      .filter((row) => row?.kind === 'sync-operation');
+    expect(captures).toHaveLength(1);
+    expect(captures[0]).toMatchObject({
+      phase: 'native',
+      origin: 'local-restore',
+      change: {
+        kind: 'media',
+        rows: {
+          media: { mimeType },
+          projectAsset: { mimeType },
+          ref: { mimeType, assetId: originalRef.assetId },
+        },
+      },
+    });
+    expect(envelope.objects[0]!.mimeType).toBe(mimeType.split(';')[0]);
+  }
+);

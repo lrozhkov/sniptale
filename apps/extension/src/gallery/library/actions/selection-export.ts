@@ -1,3 +1,4 @@
+import { prepareLibraryBackup } from '../../../workflows/sync-transfer/retained-library';
 import { createOutputFilename } from '../../../workflows/file-naming/index';
 import {
   createArchivePathAllocator,
@@ -21,7 +22,9 @@ export async function exportGalleryItemsBackup(targets: GalleryItem[]) {
   if (targets.some(isGalleryRemoteItem)) return;
   const options = createSelectedBackupExportOptions(targets);
   if (!options) return;
+  const prepared = await prepareLibraryBackup(options);
   await exportMediaHubBackup(options, {
+    ...(prepared ? { requirePreparedNative: true } : {}),
     requireSelected: true,
     filename: await createOutputFilename({
       category: 'archives',

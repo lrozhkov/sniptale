@@ -21,6 +21,7 @@ import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { parseAggregatePresentationEntry } from '../aggregate-presentations/parser';
 import { captureRootKey } from '../sync-capture/contracts';
 import { parseSyncCaptureRecord } from '../sync-capture/guards';
+import { readCheckpointInTransaction } from '../sync-capture/checkpoints';
 import { collectSyncCaptureClaims } from '../sync-capture/claims';
 import { collectDurableAssetSnapshot } from './retention-authority';
 import { readyJournalClaimsAsset } from './retention-claims';
@@ -156,6 +157,19 @@ async function commitIntent(
     const captures = raw.map(parseSyncCaptureRecord);
     if (captures.some((value) => value === null))
       throw new Error('Asset residency capture authority is invalid.');
+    for (const capture of captures) {
+      if (capture?.kind !== 'pending-checkpoint') continue;
+      const checkpoint = await readCheckpointInTransaction(tx, copy.remote.binding, capture);
+      if (!checkpoint || !same(checkpoint, capture))
+        throw new Error('Asset residency pending enrollment changed.');
+      const resources = await collectNativeEditingResources(tx, checkpoint, 'backup');
+      if (
+        target.kind === 'opfs'
+          ? resources.refs.some((ref) => ref.assetId === target.ref.assetId)
+          : resources.inlineMediaIds.includes(target.mediaId)
+      )
+        throw new AssetResidencyProtectedError('Asset residency source has a pending checkpoint.');
+    }
     const pending = collectSyncCaptureClaims(
       captures.filter((value) => value?.kind !== 'sync-operation' || value.phase !== 'published')
     );

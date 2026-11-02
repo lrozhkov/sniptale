@@ -7,7 +7,11 @@ import {
 import { getAllScenarioStoredProjects } from '../../../../composition/persistence/scenario/storage';
 import { scenarioLibraryMediaId } from '../../../../composition/persistence/scenario/library-publication';
 import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
-import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
+import { parseAssetRef, type AssetRef } from '../../../../composition/persistence/assets';
+import type {
+  ArchiveObjectRef,
+  ArchivePathAllocator,
+} from '../../../../composition/archive-transfer';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
   MEDIA_LIBRARY_STORE,
@@ -38,11 +42,27 @@ import type { MediaHubBackupRootInventoryItem } from '../export';
 import {
   createObjectCollector,
   createReadableAssetFilename,
-  readInventoryAssetFile,
+  type DeferredInventoryAssets,
   type InventoryDatabase,
 } from './helpers';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
 import { buildPortableAggregatePresentation } from './presentation';
+
+/** Normal sync can retain admitted HTML; ordinary archive inventory still reads every body. */
+interface DeferredScenarioExportInventory {
+  refs: ReadonlyMap<string, AssetRef>;
+  onObject(assetId: string, object: ArchiveObjectRef): void;
+}
+
+/** Select Scenario roots before archive reads or explicit Library preparation. */
+export function isScenarioBackupProjectSelected(
+  id: string,
+  lifecycle: { storageClass: string } | undefined,
+  options: MediaHubBackupExportOptions
+): boolean {
+  if (lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return false;
+  return options.scope === 'all' || Boolean(options.selected?.scenarioProjectIds.includes(id));
+}
 
 function readSelectedScenarioProjects(
   rows: unknown[],
@@ -54,7 +74,8 @@ function readSelectedScenarioProjects(
       const id = summary?.id ?? (isRecord(raw) && typeof raw['id'] === 'string' ? raw['id'] : null);
       if (options.scope !== 'all' && (!id || !options.selected?.scenarioProjectIds.includes(id)))
         return [];
-      if (summary?.lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return [];
+      if (summary && !isScenarioBackupProjectSelected(summary.id, summary.lifecycle, options))
+        return [];
       const entry = parseScenarioProjectEntry(raw);
       if (!entry)
         throw new Error('A selected scenario project is unavailable and cannot be exported.');
@@ -83,7 +104,6 @@ async function buildScenarioAssets(
       asset.borrowedMediaId ?? asset.galleryAssetId ?? scenarioLibraryMediaId(asset.id);
     const media = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, originId));
     const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
-    const file = await readInventoryAssetFile(db, asset.assetId, filename);
     const { assetId: _assetId, ...portable } = asset;
     assets.push({
       entry:
@@ -93,8 +113,9 @@ async function buildScenarioAssets(
         media.source.assetId !== asset.assetId
           ? { ...portable, galleryAssetId: media.id }
           : portable,
-      objectId: collector.addObject(
-        file,
+      objectId: await collector.addAsset(
+        db,
+        asset.assetId,
         filename,
         asset.mimeType,
         withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
@@ -133,14 +154,9 @@ async function buildScenarioDocuments(
     const objectsByAssetId = new Map<string, string>();
     for (const asset of document.assets) {
       if (objectsByAssetId.has(asset.assetId)) continue;
-      const file = await readInventoryAssetFile(
-        db,
-        asset.assetId,
-        `${stored.stepId}-${asset.role}`
-      );
       objectsByAssetId.set(
         asset.assetId,
-        collector.addObject(file, `${stored.stepId}-${asset.role}`, file.type || 'image/png')
+        await collector.addAsset(db, asset.assetId, `${stored.stepId}-${asset.role}`)
       );
     }
     documents.push({
@@ -180,7 +196,8 @@ async function buildScenarioExportThumbnails(
 async function buildScenarioExports(
   db: InventoryDatabase,
   project: ScenarioProjectEntry,
-  collector: ReturnType<typeof createObjectCollector>
+  collector: ReturnType<typeof createObjectCollector>,
+  deferredExports?: DeferredScenarioExportInventory
 ): Promise<PortableScenarioProjectMetadata['exports']> {
   const rows = (await db.getAllFromIndex(SCENARIO_EXPORTS_STORE, 'projectId', project.id))
     .map(parseScenarioExportEntry)
@@ -193,25 +210,43 @@ async function buildScenarioExports(
       exports.push(metadata);
       continue;
     }
-    const file = await readInventoryAssetFile(db, html.assetId, row.filename);
-    if (file.size !== row.size || !/^text\/html(?:;charset=utf-8)?$/iu.test(file.type))
-      throw new Error('Stored HTML export differs from its catalogue.');
-    exports.push({
-      ...metadata,
-      html: {
-        mode: html.mode,
-        objectId: collector.addObject(
-          file,
-          row.filename,
-          'text/html',
-          withDraftRoot(project.lifecycle?.storageClass === 'temporary', [
-            'Scenarios',
-            project.project.name,
-            'Exports',
-          ])
-        ),
-      },
-    });
+    const directory = withDraftRoot(project.lifecycle?.storageClass === 'temporary', [
+      'Scenarios',
+      project.project.name,
+      'Exports',
+    ]);
+    const deferred = deferredExports?.refs.get(html.assetId);
+    let objectId: string;
+    if (deferred) {
+      const native = parseAssetRef(await db.get('asset_refs', html.assetId));
+      const admitted = parseAssetRef(deferred);
+      if (
+        !native ||
+        !admitted ||
+        JSON.stringify(native) !== JSON.stringify(admitted) ||
+        native.size !== row.size ||
+        !/^text\/html(?:;charset=utf-8)?$/iu.test(native.mimeType)
+      )
+        throw new Error('Deferred HTML descriptor differs from its native reference.');
+      const object = collector.addObjectDescriptor(
+        native.size,
+        row.filename,
+        'text/html',
+        directory
+      );
+      deferredExports!.onObject(html.assetId, object);
+      objectId = object.objectId;
+    } else {
+      const native = parseAssetRef(await db.get('asset_refs', html.assetId));
+      if (
+        !native ||
+        native.size !== row.size ||
+        !/^text\/html(?:;charset=utf-8)?$/iu.test(native.mimeType)
+      )
+        throw new Error('Stored HTML export differs from its catalogue.');
+      objectId = await collector.addAsset(db, html.assetId, row.filename, 'text/html', directory);
+    }
+    exports.push({ ...metadata, html: { mode: html.mode, objectId } });
   }
   return exports;
 }
@@ -223,14 +258,17 @@ async function buildScenarioProjectRoot(args: {
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
   prepareRoot?: MediaHubBackupRootPreparation;
+  deferredAssets?: DeferredInventoryAssets;
+  deferredExports?: DeferredScenarioExportInventory;
 }): Promise<MediaHubBackupRootInventoryItem> {
   await args.prepareRoot?.({ rootKind: 'scenario-project', rootId: args.entry.id });
   const collector = createObjectCollector(
     `scenario-${String(args.index + 1).padStart(6, '0')}`,
-    args.paths
+    args.paths,
+    args.deferredAssets
   );
   const assets = await buildScenarioAssets(args.db, args.entry, collector);
-  const exports = await buildScenarioExports(args.db, args.entry, collector);
+  const exports = await buildScenarioExports(args.db, args.entry, collector, args.deferredExports);
   const stepDocuments = await buildScenarioDocuments(args.db, args.entry, collector, args.options);
   const exportThumbnails = await buildScenarioExportThumbnails(args.db, exports, collector);
   const projectThumbnail = await inventoryProjectThumbnail(
@@ -270,7 +308,7 @@ async function buildScenarioProjectRoot(args: {
       'scenario-project',
       args.entry.id,
       `${METADATA_ROOT}/scenario-projects/${encodeURIComponent(args.entry.id)}.json`,
-      collector.objects
+      collector.references
     ),
     load: projectInventoryLoader(metadata, collector.objects),
     summary: {
@@ -292,6 +330,8 @@ export async function buildScenarioProjectRootInventory(args: {
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
   prepareRoot?: MediaHubBackupRootPreparation;
+  deferredAssets?: DeferredInventoryAssets;
+  deferredExports?: DeferredScenarioExportInventory;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const projects = readSelectedScenarioProjects(
     await getAllScenarioStoredProjects(args.db),

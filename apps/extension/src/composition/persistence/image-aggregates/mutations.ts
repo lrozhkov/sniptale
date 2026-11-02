@@ -1,5 +1,14 @@
+import { freezeImageInTransaction, isImageCaptureSource } from '../sync-capture/image-snapshot';
+import { commitImagePresentationCacheInTransaction } from '../sync-capture/presentation';
+import { ASSET_RESIDENCY_STORE } from '../infrastructure/indexed-db/core.stores';
+import { captureCheckpointReceiptInTransaction } from '../sync-capture/checkpoints';
+import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
-import { captureImageInTransaction, readImageRevisionFence } from '../sync-capture/capture';
+import {
+  captureImageInTransaction,
+  captureMediaInTransaction,
+  readImageRevisionFence,
+} from '../sync-capture/capture';
 import { SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
@@ -11,10 +20,14 @@ import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   IMAGE_WORKSPACES_STORE,
+  PROJECT_ASSETS_STORE,
   MEDIA_LIBRARY_STORE,
   initDB,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
+import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
+import { parseProjectAssetEntry } from '../projects/read-guards';
+import type { StoredProjectAssetEntry } from '../projects/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { ImageContentState, MediaLibraryEntry } from '../media-library/contracts';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
@@ -60,6 +73,7 @@ const IMAGE_WORKSPACE_PUBLICATION_DOMAIN = 'image-workspace';
 const IMAGE_WORKSPACE_OWNER_KIND = 'image-workspace';
 const IMAGE_SNAPSHOT_STORES = [
   MEDIA_LIBRARY_STORE,
+  PROJECT_ASSETS_STORE,
   IMAGE_WORKSPACES_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_REFS_STORE,
@@ -75,6 +89,7 @@ interface PreparedImageWorkspaceInput extends Omit<
   initialStorageClass?: 'temporary' | 'library';
   refs: AssetRef[];
   publicationId?: string;
+  originalWitness?: { createdAt: number; ref: AssetRef; projectAsset: StoredProjectAssetEntry };
 }
 
 export interface CommitImageWorkspaceInput {
@@ -98,6 +113,7 @@ export interface CommitImageWorkspaceInput {
 }
 
 export interface CommitImageWorkspaceResult {
+  readonly checkpointReceipt?: SyncCheckpointReceipt;
   documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   revision: number;
   updatedAt: number;
@@ -206,7 +222,7 @@ async function commitImageWorkspaceMutation(
   input: PreparedImageWorkspaceInput,
   prepared: PreparedNewImageAggregate | null,
   lifecyclePermit?: DurableAssetLifecyclePermit
-): Promise<{ revision: number; updatedAt: number }> {
+): Promise<Omit<CommitImageWorkspaceResult, 'documentAssetsByRuntimeUrl'>> {
   const tx = db.transaction(
     [...IMAGE_SNAPSHOT_STORES, ASSET_OWNERS_STORE, ASSET_OPERATIONS_STORE],
     'readwrite'
@@ -262,6 +278,15 @@ async function commitImageWorkspaceMutation(
       throw new StaleImageWorkspaceError(input.aggregateId);
     }
 
+    if (input.originalWitness) {
+      const current = await freezeImageInTransaction(tx, input.aggregateId);
+      if (
+        current.media.createdAt !== input.originalWitness.createdAt ||
+        JSON.stringify(current.originalRef) !== JSON.stringify(input.originalWitness.ref) ||
+        JSON.stringify(current.projectAsset) !== JSON.stringify(input.originalWitness.projectAsset)
+      )
+        throw new StaleImageWorkspaceError(input.aggregateId);
+    }
     const rawWorkspace: unknown = await workspaceStore.get(input.aggregateId);
     const existing = parseImageWorkspaceEntry(rawWorkspace);
     if (rawWorkspace !== undefined && !existing) {
@@ -310,17 +335,24 @@ async function commitImageWorkspaceMutation(
         : createLibraryLifecycle('library', now),
     });
     const acceptedRoot = parseMediaLibraryEntry(await mediaStore.get(input.aggregateId));
-    if (acceptedRoot?.source.kind === 'screenshot' || acceptedRoot?.source.kind === 'stored-asset')
-      await captureImageInTransaction(
-        tx,
-        input.aggregateId,
-        input.publicationId === undefined ? {} : { publicationId: input.publicationId }
-      );
+    const checkpointReceipt =
+      acceptedRoot && isImageCaptureSource(acceptedRoot)
+        ? await captureCheckpointReceiptInTransaction(
+            tx,
+            { rootKind: 'media', rootId: input.aggregateId },
+            () =>
+              captureMediaInTransaction(
+                tx,
+                input.aggregateId,
+                input.publicationId === undefined ? {} : { publicationId: input.publicationId }
+              )
+          )
+        : null;
     await tx.done;
     if (physicalDelete.assetIds.length > 0) {
       await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit).catch(() => undefined);
     }
-    return { revision, updatedAt: now };
+    return { revision, updatedAt: now, ...(checkpointReceipt ? { checkpointReceipt } : {}) };
   } catch (error) {
     try {
       tx.abort();
@@ -332,23 +364,62 @@ async function commitImageWorkspaceMutation(
   }
 }
 
+/** Reuse only the exact immutable original already owned by this imported Image. */
+async function prepareImportedOriginalReuse(
+  db: ImageMutationDatabase,
+  input: CommitImageWorkspaceInput
+): Promise<PreparedImageWorkspaceInput['originalWitness'] | undefined> {
+  if (
+    input.requireMissingRoot ||
+    !input.document.sourceImageData.startsWith('data:') ||
+    input.reusableAssetsByRuntimeUrl?.has(input.document.sourceImageData)
+  )
+    return undefined;
+  const media = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, input.aggregateId));
+  if (!media || media.source.kind !== 'project-asset' || !isImageCaptureSource(media))
+    return undefined;
+  const tx = db.transaction(IMAGE_SNAPSHOT_STORES, 'readonly');
+  const rows = await freezeImageInTransaction(tx, input.aggregateId);
+  await tx.done;
+  if (!rows.originalRef || !rows.projectAsset)
+    throw new ImageAggregateCollisionError(input.aggregateId);
+  const original = await readAssetFile(rows.originalRef, rows.media.filename);
+  const source = await dataUrlToBlob(input.document.sourceImageData);
+  if (original.type !== source.type || original.size !== source.size) return undefined;
+  const [originalBytes, sourceBytes] = await Promise.all([
+    original.arrayBuffer(),
+    source.arrayBuffer(),
+  ]);
+  const bytes = new Uint8Array(sourceBytes);
+  if (!new Uint8Array(originalBytes).every((byte, index) => byte === bytes[index]))
+    return undefined;
+  return {
+    createdAt: rows.media.createdAt,
+    ref: rows.originalRef,
+    projectAsset: rows.projectAsset,
+  };
+}
+
 export async function commitImageWorkspace(
   input: CommitImageWorkspaceInput
 ): Promise<CommitImageWorkspaceResult> {
   // Cold database admission reserves the exclusive transition gate; it must settle before
   // staged assets hold shared transition leases or admission could queue behind them.
-  await initDB();
+  const db = await initDB();
   await recoverImageWorkspacePublications();
+  const originalWitness = await prepareImportedOriginalReuse(db, input);
+  const reusableAssetsByRuntimeUrl = new Map(input.reusableAssetsByRuntimeUrl);
+  if (originalWitness)
+    reusableAssetsByRuntimeUrl.set(input.document.sourceImageData, originalWitness.ref);
   const preparedDocument = await preparePersistedEditorDocument(input.document, {
-    ...(input.reusableAssetsByRuntimeUrl
-      ? { reusableAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl }
-      : {}),
+    reusableAssetsByRuntimeUrl,
   });
   const { reusableAssetsByRuntimeUrl: _reusableAssetsByRuntimeUrl, ...serializableInput } = input;
   const preparedInput: PreparedImageWorkspaceInput = {
     ...serializableInput,
     document: preparedDocument.document,
     refs: preparedDocument.refs,
+    ...(originalWitness ? { originalWitness } : {}),
   };
   let journalCreated = false;
   try {
@@ -358,7 +429,7 @@ export async function commitImageWorkspace(
       payload: preparedInput,
     });
     journalCreated = true;
-    let result: { revision: number; updatedAt: number } | undefined;
+    let result: Omit<CommitImageWorkspaceResult, 'documentAssetsByRuntimeUrl'> | undefined;
     await publishReadyJournalWithRetry(journal, async (ready, permit) => {
       const published = await publishImageWorkspaceJournal(ready, false, permit);
       if (!published) throw new Error('Image workspace publication was superseded.');
@@ -435,6 +506,34 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
   }
   const refs = value['refs'].map(parseAssetRef);
   if (refs.some((ref) => ref === null)) return null;
+  const rawOriginalWitness = value['originalWitness'];
+  const witnessRef = isRecord(rawOriginalWitness) ? parseAssetRef(rawOriginalWitness['ref']) : null;
+  const witnessChild = isRecord(rawOriginalWitness)
+    ? parseProjectAssetEntry(rawOriginalWitness['projectAsset'])
+    : null;
+  let originalWitness: PreparedImageWorkspaceInput['originalWitness'];
+  if (rawOriginalWitness !== undefined) {
+    if (
+      !isRecord(rawOriginalWitness) ||
+      typeof rawOriginalWitness['createdAt'] !== 'number' ||
+      !Number.isFinite(rawOriginalWitness['createdAt']) ||
+      !witnessRef ||
+      !witnessChild ||
+      witnessChild.assetId !== witnessRef.assetId ||
+      witnessChild.size !== witnessRef.size ||
+      witnessChild.mimeType !== witnessRef.mimeType ||
+      witnessChild.originMediaId !== undefined ||
+      value['aggregateId'] !== `project-asset:${witnessChild.id}` ||
+      document.sourceImage.assetId !== witnessRef.assetId ||
+      !refs.some((ref) => ref && JSON.stringify(ref) === JSON.stringify(witnessRef))
+    )
+      return null;
+    originalWitness = {
+      createdAt: rawOriginalWitness['createdAt'],
+      ref: witnessRef,
+      projectAsset: witnessChild,
+    };
+  }
   const rawSourceGuard = value['sourceGuard'];
   const sourceGuard = isRecord(rawSourceGuard)
     ? {
@@ -454,6 +553,7 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
   }
   return {
     aggregateId: value['aggregateId'],
+    ...(originalWitness ? { originalWitness } : {}),
     document,
     expectedRevision: value['expectedRevision'],
     ...(captureTime === undefined ? {} : { captureTime }),
@@ -486,7 +586,7 @@ async function publishImageWorkspaceJournal(
   journal: AssetReadyJournal,
   allowSuperseded = false,
   lifecyclePermit?: DurableAssetLifecyclePermit
-): Promise<{ revision: number; updatedAt: number } | null> {
+): Promise<Omit<CommitImageWorkspaceResult, 'documentAssetsByRuntimeUrl'> | null> {
   if (journal.domain !== IMAGE_WORKSPACE_PUBLICATION_DOMAIN || journal.operationId) {
     throw new Error('Invalid image workspace publication journal.');
   }
@@ -600,8 +700,8 @@ export interface CommitImagePresentationInput {
 }
 
 export async function commitImagePresentation(input: CommitImagePresentationInput): Promise<void> {
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(IMAGE_SNAPSHOT_STORES, 'readwrite');
+  await runWithIndexedDbMutation(async (db, permit) => {
+    const tx = db.transaction([...IMAGE_SNAPSHOT_STORES, ASSET_RESIDENCY_STORE], 'readwrite');
     try {
       const media = parseMediaLibraryEntry(
         await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.aggregateId)
@@ -610,16 +710,19 @@ export async function commitImagePresentation(input: CommitImagePresentationInpu
       if ((media.workspaceRevision ?? 0) !== input.expectedWorkspaceRevision) {
         throw new StaleImageWorkspaceError(input.aggregateId);
       }
-      await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).put({
+      const entry = {
         aggregateId: input.aggregateId,
-        aggregateKind: 'image',
+        aggregateKind: 'image' as const,
         presentationRevision: input.expectedWorkspaceRevision,
         previewBlob: input.previewBlob,
         thumbnailBlob: input.thumbnailBlob,
         updatedAt: Date.now(),
-      });
-      if (media.source.kind === 'screenshot' || media.source.kind === 'stored-asset')
-        await captureImageInTransaction(tx, input.aggregateId);
+      };
+      if (isImageCaptureSource(media)) {
+        await commitImagePresentationCacheInTransaction(tx, entry, permit);
+      } else {
+        await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).put(entry);
+      }
       await tx.done;
     } catch (error) {
       return abortIndexedDbMutation(tx, error);

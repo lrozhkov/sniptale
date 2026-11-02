@@ -1,3 +1,4 @@
+import { parsePreparedRemoteBinding } from './guards';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
 import { parseAssetRef, readAssetFile, type AssetRef } from '../assets';
@@ -53,11 +54,20 @@ function requiredRef(value: unknown): AssetRef {
   return parseAssetRef(value) ?? invalid();
 }
 
-function parseAssets(value: unknown): PreparedVideoProjectRevision['assets'] {
+function mapPreparedProjectBindings<T>(
+  value: unknown,
+  parse: (raw: Record<string, unknown>) => T
+): T[] {
   if (!Array.isArray(value) || value.length > MAX_CAPTURE_ROWS) return invalid();
-  const ids = new Set<string>();
   return value.map((raw: unknown) => {
     if (!isRecord(raw)) return invalid();
+    return parse(raw);
+  });
+}
+
+function parseAssets(value: unknown): PreparedVideoProjectRevision['assets'] {
+  const ids = new Set<string>();
+  return mapPreparedProjectBindings(value, (raw) => {
     assertKeys(raw, [
       'entry',
       'filename',
@@ -220,14 +230,12 @@ function parseExports(
   projectId: string
 ): PreparedProjectReplicaExport[] | undefined {
   if (value === undefined) return undefined;
-  if (!Array.isArray(value) || value.length > MAX_CAPTURE_ROWS) return invalid();
   const ids = new Set<string>();
-  return value.map((raw: unknown) => {
-    if (!isRecord(raw)) return invalid();
+  return mapPreparedProjectBindings(value, (raw) => {
     assertKeys(raw, ['entry', 'ref', 'remote', 'reuseExisting', 'thumbnail', 'videoReview']);
     const entry = parseProjectExportEntry(raw['entry']);
     const ref = requiredRef(raw['ref']);
-    const remote = raw['remote'];
+    const remote = parsePreparedRemoteBinding(raw['remote'], ref.sha256);
     if (
       !entry ||
       entry.projectId !== projectId ||
@@ -236,22 +244,7 @@ function parseExports(
       entry.size !== ref.size ||
       entry.mimeType !== ref.mimeType ||
       (raw['reuseExisting'] !== undefined && typeof raw['reuseExisting'] !== 'boolean') ||
-      !isRecord(remote)
-    )
-      return invalid();
-    assertKeys(remote, ['key', 'sha256']);
-    if (
-      typeof remote['key'] !== 'string' ||
-      !remote['key'] ||
-      remote['key'].length > 2048 ||
-      /[\\?#:]/u.test(remote['key']) ||
-      Array.from(remote['key']).some(
-        (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127
-      ) ||
-      !remote['key'].split('/').every((part) => part && part !== '.' && part !== '..') ||
-      typeof remote['sha256'] !== 'string' ||
-      !/^[a-f0-9]{64}$/u.test(remote['sha256']) ||
-      (ref.sha256 !== null && ref.sha256 !== remote['sha256'])
+      !remote
     )
       return invalid();
     ids.add(entry.id);
@@ -260,7 +253,7 @@ function parseExports(
     return {
       entry,
       ref,
-      remote: { key: remote['key'], sha256: remote['sha256'] },
+      remote,
       ...(raw['reuseExisting'] === undefined ? {} : { reuseExisting: raw['reuseExisting'] }),
       ...(thumbnail ? { thumbnail } : {}),
       ...(videoReview ? { videoReview } : {}),

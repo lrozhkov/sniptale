@@ -260,3 +260,272 @@ it('sends local-only identity and native preparation without provider authority'
     { kind: 'replica-prepare', selection },
   ]);
 });
+
+it('sends finite checkpoint commands and parses their safe responses', async () => {
+  const client = createSyncProductClient();
+  send.mockResolvedValue({
+    success: true,
+    result: { kind: 'checkpoint-policy', intervalMs: 300000 },
+  });
+  expect(await client.readCheckpointPolicy()).toEqual({
+    kind: 'checkpoint-policy',
+    intervalMs: 300000,
+  });
+  expect(send.mock.calls.at(-1)?.[0]).toMatchObject({ command: { kind: 'checkpoint-policy' } });
+  send.mockResolvedValue({
+    success: true,
+    result: { kind: 'checkpoint-policy', intervalMs: 60000 },
+  });
+  expect(await client.setCheckpointInterval(60000)).toEqual({
+    kind: 'checkpoint-policy',
+    intervalMs: 60000,
+  });
+  expect(send.mock.calls.at(-1)?.[0]).toMatchObject({
+    command: { kind: 'checkpoint-interval', intervalMs: 60000 },
+  });
+  send.mockResolvedValue({
+    success: true,
+    result: { kind: 'checkpoint-flushed', updated: 1, alreadyDue: 0 },
+  });
+  expect(await client.flushCheckpoints()).toEqual({
+    kind: 'checkpoint-flushed',
+    updated: 1,
+    alreadyDue: 0,
+  });
+  expect(send.mock.calls.at(-1)?.[0]).toMatchObject({ command: { kind: 'checkpoint-flush' } });
+});
+
+it('sends a due-only checkpoint wake and requires its exact fixed receipt', async () => {
+  const client = createSyncProductClient();
+  send.mockResolvedValueOnce({ success: true, result: { kind: 'checkpoint-woken' } });
+  await expect(client.wakeCheckpoints()).resolves.toEqual({ kind: 'checkpoint-woken' });
+  expect(send.mock.calls.at(-1)?.[0]).toEqual({
+    type: 'SYNC_PRODUCT_COMMAND',
+    requestId: expect.any(String),
+    command: { kind: 'checkpoint-wake' },
+  });
+  for (const result of [
+    { kind: 'checkpoint-flushed', updated: 1, alreadyDue: 0 },
+    { kind: 'checkpoint-woken', synchronized: true },
+    null,
+  ]) {
+    send.mockResolvedValueOnce({ success: true, result });
+    await expect(client.wakeCheckpoints()).rejects.toThrow();
+  }
+  send.mockResolvedValueOnce({ success: false, error: 'secrets-locked' });
+  await expect(client.wakeCheckpoints()).rejects.toThrow('Sync product command refused');
+});
+
+it('validates exact checkpoint exit client replies', async () => {
+  const client = createSyncProductClient();
+  const receipt = { rootKind: 'media' as const, rootId: 'image', revision: ids[0]! };
+  for (const outcome of ['requested', 'already-due', 'stale', 'not-pending', 'unconfigured']) {
+    send.mockResolvedValueOnce({ success: true, result: { kind: 'checkpoint-exit', outcome } });
+    await expect(client.requestCheckpointExit(receipt)).resolves.toEqual({
+      kind: 'checkpoint-exit',
+      outcome,
+    });
+    expect(send.mock.calls.at(-1)?.[0]).toEqual({
+      type: 'SYNC_PRODUCT_COMMAND',
+      requestId: expect.any(String),
+      command: { kind: 'checkpoint-exit', receipt },
+    });
+  }
+  for (const result of [
+    { kind: 'checkpoint-woken' },
+    { kind: 'checkpoint-exit', outcome: 'published' },
+    { kind: 'checkpoint-exit', outcome: 'requested', synchronized: true },
+    null,
+  ]) {
+    send.mockResolvedValueOnce({ success: true, result });
+    await expect(client.requestCheckpointExit(receipt)).rejects.toThrow();
+  }
+  send.mockResolvedValueOnce({ success: false, error: 'secrets-locked' });
+  await expect(client.requestCheckpointExit(receipt)).rejects.toThrow(
+    'Sync product command refused'
+  );
+});
+
+it('unwraps strict popup status and preserves detailed status and flush receipts', async () => {
+  const client = createSyncProductClient();
+  const status = {
+    configuration: 'unknown',
+    connection: null,
+    localPublication: 'unknown',
+    activity: 'unknown',
+    remote: { knowledge: 'unknown' },
+    protection: 'unknown',
+    issue: null,
+    repair: null,
+  };
+  send.mockResolvedValueOnce({ success: true, result: { kind: 'runtime-status', status } });
+  await expect(client.readRuntimeStatus()).resolves.toEqual(status);
+  expect(send.mock.calls.at(-1)?.[0].command).toEqual({ kind: 'runtime-status' });
+  for (const result of [
+    { kind: 'status', status },
+    { kind: 'runtime-status', status: { ...status, credentialId: ids[0] } },
+  ]) {
+    send.mockResolvedValueOnce({ success: true, result });
+    await expect(client.readRuntimeStatus()).rejects.toThrow('Sync runtime status refused');
+  }
+  send.mockRejectedValueOnce(new Error('private-provider-error'));
+  await expect(client.readRuntimeStatus()).rejects.toThrow('Sync runtime status refused');
+  const detailed = {
+    kind: 'status',
+    status: { connection: null, workspace: null, workspaceJob: null, products: [] },
+  };
+  send.mockResolvedValueOnce({ success: true, result: detailed });
+  await expect(client.readStatus()).resolves.toEqual(detailed);
+});
+it('coalesces local unlock starts and observes completion without a second flush', async () => {
+  const client = createSyncProductClient();
+  let complete!: (value: unknown) => void;
+  send.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      })
+  );
+  const first = client.startSyncUnlock();
+  const second = client.startSyncUnlock();
+  expect(send).toHaveBeenCalledOnce();
+  expect(send.mock.calls[0]?.[0]).toEqual({
+    type: 'AI_SECRET_UNLOCK',
+    operation: 'start',
+    purpose: 'sync',
+  });
+  complete({ success: true, requestId: ids[0], status: 'pending' });
+  await expect(first).resolves.toMatchObject({ status: 'pending' });
+  await expect(second).resolves.toMatchObject({ status: 'pending' });
+  send.mockResolvedValueOnce({ success: true, requestId: ids[0], status: 'completed' });
+  await expect(client.readOwnSyncUnlock(ids[0]!)).resolves.toMatchObject({ status: 'completed' });
+  expect(send.mock.calls[1]?.[0]).toEqual({
+    type: 'AI_SECRET_UNLOCK',
+    operation: 'status',
+    requestId: ids[0],
+  });
+  expect(send).toHaveBeenCalledTimes(2);
+  for (const response of [
+    { success: false, error: 'private-provider-error' },
+    { success: true, status: 'completed', credentialId: ids[0] },
+  ]) {
+    send.mockResolvedValueOnce(response);
+    await expect(client.startSyncUnlock()).rejects.toThrow('Sync unlock refused');
+  }
+  send.mockRejectedValueOnce(new Error('private-provider-error'));
+  await expect(client.readOwnSyncUnlock(ids[0]!)).rejects.toThrow('Sync unlock refused');
+});
+
+it('sends explicit search and selected JOIN with required atomic enrollment policy', async () => {
+  send.mockResolvedValue({ success: true, result: { kind: 'accepted', requestId: ids[0] } });
+  const client = createSyncProductClient();
+  const authentication = { kind: 'basic' as const, username: 'alice', password: 'private' };
+  const source = { kind: 'join' as const, identity: { incarnation: ids[0]!, revision: 2 } };
+  const expected = { spaceId: ids[0]!, bootstrapId: ids[1]!, fingerprint: 'a'.repeat(64) };
+  const discovery = {
+    rootUrl: 'https://dav.test/root/',
+    accountId: 'alice',
+    authentication,
+    previous: source,
+  };
+  const selected = { source, prefix: 'Library name/', expected, authentication };
+  const enrollment = {
+    source,
+    authentication,
+    storagePolicy: { version: 1 as const, mode: 'on-demand' as const },
+  };
+  await client.discoverWorkspace(discovery);
+  await client.joinWorkspace(selected);
+  await client.retryWorkspace({ source, authentication, operation: 'discover' });
+  await client.enrollWorkspace(enrollment);
+  expect(send.mock.calls.map(([request]) => request.command)).toEqual([
+    { kind: 'workspace-discover', ...discovery },
+    { kind: 'workspace-join', ...selected },
+    { kind: 'workspace-retry', source, authentication, operation: 'discover' },
+    { kind: 'workspace-enroll', ...enrollment },
+  ]);
+});
+
+it('prepares only the selected Scenario export using fresh product requests and existing receipts', async () => {
+  const result = { kind: 'accepted', requestId: ids[0] };
+  send.mockResolvedValue({ success: true, result });
+  const client = createSyncProductClient();
+  const target = { projectId: 'scenario-project', exportId: 'saved-html' };
+  const caller = { ...target, remoteKey: 'untrusted-object', credentialId: ids[0] };
+  await expect(client.prepareScenarioExport(caller)).resolves.toEqual(result);
+  await expect(client.prepareScenarioExport(target)).resolves.toEqual(result);
+  const requests = send.mock.calls.map(([request]) => request);
+  for (const request of requests)
+    expect(request).toEqual({
+      type: 'SYNC_PRODUCT_COMMAND',
+      requestId: expect.any(String),
+      command: { kind: 'scenario-export-prepare', ...target },
+    });
+  expect(requests[0].requestId).not.toBe(requests[1].requestId);
+  send.mockResolvedValueOnce({ success: false, error: 'secrets-locked' });
+  await expect(client.prepareScenarioExport(target)).rejects.toThrow(
+    'Sync product command refused'
+  );
+});
+
+it(
+  'projects and clones one finite Library backup command while normalizing actual ' +
+    'selected export options',
+  async () => {
+    send.mockResolvedValue({ success: true, result: { kind: 'accepted', requestId: ids[0] } });
+    const client = createSyncProductClient();
+    const expected = { incarnation: ids[0]!, revision: 1, credentialId: 'private' };
+    const options = {
+      includeDrafts: true,
+      includeSourceMetadata: false,
+      includeTelemetry: true,
+      includeWebSnapshots: false,
+      scope: 'selected' as const,
+      selected: {
+        mediaAssetIds: ['image', 'image'],
+        scenarioProjectIds: ['guide'],
+        videoProjectIds: [] as string[],
+        remoteKey: 'private',
+      },
+      budgetBytes: 1,
+    };
+    const caller = { expected, options, rootUrl: 'https://private/' };
+    await client.prepareLibraryBackup(caller);
+    const request = send.mock.calls[0]?.[0];
+    expect(request.command).toEqual({
+      kind: 'library-backup-prepare',
+      expected: { incarnation: ids[0], revision: 1 },
+      options: {
+        includeDrafts: true,
+        includeSourceMetadata: false,
+        includeTelemetry: true,
+        includeWebSnapshots: false,
+        scope: 'selected',
+        selected: { mediaAssetIds: ['image'], scenarioProjectIds: ['guide'], videoProjectIds: [] },
+      },
+    });
+    expected.revision = 2;
+    options.selected.mediaAssetIds.push('later');
+    expect(request.command.expected.revision).toBe(1);
+    expect(request.command.options.selected.mediaAssetIds).toEqual(['image']);
+    await client.prepareLibraryBackup({ expected, options: { ...options, scope: 'all' } });
+    expect(send.mock.calls[1]?.[0].command.options).toEqual({
+      includeDrafts: true,
+      includeSourceMetadata: false,
+      includeTelemetry: true,
+      includeWebSnapshots: false,
+      scope: 'all',
+    });
+    expect(send.mock.calls[0]?.[0].requestId).not.toBe(send.mock.calls[1]?.[0].requestId);
+    await expect(
+      client.prepareLibraryBackup({
+        expected,
+        options: {
+          ...options,
+          selected: { mediaAssetIds: [], scenarioProjectIds: [], videoProjectIds: [] },
+        },
+      })
+    ).rejects.toThrow();
+    expect(send).toHaveBeenCalledTimes(2);
+  }
+);

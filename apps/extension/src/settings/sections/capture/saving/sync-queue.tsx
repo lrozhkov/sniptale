@@ -3,73 +3,105 @@ import {
   createSyncProductClient,
   subscribeToSyncProductSettled,
 } from '../../../../platform/runtime-messaging/sync-product-client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { createSyncQueueManagement } from '../../../../workflows/sync-transfer/queue-management';
-import { formatDateTime, translate, useAppLocale } from '../../../../platform/i18n';
+import { formatDateTime, formatNumber, translate, useAppLocale } from '../../../../platform/i18n';
+import {
+  buildSettingsRouteUrl,
+  type SettingsQueueFilter,
+  type SettingsRoute,
+} from '../../../../platform/navigation/extension-pages/settings-route/codec';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import {
+  InformationDisclosure,
+  InspectorDisclosureView,
+} from '../../../../ui/compact-inspector-controls/disclosure';
+
+function routeHref(route: SettingsRoute) {
+  const url = buildSettingsRouteUrl(globalThis.location.href, route);
+  return `${url.search}${url.hash}`;
+}
 
 type QueueService = ReturnType<typeof createSyncQueueManagement>;
 type QueueData = Awaited<ReturnType<QueueService['read']>>;
 const buttonClass = getControlSecondaryButtonClassName({ density: 'compact' });
 
-function useSyncQueueInteraction() {
+function useSyncQueueInteraction(filter: SettingsQueueFilter) {
   const [service] = useState(() => createSyncQueueManagement());
   const [productClient] = useState(() => createSyncProductClient());
   const [jobs, setJobs] = useState<SyncProductJobSnapshot[]>([]);
   const [jobsUnavailable, setJobsUnavailable] = useState(false);
-  const [data, setData] = useState<QueueData | null>(null);
+  const [snapshot, setSnapshot] = useState<{ filter: SettingsQueueFilter; data: QueueData } | null>(
+    null
+  );
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading');
   const [message, setMessage] = useState<'refused' | 'applied' | 'historyPending' | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [commandBusy, setCommandBusy] = useState(false);
   const section = useRef<HTMLElement>(null);
   const returnFocus = useRef<{ operationId: string | null } | null>(null);
-  const pending = useRef(false);
+  const pendingCommand = useRef(false);
   const mounted = useRef(true);
+  const request = useRef(0);
+  const currentFilter = useRef(filter);
+  const pageCursor = useRef<unknown>(null);
+  if (currentFilter.current !== filter) {
+    currentFilter.current = filter;
+    pageCursor.current = null;
+    request.current++;
+  }
   const read = useCallback(
-    async (cursor: unknown = null) => {
+    async (cursor: unknown = pageCursor.current) => {
+      const selectedFilter = currentFilter.current;
+      const generation = ++request.current;
+      pageCursor.current = cursor;
+      setReading(true);
       setPhase('loading');
       const [queue, runtime] = await Promise.allSettled([
-        service.read(cursor),
+        service.read(cursor, selectedFilter),
         productClient.readStatus(),
       ]);
-      if (!mounted.current) return;
+      if (
+        !mounted.current ||
+        generation !== request.current ||
+        selectedFilter !== currentFilter.current
+      )
+        return;
       if (queue.status === 'fulfilled') {
-        setData(queue.value);
+        setSnapshot({ filter: selectedFilter, data: queue.value });
         setPhase('ready');
       } else setPhase('error');
       if (runtime.status === 'fulfilled' && runtime.value.kind === 'status') {
         setJobs(runtime.value.status.products);
         setJobsUnavailable(false);
       } else {
-        setJobs([]);
         setJobsUnavailable(true);
       }
+      setReading(false);
     },
     [service, productClient]
   );
   const refresh = useCallback(
-    async (cursor: unknown = null) => {
-      if (pending.current) return;
-      pending.current = true;
-      setBusy(true);
+    async (cursor: unknown = pageCursor.current) => {
+      if (pendingCommand.current) return;
       setMessage(null);
-      try {
-        await read(cursor);
-      } finally {
-        pending.current = false;
-        if (mounted.current) setBusy(false);
-      }
+      await read(cursor);
     },
     [read]
   );
   useEffect(() => {
     mounted.current = true;
-    void refresh();
     return () => {
       mounted.current = false;
     };
-  }, [refresh]);
+  }, []);
+  useEffect(() => {
+    pageCursor.current = null;
+    setMessage(null);
+    if (!pendingCommand.current) void read(null);
+  }, [filter, read]);
   useEffect(() => {
     const reload = () => {
       void refresh();
@@ -83,27 +115,34 @@ function useSyncQueueInteraction() {
       window.removeEventListener('focus', reload);
     };
   }, [refresh]);
+  const busy = reading || commandBusy;
+  const data = snapshot?.filter === filter ? snapshot.data : null;
   useEffect(() => {
     if (busy || !returnFocus.current) return;
     const id = returnFocus.current.operationId;
     const row =
       id === null
         ? null
-        : [...(section.current?.querySelectorAll('li') ?? [])].find(
-            (node) => node.dataset['operationId'] === id
+        : [
+            ...(section.current?.querySelectorAll<HTMLLIElement>('li[data-operation-id]') ?? []),
+          ].find(
+            (node) => node.dataset['operationId'] === id && !node.closest('details:not([open])')
           );
     const target =
       row?.querySelector('button') ??
       row ??
+      section.current?.querySelector<HTMLButtonElement>(
+        '[data-ui="sync-queue.filters"] [aria-pressed="true"]'
+      ) ??
       section.current?.querySelector<HTMLButtonElement>('[data-ui="sync-queue.control"]') ??
       section.current?.querySelector('button');
     target?.focus();
     returnFocus.current = null;
-  }, [busy]);
+  }, [busy, data]);
   const command = async (selection: unknown, operationId: string | null = null) => {
-    if (pending.current) return;
-    pending.current = true;
-    setBusy(true);
+    if (pendingCommand.current || reading) return;
+    pendingCommand.current = true;
+    setCommandBusy(true);
     setMessage(null);
     returnFocus.current = { operationId };
     try {
@@ -116,17 +155,21 @@ function useSyncQueueInteraction() {
             ? 'historyPending'
             : 'applied'
       );
-      // Reload current native revisions before another user command.
       await read();
+    } catch {
+      if (mounted.current) {
+        setMessage('refused');
+        await read();
+      }
     } finally {
-      pending.current = false;
-      if (mounted.current) setBusy(false);
+      pendingCommand.current = false;
+      if (mounted.current) setCommandBusy(false);
     }
   };
   const cancelJob = async (requestId: string) => {
-    if (pending.current) return;
-    pending.current = true;
-    setBusy(true);
+    if (pendingCommand.current || reading) return;
+    pendingCommand.current = true;
+    setCommandBusy(true);
     setMessage(null);
     returnFocus.current = { operationId: requestId };
     try {
@@ -142,8 +185,8 @@ function useSyncQueueInteraction() {
         await read();
       }
     } finally {
-      pending.current = false;
-      if (mounted.current) setBusy(false);
+      pendingCommand.current = false;
+      if (mounted.current) setCommandBusy(false);
     }
   };
   return {
@@ -151,12 +194,14 @@ function useSyncQueueInteraction() {
     phase,
     message,
     busy,
+    commandBusy,
     section,
     refresh,
     command,
     jobs,
     jobsUnavailable,
     cancelJob,
+    hasPreviousPage: pageCursor.current !== null,
   };
 }
 
@@ -171,72 +216,107 @@ function QueueOperationRow(props: {
   command: ReturnType<typeof useSyncQueueInteraction>['command'];
 }) {
   const { operation, source, scope, disabled, locale, command } = props;
-  const actions =
-    operation.status === 'published' || operation.status === 'cancelled'
-      ? []
-      : operation.status === 'paused'
-        ? (['resume', 'cancel'] as const)
-        : operation.status === 'failed' || operation.status === 'interrupted'
-          ? (['retry', 'cancel'] as const)
-          : (['pause', 'cancel'] as const);
+  const [open, setOpen] = useState(false);
+  const completed = operation.status === 'published' || operation.status === 'cancelled';
+  const actions = completed
+    ? []
+    : operation.status === 'paused'
+      ? (['resume', 'cancel'] as const)
+      : operation.status === 'failed' || operation.status === 'interrupted'
+        ? source?.retryAllowed === false
+          ? (['cancel'] as const)
+          : (['retry', 'cancel'] as const)
+        : (['pause', 'cancel'] as const);
+  const automaticRetry =
+    (operation.status === 'failed' || operation.status === 'interrupted') &&
+    (operation.failureCode === 'temporary' || operation.status === 'interrupted') &&
+    source?.retryBlocked !== 'connection-replaced' &&
+    (operation.nextDueAt !== null || operation.automaticRetryCount === 0);
+  const label = source?.label ?? operation.operationId;
   return (
     <li
-      key={operation.operationId}
       data-operation-id={operation.operationId}
       tabIndex={-1}
-      className="space-y-2 py-3"
+      className={[
+        'grid grid-cols-[minmax(0,1fr)_minmax(9rem,15rem)_auto] items-start gap-x-3',
+        'border-b border-[var(--sniptale-color-border-soft)] py-1 text-sm',
+      ].join(' ')}
     >
-      <p className="break-words [overflow-wrap:anywhere]">
-        {source?.label ?? operation.operationId}
-      </p>
-      <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--sniptale-color-text-secondary)]">
-        <span>
-          {translate(
-            source?.changeKind === 'tombstone'
-              ? 'settings.syncQueue.tombstone'
-              : source?.rootKind === 'video-project' || source?.rootKind === 'video-review'
-                ? 'settings.syncQueue.project'
-                : 'settings.syncQueue.media'
-          )}
-        </span>
-        <span>{translate(`settings.syncQueue.status.${operation.status}`)}</span>
-        <span>{translate(`settings.syncQueue.stage.${operation.stage}`)}</span>
-        {source ? (
-          <span>
-            {formatDateTime(source.createdAt, { dateStyle: 'short', timeStyle: 'short' }, locale)}
-          </span>
-        ) : null}
-      </p>
-      {operation.failureCode ? (
-        <p>{translate(`settings.syncQueue.failure.${operation.failureCode}`)}</p>
-      ) : null}
-      {operation.outcome === 'unknown' ? (
-        <p className="text-sm">{translate('settings.syncQueue.unknown')}</p>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        {actions.map((action) => (
-          <ProductActionButton
-            key={action}
-            tone="secondary"
-            className={buttonClass}
-            disabled={disabled}
-            onClick={() =>
-              void command(
-                {
-                  kind: 'operation',
-                  scope,
-                  operationId: operation.operationId,
-                  revision: operation.revision,
-                  command: action,
-                },
-                operation.operationId
-              )
-            }
-          >
-            {translate(`settings.syncQueue.action.${action}`)}
-          </ProductActionButton>
-        ))}
+      <div
+        className={[
+          'min-w-0 [&_summary]:font-normal [&_summary]:text-[var(--sniptale-color-text-primary)]',
+          '[&_summary>h4]:truncate [&_summary>h4]:font-normal',
+        ].join(' ')}
+      >
+        <InspectorDisclosureView
+          dataUi="sync-queue.operation-details"
+          variant="structural"
+          label={label}
+          open={open}
+          onOpenChange={setOpen}
+          bodyClassName="space-y-1 px-2 pb-2 pt-2 text-xs text-[var(--sniptale-color-text-secondary)]"
+        >
+          <p className="break-words [overflow-wrap:anywhere]">{label}</p>
+          <p>
+            {translate(
+              source?.changeKind === 'tombstone'
+                ? 'settings.syncQueue.tombstone'
+                : source?.rootKind === 'video-project' ||
+                    source?.rootKind === 'video-review' ||
+                    source?.rootKind === 'scenario-project'
+                  ? 'settings.syncQueue.project'
+                  : 'settings.syncQueue.media'
+            )}
+          </p>
+          <p>{translate(`settings.syncQueue.stage.${operation.stage}`)}</p>
+          {source ? (
+            <p>
+              {formatDateTime(source.createdAt, { dateStyle: 'short', timeStyle: 'short' }, locale)}
+            </p>
+          ) : null}
+          {operation.outcome === 'unknown' ? (
+            <p>{translate('settings.syncQueue.unknown')}</p>
+          ) : null}
+        </InspectorDisclosureView>
       </div>
+      <div className="min-w-0 py-1.5 text-xs leading-5 [overflow-wrap:anywhere]">
+        <p>
+          {automaticRetry
+            ? translate('settings.syncQueue.automaticRetry')
+            : translate(`settings.syncQueue.status.${operation.status}`)}
+        </p>
+        {source?.retryBlocked === 'connection-replaced' ? (
+          <p>{translate('settings.syncQueue.connectionReplaced')}</p>
+        ) : operation.failureCode ? (
+          <p>{translate(`settings.syncQueue.failure.${operation.failureCode}`)}</p>
+        ) : null}
+      </div>
+      {actions.length ? (
+        <div className="flex flex-wrap justify-end gap-1">
+          {actions.map((action) => (
+            <ProductActionButton
+              key={action}
+              tone="secondary"
+              className={buttonClass}
+              disabled={disabled}
+              onClick={() =>
+                void command(
+                  {
+                    kind: 'operation',
+                    scope,
+                    operationId: operation.operationId,
+                    revision: operation.revision,
+                    command: action,
+                  },
+                  operation.operationId
+                )
+              }
+            >
+              {translate(`settings.syncQueue.action.${action}`)}
+            </ProductActionButton>
+          ))}
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -272,41 +352,137 @@ function QueueConnectionControls(props: {
           {translate(`settings.syncQueue.action.${control.command}`)}
         </ProductActionButton>
       </div>
-      <p className="max-w-prose text-sm text-[var(--sniptale-color-text-secondary)]">
-        {translate('settings.syncQueue.queueHint')}
-      </p>
     </div>
   );
 }
 
+function QueueHistory(props: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <InspectorDisclosureView
+      dataUi="sync-queue.completed"
+      variant="structural"
+      label={props.label}
+      open={open}
+      onOpenChange={setOpen}
+      bodyClassName="pt-2"
+    >
+      {props.children}
+    </InspectorDisclosureView>
+  );
+}
+
 /** Settings owns interaction only. Native revisions remain the command authority. */
-export function SyncQueueSection() {
+export function SyncQueueSection(
+  props: {
+    filter?: SettingsQueueFilter;
+    onFilterChange?: (filter: SettingsQueueFilter) => void;
+  } = {}
+) {
   const locale = useAppLocale();
+  const [localFilter, setLocalFilter] = useState<SettingsQueueFilter>('all');
+  const filter = props.filter ?? localFilter;
   const {
     data,
     phase,
     message,
     busy,
+    commandBusy,
     section,
     refresh,
     command,
     jobs,
     jobsUnavailable,
     cancelJob,
-  } = useSyncQueueInteraction();
+    hasPreviousPage,
+  } = useSyncQueueInteraction(filter);
   const disabled = busy || phase !== 'ready';
+  const rows =
+    data?.kind === 'ready'
+      ? data.operations.map((operation, index) => ({ operation, source: data.sources[index] }))
+      : [];
+  const current = rows.filter(
+    ({ operation }) => operation.status !== 'published' && operation.status !== 'cancelled'
+  );
+  const completed = rows.filter(
+    ({ operation }) => operation.status === 'published' || operation.status === 'cancelled'
+  );
+  const repairConnection = rows.some(
+    ({ operation, source }) =>
+      source?.retryBlocked === 'connection-replaced' ||
+      operation.failureCode === 'authentication' ||
+      operation.failureCode === 'access-denied' ||
+      operation.failureCode === 'invalid-workspace' ||
+      operation.failureCode === 'storage-full'
+  );
+  const repairSecurity = rows.some(({ operation }) => operation.failureCode === 'secrets-locked');
+  const renderRows = (items: typeof rows) => (
+    <ul>
+      {items.map(({ operation, source }) =>
+        data?.kind === 'ready' ? (
+          <QueueOperationRow
+            key={operation.operationId}
+            operation={operation}
+            source={source}
+            scope={data.scope}
+            disabled={disabled}
+            locale={locale}
+            command={command}
+          />
+        ) : null
+      )}
+    </ul>
+  );
+  const count = data?.kind === 'ready' ? data.problemCount : null;
+  const pending = data?.kind === 'ready' ? data.pending : null;
+  const problemCountLabel =
+    count === null || count === undefined
+      ? null
+      : `${translate('settings.syncQueue.operationsUnit')}: ${formatNumber(count, {}, locale)}`;
+  const problemsLabel = [translate('settings.syncQueue.filters.problems'), problemCountLabel]
+    .filter(Boolean)
+    .join(' · ');
+  const checkpointTime =
+    pending?.minimumDueAt === null || pending?.minimumDueAt === undefined
+      ? null
+      : formatDateTime(pending.minimumDueAt, { dateStyle: 'short', timeStyle: 'short' }, locale);
   return (
     <section
       ref={section}
       data-ui="settings.sync-queue"
       aria-busy={busy || phase === 'loading'}
       aria-label={translate('settings.syncQueue.title')}
-      className="space-y-4"
+      className="max-w-[960px] space-y-3"
     >
-      <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
-        {translate('settings.syncQueue.pilot')}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <SegmentedSwitch<SettingsQueueFilter>
+          activeId={filter}
+          appearance="neutral"
+          density="compact"
+          ariaLabel={translate('settings.syncQueue.filterLabel')}
+          dataAttribute={{ 'data-ui': 'sync-queue.filters' }}
+          options={[
+            {
+              id: 'all',
+              label: translate('settings.syncQueue.filters.all'),
+              disabled: commandBusy,
+            },
+            {
+              id: 'problems',
+              label: problemsLabel,
+              disabled: commandBusy,
+            },
+            {
+              id: 'action-required',
+              label: translate('settings.syncQueue.filters.actionRequired'),
+              disabled: commandBusy,
+            },
+          ]}
+          onChange={(next) => {
+            if (props.onFilterChange) props.onFilterChange(next);
+            else setLocalFilter(next);
+          }}
+        />
         <ProductActionButton
           tone="secondary"
           className={buttonClass}
@@ -315,9 +491,6 @@ export function SyncQueueSection() {
         >
           {translate('settings.syncQueue.refresh')}
         </ProductActionButton>
-        <a href="?section=events-logs" className="text-sm underline underline-offset-2">
-          {translate('settings.syncQueue.history')}
-        </a>
       </div>
       {phase === 'loading' ? <p role="status">{translate('settings.syncQueue.loading')}</p> : null}
       {phase === 'error' ? <p role="alert">{translate('settings.syncQueue.unavailable')}</p> : null}
@@ -326,46 +499,6 @@ export function SyncQueueSection() {
           {translate(`settings.syncQueue.${message}`)}
         </p>
       ) : null}
-      <div className="space-y-2" data-ui="settings.sync-runtime-jobs">
-        <h3 className="font-medium">{translate('settings.syncQueue.runtimeTitle')}</h3>
-        <p className="max-w-prose text-sm text-[var(--sniptale-color-text-secondary)]">
-          {translate('settings.syncQueue.runtimeHint')}
-        </p>
-        {jobsUnavailable ? (
-          <p role="alert">{translate('settings.syncQueue.runtimeUnavailable')}</p>
-        ) : null}
-        {!jobsUnavailable && !jobs.length && phase !== 'loading' ? (
-          <p>{translate('settings.syncQueue.runtimeEmpty')}</p>
-        ) : null}
-        <ul className="divide-y divide-[var(--sniptale-color-border-soft)]">
-          {[...jobs].reverse().map((job) => (
-            <li
-              key={job.requestId}
-              data-operation-id={job.requestId}
-              tabIndex={-1}
-              className="space-y-2 py-3"
-            >
-              <p>{translate(`settings.syncQueue.jobKind.${job.kind}`)}</p>
-              <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
-                {translate(`settings.syncQueue.jobState.${job.state}`)}
-              </p>
-              {job.failureCode ? (
-                <p>{translate(`settings.syncQueue.failure.${job.failureCode}`)}</p>
-              ) : null}
-              {job.state === 'running' ? (
-                <ProductActionButton
-                  tone="secondary"
-                  className={buttonClass}
-                  disabled={busy || jobsUnavailable}
-                  onClick={() => void cancelJob(job.requestId)}
-                >
-                  {translate('settings.syncQueue.action.cancel')}
-                </ProductActionButton>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </div>
       {data?.kind === 'unconfigured' && phase === 'ready' ? (
         <p role="status">{translate('settings.syncQueue.unconfigured')}</p>
       ) : null}
@@ -377,37 +510,162 @@ export function SyncQueueSection() {
             disabled={disabled}
             command={command}
           />
-          <p className="max-w-prose text-sm text-[var(--sniptale-color-text-secondary)]">
-            {translate('settings.syncQueue.cancelHint')}
-          </p>
-          {!data.operations.length ? (
-            <p role="status">{translate('settings.syncQueue.empty')}</p>
+          {pending && pending.count > 0 ? (
+            <div data-ui="sync-queue.pending" role="status" className="space-y-1 text-sm">
+              <p>
+                {translate('settings.syncQueue.pendingRoots')}:{' '}
+                {formatNumber(pending.count, {}, locale)}
+                {checkpointTime === null
+                  ? ''
+                  : ` · ${translate('settings.syncQueue.nextCheckpoint')}: ${checkpointTime}`}
+              </p>
+              <a
+                href={routeHref({ section: 'saving', view: 'connection' })}
+                className="underline underline-offset-2"
+              >
+                {translate('settings.syncQueue.checkpointSettings')}
+              </a>
+            </div>
           ) : null}
-          <ul className="divide-y divide-[var(--sniptale-color-border-soft)]">
-            {data.operations.map((operation, index) => (
-              <QueueOperationRow
-                key={operation.operationId}
-                operation={operation}
-                source={data.sources[index]}
-                scope={data.scope}
-                disabled={disabled}
-                locale={locale}
-                command={command}
-              />
-            ))}
-          </ul>
-          {data.nextCursor ? (
-            <ProductActionButton
-              tone="secondary"
-              className={buttonClass}
-              disabled={disabled}
-              onClick={() => void refresh(data.nextCursor)}
+          {repairConnection || repairSecurity ? (
+            <div
+              data-ui="sync-queue.shared-repairs"
+              className="flex flex-wrap gap-x-4 gap-y-1 text-sm"
             >
-              {translate('settings.syncQueue.next')}
-            </ProductActionButton>
+              {repairConnection ? (
+                <a
+                  href={routeHref({ section: 'saving', view: 'connection' })}
+                  className="underline underline-offset-2"
+                >
+                  {translate('settings.syncQueue.repairConnection')}
+                </a>
+              ) : null}
+              {repairSecurity ? (
+                <a
+                  href={routeHref({ section: 'access-data', view: 'secret-protection' })}
+                  className="underline underline-offset-2"
+                >
+                  {translate('settings.syncQueue.repairSecurity')}
+                </a>
+              ) : null}
+            </div>
           ) : null}
+          {renderRows(current)}
+          {completed.length ? (
+            <QueueHistory
+              label={`${translate('settings.syncQueue.completedPage')}: ${formatNumber(completed.length, {}, locale)}`}
+            >
+              {renderRows(completed)}
+            </QueueHistory>
+          ) : null}
+          {!rows.length && phase === 'ready' ? (
+            data.nextCursor ? (
+              <p role="status">{translate('settings.syncQueue.searchContinues')}</p>
+            ) : filter !== 'all' ? (
+              <p role="status">{translate('settings.syncQueue.noMatches')}</p>
+            ) : !pending?.count ? (
+              <p role="status">{translate('settings.syncQueue.empty')}</p>
+            ) : null
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {data.nextCursor ? (
+              <ProductActionButton
+                data-ui={
+                  !rows.length && filter !== 'all'
+                    ? 'sync-queue.continue-search'
+                    : 'sync-queue.next'
+                }
+                tone="secondary"
+                className={buttonClass}
+                disabled={disabled}
+                onClick={() => void refresh(data.nextCursor)}
+              >
+                {translate(
+                  !rows.length && filter !== 'all'
+                    ? 'settings.syncQueue.continueSearch'
+                    : 'settings.syncQueue.next'
+                )}
+              </ProductActionButton>
+            ) : null}
+            {hasPreviousPage ? (
+              <ProductActionButton
+                tone="secondary"
+                className={buttonClass}
+                disabled={busy}
+                onClick={() => void refresh(null)}
+              >
+                {translate('settings.syncQueue.firstPage')}
+              </ProductActionButton>
+            ) : null}
+            {!rows.length && !data.nextCursor && filter !== 'all' ? (
+              <ProductActionButton
+                tone="secondary"
+                className={buttonClass}
+                disabled={commandBusy}
+                onClick={() => {
+                  if (props.onFilterChange) props.onFilterChange('all');
+                  else setLocalFilter('all');
+                }}
+              >
+                {translate('settings.syncQueue.showAll')}
+              </ProductActionButton>
+            ) : null}
+          </div>
         </>
       ) : null}
+      <div className="space-y-2" data-ui="settings.sync-runtime-jobs">
+        {jobsUnavailable ? (
+          <p role="alert">{translate('settings.syncQueue.runtimeUnavailable')}</p>
+        ) : null}
+        {jobs.length ? (
+          <>
+            <h3 className="font-medium">{translate('settings.syncQueue.runtimeTitle')}</h3>
+            <ul>
+              {[...jobs].reverse().map((job) => (
+                <li
+                  key={job.requestId}
+                  data-operation-id={job.requestId}
+                  tabIndex={-1}
+                  className={[
+                    'flex flex-wrap items-center justify-between gap-2',
+                    'border-b border-[var(--sniptale-color-border-soft)] py-1',
+                  ].join(' ')}
+                >
+                  <span>{translate(`settings.syncQueue.jobKind.${job.kind}`)}</span>
+                  <span className="text-sm">
+                    {translate(`settings.syncQueue.jobState.${job.state}`)}
+                    {job.failureCode
+                      ? ` · ${translate(`settings.syncQueue.failure.${job.failureCode}`)}`
+                      : ''}
+                  </span>
+                  {job.state === 'running' ? (
+                    <ProductActionButton
+                      tone="secondary"
+                      className={buttonClass}
+                      disabled={busy || jobsUnavailable}
+                      onClick={() => void cancelJob(job.requestId)}
+                    >
+                      {translate('settings.syncQueue.action.cancel')}
+                    </ProductActionButton>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </div>
+      <InformationDisclosure label={translate('settings.syncQueue.help')}>
+        <p>{translate('settings.syncQueue.pilot')}</p>
+        <p>{translate('settings.syncQueue.queueHint')}</p>
+        <p>{translate('settings.syncQueue.cancelHint')}</p>
+        <p>{translate('settings.syncQueue.runtimeHint')}</p>
+        {!jobsUnavailable && !jobs.length ? (
+          <p>{translate('settings.syncQueue.runtimeEmpty')}</p>
+        ) : null}
+        <a href={routeHref({ section: 'events-logs' })} className="underline underline-offset-2">
+          {translate('settings.syncQueue.history')}
+        </a>
+      </InformationDisclosure>
     </section>
   );
 }

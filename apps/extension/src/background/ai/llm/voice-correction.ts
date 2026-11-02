@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../../composition/persistence/secret-protection/model';
 import {
   VOICE_INPUT_TRANSCRIPT_MAX_CHARS,
   type VoiceProviderSelection,
@@ -12,13 +13,14 @@ export async function correctVoiceTranscript(args: {
   prompt: string;
   signal: AbortSignal;
   beforeSend(): Promise<void>;
+  protection?: SecretProtectionPort;
 }): Promise<string> {
   args.signal.throwIfAborted();
   if (!args.transcript.trim()) throw new Error('no-speech');
   if (args.transcript.length > VOICE_INPUT_TRANSCRIPT_MAX_CHARS || args.prompt.length > 10000)
     throw new Error('too-large');
   const approved = { ...args.selection, signal: args.signal };
-  const config = await resolveModelConfig(args.selection.modelId, approved);
+  const config = await resolveModelConfig(args.selection.modelId, approved, args.protection);
   const result = await requestChatCompletion({
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
@@ -32,7 +34,7 @@ export async function correctVoiceTranscript(args: {
     rejectTruncated: true,
     beforeSend: async () => {
       args.signal.throwIfAborted();
-      const current = await resolveModelConfig(args.selection.modelId, approved);
+      const current = await resolveModelConfig(args.selection.modelId, approved, args.protection);
       if (JSON.stringify(current) !== JSON.stringify(config)) throw new Error('model-unavailable');
       args.signal.throwIfAborted();
       await args.beforeSend();

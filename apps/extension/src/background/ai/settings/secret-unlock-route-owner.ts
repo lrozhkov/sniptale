@@ -1,10 +1,10 @@
-import type { StoredAISecretUnlockRequest } from '../../../composition/persistence/ai-settings/secret-unlock-requests.store.ts';
-import { resolveLlmSessionSenderKey } from '../llm/session-tokens';
+import type { StoredAISecretUnlockRequest } from '../../../composition/persistence/secret-protection/secret-unlock-requests.store.ts';
+import { resolveSecretUnlockSenderKey } from './authorization/secret-unlock';
 
 export function isUnlockRequestOwner(
   record: StoredAISecretUnlockRequest,
   sender: chrome.runtime.MessageSender
 ): boolean {
-  const senderKey = resolveLlmSessionSenderKey(record.purpose, sender);
+  const senderKey = resolveSecretUnlockSenderKey(record.purpose, sender);
   return record.senderKey === senderKey;
 }

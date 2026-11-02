@@ -125,15 +125,20 @@ it('allows recovery only from a completed history failure, leaving normal flush 
 it('does not ignore a history write that fails while flush is waiting', async () => {
   const { session, deps } = fixture();
   let reject!: (error: Error) => void;
+  let markStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    markStarted = resolve;
+  });
   deps.moveVideoWorkspaceHistory.mockImplementationOnce(
     () =>
       new Promise((_, fail) => {
         reject = fail;
+        markStarted();
       })
   );
   const operation = session.history('start').catch(() => undefined);
   const flushed = session.flush({ retryHistory: true });
-  await Promise.resolve();
+  await started;
   reject(new Error('Quota'));
   await expect(flushed).rejects.toThrow('storage');
   await operation;

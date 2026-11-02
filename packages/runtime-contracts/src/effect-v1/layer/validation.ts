@@ -11,6 +11,7 @@ import {
   EDITOR_KEYS,
   LAYER_KEYS,
   LAYER_NUMBER_KEYS,
+  LAYER_STRING_KEYS,
   LAYER_TYPES,
   SPATIAL_LAYER_TYPES,
 } from './rules.js';
@@ -166,6 +167,21 @@ function validateLayerValues(
       report.error('LAYER_NUMBER', `${path}.${key}`, 'Expected a finite number.');
     }
   }
+  for (const key of LAYER_STRING_KEYS) {
+    if (layer[key] !== undefined && typeof layer[key] !== 'string') {
+      report.error('LAYER_STRING', `${path}.${key}`, 'Expected a string.');
+    }
+  }
+  if (layer['pathPoints'] !== undefined && !Array.isArray(layer['pathPoints'])) {
+    report.error('LAYER_POINTS', `${path}.pathPoints`, 'Expected an array.');
+  }
+  if (
+    layer['svgPartIds'] !== undefined &&
+    (!Array.isArray(layer['svgPartIds']) ||
+      layer['svgPartIds'].some((item: unknown) => typeof item !== 'string'))
+  ) {
+    report.error('LAYER_PART_IDS', `${path}.svgPartIds`, 'Expected a string array.');
+  }
   for (const key of ['locked', 'pathClosed', 'visible']) {
     if (layer[key] !== undefined && typeof layer[key] !== 'boolean') {
       report.error('LAYER_BOOLEAN', `${path}.${key}`, 'Expected a boolean.');
@@ -176,6 +192,17 @@ function validateLayerValues(
       report.error('LAYER_EDITOR_TYPE', `${path}.editor`, 'Expected an editor capability object.');
     } else {
       rejectUnknownKeys(layer['editor'], EDITOR_KEYS, `${path}.editor`, report);
+      const canvas = layer['editor']['canvas'];
+      if (
+        canvas !== undefined &&
+        (typeof canvas !== 'string' || !['bounds', 'fullFrame', 'none'].includes(canvas))
+      ) {
+        report.error(
+          'LAYER_EDITOR_CANVAS',
+          `${path}.editor.canvas`,
+          'Expected bounds, fullFrame, or none.'
+        );
+      }
       for (const key of ['keyframeProperties', 'operations', 'properties', 'transform']) {
         if (
           layer['editor'][key] !== undefined &&

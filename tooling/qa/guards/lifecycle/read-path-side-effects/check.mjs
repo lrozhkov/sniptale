@@ -72,10 +72,12 @@ function collectAliases(sourceFile) {
       node.initializer &&
       (ts.isIdentifier(node.initializer) || ts.isPropertyAccessExpression(node.initializer))
     ) {
-      aliases.set(
-        node.name.text,
-        ts.isIdentifier(node.initializer) ? node.initializer.text : node.initializer.name.text
-      );
+      aliases.set(node.name.text, {
+        name: ts.isIdentifier(node.initializer)
+          ? node.initializer.text
+          : node.initializer.name.text,
+        localIdentifier: ts.isIdentifier(node.initializer),
+      });
     }
     ts.forEachChild(node, visit);
   };
@@ -85,7 +87,7 @@ function collectAliases(sourceFile) {
 
 function getCallName(node, aliases) {
   const name = getCallExpressionName(node);
-  return name === null ? null : (aliases.get(name) ?? name);
+  return name === null ? null : (aliases.get(name)?.name ?? name);
 }
 
 function isPersistenceWrite(node, aliases, sourceFile) {
@@ -102,10 +104,19 @@ function analyzeFunction(node, functionNames, aliases, sourceFile) {
   let directWrite = false;
   const visit = (current) => {
     if (current !== node && isFunctionNode(current)) return;
-    if (isPersistenceWrite(current, aliases, sourceFile)) directWrite = true;
-    if (ts.isCallExpression(current) && ts.isIdentifier(current.expression)) {
-      const target = aliases.get(current.expression.text) ?? current.expression.text;
-      if (functionNames.has(target)) localCalls.add(target);
+    const callIdentifier =
+      ts.isCallExpression(current) && ts.isIdentifier(current.expression)
+        ? current.expression.text
+        : null;
+    const alias = callIdentifier === null ? null : aliases.get(callIdentifier);
+    const localTarget =
+      callIdentifier === null || (alias && !alias.localIdentifier)
+        ? null
+        : (alias?.name ?? callIdentifier);
+    if (localTarget !== null && functionNames.has(localTarget)) {
+      localCalls.add(localTarget);
+    } else if (isPersistenceWrite(current, aliases, sourceFile)) {
+      directWrite = true;
     }
     ts.forEachChild(current, visit);
   };

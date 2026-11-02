@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
 import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
-// @vitest-environment jsdom
 import { VideoTrackKind } from '../../../../features/video/project/types';
 
 import { act } from 'react';

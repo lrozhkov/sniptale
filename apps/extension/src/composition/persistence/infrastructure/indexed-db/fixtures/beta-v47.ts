@@ -1,25 +1,9 @@
 import { betaV46Fixture } from './beta-v46';
 
-/** Cursor blocks add empty stores and preserve released rows and immutable objects. */
+/** Native text timing admission preserves every released row and immutable object. */
 export const betaV47Fixture = {
   ...betaV46Fixture,
   databaseVersion: 47,
-  expectedDigest: 'a5bb1a1a3738d0a3b2290718a38882107a6d75f96ebcaf8bb7fff8e427bfc06b',
-  domainVersions: { ...betaV46Fixture.domainVersions, recordings: 4 },
-  indexes: {
-    ...betaV46Fixture.indexes,
-    recording_cursor_trajectories: ['recordingId'],
-    recording_cursor_blocks: ['trajectory', 'time'],
-  },
-  records: {
-    ...betaV46Fixture.records,
-    recording_cursor_trajectories: [],
-    recording_cursor_blocks: [],
-  },
-  stores: [
-    ...betaV46Fixture.stores.filter((name) => name !== 'schema_contracts'),
-    'recording_cursor_trajectories',
-    'recording_cursor_blocks',
-    'schema_contracts',
-  ],
+  expectedDigest: 'd17da50baafeec8e8bc454d995131801217762e0b878bb77a58ae28bbabc4bdb',
+  domainVersions: { ...betaV46Fixture.domainVersions, mediaLibrary: 32 },
 } as const;

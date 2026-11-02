@@ -116,8 +116,12 @@ async function verifyRoutesExplicitModelJsonRequest() {
   });
 
   expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
-  expect(resolveModelConfigMock).toHaveBeenCalledWith('model-explicit');
-  expect(processMultiProviderRequestMock).toHaveBeenCalledWith(message, createResolvedConfig());
+  expect(resolveModelConfigMock).toHaveBeenCalledWith('model-explicit', undefined, undefined);
+  expect(processMultiProviderRequestMock).toHaveBeenCalledWith(
+    message,
+    createResolvedConfig(),
+    undefined
+  );
   expect(loggerDebugMock).toHaveBeenCalledWith('Processing LLM request', {
     hasJsonData: true,
     hasMarkdownData: false,

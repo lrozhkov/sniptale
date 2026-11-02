@@ -21,6 +21,9 @@ const CLIP_KEYS = new Set([
   'start',
 ]);
 const CONTROL_KEYS = new Set([
+  'unit',
+  'presentation',
+  'icon',
   'defaultValue',
   'localizedDefaultValue',
   'id',
@@ -63,6 +66,12 @@ export function validateEffectV1Scenes(
       scenes.set(scene['id'], scene);
     }
     validateRange(scene['start'], scene['duration'], duration, path, report);
+    if (scene['label'] !== undefined && typeof scene['label'] !== 'string') {
+      validateLocaleText(scene['label'], `${path}.label`, false, report);
+    }
+    if (scene['transition'] !== undefined && !isRecord(scene['transition'])) {
+      report.error('SCENE_TRANSITION', `${path}.transition`, 'Expected a transition object.');
+    }
     validateOptionalBoolean(scene['enabled'], `${path}.enabled`, report);
     validateOptionalBoolean(scene['locked'], `${path}.locked`, report);
   });
@@ -119,7 +128,10 @@ function validateClip(
     );
   }
   clippedLayers.add(String(clip['layerId']));
-  if (clip['sceneId'] != null && !scenes.has(String(clip['sceneId']))) {
+  if (
+    clip['sceneId'] !== undefined &&
+    (!requireIdentifier(clip['sceneId'], `${path}.sceneId`, report) || !scenes.has(clip['sceneId']))
+  ) {
     report.error(
       'CLIP_SCENE_UNKNOWN',
       `${path}.sceneId`,
@@ -139,7 +151,8 @@ function validateClip(
 
 export function validateEffectV1Controls(
   value: unknown,
-  report: EffectV1DiagnosticReporter
+  report: EffectV1DiagnosticReporter,
+  controlGroups?: unknown
 ): Set<string> {
   const ids = new Set<string>();
   if (!Array.isArray(value)) {
@@ -166,7 +179,7 @@ export function validateEffectV1Controls(
       validateLocaleText(control['label'], `${path}.label`, false, report);
     }
     validateControlValue(control, path, report);
-    validateControlPresentation(control, path, report);
+    validateControlPresentation(control, path, report, controlGroups);
   });
   return ids;
 }
@@ -176,20 +189,21 @@ function validateControlValue(
   path: string,
   report: EffectV1DiagnosticReporter
 ): void {
+  const fields =
+    control['kind'] === 'number' ? ['defaultValue', 'max', 'min', 'step'] : ['max', 'min', 'step'];
+  for (const key of fields) {
+    if (
+      (key === 'defaultValue' || control[key] !== undefined) &&
+      (typeof control[key] !== 'number' || !Number.isFinite(control[key]))
+    ) {
+      report.error('CONTROL_NUMBER', `${path}.${key}`, 'Expected a finite number.');
+    }
+  }
   if (control['kind'] === 'number') {
     const minimum = typeof control['min'] === 'number' ? control['min'] : undefined;
     const maximum = typeof control['max'] === 'number' ? control['max'] : undefined;
-    const step = typeof control['step'] === 'number' ? control['step'] : undefined;
     const defaultValue =
       typeof control['defaultValue'] === 'number' ? control['defaultValue'] : undefined;
-    for (const key of ['defaultValue', 'max', 'min', 'step']) {
-      if (
-        (key === 'defaultValue' || control[key] !== undefined) &&
-        (typeof control[key] !== 'number' || !Number.isFinite(control[key]))
-      ) {
-        report.error('CONTROL_NUMBER', `${path}.${key}`, 'Expected a finite number.');
-      }
-    }
     if (minimum !== undefined && maximum !== undefined && minimum >= maximum) {
       report.error(
         'CONTROL_RANGE',
@@ -197,9 +211,7 @@ function validateControlValue(
         'Control min must be lower than max so the parameter can change.'
       );
     }
-    if (step !== undefined && step <= 0) {
-      report.error('CONTROL_STEP', `${path}.step`, 'Control step must be greater than zero.');
-    }
+    validateControlStep(control, path, report);
     if (
       defaultValue !== undefined &&
       ((minimum !== undefined && defaultValue < minimum) ||
@@ -211,11 +223,24 @@ function validateControlValue(
         'Control defaultValue must be inside its min/max range.'
       );
     }
-  } else if (
-    ['color', 'text'].includes(String(control['kind'])) &&
-    typeof control['defaultValue'] !== 'string'
-  ) {
-    report.error('CONTROL_STRING', `${path}.defaultValue`, 'Expected a string default value.');
+  } else {
+    validateControlStep(control, path, report);
+    if (
+      ['color', 'text'].includes(String(control['kind'])) &&
+      typeof control['defaultValue'] !== 'string'
+    ) {
+      report.error('CONTROL_STRING', `${path}.defaultValue`, 'Expected a string default value.');
+    }
+  }
+}
+
+function validateControlStep(
+  control: EffectV1Record,
+  path: string,
+  report: EffectV1DiagnosticReporter
+): void {
+  if (typeof control['step'] === 'number' && control['step'] <= 0) {
+    report.error('CONTROL_STEP', `${path}.step`, 'Control step must be greater than zero.');
   }
 }
 

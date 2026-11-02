@@ -4,54 +4,61 @@ import { expect, test } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
-test('native EffectV1 annotations match export painters in both attachment planes', async ({
-  page,
-}, info) => {
-  test.setTimeout(120_000);
-  const bundle = await build({
-    entryPoints: ['tooling/test/e2e/support/quick-review-annotation-render-probe.ts'],
-    bundle: true,
-    format: 'esm',
-    platform: 'browser',
-    write: false,
-    loader: { '.svg': 'text', '.woff2': 'dataurl' },
-    define: { 'process.env.NODE_ENV': '"production"' },
-  });
-  const host = await startHostServer();
-  try {
-    await applyHarnessBootstrap(page, {});
-    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
-    await page.locator('[data-ui="gallery.page.root"]').waitFor();
-    const results = await page.evaluate(async (text) => {
-      const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+for (const combinedBorders of [false, true]) {
+  test(
+    'native EffectV1 annotations match export painters in both attachment planes ' +
+      `(borders=${combinedBorders})`,
+    async ({ page }, info) => {
+      test.setTimeout(120_000);
+      const bundle = await build({
+        entryPoints: ['tooling/test/e2e/support/quick-review-annotation-render-probe.ts'],
+        bundle: true,
+        format: 'esm',
+        platform: 'browser',
+        write: false,
+        loader: { '.svg': 'text', '.woff2': 'dataurl' },
+        define: { 'process.env.NODE_ENV': '"production"' },
+      });
+      const host = await startHostServer();
       try {
-        const module: typeof import('../support/quick-review-annotation-render-probe') =
-          await import(url);
-        return await module.parityProbe();
+        await applyHarnessBootstrap(page, {});
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        const results = await page.evaluate(
+          async ({ text, combinedBorders }) => {
+            const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+            try {
+              const module: typeof import('../support/quick-review-annotation-render-probe') =
+                await import(url);
+              return await module.parityProbe(combinedBorders);
+            } finally {
+              URL.revokeObjectURL(url);
+            }
+          },
+          { text: bundle.outputFiles[0]!.text, combinedBorders }
+        );
+        await writeFile(
+          info.outputPath('annotation-native-parity.json'),
+          JSON.stringify(results, null, 2)
+        );
+        await page.locator('body > div').last().scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: info.outputPath('annotation-native-parity.png'),
+          fullPage: false,
+        });
+        expect(results).toHaveLength(12);
+        for (const result of results) {
+          expect(result.parity, JSON.stringify(result)).toEqual({ pixels: 0, maxDifference: 0 });
+          expect(result.witness.pixels).toBeGreaterThan(100);
+        }
       } finally {
-        URL.revokeObjectURL(url);
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
       }
-    }, bundle.outputFiles[0]!.text);
-    await writeFile(
-      info.outputPath('annotation-native-parity.json'),
-      JSON.stringify(results, null, 2)
-    );
-    await page.locator('body > div').last().scrollIntoViewIfNeeded();
-    await page.screenshot({
-      path: info.outputPath('annotation-native-parity.png'),
-      fullPage: false,
-    });
-    expect(results).toHaveLength(12);
-    for (const result of results) {
-      expect(result.parity, JSON.stringify(result)).toEqual({ pixels: 0, maxDifference: 0 });
-      expect(result.witness.pixels).toBeGreaterThan(100);
     }
-  } finally {
-    await new Promise<void>((resolve, reject) =>
-      host.server.close((error) => (error ? reject(error) : resolve()))
-    );
-  }
-});
+  );
+}
 
 for (const converted of [false, true]) {
   test(

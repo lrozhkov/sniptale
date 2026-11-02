@@ -1,6 +1,8 @@
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { initDB } from '../infrastructure/indexed-db/core';
+import { parseSyncQueuePageInput, readSyncQueuePageInTransaction } from './queue-page';
+export type { SyncQueueFilter } from './queue-page';
 import {
   SYNC_CAPTURE_STORE,
   SYNC_CONNECTION_STORE,
@@ -16,7 +18,7 @@ import {
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseSyncCaptureRecord } from './guards';
-import { type CaptureOperation, type CapturedChange, type CaptureRootKind } from './contracts';
+import { type CaptureOperation } from './contracts';
 import { parsePrepared } from './outgoing';
 import {
   matchesOutgoingDispatchPrepared,
@@ -211,11 +213,6 @@ export async function readSyncQueueSourceInTransaction(
   await requireSyncQueueScopeInTransaction(tx, scope);
   return operationId === null ? readConnection(tx, scope) : readOperation(tx, scope, operationId);
 }
-/** Continuation within one enrollment lifetime. Pages are live reads, not a shared snapshot. */
-interface SyncQueueCursor {
-  scope: SyncQueueScope;
-  afterOperationId: string;
-}
 /** Read one exact retained capture join without scanning unrelated operations. */
 export async function loadSyncQueueOperation(
   value: SyncQueueScope,
@@ -230,80 +227,43 @@ export async function loadSyncQueueOperation(
   await tx.done;
   return operation;
 }
-function pageInput(scope: SyncQueueScope, options: unknown) {
-  const input: unknown = structuredClone(options);
-  if (!isRecord(input)) throw new Error('Invalid sync queue page.');
-  const limit = input['limit'] === undefined ? 50 : input['limit'];
-  if (!queueOrdinal(limit) || limit < 1 || limit > 128)
-    throw new Error('Invalid sync queue page limit.');
-  const cursor = input['cursor'];
-  let afterOperationId: string | null = null;
-  if (cursor !== undefined && cursor !== null) {
-    const cursorScope = isRecord(cursor) ? parseSyncQueueScope(cursor['scope']) : null;
-    if (
-      !isRecord(cursor) ||
-      !cursorScope ||
-      !sameQueueScope(scope, cursorScope) ||
-      !queueIdentity(cursor['afterOperationId'])
-    )
-      throw new Error('Invalid sync queue cursor.');
-    afterOperationId = cursor['afterOperationId'];
-  }
-  return { limit, afterOperationId };
+async function readQueueAuthorization(tx: QueueTransaction, scope: SyncQueueScope) {
+  const raw: unknown = await tx.objectStore(SYNC_CONNECTION_STORE).get('connection');
+  if (raw === undefined) return null;
+  const metadata = parseConnectionMetadata(raw);
+  if (!metadata || !sameConnectionScope(metadata.binding, scope))
+    throw new Error('Invalid sync queue page connection.');
+  return metadata.identity;
 }
-/** Display metadata from the exact retained capture admitted with its queue operation. */
-interface SyncQueueSource {
-  operationId: string;
-  rootKind: CaptureRootKind;
-  rootId: string;
-  changeKind: CapturedChange['change']['kind'];
-  label: string;
-  createdAt: number;
-}
-function queueSource(capture: CaptureOperation): SyncQueueSource {
-  return {
-    operationId: capture.operationId,
-    rootKind: capture.rootKind,
-    rootId: capture.rootId,
-    changeKind: capture.source.changeKind,
-    label: capture.source.label,
-    createdAt: capture.createdAt,
-  };
+function retryConnectionMatches(
+  row: SyncQueueOperation,
+  authorization: SyncConnectionIdentity | null
+): boolean {
+  return (
+    row.authorization === null ||
+    (authorization !== null && row.authorization.incarnation === authorization.incarnation)
+  );
 }
 /** Read bounded native pages. Refresh from the beginning to discover earlier insertions. */
 export async function loadSyncQueuePage(value: SyncQueueScope, options: unknown = {}) {
   const scope = scopeInput(value);
-  const { limit, afterOperationId } = pageInput(scope, options);
+  const input = parseSyncQueuePageInput(scope, options);
   const db = await initDB();
-  const tx = db.transaction([SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE], 'readonly');
+  const tx = db.transaction(
+    input.explicitFilter
+      ? [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CONNECTION_STORE]
+      : [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE],
+    'readonly'
+  );
   await requireSyncQueueScopeInTransaction(tx, scope);
   const connection = await readConnection(tx, scope);
-  const prefix = queueOperationPrefix(scope);
-  const range = IDBKeyRange.bound(
-    afterOperationId === null ? prefix : queueOperationKey(scope, afterOperationId),
-    `${prefix}\uffff`,
-    afterOperationId !== null
-  );
-  const rows: unknown[] = await tx.objectStore(SYNC_OUTBOX_STORE).getAll(range, limit + 1);
-  const operations: SyncQueueOperation[] = [];
-  const sources: SyncQueueSource[] = [];
-  for (const raw of rows) {
-    const row = parseSyncQueueOperation(raw);
-    if (!row || !sameQueueScope(row, scope)) throw new Error('Invalid sync queue operation.');
-    const joined = await readOperationCapture(tx, scope, row.operationId);
-    operations.push(joined.operation);
-    sources.push(queueSource(joined.capture));
-  }
+  const page = await readSyncQueuePageInTransaction(tx, scope, input, {
+    readCapture: readOperationCapture,
+    readAuthorization: readQueueAuthorization,
+    retryConnectionMatches,
+  });
   await tx.done;
-  const more = operations.length > limit;
-  if (more) {
-    operations.pop();
-    sources.pop();
-  }
-  const last = operations.at(-1);
-  const nextCursor: SyncQueueCursor | null =
-    more && last ? { scope, afterOperationId: last.operationId } : null;
-  return { connection, operations, nextCursor, sources };
+  return { connection, ...page };
 }
 /** Admit a retained capture in the caller's mutation transaction. The caller owns commit and abort. */
 export async function enqueueSyncQueueCaptureInTransaction(
@@ -431,6 +391,12 @@ export async function commandSyncQueueOperation(
       (command === 'retry' && !['failed', 'interrupted'].includes(current.status))
     )
       throw new Error('Sync queue operation command refused.');
+    if (
+      command === 'retry' &&
+      current.authorization !== null &&
+      !retryConnectionMatches(current, await readQueueAuthorization(tx, scope))
+    )
+      throw new Error('Sync queue operation retry connection changed.');
     const status = command === 'pause' ? 'paused' : command === 'cancel' ? 'cancelled' : 'queued';
     const row = recordQueueTransition(
       {

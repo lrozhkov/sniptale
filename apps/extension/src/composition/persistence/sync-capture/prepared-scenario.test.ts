@@ -452,3 +452,60 @@ it.each(['missing', 'size', 'MIME', 'checksum', 'damaged JSON', 'foreign history
     expect(root.entry).not.toHaveProperty('history');
   }
 );
+
+it(
+  'keeps deferred HTML descriptors out of physical claims while retaining export ' +
+    'history and hydrating presentations',
+  async () => {
+    const { root, files, history } = fixture();
+    const html = root.exportRefs[0]!;
+    root.deferredExports = [
+      { entry: root.exports[0]!, ref: html, remote: { key: 'objects/html', sha256: html.sha256! } },
+    ];
+    files.delete(html.assetId);
+    const parsed = parsePreparedScenarioReplicaRoot(root);
+    expect(parsed.deferredExports).toEqual(root.deferredExports);
+    expect(
+      collectPreparedScenarioReplicaRefs(parsed).map((source) => source.assetId)
+    ).not.toContain(html.assetId);
+    const hydrated = await hydratePreparedScenarioReplicaRoot(parsed);
+    expect(hydrated.entry.history).toEqual(history);
+    expect(hydrated.exports).toEqual(root.exports);
+    expect(hydrated.exportRefs).toEqual(root.exportRefs);
+    expect(hydrated.presentation).toBeDefined();
+    expect(io.read.mock.calls.map(([source]) => source.assetId)).not.toContain(html.assetId);
+  }
+);
+
+it.each(['entry', 'ref', 'size', 'mime', 'hash', 'key', 'extra', 'duplicate', 'reuse'] as const)(
+  'refuses a malformed deferred HTML %s descriptor before physical reads',
+  (kind) => {
+    const { root } = fixture();
+    const html = root.exportRefs[0]!;
+    const descriptor = {
+      entry: root.exports[0]!,
+      ref: html,
+      remote: { key: 'objects/html', sha256: html.sha256! },
+    };
+    let deferred: unknown = descriptor;
+    if (kind === 'entry')
+      deferred = { ...descriptor, entry: { ...descriptor.entry, id: 'foreign' } };
+    if (kind === 'ref') deferred = { ...descriptor, ref: { ...html, assetId: 'foreign' } };
+    if (kind === 'size') deferred = { ...descriptor, ref: { ...html, size: html.size + 1 } };
+    if (kind === 'mime') deferred = { ...descriptor, ref: { ...html, mimeType: 'image/png' } };
+    if (kind === 'hash')
+      deferred = { ...descriptor, remote: { ...descriptor.remote, sha256: 'f'.repeat(64) } };
+    if (kind === 'key')
+      deferred = { ...descriptor, remote: { ...descriptor.remote, key: '../foreign' } };
+    if (kind === 'extra')
+      deferred = { ...descriptor, remote: { ...descriptor.remote, binding: {} } };
+    if (kind === 'reuse') deferred = { ...descriptor, reuseExisting: 'yes' };
+    expect(() =>
+      parsePreparedScenarioReplicaRoot({
+        ...root,
+        deferredExports: kind === 'duplicate' ? [descriptor, descriptor] : [deferred],
+      })
+    ).toThrow();
+    expect(io.read).not.toHaveBeenCalled();
+  }
+);

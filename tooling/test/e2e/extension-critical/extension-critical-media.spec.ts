@@ -5,7 +5,8 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
 import { betaV1Fixture as betaV1PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { betaV5Fixture as currentPersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v5';
+import { SUPPORTED_BETA_DATABASE_FIXTURES } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures';
+import { DB_VERSION } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores';
 import { test } from '../support/extension-fixture';
 import { startHostServer } from '../support/host-server';
 import {
@@ -43,6 +44,8 @@ const GALLERY_INCLUDE_DRAFTS_DESCRIPTION = translate(
   'gallery.backupExportModal.includeDraftsDescription',
   'ru'
 );
+
+const currentPersistenceFixture = SUPPORTED_BETA_DATABASE_FIXTURES.at(-1)!;
 
 browserTest(
   'beta-v1 upgrades to current beta and preserves real IndexedDB and OPFS data through reload',
@@ -160,6 +163,7 @@ browserTest(
         };
       }, betaV1PersistenceFixture);
 
+      expect(currentPersistenceFixture.databaseVersion).toBe(DB_VERSION);
       expect(snapshot.databaseVersion).toBe(currentPersistenceFixture.databaseVersion);
       expect(snapshot.stores).toEqual([...currentPersistenceFixture.stores].sort());
       expect(snapshot.contracts).toEqual(currentPersistenceFixture.domainVersions);

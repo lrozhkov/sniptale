@@ -119,7 +119,8 @@ export function createWebdavWorkspaceHarness() {
       try {
         const connection = await enrollSyncWorkspaceConnection(
           { kind: 'join', identity },
-          { kind: 'basic', username: credentials.username, password: credentials.password }
+          { kind: 'basic', username: credentials.username, password: credentials.password },
+          { version: 1, mode: 'on-demand' }
         );
         return { code: 'success', connection };
       } catch (error) {
@@ -165,7 +166,8 @@ export function createWebdavWorkspaceHarness() {
       try {
         const connection = await enrollSyncWorkspaceConnection(
           { kind: 'allocation', identity },
-          { kind: 'basic', username: credentials.username, password: credentials.password }
+          { kind: 'basic', username: credentials.username, password: credentials.password },
+          { version: 1, mode: 'on-demand' }
         );
         return { code: 'success', connection };
       } catch (error) {

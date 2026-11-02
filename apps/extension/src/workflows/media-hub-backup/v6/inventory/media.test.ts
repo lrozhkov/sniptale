@@ -175,11 +175,13 @@ it('excludes drafts by default and places included drafts in readable folders', 
 it.each<MediaLibraryEntry['source']>([
   { kind: 'screenshot' },
   { kind: 'stored-asset', assetId: 'workspace-source' },
+  { kind: 'project-asset', projectAssetId: 'imported-image' },
 ])(
   'exports $kind image, presentation and editor dependencies as separate files',
   async (source) => {
     const entry = mediaEntry({ source });
-    if (source.kind === 'stored-asset') delete entry.blob;
+    if (source.kind !== 'screenshot') delete entry.blob;
+    if (source.kind === 'project-asset') entry.id = `project-asset:${source.projectAssetId}`;
     const document = createPersistedEditorDocumentFixture(
       createEditorDocumentFixture(),
       'workspace-source'
@@ -200,6 +202,14 @@ it.each<MediaLibraryEntry['source']>([
           };
         }
         if (store === 'asset_refs') return ref('workspace-source');
+        if (store === 'project_assets' && source.kind === 'project-asset')
+          return {
+            id: source.projectAssetId,
+            assetId: 'workspace-source',
+            createdAt: 1,
+            size: 6,
+            mimeType: 'image/png',
+          };
         if (store === 'aggregate_presentations') {
           return {
             aggregateId: entry.id,
@@ -225,7 +235,7 @@ it.each<MediaLibraryEntry['source']>([
     expect(roots).toHaveLength(1);
     expect(roots[0]?.descriptor).toMatchObject({
       objectCount: 4,
-      totalBytes: source.kind === 'stored-asset' ? 24 : 23,
+      totalBytes: source.kind === 'screenshot' ? 23 : 24,
     });
     const payload = await roots[0]!.load();
     expect(payload.objects).toHaveLength(4);
@@ -415,10 +425,10 @@ it('uses the sanitized snapshot manifest in outer metadata when provenance is di
     .mockResolvedValueOnce(new File(['image'], 'snapshot.png', { type: 'image/png' }));
   const db = {
     transaction: emptyReviewTransaction,
-    get: vi.fn(async (store: string) => {
+    get: vi.fn(async (store: string, key: unknown) => {
       if (store === 'media_library') return entry;
       if (store === 'web_snapshots') return stored;
-      if (store === 'asset_refs') return ref('snapshot-asset');
+      if (store === 'asset_refs' && typeof key === 'string') return ref(key);
       return undefined;
     }),
   };
@@ -577,4 +587,72 @@ it('retains the expected archived snapshot check after supplied database admissi
   expected.workspace.project!.name = 'Earlier project name';
   mocks.readFile.mockResolvedValue(new File(['video!'], 'source.webm', { type: 'video/webm' }));
   await expect(fixture.inventory(expected)).rejects.toThrow('Video review changed before backup');
+});
+
+it('projects an unloaded stored image ref without reading a body or lending the inline original', async () => {
+  const { blob: _blob, ...entry } = mediaEntry({
+    source: { kind: 'stored-asset', assetId: 'unloaded' },
+    size: 6,
+  });
+  const native = {
+    ...ref('unloaded'),
+    location: { kind: 'opfs' as const, objectKey: 'objects/unloaded' },
+  };
+  const onObject = vi.fn();
+  mocks.readFile.mockClear();
+  const roots = await buildMediaRootInventory({
+    db: {
+      transaction: emptyReviewTransaction,
+      get: async (store, key) =>
+        store === 'media_library'
+          ? entry
+          : store === 'asset_refs' && key === native.assetId
+            ? native
+            : undefined,
+    },
+    items: [item(entry)],
+    options: createMediaHubBackupExportOptions(),
+    paths: createArchivePathAllocator(),
+    deferredAssets: { refs: new Map([[native.assetId, native]]), onObject },
+  });
+  const loaded = await roots[0]!.load();
+  const portable = parsePortableMediaMetadata(loaded.metadata);
+  expect(loaded.objects).toEqual([]);
+  expect(roots[0]!.descriptor).toMatchObject({ objectCount: 1, totalBytes: 6 });
+  expect(onObject).toHaveBeenCalledExactlyOnceWith(
+    native.assetId,
+    expect.objectContaining({ objectId: portable.originalObjectId, size: 6 })
+  );
+  expect(mocks.readFile).not.toHaveBeenCalled();
+});
+
+it('shares media export eligibility with metadata-only Library preparation without reading files', async () => {
+  const { isMediaBackupItemSelected } = await import('./media');
+  const options = createMediaHubBackupExportOptions({
+    includeDrafts: false,
+    includeWebSnapshots: false,
+    scope: 'selected',
+    selected: {
+      mediaAssetIds: ['included', 'snapshot', 'draft'],
+      scenarioProjectIds: [],
+      videoProjectIds: [],
+    },
+  });
+  const before = mocks.readFile.mock.calls.length;
+  expect(
+    isMediaBackupItemSelected({ id: 'included', source: { kind: 'stored-asset' } }, options)
+  ).toBe(true);
+  expect(
+    isMediaBackupItemSelected({ id: 'other', source: { kind: 'stored-asset' } }, options)
+  ).toBe(false);
+  expect(
+    isMediaBackupItemSelected({ id: 'snapshot', source: { kind: 'web-snapshot' } }, options)
+  ).toBe(false);
+  expect(
+    isMediaBackupItemSelected(
+      { id: 'draft', source: { kind: 'stored-asset' }, lifecycle: { storageClass: 'temporary' } },
+      options
+    )
+  ).toBe(false);
+  expect(mocks.readFile.mock.calls.length).toBe(before);
 });

@@ -137,6 +137,7 @@ function ScenarioEditorPage() {
     <main
       className="guide-page"
       tabIndex={-1}
+      onPointerDownCapture={(event) => state.beginInteraction(event.pointerId)}
       onBlurCapture={(event) => {
         state.sealEdit();
         const field = event.target;

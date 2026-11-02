@@ -48,6 +48,7 @@ const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
   'popup-recording.mjs',
   'privacy-erasure-runtime.mjs',
   'privacy-erasure-video-preview.mjs',
+  'recording-history.mjs',
   'scenario-ai.mjs',
   'scenario-export.mjs',
   'scenario-stage.mjs',

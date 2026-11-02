@@ -19,14 +19,19 @@ import {
   verified,
   VOICE_INPUT_PARTICIPANT_ID,
 } from './result';
-import { cleanupVoiceInputForPrivacyErasure } from '../../voice-input/coordinator';
+import {
+  cleanupVoiceInputForPrivacyErasure,
+  type createVoiceInputCoordinator,
+} from '../../voice-input/coordinator';
 
 export const mediaPrivacyErasureCleanupAdapter = {
   reserveErasureExclusion: reserveMediaErasureExclusion,
-  async cleanup(): Promise<readonly ErasureParticipantResult[]> {
+  async cleanup(state?: {
+    voiceInputRuntime?: ReturnType<typeof createVoiceInputCoordinator>;
+  }): Promise<readonly ErasureParticipantResult[]> {
     let voiceInputResult: ErasureParticipantResult;
     try {
-      voiceInputResult = (await cleanupVoiceInputForPrivacyErasure())
+      voiceInputResult = (await cleanupVoiceInputForPrivacyErasure(state?.voiceInputRuntime))
         ? verified(VOICE_INPUT_PARTICIPANT_ID)
         : failed(VOICE_INPUT_PARTICIPANT_ID, 'voice-input-stop-failed');
     } catch {

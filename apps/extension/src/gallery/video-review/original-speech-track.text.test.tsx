@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTextTrack } from './original-speech-track';
 import { useReviewText } from './use-review-text';
+import type { ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTextDocument } from '../../features/video/review/text-document';
 
 let root: Root;
@@ -19,34 +20,40 @@ function Fixture({
   busy = false,
   compact = false,
   fragmentCount = 1,
+  initial,
+  edits,
 }: {
   domain?: 'source' | 'result';
   busy?: boolean;
   compact?: boolean;
   fragmentCount?: number;
+  initial?: ReviewTextDocument;
+  edits?: readonly ReviewEdit[];
 }) {
-  const document = useRef<ReviewTextDocument>({
-    version: 1,
-    fragments: Array.from({ length: fragmentCount }, (_, index) => ({
-      id: index ? 'overlap' : 'text',
-      text: 'Hello',
-      originalText: '',
-      start: 1,
-      end: 2,
-      timeDomain: domain,
-      revision: 0,
-      timingRevision: 0,
-      alignment: 'manual',
-      showInVideo: true,
-    })),
-  });
+  const document = useRef<ReviewTextDocument>(
+    initial ?? {
+      version: 1,
+      fragments: Array.from({ length: fragmentCount }, (_, index) => ({
+        id: index ? 'overlap' : 'text',
+        text: 'Hello',
+        originalText: '',
+        start: 1,
+        end: 2,
+        timeDomain: domain,
+        revision: 0,
+        timingRevision: 0,
+        alignment: 'manual',
+        showInVideo: true,
+      })),
+    }
+  );
   const [, refresh] = useState(0);
   current = document.current;
   editor = useReviewText({
     document: document.current,
     sourceDuration: 10,
     sourceTime: 0,
-    edits: [
+    edits: edits ?? [
       {
         id: 'speed',
         kind: 'speed',
@@ -304,3 +311,68 @@ it.each(['source', 'result'] as const)(
     expect(current.fragments[0]?.end).toBe(3);
   }
 );
+
+it('keeps a fully cut phrase on its retained source interval without rewriting the document', () => {
+  const initial: ReviewTextDocument = {
+    version: 1,
+    fragments: [
+      {
+        id: 'text',
+        text: 'Hidden phrase',
+        originalText: '',
+        start: 3,
+        end: 4,
+        timeDomain: 'result',
+        revision: 0,
+        timingRevision: 0,
+        alignment: 'manual',
+        showInVideo: true,
+        sourceAnchor: { duration: 1, spans: [{ start: 3, end: 4, offset: 0, duration: 1 }] },
+      },
+    ],
+  };
+  const before = structuredClone(initial);
+  act(() =>
+    root.render(
+      <Fixture
+        initial={initial}
+        edits={[{ id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 }]}
+      />
+    )
+  );
+  const block = prepare();
+  expect(block.style.left).toBe('30%');
+  expect(block.style.width).toBe('10%');
+  expect(editor.sourceInterval(current.fragments[0]!)).toEqual({ start: 3, end: 4 });
+  expect(current).toEqual(before);
+});
+
+it('replaces the old native placement only when an anchored text drag commits', async () => {
+  const initial: ReviewTextDocument = {
+    version: 1,
+    fragments: [
+      {
+        id: 'text',
+        text: 'Phrase',
+        originalText: '',
+        start: 1,
+        end: 2,
+        timeDomain: 'result',
+        revision: 0,
+        timingRevision: 0,
+        alignment: 'manual',
+        showInVideo: true,
+        sourceAnchor: { duration: 1, spans: [{ start: 2, end: 4, offset: 0, duration: 1 }] },
+      },
+    ],
+  };
+  act(() => root.render(<Fixture initial={initial} />));
+  const block = prepare();
+  await pointer(block, 'pointerdown', 200);
+  await pointer(block, 'pointermove', 300);
+  expect(current.fragments[0]?.sourceAnchor).toEqual(initial.fragments[0]!.sourceAnchor);
+  expect(block.style.left).toBe('30%');
+  await pointer(block, 'pointerup', 300);
+  expect(current.fragments[0]).toMatchObject({ start: 1.5, end: 2.5, timingRevision: 1 });
+  expect(current.fragments[0]?.sourceAnchor).toBeUndefined();
+});

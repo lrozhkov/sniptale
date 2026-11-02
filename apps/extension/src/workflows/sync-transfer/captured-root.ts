@@ -1,4 +1,9 @@
-import { loadCapturedInventory, createCapturedRootEnvelope } from './captured-inventory';
+import {
+  matchesCapturedObjectBinding,
+  loadCapturedInventory,
+  createCapturedRootEnvelope,
+  createCapturedAssetInventory,
+} from './captured-inventory';
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import { encodeCapturedScenarioRoot } from './captured-scenario';
 import { createArchivePathAllocator } from '../../composition/archive-transfer';
@@ -42,12 +47,12 @@ export async function encodeCapturedPortableRoot(
   // Parsers can retain nested values. Detach the entire accepted snapshot before the first read.
   const capture = structuredClone(parsed);
   if (capture.change.kind === 'scenario-project') {
-    const portable = await encodeCapturedScenarioRoot(capture.change.rows);
+    const portable = await encodeCapturedScenarioRoot(capture.change.rows, deferredExports);
     await parsePortableSyncRoot(portable.envelope);
     return portable;
   }
   if (capture.change.kind === 'image') {
-    const portable = await encodeCapturedImageRoot(capture.change.rows);
+    const portable = await encodeCapturedImageRoot(capture.change.rows, deferredExports);
     await parsePortableSyncRoot(portable.envelope);
     return portable;
   }
@@ -57,12 +62,19 @@ export async function encodeCapturedPortableRoot(
     return portable;
   }
   if (capture.change.kind === 'video-review') {
-    const portable = await encodeCapturedVideoReviewRoot(capture.change.rows);
+    const portable = await encodeCapturedVideoReviewRoot(capture.change.rows, deferredExports);
     await parsePortableSyncRoot(portable.envelope, portable.reviewSourceMediaId);
     return { ...portable, dependencies: capture.change.mediaDependencies };
   }
   if (capture.change.kind === 'media') {
     const rows = capture.change.rows;
+    const deferred = createCapturedAssetInventory(
+      [
+        ...('webSnapshot' in rows ? [] : [rows.ref]),
+        ...('screenshotRef' in rows ? [rows.screenshotRef] : []),
+      ],
+      deferredExports
+    );
     const roots = await buildMediaRootInventory({
       db: frozenReviewDatabase({
         source: rows,
@@ -81,20 +93,27 @@ export async function encodeCapturedPortableRoot(
         selected: { mediaAssetIds: [rows.media.id], videoProjectIds: [], scenarioProjectIds: [] },
       }),
       paths: createArchivePathAllocator(),
+      deferredAssets: deferred.port,
     });
     if (roots.length !== 1) throw new Error('Frozen recording inventory differs from its root.');
+    deferred.assertUsed();
     const { objects, metadata } = await loadCapturedInventory(roots[0]!);
-    const envelope = createCapturedRootEnvelope(roots[0]!, { metadata, objects });
+    const envelope = createCapturedRootEnvelope(
+      roots[0]!,
+      { metadata, objects },
+      deferred.descriptors()
+    );
     const portable = parsePortableMediaMetadata(metadata);
     const bindings: { objectId: string; ref: AssetRef }[] = [];
     const bind = async (objectId: string, ref: AssetRef, checkBytes = false) => {
       const object = objects.find((item) => item.ref.objectId === objectId);
-      const blob = object?.blob;
-      if (!blob || blob.size !== ref.size || blob.type !== ref.mimeType) {
+      const retained = deferred.objects.get(objectId);
+      if (!matchesCapturedObjectBinding(ref, object, retained)) {
         if (checkBytes) return;
         throw new Error('Captured media differs from its native reference.');
       }
       if (checkBytes) {
+        if (!object?.blob) throw new Error('Transformed Web Snapshot cannot retain a native body.');
         const native = await readAssetFile(ref, rows.media.filename);
         const digest = async (blob: Blob) => {
           const hash = sha256.create();
@@ -110,7 +129,7 @@ export async function encodeCapturedPortableRoot(
             reader.releaseLock();
           }
         };
-        if ((await digest(native)) !== (await digest(blob))) return;
+        if ((await digest(native)) !== (await digest(object.blob))) return;
       }
       bindings.push({ objectId, ref });
     };
@@ -141,6 +160,7 @@ export async function encodeCapturedPortableRoot(
       objects,
       dependencies: [],
       bindings,
+      ...(deferred.objects.size ? { retainedObjects: deferred.retainedObjects() } : {}),
     };
   }
   throw new Error('Unsupported portable capture.');

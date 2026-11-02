@@ -1,7 +1,14 @@
+import {
+  SYNC_CAPTURE_SCOPE_PHASE_INDEX,
+  SYNC_PENDING_SCOPE_DUE_INDEX,
+  SYNC_QUEUE_SCOPE_STATUS_INDEX,
+} from './sync-queue-index-migration';
+import { ROW_REFERENCE_INDEX } from './row-index-contract';
+
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 48;
+export const DB_VERSION = 53;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -51,6 +58,7 @@ export const SYNC_CAPTURE_STORE = 'sync_capture';
 export const SYNC_OUTBOX_STORE = 'sync_outbox';
 export const SYNC_CATALOG_CACHE_STORE = 'sync_catalog_cache';
 export const SYNC_CONNECTION_STORE = 'sync_connection';
+export const SECRET_PROTECTION_STORE = 'secret_protection';
 export const SCHEMA_CONTRACTS_STORE = 'schema_contracts';
 
 export const EXPECTED_STORES = [
@@ -95,6 +103,7 @@ export const EXPECTED_STORES = [
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
   ASSET_RESIDENCY_STORE,
+  SECRET_PROTECTION_STORE,
   RECORDING_CURSOR_TRAJECTORIES_STORE,
   RECORDING_CURSOR_BLOCKS_STORE,
   RECORDING_EVENTS_STORE,
@@ -102,49 +111,63 @@ export const EXPECTED_STORES = [
 ] as const;
 
 export const EXPECTED_INDEXES = {
-  [STORE_NAME]: ['createdAt'],
+  [STORE_NAME]: ['createdAt', ROW_REFERENCE_INDEX],
   [RECORDING_TELEMETRY_STORE]: ['updatedAt'],
-  [RECORDING_RECOVERY_SESSIONS_STORE]: ['createdAt'],
+  [RECORDING_RECOVERY_SESSIONS_STORE]: ['createdAt', 'recoveryId'],
   [RECORDING_RECOVERY_BLOCKS_STORE]: ['id'],
   [DIAGNOSTICS_META_STORE]: [],
   [DIAGNOSTICS_EVENTS_STORE]: ['recordingId'],
-  [VIDEO_PROJECTS_STORE]: ['updatedAt', 'usageReferenceKeys'],
+  [VIDEO_PROJECTS_STORE]: ['updatedAt', 'usageReferenceKeys', ROW_REFERENCE_INDEX],
   [VIDEO_PROJECT_REVISIONS_STORE]: [],
   [SCENARIO_PROJECTS_STORE]: ['updatedAt'],
   [SCENARIO_PROJECT_HISTORY_STORE]: ['projectId'],
   [SCENARIO_PROJECT_UNITS_STORE]: ['projectId'],
-  [PROJECT_ASSETS_STORE]: ['createdAt', 'originMediaId'],
-  [SCENARIO_ASSETS_STORE]: ['projectId', 'createdAt', 'borrowedMediaId', 'galleryAssetId'],
+  [PROJECT_ASSETS_STORE]: ['createdAt', 'originMediaId', ROW_REFERENCE_INDEX],
+  [SCENARIO_ASSETS_STORE]: [
+    'projectId',
+    'createdAt',
+    'borrowedMediaId',
+    'galleryAssetId',
+    ROW_REFERENCE_INDEX,
+  ],
   [SCENARIO_PENDING_ASSETS_STORE]: ['tabId', 'createdAt'],
-  [PROJECT_EXPORTS_STORE]: ['projectId', 'createdAt'],
-  [SCENARIO_EXPORTS_STORE]: ['projectId', 'createdAt'],
-  [SCENARIO_STEP_EDITOR_DOCUMENTS_STORE]: ['projectId', 'updatedAt'],
-  [MEDIA_LIBRARY_STORE]: ['createdAt', 'kind'],
+  [PROJECT_EXPORTS_STORE]: ['projectId', 'createdAt', ROW_REFERENCE_INDEX],
+  [SCENARIO_EXPORTS_STORE]: ['projectId', 'createdAt', ROW_REFERENCE_INDEX],
+  [SCENARIO_STEP_EDITOR_DOCUMENTS_STORE]: ['projectId', 'updatedAt', ROW_REFERENCE_INDEX],
+  [MEDIA_LIBRARY_STORE]: ['createdAt', 'kind', ROW_REFERENCE_INDEX],
   [THUMBNAILS_STORE]: [],
-  [IMAGE_WORKSPACES_STORE]: ['updatedAt'],
-  [VIDEO_WORKSPACES_STORE]: ['updatedAt', 'usageReferenceKeys'],
-  [VIDEO_WORKSPACE_HISTORY_STORE]: ['aggregateId'],
+  [IMAGE_WORKSPACES_STORE]: ['updatedAt', ROW_REFERENCE_INDEX],
+  [VIDEO_WORKSPACES_STORE]: ['updatedAt', 'usageReferenceKeys', ROW_REFERENCE_INDEX],
+  [VIDEO_WORKSPACE_HISTORY_STORE]: ['aggregateId', ROW_REFERENCE_INDEX],
   [VIDEO_WORKSPACE_DRAFTS_STORE]: ['updatedAt'],
   [AGGREGATE_PRESENTATIONS_STORE]: ['updatedAt'],
-  [WEB_SNAPSHOTS_STORE]: ['createdAt'],
+  [WEB_SNAPSHOTS_STORE]: ['createdAt', ROW_REFERENCE_INDEX],
   [VIDEO_EFFECT_BUNDLES_STORE]: ['enabled', 'updatedAt'],
-  [PROJECT_EXPORT_INPUTS_STORE]: ['createdAt'],
+  [PROJECT_EXPORT_INPUTS_STORE]: ['createdAt', ROW_REFERENCE_INDEX],
   [FRAME_ANNOTATION_RASTER_JOBS_STORE]: ['createdAt'],
   [EDITOR_CUSTOM_SHAPES_STORE]: ['enabled', 'updatedAt'],
   [STATE_MANAGER_STORE]: ['domain', 'updatedAtEpochMs'],
   [NATIVE_TRANSFER_SESSIONS_STORE]: ['createdAt', 'updatedAt'],
   [NATIVE_TRANSFER_CHUNKS_STORE]: ['sessionId'],
-  [ASSET_REFS_STORE]: ['createdAt'],
-  [ASSET_OWNERS_STORE]: ['assetId'],
-  [ASSET_OPERATIONS_STORE]: ['status', 'updatedAt'],
+  [ASSET_REFS_STORE]: ['createdAt', ROW_REFERENCE_INDEX],
+  [ASSET_OWNERS_STORE]: ['assetId', ROW_REFERENCE_INDEX],
+  [ASSET_OPERATIONS_STORE]: ['status', 'updatedAt', ROW_REFERENCE_INDEX],
   [VOICE_INPUT_HISTORY_STORE]: [],
-  [SYNC_CAPTURE_STORE]: ['kind', 'rootKey', 'createdAt'],
-  [SYNC_OUTBOX_STORE]: ['syncQueueDue'],
+  [SYNC_CAPTURE_STORE]: [
+    'kind',
+    'rootKey',
+    'createdAt',
+    ROW_REFERENCE_INDEX,
+    SYNC_CAPTURE_SCOPE_PHASE_INDEX,
+    SYNC_PENDING_SCOPE_DUE_INDEX,
+  ],
+  [SYNC_OUTBOX_STORE]: ['syncQueueDue', SYNC_QUEUE_SCOPE_STATUS_INDEX],
   [SYNC_CATALOG_CACHE_STORE]: [],
   [SYNC_CONNECTION_STORE]: [],
   [ASSET_RESIDENCY_STORE]: [],
-  [RECORDING_CURSOR_TRAJECTORIES_STORE]: ['recordingId'],
+  [SECRET_PROTECTION_STORE]: [],
+  [RECORDING_CURSOR_TRAJECTORIES_STORE]: ['recordingId', 'snapshotAssetId'],
   [RECORDING_CURSOR_BLOCKS_STORE]: ['trajectory', 'time'],
-  [RECORDING_EVENTS_STORE]: ['kind', 'timeBuckets'],
+  [RECORDING_EVENTS_STORE]: ['kind', 'timeBuckets', 'snapshotAssetId'],
   [SCHEMA_CONTRACTS_STORE]: [],
 } as const satisfies Record<(typeof EXPECTED_STORES)[number], readonly string[]>;

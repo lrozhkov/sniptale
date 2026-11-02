@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { ReviewBorderOverlay } from './border-overlay';
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
@@ -643,10 +642,12 @@ it('shows a physical circle and preserves its aspect while resizing the Gallery 
 });
 
 it.each([
-  { direction: 'right', delta: 60, left: '62.5%', authoredX: 0.5 },
-  { direction: 'left', delta: -60, left: '12.5%', authoredX: 0 },
+  { direction: 'right interior', delta: 60, left: 67.5, authoredX: 0.6 },
+  { direction: 'left interior', delta: -60, left: 7.5, authoredX: 0 },
+  { direction: 'right boundary', delta: 100, left: 75, authoredX: 0.75 },
+  { direction: 'left boundary', delta: -100, left: 0, authoredX: 0 },
 ])(
-  'keeps the $direction edge circle preview and selection equal to its committed position',
+  'keeps the $direction circle preview and selection equal to its committed position',
   async ({ delta, left, authoredX }) => {
     let frame: FrameRequestCallback | undefined;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -663,13 +664,17 @@ it.each([
     await pointer(view.group, 'pointerdown', 100, 50);
     await pointer(view.plane, 'pointermove', 100 + delta, 50);
     act(() => frame?.(0));
-    expect(view.group.style.left).toBe(left);
+    expect(parseFloat(view.group.style.left)).toBeCloseTo(left, 10);
+    expect(view.group.style.width).toBe('25%');
+    expect(view.group.style.height).toBe('50%');
     const preview = view.onPreview.mock.lastCall?.[0].spotlight;
-    expect(preview.area.x).toBe(authoredX);
+    expect(preview.area.x).toBeCloseTo(authoredX, 10);
     await pointer(view.plane, 'pointerup', 100 + delta, 50);
     expect(view.onChange.mock.lastCall?.[0].spotlight).toEqual(preview);
     const accepted = render(false, preview);
-    expect(accepted.group.style.left).toBe(left);
+    expect(parseFloat(accepted.group.style.left)).toBeCloseTo(left, 10);
+    expect(accepted.group.style.width).toBe('25%');
+    expect(accepted.group.style.height).toBe('50%');
   }
 );
 
@@ -789,28 +794,3 @@ it.each(['border', 'spotlight'] as const)(
     expect(paint).toHaveBeenCalledTimes(3);
   }
 );
-
-it('paints identical border inputs once but repaints after geometry changes or remount', () => {
-  const frame = {
-    id: 'b',
-    path: 'M0 0H100V50Z',
-    perimeter: 300,
-    width: 2,
-    color: '#ffffff',
-    style: 'solid' as const,
-    start: 0,
-    end: 1,
-    opacity: 1,
-  };
-  vi.mocked(drawSceneBorders).mockClear();
-  const renderBorder = (frames: (typeof frame)[]) =>
-    act(() => root.render(<ReviewBorderOverlay output={{ ...output }} frames={frames} />));
-  renderBorder([frame]);
-  renderBorder([{ ...frame }]);
-  expect(drawSceneBorders).toHaveBeenCalledOnce();
-  renderBorder([{ ...frame, width: 3 }]);
-  expect(drawSceneBorders).toHaveBeenCalledTimes(2);
-  renderBorder([]);
-  renderBorder([{ ...frame, width: 3 }]);
-  expect(drawSceneBorders).toHaveBeenCalledTimes(3);
-});

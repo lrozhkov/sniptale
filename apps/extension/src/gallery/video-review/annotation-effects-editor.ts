@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
 import type {
   ReviewAnnotationEffect,
@@ -81,10 +81,14 @@ export function useReviewAnnotationEffects(
   const completion = useRef<Promise<boolean> | null>(null);
   const failedChoice = useRef<Choice | null>(null);
   const [geometry, updateGeometry] = useState<ReviewAnnotationGeometry | null>(null);
+  const reportedGeometry = useRef<ReviewAnnotationGeometry | null>(null);
   const setGeometry = useCallback((next: ReviewAnnotationGeometry | null) => {
-    updateGeometry((previous) =>
-      JSON.stringify(previous) === JSON.stringify(next) ? previous : next
-    );
+    // The stage reports after render: reject equal reports before scheduling another root update.
+    if (JSON.stringify(reportedGeometry.current) === JSON.stringify(next)) return;
+    reportedGeometry.current = next;
+    // Derived inspector geometry must not compete with continuous pointer updates.
+    if (next) startTransition(() => updateGeometry(next));
+    else updateGeometry(null);
   }, []);
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [pending, setPending] = useState(false);
@@ -94,7 +98,7 @@ export function useReviewAnnotationEffects(
     draft.current = null;
     failedChoice.current = null;
     setGesture(null);
-    updateGeometry(null);
+    setGeometry(null);
     setPending(false);
     setFailure(null);
     const protect = (event: BeforeUnloadEvent) => {
@@ -113,7 +117,7 @@ export function useReviewAnnotationEffects(
       draft.current = null;
       completion.current = null;
     };
-  }, [args.session]);
+  }, [args.session, setGeometry]);
   const active = (owner: typeof args, controller: AbortController) =>
     mounted.current && latest.current.session === owner.session && !controller.signal.aborted;
   const currentLane = () => args.session.getSnapshot().document.advancedContent.annotationEffects;

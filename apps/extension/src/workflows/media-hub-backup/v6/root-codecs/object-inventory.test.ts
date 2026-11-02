@@ -1,7 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import type { ArchiveReader } from '../../../../composition/archive-transfer';
 import type { JsonValue, MediaHubBackupRootEnvelope } from '../contracts';
-import { assertArchiveRootObjectInventory } from './object-inventory';
+import {
+  assertArchiveRootObjectInventory,
+  collectArchiveNativeMimeTypes,
+} from './object-inventory';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../../features/editor/document/constants';
 import { assertMetadataJson } from '../codec';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
@@ -380,4 +383,31 @@ it('admits exact Scenario history roles without bytes only for metadata discover
   );
   root.objects[1]!.mimeType = 'text/html';
   await expect(assertArchiveRootObjectInventory(root, null, [])).rejects.toThrow();
+});
+
+it.each([media, scenario, video])(
+  'returns full typed MIME declarations for root family %#',
+  async (fixture) => {
+    const root = fixture('image/png; name="source.png"');
+    const before = structuredClone(root);
+    expect(await collectArchiveNativeMimeTypes(root)).toEqual(
+      new Map([['body', 'image/png; name="source.png"']])
+    );
+    expect(root).toEqual(before);
+  }
+);
+
+it('refuses conflicting declarations for the same object', async () => {
+  const root = video('video/webm;codecs=vp8');
+  root.objects = root.objects.map((item) => ({ ...item, mimeType: 'video/webm' }));
+  metadata(root)['projectExports'] = [
+    { entry: { id: 'export', mimeType: 'video/webm;codecs=vp9', size: 3 }, objectId: 'body' },
+  ];
+  await expect(collectArchiveNativeMimeTypes(root)).rejects.toThrow('MIME');
+});
+
+it('refuses a native declaration with a different container MIME', async () => {
+  const root = media('video/webm;codecs=vp8');
+  root.objects = root.objects.map((item) => ({ ...item, mimeType: 'image/png' }));
+  await expect(collectArchiveNativeMimeTypes(root)).rejects.toThrow('MIME');
 });

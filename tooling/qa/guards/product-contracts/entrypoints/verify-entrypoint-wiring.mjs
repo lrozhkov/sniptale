@@ -93,7 +93,8 @@ function collectFileViolations(relativePath, sourceFile) {
       );
     }
     const moduleSpecifier = moduleSpecifierText(node);
-    if (moduleSpecifier?.includes('/contracts/messaging')) {
+    const erasedTypeImport = ts.isImportDeclaration(node) && node.importClause?.isTypeOnly === true;
+    if (moduleSpecifier?.includes('/contracts/messaging') && !erasedTypeImport) {
       violations.push(
         createViolation(
           'entrypoint-message-contracts',

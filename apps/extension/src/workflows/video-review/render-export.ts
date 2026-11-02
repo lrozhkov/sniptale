@@ -9,7 +9,7 @@ import type { WatermarkRenderer } from '../../features/video/composition/canvas/
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
-import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from './spatial-render-session';
 import {
   createAdaptiveFrameWriter,
   createAdaptiveComparisonBudget,
@@ -549,7 +549,7 @@ export async function renderRenderWindowFrames(
       quickEditFocusType(r) === 'zoom' &&
       (hasQuickEditPerspective(r.perspective) || r.depthOfField?.enabled)
   )
-    ? createReviewSpatialRenderer()
+    ? createReviewSpatialSession()
     : undefined;
   let dissolve: HTMLCanvasElement | undefined;
   let frame = 0;

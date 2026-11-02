@@ -30,8 +30,8 @@ vi.mock('./alpha-reset', () => ({
   resetIncompatibleAISettings: resetIncompatibleAISettingsMock,
 }));
 
-vi.mock('./secret-protection-transition.store.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./secret-protection-transition.store.ts')>()),
+vi.mock('../secret-protection/transition.store.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../secret-protection/transition.store.ts')>()),
   recoverStoredAISecretPassphraseProtectionTransition:
     recoverStoredAISecretPassphraseProtectionTransitionMock,
 }));
@@ -63,7 +63,7 @@ describe('ai/init', () => {
     expect(resetIncompatibleAISettingsMock).not.toHaveBeenCalled();
   });
 
-  it('runs reset and secret protection recovery once when the seam is not ready', async () => {
+  it('runs only the AI schema reset once when the seam is not ready', async () => {
     localGetMock.mockResolvedValue({
       [AI_STORAGE_VERSION_KEY]: null,
     });
@@ -74,10 +74,10 @@ describe('ai/init', () => {
     await expect(initializeAiStorageAccess()).resolves.toBeUndefined();
     await expect(initializeAiStorageAccess()).resolves.toBeUndefined();
     expect(resetIncompatibleAISettingsMock).toHaveBeenCalledTimes(1);
-    expect(recoverStoredAISecretPassphraseProtectionTransitionMock).toHaveBeenCalledTimes(1);
+    expect(recoverStoredAISecretPassphraseProtectionTransitionMock).not.toHaveBeenCalled();
   });
 
-  it('skips reset but still recovers secret protection transitions when already ready', async () => {
+  it('skips reset and leaves shared protection recovery to its owner when already ready', async () => {
     localGetMock.mockResolvedValue({
       [AI_STORAGE_VERSION_KEY]: AI_STORAGE_VERSION,
     });
@@ -86,6 +86,6 @@ describe('ai/init', () => {
 
     await expect(initializeAiStorageAccess()).resolves.toBeUndefined();
     expect(resetIncompatibleAISettingsMock).not.toHaveBeenCalled();
-    expect(recoverStoredAISecretPassphraseProtectionTransitionMock).toHaveBeenCalledTimes(1);
+    expect(recoverStoredAISecretPassphraseProtectionTransitionMock).not.toHaveBeenCalled();
   });
 });

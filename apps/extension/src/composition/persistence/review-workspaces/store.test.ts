@@ -132,6 +132,8 @@ it('preserves lane membership and locks through durable history and retry', asyn
 
 it('reopens exactly one durable history and rejects missing, malformed or changed media', async () => {
   const opened = await openVideoWorkspace(id, source);
+  expect(opened).not.toHaveProperty('checkpointReceipt');
+  expect(await readVideoWorkspace(id)).not.toHaveProperty('checkpointReceipt');
   expect(opened.workspace.revision).toBe(1);
   expect(opened.workspace.advanced.background.zoomBehavior).toBe('window');
   expect(await openVideoWorkspace(id, source)).toEqual(opened);
@@ -1176,4 +1178,83 @@ it('retains the archived quick project source after the new default project is p
   expect(
     (await openVideoWorkspace('recording:quick-project:retained', source)).workspace.aggregateId
   ).toBe('recording:quick-project:retained');
+});
+
+it('publishes text anchors atomically and retains them through conflict, retry, history and reopen', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const advanced = createQuickEditAdvancedState();
+  advanced.text = {
+    version: 1,
+    fragments: [
+      {
+        id: 'text',
+        start: 8,
+        end: 10,
+        text: 'Later',
+        originalText: '',
+        revision: 0,
+        timingRevision: 0,
+        timeDomain: 'result',
+        showInVideo: true,
+        alignment: 'manual',
+      },
+    ],
+  };
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    advanced,
+  });
+  const args = {
+    aggregateId: id,
+    expectedRevision: saved.workspace.revision,
+    expectedSourceAssetId: saved.workspace.sourceAssetId,
+    operation: {
+      id: 'text-cut',
+      at: 1,
+      target: 'edit',
+      before: null,
+      after: { id: 'cut', kind: 'cut', start: 1, end: 3, requestedStart: 1, requestedEnd: 3 },
+    },
+  };
+  harness.failure = true;
+  await expect(commitVideoWorkspace(args)).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(saved.workspace);
+  harness.failure = false;
+  const [first, stale] = await Promise.allSettled([
+    commitVideoWorkspace(args),
+    commitVideoWorkspace({ ...args, operation: { ...args.operation, id: 'stale-cut' } }),
+  ]);
+  expect(first.status).toBe('fulfilled');
+  expect(stale).toMatchObject({ status: 'rejected', reason: { code: 'conflict' } });
+  if (first.status !== 'fulfilled') throw first.reason;
+  const committed = first.value;
+  const { replayReviewHistory } = await import('../../../features/video/review/document');
+  const text = (workspace: typeof saved.workspace) =>
+    replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      workspace.source,
+      reviewAdvancedContentBaseline(workspace.advanced)
+    ).advancedContent.text;
+  expect(text(committed.workspace)?.fragments[0]).toMatchObject({
+    start: 6,
+    end: 8,
+    sourceAnchor: { duration: 2, spans: [{ start: 8, end: 10, offset: 0, duration: 2 }] },
+  });
+  expect(committed.workspace.history.at(-1)).toMatchObject({ preserveTextAnchors: true });
+  expect(text((await openVideoWorkspace(id, source)).workspace)).toEqual(text(committed.workspace));
+  const undone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: committed.workspace.revision,
+    direction: 'undo',
+  });
+  expect(text(undone.workspace)).toEqual(advanced.text);
+  const redone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: undone.workspace.revision,
+    direction: 'redo',
+  });
+  expect(text(redone.workspace)).toEqual(text(committed.workspace));
 });

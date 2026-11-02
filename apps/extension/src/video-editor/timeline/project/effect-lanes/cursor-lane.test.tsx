@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
 import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
-// @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

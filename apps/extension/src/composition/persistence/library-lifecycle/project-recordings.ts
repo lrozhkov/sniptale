@@ -1,3 +1,4 @@
+import { visitIndexedDbStoreRows } from '../infrastructure/indexed-db/read-primitives';
 import {
   MEDIA_LIBRARY_STORE,
   STORE_NAME,
@@ -53,17 +54,28 @@ export async function repairLinkedRecordingLifecycles(now = Date.now()): Promise
     const tx = db.transaction([VIDEO_PROJECTS_STORE, STORE_NAME, MEDIA_LIBRARY_STORE], 'readwrite');
     const projectStore = tx.objectStore(VIDEO_PROJECTS_STORE);
     const recordingIds = new Set<string>();
-    for (const raw of await projectStore.getAll()) {
-      const project = parseVideoProjectEntry(raw);
-      if (!project) continue;
-      for (const id of collectVideoProjectReferences(project).recordingIds) recordingIds.add(id);
+    try {
+      await visitIndexedDbStoreRows(projectStore, (raw) => {
+        const project = parseVideoProjectEntry(raw);
+        if (!project) return true;
+        for (const id of collectVideoProjectReferences(project).recordingIds) recordingIds.add(id);
+        return true;
+      });
+      await promoteLinkedRecordingLifecycles({
+        mediaStore: tx.objectStore(MEDIA_LIBRARY_STORE),
+        now,
+        recordingIds,
+        recordingStore: tx.objectStore(STORE_NAME),
+      });
+      await tx.done;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        // A completed transaction needs no abort.
+      }
+      await tx.done.catch(() => undefined);
+      throw error;
     }
-    await promoteLinkedRecordingLifecycles({
-      mediaStore: tx.objectStore(MEDIA_LIBRARY_STORE),
-      now,
-      recordingIds,
-      recordingStore: tx.objectStore(STORE_NAME),
-    });
-    await tx.done;
   });
 }

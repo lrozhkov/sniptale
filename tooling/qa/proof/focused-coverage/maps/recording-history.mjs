@@ -43,8 +43,8 @@ export const RECORDING_HISTORY_OWNER_MAPPINGS = [
     owner: 'native-recording-history-lifecycle',
     productionFile: 'apps/extension/src/background/capture/native-app/history-ingestion.ts',
     exclusive: true,
-    reason:
-      'Recording ingestion, completed-parent recovery, lease refusal and exact receipt replay use the recording controller suites.',
+    reason: `Recording ingestion, completed-parent recovery, lease refusal and exact receipt replay use the
+recording controller suites.`,
     testFiles: [
       'apps/extension/src/background/capture/native-app/history-ingestion.test.ts',
       'apps/extension/src/background/capture/native-app/controller-recording.test.ts',
@@ -60,8 +60,8 @@ export const RECORDING_HISTORY_OWNER_MAPPINGS = [
     owner: 'native-recording-history-lifecycle',
     productionFile: 'apps/extension/src/background/capture/native-app/ingestion-types.ts',
     exclusive: true,
-    reason:
-      'Recording ingestion, completed-parent recovery, lease refusal and exact receipt replay use the recording controller suites.',
+    reason: `Recording ingestion, completed-parent recovery, lease refusal and exact receipt replay use the
+recording controller suites.`,
     testFiles: [
       'apps/extension/src/background/capture/native-app/history-ingestion.test.ts',
       'apps/extension/src/background/capture/native-app/controller-recording.test.ts',
@@ -77,8 +77,8 @@ export const RECORDING_HISTORY_OWNER_MAPPINGS = [
     owner: 'native-recording-history-lifecycle',
     productionFile: 'apps/extension/src/background/capture/native-app/recording.ts',
     exclusive: true,
-    reason:
-      'Recording ingestion, completed-parent recovery, lease refusal and exact receipt replay use the recording controller suites.',
+    reason: `Recording ingestion, completed-parent recovery, lease refusal and exact receipt replay use the
+recording controller suites.`,
     testFiles: [
       'apps/extension/src/background/capture/native-app/history-ingestion.test.ts',
       'apps/extension/src/background/capture/native-app/controller-recording.test.ts',
@@ -94,8 +94,8 @@ export const RECORDING_HISTORY_OWNER_MAPPINGS = [
     owner: 'native-recording-history-lifecycle',
     productionFile: 'apps/extension/src/background/capture/native-app/sessions.ts',
     exclusive: true,
-    reason:
-      'Recording ingestion, completed-parent recovery, lease refusal and exact receipt replay use the recording controller suites.',
+    reason: `Recording ingestion, completed-parent recovery, lease refusal and exact receipt replay use the
+recording controller suites.`,
     testFiles: [
       'apps/extension/src/background/capture/native-app/history-ingestion.test.ts',
       'apps/extension/src/background/capture/native-app/controller-recording.test.ts',

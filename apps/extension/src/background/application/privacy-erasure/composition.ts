@@ -6,7 +6,11 @@ import { diagnosticsPrivacyErasureCleanupAdapter } from '../../diagnostics/priva
 import { mediaPrivacyErasureCleanupAdapter } from '../../media/privacy-erasure/cleanup';
 import { extensionPageLocalStorageErasureAdapter } from './page-local-storage';
 import type { BackgroundRuntimeState } from '../runtime-state';
-import type { NativeIngestionCleanupPort, SyncPrivacyErasurePort } from './ports';
+import type {
+  NativeIngestionCleanupPort,
+  SyncPrivacyErasurePort,
+  SecretProtectionPrivacyErasurePort,
+} from './ports';
 import {
   backgroundRuntimeCleanupAdapter,
   configureBackgroundRuntimeScreenshotCleanupPort,
@@ -24,6 +28,17 @@ const unavailableNativeIngestionCleanupPort: NativeIngestionCleanupPort = {
     return {
       release() {},
       async waitForActiveMutations() {},
+    };
+  },
+};
+
+let secretProtectionPrivacyErasurePort: SecretProtectionPrivacyErasurePort = {
+  reserveErasure() {
+    return {
+      release() {},
+      async prepare() {
+        throw new Error('Secret protection erasure is unavailable');
+      },
     };
   },
 };
@@ -86,7 +101,31 @@ const privacyErasureUseCase = new PrivacyErasureUseCase({
       audioJobs?.reserveErasureExclusion() ?? { release() {}, async waitForActiveMutations() {} },
   },
   sync: {
-    reserveErasureExclusion: () => syncPrivacyErasurePort.reserveErasureExclusion(),
+    reserveErasureExclusion(options) {
+      const secret = secretProtectionPrivacyErasurePort.reserveErasure();
+      try {
+        const sync = syncPrivacyErasurePort.reserveErasureExclusion(options);
+        return {
+          release() {
+            try {
+              sync.release();
+            } finally {
+              secret.release();
+            }
+          },
+          async quiesce() {
+            // Native revocation uses ordinary writer admission before the common exclusive lock.
+            await sync.quiesce();
+            await secret.prepare({
+              includeAiProviderSecrets: options?.includeAiProviderSecrets ?? true,
+            });
+          },
+        };
+      } catch (error) {
+        secret.release();
+        throw error;
+      }
+    },
   },
   diagnostics: diagnosticsPrivacyErasureCleanupAdapter,
   media: mediaPrivacyErasureCleanupAdapter,
@@ -99,6 +138,13 @@ const privacyErasureUseCase = new PrivacyErasureUseCase({
   runtime: backgroundRuntimeCleanupAdapter,
   storage: createPrivacyErasureStorageCleanupAdapter(extensionPageLocalStorageErasureAdapter),
 });
+
+/** Installs the one runtime-owned shared secret session before erasure admission. */
+export function configureSecretProtectionPrivacyErasurePort(
+  port: SecretProtectionPrivacyErasurePort
+): void {
+  secretProtectionPrivacyErasurePort = port;
+}
 
 /** Installs the runtime-owned sync exclusion before privacy erasure can remove local data. */
 export function configureSyncPrivacyErasurePort(port: SyncPrivacyErasurePort): void {

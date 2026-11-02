@@ -1,9 +1,13 @@
+import { parseSyncWorkspaceJobSnapshot } from '../../contracts/messaging/contracts/runtime/sync-product';
+import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
 import type { SyncProductExecutionInput, SyncProductExecutionResult } from './product-execution';
 import type {
   SyncProductExecutorRequest,
+  SyncCredentialLease,
   SyncProductResponse,
   SyncProductJobSnapshot,
   SyncProductCompletion,
+  SyncWorkspaceDiscovery,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import {
   sameConnectionScope,
@@ -28,6 +32,11 @@ import type {
 } from '../../composition/persistence/remote-connection/model';
 
 const MAX_RETAINED_THUMBNAIL_BYTES = 4 * 1024 * 1024;
+function stoppedCode(signal: AbortSignal): 'secrets-locked' | 'interrupted' {
+  return signal.reason instanceof SyncRemoteError && signal.reason.code === 'secrets-locked'
+    ? 'secrets-locked'
+    : 'interrupted';
+}
 
 type TerminalSnapshot = Omit<
   SyncExecutorJobSnapshot,
@@ -46,6 +55,7 @@ export interface SyncExecutionResult {
 export type SyncExecutionInput = SyncExecutorBinding & {
   operationId: string;
   expectedRevision: number;
+  credentialLease?: SyncCredentialLease;
   signal: AbortSignal;
   onProgress(progress: Pick<SyncExecutorJobSnapshot, 'stage' | 'runId'>): void;
 };
@@ -58,19 +68,25 @@ export interface SyncExecutorExecution {
 
 /** One workspace selection; credentials belong only to the synchronously constructed handle. */
 export interface SyncWorkspaceExecutionInput {
+  operation?: 'discover';
   source: SyncWorkspaceSource;
   authentication: SyncConnectionAuthentication;
 }
 
 /** Safe terminal projection and explicit resource containment. */
 export interface SyncWorkspaceExecutionResult {
-  snapshot: Pick<SyncWorkspaceJobSnapshot, 'failureCode'> & {
-    state: Exclude<SyncWorkspaceJobSnapshot['state'], 'running'>;
-  };
+  snapshot:
+    | {
+        state: 'ready' | 'failed' | 'interrupted';
+        failureCode: SyncWorkspaceJobSnapshot['failureCode'];
+        discovery?: never;
+      }
+    | { state: 'discovered'; failureCode: null; discovery: SyncWorkspaceDiscovery };
   containment: 'contained' | 'unsafe';
 }
 
 interface WorkspaceJob {
+  operation?: 'discover';
   snapshot: SyncWorkspaceJobSnapshot;
   source: SyncWorkspaceSource;
   execution: { run(): Promise<SyncWorkspaceExecutionResult>; drain(): Promise<void> };
@@ -150,6 +166,7 @@ class SyncConnectionExecutor {
   }
   #jobs = new Map<string, Job>();
   #binding: SyncExecutorBinding | null = null;
+  #credentialLease: SyncCredentialLease | null = null;
   #workspace: WorkspaceJob | null = null;
   #products = new Map<string, ProductJob>();
   #stoppedWorkspaceIncarnations = new Set<string>();
@@ -176,21 +193,35 @@ class SyncConnectionExecutor {
 
   #failed(job: Job | WorkspaceJob) {
     job.unsafe = true;
-    job.snapshot.state = 'failed';
-    job.snapshot.failureCode = 'internal';
+    if ('source' in job) {
+      const { requestId, sourceKind, selectionIncarnation, selectionRevision } = job.snapshot;
+      job.snapshot = {
+        ...(requestId ? { requestId } : {}),
+        sourceKind,
+        selectionIncarnation,
+        selectionRevision,
+        state: 'failed',
+        failureCode: 'internal',
+      };
+    } else {
+      job.snapshot.state = 'failed';
+      job.snapshot.failureCode = 'internal';
+    }
     this.#phase = 'failed';
   }
 
-  async #run(job: Job, selected: SyncExecutorBinding) {
+  async #run(job: Job, selected: SyncExecutorBinding, credentialLease?: SyncCredentialLease) {
     try {
       // Stop can reserve before this detached workflow starts.
       if (job.controller.signal.aborted) {
-        job.snapshot.state = 'interrupted';
-        job.snapshot.failureCode = 'interrupted';
+        job.snapshot.failureCode = stoppedCode(job.controller.signal);
+        job.snapshot.state =
+          job.snapshot.failureCode === 'secrets-locked' ? 'failed' : 'interrupted';
         return;
       }
       job.execution = this.#ports.createExecution({
         ...structuredClone(selected),
+        ...(credentialLease ? { credentialLease: structuredClone(credentialLease) } : {}),
         operationId: job.snapshot.operationId,
         expectedRevision: job.snapshot.expectedRevision,
         signal: job.controller.signal,
@@ -204,8 +235,9 @@ class SyncConnectionExecutor {
       if (result.containment === 'unsafe') this.#failed(job);
       else if (!job.controller.signal.aborted) Object.assign(job.snapshot, result.snapshot);
       else {
-        job.snapshot.state = 'interrupted';
-        job.snapshot.failureCode = 'interrupted';
+        job.snapshot.failureCode = stoppedCode(job.controller.signal);
+        job.snapshot.state =
+          job.snapshot.failureCode === 'secrets-locked' ? 'failed' : 'interrupted';
       }
     } catch {
       this.#failed(job);
@@ -223,18 +255,57 @@ class SyncConnectionExecutor {
   }
 
   async #runWorkspace(job: WorkspaceJob) {
+    const interrupted = () => {
+      const { requestId, sourceKind, selectionIncarnation, selectionRevision } = job.snapshot;
+      job.snapshot = {
+        ...(requestId ? { requestId } : {}),
+        sourceKind,
+        selectionIncarnation,
+        selectionRevision,
+        state: 'interrupted',
+        failureCode: 'interrupted',
+      };
+    };
     try {
       if (job.stopped) {
-        job.snapshot.state = 'interrupted';
-        job.snapshot.failureCode = 'interrupted';
+        interrupted();
         return;
       }
       const result = await job.execution.run();
       if (result.containment === 'unsafe') this.#failed(job);
-      else if (!job.stopped) Object.assign(job.snapshot, result.snapshot);
+      else if (job.stopped) interrupted();
+      else if (result.snapshot.state === 'discovered') {
+        const discovery = result.snapshot.discovery;
+        const snapshot = parseSyncWorkspaceJobSnapshot({
+          ...job.snapshot,
+          ...result.snapshot,
+          sourceKind: 'join',
+          selectionIncarnation: discovery.source.identity.incarnation,
+          selectionRevision: discovery.source.identity.revision,
+        });
+        if (
+          job.operation !== 'discover' ||
+          job.source.kind !== 'join' ||
+          !snapshot ||
+          discovery.source.identity.incarnation !== job.source.identity.incarnation ||
+          discovery.source.identity.revision <= job.source.identity.revision
+        )
+          this.#failed(job);
+        else {
+          job.snapshot = snapshot;
+          job.source = structuredClone(discovery.source);
+        }
+      } else if (job.operation === 'discover' && result.snapshot.state === 'ready')
+        this.#failed(job);
       else {
-        job.snapshot.state = 'interrupted';
-        job.snapshot.failureCode = 'interrupted';
+        const { requestId, sourceKind, selectionIncarnation, selectionRevision } = job.snapshot;
+        job.snapshot = {
+          ...(requestId ? { requestId } : {}),
+          sourceKind,
+          selectionIncarnation,
+          selectionRevision,
+          ...result.snapshot,
+        };
       }
     } catch {
       this.#failed(job);
@@ -246,6 +317,11 @@ class SyncConnectionExecutor {
   }
 
   startWorkspace(request: SyncWorkspaceStartRequest): SyncStartResponse {
+    if (
+      (request.operation !== undefined && request.operation !== 'discover') ||
+      (request.operation === 'discover' && request.source.kind !== 'join')
+    )
+      return refused();
     if (
       !matchesTarget(request, this.#ports, this.#executorRevision) ||
       this.#stopping ||
@@ -260,6 +336,7 @@ class SyncConnectionExecutor {
       return refused();
     if (this.#workspace?.active) {
       if (
+        this.#workspace.operation !== request.operation ||
         this.#workspace.source.kind !== request.source.kind ||
         !sameSyncConnectionIdentity(this.#workspace.source.identity, request.source.identity)
       )
@@ -275,6 +352,7 @@ class SyncConnectionExecutor {
     let execution: WorkspaceJob['execution'];
     try {
       execution = this.#ports.createWorkspaceExecution({
+        ...(request.operation ? { operation: request.operation } : {}),
         source: structuredClone(request.source),
         authentication: structuredClone(request.authentication),
       });
@@ -282,6 +360,7 @@ class SyncConnectionExecutor {
       return refused();
     }
     const job: WorkspaceJob = {
+      ...(request.operation ? { operation: request.operation } : {}),
       source: structuredClone(request.source),
       snapshot: {
         requestId: request.requestId,
@@ -332,7 +411,14 @@ class SyncConnectionExecutor {
       authorization: request.authorization,
     });
     const changed = !this.#binding || !sameBinding(this.#binding, selected);
-    if (this.#phase === 'stopped' && !changed) return null;
+    const freshLease =
+      request.credentialLease && request.credentialLease.leaseId !== this.#credentialLease?.leaseId;
+    if (this.#phase === 'stopped' && !changed) {
+      if (!freshLease) return null;
+      this.#phase = 'idle';
+      this.#jobs.clear();
+      this.#products.clear();
+    }
     if (changed) {
       if (
         [...this.#products.values()].some((item) => item.active || item.unsafe) ||
@@ -343,7 +429,8 @@ class SyncConnectionExecutor {
       if (
         this.#phase === 'stopped' &&
         this.#binding &&
-        sameSyncConnectionIdentity(this.#binding.authorization, selected.authorization)
+        sameSyncConnectionIdentity(this.#binding.authorization, selected.authorization) &&
+        !freshLease
       )
         return null;
       this.#binding = structuredClone(selected);
@@ -352,6 +439,9 @@ class SyncConnectionExecutor {
       this.#products.clear();
       this.#phase = 'idle';
     }
+    this.#credentialLease = request.credentialLease
+      ? structuredClone(request.credentialLease)
+      : null;
     return selected;
   }
 
@@ -397,7 +487,9 @@ class SyncConnectionExecutor {
     };
     this.#jobs.set(request.operationId, job);
     this.#phase = 'running';
-    job.completion = Promise.resolve().then(() => this.#run(job, selected));
+    job.completion = Promise.resolve().then(() =>
+      this.#run(job, selected, request.credentialLease)
+    );
     return {
       success: true,
       result: 'accepted',
@@ -423,6 +515,8 @@ class SyncConnectionExecutor {
     this.#stopRevision = this.#executorRevision;
     this.#executorRevision += 1;
     this.#phase = 'stopping';
+    const stopReason =
+      request.reason === 'secrets-locked' ? new SyncRemoteError('secrets-locked') : undefined;
     const pending = [...this.#jobs.values()];
     const pendingWorkspace = this.#workspace;
     const pendingProducts = [...this.#products.values()];
@@ -430,7 +524,7 @@ class SyncConnectionExecutor {
     const workspaceWasActive = pendingWorkspace?.active ?? false;
     const unsafeProducts = new Set(pendingProducts.filter((item) => item.unsafe));
     const productDrains = pendingProducts.map((item) => {
-      item.controller.abort();
+      item.controller.abort(stopReason);
       try {
         const drain = item.execution.drain();
         void drain.catch(() => undefined);
@@ -460,7 +554,7 @@ class SyncConnectionExecutor {
       void workspaceDrain.catch(() => undefined);
     }
     const unsafeBeforeStop = new Set(pending.filter((job) => job.unsafe));
-    for (const job of pending) job.controller.abort();
+    for (const job of pending) job.controller.abort(stopReason);
     this.#stopping = (async (): Promise<SyncStopResponse> => {
       // Allow reserved detached jobs to install their handles or observe cancellation.
       await Promise.resolve();
@@ -618,7 +712,9 @@ class SyncConnectionExecutor {
       this.#workspace?.unsafe ||
       (this.#phase === 'stopped' &&
         this.#binding &&
-        sameSyncConnectionIdentity(this.#binding.authorization, command.binding.authorization))
+        sameSyncConnectionIdentity(this.#binding.authorization, command.binding.authorization) &&
+        (!command.credentialLease ||
+          command.credentialLease.leaseId === this.#credentialLease?.leaseId))
     )
       return false;
     return !(
@@ -670,8 +766,9 @@ class SyncConnectionExecutor {
     const { controller, execution } = selected;
     try {
       if (controller.signal.aborted) {
-        selected.snapshot.state = 'interrupted';
-        selected.snapshot.failureCode = 'interrupted';
+        selected.snapshot.failureCode = stoppedCode(controller.signal);
+        selected.snapshot.state =
+          selected.snapshot.failureCode === 'secrets-locked' ? 'failed' : 'interrupted';
         return;
       }
       const result = await execution.run();
@@ -716,6 +813,9 @@ class SyncConnectionExecutor {
     try {
       execution = this.#ports.createProductExecution({
         ...structuredClone(command.binding),
+        ...(command.credentialLease
+          ? { credentialLease: structuredClone(command.credentialLease) }
+          : {}),
         work: structuredClone(command.work),
         signal: controller.signal,
       });
@@ -724,6 +824,9 @@ class SyncConnectionExecutor {
     }
     if (this.#binding && !sameBinding(this.#binding, command.binding)) this.#products.clear();
     this.#binding = structuredClone(command.binding);
+    this.#credentialLease = command.credentialLease
+      ? structuredClone(command.credentialLease)
+      : null;
     const selected: ProductJob = {
       snapshot: {
         requestId: command.operationRequestId,

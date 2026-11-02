@@ -3,14 +3,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { expect, it } from 'vitest';
+import { cruise, type IRegularForbiddenRuleType } from 'dependency-cruiser';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 
-import { createTempRoot, withCwd } from '../../test-support/test-helpers';
+import { createTempRoot, withCwd, writeFile } from '../../test-support/test-helpers';
 
-type DependencyRule = {
+type DependencyRule = IRegularForbiddenRuleType & {
   name: string;
-  to?: {
-    pathNot?: string[];
-  };
+  to: IRegularForbiddenRuleType['to'] & { pathNot?: string[] };
 };
 
 const require = createRequire(import.meta.url);
@@ -55,22 +55,90 @@ it('keeps the exception fail-closed when installed dependencies are unavailable'
   expect(findNobleSha2Pattern(rules)).toBe('(?!)');
 });
 
+function installIndexedDbTypesFixture(root: string) {
+  const main = require.resolve('fake-indexeddb');
+  const installed = path.resolve(path.dirname(main), '../..');
+  const manifest: unknown = JSON.parse(
+    fs.readFileSync(path.join(installed, 'package.json'), 'utf8')
+  );
+  if (!isRecord(manifest) || !isRecord(manifest['exports']))
+    throw new Error('Installed fake IndexedDB manifest has no declared exports.');
+  const target = path.join(root, 'node_modules/fake-indexeddb');
+  fs.mkdirSync(path.join(target, 'build/cjs'), { recursive: true });
+  fs.writeFileSync(
+    path.join(target, 'package.json'),
+    JSON.stringify({
+      ...manifest,
+      exports: { ...manifest['exports'], './other': { types: './other.d.ts' } },
+    })
+  );
+  fs.copyFileSync(main, path.join(target, 'build/cjs/index.js'));
+  fs.copyFileSync(path.join(installed, 'types.d.ts'), path.join(target, 'types.d.ts'));
+  fs.writeFileSync(path.join(target, 'other.d.ts'), 'export {};\n');
+}
+
 it('admits only the declared installed fake IndexedDB types export', async () => {
   const workspaceRoot = createTempRoot('dependency-rules-indexed-db-types-');
-  const types = path.resolve(path.dirname(require.resolve('fake-indexeddb')), '../../types.d.ts');
-  fs.symlinkSync(
-    path.join(process.cwd(), 'node_modules'),
-    path.join(workspaceRoot, 'node_modules')
+  installIndexedDbTypesFixture(workspaceRoot);
+  installIndexedDbTypesFixture(path.join(workspaceRoot, 'packages/hostile'));
+  writeFile(
+    workspaceRoot,
+    'entry.mjs',
+    "import 'fake-indexeddb'; import 'fake-indexeddb/other';\n"
   );
-  const rules = await withCwd(workspaceRoot, () => loadRules());
-  const pattern = rules.find((candidate) => candidate.name === 'no-non-package-json')?.to
-    ?.pathNot?.[1];
-  const relativeTypes = path.relative(workspaceRoot, types).split(path.sep).join('/');
-  expect(pattern).toBe(`^${escapeRegex(relativeTypes)}$`);
-  expect(new RegExp(pattern!).test('node_modules/fake-indexeddb/other.d.ts')).toBe(false);
-  expect(new RegExp(pattern!).test('packages/hostile/node_modules/fake-indexeddb/types.d.ts')).toBe(
-    false
+  writeFile(workspaceRoot, 'packages/hostile/entry.mjs', "import 'fake-indexeddb';\n");
+  const graph = await withCwd(workspaceRoot, async () => {
+    const rule = loadRules().find((candidate) => candidate.name === 'no-non-package-json');
+    if (!rule) throw new Error('Missing installed-package dependency rule.');
+    const result = await cruise(
+      ['entry.mjs', 'packages/hostile/entry.mjs'],
+      {
+        validate: true,
+        ruleSet: { forbidden: [rule] },
+        outputType: 'json',
+        doNotFollow: { path: 'node_modules' },
+      },
+      {
+        exportsFields: ['exports'],
+        conditionNames: ['types', 'import', 'require', 'default'],
+        bustTheCache: true,
+      }
+    );
+    const output: unknown =
+      typeof result.output === 'string' ? JSON.parse(result.output) : result.output;
+    if (!isRecord(output) || !Array.isArray(output['modules']) || !isRecord(output['summary']))
+      throw new Error('Dependency-cruiser did not return its resolved graph.');
+    return output;
+  });
+  expect(graph['modules']).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source: 'entry.mjs',
+        dependencies: expect.arrayContaining([
+          expect.objectContaining({
+            resolved: 'node_modules/fake-indexeddb/types.d.ts',
+            dependencyTypes: expect.arrayContaining(['npm-unknown']),
+            couldNotResolve: false,
+            valid: true,
+          }),
+        ]),
+      }),
+    ])
   );
+  const summary = graph['summary'];
+  if (!isRecord(summary)) throw new Error('Dependency-cruiser summary is missing.');
+  expect(summary['violations']).toEqual([
+    expect.objectContaining({
+      to: 'node_modules/fake-indexeddb/other.d.ts',
+      dependencyTypes: expect.arrayContaining(['npm-unknown']),
+      rule: { severity: 'error', name: 'no-non-package-json' },
+    }),
+    expect.objectContaining({
+      to: 'packages/hostile/node_modules/fake-indexeddb/types.d.ts',
+      dependencyTypes: expect.arrayContaining(['npm-unknown']),
+      rule: { severity: 'error', name: 'no-non-package-json' },
+    }),
+  ]);
 });
 
 it('keeps the fake IndexedDB export exception closed without an installed package', async () => {

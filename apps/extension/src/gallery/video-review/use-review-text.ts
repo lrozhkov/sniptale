@@ -1,3 +1,5 @@
+import { reviewTextSourceInterval } from '../../features/video/review/text-timing';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { useMemo, useState } from 'react';
 import type { ReviewTextTypingTarget } from '../../features/video/review/text-types';
 import {
@@ -104,6 +106,10 @@ export function useReviewText(args: {
     null
   );
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const segments = useMemo(
+    () => buildReviewTimeMap(args.sourceDuration, args.edits),
+    [args.sourceDuration, args.edits]
+  );
   const projection = useMemo(
     () => createTrackProjection(args.sourceDuration, args.edits),
     [args.sourceDuration, args.edits]
@@ -169,9 +175,11 @@ export function useReviewText(args: {
       }
     });
   const sourceInterval = (fragment: ReviewTextFragment) =>
-    fragment.timeDomain === 'source'
-      ? { start: fragment.start, end: fragment.end }
-      : { start: projection.source(fragment.start), end: projection.source(fragment.end, 'end') };
+    fragment.sourceAnchor
+      ? reviewTextSourceInterval(fragment, segments)
+      : fragment.timeDomain === 'source'
+        ? { start: fragment.start, end: fragment.end }
+        : { start: projection.source(fragment.start), end: projection.source(fragment.end, 'end') };
   return {
     document,
     captions: args.captions ?? createReviewCaptionSettings(),

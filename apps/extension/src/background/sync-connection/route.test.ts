@@ -351,3 +351,21 @@ it.each([
   expect(f.loadWorkspace).not.toHaveBeenCalled();
   expect(f.contains).not.toHaveBeenCalled();
 });
+
+it('returns secrets-locked separately from origin permission failure', async () => {
+  const response = deferred<unknown>();
+  const contains = vi.fn(async () => true);
+  routeSyncConnectionOriginPermission(message, sender, (value) => response.resolve(value), {
+    loadConnection: async () => connection(),
+    loadWorkspace: async () => null,
+    contains,
+    checkLease: async () => false,
+    isLocked: async () => true,
+  });
+  await expect(response.promise).resolves.toEqual({
+    success: true,
+    allowed: false,
+    reason: 'secrets-locked',
+  });
+  expect(contains).not.toHaveBeenCalled();
+});

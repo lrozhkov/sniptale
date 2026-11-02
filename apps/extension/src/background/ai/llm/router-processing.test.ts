@@ -100,7 +100,8 @@ async function verifyJsonBranch() {
   expect(processWithLLMConfigMock).toHaveBeenCalledWith(
     { prompt: 'Normalize JSON', jsonData: '{"fields":[]}' },
     config,
-    3
+    3,
+    undefined
   );
   expect(loggerDebugMock).toHaveBeenCalledWith('Processing provider-backed LLM request', {
     hasJsonData: true,
@@ -120,7 +121,8 @@ async function verifyJsonBranchRedactsFinalProviderPayload() {
       prompt: 'Use Authorization: Bearer prompt-secret',
       jsonData: '{"password":"json-secret","visible":"display"}',
     }),
-    config
+    config,
+    undefined
   );
 
   const [request] = processWithLLMConfigMock.mock.calls[0] ?? [];
@@ -148,7 +150,8 @@ async function verifyMarkdownBranch() {
 
   expect(processWithLLMMock).toHaveBeenCalledWith(
     { prompt: 'Summarize markdown', markdownData: '| a |\n| - |' },
-    config
+    config,
+    undefined
   );
 }
 
@@ -160,7 +163,8 @@ async function verifyMarkdownBranchRedactsFinalProviderPayload() {
       prompt: 'Use Authorization: Bearer prompt-secret',
       markdownData: '| Password | Notes |\n| --- | --- |\n| markdown-secret | visible |',
     }),
-    config
+    config,
+    undefined
   );
 
   const [request] = processWithLLMMock.mock.calls[0] ?? [];

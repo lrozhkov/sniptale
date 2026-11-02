@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../composition/persistence/secret-protection/model';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   parseVoiceInputPortRequest,
@@ -642,7 +643,8 @@ export function createVoiceInputCoordinator(
   schedule: (callback: () => void, delayMs: number) => void = (callback, delayMs) => {
     globalThis.setTimeout(callback, delayMs);
   },
-  dependencies?: Partial<CoordinatorDependencies>
+  dependencies?: Partial<CoordinatorDependencies>,
+  protection?: SecretProtectionPort
 ) {
   const history = dependencies?.history ?? createVoiceInputHistory();
   const deps: CoordinatorDependencies = {
@@ -655,7 +657,9 @@ export function createVoiceInputCoordinator(
           microphoneDeviceId: null,
           mode: 'local-first',
         }),
-    processor: dependencies?.processor ?? createVoiceInputProcessor({ history }),
+    processor:
+      dependencies?.processor ??
+      createVoiceInputProcessor({ history, ...(protection ? { protection } : {}) }),
   };
   const coordinator = new VoiceInputCoordinator(gateway, createInternalSessionId, schedule, deps);
   return {
@@ -666,16 +670,23 @@ export function createVoiceInputCoordinator(
   };
 }
 
-const voiceInputCoordinator = createVoiceInputCoordinator();
-
-export function registerVoiceInputPorts(): () => void {
-  return browserRuntime.subscribeToConnections(voiceInputCoordinator.registerPort);
+/** Register the same explicit runtime that owns offscreen events and privacy cleanup. */
+export function registerVoiceInputPorts(
+  coordinator: ReturnType<typeof createVoiceInputCoordinator>
+): () => void {
+  return browserRuntime.subscribeToConnections(coordinator.registerPort);
 }
 
-export function handleVoiceInputOffscreenEvent(message: OffscreenVoiceInputEventMessage): void {
-  voiceInputCoordinator.handleOffscreenEvent(message);
+export function handleVoiceInputOffscreenEvent(
+  message: OffscreenVoiceInputEventMessage,
+  coordinator?: ReturnType<typeof createVoiceInputCoordinator>
+): void {
+  if (!coordinator) throw new Error('Voice input runtime unavailable');
+  coordinator.handleOffscreenEvent(message);
 }
 
-export function cleanupVoiceInputForPrivacyErasure(): Promise<boolean> {
-  return voiceInputCoordinator.cleanupForPrivacyErasure();
+export function cleanupVoiceInputForPrivacyErasure(
+  coordinator?: ReturnType<typeof createVoiceInputCoordinator>
+): Promise<boolean> {
+  return coordinator ? coordinator.cleanupForPrivacyErasure() : Promise.resolve(true);
 }

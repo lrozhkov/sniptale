@@ -1,39 +1,38 @@
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { expect, it, vi } from 'vitest';
+import { EXPECTED_STORES } from '../infrastructure/indexed-db/core';
+import { beforeEach, expect, it } from 'vitest';
 import { deleteProjectAssetsUnreferencedByOtherProjects } from './asset-references';
 import { buildPhysicalDeleteOperation } from '../assets';
 import { createProjectAssetEntry, createVideoProjectEntry } from './index.test-support';
+import { rows, harness } from '../media-library/delete-cascade.test-support';
+
+beforeEach(() => {
+  rows.clear();
+  for (const name of EXPECTED_STORES) rows.set(name, new Map());
+});
+
+function table(name: string) {
+  const store = rows.get(name);
+  if (!store) throw new Error(`Missing fixture store ${name}`);
+  return store;
+}
 
 it('defers an ordinary save release until mounted Undo readers have drained', async () => {
-  const remove = vi.fn();
-  const asset = createProjectAssetEntry({ id: 'private', assetId: 'held-bytes' });
-  const tables: Record<string, unknown> = {
-    media_library: { get: async () => undefined, delete: remove },
-    project_assets: { get: async () => asset, delete: remove },
-    video_projects: { getAll: async () => [] },
-    scenario_assets: { getAll: async () => [] },
-    video_workspaces: { getAll: async () => [], get: async () => undefined, delete: remove },
-    video_workspace_history: {
-      getAll: async () => [],
-      index: () => ({ getAll: async () => [], getAllKeys: async () => [] }),
-    },
-    image_workspaces: { get: async () => undefined, delete: remove },
-    aggregate_presentations: { delete: remove },
-    thumbnails: { delete: remove },
-    video_workspace_drafts: { delete: remove },
-    asset_owners: { delete: remove, index: () => ({ count: async () => 0 }) },
-    asset_refs: { delete: remove },
-  };
+  table('project_assets').set(
+    'private',
+    createProjectAssetEntry({ id: 'private', assetId: 'held-bytes' })
+  );
+  const before = structuredClone(rows);
   const operation = buildPhysicalDeleteOperation([]);
+  const db = await harness.db();
+  const tx = db.transaction([...rows.keys()], 'readwrite');
   await deleteProjectAssetsUnreferencedByOtherProjects({
-    tx: { objectStore: (name: string) => tables[name] } as Parameters<
-      typeof deleteProjectAssetsUnreferencedByOtherProjects
-    >[0]['tx'],
+    tx,
     operation,
     projectAssetIds: ['private'],
     deferForReaders: true,
   });
-  expect(remove).not.toHaveBeenCalled();
+  await tx.done;
+  expect(rows).toEqual(before);
   expect(operation).toMatchObject({
     assetIds: [],
     privateSources: [{ projectAssetId: 'private', expectedAssetId: 'held-bytes' }],
@@ -43,50 +42,32 @@ it('defers an ordinary save release until mounted Undo readers have drained', as
 it.each(['unknown-video', 'scenario', 'review'] as const)(
   'retains a private resource used by an external %s consumer',
   async (kind) => {
-    const remove = vi.fn();
-    const asset = createProjectAssetEntry({ id: 'private' });
-    const args = {
-      assetOwnerStore: { delete: remove, index: () => ({ count: async () => 0 }) },
-      assetRefStore: { delete: remove },
-      mediaLibraryStore: { get: async () => undefined, put: vi.fn(), delete: remove },
-      operation: buildPhysicalDeleteOperation([]),
-      ownerProjectId: 'owner',
-      projectAssetIds: [asset.id],
-      projectAssetStore: { get: async () => asset, delete: remove },
-      projectStore: {
-        getAll: async () =>
-          kind === 'unknown-video'
-            ? [{ ...createVideoProjectEntry(), project: { version: 999 } }]
-            : [],
-      },
-      scenarioAssetStore: {
-        getAll: async () =>
-          kind === 'scenario'
-            ? [{ id: 'child', assetId: 'bytes', galleryAssetId: 'project-asset:private' }]
-            : [],
-      },
-      videoWorkspaceStore: {
-        delete: remove,
-        getAll: async () => (kind === 'review' ? [{ aggregateId: 'external', version: 999 }] : []),
-      },
-      videoDraftStore: { delete: remove },
-    };
-    const stores: Record<string, unknown> = {
-      media_library: args.mediaLibraryStore,
-      project_assets: args.projectAssetStore,
-      video_projects: args.projectStore,
-      scenario_assets: args.scenarioAssetStore,
-      video_workspaces: args.videoWorkspaceStore,
-      video_workspace_history: { getAll: async () => [] },
-    };
+    table('project_assets').set('private', createProjectAssetEntry({ id: 'private' }));
+    if (kind === 'unknown-video')
+      table('video_projects').set('unknown', {
+        ...createVideoProjectEntry(),
+        project: { version: 999 },
+      });
+    if (kind === 'scenario')
+      table('scenario_assets').set('child', {
+        id: 'child',
+        assetId: 'bytes',
+        galleryAssetId: 'project-asset:private',
+      });
+    if (kind === 'review')
+      table('video_workspaces').set('external', { aggregateId: 'external', version: 999 });
+    const before = structuredClone(rows);
+    const operation = buildPhysicalDeleteOperation([]);
+    const db = await harness.db();
+    const tx = db.transaction([...rows.keys()], 'readwrite');
     await deleteProjectAssetsUnreferencedByOtherProjects({
-      tx: { objectStore: (name: string) => stores[name] } as Parameters<
-        typeof deleteProjectAssetsUnreferencedByOtherProjects
-      >[0]['tx'],
-      operation: args.operation,
-      projectAssetIds: args.projectAssetIds,
+      tx,
+      operation,
+      projectAssetIds: ['private'],
     });
-    expect(remove).not.toHaveBeenCalled();
+    await tx.done;
+    expect(rows).toEqual(before);
+    expect(operation.assetIds).toEqual([]);
   }
 );
 
@@ -105,11 +86,6 @@ it('retains an independent quick-edit project and its nested auxiliaries after p
     fadeIn: 0,
     fadeOut: 0,
   });
-  const tables = new Map<string, Map<string, unknown>>();
-  const table = (name: string) => {
-    if (!tables.has(name)) tables.set(name, new Map());
-    return tables.get(name)!;
-  };
   for (const id of ['parent', 'child'])
     table('project_assets').set(id, createProjectAssetEntry({ id, assetId: `${id}-bytes` }));
   table('video_workspaces').set('project-asset:parent', {
@@ -124,34 +100,14 @@ it('retains an independent quick-edit project and its nested auxiliaries after p
     createdAt: 1,
     updatedAt: 1,
   });
-  const store = (name: string) => ({
-    get: async (key: string) => table(name).get(key),
-    getAll: async () => [...table(name).values()],
-    put: vi.fn(),
-    delete: async (key: IDBValidKey) =>
-      table(name).delete(Array.isArray(key) ? JSON.stringify(key) : String(key)),
-    index: (indexName: string) => ({
-      count: async () => 0,
-      getAll: async (key: IDBValidKey) =>
-        [...table(name).values()].filter(isRecord).filter((row) => row[indexName] === key),
-      getAllKeys: async (key: IDBValidKey) =>
-        [...table(name).values()]
-          .filter(isRecord)
-          .filter((row) => row[indexName] === key)
-          .map((row) => {
-            if (typeof row['aggregateId'] !== 'string' || typeof row['ordinal'] !== 'number')
-              throw new Error('Invalid history fixture key');
-            return [row['aggregateId'], row['ordinal']];
-          }),
-    }),
-  });
+  const db = await harness.db();
+  const tx = db.transaction([...rows.keys()], 'readwrite');
   await deleteProjectAssetsUnreferencedByOtherProjects({
-    tx: { objectStore: store } as unknown as Parameters<
-      typeof deleteProjectAssetsUnreferencedByOtherProjects
-    >[0]['tx'],
+    tx,
     operation: buildPhysicalDeleteOperation([]),
     projectAssetIds: ['parent'],
   });
+  await tx.done;
   expect(table('project_assets').has('parent')).toBe(true);
   expect(table('project_assets').has('child')).toBe(true);
   expect(table('video_workspaces').has('project-asset:parent')).toBe(true);

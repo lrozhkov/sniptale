@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import { prepareRecordingEventsProject } from '../../../../features/video/project/recording-events/project-window';
@@ -7,7 +8,6 @@ import fixtureData from '../../../../features/video/project/recording-events/fix
 import { recordingEventProjectActions } from '../../../../features/video/project/recording-events/project-facts';
 import { resolveRecordingActionOccurrences } from '../../../project/operations/recording-events-selection';
 import { resolveTypingSpanSource } from '../../../project/state/clip-timeline/source-range';
-// @vitest-environment jsdom
 
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import {

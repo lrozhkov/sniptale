@@ -321,11 +321,16 @@ it('uses the same shape rules for project metadata and native projects', () => {
   const project = createEmptyVideoProject('Metadata');
   const metadata: VideoProjectMetadata = project;
   expect(isHydratableVideoProjectMetadata(metadata)).toBe(true);
+  for (const version of [49, 50]) {
+    const candidate = { ...project, version };
+    expect(isHydratableVideoProject(candidate)).toBe(true);
+    expect(isHydratableVideoProjectMetadata(candidate)).toBe(true);
+  }
   for (const patch of [
     { id: 7 },
     { width: NaN },
     { duration: -1 },
-    { version: 49 },
+    { version: 51 },
     { source: { kind: 'unsupported' } },
     { templateInstances: [] },
     { actionPresentation: { enabled: 'yes' } },

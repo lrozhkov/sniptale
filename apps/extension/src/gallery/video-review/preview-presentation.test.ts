@@ -137,16 +137,17 @@ it.each(['invalidate', 'dispose'] as const)(
 );
 
 it.each([15, 24, 30, 60])(
-  'caps all publications at %i FPS while synthetic time advances without source callbacks',
+  'keeps %i FPS publication slots within one browser tick without source callbacks',
   async (frameRate) => {
     const f = fixture();
     f.scheduler.update({ ...f.state, frameRate });
     for (let now = 0; now <= 1000; now += 5) await f.step(now);
-    expect(f.publishTimes.length).toBeGreaterThan(10);
-    for (let i = 1; i < f.publishTimes.length; i++)
-      expect(f.publishTimes[i]! - f.publishTimes[i - 1]!).toBeGreaterThanOrEqual(
-        1000 / frameRate - 1e-7
-      );
+    expect(f.publishTimes.length).toBe(Math.floor(frameRate) + 1);
+    for (let i = 0; i < f.publishTimes.length; i++) {
+      const slot = (i * 1000) / frameRate;
+      expect(f.publishTimes[i]!).toBeGreaterThanOrEqual(slot - 0.1);
+      expect(f.publishTimes[i]!).toBeLessThanOrEqual(slot + 5);
+    }
     expect(f.dependencies.capture.mock.calls.at(-1)![1]).toBeGreaterThan(0.9);
     expect(f.dependencies.onError).not.toHaveBeenCalled();
     f.scheduler.dispose();
@@ -316,7 +317,7 @@ it.each(['playing', 'interacting'] as const)(
   }
 );
 
-it('drops early completions while preserving publication spacing and releasing leases', async () => {
+it('holds early completed frames until publication cadence instead of discarding rendered work', async () => {
   const f = fixture();
   f.dependencies.render.mockImplementationOnce(() => {
     f.advance(50);
@@ -327,11 +328,13 @@ it('drops early completions while preserving publication spacing and releasing l
   await f.step(66);
   expect(f.dependencies.render).toHaveBeenCalledTimes(2);
   expect(f.publishTimes).toEqual([50]);
-  expect(f.completed.release).toHaveBeenCalledTimes(2);
-  expect(f.captured.release).toHaveBeenCalledTimes(2);
-  expect(f.prepared.release).toHaveBeenCalledTimes(2);
+  expect(f.completed.release).toHaveBeenCalledTimes(1);
+  expect(f.captured.release).toHaveBeenCalledTimes(1);
+  expect(f.prepared.release).toHaveBeenCalledTimes(1);
   await f.step(100);
   expect(f.publishTimes).toEqual([50, 100]);
+  expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+  expect(f.completed.release).toHaveBeenCalledTimes(2);
   expect(f.dependencies.onError).not.toHaveBeenCalled();
   f.scheduler.dispose();
 });
@@ -398,5 +401,47 @@ it('retains a changed paused interaction after a completion falls before the pub
   await f.step(100);
   expect(f.publishTimes).toEqual([50, 100]);
   expect(f.dependencies.onError).not.toHaveBeenCalled();
+  f.scheduler.dispose();
+});
+
+it.each(['invalidate', 'hidden', 'dispose'] as const)(
+  'releases a completed frame waiting for cadence after %s',
+  async (reason) => {
+    const f = fixture();
+    f.dependencies.render.mockImplementationOnce(() => {
+      f.advance(50);
+      return f.completed;
+    });
+    f.scheduler.update(f.state);
+    await f.step(0);
+    await f.step(66);
+    expect(f.completed.release).toHaveBeenCalledTimes(1);
+    if (reason === 'dispose') f.scheduler.dispose();
+    else if (reason === 'hidden') f.scheduler.update({ ...f.state, visible: false });
+    else f.scheduler.invalidate();
+    await flush();
+    expect(f.completed.release).toHaveBeenCalledTimes(2);
+    expect(f.captured.release).toHaveBeenCalledTimes(2);
+    expect(f.prepared.release).toHaveBeenCalledTimes(2);
+    expect(f.publishTimes).toEqual([50]);
+    expect(f.dependencies.onError).not.toHaveBeenCalled();
+    f.scheduler.dispose();
+    expect(f.ticks.size).toBe(0);
+  }
+);
+
+it('keeps 30 FPS cadence when browser ticks are quantized to tenths of a millisecond', async () => {
+  const f = fixture();
+  f.scheduler.update(f.state);
+  for (let frame = 0; frame <= 10; frame++) await f.step(Math.round((frame * 1000) / 3) / 10);
+  expect(f.publishTimes).toHaveLength(11);
+  f.scheduler.dispose();
+});
+
+it('publishes every available tick when no frame-rate limit is selected', async () => {
+  const f = fixture();
+  f.scheduler.update({ ...f.state, frameRate: null });
+  for (let now = 0; now <= 30; now += 5) await f.step(now);
+  expect(f.publishTimes).toEqual([0, 5, 10, 15, 20, 25, 30]);
   f.scheduler.dispose();
 });

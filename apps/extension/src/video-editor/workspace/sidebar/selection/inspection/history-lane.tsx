@@ -1,4 +1,5 @@
 import { REVIEW_KEY_DEFAULT } from '../../../../../features/video/project/action-feedback/key-animation';
+import { TextCursorInput, Timer } from 'lucide-react';
 import { getVideoProjectKeyStyle } from '../../../../../features/video/project/action-feedback/projection';
 import { KeyFeedbackFields } from '../effect-controls/key-feedback-fields';
 import {
@@ -203,6 +204,7 @@ function historyKeyGroups(
     ),
     {
       id: 'keys',
+      ...(mixedKeyFamilies ? { icon: TextCursorInput } : {}),
       semantic: 'keyboard',
       visible: !capturedKeys.length || hasLegacyKeys,
       label: translate(
@@ -264,6 +266,7 @@ function capturedKeyGroups(
           },
           {
             id: 'captured-key-timing',
+            icon: Timer,
             semantic: 'animation' as const,
             label: translate('gallery.videoReview.clickTiming'),
             content: fields('timing'),

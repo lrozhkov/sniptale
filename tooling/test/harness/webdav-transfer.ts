@@ -1,3 +1,4 @@
+import { createWebdavCheckpointHarness } from './webdav-checkpoints';
 import { createWebdavReviewHarness } from './webdav-review';
 import { createWebdavWorkspaceHarness } from './webdav-workspace';
 import { createWebdavConnectionHarness } from './webdav-connection';
@@ -138,6 +139,7 @@ const webdavTransferHarness = {
   }),
   portable: createWebdavPortableHarness(connected),
   review: createWebdavReviewHarness(connected),
+  checkpoints: createWebdavCheckpointHarness(),
   nativePutCalls: () => nativePutCalls,
   prepareSource,
   uploadSource,

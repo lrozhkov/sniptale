@@ -4,7 +4,7 @@ import {
 } from '../assets/residency';
 import { assetResidencyCopyId } from '../assets/residency-records';
 import { ASSET_RESIDENCY_STORE } from '../infrastructure/indexed-db/core.stores';
-import { captureImageInTransaction, readImageRevisionFence } from '../sync-capture/capture';
+import { captureMediaInTransaction, readImageRevisionFence } from '../sync-capture/capture';
 import { ASSET_REFS_STORE, SYNC_CAPTURE_STORE } from '../infrastructure/indexed-db/core.stores';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import { measureImageBlob } from '@sniptale/platform/browser/media/image-dimensions';
@@ -96,7 +96,7 @@ export async function saveScreenshotMediaAsset(
         thumbnailBlob,
         updatedAt: now,
       });
-      await captureImageInTransaction(tx, assetId);
+      await captureMediaInTransaction(tx, assetId);
       await tx.done;
     } catch (error) {
       try {

@@ -4,6 +4,7 @@ import {
   publishVideoEditorSaveReadiness,
   waitForVideoEditorSave,
   registerVideoEditorSaveBarrier,
+  prepareVideoEditorCheckpointExit,
 } from './save-readiness';
 
 let generation = Symbol();
@@ -201,4 +202,110 @@ it('rejects replacement of the same project with a new session generation', asyn
     saveState: 'saved',
   });
   await expect(waiting).rejects.toThrow('could not be saved');
+});
+
+it('prepares exact exit observations without changing the ordinary save barrier', async () => {
+  const receipt = {
+    rootKind: 'video-project' as const,
+    rootId: 'project-1',
+    revision: '11111111-1111-4111-8111-111111111111',
+  };
+  let eligible = true;
+  const cleanup = registerVideoEditorSaveBarrier(
+    'project-1',
+    generation,
+    async () => undefined,
+    () => ({ receipt, isCurrent: () => eligible })
+  );
+  try {
+    await expect(waitForVideoEditorSave('project-1')).resolves.toBeUndefined();
+    const exit = await prepareVideoEditorCheckpointExit('project-1');
+    expect(exit.receipt).toEqual(receipt);
+    expect(exit.isCurrent()).toBe(true);
+    eligible = false;
+    expect(exit.isCurrent()).toBe(false);
+  } finally {
+    cleanup();
+  }
+});
+
+it('invalidates an exit witness for new versions or replacement', async () => {
+  const cleanup = registerVideoEditorSaveBarrier(
+    'project-1',
+    generation,
+    async () => undefined,
+    () => ({ receipt: null, isCurrent: () => true })
+  );
+  const exit = await prepareVideoEditorCheckpointExit('project-1');
+  expect(exit.isCurrent()).toBe(true);
+  publish({ projectId: 'project-1', saveState: 'dirty' });
+  expect(exit.isCurrent()).toBe(false);
+  publish({ projectId: 'project-1', saveState: 'saved' });
+  const newer = await prepareVideoEditorCheckpointExit('project-1');
+  const replacement = registerVideoEditorSaveBarrier(
+    'project-1',
+    generation,
+    async () => undefined,
+    () => ({ receipt: null, isCurrent: () => true })
+  );
+  expect(newer.isCurrent()).toBe(false);
+  cleanup();
+  replacement();
+});
+
+it('gives legacy registrations no exit authority', async () => {
+  const cleanup = registerVideoEditorSaveBarrier('project-1', generation, async () => undefined);
+  try {
+    const exit = await prepareVideoEditorCheckpointExit('project-1');
+    expect(exit.receipt).toBeNull();
+    expect(exit.isCurrent()).toBe(false);
+    await expect(waitForVideoEditorSave('project-1')).resolves.toBeUndefined();
+  } finally {
+    cleanup();
+  }
+});
+
+it('refuses replacement during exit preparation and an ineligible provider before issuing receipt', async () => {
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const cleanup = registerVideoEditorSaveBarrier('project-1', generation, () => waiting);
+  const pending = prepareVideoEditorCheckpointExit('project-1');
+  cleanup();
+  release();
+  await expect(pending).rejects.toThrow('changed');
+  const current = registerVideoEditorSaveBarrier(
+    'project-1',
+    generation,
+    async () => undefined,
+    () => null
+  );
+  try {
+    const exit = await prepareVideoEditorCheckpointExit('project-1');
+    expect(exit.receipt).toBeNull();
+    expect(exit.isCurrent()).toBe(false);
+  } finally {
+    current();
+  }
+});
+
+it('invalidates an exit witness after a same-project generation replacement or writer cleanup', async () => {
+  const cleanup = registerVideoEditorSaveBarrier(
+    'project-1',
+    generation,
+    async () => undefined,
+    () => ({ receipt: null, isCurrent: () => true })
+  );
+  const exit = await prepareVideoEditorCheckpointExit('project-1');
+  publishVideoEditorSaveReadiness({
+    projectId: 'project-1',
+    generation: Symbol(),
+    saveState: 'saved',
+    requestedVersion: 0,
+    savedVersion: 0,
+  });
+  expect(exit.isCurrent()).toBe(false);
+  cleanup();
+  expect(exit.isCurrent()).toBe(false);
 });

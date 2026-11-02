@@ -22,6 +22,24 @@
       }
     },
     {
+      "id": "02464b6daa7769984d711ba164f60a71db47a1104b0d13784a2f0b418e2020d0",
+      "classification": "tool-noise",
+      "owner": "features/video/composition/motion/window-camera-geometry",
+      "reason": "The matched range declares overlapping geometry inputs for region geometry and endpoint-link geometry. Their phase, endpoint, connectivity and window-weight contracts differ. The range contains no duplicate executable operation.",
+      "removalCondition": "Remove when this exact detector pair changes or disappears. Reassess if the two inputs become one independently owned public contract.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
+        "start": 513,
+        "end": 523
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
+        "start": 88,
+        "end": 98
+      }
+    },
+    {
       "id": "02c6d78fc7fd1cc1ed32671ad173887ba42eba391224f3fad21c6bfc059d5003",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures",
@@ -55,24 +73,6 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/preset-list.tsx",
         "start": 131,
         "end": 145
-      }
-    },
-    {
-      "id": "0401b7d3083dcbf358f2af0d4844419a60bc05be9a2bc762a851d366362490a0",
-      "classification": "tool-noise",
-      "owner": "features/video/composition/motion/window-camera-geometry",
-      "reason": "The match is an input type declaration. Geometry and link geometry have different phase, transition and window-weight parameters; there is no duplicated operation in the matched range.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
-        "start": 516,
-        "end": 526
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
-        "start": 88,
-        "end": 98
       }
     },
     {
@@ -145,24 +145,6 @@
         "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
         "start": 142,
         "end": 149
-      }
-    },
-    {
-      "classification": "tool-noise",
-      "owner": "composition/persistence/sync-capture/prepared-project",
-      "reason": "The exact match is bounded-array admission, a local ID accumulator, mapping, a record check and the opening of distinct allowed-key lists. Asset parsing then validates filenames, publication and source bindings. Export parsing validates project identity, remote bindings, thumbnails and export review. No matched source contains a duplicated asset or export validation algorithm. A generic record-mapping factory would hide these independent schemas.",
-      "removalCondition": "Remove when either schema admission prologue changes or a common accepted schema replaces both.",
-      "reviewBy": "2027-04-15",
-      "id": "0c4e8cfd2947f96b8b932f4392025058852b02dd470c3e8b745d0454836f1e5a",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
-        "start": 223,
-        "end": 227
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/sync-capture/prepared-project.ts",
-        "start": 57,
-        "end": 62
       }
     },
     {
@@ -958,6 +940,24 @@
       }
     },
     {
+      "id": "456f3325705809f363d6136e12f2ce194bb966a12d0497b2747467f3b3f747ec",
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db",
+      "reason": "These ranges import canonical store identifiers for separate schema-description and native-upgrade consumers. The match contains no duplicate executable algorithm or store definition.",
+      "removalCondition": "Remove when this exact detector pair disappears or either consumer no longer needs these imports.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
+        "start": 4,
+        "end": 38
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
+        "start": 6,
+        "end": 40
+      }
+    },
+    {
       "id": "47111a81f930caef1c62e218c759c831ce1785a5b660adb5b469e8cd000ffcf5",
       "classification": "tool-noise",
       "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
@@ -991,24 +991,6 @@
         "path": "packages/ui/src/styles/ai-modal/shell.css",
         "start": 49,
         "end": 54
-      }
-    },
-    {
-      "id": "47d39e63e36deb0b41e681237cb0756df9af544887c2489339d606e785b9b78a",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/project effect export contracts",
-      "reason": "Catalog bundles and materialized instance bundles have distinct manifest and document contracts; keeping archive assembly local preserves each format authority.",
-      "removalCondition": "Remove when both exports adopt one archive contract and asset representation or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/project/effect-bundle/catalog/export.ts",
-        "start": 56,
-        "end": 69
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/project/effect-instance/export.ts",
-        "start": 93,
-        "end": 106
       }
     },
     {
@@ -2254,24 +2236,6 @@
       }
     },
     {
-      "id": "9f5de746009a52e0f54b36b8caa9ffd5380b8cc9ef2e0e55e45a51b4b4595cc2",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db",
-      "reason": "Independent historical descriptors select database versions 36 to 37 and 37 to 38. Store validation already delegates to requireMigrationStores. Migrate returns undefined. The match crosses the next descriptor boundary.",
-      "removalCondition": "Remove when either historical descriptor changes or this exact finding disappears.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 849,
-        "end": 866
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 871,
-        "end": 888
-      }
-    },
-    {
       "id": "a3a3d7200d26a543142f4019776f235babe71b7bf9234ab27e1b4b50bf73a899",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
@@ -2686,24 +2650,6 @@
       }
     },
     {
-      "id": "b9c5649e5313c9e9642e5c269ef24accfe00d012cb27fc336de54bb356abe405",
-      "classification": "tool-noise",
-      "owner": "video-editor/project/history",
-      "reason": "The overlap is terminal snapshot projection/failure result for inverse stack transitions. Undo removes past and prepends future; Redo removes future and appends bounded past. Existing history owner already contains both operations, and existing baseline names this distinction.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/project/history/index.ts",
-        "start": 195,
-        "end": 207
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/project/history/index.ts",
-        "start": 240,
-        "end": 252
-      }
-    },
-    {
       "id": "b9d1cd1cf46261a9f3d21e47a897306e2cf10188d8e74d5d315260c8f5479046",
       "classification": "tool-noise",
       "owner": "content/public/preparation-surface scrollbar effects",
@@ -3010,6 +2956,24 @@
       }
     },
     {
+      "id": "d00ff96d3328a5a217cb05b39166042a53bca0472f3c45256af30ab56f1a7a79",
+      "classification": "tool-noise",
+      "owner": "composition/persistence/infrastructure/indexed-db/fixtures",
+      "reason": "Released source-version fixtures preserve version-local stored rows and expected digests. The matched completion-outbox and diagnostics literals are historical compatibility evidence. Shared row construction would couple independent migration inputs.",
+      "removalCondition": "Remove when either source version is unsupported or this exact detector pair disappears.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1.ts",
+        "start": 124,
+        "end": 151
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v48.ts",
+        "start": 133,
+        "end": 163
+      }
+    },
+    {
       "id": "d1f3afe5b9058c27e244806f48eb29eaaae869d1855161fbd0e1a96fc50562f3",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal-content",
@@ -3025,24 +2989,6 @@
         "path": "packages/ui/src/styles/ai-modal-content/preview-spoilers.css",
         "start": 77,
         "end": 83
-      }
-    },
-    {
-      "id": "d28775258acd4a47b3cc9a8d66ada3f3fe1d5dff091eb5851f70e313358d27a1",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db",
-      "reason": "Independent historical descriptors select database versions 36 to 37 and 38 to 39. Store validation already delegates to requireMigrationStores. Migrate returns undefined. The match crosses the next descriptor boundary.",
-      "removalCondition": "Remove when either historical descriptor changes or this exact finding disappears.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 849,
-        "end": 866
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 893,
-        "end": 910
       }
     },
     {
@@ -3277,24 +3223,6 @@
         "path": "apps/extension/src/features/highlighter/frame-annotation/step-badge/interactive-surface.tsx",
         "start": 23,
         "end": 30
-      }
-    },
-    {
-      "id": "e8d4ddc1ff99a4a10b493a5f61b1d4667043aefbe64d3c7834af03d6e493db04",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db",
-      "reason": "The entire matched fragment imports canonical store constants. Schema contracts describe stores, while upgrade creates them. The match contains no executable algorithm.",
-      "removalCondition": "Remove when this exact import finding disappears or either module stops requiring these imports.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
-        "start": 5,
-        "end": 38
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
-        "start": 1,
-        "end": 34
       }
     },
     {

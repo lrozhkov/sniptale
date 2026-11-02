@@ -47,7 +47,11 @@ export const backgroundIngressBackgroundOwnedRouteGroups = [
     sideEffects:
       'read-only native connection or workspace allocation and optional host permission query',
     transitiveStateOwner: 'native remote-connection owner and browser permission authority',
-    messageTypes: ['SYNC_CONNECTION_ORIGIN_PERMISSION', 'SYNC_WORKSPACE_ORIGIN_PERMISSION'],
+    messageTypes: [
+      'SYNC_CONNECTION_ORIGIN_PERMISSION',
+      'SYNC_WORKSPACE_ORIGIN_PERMISSION',
+      'SYNC_CONNECTION_CREDENTIAL',
+    ],
   },
   {
     acceptedSenderClass: 'checked top-level content runtime including the owned shim sender',

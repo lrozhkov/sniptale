@@ -35,10 +35,15 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it('loads ai providers runtime data in one batch and preserves order', async () => {
+it('loads AI catalog data in one batch without taking ownership of shared protection status', async () => {
   loaderMocks.requestAISettingsPageRuntimeDataMock.mockResolvedValue({
     scenarioEditorSystemPrompt: 'Scenario prompt',
-    secretProtectionStatus: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
+    secretProtectionStatus: {
+      isEnabled: true,
+      isUnlocked: false,
+      mode: 'passphrase',
+      participants: { ai: false, webdav: true },
+    },
     selectionBootstrap: {
       chromeAiEnabled: true,
       globalSystemPrompt: 'Shared prompt',
@@ -58,7 +63,6 @@ it('loads ai providers runtime data in one batch and preserves order', async () 
     'Shared prompt',
     'Scenario prompt',
     true,
-    { isEnabled: false, isUnlocked: true, mode: 'transparent' },
   ]);
   expect(loaderMocks.requestAISettingsPageRuntimeDataMock).toHaveBeenCalledTimes(1);
 });

@@ -100,6 +100,7 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
   objectText: { ru: 'Текст', en: 'Text' },
   objectAppearance: { ru: 'Вид', en: 'Appearance' },
   objectAnimation: { ru: 'Анимация', en: 'Animation' },
+  effectAnimation: { ru: 'Анимация эффекта', en: 'Effect animation' },
   objectAdvanced: { ru: 'Дополнительно', en: 'Advanced' },
   appearanceOrder: { ru: 'Порядок появления', en: 'Appearance order' },
   lineThenText: { ru: 'Линия → текст', en: 'Line → text' },

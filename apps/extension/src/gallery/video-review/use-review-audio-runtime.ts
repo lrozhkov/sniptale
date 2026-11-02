@@ -45,6 +45,8 @@ interface ReviewAudioRuntimeProps {
   playing: boolean;
   silent?: boolean;
   outputTime: number;
+  /** Reads the media clock in result time when React commits a delayed transport sample. */
+  sourceToResult?: ((sourceTime: number) => number | null) | undefined;
   seekRevision?: number | undefined;
   original: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
@@ -107,6 +109,8 @@ export function useReviewEditorAudioRuntime(args: {
   playing: boolean;
   silent?: boolean;
   outputTime: number;
+  /** Reads the media clock in result time when React commits a delayed transport sample. */
+  sourceToResult?: ((sourceTime: number) => number | null) | undefined;
   seekRevision?: number | undefined;
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
@@ -122,6 +126,7 @@ export function useReviewEditorAudioRuntime(args: {
     playing: args.playing,
     silent: args.silent ?? false,
     outputTime: args.outputTime,
+    sourceToResult: args.sourceToResult,
     seekRevision: args.seekRevision,
     original: args.originalAudio,
     voiceover: args.voiceover,
@@ -246,8 +251,15 @@ class ReviewAudioPlaybackSession {
     this.actionSource?.dispose();
     this.actionSource = null;
   }
-  needsSeek(outputTime: number) {
-    if (!this.latest.current.playing || !this.anchor) return false;
+  private readOutputTime(current: ReviewAudioRuntimeProps) {
+    const media = current.video.current;
+    return current.sourceToResult && media
+      ? current.sourceToResult(media.currentTime)
+      : current.outputTime;
+  }
+  needsSeek() {
+    const outputTime = this.readOutputTime(this.latest.current);
+    if (!this.latest.current.playing || !this.anchor || outputTime === null) return false;
     const engine = this.engines.get();
     return (
       !!engine &&
@@ -278,7 +290,10 @@ class ReviewAudioPlaybackSession {
   }
   schedule(planKey: string) {
     this.auditionActive = false;
-    const current = this.latest.current;
+    const current = {
+      ...this.latest.current,
+      outputTime: this.readOutputTime(this.latest.current) ?? this.latest.current.outputTime,
+    };
     const generation = ++this.generation;
     this.preparation?.abort();
     this.clearActionResources();
@@ -525,7 +540,7 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     session.current?.cancelAudition();
   }, [planKey, props.seekRevision, props.recordingActionSource]);
   useEffect(() => {
-    if (session.current?.needsSeek(props.outputTime)) session.current.schedule(planKey);
+    if (session.current?.needsSeek()) session.current.schedule(planKey);
   }, [props.outputTime, planKey]);
   useEffect(() => {
     peek()?.setOriginalGain(

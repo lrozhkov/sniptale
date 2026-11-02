@@ -1,3 +1,5 @@
+import { readCompatibleImageReplicaPredecessorInTransaction } from './freeze';
+import { readCheckpointInTransaction } from './checkpoints';
 import { parseAppliedCaptureReceipt } from './guards';
 import { isCaptureReplicaHeader } from './guards';
 import { identity, ordinal } from './guards';
@@ -27,9 +29,15 @@ import {
   retireAssetResidencyCopyInTransaction,
 } from '../assets/residency';
 import { parseAssetRef } from '../assets/guards';
+import type { StoredProjectAssetEntry } from '../projects/contracts';
+import { parseProjectAssetEntry } from '../projects/read-guards';
+import { isImageCaptureSource } from './image-snapshot';
 import type { MediaLibraryEntry } from '../media-library/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { publishPreparedMediaSourceInTransaction } from '../media-library/source-publication';
+import {
+  publishPreparedMediaSourceInTransaction,
+  publishPreparedMediaProjectChildInTransaction,
+} from '../media-library/source-publication';
 import { releaseMediaSource } from '../media-library/delete-cascade.sources';
 import type { StoredImageWorkspaceEntry } from '../image-workspaces/contracts';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
@@ -72,7 +80,6 @@ import {
   freezeImageInTransaction,
   digestCapturedImageRows,
   isBoundedImageMetadata,
-  readImageReplicaPredecessorInTransaction,
 } from './image-snapshot';
 
 /** Native JSON plus staged immutable refs; portable codecs remain in the workflow owner. */
@@ -88,6 +95,7 @@ export interface ApplyPreparedImageReplicaInput {
   expectedNativeRevision: number | null;
   media: Omit<MediaLibraryEntry, 'blob'>;
   originalRef: AssetRef;
+  projectAsset?: StoredProjectAssetEntry;
   workspace: StoredImageWorkspaceEntry | null;
   documentRefs: AssetRef[];
   presentation: null | {
@@ -156,11 +164,14 @@ function parseImageReplicaIdentity(value: Record<string, unknown>): ImageReplica
 function parseImageReplicaSource(value: Record<string, unknown>) {
   const media = parseMediaLibraryEntry(value['media']);
   const originalRef = parseAssetRef(value['originalRef']);
+  const projectAsset =
+    value['projectAsset'] === undefined ? undefined : parseProjectAssetEntry(value['projectAsset']);
   if (
     !media ||
     media.blob !== undefined ||
-    (media.source.kind !== 'screenshot' && media.source.kind !== 'stored-asset') ||
-    !['image', 'screenshot'].includes(media.kind) ||
+    !isImageCaptureSource(media) ||
+    (value['projectAsset'] !== undefined && !projectAsset) ||
+    (media.source.kind === 'project-asset' ? !projectAsset : projectAsset !== undefined) ||
     media.lifecycle?.storageClass !== 'library' ||
     media.recordingMetadata ||
     media.recordingGroup ||
@@ -168,10 +179,18 @@ function parseImageReplicaSource(value: Record<string, unknown>) {
     !originalRef ||
     originalRef.size !== media.size ||
     originalRef.mimeType !== media.mimeType ||
-    (media.source.kind === 'stored-asset' && media.source.assetId !== originalRef.assetId)
+    (media.source.kind === 'stored-asset' && media.source.assetId !== originalRef.assetId) ||
+    (media.source.kind === 'project-asset' &&
+      (!projectAsset ||
+        projectAsset.originMediaId !== undefined ||
+        media.id !== `project-asset:${projectAsset.id}` ||
+        media.source.projectAssetId !== projectAsset.id ||
+        projectAsset.assetId !== originalRef.assetId ||
+        projectAsset.size !== originalRef.size ||
+        projectAsset.mimeType !== originalRef.mimeType))
   )
     return null;
-  return { media, originalRef };
+  return { media, originalRef, ...(projectAsset ? { projectAsset } : {}) };
 }
 
 function parseImageReplicaDocument(value: Record<string, unknown>, media: MediaLibraryEntry) {
@@ -269,6 +288,7 @@ export function parseApplyPreparedImageReplicaInput(
     'expectedNativeRevision',
     'media',
     'originalRef',
+    'projectAsset',
     'workspace',
     'documentRefs',
     'presentation',
@@ -368,11 +388,16 @@ async function checkedImageOriginalDigest(
   input: ApplyPreparedImageReplicaInput,
   original: Blob
 ): Promise<string | null> {
-  if (input.expectedNativeRevision === null) return null;
+  if (
+    input.expectedNativeRevision === null &&
+    (input.expectedLocalGeneration === 0 || input.media.source.kind !== 'project-asset')
+  )
+    return null;
   const db = await initDB();
   const tx = db.transaction(
     [
       MEDIA_LIBRARY_STORE,
+      PROJECT_ASSETS_STORE,
       IMAGE_WORKSPACES_STORE,
       AGGREGATE_PRESENTATIONS_STORE,
       ASSET_REFS_STORE,
@@ -394,7 +419,15 @@ async function checkedImageOriginalDigest(
     JSON.stringify(state.basis) !== JSON.stringify(input.expectedBasis)
   )
     refuseImageReplica();
-  const predecessor = await readImageReplicaPredecessorInTransaction(tx, input.media.id, state);
+  if (state.deleted) {
+    await tx.done;
+    return null;
+  }
+  const predecessor = await readCompatibleImageReplicaPredecessorInTransaction(
+    tx,
+    input.media.id,
+    state
+  );
   const previous = predecessor.rows;
   await tx.done;
   if (predecessor.unloadedCopy) {
@@ -415,14 +448,15 @@ async function checkedImageOriginalDigest(
       : null);
   if (!previousBlob) refuseImageReplica();
   if (
-    previous.media.workspaceRevision !== input.expectedNativeRevision ||
+    (previous.media.workspaceRevision !== input.expectedNativeRevision &&
+      !(predecessor.legacyOriginalOnly && input.expectedNativeRevision === null)) ||
     previousBlob.size !== original.size ||
     previousBlob.type !== original.type
   )
     return null;
   // Bind byte equality to the exact metadata predecessor. Commit repeats state and revision checks.
   return (await hashOriginal(previousBlob)) === (await hashOriginal(original))
-    ? digestCapturedImageRows(previous)
+    ? predecessor.digest
     : null;
 }
 
@@ -448,6 +482,8 @@ async function readImageReplicaPredecessorState(
   input: ApplyPreparedImageReplicaInput,
   keys: ImageReplicaKeys
 ): Promise<SyncCaptureRootState | null> {
+  if (await readCheckpointInTransaction(tx, input, { rootKind: 'media', rootId: input.media.id }))
+    refuseImageReplica();
   const captures = tx.objectStore(SYNC_CAPTURE_STORE);
   const raw: unknown = await captures.get(keys.stateKey);
   const state = raw === undefined ? null : parseSyncCaptureRecord(raw);
@@ -502,7 +538,7 @@ async function admitImageReplicaPredecessor(
     raw === undefined
       ? null
       : state
-        ? await readImageReplicaPredecessorInTransaction(tx, input.media.id, state)
+        ? await readCompatibleImageReplicaPredecessorInTransaction(tx, input.media.id, state)
         : null;
   if (raw !== undefined && !predecessor) refuseImageReplica();
   const previous = predecessor?.rows ?? null;
@@ -512,7 +548,8 @@ async function admitImageReplicaPredecessor(
       state.deleted ||
       state.nativeDigest !== predecessor?.digest ||
       previous.media.source.kind !== input.media.source.kind ||
-      input.expectedNativeRevision !== previous.media.workspaceRevision
+      (input.expectedNativeRevision !== previous.media.workspaceRevision &&
+        !(predecessor?.legacyOriginalOnly && input.expectedNativeRevision === null))
     )
       refuseImageReplica();
     if (
@@ -521,6 +558,14 @@ async function admitImageReplicaPredecessor(
     )
       await assertStandaloneMediaSourceReplaceable(previous.media, tx);
   } else {
+    if (
+      input.projectAsset &&
+      ((await tx.objectStore(PROJECT_ASSETS_STORE).get(input.projectAsset.id)) !== undefined ||
+        (await tx
+          .objectStore(ASSET_OWNERS_STORE)
+          .get(['project-asset', input.projectAsset.id, 'body'])) !== undefined)
+    )
+      refuseImageReplica();
     if (
       input.media.source.kind === 'stored-asset' &&
       (await tx
@@ -599,16 +644,20 @@ async function publishImageReplicaNative(
     ...(input.media.source.kind === 'screenshot' ? { blob: hydrated.originalBlob } : {}),
     workspaceRevision: admission.revision,
   };
-  await publishPreparedMediaSourceInTransaction(
-    { media, original: { ref: input.originalRef } },
-    {
-      media: tx.objectStore(MEDIA_LIBRARY_STORE),
-      refs: tx.objectStore(ASSET_REFS_STORE),
-      owners: tx.objectStore(ASSET_OWNERS_STORE),
-      projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),
-      projectExports: tx.objectStore(PROJECT_EXPORTS_STORE),
-    }
-  );
+  const source = {
+    media,
+    original: { ref: input.originalRef },
+    ...(input.projectAsset ? { projectAsset: input.projectAsset } : {}),
+  };
+  const stores = {
+    media: tx.objectStore(MEDIA_LIBRARY_STORE),
+    refs: tx.objectStore(ASSET_REFS_STORE),
+    owners: tx.objectStore(ASSET_OWNERS_STORE),
+    projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),
+    projectExports: tx.objectStore(PROJECT_EXPORTS_STORE),
+  };
+  await publishPreparedMediaSourceInTransaction(source, stores);
+  await publishPreparedMediaProjectChildInTransaction(source, stores);
   if (input.workspace)
     await putImageWorkspaceBackupRestore({
       entry: { ...input.workspace, revision: admission.revision },
@@ -703,7 +752,9 @@ async function commitImageReplica(
   if (!Number.isSafeInteger(generation)) refuseImageReplica();
   await assertImageReplicaDocumentRefs(tx, [
     ...input.documentRefs,
-    ...(input.media.source.kind === 'stored-asset' ? [input.originalRef] : []),
+    ...(input.media.source.kind === 'stored-asset' || input.media.source.kind === 'project-asset'
+      ? [input.originalRef]
+      : []),
   ]);
   const previousResidency = await readAssetResidencyCopyInTransaction(
     tx,

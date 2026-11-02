@@ -1,5 +1,6 @@
 import { recoverNativeRecordingHistories } from '../recordings/native-history/recovery';
 import { retireJournalRecordingEventStages } from '../recordings/recording-events/staging';
+import { prepareAssetReadyClaimIndex } from '../assets/opfs-store';
 import { syncReplicaPublicationAdapter } from '../sync-capture/replica-publication';
 import { recordingCursorTrajectoryPublicationAdapter } from '../recordings/telemetry';
 import { retireJournalCursorTrajectoryStages } from '../recordings/cursor-trajectory/staging';
@@ -552,13 +553,21 @@ async function recoverPublications(
   return runStorageStartupPhase('asset-recovery', () =>
     runWithDurableAssetOperationRecovery(permit, async () => {
       await runStorageStartupPhase('asset-writing-cleanup', () =>
-        runWithDurableAssetLifecycleLock(async () => {
-          // Publication holds this same lifecycle lock, so one lazy snapshot covers this cleanup batch.
-          let authority: ReturnType<typeof readPhysicalDeleteAuthority> | undefined;
-          return collectQuiescentWritingObjects({}, async (assetId) => {
-            authority ??= readPhysicalDeleteAuthority();
-            return (await authority)(assetId) !== 'unowned';
-          });
+        runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+          await prepareAssetReadyClaimIndex(lifecyclePermit);
+          return collectQuiescentWritingObjects(
+            {},
+            async (assetId) => {
+              const authority = await readPhysicalDeleteAuthority(
+                [assetId],
+                undefined,
+                lifecyclePermit
+              );
+              const state = authority(assetId);
+              return state === 'invalid' || state === 'mismatch' ? null : state !== 'unowned';
+            },
+            lifecyclePermit
+          );
         })
       );
       await runStorageStartupPhase('asset-backup-recovery', () =>

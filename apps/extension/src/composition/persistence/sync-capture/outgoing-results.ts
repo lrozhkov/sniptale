@@ -1,7 +1,19 @@
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { initDB } from '../infrastructure/indexed-db/core';
-import { SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE } from '../infrastructure/indexed-db/core.stores';
+import {
+  ASSET_REFS_STORE,
+  SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
+  SYNC_OUTBOX_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import {
+  parseSyncConnectionIdentity,
+  sameConnectionScope,
+  type SyncConnectionIdentity,
+} from '../remote-connection/model';
+import { checkSyncConnectionAdmission } from '../remote-connection/store';
+import { parseSyncQueueScope, queueNativeCursorKey, type SyncQueueScope } from './queue-model';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import type { PublishedCaptureOperation } from './contracts';
 import { parseSyncCaptureRecord } from './guards';
@@ -269,4 +281,75 @@ export async function commitVerifiedOutgoingResult(
       throw error;
     }
   });
+}
+
+/** Read one bounded native page. Selection is advisory and grants no pin-release authority. */
+export async function discoverPublishedOutgoingRetirement(input: {
+  scope: SyncQueueScope;
+  authorization: SyncConnectionIdentity;
+  afterKey: IDBValidKey | null;
+  signal: AbortSignal;
+}): Promise<{ operationIds: string[]; afterKey: IDBValidKey | null; scanned: number }> {
+  const scope = parseSyncQueueScope(structuredClone(input.scope));
+  const authorization = parseSyncConnectionIdentity(structuredClone(input.authorization));
+  const afterKey = structuredClone(input.afterKey);
+  if (!scope || !authorization || (afterKey !== null && !queueNativeCursorKey(afterKey)))
+    throw new Error('Invalid published retirement selection.');
+  input.signal.throwIfAborted();
+  const db = await initDB();
+  input.signal.throwIfAborted();
+  const tx = db.transaction(
+    [SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE, ASSET_REFS_STORE],
+    'readonly'
+  );
+  try {
+    await checkSyncConnectionAdmission(tx, scope, authorization);
+    const store = tx.objectStore(SYNC_CAPTURE_STORE);
+    const keys = await store.getAllKeys(
+      afterKey === null ? undefined : IDBKeyRange.lowerBound(afterKey, true),
+      64
+    );
+    const operationIds: string[] = [];
+    let scanned = 0;
+    let lastKey: IDBValidKey | null = null;
+    for (const key of keys) {
+      input.signal.throwIfAborted();
+      scanned++;
+      lastKey = key;
+      const operation = parseSyncCaptureRecord(await store.get(key));
+      if (
+        !operation ||
+        operation.kind !== 'sync-operation' ||
+        operation.phase !== 'published' ||
+        operation.key !== key ||
+        !sameConnectionScope(scope, operation)
+      )
+        continue;
+      let ownerless = false;
+      for (const object of operation.objects) {
+        if (!object.pinned) continue;
+        if ((await tx.objectStore(ASSET_REFS_STORE).getKey(object.ref.assetId)) === undefined) {
+          ownerless = true;
+          break;
+        }
+      }
+      if (ownerless) operationIds.push(operation.operationId);
+      if (operationIds.length === 2) break;
+    }
+    input.signal.throwIfAborted();
+    await tx.done;
+    return {
+      operationIds,
+      scanned,
+      afterKey: scanned === keys.length && keys.length < 64 ? null : lastKey,
+    };
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      /* Transaction can already be closed. */
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
 }

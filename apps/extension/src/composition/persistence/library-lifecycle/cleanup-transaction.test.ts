@@ -1,3 +1,4 @@
+import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 
@@ -530,32 +531,18 @@ it.each(['scenario-snapshot', 'video-snapshot', 'review-audio'] as const)(
       updatedAt: 1,
     };
     const deletes = vi.fn();
-    persistenceMocks.runWithIndexedDbMutation.mockReset().mockImplementation(async (operation) =>
-      operation({
-        transaction: () => ({
-          done: Promise.resolve(),
-          objectStore: (store: string) => ({
-            get: async () =>
-              store === 'media_library' ? media : store === 'project_assets' ? source : undefined,
-            getAll: async () =>
-              store === 'video_projects' && use === 'video-snapshot'
-                ? [video]
-                : store === 'scenario_assets' && use === 'scenario-snapshot'
-                  ? [scenario]
-                  : store === 'video_workspaces' && use === 'review-audio'
-                    ? [review]
-                    : [],
-            delete: deletes,
-            put: vi.fn(),
-            index: () => ({
-              count: async () => 0,
-              getAll: async () => [],
-              getAllKeys: async () => [],
-            }),
-          }),
-        }),
-      })
-    );
+    const fixture = createReviewWorkspaceStoreFixture(() => false);
+    for (const rows of fixture.rows.values()) rows.clear();
+    fixture.rows.get('media_library')!.set(media.id, media);
+    fixture.rows.get('project_assets')!.set(source.id, source);
+    if (use === 'video-snapshot') fixture.rows.get('video_projects')!.set(video.id, video);
+    if (use === 'scenario-snapshot')
+      fixture.rows.get('scenario_assets')!.set(scenario.id, scenario);
+    if (use === 'review-audio')
+      fixture.rows.get('video_workspaces')!.set(review.aggregateId, review);
+    persistenceMocks.runWithIndexedDbMutation
+      .mockReset()
+      .mockImplementation(async (operation) => operation(fixture.database));
     expect(
       await cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
     ).toEqual({ movedCount: 0, retainedCount: 1, movedIds: [] });

@@ -9,7 +9,7 @@ import {
   resolvePreviewRenderAllocation,
   type PreviewRenderAllocationInput,
 } from '../../../../apps/extension/src/workflows/video-review/preview-render-allocation';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../../../apps/extension/src/workflows/video-review/spatial-render-session';
 import { drawReviewWebcam } from '../../../../apps/extension/src/workflows/video-review/render-webcam';
 import { quickEditMotionBlurCameras } from '../../../../apps/extension/src/features/video/review/advanced/motion-blur';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../apps/extension/src/features/video/project/camera/appearance';
@@ -283,7 +283,7 @@ async function reference(
         },
       }
     : scene.background;
-  const spatial = layout.spatial ? createReviewSpatialRenderer() : undefined;
+  const spatial = layout.spatial ? createReviewSpatialSession() : undefined;
   const textOwner = owner();
   const signal = new AbortController().signal;
   const header = scene.windowHeader

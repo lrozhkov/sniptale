@@ -11,6 +11,10 @@ const fileReaderMocks = vi.hoisted(() => ({
   readFileAsText: vi.fn(),
 }));
 
+const checkpointMocks = vi.hoisted(() => ({ requestExit: vi.fn() }));
+vi.mock('../../../platform/runtime-messaging/sync-product-client', () => ({
+  createSyncProductClient: () => ({ requestCheckpointExit: checkpointMocks.requestExit }),
+}));
 const waitForEditorDocumentCanvasMock = vi.fn();
 
 vi.mock('../../../platform/runtime-messaging', async (importOriginal) => ({
@@ -284,3 +288,66 @@ it('ignores older session-import file reads after a newer import starts', async 
   expect(setImageData).toHaveBeenCalledTimes(1);
   expect(setImageData).toHaveBeenCalledWith('data:image/png;base64,second');
 });
+
+it.each(['raster', 'session'] as const)(
+  'guards %s replacement while the exact exit receipt is submitted',
+  async (kind) => {
+    const receipt = {
+      rootKind: 'media' as const,
+      rootId: 'old-image',
+      revision: crypto.randomUUID(),
+    };
+    const request = createDeferred<void>();
+    const entered = createDeferred<void>();
+    let current = true;
+    checkpointMocks.requestExit.mockImplementation(() => {
+      entered.resolve();
+      return request.promise;
+    });
+    const autosaveService = {
+      flushAutosave: vi.fn(async () => undefined),
+      prepareCheckpointExit: vi.fn(async () => ({ receipt, isCurrent: () => current })),
+      beginHydration: vi.fn(() => ({ saveNow: vi.fn(), finish: vi.fn() })),
+      persistSnapshot: vi.fn(async () => undefined),
+    };
+    const controller = {
+      canvas: {},
+      autosaveService,
+      exportDocument: () => createEditorDocument('previous'),
+      loadDocument: vi.fn(async () => undefined),
+      openImage: vi.fn(async () => undefined),
+    };
+    fileReaderMocks.readFileAsDataUrl.mockResolvedValueOnce('data:image/png;base64,new');
+    fileReaderMocks.readFileAsText.mockResolvedValueOnce(
+      JSON.stringify(createEditorDocument('data:image/png;base64,new'))
+    );
+    const publish = vi.fn();
+    const replacing =
+      kind === 'raster'
+        ? editorFileActions.openEditorImageFromFile(
+            controller,
+            new File(['bytes'], 'new.png', { type: 'image/png' }),
+            publish
+          )
+        : editorFileActions.importEditorSessionFromFile(
+            controller,
+            new File(['bytes'], 'new.json', { type: 'application/json' }),
+            publish
+          );
+    await Promise.race([
+      entered.promise,
+      replacing.then(() => {
+        throw new Error('Replacement bypassed exit intent.');
+      }),
+    ]);
+    expect(checkpointMocks.requestExit).toHaveBeenCalledWith(receipt);
+    expect(controller.openImage).not.toHaveBeenCalled();
+    expect(controller.loadDocument).not.toHaveBeenCalled();
+    expect(autosaveService.beginHydration).not.toHaveBeenCalled();
+    current = false;
+    request.resolve();
+    await expect(replacing).rejects.toThrow('changed');
+    expect(publish).not.toHaveBeenCalled();
+    expect(autosaveService.beginHydration).not.toHaveBeenCalled();
+  }
+);

@@ -189,3 +189,41 @@ it('treats a legacy root without workspaceRevision as revision zero', async () =
 
   expect(put).toHaveBeenCalledWith(expect.objectContaining({ presentationRevision: 0 }));
 });
+
+it('rejects a stale Scenario renderer before writing presentation or checkpoint state', async () => {
+  const project = createGuideProject('Current Scenario');
+  const root = { createdAt: 1, id: project.id, project, updatedAt: 2, workspaceRevision: 5 };
+  const put = vi.fn();
+  const readProfile = vi.fn();
+  const abort = vi.fn();
+  mocks.runWithIndexedDbMutation.mockImplementation(async (effect) =>
+    effect({
+      transaction: vi.fn(() => ({
+        abort,
+        done: Promise.resolve(),
+        objectStore: vi.fn((name: string) =>
+          name === 'scenario_projects'
+            ? { get: vi.fn(async () => root) }
+            : name === 'scenario_project_history' || name === 'scenario_project_units'
+              ? { index: () => ({ getAll: async () => [] }) }
+              : name === 'sync_capture'
+                ? { get: readProfile, put }
+                : { put }
+        ),
+      })),
+    })
+  );
+
+  await expect(
+    commitProjectAggregatePresentation({
+      expectedWorkspaceRevision: 4,
+      ref: { id: project.id, kind: 'scenario' },
+      previewBlob: new Blob(['stale preview']),
+      thumbnailBlob: new Blob(['stale thumbnail']),
+    })
+  ).rejects.toThrow('changed during preview rendering');
+
+  expect(abort).toHaveBeenCalledOnce();
+  expect(put).not.toHaveBeenCalled();
+  expect(readProfile).not.toHaveBeenCalled();
+});

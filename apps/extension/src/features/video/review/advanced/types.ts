@@ -13,11 +13,12 @@ export type {
 import type { CameraTransition } from '../../project/motion/transitions';
 import type { MotionBlurPhases } from '../../project/motion/blur';
 import type { Gradient, Paint } from '@sniptale/foundation/paint';
-import type { ReviewTimeSegment } from '../time-segment';
+import type { ReviewTimeSegment, QuickEditVoiceoverAnchor } from '../time-segment';
+export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 26;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 27;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -182,16 +183,10 @@ export type QuickEditBackgroundSettings = {
 );
 
 /** One voiceover or music clip; timeline coordinates are seconds like the video domain. */
-export interface QuickEditVoiceoverAnchor {
-  start: number;
-  end: number;
-  offset: number;
-  duration: number;
-}
 
 export interface QuickEditAudioClip {
   /** Immutable text association; deleting or editing text does not delete this audio. */
-  textSnapshot?: import('../text-document').ReviewVoiceTextSnapshot;
+  textSnapshot?: import('../text-types').ReviewVoiceTextSnapshot;
   /** Optional native-asset transcript and immutable accepted speech replacements. */
   transcript?: ReviewSpeechTranscript;
   /** Native sample tempo, independent of video Speed; absent means 1x. */
@@ -269,8 +264,8 @@ export interface QuickEditAdvancedState extends QuickEditAdvancedContent {
 export interface QuickEditAdvancedContent {
   cameraFollowDefaults?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   cursorFocusPath?: import('../../project/cursor-focus-path/types').CursorFocusPath;
-  text?: import('../text-document').ReviewTextDocument;
-  captions?: import('../text-document').ReviewCaptionSettings;
+  text?: import('../text-types').ReviewTextDocument;
+  captions?: import('../text-types').ReviewCaptionSettings;
   annotationEffects?: import('../annotation-effects/types').ReviewAnnotationEffects;
   /** Missing on older projects means enabled. */
   actionsEnabled?: boolean;

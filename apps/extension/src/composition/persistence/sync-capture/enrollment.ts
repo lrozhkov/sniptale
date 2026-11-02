@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from './checkpoints';
 import type { IDBPTransaction } from 'idb';
 import { capturePreparedDatabase } from '../infrastructure/indexed-db/core';
 import {
@@ -121,12 +122,15 @@ async function captureMissingRoot(
     // Incoming receipts, local writes and tombstones already own this exact space identity.
     return false;
   }
-  if (rootKind === 'media') return Boolean(await captureMediaInTransaction(tx, rootId));
+  // Pending native work owns the identity before its first causal capture.
+  if (await readCheckpointInTransaction(tx, scope, { rootKind, rootId })) return false;
+  if (rootKind === 'media')
+    return Boolean(await captureMediaInTransaction(tx, rootId, { checkpoint: 'freeze' }));
   if (rootKind === 'video-project')
-    return Boolean(await captureVideoProjectInTransaction(tx, rootId));
+    return Boolean(await captureVideoProjectInTransaction(tx, rootId, { checkpoint: 'freeze' }));
   if (rootKind === 'scenario-project')
-    return Boolean(await captureScenarioProjectInTransaction(tx, rootId));
-  return Boolean(await captureVideoReviewInTransaction(tx, rootId));
+    return Boolean(await captureScenarioProjectInTransaction(tx, rootId, { checkpoint: 'freeze' }));
+  return Boolean(await captureVideoReviewInTransaction(tx, rootId, { checkpoint: 'freeze' }));
 }
 
 type EnrollmentResult = {

@@ -1,3 +1,25 @@
+vi.mock('../secret-protection/service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secret-protection/service')>();
+  const { SecretProtectionAdmissionPermit, SecretProtectionLockedError } =
+    await import('../secret-protection/model');
+  const { readPreparedSecretProtectionControl } =
+    await import('../secret-protection/transition.store');
+  const withSecretProtectionWriter: typeof actual.withSecretProtectionWriter = async (
+    operation,
+    permit
+  ) => {
+    const control = await readPreparedSecretProtectionControl();
+    if (control?.phase === 'transitioning') throw new SecretProtectionLockedError();
+    if (permit) {
+      if (!SecretProtectionAdmissionPermit.isActive(permit))
+        throw new SecretProtectionLockedError();
+      return operation(permit);
+    }
+    return SecretProtectionAdmissionPermit.run(operation);
+  };
+  return { ...actual, withSecretProtectionWriter };
+});
+
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import {
@@ -113,9 +135,14 @@ function expectNoPersistedPassphraseKeyMaterial() {
 
   expect(sessionSetMock).not.toHaveBeenCalled();
   expect(sessionState[AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY]).toBeUndefined();
-  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeUndefined();
+  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeNull();
   expect(Object.keys(localState).sort()).toEqual(
-    [AI_PROVIDERS_KEY, AI_PROVIDER_SECRETS_KEY, AI_SECRET_PROTECTION_KEY].sort()
+    [
+      AI_PROVIDERS_KEY,
+      AI_PROVIDER_SECRETS_KEY,
+      AI_SECRET_PROTECTION_KEY,
+      AI_LOCAL_SECRET_KEY_STORAGE_KEY,
+    ].sort()
   );
   expect(protection).toEqual({
     enabledAt: expect.any(Number),
@@ -150,41 +177,47 @@ beforeEach(() => {
   installStorageState({});
 });
 
-it('locks passphrase-protected provider secrets after service-worker module restart', async () => {
+it('requires explicit protected admission after provider storage module restart', async () => {
   await installTransparentProviderSecret('provider-secret');
-
-  const { enableStoredAISecretPassphraseProtection, loadStoredAISecretProtectionStatus } =
-    await import('./provider-secret-protection.store.ts');
-  const { loadStoredAIProviderSecret } = await import('./provider-secrets.store.ts');
-
-  await enableStoredAISecretPassphraseProtection('correct horse battery staple');
+  const { createSecretProtectionProfile } = await import('../secret-protection/profile.store');
+  const { createAISecretProtectionParticipant } =
+    await import('./provider-secret-protection.store');
+  const { loadStoredAIProviderSecret } = await import('./provider-secrets.store');
+  const protectedProfile = await createSecretProtectionProfile('correct horse battery staple');
+  const participant = createAISecretProtectionParticipant();
+  await participant.apply(
+    await participant.prepare({
+      action: 'protect',
+      sourceKey: null,
+      targetKey: protectedProfile.key,
+      sourceProfileBinding: null,
+      targetProfileBinding: 'profile',
+    }),
+    undefined,
+    protectedProfile.profile
+  );
   expectNoPersistedPassphraseKeyMaterial();
-  await expect(loadStoredAISecretProtectionStatus()).resolves.toEqual({
-    isEnabled: true,
-    isUnlocked: true,
-    mode: 'passphrase',
-  });
-  await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBe('provider-secret');
-
+  await expect(loadStoredAIProviderSecret('provider-1', protectedProfile.key)).resolves.toBe(
+    'provider-secret'
+  );
   vi.resetModules();
-  const restartedProtection = await import('./provider-secret-protection.store.ts');
-  const restartedSecrets = await import('./provider-secrets.store.ts');
-
-  await expect(restartedProtection.loadStoredAISecretProtectionStatus()).resolves.toEqual({
-    isEnabled: true,
-    isUnlocked: false,
-    mode: 'passphrase',
-  });
+  const restartedSecrets = await import('./provider-secrets.store');
   await expect(restartedSecrets.readStoredAIProviderSecretState('provider-1')).resolves.toEqual({
     status: 'locked',
   });
   await expect(restartedSecrets.loadStoredAIProviderSecret('provider-1')).resolves.toBeNull();
-
-  await restartedProtection.unlockStoredAISecretProtection('correct horse battery staple');
-  expectNoPersistedPassphraseKeyMaterial();
-  await expect(restartedSecrets.loadStoredAIProviderSecret('provider-1')).resolves.toBe(
-    'provider-secret'
+  const { verifySecretProtectionPassphrase } = await import('../secret-protection/profile.store');
+  await expect(
+    verifySecretProtectionPassphrase('wrong phrase', protectedProfile.profile)
+  ).rejects.toThrow();
+  const admittedKey = await verifySecretProtectionPassphrase(
+    'correct horse battery staple',
+    protectedProfile.profile
   );
+  expectNoPersistedPassphraseKeyMaterial();
+  await expect(
+    restartedSecrets.loadStoredAIProviderSecret('provider-1', admittedKey)
+  ).resolves.toBe('provider-secret');
 });
 
 it('rejects downgraded passphrase metadata before deriving a key', async () => {
@@ -211,32 +244,30 @@ it('rejects downgraded passphrase metadata before deriving a key', async () => {
   });
   const deriveBitsSpy = vi.spyOn(crypto.subtle, 'deriveBits');
 
-  const { readStoredAISecretProtection, unlockStoredAISecretPassphrase } =
-    await import('./secret-protection.store.ts');
+  const { readSecretProtectionProfile } = await import('../secret-protection/profile.store.ts');
 
-  await expect(readStoredAISecretProtection()).resolves.toBeNull();
-  await expect(unlockStoredAISecretPassphrase('passphrase')).resolves.toBeUndefined();
+  await expect(readSecretProtectionProfile()).rejects.toThrow('profile unavailable');
   expect(deriveBitsSpy).not.toHaveBeenCalled();
 });
 
 it('rejects hostile passphrase salt and iteration metadata before deriving a key', async () => {
-  const { createAISecretPassphraseProtection, readStoredAISecretProtection } =
-    await import('./secret-protection.store.ts');
-  const validProtection = await createAISecretPassphraseProtection('passphrase');
+  const { createSecretProtectionProfile, readSecretProtectionProfile } =
+    await import('../secret-protection/profile.store.ts');
+  const validProtection = await createSecretProtectionProfile('passphrase');
 
   for (const kdf of [
-    { ...validProtection.protection.kdf, iterations: 10_000_000 },
-    { ...validProtection.protection.kdf, salt: 'not base64 !' },
-    { ...validProtection.protection.kdf, salt: btoa('short') },
-    { ...validProtection.protection.kdf, salt: btoa('12345678901234567') },
+    { ...validProtection.profile.kdf, iterations: 10_000_000 },
+    { ...validProtection.profile.kdf, salt: 'not base64 !' },
+    { ...validProtection.profile.kdf, salt: btoa('short') },
+    { ...validProtection.profile.kdf, salt: btoa('12345678901234567') },
   ]) {
     installStorageState({
       [AI_SECRET_PROTECTION_KEY]: {
-        ...validProtection.protection,
+        ...validProtection.profile,
         kdf,
       },
     });
 
-    await expect(readStoredAISecretProtection()).resolves.toBeNull();
+    await expect(readSecretProtectionProfile()).rejects.toThrow('profile unavailable');
   }
 });

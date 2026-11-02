@@ -72,7 +72,8 @@ export function retimeReviewVoiceover(
       previousEnd === undefined ? group.start : previousEnd + group.start - groups[index - 1]!.end;
     let offset = group.offset;
     let remaining = group.duration;
-    while (remaining > 1e-7) {
+    // Every positive native interval needs a first span, even below the residual tolerance.
+    do {
       const part = map.find(
         (segment) => source >= segment.sourceStart && source < segment.sourceEnd
       );
@@ -85,7 +86,7 @@ export function retimeReviewVoiceover(
       source = end;
       offset += duration;
       remaining -= duration;
-    }
+    } while (remaining > 1e-7);
     previousEnd = source;
   }
   return { ...clip, timelineStart: anchors[0]!.start, sourceAnchor: anchors };

@@ -458,3 +458,121 @@ it.each([
   ).toBe(allowed);
   expect(hasPreauthorizedAiSettingsMutationMessage(message)).toBe(allowed);
 });
+
+it('admits only the finite popup sync runtime verbs through the IPC kernel', () => {
+  vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+  const popup = { id: 'test', url: POPUP_URL };
+  for (const command of [{ kind: 'runtime-status' }, { kind: 'checkpoint-flush' }] as const)
+    expect(authorizeProduct(command, popup)).toEqual({ authorized: true });
+  for (const command of [
+    { kind: 'status' },
+    { kind: 'checkpoint-wake' },
+    { kind: 'cache-status' },
+    { kind: 'catalog-refresh', bypassCache: false },
+  ] as const)
+    expect(authorizeProduct(command, popup)).toEqual({
+      authorized: false,
+      reason: 'Sync product command refused',
+    });
+  for (const candidate of [
+    { ...popup, id: 'other' },
+    { ...popup, tab: { id: 1 } as chrome.tabs.Tab },
+    { ...popup, url: POPUP_URL + '?fake=1' },
+  ])
+    expect(authorizeProduct({ kind: 'runtime-status' }, candidate)).toEqual({
+      authorized: false,
+      reason: 'Sync product command refused',
+    });
+});
+
+it('keeps discovery and exact workspace selection exclusive to Settings', () => {
+  const source = {
+    kind: 'join' as const,
+    identity: { incarnation: productRequestId, revision: 2 },
+  };
+  const authentication = { kind: 'bearer' as const, accessToken: 'private' };
+  const commands: SyncProductCommand[] = [
+    {
+      kind: 'workspace-discover',
+      rootUrl: 'https://dav.example/root/',
+      accountId: 'account',
+      authentication,
+      previous: null,
+    },
+    {
+      kind: 'workspace-join',
+      source,
+      prefix: 'Workspace/',
+      expected: {
+        spaceId: productRequestId,
+        bootstrapId: productRequestId,
+        fingerprint: 'a'.repeat(64),
+      },
+      authentication,
+    },
+    {
+      kind: 'workspace-enroll',
+      source,
+      authentication,
+      storagePolicy: { version: 1, mode: 'on-demand' },
+    },
+  ];
+  vi.stubGlobal('chrome', { runtime: { id: 'test' } });
+  for (const command of commands) {
+    expect(authorizeProduct(command, sender({ url: SETTINGS_URL }))).toEqual({ authorized: true });
+    for (const other of [
+      sender({ url: productGallery }),
+      { id: 'test', url: POPUP_URL },
+      sender({ url: CONTENT_URL, tabId: 1, documentId: 'doc', frameId: 0 }),
+    ])
+      expect(authorizeProduct(command, other)).toEqual({
+        authorized: false,
+        reason: 'Sync product command refused',
+      });
+  }
+});
+
+it('keeps saved Scenario HTML preparation in the Gallery product boundary', () => {
+  const command: SyncProductCommand = {
+    kind: 'scenario-export-prepare',
+    projectId: 'scenario',
+    exportId: 'saved-html',
+  };
+  expect(authorizeProduct(command, sender({ url: productGallery }))).toEqual({ authorized: true });
+  for (const candidate of [
+    sender({ url: SETTINGS_URL }),
+    sender({ url: CONTENT_URL, tabId: 1, frameId: 0, documentId: 'content' }),
+    { id: 'test', url: POPUP_URL },
+  ])
+    expect(authorizeProduct(command, candidate)).toEqual({
+      authorized: false,
+      reason: 'Sync product command refused',
+    });
+});
+
+it('keeps whole Library preparation in the Gallery product boundary', () => {
+  const command: SyncProductCommand = {
+    kind: 'library-backup-prepare',
+    expected: { incarnation: '11111111-1111-4111-8111-111111111111', revision: 1 },
+    options: {
+      includeDrafts: false,
+      includeSourceMetadata: true,
+      includeTelemetry: true,
+      includeWebSnapshots: true,
+      scope: 'all',
+    },
+  };
+  expect(authorizeProduct(command, sender({ url: productGallery }))).toEqual({ authorized: true });
+  for (const candidate of [
+    sender({ url: SETTINGS_URL }),
+    sender({ url: CONTENT_URL, tabId: 1, frameId: 0, documentId: 'content' }),
+    sender({ url: 'chrome-extension://test/apps/extension/src/editor/index.html' }),
+    sender({ url: 'chrome-extension://test/apps/extension/src/scenario-editor/index.html' }),
+    sender({ url: 'chrome-extension://test/apps/extension/src/video-editor/index.html' }),
+    { id: 'test', url: POPUP_URL },
+  ])
+    expect(authorizeProduct(command, candidate)).toEqual({
+      authorized: false,
+      reason: 'Sync product command refused',
+    });
+});

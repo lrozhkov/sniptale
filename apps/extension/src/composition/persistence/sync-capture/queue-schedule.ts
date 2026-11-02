@@ -9,6 +9,8 @@ import {
 } from '../infrastructure/indexed-db/core.stores';
 import {
   parseSyncConnectionIdentity,
+  parseConnectionMetadata,
+  sameConnectionScope,
   sameSyncConnectionIdentity,
   type SyncConnectionIdentity,
 } from '../remote-connection/model';
@@ -27,6 +29,7 @@ import {
   queueUuid,
   sameQueueScope,
   queueRetrySchedule,
+  recordQueueTransition,
   type SyncQueueConnection,
   type SyncQueueOperation,
   type SyncQueueScope,
@@ -100,7 +103,8 @@ async function mutate<T>(
   operation: (
     tx: IDBPTransaction<unknown, string[], 'readwrite'>,
     connection: SyncQueueConnection
-  ) => Promise<T>
+  ) => Promise<T>,
+  allowPaused = false
 ): Promise<T> {
   // Erasure closes this captured handle. Delayed work cannot reopen a replacement database.
   const db = capturePreparedDatabase();
@@ -112,7 +116,18 @@ async function mutate<T>(
     );
     try {
       await requireSyncQueueScopeInTransaction(tx, scope);
-      await checkSyncConnectionAdmission(tx, scope, authorization);
+      if (allowPaused) {
+        const current = parseConnectionMetadata(
+          await tx.objectStore(SYNC_CONNECTION_STORE).get('connection')
+        );
+        if (
+          !current ||
+          current.phase === 'updating-auth' ||
+          !sameConnectionScope(current.binding, scope) ||
+          !sameSyncConnectionIdentity(current.identity, authorization)
+        )
+          throw new Error('Sync queue unlock selection changed.');
+      } else await checkSyncConnectionAdmission(tx, scope, authorization);
       const result = await operation(tx, await readConnection(tx, scope));
       await tx.done;
       return result;
@@ -354,4 +369,78 @@ export async function deferDueSyncQueueOperation(value: SyncQueueDueCandidate): 
     await store.put({ ...connection, scheduleProgress: progress });
     return true;
   });
+}
+
+/** Requeue one bounded page after explicit unlock without changing either user pause owner. */
+export async function resumeSecretLockedSyncQueuePage(
+  value: SyncQueueScope,
+  identity: SyncConnectionIdentity,
+  afterKey: string | null = null,
+  limit = 64
+): Promise<{ afterKey: string | null; complete: boolean; resumed: number; scanned: number }> {
+  const { scope, authorization } = inputs(value, identity);
+  pageLimit(limit, 64);
+  const prefix = queueOperationPrefix(scope);
+  if (
+    afterKey !== null &&
+    (typeof afterKey !== 'string' || afterKey.length > 8192 || !afterKey.startsWith(prefix))
+  )
+    throw new Error('Invalid sync unlock continuation.');
+  return mutate(
+    scope,
+    authorization,
+    async (tx, connection) => {
+      const store = tx.objectStore(SYNC_OUTBOX_STORE);
+      let cursor = await store.openCursor(
+        IDBKeyRange.bound(afterKey ?? prefix, `${prefix}\uffff`, afterKey !== null)
+      );
+      let resumed = 0;
+      let scanned = 0;
+      let continuation = afterKey;
+      while (cursor && scanned < limit) {
+        if (typeof cursor.primaryKey !== 'string')
+          throw new Error('Invalid sync queue native key.');
+        continuation = cursor.primaryKey;
+        const row = parseSyncQueueOperation(cursor.value);
+        if (
+          row &&
+          sameQueueScope(row, scope) &&
+          row.key === cursor.primaryKey &&
+          row.status === 'failed' &&
+          row.failureCode === 'secrets-locked' &&
+          row.runId === null &&
+          row.authorization?.incarnation === authorization.incarnation
+        ) {
+          if (!Number.isSafeInteger(row.revision + 1))
+            throw new Error('Sync queue revision exhausted.');
+          await store.put(
+            recordQueueTransition(
+              {
+                ...row,
+                revision: row.revision + 1,
+                status: 'queued',
+                authorization,
+                failureCode: null,
+                nextDueAt: Date.now(),
+                automaticRetryCount: 0,
+              },
+              'retried'
+            )
+          );
+          resumed += 1;
+        }
+        scanned += 1;
+        cursor = await cursor.continue();
+      }
+      if (resumed > 0) {
+        const progress = progressFor(connection, authorization);
+        await store.put({
+          ...connection,
+          scheduleProgress: progress ? { ...advanceProgress(progress), dueAfter: null } : null,
+        });
+      }
+      return { afterKey: continuation, complete: cursor === null, resumed, scanned };
+    },
+    true
+  );
 }

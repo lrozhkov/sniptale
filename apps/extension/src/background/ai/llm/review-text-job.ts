@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../../composition/persistence/secret-protection/model';
 import { createTextJobLifecycle } from './text-job-lifecycle';
 import {
   REVIEW_TEXT_FAILURE_CODES,
@@ -22,10 +23,13 @@ interface Dependencies {
   assertScope: typeof assertReviewTextJobScope;
 }
 /** Every one-shot Port owns cancellation before authorization awaits; erasure drains that same flight. */
-export function createReviewTextJobService(overrides: Partial<Dependencies> = {}) {
+export function createReviewTextJobService(
+  overrides: Partial<Dependencies> = {},
+  protection?: SecretProtectionPort
+) {
   const deps: Dependencies = {
     authorize: authorizeReviewText,
-    resolveModel: resolveModelConfig,
+    resolveModel: (id, approved) => resolveModelConfig(id, approved, protection),
     request: requestChatCompletion,
     history: saveRequestHistory,
     assertScope: assertReviewTextJobScope,

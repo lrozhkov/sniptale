@@ -1,3 +1,7 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { createLibraryLifecycle } from '../../library-lifecycle/contracts';
+import { createReviewWorkspaceStoreFixture } from '../../review-workspaces/store.test-support';
+import { parseSyncCaptureRecord } from '../../sync-capture/guards';
 import { createGuideProject } from '../../../../features/scenario/project/factories';
 import { beforeEach, expect, it, vi } from 'vitest';
 
@@ -353,4 +357,237 @@ it('advances same-millisecond writes before rejecting a stale writer', async () 
   ).rejects.toThrow('Scenario project project-1 was changed before this save completed');
 
   expect(txPutMock).not.toHaveBeenCalled();
+});
+
+function nativeReceiptFixture(configured = true) {
+  let refuseCapture = false;
+  const fixture = createReviewWorkspaceStoreFixture(
+    (name) => name === 'sync_capture' && refuseCapture
+  );
+  fixture.rows.set('scenario_exports', new Map());
+  fixture.rows.set('scenario_step_editor_documents', new Map());
+  initDBMock.mockResolvedValue(fixture.database);
+  if (configured)
+    fixture.rows.get('sync_capture')!.set('profile', {
+      version: 1,
+      kind: 'profile',
+      key: 'profile',
+      createdAt: 1,
+      enabled: true,
+      spaceId: 'scenario-receipt-space',
+      connectionGeneration: 1,
+      checkpointIntervalMs: 60000,
+    });
+  return {
+    ...fixture,
+    refuse: (value: boolean) => {
+      refuseCapture = value;
+    },
+  };
+}
+function pendingScenarioReceipt(fixture: ReturnType<typeof nativeReceiptFixture>, rootId: string) {
+  const pending = [...fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .find(
+      (row) =>
+        row?.kind === 'pending-checkpoint' &&
+        row.rootKind === 'scenario-project' &&
+        row.rootId === rootId
+    );
+  if (pending?.kind !== 'pending-checkpoint')
+    throw new Error('Expected pending Scenario checkpoint.');
+  return pending;
+}
+
+it('returns exact distinct native pending receipts without storing acknowledgement metadata', async () => {
+  const fixture = nativeReceiptFixture();
+  const first = await saveScenarioProject(createGuideProject('First', 'receipt-scenario', 1), {
+    expectedRevision: null,
+  });
+  const firstPending = pendingScenarioReceipt(fixture, first.project.id);
+  const firstReceipt = structuredClone(first.checkpointReceipt);
+  expect(firstReceipt).toEqual({
+    rootKind: 'scenario-project',
+    rootId: first.project.id,
+    revision: firstPending.revision,
+  });
+  const second = await saveScenarioProject(
+    { ...first.project, name: 'Second' },
+    { expectedRevision: first.workspaceRevision }
+  );
+  const secondPending = pendingScenarioReceipt(fixture, first.project.id);
+  expect(second.checkpointReceipt).toEqual({
+    rootKind: 'scenario-project',
+    rootId: first.project.id,
+    revision: secondPending.revision,
+  });
+  expect(second.checkpointReceipt?.revision).not.toBe(firstReceipt?.revision);
+  expect(first.checkpointReceipt).toEqual(firstReceipt);
+  expect(secondPending.dueAt).toBe(firstPending.dueAt);
+  expect(second.project).not.toHaveProperty('checkpointReceipt');
+  for (const name of ['scenario_projects', 'scenario_project_history', 'scenario_project_units']) {
+    for (const row of fixture.rows.get(name)!.values())
+      expect(row).not.toHaveProperty('checkpointReceipt');
+  }
+});
+
+it('receipts the equal-content promotion branch without changing the document revision', async () => {
+  const fixture = nativeReceiptFixture();
+  const temporary = await saveScenarioProject(
+    createGuideProject('Temporary', 'receipt-scenario', 1),
+    { expectedRevision: null, storageClass: 'temporary' }
+  );
+  const stored = fixture.rows.get('scenario_projects')!.get(temporary.project.id);
+  if (!isRecord(stored)) throw new Error('Expected physical Scenario root.');
+  fixture.rows
+    .get('scenario_projects')!
+    .set(temporary.project.id, { ...stored, lifecycle: createLibraryLifecycle('temporary', 1) });
+  const promoted = await saveScenarioProject(temporary.project, {
+    expectedRevision: temporary.workspaceRevision,
+  });
+  expect(promoted.workspaceRevision).toBe(temporary.workspaceRevision);
+  expect(promoted.checkpointReceipt?.revision).toBe(
+    pendingScenarioReceipt(fixture, promoted.project.id).revision
+  );
+  expect(fixture.rows.get('scenario_projects')!.get(promoted.project.id)).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+  });
+  const replay = await saveScenarioProject(promoted.project, {
+    expectedRevision: promoted.workspaceRevision,
+  });
+  expect(replay.workspaceRevision).toBe(promoted.workspaceRevision);
+  expect(replay.checkpointReceipt?.revision).not.toBe(promoted.checkpointReceipt?.revision);
+});
+
+it('preserves native rows on stale CAS or capture abort and issues a new receipt on retry', async () => {
+  const fixture = nativeReceiptFixture();
+  const first = await saveScenarioProject(createGuideProject('First', 'receipt-scenario', 1), {
+    expectedRevision: null,
+  });
+  const before = structuredClone(fixture.rows);
+  await expect(
+    saveScenarioProject({ ...first.project, name: 'Stale' }, { expectedRevision: 0 })
+  ).rejects.toMatchObject({ name: 'StaleScenarioAggregateRevisionError' });
+  expect(fixture.rows).toEqual(before);
+  fixture.refuse(true);
+  await expect(
+    saveScenarioProject(
+      { ...first.project, name: 'Retry' },
+      { expectedRevision: first.workspaceRevision }
+    )
+  ).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  expect(fixture.rows).toEqual(before);
+  fixture.refuse(false);
+  const retried = await saveScenarioProject(
+    { ...first.project, name: 'Retry' },
+    { expectedRevision: first.workspaceRevision }
+  );
+  expect(retried.checkpointReceipt).toBeDefined();
+  expect(retried.checkpointReceipt?.revision).not.toBe(first.checkpointReceipt?.revision);
+});
+
+it.each(['unconfigured', 'disabled', 'immediate'] as const)(
+  'issues a due receipt only for admitted immediate native work: %s',
+  async (mode) => {
+    const fixture = nativeReceiptFixture(mode !== 'unconfigured');
+    if (mode !== 'unconfigured')
+      fixture.rows.get('sync_capture')!.set('profile', {
+        version: 1,
+        kind: 'profile',
+        key: 'profile',
+        createdAt: 1,
+        enabled: mode !== 'disabled',
+        spaceId: 'scenario-receipt-space',
+        connectionGeneration: 1,
+        checkpointIntervalMs: 0,
+      });
+    const saved = await saveScenarioProject(createGuideProject('Local', 'receipt-scenario', 1), {
+      expectedRevision: null,
+    });
+    const pending = [...fixture.rows.get('sync_capture')!.values()]
+      .map(parseSyncCaptureRecord)
+      .filter((row) => row?.kind === 'pending-checkpoint');
+    if (mode === 'immediate') {
+      expect(saved.checkpointReceipt).toBeDefined();
+      expect(pending).toHaveLength(1);
+      expect(pending[0]?.revision).toBe(saved.checkpointReceipt?.revision);
+      expect(pending[0]?.dueAt).toBe(pending[0]?.createdAt);
+    } else {
+      expect(saved).not.toHaveProperty('checkpointReceipt');
+      expect(pending).toHaveLength(0);
+    }
+  }
+);
+
+it('returns the transient receipt only after the native transaction commits', async () => {
+  const fixture = nativeReceiptFixture();
+  let commit!: () => void;
+  const commitAllowed = new Promise<void>((resolve) => {
+    commit = resolve;
+  });
+  let reachedDone!: () => void;
+  const waitingForCommit = new Promise<void>((resolve) => {
+    reachedDone = resolve;
+  });
+  initDBMock.mockResolvedValue({
+    ...fixture.database,
+    transaction(names: string[], mode: string) {
+      const tx = fixture.database.transaction(names, mode);
+      return {
+        abort: () => tx.abort(),
+        objectStore: (name: string) => tx.objectStore(name),
+        get done() {
+          reachedDone();
+          return commitAllowed.then(() => tx.done);
+        },
+      };
+    },
+  });
+  let acknowledgement: Awaited<ReturnType<typeof saveScenarioProject>> | undefined;
+  const saving = saveScenarioProject(createGuideProject('Commit ordered', 'receipt-scenario', 1), {
+    expectedRevision: null,
+  }).then((result) => {
+    acknowledgement = result;
+    return result;
+  });
+  await waitingForCommit;
+  expect(acknowledgement).toBeUndefined();
+  expect(fixture.rows.get('scenario_projects')!.size).toBe(0);
+  commit();
+  const result = await saving;
+  expect(result.checkpointReceipt?.revision).toBe(
+    pendingScenarioReceipt(fixture, result.project.id).revision
+  );
+});
+
+it('withholds the receipt and native rows when transaction completion aborts after capture', async () => {
+  const fixture = nativeReceiptFixture();
+  const first = await saveScenarioProject(createGuideProject('First', 'receipt-scenario', 1), {
+    expectedRevision: null,
+  });
+  const before = structuredClone(fixture.rows);
+  initDBMock.mockResolvedValue({
+    ...fixture.database,
+    transaction(names: string[], mode: string) {
+      const tx = fixture.database.transaction(names, mode);
+      return {
+        abort: () => tx.abort(),
+        objectStore: (name: string) => tx.objectStore(name),
+        get done() {
+          tx.abort();
+          return tx.done;
+        },
+      };
+    },
+  });
+  await expect(
+    saveScenarioProject(
+      { ...first.project, name: 'Aborted after capture' },
+      { expectedRevision: first.workspaceRevision }
+    )
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  expect(fixture.rows).toEqual(before);
+  expect(first.checkpointReceipt?.revision).toBe(
+    pendingScenarioReceipt(fixture, first.project.id).revision
+  );
 });

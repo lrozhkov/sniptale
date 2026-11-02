@@ -28,57 +28,61 @@
       "id": "x",
       "kind": "number",
       "label": {
-        "ru": "Положение X (%)",
-        "en": "Placement X (%)"
+        "ru": "Положение X",
+        "en": "Placement X"
       },
       "defaultValue": 50,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "geometry",
-      "order": 2
+      "order": 2,
+      "unit": "percent"
     },
     {
       "id": "y",
       "kind": "number",
       "label": {
-        "ru": "Положение Y (%)",
-        "en": "Placement Y (%)"
+        "ru": "Положение Y",
+        "en": "Placement Y"
       },
       "defaultValue": 50,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "geometry",
-      "order": 3
+      "order": 3,
+      "unit": "percent"
     },
     {
       "id": "width",
       "kind": "number",
       "label": {
-        "ru": "Ширина (%)",
-        "en": "Width (%)"
+        "ru": "Ширина",
+        "en": "Width"
       },
       "defaultValue": 52,
       "min": 12,
       "max": 88,
       "step": 1,
       "group": "geometry",
-      "order": 4
+      "order": 4,
+      "unit": "percent"
     },
     {
       "id": "height",
       "kind": "number",
       "label": {
-        "ru": "Высота (%)",
-        "en": "Height (%)"
+        "ru": "Высота",
+        "en": "Height"
       },
       "defaultValue": 38,
       "min": 12,
       "max": 80,
       "step": 1,
       "group": "geometry",
-      "order": 5
+      "order": 5,
+      "unit": "percent"
     },
     {
       "id": "line",
@@ -92,35 +96,38 @@
       "max": 8,
       "step": 1,
       "group": "appearance",
-      "order": 6
+      "order": 6,
+      "unit": "px"
     },
     {
       "id": "entry",
       "kind": "number",
       "label": {
-        "ru": "Вход (% длительности)",
-        "en": "Entrance (% duration)"
+        "ru": "Длительность входа",
+        "en": "Entrance duration"
       },
       "defaultValue": 18,
       "min": 5,
       "max": 40,
       "step": 1,
       "group": "animation",
-      "order": 7
+      "order": 7,
+      "unit": "percent"
     },
     {
       "id": "dim",
       "kind": "number",
       "label": {
-        "ru": "Затемнение (%)",
-        "en": "Dimming (%)"
+        "ru": "Затемнение",
+        "en": "Dimming"
       },
       "defaultValue": 58,
       "min": 0,
       "max": 90,
       "step": 1,
       "group": "processing",
-      "order": 8
+      "order": 8,
+      "unit": "percent"
     }
   ],
   "layers": [],

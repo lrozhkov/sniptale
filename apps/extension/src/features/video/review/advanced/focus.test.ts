@@ -254,3 +254,43 @@ it.each([
     expect(northwest.y + northwest.height).toBeCloseTo(area.y + area.height, 12);
   }
 );
+
+it('contract phases read canvas dimension accessors for every focus effect', () => {
+  const output: { width: number; height: number } = Object.create({
+    get width() {
+      return 960;
+    },
+    get height() {
+      return 540;
+    },
+  });
+  expect(Object.keys(output)).toEqual([]);
+  for (const effect of ['dim', 'blur', 'magnify'] as const) {
+    const region = {
+      ...createQuickEditZoomRegion({ id: effect, at: 0, duration: 12 }),
+      enter: { type: 'linear' as const, duration: 2 },
+      exit: { type: 'linear' as const, duration: 2 },
+      spotlight: {
+        ...createQuickEditSpotlight(),
+        effect,
+        reveal: 'contract' as const,
+        exitReveal: 'contract' as const,
+      },
+    };
+    for (const time of [0.6, 10.6]) {
+      const args = {
+        regions: [region],
+        time,
+        video: { x: 0, y: 0, width: 960, height: 540 },
+        scale: 1,
+      };
+      const frame = evaluateQuickEditSpotlightAtTime({ ...args, output });
+      const expected = evaluateQuickEditSpotlightAtTime({
+        ...args,
+        output: { width: 960, height: 540 },
+      });
+      expect(frame).toEqual(expected);
+      expect(Object.values(frame!.opening).every(Number.isFinite)).toBe(true);
+    }
+  }
+});

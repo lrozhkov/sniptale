@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../../composition/persistence/secret-protection/model';
 import type {
   ProcessWithLLMMessage,
   ProcessWithLLMResponse,
@@ -21,24 +22,28 @@ import { hasPreauthorizedLlmRouteMessage } from './authorization/preauthorizatio
 
 const logger = createLogger({ namespace: 'BackgroundLlmRoute' });
 
-async function processWithLLMRequest(message: {
-  prompt: string;
-  jsonData?: string | undefined;
-  markdownData?: string | undefined;
-  modelId?: string | null | undefined;
-  privacyProof?: AiPrivacyProof | undefined;
-}): Promise<ProcessWithLLMResponse> {
+async function processWithLLMRequest(
+  message: {
+    prompt: string;
+    jsonData?: string | undefined;
+    markdownData?: string | undefined;
+    modelId?: string | null | undefined;
+    privacyProof?: AiPrivacyProof | undefined;
+  },
+  protection?: SecretProtectionPort
+): Promise<ProcessWithLLMResponse> {
   logLLMRequest(message);
 
   const modelId = await resolveRequiredLlmModelId(message.modelId);
-  const config = await resolveModelConfig(modelId);
-  return processMultiProviderRequest(message, config);
+  const config = await resolveModelConfig(modelId, undefined, protection);
+  return processMultiProviderRequest(message, config, protection);
 }
 
 export function routeLlmMessage(
   message: unknown,
   sendResponse: ResponseSender<ProcessWithLLMResponse>,
-  sender: chrome.runtime.MessageSender
+  sender: chrome.runtime.MessageSender,
+  protection?: SecretProtectionPort
 ): boolean {
   if (!isProcessWithLLMMessage(message)) {
     return false;
@@ -57,7 +62,7 @@ export function routeLlmMessage(
   }
 
   respondAsyncLlmRoute({
-    work: processLlmRequestWithHistory(llmMessage),
+    work: processLlmRequestWithHistory(llmMessage, protection),
     sendResponse,
     logger,
     failureLogMessage: 'LLM route request failed',
@@ -87,9 +92,10 @@ function getLlmPayloadError(message: ProcessWithLLMMessage): string | null {
 }
 
 function processLlmRequestWithHistory(
-  message: ProcessWithLLMMessage
+  message: ProcessWithLLMMessage,
+  protection?: SecretProtectionPort
 ): Promise<ProcessWithLLMResponse> {
-  return processWithLLMRequest(message)
+  return processWithLLMRequest(message, protection)
     .then((result) => {
       return result;
     })

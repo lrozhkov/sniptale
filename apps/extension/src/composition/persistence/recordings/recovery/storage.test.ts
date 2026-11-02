@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => {
-  const faults = { strict: true, block: false };
+  const faults = { strict: true, block: false, forbidScan: false };
   const sessions = new Map<string, unknown>();
   const blocks = new Map<string, unknown>();
   const transaction = vi.fn(
@@ -33,10 +33,19 @@ const state = vi.hoisted(() => {
             map.delete(key(id));
           },
           async getAll() {
+            if (faults.forbidScan) throw new Error('Global recovery session scan forbidden');
             return [...map.values()];
           },
-          index() {
+          index(indexName: string) {
             return {
+              async getAll(id: string) {
+                return [...map.values()].filter(
+                  (value) =>
+                    typeof value === 'object' &&
+                    value !== null &&
+                    Reflect.get(value, indexName) === id
+                );
+              },
               async getAllKeys(id: string) {
                 return [...map.values()].flatMap((value) => {
                   if (
@@ -165,6 +174,7 @@ beforeEach(() => {
   });
   state.faults.strict = true;
   state.faults.block = false;
+  state.faults.forbidScan = false;
   state.sessions.clear();
   state.blocks.clear();
   state.transaction.mockClear();
@@ -439,4 +449,15 @@ it('refuses recovery operations when cross-context locks are unavailable', async
       'epoch'
     )
   ).rejects.toThrow('Web Locks');
+});
+
+it('removes selected recovery blocks without enumerating unrelated session headers', async () => {
+  const selected = await open('selected');
+  const unrelated = await open('unrelated');
+  await commitRecoveryBlock(selected, new Uint8Array([1, 2]).buffer);
+  await commitRecoveryBlock(unrelated, new Uint8Array([3, 4]).buffer);
+  state.faults.forbidScan = true;
+  await deleteRecoveryRecording(selected.id, selected.incarnation);
+  expect(state.sessions.has(JSON.stringify(selected.id))).toBe(false);
+  expect(await read(unrelated)).toEqual([3, 4]);
 });

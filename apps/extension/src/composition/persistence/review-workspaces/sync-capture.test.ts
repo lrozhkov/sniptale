@@ -1,3 +1,6 @@
+import { initDB } from '../infrastructure/indexed-db/core';
+import { parseSyncCaptureRecord } from '../sync-capture/guards';
+import { captureRootCheckpointInTransaction } from '../sync-capture/capture';
 import { updateMediaLibraryEntry } from '../media-library/index.library';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -66,6 +69,40 @@ function captures(rootId?: string) {
         row['rootKind'] === 'video-review' &&
         (rootId === undefined || row['rootId'] === rootId)
     );
+}
+function pendingRecords() {
+  return [...table('sync_capture').values()]
+    .map(parseSyncCaptureRecord)
+    .filter((row) => row?.kind === 'pending-checkpoint');
+}
+function pending(rootId = id) {
+  const selected = pendingRecords().find(
+    (row) => row?.rootKind === 'video-review' && row.rootId === rootId
+  );
+  if (!selected || selected.kind !== 'pending-checkpoint')
+    throw new Error('Missing pending Review root.');
+  return selected;
+}
+async function checkpoint(rootId = id) {
+  const selected = pending(rootId);
+  const db = await initDB();
+  const tx = db.transaction([...fixture.rows.keys()], 'readwrite');
+  try {
+    const captured = await captureRootCheckpointInTransaction(tx, selected, {
+      now: selected.dueAt,
+    });
+    await tx.done;
+    if (!captured) throw new Error('Expected due native Review checkpoint.');
+    return captured;
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      /* A failed transaction can already be inactive. */
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
 }
 function current(rootId = id) {
   const workspace = parseVideoWorkspace(fixtureWorkspaceValue(fixture.rows, rootId));
@@ -156,12 +193,15 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it('captures initial opening and each accepted content or draft after-image in the native transaction', async () => {
+it('coalesces accepted opening, content, draft and Undo into one due native checkpoint', async () => {
   const opened = await openVideoWorkspace(id, source, 'review-original');
-  expect(captures(id)).toHaveLength(1);
+  const first = pending();
+  expect(first.dueAt).toBe(first.createdAt + 300000);
+  expect(captures(id)).toHaveLength(0);
   await openVideoWorkspace(id, source, 'review-original');
-  expect(captures(id)).toHaveLength(1);
+  expect(pending().dueAt).toBe(first.dueAt);
   const saved = await commit(opened);
+  const content = pending();
   const drafted = await saveVideoWorkspaceDraft({
     aggregateId: id,
     expectedRevision: saved.workspace.revision,
@@ -171,15 +211,8 @@ it('captures initial opening and each accepted content or draft after-image in t
     before: null,
   });
   expect(drafted.workspace.revision).toBe(saved.workspace.revision);
-  expect(captures(id)).toHaveLength(3);
-  expect(captures(id).at(-1)).toMatchObject({
-    change: {
-      kind: 'video-review',
-      rows: {
-        review: { draft: { annotation: { text: 'Recovery' } } },
-      },
-    },
-  });
+  expect(pending().revision).not.toBe(content.revision);
+  expect(pending().dueAt).toBe(first.dueAt);
   const undone = await moveVideoWorkspaceHistory({
     aggregateId: id,
     expectedRevision: drafted.workspace.revision,
@@ -187,25 +220,44 @@ it('captures initial opening and each accepted content or draft after-image in t
     direction: 'undo',
   });
   expect(undone.workspace.cursor).toBe(0);
-  expect(captures(id)).toHaveLength(4);
-  await moveVideoWorkspaceHistory({
+  const boundary = await moveVideoWorkspaceHistory({
     aggregateId: id,
     expectedRevision: undone.workspace.revision,
     expectedSourceAssetId: undone.workspace.sourceAssetId,
     direction: 'undo',
   });
-  expect(captures(id)).toHaveLength(4);
+  expect(boundary.workspace.revision).toBe(undone.workspace.revision);
+  expect(captures(id)).toHaveLength(0);
+  expect(pendingRecords()).toHaveLength(1);
+  await checkpoint();
+  expect(captures(id)).toHaveLength(1);
+  expect(captures(id)[0]).toMatchObject({
+    change: {
+      kind: 'video-review',
+      rows: { review: { workspace: { cursor: 0 }, draft: { annotation: { text: 'Recovery' } } } },
+    },
+  });
+  expect(pendingRecords()).toHaveLength(0);
 });
 
-it('serializes parallel writers and captures only the admitted workspace CAS', async () => {
+it('serializes parallel native writers and checkpoints only the admitted workspace CAS', async () => {
   const opened = await openVideoWorkspace(id, source);
+  const first = pending();
   const result = await Promise.allSettled([commit(opened, 'First'), commit(opened, 'Second')]);
   expect(result.map((entry) => entry.status).sort()).toEqual(['fulfilled', 'rejected']);
-  expect(captures(id)).toHaveLength(2);
   expect(current().history).toHaveLength(1);
+  expect(captures(id)).toHaveLength(0);
+  expect(pendingRecords()).toHaveLength(1);
+  expect(pending().revision).not.toBe(first.revision);
+  expect(pending().dueAt).toBe(first.dueAt);
+  await checkpoint();
+  expect(captures(id)).toHaveLength(1);
+  expect(captures(id)[0]).toMatchObject({
+    change: { rows: { review: { workspace: { history: [{ after: { text: 'First' } }] } } } },
+  });
 });
 
-it('captures New archive and default atomically and acknowledges its stable retry without new intents', async () => {
+it('marks New archive and default atomically and replays without changing native or pending state', async () => {
   const saved = await commit(await openVideoWorkspace(id, source));
   const archiveId = 'project-asset:quick-project:first';
   const next = await create(saved, archiveId);
@@ -213,13 +265,21 @@ it('captures New archive and default atomically and acknowledges its stable retr
   expect(current(archiveId).history).toEqual(saved.workspace.history);
   expect(next.workspace.history).toEqual([]);
   expect(table('media_library').has(archiveId)).toBe(false);
+  expect(captures()).toHaveLength(0);
+  expect(pendingRecords()).toHaveLength(2);
+  const beforeReplay = structuredClone(fixture.rows);
+  const replay = await create(saved, archiveId);
+  expect(replay.workspace).toEqual(next.workspace);
+  expect(replay).not.toHaveProperty('archiveCheckpointReceipt');
+  expect(replay).not.toHaveProperty('checkpointReceipt');
+  expect(fixture.rows).toEqual(beforeReplay);
+  await checkpoint(archiveId);
+  await checkpoint(id);
   expect(captures(archiveId)).toHaveLength(1);
-  const count = captures().length;
-  expect((await create(saved, archiveId)).workspace).toEqual(next.workspace);
-  expect(captures()).toHaveLength(count);
+  expect(captures(id)).toHaveLength(1);
 });
 
-it('rolls back New native rows and both root intents after capture failure and retries the command', async () => {
+it('rolls back New native rows and both pending roots after capture failure and retries the command', async () => {
   const opened = await openVideoWorkspace(id, source);
   const before = structuredClone(fixture.rows);
   successfulCaptureWrites = 2;
@@ -227,11 +287,15 @@ it('rolls back New native rows and both root intents after capture failure and r
   await expect(create(opened, archiveId)).rejects.toThrow();
   expect(fixture.rows).toEqual(before);
   successfulCaptureWrites = undefined;
-  await create(opened, archiveId);
+  const created = await create(opened, archiveId);
+  expect(created.archiveCheckpointReceipt?.revision).toBe(pending(archiveId).revision);
+  expect(pendingRecords()).toHaveLength(2);
+  expect(captures()).toHaveLength(0);
+  await checkpoint(archiveId);
   expect(captures(archiveId)).toHaveLength(1);
 });
 
-it('renames and changes Trash only for the selected independent archive root', async () => {
+it('defers rename and captures Trash transitions only for the selected independent archive root', async () => {
   const opened = await openVideoWorkspace(id, source);
   const firstId = 'project-asset:quick-project:first';
   const secondId = 'project-asset:quick-project:second';
@@ -241,6 +305,9 @@ it('renames and changes Trash only for the selected independent archive root', a
   const sourceBefore = structuredClone(table('media_library').get(id));
   const first = current(firstId);
   await renameVideoWorkspaceProject(firstId, first.revision, 'Independent name');
+  expect(captures(firstId)).toHaveLength(0);
+  expect(pending(firstId).rootId).toBe(firstId);
+  const otherPending = structuredClone(pending(secondId));
   await moveStoredItemsToTrash(
     [{ kind: 'quick-edit-project', id: firstId, expectedRevision: current(firstId).revision }],
     100
@@ -253,21 +320,27 @@ it('renames and changes Trash only for the selected independent archive root', a
   expect(current(firstId).project?.lifecycle.trashedAt).toBeUndefined();
   expect(current(secondId)).toEqual(untouched);
   expect(table('media_library').get(id)).toEqual(sourceBefore);
-  expect(captures(firstId)).toHaveLength(4);
+  expect(captures(firstId)).toHaveLength(2);
+  expect(captures(secondId)).toHaveLength(0);
+  expect(pending(secondId)).toEqual(otherPending);
+  await checkpoint(secondId);
   expect(captures(secondId)).toHaveLength(1);
 });
 
 it('fences a delayed writer after purge and reopening the same default identity', async () => {
   const old = await openVideoWorkspace(id, source);
+  const oldPending = pending();
   await deleteVideoWorkspaceProject(id, old.workspace.revision);
+  expect(pendingRecords()).toHaveLength(0);
   expect(await readVideoWorkspace(id)).toBeNull();
   const reopened = await openVideoWorkspace(id, source);
   expect(reopened.workspace.revision).toBeGreaterThan(old.workspace.revision);
   const before = structuredClone(fixture.rows);
   await expect(commit(old, 'Delayed')).rejects.toMatchObject({ code: 'conflict' });
   expect(fixture.rows).toEqual(before);
-  expect(captures(id)).toHaveLength(3);
-  expect(captures(id)[1]).toMatchObject({ change: { kind: 'tombstone' } });
+  expect(captures(id)).toHaveLength(1);
+  expect(captures(id)[0]).toMatchObject({ change: { kind: 'tombstone' } });
+  expect(pending().revision).not.toBe(oldPending.revision);
 });
 
 it('refuses a New command retry after its archive was purged without resetting the newer default', async () => {
@@ -313,7 +386,7 @@ it('refuses unsupported enrolled recording opening atomically and preserves disa
   expect(captures()).toEqual([]);
 });
 
-it('captures legacy project materialization and rolls back an initial opening capture failure', async () => {
+it('defers legacy materialization and rolls back initial opening pending failure', async () => {
   failStore = 'sync_capture';
   const before = structuredClone(fixture.rows);
   await expect(openVideoWorkspace(id, source)).rejects.toThrow();
@@ -325,7 +398,10 @@ it('captures legacy project materialization and rolls back an initial opening ca
   const materialized = await openVideoWorkspace(id, source);
   expect(materialized.workspace.project).toBeDefined();
   expect(materialized.workspace.revision).toBeGreaterThan(opened.workspace.revision);
-  expect(captures(id)).toHaveLength(2);
+  expect(captures(id)).toHaveLength(0);
+  expect(pendingRecords()).toHaveLength(1);
+  await checkpoint();
+  expect(captures(id)).toHaveLength(1);
 });
 
 it('admits only one parallel draft-only writer without advancing the document revision', async () => {
@@ -347,11 +423,17 @@ it('admits only one parallel draft-only writer without advancing the document re
   ]);
   expect(result.map((entry) => entry.status).sort()).toEqual(['fulfilled', 'rejected']);
   expect(current().revision).toBe(opened.workspace.revision);
-  expect(captures(id)).toHaveLength(2);
+  expect(captures(id)).toHaveLength(0);
+  expect(pendingRecords()).toHaveLength(1);
   expect((await readVideoWorkspace(id))?.draft?.annotation.text).toBe('Saved');
+  await checkpoint();
+  expect(captures(id)).toHaveLength(1);
+  expect(captures(id)[0]).toMatchObject({
+    change: { rows: { review: { draft: { annotation: { text: 'Saved' } } } } },
+  });
 });
 
-it('publishes a source default independently when New is invoked from an archive', async () => {
+it('keeps archived editor and reset default independent across New and explicit checkpoints', async () => {
   const saved = await commit(await openVideoWorkspace(id, source));
   const firstId = 'project-asset:quick-project:from-default';
   await create(saved, firstId);
@@ -363,8 +445,15 @@ it('publishes a source default independently when New is invoked from an archive
   expect(await readVideoWorkspace(firstId)).toEqual(firstBefore);
   expect(current(secondId).sourceMediaId).toBe(id);
   expect(current().history).toEqual([]);
+  expect(captures(firstId)).toHaveLength(0);
+  expect(captures(secondId)).toHaveLength(0);
+  expect(pendingRecords()).toHaveLength(3);
+  await checkpoint(firstId);
+  await checkpoint(secondId);
   expect(captures(firstId)).toHaveLength(1);
   expect(captures(secondId)).toHaveLength(1);
+  expect(captures(id)).toHaveLength(0);
+  expect(pending(id).rootId).toBe(id);
 });
 
 it('captures original Library metadata without changing its independent review or draft', async () => {

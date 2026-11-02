@@ -136,3 +136,22 @@ it('treats scenario-editor as an entrypoint runtime surface', async () => {
     }
   );
 });
+
+it('allows erased contract type imports while refusing value and dynamic contract imports', async () => {
+  const module = await loadModule();
+  for (const [source, count] of [
+    [
+      'import type { SyncCredentialLease } from ' +
+        "'../contracts/messaging/contracts/runtime-message/sync-connection.types';",
+      0,
+    ],
+    ["import { parseMessage } from '../contracts/messaging/runtime';", 1],
+    ["void import('../contracts/messaging/runtime');", 1],
+  ] as const) {
+    await withTempRepo({ 'apps/extension/src/offscreen/offscreen.ts': source }, (root) => {
+      expect(
+        collectViolationsForFile(module, root, 'apps/extension/src/offscreen/offscreen.ts')
+      ).toHaveLength(count);
+    });
+  }
+});

@@ -107,14 +107,20 @@ describe('sync lifecycle coordinator', () => {
       challenge: 'old',
       snapshot: f.snapshot,
     }));
-    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+      code: 'coordinator-refused',
+      message: 'Sync coordinator operation refused',
+    });
     expect(f.deps.startExecutor).not.toHaveBeenCalled();
     f.deps.inspectExecutor.mockImplementation(async (_id, challenge) => ({
       kind: 'present',
       challenge,
       snapshot: { ...f.snapshot, offscreenStartupId: 'old' },
     }));
-    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+      code: 'coordinator-refused',
+      message: 'Sync coordinator operation refused',
+    });
   });
 
   it('reserves erasure synchronously and prevents late Start after held Inspect', async () => {
@@ -127,10 +133,16 @@ describe('sync lifecycle coordinator', () => {
       return { kind: 'present', challenge, snapshot: f.snapshot };
     });
     const start = f.coordinator.start(f.selection);
-    const refusedStart = expect(start).rejects.toThrow('refused');
+    const refusedStart = expect(start).rejects.toMatchObject({
+      code: 'generation-changed',
+      message: 'Sync coordinator operation refused',
+    });
     await entered.promise;
     const reservation = f.coordinator.reserveErasure();
-    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+      code: 'privacy-exclusion',
+      message: 'Sync coordinator operation refused',
+    });
     const drain = reservation.quiesce();
     held.resolve();
     await refusedStart;
@@ -248,7 +260,10 @@ describe('sync lifecycle coordinator', () => {
       f.metadata.identity = { ...f.metadata.identity, revision: 2 };
       return 'startup';
     });
-    await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
+    await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+      code: 'binding-changed',
+      message: 'Sync coordinator operation refused',
+    });
     expect(f.deps.startExecutor).not.toHaveBeenCalled();
   });
 });
@@ -272,6 +287,7 @@ function workspaceFixture() {
   const selection = {
     source: structuredClone(workspace.source),
     authentication: { kind: 'basic' as const, username: 'account', password: 'private-password' },
+    storagePolicy: { version: 1 as const, mode: 'on-demand' as const },
   };
   return { ...f, workspace, selection };
 }
@@ -423,11 +439,15 @@ describe('workspace enrollment handoff', () => {
       expect(f.deps.enrollConnection).not.toHaveBeenCalled();
       stopped.resolve();
       expect(await pending).toBe(f.metadata);
-      expect(f.deps.enrollConnection).toHaveBeenCalledWith(f.workspace.source, {
-        kind: 'basic',
-        username: 'account',
-        password: 'private-password',
-      });
+      expect(f.deps.enrollConnection).toHaveBeenCalledWith(
+        f.workspace.source,
+        {
+          kind: 'basic',
+          username: 'account',
+          password: 'private-password',
+        },
+        { version: 1, mode: 'on-demand' }
+      );
       expect(f.deps.startExecutor).not.toHaveBeenCalled();
     }
   );
@@ -689,18 +709,24 @@ describe('single-observation product target authority', () => {
         coordinator.productCommand(requestId, { kind }, 'settings')
       ).resolves.toMatchObject({ success: true });
       expect(productExecutor).toHaveBeenCalledTimes(3);
-      for (const jobKind of ['replica-prepare', 'native-prepare', 'native-release'] as const) {
+      for (const jobKind of [
+        'replica-prepare',
+        'native-prepare',
+        'native-release',
+        'scenario-export-prepare',
+        'library-backup-prepare',
+      ] as const) {
         f.snapshot.products[0]!.kind = jobKind;
         await expect(
           coordinator.productCommand(requestId, { kind }, 'settings')
         ).resolves.toMatchObject({ success: true });
       }
-      expect(productExecutor).toHaveBeenCalledTimes(6);
+      expect(productExecutor).toHaveBeenCalledTimes(8);
       f.snapshot.products[0]!.kind = 'thumbnail-read';
       await expect(coordinator.productCommand(requestId, { kind }, 'settings')).rejects.toThrow(
         'refused'
       );
-      expect(productExecutor).toHaveBeenCalledTimes(6);
+      expect(productExecutor).toHaveBeenCalledTimes(8);
     }
   );
 
@@ -863,4 +889,744 @@ it('reads a fully stopped executor after local-only retirement without admitting
   await expect(f.coordinator.inspect()).resolves.toEqual(f.snapshot);
   await expect(f.coordinator.start(f.selection)).rejects.toThrow('refused');
   expect(f.deps.startExecutor).not.toHaveBeenCalled();
+});
+
+it.each([
+  'selection-changed',
+  'executor-unavailable',
+  'binding-changed',
+  'receipt-invalid',
+] as const)('preserves refusal behavior with the finite %s start reason', async (code) => {
+  const f = fixture();
+  if (code === 'selection-changed') f.metadata.phase = 'paused';
+  if (code === 'executor-unavailable') f.snapshot.phase = 'failed';
+  if (code === 'binding-changed')
+    f.snapshot.binding = {
+      scope: { ...f.selection.scope, connectionGeneration: 2 },
+      authorization: f.selection.authorization,
+    };
+  if (code === 'receipt-invalid')
+    f.deps.startExecutor.mockResolvedValue({ executorId: 'replaced', executorRevision: 4 });
+  await expect(f.coordinator.start(f.selection)).rejects.toMatchObject({
+    code,
+    message: 'Sync coordinator operation refused',
+  });
+  expect(f.deps.startExecutor).toHaveBeenCalledTimes(code === 'receipt-invalid' ? 1 : 0);
+});
+
+it('preserves user pause across shared lock and unlock', async () => {
+  const f = fixture();
+  f.metadata.phase = 'paused';
+  await f.coordinator.containForSecretProtection();
+  expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+  expect(f.deps.revokeConnection).not.toHaveBeenCalled();
+  expect(f.metadata.phase).toBe('paused');
+});
+
+it('reports lock failure when body containment fails', async () => {
+  const f = fixture();
+  f.deps.stopExecutor.mockRejectedValueOnce(new Error('Unsafe containment'));
+  await expect(f.coordinator.containForSecretProtection()).rejects.toThrow('Unsafe containment');
+  expect(f.deps.revokeConnection).not.toHaveBeenCalled();
+});
+
+describe('read-only sync activity observation', () => {
+  const unknown = { activity: 'unknown', remote: { knowledge: 'unknown' }, failureCode: null };
+  function activityFixture() {
+    const f = fixture();
+    f.snapshot.phase = 'idle';
+    const productExecutor = vi.fn<
+      NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>
+    >(async () => ({
+      success: true,
+      result: {
+        kind: 'operation',
+        job: f.snapshot.products?.at(-1) ?? null,
+        completion: { kind: 'automatic', applied: 0, deferred: 0, remaining: false },
+      },
+    }));
+    const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+    const observe = () =>
+      coordinator.observeActivity({
+        scope: f.selection.scope,
+        authorization: f.selection.authorization,
+      });
+    return { ...f, coordinator, productExecutor, observe };
+  }
+  function automatic(
+    state: 'running' | 'ready' | 'failed' | 'interrupted' = 'ready',
+    requestId = 'latest'
+  ) {
+    return { requestId, kind: 'automatic-sync' as const, state, failureCode: null };
+  }
+  function expectNoEffects(f: ReturnType<typeof activityFixture>) {
+    for (const key of [
+      'loadConnection',
+      'loadWorkspace',
+      'ensureDocument',
+      'startExecutor',
+      'stopExecutor',
+      'revokeConnection',
+      'revokeWorkspace',
+      'enrollConnection',
+      'startWorkspaceExecutor',
+      'hasOriginPermission',
+    ] as const)
+      expect(f.deps[key]).not.toHaveBeenCalled();
+  }
+
+  it('observes cold and stale bindings without loading native state or controlling execution', async () => {
+    const f = activityFixture();
+    await expect(f.observe()).resolves.toEqual({ ...unknown, activity: 'idle' });
+    expect(f.deps.inspectExecutor).toHaveBeenCalledWith(null, 'challenge', true);
+    f.snapshot.binding = {
+      ...f.snapshot.binding!,
+      authorization: { ...f.metadata.identity, revision: 2 },
+    };
+    await expect(f.observe()).resolves.toEqual(unknown);
+    f.snapshot.binding = {
+      scope: { ...f.selection.scope, spaceId: 'foreign' },
+      authorization: f.selection.authorization,
+    };
+    await expect(f.observe()).resolves.toEqual(unknown);
+    f.snapshot.binding = null;
+    await expect(f.observe()).resolves.toEqual(unknown);
+    expectNoEffects(f);
+    expect(f.productExecutor).not.toHaveBeenCalled();
+  });
+
+  it('does not inspect during exclusion and does not block privacy drain over IPC', async () => {
+    const f = activityFixture();
+    const reservation = f.coordinator.reserveErasure();
+    await expect(f.observe()).resolves.toEqual(unknown);
+    expect(f.deps.inspectExecutor).not.toHaveBeenCalled();
+    reservation.release();
+    const entered = deferred<void>();
+    const held = deferred<void>();
+    f.deps.inspectExecutor.mockImplementation(async (_startup, challenge) => {
+      entered.resolve();
+      await held.promise;
+      return { kind: 'present', challenge, snapshot: f.snapshot };
+    });
+    const observation = f.observe();
+    await entered.promise;
+    const next = f.coordinator.reserveErasure();
+    next.release();
+    held.resolve();
+    await expect(observation).resolves.toEqual(unknown);
+    expectNoEffects(f);
+  });
+
+  it.each(['idle', 'stopped'] as const)(
+    'reports stable %s without inferring remote completion from local state',
+    async (phase) => {
+      const f = activityFixture();
+      f.snapshot.phase = phase;
+      await expect(f.observe()).resolves.toEqual({ ...unknown, activity: 'idle' });
+      expect(f.productExecutor).not.toHaveBeenCalled();
+    }
+  );
+
+  it('includes automatic work, ignores thumbnail work, and gives stopping priority', async () => {
+    const f = activityFixture();
+    f.snapshot.products = [automatic('running')];
+    await expect(f.observe()).resolves.toMatchObject({ activity: 'running' });
+    f.snapshot.products = [{ ...automatic('running'), kind: 'thumbnail-read' }];
+    await expect(f.observe()).resolves.toEqual({ ...unknown, activity: 'idle' });
+    f.snapshot.jobs = [
+      {
+        operationId: 'outgoing',
+        expectedRevision: 1,
+        state: 'running',
+        stage: 'queued',
+        failureCode: null,
+        runId: null,
+      },
+    ];
+    await expect(f.observe()).resolves.toMatchObject({ activity: 'running' });
+    f.snapshot.phase = 'stopping';
+    await expect(f.observe()).resolves.toMatchObject({ activity: 'stopping' });
+    expect(f.productExecutor).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { deferred: 0, remaining: false, outcome: 'complete' },
+    { deferred: 1, remaining: false, outcome: 'deferred' },
+    { deferred: 0, remaining: true, outcome: 'deferred' },
+  ] as const)(
+    'uses actual automatic completion $outcome after replacing an old failure',
+    async ({ deferred, remaining, outcome }) => {
+      const f = activityFixture();
+      const latest = automatic();
+      f.snapshot.products = [
+        { ...automatic('failed', 'old'), failureCode: 'authentication' },
+        latest,
+      ];
+      f.productExecutor.mockResolvedValue({
+        success: true,
+        result: {
+          kind: 'operation',
+          job: latest,
+          completion: { kind: 'automatic', applied: 0, deferred, remaining },
+        },
+      });
+      await expect(f.observe()).resolves.toEqual({
+        activity: 'idle',
+        remote: { knowledge: 'observed-pass', outcome },
+        failureCode: null,
+      });
+      expect(f.productExecutor).toHaveBeenCalledExactlyOnceWith({
+        offscreenStartupId: 'startup',
+        executorId: 'executor',
+        executorRevision: 4,
+        command: { kind: 'inspect', operationRequestId: 'latest' },
+        advisory: true,
+      });
+      expect(f.deps.inspectExecutor).toHaveBeenCalledTimes(2);
+      expectNoEffects(f);
+    }
+  );
+
+  it('requires a product port and exact automatic completion evidence', async () => {
+    const f = activityFixture();
+    f.snapshot.products = [automatic()];
+    const missing = createSyncConnectionCoordinator(f.deps);
+    await expect(missing.observeActivity(f.snapshot.binding!)).resolves.toEqual({
+      ...unknown,
+      activity: 'idle',
+    });
+    for (const result of [
+      { kind: 'operation' as const, job: automatic(), completion: null },
+      {
+        kind: 'operation' as const,
+        job: automatic('ready', 'other'),
+        completion: { kind: 'automatic' as const, applied: 1, deferred: 0, remaining: false },
+      },
+      {
+        kind: 'operation' as const,
+        job: automatic('running'),
+        completion: { kind: 'automatic' as const, applied: 1, deferred: 0, remaining: false },
+      },
+      {
+        kind: 'operation' as const,
+        job: automatic(),
+        completion: { kind: 'catalog' as const, count: 1 },
+      },
+      {
+        kind: 'operation' as const,
+        job: { ...automatic(), kind: 'catalog-refresh' as const },
+        completion: { kind: 'automatic' as const, applied: 1, deferred: 0, remaining: false },
+      },
+    ]) {
+      f.productExecutor.mockResolvedValue({ success: true, result });
+      await expect(f.observe()).resolves.toEqual({ ...unknown, activity: 'idle' });
+    }
+    expectNoEffects(f);
+  });
+
+  it.each(['binding', 'attempt', 'phase', 'executor', 'generation'] as const)(
+    'refuses completion after %s changes during inspection',
+    async (change) => {
+      const f = activityFixture();
+      const latest = automatic();
+      f.snapshot.products = [latest];
+      f.productExecutor.mockImplementation(async () => {
+        if (change === 'binding') f.snapshot.binding = null;
+        if (change === 'attempt') f.snapshot.products = [automatic('ready', 'replacement')];
+        if (change === 'phase') f.snapshot.phase = 'running';
+        if (change === 'executor') f.snapshot.executorId = 'replacement';
+        if (change === 'generation') f.coordinator.reserveErasure().release();
+        return {
+          success: true,
+          result: {
+            kind: 'operation',
+            job: latest,
+            completion: { kind: 'automatic', applied: 0, deferred: 0, remaining: false },
+          },
+        };
+      });
+      await expect(f.observe()).resolves.toEqual(unknown);
+      expectNoEffects(f);
+    }
+  );
+
+  it.each(['snapshot', 'completion'] as const)(
+    'does not hold a mutation permit or transition queue during %s IPC',
+    async (wait) => {
+      const f = activityFixture();
+      const entered = deferred<void>();
+      const held = deferred<void>();
+      if (wait === 'snapshot') {
+        f.deps.inspectExecutor.mockImplementationOnce(async (_startup, challenge) => {
+          entered.resolve();
+          await held.promise;
+          return { kind: 'present', challenge, snapshot: f.snapshot };
+        });
+      } else {
+        const latest = automatic();
+        f.snapshot.products = [latest];
+        f.productExecutor.mockImplementationOnce(async () => {
+          entered.resolve();
+          await held.promise;
+          return {
+            success: true,
+            result: {
+              kind: 'operation',
+              job: latest,
+              completion: { kind: 'automatic', applied: 0, deferred: 0, remaining: false },
+            },
+          };
+        });
+      }
+      const observation = f.observe();
+      await entered.promise;
+      const reservation = f.coordinator.reserveErasure();
+      await reservation.quiesce();
+      expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+      reservation.release();
+      held.resolve();
+      await expect(observation).resolves.toEqual(unknown);
+    }
+  );
+
+  it('rechecks binding after the final executor observation wait', async () => {
+    const f = activityFixture();
+    f.snapshot.products = [automatic()];
+    const entered = deferred<void>();
+    const held = deferred<void>();
+    f.deps.inspectExecutor.mockImplementationOnce(async (_startup, challenge) => ({
+      kind: 'present',
+      challenge,
+      snapshot: f.snapshot,
+    }));
+    f.deps.inspectExecutor.mockImplementationOnce(async (_startup, challenge) => {
+      entered.resolve();
+      await held.promise;
+      return { kind: 'present', challenge, snapshot: f.snapshot };
+    });
+    const observation = f.observe();
+    await entered.promise;
+    f.snapshot.binding!.authorization = { ...f.metadata.identity, revision: 2 };
+    held.resolve();
+    await expect(observation).resolves.toEqual(unknown);
+    expectNoEffects(f);
+  });
+  it('reports only the latest automatic failure and ignores outgoing terminal history', async () => {
+    const f = activityFixture();
+    f.snapshot.products = [{ ...automatic('failed'), failureCode: 'authentication' }];
+    await expect(f.observe()).resolves.toEqual({
+      ...unknown,
+      activity: 'idle',
+      failureCode: 'authentication',
+    });
+    f.snapshot.products = [automatic('interrupted')];
+    await expect(f.observe()).resolves.toEqual({
+      ...unknown,
+      activity: 'idle',
+      failureCode: 'interrupted',
+    });
+    f.snapshot.products = [];
+    f.snapshot.jobs = [
+      {
+        operationId: 'old',
+        expectedRevision: 1,
+        state: 'failed',
+        stage: 'queued',
+        failureCode: 'internal',
+        runId: null,
+      },
+    ];
+    await expect(f.observe()).resolves.toEqual({ ...unknown, activity: 'idle' });
+  });
+
+  it('fails softly on absence, failed executors, stale challenges, and advisory transport errors', async () => {
+    const f = activityFixture();
+    f.deps.inspectExecutor.mockResolvedValueOnce({ kind: 'absent' });
+    await expect(f.observe()).resolves.toEqual(unknown);
+    f.snapshot.phase = 'failed';
+    await expect(f.observe()).resolves.toEqual(unknown);
+    f.snapshot.phase = 'idle';
+    f.deps.inspectExecutor.mockResolvedValueOnce({
+      kind: 'present',
+      challenge: 'stale',
+      snapshot: f.snapshot,
+    });
+    await expect(f.observe()).resolves.toEqual(unknown);
+    f.deps.inspectExecutor.mockRejectedValueOnce(new Error('private transport detail'));
+    await expect(f.observe()).resolves.toEqual(unknown);
+    f.snapshot.products = [automatic()];
+    f.productExecutor.mockRejectedValueOnce(new Error('private completion detail'));
+    await expect(f.observe()).resolves.toEqual(unknown);
+    f.productExecutor.mockResolvedValueOnce({ success: false, error: 'Sync operation refused' });
+    await expect(f.observe()).resolves.toEqual(unknown);
+    expectNoEffects(f);
+  });
+});
+
+describe('workspace discovered selection', () => {
+  function discovered() {
+    const f = workspaceFixture();
+    f.workspace.source.kind = 'join';
+    f.workspace.source.identity.revision = 2;
+    f.workspace.phase = 'checking';
+    f.snapshot.phase = 'idle';
+    const expected = {
+      spaceId: '10000000-0000-4000-8000-000000000003',
+      bootstrapId: '10000000-0000-4000-8000-000000000004',
+      fingerprint: 'a'.repeat(64),
+    };
+    const source = {
+      kind: 'join' as const,
+      identity: structuredClone(f.workspace.source.identity),
+    };
+    f.snapshot.workspace = {
+      sourceKind: 'join',
+      selectionIncarnation: source.identity.incarnation,
+      selectionRevision: 2,
+      state: 'discovered',
+      failureCode: null,
+      discovery: {
+        source,
+        scope: 'children',
+        complete: true,
+        candidates: [{ prefix: 'Team space/', identity: expected }],
+        issues: [],
+      },
+    };
+    const next = {
+      kind: 'join' as const,
+      identity: { incarnation: '10000000-0000-4000-8000-000000000006', revision: 1 },
+    };
+    const create = vi.fn(async () => next);
+    const coordinator = createSyncConnectionCoordinator({
+      ...f.deps,
+      createWorkspaceSelection: create,
+    });
+    return {
+      ...f,
+      source,
+      expected,
+      next,
+      create,
+      coordinator,
+      input: { source, prefix: 'Team space/', expected },
+    };
+  }
+  it('selects only the exact contained discovered candidate through native CAS', async () => {
+    const f = discovered();
+    expect(await f.coordinator.selectWorkspace(f.input)).toEqual(f.next);
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+    expect(f.create).toHaveBeenCalledExactlyOnceWith({
+      kind: 'join',
+      rootUrl: f.workspace.rootUrl + 'Team%20space/',
+      accountId: 'account',
+      expected: f.expected,
+      previous: f.source,
+    });
+    expect(f.deps.startWorkspaceExecutor).not.toHaveBeenCalled();
+  });
+  it('refuses discovery selection after held containment changes its source', async () => {
+    const f = discovered();
+    const entered = deferred<void>();
+    const release = deferred<void>();
+    f.deps.stopExecutor.mockImplementationOnce(async () => {
+      entered.resolve();
+      await release.promise;
+      return { executorId: 'executor', executorRevision: 5 };
+    });
+    const pending = f.coordinator.selectWorkspace(f.input);
+    await entered.promise;
+    f.workspace.source.identity.revision++;
+    release.resolve();
+    await expect(pending).rejects.toThrow('refused');
+    expect(f.create).not.toHaveBeenCalled();
+  });
+  it('refuses unknown or running discovery selection without replacing native intent', async () => {
+    for (const state of ['unknown', 'running', 'candidate-missing'] as const) {
+      const f = discovered();
+      if (state === 'unknown') f.snapshot.workspace = null;
+      else if (state === 'running')
+        f.snapshot.workspace = {
+          sourceKind: 'join',
+          selectionIncarnation: f.source.identity.incarnation,
+          selectionRevision: 2,
+          state: 'running',
+          failureCode: null,
+        };
+      else f.input.prefix = 'Other/';
+      await expect(f.coordinator.selectWorkspace(f.input)).rejects.toThrow('refused');
+      expect(f.create).not.toHaveBeenCalled();
+    }
+  });
+});
+
+it('does not convert a restarted search into enrollment', async () => {
+  const f = workspaceFixture();
+  f.workspace.source.kind = 'join';
+  f.workspace.phase = 'checking';
+  f.selection.source = structuredClone(f.workspace.source);
+  f.snapshot.workspace = null;
+  await expect(f.coordinator.enrollWorkspace(f.selection)).rejects.toThrow('refused');
+  expect(f.deps.enrollConnection).not.toHaveBeenCalled();
+});
+
+it.each(['revision', 'incarnation'] as const)(
+  'refuses stale Library batch %s before allocating the offscreen document',
+  async (changed) => {
+    const f = fixture();
+    const productExecutor =
+      vi.fn<NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>>();
+    const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+    const options = {
+      includeDrafts: false,
+      includeSourceMetadata: true,
+      includeTelemetry: true,
+      includeWebSnapshots: true,
+      scope: 'all' as const,
+    };
+    await expect(
+      coordinator.productCommand('11111111-1111-4111-8111-111111111111', {
+        kind: 'library-backup-prepare',
+        expected:
+          changed === 'revision'
+            ? { ...f.metadata.identity, revision: 2 }
+            : { ...f.metadata.identity, incarnation: '21111111-1111-4111-8111-111111111111' },
+        options,
+      })
+    ).rejects.toThrow('refused');
+    expect(f.deps.ensureDocument).not.toHaveBeenCalled();
+    expect(productExecutor).not.toHaveBeenCalled();
+  }
+);
+it(
+  'derives Library batch dispatch from the current connection and refuses replacement ' +
+    'during document admission',
+  async () => {
+    const f = fixture();
+    const document = deferred<string>();
+    f.deps.ensureDocument.mockReturnValueOnce(document.promise);
+    const productExecutor = vi.fn<
+      NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>
+    >(async (input) => ({
+      success: true,
+      result: { kind: 'accepted', requestId: input.command.operationRequestId },
+    }));
+    const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+    const options = {
+      includeDrafts: false,
+      includeSourceMetadata: true,
+      includeTelemetry: true,
+      includeWebSnapshots: true,
+      scope: 'all' as const,
+    };
+    const started = coordinator.productCommand('11111111-1111-4111-8111-111111111111', {
+      kind: 'library-backup-prepare',
+      expected: { ...f.metadata.identity },
+      options,
+    });
+    const refused = expect(started).rejects.toThrow('refused');
+    await vi.waitFor(() => expect(f.deps.ensureDocument).toHaveBeenCalledOnce());
+    f.metadata.identity = { ...f.metadata.identity, revision: 2 };
+    document.resolve('startup');
+    await refused;
+    expect(productExecutor).not.toHaveBeenCalled();
+  }
+);
+
+it('forwards one current Library batch using only native execution binding and detached options', async () => {
+  const f = fixture();
+  const productExecutor = vi.fn<
+    NonNullable<SyncConnectionCoordinatorDependencies['productExecutor']>
+  >(async (input) => ({
+    success: true,
+    result: { kind: 'accepted', requestId: input.command.operationRequestId },
+  }));
+  const coordinator = createSyncConnectionCoordinator({ ...f.deps, productExecutor });
+  const options = {
+    includeDrafts: false,
+    includeSourceMetadata: true,
+    includeTelemetry: false,
+    includeWebSnapshots: false,
+    scope: 'selected' as const,
+    selected: {
+      mediaAssetIds: ['image'],
+      scenarioProjectIds: [] as string[],
+      videoProjectIds: [] as string[],
+    },
+  };
+  const work = {
+    kind: 'library-backup-prepare' as const,
+    expected: { ...f.metadata.identity },
+    options,
+  };
+  await expect(
+    coordinator.productCommand('11111111-1111-4111-8111-111111111111', work)
+  ).resolves.toMatchObject({ success: true });
+  expect(productExecutor).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      command: {
+        kind: 'start',
+        operationRequestId: '11111111-1111-4111-8111-111111111111',
+        binding: { scope: f.selection.scope, authorization: f.metadata.identity },
+        work,
+      },
+    })
+  );
+  options.selected.mediaAssetIds.push('later');
+  work.expected.revision = 2;
+  expect(productExecutor.mock.calls[0]?.[0].command).toMatchObject({
+    work: {
+      expected: { incarnation: f.metadata.identity.incarnation, revision: 1 },
+      options: { selected: { mediaAssetIds: ['image'] } },
+    },
+  });
+  expect(f.deps.startExecutor).not.toHaveBeenCalled();
+  expect(f.deps.enrollConnection).not.toHaveBeenCalled();
+});
+
+describe('connected credential repair', () => {
+  function repairFixture() {
+    const f = fixture();
+    const begin = vi.fn(async () => {
+      f.metadata.identity = { ...f.metadata.identity, revision: f.metadata.identity.revision + 1 };
+      f.metadata.phase = 'updating-auth';
+      return structuredClone(f.metadata);
+    });
+    const commit = vi.fn(async (reservation: SyncConnectionMetadata) => reservation);
+    const coordinator = createSyncConnectionCoordinator({
+      ...f.deps,
+      beginAuthenticationUpdate: begin,
+      commitAuthenticationUpdate: commit,
+    });
+    return { ...f, begin, commit, coordinator };
+  }
+  const authentication = { kind: 'basic' as const, username: 'account', password: 'replacement' };
+  it('reserves the selected identity, drains the old executor and commits without replacing its binding', async () => {
+    const f = repairFixture();
+    const expected = structuredClone(f.metadata.identity);
+    const binding = structuredClone(f.metadata.binding);
+    await f.coordinator.updateAuthentication(expected, authentication);
+    expect(f.begin).toHaveBeenCalledOnce();
+    expect(f.deps.stopExecutor).toHaveBeenCalledOnce();
+    expect(f.commit).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ binding }),
+      authentication
+    );
+    expect(f.begin.mock.invocationCallOrder[0]).toBeLessThan(
+      f.deps.stopExecutor.mock.invocationCallOrder[0]!
+    );
+    expect(f.deps.stopExecutor.mock.invocationCallOrder[0]).toBeLessThan(
+      f.commit.mock.invocationCallOrder[0]!
+    );
+    expect(f.deps.revokeConnection).not.toHaveBeenCalled();
+  });
+  it('refuses the second parallel writer against the old identity', async () => {
+    const f = repairFixture();
+    const expected = structuredClone(f.metadata.identity);
+    const first = f.coordinator.updateAuthentication(expected, authentication);
+    const second = f.coordinator.updateAuthentication(expected, authentication);
+    await first;
+    await expect(second).rejects.toThrow();
+    expect(f.commit).toHaveBeenCalledOnce();
+  });
+  it('does not commit when executor containment fails', async () => {
+    const f = repairFixture();
+    f.deps.stopExecutor.mockRejectedValue(new Error('unavailable'));
+    await expect(
+      f.coordinator.updateAuthentication(f.metadata.identity, authentication)
+    ).rejects.toThrow();
+    expect(f.commit).not.toHaveBeenCalled();
+  });
+  it('refuses another account and revoked permission before reservation', async () => {
+    const f = repairFixture();
+    await expect(
+      f.coordinator.updateAuthentication(f.metadata.identity, {
+        ...authentication,
+        username: 'other',
+      })
+    ).rejects.toThrow();
+    f.deps.hasOriginPermission.mockResolvedValue(false);
+    await expect(
+      f.coordinator.updateAuthentication(f.metadata.identity, authentication)
+    ).rejects.toThrow();
+    expect(f.begin).not.toHaveBeenCalled();
+  });
+  it('refuses a delayed credential commit after lifecycle exclusion and allows a fresh retry', async () => {
+    const f = repairFixture();
+    const observed = deferred<Awaited<ReturnType<typeof f.deps.inspectExecutor>>>();
+    const entered = deferred<void>();
+    f.deps.inspectExecutor.mockImplementationOnce(async () => {
+      entered.resolve();
+      return observed.promise;
+    });
+    const updating = f.coordinator.updateAuthentication(f.metadata.identity, authentication);
+    await entered.promise;
+    const exclusion = f.coordinator.reserveErasure();
+    observed.resolve({ kind: 'absent' });
+    await expect(updating).rejects.toThrow();
+    expect(f.commit).not.toHaveBeenCalled();
+    exclusion.release();
+    f.deps.inspectExecutor.mockResolvedValue({ kind: 'absent' });
+    await f.coordinator.updateAuthentication(f.metadata.identity, authentication);
+    expect(f.commit).toHaveBeenCalledOnce();
+  });
+  it('preserves authority when shared secret admission refuses a locked update', async () => {
+    const f = repairFixture();
+    const original = structuredClone(f.metadata);
+    f.begin.mockRejectedValue(new Error('secrets-locked'));
+    await expect(
+      f.coordinator.updateAuthentication(f.metadata.identity, authentication)
+    ).rejects.toThrow();
+    expect(f.metadata).toEqual(original);
+    expect(f.deps.stopExecutor).not.toHaveBeenCalled();
+    expect(f.commit).not.toHaveBeenCalled();
+  });
+});
+
+describe('explicit native connection resume', () => {
+  function resumeFixture() {
+    const f = fixture();
+    f.metadata.phase = 'paused';
+    const resume = vi.fn(async () => {
+      f.metadata.phase = 'active';
+    });
+    const coordinator = createSyncConnectionCoordinator({ ...f.deps, resumeConnection: resume });
+    return { ...f, resume, coordinator };
+  }
+  it('resumes only the selected native connection after origin admission and containment', async () => {
+    const f = resumeFixture();
+    const expected = structuredClone(f.metadata.identity);
+    await f.coordinator.resumeConnection(expected);
+    expect(f.resume).toHaveBeenCalledExactlyOnceWith(expected);
+    expect(f.deps.stopExecutor.mock.invocationCallOrder[0]).toBeLessThan(
+      f.resume.mock.invocationCallOrder[0]!
+    );
+    expect(f.metadata.phase).toBe('active');
+  });
+  it('refuses revoked permission and stale identities without native resume', async () => {
+    const f = resumeFixture();
+    f.deps.hasOriginPermission.mockResolvedValue(false);
+    await expect(f.coordinator.resumeConnection(f.metadata.identity)).rejects.toThrow();
+    f.deps.hasOriginPermission.mockResolvedValue(true);
+    await expect(
+      f.coordinator.resumeConnection({ ...f.metadata.identity, revision: 99 })
+    ).rejects.toThrow();
+    expect(f.resume).not.toHaveBeenCalled();
+  });
+  it('refuses native resume after a lifecycle exclusion during containment', async () => {
+    const f = resumeFixture();
+    const stopped = deferred<{ executorId: string; executorRevision: number }>();
+    const entered = deferred<void>();
+    f.deps.stopExecutor.mockImplementation(async () => {
+      entered.resolve();
+      return stopped.promise;
+    });
+    const pending = f.coordinator.resumeConnection(f.metadata.identity);
+    await entered.promise;
+    const exclusion = f.coordinator.reserveErasure();
+    stopped.resolve({ executorId: 'executor', executorRevision: 5 });
+    await expect(pending).rejects.toThrow();
+    expect(f.resume).not.toHaveBeenCalled();
+    exclusion.release();
+  });
 });

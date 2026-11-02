@@ -1,5 +1,4 @@
 import type { IDBPTransaction } from 'idb';
-import type { IndexedDbWriteTransaction } from '../infrastructure/indexed-db/core';
 import { ASSET_RESIDENCY_STORE } from '../infrastructure/indexed-db/core.stores';
 import {
   isActivePersistenceMutationPermit,
@@ -19,7 +18,7 @@ import {
   type AssetResidencyTarget,
 } from './residency-records';
 
-type Transaction = Pick<IndexedDbWriteTransaction, 'objectStore'>;
+type Transaction = Pick<IDBPTransaction<unknown, string[], 'readwrite'>, 'objectStore'>;
 type ReadTransaction = Pick<
   IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
   'objectStore'
@@ -335,4 +334,33 @@ export async function retireAssetResidencyCopyInTransaction(
     throw new Error('Asset residency retirement source is stale.');
   await tx.objectStore(ASSET_RESIDENCY_STORE).delete(expected.id);
   admitted(permit);
+}
+
+/** Rebase only exact inline recovery metadata after a separately rendered presentation commit. */
+export async function rebaseInlineImagePresentationInTransaction(
+  tx: Transaction,
+  expectedCopy: AssetResidencyCopy,
+  nativeDigest: string,
+  permit: PersistenceMutationPermit
+): Promise<AssetResidencyCopy> {
+  admitted(permit);
+  const expected = parseAssetResidencyRecord(expectedCopy);
+  if (
+    !expected ||
+    expected.kind !== 'copy' ||
+    expected.target.kind !== 'inline-image' ||
+    !/^[a-f0-9]{64}$/u.test(nativeDigest)
+  ) {
+    throw new Error('Inline image presentation rebase is invalid.');
+  }
+  const current = await readAssetResidencyCopyInTransaction(tx, expected.id);
+  admitted(permit);
+  if (!current || JSON.stringify(current) !== JSON.stringify(expected))
+    throw new Error('Inline image presentation rebase source is stale.');
+  const { duplicatePreview: _duplicatePreview, ...target } = expected.target;
+  return write(
+    tx,
+    { ...expected, revision: nextRevision(expected.revision), target: { ...target, nativeDigest } },
+    permit
+  );
 }

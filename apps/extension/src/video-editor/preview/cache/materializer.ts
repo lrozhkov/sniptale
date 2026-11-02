@@ -17,12 +17,16 @@ import {
 import { createPreviewRenderResources } from '../../../workflows/video-review/preview-render-resources';
 import { createVideoProjectWatermarkRenderer } from '../../../features/video/composition/canvas/project-watermark';
 import { loadVideoEditorAssetBlob } from '../../runtime/session/asset-urls';
+import { createReviewSpatialSession } from '../../../workflows/video-review/spatial-render-session';
+import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import {
-  createReviewSpatialRenderer,
-  type ReviewSpatialRenderer,
-} from '../../../features/video/composition/canvas/spatial-renderer';
-import { projectWindowHeaderImages } from '../../../features/video/composition/draw/window-header';
-import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
+  projectWindowHeaderImages,
+  windowHeaderImageKey,
+} from '../../../features/video/composition/draw/window-header';
+import type {
+  VideoCompositionCameraState,
+  VideoCompositionFrame,
+} from '../../../features/video/composition/types';
 import {
   getVideoClipSourceTime,
   isClipActiveAtTime,
@@ -34,7 +38,9 @@ import { renderPreviewScene } from '../stage/scene/render-preview';
 import { createVideoProjectCaptionRenderer } from '../../../workflows/video-review/project-captions';
 import type { VideoEditorPreviewRasterSize } from '../stage/sizing/raster';
 
-const FRAME_SOURCE_TIMEOUT_MS = 2_000;
+const MEDIA_LOAD_TIMEOUT_MS = 2_000;
+// Long-GOP UHD seeks exceeded two seconds in Chromium. Cancellation still interrupts this bounded wait.
+const VIDEO_SEEK_TIMEOUT_MS = 5_000;
 const MEDIA_READY_FOR_CURRENT_FRAME = 2;
 
 export interface VideoPreviewFrameMaterializer {
@@ -61,6 +67,7 @@ interface VideoPreviewMaterializerState {
   effectRuntime: ReturnType<typeof createVideoEditorEffectRuntime> | null;
   imageBank: Record<string, HTMLImageElement>;
   videoRefs: Record<string, HTMLVideoElement | null>;
+  videoSlots: { assetId: string; src: string; video: HTMLVideoElement }[];
 }
 
 function throwIfAborted(signal: AbortSignal): void {
@@ -68,7 +75,12 @@ function throwIfAborted(signal: AbortSignal): void {
 }
 
 function waitForImage(image: HTMLImageElement, signal: AbortSignal): Promise<void> {
-  if (image.complete && image.naturalWidth > 0) return Promise.resolve();
+  throwIfAborted(signal);
+  if (image.complete) {
+    return image.naturalWidth > 0
+      ? Promise.resolve()
+      : Promise.reject(new Error('Preview media could not be decoded'));
+  }
   return waitForMediaEvent(image, ['load'], signal);
 }
 
@@ -81,7 +93,7 @@ function waitForMediaEvent(
   return new Promise((resolve, reject) => {
     const timeoutId = window.setTimeout(
       () => settle(new Error('Preview media timed out')),
-      FRAME_SOURCE_TIMEOUT_MS
+      MEDIA_LOAD_TIMEOUT_MS
     );
     const cleanup = () => {
       window.clearTimeout(timeoutId);
@@ -126,7 +138,7 @@ function seekVideoToDecodedTime(
   return new Promise((resolve, reject) => {
     const timeoutId = window.setTimeout(
       () => settle(new Error('Preview media timed out')),
-      FRAME_SOURCE_TIMEOUT_MS
+      VIDEO_SEEK_TIMEOUT_MS
     );
     const pollId = window.setInterval(checkReady, 16);
     const cleanup = () => {
@@ -236,7 +248,7 @@ export function createVideoPreviewFrameMaterializer(params: {
   let busy = false;
   const joinPlans = resolveVideoProjectCompositionJoinPlans(params.project);
   const { canvas, stage } = createMaterializerSurface(params.ownerDocument, params.rasterSize);
-  const state = createMaterializerMediaState(params, stage);
+  const state = createMaterializerMediaState(params);
   let presentation = joinPlans.length
     ? createMaterializedJoinPresentation(params, state, canvas, stage, joinPlans)
     : null;
@@ -466,8 +478,7 @@ function createMaterializedJoinPresentation(
 }
 
 function createMaterializerMediaState(
-  params: Parameters<typeof createVideoPreviewFrameMaterializer>[0],
-  stage: HTMLDivElement
+  params: Parameters<typeof createVideoPreviewFrameMaterializer>[0]
 ): VideoPreviewMaterializerState {
   const state: VideoPreviewMaterializerState = {
     disposed: false,
@@ -481,22 +492,8 @@ function createMaterializerMediaState(
     effectRuntime: null,
     imageBank: {},
     videoRefs: {},
+    videoSlots: [],
   };
-  for (const clip of params.project.clips.filter(isVideoClip)) {
-    const src = params.assetUrls[clip.assetId];
-    if (!src) continue;
-    const video = params.ownerDocument.createElement('video');
-    Object.assign(video, {
-      defaultMuted: true,
-      muted: true,
-      playsInline: true,
-      preload: 'auto',
-      src,
-    });
-    video.style.cssText = 'position:absolute;width:1px;height:1px;pointer-events:none';
-    stage.append(video);
-    state.videoRefs[clip.id] = video;
-  }
   for (const asset of params.project.assets) {
     const src = params.assetUrls[asset.id];
     if (!src || asset.type !== 'IMAGE') continue;
@@ -523,12 +520,14 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
     state.stagingCanvas.height = 0;
   }
   state.stagingCanvas = null;
-  Object.values(state.videoRefs).forEach((video) => {
-    video?.pause();
-    video?.removeAttribute('src');
-    video?.load();
-    video?.remove();
+  state.videoSlots.forEach(({ video }) => {
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    video.remove();
   });
+  state.videoSlots = [];
+  state.videoRefs = {};
   state.effectRuntime?.dispose();
   state.playbackSampler?.dispose();
   state.playbackSampler = null;
@@ -574,10 +573,8 @@ async function renderMaterializedFrame(
       decodedVideoFrames = sampled.media;
     }
     assertActive();
-    await Promise.all(Object.values(state.imageBank).map((image) => waitForImage(image, signal)));
-    assertActive();
-    if (!decodedVideoFrames)
-      await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
+    if (!decodedVideoFrames) await prepareMaterializedVideos(params, state, stage, time, signal);
+    else state.videoRefs = {};
     assertActive();
     const eventsProject = await state.recordingEventsRenderer.prepare(
       params.project,
@@ -600,7 +597,7 @@ async function renderMaterializedFrame(
       spatialRenderer: () => {
         assertActive();
         if (state.spatialRenderer) return state.spatialRenderer;
-        const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+        const renderer: ReviewSpatialRenderer = createReviewSpatialSession(() => {
           if (state.spatialRenderer !== renderer) return;
           state.spatialRenderer = null;
           renderer.dispose();
@@ -619,6 +616,7 @@ async function renderMaterializedFrame(
         return state.effectRuntime.executor;
       },
       imageBank: state.imageBank,
+      prepareImages: (frames) => prepareMaterializedImages(state.imageBank, frames, signal),
       previewRasterSize: params.rasterSize,
       project: renderProject,
       signal,
@@ -639,18 +637,89 @@ async function renderMaterializedFrame(
 }
 
 async function prepareMaterializedVideos(
-  project: VideoProject,
-  videoRefs: Record<string, HTMLVideoElement | null>,
+  params: Parameters<typeof createVideoPreviewFrameMaterializer>[0],
+  state: VideoPreviewMaterializerState,
+  stage: HTMLDivElement,
   time: number,
   signal: AbortSignal
 ): Promise<void> {
+  const project = params.project;
   const activeVideos = project.clips
     .filter(isVideoClip)
     .filter((clip) => isClipActiveAtTime(clip, time) && hasCameraMediaAt(project, clip, time));
-  for (const clip of activeVideos) {
-    const video = videoRefs[clip.id];
-    if (!video) throw new Error(`Preview video source is unavailable for clip ${clip.id}`);
+  const sources = activeVideos.map((clip) => {
+    const src = params.assetUrls[clip.assetId];
+    if (!src) throw new Error(`Preview video source is unavailable for clip ${clip.id}`);
+    return { clip, src };
+  });
+  const used = new Set<HTMLVideoElement>();
+  const refs: VideoPreviewMaterializerState['videoRefs'] = {};
+  // Reserve surviving clips before new clips can reuse their source slots.
+  for (const { clip, src } of sources) {
+    const prior = state.videoRefs[clip.id];
+    const slot = state.videoSlots.find(
+      (entry) => entry.video === prior && entry.assetId === clip.assetId && entry.src === src
+    );
+    if (slot) {
+      refs[clip.id] = slot.video;
+      used.add(slot.video);
+    }
+  }
+  for (const { clip, src } of sources) {
+    if (refs[clip.id]) continue;
+    let slot =
+      state.videoSlots.find(
+        (entry) => !used.has(entry.video) && entry.assetId === clip.assetId && entry.src === src
+      ) ?? state.videoSlots.find((entry) => !used.has(entry.video));
+    if (!slot) {
+      const video = params.ownerDocument.createElement('video');
+      Object.assign(video, { defaultMuted: true, muted: true, playsInline: true, preload: 'auto' });
+      video.style.cssText = 'position:absolute;width:1px;height:1px;pointer-events:none';
+      stage.append(video);
+      slot = { assetId: clip.assetId, src, video };
+      video.src = src;
+      state.videoSlots.push(slot);
+    } else if (slot.src !== src) {
+      slot.video.pause();
+      slot.video.src = src;
+    }
+    slot.assetId = clip.assetId;
+    slot.src = src;
+    refs[clip.id] = slot.video;
+    used.add(slot.video);
+  }
+  state.videoRefs = refs;
+  for (const { clip } of sources) {
+    throwIfAborted(signal);
+    if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
+    const video = refs[clip.id]!;
     video.pause();
     await waitForDecodedVideoFrame(video, getVideoClipSourceTime(clip, time), project.fps, signal);
   }
+}
+
+async function prepareMaterializedImages(
+  imageBank: Record<string, HTMLImageElement>,
+  frames: readonly VideoCompositionFrame[],
+  signal: AbortSignal
+): Promise<void> {
+  const keys = new Set<string>();
+  for (const frame of frames) {
+    for (const layer of [...frame.visualLayers, ...frame.effectInputLayers]) {
+      if (layer.kind === 'image') keys.add(layer.clip.assetId);
+      if (layer.kind === 'shape' && layer.clip.embeddedAsset)
+        keys.add(layer.clip.embeddedAsset.assetId);
+      if (
+        (layer.kind === 'image' || (layer.kind === 'video' && layer.trackRole !== 'CAMERA')) &&
+        layer.clip.windowHeader
+      )
+        keys.add(windowHeaderImageKey(layer.clipId, layer.clip.windowHeader));
+    }
+  }
+  await Promise.all(
+    [...keys].map((key) => {
+      const image = imageBank[key];
+      return image ? waitForImage(image, signal) : undefined;
+    })
+  );
 }

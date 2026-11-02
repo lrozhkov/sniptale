@@ -113,7 +113,7 @@ function isEffectSnapshot(
   } catch {
     return false;
   }
-  const validation = validateEffectV1Document(input);
+  const validation = validateEffectV1Document(input, { presentationPolicy: 'retained' });
   const retainedByteLength =
     new TextEncoder().encode(value['source']).byteLength +
     sumEffectSnapshotAssetBytes(value['assets']);
@@ -251,7 +251,7 @@ function hasValidInstanceLayout(
   } catch {
     return false;
   }
-  const document = validateEffectV1Document(value).document;
+  const document = validateEffectV1Document(value, { presentationPolicy: 'retained' }).document;
   if (!document) return false;
   const handles = document.objectLayout?.handles ?? [];
   const anchors = instance.sceneAnchors ?? {};

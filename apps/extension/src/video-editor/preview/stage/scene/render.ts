@@ -1,10 +1,8 @@
 import { createVideoPreviewCompositionJoinRenderer } from './joins';
 import { createVideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
 import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
-import {
-  createReviewSpatialRenderer,
-  type ReviewSpatialRenderer,
-} from '../../../../features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../../../workflows/video-review/spatial-render-session';
+import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 import { usePreviewFrameRate } from '../frame-rate';
 import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 
@@ -202,7 +200,7 @@ function usePreviewRenderSchedulerRef(
             spatialRenderer: () => {
               input.signal?.throwIfAborted();
               if (spatialRef.current) return spatialRef.current;
-              const renderer: ReviewSpatialRenderer = createReviewSpatialRenderer(() => {
+              const renderer: ReviewSpatialRenderer = createReviewSpatialSession(() => {
                 if (spatialRef.current !== renderer) return;
                 spatialRef.current = null;
                 renderer.dispose();

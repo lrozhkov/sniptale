@@ -1,3 +1,4 @@
+import { Waypoints } from 'lucide-react';
 import { InspectCursorPath } from './cursor-path';
 import { translate } from '../../../../../platform/i18n';
 import { InspectorActionButton } from '../shared/actions';
@@ -60,6 +61,7 @@ function createCursorGroups(
   const groups = [
     {
       id: 'focus-path',
+      icon: Waypoints,
       defaultActive:
         props.project.source.kind === 'recording' || props.project.cursorFocusPath !== undefined,
       semantic: 'animation' as const,

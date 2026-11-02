@@ -1,3 +1,4 @@
+import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
 import type { SaveVideoProjectOptions } from './index.save-guard';
 import type { VideoProject } from '../../../features/video/project/types';
 import { saveVideoProject } from './index';
@@ -10,6 +11,7 @@ export interface CommitVideoProjectMutationOptions {
 }
 
 export interface VideoProjectWorkspaceCommit {
+  readonly checkpointReceipt?: SyncCheckpointReceipt;
   project: VideoProject;
   workspaceRevision: number;
 }
@@ -44,5 +46,9 @@ export async function commitVideoProjectWorkspaceMutation(
     expectedProject: structuredClone(options.expectedProject),
     storageClass: 'library',
   });
-  return { project: entry.project, workspaceRevision: entry.workspaceRevision ?? 0 };
+  return {
+    project: entry.project,
+    workspaceRevision: entry.workspaceRevision ?? 0,
+    ...(entry.checkpointReceipt ? { checkpointReceipt: entry.checkpointReceipt } : {}),
+  };
 }

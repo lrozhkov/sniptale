@@ -1,6 +1,6 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import React from 'react';
-import { FlipHorizontal2, FlipVertical2, Move, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
+import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
 import type {
   EditorLayerItem,
   EditorSelectionState,
@@ -93,7 +93,6 @@ function TransformationEditor(
       tabIndex={-1}
     >
       <EditorInspectorDetails
-        icon={Move}
         initiallyOpen
         label={translateLayerEffects('editor.layerEffects.flipAndRotate')}
         level="section"

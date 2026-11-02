@@ -170,3 +170,94 @@ it('rejects malformed unlock-page submitters without a request id', () => {
     })
   ).toBe('Unauthorized AI secret unlock submitter');
 });
+
+it('allows only the exact popup document to own a sync unlock request', () => {
+  const sender: chrome.runtime.MessageSender = {
+    id: 'extension-id',
+    documentId: 'popup-document',
+    frameId: 0,
+    url: 'chrome-extension://extension-id/apps/extension/src/popup/index.html',
+  };
+  const message: AISecretUnlockMessage = {
+    type: 'AI_SECRET_UNLOCK',
+    operation: 'start',
+    purpose: 'sync',
+  };
+  expect(authorizeAISecretUnlockSenderForState({ message, sender })).toBeNull();
+  expect(
+    authorizeAISecretUnlockSenderForState({
+      message,
+      sender: { ...sender, documentLifecycle: 'active' },
+    })
+  ).toBeNull();
+  const withoutFrame = { ...sender };
+  delete withoutFrame.frameId;
+  expect(authorizeAISecretUnlockSenderForState({ message, sender: withoutFrame })).toBeNull();
+  const withoutDocument = { ...sender };
+  delete withoutDocument.documentId;
+  expect(authorizeAISecretUnlockSenderForState({ message, sender: withoutDocument })).toBeNull();
+  for (const candidate of [
+    { ...sender, id: 'other-extension' },
+    { ...sender, documentId: '' },
+    { ...sender, frameId: 1 },
+    { ...sender, documentLifecycle: 'prerender' as const },
+    { ...sender, url: `${sender.url}?` },
+    { ...sender, url: `${sender.url}#` },
+    { ...sender, url: `${sender.url}?extra=1` },
+    { ...sender, tab: { id: 7 } as chrome.tabs.Tab },
+    { ...sender, url: 'https://example.test/apps/extension/src/popup/index.html' },
+    { ...sender, url: 'chrome-extension://other-extension/apps/extension/src/popup/index.html' },
+    { ...sender, url: 'chrome-extension://extension-id/apps/extension/src/settings/index.html' },
+  ])
+    expect(authorizeAISecretUnlockSenderForState({ message, sender: candidate })).not.toBeNull();
+  const record = { senderKey: 'sync:popup:document:popup-document' };
+  expect(
+    authorizeAISecretUnlockSenderForState({ message: createStatusMessage(), record, sender })
+  ).toBeNull();
+  expect(
+    authorizeAISecretUnlockSenderForState({
+      message: createStatusMessage(),
+      record,
+      sender: { ...sender, documentId: 'new-popup' },
+    })
+  ).not.toBeNull();
+});
+
+it('admits the observed native action popup principal without optional sender fields for status only', () => {
+  const popup = {
+    id: 'extension-id',
+    url: 'chrome-extension://extension-id/apps/extension/src/popup/index.html',
+  };
+  expect(
+    authorizeAISecretUnlockSenderForState({
+      message: { type: 'AI_SECRET_UNLOCK', operation: 'start', purpose: 'sync' },
+      sender: popup,
+    })
+  ).toBeNull();
+  const record = { senderKey: 'sync:popup:extension:extension-id' };
+  expect(
+    authorizeAISecretUnlockSenderForState({ message: createStatusMessage(), record, sender: popup })
+  ).toBeNull();
+  const privilegedMessages: AISecretUnlockMessage[] = [
+    { type: 'AI_SECRET_UNLOCK', operation: 'submit', requestId: 'request-1', passphrase: 'phrase' },
+    { type: 'AI_SECRET_UNLOCK', operation: 'cancel', requestId: 'request-1' },
+  ];
+  for (const message of privilegedMessages)
+    expect(
+      authorizeAISecretUnlockSenderForState({
+        message,
+        record,
+        sender: popup,
+      })
+    ).not.toBeNull();
+  for (const sender of [
+    { ...popup, frameId: 1 },
+    { ...popup, documentLifecycle: 'cached' as const },
+    { ...popup, tab: { id: 1 } as chrome.tabs.Tab },
+    { ...popup, url: popup.url + '?x=1' },
+    { ...popup, id: 'other' },
+  ])
+    expect(
+      authorizeAISecretUnlockSenderForState({ message: createStatusMessage(), record, sender })
+    ).not.toBeNull();
+});

@@ -1,18 +1,32 @@
+import {
+  EffectControlChoices,
+  EffectControlFrame,
+  effectControlUnit,
+  effectControlSliderRange,
+} from '../../ui/effect-control-presentation/controls';
+import { EffectControlTree } from '../../ui/effect-control-presentation/groups';
+import {
+  effectControlIcons,
+  effectControlRootIcon,
+} from '../../ui/effect-control-presentation/icons';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
-import { useMemo, useRef } from 'react';
-import { Clock3, Copy, Move, Palette, Shapes, Trash2 } from 'lucide-react';
+import { useMemo, useRef, type KeyboardEvent } from 'react';
+import { Clock3, Copy, Move, LayoutTemplate, Trash2 } from 'lucide-react';
 import {
   applyEffectV1ControlPreset,
   resolveEffectLocaleText,
   resolveEffectV1ControlDefault,
   type ControlDefinition,
   type EffectV1Document,
+  resolveEffectV1ControlGroup,
+  EFFECT_V1_CONTROL_GROUPS,
 } from '@sniptale/runtime-contracts/effect-v1';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   ColorField,
   SelectField,
   TextField,
+  TextareaField,
   ToggleField,
 } from '../../ui/compact-inspector-controls';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
@@ -23,6 +37,7 @@ import {
   reviewDeleteButtonClassName,
   reviewSelectFieldClassName,
   reviewTextButtonClassName,
+  ReviewDetails,
 } from './controls';
 import { ReviewInspectorSections, reviewInspectorActions } from './inspector-sections';
 import {
@@ -141,31 +156,6 @@ function AnnotationParameters(
       };
     }
     return { transform: { ...transform, [axis]: next } };
-  };
-  const groups = new Map<string, ControlDefinition[]>();
-  for (const control of [...document.controls].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))) {
-    const group = control.group ?? 'parameters';
-    const members = groups.get(group) ?? [];
-    members.push(control);
-    groups.set(group, members);
-  }
-  const label = (group: string) => {
-    switch (group) {
-      case 'appearance':
-        return translate('gallery.videoReview.annotationAppearance');
-      case 'animation':
-        return translate('gallery.videoReview.annotationAnimation');
-      case 'typography':
-        return translate('gallery.videoReview.annotationTypography');
-      case 'content':
-        return translate('gallery.videoReview.annotationContent');
-      case 'geometry':
-        return translate('gallery.videoReview.annotationGeometry');
-      case 'parameters':
-        return translate('gallery.videoReview.annotationParameters');
-      default:
-        return group;
-    }
   };
   const sections = [
     {
@@ -304,7 +294,7 @@ function AnnotationParameters(
           {
             id: 'presets',
             label: translate('gallery.videoReview.annotationPresets'),
-            icon: Palette,
+            icon: LayoutTemplate,
             content: (
               <AnnotationPreset
                 document={document}
@@ -317,29 +307,16 @@ function AnnotationParameters(
           },
         ]
       : []),
-    ...[...groups].map(([group, controls]) => ({
-      id: `sdk:${group}`,
-      label: label(group),
-      icon: Shapes,
-      content: (
-        <div className="flex min-w-0 flex-col gap-2">
-          {controls.map((control) => (
-            <AnnotationControl
-              key={control.id}
-              document={document}
-              control={control}
-              instance={instance}
-              value={values[control.id] ?? resolveEffectV1ControlDefault(control, locale)}
-              locale={locale}
-              editor={editor}
-              disabled={disabled}
-              preview={preview}
-              commit={commit}
-            />
-          ))}
-        </div>
-      ),
-    })),
+    ...annotationSdkSections({
+      document,
+      instance,
+      values,
+      locale,
+      editor,
+      disabled,
+      preview,
+      commit,
+    }),
     reviewInspectorActions(
       <>
         <ReviewButton
@@ -395,6 +372,87 @@ function AnnotationParameters(
   );
 }
 
+function annotationSdkSections(props: {
+  document: EffectV1Document;
+  instance: ReviewAnnotationEffect;
+  values: Record<string, string | number>;
+  locale: string;
+  editor: Editor;
+  disabled: boolean;
+  preview(patch: Patch): void;
+  commit(): void;
+}) {
+  const { document, instance, values, locale, editor, disabled, preview, commit } = props;
+  const groups = new Map<string, ControlDefinition[]>();
+  for (const control of [...document.controls].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))) {
+    const group = resolveEffectV1ControlGroup(control.group, document.controlGroups) ?? 'advanced';
+    const members = groups.get(group) ?? [];
+    members.push(control);
+    groups.set(group, members);
+  }
+  const label = (group: string) => {
+    switch (group) {
+      case 'content':
+        return translate('videoEditor.effectsLibrary.objectText');
+      case 'typography':
+        return translate('videoEditor.effectsLibrary.objectTypography');
+      case 'appearance':
+        return translate('videoEditor.effectsLibrary.objectAppearance');
+      case 'geometry':
+        return translate('videoEditor.effectsLibrary.objectGeometry');
+      case 'processing':
+        return translate('videoEditor.effectsLibrary.objectProcessing');
+      case 'animation':
+        return translate('videoEditor.effectsLibrary.objectAnimation');
+      default:
+        return translate('videoEditor.effectsLibrary.objectAdvanced');
+    }
+  };
+  return EFFECT_V1_CONTROL_GROUPS.filter((group) => groups.has(group)).map((group) => ({
+    id: `sdk:${group}`,
+    label: label(group),
+    icon: effectControlRootIcon(group),
+    content: (
+      <div className="flex min-w-0 flex-col gap-2">
+        <EffectControlTree
+          document={document}
+          parentId={group}
+          controls={groups.get(group) ?? []}
+          renderGroup={(definition, children) => (
+            // Placement already owns Move; nested group icons are optional.
+            <ReviewDetails
+              preferenceId={`effect-group:${document.id}:${definition.id}`}
+              label={resolveEffectLocaleText(definition.label, locale)}
+              initiallyOpen={!definition.collapsed}
+              {...(definition.icon && definition.icon !== 'move'
+                ? { icon: effectControlIcons[definition.icon] }
+                : {})}
+            >
+              {children}
+            </ReviewDetails>
+          )}
+          renderControl={(control) => (
+            <EffectControlFrame control={control}>
+              <AnnotationControl
+                key={control.id}
+                document={document}
+                control={control}
+                instance={instance}
+                value={values[control.id] ?? resolveEffectV1ControlDefault(control, locale)}
+                locale={locale}
+                editor={editor}
+                disabled={disabled}
+                preview={preview}
+                commit={commit}
+              />
+            </EffectControlFrame>
+          )}
+        />
+      </div>
+    ),
+  }));
+}
+
 function AnnotationPreset(props: {
   document: EffectV1Document;
   instance: ReviewAnnotationEffect;
@@ -434,7 +492,7 @@ function AnnotationPreset(props: {
   );
 }
 
-function AnnotationControl(props: {
+type AnnotationControlProps = {
   document: EffectV1Document;
   control: ControlDefinition;
   instance: ReviewAnnotationEffect;
@@ -444,9 +502,10 @@ function AnnotationControl(props: {
   disabled: boolean;
   preview(patch: Patch): void;
   commit(): void;
-}) {
+};
+
+function AnnotationControl(props: AnnotationControlProps) {
   const { control, instance, editor } = props;
-  const cancelling = useRef(false);
   const label = resolveEffectLocaleText(control.label, props.locale) || control.id;
   const bound = props.document.objectLayout?.handles?.some(
     (handle) => handle.xControl === control.id || handle.yControl === control.id
@@ -474,26 +533,21 @@ function AnnotationControl(props: {
   };
   if (control.options?.length)
     return (
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={label}
+      <EffectControlChoices
+        control={control}
+        value={props.value}
+        locale={props.locale}
         disabled={disabled}
-        value={control.options.findIndex((item) => item.value === props.value).toString()}
-        options={control.options.map((option, index) => ({
-          value: index.toString(),
-          label: resolveEffectLocaleText(option.label, props.locale),
-        }))}
-        onChange={(id) => {
-          const option = control.options?.find((_, index) => index.toString() === id);
-          if (option) {
-            preview(option.value);
-            props.commit();
-          }
+        onChange={(value) => {
+          preview(value);
+          props.commit();
         }}
       />
     );
   if (control.kind === 'number') {
     const value = typeof props.value === 'number' ? props.value : control.defaultValue;
+    const range =
+      control.presentation === 'slider' ? effectControlSliderRange(control, value) : control;
     const layout = props.document.objectLayout;
     const handle = layout?.handles?.find(
       (item) => item.xControl === control.id || item.yControl === control.id
@@ -514,14 +568,20 @@ function AnnotationControl(props: {
         min={control.min}
         max={control.max}
         step={control.step}
+        unit={effectControlUnit(control.unit)}
+        revealScrub={control.presentation === 'slider'}
         patch={patch}
-        scrub={annotationNumericScrub(
-          value,
-          control.min,
-          control.max,
-          control.step,
-          length === undefined ? undefined : { min: -length, max: 2 * length }
-        )}
+        scrub={
+          control.presentation === 'number'
+            ? undefined
+            : annotationNumericScrub(
+                value,
+                range.min,
+                range.max,
+                range.step,
+                length === undefined ? undefined : { min: -length, max: 2 * length }
+              )
+        }
       />
     );
   }
@@ -540,27 +600,65 @@ function AnnotationControl(props: {
       />
     );
   return (
+    <AnnotationTextControl
+      control={control}
+      label={label}
+      value={props.value}
+      disabled={disabled}
+      editor={editor}
+      preview={preview}
+      commit={props.commit}
+    />
+  );
+}
+
+function AnnotationTextControl(
+  props: Pick<AnnotationControlProps, 'value' | 'editor' | 'disabled' | 'commit'> & {
+    control: Extract<ControlDefinition, { defaultValue: string }>;
+    label: string;
+    preview(value: string): void;
+  }
+) {
+  const { control, editor, disabled, label, preview } = props;
+  const cancelling = useRef(false);
+  const onBlur = () => {
+    if (!cancelling.current) props.commit();
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelling.current = true;
+      editor.cancelGesture();
+      event.currentTarget.blur();
+      cancelling.current = false;
+    } else if (
+      event.key === 'Enter' &&
+      (control.presentation !== 'textarea' || event.ctrlKey || event.metaKey)
+    ) {
+      event.preventDefault();
+      props.commit();
+    }
+  };
+  if (control.presentation === 'textarea')
+    return (
+      <TextareaField
+        label={label}
+        disabled={disabled}
+        value={typeof props.value === 'string' ? props.value : control.defaultValue}
+        onChange={preview}
+        onBlur={onBlur}
+        onKeyDown={onKeyDown}
+      />
+    );
+  return (
     <TextField
       label={label}
       disabled={disabled}
       value={typeof props.value === 'string' ? props.value : control.defaultValue}
       onChange={(event) => preview(event.currentTarget.value)}
-      onBlur={() => {
-        if (!cancelling.current) props.commit();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          event.stopPropagation();
-          cancelling.current = true;
-          editor.cancelGesture();
-          event.currentTarget.blur();
-          cancelling.current = false;
-        } else if (event.key === 'Enter') {
-          event.preventDefault();
-          props.commit();
-        }
-      }}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
     />
   );
 }

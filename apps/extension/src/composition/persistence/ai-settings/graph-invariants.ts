@@ -1,3 +1,4 @@
+import type { SecretProtectionAdmissionPermit } from '../secret-protection/model';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
 import { loadAIModels, loadAIProviders } from './core';
 import {
@@ -29,10 +30,15 @@ function assertModelGraphInvariants(providers: AIProvider[], models: AIModel[]):
 async function assertProviderSecretInvariants(
   providers: AIProvider[],
   providerIds: Set<string>,
-  providerSecrets: Record<string, unknown>
+  providerSecrets: Record<string, unknown>,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<void> {
   for (const provider of providers) {
-    const secretState = await readStoredAIProviderSecretState(provider.id);
+    const secretState = await readStoredAIProviderSecretState(
+      provider.id,
+      undefined,
+      admissionPermit
+    );
     if (
       provider.hasStoredApiKey &&
       secretState.status !== 'ok' &&
@@ -55,12 +61,14 @@ async function assertProviderSecretInvariants(
   }
 }
 
-export async function assertAISettingsGraphInvariants(): Promise<void> {
+export async function assertAISettingsGraphInvariants(
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<void> {
   const [providers, models, providerSecrets] = await Promise.all([
     loadAIProviders(),
     loadAIModels(),
     readStoredProviderSecrets(),
   ]);
   const providerIds = assertModelGraphInvariants(providers, models);
-  await assertProviderSecretInvariants(providers, providerIds, providerSecrets);
+  await assertProviderSecretInvariants(providers, providerIds, providerSecrets, admissionPermit);
 }

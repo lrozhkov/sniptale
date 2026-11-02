@@ -31,7 +31,7 @@ describe('voice input offscreen event route', () => {
     };
 
     expect(routeVoiceInputOffscreenEvent(message, sendResponse)).toBe(true);
-    expect(handleVoiceInputOffscreenEvent).toHaveBeenCalledWith(message);
+    expect(handleVoiceInputOffscreenEvent).toHaveBeenCalledWith(message, undefined);
     expect(sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
   });
 
