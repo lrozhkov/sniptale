@@ -125,6 +125,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
 }
 
 test('styles native capture with captions and an overlong address', async ({}, info) => {
+  test.setTimeout(120_000);
   const size = { width: 1280, height: 560 };
   const browser = await launchExtensionBrowser({ viewport: size });
   const host = await startHostServer();
@@ -227,7 +228,7 @@ test('styles native capture with captions and an overlong address', async ({}, i
                 screenshotMode: mode,
                 afterCapture: 'download_default',
                 exitAfterCapture: true,
-                imageFormat: format,
+                imageFormat: mode === 'selection' ? 'webp' : format,
                 imageQuality: 90,
                 appearance,
               },
@@ -257,6 +258,16 @@ test('styles native capture with captions and an overlong address', async ({}, i
         await page.mouse.down();
         await page.mouse.move(500, 380, { steps: 4 });
         await page.mouse.up();
+        await page.locator('.sniptale-selection-capture-menu-trigger').click();
+        await page.locator('[data-ui="content.selection.capture-parameters"]').click();
+        await page.locator('[data-ui="content.selection.capture-format.png"]').click();
+        await page.keyboard.press('Escape');
+        // Cross the MV3 idle deadline without extension-page polling during editing.
+        await new Promise((resolve) => setTimeout(resolve, 45_000));
+        await page.screenshot({
+          path: info.outputPath('delayed-selection.png'),
+          fullPage: false,
+        });
         await page.locator('.sniptale-selection-size-confirm-button').click();
       }
       let filename = '';

@@ -72,6 +72,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   latestState = null;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -258,6 +259,96 @@ async function verifyDelayedPreferenceDoesNotOverwriteScenarioRestore() {
 }
 
 describe('useContentAppModeState', () => {
+  it('does not retain the worker for idle content or recording alone', async () => {
+    vi.useFakeTimers();
+    await renderHarness();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    act(() => getLatestState().setVideoRecordingMode?.(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(storageMocks.sendRuntimeMessage).not.toHaveBeenCalledWith({
+      type: 'SCREENSHOT_MODE_STATUS',
+    });
+  });
+
+  it.each([
+    'setScreenshotMode',
+    'setDrawingMode',
+    'setHighlighterMode',
+    'setQuickEditMode',
+    'setQuickEditDocumentMode',
+    'setAiPickMode',
+    'setDesignReviewMode',
+  ] as const)('retains the worker during %s and stops when the page mode ends', async (setter) => {
+    vi.useFakeTimers();
+    await renderHarness();
+    const probes = () =>
+      storageMocks.sendRuntimeMessage.mock.calls.filter(
+        ([message]) =>
+          typeof message === 'object' &&
+          message !== null &&
+          'type' in message &&
+          message.type === 'SCREENSHOT_MODE_STATUS'
+      ).length;
+    act(() => getLatestState()[setter]?.(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(180_000);
+    });
+    expect(probes()).toBe(9);
+    act(() => getLatestState()[setter]?.(false));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(probes()).toBe(9);
+  });
+
+  it('preserves active page editing after a probe failure and stops on unmount', async () => {
+    vi.useFakeTimers();
+    await renderHarness();
+    act(() => {
+      getLatestState().setScreenshotMode(true);
+      getLatestState().setDrawingMode?.(true);
+    });
+    storageMocks.sendRuntimeMessage.mockRejectedValue(new Error('Status unavailable'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(getLatestState().screenshotMode).toBe(true);
+    expect(getLatestState().drawingMode).toBe(true);
+    expect(storageMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      type: 'SCREENSHOT_MODE_STATUS',
+    });
+    act(() => root?.unmount());
+    root = null;
+    const completed = storageMocks.sendRuntimeMessage.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(storageMocks.sendRuntimeMessage).toHaveBeenCalledTimes(completed);
+  });
+
+  it('uses one timer across page-mode changes and toolbar collapse', async () => {
+    vi.useFakeTimers();
+    await renderHarness();
+    act(() => getLatestState().setDrawingMode?.(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    act(() => {
+      getLatestState().setDrawingMode?.(false);
+      getLatestState().setHighlighterMode(true);
+      getLatestState().setIsToolbarVisible(false);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(storageMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+      type: 'SCREENSHOT_MODE_STATUS',
+    });
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
   it('projects the Design Review flag and control through the grouped mode owner', async () => {
     await renderHarness();
 

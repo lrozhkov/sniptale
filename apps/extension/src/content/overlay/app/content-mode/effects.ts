@@ -7,6 +7,25 @@ import { loadSettings } from '../../../../composition/persistence/settings';
 
 const logger = createLogger({ namespace: 'ContentAppModeState' });
 
+export function usePageModeWorkerRetention(active: boolean): void {
+  useEffect(() => {
+    if (!active) return;
+    let pending = false;
+    // MV3 discards in-memory surface authority after 30 seconds without extension activity.
+    const timer = window.setInterval(() => {
+      if (pending) return;
+      pending = true;
+      void getContentRuntimeServices()
+        .messaging.sendRuntimeMessage({ type: MessageType.SCREENSHOT_MODE_STATUS })
+        .catch(() => undefined)
+        .finally(() => {
+          pending = false;
+        });
+    }, 20_000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+}
+
 export function useCaptureActionPreference(
   captureAction: CaptureActionType,
   setCaptureAction: (action: CaptureActionType) => void

@@ -63,6 +63,47 @@ beforeEach(() => {
 });
 
 describe('quick-action appearance admission and delivery preparation', () => {
+  it('uses selection preferences for appearance encoding without changing its snapshot', async () => {
+    const accepted = output();
+    mocks.snapshot.mockReturnValueOnce(accepted);
+    const admission = beginPageAppearance(1, 'tx', undefined, false, {
+      imageFormat: 'jpeg',
+      imageQuality: 37,
+    });
+    try {
+      await expect(admission.prepare!('raw', 'capture.png')).resolves.toEqual({
+        dataUrl: 'styled',
+        filename: 'capture.jpg',
+      });
+      expect(mocks.render).toHaveBeenCalledWith(
+        expect.objectContaining({
+          imageFormat: 'jpeg',
+          imageQuality: 37,
+          appearance: accepted.appearance,
+        })
+      );
+      expect(mocks.current).toHaveBeenCalledWith(1, 'tx');
+      expect(accepted).toMatchObject({ imageFormat: 'png', imageQuality: 90 });
+    } finally {
+      admission.release();
+    }
+  });
+
+  it('keeps clipboard appearance PNG when selection preferences request JPEG', async () => {
+    const admission = beginPageAppearance(1, 'tx', 'png', false, {
+      imageFormat: 'jpeg',
+      imageQuality: 37,
+    });
+    try {
+      await admission.prepare!('raw', 'capture.jpg');
+      expect(mocks.render).toHaveBeenCalledWith(
+        expect.objectContaining({ imageFormat: 'png', imageQuality: 37 })
+      );
+    } finally {
+      admission.release();
+    }
+  });
+
   it('keeps parallel tab preparations isolated when raster replies resolve out of order', async () => {
     const first = deferred<string>(),
       second = deferred<string>();

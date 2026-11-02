@@ -137,7 +137,8 @@ export function beginPageAppearance(
   tabId: number,
   transactionId?: string,
   outputFormat?: AppearanceOutput['imageFormat'],
-  fullPageFileBudget = false
+  fullPageFileBudget = false,
+  capturePreferences?: Pick<AppearanceOutput, 'imageFormat' | 'imageQuality'>
 ): { prepare?: CaptureImagePreparation; assertCurrent(): void; release(): void } {
   if (transactionId === undefined) return { assertCurrent() {}, release() {} };
   const output = getQuickActionAppearanceSnapshot(tabId, transactionId);
@@ -153,7 +154,11 @@ export function beginPageAppearance(
   };
   return {
     prepare: createPreparation(
-      outputFormat === undefined ? output : { ...output, imageFormat: outputFormat },
+      {
+        ...output,
+        ...capturePreferences,
+        ...(outputFormat === undefined ? {} : { imageFormat: outputFormat }),
+      },
       assertCurrent,
       tabId,
       fullPageFileBudget

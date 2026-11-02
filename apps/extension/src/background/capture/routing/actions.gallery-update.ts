@@ -34,9 +34,17 @@ export function handleSaveScreenshotToGallery(
   const generation = getMediaAuthorityGeneration();
   let appearance: ReturnType<typeof beginPageAppearance>;
   try {
-    appearance =
-      payload.actionType === 'copy'
-        ? beginPageAppearance(resolvedTabId, payload.quickActionTransactionId, 'png')
+    const outputFormat = payload.actionType === 'copy' ? 'png' : undefined;
+    appearance = payload.capturePreferences
+      ? beginPageAppearance(
+          resolvedTabId,
+          payload.quickActionTransactionId,
+          outputFormat,
+          false,
+          payload.capturePreferences
+        )
+      : outputFormat
+        ? beginPageAppearance(resolvedTabId, payload.quickActionTransactionId, outputFormat)
         : beginPageAppearance(resolvedTabId, payload.quickActionTransactionId);
   } catch (error) {
     releasePermit();
@@ -57,9 +65,11 @@ export function handleSaveScreenshotToGallery(
     if (appearance.prepare) {
       prepared = await appearance.prepare(payload.dataUrl, payload.filename);
     } else {
-      const output = payload.quickActionTransactionId
-        ? getQuickActionAppearanceSnapshot(resolvedTabId, payload.quickActionTransactionId)
-        : (payload.capturePreferences ?? (await loadSettings()));
+      const output =
+        payload.capturePreferences ??
+        (payload.quickActionTransactionId
+          ? getQuickActionAppearanceSnapshot(resolvedTabId, payload.quickActionTransactionId)
+          : await loadSettings());
       assertCurrent();
       const format = payload.actionType === 'copy' ? 'png' : output.imageFormat;
       prepared = {

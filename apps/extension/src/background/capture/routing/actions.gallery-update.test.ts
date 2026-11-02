@@ -57,6 +57,32 @@ beforeEach(() => {
   });
 });
 
+it('uses selection menu encoding preferences over quick-action defaults', async () => {
+  const sendResponse = vi.fn();
+  handleSaveScreenshotToGallery(
+    {
+      dataUrl: 'data:image/png;base64,crop',
+      filename: 'selection.png',
+      quickActionTransactionId: 'tx-1',
+      capturePreferences: { imageFormat: 'jpeg', imageQuality: 37 },
+    },
+    7,
+    sendResponse
+  );
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+  expect(finalizeScreenshotDataUrlMock).toHaveBeenCalledWith('data:image/png;base64,crop', {
+    format: 'jpeg',
+    quality: 37,
+  });
+  expect(sendResponse).toHaveBeenCalledWith(
+    expect.objectContaining({
+      success: true,
+      dataUrl: 'data:image/jpeg;base64,final',
+      filename: 'selection.jpg',
+    })
+  );
+});
+
 it('issues an exact editor asset capability after an authorized save succeeds', async () => {
   const message = { dataUrl: 'data:image/png;base64,1', filename: 'capture.png' };
   const authorization = {

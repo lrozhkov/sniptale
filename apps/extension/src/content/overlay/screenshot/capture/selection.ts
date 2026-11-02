@@ -7,6 +7,7 @@ import { prepareFrozenSelectionFrame } from '../../../selection/selection-mode/f
 import type { FrozenSelectionFrame } from '../../../selection/selection-mode/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
+import { pageCapturePreferences } from '../../../application/capture-preferences';
 import type { CaptureResponse } from '../../../../contracts/messaging/contracts/response-types';
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { cropImage } from '@sniptale/platform/browser/media/image-crop';
@@ -209,6 +210,13 @@ export async function runSelectionScreenshot(
   const showSuccessToast = options.showSuccessToast !== false;
   try {
     assertCurrentScreenshotRun(runtime, options.runToken);
+    const quickAction = runtime.quickActionOverlayRef?.current;
+    if (quickAction) {
+      pageCapturePreferences.update('selection', {
+        imageFormat: quickAction.imageFormat,
+        imageQuality: quickAction.imageQuality,
+      });
+    }
     logSelectionScreenshotDiag('runSelectionScreenshot.start');
     hideRuntimeShellForCapture(runtime);
     if (runtime.captureAdapter) {
