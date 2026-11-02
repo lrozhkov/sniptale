@@ -14,6 +14,14 @@ The canonical npm installation uses the dedicated lock under `tooling/configs/ci
 
 Ready pull requests run the Pull request checks through the trusted reusable Checks workflow.
 
+Fast proof first runs product static controls, harness tests, and the production build. It waits for all started prerequisites. A failed or blocked prerequisite stops execution before audits, including full product coverage. CI retains prerequisite diagnostics and fails the gate.
+
+After successful prerequisites, CI runs the PR audit profile. Full product coverage supplies the shared unit-test result. This order preserves mandatory controls and proof admission. It prevents expensive coverage execution after a prerequisite failure.
+
+Use focused checks during defect correction. Start full CI after the candidate passes its prerequisites. After a failure, diagnose the failed stage before another full run. Use the existing proof owner to determine evidence validity.
+
+Never change receipts to retain a previous result. A timeout alone does not establish a product regression. Check the same test in isolation before changing resource budgets or deadlines. Preserve its assertions during diagnosis.
+
 Release provenance admits an exact Fast proof before release execution. [Wrapper summary](wrapper-summary.md#freshness-and-reuse) owns proof composition and reuse behavior.
 
 Repository-audit, topology, and mutation evidence run after proof sealing in a separate non-blocking job. These artifacts neither satisfy nor block the canonical gate.
