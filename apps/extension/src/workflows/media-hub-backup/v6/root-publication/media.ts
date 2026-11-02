@@ -65,6 +65,7 @@ import {
   THUMBNAILS_STORE,
   WEB_SNAPSHOTS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import type {
@@ -469,7 +470,9 @@ type PreparedMediaRoot = Awaited<ReturnType<typeof prepareMediaRoot>>;
 
 function isCaptureImage(media: MediaLibraryEntry): boolean {
   return (
-    (media.source.kind === 'screenshot' || media.source.kind === 'stored-asset') &&
+    (media.source.kind === 'screenshot' ||
+      media.source.kind === 'stored-asset' ||
+      media.source.kind === 'project-asset') &&
     (media.kind === 'image' || media.kind === 'screenshot')
   );
 }
@@ -613,6 +616,7 @@ async function commitPreparedMediaRoot(args: {
         MEDIA_LIBRARY_STORE,
         ASSET_RESIDENCY_STORE,
         SYNC_CAPTURE_STORE,
+        SYNC_OUTBOX_STORE,
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,

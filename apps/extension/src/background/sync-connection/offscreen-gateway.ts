@@ -1,5 +1,8 @@
 import { parseSyncProductResponse } from '../../contracts/messaging/contracts/runtime/sync-product';
-import type { SyncProductExecutorRequest } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import type {
+  SyncCredentialLease,
+  SyncProductExecutorRequest,
+} from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -25,6 +28,12 @@ type GatewayCommand =
   | Omit<SyncInspectRequest, 'capabilityToken'>
   | Omit<SyncStopRequest, 'capabilityToken'>;
 interface GatewayDependencies {
+  issueCredentialLease?(target: {
+    offscreenStartupId: string;
+    executorId: string;
+    authorization: import('../../composition/persistence/remote-connection/model').SyncConnectionIdentity;
+  }): Promise<SyncCredentialLease>;
+  revokeCredentialLeases?(): void;
   ensureDocument(): Promise<unknown>;
   waitForReady(): Promise<void>;
   getDocumentUrls(): Promise<readonly string[]>;
@@ -109,20 +118,34 @@ export function createSyncOffscreenGateway(
       return { kind: 'present', challenge, snapshot };
     },
     async productExecutor(input) {
+      const command =
+        input.command.kind === 'start' && deps.issueCredentialLease
+          ? {
+              ...input.command,
+              credentialLease: await deps.issueCredentialLease({
+                offscreenStartupId: input.offscreenStartupId,
+                executorId: input.executorId,
+                authorization: input.command.binding.authorization,
+              }),
+            }
+          : input.command;
       const response = await deps.send(
         attachOffscreenCommandCapability({
           type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
           requestId: deps.createRequestId(),
           ...input,
+          command,
         })
       );
       return parseSyncProductResponse(response) ?? refused();
     },
     async startExecutor(input) {
+      const credentialLease = await deps.issueCredentialLease?.(input);
       const response = await send({
         type: MessageType.OFFSCREEN_SYNC_START,
         requestId: deps.createRequestId(),
         ...input,
+        ...(credentialLease ? { credentialLease } : {}),
       });
       return acceptedExecutorReceipt(response, input);
     },
@@ -142,6 +165,7 @@ export function createSyncOffscreenGateway(
       return acceptedExecutorReceipt(response, input);
     },
     async stopExecutor(input) {
+      deps.revokeCredentialLeases?.();
       const response = await send({
         type: MessageType.OFFSCREEN_SYNC_STOP,
         requestId: deps.createRequestId(),

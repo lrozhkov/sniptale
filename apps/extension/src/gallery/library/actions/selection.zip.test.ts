@@ -17,11 +17,13 @@ const {
   downloadBlobMock,
   exportMediaHubBackupMock,
   getMediaAssetBlobMock,
+  prepareLibraryBackupMock,
 } = vi.hoisted(() => ({
   createDirectFileSinkMock: vi.fn(),
   downloadBlobMock: vi.fn(),
   exportMediaHubBackupMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
+  prepareLibraryBackupMock: vi.fn(),
 }));
 
 vi.mock('../../../composition/archive-transfer', async (importOriginal) => ({
@@ -44,12 +46,18 @@ vi.mock('../../../workflows/media-hub-backup', async (importOriginal) => ({
   exportMediaHubBackup: exportMediaHubBackupMock,
 }));
 
+vi.mock('../../../workflows/sync-transfer/retained-library', () => ({
+  prepareLibraryBackup: prepareLibraryBackupMock,
+}));
+
 vi.mock('./shared', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./shared')>()),
   downloadBlob: downloadBlobMock,
 }));
 
 beforeEach(() => {
+  prepareLibraryBackupMock.mockReset();
+  prepareLibraryBackupMock.mockResolvedValue(false);
   createDirectFileSinkMock.mockReset();
   downloadBlobMock.mockReset();
   exportMediaHubBackupMock.mockReset();
@@ -248,4 +256,43 @@ it('exports the explicit preview target without changing the library selection',
     expect.objectContaining({ requireSelected: true })
   );
   expect(controller.state.selection.selectedItems).toEqual([selected]);
+});
+
+it('waits one cumulative preparation for direct multi-selection before starting a readonly archive', async () => {
+  let finish!: (value: boolean) => void;
+  prepareLibraryBackupMock.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const { controller } = createController({
+    selectedItems: [createMediaItem({ entityId: 'one' }), createMediaItem({ entityId: 'two' })],
+  });
+  const exporting = createSelectionBackupAction(controller)(runBusyAction);
+  await Promise.resolve();
+  expect(prepareLibraryBackupMock).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      scope: 'selected',
+      selected: { mediaAssetIds: ['one', 'two'], scenarioProjectIds: [], videoProjectIds: [] },
+    })
+  );
+  expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
+  finish(true);
+  await exporting;
+  expect(exportMediaHubBackupMock).toHaveBeenCalledExactlyOnceWith(
+    expect.any(Object),
+    expect.objectContaining({ requireSelected: true, requirePreparedNative: true })
+  );
+});
+
+it('does not start a selected archive after its cumulative preparation refuses', async () => {
+  prepareLibraryBackupMock.mockRejectedValueOnce(new Error('Download allowance exhausted'));
+  const { controller } = createController({
+    selectedItems: [createMediaItem({ entityId: 'one' })],
+  });
+  await expect(createSelectionBackupAction(controller)(runBusyAction)).rejects.toThrow(
+    'Download allowance exhausted'
+  );
+  expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
 });

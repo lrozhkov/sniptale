@@ -2,7 +2,7 @@ import type {
   AISecretUnlockMessage,
   AISecretUnlockResponse,
 } from '../../../contracts/messaging/ai-secret-unlock';
-import { isAISecretInvalidPassphraseError } from '../../../composition/persistence/ai-settings/secret-protection.store.ts';
+import { SecretProtectionInvalidPassphraseError } from '../../../composition/persistence/secret-protection/model';
 import {
   createNonPendingUnlockResponse,
   createStaleUnlockTransitionResponse,
@@ -69,7 +69,7 @@ export async function submitUnlockRequest(args: {
   try {
     await args.unlockAISecretProtection(args.message.passphrase);
   } catch (error) {
-    if (!isAISecretInvalidPassphraseError(error)) {
+    if (!(error instanceof SecretProtectionInvalidPassphraseError)) {
       return createUnlockLifecycleFailureResponse({ error, requestId: args.message.requestId });
     }
     return rollbackSubmittedUnlockRequest({

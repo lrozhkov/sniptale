@@ -32,7 +32,7 @@ export function getScenarioProjectRecord(id: string): Promise<GuideProject | und
 }
 
 /**
- * Persists the edit buffer and returns the owner-issued committed snapshot.
+ * Persists the edit buffer and preserves the owner-issued snapshot and transient receipt.
  */
 export async function saveScenarioProjectRecord(
   project: GuideProject,

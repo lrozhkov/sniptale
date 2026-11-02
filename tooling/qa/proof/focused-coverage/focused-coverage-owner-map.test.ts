@@ -15,6 +15,40 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it.each(['controller.ts', 'context.tsx', 'view.tsx', 'dialog.tsx'])(
+  'selects direct and participant composition proof for the common Settings protection %s owner',
+  async (owner) => {
+    const module = await importOwnerMap();
+    const root = 'apps/extension/src/settings/secret-protection';
+    expect(module.resolveMappedCoverageOwnerTests(`${root}/${owner}`)).toEqual(
+      expect.arrayContaining([
+        `${root}/controller.test.tsx`,
+        `${root}/context.test.tsx`,
+        `${root}/view.test.tsx`,
+        `${root}/dialog.test.tsx`,
+        `${root}/integration.test.tsx`,
+        'apps/extension/src/settings/sections/capture/saving/sync-connection.test.tsx',
+        'apps/extension/src/settings/sections/system/access-data/index.test.tsx',
+      ])
+    );
+  }
+);
+
+it('keeps the shared protection client and retained AI mutations on their real wire proof', async () => {
+  const module = await importOwnerMap();
+  const test = 'apps/extension/src/settings/runtime/secret-protection.test.ts';
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/settings/runtime/secret-protection.ts'
+    )
+  ).toEqual([test]);
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/settings/runtime/ai-settings/mutations.ts'
+    )
+  ).toEqual([test]);
+});
+
 it.each(['core.ts', 'settings.ts', 'graph-mutations.ts'])(
   'retains AI settings aggregation and queued command proof for %s',
   async (owner) => {
@@ -36,11 +70,13 @@ it.each(['parser', 'store'])(
     const module = await importOwnerMap();
     expect(
       module.resolveMappedCoverageOwnerTests(
-        `apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.${owner}.ts`
+        `apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.${owner}.ts`
       )
     ).toEqual([
+      'apps/extension/src/background/ai/settings/authorization/secret-unlock.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.lifecycle.test.ts',
       'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.test.ts',
     ]);
   }
 );
@@ -528,3 +564,14 @@ it.each(['core.stores.ts', 'upgrade/core.ts'])(
     );
   }
 );
+
+it.each([
+  'apps/extension/src/composition/persistence/assets/retention-index.ts',
+  'apps/extension/src/composition/persistence/assets/operations.ts',
+])('selects both Review attachment adapter suites for %s', async (owner) => {
+  const module = await importOwnerMap();
+  expect(module.resolveMappedCoverageOwnerTests(owner)).toEqual([
+    'apps/extension/src/workflows/video-review/presentation-attachment.test.ts',
+    'apps/extension/src/workflows/video-review/watermark-image.test.ts',
+  ]);
+});

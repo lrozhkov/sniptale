@@ -1,3 +1,8 @@
+import type { SyncWorkspaceIdentity } from '../../../sync-workspace';
+import type {
+  SyncCheckpointInterval,
+  SyncCheckpointReceipt,
+} from '../../../../composition/persistence/sync-capture/checkpoint-contracts';
 import type {
   SyncCacheStatus,
   SyncCacheRootStatus,
@@ -10,12 +15,33 @@ import type {
   SyncConnectionAuthentication,
   SyncConnectionIdentity,
   SyncWorkspaceSource,
+  SyncStoragePolicy,
 } from '../../../../composition/persistence/remote-connection/model';
 import type {
   SyncQueueFailureCode,
   SyncQueueScope,
   SyncQueueStage,
 } from '../../../../composition/persistence/sync-capture/queue-model';
+
+/** Private command authority. This value never enters executor snapshots or UI projections. */
+export interface SyncCredentialLease {
+  leaseId: string;
+  workerEpoch: string;
+  protectionEpoch: number;
+  offscreenStartupId: string;
+  executorId: string;
+  authorization: SyncConnectionIdentity;
+  credentialId: string;
+}
+export interface SyncCredentialRequest {
+  type: typeof MessageType.SYNC_CONNECTION_CREDENTIAL;
+  requestId: string;
+  credentialLease: SyncCredentialLease;
+}
+export type SyncCredentialResponse = RuntimeMessageResponse<{
+  authentication: SyncConnectionAuthentication;
+  credentialLease: SyncCredentialLease;
+}>;
 
 /** Disposable executor binding. Native connection and queue records remain authoritative. */
 export interface SyncExecutorBinding {
@@ -35,6 +61,7 @@ export interface SyncExecutorJobSnapshot {
 
 /** Fixed workspace outcome codes exclude provider details and credentials. */
 export type SyncWorkspaceFailureCode =
+  | 'secrets-locked'
   | 'temporary'
   | 'authentication'
   | 'access-denied'
@@ -43,15 +70,41 @@ export type SyncWorkspaceFailureCode =
   | 'interrupted'
   | 'internal';
 
+/** Fixed discovery failures exclude provider text and credentials. */
+export type SyncWorkspaceDiscoveryIssueCode =
+  | SyncWorkspaceFailureCode
+  | 'bootstrap-incomplete'
+  | 'unsupported-format'
+  | 'metadata-limit'
+  | 'pagination-cycle'
+  | 'invalid-response';
+/** Bounded marker observations convey no enrollment or credential authority. */
+export interface SyncWorkspaceDiscovery {
+  source: SyncWorkspaceSource & { kind: 'join' };
+  scope: 'exact' | 'children';
+  complete: boolean;
+  candidates: { prefix: string; identity: SyncWorkspaceIdentity }[];
+  issues: { prefix: string; code: SyncWorkspaceDiscoveryIssueCode }[];
+}
 /** Safe projection of the selected workspace source; carries no authentication. */
-export interface SyncWorkspaceJobSnapshot {
+export type SyncWorkspaceJobSnapshot = {
   requestId?: string;
-  sourceKind: SyncWorkspaceSource['kind'];
   selectionIncarnation: string;
   selectionRevision: number;
-  state: 'running' | 'ready' | 'failed' | 'interrupted';
-  failureCode: SyncWorkspaceFailureCode | null;
-}
+} & (
+  | {
+      sourceKind: 'allocation' | 'join';
+      state: 'running' | 'ready' | 'failed' | 'interrupted';
+      failureCode: SyncWorkspaceFailureCode | null;
+      discovery?: never;
+    }
+  | {
+      sourceKind: 'join';
+      state: 'discovered';
+      failureCode: null;
+      discovery: SyncWorkspaceDiscovery;
+    }
+);
 
 /** Inspect is independent of active IO; this projection conveys no durable authority. */
 export interface SyncExecutorSnapshot {
@@ -71,6 +124,7 @@ interface SyncCommandEnvelope {
   offscreenStartupId: string;
 }
 export interface SyncStartRequest extends SyncCommandEnvelope, SyncExecutorBinding {
+  credentialLease?: SyncCredentialLease;
   type: typeof MessageType.OFFSCREEN_SYNC_START;
   executorId: string;
   executorRevision: number;
@@ -79,6 +133,7 @@ export interface SyncStartRequest extends SyncCommandEnvelope, SyncExecutorBindi
 }
 /** Bounded credentials live only in this disposable capability command. */
 export interface SyncWorkspaceStartRequest extends SyncCommandEnvelope {
+  operation?: 'discover';
   type: typeof MessageType.OFFSCREEN_SYNC_WORKSPACE_START;
   executorId: string;
   executorRevision: number;
@@ -92,12 +147,14 @@ export interface SyncInspectRequest extends SyncCommandEnvelope {
   challenge: string;
 }
 export interface SyncStopRequest extends SyncCommandEnvelope {
+  reason?: 'secrets-locked';
   type: typeof MessageType.OFFSCREEN_SYNC_STOP;
   executorId: string;
   executorRevision: number;
 }
 /** Background checks the exact durable identity and origin without a coordinator lock. */
 export interface SyncOriginPermissionRequest {
+  credentialLease?: SyncCredentialLease;
   advisory?: true;
   type: typeof MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION;
   requestId: string;
@@ -126,8 +183,12 @@ export type SyncStopResponse = RuntimeMessageResponse<{
   executorId: string;
   executorRevision: number;
 }>;
-export type SyncOriginPermissionResponse = RuntimeMessageResponse<{ allowed: boolean }>;
+export type SyncOriginPermissionResponse = RuntimeMessageResponse<{
+  allowed: boolean;
+  reason?: 'secrets-locked';
+}>;
 export type SyncConnectionRuntimeRequest =
+  | SyncCredentialRequest
   | SyncProductRequest
   | SyncProductExecutorRequest
   | SyncWorkspaceStartRequest
@@ -137,6 +198,7 @@ export type SyncConnectionRuntimeRequest =
   | SyncStopRequest
   | SyncOriginPermissionRequest;
 export type RuntimeSyncConnectionRequestByType = {
+  [MessageType.SYNC_CONNECTION_CREDENTIAL]: SyncCredentialRequest;
   [MessageType.SYNC_PRODUCT_COMMAND]: SyncProductRequest;
   [MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND]: SyncProductExecutorRequest;
   [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: SyncWorkspaceStartRequest;
@@ -147,6 +209,7 @@ export type RuntimeSyncConnectionRequestByType = {
   [MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION]: SyncOriginPermissionRequest;
 };
 export type RuntimeSyncConnectionResponseByType = {
+  [MessageType.SYNC_CONNECTION_CREDENTIAL]: SyncCredentialResponse;
   [MessageType.SYNC_PRODUCT_COMMAND]: SyncProductResponse;
   [MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND]: SyncProductResponse;
   [MessageType.OFFSCREEN_SYNC_WORKSPACE_START]: SyncStartResponse;
@@ -187,11 +250,31 @@ export interface SyncRemoteCatalogCard {
 
 export type SyncNativeEditingRoot = Pick<SyncRemoteSelection, 'rootKind' | 'rootId'>;
 
+/** Canonical structural projection of the existing Library export choices, without download authority. */
+export interface SyncLibraryBackupOptions {
+  includeDrafts: boolean;
+  includeSourceMetadata: boolean;
+  includeTelemetry: boolean;
+  includeWebSnapshots: boolean;
+  scope: 'all' | 'selected';
+  selected?: {
+    mediaAssetIds: string[];
+    scenarioProjectIds: string[];
+    videoProjectIds: string[];
+  };
+}
+
 export type SyncProductWork =
+  | {
+      kind: 'library-backup-prepare';
+      expected: SyncConnectionIdentity;
+      options: SyncLibraryBackupOptions;
+    }
   | { kind: 'backup-prepare'; root: SyncNativeEditingRoot }
   | { kind: 'native-release'; root: SyncNativeEditingRoot }
   | { kind: 'cache-trim' }
   | { kind: 'native-prepare'; root: SyncNativeEditingRoot }
+  | { kind: 'scenario-export-prepare'; projectId: string; exportId: string }
   | { kind: 'automatic-sync' }
   | { kind: 'catalog-refresh'; bypassCache: boolean }
   | { kind: 'replica-prepare'; selection: SyncRemoteSelection; preserveNative?: true }
@@ -203,6 +286,11 @@ export type SyncProductWork =
       resolutionId: string;
     };
 export type SyncProductCommand =
+  | { kind: 'checkpoint-policy' }
+  | { kind: 'checkpoint-interval'; intervalMs: SyncCheckpointInterval }
+  | { kind: 'checkpoint-flush' }
+  | { kind: 'checkpoint-exit'; receipt: SyncCheckpointReceipt }
+  | { kind: 'checkpoint-wake' }
   | { kind: 'cache-status' }
   | { kind: 'cache-budget'; budgetBytes: number; revision: number }
   | { kind: 'cache-root-status'; root: SyncNativeEditingRoot }
@@ -214,13 +302,22 @@ export type SyncProductCommand =
       authentication: SyncConnectionAuthentication;
     }
   | {
-      kind: 'workspace-join';
+      kind: 'workspace-discover';
       rootUrl: string;
       accountId: string;
+      authentication: SyncConnectionAuthentication;
+      previous: SyncWorkspaceSource | null;
+    }
+  | {
+      kind: 'workspace-join';
+      source: SyncWorkspaceSource & { kind: 'join' };
+      prefix: string;
+      expected: SyncWorkspaceIdentity;
       authentication: SyncConnectionAuthentication;
     }
   | {
       kind: 'workspace-retry';
+      operation?: 'discover';
       source: SyncWorkspaceSource;
       authentication: SyncConnectionAuthentication;
     }
@@ -228,9 +325,17 @@ export type SyncProductCommand =
       kind: 'workspace-enroll';
       source: SyncWorkspaceSource;
       authentication: SyncConnectionAuthentication;
+      storagePolicy: SyncStoragePolicy;
     }
   | { kind: 'workspace-abandon'; source: SyncWorkspaceSource }
   | { kind: 'status' }
+  | { kind: 'runtime-status' }
+  | {
+      kind: 'connection-authentication';
+      expected: SyncConnectionIdentity;
+      authentication: SyncConnectionAuthentication;
+    }
+  | { kind: 'connection-resume'; expected: SyncConnectionIdentity }
   | { kind: 'connection-local-only'; expected: SyncConnectionIdentity }
   | Exclude<SyncProductWork, { kind: 'automatic-sync' }>
   | { kind: 'inspect'; requestId: string; advisory?: true }
@@ -241,9 +346,11 @@ export type SyncProductFailureCode =
   | 'unavailable'
   | 'invalid-data';
 export type SyncProductCompletion =
+  | { kind: 'library-backup'; expected: SyncConnectionIdentity; options: SyncLibraryBackupOptions }
   | { kind: 'native-release'; root: SyncNativeEditingRoot; result: SyncCacheReleaseResult }
   | { kind: 'cache-trim'; result: SyncCacheTrimResult }
   | { kind: 'native'; root: SyncNativeEditingRoot }
+  | { kind: 'scenario-export'; projectId: string; exportId: string }
   | { kind: 'automatic'; applied: number; deferred: number; remaining: boolean }
   | { kind: 'resolution'; operationId: string }
   | { kind: 'catalog'; count: number }
@@ -257,6 +364,7 @@ export interface SyncProductJobSnapshot {
 }
 export interface SyncProductStatus {
   connection: {
+    expected: SyncConnectionIdentity;
     phase: 'active' | 'paused' | 'updating-auth';
     rootUrl: string;
     accountId: string;
@@ -270,7 +378,40 @@ export interface SyncProductStatus {
   workspaceJob: SyncWorkspaceJobSnapshot | null;
   products: SyncProductJobSnapshot[];
 }
+/** Public popup observation excludes native identities and execution authority. */
+export interface SyncPopupRuntimeStatus {
+  configuration: 'configured' | 'unconfigured' | 'unknown';
+  connection: 'active' | 'paused' | 'credentials-required' | 'updating-auth' | null;
+  localPublication: 'waiting' | 'published' | 'discovering' | 'unknown';
+  activity: 'idle' | 'running' | 'stopping' | 'unknown';
+  remote:
+    | { knowledge: 'unknown' }
+    | { knowledge: 'observed-pass'; outcome: 'complete' | 'deferred' };
+  protection: 'not-enrolled' | 'unlocked' | 'locked' | 'unknown';
+  issue:
+    | SyncProductFailureCode
+    | 'queue-problem'
+    | 'permission-required'
+    | 'index-coverage'
+    | 'not-ready'
+    | null;
+  repair:
+    | 'connection'
+    | 'security'
+    | 'queue'
+    | 'queue-problems'
+    | 'queue-action-required'
+    | 'storage'
+    | null;
+}
 export type SyncProductResult =
+  | { kind: 'checkpoint-policy'; intervalMs: SyncCheckpointInterval }
+  | { kind: 'checkpoint-flushed'; updated: number; alreadyDue: number }
+  | { kind: 'checkpoint-woken' }
+  | {
+      kind: 'checkpoint-exit';
+      outcome: 'requested' | 'already-due' | 'stale' | 'not-pending' | 'unconfigured';
+    }
   | { kind: 'local-only'; history: 'delivered' | 'incomplete' }
   | {
       kind: 'local-only-refused';
@@ -281,6 +422,7 @@ export type SyncProductResult =
   | { kind: 'cache-root'; status: SyncCacheRootStatus }
   | { kind: 'accepted'; requestId: string }
   | { kind: 'status'; status: SyncProductStatus }
+  | { kind: 'runtime-status'; status: SyncPopupRuntimeStatus }
   | { kind: 'enrolled' }
   | {
       kind: 'operation';
@@ -303,6 +445,7 @@ export interface SyncProductExecutorRequest extends SyncCommandEnvelope {
   command:
     | {
         kind: 'start';
+        credentialLease?: SyncCredentialLease;
         operationRequestId: string;
         binding: SyncExecutorBinding;
         work: SyncProductWork;

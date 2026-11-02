@@ -10,7 +10,11 @@ import { createMediaLibraryEntry } from '../projects/index.storage.test-support'
 import { EXPECTED_STORES } from '../infrastructure/indexed-db/core.stores';
 import { assetResidencyCopyId, parseAssetResidencyRecord } from './residency-records';
 import type { AssetRef } from './contracts';
-import type { PublishedCaptureOperation } from '../sync-capture/contracts';
+import {
+  captureRootKey,
+  pendingCheckpointKey,
+  type PublishedCaptureOperation,
+} from '../sync-capture/contracts';
 import {
   unloadVerifiedAssetObject,
   restoreVerifiedAssetObject,
@@ -673,4 +677,87 @@ it('still refuses a malformed live pinned root instead of treating it as deleted
   f.table('video_projects').set(rootId, { id: rootId, damaged: true });
   await expect(f.unload()).rejects.toThrow('Native editing resources are unavailable');
   expect(await f.bytes()).toBe('abc');
+});
+
+function markPendingOriginal(
+  f: Awaited<ReturnType<typeof fixture>>,
+  rootId = f.media.id,
+  generation = 3
+) {
+  const rootKey = captureRootKey('space', 'media', rootId);
+  const checkpoint = {
+    version: 1,
+    kind: 'pending-checkpoint',
+    key: pendingCheckpointKey(rootKey),
+    createdAt: 2,
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: generation,
+    rootKind: 'media',
+    rootId,
+    rootKey,
+    revision: '44444444-4444-4444-8444-444444444444',
+    dueAt: 1000,
+  };
+  f.table('sync_capture').set(checkpoint.key, checkpoint);
+  return checkpoint;
+}
+
+it('protects pending checkpoint dependencies before releasing publication pins', async () => {
+  const f = await fixture();
+  const borrower = { ...f.media, id: 'pending-borrower' };
+  f.table('media_library').set(borrower.id, borrower);
+  const owner = { ...f.owner, ownerId: borrower.id };
+  f.table('asset_owners').set(JSON.stringify([owner.ownerKind, owner.ownerId, owner.role]), owner);
+  const checkpoint = markPendingOriginal(f, borrower.id);
+  await expect(f.unload()).rejects.toThrow('pending checkpoint');
+  expect(await f.bytes()).toBe('abc');
+  expect(f.table('asset_residency').size).toBe(0);
+  expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
+  expect(f.table('sync_capture').get(checkpoint.key)).toEqual(checkpoint);
+});
+
+it('rechecks a pending checkpoint created during a controlled object-lock wait', async () => {
+  const f = await fixture();
+  let release!: () => void;
+  let waiting!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    waiting = resolve;
+  });
+  f.options.requestExclusiveLock = async (_name, _options, operation) => {
+    waiting();
+    await gate;
+    await operation(true);
+  };
+  const command = f.unload();
+  await started;
+  markPendingOriginal(f);
+  release();
+  await expect(command).rejects.toThrow('pending checkpoint');
+  expect(await f.bytes()).toBe('abc');
+  expect(f.table('asset_residency').size).toBe(0);
+});
+
+it('refuses a stale pending enrollment without deleting bytes', async () => {
+  const f = await fixture();
+  markPendingOriginal(f, f.media.id, 2);
+  await expect(f.unload()).rejects.toThrow('enrollment');
+  expect(await f.bytes()).toBe('abc');
+  expect(f.table('asset_residency').size).toBe(0);
+});
+
+it('retries unload after pending refusal without changing publication facts', async () => {
+  const f = await fixture();
+  const checkpoint = markPendingOriginal(f);
+  await expect(f.unload()).rejects.toThrow('pending checkpoint');
+  expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
+  f.table('sync_capture').delete(checkpoint.key);
+  await expect(f.unload()).resolves.toMatchObject({ phase: 'unloaded' });
+  expect(f.table('sync_capture').get(f.publication.key)).toEqual({
+    ...f.publication,
+    objects: f.publication.objects.map((object) => ({ ...object, pinned: false })),
+  });
 });

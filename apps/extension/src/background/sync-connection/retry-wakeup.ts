@@ -1,3 +1,8 @@
+import { SecretProtectionLockedError } from '../../composition/persistence/secret-protection/model';
+import type {
+  materializeDueSyncCheckpoints,
+  SyncCheckpointScheduleObservation,
+} from '../../composition/persistence/sync-capture/checkpoint-schedule';
 import { SyncConnectionCoordinatorError } from './coordinator';
 import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
 import { SyncWorkspaceError } from '../../workflows/sync-transfer/workspace';
@@ -29,7 +34,9 @@ const logger = createLogger({ namespace: 'SyncQueueRetry' });
 /** Native scheduling and the existing coordinator retain all durable admission authority. */
 export interface SyncQueueRetryWakeupDependencies {
   loadConnection(): Promise<SyncConnectionMetadata | null>;
+  canDispatch?(): Promise<boolean>;
   reconcileCaptures: typeof reconcileSyncQueueCaptures;
+  flushCheckpoints?: typeof materializeDueSyncCheckpoints;
   refreshIncoming?: () => Promise<void>;
   discoverInitialRoots?(
     scope: SyncQueueScope,
@@ -59,6 +66,7 @@ type DiagnosticReason =
   | SyncRemoteError['code']
   | SyncWorkspaceError['code']
   | SyncCatalogError['code']
+  | 'secrets-locked'
   | 'unexpected';
 
 type RetryStage =
@@ -66,6 +74,7 @@ type RetryStage =
   | 'alarm-create'
   | 'connection-load'
   | 'initial-discovery'
+  | 'checkpoint-capture'
   | 'capture-enqueue'
   | 'incoming-refresh'
   | 'schedule-load'
@@ -89,8 +98,38 @@ function warnDeferred(
   }
 }
 
+function reportCheckpoint(observation: SyncCheckpointScheduleObservation): void {
+  try {
+    if (observation.phase === 'preparing') {
+      logger.info('sync.checkpoint.preparing');
+      return;
+    }
+    const c = observation.counts;
+    const fields = [
+      `capturedRoots=${c.capturedRoots}`,
+      `acknowledgedRoots=${c.acknowledgedRoots}`,
+      `deadlineWaitingRoots=${c.deadlineWaitingRoots}`,
+      `scopeMismatchRoots=${c.scopeMismatchRoots}`,
+      `invalidPendingRoots=${c.invalidPendingRoots}`,
+      `revisionChangedRoots=${c.revisionChangedRoots}`,
+      `predecessorWaitingRoots=${c.predecessorWaitingRoots}`,
+      `admissionRefusedRoots=${c.admissionRefusedRoots}`,
+      `captureFailedRoots=${c.captureFailedRoots}`,
+      `deferredRoots=${c.deferredRoots}`,
+      `publicationBusyPasses=${c.publicationBusyPasses}`,
+      `progressChangedPasses=${c.progressChangedPasses}`,
+      `admissionRefusedPasses=${c.admissionRefusedPasses}`,
+      `failedPasses=${c.failedPasses}`,
+    ].join(' ');
+    logger.info(`sync.checkpoint.settled ${fields}`);
+  } catch {
+    /* Diagnostics cannot change scheduling or retained native work. */
+  }
+}
+
 function diagnosticReason(error: unknown): DiagnosticReason {
   try {
+    if (error instanceof SecretProtectionLockedError) return 'secrets-locked';
     if (error instanceof SyncConnectionCoordinatorError) {
       const code = error.code;
       switch (code) {
@@ -122,6 +161,7 @@ function diagnosticReason(error: unknown): DiagnosticReason {
       case 'unsupported-cursor':
       case 'metadata-limit':
       case 'cancelled':
+      case 'secrets-locked':
       case 'authentication':
       case 'access-denied':
       case 'missing':
@@ -239,6 +279,7 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
     }
     if (disposed) return;
     context.stage = 'connection-load';
+    if (deps.canDispatch && !(await deps.canDispatch())) return;
     const connection = await deps.loadConnection();
     if (disposed) return;
     if (!connection || connection.phase !== 'active') return;
@@ -259,6 +300,25 @@ export function createSyncQueueRetryWakeup(deps: SyncQueueRetryWakeupDependencie
           followupPending = true;
       } catch (error) {
         warnDeferred('initial-discovery', diagnosticReason(error));
+      }
+      if (disposed) return;
+      let checkpointReported = false;
+      try {
+        const checkpoints = await deps.flushCheckpoints?.(
+          scope,
+          connection.identity,
+          (observation) => {
+            if (disposed) return;
+            if (observation.phase === 'settled') checkpointReported = true;
+            reportCheckpoint(observation);
+          }
+        );
+        if (disposed) return;
+        if (checkpoints?.remaining && checkpoints.advanced) followupPending = true;
+        if (checkpoints && checkpoints.refused > 0 && !checkpointReported)
+          warnDeferred('checkpoint-capture', 'refused');
+      } catch (error) {
+        if (!checkpointReported) warnDeferred('checkpoint-capture', diagnosticReason(error));
       }
       if (disposed) return;
       try {

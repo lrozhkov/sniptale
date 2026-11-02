@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useId, useMemo, useState, type FormEvent } from 'react';
 
 import { translate } from '../../../../platform/i18n';
 import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
@@ -105,6 +105,7 @@ function AISecretUnlockPassphraseField(
     >
       <ProductInput
         autoComplete="off"
+        aria-label={translate('settings.aiProviders.secretProtectionPassphraseLabel')}
         autoFocus
         disabled={props.isSubmitting || !props.requestId}
         onChange={(event) => props.onPassphraseChange(event.currentTarget.value)}
@@ -136,13 +137,21 @@ function AISecretUnlockFooter(
 }
 
 function AISecretUnlockModal(props: AISecretUnlockModalProps) {
+  const titleId = useId();
   return (
-    <ProductModal closeOnBackdrop={false} maxWidth="420px" width="calc(100vw - 32px)">
+    <ProductModal
+      closeOnBackdrop={false}
+      labelledBy={titleId}
+      maxWidth="420px"
+      width="calc(100vw - 32px)"
+    >
       <ProductModalHeader
         compact
         disabled={props.isSubmitting}
         onClose={props.onCancel}
-        title={translate('settings.aiProviders.secretProtectionUnlockTitle')}
+        title={
+          <span id={titleId}>{translate('settings.aiProviders.secretProtectionUnlockTitle')}</span>
+        }
       />
       <ProductModalBody compact asForm className="space-y-4" onSubmit={props.onSubmit}>
         <AISecretUnlockPassphraseField

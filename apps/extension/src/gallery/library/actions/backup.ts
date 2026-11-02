@@ -1,7 +1,7 @@
 import {
   planRetainedLibrary,
   RetainedLibraryNotReadyError,
-  prepareRetainedLibrary,
+  prepareLibraryBackup,
 } from '../../../workflows/sync-transfer/retained-library';
 import { runWithAssetResourceRead } from '../../../composition/persistence/assets/resource-sessions';
 import {
@@ -108,7 +108,7 @@ export function createExportBackupAction(
       async () => {
         try {
           const options = createInitialBackupExportOptions(controller);
-          const preparation = options.scope === 'all' ? await planRetainedLibrary() : null;
+          const preparation = await planRetainedLibrary(options);
           if (preparation) {
             controller.actions.surface.setPendingExport({ options, summary: null, preparation });
           } else {
@@ -135,16 +135,22 @@ export function createConfirmExportBackupAction(controller: GalleryBackupExportC
         try {
           const preparation = controller.state.storage.pendingExport?.preparation;
           await runWithAssetResourceRead(async () => {
-            if (preparation) {
-              await prepareRetainedLibrary(preparation, abortController.signal);
-            } else {
+            const prepared = await prepareLibraryBackup(
+              options,
+              abortController.signal,
+              preparation?.authorization
+            );
+            if (!prepared) {
               const summary = await inspectLocalMediaHubBackup(options);
               abortController.signal.throwIfAborted();
               controller.actions.surface.setPendingExport({ options, summary });
             }
             abortController.signal.throwIfAborted();
             phase = 'write';
-            await exportMediaHubBackup(options, { signal: abortController.signal });
+            await exportMediaHubBackup(options, {
+              signal: abortController.signal,
+              ...(prepared ? { requirePreparedNative: true } : {}),
+            });
           });
           if (abortController.signal.aborted) {
             return;

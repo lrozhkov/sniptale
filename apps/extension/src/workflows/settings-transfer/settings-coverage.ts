@@ -123,15 +123,8 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     ['ai.providers']
   ),
   excluded(
-    'ai/connections/controller/section/secret-protection.ts',
-    [
-      'changeAISecretPassphraseProtection',
-      'disableAISecretPassphraseProtection',
-      'enableAISecretPassphraseProtection',
-      'lockAISecretPassphraseProtection',
-      'resetAISecretPassphraseProtection',
-      'unlockAISecretPassphraseProtection',
-    ],
+    'apps/extension/src/settings/secret-protection/context.tsx',
+    ['createSecretProtectionClient', 'settingsRuntimeMessagingTransport'],
     'secret'
   ),
   transferable(

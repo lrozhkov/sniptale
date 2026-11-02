@@ -10,8 +10,8 @@ const dependencyMocks = vi.hoisted(() => ({
   useAiProvidersDataStateMock: vi.fn(),
   useAiProvidersDeleteHandlersMock: vi.fn(),
   useAiProvidersProviderSecretActionsMock: vi.fn(),
-  useAiProvidersSecretProtectionStateMock: vi.fn(),
-  useAiSecretProtectionDataStateMock: vi.fn(),
+  useSettingsSecretProtectionMock: vi.fn(),
+  sharedEnsureUnlockedMock: vi.fn(),
   useAiProvidersLoaderMock: vi.fn(),
   useAiProvidersModalStateMock: vi.fn(),
 }));
@@ -23,7 +23,6 @@ vi.mock('../../../model-options', () => ({
 vi.mock('../../../state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../state')>()),
   useAiProvidersDataState: dependencyMocks.useAiProvidersDataStateMock,
-  useAiSecretProtectionDataState: dependencyMocks.useAiSecretProtectionDataStateMock,
   useAiProvidersLoader: dependencyMocks.useAiProvidersLoaderMock,
 }));
 
@@ -43,8 +42,8 @@ vi.mock('../../modal-state', () => ({
   useAiProvidersModalState: dependencyMocks.useAiProvidersModalStateMock,
 }));
 
-vi.mock('../../secret-protection', () => ({
-  useAiProvidersSecretProtectionState: dependencyMocks.useAiProvidersSecretProtectionStateMock,
+vi.mock('../../../../../../../secret-protection/context', () => ({
+  useSettingsSecretProtection: dependencyMocks.useSettingsSecretProtectionMock,
 }));
 
 const PROVIDER: AIProvider = {
@@ -79,20 +78,9 @@ function createDataState() {
   };
 }
 
-function createSecretProtectionDataState() {
-  return {
-    secretProtectionStatus: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
-    setSecretProtectionStatus: vi.fn(),
-  };
-}
-
-function mockRuntimeState(
-  dataState: ReturnType<typeof createDataState>,
-  secretProtectionDataState: ReturnType<typeof createSecretProtectionDataState>
-) {
+function mockRuntimeState(dataState: ReturnType<typeof createDataState>) {
   const reloadData = vi.fn().mockResolvedValue(undefined);
   dependencyMocks.useAiProvidersDataStateMock.mockReturnValue(dataState);
-  dependencyMocks.useAiSecretProtectionDataStateMock.mockReturnValue(secretProtectionDataState);
   dependencyMocks.useAiProvidersLoaderMock.mockReturnValue({ reloadData });
 }
 
@@ -140,9 +128,9 @@ function mockChromeAiState() {
 }
 
 function mockSecretProtectionState() {
-  dependencyMocks.useAiProvidersSecretProtectionStateMock.mockReturnValue({
-    dialog: null,
-    status: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
+  dependencyMocks.sharedEnsureUnlockedMock.mockResolvedValue(undefined);
+  dependencyMocks.useSettingsSecretProtectionMock.mockReturnValue({
+    ensureUnlocked: dependencyMocks.sharedEnsureUnlockedMock,
   });
 }
 
@@ -156,8 +144,7 @@ function mockModelOptions() {
 
 function mockDependencies() {
   const dataState = createDataState();
-  const secretProtectionDataState = createSecretProtectionDataState();
-  mockRuntimeState(dataState, secretProtectionDataState);
+  mockRuntimeState(dataState);
   mockModalState();
   mockDeleteHandlers();
   mockProviderSecretActions();
@@ -180,7 +167,7 @@ function expectControllerDependencyShape(
       enabled: false,
     },
     secretProtection: {
-      status: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
+      ensureUnlocked: expect.any(Function),
     },
     dataState: {
       isLoading: false,
@@ -199,8 +186,7 @@ function expectControllerDependencyShape(
 
 function expectOwnerHookCalls() {
   expect(dependencyMocks.useAiProvidersLoaderMock).toHaveBeenCalledWith(
-    dependencyMocks.useAiProvidersDataStateMock.mock.results[0]?.value,
-    dependencyMocks.useAiSecretProtectionDataStateMock.mock.results[0]?.value
+    dependencyMocks.useAiProvidersDataStateMock.mock.results[0]?.value
   );
   expect(dependencyMocks.useAiProvidersChromeAiStateMock).toHaveBeenCalledWith({
     chromeAiEnabled: false,
@@ -216,10 +202,7 @@ function expectOwnerHookCalls() {
   expect(dependencyMocks.useAiProvidersProviderSecretActionsMock).toHaveBeenCalledWith({
     reloadData: expect.any(Function),
   });
-  expect(dependencyMocks.useAiProvidersSecretProtectionStateMock).toHaveBeenCalledWith({
-    reloadData: expect.any(Function),
-    status: { isEnabled: false, isUnlocked: true, mode: 'transparent' },
-  });
+  expect(dependencyMocks.useSettingsSecretProtectionMock).toHaveBeenCalled();
 }
 
 it('builds the controller dependencies from owner-local hooks', () => {
@@ -227,4 +210,20 @@ it('builds the controller dependencies from owner-local hooks', () => {
 
   expectControllerDependencyShape(deps);
   expectOwnerHookCalls();
+});
+
+it('binds provider secret saves to shared admission for the AI participant', async () => {
+  const deps = useAiProvidersSectionControllerDependencies();
+
+  await deps.secretProtection.ensureUnlocked();
+
+  expect(dependencyMocks.sharedEnsureUnlockedMock).toHaveBeenCalledExactlyOnceWith('ai');
+});
+
+it('propagates shared unlock cancellation to the existing AI save barrier', async () => {
+  const cancelled = new Error('Unlock cancelled');
+  dependencyMocks.sharedEnsureUnlockedMock.mockRejectedValueOnce(cancelled);
+  const deps = useAiProvidersSectionControllerDependencies();
+
+  await expect(deps.secretProtection.ensureUnlocked()).rejects.toBe(cancelled);
 });

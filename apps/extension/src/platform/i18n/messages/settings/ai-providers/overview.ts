@@ -21,10 +21,6 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
     ru: 'Chrome AI',
     en: 'Chrome AI',
   },
-  securityTab: {
-    ru: 'Безопасность',
-    en: 'Security',
-  },
   chromeAiTitle: {
     ru: 'Включить Chrome AI',
     en: 'Enable Chrome AI',

@@ -132,6 +132,8 @@ it('preserves lane membership and locks through durable history and retry', asyn
 
 it('reopens exactly one durable history and rejects missing, malformed or changed media', async () => {
   const opened = await openVideoWorkspace(id, source);
+  expect(opened).not.toHaveProperty('checkpointReceipt');
+  expect(await readVideoWorkspace(id)).not.toHaveProperty('checkpointReceipt');
   expect(opened.workspace.revision).toBe(1);
   expect(opened.workspace.advanced.background.zoomBehavior).toBe('window');
   expect(await openVideoWorkspace(id, source)).toEqual(opened);

@@ -38,6 +38,8 @@ vi.mock('./frame', () => ({
 }));
 
 import { BackupExportModalContent } from './backup-export-content';
+import type { BackupExportModalProps } from './types';
+import { galleryBackupExportModalMessages } from '../../../platform/i18n/messages/gallery/backup-export-modal';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -108,6 +110,8 @@ function renderBackupExportModal(args: {
   onExport?: (options: MediaHubBackupExportOptions) => Promise<void>;
   onInspect?: (options: MediaHubBackupExportOptions) => Promise<MediaHubLocalBackupSummary>;
   options?: MediaHubBackupExportOptions;
+  summary?: MediaHubLocalBackupSummary | null;
+  preparation?: BackupExportModalProps['preparation'];
 }) {
   const onClose = args.onClose ?? vi.fn();
   const onExport = args.onExport ?? vi.fn(async () => undefined);
@@ -121,7 +125,8 @@ function renderBackupExportModal(args: {
     root?.render(
       <BackupExportModalContent
         options={args.options ?? createExportOptions()}
-        summary={createLocalSummary()}
+        summary={args.summary === undefined ? createLocalSummary() : args.summary}
+        {...(args.preparation === undefined ? {} : { preparation: args.preparation })}
         onClose={onClose}
         onExport={onExport}
         onInspect={onInspect}
@@ -134,6 +139,7 @@ function renderBackupExportModal(args: {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  translateMock.mockImplementation((key: string) => key);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -278,7 +284,129 @@ it('keeps catalog confirmation and privacy changes metadata-only before download
   });
   expect(onInspect).not.toHaveBeenCalled();
   expect(onExport).not.toHaveBeenCalled();
-  expect(container?.textContent).toContain('gallery.backupExportModal.remoteRoots');
+  expect(container?.textContent).toContain('gallery.backupExportModal.remotePreparation');
+  expect(container?.textContent).toContain('gallery.backupExportModal.scopeAll');
   await act(async () => findButton('gallery.backupExportModal.downloadAndExport').click());
   expect(onExport).toHaveBeenCalledWith(expect.objectContaining({ includeDrafts: true }));
+});
+
+function preparation(missingCount: 0 | 1): NonNullable<BackupExportModalProps['preparation']> {
+  return {
+    binding: {
+      provider: 'webdav',
+      rootUrl: 'https://dav.example/',
+      accountId: 'fixture',
+      spaceId: 'space',
+      connectionGeneration: 1,
+      profileCreatedAt: 1,
+    },
+    authorization: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 },
+    missing: missingCount
+      ? [
+          {
+            rootKind: 'video-project',
+            rootId: 'remote',
+            operationId: 'op',
+            sourceDigest: 'a'.repeat(64),
+          },
+        ]
+      : [],
+    nativeRootCount: 0,
+    remoteBytesUpperBound: missingCount ? 4096 : 0,
+  };
+}
+
+it.each(['en', 'ru'] as const)(
+  'does not describe a selected backup as the whole Library or promise a stale size in %s',
+  async (locale) => {
+    translateMock.mockImplementation((key: string) =>
+      key === 'gallery.backupExportModal.remotePreparation'
+        ? galleryBackupExportModalMessages.remotePreparation[locale]
+        : key === 'gallery.backupExportModal.nativePreparation'
+          ? galleryBackupExportModalMessages.nativePreparation[locale]
+          : key
+    );
+    const selected = {
+      mediaAssetIds: ['chosen-media'],
+      scenarioProjectIds: ['chosen-scenario'],
+      videoProjectIds: [],
+    };
+    const onInspect = vi.fn();
+    const onExport = vi.fn(async () => undefined);
+    const onClose = vi.fn();
+    renderBackupExportModal({
+      options: createExportOptions({ scope: 'selected', selected }),
+      summary: null,
+      preparation: preparation(0),
+      onInspect,
+      onExport,
+      onClose,
+    });
+    expect(container?.textContent).toContain('gallery.backupExportModal.scopeSelected');
+    expect(container?.textContent).not.toMatch(/local library|текущего каталога сервера/iu);
+    expect(container?.textContent).not.toContain('shared.bytes.zero');
+    expect(container?.textContent).not.toContain('gallery.backupExportModal.remoteRoots');
+    expect(container?.textContent).not.toContain('gallery.backupExportModal.remoteSize');
+    expect(container?.textContent).not.toMatch(
+      /not included above|не включён в оценку|at most|не более/iu
+    );
+    expect(container?.textContent).toMatch(
+      locale === 'en'
+        ? /chosen items.*related files/iu
+        : /выбранные материалы.*связанные с ними файлы/iu
+    );
+    expect(container?.textContent).toMatch(
+      locale === 'en'
+        ? /Missing files download after confirmation/iu
+        : /Недостающие файлы.*после подтверждения/iu
+    );
+    expect(container?.textContent).toMatch(
+      locale === 'en'
+        ? /Cancellation keeps completed downloads/iu
+        : /Отмена сохранит уже скачанные данные/iu
+    );
+    await act(async () => {
+      const toggles = container!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+      toggles[0]!.click();
+      toggles[3]!.click();
+    });
+    expect(onInspect).not.toHaveBeenCalled();
+    expect(onExport).not.toHaveBeenCalled();
+    await act(async () => findButton('gallery.backupExportModal.downloadAndExport').click());
+    expect(onExport).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        scope: 'selected',
+        selected,
+        includeDrafts: true,
+        includeWebSnapshots: false,
+      })
+    );
+    await act(async () => findButton('common.actions.cancel').click());
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onExport).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps full-library confirmation honest after options change while the old preparation plan remains', async () => {
+  const onInspect = vi.fn();
+  const onExport = vi.fn(async () => undefined);
+  const onClose = vi.fn();
+  const oldPlan = preparation(1);
+  renderBackupExportModal({
+    options: createExportOptions(),
+    summary: null,
+    preparation: oldPlan,
+    onInspect,
+    onExport,
+    onClose,
+  });
+  expect(container?.textContent).toContain('gallery.backupExportModal.scopeAll');
+  await act(async () => findButton('gallery.backupExportModal.supportBundle').click());
+  expect(container?.textContent).not.toContain('4 shared.bytes.kb');
+  expect(container?.textContent).not.toContain('gallery.backupExportModal.remoteSize');
+  expect(onInspect).not.toHaveBeenCalled();
+  expect(onExport).not.toHaveBeenCalled();
+  await act(async () => findButton('common.actions.cancel').click());
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(onExport).not.toHaveBeenCalled();
 });

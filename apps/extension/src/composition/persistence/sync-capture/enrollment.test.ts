@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { capturePreparedDatabase } from '../infrastructure/indexed-db/core';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
+import {
+  createVideoProjectEntry,
+  createMediaLibraryEntry,
+  createProjectAssetEntry,
+} from '../projects/index.test-support';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
+import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
+import { deferCheckpointInTransaction } from './checkpoints';
 import { captureMediaInTransaction } from './capture';
 import { captureRootKey } from './contracts';
 import { discoverInitialSyncRoots } from './enrollment';
@@ -327,5 +335,160 @@ it.each([
       'Invalid sync queue connection'
     );
     expect(f.rows).toEqual(before);
+  }
+);
+
+it('keeps uncaptured pending project ownership during initial discovery', async () => {
+  const f = setup();
+  f.table('media_library').clear();
+  f.table('sync_capture').set('profile', { ...f.profile, checkpointIntervalMs: 300000 });
+  const entry = createVideoProjectEntry({ id: 'pending-project', name: 'Latest local edits' });
+  f.table('video_projects').set(entry.id, entry);
+  const db = capturePreparedDatabase();
+  if (!db) throw new Error('Expected prepared enrollment database');
+  const tx = db.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'video-project', rootId: entry.id },
+    100
+  );
+  await tx.done;
+  if (!pending) throw new Error('Expected pending project ownership');
+  await discoverInitialSyncRoots(scope, authorization);
+  expect(await discoverInitialSyncRoots(scope, authorization)).toMatchObject({
+    captured: 0,
+    existing: 1,
+    refused: 0,
+  });
+  expect(f.table('sync_capture').get(pending.key)).toEqual(pending);
+  expect(captures(f)).toHaveLength(0);
+  expect(f.table('video_projects').get(entry.id)).toEqual(entry);
+});
+
+it('immediately captures a preexisting project during interval-enabled initial discovery', async () => {
+  const f = setup();
+  f.table('media_library').clear();
+  f.table('sync_capture').set('profile', { ...f.profile, checkpointIntervalMs: 300000 });
+  const entry = createVideoProjectEntry({
+    id: 'preexisting-project',
+    name: 'Existing local project',
+  });
+  f.table('video_projects').set(entry.id, entry);
+  await discoverInitialSyncRoots(scope, authorization);
+  expect(await discoverInitialSyncRoots(scope, authorization)).toMatchObject({
+    captured: 1,
+    refused: 0,
+  });
+  expect(captures(f)).toHaveLength(1);
+  expect(captures(f)[0]).toMatchObject({
+    rootId: entry.id,
+    phase: 'native',
+    change: { kind: 'video-project', rows: { project: entry } },
+  });
+  expect(
+    [...f.table('sync_capture').values()]
+      .map(parseSyncCaptureRecord)
+      .filter((row) => row?.kind === 'pending-checkpoint')
+  ).toHaveLength(0);
+});
+
+it('preserves pending work created after initial root discovery and before capture', async () => {
+  const f = setup();
+  f.table('sync_capture').set('profile', { ...f.profile, checkpointIntervalMs: 300000 });
+  const held = holdDiscovery(f);
+  const discovery = discoverInitialSyncRoots(scope, authorization);
+  await held.reached.promise;
+  const db = capturePreparedDatabase();
+  if (!db) throw new Error('Expected prepared enrollment database');
+  const tx = db.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'media', rootId: mediaId },
+    100
+  );
+  await tx.done;
+  if (!pending) throw new Error('Expected pending root');
+  held.release.resolve();
+  expect(await discovery).toMatchObject({ captured: 0, existing: 1, refused: 0 });
+  expect(f.table('sync_capture').get(pending.key)).toEqual(pending);
+  expect(captures(f)).toHaveLength(0);
+  expect(f.table('media_library').get(mediaId)).toEqual(betaV1Fixture.records.media_library[0]);
+});
+
+it.each([false, true])(
+  'enrolls imported Image source without changing original ownership, edited=%s',
+  async (edited) => {
+    const f = setup();
+    f.table('media_library').clear();
+    f.table('recordings').clear();
+    for (const name of ['project_assets', 'image_workspaces', 'aggregate_presentations'])
+      if (!f.rows.has(name)) f.rows.set(name, new Map());
+    const ref = {
+      assetId: 'enrolled-image',
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: 'objects/enrolled-image' },
+      mimeType: 'image/png',
+      size: 8,
+      sha256: null,
+    };
+    const child = createProjectAssetEntry({
+      id: 'enrolled-image-child',
+      assetId: ref.assetId,
+      size: ref.size,
+      mimeType: ref.mimeType,
+    });
+    const media = createMediaLibraryEntry({
+      id: `project-asset:${child.id}`,
+      kind: 'image',
+      source: { kind: 'project-asset', projectAssetId: child.id },
+      size: ref.size,
+      mimeType: ref.mimeType,
+      workspaceRevision: edited ? 2 : 0,
+      imageContentState: edited ? 'edited' : 'original',
+      lifecycle: { savedAt: 1, updatedAt: 1, storageClass: 'library' },
+    });
+    const owner = {
+      assetId: ref.assetId,
+      ownerKind: 'project-asset',
+      ownerId: child.id,
+      role: 'body',
+    };
+    f.table('media_library').set(media.id, media);
+    f.table('project_assets').set(child.id, child);
+    f.table('asset_refs').set(ref.assetId, ref);
+    const ownerKey = JSON.stringify(['project-asset', child.id, 'body']);
+    f.table('asset_owners').set(ownerKey, owner);
+    const workspace = {
+      aggregateId: media.id,
+      revision: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      sourceTitle: null,
+      sourceUrl: null,
+      document: createPersistedEditorDocumentFixture(createEditorDocumentFixture(), ref.assetId),
+    };
+    if (edited) f.table('image_workspaces').set(media.id, workspace);
+    expect(await discoverInitialSyncRoots(scope, authorization)).toMatchObject({
+      captured: 1,
+      refused: 0,
+    });
+    const captured = captures(f);
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({
+      rootId: media.id,
+      change: {
+        kind: edited ? 'image' : 'media',
+        rows: {
+          media,
+          projectAsset: child,
+          ...(edited ? { workspace, originalRef: ref } : { ref }),
+        },
+      },
+    });
+    expect(f.table('media_library').get(media.id)).toEqual(media);
+    expect(f.table('project_assets').get(child.id)).toEqual(child);
+    expect(f.table('asset_owners').get(ownerKey)).toEqual(owner);
+    expect(f.table('asset_refs').get(ref.assetId)).toEqual(ref);
+    expect(fetch).not.toHaveBeenCalled();
   }
 );

@@ -9,6 +9,7 @@ import type { VideoWorkspaceSnapshot } from '../../composition/persistence/revie
 import type { VideoWorkspaceTypingChange } from '../../composition/persistence/review-workspaces/typing';
 import type { createVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/store';
 import type { renameVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/project-commands';
+import type { SyncProductResult } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import type * as persistence from '../../composition/persistence/review-workspaces/store';
 import type {
   ReviewSpeechPublicationChange,
@@ -37,6 +38,8 @@ export type AutosaveCapture = {
 
 export type Failure = 'conflict' | 'changed-source' | 'missing-media' | 'invalid' | 'storage';
 
+import type { acquireSyncCheckpointEdit } from '../../composition/persistence/sync-capture/checkpoint-publication';
+
 export type ReviewSessionPersistence = Pick<
   typeof persistence,
   | 'saveVideoWorkspaceSnapshot'
@@ -46,6 +49,8 @@ export type ReviewSessionPersistence = Pick<
   | 'saveVideoWorkspaceAdvanced'
   | 'saveVideoWorkspaceDraft'
 > & {
+  acquireSyncCheckpointEdit?: typeof acquireSyncCheckpointEdit;
+  wakeCheckpoints?: () => Promise<Extract<SyncProductResult, { kind: 'checkpoint-woken' }>>;
   renameVideoWorkspaceProject?: typeof renameVideoWorkspaceProject;
   createVideoWorkspaceProject?: typeof createVideoWorkspaceProject;
 } & Partial<

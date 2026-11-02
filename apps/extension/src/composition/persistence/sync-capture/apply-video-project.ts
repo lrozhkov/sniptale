@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from './checkpoints';
 import { VideoProjectApplyConflictError } from './apply-video-project.contracts';
 import type {
   ApplyPreparedVideoProjectRevisionInput,
@@ -505,6 +506,24 @@ async function admitApplication(tx: ApplyTransaction, candidate: HydratedProject
       : await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
   if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
     throw new VideoProjectApplyConflictError('profile-changed');
+  if (
+    await readCheckpointInTransaction(tx, candidate, {
+      rootKind: 'video-project',
+      rootId: root.entry.id,
+    })
+  )
+    throw new VideoProjectApplyConflictError('pending-local-change');
+  for (const dependency of candidate.dependencies)
+    if (
+      await readCheckpointInTransaction(tx, candidate, {
+        rootKind: 'media',
+        rootId: dependency.entry.id,
+      })
+    )
+      throw new VideoProjectApplyConflictError('dependency-changed');
+  for (const dependency of candidate.rootDependencies ?? [])
+    if (await readCheckpointInTransaction(tx, candidate, dependency))
+      throw new VideoProjectApplyConflictError('dependency-changed');
   assertSupportedClosure(candidate);
   const current = await assertLocalPredecessor(tx, candidate, identity);
   const { state, receipt } = await prepareApplicationProvenance(

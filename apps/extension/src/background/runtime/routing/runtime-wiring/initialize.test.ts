@@ -1,3 +1,15 @@
+vi.mock('../../../secret-protection/composition', async () => {
+  const { SecretProtectionAdmissionPermit } =
+    await import('../../../../composition/persistence/secret-protection/model');
+  const withAdmission: import('../../../../composition/persistence/secret-protection/model').SecretProtectionPort['withAdmission'] =
+    (_id, operation) => SecretProtectionAdmissionPermit.run((permit) => operation(null, permit));
+  return {
+    createBackgroundSecretProtection: () => ({
+      service: { prepare: async () => undefined, readKey: async () => null, withAdmission },
+      bindSync: () => undefined,
+    }),
+  };
+});
 vi.mock('./startup', () => ({ runStartupMaintenance: vi.fn() }));
 vi.mock('../../../page-access/lifecycle', () => ({ initializePageAccessLifecycle: vi.fn() }));
 vi.mock('../../../page-recovery/ports', () => ({ registerPageRecoveryPorts: vi.fn() }));
@@ -213,6 +225,7 @@ vi.mock('../../../application/aggregate-promotion/ports', () => ({
 }));
 
 vi.mock('../../../application/privacy-erasure/composition', () => ({
+  configureSecretProtectionPrivacyErasurePort: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
   eraseLocalExtensionDataFromBackground,
@@ -273,9 +286,18 @@ beforeEach(() => {
     productExecutor: syncWiring.productExecutor,
   });
   syncWiring.createCoordinator.mockReturnValue({
+    containForSecretProtection: vi.fn(async () => undefined),
+    observeActivity: vi.fn(async () => ({
+      activity: 'unknown' as const,
+      remote: { knowledge: 'unknown' as const },
+      failureCode: null,
+    })),
     inspect: syncWiring.inspect,
+    updateAuthentication: vi.fn(async () => undefined),
+    resumeConnection: vi.fn(async () => undefined),
     localOnly: syncWiring.localOnly,
     planWorkspace: syncWiring.planWorkspace,
+    selectWorkspace: vi.fn(),
     productCommand: syncWiring.productCommand,
     start: syncWiring.start,
     startWorkspace: syncWiring.startWorkspace,
@@ -301,7 +323,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it('registers all background listeners through the runtime-wiring owner', () => {
+it('registers all background listeners through the runtime-wiring owner', async () => {
   const state = createModeState();
   initializeNativeAppPermissionLifecycle.mockImplementation((service: { connect: () => void }) => {
     service.connect();
@@ -341,7 +363,7 @@ it('registers all background listeners through the runtime-wiring owner', () => 
   expect(nativeAppConnect).toHaveBeenCalledTimes(1);
   expect(registerWebSnapshotViewerPorts).toHaveBeenCalledWith(state.webSnapshotViewerPorts);
   expect(createRetryWakeup).toHaveBeenCalledOnce();
-  expect(runRetryWakeup).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(runRetryWakeup).toHaveBeenCalledOnce());
   expect(initializeBackgroundContextMenus).toHaveBeenCalledWith({
     captureGuardState: state.captureGuardState,
     screenshotModeState: state.screenshotModeState,
@@ -359,7 +381,7 @@ it('creates a disposable viewer port registry when runtime state omits it', () =
   expect(registerWebSnapshotViewerPorts).toHaveBeenCalledWith(expect.any(Map));
 });
 
-it('registers the security control only in the security E2E build', () => {
+it('registers the security control only in the security E2E build', async () => {
   Object.defineProperty(globalThis, '__SNIPTALE_SECURITY_E2E__', {
     configurable: true,
     value: true,
@@ -377,11 +399,12 @@ it('registers the security control only in the security E2E build', () => {
           inspect: syncWiring.inspect,
           localOnly: syncWiring.localOnly,
           planWorkspace: syncWiring.planWorkspace,
+          selectWorkspace: expect.any(Function),
           productCommand: syncWiring.productCommand,
         }),
       })
     );
-    expect(runRetryWakeup).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(runRetryWakeup).toHaveBeenCalledOnce());
   } finally {
     Reflect.deleteProperty(globalThis, '__SNIPTALE_SECURITY_E2E__');
   }
@@ -402,7 +425,7 @@ it('wakes newly activated queue work only after the security start is accepted',
   const accepted = deferred<typeof receipt>();
   syncWiring.start.mockReturnValueOnce(accepted.promise);
   const completion = control.start(input);
-  expect(runRetryWakeup).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(runRetryWakeup).toHaveBeenCalledOnce());
   accepted.resolve(receipt);
   expect(await completion).toEqual(receipt);
   expect(syncWiring.start).toHaveBeenCalledWith(input);
@@ -656,7 +679,16 @@ it('injects native workspace authority and the shared gateway into the same coor
   initializeBackgroundRuntime(createModeState());
   const deps = coordinatorDependencies();
   expect(deps.loadWorkspace).toBe(syncWiring.loadWorkspace);
-  expect(deps.startWorkspaceExecutor).toBe(syncWiring.startWorkspaceExecutor);
+  expect(deps.startWorkspaceExecutor).toBeTypeOf('function');
+  const start = {
+    source: nativeWorkspace().source,
+    authentication: { kind: 'basic' as const, username: 'account', password: 'secret' },
+    offscreenStartupId: 'startup',
+    executorId: 'executor',
+    executorRevision: 1,
+  };
+  await deps.startWorkspaceExecutor(start);
+  expect(syncWiring.startWorkspaceExecutor).toHaveBeenCalledWith(start);
   const allocation = nativeWorkspace();
   const committed = deferred<void>();
   syncWiring.revokeWorkspace.mockReturnValueOnce(committed.promise);
@@ -771,24 +803,42 @@ it('wires JOIN revocation and enrollment through the shared coordinator', async 
   expect(syncWiring.revokeJoin).toHaveBeenCalledExactlyOnceWith(
     selected.source.identity.incarnation
   );
-  expect(deps.enrollConnection).toBe(syncWiring.enrollConnection);
+  expect(deps.enrollConnection).toBeTypeOf('function');
+  await deps.enrollConnection(
+    selected.source,
+    {
+      kind: 'basic',
+      username: 'account',
+      password: 'secret',
+    },
+    { version: 1, mode: 'on-demand' }
+  );
+  expect(syncWiring.enrollConnection).toHaveBeenCalledWith(
+    selected.source,
+    { kind: 'basic', username: 'account', password: 'secret' },
+    { version: 1, mode: 'on-demand' },
+    null,
+    null,
+    expect.any(Object)
+  );
   expect(await deps.hasOriginPermission('https://dav.example.test')).toBe(true);
   expect(syncWiring.contains).toHaveBeenCalledWith({ origins: ['https://dav.example.test/*'] });
   const control = registerSecurityE2EControl.mock.calls[0]?.[0];
   expect(control?.enrollWorkspace).toBe(syncWiring.enrollWorkspace);
 });
 
-it('binds product ingress and retry in production without security controls', () => {
+it('binds product ingress and retry in production without security controls', async () => {
   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
   initializeBackgroundRuntime(createModeState());
   const coordinator = syncWiring.createCoordinator.mock.results.at(-1)?.value;
   expect(coordinator).toBeDefined();
   expect(syncWiring.configureProductRoute).toHaveBeenCalledExactlyOnceWith(
     coordinator,
+    expect.any(Function),
     expect.any(Function)
   );
   expect(createRetryWakeup).toHaveBeenCalledOnce();
-  expect(runRetryWakeup).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(runRetryWakeup).toHaveBeenCalledOnce());
   expect(registerSecurityE2EControl).not.toHaveBeenCalled();
   expect(coordinatorDependencies().productExecutor).toBe(syncWiring.productExecutor);
   expect(coordinator?.planWorkspace).toBe(syncWiring.planWorkspace);

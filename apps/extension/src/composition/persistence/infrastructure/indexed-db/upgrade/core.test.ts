@@ -314,3 +314,51 @@ it.each([0, 1])(
     }
   }
 );
+
+it('publishes the checkpoint contract without reading or rewriting native captures or bytes', () => {
+  const harness = createUpgradeHarness();
+  harness.db.objectStoreNames.push('sync_capture', 'sync_outbox', 'sync_connection');
+  const contracts = { put: vi.fn((_value: unknown) => undefined) };
+  harness.transaction.objectStore.mockImplementation((name: string) => {
+    if (name !== SCHEMA_CONTRACTS_STORE) throw new Error('Unexpected native store access.');
+    return contracts;
+  });
+
+  handleDatabaseUpgrade(harness.db, 48, 49, harness.transaction);
+
+  expect(harness.db.createObjectStore).not.toHaveBeenCalled();
+  expect(harness.db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(contracts.put.mock.calls.map(([value]) => value)).toContainEqual({
+    domainId: 'syncCapture',
+    schemaVersion: 9,
+  });
+  expect(harness.transaction.abort).not.toHaveBeenCalled();
+});
+
+it('aborts checkpoint admission when its existing capture store is unavailable', () => {
+  const harness = createUpgradeHarness();
+  harness.db.objectStoreNames.push('sync_outbox', 'sync_connection');
+
+  expect(() => handleDatabaseUpgrade(harness.db, 48, 49, harness.transaction)).toThrow(
+    'Sync checkpoint stores are unavailable.'
+  );
+  expect(harness.transaction.abort).toHaveBeenCalledOnce();
+  expect(harness.transaction.objectStore).not.toHaveBeenCalled();
+});
+
+it('upgrades version 49 with empty dedicated secret protection store', () => {
+  const harness = createUpgradeHarness();
+  harness.db.objectStoreNames.push(
+    ...EXPECTED_STORES.filter((name) => name !== 'secret_protection')
+  );
+  const contracts = { put: vi.fn() };
+  harness.transaction.objectStore.mockReturnValue(contracts);
+  executeDatabaseUpgrade(harness.db, 49, 50, harness.transaction, DATABASE_MIGRATIONS);
+  expect(harness.db.createObjectStore).toHaveBeenCalledExactlyOnceWith('secret_protection', {
+    keyPath: 'key',
+  });
+  expect(harness.db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(harness.stores.get('secret_protection')?.put).not.toHaveBeenCalled();
+  expect(contracts.put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(harness.transaction.abort).not.toHaveBeenCalled();
+});

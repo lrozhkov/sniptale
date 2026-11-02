@@ -307,6 +307,27 @@ it('readmits an expired permit and protects a recreated identity with a fresh re
   );
 });
 
+it('settles an empty marker list without browser OPFS', async () => {
+  await expect(settleAssetWritingMarkers([])).resolves.toBeUndefined();
+});
+
+it('settles an empty marker list without resolving an unavailable origin', async () => {
+  const getOriginRoot = vi.fn(async (): Promise<FileSystemDirectoryHandle> => {
+    throw new Error('Origin unavailable');
+  });
+  await expect(settleAssetWritingMarkers([], { getOriginRoot })).resolves.toBeUndefined();
+  expect(getOriginRoot).not.toHaveBeenCalled();
+});
+
+it('preserves origin refusal for nonempty marker settlement', async () => {
+  const failure = new Error('Origin unavailable');
+  const getOriginRoot = vi.fn(async (): Promise<FileSystemDirectoryHandle> => {
+    throw failure;
+  });
+  await expect(settleAssetWritingMarkers(['asset-0'], { getOriginRoot })).rejects.toBe(failure);
+  expect(getOriginRoot).toHaveBeenCalledOnce();
+});
+
 it('settles selected markers without deleting bytes or ready journal claims', async () => {
   const f = await fixture(3, 0);
   await writeFile(f.ready, 'claimed', JSON.stringify(journal('asset-0')));

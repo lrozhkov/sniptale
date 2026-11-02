@@ -10,10 +10,26 @@ import {
 import { toErrorMessage } from './helpers';
 import type { ProjectHandlerPort, VideoEditorActionHandlers } from './types';
 import type { VideoEditorConfirmDialogState } from '../controller/workspace-state';
-import { waitForVideoEditorSave } from '../session/save-readiness';
+import {
+  prepareVideoEditorCheckpointExit,
+  type VideoEditorCheckpointExit,
+} from '../session/save-readiness';
+import { createSyncProductClient } from '../../../platform/runtime-messaging/sync-product-client';
 import { beginProjectTransition } from './project-transition';
 
 const logger = createLogger({ namespace: 'VideoEditorProjects' });
+
+async function prepareProjectExit(projectId: string): Promise<VideoEditorCheckpointExit> {
+  const witness = await prepareVideoEditorCheckpointExit(projectId);
+  if (witness.isCurrent() && witness.receipt) {
+    try {
+      await createSyncProductClient().requestCheckpointExit(witness.receipt);
+    } catch {
+      // The saved pending checkpoint retains its original durable deadline.
+    }
+  }
+  return witness;
+}
 
 export async function loadProjectWorkspace(
   projectId: string,
@@ -24,12 +40,10 @@ export async function loadProjectWorkspace(
     const currentProject = port.getCurrentProject();
     if (currentProject && port.beforeLeave && !(await port.beforeLeave())) return;
     if (!transition.isCurrent()) return;
-    if (currentProject && currentProject.id !== projectId) {
-      await waitForVideoEditorSave(currentProject.id);
-      if (!transition.isCurrent()) return;
-    }
+    const exit = currentProject ? await prepareProjectExit(currentProject.id) : null;
+    if (!transition.isCurrent() || (exit && !exit.isCurrent())) return;
     const project = await openPersistedProject(projectId);
-    if (!transition.isCurrent()) return;
+    if (!transition.isCurrent() || (exit && !exit.isCurrent())) return;
     port.applyLoadedProject(project, project.baseRecordingId);
     await Promise.all([
       port.libraries.refreshProjects(),
@@ -53,10 +67,8 @@ export async function createProjectWorkspace(
     const currentProject = port.getCurrentProject();
     if (currentProject && port.beforeLeave && !(await port.beforeLeave())) return;
     if (!transition.isCurrent()) return;
-    if (currentProject) {
-      await waitForVideoEditorSave(currentProject.id);
-      if (!transition.isCurrent()) return;
-    }
+    const exit = currentProject ? await prepareProjectExit(currentProject.id) : null;
+    if (!transition.isCurrent() || (exit && !exit.isCurrent())) return;
     const source = port.getCurrentProject();
     if (copyCurrent && (!source || source.id !== currentProject?.id)) {
       throw new Error(translate('common.errors.actionFailed'));
@@ -65,7 +77,7 @@ export async function createProjectWorkspace(
       copyCurrent && source
         ? await copyProject(source, projectName ?? source.name)
         : await createBlankProject(projectName);
-    if (!transition.isCurrent()) return;
+    if (!transition.isCurrent() || (exit && !exit.isCurrent())) return;
     port.applyLoadedProject(project, project.baseRecordingId);
     const refreshes = await Promise.allSettled([
       port.libraries.refreshProjects(),

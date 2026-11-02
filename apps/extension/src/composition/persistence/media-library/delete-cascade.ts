@@ -30,6 +30,7 @@ import { removeVideoProjectLibrarySources } from '../../../features/video/projec
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -328,6 +329,7 @@ async function commitCascadeTransaction(
 ): Promise<void> {
   const tx = createStrictRecordingTransaction(db, [
     SYNC_CAPTURE_STORE,
+    SYNC_OUTBOX_STORE,
     MEDIA_LIBRARY_STORE,
     VIDEO_PROJECTS_STORE,
     SCENARIO_PROJECTS_STORE,

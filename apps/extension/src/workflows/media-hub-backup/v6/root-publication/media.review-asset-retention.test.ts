@@ -1,3 +1,9 @@
+import { projectRowReferenceKeys } from '../../../../composition/persistence/assets/retention-index-projection';
+import { projectWorkspaceReferenceKeys } from '../../../../composition/persistence/review-workspaces/index-projection';
+import {
+  ROW_REFERENCE_INDEX,
+  UNKNOWN_HISTORY_REFERENCES,
+} from '../../../../composition/persistence/infrastructure/indexed-db/row-index-contract';
 import { createLibraryLifecycle } from '../../../../composition/persistence/library-lifecycle/contracts';
 import { parseVideoWorkspace } from '../../../../composition/persistence/review-workspaces/parser';
 import {
@@ -193,6 +199,27 @@ function installDatabase(
   const storeFor = (name: string) => {
     const table = tables.get(name) ?? new Map<string, unknown>();
     tables.set(name, table);
+    const referenceKeys = (value: unknown): string[] => {
+      if (name === 'video_workspaces') {
+        const own = isRecord(value)
+          ? [...(tables.get('video_workspace_history')?.values() ?? [])].filter(
+              (row) => isRecord(row) && row['aggregateId'] === value['aggregateId']
+            )
+          : [];
+        return projectWorkspaceReferenceKeys(value, own);
+      }
+      if (name === 'video_workspace_history') {
+        const id = isRecord(value) ? value['aggregateId'] : undefined;
+        const head = typeof id === 'string' ? tables.get('video_workspaces')?.get(id) : undefined;
+        const own = [...(tables.get('video_workspace_history')?.values() ?? [])].filter(
+          (row) => isRecord(row) && row['aggregateId'] === id
+        );
+        return projectWorkspaceReferenceKeys(head, own).includes(UNKNOWN_HISTORY_REFERENCES)
+          ? [UNKNOWN_HISTORY_REFERENCES]
+          : [];
+      }
+      return projectRowReferenceKeys(name, value);
+    };
     return {
       get: async (key: IDBValidKey) =>
         table.get(
@@ -219,7 +246,11 @@ function installDatabase(
       },
       index: (indexName: string) => ({
         getAll: async (key: IDBValidKey) =>
-          [...table.values()].filter(isRecord).filter((row) => row[indexName] === key),
+          [...table.values()].filter((row) =>
+            indexName === ROW_REFERENCE_INDEX
+              ? referenceKeys(row).includes(typeof key === 'string' ? key : '')
+              : isRecord(row) && row[indexName] === key
+          ),
         getAllKeys: async (key: IDBValidKey) =>
           [...table.values()]
             .filter(isRecord)

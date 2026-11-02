@@ -10,12 +10,16 @@ const {
   mockDeletePersistedProject,
   mockOpenPersistedProject,
   mockWaitForVideoEditorSave,
+  mockPrepareCheckpointExit,
+  mockRequestCheckpointExit,
 } = vi.hoisted(() => ({
   mockCopyProject: vi.fn(),
   mockCreateBlankProject: vi.fn(),
   mockDeletePersistedProject: vi.fn(),
   mockOpenPersistedProject: vi.fn(),
   mockWaitForVideoEditorSave: vi.fn(),
+  mockPrepareCheckpointExit: vi.fn(),
+  mockRequestCheckpointExit: vi.fn(),
 }));
 
 vi.mock('../../project/operations/ops', async (importOriginal) => ({
@@ -29,7 +33,20 @@ vi.mock('../../project/operations/ops', async (importOriginal) => ({
 vi.mock('../session/save-readiness', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session/save-readiness')>()),
   waitForVideoEditorSave: mockWaitForVideoEditorSave,
+  prepareVideoEditorCheckpointExit: mockPrepareCheckpointExit,
 }));
+
+vi.mock('../../../platform/runtime-messaging/sync-product-client', () => ({
+  createSyncProductClient: () => ({ requestCheckpointExit: mockRequestCheckpointExit }),
+}));
+
+beforeEach(() => {
+  mockPrepareCheckpointExit.mockImplementation(async (projectId: string) => {
+    await mockWaitForVideoEditorSave(projectId);
+    return { receipt: null, isCurrent: () => true };
+  });
+  mockRequestCheckpointExit.mockResolvedValue({ kind: 'checkpoint-exit', outcome: 'requested' });
+});
 
 function createProjectListItem(overrides: {
   createdAt: number;
@@ -172,9 +189,9 @@ describe('deleteProjectWorkspace', () => {
     );
 
     const first = loadProjectWorkspace('other-project', params);
-    await Promise.resolve();
+    await vi.waitFor(() => expect(resolvers.has('other-project')).toBe(true));
     const second = loadProjectWorkspace('latest-project', params);
-    await Promise.resolve();
+    await vi.waitFor(() => expect(resolvers.has('latest-project')).toBe(true));
     resolvers.get('latest-project')?.({
       ...createCurrentProject(),
       id: 'latest-project',
@@ -221,8 +238,7 @@ describe('createProjectWorkspace', () => {
     expect(mockCreateBlankProject).not.toHaveBeenCalled();
     expect(port.applyLoadedProject).not.toHaveBeenCalled();
     saved();
-    await Promise.resolve();
-    expect(mockCreateBlankProject).toHaveBeenCalledWith('New');
+    await vi.waitFor(() => expect(mockCreateBlankProject).toHaveBeenCalledWith('New'));
     expect(port.applyLoadedProject).not.toHaveBeenCalled();
     created(next);
     await task;
@@ -278,3 +294,129 @@ it.each(['open', 'create', 'delete'] as const)(
     expect(port.applyLoadedProject).not.toHaveBeenCalled();
   }
 );
+
+describe('checkpoint exit during project transitions', () => {
+  const receipt = {
+    rootKind: 'video-project' as const,
+    rootId: 'current-project',
+    revision: '11111111-1111-4111-8111-111111111111',
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockWaitForVideoEditorSave.mockResolvedValue(undefined);
+    mockOpenPersistedProject.mockResolvedValue({ ...createCurrentProject(), id: 'other-project' });
+    mockCreateBlankProject.mockResolvedValue({ ...createCurrentProject(), id: 'new-project' });
+  });
+
+  it('submits exact saved receipt before target opening', async () => {
+    const port = createProjectHandlerParams();
+    let release!: () => void;
+    mockPrepareCheckpointExit.mockResolvedValue({ receipt, isCurrent: () => true });
+    mockRequestCheckpointExit.mockReturnValue(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      })
+    );
+    const task = loadProjectWorkspace('other-project', port);
+    await vi.waitFor(() => expect(mockRequestCheckpointExit).toHaveBeenCalledWith(receipt));
+    expect(mockOpenPersistedProject).not.toHaveBeenCalled();
+    release();
+    await task;
+    expect(port.applyLoadedProject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'other-project' }),
+      null
+    );
+  });
+
+  it.each(['edit', 'replacement', 'rejection'] as const)(
+    'refuses %s during held exit request',
+    async (change) => {
+      const port = createProjectHandlerParams();
+      let current = true;
+      let release!: () => void;
+      let reject!: (error: Error) => void;
+      mockPrepareCheckpointExit.mockResolvedValue({ receipt, isCurrent: () => current });
+      mockRequestCheckpointExit.mockReturnValue(
+        new Promise<void>((resolve, refuse) => {
+          release = resolve;
+          reject = refuse;
+        })
+      );
+      const task = loadProjectWorkspace('other-project', port);
+      await vi.waitFor(() => expect(mockRequestCheckpointExit).toHaveBeenCalledOnce());
+      current = false;
+      if (change === 'replacement')
+        port.getCurrentProject = () => ({ ...createCurrentProject(), id: 'replacement' });
+      if (change === 'rejection') reject(new Error('transport unavailable'));
+      else release();
+      await task;
+      expect(mockOpenPersistedProject).not.toHaveBeenCalled();
+      expect(port.applyLoadedProject).not.toHaveBeenCalled();
+    }
+  );
+
+  it('permits retry after advisory rejection only for current witness', async () => {
+    const port = createProjectHandlerParams();
+    mockPrepareCheckpointExit.mockResolvedValue({ receipt, isCurrent: () => true });
+    mockRequestCheckpointExit.mockRejectedValue(new Error('transport unavailable'));
+    await loadProjectWorkspace('other-project', port);
+    await loadProjectWorkspace('other-project', port);
+    expect(mockRequestCheckpointExit).toHaveBeenCalledTimes(2);
+    expect(mockRequestCheckpointExit).toHaveBeenNthCalledWith(2, receipt);
+    expect(port.applyLoadedProject).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for pending local save before exit request', async () => {
+    const port = createProjectHandlerParams();
+    let saved!: () => void;
+    mockPrepareCheckpointExit.mockImplementation(async () => {
+      await new Promise<void>((resolve) => {
+        saved = resolve;
+      });
+      return { receipt, isCurrent: () => true };
+    });
+    const task = createProjectWorkspace(port, 'New');
+    expect(mockRequestCheckpointExit).not.toHaveBeenCalled();
+    expect(mockCreateBlankProject).not.toHaveBeenCalled();
+    saved();
+    await task;
+    expect(mockRequestCheckpointExit).toHaveBeenCalledWith(receipt);
+    expect(port.applyLoadedProject).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'new-project' }),
+      null
+    );
+  });
+
+  it('skips RPC for clean source without receipt', async () => {
+    const port = createProjectHandlerParams();
+    await createProjectWorkspace(port, 'New');
+    expect(mockRequestCheckpointExit).not.toHaveBeenCalled();
+    expect(port.applyLoadedProject).toHaveBeenCalledOnce();
+  });
+
+  it('refuses stale witness after target creation', async () => {
+    const port = createProjectHandlerParams();
+    let current = true;
+    let created!: (project: ReturnType<typeof createCurrentProject>) => void;
+    mockPrepareCheckpointExit.mockResolvedValue({ receipt: null, isCurrent: () => current });
+    mockCreateBlankProject.mockReturnValue(
+      new Promise((resolve) => {
+        created = resolve;
+      })
+    );
+    const task = createProjectWorkspace(port, 'New');
+    await vi.waitFor(() => expect(mockCreateBlankProject).toHaveBeenCalledOnce());
+    current = false;
+    created({ ...createCurrentProject(), id: 'new-project' });
+    await task;
+    expect(port.applyLoadedProject).not.toHaveBeenCalled();
+  });
+
+  it('guards same-project replacement', async () => {
+    const port = createProjectHandlerParams();
+    mockPrepareCheckpointExit.mockResolvedValue({ receipt, isCurrent: () => false });
+    await loadProjectWorkspace('current-project', port);
+    expect(mockOpenPersistedProject).not.toHaveBeenCalled();
+    expect(mockRequestCheckpointExit).not.toHaveBeenCalled();
+  });
+});

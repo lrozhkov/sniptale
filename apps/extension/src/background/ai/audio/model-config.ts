@@ -1,3 +1,8 @@
+import { AIProviderRequestError } from '../providers';
+import {
+  SecretProtectionLockedError,
+  type SecretProtectionPort,
+} from '../../../composition/persistence/secret-protection/model';
 import {
   getAIProviderDefinition,
   type AIProviderType,
@@ -52,7 +57,10 @@ interface AudioModelSelection {
   signal?: AbortSignal;
 }
 
-async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<AudioModelConfig> {
+async function resolveSelectedAudioModel(
+  args: AudioModelSelection,
+  protection?: SecretProtectionPort
+): Promise<AudioModelConfig> {
   args.signal?.throwIfAborted();
   await initializeAiStorageAccess();
   const [models, providers] = await Promise.all([loadAIModels(), loadAIProviders()]);
@@ -118,9 +126,20 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
   if (!(await chrome.permissions.contains({ origins: [`${new URL(url).origin}/*`] })))
     throw new Error('permission-denied');
   args.signal?.throwIfAborted();
-  const apiKey = provider.hasStoredApiKey
-    ? await activateStoredAIProviderSecretForUse(provider)
-    : '';
+  let apiKey: string | null;
+  try {
+    apiKey = provider.hasStoredApiKey
+      ? protection
+        ? await protection.withAdmission('ai', (key, permit) =>
+            activateStoredAIProviderSecretForUse(provider, key, permit)
+          )
+        : await activateStoredAIProviderSecretForUse(provider)
+      : '';
+  } catch (error) {
+    if (error instanceof SecretProtectionLockedError)
+      throw new AIProviderRequestError('secret-locked');
+    throw error;
+  }
   args.signal?.throwIfAborted();
   if (apiKey === null || (requiresSecret && !apiKey)) throw new Error('secret-unavailable');
   const instructions = chat ? await loadAudioTranscriptionSystemPrompt() : undefined;
@@ -156,32 +175,42 @@ async function resolveSelectedAudioModel(args: AudioModelSelection): Promise<Aud
 }
 
 /** Resolves editor audio operations after their existing project/source admission. */
-export function resolveAudioModelConfig(request: AudioJobStart): Promise<AudioModelConfig> {
+export function resolveAudioModelConfig(
+  request: AudioJobStart,
+  protection?: SecretProtectionPort
+): Promise<AudioModelConfig> {
   if (!isAudioSourceJobScope(request.scope) && !request.approvedProviderId)
     return Promise.reject(new Error('model-unavailable'));
-  return resolveSelectedAudioModel({
-    modelId: request.modelId,
-    operation: request.operation,
-    ...(request.approvedProviderId === undefined
-      ? {}
-      : { approvedProviderId: request.approvedProviderId }),
-    ...(request.approvedSelection ? { approved: request.approvedSelection } : {}),
-    recognition: request.operation === 'transcription' && Boolean(request.recognition),
-    ...(request.operation === 'speech' ? { profile: request.profile } : {}),
-  });
+  return resolveSelectedAudioModel(
+    {
+      modelId: request.modelId,
+      operation: request.operation,
+      ...(request.approvedProviderId === undefined
+        ? {}
+        : { approvedProviderId: request.approvedProviderId }),
+      ...(request.approvedSelection ? { approved: request.approvedSelection } : {}),
+      recognition: request.operation === 'transcription' && Boolean(request.recognition),
+      ...(request.operation === 'speech' ? { profile: request.profile } : {}),
+    },
+    protection
+  );
 }
 
 /** Resolves the exact configured voice model and destination without a fabricated project scope. */
 export function resolveTranscriptionModelConfig(
   selection: VoiceProviderSelection,
-  signal: AbortSignal
+  signal: AbortSignal,
+  protection?: SecretProtectionPort
 ): Promise<AudioModelConfig> {
-  return resolveSelectedAudioModel({
-    modelId: selection.modelId,
-    operation: 'transcription',
-    approvedProviderId: selection.approvedProviderId,
-    approved: selection,
-    recognition: 'automatic',
-    signal,
-  });
+  return resolveSelectedAudioModel(
+    {
+      modelId: selection.modelId,
+      operation: 'transcription',
+      approvedProviderId: selection.approvedProviderId,
+      approved: selection,
+      recognition: 'automatic',
+      signal,
+    },
+    protection
+  );
 }

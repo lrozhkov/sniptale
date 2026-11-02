@@ -5,13 +5,12 @@ import { AIProvidersProvidersCard } from './cards';
 import type { AiProvidersSectionState } from '../controller/types';
 import { AIProvidersChromeAiCard } from './chrome-ai-card';
 import { AIProvidersSectionModals } from './modals';
-import { AIProvidersSecretProtectionCard } from './secret-protection-card';
-import { SecretProtectionDialog } from './secret-protection-dialog';
+import { SettingsSecretProtectionParticipantSummary } from '../../../../secret-protection/context';
 
-type AiConnectionsView = 'integrations' | 'chrome-ai' | 'security';
+type AiConnectionsView = 'integrations' | 'chrome-ai';
 
 function resolveView(view: string | undefined): AiConnectionsView {
-  return view === 'chrome-ai' || view === 'security' ? view : 'integrations';
+  return view === 'chrome-ai' ? view : 'integrations';
 }
 
 export function AIProvidersSectionContent(props: {
@@ -30,20 +29,18 @@ export function AIProvidersSectionContent(props: {
         items={[
           { id: 'integrations', label: translate('settings.aiProviders.integrationsTab') },
           { id: 'chrome-ai', label: translate('settings.aiProviders.chromeAiTab') },
-          { id: 'security', label: translate('settings.aiProviders.securityTab') },
         ]}
         onChange={props.onViewChange}
       />
       {activeView === 'integrations' ? (
         <div className="space-y-6">
+          <SettingsSecretProtectionParticipantSummary participant="ai" />
           <AIProvidersProvidersCard state={state} />
           <AIProvidersModelsCard state={state} />
         </div>
       ) : null}
       {activeView === 'chrome-ai' ? <AIProvidersChromeAiCard state={state} /> : null}
-      {activeView === 'security' ? <AIProvidersSecretProtectionCard state={state} /> : null}
       <AIProvidersSectionModals state={state} />
-      <SecretProtectionDialog state={state.secretProtection} />
     </div>
   );
 }

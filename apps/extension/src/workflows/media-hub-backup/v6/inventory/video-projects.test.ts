@@ -6,9 +6,10 @@ import {
 
 const mocks = vi.hoisted(() => ({ readInventoryAssetFile: vi.fn() }));
 
-vi.mock('./helpers', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./helpers')>()),
-  readInventoryAssetFile: mocks.readInventoryAssetFile,
+vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
+  readAssetFile: (ref: { assetId: string }, filename: string) =>
+    mocks.readInventoryAssetFile(undefined, ref.assetId, filename),
 }));
 
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
@@ -297,4 +298,74 @@ it('preserves private representation visibility in the portable project inventor
   const payload = await roots[0]!.load();
   const metadata = parsePortableVideoProjectMetadata(payload.metadata);
   expect(metadata.projectAssets[0]).toMatchObject({ publishToLibrary: false });
+});
+
+it('retains exact project and private Review asset descriptors without reading unloaded files', async () => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  const video = {
+    ...ref('local-video', 'video/webm', 10),
+    location: { kind: 'opfs' as const, objectKey: 'objects/local-video' },
+  };
+  const music = {
+    ...ref('local-music', 'audio/mpeg', 8),
+    location: { kind: 'opfs' as const, objectKey: 'objects/local-music' },
+  };
+  const base = database(
+    [
+      assetEntry('project-asset-1', video.assetId, video.mimeType, video.size),
+      assetEntry('music', music.assetId, music.mimeType, music.size),
+    ],
+    new Map(),
+    [entry],
+    [workspaceRow]
+  );
+  const db = {
+    ...base,
+    get: async (store: string, key: unknown) =>
+      store === 'asset_refs'
+        ? key === video.assetId
+          ? video
+          : key === music.assetId
+            ? music
+            : undefined
+        : base.get(store, key),
+  };
+  const onObject = vi.fn();
+  const roots = await buildVideoProjectRootInventory({
+    db,
+    options: createMediaHubBackupExportOptions({ includeDrafts: true }),
+    paths,
+    deferredAssets: {
+      refs: new Map([
+        [video.assetId, video],
+        [music.assetId, music],
+      ]),
+      onObject,
+    },
+  });
+  const loaded = await roots[0]!.load();
+  const metadata = parsePortableVideoProjectMetadata(loaded.metadata);
+  expect(loaded.objects).toEqual([]);
+  expect(roots[0]!.descriptor).toMatchObject({ objectCount: 2, totalBytes: 18 });
+  expect(metadata.projectAssets).toHaveLength(2);
+  expect(onObject).toHaveBeenCalledTimes(2);
+  expect(mocks.readInventoryAssetFile).not.toHaveBeenCalled();
+});
+
+it('shares selected and draft project export eligibility with Library preparation', async () => {
+  const { isVideoProjectBackupSelected } = await import('./video-projects');
+  const options = createMediaHubBackupExportOptions({
+    scope: 'selected',
+    selected: { mediaAssetIds: [], scenarioProjectIds: [], videoProjectIds: ['included', 'draft'] },
+  });
+  expect(isVideoProjectBackupSelected('included', undefined, options)).toBe(true);
+  expect(isVideoProjectBackupSelected('draft', { storageClass: 'temporary' }, options)).toBe(false);
+  expect(isVideoProjectBackupSelected('other', undefined, options)).toBe(false);
+  expect(
+    isVideoProjectBackupSelected(
+      'draft',
+      { storageClass: 'temporary' },
+      { ...options, includeDrafts: true }
+    )
+  ).toBe(true);
 });

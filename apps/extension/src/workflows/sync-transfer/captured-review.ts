@@ -1,10 +1,18 @@
-import { loadCapturedInventory, createCapturedRootEnvelope } from './captured-inventory';
+import { parseCapturedMediaRows } from '../../composition/persistence/sync-capture/media-snapshot';
+import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
+import {
+  loadCapturedInventory,
+  createCapturedRootEnvelope,
+  createCapturedAssetInventory,
+} from './captured-inventory';
 import { createArchivePathAllocator } from '../../composition/archive-transfer';
 import type { AssetRef } from '../../composition/persistence/assets';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import type { VideoReviewBackupDatabase } from '../../composition/persistence/review-workspaces/backup-restore';
 import {
   ASSET_REFS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -25,9 +33,13 @@ import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/option
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
 
 /** Encodes one frozen review through the backup inventory without publishing its source again. */
-export async function encodeCapturedVideoReviewRoot(value: CapturedVideoReviewRows) {
+export async function encodeCapturedVideoReviewRoot(
+  value: CapturedVideoReviewRows,
+  copies: ReadonlyMap<string, AssetResidencyCopy> = new Map()
+) {
   const rows = parseCapturedVideoReviewRows(value);
   if (!rows) throw new Error('Invalid frozen video review.');
+  const deferred = createCapturedAssetInventory([rows.source.ref, ...rows.refs], copies);
   const aggregateId = rows.review.workspace.aggregateId;
   const sourceMediaId = rows.source.media.id;
   const item: MediaLibraryItem = { ...rows.source.media, hasThumbnail: false };
@@ -45,9 +57,11 @@ export async function encodeCapturedVideoReviewRoot(value: CapturedVideoReviewRo
       selected: { mediaAssetIds: [aggregateId], videoProjectIds: [], scenarioProjectIds: [] },
     }),
     paths: createArchivePathAllocator(),
+    deferredAssets: deferred.port,
   });
   if (roots.length !== 1 || roots[0]!.descriptor.rootId !== aggregateId)
     throw new Error('Frozen video review inventory differs from its root.');
+  deferred.assertUsed();
   const { objects, metadata } = await loadCapturedInventory(roots[0]!);
   const portable = parsePortableMediaMetadata(metadata);
   if (!portable.videoReview)
@@ -57,13 +71,18 @@ export async function encodeCapturedVideoReviewRoot(value: CapturedVideoReviewRo
   const bindings: { objectId: string; ref: AssetRef }[] = [];
   const bind = (objectId: string, ref: AssetRef | undefined) => {
     const object = objects.find((candidate) => candidate.ref.objectId === objectId);
+    const retained = deferred.objects.get(objectId);
+    const descriptor = object?.ref ?? retained?.ref;
     if (
       !ref ||
-      !object ||
-      object.ref.size !== ref.size ||
-      object.ref.mimeType !== ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
-      object.blob.size !== ref.size ||
-      object.blob.type !== ref.mimeType
+      !descriptor ||
+      descriptor.size !== ref.size ||
+      descriptor.mimeType !== ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
+      (object
+        ? object.blob.size !== ref.size || object.blob.type !== ref.mimeType
+        : !retained ||
+          retained.copy.target.kind !== 'opfs' ||
+          JSON.stringify(retained.copy.target.ref) !== JSON.stringify(ref))
     )
       throw new Error('Captured video review object differs from its native reference.');
     bindings.push({ objectId, ref });
@@ -71,8 +90,18 @@ export async function encodeCapturedVideoReviewRoot(value: CapturedVideoReviewRo
   bind(portable.originalObjectId, rows.source.ref);
   for (const asset of portable.reviewAssets ?? [])
     bind(asset.objectId, refs.get(assets.get(asset.entry.id)?.assetId ?? ''));
-  const envelope = createCapturedRootEnvelope(roots[0]!, { metadata, objects });
-  return { envelope, objects, bindings, reviewSourceMediaId: sourceMediaId };
+  const envelope = createCapturedRootEnvelope(
+    roots[0]!,
+    { metadata, objects },
+    deferred.descriptors()
+  );
+  return {
+    envelope,
+    objects,
+    bindings,
+    reviewSourceMediaId: sourceMediaId,
+    ...(deferred.objects.size ? { retainedObjects: deferred.retainedObjects() } : {}),
+  };
 }
 
 interface FrozenReviewDatabase extends VideoReviewBackupDatabase {
@@ -85,6 +114,14 @@ type FrozenMediaRows = Omit<CapturedVideoReviewRows, 'review' | 'thumbnail'> &
 /** Provides the backup inventory with frozen native rows and no live database access. */
 export function frozenReviewDatabase(source: FrozenMediaRows): FrozenReviewDatabase {
   const snapshot = structuredClone(source);
+  const sourceMedia = snapshot.source.media;
+  // Legacy source captures declare an original only; authored Image checkpoints use their own encoder.
+  const absentImageMetadata =
+    sourceMedia.source.kind === 'project-asset' &&
+    (sourceMedia.kind === 'image' || sourceMedia.kind === 'screenshot') &&
+    sourceMedia.workspaceRevision === 0 &&
+    sourceMedia.imageContentState !== 'edited' &&
+    parseCapturedMediaRows(snapshot.source) !== null;
   const aggregateId = snapshot.review?.workspace.aggregateId ?? snapshot.source.media.id;
   const assets = [
     ...('projectAsset' in snapshot.source ? [snapshot.source.projectAsset] : []),
@@ -150,6 +187,16 @@ export function frozenReviewDatabase(source: FrozenMediaRows): FrozenReviewDatab
     return key;
   }
   async function get(store: string, key: unknown): Promise<unknown> {
+    if (
+      absentImageMetadata &&
+      ((store === IMAGE_WORKSPACES_STORE && key === sourceMedia.id) ||
+        (store === AGGREGATE_PRESENTATIONS_STORE &&
+          Array.isArray(key) &&
+          key.length === 2 &&
+          key[0] === 'image' &&
+          key[1] === sourceMedia.id))
+    )
+      return undefined;
     const accepted = checkedKey(store, key);
     const field =
       store === RECORDING_TELEMETRY_STORE

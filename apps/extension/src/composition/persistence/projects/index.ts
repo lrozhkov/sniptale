@@ -1,3 +1,5 @@
+import { captureCheckpointReceiptInTransaction } from '../sync-capture/checkpoints';
+import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
 import { allocateVideoProjectRevisionInTransaction } from './revisions';
 import { captureVideoProjectInTransaction } from '../sync-capture/capture';
 import { publishLibraryProjectBindingInTransaction } from './known-library-source';
@@ -94,10 +96,15 @@ export { deleteVideoProject } from './index.delete.ts';
 export * from './index.exports.ts';
 export { InvalidVideoProjectError, UnsupportedEngine1VideoProjectError } from './contracts';
 
+/** Transient writer ACK; checkpoint metadata is never part of the stored project entry. */
+export interface VideoProjectSaveResult extends VideoProjectEntry {
+  readonly checkpointReceipt?: SyncCheckpointReceipt;
+}
+
 export async function saveVideoProject(
   project: VideoProject,
   options: SaveVideoProjectOptions = {}
-): Promise<VideoProjectEntry> {
+): Promise<VideoProjectSaveResult> {
   const expectedReviewWorkspace = options.expectedReviewWorkspace
     ? structuredClone(options.expectedReviewWorkspace)
     : undefined;
@@ -171,12 +178,16 @@ export async function saveVideoProject(
       });
       if (physicalDelete.assetIds.length > 0 || physicalDelete.privateSources?.length)
         await assetOperationStore.put(physicalDelete);
-      await captureVideoProjectInTransaction(tx, entry.id);
+      const checkpointReceipt = await captureCheckpointReceiptInTransaction(
+        tx,
+        { rootKind: 'video-project', rootId: entry.id },
+        () => captureVideoProjectInTransaction(tx, entry.id)
+      );
       await tx.done;
       publishMediaHubLibraryChanged(existing ? 'update' : 'create', [
         `video-project:${candidate.id}`,
       ]);
-      return entry;
+      return { ...entry, ...(checkpointReceipt ? { checkpointReceipt } : {}) };
     } catch (error) {
       try {
         tx.abort();

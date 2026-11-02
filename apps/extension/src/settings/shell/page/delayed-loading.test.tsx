@@ -4,11 +4,14 @@ vi.mock('../../sections/system/events-logs', () => {
   return { EventsLogsSection: markerComponent('events-logs-section') };
 });
 
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../ui/native-hints', () => ({ NativeHints: () => null }));
+vi.mock('../../secret-protection/context', () => ({
+  SettingsSecretProtectionProvider: ({ children }: { children: ReactNode }) => children,
+}));
 
 const settingsPageDelayMocks = vi.hoisted(() => ({
   loadedSectionModules: [] as string[],

@@ -9,12 +9,18 @@ import {
   completeSyncWorkspaceJoin,
   loadSyncWorkspaceJoin,
   revokeSyncWorkspaceJoin,
+  type SyncWorkspaceJoin,
 } from '../../composition/persistence/remote-connection/workspace-join';
 import { SyncCatalogError } from './catalog';
 import { createSyncWorkspaceJoinRequests } from './connection-requests';
 import { SyncRemoteError } from './remote-store';
 import { createWebdavRemoteStore } from './webdav';
-import { prepareSyncWorkspaceJoin, SyncWorkspaceError } from './workspace';
+import {
+  discoverSyncWorkspaces,
+  prepareSyncWorkspaceJoin,
+  SyncWorkspaceError,
+  type SyncWorkspaceDiscovery,
+} from './workspace';
 
 /** Fixed failures exclude endpoints, provider responses, credentials and native exceptions. */
 class WebdavWorkspaceJoinError extends Error {
@@ -38,16 +44,38 @@ function detachedAuthentication(input: unknown) {
   return parsed;
 }
 
-/**
- * Own one read-only JOIN check, bounded in-memory credentials and all issued IO.
- * Successful readiness is returned only after drain and an exact native completion.
- * Active close revokes the intent lifetime before it can authorize enrollment.
- */
-export function createWebdavWorkspaceJoin(options: {
+interface WebdavWorkspaceJoinOptions {
   identity: unknown;
   authentication: unknown;
   hasOriginPermission: (origin: string) => Promise<boolean>;
-}) {
+  operation?: 'discover';
+}
+type PreparedWorkspaceJoin = Awaited<ReturnType<typeof prepareSyncWorkspaceJoin>> & {
+  intent: SyncWorkspaceJoin;
+};
+interface DiscoveredWorkspaceJoin {
+  operation: 'discover';
+  source: { kind: 'join'; identity: SyncWorkspaceJoin['identity'] };
+  discovery: SyncWorkspaceDiscovery;
+}
+interface WorkspaceJoinHandle<T> {
+  run(): Promise<T>;
+  close(): Promise<void>;
+}
+
+/** Own one read-only JOIN check and all issued IO; only prepare can install native readiness. */
+export function createWebdavWorkspaceJoin(
+  options: WebdavWorkspaceJoinOptions & { operation?: undefined }
+): WorkspaceJoinHandle<PreparedWorkspaceJoin>;
+export function createWebdavWorkspaceJoin(
+  options: WebdavWorkspaceJoinOptions & { operation: 'discover' }
+): WorkspaceJoinHandle<DiscoveredWorkspaceJoin>;
+export function createWebdavWorkspaceJoin(
+  options: WebdavWorkspaceJoinOptions
+): WorkspaceJoinHandle<PreparedWorkspaceJoin | DiscoveredWorkspaceJoin>;
+export function createWebdavWorkspaceJoin(
+  options: WebdavWorkspaceJoinOptions
+): WorkspaceJoinHandle<PreparedWorkspaceJoin | DiscoveredWorkspaceJoin> {
   let identity;
   let authentication: SyncConnectionAuthentication | null;
   try {
@@ -57,6 +85,9 @@ export function createWebdavWorkspaceJoin(options: {
     throw new SyncRemoteError('invalid-configuration');
   }
   if (!identity) throw new SyncRemoteError('invalid-configuration');
+  if (options.operation !== undefined && options.operation !== 'discover')
+    throw new SyncRemoteError('invalid-configuration');
+  const operation = options.operation;
   const selectedIdentity = identity;
   const hasOriginPermission = options.hasOriginPermission;
   const controller = new AbortController();
@@ -85,10 +116,14 @@ export function createWebdavWorkspaceJoin(options: {
       signal.throwIfAborted();
       if (!selected || !sameSyncConnectionIdentity(selected.identity, selectedIdentity))
         throw new WebdavWorkspaceJoinError('join-refused');
+      if (operation === 'discover' && (selected.expected !== null || selected.workspace !== null))
+        throw new WebdavWorkspaceJoinError('join-refused');
       authentication = parseConnectionAuthentication(authentication, selected.accountId);
       if (!authentication) throw new SyncRemoteError('invalid-configuration');
       const checking = await beginSyncWorkspaceJoin(selected.identity);
       signal.throwIfAborted();
+      if (operation === 'discover' && checking.expected !== null)
+        throw new WebdavWorkspaceJoinError('join-refused');
       requests = createSyncWorkspaceJoinRequests({ intent: checking, hasOriginPermission });
       const remote = await createWebdavRemoteStore(
         {
@@ -105,12 +140,35 @@ export function createWebdavWorkspaceJoin(options: {
         },
         signal
       );
-      const checked = await prepareSyncWorkspaceJoin(remote, signal, checking.expected);
+      const checked =
+        operation === 'discover'
+          ? await discoverSyncWorkspaces(remote, signal)
+          : await prepareSyncWorkspaceJoin(remote, signal, checking.expected);
       await drain();
       signal.throwIfAborted();
       if (!(await hasOriginPermission(new URL(checking.rootUrl).origin)))
         throw new SyncRemoteError('access-denied');
       signal.throwIfAborted();
+      if (operation === 'discover') {
+        const current = await loadSyncWorkspaceJoin();
+        signal.throwIfAborted();
+        if (
+          !current ||
+          current.phase !== 'checking' ||
+          current.expected !== null ||
+          !sameSyncConnectionIdentity(current.identity, checking.identity) ||
+          current.rootUrl !== checking.rootUrl ||
+          current.accountId !== checking.accountId
+        )
+          throw new WebdavWorkspaceJoinError('join-refused');
+        if (!('candidates' in checked)) throw new WebdavWorkspaceJoinError('join-refused');
+        return {
+          operation: 'discover' as const,
+          source: { kind: 'join' as const, identity: checking.identity },
+          discovery: checked,
+        };
+      }
+      if (!('identity' in checked)) throw new WebdavWorkspaceJoinError('join-refused');
       const intent = await completeSyncWorkspaceJoin(checking.identity, checked.identity);
       // Close can revoke a ready revision while the completion result is in flight.
       signal.throwIfAborted();

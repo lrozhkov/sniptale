@@ -1,3 +1,4 @@
+import type { SettingsQueueFilter } from '../../../../platform/navigation/extension-pages/settings-route/codec';
 import { SyncConnectionSection } from './sync-connection';
 import { SyncQueueSection } from './sync-queue';
 import { SyncCacheSection } from './sync-cache';
@@ -11,6 +12,8 @@ import { StorageDraftsSection } from '../storage-drafts';
 export function SavePresetsSection(props: {
   onViewChange?: (view: string) => void;
   view?: string;
+  queueFilter?: SettingsQueueFilter;
+  onQueueFilterChange?: (filter: SettingsQueueFilter) => void;
 }) {
   const savePresetsSection = useSavePresetsSection();
   const { editingPreset, ...contentProps } = savePresetsSection;
@@ -52,7 +55,14 @@ export function SavePresetsSection(props: {
         />
       ) : null}
       {view === 'connection' ? <SyncConnectionSection /> : null}
-      {view === 'queue' ? <SyncQueueSection /> : null}
+      {view === 'queue' ? (
+        <SyncQueueSection
+          {...(props.queueFilter === undefined ? {} : { filter: props.queueFilter })}
+          {...(props.onQueueFilterChange === undefined
+            ? {}
+            : { onFilterChange: props.onQueueFilterChange })}
+        />
+      ) : null}
       {view === 'files' ? <FilenameRulesSettings /> : null}
       {view === 'storage' ? <StorageDraftsSection view="storage" /> : null}
       {view === 'storage' ? <SyncCacheSection /> : null}

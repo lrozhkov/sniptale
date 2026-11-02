@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from './checkpoints';
 import { isCaptureDependencyVersion } from './guards';
 import { readAppliedCaptureReceipt } from './guards';
 import { identity, ordinal } from './guards';
@@ -11,13 +12,21 @@ import {
   completePhysicalDeleteOperation,
 } from '../assets';
 import { parseAssetOwner } from '../assets/guards';
+import {
+  admitRemoteAssetResidencyInTransaction,
+  readAssetResidencyCopyInTransaction,
+} from '../assets/residency';
+import { assetResidencyCopyId } from '../assets/residency-records';
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
+import type { SyncConnectionMetadata } from '../remote-connection/model';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
-import { initDB } from '../infrastructure/indexed-db/core';
+import { initDB, capturePreparedDatabase } from '../infrastructure/indexed-db/core';
 import * as stores from '../infrastructure/indexed-db/core.stores';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction';
 import {
   parseSyncConnectionIdentity,
+  sameConnectionBinding,
   type SyncConnectionIdentity,
 } from '../remote-connection/model';
 import { checkSyncConnectionAdmission } from '../remote-connection/store';
@@ -25,7 +34,7 @@ import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { assertPreparedLibrarySource } from '../projects/source-admission';
 import { putScenarioProjectBackupRestore } from '../scenario/backup-restore';
 import { readScenarioStorage, createScenarioProjectStore } from '../scenario/storage';
-import { parseScenarioProjectEntry } from '../scenario/read-guards';
+import { parseScenarioProjectEntry, parseScenarioExportEntry } from '../scenario/read-guards';
 import { assertBorrowedScenarioAssetSource } from '../scenario/library-publication';
 import { parseSyncCaptureRecord } from './guards';
 import {
@@ -238,6 +247,133 @@ export async function loadScenarioReplicaPredecessorAssets(input: {
   await tx.done;
   return structuredClone(result);
 }
+/** Read exact retained HTML ownership under its current causal predecessor and authorization. */
+export async function loadScenarioReplicaExport(input: {
+  spaceId: string;
+  profileCreatedAt: number;
+  connectionGeneration: number;
+  authorization?: SyncConnectionIdentity;
+  projectId: string;
+  exportId: string;
+  expectedLocalGeneration: number;
+  expectedBasis: readonly string[];
+}) {
+  const selected = structuredClone(input);
+  if (
+    !identity(selected.projectId) ||
+    !identity(selected.exportId) ||
+    !identity(selected.spaceId) ||
+    !ordinal(selected.profileCreatedAt) ||
+    !ordinal(selected.connectionGeneration) ||
+    selected.connectionGeneration < 1 ||
+    !ordinal(selected.expectedLocalGeneration) ||
+    selected.expectedBasis.length !== (selected.expectedLocalGeneration === 0 ? 0 : 1) ||
+    !selected.expectedBasis.every(identity)
+  )
+    refuse();
+  const db = await initDB();
+  const tx = db.transaction(
+    [...new Set([...SCENARIO_CAPTURE_STORES, stores.SYNC_CONNECTION_STORE])],
+    'readonly'
+  );
+  const connection = await checkSyncConnectionAdmission(
+    tx,
+    selected,
+    selected.authorization ?? null
+  );
+  const profile = parseSyncCaptureRecord(
+    await tx.objectStore(stores.SYNC_CAPTURE_STORE).get('profile')
+  );
+  if (!profile || profile.kind !== 'profile' || !profile.enabled) refuse();
+  if (
+    await readCheckpointInTransaction(tx, selected, {
+      rootKind: 'scenario-project',
+      rootId: selected.projectId,
+    })
+  )
+    refuse();
+  const rootKey = captureRootKey(selected.spaceId, 'scenario-project', selected.projectId);
+  for (const rawCapture of await tx
+    .objectStore(stores.SYNC_CAPTURE_STORE)
+    .index('rootKey')
+    .getAll(rootKey)) {
+    const capture = parseSyncCaptureRecord(rawCapture);
+    if (!capture || (capture.kind === 'sync-operation' && capture.phase !== 'published')) refuse();
+  }
+  const rawState: unknown = await tx
+    .objectStore(stores.SYNC_CAPTURE_STORE)
+    .get(JSON.stringify(['root-state', rootKey]));
+  const state = rawState === undefined ? null : parseSyncCaptureRecord(rawState);
+  if (
+    (rawState !== undefined && (!state || state.kind !== 'root-state')) ||
+    (state &&
+      (state.kind !== 'root-state' ||
+        state.rootKey !== rootKey ||
+        state.spaceId !== selected.spaceId ||
+        state.rootKind !== 'scenario-project' ||
+        state.rootId !== selected.projectId)) ||
+    (state?.kind === 'root-state' ? state.generation : 0) !== selected.expectedLocalGeneration ||
+    JSON.stringify(state?.kind === 'root-state' ? state.basis : []) !==
+      JSON.stringify(selected.expectedBasis)
+  )
+    refuse();
+  const current = (await readScenarioStorage(tx, selected.projectId)).logical;
+  if (current !== undefined) {
+    if (
+      !state ||
+      state.kind !== 'root-state' ||
+      state.deleted ||
+      !state.nativeDigest ||
+      state.nativeDigest !==
+        digestCapturedScenarioRows(await freezeScenarioInTransaction(tx, selected.projectId))
+    )
+      refuse();
+  } else if (state && (state.kind !== 'root-state' || !state.deleted)) refuse();
+  const raw: unknown = await tx.objectStore(stores.SCENARIO_EXPORTS_STORE).get(selected.exportId);
+  if (raw === undefined) {
+    await tx.done;
+    return null;
+  }
+  const entry = parseScenarioExportEntry(raw);
+  if (
+    !entry?.html ||
+    entry.id !== selected.exportId ||
+    entry.projectId !== selected.projectId ||
+    current === undefined
+  )
+    refuse();
+  const ref = parseAssetRef(await tx.objectStore(stores.ASSET_REFS_STORE).get(entry.html.assetId));
+  const owner = parseAssetOwner(
+    await tx.objectStore(stores.ASSET_OWNERS_STORE).get(['scenario-export', entry.id, 'body'])
+  );
+  if (
+    !ref ||
+    ref.assetId !== entry.html.assetId ||
+    ref.size !== entry.size ||
+    !/^text\/html(?:;charset=utf-8)?$/iu.test(ref.mimeType) ||
+    !owner ||
+    owner.assetId !== ref.assetId ||
+    owner.ownerKind !== 'scenario-export' ||
+    owner.ownerId !== entry.id ||
+    owner.role !== 'body'
+  )
+    refuse();
+  const copy = await readAssetResidencyCopyInTransaction(
+    tx,
+    assetResidencyCopyId({ kind: 'opfs', ref })
+  );
+  if (
+    copy &&
+    (!connection ||
+      copy.target.kind !== 'opfs' ||
+      JSON.stringify(copy.target.ref) !== JSON.stringify(ref) ||
+      !sameConnectionBinding(copy.remote.binding, connection.binding))
+  )
+    refuse();
+  await tx.done;
+  return { entry, ref, copy };
+}
+
 type ScenarioWriteTransaction = IDBPTransaction<unknown, string[], 'readwrite'>;
 type NativeScenarioRoot = Awaited<ReturnType<typeof hydratePreparedScenarioReplicaRoot>>;
 type ScenarioDeleteOperation = ReturnType<typeof buildPhysicalDeleteOperation>;
@@ -281,6 +417,13 @@ async function admitScenarioPredecessor(
   root: NativeScenarioRoot
 ) {
   const key = keys(input);
+  if (
+    await readCheckpointInTransaction(tx, input, {
+      rootKind: 'scenario-project',
+      rootId: root.entry.id,
+    })
+  )
+    refuse();
   const rawState: unknown = await tx.objectStore(stores.SYNC_CAPTURE_STORE).get(key.stateKey);
   const state = rawState === undefined ? null : parseSyncCaptureRecord(rawState);
   if (
@@ -330,6 +473,13 @@ async function assertScenarioBorrowedDependencies(
   root: NativeScenarioRoot
 ): Promise<void> {
   for (const dependency of input.dependencies) {
+    if (
+      await readCheckpointInTransaction(tx, input, {
+        rootKind: 'media',
+        rootId: dependency.entry.id,
+      })
+    )
+      refuse();
     const dependencyKey = captureRootKey(input.spaceId, 'media', dependency.entry.id);
     const dependencyState = parseSyncCaptureRecord(
       await tx
@@ -364,6 +514,66 @@ async function assertScenarioBorrowedDependencies(
   if ([...needed].some((id) => !input.dependencies.some((item) => item.entry.id === id))) refuse();
   for (const asset of root.assets)
     if (asset.entry.borrowedMediaId) await assertBorrowedScenarioAssetSource(tx, asset.entry);
+}
+
+async function admitDeferredScenarioExports(
+  tx: ScenarioWriteTransaction,
+  input: ApplyPreparedScenarioReplicaInput,
+  connection: SyncConnectionMetadata | null,
+  permit: PersistenceMutationPermit
+): Promise<void> {
+  for (const item of input.root.deferredExports ?? []) {
+    if (!connection) refuse();
+    const raw: unknown = await tx.objectStore(stores.SCENARIO_EXPORTS_STORE).get(item.entry.id);
+    const rawRef: unknown = await tx.objectStore(stores.ASSET_REFS_STORE).get(item.ref.assetId);
+    const rawOwner: unknown = await tx
+      .objectStore(stores.ASSET_OWNERS_STORE)
+      .get(['scenario-export', item.entry.id, 'body']);
+    const copy = await readAssetResidencyCopyInTransaction(
+      tx,
+      assetResidencyCopyId({ kind: 'opfs', ref: item.ref })
+    );
+    if (item.reuseExisting) {
+      const owner = parseAssetOwner(rawOwner);
+      if (
+        JSON.stringify(parseScenarioExportEntry(raw)) !== JSON.stringify(item.entry) ||
+        JSON.stringify(parseAssetRef(rawRef)) !== JSON.stringify(item.ref) ||
+        !owner ||
+        owner.assetId !== item.ref.assetId ||
+        owner.ownerKind !== 'scenario-export' ||
+        owner.ownerId !== item.entry.id ||
+        owner.role !== 'body' ||
+        (copy &&
+          (copy.target.kind !== 'opfs' ||
+            (copy.phase !== 'resident' && copy.phase !== 'unloaded') ||
+            JSON.stringify(copy.target.ref) !== JSON.stringify(item.ref) ||
+            !sameConnectionBinding(copy.remote.binding, connection.binding) ||
+            copy.remote.key !== item.remote.key ||
+            copy.remote.sha256 !== item.remote.sha256))
+      )
+        refuse();
+      continue;
+    }
+    if (
+      raw !== undefined ||
+      rawRef !== undefined ||
+      rawOwner !== undefined ||
+      copy ||
+      (await tx.objectStore(stores.ASSET_OWNERS_STORE).index('assetId').count(item.ref.assetId)) !==
+        0
+    )
+      refuse();
+    await admitRemoteAssetResidencyInTransaction(
+      tx,
+      {
+        operationId: input.operationId,
+        target: { kind: 'opfs', ref: item.ref },
+        remote: { ...item.remote, binding: connection.binding },
+        lastUsedAt: Date.now(),
+      },
+      permit
+    );
+  }
 }
 
 async function publishScenarioReplica(
@@ -401,6 +611,13 @@ async function publishScenarioReplica(
     },
   });
   if (!published.imported) refuse();
+  // Replacement can unlink then restore the same retained resource inside this transaction.
+  const retained = new Set([
+    ...root.assets.map((item) => item.ref.assetId),
+    ...(root.exportRefs ?? []).map((ref) => ref.assetId),
+    ...root.stepDocuments.flatMap((item) => item.refs.map((ref) => ref.assetId)),
+  ]);
+  operation.assetIds = operation.assetIds.filter((assetId) => !retained.has(assetId));
   if (root.entry.lifecycle?.storageClass === 'temporary') {
     const accepted = parseScenarioProjectEntry(
       (await readScenarioStorage(tx, root.entry.id)).logical
@@ -448,6 +665,7 @@ export async function applyPreparedScenarioReplica(
 ) {
   const input = structuredClone(parseApplyPreparedScenarioReplicaInput(raw));
   const db = await initDB();
+  const preparedDatabase = capturePreparedDatabase();
   const read = db.transaction(
     [stores.SYNC_CAPTURE_STORE, stores.SYNC_CONNECTION_STORE],
     'readonly'
@@ -460,7 +678,8 @@ export async function applyPreparedScenarioReplica(
   const root = await hydratePreparedScenarioReplicaRoot(input.root);
   assertScenarioResourceClosure(root);
   const operation = buildPhysicalDeleteOperation([]);
-  const result = await runWithIndexedDbMutation(async (database) => {
+  const result = await runWithIndexedDbMutation(async (database, permit) => {
+    if (preparedDatabase !== null && capturePreparedDatabase() !== preparedDatabase) refuse();
     const tx = database.transaction(
       [
         ...new Set([
@@ -479,10 +698,13 @@ export async function applyPreparedScenarioReplica(
         await tx.done;
         return { status: 'duplicate' as const, generation: replay };
       }
-      if (input.authorization) await checkSyncConnectionAdmission(tx, input, input.authorization);
+      const connection = input.authorization
+        ? await checkSyncConnectionAdmission(tx, input, input.authorization)
+        : null;
       if (!profile.enabled) refuse();
       const admission = await admitScenarioPredecessor(tx, input, root);
       await assertScenarioBorrowedDependencies(tx, input, root);
+      await admitDeferredScenarioExports(tx, input, connection, permit);
       const published = await publishScenarioReplica(tx, input, root, operation, admission);
       await tx.done;
       return published;

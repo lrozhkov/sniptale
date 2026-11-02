@@ -1,3 +1,28 @@
+vi.mock('../../../composition/persistence/secret-protection/service', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../../../composition/persistence/secret-protection/service')
+    >();
+  const { SecretProtectionAdmissionPermit, SecretProtectionLockedError } =
+    await import('../../../composition/persistence/secret-protection/model');
+  const { readPreparedSecretProtectionControl } =
+    await import('../../../composition/persistence/secret-protection/transition.store');
+  const withSecretProtectionWriter: typeof actual.withSecretProtectionWriter = async (
+    operation,
+    permit
+  ) => {
+    if ((await readPreparedSecretProtectionControl())?.phase === 'transitioning')
+      throw new SecretProtectionLockedError();
+    if (permit) {
+      if (!SecretProtectionAdmissionPermit.isActive(permit))
+        throw new SecretProtectionLockedError();
+      return operation(permit);
+    }
+    return SecretProtectionAdmissionPermit.run(operation);
+  };
+  return { ...actual, withSecretProtectionWriter };
+});
+
 vi.mock('../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
   ...(await original<
     typeof import('../../../composition/persistence/infrastructure/indexed-db/core')

@@ -1,3 +1,4 @@
+import type { BackgroundRuntimeState } from '../../application/runtime-state';
 import type { ErasureParticipantResult } from '@sniptale/runtime-contracts/privacy-erasure/types';
 
 import {
@@ -23,10 +24,10 @@ import { cleanupVoiceInputForPrivacyErasure } from '../../voice-input/coordinato
 
 export const mediaPrivacyErasureCleanupAdapter = {
   reserveErasureExclusion: reserveMediaErasureExclusion,
-  async cleanup(): Promise<readonly ErasureParticipantResult[]> {
+  async cleanup(state?: BackgroundRuntimeState): Promise<readonly ErasureParticipantResult[]> {
     let voiceInputResult: ErasureParticipantResult;
     try {
-      voiceInputResult = (await cleanupVoiceInputForPrivacyErasure())
+      voiceInputResult = (await cleanupVoiceInputForPrivacyErasure(state?.voiceInputRuntime))
         ? verified(VOICE_INPUT_PARTICIPANT_ID)
         : failed(VOICE_INPUT_PARTICIPANT_ID, 'voice-input-stop-failed');
     } catch {

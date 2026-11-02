@@ -5,6 +5,7 @@ import {
   SETTINGS_SECTION_IDS,
   SETTINGS_SECTION_VIEWS,
   updateSettingsRouteView,
+  type SettingsRoute,
 } from './codec';
 
 const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
@@ -20,6 +21,31 @@ describe('settings route codec', () => {
       view: 'permissions',
     });
   });
+  it('redirects the legacy AI security view to common secret protection', () => {
+    const result = resolveSettingsRoute(
+      `${BASE}?keep=1&section=ai-connections&view=security#anchor`
+    );
+    expect(result.route).toEqual({ section: 'access-data', view: 'secret-protection' });
+    expect(result.shouldReplace).toBe(true);
+    expect(result.source).toBe('legacy');
+    expect(result.normalizedUrl.searchParams.get('section')).toBe('access-data');
+    expect(result.normalizedUrl.searchParams.get('view')).toBe('secret-protection');
+    expect(result.normalizedUrl.searchParams.get('keep')).toBe('1');
+    expect(result.normalizedUrl.hash).toBe('#anchor');
+  });
+
+  it('round trips the canonical shared protection route without replacement', () => {
+    const route = { section: 'access-data', view: 'secret-protection' } as const;
+    const url = buildSettingsRouteUrl(`${BASE}?keep=1#anchor`, route);
+    expect(resolveSettingsRoute(url)).toMatchObject({
+      route,
+      shouldReplace: false,
+      source: 'canonical',
+    });
+    expect(url.searchParams.get('keep')).toBe('1');
+    expect(url.hash).toBe('#anchor');
+  });
+
   it('exposes the canonical leaf and view inventory', () => {
     expect(SETTINGS_SECTION_IDS).toHaveLength(16);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
@@ -28,10 +54,10 @@ describe('settings route codec', () => {
       'media-quality': ['image', 'video'],
       saving: ['settings', 'files', 'drafts', 'storage', 'templates', 'queue', 'connection'],
       'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds'],
-      'ai-connections': ['integrations', 'chrome-ai', 'security'],
+      'ai-connections': ['integrations', 'chrome-ai'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
       'native-app': ['connection', 'capture', 'commands', 'telemetry'],
-      'access-data': ['permissions', 'required-permissions', 'privacy'],
+      'access-data': ['permissions', 'required-permissions', 'privacy', 'secret-protection'],
       'settings-transfer': [],
       'events-logs': [],
     });
@@ -190,4 +216,71 @@ it('opens scenario layouts as a canonical settings leaf', () => {
 it('round trips the saving connection subpage through the normal Settings route', () => {
   const route = { section: 'saving', view: 'connection' } as const;
   expect(resolveSettingsRoute(buildSettingsRouteUrl(BASE, route)).route).toEqual(route);
+});
+
+it.each(['all', 'problems', 'action-required'] as const)(
+  'round trips the allowlisted queue filter %s',
+  (queueFilter) => {
+    const route = { section: 'saving', view: 'queue', queueFilter } as const;
+    const url = buildSettingsRouteUrl(`${BASE}?keep=1#anchor`, route);
+    expect(url.searchParams.get('queueFilter')).toBe(queueFilter);
+    expect(resolveSettingsRoute(url)).toMatchObject({
+      route,
+      shouldReplace: false,
+      source: 'canonical',
+    });
+  }
+);
+
+it.each([
+  'section=saving&view=queue&queueFilter=unknown',
+  'section=saving&view=queue&queueFilter=',
+  'section=saving&view=queue&queueFilter=problems&queueFilter=action-required',
+  'section=saving&view=connection&queueFilter=problems',
+  'section=annotations&view=tags&queueFilter=all',
+  'queueFilter=action-required',
+  'section=missing&queueFilter=problems',
+])('removes an invalid, duplicate or nonqueue filter: %s', (query) => {
+  const result = resolveSettingsRoute(`${BASE}?${query}&keep=1#anchor`);
+  expect(result.shouldReplace).toBe(true);
+  expect(result.normalizedUrl.searchParams.has('queueFilter')).toBe(false);
+  expect(result.normalizedUrl.searchParams.get('keep')).toBe('1');
+  expect(result.normalizedUrl.hash).toBe('#anchor');
+  expect('queueFilter' in result.route).toBe(false);
+});
+it('drops a queue filter on navigation to another view while retaining the active queue view filter', () => {
+  const queue = { section: 'saving', view: 'queue', queueFilter: 'problems' } as const;
+  expect(updateSettingsRouteView(queue, 'queue')).toEqual(queue);
+  const connection = updateSettingsRouteView(queue, 'connection');
+  expect(connection).toEqual({ section: 'saving', view: 'connection' });
+  const url = buildSettingsRouteUrl(
+    `${BASE}?section=saving&view=queue&queueFilter=problems&keep=1`,
+    connection
+  );
+  expect(url.searchParams.has('queueFilter')).toBe(false);
+  expect(url.searchParams.get('keep')).toBe('1');
+  expect(resolveSettingsRoute(`${BASE}?section=saving&view=queue`).route).toEqual({
+    section: 'saving',
+    view: 'queue',
+  });
+});
+it('rejects an invalid queue filter at the builder boundary without accepting arbitrary route state', () => {
+  const queue = { section: 'saving', view: 'queue' } as const;
+  Object.defineProperty(queue, 'queueFilter', { value: 'server-controlled', enumerable: true });
+  expect(() => buildSettingsRouteUrl(BASE, queue)).toThrow('queue filter');
+  const connection = { section: 'saving', view: 'connection' } as const;
+  Object.defineProperty(connection, 'queueFilter', { value: 'problems', enumerable: true });
+  expect(() => buildSettingsRouteUrl(BASE, connection)).toThrow('queue filter');
+});
+
+it('builds valid defaults from generic section-only navigation without carrying a queue filter', () => {
+  for (const section of SETTINGS_SECTION_IDS) {
+    const route: SettingsRoute = { section };
+    const url = buildSettingsRouteUrl(`${BASE}?queueFilter=problems&keep=1`, route);
+    const resolved = resolveSettingsRoute(url);
+    expect(resolved.route.section).toBe(section);
+    expect(resolved.route.view).toBe(SETTINGS_SECTION_VIEWS[section][0]);
+    expect(url.searchParams.has('queueFilter')).toBe(false);
+    expect(url.searchParams.get('keep')).toBe('1');
+  }
 });

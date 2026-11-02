@@ -5,7 +5,12 @@ import { test, expect } from '../support/extension-fixture';
 
 const text = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
 
-async function configure(page: Page, extensionId: string, theme: 'light' | 'dark') {
+async function configure(
+  page: Page,
+  extensionId: string,
+  theme: 'light' | 'dark',
+  locale: 'ru' | 'en' = 'ru'
+) {
   const base = `chrome-extension://${extensionId}/apps/extension/src/settings/index.html`;
   await page.goto(`${base}?section=interface-browser&view=interface`);
   await expect(page.locator('#settings-interface-language')).toBeEnabled();
@@ -19,13 +24,16 @@ async function configure(page: Page, extensionId: string, theme: 'light' | 'dark
       )
     )
     .toMatch(/^(ru|en)$/);
-  await page.evaluate(async (theme) => {
-    localStorage.setItem('sniptale-locale-preference', 'ru');
-    await chrome.storage.local.set({
-      'sniptale-locale-preference': 'ru',
-      'sniptale-theme-preference': theme,
-    });
-  }, theme);
+  await page.evaluate(
+    async ({ theme, locale }) => {
+      localStorage.setItem('sniptale-locale-preference', locale);
+      await chrome.storage.local.set({
+        'sniptale-locale-preference': locale,
+        'sniptale-theme-preference': theme,
+      });
+    },
+    { theme, locale }
+  );
   return base;
 }
 
@@ -173,16 +181,36 @@ async function aiConnectionForms(page: Page, base: string, info: TestInfo) {
   await page.screenshot({ path: info.outputPath('provider-draft.png'), fullPage: false });
   await cancelDialog(dialog);
   await page.goto(`${base}?section=ai-connections&view=security`);
+  await expect(page).toHaveURL(`${base}?section=access-data&view=secret-protection`);
+  await expect(
+    page.getByRole('heading', { name: text('settings.secretProtection.title'), exact: true })
+  ).toBeVisible();
+  const aiProtection = page.getByRole('switch', {
+    name: text('settings.secretProtection.aiParticipant'),
+    exact: true,
+  });
+  await expect(aiProtection).toBeEnabled();
+  await expect(aiProtection).not.toBeChecked();
+  await expect(
+    page.getByRole('switch', {
+      name: text('settings.secretProtection.webdavParticipant'),
+      exact: true,
+    })
+  ).not.toBeChecked();
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: info.outputPath('shared-secret-protection.png'), fullPage: false });
   await page
     .getByRole('switch', {
-      name: text('settings.aiProviders.secretProtectionTitle'),
+      name: text('settings.secretProtection.aiParticipant'),
       exact: true,
     })
     .click();
   await assertDialog(dialog);
+  await expect(dialog).toContainText(text('settings.secretProtection.enableTitle'));
   await dialog.locator('input[type="password"]').first().fill('synthetic-local-draft');
   await page.screenshot({ path: info.outputPath('key-protection-draft.png'), fullPage: false });
   await cancelDialog(dialog);
+  await expect(aiProtection).not.toBeChecked();
 }
 
 for (const theme of ['light', 'dark'] as const) {
@@ -255,3 +283,106 @@ test('settings background name retains the standard field and rename flow', asyn
     page.locator('[data-settings-collection-item]').filter({ hasText: 'Renamed background' })
   ).toBeVisible();
 });
+
+for (const locale of ['ru', 'en'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+      test(`shared secret protection ${locale} ${theme} ${viewport.name}`, async ({
+        page,
+        extensionId,
+      }, info) => {
+        const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+        await page.setViewportSize(viewport.size);
+        const base = await configure(page, extensionId, theme, locale);
+        await page.goto(`${base}?section=ai-connections&view=security`);
+        await expect(page).toHaveURL(`${base}?section=access-data&view=secret-protection`);
+        await expect(
+          page.getByRole('heading', { name: t('settings.secretProtection.title'), exact: true })
+        ).toBeVisible();
+        const ai = page.getByRole('switch', {
+          name: t('settings.secretProtection.aiParticipant'),
+          exact: true,
+        });
+        const webdav = page.getByRole('switch', {
+          name: t('settings.secretProtection.webdavParticipant'),
+          exact: true,
+        });
+        await expect(ai).toBeEnabled();
+        await expect(ai).not.toBeChecked();
+        await expect(webdav).not.toBeChecked();
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+          await Promise.all(
+            document
+              .getAnimations()
+              .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+              .map((animation) => animation.finished.catch(() => undefined))
+          );
+        });
+        await page.screenshot({
+          path: info.outputPath('shared-protection-page.png'),
+          fullPage: false,
+        });
+        await ai.click();
+        const dialog = page.getByRole('dialog');
+        await expect(dialog).toBeVisible();
+        await dialog.evaluate(async (node) => {
+          await Promise.all(
+            node
+              .getAnimations({ subtree: true })
+              .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+              .map((animation) => animation.finished.catch(() => undefined))
+          );
+        });
+        const bounds = await dialog.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds!.width).toBeLessThanOrEqual(421);
+        expect(bounds!.height).toBeLessThanOrEqual(viewport.size.height - 31);
+        expect(
+          Math.abs(bounds!.x + bounds!.width / 2 - viewport.size.width / 2)
+        ).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(bounds!.y + bounds!.height / 2 - viewport.size.height / 2)
+        ).toBeLessThanOrEqual(1);
+        await expect(dialog.locator('.sniptale-modal-header-sm')).toHaveCSS(
+          'border-bottom-width',
+          '0px'
+        );
+        await expect(dialog.locator('.sniptale-modal-footer-sm')).toHaveCSS(
+          'border-top-width',
+          '0px'
+        );
+        const fields = dialog.locator('input[type="password"]');
+        await expect(fields).toHaveCount(2);
+        await fields.nth(0).fill('local draft phrase');
+        await fields.nth(1).fill('different draft');
+        await dialog.getByRole('button', { name: t('common.actions.save'), exact: true }).click();
+        await expect(dialog).toContainText(t('settings.secretProtection.passphraseMismatch'));
+        const cancel = dialog.getByRole('button', {
+          name: t('common.actions.cancel'),
+          exact: true,
+        });
+        await cancel.scrollIntoViewIfNeeded();
+        await expect(cancel).toBeInViewport({ ratio: 1 });
+        await expect(
+          dialog.getByRole('button', { name: t('common.actions.save'), exact: true })
+        ).toBeInViewport({ ratio: 1 });
+        await page.screenshot({
+          path: info.outputPath('shared-protection-invalid-draft.png'),
+          fullPage: false,
+        });
+        await cancel.click();
+        await expect(dialog).toHaveCount(0);
+        await expect(ai).not.toBeChecked();
+        await ai.click();
+        await expect(dialog.locator('input[type="password"]').first()).toHaveValue('');
+        await dialog.getByRole('button', { name: t('common.actions.cancel'), exact: true }).click();
+        await page.setViewportSize({ width: 1100, height: viewport.size.height });
+        const overflow = await page
+          .locator('[data-ui="settings.page.content-scroll"]')
+          .evaluate((node) => node.scrollWidth - node.clientWidth);
+        expect(overflow).toBeLessThanOrEqual(1);
+      });
+    }
+  }
+}

@@ -53,6 +53,7 @@ import {
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
   configureSyncPrivacyErasurePort,
+  configureSecretProtectionPrivacyErasurePort,
   eraseLocalExtensionDataFromBackground,
 } from './composition';
 
@@ -65,6 +66,9 @@ const verifiedParticipant = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  configureSecretProtectionPrivacyErasurePort({
+    reserveErasure: () => ({ release() {}, async prepare() {} }),
+  });
   configureSyncPrivacyErasurePort({
     reserveErasureExclusion: () => ({ release() {}, async quiesce() {} }),
   });
@@ -228,4 +232,89 @@ it('fails closed before any cleanup when runtime has not configured sync quiesce
   expect(nativeIngestionCleanupMock).not.toHaveBeenCalled();
   expect(runtimeCleanupMock).not.toHaveBeenCalled();
   expect(storageCleanupMock).not.toHaveBeenCalled();
+});
+
+it('reserves common protection synchronously and holds it through storage cleanup', async () => {
+  const events: string[] = [];
+  const release = vi.fn(() => {
+    events.push('secret-release');
+  });
+  const prepare = vi.fn(async (_options: { includeAiProviderSecrets: boolean }) => {
+    events.push('secret-prepare');
+  });
+  const reserveErasure = vi.fn(() => {
+    events.push('secret-reserve');
+    return { release, prepare };
+  });
+  configureSecretProtectionPrivacyErasurePort({ reserveErasure });
+  configureSyncPrivacyErasurePort({
+    reserveErasureExclusion: () => ({
+      release() {
+        events.push('sync-release');
+      },
+      async quiesce() {
+        events.push('sync-quiesce');
+      },
+    }),
+  });
+  storageCleanupMock.mockImplementationOnce(async () => {
+    events.push('storage');
+    expect(release).not.toHaveBeenCalled();
+    return {
+      failedRequiredParticipantIds: [],
+      indexedDbStoresCleared: 1,
+      localStorageKeysRemoved: [],
+      sessionStorageKeysRemoved: [],
+      syncStorageKeysRemoved: [],
+      participants: [verifiedParticipant],
+      success: true,
+    };
+  });
+  const result = eraseLocalExtensionDataFromBackground(
+    {
+      type: MessageType.ERASE_LOCAL_EXTENSION_DATA,
+      includeAiProviderSecrets: false,
+      preservePreferences: true,
+    },
+    createBackgroundRuntimeState()
+  );
+  expect(reserveErasure).toHaveBeenCalledOnce();
+  await expect(result).resolves.toEqual(expect.objectContaining({ success: true }));
+  expect(prepare).toHaveBeenCalledExactlyOnceWith({ includeAiProviderSecrets: false });
+  expect(events).toEqual([
+    'secret-reserve',
+    'sync-quiesce',
+    'secret-prepare',
+    'storage',
+    'sync-release',
+    'secret-release',
+  ]);
+});
+
+it('fails closed and releases both reservations when shared protection preparation fails', async () => {
+  const release = vi.fn();
+  const syncRelease = vi.fn();
+  configureSecretProtectionPrivacyErasurePort({
+    reserveErasure: () => ({
+      release,
+      async prepare() {
+        throw new Error('shared journal unavailable');
+      },
+    }),
+  });
+  configureSyncPrivacyErasurePort({
+    reserveErasureExclusion: () => ({ release: syncRelease, async quiesce() {} }),
+  });
+  const result = await eraseLocalExtensionDataFromBackground(
+    {
+      type: MessageType.ERASE_LOCAL_EXTENSION_DATA,
+      includeAiProviderSecrets: true,
+      preservePreferences: false,
+    },
+    createBackgroundRuntimeState()
+  );
+  expect(result.success).toBe(false);
+  expect(storageCleanupMock).not.toHaveBeenCalled();
+  expect(release).toHaveBeenCalledOnce();
+  expect(syncRelease).toHaveBeenCalledOnce();
 });

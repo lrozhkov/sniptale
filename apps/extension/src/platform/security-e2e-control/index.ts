@@ -5,6 +5,7 @@ import {
   parseSyncConnectionIdentity,
   parseSyncWorkspaceSource,
   parseConnectionMetadata,
+  parseSyncStoragePolicy,
 } from '../../composition/persistence/remote-connection/model';
 import {
   parseSyncQueueScope,
@@ -17,6 +18,7 @@ import type {
   SyncConnectionIdentity,
   SyncWorkspaceSource,
   SyncConnectionMetadata,
+  SyncStoragePolicy,
 } from '../../composition/persistence/remote-connection/model';
 import { parseSyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime/sync-connection';
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
@@ -134,6 +136,10 @@ export interface SecurityE2ESyncWorkspaceSelection {
   authentication: SyncConnectionAuthentication;
 }
 
+export interface SecurityE2ESyncWorkspaceEnrollment extends SecurityE2ESyncWorkspaceSelection {
+  storagePolicy: SyncStoragePolicy;
+}
+
 /** Structural injection keeps background runtime ownership outside the app-core control module. */
 export interface SecurityE2ESyncRuntime {
   start(
@@ -142,7 +148,7 @@ export interface SecurityE2ESyncRuntime {
   startWorkspace(
     selection: SecurityE2ESyncWorkspaceSelection
   ): Promise<{ executorId: string; executorRevision: number }>;
-  enrollWorkspace(selection: SecurityE2ESyncWorkspaceSelection): Promise<SyncConnectionMetadata>;
+  enrollWorkspace(selection: SecurityE2ESyncWorkspaceEnrollment): Promise<SyncConnectionMetadata>;
   inspect(): Promise<SyncExecutorSnapshot | null>;
   reserveErasure(): { quiesce(): Promise<void>; release(): void };
   erase?(): Promise<boolean>;
@@ -181,9 +187,14 @@ function parseSyncSelection(value: unknown): SecurityE2ESyncSelection | null {
 type SyncControlCommand =
   | { type: 'sync-start'; requestId: string; selection: SecurityE2ESyncSelection }
   | {
-      type: 'sync-workspace-start' | 'sync-workspace-enroll';
+      type: 'sync-workspace-start';
       requestId: string;
       selection: SecurityE2ESyncWorkspaceSelection;
+    }
+  | {
+      type: 'sync-workspace-enroll';
+      requestId: string;
+      selection: SecurityE2ESyncWorkspaceEnrollment;
     }
   | { type: 'sync-inspect' | 'sync-stop' | 'sync-erase'; requestId: string };
 
@@ -193,7 +204,15 @@ function parseSyncControlCommand(value: unknown): SyncControlCommand | null {
   if (value['type'] === 'sync-workspace-start' || value['type'] === 'sync-workspace-enroll') {
     if (!exact(value, ['type', 'requestId', 'payload'])) return null;
     const payload = value['payload'];
-    if (!isRecord(payload) || !exact(payload, ['source', 'authentication'])) return null;
+    if (
+      !isRecord(payload) ||
+      !exact(payload, [
+        'source',
+        'authentication',
+        ...(value['type'] === 'sync-workspace-enroll' ? ['storagePolicy'] : []),
+      ])
+    )
+      return null;
     const source = parseSyncWorkspaceSource(payload['source']);
     const rawAuthentication = payload['authentication'];
     if (!isRecord(rawAuthentication)) return null;
@@ -202,9 +221,18 @@ function parseSyncControlCommand(value: unknown): SyncControlCommand | null {
       rawAuthentication,
       typeof username === 'string' ? username : ''
     );
-    return source && authentication
-      ? { type: value['type'], requestId, selection: { source, authentication } }
-      : null;
+    if (!source || !authentication) return null;
+    if (value['type'] === 'sync-workspace-enroll') {
+      const storagePolicy = parseSyncStoragePolicy(payload['storagePolicy']);
+      return storagePolicy
+        ? {
+            type: 'sync-workspace-enroll',
+            requestId,
+            selection: { source, authentication, storagePolicy },
+          }
+        : null;
+    }
+    return { type: 'sync-workspace-start', requestId, selection: { source, authentication } };
   }
   if (value['type'] === 'sync-start') {
     if (!exact(value, ['type', 'requestId', 'payload'])) return null;

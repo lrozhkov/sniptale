@@ -1,3 +1,7 @@
+import {
+  SecretProtectionLockedError,
+  type SecretProtectionPort,
+} from '../../../composition/persistence/secret-protection/model';
 import { AIProviderRequestError } from '../providers';
 import { supportsAIProviderModelOperation } from '../../../contracts/settings/model-operation';
 import { translate } from '../../../platform/i18n';
@@ -36,7 +40,8 @@ export async function resolveModelConfig(
   approved?: Pick<
     ReviewTextStart,
     'approvedProviderId' | 'approvedDestination' | 'approvedModelCode'
-  > & { signal: AbortSignal }
+  > & { signal: AbortSignal },
+  protection?: SecretProtectionPort
 ): Promise<ResolvedLlmModelConfig> {
   approved?.signal.throwIfAborted();
   await initializeAiStorageAccess();
@@ -86,7 +91,20 @@ export async function resolveModelConfig(
     approved.signal.throwIfAborted();
   }
 
-  const apiKey = needsCredential ? await activateStoredAIProviderSecretForUse(provider) : '';
+  let apiKey: string | null;
+  try {
+    apiKey = needsCredential
+      ? protection
+        ? await protection.withAdmission('ai', (key, permit) =>
+            activateStoredAIProviderSecretForUse(provider, key, permit)
+          )
+        : await activateStoredAIProviderSecretForUse(provider)
+      : '';
+  } catch (error) {
+    if (error instanceof SecretProtectionLockedError)
+      throw new AIProviderRequestError('secret-locked');
+    throw error;
+  }
   approved?.signal.throwIfAborted();
   if (needsCredential && !apiKey) {
     throw new Error(translate('background.runtime.llmProviderApiKeyReentryRequired'));
@@ -124,9 +142,10 @@ export async function resolveModelConfig(
 
 /** Revalidate a frozen legacy-route configuration before the SDK sends any payload. */
 export async function assertResolvedLlmModelConfigCurrent(
-  config: ResolvedLlmModelConfig
+  config: ResolvedLlmModelConfig,
+  protection?: SecretProtectionPort
 ): Promise<void> {
-  const current = await resolveModelConfig(config.modelId);
+  const current = await resolveModelConfig(config.modelId, undefined, protection);
   if (JSON.stringify(current) !== JSON.stringify(config)) throw new Error('model-unavailable');
   if (!(await chrome.permissions.contains({ origins: [`${new URL(config.baseUrl).origin}/*`] })))
     throw new Error('permission-denied');

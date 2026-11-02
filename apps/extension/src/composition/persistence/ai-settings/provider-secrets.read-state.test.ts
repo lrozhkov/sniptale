@@ -1,3 +1,25 @@
+vi.mock('../secret-protection/service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secret-protection/service')>();
+  const { SecretProtectionAdmissionPermit, SecretProtectionLockedError } =
+    await import('../secret-protection/model');
+  const { readPreparedSecretProtectionControl } =
+    await import('../secret-protection/transition.store');
+  const withSecretProtectionWriter: typeof actual.withSecretProtectionWriter = async (
+    operation,
+    permit
+  ) => {
+    const control = await readPreparedSecretProtectionControl();
+    if (control?.phase === 'transitioning') throw new SecretProtectionLockedError();
+    if (permit) {
+      if (!SecretProtectionAdmissionPermit.isActive(permit))
+        throw new SecretProtectionLockedError();
+      return operation(permit);
+    }
+    return SecretProtectionAdmissionPermit.run(operation);
+  };
+  return { ...actual, withSecretProtectionWriter };
+});
+
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import {
@@ -124,14 +146,14 @@ it('returns key-missing when encrypted secrets have no transparent key', async (
 });
 
 it('returns locked when passphrase-protected secrets are not unlocked', async () => {
-  const { createAISecretPassphraseProtection } = await import('./secret-protection.store.ts');
-  const protection = await createAISecretPassphraseProtection('passphrase');
+  const { createSecretProtectionProfile } = await import('../secret-protection/profile.store.ts');
+  const protection = await createSecretProtectionProfile('passphrase');
   installStorageState({
     [AI_PROVIDERS_KEY]: [createStoredProvider()],
     [AI_PROVIDER_SECRETS_KEY]: {
       'provider-1': await encryptSecret('provider-secret', protection.key),
     },
-    [AI_SECRET_PROTECTION_KEY]: protection.protection,
+    [AI_SECRET_PROTECTION_KEY]: protection.profile,
   });
   const { readStoredAIProviderSecretState } = await import('./provider-secrets.store.ts');
 

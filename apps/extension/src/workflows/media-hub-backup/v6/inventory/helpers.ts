@@ -5,7 +5,11 @@ import type {
   ArchivePathAllocator,
   ArchiveObjectRef,
 } from '../../../../composition/archive-transfer';
-import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
+import {
+  parseAssetRef,
+  readAssetFile,
+  type AssetRef,
+} from '../../../../composition/persistence/assets';
 import type { ArchiveRootObjectSource } from '../export';
 import { createInternalObjectSegments } from '../layout';
 
@@ -15,7 +19,17 @@ export interface InventoryDatabase {
   getAllFromIndex(store: string, index: string, key: unknown): Promise<unknown[]>;
 }
 
-export function createObjectCollector(rootLabel: string, paths: ArchivePathAllocator) {
+/** Internal frozen inventory input; the caller retains native copy admission. */
+export interface DeferredInventoryAssets {
+  refs: ReadonlyMap<string, AssetRef>;
+  onObject(assetId: string, descriptor: ArchiveObjectRef): void;
+}
+
+export function createObjectCollector(
+  rootLabel: string,
+  paths: ArchivePathAllocator,
+  deferredAssets?: DeferredInventoryAssets
+) {
   const objects: ArchiveRootObjectSource[] = [];
   const references: { ref: ArchiveObjectRef }[] = [];
   const addObjectDescriptor = (
@@ -47,7 +61,44 @@ export function createObjectCollector(rootLabel: string, paths: ArchivePathAlloc
     objects.push({ blob, ref });
     return ref.objectId;
   };
-  return { addObject, addObjectDescriptor, objects, references };
+  const deferredDescriptors = new Map<string, ArchiveObjectRef>();
+  const addAsset = async (
+    db: Pick<InventoryDatabase, 'get'>,
+    assetId: string,
+    filename: string,
+    mimeType?: string,
+    directory?: readonly string[]
+  ): Promise<string> => {
+    const source = parseAssetRef(await db.get('asset_refs', assetId));
+    if (!source || source.assetId !== assetId)
+      throw new Error(`Archive inventory asset reference is missing: ${assetId}.`);
+    const deferred = deferredAssets?.refs.get(assetId);
+    if (deferredAssets && deferred) {
+      const ref = parseAssetRef(deferred);
+      if (
+        !ref ||
+        JSON.stringify(ref) !== JSON.stringify(source) ||
+        (mimeType !== undefined &&
+          mimeType.split(';', 1)[0]!.trim().toLowerCase() !==
+            ref.mimeType.split(';', 1)[0]!.trim().toLowerCase())
+      )
+        throw new Error('Deferred inventory asset differs from its frozen reference.');
+      const existing = deferredDescriptors.get(assetId);
+      if (existing) return existing.objectId;
+      const descriptor = addObjectDescriptor(
+        ref.size,
+        filename,
+        mimeType ?? ref.mimeType,
+        directory
+      );
+      deferredDescriptors.set(assetId, descriptor);
+      deferredAssets.onObject(assetId, descriptor);
+      return descriptor.objectId;
+    }
+    const file = await readAssetFile(source, filename);
+    return addObject(file, filename, mimeType ?? (file.type || source.mimeType), directory);
+  };
+  return { addObject, addObjectDescriptor, addAsset, objects, references };
 }
 
 export async function readInventoryAssetFile(

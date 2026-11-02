@@ -9,7 +9,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { parsePortableVideoProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
 import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
 import { projectSyncCatalog } from './catalog-graph';
-import { createSyncAttempt, parseSyncAttemptText } from './wire-record';
+import { createSyncAttempt, hashSyncText, parseSyncAttemptText } from './wire-record';
 import { prepareCatalogReplica } from './incoming';
 
 import {
@@ -34,6 +34,10 @@ const io = vi.hoisted(() => ({
   predecessor: vi.fn(),
   scenarioPredecessor: vi.fn(),
   releaseReader: vi.fn(),
+  resident: vi.fn(),
+}));
+vi.mock('../../composition/persistence/sync-capture/catalog-admission', () => ({
+  loadCatalogReplicaResidentCandidates: io.resident,
 }));
 vi.mock('../../composition/persistence/assets/resource-sessions', () => ({
   runWithAssetResourceRead: async (operation: () => Promise<unknown>) => {
@@ -81,6 +85,7 @@ vi.mock('../media-hub-backup/v6/staging', () => ({ stageRootObjects: io.stage })
 beforeEach(() => {
   vi.clearAllMocks();
   resetIncomingTestIO(io);
+  io.resident.mockReset().mockResolvedValue({ refs: [], inlineOriginals: [] });
   vi.mocked(loadProjectReplicaExport).mockResolvedValue(null);
 });
 
@@ -429,3 +434,51 @@ it.each([
     );
   }
 );
+
+it('applies a resident Montage successor with private assets and changed previews without binary GETs', async () => {
+  const f = await fixture(true);
+  const envelope = projectEnvelope();
+  const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
+  metadata.thumbnail = { objectId: 'thumbnail', createdAt: 1, updatedAt: 1, width: 1, height: 1 };
+  metadata.presentation = {
+    entry: {
+      aggregateId: 'project',
+      aggregateKind: 'video-project',
+      presentationRevision: 0,
+      updatedAt: 1,
+    },
+    thumbnailObjectId: 'thumbnail',
+    previewObjectId: 'preview',
+  };
+  envelope.metadata = JSON.parse(JSON.stringify(metadata));
+  envelope.objects.push(object('thumbnail', 'thumbnail.png'), object('preview', 'preview.png'));
+  envelope.descriptor.objectCount = envelope.objects.length;
+  envelope.descriptor.totalBytes = 12;
+  const selected = await attempt(parseRootEnvelope(envelope), 'project-op', 4);
+  const media = await attempt(mediaEnvelope().envelope, 'media-op');
+  const retained = { ...ref('retained-private'), sha256: null };
+  io.resident.mockResolvedValue({ refs: [retained], inlineOriginals: [] });
+  const result = await prepareCatalogReplica({
+    ...f,
+    catalog: { ...f.catalog, ...projectSyncCatalog('space', [media, selected]) },
+    admission: {
+      ...f.admission,
+      authorization: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 },
+      expectedLocalGeneration: 1,
+      expectedBasis: ['project-op'],
+    },
+    rootKind: 'video-project',
+    rootId: 'project',
+    binaryAdmission: 'resident',
+    signal: new AbortController().signal,
+  });
+  expect(result.payload.kind).toBe('video-project');
+  if (result.payload.kind !== 'video-project') throw new Error('Expected project.');
+  expect(result.payload.input.root.assets[0]?.ref).toEqual(retained);
+  expect(result.payload.input.root.thumbnail).toBeUndefined();
+  expect(result.payload.input.root.presentation).toBeUndefined();
+  expect(result.payload.input.sourceDigest).toBe(hashSyncText(selected.operationText));
+  expect(result.payload.input.root.exports).toHaveLength(1);
+  expect(f.reads).toEqual([]);
+  expect(io.staged).toEqual([]);
+});

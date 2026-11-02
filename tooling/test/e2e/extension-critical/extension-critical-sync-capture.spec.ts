@@ -21,7 +21,12 @@ test('native capture commits accepted revisions and retains frozen source bytes'
     await page.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
     await page.waitForFunction(() => Boolean(window.syncCaptureHarness));
     const saved = await page.evaluate(() => window.syncCaptureHarness.saveProof());
-    expect(saved).toMatchObject({ rollback: true, parallel: true, recreation: true });
+    expect(saved).toMatchObject({
+      rollback: true,
+      parallel: true,
+      recreation: true,
+      pendingThenCheckpoint: true,
+    });
     const exported = await page.evaluate(() => window.syncCaptureHarness.exportProof());
     expect(exported).toEqual({ replay: true, frozen: true });
     const cascade = await page.evaluate(() => window.syncCaptureHarness.cascadeProof());
@@ -163,6 +168,8 @@ for (const viewport of [
       );
       expect(after).toMatchObject({
         captured: true,
+        pendingThenCheckpoint: true,
+        checkpointRevision: expect.any(String),
         usage: true,
         cascade: true,
         delayedWriterRefused: true,
@@ -447,6 +454,8 @@ test('pre-profile originals join project capture atomically and survive browser 
       retry: true,
       parallel: true,
       sharedHead: true,
+      checkpointAtomic: true,
+      pendingRevision: expect.any(String),
     });
     const frozen = await page.evaluate(
       (id) => window.syncCaptureHarness.verifyFrozenPersistence(id),
@@ -469,6 +478,12 @@ test('pre-profile originals join project capture atomically and survive browser 
     await restarted.goto(`${host.origin}/tooling/test/harness/sync-capture.html`);
     await restarted.waitForFunction(() => Boolean(window.syncCaptureHarness));
     expect(await restarted.evaluate(() => window.syncCaptureHarness.changes())).toEqual(captured);
+    expect(
+      await restarted.evaluate(
+        (id) => window.syncCaptureHarness.pendingProject(id),
+        proof.projectId
+      )
+    ).toMatchObject({ revision: proof.pendingRevision });
     expect(
       await restarted.evaluate(
         (id) => window.syncCaptureHarness.verifyFrozenPersistence(id),

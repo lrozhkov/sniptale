@@ -1,3 +1,4 @@
+import { SYNC_QUEUE_SUMMARY_INDEXES } from '../sync-queue-index-migration';
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
@@ -7,6 +8,7 @@ import {
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
+  SECRET_PROTECTION_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
@@ -64,6 +66,7 @@ it('adds empty history stores and DB48 reference indexes before publishing curre
     [SYNC_CATALOG_CACHE_STORE, { keyPath: 'key' }],
     [SYNC_CONNECTION_STORE, { keyPath: 'key' }],
     [ASSET_RESIDENCY_STORE, { keyPath: 'id' }],
+    [SECRET_PROTECTION_STORE, { keyPath: 'key' }],
   ]);
   expect(indexes.mock.calls).toEqual([
     ['aggregateId', 'aggregateId'],
@@ -92,6 +95,11 @@ it('adds empty history stores and DB48 reference indexes before publishing curre
       { multiEntry: true },
     ]),
     ['recoveryId', 'recoveryId'],
+    ...SYNC_QUEUE_SUMMARY_INDEXES.map(({ indexName, keyPath }) => [
+      indexName,
+      [...keyPath],
+      { unique: false },
+    ]),
   ]);
   await vi.waitFor(() =>
     expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 1)
@@ -101,6 +109,8 @@ it('adds empty history stores and DB48 reference indexes before publishing curre
     ...REFERENCE_INDEX_STORES.map((name) => [name]),
     [RECORDING_RECOVERY_SESSIONS_STORE],
     [REFERENCE_INDEX_STORES[0]],
+    [SYNC_CAPTURE_STORE],
+    [SYNC_OUTBOX_STORE],
     ['schema_contracts'],
     ...REFERENCE_INDEX_STORES.slice(1).map((name) => [name]),
     ['video_workspaces'],

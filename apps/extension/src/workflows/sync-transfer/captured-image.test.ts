@@ -1,5 +1,16 @@
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+} from '../../composition/persistence/assets/residency-records';
+import { hashSyncText } from './wire-record';
+import { createScenarioReplicaFixture } from '../../composition/persistence/sync-capture/test-support/scenario-replica.test-support';
+import { applyPreparedImageReplica } from '../../composition/persistence/sync-capture/apply-image';
+import { commitImagePresentation } from '../../composition/persistence/image-aggregates/mutations';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createMediaLibraryEntry } from '../../composition/persistence/projects/index.test-support';
+import {
+  createMediaLibraryEntry,
+  createProjectAssetEntry,
+} from '../../composition/persistence/projects/index.test-support';
 import { createPersistedEditorDocumentFixture } from '../../composition/persistence/document-assets/test-support';
 import { createEditorDocumentFixture } from '../../editor/document/page-session/document.test-support';
 import type {
@@ -19,6 +30,7 @@ import { preparePortableReplica } from './prepared-root';
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
 
 const io = vi.hoisted(() => ({
+  live: vi.fn(),
   read: vi.fn(),
   discard: vi.fn(),
   release: vi.fn(),
@@ -29,6 +41,12 @@ const io = vi.hoisted(() => ({
   sequence: 0,
   bytes: new Map<string, Blob>(),
   staged: [] as string[],
+}));
+vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<
+    typeof import('../../composition/persistence/infrastructure/indexed-db/core')
+  >()),
+  initDB: io.live,
 }));
 vi.mock('../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/assets')>()),
@@ -598,3 +616,311 @@ it('hands off only committed transport markers and preserves accepted bytes afte
   expect(io.release).not.toHaveBeenCalled();
   expect(io.settle).toHaveBeenCalledTimes(2);
 });
+
+it('applies a document fallback without waiting for a later presentation', async () => {
+  const rows = imageRows();
+  rows.presentation = null;
+  const capture = nativeImageCapture(rows);
+  const frozen = structuredClone(capture);
+  const encoded = await encodeCapturedImageRoot(rows);
+  const fixture = createScenarioReplicaFixture();
+  fixture.fixture.rows.get('media_library')!.clear();
+  io.live.mockResolvedValue(fixture.database);
+  const verified = new Map<string, AssetRef>();
+  const files = new Map<string, Blob>();
+  for (const object of encoded.objects) {
+    const assetId = `received-${object.ref.objectId}`;
+    verified.set(object.ref.objectId, {
+      assetId,
+      createdAt: 1,
+      size: object.blob.size,
+      mimeType: object.blob.type,
+      location: { kind: 'opfs', objectKey: `objects/${assetId}` },
+      sha256: null,
+    });
+    files.set(assetId, object.blob);
+  }
+  io.read.mockImplementation(
+    async (ref: AssetRef, filename: string) =>
+      new File([files.get(ref.assetId) ?? 'document'], filename, { type: ref.mimeType })
+  );
+  const payload = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: verified,
+    senderDependencies: [],
+    admission: {
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 1,
+      operationId: 'fallback-image',
+      sourceDigest: capture.sourceSha256,
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  if (payload.kind !== 'image') throw new Error('Expected image replica.');
+  expect(payload.input.presentation).toBeNull();
+  await expect(applyPreparedImageReplica(payload.input)).resolves.toMatchObject({
+    status: 'applied',
+  });
+  const workspace = fixture.fixture.rows.get('image_workspaces')!.get(rows.media.id);
+  expect(workspace).toMatchObject({
+    document: { sourceImage: { assetId: expect.stringMatching(/^received-/u) } },
+  });
+  await commitImagePresentation({
+    aggregateId: rows.media.id,
+    expectedWorkspaceRevision: (
+      fixture.fixture.rows.get('media_library')!.get(rows.media.id) as { workspaceRevision: number }
+    ).workspaceRevision,
+    previewBlob: new Blob(['late-preview'], { type: 'image/png' }),
+    thumbnailBlob: new Blob(['late-thumbnail'], { type: 'image/png' }),
+  });
+  expect(capture).toEqual(frozen);
+  const repeated = await encodeCapturedImageRoot(rows);
+  expect(repeated.envelope).toEqual(encoded.envelope);
+  expect(await Promise.all(repeated.objects.map(({ blob }) => blob.text()))).toEqual(
+    await Promise.all(encoded.objects.map(({ blob }) => blob.text()))
+  );
+  expect(
+    [...fixture.fixture.rows.get('sync_capture')!.values()].filter(
+      (row) =>
+        (row as { kind?: string }).kind === 'sync-operation' ||
+        (row as { kind?: string }).kind === 'pending-checkpoint'
+    )
+  ).toEqual([]);
+  await expect(applyPreparedImageReplica(payload.input)).resolves.toMatchObject({
+    status: 'duplicate',
+  });
+});
+
+function verifiedDeferredCopy(ref: AssetRef, index = 0): AssetResidencyCopy {
+  return {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId({ kind: 'opfs', ref }),
+    revision: 1,
+    operationId: 'accepted-copy',
+    phase: 'unloaded',
+    lastUsedAt: 1,
+    target: { kind: 'opfs', ref },
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'user',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+      key: `Files/${hashSyncText('space')}/00000000-0000-0000-0000-000000000001/native-${index}/original-${index}.bin`,
+      sha256: ref.sha256 ?? String(index % 10).repeat(64),
+    },
+  };
+}
+
+it(
+  'retains an unloaded image document slot while inline original and presentation ' +
+    'remain genuine local objects',
+  async () => {
+    const rows = imageRows();
+    const ref = rows.refs[0]!;
+    io.read.mockRejectedValue(new Error('Unloaded document must not be read.'));
+    const copy = verifiedDeferredCopy(ref);
+    const encoded = await encodeCapturedImageRoot(rows, new Map([[ref.assetId, copy]]));
+    const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+    const id = metadata.workspace!.document.assets[0]!.objectId;
+    expect(encoded.retainedObjects).toEqual([
+      { objectId: id, remoteKey: copy.remote.key, sha256: copy.remote.sha256 },
+    ]);
+    expect(encoded.bindings.find((binding) => binding.objectId === id)?.ref).toEqual(ref);
+    expect(encoded.objects.some((object) => object.ref.objectId === id)).toBe(false);
+    expect(
+      encoded.objects.find((object) => object.ref.objectId === metadata.originalObjectId)?.blob
+    ).toBeInstanceOf(Blob);
+    expect(encoded.envelope.descriptor.objectCount).toBe(encoded.objects.length + 1);
+    expect(io.read).not.toHaveBeenCalled();
+  }
+);
+
+it('does not lend an unloaded document copy to an identical inline original or presentation', async () => {
+  const rows = imageRows();
+  const digest = hashSyncText('document');
+  rows.refs[0]!.sha256 = digest;
+  rows.media.blob = new Blob(['document'], { type: 'image/png' });
+  rows.presentation!.previewBlob = new Blob(['document'], { type: 'image/png' });
+  const ref = rows.refs[0]!;
+  const copy = verifiedDeferredCopy(ref);
+  io.read.mockRejectedValue(new Error('Must remain unloaded.'));
+  const encoded = await encodeCapturedImageRoot(rows, new Map([[ref.assetId, copy]]));
+  const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+  const documentId = metadata.workspace!.document.sourceImage.objectId;
+  expect(documentId).not.toBe(metadata.originalObjectId);
+  expect(metadata.presentation!.previewObjectId).toBe(metadata.originalObjectId);
+  expect(
+    encoded.objects.find((object) => object.ref.objectId === metadata.originalObjectId)?.blob
+  ).toBeInstanceOf(Blob);
+  expect(encoded.retainedObjects?.map((object) => object.objectId)).toEqual([documentId]);
+  expect(encoded.bindings).toEqual([{ objectId: documentId, ref }]);
+  expect(io.read).not.toHaveBeenCalled();
+});
+
+it.each([false, true])(
+  'canonicalizes copied image role aliases only when native expected SHA proves equality (proved=%s)',
+  async (proved) => {
+    const rows = imageRows();
+    rows.presentation = null;
+    const digest = hashSyncText('document');
+    const source = rows.refs[0]!;
+    source.sha256 = proved ? digest : null;
+    const background: AssetRef = {
+      ...source,
+      assetId: 'background-copy',
+      location: { kind: 'opfs', objectKey: 'objects/background-copy' },
+    };
+    rows.refs.push(background);
+    const asset = rows.workspace!.document.sourceImage;
+    rows.workspace!.document.frame.backgroundImage = { ...asset, assetId: background.assetId };
+    rows.workspace!.document.assets.push({
+      ...asset,
+      assetId: background.assetId,
+      role: 'frame-background',
+    });
+    const copies = new Map(
+      [source, background].map((ref, index) => {
+        const copy = verifiedDeferredCopy(ref, index);
+        copy.remote.sha256 = digest;
+        return [ref.assetId, copy] as const;
+      })
+    );
+    io.read.mockRejectedValue(new Error('Must remain unloaded.'));
+    const encoded = await encodeCapturedImageRoot(rows, copies);
+    const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+    const ids = metadata.workspace!.document.assets.map((asset) => asset.objectId);
+    expect(new Set(ids).size).toBe(proved ? 1 : 2);
+    const backgroundId = metadata.workspace!.document.assets.find(
+      (asset) => asset.role === 'frame-background'
+    )!.objectId;
+    expect(metadata.workspace!.document.frame.backgroundImage?.objectId).toBe(backgroundId);
+    expect(encoded.retainedObjects).toHaveLength(proved ? 1 : 2);
+    expect(encoded.objects).toHaveLength(1);
+    expect(io.read).not.toHaveBeenCalled();
+  }
+);
+
+it('cannot invent an original ref for an inline image by supplying a copied asset', async () => {
+  const rows = imageRows();
+  rows.workspace = null;
+  rows.refs = [];
+  const foreign: AssetRef = {
+    assetId: 'made-up-original',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/made-up-original' },
+    mimeType: rows.media.mimeType,
+    size: rows.media.size,
+    sha256: null,
+  };
+  await expect(
+    encodeCapturedImageRoot(rows, new Map([[foreign.assetId, verifiedDeferredCopy(foreign)]]))
+  ).rejects.toThrow('Deferred');
+  expect(io.read).not.toHaveBeenCalled();
+});
+
+it('encodes imported Image frozen child document and presentation using one verified original binding', async () => {
+  const rows = imageRows();
+  const id = 'project-asset:imported-image';
+  const original = rows.refs[0]!;
+  const { blob: _blob, ...media } = rows.media;
+  rows.media = {
+    ...media,
+    id,
+    source: { kind: 'project-asset', projectAssetId: 'imported-image' },
+    size: original.size,
+  };
+  rows.originalRef = original;
+  rows.projectAsset = createProjectAssetEntry({
+    id: 'imported-image',
+    assetId: original.assetId,
+    size: original.size,
+    mimeType: original.mimeType,
+  });
+  rows.workspace = { ...rows.workspace!, aggregateId: id };
+  rows.presentation = null;
+  const encoded = await encodeCapturedImageRoot(rows);
+  expect(encoded.objects).toHaveLength(1);
+  expect(encoded.bindings).toEqual([{ objectId: encoded.objects[0]!.ref.objectId, ref: original }]);
+  const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+  expect(metadata.entry.source).toEqual(rows.media.source);
+  expect(metadata.projectAsset?.id).toBe(rows.projectAsset.id);
+  expect(metadata.projectAsset).not.toHaveProperty('assetId');
+  expect(metadata.workspace?.document.sourceImage.objectId).toBe(metadata.originalObjectId);
+  const { parsePortableSyncRoot } = await import('./prepared-root');
+  expect((await parsePortableSyncRoot(encoded.envelope)).kind).toBe('image');
+  const received = {
+    ...original,
+    assetId: 'received-imported-original',
+    location: { kind: 'opfs' as const, objectKey: 'objects/received-imported-original' },
+  };
+  const payload = await preparePortableReplica({
+    envelope: encoded.envelope,
+    verifiedObjects: new Map([[metadata.originalObjectId, received]]),
+    senderDependencies: [],
+    admission: {
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 1,
+      operationId: 'imported-image-incoming',
+      sourceDigest: 'a'.repeat(64),
+      expectedLocalGeneration: 0,
+      expectedBasis: [],
+      expectedWorkspaceRevision: null,
+      dependencies: [],
+    },
+  });
+  if (payload.kind !== 'image') throw new Error('Expected imported Image payload');
+  expect(payload.input.media.source).toEqual(rows.media.source);
+  expect(payload.input.projectAsset).toEqual({ ...rows.projectAsset, assetId: received.assetId });
+  expect(payload.input.originalRef).toEqual(received);
+  expect(payload.input.workspace?.document.sourceImage.assetId).toBe(received.assetId);
+  expect(payload.input.media).not.toHaveProperty('blob');
+  const forged = structuredClone(encoded.envelope);
+  const forgedMetadata = parsePortableMediaMetadata(forged.metadata);
+  if (!forgedMetadata.projectAsset) throw new Error('Expected source child');
+  forgedMetadata.projectAsset.id = 'foreign-child';
+  forged.metadata = JSON.parse(JSON.stringify(forgedMetadata));
+  await expect(parsePortableSyncRoot(forged)).rejects.toThrow('association');
+});
+
+it.each([0, 1])(
+  'classifies an imported original-only snapshot by its native revision, revision=%s',
+  async (revision) => {
+    const rows = imageRows();
+    const original = rows.refs[0]!;
+    const { blob: _blob, ...media } = rows.media;
+    rows.media = {
+      ...media,
+      id: 'project-asset:original-only-image',
+      source: { kind: 'project-asset', projectAssetId: 'original-only-image' },
+      workspaceRevision: revision,
+      imageContentState: 'original',
+      size: original.size,
+    };
+    rows.projectAsset = createProjectAssetEntry({
+      id: 'original-only-image',
+      assetId: original.assetId,
+      size: original.size,
+      mimeType: original.mimeType,
+    });
+    rows.originalRef = original;
+    rows.workspace = null;
+    rows.presentation = null;
+    rows.refs = [];
+    const encoded = await encodeCapturedImageRoot(rows);
+    const { parsePortableSyncRoot } = await import('./prepared-root');
+    expect((await parsePortableSyncRoot(encoded.envelope)).kind).toBe(
+      revision === 0 ? 'media' : 'image'
+    );
+    expect(encoded.objects).toHaveLength(1);
+  }
+);

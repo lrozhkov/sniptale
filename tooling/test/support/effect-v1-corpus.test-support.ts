@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import corpusLock from '../../../apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/contract-lock.json';
-import corpusExpectations from '../../../apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/expectations.json';
+import corpusLock from '../../../apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/contract-lock.json' with { type: 'json' };
+import corpusExpectations from '../../../apps/extension/src/features/video/project/effect-bundle/fixtures/corpus/expectations.json' with { type: 'json' };
 
 /**
  * Shared proof owner for the authoritative SDK bundle corpus.

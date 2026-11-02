@@ -38,6 +38,7 @@ import {
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
+  SECRET_PROTECTION_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -67,8 +68,13 @@ interface StoredSchemaContract {
 
 export const PERSISTENCE_DOMAIN_REGISTRY = [
   {
+    domainId: 'secretProtection',
+    schemaVersion: 1,
+    stores: [{ storeName: SECRET_PROTECTION_STORE, dataClass: 'durable-authority' }],
+  },
+  {
     domainId: 'syncCapture',
-    schemaVersion: 7,
+    schemaVersion: 9,
     stores: [
       { storeName: SYNC_CAPTURE_STORE, dataClass: 'durable-authority' },
       { storeName: SYNC_OUTBOX_STORE, dataClass: 'durable-authority' },

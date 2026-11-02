@@ -1,14 +1,10 @@
 import { useAiProvidersChromeAiState } from '../../../chrome-ai';
-import {
-  useAiProvidersDataState,
-  useAiProvidersLoader,
-  useAiSecretProtectionDataState,
-} from '../../../state';
+import { useAiProvidersDataState, useAiProvidersLoader } from '../../../state';
 import type { AiProvidersSectionControllerBuildProps } from '../build';
 import { useAiProvidersDeleteHandlers } from '../../delete-handlers';
 import { useAiProvidersProviderSecretActions } from '../../provider-secret-actions';
 import { useAiProvidersModalState } from '../../modal-state';
-import { useAiProvidersSecretProtectionState } from '../../secret-protection';
+import { useSettingsSecretProtection } from '../../../../../../../secret-protection/context';
 import { buildAiProvidersSectionControllerDependencies } from './assemble';
 
 function buildControllerDataState(
@@ -39,14 +35,10 @@ function buildControllerModalState(
 
 export function useAiProvidersSectionControllerDependencies(): AiProvidersSectionControllerBuildProps {
   const dataState = useAiProvidersDataState();
-  const secretProtectionDataState = useAiSecretProtectionDataState();
   const modalState = useAiProvidersModalState();
-  const { reloadData } = useAiProvidersLoader(dataState, secretProtectionDataState);
-  const secretStatus = secretProtectionDataState.secretProtectionStatus;
-  const secretProtection = useAiProvidersSecretProtectionState({
-    reloadData,
-    status: secretStatus,
-  });
+  const { reloadData } = useAiProvidersLoader(dataState);
+  const sharedProtection = useSettingsSecretProtection();
+  const secretProtection = { ensureUnlocked: () => sharedProtection.ensureUnlocked('ai') };
   const deleteHandlers = useAiProvidersDeleteHandlers({
     confirmDelete: modalState.confirmDelete,
     reloadData,

@@ -1,4 +1,6 @@
-import { loadCapturedInventory, createCapturedRootEnvelope } from './captured-inventory';
+import { loadCapturedInventory, createCapturedAssetInventory } from './captured-inventory';
+import { parseRootEnvelope } from '../media-hub-backup/v6/codec';
+import { type AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { createArchivePathAllocator } from '../../composition/archive-transfer';
 import { parseScenarioProjectEntry } from '../../composition/persistence/scenario/read-guards';
@@ -14,10 +16,16 @@ import { parsePortableScenarioProjectMetadata } from '../media-hub-backup/v6/roo
 import type { AssetRef } from '../../composition/persistence/assets/contracts';
 
 /** Reuse the existing backup inventory with one immutable, canonically admitted native snapshot. */
-export async function encodeCapturedScenarioRoot(value: CapturedScenarioRows) {
+export async function encodeCapturedScenarioRoot(
+  value: CapturedScenarioRows,
+  deferredExports: ReadonlyMap<string, AssetResidencyCopy> = new Map()
+) {
   const parsed = parseCapturedScenarioRows(value);
   if (!parsed || !parsed.mediaDependencies) throw new Error('Invalid captured Scenario root.');
   const rows = structuredClone(parsed);
+  const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
+  const deferred = createCapturedAssetInventory(rows.refs, deferredExports);
+  const deferredObjects = deferred.objects;
   let history: unknown;
   if (rows.history) {
     const bytes = new Uint8Array(await rows.history.blob.arrayBuffer());
@@ -93,24 +101,37 @@ export async function encodeCapturedScenarioRoot(value: CapturedScenarioRows) {
       includeWebSnapshots: false,
     }),
     paths: createArchivePathAllocator(),
+    deferredAssets: deferred.port,
   });
   if (roots.length !== 1 || roots[0]!.descriptor.rootId !== entry.id)
     throw new Error('Captured Scenario differs from its inventory.');
+  deferred.assertUsed();
   const { objects, metadata } = await loadCapturedInventory(roots[0]!);
-  const envelope = createCapturedRootEnvelope(roots[0]!, { metadata, objects });
+  const descriptors = [...objects.map((object) => object.ref), ...deferred.descriptors()].sort(
+    (a, b) => a.objectId.localeCompare(b.objectId)
+  );
+  const envelope = parseRootEnvelope({
+    descriptor: { ...roots[0]!.descriptor, metadataPath: 'Metadata/sync-root.json' },
+    metadata,
+    objects: descriptors,
+  });
   const portable = parsePortableScenarioProjectMetadata(metadata);
-  const refs = new Map(rows.refs.map((ref) => [ref.assetId, ref]));
   const bindings: { objectId: string; ref: AssetRef }[] = [];
   const bind = (objectId: string, assetId: string | undefined) => {
     const ref = assetId ? refs.get(assetId) : undefined;
     const object = objects.find((item) => item.ref.objectId === objectId);
+    const descriptor = descriptors.find((item) => item.objectId === objectId);
+    const retained = deferredObjects.get(objectId);
     if (
       !ref ||
-      !object ||
-      object.ref.size !== ref.size ||
-      object.ref.mimeType !== ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
-      object.blob.size !== ref.size ||
-      object.blob.type !== ref.mimeType
+      !descriptor ||
+      descriptor.size !== ref.size ||
+      descriptor.mimeType !== ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() ||
+      (object
+        ? object.blob.size !== ref.size || object.blob.type !== ref.mimeType
+        : !retained ||
+          retained.copy.target.kind !== 'opfs' ||
+          JSON.stringify(retained.copy.target.ref) !== JSON.stringify(ref))
     )
       throw new Error('Captured Scenario object differs from its native reference.');
     const previous = bindings.find((item) => item.objectId === objectId);
@@ -132,5 +153,11 @@ export async function encodeCapturedScenarioRoot(value: CapturedScenarioRows) {
   for (const output of portable.exports)
     if (output.html)
       bind(output.html.objectId, rows.exports.find((item) => item.id === output.id)?.html?.assetId);
-  return { envelope, objects, dependencies: rows.mediaDependencies ?? [], bindings };
+  return {
+    envelope,
+    objects,
+    dependencies: rows.mediaDependencies ?? [],
+    bindings,
+    ...(deferredObjects.size ? { retainedObjects: deferred.retainedObjects() } : {}),
+  };
 }

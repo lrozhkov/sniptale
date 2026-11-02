@@ -30,7 +30,7 @@ type DiagnosticReason =
 function event(
   state: 'applied' | 'deferred',
   stage: 'basis' | 'deletion' | 'residency' | 'apply',
-  reason: DiagnosticReason | 'none' | 'basis-changed' | 'unloaded'
+  reason: DiagnosticReason | 'none' | 'basis-changed' | 'unloaded' | 'pending-local-change'
 ): void {
   try {
     const message = `sync.incoming.${state} stage=${stage} reason=${reason}`;
@@ -59,6 +59,7 @@ function diagnosticReason(error: unknown): DiagnosticReason {
       case 'unsupported-cursor':
       case 'metadata-limit':
       case 'cancelled':
+      case 'secrets-locked':
       case 'authentication':
       case 'access-denied':
       case 'missing':
@@ -109,6 +110,7 @@ export function createAutomaticCatalogSync() {
       remote: SyncRemoteStore;
       catalog: Catalog;
       signal: AbortSignal;
+      binaryAdmission?: 'resident';
     }): Promise<{ applied: number; deferred: number; remaining: boolean }> {
       const selected = structuredClone({ scope: args.scope, authorization: args.authorization });
       const currentBinding = JSON.stringify(selected);
@@ -137,6 +139,16 @@ export function createAutomaticCatalogSync() {
         const key = syncCatalogRootKey(root.rootKind, root.rootId);
         if (afterRootKey !== null && key <= afterRootKey) continue;
         const local = materialized.get(key);
+        if (local?.pending) {
+          if (result.applied + result.deferred >= 2) {
+            result.remaining = true;
+            return result;
+          }
+          event('deferred', 'basis', 'pending-local-change');
+          result.deferred++;
+          afterRootKey = key;
+          continue;
+        }
         const head = root.heads[0];
         if (
           !local ||
@@ -197,6 +209,7 @@ export function createAutomaticCatalogSync() {
               remote: args.remote,
               catalog,
               residentOnly: true,
+              ...(args.binaryAdmission ? { binaryAdmission: args.binaryAdmission } : {}),
               selection: {
                 rootKind: root.rootKind,
                 rootId: root.rootId,

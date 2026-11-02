@@ -1,10 +1,18 @@
+import type { SyncDownloadAllowance } from './native-residency';
+import { encodePortableScenarioProjectEntry } from '../media-hub-backup/v6/root-codecs/projects';
+import { projectScenarioPrivacy } from '../media-hub-backup/v6/privacy';
+import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
+import { loadCatalogReplicaResidentCandidates } from '../../composition/persistence/sync-capture/catalog-admission';
 import {
   runWithPersistenceMutationTransition,
   type PersistenceMutationTransitionPermit,
 } from '../../composition/persistence/infrastructure/mutation-barrier';
 import { hasUnloadedNativeEditingRoot, restoreStagedNativeOriginal } from './native-residency';
 import { parseScenarioAssetEntry } from '../../composition/persistence/scenario/read-guards';
-import { loadScenarioReplicaPredecessorAssets } from '../../composition/persistence/sync-capture/apply-scenario';
+import {
+  loadScenarioReplicaPredecessorAssets,
+  loadScenarioReplicaExport,
+} from '../../composition/persistence/sync-capture/apply-scenario';
 import { collectPreparedScenarioReplicaRefs } from '../../composition/persistence/sync-capture/prepared-scenario';
 import type { CaptureRootKind } from '../../composition/persistence/sync-capture/contracts';
 import {
@@ -41,7 +49,7 @@ import {
   type PortableReplicaAdmission,
   type DeferredProjectExport,
 } from './prepared-root';
-import { portableSyncRootDependencyIds } from './prepared-scenario';
+import { portableSyncRootDependencyIds, type DeferredScenarioExport } from './prepared-scenario';
 import { SyncRemoteError, type SyncRemoteStore } from './remote-store';
 import { createSyncAttempt, hashSyncText, parseSyncOperationText } from './wire-record';
 
@@ -163,6 +171,8 @@ async function selectReplicaPreparation(args: {
   admission: Omit<PortableReplicaAdmission, 'operationId' | 'sourceDigest'>;
   signal: AbortSignal;
   residentOnly?: true;
+  binaryAdmission?: 'resident';
+  downloadAllowance?: SyncDownloadAllowance;
 }) {
   const selected = selectedOperation(args.catalog, args.rootKind, args.rootId);
   const admission = structuredClone(args.admission);
@@ -251,7 +261,8 @@ async function selectReplicaPreparation(args: {
       )
         retainedExportIds.add(item.entry.id);
     }
-  const selectedIds = portableSyncEditingObjectIds(parsed, retainedExportIds);
+  const omitPresentation = args.binaryAdmission === 'resident';
+  const selectedIds = portableSyncEditingObjectIds(parsed, retainedExportIds, omitPresentation);
   const editing = parsed.envelope.objects.filter((object) => selectedIds.includes(object.objectId));
   return {
     selected,
@@ -262,6 +273,7 @@ async function selectReplicaPreparation(args: {
     selectedIds,
     editing,
     retainedExportIds,
+    omitPresentation,
   };
 }
 
@@ -485,7 +497,9 @@ async function collectReplicaOriginalRefs(
   const borrowedRefs = new Map<string, AssetRef>();
   if (
     parsed.kind === 'media' ||
-    (parsed.kind === 'image' && parsed.metadata.entry.source.kind === 'stored-asset')
+    (parsed.kind === 'image' &&
+      (parsed.metadata.entry.source.kind === 'stored-asset' ||
+        parsed.metadata.entry.source.kind === 'project-asset'))
   ) {
     const original = await checkedPredecessorOriginal(parsed, operation, admission, args.signal);
     if (original) borrowedRefs.set(...original);
@@ -495,6 +509,113 @@ async function collectReplicaOriginalRefs(
   retainReviewDependencyObjects(preparation, dependencies, borrowedRefs);
   retainProjectDependencyObjects(preparation, dependencies, borrowedRefs);
   return borrowedRefs;
+}
+
+async function collectResidentObjects(
+  args: ReplicaPreparationInput,
+  preparation: ReplicaPreparation,
+  refs: Map<string, AssetRef>
+): Promise<Map<string, Blob>> {
+  const localObjects = new Map<string, Blob>();
+  if (args.binaryAdmission !== 'resident') return localObjects;
+  const { admission, editing, operation } = preparation;
+  if (!admission.authorization || admission.expectedLocalGeneration < 1)
+    throw new Error('On-demand incoming requires local verified objects.');
+  const candidates = await loadCatalogReplicaResidentCandidates({
+    scope: {
+      spaceId: admission.spaceId,
+      profileCreatedAt: admission.profileCreatedAt,
+      connectionGeneration: admission.connectionGeneration,
+    },
+    authorization: admission.authorization,
+    rootKind: args.rootKind,
+    rootId: args.rootId,
+    expectedLocalGeneration: admission.expectedLocalGeneration,
+    expectedBasis: admission.expectedBasis,
+    expectedWorkspaceRevision: admission.expectedWorkspaceRevision,
+  });
+  if (
+    preparation.parsed.kind === 'scenario-project' &&
+    candidates.scenarioEntry &&
+    preparation.parsed.metadata.historyObjectId
+  ) {
+    const { history } = encodePortableScenarioProjectEntry(
+      projectScenarioPrivacy(
+        candidates.scenarioEntry,
+        createMediaHubBackupExportOptions({
+          includeDrafts: candidates.scenarioEntry.lifecycle?.storageClass === 'temporary',
+          includeSourceMetadata: true,
+          includeTelemetry: true,
+          includeWebSnapshots: false,
+        })
+      )
+    );
+    if (history?.length) {
+      const objectId = preparation.parsed.metadata.historyObjectId;
+      const blob = new Blob([JSON.stringify(history)], { type: 'application/json' });
+      const object = editing.find((item) => item.objectId === objectId);
+      const expected = operation.objects.find((item) => item.objectId === objectId);
+      if (
+        object &&
+        expected &&
+        object.size === blob.size &&
+        object.mimeType === blob.type &&
+        (await hashFile(blob, args.signal)) === expected.sha256
+      )
+        localObjects.set(objectId, blob);
+    }
+  }
+  const hashes = new Map<string, string>();
+  for (const object of editing) {
+    args.signal.throwIfAborted();
+    if (refs.has(object.objectId) || localObjects.has(object.objectId)) continue;
+    const expected = operation.objects.find((item) => item.objectId === object.objectId);
+    check(expected);
+    for (const ref of candidates.refs) {
+      if (
+        ref.size !== object.size ||
+        ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() !== object.mimeType
+      )
+        continue;
+      try {
+        let digest = hashes.get(ref.assetId);
+        if (!digest) {
+          const file = await readAssetFile(ref, object.filename);
+          if (file.size !== object.size || file.type !== ref.mimeType) continue;
+          digest = await hashFile(file, args.signal);
+          hashes.set(ref.assetId, digest);
+        }
+        if (digest === expected.sha256) {
+          refs.set(object.objectId, ref);
+          break;
+        }
+      } catch (error) {
+        args.signal.throwIfAborted();
+        if (
+          !(
+            error instanceof MissingAssetObjectError ||
+            (error instanceof DOMException && error.name === 'NotFoundError')
+          )
+        )
+          throw error;
+      }
+    }
+    if (refs.has(object.objectId)) continue;
+    for (const { blob, mimeType } of candidates.inlineOriginals) {
+      if (
+        blob.size !== object.size ||
+        mimeType.split(';', 1)[0]!.trim().toLowerCase() !== object.mimeType
+      )
+        continue;
+      if ((await hashFile(blob, args.signal)) === expected.sha256) {
+        localObjects.set(object.objectId, blob);
+        break;
+      }
+    }
+    if (!localObjects.has(object.objectId))
+      throw new Error('On-demand incoming requires local verified objects.');
+  }
+  return localObjects;
 }
 
 async function prepareStagedReplica(
@@ -566,8 +687,68 @@ async function prepareStagedReplica(
         ...(retained ? { retainedEntry: retained.entry } : {}),
       });
     }
+  const deferredScenarioExports = new Map<string, DeferredScenarioExport>();
+  if (parsed.kind === 'scenario-project')
+    for (const item of parsed.metadata.exports) {
+      if (!item.html) continue;
+      const object = parsed.envelope.objects.find(
+        (object) => object.objectId === item.html?.objectId
+      );
+      const digest = operation.objects.find((object) => object.objectId === item.html?.objectId);
+      const physical = physicalObjects.find((object) => object.objectId === item.html?.objectId);
+      check(
+        object && digest && physical && /^text\/html(?:;charset=utf-8)?$/iu.test(object.mimeType)
+      );
+      const retained = await loadScenarioReplicaExport({
+        ...admission,
+        projectId: parsed.metadata.entry.id,
+        exportId: item.id,
+      });
+      signal.throwIfAborted();
+      if (retained) {
+        check(
+          retained.ref.size === object.size &&
+            retained.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase() === object.mimeType
+        );
+        if (retained.copy) check(retained.copy.remote.sha256 === digest.sha256);
+        try {
+          const file = await readAssetFile(retained.ref, object.filename);
+          check(file.size === object.size && (await hashFile(file, signal)) === digest.sha256);
+        } catch (error) {
+          signal.throwIfAborted();
+          if (
+            !(
+              error instanceof MissingAssetObjectError ||
+              (error instanceof DOMException && error.name === 'NotFoundError')
+            )
+          )
+            throw error;
+          check(
+            retained.copy &&
+              retained.copy.phase !== 'resident' &&
+              retained.copy.remote.sha256 === digest.sha256
+          );
+        }
+      }
+      const assetId = retained?.ref.assetId ?? crypto.randomUUID();
+      const ref = retained?.ref ?? {
+        assetId,
+        createdAt: Date.now(),
+        location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+        size: object.size,
+        mimeType: object.mimeType,
+        sha256: digest.sha256,
+      };
+      deferredScenarioExports.set(item.id, {
+        ref,
+        remote: { key: retained?.copy?.remote.key ?? physical.remoteKey, sha256: digest.sha256 },
+        ...(retained ? { retainedEntry: retained.entry } : {}),
+      });
+    }
   return preparePortableReplica({
     deferredExports,
+    deferredScenarioExports,
+    omitPresentation: preparation.omitPresentation,
     envelope: parsed.envelope,
     verifiedObjects: refs,
     senderDependencies: operation.dependencies.map((dependency) => {
@@ -609,7 +790,9 @@ async function retainRestoredOriginal(
     (admission.expectedLocalGeneration > 0 ||
       (parsed.kind === 'media' && parsed.metadata.projectExport)) &&
     (parsed.kind === 'media' ||
-      (parsed.kind === 'image' && parsed.metadata.entry.source.kind === 'stored-asset'))
+      (parsed.kind === 'image' &&
+        (parsed.metadata.entry.source.kind === 'stored-asset' ||
+          parsed.metadata.entry.source.kind === 'project-asset')))
   ) {
     const object = parsed.envelope.objects.find(
       (item) => item.objectId === parsed.metadata.originalObjectId
@@ -646,6 +829,7 @@ async function stageReplicaAttempts(
   args: ReplicaPreparationInput,
   preparation: ReplicaPreparation,
   borrowedRefs: ReadonlyMap<string, AssetRef>,
+  localObjects: ReadonlyMap<string, Blob>,
   transitionPermit: PersistenceMutationTransitionPermit
 ) {
   const { editing, selected, operation } = preparation;
@@ -675,8 +859,16 @@ async function stageReplicaAttempts(
         ),
         signal: args.signal,
         async readObject(object) {
+          const local = localObjects.get(object.objectId);
+          if (local)
+            return {
+              pipeTo: (sink, signal) => local.stream().pipeTo(sink, signal ? { signal } : {}),
+            };
+          if (args.binaryAdmission === 'resident')
+            throw new Error('On-demand incoming requires local verified objects.');
           const binding = physical.objects.find((item) => item.objectId === object.objectId);
           check(binding);
+          args.downloadAllowance?.reserveObject(object.size);
           const stream = await args.remote.read(binding.remoteKey, args.signal);
           return { pipeTo: (sink, signal) => stream.pipeTo(sink, signal ? { signal } : {}) };
         },
@@ -730,7 +922,8 @@ export async function prepareCatalogReplica(args: ReplicaPreparationInput) {
         )
           throw new Error('Background incoming requires resident editing resources.');
         const refs = await collectReplicaOriginalRefs(args, preparation);
-        return stageReplicaAttempts(args, preparation, refs, transition);
+        const localObjects = await collectResidentObjects(args, preparation, refs);
+        return stageReplicaAttempts(args, preparation, refs, localObjects, transition);
       })
     )
   );

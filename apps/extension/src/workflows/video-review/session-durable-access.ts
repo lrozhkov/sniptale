@@ -1,3 +1,5 @@
+import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
+import { acquireSyncCheckpointEdit } from '../../composition/persistence/sync-capture/checkpoint-publication';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { renameVideoWorkspaceProject } from '../../composition/persistence/review-workspaces/project-commands';
 import {
@@ -35,6 +37,8 @@ import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 
 /** Default persistence adapter; the session factory still accepts an explicit injected adapter. */
 export const reviewSessionPersistence = {
+  acquireSyncCheckpointEdit,
+  wakeCheckpoints: () => createSyncProductClient().wakeCheckpoints(),
   async renameVideoWorkspaceProject(...args: Parameters<typeof renameVideoWorkspaceProject>) {
     await renameVideoWorkspaceProject(...args);
     publishMediaHubLibraryChanged('update', [args[0]]);

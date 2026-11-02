@@ -4,6 +4,7 @@ import {
 } from '../../../composition/persistence/image-workspaces';
 import { useEditorStore } from '../../state/useEditorStore';
 import {
+  retireAutosaveCheckpointEdit,
   cancelPendingAutosaveRequest,
   interruptImagePresentation,
   releaseAutosaveInteraction,
@@ -17,9 +18,11 @@ export function activateAutosaveContext(
   context: ActiveEditorSessionContext,
   options: { preserveHydratedDocument?: boolean; preserveMode?: boolean } = {}
 ): void {
+  state.lastCheckpointReceipt = null;
   cancelPendingAutosaveRequest(state);
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
+  retireAutosaveCheckpointEdit(state);
   state.presentationPending = false;
   state.presentationRetryAttempt = 0;
   if (!options.preserveHydratedDocument) {
@@ -100,9 +103,11 @@ export async function discardAutosaveDraft(
 ): Promise<void> {
   state.hydration = null;
   state.hydrationGeneration += 1;
+  state.lastCheckpointReceipt = null;
   cancelPendingAutosaveRequest(state);
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
+  retireAutosaveCheckpointEdit(state);
   state.presentationPending = false;
   state.presentationRetryAttempt = 0;
   state.releaseHydratedDocument?.();
@@ -121,11 +126,13 @@ export async function discardAutosaveDraft(
 }
 
 export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
+  state.lastCheckpointReceipt = null;
   state.hydration = null;
   state.hydrationGeneration += 1;
   state.coordinator?.dispose();
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
+  retireAutosaveCheckpointEdit(state);
   state.presentationPending = false;
   state.presentationRetryAttempt = 0;
   state.releaseHydratedDocument?.();

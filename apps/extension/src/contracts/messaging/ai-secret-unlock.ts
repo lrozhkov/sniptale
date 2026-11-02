@@ -1,5 +1,13 @@
+import type { SyncConnectionIdentity } from '../../composition/persistence/remote-connection/model';
 import type { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { LlmSessionPurpose } from './llm';
+
+export type AISecretUnlockPurpose = LlmSessionPurpose | 'sync';
+export interface SyncUnlockIntent {
+  authorization: SyncConnectionIdentity;
+  credentialId: string;
+  workspaceFingerprint: string | null;
+}
 
 export type AISecretUnlockStatus =
   | 'pending'
@@ -18,7 +26,7 @@ type AISecretUnlockMessageBase<TOperation extends AISecretUnlockOperation> = {
 export type AISecretUnlockOperation = 'start' | 'submit' | 'status' | 'cancel';
 
 export type AISecretUnlockMessage =
-  | (AISecretUnlockMessageBase<'start'> & { purpose: LlmSessionPurpose })
+  | (AISecretUnlockMessageBase<'start'> & { purpose: AISecretUnlockPurpose })
   | (AISecretUnlockMessageBase<'submit'> & { requestId: string; passphrase: string })
   | (AISecretUnlockMessageBase<'status'> & { requestId: string })
   | (AISecretUnlockMessageBase<'cancel'> & { requestId: string });

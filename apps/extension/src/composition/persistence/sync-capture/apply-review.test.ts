@@ -1,3 +1,4 @@
+import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import {
   buildRecordingMediaEntry,
   buildProjectExportMediaEntry,
@@ -683,4 +684,47 @@ it('checks authorization before mutation and replays committed results after pau
     status: 'duplicate',
   });
   expect(fixture.rows).toEqual(committed);
+});
+
+it('refuses a pending checkpoint before the first causal review state', async () => {
+  const candidate = input();
+  const tx = fixture.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'video-review', rootId: candidate.root.review.workspace.aggregateId },
+    2
+  );
+  await tx.done;
+  expect(pending).not.toBeNull();
+  const before = structuredClone(fixture.rows);
+  await expect(applyPreparedVideoReviewReplica(candidate)).rejects.toThrow();
+  expect(fixture.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = fixture.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedVideoReviewReplica(candidate)).resolves.toMatchObject({
+    status: 'applied',
+  });
+});
+
+it('refuses pending work with unchanged causal generation and native digest', async () => {
+  const first = input();
+  await applyPreparedVideoReviewReplica(first);
+  const next = replacement(first);
+  const tx = fixture.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'video-review', rootId: first.root.review.workspace.aggregateId },
+    2
+  );
+  await tx.done;
+  const before = structuredClone(fixture.rows);
+  await expect(applyPreparedVideoReviewReplica(next)).rejects.toThrow();
+  expect(fixture.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = fixture.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedVideoReviewReplica(next)).resolves.toMatchObject({ status: 'applied' });
 });

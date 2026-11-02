@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../../../composition/persistence/secret-protection/model';
 import type { LLMRequestOptimized, LLMResponse } from '../../../../contracts/messaging/llm';
 import { translate } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -42,14 +43,17 @@ function buildUserPrompt(markdownData: string, userInstruction: string): string 
   return `${markdownData}\n\n### Instruction:\n${userInstruction}`;
 }
 
-function getTransportRequestSettings(config: ResolvedLlmModelConfig): TransportRequestSettings {
+function getTransportRequestSettings(
+  config: ResolvedLlmModelConfig,
+  protection?: SecretProtectionPort
+): TransportRequestSettings {
   return {
     baseUrl: config.baseUrl,
     apiKey: config.apiKey,
     modelCode: config.modelCode,
     connectionType: config.connectionType,
     observationBinding: config.observationBinding,
-    beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
+    beforeSend: () => assertResolvedLlmModelConfigCurrent(config, protection),
     ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
   };
 }
@@ -136,7 +140,8 @@ function assertValidJsonResponse(cleanedResponse: string, attempt: number): void
 
 export async function processMarkdownRequest(
   request: LLMRequestOptimized,
-  config: ResolvedLlmModelConfig
+  config: ResolvedLlmModelConfig,
+  protection?: SecretProtectionPort
 ): Promise<LLMResponse> {
   const systemPrompt = getSystemPrompt();
   const userPrompt = buildUserPrompt(request.markdownData || '', request.prompt);
@@ -149,7 +154,7 @@ export async function processMarkdownRequest(
 
   try {
     const content = await requestConfigChatCompletion(
-      getTransportRequestSettings(config),
+      getTransportRequestSettings(config, protection),
       systemPrompt,
       userPrompt,
       translate('background.runtime.llmInvalidProviderApiKey')
@@ -177,7 +182,8 @@ export async function processMarkdownRequest(
 export async function processJsonConfigRequest(
   request: LLMRequestOptimized,
   config: ResolvedLlmModelConfig,
-  maxRetries = 3
+  maxRetries = 3,
+  protection?: SecretProtectionPort
 ): Promise<LLMResponse> {
   logger.debug('Processing JSON request with provider config', {
     baseUrl: config.baseUrl,
@@ -196,7 +202,7 @@ export async function processJsonConfigRequest(
     },
     execute: (systemPrompt, userPrompt) =>
       requestConfigChatCompletion(
-        getTransportRequestSettings(config),
+        getTransportRequestSettings(config, protection),
         systemPrompt,
         userPrompt,
         translate('background.runtime.llmInvalidProviderApiKey')

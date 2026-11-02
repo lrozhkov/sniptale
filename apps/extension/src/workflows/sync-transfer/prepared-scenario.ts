@@ -12,7 +12,11 @@ import {
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { AssetRef } from '../../composition/persistence/assets/contracts';
-import { parsePreparedScenarioReplicaRoot } from '../../composition/persistence/sync-capture/prepared-scenario';
+import {
+  parsePreparedScenarioReplicaRoot,
+  type PreparedScenarioReplicaExport,
+} from '../../composition/persistence/sync-capture/prepared-scenario';
+import { parseScenarioExportEntry } from '../../composition/persistence/scenario/read-guards';
 import { prepareScenarioProjectPublication } from '../media-hub-backup/v6/root-publication/scenario-project-publication';
 import type { PortableScenarioProjectMetadata } from '../media-hub-backup/v6/root-codecs/projects';
 
@@ -22,6 +26,13 @@ type ScenarioDependencyRoot =
       entry: { project: Pick<VideoProjectEntry['project'], 'assets' | 'source'> };
     }
   | { kind: 'media' | 'image' | 'video-review' | 'scenario-project' };
+
+/** Native saved HTML identity and its exact immutable remote body. */
+export interface DeferredScenarioExport {
+  ref: AssetRef;
+  remote: PreparedScenarioReplicaExport['remote'];
+  retainedEntry?: PreparedScenarioReplicaExport['entry'];
+}
 
 /** Reuse archive decoding, preserving normal-sync logical IDs and target-owned borrowed sources. */
 export async function preparePortableScenarioRoot(args: {
@@ -33,9 +44,43 @@ export async function preparePortableScenarioRoot(args: {
   refFor: (id: string) => AssetRef;
   stageNativeMetadata: (blob: Blob) => Promise<AssetRef>;
   objectIds: readonly string[];
+  omitPresentation?: boolean;
+  deferredExports?: ReadonlyMap<string, DeferredScenarioExport>;
 }) {
+  const deferredExports =
+    args.deferredExports === undefined
+      ? undefined
+      : new Map(
+          args.metadata.exports.flatMap((item) => {
+            if (!item.html) return [];
+            const deferred = args.deferredExports?.get(item.id);
+            if (!deferred) throw new Error('Deferred Scenario HTML binding is missing.');
+            const entry =
+              deferred.retainedEntry ??
+              parseScenarioExportEntry({
+                ...item,
+                html: { mode: item.html.mode, assetId: deferred.ref.assetId },
+              });
+            if (!entry) throw new Error('Deferred Scenario HTML metadata is invalid.');
+            return [
+              [
+                item.id,
+                {
+                  entry,
+                  ref: deferred.ref,
+                  remote: deferred.remote,
+                  ...(deferred.retainedEntry ? { reuseExisting: true } : {}),
+                },
+              ] as const,
+            ];
+          })
+        );
+  if (args.deferredExports && deferredExports?.size !== args.deferredExports.size)
+    throw new Error('Deferred Scenario HTML inventory differs from its catalogue.');
   const prepared = await prepareScenarioProjectPublication({
     metadata: args.metadata,
+    ...(deferredExports ? { deferredExports } : {}),
+    omitPresentation: args.omitPresentation ?? false,
     rootId: args.metadata.entry.id,
     sourceExists: args.admission.expectedWorkspaceRevision !== null,
     session: {
@@ -62,31 +107,34 @@ export async function preparePortableScenarioRoot(args: {
             byte.toString(16).padStart(2, '0')
           ).join(''),
         };
-  const thumbnails = [
-    ...(args.metadata.thumbnail
-      ? [{ metadata: args.metadata.thumbnail, assetId: `scenario:${entry.id}` }]
-      : []),
-    ...args.metadata.exportThumbnails.map((item) => ({
-      metadata: item.thumbnail,
-      assetId: `scenario-export:${item.exportId}`,
-    })),
-  ].map(({ metadata, assetId }) => ({
-    entry: {
-      assetId,
-      createdAt: metadata.createdAt,
-      updatedAt: metadata.updatedAt,
-      width: metadata.width,
-      height: metadata.height,
-    },
-    ref: args.refFor(metadata.objectId),
-  }));
-  const presentation = args.metadata.presentation;
+  const thumbnails = args.omitPresentation
+    ? []
+    : [
+        ...(args.metadata.thumbnail
+          ? [{ metadata: args.metadata.thumbnail, assetId: `scenario:${entry.id}` }]
+          : []),
+        ...args.metadata.exportThumbnails.map((item) => ({
+          metadata: item.thumbnail,
+          assetId: `scenario-export:${item.exportId}`,
+        })),
+      ].map(({ metadata, assetId }) => ({
+        entry: {
+          assetId,
+          createdAt: metadata.createdAt,
+          updatedAt: metadata.updatedAt,
+          width: metadata.width,
+          height: metadata.height,
+        },
+        ref: args.refFor(metadata.objectId),
+      }));
+  const presentation = args.omitPresentation ? undefined : args.metadata.presentation;
   if (!isRecord(entry.project)) throw new Error('Invalid prepared Scenario document.');
   return parsePreparedScenarioReplicaRoot({
     entry,
     assets: prepared.root.assets,
     exports: prepared.root.exports,
     exportRefs: prepared.root.exportRefs ?? [],
+    ...(prepared.root.deferredExports ? { deferredExports: prepared.root.deferredExports } : {}),
     stepDocuments: prepared.root.stepDocuments,
     thumbnails,
     ...(historyRef ? { historyRef } : {}),

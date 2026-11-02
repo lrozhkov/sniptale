@@ -1,3 +1,4 @@
+import { deferCheckpointInTransaction } from './checkpoints';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { runWithExclusivePersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { captureRootKey, type PreparedCaptureOperation } from './contracts';
@@ -268,6 +269,33 @@ it('refuses outgoing dispatch admission after a newer local generation without c
   if (!prepared) throw new Error('Missing prepared decision');
   await expect(assertConflictResolutionCurrent(prepared)).resolves.toBeUndefined();
   f.table('sync_capture').set(stateKey, { ...f.state, generation: 5, basis: ['new-local'] });
+  const before = structuredClone(f.rows);
+  await expect(assertConflictResolutionCurrent(prepared)).rejects.toMatchObject({
+    code: 'selection-changed',
+  });
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses a decision selected before a pending checkpoint without advancing causal state', async () => {
+  const f = setup();
+  const operation = await decision();
+  await loadConflictResolutionContext(selection());
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  await deferCheckpointInTransaction(tx, selection(), 2);
+  await tx.done;
+  const before = structuredClone(f.rows);
+  await expect(commitConflictResolution(input(operation))).rejects.toThrow('selection changed');
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses publication after a pending checkpoint without advancing causal state', async () => {
+  const f = setup();
+  await commitConflictResolution(input(await decision()));
+  const prepared = await loadPreparedOutgoingOperation(scope.spaceId, commandId);
+  if (!prepared) throw new Error('Missing prepared conflict fixture');
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  await deferCheckpointInTransaction(tx, selection(), 2);
+  await tx.done;
   const before = structuredClone(f.rows);
   await expect(assertConflictResolutionCurrent(prepared)).rejects.toMatchObject({
     code: 'selection-changed',

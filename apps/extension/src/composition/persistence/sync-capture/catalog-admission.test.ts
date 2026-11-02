@@ -1,3 +1,6 @@
+import { createGuideProject } from '../../../features/scenario/project/factories';
+import { createScenarioProjectEntry } from '../scenario/projects/entry';
+import { deferCheckpointInTransaction } from './checkpoints';
 import { createNativeCapture } from './test-support/frozen-snapshot-database';
 import { preparedOutgoingOperationKey } from './outgoing';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -6,6 +9,7 @@ import { createMediaLibraryEntry } from '../projects/index.test-support';
 import { applyPreparedMediaReplica, type ApplyPreparedMediaReplicaInput } from './apply-media';
 import {
   loadCatalogReplicaAdmission,
+  loadCatalogReplicaResidentCandidates,
   loadCatalogNativeBases,
   hasCatalogReplicaReceipt,
   loadMaterializedCatalogSelections,
@@ -13,10 +17,11 @@ import {
 import { parseSyncCaptureRecord } from './guards';
 import { captureRootKey } from './contracts';
 
-const io = vi.hoisted(() => ({ database: vi.fn() }));
+const io = vi.hoisted(() => ({ database: vi.fn(), prepared: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: io.database,
+  capturePreparedDatabase: io.prepared,
 }));
 beforeEach(() => vi.clearAllMocks());
 const scope = { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 3 };
@@ -25,6 +30,7 @@ function setup() {
   const fixture = createReviewWorkspaceStoreFixture(() => false);
   const table = (name: string) => fixture.rows.get(name)!;
   io.database.mockResolvedValue(fixture.database);
+  io.prepared.mockReturnValue(fixture.database);
   table('sync_capture').set('profile', {
     version: 1,
     kind: 'profile',
@@ -530,5 +536,260 @@ it.each([
       loadMaterializedCatalogSelections({ scope, selections: [selection] })
     ).resolves.toEqual(change === 'current' ? [selection] : []);
     expect(f.rows).toEqual(before);
+  }
+);
+
+it('refuses pending target and dependency admission without causal generation changes', async () => {
+  const f = setup();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  await deferCheckpointInTransaction(tx, f.args, 2);
+  await tx.done;
+  const before = structuredClone(f.rows);
+  await expect(loadCatalogReplicaAdmission({ ...f.args, dependencyMediaIds: [] })).rejects.toThrow(
+    'admission refused'
+  );
+  expect(f.rows).toEqual(before);
+  const dependency = setup();
+  await applyPreparedMediaReplica(dependency.input);
+  const mark = dependency.database.transaction(['sync_capture'], 'readwrite');
+  await deferCheckpointInTransaction(
+    mark,
+    { rootKind: 'media', rootId: dependency.input.rows.media.id },
+    2
+  );
+  await mark.done;
+  const dependencyBefore = structuredClone(dependency.rows);
+  await expect(loadCatalogReplicaAdmission(dependency.args)).rejects.toThrow('admission refused');
+  expect(dependency.rows).toEqual(dependencyBefore);
+});
+
+it('reports pending native bases before the first causal state', async () => {
+  const f = setup();
+  const root = { rootKind: f.args.rootKind, rootId: f.args.rootId };
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  await deferCheckpointInTransaction(tx, root, 2);
+  await tx.done;
+  await expect(loadCatalogNativeBases({ scope, authorization, roots: [root] })).resolves.toEqual([
+    { ...root, generation: 0, basis: [], pending: true },
+  ]);
+});
+
+async function residentFixture() {
+  const f = setup();
+  await applyPreparedMediaReplica(f.input);
+  const args = {
+    scope,
+    authorization,
+    rootKind: 'media' as const,
+    rootId: f.input.rows.media.id,
+    expectedLocalGeneration: 1,
+    expectedBasis: ['source-operation'],
+    expectedWorkspaceRevision: null,
+  };
+  return { ...f, args };
+}
+it('offers only exact resident predecessor refs without opening storage or reading bytes', async () => {
+  const f = await residentFixture();
+  const stream = vi.spyOn(Blob.prototype, 'stream');
+  io.database.mockClear();
+  const before = structuredClone(f.rows);
+  try {
+    await expect(loadCatalogReplicaResidentCandidates(f.args)).resolves.toEqual({
+      refs: [f.input.rows.ref],
+      inlineOriginals: [],
+    });
+    expect(stream).not.toHaveBeenCalled();
+    expect(io.database).not.toHaveBeenCalled();
+    expect(f.rows).toEqual(before);
+  } finally {
+    stream.mockRestore();
+  }
+});
+it('refuses resident candidates without a prepared handle rather than reopening storage', async () => {
+  const f = await residentFixture();
+  io.prepared.mockReturnValue(null);
+  io.database.mockClear();
+  await expect(loadCatalogReplicaResidentCandidates(f.args)).rejects.toThrow('admission refused');
+  expect(io.database).not.toHaveBeenCalled();
+});
+it.each(['generation', 'basis', 'deleted', 'connection'] as const)(
+  'refuses late resident reuse after %s changes',
+  async (change) => {
+    const f = await residentFixture();
+    if (change === 'connection')
+      f.table('sync_connection').set('connection', {
+        ...f.connection,
+        identity: { ...authorization, revision: 2 },
+      });
+    else {
+      const key = JSON.stringify([
+        'root-state',
+        captureRootKey(scope.spaceId, 'media', f.args.rootId),
+      ]);
+      const state = parseSyncCaptureRecord(f.table('sync_capture').get(key));
+      if (!state || state.kind !== 'root-state') throw new Error('Expected native predecessor');
+      f.table('sync_capture').set(key, {
+        ...state,
+        ...(change === 'generation'
+          ? { generation: 3 }
+          : change === 'basis'
+            ? { basis: ['restored'] }
+            : { deleted: true }),
+      });
+    }
+    const before = structuredClone(f.rows);
+    await expect(loadCatalogReplicaResidentCandidates(f.args)).rejects.toThrow('admission refused');
+    expect(f.rows).toEqual(before);
+  }
+);
+it('refuses resident reuse when prepared storage changes before completion', async () => {
+  const f = await residentFixture();
+  io.prepared.mockReturnValueOnce(f.database).mockReturnValue(null);
+  await expect(loadCatalogReplicaResidentCandidates(f.args)).rejects.toThrow('admission refused');
+});
+
+it('refuses resident candidates after an accepted local edit becomes pending', async () => {
+  const f = await residentFixture();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  await deferCheckpointInTransaction(tx, { rootKind: 'media', rootId: f.args.rootId }, 2);
+  await tx.done;
+  const before = structuredClone(f.rows);
+  await expect(loadCatalogReplicaResidentCandidates(f.args)).rejects.toThrow('admission refused');
+  expect(f.rows).toEqual(before);
+});
+it.each(['image/png', ''])(
+  'offers an inline screenshot original without reading or promoting its bytes (Blob MIME=%s)',
+  async (blobType) => {
+    const f = setup();
+    const blob = new Blob(['local original'], { type: blobType });
+    const media = createMediaLibraryEntry({
+      id: 'inline-image',
+      kind: 'screenshot',
+      source: { kind: 'screenshot' },
+      size: blob.size,
+      mimeType: 'image/png',
+      blob,
+      workspaceRevision: 0,
+      imageContentState: 'original',
+      lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+    });
+    f.table('media_library').set(media.id, media);
+    const rootKey = captureRootKey(scope.spaceId, 'media', media.id);
+    const key = JSON.stringify(['root-state', rootKey]);
+    f.table('sync_capture').set(key, {
+      version: 1,
+      kind: 'root-state',
+      key,
+      createdAt: 1,
+      spaceId: scope.spaceId,
+      rootKind: 'media',
+      rootId: media.id,
+      rootKey,
+      generation: 1,
+      basis: ['native-image-baseline'],
+    });
+    const stream = vi.spyOn(Blob.prototype, 'stream');
+    const before = structuredClone(f.rows);
+    try {
+      const result = await loadCatalogReplicaResidentCandidates({
+        scope,
+        authorization,
+        rootKind: 'media',
+        rootId: media.id,
+        expectedLocalGeneration: 1,
+        expectedBasis: ['native-image-baseline'],
+        expectedWorkspaceRevision: 0,
+      });
+      expect(result.refs).toEqual([]);
+      expect(result.inlineOriginals).toEqual([{ mediaId: media.id, blob, mimeType: 'image/png' }]);
+      expect(stream).not.toHaveBeenCalled();
+      expect(f.rows).toEqual(before);
+    } finally {
+      stream.mockRestore();
+    }
+  }
+);
+it('does not offer local candidates for a disabled profile', async () => {
+  const f = await residentFixture();
+  const profile = parseSyncCaptureRecord(f.table('sync_capture').get('profile'));
+  if (!profile || profile.kind !== 'profile') throw new Error('Expected native profile');
+  f.table('sync_capture').set('profile', { ...profile, enabled: false });
+  await expect(loadCatalogReplicaResidentCandidates(f.args)).rejects.toThrow('admission refused');
+});
+
+it(
+  'offers the same guarded logical Scenario history and its immutable saved HTML refs ' +
+    'without reading bytes',
+  async () => {
+    const f = setup();
+    const project = createGuideProject('Guide', 'guide', 1);
+    const before = createScenarioProjectEntry({ project, existing: undefined, updatedAt: 1 });
+    const entry = createScenarioProjectEntry({ project, existing: before, updatedAt: 2 });
+    f.table('scenario_projects').set(entry.id, entry);
+    f.rows.set(
+      'scenario_exports',
+      new Map([
+        [
+          'saved',
+          {
+            id: 'saved',
+            projectId: entry.id,
+            format: 'html',
+            filename: 'saved.html',
+            createdAt: 1,
+            size: 3,
+            html: { mode: 'guide', assetId: 'saved-html' },
+          },
+        ],
+      ])
+    );
+    f.rows.set('scenario_step_editor_documents', new Map());
+    const htmlRef = {
+      assetId: 'saved-html',
+      size: 3,
+      mimeType: 'text/html',
+      createdAt: 1,
+      sha256: null,
+      location: { kind: 'opfs', objectKey: 'objects/saved-html' },
+    };
+    f.table('asset_refs').set('saved-html', htmlRef);
+    f.table('asset_owners').set(JSON.stringify(['scenario-export', 'saved', 'body']), {
+      ownerKind: 'scenario-export',
+      ownerId: 'saved',
+      role: 'body',
+      assetId: 'saved-html',
+    });
+    const rootKey = captureRootKey(scope.spaceId, 'scenario-project', entry.id);
+    const key = JSON.stringify(['root-state', rootKey]);
+    f.table('sync_capture').set(key, {
+      version: 1,
+      kind: 'root-state',
+      key,
+      createdAt: 1,
+      spaceId: scope.spaceId,
+      rootKind: 'scenario-project',
+      rootId: entry.id,
+      rootKey,
+      generation: 1,
+      basis: ['before'],
+    });
+    const stream = vi.spyOn(Blob.prototype, 'stream');
+    const snapshot = structuredClone(f.rows);
+    try {
+      const result = await loadCatalogReplicaResidentCandidates({
+        scope,
+        authorization,
+        rootKind: 'scenario-project',
+        rootId: entry.id,
+        expectedLocalGeneration: 1,
+        expectedBasis: ['before'],
+        expectedWorkspaceRevision: entry.workspaceRevision,
+      });
+      expect(result).toMatchObject({ scenarioEntry: entry, refs: [htmlRef], inlineOriginals: [] });
+      expect(stream).not.toHaveBeenCalled();
+      expect(f.rows).toEqual(snapshot);
+    } finally {
+      stream.mockRestore();
+    }
   }
 );

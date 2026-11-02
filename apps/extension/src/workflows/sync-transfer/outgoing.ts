@@ -1,5 +1,4 @@
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
-import { sanitizeArchivePathSegment } from '../../composition/archive-transfer';
 import {
   runWithPersistenceMutationTransition,
   type PersistenceMutationTransitionPermit,
@@ -31,7 +30,6 @@ import {
   commitPreparedOutgoingOperation,
   collectNativeOutgoingAssetRefs,
   loadNativeOutgoingRecoveryCopy,
-  restoreNativeOutgoingAsset,
   loadNativeOutgoingCapture,
   loadPreparedOutgoingOperation,
   readOutgoingOperation,
@@ -236,64 +234,57 @@ interface OutgoingResourceRecovery {
   signal: AbortSignal;
 }
 
-async function selectDeferredExports(capture: CapturedChange, recovery?: OutgoingResourceRecovery) {
-  const copies = new Map<string, AssetResidencyCopy>();
-  if (capture.change.kind !== 'video-project' || !recovery?.authorization) return copies;
-  const rows = capture.change.rows;
-  const keys = new Set<string>();
-  for (const entry of rows.exports) {
-    if (rows.exports.filter((item) => item.assetId === entry.assetId).length !== 1) continue;
-    recovery.signal.throwIfAborted();
-    const ref = rows.refs.find((item) => item.assetId === entry.assetId);
-    check(ref);
-    try {
-      await readAssetFile(ref, entry.filename);
-      continue;
-    } catch (error) {
-      recovery.signal.throwIfAborted();
-      // Empty interrupted targets must pass the existing ownership-checked recovery.
-      if (error instanceof AssetObjectSizeMismatchError && error.actualSize === 0) continue;
-      if (
-        !(
-          error instanceof MissingAssetObjectError ||
-          (error instanceof DOMException && error.name === 'NotFoundError')
-        )
-      )
-        throw error;
-    }
-    const copy = await loadNativeOutgoingRecoveryCopy({
-      capture,
-      ref,
-      authorization: recovery.authorization,
-    });
-    if (
-      !isSyncObjectRemoteKey(
-        capture.spaceId,
-        sanitizeArchivePathSegment(entry.filename),
-        copy.remote.key
-      )
-    )
-      continue;
-    if (keys.has(copy.remote.key)) continue;
-    keys.add(copy.remote.key);
-    copies.set(ref.assetId, copy);
+/** Exclude causal-only refs and outputs whose transport bytes are generated from local input. */
+function bytePreservingAssetIds(capture: CapturedChange): ReadonlySet<string> {
+  const change = capture.change;
+  switch (change.kind) {
+    case 'tombstone':
+      return new Set();
+    case 'media':
+      return new Set(
+        'webSnapshot' in change.rows
+          ? [change.rows.screenshotRef.assetId]
+          : [change.rows.ref.assetId]
+      );
+    case 'image':
+      return new Set([
+        ...(change.rows.originalRef ? [change.rows.originalRef.assetId] : []),
+        ...(change.rows.workspace?.document.assets.map((asset) => asset.assetId) ?? []),
+      ]);
+    case 'video-review':
+      return new Set([
+        change.rows.source.ref.assetId,
+        ...change.rows.assets.map((asset) => asset.assetId),
+      ]);
+    case 'video-project':
+      return new Set([
+        ...change.rows.assets.map((asset) => asset.assetId),
+        ...change.rows.exports.map((entry) => entry.assetId),
+      ]);
+    case 'scenario-project':
+      return new Set([
+        ...change.rows.assets.map((asset) => asset.assetId),
+        ...change.rows.documents.flatMap((document) =>
+          document.document.assets.map((asset) => asset.assetId)
+        ),
+        ...change.rows.exports.flatMap((entry) => (entry.html ? [entry.html.assetId] : [])),
+      ]);
   }
-  return copies;
 }
 
-async function prepareCapturedFiles(
-  capture: CapturedChange,
-  recovery: OutgoingResourceRecovery,
-  transitionPermit: PersistenceMutationTransitionPermit,
-  deferredExports: ReadonlyMap<string, AssetResidencyCopy>
-) {
+/** Select only exact native copies; publication never downloads an unchanged original. */
+async function selectDeferredAssets(capture: CapturedChange, recovery?: OutgoingResourceRecovery) {
+  const copies = new Map<string, AssetResidencyCopy>();
+  const bytePreserving = bytePreservingAssetIds(capture);
   for (const ref of collectNativeOutgoingAssetRefs(capture)) {
-    if (deferredExports.has(ref.assetId)) continue;
-    recovery.signal.throwIfAborted();
+    if (!bytePreserving.has(ref.assetId)) continue;
+    recovery?.signal.throwIfAborted();
     try {
-      await readAssetFile(ref, ref.assetId);
+      const file = await readAssetFile(ref, ref.assetId);
+      if (ref.sha256 !== null) check((await hashFile(file, recovery?.signal)) === ref.sha256);
       continue;
     } catch (error) {
+      recovery?.signal.throwIfAborted();
       if (
         !(
           error instanceof MissingAssetObjectError ||
@@ -306,50 +297,17 @@ async function prepareCapturedFiles(
     const copy = await loadNativeOutgoingRecoveryCopy({
       capture,
       ref,
-      authorization: recovery.authorization,
+      authorization: recovery?.authorization,
     });
-    // The native owner rechecks capture, copy and authorization before physical installation and settlement.
-    const staged = await stageRootObjects({
-      transitionPermit,
-      objects: [
-        {
-          objectId: ref.assetId,
-          path: ref.location.objectKey,
-          filename: ref.assetId,
-          mimeType: ref.mimeType,
-          size: ref.size,
-        },
-      ],
-      expectedSha256: new Map([[ref.assetId, copy.remote.sha256]]),
-      signal: recovery.signal,
-      async readObject() {
-        const stream = await recovery.remote.read(copy.remote.key, recovery.signal);
-        return { pipeTo: (sink, signal) => stream.pipeTo(sink, signal ? { signal } : {}) };
-      },
-    });
-    try {
-      const source = staged[0];
-      check(source && staged.length === 1);
-      const result = await restoreNativeOutgoingAsset(
-        {
-          capture,
-          copy,
-          authorization: recovery.authorization,
-          sourceBlob: await readAssetFile(source.ref, ref.assetId),
-          signal: recovery.signal,
-        },
-        { persistenceTransitionPermit: transitionPermit }
-      );
-      if (result === 'busy') throw new SyncRemoteError('temporary');
-    } catch (error) {
-      return discardTransportCopies(staged, error);
-    }
-    const failures = await collectPreparedAssetCleanupFailures(
-      staged.map((item) => item.ref.assetId)
+    const physicalFilename = copy.remote.key.split('/').at(-1);
+    check(
+      physicalFilename &&
+        isSyncObjectRemoteKey(capture.spaceId, physicalFilename, copy.remote.key) &&
+        (ref.sha256 === null || ref.sha256 === copy.remote.sha256)
     );
-    if (failures.length)
-      throw new AggregateError(failures, 'Outgoing file recovery cleanup failed.');
+    copies.set(ref.assetId, copy);
   }
+  return copies;
 }
 
 /** Freeze portable bytes once from authoritative native capture and reuse existing file refs. */
@@ -371,8 +329,7 @@ export async function prepareCapturedOutgoing(
   return runWithPersistenceMutationTransition((transition) =>
     runWithAssetResourceRead(() =>
       runWithDurableAssetOperation(async () => {
-        const deferredExports = await selectDeferredExports(capture, recovery);
-        if (recovery) await prepareCapturedFiles(capture, recovery, transition, deferredExports);
+        const deferredExports = await selectDeferredAssets(capture, recovery);
         return prepareNativeOutgoing(capture, transition, deferredExports, recovery?.authorization);
       })
     )

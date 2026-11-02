@@ -12,11 +12,17 @@ const baseUnlockSchema = z.object({
 });
 
 export const aiSecretUnlockMessageSchema = defineAISecretUnlockMessageSchema(
-  z.discriminatedUnion('operation', [
+  z.union([
     baseUnlockSchema
       .extend({
         operation: z.literal('start'),
         purpose: z.enum(['content-ai-pick', 'scenario-editor', 'review-text']),
+      })
+      .strict(),
+    baseUnlockSchema
+      .extend({
+        operation: z.literal('start'),
+        purpose: z.literal('sync'),
       })
       .strict(),
     baseUnlockSchema

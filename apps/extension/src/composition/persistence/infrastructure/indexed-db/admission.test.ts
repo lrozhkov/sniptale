@@ -456,3 +456,22 @@ it('refuses current capture databases with a missing store index or domain contr
   });
   expect(mocks.eraseAssetStorage).not.toHaveBeenCalled();
 });
+
+it.each([
+  ['sync_capture', 'syncCaptureScopePhase'],
+  ['sync_capture', 'syncPendingScopeDue'],
+  ['sync_outbox', 'syncQueueScopeStatus'],
+] as const)(
+  'refuses a current database missing summary projection %s.%s without repair',
+  async (storeName, missing) => {
+    const indexes = EXPECTED_INDEXES[storeName].filter((name) => name !== missing);
+    mocks.openDB.mockResolvedValueOnce(
+      createCurrentDatabase({ indexes: { [storeName]: indexes } })
+    );
+    await expect(inspectDatabaseAdmission()).resolves.toMatchObject({
+      reason: 'indexes',
+      status: 'corrupt',
+    });
+    expect(mocks.openDB).toHaveBeenCalledTimes(1);
+  }
+);

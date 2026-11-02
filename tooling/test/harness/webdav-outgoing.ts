@@ -1,3 +1,8 @@
+import { captureRootCheckpointInTransaction } from '../../../apps/extension/src/composition/persistence/sync-capture/capture';
+import { readCheckpointInTransaction } from '../../../apps/extension/src/composition/persistence/sync-capture/checkpoints';
+import { tryRunWithSyncCheckpointPublication } from '../../../apps/extension/src/composition/persistence/sync-capture/checkpoint-publication';
+import { runWithPersistenceMutationPermit } from '../../../apps/extension/src/composition/persistence/infrastructure/mutation-barrier';
+import { createProjectMutationStores } from '../../../apps/extension/src/composition/persistence/projects/mutation-stores';
 import { parseRecordingEntry } from '../../../apps/extension/src/composition/persistence/recordings/index.guards';
 import { readVideoWorkspace } from '../../../apps/extension/src/composition/persistence/review-workspaces/store';
 import type { CaptureRootKind } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
@@ -109,6 +114,64 @@ export function createWebdavOutgoingHarness(
     };
   }
   return {
+    /** Explicit fixture action; it grants no product connection or transport authority. */
+    async checkpointRoot(rootKind: CaptureRootKind, rootId: string) {
+      const db = await initDB();
+      const selection = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+      let pending: Awaited<ReturnType<typeof readCheckpointInTransaction>>;
+      try {
+        const profile = parseSyncCaptureRecord(
+          await selection.objectStore(SYNC_CAPTURE_STORE).get('profile')
+        );
+        if (!profile || profile.kind !== 'profile')
+          throw new Error('Native checkpoint profile is missing.');
+        pending = await readCheckpointInTransaction(
+          selection,
+          {
+            spaceId: profile.spaceId,
+            connectionGeneration: profile.connectionGeneration,
+            profileCreatedAt: profile.createdAt,
+          },
+          { rootKind, rootId }
+        );
+        await selection.done;
+      } catch (error) {
+        await selection.done.catch(() => undefined);
+        throw error;
+      }
+      if (!pending)
+        return { outcome: 'not-pending' as const, pendingRevision: null, operationId: null };
+      const selected = pending;
+      const result = await tryRunWithSyncCheckpointPublication(() =>
+        runWithPersistenceMutationPermit(async () => {
+          const { tx } = createProjectMutationStores(db, { checkpointAdmission: true });
+          try {
+            const capture = await captureRootCheckpointInTransaction(tx, selected, { force: true });
+            await tx.done;
+            return {
+              outcome: capture ? ('captured' as const) : ('refused' as const),
+              pendingRevision: selected.revision,
+              operationId: capture?.operationId ?? null,
+            };
+          } catch (error) {
+            try {
+              tx.abort();
+            } catch {
+              /* The transaction can already be closed. */
+            }
+            await tx.done.catch(() => undefined);
+            throw error;
+          }
+        })
+      );
+      return (
+        result ?? {
+          outcome: 'busy' as const,
+          pendingRevision: selected.revision,
+          operationId: null,
+        }
+      );
+    },
     holdNextAdmission() {
       let release!: () => void;
       const promise = new Promise<void>((resolve) => {

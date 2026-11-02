@@ -67,7 +67,7 @@ async function verifyMarkdownDelegation() {
 
   const result = await processWithLLM(request, config);
 
-  expect(processMarkdownRequestMock).toHaveBeenCalledWith(request, config);
+  expect(processMarkdownRequestMock).toHaveBeenCalledWith(request, config, undefined);
   expect(processJsonConfigRequestMock).not.toHaveBeenCalled();
   expect(result).toEqual({
     cleanedResponse: '| cleaned |',
@@ -85,8 +85,8 @@ async function verifyJsonDelegationWithRetryControl() {
   await processWithLLMJSON(request, config);
   const configResult = await processWithLLMConfig(request, config, 5);
 
-  expect(processJsonConfigRequestMock).toHaveBeenNthCalledWith(1, request, config, 3);
-  expect(processJsonConfigRequestMock).toHaveBeenNthCalledWith(2, request, config, 5);
+  expect(processJsonConfigRequestMock).toHaveBeenNthCalledWith(1, request, config, 3, undefined);
+  expect(processJsonConfigRequestMock).toHaveBeenNthCalledWith(2, request, config, 5, undefined);
   expect(processMarkdownRequestMock).not.toHaveBeenCalled();
   expect(configResult).toEqual({
     cleanedResponse: '{"ok":true}',

@@ -578,6 +578,7 @@ it.each(['basis', 'deletion', 'residency', 'apply'] as const)(
 );
 
 it.each([
+  [new SyncRemoteError('secrets-locked'), 'secrets-locked'],
   [new SyncWorkspaceError('binding-mismatch'), 'binding-mismatch'],
   [new SyncCatalogError('pagination-cycle'), 'pagination-cycle'],
   [Object.assign(new SyncRemoteError('transport'), { code: 'private-hostile-code' }), 'unexpected'],
@@ -617,3 +618,43 @@ it.each(['warn', 'info'] as const)(
     expect(ports.receive).toHaveBeenCalledTimes(3);
   }
 );
+
+it('defers pending native roots without reading or replacing their resources', async () => {
+  const f = await successor();
+  ports.bases.mockResolvedValue([{ ...f.local, pending: true }]);
+  const input = args(catalog([f.base, f.head]));
+  expect(await createAutomaticCatalogSync().run(input)).toEqual({
+    applied: 0,
+    deferred: 1,
+    remaining: false,
+  });
+  expect(ports.receive).not.toHaveBeenCalled();
+  expect(ports.deletion).not.toHaveBeenCalled();
+  expect(ports.admission).not.toHaveBeenCalled();
+  expect(input.remote.read).not.toHaveBeenCalled();
+  expect(ports.warn).toHaveBeenCalledWith(
+    'sync.incoming.deferred stage=basis reason=pending-local-change'
+  );
+});
+
+it('bounds pending deferrals and continues beyond them on the next pass', async () => {
+  const roots = await Promise.all(['a', 'b', 'c'].map((id) => successor(`project-asset:${id}`)));
+  ports.bases.mockResolvedValue(roots.map(({ local }) => ({ ...local, pending: true })));
+  const input = args(catalog(roots.flatMap(({ base, head }) => [base, head])));
+  const owner = createAutomaticCatalogSync();
+  expect(await owner.run(input)).toEqual({ applied: 0, deferred: 2, remaining: true });
+  expect(await owner.run(input)).toEqual({ applied: 0, deferred: 1, remaining: false });
+  expect(ports.receive).not.toHaveBeenCalled();
+  expect(ports.deletion).not.toHaveBeenCalled();
+  expect(ports.warn).toHaveBeenCalledTimes(3);
+});
+
+it('keeps on-demand binary admission separate from the legacy resident-only contract', async () => {
+  const f = await successor();
+  ports.bases.mockResolvedValue([f.local]);
+  const input = args(catalog([f.base, f.head]));
+  await createAutomaticCatalogSync().run({ ...input, binaryAdmission: 'resident' });
+  expect(ports.receive).toHaveBeenCalledWith(
+    expect.objectContaining({ residentOnly: true, binaryAdmission: 'resident' })
+  );
+});

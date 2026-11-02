@@ -627,6 +627,7 @@ export async function settleAssetWritingMarkers(
   assetIds: readonly string[],
   options: AssetOpfsOptions = {}
 ): Promise<void> {
+  if (assetIds.length === 0) return;
   const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
   if (!writing) return;
   for (const assetId of assetIds) {

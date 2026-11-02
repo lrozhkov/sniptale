@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from './checkpoints';
 import { readCaptureRootState } from './guards';
 import { readScenarioProjectDependenciesInTransaction } from './scenario-dependencies';
 import { readOutgoingOperation } from './outgoing';
@@ -7,7 +8,11 @@ import { SCENARIO_CAPTURE_STORES } from './scenario-snapshot';
 import type { CausalRootDependency } from './contracts';
 import { captureProfileBounds } from './contracts';
 import type { IDBPTransaction } from 'idb';
-import { initDB } from '../infrastructure/indexed-db/core';
+import { initDB, capturePreparedDatabase } from '../infrastructure/indexed-db/core';
+import {
+  collectNativeEditingResources,
+  NATIVE_EDITING_RESOURCE_STORES,
+} from '../assets/editing-resources';
 import {
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
@@ -37,9 +42,10 @@ import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { readWorkspaceStorage } from '../review-workspaces/storage';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
-import { captureRootKey, type CaptureRootKind } from './contracts';
+import { captureRootKey, type CaptureRootKind, type SyncCaptureRootState } from './contracts';
 import { parseSyncCaptureRecord } from './guards';
-import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
+import { isImageCaptureSource } from './image-snapshot';
+import { readCompatibleImageReplicaPredecessorInTransaction } from './freeze';
 import { digestCapturedMediaRows } from './freeze';
 import { freezeMediaInTransaction } from './freeze';
 import type { ApplyPreparedVideoProjectRevisionInput } from './apply-video-project';
@@ -73,7 +79,12 @@ async function rootState(
   return state;
 }
 
-async function workspaceRevision(tx: ReadTransaction, rootKind: CaptureRootKind, rootId: string) {
+async function workspaceRevision(
+  tx: ReadTransaction,
+  rootKind: CaptureRootKind,
+  rootId: string,
+  state: SyncCaptureRootState | null
+) {
   if (rootKind === 'scenario-project') {
     const raw = (await readScenarioStorage(tx, rootId)).logical;
     if (raw === undefined) return null;
@@ -99,10 +110,8 @@ async function workspaceRevision(tx: ReadTransaction, rootKind: CaptureRootKind,
   if (raw === undefined) return null;
   const media = parseMediaLibraryEntry(raw);
   if (!media || media.id !== rootId) refuse();
-  return media.source.kind === 'screenshot' ||
-    (media.source.kind === 'stored-asset' && media.mimeType.startsWith('image/'))
-    ? (media.workspaceRevision ?? 0)
-    : null;
+  if (media.source.kind === 'project-asset' && state?.nativeRevision === undefined) return null;
+  return isImageCaptureSource(media) ? (media.workspaceRevision ?? 0) : null;
 }
 
 /** Read one consistent native predecessor; publication repeats admission in its write transaction. */
@@ -152,8 +161,11 @@ export async function loadCatalogReplicaAdmission(args: {
   await checkSyncConnectionAdmission(tx, selected.scope, authorization);
   const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
   if (!profile || profile.kind !== 'profile' || !profile.enabled) refuse();
+  if (await readCheckpointInTransaction(tx, selected.scope, selected)) refuse();
+  for (const dependency of selected.dependencyRoots ?? [])
+    if (await readCheckpointInTransaction(tx, selected.scope, dependency)) refuse();
   const state = await rootState(tx, selected.scope.spaceId, selected.rootKind, selected.rootId);
-  const revision = await workspaceRevision(tx, selected.rootKind, selected.rootId);
+  const revision = await workspaceRevision(tx, selected.rootKind, selected.rootId, state);
   const dependencies: ApplyPreparedVideoProjectRevisionInput['dependencies'][number][] = [];
   const rootDependencies = await readScenarioProjectDependenciesInTransaction(
     tx,
@@ -162,16 +174,22 @@ export async function loadCatalogReplicaAdmission(args: {
   );
   if (!rootDependencies) refuse();
   for (const mediaId of selected.dependencyMediaIds) {
+    if (
+      await readCheckpointInTransaction(tx, selected.scope, { rootKind: 'media', rootId: mediaId })
+    )
+      refuse();
     const dependencyState = await rootState(tx, selected.scope.spaceId, 'media', mediaId);
     if (!dependencyState || dependencyState.deleted || dependencyState.basis.length !== 1) refuse();
     const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
     if (!media || media.lifecycle?.storageClass !== 'library') refuse();
-    const image = media.source.kind === 'stored-asset' && media.mimeType.startsWith('image/');
-    const rows = image
-      ? await freezeImageInTransaction(tx, mediaId)
-      : await freezeMediaInTransaction(tx, mediaId, { allowIndependentReview: true });
+    const image = isImageCaptureSource(media)
+      ? await readCompatibleImageReplicaPredecessorInTransaction(tx, mediaId, dependencyState)
+      : null;
+    const rows =
+      image?.rows ??
+      (await freezeMediaInTransaction(tx, mediaId, { allowIndependentReview: true }));
     const ref = 'ref' in rows ? rows.ref : rows.originalRef;
-    const digest = 'ref' in rows ? digestCapturedMediaRows(rows) : digestCapturedImageRows(rows);
+    const digest = image?.digest ?? ('ref' in rows ? digestCapturedMediaRows(rows) : null);
     if (!ref || dependencyState.nativeDigest !== digest) refuse();
     dependencies.push({
       entry: rows.media,
@@ -190,6 +208,88 @@ export async function loadCatalogReplicaAdmission(args: {
     dependencies,
     ...(rootDependencies.length ? { rootDependencies } : {}),
   });
+}
+
+/** Offer only this exact predecessor's local resources; callers must verify actual bytes before reuse. */
+export async function loadCatalogReplicaResidentCandidates(args: {
+  scope: SyncConnectionScope;
+  authorization: SyncConnectionIdentity;
+  rootKind: CaptureRootKind;
+  rootId: string;
+  expectedLocalGeneration: number;
+  expectedBasis: readonly string[];
+  expectedWorkspaceRevision: number | null;
+}) {
+  const db = capturePreparedDatabase();
+  if (!db) refuse();
+  const selected = structuredClone(args);
+  const authorization = parseSyncConnectionIdentity(selected.authorization);
+  if (
+    !authorization ||
+    !['media', 'video-review', 'video-project', 'scenario-project'].includes(selected.rootKind) ||
+    !selected.rootId ||
+    selected.rootId.length > 256 ||
+    !Number.isSafeInteger(selected.expectedLocalGeneration) ||
+    selected.expectedLocalGeneration < 1 ||
+    selected.expectedBasis.length !== 1 ||
+    (selected.expectedWorkspaceRevision !== null &&
+      (!Number.isSafeInteger(selected.expectedWorkspaceRevision) ||
+        selected.expectedWorkspaceRevision < 0))
+  )
+    refuse();
+  const tx = db.transaction(
+    [...new Set([...NATIVE_EDITING_RESOURCE_STORES, SYNC_CAPTURE_STORE, SYNC_CONNECTION_STORE])],
+    'readonly'
+  );
+  try {
+    await checkSyncConnectionAdmission(tx, selected.scope, authorization);
+    const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+    if (!profile || profile.kind !== 'profile' || !profile.enabled) refuse();
+    if (await readCheckpointInTransaction(tx, selected.scope, selected)) refuse();
+    const state = await rootState(tx, selected.scope.spaceId, selected.rootKind, selected.rootId);
+    if (
+      !state ||
+      state.deleted ||
+      state.generation !== selected.expectedLocalGeneration ||
+      JSON.stringify(state.basis) !== JSON.stringify(selected.expectedBasis) ||
+      (await workspaceRevision(tx, selected.rootKind, selected.rootId, state)) !==
+        selected.expectedWorkspaceRevision
+    )
+      refuse();
+    const scenarioEntry =
+      selected.rootKind === 'scenario-project'
+        ? parseScenarioProjectEntry((await readScenarioStorage(tx, selected.rootId)).logical)
+        : null;
+    if (selected.rootKind === 'scenario-project' && !scenarioEntry) refuse();
+    const resources = await collectNativeEditingResources(
+      tx,
+      selected,
+      selected.rootKind === 'scenario-project' ? 'backup' : 'editing'
+    );
+    const inlineOriginals: { mediaId: string; blob: Blob; mimeType: string }[] = [];
+    for (const mediaId of resources.inlineMediaIds) {
+      const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+      if (!media || media.id !== mediaId || media.source.kind !== 'screenshot') refuse();
+      if (media.blob) {
+        if (
+          media.blob.size !== media.size ||
+          (media.blob.type && media.blob.type !== media.mimeType)
+        )
+          refuse();
+        inlineOriginals.push({ mediaId, blob: media.blob, mimeType: media.mimeType });
+      }
+    }
+    await tx.done;
+    if (capturePreparedDatabase() !== db) refuse();
+    return structuredClone({
+      refs: resources.refs,
+      inlineOriginals,
+      ...(scenarioEntry ? { scenarioEntry } : {}),
+    });
+  } catch (error) {
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
 }
 
 /** Observe authoritative completion after a publication or cancellation raced with cleanup. */
@@ -356,15 +456,17 @@ export async function loadCatalogNativeBases(args: {
     rootId: string;
     generation: number;
     basis: string[];
+    pending?: true;
   }[] = [];
   for (const root of selected.roots) {
     const state = await rootState(tx, selected.scope.spaceId, root.rootKind, root.rootId);
-    if (state)
+    const pending = await readCheckpointInTransaction(tx, selected.scope, root);
+    if (state || pending)
       bases.push({
-        rootKind: state.rootKind,
-        rootId: state.rootId,
-        generation: state.generation,
-        basis: [...state.basis],
+        ...root,
+        generation: state?.generation ?? 0,
+        basis: [...(state?.basis ?? [])],
+        ...(pending ? { pending: true as const } : {}),
       });
   }
   await tx.done;

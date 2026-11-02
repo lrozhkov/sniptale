@@ -17,13 +17,15 @@ import { buildVideoProjectRootInventory } from './video-projects';
 import { resolveBackupDependencySelection } from './scenario-dependencies';
 import { MEDIA_HUB_BACKUP_SHARED_LAYOUT } from '../layout';
 
-export async function buildMediaHubBackupExportPlanFromLibraryV6(
+interface LibraryInventoryAdmission {
+  expectedReview?: VideoWorkspaceSnapshot | undefined;
+  requireSelected?: boolean;
+  prepareRoot?: MediaHubBackupRootPreparation;
+}
+
+async function collectNativeLibraryRoots(
   options: MediaHubBackupExportOptions,
-  admission: {
-    expectedReview?: VideoWorkspaceSnapshot | undefined;
-    requireSelected?: boolean;
-    prepareRoot?: MediaHubBackupRootPreparation;
-  } = {}
+  admission: LibraryInventoryAdmission
 ) {
   const db = await initDB();
   const dependencies = await resolveBackupDependencySelection(db, options);
@@ -59,11 +61,6 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
       `Selected project requires an excluded draft media item: ${missingDependency}.`
     );
   }
-  const effects =
-    options.scope === 'all' || videoProjects.length > 0
-      ? await buildEffectBundleRootInventory(db, paths)
-      : [];
-
   const scenarioProjects = await buildScenarioProjectRootInventory({
     db,
     options: effectiveOptions,
@@ -85,6 +82,29 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
       scenarioProjectIds: exportedScenarioIds,
       videoProjectIds: new Set(videoProjects.map((root) => root.descriptor.rootId)),
     });
+  return { db, paths, media, scenarioProjects, videoProjects };
+}
+
+/** Prepare the canonical native graph without browser-storage-only archive settings. */
+export async function prepareMediaHubBackupRootsFromLibraryV6(
+  options: MediaHubBackupExportOptions,
+  admission: { prepareRoot: MediaHubBackupRootPreparation; requireSelected?: boolean }
+): Promise<void> {
+  await collectNativeLibraryRoots(options, admission);
+}
+
+export async function buildMediaHubBackupExportPlanFromLibraryV6(
+  options: MediaHubBackupExportOptions,
+  admission: LibraryInventoryAdmission = {}
+) {
+  const { db, paths, media, scenarioProjects, videoProjects } = await collectNativeLibraryRoots(
+    options,
+    admission
+  );
+  const effects =
+    options.scope === 'all' || videoProjects.length > 0
+      ? await buildEffectBundleRootInventory(db, paths)
+      : [];
   return buildMediaHubBackupExportPlanV6({
     layout: MEDIA_HUB_BACKUP_SHARED_LAYOUT,
     ...(options.scope === 'all' ? { galleryViews: await listGallerySavedViews() } : {}),

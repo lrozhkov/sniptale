@@ -8,21 +8,30 @@ import {
   commitSyncConnectionAuthentication,
   commandSyncConnection,
   loadSyncConnection,
+  readPreparedSyncConnection,
   loadSyncConnectionAuthentication,
   checkSyncConnectionAdmission,
 } from './store';
 import {
   parseConnectionMetadata,
+  parseSyncStoragePolicy,
   type SyncConnectionBinding,
   type SyncConnectionMetadata,
 } from './model';
 import { encodeSyncWorkspaceMarker } from '../../../contracts/sync-workspace';
 import { withSyncConnectionAdmissionLock } from './coordination';
+import { createWebdavSecretProtectionParticipant } from './protection';
 
-const io = vi.hoisted(() => ({ database: vi.fn(), encrypt: vi.fn(), decrypt: vi.fn() }));
+const io = vi.hoisted(() => ({
+  database: vi.fn(),
+  prepared: vi.fn<() => unknown>(() => null),
+  encrypt: vi.fn(),
+  decrypt: vi.fn(),
+}));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: io.database,
+  capturePreparedDatabase: io.prepared,
 }));
 vi.mock('@sniptale/platform/security/local-secret-crypto', async (original) => {
   const actual = await original<typeof import('@sniptale/platform/security/local-secret-crypto')>();
@@ -46,6 +55,7 @@ function deferred<T>() {
 }
 beforeEach(async () => {
   vi.clearAllMocks();
+  io.prepared.mockReturnValue(null);
   vi.stubGlobal('crypto', webcrypto);
   const actual = await vi.importActual<
     typeof import('@sniptale/platform/security/local-secret-crypto')
@@ -89,6 +99,7 @@ function setup(spaceId = 'space') {
       ]),
     ],
     ['sync_connection', new Map()],
+    ['secret_protection', new Map()],
   ]);
   let failAt = 0;
   let writes = 0;
@@ -547,4 +558,181 @@ it('refuses changed workspace identity and legacy context for enrolled credentia
   const before = structuredClone(f.rows);
   await expect(loadSyncConnectionAuthentication(active.identity)).rejects.toThrow('refused');
   expect(f.rows).toEqual(before);
+});
+
+it('reads prepared connection metadata without opening storage or reading credentials', async () => {
+  const f = setup();
+  const selected = await activate();
+  io.prepared.mockReturnValue(f.database);
+  io.database.mockClear();
+  const original = f.database.transaction.bind(f.database);
+  const reads = vi.fn();
+  const transaction = vi.spyOn(f.database, 'transaction').mockImplementation((stores, mode) => {
+    const tx = original(stores, mode);
+    return {
+      ...tx,
+      objectStore(name: string) {
+        const store = tx.objectStore(name);
+        return {
+          ...store,
+          get: async (key: string) => {
+            reads(name, key);
+            if (key === 'credential') throw new Error('Forbidden credential read');
+            return store.get(key);
+          },
+        };
+      },
+    };
+  });
+  expect(await readPreparedSyncConnection()).toEqual(selected);
+  expect(transaction).toHaveBeenCalledWith(['sync_capture', 'sync_connection'], 'readonly');
+  expect(reads.mock.calls).toEqual([
+    ['sync_connection', 'connection'],
+    ['sync_capture', 'profile'],
+  ]);
+  f.table('sync_capture').set('profile', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    createdAt: 1,
+    enabled: true,
+    spaceId: 'replacement-space',
+    connectionGeneration: 3,
+  });
+  expect(await readPreparedSyncConnection()).toBeNull();
+  expect(io.database).not.toHaveBeenCalled();
+});
+
+it('returns unknown for cold, closed, failed and replaced prepared connection reads', async () => {
+  const f = setup();
+  await activate();
+  io.database.mockClear();
+  expect(await readPreparedSyncConnection()).toBeNull();
+  io.prepared.mockReturnValue(f.database);
+  const original = f.database.transaction.bind(f.database);
+  const transaction = vi.spyOn(f.database, 'transaction');
+  transaction.mockImplementationOnce(() => {
+    throw new Error('Closed');
+  });
+  expect(await readPreparedSyncConnection()).toBeNull();
+  transaction.mockImplementationOnce((stores, mode) => {
+    const tx = original(stores, mode);
+    return { ...tx, done: Promise.reject(new Error('Commit failed')) };
+  });
+  expect(await readPreparedSyncConnection()).toBeNull();
+  transaction.mockRestore();
+  const gate = deferred<void>();
+  const entered = deferred<void>();
+  vi.spyOn(f.database, 'transaction').mockImplementationOnce((stores, mode) => {
+    const tx = original(stores, mode);
+    return {
+      ...tx,
+      get done() {
+        entered.resolve();
+        return gate.promise;
+      },
+    };
+  });
+  const pending = readPreparedSyncConnection();
+  let settled = false;
+  void pending.then(() => {
+    settled = true;
+  });
+  await entered.promise;
+  expect(settled).toBe(false);
+  io.prepared.mockReturnValue(setup().database);
+  gate.resolve();
+  expect(await pending).toBeNull();
+  expect(io.database).not.toHaveBeenCalled();
+});
+
+it('parses only the supported closed storage policy and normalizes absent legacy metadata', async () => {
+  const f = setup();
+  const active = await activate();
+  const legacy = { ...active };
+  delete legacy.storagePolicy;
+  expect(parseSyncStoragePolicy({ version: 1, mode: 'on-demand' })).toEqual({
+    version: 1,
+    mode: 'on-demand',
+  });
+  const expected = {
+    ...parseConnectionMetadata(active),
+    storagePolicy: { version: 1, mode: 'on-demand' },
+  };
+  expect(parseConnectionMetadata(legacy)).toEqual(expected);
+  for (const policy of [
+    undefined,
+    null,
+    {},
+    { version: 2, mode: 'on-demand' },
+    { version: 1, mode: 'full-download' },
+    { version: 1, mode: 'on-demand', extra: true },
+  ]) {
+    expect(parseSyncStoragePolicy(policy)).toBeNull();
+    expect(parseConnectionMetadata({ ...legacy, storagePolicy: policy })).toBeNull();
+  }
+  f.table().set('connection', legacy);
+  const before = structuredClone(f.rows);
+  expect(await loadSyncConnection()).toEqual(expected);
+  expect(f.rows).toEqual(before);
+  expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(basic);
+});
+
+it.each([false, true])(
+  'recovers a legacy pending protection payload after metadata normalization without ' +
+    'changing ciphertext context (checked %s)',
+  async (checked) => {
+    const workspace = checked
+      ? encodeSyncWorkspaceMarker(crypto.randomUUID(), crypto.randomUUID()).identity
+      : null;
+    const f = setup(workspace?.spaceId ?? 'space');
+    const initial = await beginSyncConnectionAuthUpdate(
+      { ...binding, spaceId: workspace?.spaceId ?? binding.spaceId },
+      null
+    );
+    const reservation = { ...initial, ...(workspace ? { workspace } : {}) };
+    f.table().set('connection', structuredClone(reservation));
+    const active = await commitSyncConnectionAuthentication(reservation, basic);
+    const participant = createWebdavSecretProtectionParticipant();
+    const prepared = await participant.prepare({
+      action: 'unprotect',
+      sourceKey: null,
+      targetKey: null,
+      sourceProfileBinding: null,
+      targetProfileBinding: null,
+    });
+    const payload = prepared.payload;
+    if (!isRecord(payload) || !isRecord(payload['source']) || !isRecord(payload['target']))
+      throw new Error('Missing journal payload');
+    for (const selected of [payload['source'], payload['target']]) {
+      const metadata = selected['metadata'];
+      if (!isRecord(metadata)) throw new Error('Missing journal metadata');
+      delete metadata['storagePolicy'];
+    }
+    const legacy = { ...active };
+    delete legacy.storagePolicy;
+    f.table().set('connection', legacy);
+    const oldEnvelope = structuredClone(credential(f)['envelope']);
+    expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(basic);
+    expect(credential(f)['envelope']).toEqual(oldEnvelope);
+    await participant.apply(prepared);
+    expect((await loadSyncConnection())?.storagePolicy).toEqual({ version: 1, mode: 'on-demand' });
+    expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(basic);
+    const committed = structuredClone(f.rows);
+    await participant.apply(prepared);
+    expect(f.rows).toEqual(committed);
+  }
+);
+
+it('commits a legacy pending auth reservation through normalized CAS without changing credential AAD', async () => {
+  const f = setup();
+  const reservation = await beginSyncConnectionAuthUpdate(binding, null);
+  delete reservation.storagePolicy;
+  f.table().set('connection', structuredClone(reservation));
+  const active = await commitSyncConnectionAuthentication(reservation, basic);
+  expect(active.storagePolicy).toEqual({ version: 1, mode: 'on-demand' });
+  expect(credential(f)['envelope']).toMatchObject({
+    additionalData: { version: 'sync-connection-secret:v1' },
+  });
+  expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(basic);
 });

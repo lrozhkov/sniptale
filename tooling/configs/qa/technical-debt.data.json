@@ -1475,6 +1475,69 @@
         "rule": "generic-api-key"
       },
       "targetAction": "Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings."
+    },
+    {
+      "id": "noise.codeql.transform-stream-archive-transfer",
+      "classification": "tool-noise",
+      "owner": "archive-transfer",
+      "risk": "Removing this transformer would remove byte-limit or source-integrity enforcement.",
+      "reason": "The CodeQL streamsapi.js extern declares TransformStream with zero parameters. The standard constructor accepts the transformer argument used here. Existing stream tests exercise its callbacks and rejection paths.",
+      "removalCondition": "Remove when CodeQL models the standard transformer parameter or this exact constructor call changes.",
+      "reviewBy": "2027-05-02",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/composition/archive-transfer/writer.ts:38:f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f",
+        "file": "apps/extension/src/composition/archive-transfer/writer.ts",
+        "line": 38,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking."
+    },
+    {
+      "id": "noise.codeql.transform-stream-remote-object-integrity",
+      "classification": "tool-noise",
+      "owner": "sync-transfer-integrity",
+      "risk": "Removing this transformer would remove byte-limit or source-integrity enforcement.",
+      "reason": "The CodeQL streamsapi.js extern declares TransformStream with zero parameters. The standard constructor accepts the transformer argument used here. Existing stream tests exercise its callbacks and rejection paths.",
+      "removalCondition": "Remove when CodeQL models the standard transformer parameter or this exact constructor call changes.",
+      "reviewBy": "2027-05-02",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts:16:0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705",
+        "file": "apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts",
+        "line": 16,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking."
+    },
+    {
+      "id": "noise.codeql.transform-stream-webdav",
+      "classification": "tool-noise",
+      "owner": "sync-transfer-webdav",
+      "risk": "Removing this transformer would remove byte-limit or source-integrity enforcement.",
+      "reason": "The CodeQL streamsapi.js extern declares TransformStream with zero parameters. The standard constructor accepts the transformer argument used here. Existing stream tests exercise its callbacks and rejection paths.",
+      "removalCondition": "Remove when CodeQL models the standard transformer parameter or this exact constructor call changes.",
+      "reviewBy": "2027-05-02",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/webdav.ts:288:199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4",
+        "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
+        "line": 288,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking."
     }
   ]
 }

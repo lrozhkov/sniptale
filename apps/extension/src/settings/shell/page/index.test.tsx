@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react';
+import { act, useEffect, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +14,36 @@ const settingsPageMocks = vi.hoisted(() => ({
   useCommandPaletteHotkeyMock: vi.fn(),
   useSettingsStoreMock: vi.fn(),
   mediaAccessProviderMock: vi.fn(),
+  protectionProviderMountMock: vi.fn(),
+  protectionProviderUnmountMock: vi.fn(),
+  protectionProviderPropsMock: vi.fn<(props: { onOpenConfiguration: () => void }) => void>(),
+}));
+
+vi.mock('../../secret-protection/context', () => ({
+  SettingsSecretProtectionProvider: (props: {
+    children: ReactNode;
+    onOpenConfiguration: () => void;
+  }) => {
+    settingsPageMocks.protectionProviderPropsMock(props);
+    useEffect(() => {
+      settingsPageMocks.protectionProviderMountMock();
+      return () => settingsPageMocks.protectionProviderUnmountMock();
+    }, []);
+    return (
+      <>
+        {props.children}
+        <div
+          className="sniptale-modal sniptale-settings-workspace"
+          data-testid="shared-protection-dialog"
+        />
+      </>
+    );
+  },
+}));
+
+vi.mock('./welcome', () => ({ WelcomePage: () => <div>welcome-page</div> }));
+vi.mock('../../sections/ai/unlock', () => ({
+  AISecretUnlockPage: () => <div>request-unlock-page</div>,
 }));
 
 vi.mock('../../runtime/recording-media-access/provider', () => ({
@@ -216,6 +246,10 @@ beforeEach(() => {
   vi.useFakeTimers();
   window.history.replaceState(null, '', '/');
   settingsPageMocks.loadSettingsMock.mockReset();
+  settingsPageMocks.mediaAccessProviderMock.mockReset();
+  settingsPageMocks.protectionProviderMountMock.mockReset();
+  settingsPageMocks.protectionProviderUnmountMock.mockReset();
+  settingsPageMocks.protectionProviderPropsMock.mockReset();
   settingsPageMocks.settingsCommandPaletteMock.mockReset();
   settingsPageMocks.settingsSidebarMock.mockReset();
   settingsPageMocks.useAppLocaleMock.mockReset();
@@ -246,6 +280,12 @@ describe('SettingsPage', () => {
     expect(settingsPageMocks.useAppLocaleMock).toHaveBeenCalledTimes(1);
     expect(container?.textContent).toContain('appearance-section');
     expectSettingsPageShell();
+    expect(
+      container
+        ?.querySelector('[data-testid="shared-protection-dialog"]')
+        ?.closest('[data-ui="settings.page.root"]')
+    ).not.toBeNull();
+    expect(settingsPageMocks.protectionProviderMountMock).toHaveBeenCalledTimes(1);
 
     await openPaletteFromHotkey();
     expect(container?.querySelector('[data-testid="settings-command-palette"]')).not.toBeNull();
@@ -254,6 +294,37 @@ describe('SettingsPage', () => {
       clickButton('palette-close');
     });
     expect(container?.querySelector('[data-testid="settings-command-palette"]')).toBeNull();
+  });
+});
+
+describe('SettingsPage composition', () => {
+  it.each([
+    ['?welcome=1', 'welcome-page'],
+    ['?aiUnlock=1&requestId=selected', 'request-unlock-page'],
+  ])('keeps the ordinary shared protection provider outside %s mode', async (query, marker) => {
+    window.history.replaceState(null, '', query);
+    await renderPage();
+
+    expect(container?.textContent).toContain(marker);
+    expect(settingsPageMocks.protectionProviderMountMock).not.toHaveBeenCalled();
+    expect(settingsPageMocks.protectionProviderPropsMock).not.toHaveBeenCalled();
+    expect(settingsPageMocks.mediaAccessProviderMock).not.toHaveBeenCalled();
+    expect(settingsPageMocks.loadSettingsMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps one common provider across participant configuration navigation', async () => {
+    await renderPage();
+    const openConfiguration =
+      settingsPageMocks.protectionProviderPropsMock.mock.lastCall?.[0].onOpenConfiguration;
+    expect(openConfiguration).toBeTypeOf('function');
+
+    await act(async () => openConfiguration?.());
+    await flushLazySettingsSection();
+
+    expect(container?.textContent).toContain('permissions-section');
+    expect(window.location.search).toBe('?section=access-data&view=secret-protection');
+    expect(settingsPageMocks.protectionProviderMountMock).toHaveBeenCalledTimes(1);
+    expect(settingsPageMocks.protectionProviderUnmountMock).not.toHaveBeenCalled();
   });
 });
 
@@ -318,6 +389,11 @@ describe('SettingsPage navigation', () => {
     expect(sidebarProps.disabled).toBe(true);
     await act(async () => clickButton('quick-actions'));
     expect(container?.textContent).toContain('lock-navigation');
+    await act(async () =>
+      settingsPageMocks.protectionProviderPropsMock.mock.lastCall?.[0].onOpenConfiguration()
+    );
+    expect(container?.textContent).toContain('lock-navigation');
+    expect(window.location.search).toContain('section=settings-transfer');
 
     const hotkeyArgs = settingsPageMocks.useCommandPaletteHotkeyMock.mock.lastCall?.[0] as {
       onOpen: () => void;

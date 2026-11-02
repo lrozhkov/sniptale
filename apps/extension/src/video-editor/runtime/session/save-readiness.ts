@@ -1,3 +1,4 @@
+import type { SyncCheckpointReceipt } from '../../../composition/persistence/sync-capture/contracts';
 import type { VideoProject } from '../../../features/video/project/types/model';
 import type { VideoEditorSaveState } from '../../contracts/session-state';
 
@@ -12,16 +13,26 @@ interface SaveReadinessSnapshot {
 
 let currentSnapshot: SaveReadinessSnapshot | null = null;
 let listeners: Array<(snapshot: SaveReadinessSnapshot) => void> = [];
-let latestBarrier: { projectId: string; generation: symbol; flush: () => Promise<void> } | null =
-  null;
+/** Page-local witness for the extra asynchronous exit-intent step. */
+export interface VideoEditorCheckpointExit {
+  receipt: SyncCheckpointReceipt | null;
+  isCurrent(): boolean;
+}
+let latestBarrier: {
+  projectId: string;
+  generation: symbol;
+  flush: () => Promise<void>;
+  checkpointExit?: () => VideoEditorCheckpointExit | null;
+} | null = null;
 
 /** Leases the mounted writer's latest-document barrier; stale cleanup cannot detach its successor. */
 export function registerVideoEditorSaveBarrier(
   projectId: string,
   generation: symbol,
-  flush: () => Promise<void>
+  flush: () => Promise<void>,
+  checkpointExit?: () => VideoEditorCheckpointExit | null
 ): () => void {
-  const lease = { projectId, generation, flush };
+  const lease = { projectId, generation, flush, ...(checkpointExit ? { checkpointExit } : {}) };
   latestBarrier = lease;
   return () => {
     if (latestBarrier === lease) latestBarrier = null;
@@ -50,6 +61,40 @@ export async function waitForVideoEditorSave(projectId: string): Promise<void> {
     throw new Error('The video project has unsaved changes.');
   }
   await observeSaveVersion(projectId, current.generation, current.requestedVersion, true).promise;
+}
+
+/** Prepare one exact acknowledged receipt while retaining the mounted writer's exit witness. */
+export async function prepareVideoEditorCheckpointExit(
+  projectId: string
+): Promise<VideoEditorCheckpointExit> {
+  const barrier = latestBarrier;
+  await waitForVideoEditorSave(projectId);
+  const settled = currentSnapshot;
+  const refused = (): VideoEditorCheckpointExit => ({ receipt: null, isCurrent: () => false });
+  if (
+    !barrier ||
+    latestBarrier !== barrier ||
+    barrier.projectId !== projectId ||
+    !settled ||
+    settled.projectId !== projectId ||
+    settled.generation !== barrier.generation ||
+    settled.savedVersion < settled.requestedVersion ||
+    !barrier.checkpointExit
+  )
+    return refused();
+  const observed = barrier.checkpointExit();
+  if (!observed || !observed.isCurrent()) return refused();
+  const { generation, requestedVersion, savedVersion } = settled;
+  return {
+    receipt: observed.receipt ? { ...observed.receipt } : null,
+    isCurrent: () =>
+      latestBarrier === barrier &&
+      currentSnapshot?.projectId === projectId &&
+      currentSnapshot.generation === generation &&
+      currentSnapshot.requestedVersion === requestedVersion &&
+      currentSnapshot.savedVersion === savedVersion &&
+      observed.isCurrent(),
+  };
 }
 
 function subscribeToSaveReadiness(listener: (snapshot: SaveReadinessSnapshot) => void): () => void {

@@ -1,3 +1,4 @@
+import type { SecretProtectionAdmissionPermit } from '../secret-protection/model';
 import { parseDrawingPaletteState } from '../drawing-palette/parser';
 import { parseStoredSettings } from '../settings/guards';
 import { parsePageLaunchPreferences } from '../../../contracts/page-launch';
@@ -65,6 +66,7 @@ export async function applySettingsTransferDomains(args: {
   domains: Record<string, SettingsTransferDomainPayload>;
   summary: SettingsTransferChangeSummary;
   permit?: PersistenceMutationPermit;
+  admissionPermit?: SecretProtectionAdmissionPermit;
 }): Promise<void> {
   const [beforeSync, beforeLocal, currentSettings, currentVideo] = await Promise.all([
     browserStorage.sync.get([...SYNC_KEYS]),
@@ -102,6 +104,7 @@ export async function applySettingsTransferDomains(args: {
   const providerPlan = importedProviders
     ? await prepareAIProviderTransferMutation({
         importedProviders,
+        ...(args.admissionPermit ? { admissionPermit: args.admissionPermit } : {}),
         ...(args.permit === undefined ? {} : { permit: args.permit }),
       })
     : null;

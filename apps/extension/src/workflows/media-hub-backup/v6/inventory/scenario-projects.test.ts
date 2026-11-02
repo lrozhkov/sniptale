@@ -1,5 +1,9 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 const read = vi.hoisted(() => vi.fn());
+beforeEach(() => {
+  read.mockReset();
+});
+import type { AssetRef } from '../../../../composition/persistence/assets/contracts';
 vi.mock('../../../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../../../composition/persistence/assets')>()),
   readAssetFile: read,
@@ -182,3 +186,183 @@ function scenarioTransaction(projects: unknown[]) {
     done: Promise.resolve(),
   };
 }
+
+function unloadedExportFixture() {
+  const project = createGuideProject('Current authored project', 'guide', 1);
+  const entry = { id: project.id, project, createdAt: 1, updatedAt: 2, workspaceRevision: 2 };
+  const ref: AssetRef = {
+    assetId: 'retained-html',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/retained-html' },
+    size: 4096,
+    mimeType: 'text/html;charset=utf-8',
+    sha256: 'a'.repeat(64),
+  };
+  const saved = {
+    id: 'historical',
+    projectId: entry.id,
+    filename: 'renamed saved export.html',
+    format: 'html',
+    createdAt: 1,
+    size: ref.size,
+    trashState: { updatedAt: 2, trashedAt: 2 },
+    html: { mode: 'guide', assetId: ref.assetId },
+  };
+  const db = {
+    transaction: () => scenarioTransaction([entry]),
+    get: async (store: string) => (store === 'asset_refs' ? ref : undefined),
+    getAll: async (store: string) => (store === 'scenario_projects' ? [entry] : []),
+    getAllFromIndex: async (store: string) => (store === 'scenario_exports' ? [saved] : []),
+  };
+  return { ref, saved, db };
+}
+
+it('supports an explicit sync-only HTML descriptor without a body or fake ready object', async () => {
+  const { ref, saved, db } = unloadedExportFixture();
+  read.mockRejectedValue(new Error('Historical HTML must remain unloaded.'));
+  const onObject = vi.fn();
+  const roots = await buildScenarioProjectRootInventory({
+    db,
+    options: createMediaHubBackupExportOptions(),
+    paths: createArchivePathAllocator(),
+    deferredExports: { refs: new Map([[ref.assetId, ref]]), onObject },
+  });
+  const loaded = await roots[0]!.load();
+  const metadata = parsePortableScenarioProjectMetadata(loaded.metadata);
+  expect(metadata.exports[0]).toMatchObject({
+    id: saved.id,
+    filename: saved.filename,
+    size: saved.size,
+    createdAt: saved.createdAt,
+    trashState: saved.trashState,
+    html: { mode: 'guide' },
+  });
+  expect(loaded.objects).toEqual([]);
+  expect(roots[0]!.descriptor).toMatchObject({ objectCount: 1, totalBytes: ref.size });
+  expect(onObject).toHaveBeenCalledExactlyOnceWith(
+    ref.assetId,
+    expect.objectContaining({
+      objectId: metadata.exports[0]!.html!.objectId,
+      filename: saved.filename,
+      size: ref.size,
+      mimeType: 'text/html',
+    })
+  );
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('still requires original historical HTML bytes for an ordinary archive', async () => {
+  const { db } = unloadedExportFixture();
+  read.mockRejectedValue(new Error('Historical HTML is unavailable.'));
+  await expect(
+    buildScenarioProjectRootInventory({
+      db,
+      options: createMediaHubBackupExportOptions(),
+      paths: createArchivePathAllocator(),
+    })
+  ).rejects.toThrow('Historical HTML is unavailable');
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+it.each(['native-ref', 'size', 'mime'] as const)(
+  'refuses a sync-only HTML descriptor with changed %s',
+  async (kind) => {
+    const { ref, db } = unloadedExportFixture();
+    const candidate = {
+      ...ref,
+      ...(kind === 'native-ref'
+        ? { createdAt: 2 }
+        : kind === 'size'
+          ? { size: 1 }
+          : { mimeType: 'image/png' }),
+    };
+    await expect(
+      buildScenarioProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions(),
+        paths: createArchivePathAllocator(),
+        deferredExports: { refs: new Map([[ref.assetId, candidate]]), onObject: vi.fn() },
+      })
+    ).rejects.toThrow('Deferred');
+    expect(read).not.toHaveBeenCalled();
+  }
+);
+
+it('retains a Scenario editing asset descriptor and keeps generated history as actual bytes', async () => {
+  const project = createGuideProject('Deferred', 'scenario-deferred', 1);
+  const step = createGuideStep('Text', 'step');
+  step.blocks.push({ kind: 'text', id: 'text', paragraphs: createGuideParagraphs('saved') });
+  project.items.push(step);
+  const entry = {
+    id: project.id,
+    project: { ...project, updatedAt: 2 },
+    createdAt: 1,
+    updatedAt: 2,
+    workspaceRevision: 2,
+    history: [{ revision: 1, savedAt: 1, project }],
+  };
+  const native: AssetRef = {
+    assetId: 'editing-resource',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/editing-resource' },
+    mimeType: 'image/png',
+    size: 4,
+    sha256: 'a'.repeat(64),
+  };
+  const asset = {
+    id: 'scenario-asset',
+    projectId: entry.id,
+    assetId: native.assetId,
+    galleryAssetId: null,
+    mimeType: native.mimeType,
+    size: native.size,
+    width: 100,
+    height: 50,
+    createdAt: 1,
+  };
+  const onObject = vi.fn();
+  const roots = await buildScenarioProjectRootInventory({
+    db: {
+      transaction: () => scenarioTransaction([entry]),
+      get: async (store, key) =>
+        store === 'asset_refs' && key === native.assetId ? native : undefined,
+      getAll: async (store) => (store === 'scenario_projects' ? [entry] : []),
+      getAllFromIndex: async (store) => (store === 'scenario_assets' ? [asset] : []),
+    },
+    options: createMediaHubBackupExportOptions(),
+    paths: createArchivePathAllocator(),
+    deferredAssets: { refs: new Map([[native.assetId, native]]), onObject },
+  });
+  const loaded = await roots[0]!.load();
+  const metadata = parsePortableScenarioProjectMetadata(loaded.metadata);
+  expect(onObject).toHaveBeenCalledExactlyOnceWith(
+    native.assetId,
+    expect.objectContaining({ objectId: metadata.assets[0]!.objectId, size: 4 })
+  );
+  expect(loaded.objects).toHaveLength(1);
+  expect(loaded.objects[0]!.ref.objectId).toBe(metadata.historyObjectId);
+  expect(JSON.parse(await loaded.objects[0]!.blob.text())).toHaveLength(1);
+  expect(roots[0]!.descriptor.objectCount).toBe(2);
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('shares Scenario export eligibility with Library preparation before any HTML read', async () => {
+  const { isScenarioBackupProjectSelected } = await import('./scenario-projects');
+  const options = createMediaHubBackupExportOptions({
+    scope: 'selected',
+    selected: { mediaAssetIds: [], scenarioProjectIds: ['included', 'draft'], videoProjectIds: [] },
+  });
+  expect(isScenarioBackupProjectSelected('included', undefined, options)).toBe(true);
+  expect(isScenarioBackupProjectSelected('draft', { storageClass: 'temporary' }, options)).toBe(
+    false
+  );
+  expect(isScenarioBackupProjectSelected('other', undefined, options)).toBe(false);
+  expect(
+    isScenarioBackupProjectSelected(
+      'draft',
+      { storageClass: 'temporary' },
+      { ...options, includeDrafts: true }
+    )
+  ).toBe(true);
+  expect(read).not.toHaveBeenCalled();
+});

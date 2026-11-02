@@ -1,4 +1,8 @@
 import {
+  installSyncQueueSummaryIndexes,
+  estimateSyncQueueSummaryIndexBytes,
+} from './sync-queue-index-migration';
+import {
   installDeletionReferenceIndexes,
   estimateDeletionReferenceIndexBytes,
 } from './deletion-index-migration';
@@ -12,6 +16,7 @@ import {
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
+  SECRET_PROTECTION_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_RESIDENCY_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -769,6 +774,53 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         db,
         REFERENCE_INDEX_STORES,
         'Deletion reference stores are unavailable.'
+      );
+    },
+  },
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'syncCapture', from: 7, to: 8 }],
+    fromDatabaseVersion: 48,
+    toDatabaseVersion: 49,
+    stores: [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CONNECTION_STORE],
+    validationStores: [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE, SYNC_CONNECTION_STORE],
+    diagnostic: 'Sync checkpoint stores are unavailable.',
+  }),
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'secretProtection', from: 0, to: 1 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 49,
+    toDatabaseVersion: 50,
+    risk: 'additive',
+    stores: [SECRET_PROTECTION_STORE],
+    migrate(db) {
+      db.createObjectStore(SECRET_PROTECTION_STORE, { keyPath: 'key' });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SECRET_PROTECTION_STORE],
+        'Secret protection store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'syncCapture', from: 8, to: 9 }],
+    estimateAdditionalBytes: estimateSyncQueueSummaryIndexBytes,
+    fromDatabaseVersion: 50,
+    toDatabaseVersion: 51,
+    risk: 'additive',
+    stores: [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE],
+    migrate(_db, transaction) {
+      return installSyncQueueSummaryIndexes(transaction);
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [SYNC_CAPTURE_STORE, SYNC_OUTBOX_STORE],
+        'Sync queue summary stores are unavailable.'
       );
     },
   },

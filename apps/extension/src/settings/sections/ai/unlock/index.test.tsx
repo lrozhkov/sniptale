@@ -203,3 +203,22 @@ it('closes locally without runtime messaging when the unlock request id is missi
     value: originalClose,
   });
 });
+
+it('gives the shared request passphrase its visible accessible name', async () => {
+  const rendered = await renderUnlockPage();
+  const input = rendered.querySelector('input');
+  expect(input).not.toBeNull();
+  expect(input?.getAttribute('aria-label') ?? input?.labels?.item(0)?.textContent).toBe(
+    translate('settings.aiProviders.secretProtectionPassphraseLabel')
+  );
+});
+
+it('names the unlock request dialog from its visible heading', async () => {
+  const rendered = await renderUnlockPage();
+  const dialog = rendered.querySelector('[role="dialog"]');
+  expect(dialog).not.toBeNull();
+  const titleId = dialog?.getAttribute('aria-labelledby');
+  expect(titleId).toBeTruthy();
+  const title = [...rendered.querySelectorAll('[id]')].find((node) => node.id === titleId);
+  expect(title?.textContent).toBe(translate('settings.aiProviders.secretProtectionUnlockTitle'));
+});

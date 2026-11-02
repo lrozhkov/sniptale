@@ -51,7 +51,7 @@ import type { MediaHubBackupRootInventoryItem } from '../export';
 import {
   createObjectCollector,
   createReadableAssetFilename,
-  readInventoryAssetFile,
+  type DeferredInventoryAssets,
   type InventoryDatabase,
 } from './helpers';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
@@ -66,7 +66,8 @@ interface DeferredProjectExportInventory {
   onObject(assetId: string, object: ArchiveObjectRef): void;
 }
 
-function selected(
+/** Select project roots before archive reads or explicit Library preparation. */
+export function isVideoProjectBackupSelected(
   id: string,
   lifecycle: { storageClass: string } | undefined,
   options: MediaHubBackupExportOptions
@@ -95,7 +96,8 @@ function readSelectedVideoProjects(
       if (result.status === 'invalid') {
         throw new Error('Stored video project is invalid and cannot be exported.');
       }
-      return result.status === 'ready' && selected(result.entry.id, result.entry.lifecycle, options)
+      return result.status === 'ready' &&
+        isVideoProjectBackupSelected(result.entry.id, result.entry.lifecycle, options)
         ? [result.entry]
         : [];
     })
@@ -107,12 +109,10 @@ function portableProjectAssetInventory(args: {
   portable: ReturnType<typeof encodePortableVideoProjectAsset>;
   media: ReturnType<typeof parseMediaLibraryEntry>;
   videoReview: Awaited<ReturnType<typeof readVideoReviewForBackup>> | undefined;
-  file: File;
+  objectId: string;
   filename: string;
-  entry: VideoProjectEntry;
-  collector: ReturnType<typeof createObjectCollector>;
 }) {
-  const { asset, portable, media, videoReview, file, filename, entry, collector } = args;
+  const { asset, portable, media, videoReview, objectId, filename } = args;
   return {
     entry: portable,
     ...(media
@@ -120,17 +120,7 @@ function portableProjectAssetInventory(args: {
       : { publishToLibrary: false }),
     ...(videoReview && !media ? { videoReview: encodePortableReviewAssetRefs(videoReview) } : {}),
     filename,
-    objectId: collector.addObject(
-      file,
-      filename,
-      asset.mimeType,
-      withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
-        'Recordings',
-        'Projects',
-        entry.project.name,
-        'Assets',
-      ])
-    ),
+    objectId,
   };
 }
 
@@ -155,7 +145,18 @@ async function buildProjectAssets(
       await db.get(MEDIA_LIBRARY_STORE, createProjectAssetMediaId(asset.id))
     );
     const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
-    const file = await readInventoryAssetFile(db, asset.assetId, filename);
+    const objectId = await collector.addAsset(
+      db,
+      asset.assetId,
+      filename,
+      asset.mimeType,
+      withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+        'Recordings',
+        'Projects',
+        entry.project.name,
+        'Assets',
+      ])
+    );
     const portable = encodePortableVideoProjectAsset(asset);
     const videoReview = asset.mimeType.startsWith('video/')
       ? await readVideoReviewForBackup({
@@ -173,10 +174,8 @@ async function buildProjectAssets(
         portable,
         media,
         videoReview,
-        file,
+        objectId,
         filename,
-        entry,
-        collector,
       })
     );
   }
@@ -231,8 +230,13 @@ async function buildProjectExports({
       deferredExports!.onObject(exportEntry.assetId, object);
       objectId = object.objectId;
     } else {
-      const file = await readInventoryAssetFile(db, exportEntry.assetId, exportEntry.filename);
-      objectId = collector.addObject(file, exportEntry.filename, exportEntry.mimeType, directory);
+      objectId = await collector.addAsset(
+        db,
+        exportEntry.assetId,
+        exportEntry.filename,
+        exportEntry.mimeType,
+        directory
+      );
     }
     const { recordingMetadata, ...portable } = encodePortableVideoProjectExport(exportEntry);
     const thumbnail = parseMediaThumbnailEntry(
@@ -313,7 +317,18 @@ async function buildReviewReferencedAssets(
     );
     const filename =
       media?.filename ?? createReadableAssetFilename(fallbackIndex++, asset.mimeType);
-    const file = await readInventoryAssetFile(db, asset.assetId, filename);
+    const objectId = await collector.addAsset(
+      db,
+      asset.assetId,
+      filename,
+      asset.mimeType,
+      withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+        'Recordings',
+        'Projects',
+        entry.project.name,
+        'Assets',
+      ])
+    );
     const portable = encodePortableVideoProjectAsset(asset);
     const videoReview =
       !media && asset.mimeType.startsWith('video/')
@@ -333,10 +348,8 @@ async function buildReviewReferencedAssets(
         portable,
         media,
         videoReview,
-        file,
+        objectId,
         filename,
-        entry,
-        collector,
       })
     );
   }
@@ -349,6 +362,7 @@ async function buildVideoProjectRoot(args: {
   index: number;
   paths: ArchivePathAllocator;
   prepareRoot?: MediaHubBackupRootPreparation;
+  deferredAssets?: DeferredInventoryAssets;
   deferredExports?: DeferredProjectExportInventory;
   options: MediaHubBackupExportOptions;
 }): Promise<MediaHubBackupRootInventoryItem> {
@@ -356,7 +370,8 @@ async function buildVideoProjectRoot(args: {
   await verifyVideoProjectEffectSnapshotIntegrity(args.entry.project);
   const collector = createObjectCollector(
     `video-${String(args.index + 1).padStart(6, '0')}`,
-    args.paths
+    args.paths,
+    args.deferredAssets
   );
   const referencedIds = new Set<string>();
   const sourceAssets = await buildProjectAssets(args.db, args.entry, collector, referencedIds);
@@ -436,6 +451,7 @@ export async function buildVideoProjectRootInventory(args: {
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
   prepareRoot?: MediaHubBackupRootPreparation;
+  deferredAssets?: DeferredInventoryAssets;
   deferredExports?: DeferredProjectExportInventory;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const entries = readSelectedVideoProjects(

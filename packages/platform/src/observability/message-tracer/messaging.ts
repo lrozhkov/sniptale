@@ -182,7 +182,11 @@ function extractMessageType(message: unknown): string | undefined {
 }
 
 function isSyncProductTrace(messageType: string): boolean {
-  return messageType === 'SYNC_PRODUCT_COMMAND' || messageType === 'OFFSCREEN_SYNC_PRODUCT_COMMAND';
+  return (
+    messageType === 'SYNC_PRODUCT_COMMAND' ||
+    messageType === 'OFFSCREEN_SYNC_PRODUCT_COMMAND' ||
+    messageType === 'SYNC_CONNECTION_CREDENTIAL'
+  );
 }
 
 function sanitizeMessageTracePayload(messageType: string, payload: unknown): unknown {

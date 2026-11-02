@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from './checkpoints';
 import { isCaptureReplicaPredecessor } from './guards';
 import { readAppliedCaptureReceipt } from './guards';
 import {
@@ -14,7 +15,8 @@ import {
 } from '../../../features/web-snapshot/provenance';
 import { validateRetainedWebSnapshotScreenshot } from '../../../features/web-snapshot/screenshot-validation';
 import { readAssetFile } from '../assets';
-import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
+import { isImageCaptureSource } from './image-snapshot';
+import { readCompatibleImageReplicaPredecessorInTransaction } from './freeze';
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from '../assets/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -416,15 +418,16 @@ export async function loadMediaReplicaPredecessorRef(input: {
     await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.mediaId)
   );
   if (!media) throw new MediaReplicaConflictError('source-changed');
-  if (
-    media.source.kind === 'stored-asset' &&
-    (media.kind === 'image' || media.kind === 'screenshot')
-  ) {
-    const previous = await freezeImageInTransaction(tx, input.mediaId);
-    if (state.nativeDigest !== digestCapturedImageRows(previous))
+  if (isImageCaptureSource(media)) {
+    const previous = await readCompatibleImageReplicaPredecessorInTransaction(
+      tx,
+      input.mediaId,
+      state
+    );
+    if (state.nativeDigest !== previous.digest)
       throw new MediaReplicaConflictError('source-changed');
     await tx.done;
-    return structuredClone(previous.originalRef ?? null);
+    return structuredClone(previous.rows.originalRef ?? null);
   }
   if (
     !['project-asset', 'project-export', 'stored-asset', 'recording', 'web-snapshot'].includes(
@@ -584,6 +587,13 @@ export async function applyPreparedMediaReplica(
         await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
       if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
         throw new MediaReplicaConflictError('profile-changed');
+      if (
+        await readCheckpointInTransaction(tx, candidate, {
+          rootKind: 'media',
+          rootId: candidate.rows.media.id,
+        })
+      )
+        throw new MediaReplicaConflictError('source-changed');
       if (candidate.expectedLocalGeneration === 0) {
         const retained =
           'projectExport' in candidate.rows && candidate.rows.ref.sha256 !== null

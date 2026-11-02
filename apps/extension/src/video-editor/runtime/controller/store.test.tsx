@@ -1,3 +1,4 @@
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -6,6 +7,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { useVideoEditorStore } from '../../state/store';
 import {
   getCurrentVideoEditorCurrentTime,
+  subscribeVideoEditorProjectHistory,
   getCurrentVideoEditorExportStateSnapshot,
   getCurrentVideoEditorSelectedClipId,
   useVideoEditorAnnotationEditingPort,
@@ -328,3 +330,20 @@ function useAssertSelectorsRequireAProjection() {
 }
 
 void useAssertSelectorsRequireAProjection;
+
+it('publishes a history lease synchronously before the authored project changes', () => {
+  const project = createEmptyVideoProject('Before gesture');
+  useVideoEditorStore.getState().setProject(project, null);
+  const observed: { lease: symbol | null; name: string | undefined }[] = [];
+  const unsubscribe = subscribeVideoEditorProjectHistory((snapshot) => {
+    observed.push({ lease: snapshot.lease, name: useVideoEditorStore.getState().project?.name });
+  });
+  const lease = useVideoEditorStore.getState().beginProjectHistoryTransaction();
+  expect(lease).not.toBeNull();
+  expect(observed.at(-1)).toEqual({ lease, name: 'Before gesture' });
+  useVideoEditorStore.getState().renameProject('During gesture');
+  expect(observed).toHaveLength(2);
+  useVideoEditorStore.getState().endProjectHistoryTransaction(lease!);
+  expect(observed.at(-1)).toEqual({ lease: null, name: 'During gesture' });
+  unsubscribe();
+});

@@ -3,7 +3,11 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { touchNativeCacheRoot } from './native-cache';
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import type { SyncNativeEditingRoot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
-import { isNativeEditingRootReady, needsNativeEditingPreparation } from './native-residency';
+import {
+  isNativeEditingRootReady,
+  needsNativeEditingPreparation,
+  isNativeScenarioExportReady,
+} from './native-residency';
 
 const logger = createLogger({ namespace: 'SyncEditingAdmission' });
 async function used(root: SyncNativeEditingRoot): Promise<void> {
@@ -64,6 +68,42 @@ export async function ensureNativeBackupRootAvailable(
       !(await isNativeEditingRootReady(root, 'backup'))
     )
       throw new Error('Native backup resources are unavailable.');
+  } finally {
+    signal?.removeEventListener('abort', cancel);
+  }
+}
+
+/** Saved HTML is an explicit artifact action, not an editor or whole-project backup preparation. */
+export async function ensureScenarioHtmlArtifactAvailable(
+  target: { projectId: string; exportId: string },
+  signal?: AbortSignal
+): Promise<void> {
+  const selected = { ...target };
+  signal?.throwIfAborted();
+  const ready = await isNativeScenarioExportReady(selected);
+  signal?.throwIfAborted();
+  if (ready) return;
+  const client = createSyncProductClient();
+  const accepted = await client.prepareScenarioExport(selected);
+  if (accepted.kind !== 'accepted') throw new Error('Saved Scenario HTML preparation refused.');
+  const cancel = () => {
+    void client
+      .cancel(accepted.requestId)
+      .catch(() => logger.warn('scenario-html-preparation-cancel-deferred'));
+  };
+  signal?.addEventListener('abort', cancel, { once: true });
+  if (signal?.aborted) cancel();
+  try {
+    const result = await client.waitForOperation(accepted.requestId);
+    signal?.throwIfAborted();
+    if (
+      result.job?.state !== 'ready' ||
+      result.completion?.kind !== 'scenario-export' ||
+      result.completion.projectId !== selected.projectId ||
+      result.completion.exportId !== selected.exportId ||
+      !(await isNativeScenarioExportReady(selected))
+    )
+      throw new Error('Saved Scenario HTML is unavailable.');
   } finally {
     signal?.removeEventListener('abort', cancel);
   }

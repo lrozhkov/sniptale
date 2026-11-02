@@ -1,3 +1,25 @@
+vi.mock('../secret-protection/service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secret-protection/service')>();
+  const { SecretProtectionAdmissionPermit, SecretProtectionLockedError } =
+    await import('../secret-protection/model');
+  const { readPreparedSecretProtectionControl } =
+    await import('../secret-protection/transition.store');
+  const withSecretProtectionWriter: typeof actual.withSecretProtectionWriter = async (
+    operation,
+    permit
+  ) => {
+    const control = await readPreparedSecretProtectionControl();
+    if (control?.phase === 'transitioning') throw new SecretProtectionLockedError();
+    if (permit) {
+      if (!SecretProtectionAdmissionPermit.isActive(permit))
+        throw new SecretProtectionLockedError();
+      return operation(permit);
+    }
+    return SecretProtectionAdmissionPermit.run(operation);
+  };
+  return { ...actual, withSecretProtectionWriter };
+});
+
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import {
@@ -191,9 +213,11 @@ it('delegates provider persistence helpers to the provider-secret store seam', a
   expect(saveStoredAIProvidersMock).toHaveBeenCalledWith([]);
   expect(upsertStoredAIProviderRecordMock).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'provider-1' }),
+    undefined,
+    undefined,
     undefined
   );
-  expect(clearStoredAIProviderSecretMock).toHaveBeenCalledWith('provider-1', undefined);
+  expect(clearStoredAIProviderSecretMock).toHaveBeenCalledWith('provider-1', undefined, undefined);
   expect(deleteStoredAIProviderRecordMock).toHaveBeenCalledWith('provider-1');
 });
 

@@ -6,6 +6,7 @@ import {
   RECORDING_TELEMETRY_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -32,10 +33,14 @@ import {
 
 type ProjectMutationDatabase = Awaited<ReturnType<typeof initDB>>;
 
-export function createProjectMutationStores(db: ProjectMutationDatabase) {
+export function createProjectMutationStores(
+  db: ProjectMutationDatabase,
+  options: { checkpointAdmission?: true } = {}
+) {
   const tx = db.transaction(
     [
       ...SCENARIO_CAPTURE_STORES,
+      ...(options.checkpointAdmission ? [SYNC_CONNECTION_STORE] : []),
       VIDEO_PROJECT_REVISIONS_STORE,
       SYNC_CAPTURE_STORE,
       VIDEO_PROJECTS_STORE,

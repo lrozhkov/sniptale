@@ -38,7 +38,10 @@ async function store(rootUrl = 'https://dav.example/root/') {
 beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockImplementation(async (input) => xml(entry(new URL(urlOf(input)).pathname)));
-  vi.stubGlobal('fetch', fetchMock);
+  // Native fetch snapshots RequestInit headers before the caller releases temporary secrets.
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+    fetchMock(input, init ? { ...init, headers: new Headers(init.headers) } : init)
+  );
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -767,3 +770,18 @@ it.each(['{}', markerText.replace('10000000-', '30000000-'), `${markerText}\n`])
     expect(fetchMock).not.toHaveBeenCalled();
   }
 );
+
+it('preserves secrets-locked through real WebDAV handling without dispatching HTTP', async () => {
+  const attempt = createWebdavRemoteStore(
+    {
+      rootUrl: 'https://dav.example/root/',
+      authentication: async () => {
+        throw new SyncRemoteError('secrets-locked');
+      },
+      request: (requestSignal, issue) => issue(requestSignal),
+    },
+    signal()
+  ).then((remote) => remote.read('object.bin', signal()));
+  await expect(attempt).rejects.toMatchObject({ code: 'secrets-locked' });
+  expect(fetchMock).not.toHaveBeenCalled();
+});

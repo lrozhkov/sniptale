@@ -1,6 +1,7 @@
 import { lazy, type LazyExoticComponent, type ReactNode } from 'react';
 import type {
   SettingsRoute,
+  SettingsQueueFilter,
   SettingsSectionId,
 } from '../../../platform/navigation/extension-pages/settings-route/codec';
 import { AppearanceSection } from '../../sections/general/interface-browser';
@@ -16,6 +17,8 @@ type DeferredSettingsSection = Exclude<SettingsSectionId, 'interface-browser'>;
 type DeferredSectionComponent = React.ComponentType<{
   onViewChange?: (view: string) => void;
   view?: string;
+  queueFilter?: SettingsQueueFilter;
+  onQueueFilterChange?: (filter: SettingsQueueFilter) => void;
 }>;
 
 function createLazySettingsSection(
@@ -60,7 +63,8 @@ export function shouldDeferSettingsTab(
 
 export function renderSettingsRouteContent(
   route: SettingsRoute,
-  onViewChange: (view: string) => void
+  onViewChange: (view: string) => void,
+  onQueueFilterChange?: (filter: SettingsQueueFilter) => void
 ): ReactNode {
   if (route.section === 'interface-browser') {
     return (
@@ -75,6 +79,12 @@ export function renderSettingsRouteContent(
     <Section
       onViewChange={onViewChange}
       {...(route.view === undefined ? {} : { view: route.view })}
+      {...(route.section === 'saving' && route.view === 'queue'
+        ? {
+            ...(route.queueFilter === undefined ? {} : { queueFilter: route.queueFilter }),
+            ...(onQueueFilterChange === undefined ? {} : { onQueueFilterChange }),
+          }
+        : {})}
     />
   );
 }

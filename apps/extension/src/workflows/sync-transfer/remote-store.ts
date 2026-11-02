@@ -22,6 +22,7 @@ export interface SyncRemoteStore {
 }
 
 type SyncRemoteErrorCode =
+  | 'secrets-locked'
   | 'invalid-configuration'
   | 'invalid-key'
   | 'invalid-response'

@@ -1,3 +1,5 @@
+import { SecretProtectionAdmissionPermit } from '../../../composition/persistence/secret-protection/model';
+import type { SecretProtectionService } from '../../../composition/persistence/secret-protection/model';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
@@ -139,4 +141,71 @@ it('refreshes accepted activation after commit and preserves it when metadata fa
   storageMocks.mutateStoredAISettings.mockRejectedValueOnce(new Error('provider unavailable'));
   await expect(mutateAiSettings(message)).rejects.toThrow('provider unavailable');
   expect(catalogs.refreshProviderCatalog).not.toHaveBeenCalled();
+});
+
+it('routes protection commands to the injected common service without AI core dispatch', async () => {
+  const service: SecretProtectionService = {
+    prepare: vi.fn(async () => undefined),
+    enable: vi.fn(async () => undefined),
+    disable: vi.fn(async () => undefined),
+    unlock: vi.fn(async () => undefined),
+    lock: vi.fn(async () => undefined),
+    changePassphrase: vi.fn(async () => undefined),
+    reset: vi.fn(async () => undefined),
+    resetParticipant: vi.fn(async () => undefined),
+    readPreparedStatus: vi.fn(async () => null),
+    readStatus: vi.fn(async () => ({
+      isEnabled: true,
+      isUnlocked: true,
+      mode: 'passphrase' as const,
+      participants: { ai: true, webdav: true },
+    })),
+    getEpoch: vi.fn(async () => 1),
+    readKey: vi.fn(async () => null),
+    withAdmission: async (_participant, operation) =>
+      SecretProtectionAdmissionPermit.run((permit) => operation(null, permit)),
+    clearMemory: vi.fn(),
+    reserveErasure: () => ({ prepare: async () => undefined, release: () => undefined }),
+  };
+  for (const command of [
+    { operation: 'enable-secret-passphrase-protection', passphrase: 'enable' },
+    { operation: 'disable-secret-passphrase-protection', passphrase: 'disable' },
+    { operation: 'unlock-secret-passphrase-protection', passphrase: 'unlock' },
+    {
+      operation: 'change-secret-passphrase-protection',
+      currentPassphrase: 'old',
+      nextPassphrase: 'next',
+    },
+    { operation: 'lock-secret-passphrase-protection' },
+    { operation: 'reset-secret-passphrase-protection' },
+  ] as const)
+    await mutateAiSettings({ ...command, type: 'AI_SETTINGS_MUTATION' }, service);
+  await mutateAiSettings(
+    {
+      type: 'AI_SETTINGS_MUTATION',
+      operation: 'enable-secret-passphrase-protection',
+      participant: 'webdav',
+    },
+    service
+  );
+  await mutateAiSettings(
+    {
+      type: 'AI_SETTINGS_MUTATION',
+      operation: 'disable-secret-passphrase-protection',
+      participant: 'webdav',
+    },
+    service
+  );
+  expect(service.enable).toHaveBeenCalledWith('ai', 'enable');
+  expect(service.enable).toHaveBeenCalledWith('webdav', undefined);
+  expect(service.disable).toHaveBeenCalledWith('webdav', undefined);
+  expect(service.disable).toHaveBeenCalledWith('ai', 'disable');
+  expect(service.unlock).toHaveBeenCalledWith('unlock');
+  expect(service.changePassphrase).toHaveBeenCalledWith({
+    currentPassphrase: 'old',
+    nextPassphrase: 'next',
+  });
+  expect(service.lock).toHaveBeenCalledOnce();
+  expect(service.reset).toHaveBeenCalledOnce();
+  expect(storageMocks.mutateStoredAISettings).not.toHaveBeenCalled();
 });

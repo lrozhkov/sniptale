@@ -34,6 +34,8 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/scenario/storage.ts',
   // Appends only through the admitted domain transaction; the caller owns permit and commit/abort.
   'apps/extension/src/composition/persistence/sync-capture/capture.ts',
+  // Uses only the caller's admitted transaction; the caller owns commit and abort.
+  'apps/extension/src/composition/persistence/sync-capture/checkpoints.ts',
   // Requires the caller's active mutation permit before its delivery cursor transaction.
   'apps/extension/src/composition/persistence/sync-capture/queue-history.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',

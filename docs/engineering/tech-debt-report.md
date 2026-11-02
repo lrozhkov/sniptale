@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=3, tool-noise=67.
-- Enforced source: codeql=5, gitleaks=62, license=1, scc=2.
+- Classification: accepted-architecture=3, tool-noise=70.
+- Enforced source: codeql=8, gitleaks=62, license=1, scc=2.
 
 ## Active decisions
 
@@ -79,3 +79,6 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `noise.gitleaks.webdav-clone-pair.1853` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
 - `noise.gitleaks.webdav-clone-pair.1890` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
 - `noise.gitleaks.webdav-clone-pair.1927` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
+- `noise.codeql.transform-stream-archive-transfer` — archive-transfer: Removing this transformer would remove byte-limit or source-integrity enforcement. Action: Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking. Review: 2027-05-02.
+- `noise.codeql.transform-stream-remote-object-integrity` — sync-transfer-integrity: Removing this transformer would remove byte-limit or source-integrity enforcement. Action: Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking. Review: 2027-05-02.
+- `noise.codeql.transform-stream-webdav` — sync-transfer-webdav: Removing this transformer would remove byte-limit or source-integrity enforcement. Action: Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking. Review: 2027-05-02.

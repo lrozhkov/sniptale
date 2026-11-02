@@ -1,5 +1,12 @@
+import { createScenarioReplicaFixture } from '../../composition/persistence/sync-capture/test-support/scenario-replica.test-support';
+import { applyPreparedScenarioReplica } from '../../composition/persistence/sync-capture/apply-scenario';
+import { commitProjectAggregatePresentation } from '../../composition/persistence/aggregate-presentations';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { beforeEach, expect, it, vi } from 'vitest';
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+} from '../../composition/persistence/assets/residency-records';
 import type { AssetRef } from '../../composition/persistence/assets/contracts';
 import {
   createGuideProject,
@@ -23,6 +30,7 @@ import {
   collectPreparedScenarioReplicaRefs,
 } from '../../composition/persistence/sync-capture/prepared-scenario';
 import { encodeCapturedScenarioRoot } from './captured-scenario';
+import { preparePortableScenarioRoot } from './prepared-scenario';
 import { parsePortableSyncRoot, preparePortableReplica } from './prepared-root';
 import {
   createSyncAttempt,
@@ -37,6 +45,8 @@ const io = vi.hoisted(() => ({ read: vi.fn(), live: vi.fn(), files: new Map<stri
 vi.mock('../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/assets')>()),
   readAssetFile: io.read,
+  listReadyJournals: vi.fn(async () => []),
+  completePhysicalDeleteOperation: vi.fn(async () => undefined),
 }));
 vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
   ...(await original<
@@ -245,33 +255,29 @@ async function wireRoundtrip(rows: CapturedScenarioRows) {
 }
 
 async function prepareOwned(rows: CapturedScenarioRows) {
-  const { portable, wire, text } = await wireRoundtrip(rows);
+  const { portable, wire } = await wireRoundtrip(rows);
   const verified = new Map<string, AssetRef>();
   for (const object of portable.objects) {
     const staged = new Blob([object.blob], { type: object.ref.mimeType });
     const ref = retainBytes(`received-${object.ref.objectId}`, staged);
     verified.set(object.ref.objectId, { ...ref, sha256: await streamedHash(object.blob) });
   }
-  const payload = await preparePortableReplica({
-    envelope: wire.envelope,
-    verifiedObjects: verified,
-    senderDependencies: wire.dependencies,
-    admission: {
-      spaceId: 'space',
-      profileCreatedAt: 1,
-      connectionGeneration: 1,
-      operationId: wire.operationId,
-      sourceDigest: hashSyncText(text),
-      expectedLocalGeneration: 0,
-      expectedBasis: [],
-      expectedWorkspaceRevision: null,
-      dependencies: [],
+  const parsed = await parsePortableSyncRoot(wire.envelope);
+  if (parsed.kind !== 'scenario-project') throw new Error('Expected portable Scenario.');
+  // This full-body roundtrip deliberately models materialized archive decoding, not editing-only incoming.
+  const root = await preparePortableScenarioRoot({
+    metadata: parsed.metadata,
+    admission: { expectedWorkspaceRevision: null, dependencies: [] },
+    objectIds: [...verified.keys()],
+    refFor(id) {
+      const ref = verified.get(id);
+      if (!ref) throw new Error('Missing materialized fixture object.');
+      return ref;
     },
     stageNativeMetadata: async (blob) => retainBytes('received-native-history', blob),
   });
-  if (payload.kind !== 'scenario-project')
-    throw new Error('Expected native Scenario journal payload.');
-  return { portable, wire, verified, root: payload.input.root };
+  if (!root) throw new Error('Expected native Scenario journal root.');
+  return { portable, wire, verified, root };
 }
 
 it.each(['guide', 'tour'] as const)(
@@ -603,4 +609,236 @@ it('round trips a retained Scenario inventory above 64 objects through physical 
   expect(catalog.operations.get(wire.operationId)?.operation).toEqual(wire);
   expect(reads).toEqual([attempt.recordKey]);
   expect(io.live).not.toHaveBeenCalled();
+});
+
+it('applies a document fallback without waiting for a later presentation', async () => {
+  const rows = await acceptedRows();
+  rows.presentation = null;
+  const frozen = structuredClone(rows);
+  const before = await wireRoundtrip(rows);
+  const { root } = await prepareOwned(rows);
+  const fixture = createScenarioReplicaFixture();
+  // The generic fixture lacks the native stepId key path. Adapt that store only.
+  io.live.mockResolvedValue({
+    ...fixture.database,
+    transaction(names: string[], mode: string) {
+      const tx = fixture.database.transaction(names, mode);
+      return {
+        ...tx,
+        objectStore(name: string) {
+          const store = tx.objectStore(name);
+          if (name !== 'scenario_step_editor_documents') return store;
+          return {
+            ...store,
+            put: (value: { stepId: string }) => store.put({ ...value, id: value.stepId }),
+          };
+        },
+      };
+    },
+  });
+  const input = {
+    ...fixture.input,
+    root,
+    operationId: before.wire.operationId,
+    sourceDigest: hashSyncText(before.text),
+  };
+  await expect(applyPreparedScenarioReplica(input)).resolves.toMatchObject({ status: 'applied' });
+  const native = await hydratePreparedScenarioReplicaRoot(root);
+  expect(native.entry.project.items).toEqual(rows.entry.project.items);
+  expect(native.stepDocuments[0]?.entry.document.sourceImage.assetId).toMatch(/^received-/u);
+  expect(native.presentation).toBeUndefined();
+  const stored = fixture.fixture.rows.get('scenario_projects')!.get(rows.entry.id) as {
+    workspaceRevision: number;
+  };
+  await commitProjectAggregatePresentation({
+    ref: { kind: 'scenario', id: rows.entry.id },
+    expectedWorkspaceRevision: stored.workspaceRevision,
+    previewBlob: new Blob(['late-preview'], { type: 'image/png' }),
+    thumbnailBlob: new Blob(['late-thumbnail'], { type: 'image/png' }),
+  });
+  expect(rows).toEqual(frozen);
+  expect((await wireRoundtrip(rows)).text).toBe(before.text);
+  expect(
+    [...fixture.fixture.rows.get('sync_capture')!.values()].filter(
+      (row) =>
+        (row as { kind?: string }).kind === 'sync-operation' ||
+        (row as { kind?: string }).kind === 'pending-checkpoint'
+    )
+  ).toEqual([]);
+  await expect(applyPreparedScenarioReplica(input)).resolves.toMatchObject({ status: 'duplicate' });
+});
+
+async function unloadedHtml(rows: CapturedScenarioRows) {
+  const exported = rows.exports[0]!;
+  const ref = rows.refs.find((item) => item.assetId === exported.html?.assetId)!;
+  const body = io.files.get(ref.assetId)!;
+  const copy: AssetResidencyCopy = {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId({ kind: 'opfs', ref }),
+    revision: 1,
+    operationId: 'accepted-remote',
+    phase: 'unloaded',
+    target: { kind: 'opfs', ref },
+    lastUsedAt: 1,
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'user',
+        spaceId: 'space',
+        profileCreatedAt: 1,
+        connectionGeneration: 1,
+      },
+      key: `Files/${hashSyncText('space')}/00000000-0000-0000-0000-000000000001/saved-body/original.html`,
+      sha256: await streamedHash(body),
+    },
+  };
+  io.files.delete(ref.assetId);
+  return { ref, body, copy };
+}
+
+it.each(['guide', 'tour'] as const)(
+  'retains unloaded %s historical HTML after a metadata rename without reading or replacing bytes',
+  async (mode) => {
+    const rows = await acceptedRows(mode);
+    const { ref, copy } = await unloadedHtml(rows);
+    rows.exports[0]!.filename = 'new user chosen name.html';
+    rows.exports[0]!.trashState = { updatedAt: 4, trashedAt: 4 };
+    const before = structuredClone(rows);
+    const encoded = await encodeCapturedScenarioRoot(rows, new Map([[ref.assetId, copy]]));
+    const parsed = await parsePortableSyncRoot(encoded.envelope);
+    if (parsed.kind !== 'scenario-project') throw new Error('Expected Scenario.');
+    const exported = parsed.metadata.exports[0]!;
+    expect(exported).toMatchObject({
+      filename: 'new user chosen name.html',
+      trashState: { updatedAt: 4, trashedAt: 4 },
+      html: { mode },
+    });
+    const descriptor = encoded.envelope.objects.find(
+      (item) => item.objectId === exported.html!.objectId
+    )!;
+    expect(descriptor).toMatchObject({
+      filename: 'original.html',
+      size: ref.size,
+      mimeType: 'text/html',
+    });
+    expect(encoded.objects.some((item) => item.ref.objectId === descriptor.objectId)).toBe(false);
+    expect(encoded.retainedObjects).toEqual([
+      { objectId: descriptor.objectId, remoteKey: copy.remote.key, sha256: copy.remote.sha256 },
+    ]);
+    expect(encoded.bindings.find((item) => item.objectId === descriptor.objectId)?.ref).toEqual(
+      ref
+    );
+    expect(encoded.envelope.descriptor.objectCount).toBe(encoded.objects.length + 1);
+    expect(io.read.mock.calls.some(([readRef]) => readRef.assetId === ref.assetId)).toBe(false);
+    const repeated = await encodeCapturedScenarioRoot(
+      rows,
+      new Map([[ref.assetId, structuredClone(copy)]])
+    );
+    expect(repeated.envelope).toEqual(encoded.envelope);
+    expect(repeated.retainedObjects).toEqual(encoded.retainedObjects);
+    expect(rows).toEqual(before);
+    expect(io.live).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['target', 'scope', 'digest', 'not-export'] as const)(
+  'refuses a corrupt deferred HTML %s without reading the historical body',
+  async (kind) => {
+    const rows = await acceptedRows();
+    const { ref, copy } = await unloadedHtml(rows);
+    if (kind === 'target' && copy.target.kind === 'opfs')
+      copy.target.ref = { ...ref, size: ref.size + 1 };
+    if (kind === 'scope')
+      copy.remote.key = copy.remote.key.replace(hashSyncText('space'), hashSyncText('foreign'));
+    if (kind === 'digest') copy.remote.sha256 = 'not-a-digest';
+
+    await expect(
+      encodeCapturedScenarioRoot(
+        rows,
+        new Map([[kind === 'not-export' ? 'foreign' : ref.assetId, copy]])
+      )
+    ).rejects.toThrow('Deferred');
+    expect(io.read.mock.calls.some(([readRef]) => readRef.assetId === ref.assetId)).toBe(false);
+  }
+);
+
+function verifiedDeferredCopy(ref: AssetRef, index = 0): AssetResidencyCopy {
+  return {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId({ kind: 'opfs', ref }),
+    revision: 1,
+    operationId: 'accepted-copy',
+    phase: 'unloaded',
+    lastUsedAt: 1,
+    target: { kind: 'opfs', ref },
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'user',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+      key: `Files/${hashSyncText('space')}/00000000-0000-0000-0000-000000000001/native-${index}/original-${index}.bin`,
+      sha256: ref.sha256 ?? String(index % 10).repeat(64),
+    },
+  };
+}
+
+it(
+  'retains Scenario editing assets document roles and saved HTML while history and ' +
+    'presentation stay local',
+  async () => {
+    const rows = await acceptedRows();
+    const copies = new Map(
+      rows.refs.map((ref, index) => [ref.assetId, verifiedDeferredCopy(ref, index)])
+    );
+    io.read.mockRejectedValue(new Error('Unloaded Scenario resource must not be read.'));
+    const encoded = await encodeCapturedScenarioRoot(rows, copies);
+    const parsed = await parsePortableSyncRoot(encoded.envelope);
+    if (parsed.kind !== 'scenario-project') throw new Error('Expected Scenario.');
+    expect(encoded.retainedObjects).toHaveLength(rows.refs.length);
+    const current = parsed.metadata.assets.find((asset) => asset.entry.id === 'current-image')!;
+    expect(parsed.metadata.stepDocuments[0]!.document.assets[0]!.objectId).toBe(current.objectId);
+    expect(
+      encoded.objects.find((object) => object.ref.objectId === parsed.metadata.historyObjectId)
+        ?.blob.type
+    ).toBe('application/json');
+    expect(encoded.objects.some((object) => object.ref.objectId === current.objectId)).toBe(false);
+    expect(encoded.envelope.descriptor.objectCount).toBe(encoded.objects.length + rows.refs.length);
+    expect(io.read).not.toHaveBeenCalled();
+    expect(io.live).not.toHaveBeenCalled();
+  }
+);
+
+it('detaches verified copied bindings before frozen Scenario inventory yields', async () => {
+  const rows = await acceptedRows();
+  const { ref, copy } = await unloadedHtml(rows);
+  const originalKey = copy.remote.key;
+  const copies = new Map([[ref.assetId, copy]]);
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const read = io.read.getMockImplementation()!;
+  io.read.mockImplementationOnce(async (...args: [AssetRef, string]) => {
+    entered();
+    await gate;
+    return read(...args);
+  });
+  const pending = encodeCapturedScenarioRoot(rows, copies);
+  await started;
+  copy.remote.key = 'changed-live-key';
+  copies.clear();
+  release();
+  const encoded = await pending;
+  expect(encoded.retainedObjects?.[0]?.remoteKey).toBe(originalKey);
 });

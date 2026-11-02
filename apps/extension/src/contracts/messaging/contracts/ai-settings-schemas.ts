@@ -89,6 +89,7 @@ const secretProtectionStatusSchema = z
     isEnabled: z.boolean(),
     isUnlocked: z.boolean(),
     mode: z.enum(['transparent', 'passphrase']),
+    participants: z.object({ ai: z.boolean(), webdav: z.boolean() }).strict().optional(),
   })
   .strict();
 
@@ -204,12 +205,14 @@ export const aiSettingsMutationMessageSchema = defineAiSettingsMutationMessageSc
     baseMutationSchema
       .extend({
         operation: z.literal('enable-secret-passphrase-protection'),
-        passphrase: passphraseSchema,
+        participant: z.enum(['ai', 'webdav']).optional(),
+        passphrase: passphraseSchema.optional(),
       })
       .strict(),
     baseMutationSchema
       .extend({
         operation: z.literal('disable-secret-passphrase-protection'),
+        participant: z.enum(['ai', 'webdav']).optional(),
         passphrase: passphraseSchema.optional(),
       })
       .strict(),

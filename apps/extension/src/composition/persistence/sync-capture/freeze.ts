@@ -1,5 +1,8 @@
 import { resolveCapturedProjectAssetSource } from './project-snapshot';
-import { freezeImageInTransaction } from './image-snapshot';
+import {
+  freezeImageInTransaction,
+  readImageReplicaPredecessorInTransaction,
+} from './image-snapshot';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
 import { collectCapturedProjectRecordingIds } from './project-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
@@ -53,6 +56,7 @@ import {
   MAX_CAPTURE_ROWS,
   type CapturedVideoProjectRows,
   type CapturedMediaRows,
+  type SyncCaptureRootState,
 } from './contracts';
 import {
   isSupportedCaptureProject,
@@ -101,6 +105,37 @@ export function digestCapturedMediaRows(rows: CapturedMediaRows): string {
   requireSupported(normalized !== null);
   const digest = sha256(new TextEncoder().encode(JSON.stringify(normalized)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Admit a pristine original-only legacy image without treating an unsynced workspace as published. */
+export async function readCompatibleImageReplicaPredecessorInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
+  mediaId: string,
+  state: SyncCaptureRootState
+) {
+  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  if (media?.source.kind !== 'project-asset' || state.nativeRevision !== undefined)
+    return {
+      ...(await readImageReplicaPredecessorInTransaction(tx, mediaId, state)),
+      legacyOriginalOnly: false,
+    };
+  const rows = await freezeImageInTransaction(tx, mediaId);
+  requireSupported(
+    !state.deleted &&
+      state.rootKind === 'media' &&
+      state.rootId === mediaId &&
+      rows.media.workspaceRevision === 0 &&
+      rows.workspace === null &&
+      rows.presentation === null
+  );
+  const original = parseCapturedMediaRows({
+    media: rows.media,
+    projectAsset: rows.projectAsset,
+    ref: rows.originalRef,
+  });
+  requireSupported(original !== null);
+  const digest = digestCapturedMediaRows(original);
+  return { rows, digest, unloadedCopy: null, legacyOriginalOnly: true };
 }
 
 /** Freeze one original-only Library source through the caller's transaction. */
@@ -487,6 +522,10 @@ class NativeProjectSnapshot {
         await this.retainRef(source.assetId, entry.size, entry.mimeType);
         break;
       case 'project-asset':
+        if (entry.kind === 'image' || entry.kind === 'screenshot') {
+          await freezeImageInTransaction(this.tx, id);
+          this.independentImages.add(id);
+        }
         await this.bindProjectAsset(entry, source.projectAssetId);
         break;
       case 'project-export':

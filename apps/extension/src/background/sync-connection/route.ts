@@ -23,6 +23,12 @@ import {
 import { hasOffscreenRuntimeCapability } from '../offscreen-document/sender-policy';
 
 interface OriginPermissionDependencies {
+  isLocked?(): Promise<boolean>;
+  checkLease?(
+    input: unknown,
+    authorization: SyncOriginPermissionRequest['authorization'],
+    origin: string
+  ): Promise<boolean>;
   loadConnection(): Promise<SyncConnectionMetadata | null>;
   loadWorkspace(): Promise<SyncWorkspaceSelection | null>;
   contains(permissions: chrome.permissions.Permissions): Promise<boolean>;
@@ -53,15 +59,30 @@ async function queryPermission(
   deps: OriginPermissionDependencies
 ): Promise<SyncOriginPermissionResponse> {
   try {
+    if (
+      deps.checkLease &&
+      !(await deps.checkLease(request.credentialLease, request.authorization, request.origin))
+    )
+      return {
+        success: true,
+        allowed: false,
+        ...((await deps.isLocked?.()) ? { reason: 'secrets-locked' as const } : {}),
+      };
     const before = await deps.loadConnection();
     if (!matchesRequest(before, request)) return { success: true, allowed: false };
     if (!(await deps.contains({ origins: [`${request.origin}/*`] })))
       return { success: true, allowed: false };
     const after = await deps.loadConnection();
+    const leaseAllowed =
+      !deps.checkLease ||
+      (await deps.checkLease(request.credentialLease, request.authorization, request.origin));
     return {
       success: true,
+      ...(!leaseAllowed && (await deps.isLocked?.()) ? { reason: 'secrets-locked' as const } : {}),
       allowed:
-        matchesRequest(after, request) && sameConnectionBinding(before.binding, after.binding),
+        leaseAllowed &&
+        matchesRequest(after, request) &&
+        sameConnectionBinding(before.binding, after.binding),
     };
   } catch {
     return { success: false, error: REFUSAL };

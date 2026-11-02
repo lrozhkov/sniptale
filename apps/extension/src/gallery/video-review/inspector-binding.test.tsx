@@ -22,6 +22,8 @@ vi.mock('./text-panel', () => ({
 }));
 const sceneProbe = vi.hoisted(() => ({ enabled: false, captionsLocked: false }));
 const backupExport = vi.hoisted(() => vi.fn());
+const prepareLibraryBackup = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../../workflows/sync-transfer/retained-library', () => ({ prepareLibraryBackup }));
 const openFullEditor = vi.hoisted(() => vi.fn());
 vi.mock('../../platform/navigation/extension-pages', async (original) => ({
   ...(await original<typeof import('../../platform/navigation/extension-pages')>()),
@@ -207,7 +209,13 @@ it('joins every editor buffer for either recognition source and guards related-t
       ...props,
       state: {
         ...props.state,
-        session: { ...props.state.session, saveBuffered: save },
+        composer: { ...props.state.composer, endCheckpointEditAfterFlush: () => true },
+        session: {
+          ...props.state.session,
+          saveBuffered: save,
+          getCheckpointExitReceipt: () => null,
+          getSnapshot: () => ({ ...props.state.snapshot, snapshot: expectedReview }),
+        },
         run: async (action: () => Promise<unknown>) => {
           try {
             await action();
@@ -218,13 +226,32 @@ it('joins every editor buffer for either recognition source and guards related-t
       },
     };
     await act(async () => root.render(<ReviewInspectorBinding {...backupProps} />));
+    let finishPreparation!: (prepared: boolean) => void;
+    let enterPreparation!: () => void;
+    const preparing = new Promise<void>((resolve) => {
+      enterPreparation = resolve;
+    });
+    prepareLibraryBackup.mockImplementationOnce(() => {
+      order.push('batch');
+      enterPreparation();
+      return new Promise<boolean>((resolve) => {
+        finishPreparation = resolve;
+      });
+    });
     backupExport.mockImplementationOnce(async () => {
       order.push('export');
     });
-    await act(async () =>
-      backupProps.state.run(() => backupReview(backupProps.state, backupProps.canvasComments))
+    const pendingBackup = backupProps.state.run(() =>
+      backupReview(backupProps.state, backupProps.canvasComments)
     );
-    expect(order.slice(-5)).toEqual(['notes', 'advanced', 'canvas', 'save', 'export']);
+    await act(async () => {
+      await preparing;
+      expect(backupExport).not.toHaveBeenCalled();
+      finishPreparation(true);
+      await pendingBackup;
+    });
+    expect(order.slice(-6)).toEqual(['notes', 'advanced', 'canvas', 'save', 'batch', 'export']);
+    expect(prepareLibraryBackup).toHaveBeenCalledOnce();
     expect(backupExport).toHaveBeenCalledWith(
       expect.objectContaining({
         scope: 'selected',
@@ -234,7 +261,7 @@ it('joins every editor buffer for either recognition source and guards related-t
           videoProjectIds: [],
         },
       }),
-      { expectedReview, requireSelected: true }
+      { expectedReview, requireSelected: true, requirePreparedNative: true }
     );
     save.mockRejectedValueOnce(new Error('Save refused'));
     await act(async () =>

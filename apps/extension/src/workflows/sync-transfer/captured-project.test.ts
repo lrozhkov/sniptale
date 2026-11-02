@@ -1,3 +1,8 @@
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+} from '../../composition/persistence/assets/residency-records';
+import { hashSyncText } from './wire-record';
 import { CaptureMode, VideoDisplaySurface } from '@sniptale/runtime-contracts/video/types/types';
 import { parseVideoProjectEntry } from '../../composition/persistence/projects/read-guards';
 import { VideoProjectAssetType } from '../../features/video/project/types';
@@ -400,6 +405,16 @@ it('keeps effect binary objects unbound while preserving the complete backup sna
     expect(object.ref.size).toBe(asset.byteLength);
     expect(object.ref.filename).not.toContain(':');
   }
+  io.read.mockClear();
+  io.read.mockRejectedValue(new Error('Unloaded Montage bodies must not be read.'));
+  const copies = new Map(
+    rows.refs.map((ref, index) => [ref.assetId, verifiedDeferredCopy(ref, index)])
+  );
+  const retained = await encodeCapturedProjectRoot(rows, copies);
+  expect(retained.objects).toHaveLength(document.assets.length);
+  expect(retained.retainedObjects).toHaveLength(rows.refs.length);
+  expect(retained.envelope.metadata).toEqual(result.envelope.metadata);
+  expect(io.read).not.toHaveBeenCalled();
 });
 
 it('refuses missing dependency evidence and changed native file metadata', async () => {
@@ -728,4 +743,45 @@ it('encodes a frozen Montage export with matching acquisition metadata and exact
   const changed = structuredClone(frozen);
   changed.media[0]!.recordingMetadata = { ...exported.recordingMetadata, actionCount: 5 };
   await expect(encodeCapturedProjectRoot(changed)).rejects.toThrow('Invalid frozen project');
+});
+
+function verifiedDeferredCopy(ref: AssetRef, index = 0): AssetResidencyCopy {
+  return {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId({ kind: 'opfs', ref }),
+    revision: 1,
+    operationId: 'accepted-copy',
+    phase: 'unloaded',
+    lastUsedAt: 1,
+    target: { kind: 'opfs', ref },
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'user',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+      key: `Files/${hashSyncText('space')}/00000000-0000-0000-0000-000000000001/native-${index}/original-${index}.bin`,
+      sha256: ref.sha256 ?? String(index % 10).repeat(64),
+    },
+  };
+}
+
+it('retains frozen Montage editing assets and historical exports using canonical descriptor slots', async () => {
+  const rows = projectRows();
+  const copies = new Map(
+    rows.refs.map((ref, index) => [ref.assetId, verifiedDeferredCopy(ref, index)])
+  );
+  io.read.mockRejectedValue(new Error('Unloaded Montage resource must not be read.'));
+  const encoded = await encodeCapturedProjectRoot(rows, copies);
+  expect(encoded.objects).toEqual([]);
+  expect(encoded.retainedObjects).toHaveLength(rows.refs.length);
+  expect(encoded.bindings.map(({ ref }) => ref.assetId)).toEqual(
+    rows.refs.map((ref) => ref.assetId)
+  );
+  expect(encoded.envelope.descriptor.objectCount).toBe(rows.refs.length);
+  expect(io.read).not.toHaveBeenCalled();
 });

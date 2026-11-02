@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../../composition/persistence/secret-protection/model';
 import { processWithLLM, processWithLLMConfig } from './service';
 import type { DOMNode } from '../../../contracts/messaging/llm';
 import type { ProcessWithLLMResponse } from '../../../contracts/messaging/llm';
@@ -37,7 +38,8 @@ function createProcessWithLlmResult(args: {
 
 export async function processMultiProviderRequest(
   message: LlmRequestPayload,
-  config: ModelConfigSnapshot
+  config: ModelConfigSnapshot,
+  protection?: SecretProtectionPort
 ): Promise<ProcessWithLLMResult> {
   const prepared = await prepareProviderContentAiEgress(message);
   logger.debug('Processing provider-backed LLM request', {
@@ -49,19 +51,20 @@ export async function processMultiProviderRequest(
   });
 
   if (prepared.payloadKind === 'json') {
-    return processMultiProviderJson(prepared.request, config);
+    return processMultiProviderJson(prepared.request, config, protection);
   }
   if (prepared.payloadKind === 'markdown') {
-    return processMultiProviderMarkdown(prepared.request, config);
+    return processMultiProviderMarkdown(prepared.request, config, protection);
   }
   throw new Error('Neither jsonData nor markdownData provided');
 }
 
 function processMultiProviderJson(
   request: Parameters<typeof processWithLLMConfig>[0],
-  config: ModelConfigSnapshot
+  config: ModelConfigSnapshot,
+  protection?: SecretProtectionPort
 ): Promise<ProcessWithLLMResult> {
-  return processWithLLMConfig(request, config, 3).then((result) =>
+  return processWithLLMConfig(request, config, 3, protection).then((result) =>
     createProcessWithLlmJsonResult(result)
   );
 }
@@ -88,9 +91,10 @@ function createProcessWithLlmJsonResult(result: {
 
 async function processMultiProviderMarkdown(
   request: Parameters<typeof processWithLLM>[0],
-  config: ModelConfigSnapshot
+  config: ModelConfigSnapshot,
+  protection?: SecretProtectionPort
 ) {
-  const result = await processWithLLM(request, config);
+  const result = await processWithLLM(request, config, protection);
   return createProcessWithLlmResult({
     changes: undefined,
     data: result.data,

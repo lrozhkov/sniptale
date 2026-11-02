@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../../composition/persistence/secret-protection/model';
 import {
   AUDIO_JOB_TIMEOUT_MS,
   isAudioSourceJobScope,
@@ -315,11 +316,12 @@ class AudioJobCoordinator {
 
 /** Worker restart destroys every capability and never resumes a paid POST. */
 export function createAudioJobService(
-  overrides: Partial<AudioJobDependencies> = {}
+  overrides: Partial<AudioJobDependencies> = {},
+  protection?: SecretProtectionPort
 ): AudioJobService {
   return new AudioJobCoordinator({
     authorize: authorizeAudioJob,
-    resolveModel: resolveAudioModelConfig,
+    resolveModel: (request) => resolveAudioModelConfig(request, protection),
     request: requestAudio,
     write: writeAudioStaging,
     read: readAudioStaging,

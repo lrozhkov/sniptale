@@ -1,9 +1,14 @@
+import {
+  SYNC_CAPTURE_SCOPE_PHASE_INDEX,
+  SYNC_PENDING_SCOPE_DUE_INDEX,
+  SYNC_QUEUE_SCOPE_STATUS_INDEX,
+} from './sync-queue-index-migration';
 import { ROW_REFERENCE_INDEX } from './row-index-contract';
 
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 48;
+export const DB_VERSION = 51;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -50,6 +55,7 @@ export const SYNC_CAPTURE_STORE = 'sync_capture';
 export const SYNC_OUTBOX_STORE = 'sync_outbox';
 export const SYNC_CATALOG_CACHE_STORE = 'sync_catalog_cache';
 export const SYNC_CONNECTION_STORE = 'sync_connection';
+export const SECRET_PROTECTION_STORE = 'secret_protection';
 export const SCHEMA_CONTRACTS_STORE = 'schema_contracts';
 
 export const EXPECTED_STORES = [
@@ -94,6 +100,7 @@ export const EXPECTED_STORES = [
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
   ASSET_RESIDENCY_STORE,
+  SECRET_PROTECTION_STORE,
   SCHEMA_CONTRACTS_STORE,
 ] as const;
 
@@ -140,10 +147,18 @@ export const EXPECTED_INDEXES = {
   [ASSET_OWNERS_STORE]: ['assetId', ROW_REFERENCE_INDEX],
   [ASSET_OPERATIONS_STORE]: ['status', 'updatedAt', ROW_REFERENCE_INDEX],
   [VOICE_INPUT_HISTORY_STORE]: [],
-  [SYNC_CAPTURE_STORE]: ['kind', 'rootKey', 'createdAt', ROW_REFERENCE_INDEX],
-  [SYNC_OUTBOX_STORE]: ['syncQueueDue'],
+  [SYNC_CAPTURE_STORE]: [
+    'kind',
+    'rootKey',
+    'createdAt',
+    ROW_REFERENCE_INDEX,
+    SYNC_CAPTURE_SCOPE_PHASE_INDEX,
+    SYNC_PENDING_SCOPE_DUE_INDEX,
+  ],
+  [SYNC_OUTBOX_STORE]: ['syncQueueDue', SYNC_QUEUE_SCOPE_STATUS_INDEX],
   [SYNC_CATALOG_CACHE_STORE]: [],
   [SYNC_CONNECTION_STORE]: [],
   [ASSET_RESIDENCY_STORE]: [],
+  [SECRET_PROTECTION_STORE]: [],
   [SCHEMA_CONTRACTS_STORE]: [],
 } as const satisfies Record<(typeof EXPECTED_STORES)[number], readonly string[]>;

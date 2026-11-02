@@ -14,11 +14,11 @@ This document owns retention, secret handling, network egress, transfer, and dia
 - Limit secret writes to `secretStorageOwners` in the storage inventory.
 - Limit secret-bearing headers to `secretHeaderOwners` in the network inventory.
 
-Passphrase protection is optional. Its persistent metadata may contain only the mode, version, KDF parameters, salt, and encrypted verifier. [Local secret crypto](../../packages/platform/src/security/local-secret-crypto.ts) owns the algorithm and parameter values. Derived keys remain in background memory and disappear when the MV3 worker stops.
+Passphrase protection is optional. Its persistent metadata may contain only the mode, version, KDF parameters, salt, and encrypted verifier. [Local secret crypto](../../packages/platform/src/security/local-secret-crypto.ts) owns the algorithm and parameter values. One constructed background service owns the unlocked key. Derived keys remain in its memory and disappear when the MV3 worker stops.
 
-Write a transition marker before changing protection mode or resetting secrets. Recovery must finish committed cleanup or fail closed. A reset removes provider secrets because a forgotten passphrase is unrecoverable.
+Write a transition marker before changing protection mode or resetting secrets. Recovery must finish committed cleanup or fail closed. A shared reset removes enrolled credentials because a forgotten passphrase is unrecoverable. It preserves projects, unenrolled credentials and remote files.
 
-An unlock request may persist session metadata under `AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY`. Limit the record to request identity, extension-page owner, purpose, status, timestamps, and a fixed failure reason. Route unlock through the background owner and the Settings page. Do not render an unlock prompt in a content page.
+An unlock request may persist session metadata under `AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY`. Limit the record to request identity, extension-page owner, purpose, status, timestamps, and a fixed failure reason. A sync purpose also carries an exact native selection and a one-shot consumption flag. Route unlock through the background owner and the Settings page. Do not render an unlock prompt in a content page.
 
 ## Sync connection secrets
 
@@ -425,3 +425,18 @@ Experimental project sync uses the existing backup metadata policy. Frozen nativ
 Incoming project preparation downloads only resources required for editing. Export-only review resources and saved export bodies remain remote until another supported operation needs them. Originals and saved exports remain ordinary files for an independent DAV client.
 
 Completed receipt replay does not require temporary files. Cleanup follows existing claims and native ownership. A publication receipt alone grants no authority to remove local source data. No project metadata, review content, file bytes or staged references enter diagnostics through this change.
+
+
+## Shared secret session and recovery
+
+The concrete `composition/persistence/secret-protection` owner coordinates the shared profile, session and participant transitions. AI provider storage and WebDAV credential storage remain domain adapters. The shared owner preserves the existing AI profile storage key and verifier identity. Each domain retains its existing envelope AAD. A WebDAV protected credential contains a profile binding and ciphertext. It contains no local decrypt key. Transparent credentials retain local encryption when the user does not enroll them.
+
+Participation is independent of profile existence. A participant opt-out does not change another participant. A phrase change covers every enrolled participant. An AI schema reset removes only AI participation. The shared forgotten-phrase reset removes all enrolled credentials and the profile. A connection without its credential requires explicit credential replacement.
+
+The dedicated native `secret_protection` store contains control state and an encrypted transition journal. The journal stores target ciphertext and exact source selections. A non-exportable random recovery key protects the journal payload. The journal never contains a phrase, a derived key or source transparent key material. An AI transparent target retains its existing random-key storage tradeoff. Recovery aborts an undecided target or completes the exact committed target. Invalid recovery evidence closes admission.
+
+Background issues disposable credential leases to the current offscreen executor. Each lease binds the worker, offscreen startup, executor, protection epoch and exact connection identity. The credential bridge accepts only the canonical offscreen sender. The bridge checks native authority around permission and decrypt waits. Actual HTTP dispatch also checks the stable durable epoch under the existing admission lock. Credential bridge requests and responses exclude their payloads from traces and diagnostic capture.
+
+Lock closes admission before it stops and drains the executor and response bodies. Failed containment cannot produce successful lock or privacy completion. Worker startup changes the durable epoch and drains a surviving executor before it grants replacement leases. The fixed `secrets-locked` result does not mean an incorrect server password. An explicit unlock resumes eligible blocked work. It preserves user pause and checkpoint intervals. A consumed sync unlock intent can request an interval bypass once for its exact current selection.
+
+Erasure reserves credential admission synchronously. It drains sync before it acquires the exclusive writer lock for cleanup. It removes native credentials, the journal and recovery keys even when preferences remain. If the user preserves enrolled AI secrets, erasure retains their shared profile. The service clears its unlocked key and disposable leases. Backup, Settings transfer and remote serializers exclude shared protection records and the native journal.

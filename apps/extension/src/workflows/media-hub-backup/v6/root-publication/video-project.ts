@@ -6,6 +6,7 @@ import { createVideoWorkspaceStore } from '../../../../composition/persistence/r
 import {
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   STORE_NAME,
   IMAGE_WORKSPACES_STORE,
   SCENARIO_ASSETS_STORE,
@@ -59,6 +60,7 @@ import { transformPortableVideoProjectReferences } from './video-project-referen
 const VIDEO_PROJECT_RESTORE_STORES = [
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   STORE_NAME,
   VIDEO_PROJECTS_STORE,
   PROJECT_EXPORT_INPUTS_STORE,

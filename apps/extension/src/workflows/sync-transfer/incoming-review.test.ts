@@ -19,6 +19,10 @@ const io = vi.hoisted(() => ({
   stage: vi.fn(),
   journal: vi.fn(),
   discard: vi.fn(),
+  resident: vi.fn(),
+}));
+vi.mock('../../composition/persistence/sync-capture/catalog-admission', () => ({
+  loadCatalogReplicaResidentCandidates: io.resident,
 }));
 vi.mock('../../composition/persistence/assets', async (original) => ({
   ...(await original<typeof import('../../composition/persistence/assets')>()),
@@ -231,6 +235,7 @@ async function fixture() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  io.resident.mockReset().mockResolvedValue({ refs: [], inlineOriginals: [] });
   io.read.mockImplementation(
     async (ref: AssetRef, filename: string) =>
       new File([new Uint8Array(ref.size)], filename, { type: ref.mimeType })
@@ -312,4 +317,34 @@ it('discards only new private staging when durable journal creation fails', asyn
   expect(io.discard.mock.calls.flat()).not.toContain('target-original');
   expect(io.discard.mock.calls.flat()).not.toContain('target-music');
   expect(io.discard.mock.calls[0]?.[0]).toMatch(/^staged-/u);
+});
+
+it('reuses a private resident Review background while preserving admitted source and audio dependencies', async () => {
+  const f = await fixture();
+  const resident = reference('resident-background', 'image/png');
+  io.resident.mockResolvedValue({ refs: [resident], inlineOriginals: [] });
+  const result = await prepareCatalogReplica({
+    ...f,
+    admission: {
+      ...f.admission,
+      authorization: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 },
+      expectedLocalGeneration: 1,
+      expectedBasis: ['review-op'],
+    },
+    rootKind: 'video-review',
+    rootId: reviewId,
+    binaryAdmission: 'resident',
+    signal: new AbortController().signal,
+  });
+  expect(result.payload.kind).toBe('video-review');
+  if (result.payload.kind !== 'video-review') throw new Error('Expected Review.');
+  expect(
+    result.payload.input.root.assets.some((asset) => asset.ref.assetId === resident.assetId)
+  ).toBe(true);
+  expect(result.payload.input.root.review.workspace.sourceAssetId).toBe('target-original');
+  expect(result.payload.input.root.assets.find((asset) => asset.reusePublished)?.ref.assetId).toBe(
+    'target-music'
+  );
+  expect(f.reads).toEqual([]);
+  expect(io.discard).not.toHaveBeenCalled();
 });

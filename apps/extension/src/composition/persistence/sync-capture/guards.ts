@@ -13,6 +13,12 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseAssetRef } from '../assets/guards';
 import {
   captureRootKey,
+  pendingCheckpointKey,
+  SYNC_CHECKPOINT_INTERVALS,
+  DEFAULT_SYNC_CHECKPOINT_INTERVAL,
+  type SyncCheckpointInterval,
+  type SyncPendingCheckpoint,
+  type SyncCheckpointReceipt,
   captureProfileBounds,
   MAX_CAPTURE_METADATA_BYTES,
   MAX_CAPTURE_ROWS,
@@ -93,6 +99,77 @@ function parseCaptureHeader(value: Record<string, unknown>): CaptureRecordHeader
   };
 }
 
+/** Parse an exact pending receipt; it grants no scope, transport or credential authority. */
+export function parseSyncCheckpointReceipt(value: unknown): SyncCheckpointReceipt | null {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 3 ||
+    !['rootKind', 'rootId', 'revision'].every((field) => Object.hasOwn(value, field)) ||
+    !identity(value['rootId']) ||
+    typeof value['revision'] !== 'string' ||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
+      value['revision']
+    )
+  )
+    return null;
+  const rootKind = value['rootKind'];
+  if (
+    rootKind !== 'media' &&
+    rootKind !== 'video-project' &&
+    rootKind !== 'video-review' &&
+    rootKind !== 'scenario-project'
+  )
+    return null;
+  return { rootKind, rootId: value['rootId'], revision: value['revision'] };
+}
+
+/** Only the shared finite interval scale is accepted from persisted data. */
+export function parseSyncCheckpointInterval(value: unknown): SyncCheckpointInterval | null {
+  return SYNC_CHECKPOINT_INTERVALS.find((interval) => interval === value) ?? null;
+}
+
+function parsePendingCheckpoint(
+  value: Record<string, unknown>,
+  header: CaptureRecordHeader
+): SyncPendingCheckpoint | null {
+  const rootKind = value['rootKind'];
+  const rootId = value['rootId'];
+  const rootKey = value['rootKey'];
+  if (
+    (rootKind !== 'media' &&
+      rootKind !== 'video-project' &&
+      rootKind !== 'video-review' &&
+      rootKind !== 'scenario-project') ||
+    !identity(rootId) ||
+    !storageKey(rootKey) ||
+    rootKey !== captureRootKey(header.spaceId, rootKind, rootId) ||
+    header.key !== pendingCheckpointKey(rootKey) ||
+    !ordinal(value['profileCreatedAt']) ||
+    !ordinal(value['connectionGeneration']) ||
+    value['connectionGeneration'] === 0 ||
+    !ordinal(value['dueAt']) ||
+    value['dueAt'] < header.createdAt ||
+    (value['flushRequested'] !== undefined && value['flushRequested'] !== true) ||
+    typeof value['revision'] !== 'string' ||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(
+      value['revision']
+    )
+  )
+    return null;
+  return {
+    ...header,
+    kind: 'pending-checkpoint',
+    rootKind,
+    rootId,
+    rootKey,
+    profileCreatedAt: value['profileCreatedAt'],
+    connectionGeneration: value['connectionGeneration'],
+    revision: value['revision'],
+    dueAt: value['dueAt'],
+    ...(value['flushRequested'] === true ? { flushRequested: true } : {}),
+  };
+}
+
 function parseCaptureProfile(
   value: Record<string, unknown>,
   header: CaptureRecordHeader
@@ -101,15 +178,20 @@ function parseCaptureProfile(
     value['key'] !== 'profile' ||
     typeof value['enabled'] !== 'boolean' ||
     !ordinal(value['connectionGeneration']) ||
-    value['connectionGeneration'] === 0
+    value['connectionGeneration'] === 0 ||
+    (value['checkpointIntervalMs'] !== undefined &&
+      parseSyncCheckpointInterval(value['checkpointIntervalMs']) === null)
   )
     return null;
+  const checkpointIntervalMs =
+    parseSyncCheckpointInterval(value['checkpointIntervalMs']) ?? DEFAULT_SYNC_CHECKPOINT_INTERVAL;
   return {
     ...header,
     kind: 'profile',
     key: 'profile',
     enabled: value['enabled'],
     connectionGeneration: value['connectionGeneration'],
+    checkpointIntervalMs,
   };
 }
 
@@ -499,6 +581,8 @@ export function parseSyncCaptureRecord(value: unknown): SyncCaptureRecord | null
   const header = parseCaptureHeader(value);
   if (!header) return null;
   switch (value['kind']) {
+    case 'pending-checkpoint':
+      return parsePendingCheckpoint(value, header);
     case 'profile':
       return parseCaptureProfile(value, header);
     case 'applied-operation':

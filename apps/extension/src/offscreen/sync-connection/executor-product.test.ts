@@ -64,6 +64,73 @@ describe('named product execution containment', () => {
     completion: { kind: 'catalog' as const, count: 3 },
     containment: 'contained' as const,
   };
+  it('deduplicates the exact saved HTML action and retains its distinct completion identity', async () => {
+    const f = productFixture();
+    const work = {
+      kind: 'scenario-export-prepare' as const,
+      projectId: 'scenario',
+      exportId: 'saved-html',
+    };
+    await expect(f.startProduct(work)).resolves.toMatchObject({
+      success: true,
+      result: { kind: 'accepted' },
+    });
+    await f.startProduct(work);
+    expect(f.create).toHaveBeenCalledOnce();
+    expect(f.create).toHaveBeenCalledWith(expect.objectContaining({ work }));
+    f.result.resolve({
+      state: 'ready',
+      failureCode: null,
+      completion: { kind: 'scenario-export', projectId: 'scenario', exportId: 'saved-html' },
+      containment: 'contained',
+    });
+    await settleWorkflow();
+    await expect(
+      f.command({ kind: 'inspect', operationRequestId: f.operationRequestId })
+    ).resolves.toMatchObject({
+      result: {
+        job: { kind: 'scenario-export-prepare', state: 'ready' },
+        completion: { kind: 'scenario-export', projectId: 'scenario', exportId: 'saved-html' },
+      },
+    });
+  });
+  it('deduplicates one Library preparation action and retains its exact options through completion', async () => {
+    const f = productFixture();
+    const options = {
+      includeDrafts: false,
+      includeSourceMetadata: true,
+      includeTelemetry: true,
+      includeWebSnapshots: false,
+      scope: 'selected' as const,
+      selected: { mediaAssetIds: ['a', 'b'], scenarioProjectIds: [], videoProjectIds: [] },
+    };
+    const work = {
+      kind: 'library-backup-prepare' as const,
+      expected: binding.authorization,
+      options,
+    };
+    await expect(f.startProduct(work)).resolves.toMatchObject({
+      success: true,
+      result: { kind: 'accepted' },
+    });
+    await f.startProduct(work);
+    expect(f.create).toHaveBeenCalledOnce();
+    f.result.resolve({
+      state: 'ready',
+      failureCode: null,
+      completion: { kind: 'library-backup', expected: binding.authorization, options },
+      containment: 'contained',
+    });
+    await settleWorkflow();
+    await expect(
+      f.command({ kind: 'inspect', operationRequestId: f.operationRequestId })
+    ).resolves.toMatchObject({
+      result: {
+        job: { kind: 'library-backup-prepare', state: 'ready' },
+        completion: { kind: 'library-backup', expected: binding.authorization, options },
+      },
+    });
+  });
   it('retires previous product observations when a new connection binding starts', async () => {
     const f = productFixture();
     await f.startProduct();
@@ -496,4 +563,40 @@ it('keeps Stop authoritative while foreground admission drains an automatic oper
   await expect(stopped).resolves.toMatchObject({ success: true });
   expect(create).toHaveBeenCalledOnce();
   expect(f.inspect().phase).toBe('stopped');
+});
+
+it('keeps completed discovery unchanged when the existing product cancel path observes it', async () => {
+  const test = fixture();
+  test.startWorkspace({
+    source: { kind: 'join', identity: binding.authorization },
+    operation: 'discover',
+  });
+  await settleWorkflow();
+  test.workspacePending[0]!.result.resolve({
+    containment: 'contained',
+    snapshot: {
+      state: 'discovered',
+      failureCode: null,
+      discovery: {
+        source: { kind: 'join', identity: { ...binding.authorization, revision: 2 } },
+        scope: 'children',
+        complete: true,
+        candidates: [],
+        issues: [],
+      },
+    },
+  });
+  await settleWorkflow();
+  const result = await test.executor.productCommand({
+    ...base,
+    type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+    executorRevision: test.inspect().executorRevision,
+    command: { kind: 'cancel', operationRequestId: base.requestId },
+  });
+  expect(result).toEqual({
+    success: true,
+    result: { kind: 'cancelled', outcome: 'already-completed' },
+  });
+  expect(test.workspacePending[0]!.drain).not.toHaveBeenCalled();
+  expect(test.inspect().workspace).toMatchObject({ state: 'discovered', selectionRevision: 2 });
 });

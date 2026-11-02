@@ -665,13 +665,13 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "file": "apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.parser.ts",
+      "file": "apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.parser.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "file": "apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.ts",
+      "file": "apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"

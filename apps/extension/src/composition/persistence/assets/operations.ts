@@ -434,6 +434,18 @@ export async function abortArchiveRestoreSession(
   });
 }
 
+function hasRetainedNativeClaim(
+  snapshot: Awaited<ReturnType<typeof collectTargetAssetSnapshot>>,
+  assetId: string
+): boolean {
+  return (
+    snapshot.refs.some((entry) => entry.assetId === assetId) ||
+    snapshot.owners.some((entry) => entry.assetId === assetId) ||
+    snapshot.expectedOwners.some((entry) => entry.assetId === assetId) ||
+    snapshot.protectedRollbackAssetIds.has(assetId)
+  );
+}
+
 /**
  * Release only checked publication pins for ownerless native bytes.
  * Remote verification precedes the lifecycle hold. Existing delete authority rechecks every other claim.
@@ -461,23 +473,32 @@ export async function releasePublishedOperationPins(
   // A probe avoids downloading retained media while a reader already prevents cleanup.
   // Native admission reacquires the gate after verification and remains authoritative.
   if (!(await tryAssetResourceCleanup(async () => true))) return { released: [], intent: null };
-  for (const object of selected) await verifyRemote(structuredClone(object));
+  const snapshot = await collectTargetAssetSnapshot(
+    db,
+    selected.map((object) => object.ref.assetId),
+    signal
+  );
+  if (!snapshot.authorityValid) throw new Error('Invalid asset retention authority.');
+  signal?.throwIfAborted();
+  const verifiedCandidates = selected.filter(
+    ({ ref }) => !hasRetainedNativeClaim(snapshot, ref.assetId)
+  );
+  if (!verifiedCandidates.length) return { released: [], intent: null };
+  for (const object of verifiedCandidates) await verifyRemote(structuredClone(object));
   return runWithPersistenceMutationTransition(() =>
     runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
       signal?.throwIfAborted();
       const released = await tryAssetResourceCleanup(async () => {
-        const ids = selected.map((object) => object.ref.assetId);
+        const ids = verifiedCandidates.map((object) => object.ref.assetId);
         const snapshot = await collectTargetAssetSnapshot(db, ids, signal);
         const ready = await readAssetReadyClaims(ids, lifecyclePermit);
         const writing = new Set(await readWritingAssetIds(ids));
         if (!snapshot.authorityValid || !ready.valid)
           throw new Error('Invalid asset retention authority.');
-        const eligible = selected.filter(
+        // Newly ownerless objects wait for another verified pass; new claims still prevent release.
+        const eligible = verifiedCandidates.filter(
           ({ ref }) =>
-            !snapshot.refs.some((entry) => entry.assetId === ref.assetId) &&
-            !snapshot.owners.some((entry) => entry.assetId === ref.assetId) &&
-            !snapshot.expectedOwners.some((entry) => entry.assetId === ref.assetId) &&
-            !snapshot.protectedRollbackAssetIds.has(ref.assetId) &&
+            !hasRetainedNativeClaim(snapshot, ref.assetId) &&
             !writing.has(ref.assetId) &&
             !ready.assetIds.has(ref.assetId)
         );

@@ -1,10 +1,8 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { importAesGcmKey } from '@sniptale/platform/security/local-secret-crypto';
 import { readStoredSecretKeyMaterial } from './provider-secret-keys.store.ts';
-import {
-  readStoredAISecretProtection,
-  readUnlockedAISecretPassphraseKey,
-} from './secret-protection.store.ts';
+import { assertUnprotectedLegacyAccess } from './provider-secret-keys.store.ts';
+import { SecretProtectionLockedError } from '../secret-protection/model';
 
 const logger = createLogger({ namespace: 'SharedAiStorage' });
 
@@ -15,16 +13,22 @@ export type AIProviderSecretReadState =
   | { status: 'key-missing' }
   | { status: 'corrupt'; error: unknown };
 
-export async function readProviderSecretKeyState(): Promise<
+export async function readProviderSecretKeyState(
+  operationKey?: CryptoKey | null
+): Promise<
   | { status: 'ok'; key: CryptoKey }
   | { status: 'locked' }
   | { status: 'key-missing' }
   | { status: 'corrupt'; error: unknown }
 > {
-  const protection = await readStoredAISecretProtection();
-  if (protection) {
-    const key = await readUnlockedAISecretPassphraseKey();
-    return key ? { status: 'ok', key } : { status: 'locked' };
+  if (operationKey) return { status: 'ok', key: operationKey };
+  if (operationKey === undefined) {
+    try {
+      await assertUnprotectedLegacyAccess();
+    } catch (error) {
+      if (error instanceof SecretProtectionLockedError) return { status: 'locked' };
+      throw error;
+    }
   }
 
   const keyMaterial = await readStoredSecretKeyMaterial();

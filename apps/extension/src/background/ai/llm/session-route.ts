@@ -1,3 +1,5 @@
+import type { SecretProtectionService } from '../../../composition/persistence/secret-protection/model';
+import type { AISecretProtectionStatusPayload } from '../../../contracts/messaging/ai-settings-runtime';
 import type {
   RequestLlmSessionMessage,
   RequestLlmSessionResponse,
@@ -17,7 +19,8 @@ function isRequestLlmSessionMessage(message: unknown): message is RequestLlmSess
 
 async function resolveLlmSessionResponse(
   message: RequestLlmSessionMessage,
-  sender: chrome.runtime.MessageSender
+  sender: chrome.runtime.MessageSender,
+  protection?: Pick<SecretProtectionService, 'readStatus'>
 ): Promise<RequestLlmSessionResponse> {
   if (!llmPreauthorization.hasPreauthorizedLlmSessionRequestMessage(message)) {
     logger.warn('Rejected LLM session request from unauthorized sender', {
@@ -28,8 +31,11 @@ async function resolveLlmSessionResponse(
     return { success: false, error: 'Unauthorized LLM session sender' };
   }
 
-  const protectionStatus = await loadAISecretProtectionStatus();
-  if (protectionStatus.isEnabled && !protectionStatus.isUnlocked) {
+  const protectionStatus: AISecretProtectionStatusPayload = protection
+    ? await protection.readStatus()
+    : await loadAISecretProtectionStatus();
+  const aiParticipates = protectionStatus.participants?.ai ?? protectionStatus.isEnabled;
+  if (aiParticipates && !protectionStatus.isUnlocked) {
     return {
       success: false,
       reason: 'ai-secrets-locked',
@@ -51,13 +57,14 @@ async function resolveLlmSessionResponse(
 export function routeLlmSessionMessage(
   message: unknown,
   sender: chrome.runtime.MessageSender,
-  sendResponse: ResponseSender<RequestLlmSessionResponse>
+  sendResponse: ResponseSender<RequestLlmSessionResponse>,
+  protection?: Pick<SecretProtectionService, 'readStatus'>
 ): boolean {
   if (!isRequestLlmSessionMessage(message)) {
     return false;
   }
 
-  resolveLlmSessionResponse(message, sender).then(sendResponse, (error) => {
+  resolveLlmSessionResponse(message, sender, protection).then(sendResponse, (error) => {
     logger.error('LLM session request failed', error);
     sendResponse({
       success: false,

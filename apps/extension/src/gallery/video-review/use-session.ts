@@ -137,6 +137,14 @@ export function useReviewComposer(session: Session) {
   useComposerUnloadProtection(latest);
   const mounted = useRef(true);
   const committing = useRef<Promise<void> | null>(null);
+  const checkpointEdit = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      checkpointEdit.current?.();
+      checkpointEdit.current = null;
+    },
+    [session]
+  );
   const [finishing, setFinishing] = useState(false);
   const flush = useCallback(async (): Promise<void> => {
     while (latest.current.dirty) await session.flushAutosave(['draft']);
@@ -144,6 +152,7 @@ export function useReviewComposer(session: Session) {
   const change = useCallback(
     (value: ReviewAnnotation | null, previous = latest.current.before) => {
       if (committing.current) return;
+      checkpointEdit.current ??= session.beginCheckpointEdit();
       latest.current = {
         annotation: value,
         before: previous,
@@ -176,6 +185,8 @@ export function useReviewComposer(session: Session) {
   useRecoveryLifecycle(flush, mounted);
   const clearLocal = () => {
     session.cancelAutosave('draft');
+    checkpointEdit.current?.();
+    checkpointEdit.current = null;
     latest.current = {
       annotation: null,
       before: null,
@@ -213,11 +224,19 @@ export function useReviewComposer(session: Session) {
     getCurrent: () => latest.current,
     change,
     flush,
+    endCheckpointEditAfterFlush: () => {
+      if (!mounted.current || latest.current.dirty || committing.current) return false;
+      checkpointEdit.current?.();
+      checkpointEdit.current = null;
+      return true;
+    },
     ...completion,
     reload: () =>
       commitField(async () => {
         session.cancelAutosave('draft');
         await session.reload();
+        checkpointEdit.current?.();
+        checkpointEdit.current = null;
         const draft = session.getSnapshot().snapshot.draft;
         latest.current = {
           annotation: draft?.annotation ?? null,

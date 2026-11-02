@@ -1,3 +1,25 @@
+vi.mock('../secret-protection/service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secret-protection/service')>();
+  const { SecretProtectionAdmissionPermit, SecretProtectionLockedError } =
+    await import('../secret-protection/model');
+  const { readPreparedSecretProtectionControl } =
+    await import('../secret-protection/transition.store');
+  const withSecretProtectionWriter: typeof actual.withSecretProtectionWriter = async (
+    operation,
+    permit
+  ) => {
+    const control = await readPreparedSecretProtectionControl();
+    if (control?.phase === 'transitioning') throw new SecretProtectionLockedError();
+    if (permit) {
+      if (!SecretProtectionAdmissionPermit.isActive(permit))
+        throw new SecretProtectionLockedError();
+      return operation(permit);
+    }
+    return SecretProtectionAdmissionPermit.run(operation);
+  };
+  return { ...actual, withSecretProtectionWriter };
+});
+
 import { beforeEach, expect, it, vi } from 'vitest';
 import { selectSettingsTransferProviderMetadata } from '../../../contracts/settings-transfer/provider-metadata';
 import { createAIProviderSecretAdditionalData } from './provider-secret-binding';
@@ -9,7 +31,6 @@ import {
   AI_PROVIDERS_KEY,
   AI_PROVIDER_SECRETS_KEY,
   AI_SECRET_PROTECTION_KEY,
-  AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY,
 } from './constants';
 import {
   createAesGcmKeyMaterial,
@@ -136,17 +157,6 @@ function expectPassphraseProtectionMetadata() {
 function expectNoSessionPassphraseKeyMaterial() {
   expect(sessionSetMock).not.toHaveBeenCalled();
   expect(sessionState[AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY]).toBeUndefined();
-}
-
-async function expectPassphraseProtectionStatus(
-  loadStatus: () => Promise<unknown>,
-  isUnlocked: boolean
-) {
-  await expect(loadStatus()).resolves.toEqual({
-    isEnabled: true,
-    isUnlocked,
-    mode: 'passphrase',
-  });
 }
 
 async function installTransparentProviderSecret(secret: string) {
@@ -299,64 +309,70 @@ it('does not reconstruct provider secrets from metadata and key material without
   expect(loggerErrorMock).not.toHaveBeenCalled();
 });
 
-it('keeps passphrase-protected key material out of session storage', async () => {
-  await installTransparentProviderSecret('provider-1-secret');
-  sessionState[AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY] = 'legacy-session-key-material';
-
-  const {
-    enableStoredAISecretPassphraseProtection,
-    lockStoredAISecretProtection,
-    loadStoredAISecretProtectionStatus,
-    unlockStoredAISecretProtection,
-  } = await import('./provider-secret-protection.store.ts');
-  const { loadStoredAIProviderSecret } = await import('./provider-secrets.store.ts');
-
-  await enableStoredAISecretPassphraseProtection('correct horse battery staple');
-
-  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeUndefined();
+it('keeps protected participant keys out of session storage and requires explicit admission', async () => {
+  await installModernProviderSecret();
+  const { createSecretProtectionProfile } = await import('../secret-protection/profile.store');
+  const { createAISecretProtectionParticipant } =
+    await import('./provider-secret-protection.store');
+  const { loadStoredAIProviderSecret } = await import('./provider-secrets.store');
+  const protectedProfile = await createSecretProtectionProfile('correct horse battery staple');
+  const participant = createAISecretProtectionParticipant();
+  const prepared = await participant.prepare({
+    action: 'protect',
+    sourceKey: null,
+    targetKey: protectedProfile.key,
+    sourceProfileBinding: null,
+    targetProfileBinding: 'profile',
+  });
+  expect(JSON.stringify(prepared.payload)).not.toContain('modern-test-secret');
+  await participant.apply(prepared, undefined, protectedProfile.profile);
+  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeNull();
   expectPassphraseProtectionMetadata();
   expectNoSessionPassphraseKeyMaterial();
-  await expectPassphraseProtectionStatus(loadStoredAISecretProtectionStatus, true);
-  await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBe('provider-1-secret');
-
-  sessionState[AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY] = { request: { status: 'pending' } };
-  await lockStoredAISecretProtection();
-  expect(sessionState[AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY]).toBeUndefined();
-  expect(sessionState[AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY]).toBeUndefined();
   await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBeNull();
-  expectPassphraseProtectionMetadata();
-  await expectPassphraseProtectionStatus(loadStoredAISecretProtectionStatus, false);
-  await expect(unlockStoredAISecretProtection('wrong passphrase')).rejects.toThrow();
-  expectPassphraseProtectionMetadata();
-  await unlockStoredAISecretProtection('correct horse battery staple');
-  expectNoSessionPassphraseKeyMaterial();
-  await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBe('provider-1-secret');
+  await expect(loadStoredAIProviderSecret('provider-1', protectedProfile.key)).resolves.toBe(
+    'modern-test-secret'
+  );
 });
 
-it('rotates passphrase-protected secrets without storing key material in session storage', async () => {
-  await installTransparentProviderSecret('provider-1-secret');
-
-  const {
-    changeStoredAISecretPassphraseProtection,
-    enableStoredAISecretPassphraseProtection,
-    lockStoredAISecretProtection,
-    unlockStoredAISecretProtection,
-  } = await import('./provider-secret-protection.store.ts');
-  const { loadStoredAIProviderSecret } = await import('./provider-secrets.store.ts');
-
-  await enableStoredAISecretPassphraseProtection('old passphrase');
-  sessionState[AI_PASSPHRASE_SESSION_KEY_STORAGE_KEY] = 'legacy-session-key-material';
-  await changeStoredAISecretPassphraseProtection({
-    currentPassphrase: 'old passphrase',
-    nextPassphrase: 'new passphrase',
-  });
-
+it('rotates participant ciphertext with explicit source and target keys', async () => {
+  await installModernProviderSecret();
+  const { createSecretProtectionProfile } = await import('../secret-protection/profile.store');
+  const { createAISecretProtectionParticipant } =
+    await import('./provider-secret-protection.store');
+  const { loadStoredAIProviderSecret } = await import('./provider-secrets.store');
+  const old = await createSecretProtectionProfile('old passphrase');
+  const next = await createSecretProtectionProfile('new passphrase');
+  const participant = createAISecretProtectionParticipant();
+  await participant.apply(
+    await participant.prepare({
+      action: 'protect',
+      sourceKey: null,
+      targetKey: old.key,
+      sourceProfileBinding: null,
+      targetProfileBinding: 'old',
+    }),
+    undefined,
+    old.profile
+  );
+  const before = structuredClone(localState[AI_PROVIDER_SECRETS_KEY]);
+  await participant.apply(
+    await participant.prepare({
+      action: 'rekey',
+      sourceKey: old.key,
+      targetKey: next.key,
+      sourceProfileBinding: 'old',
+      targetProfileBinding: 'next',
+    }),
+    undefined,
+    next.profile
+  );
+  expect(localState[AI_PROVIDER_SECRETS_KEY]).not.toEqual(before);
   expectNoSessionPassphraseKeyMaterial();
-  await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBe('provider-1-secret');
-  await lockStoredAISecretProtection();
-  await expect(unlockStoredAISecretProtection('old passphrase')).rejects.toThrow();
-  await unlockStoredAISecretProtection('new passphrase');
-  await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBe('provider-1-secret');
+  await expect(loadStoredAIProviderSecret('provider-1', old.key)).resolves.toBeNull();
+  await expect(loadStoredAIProviderSecret('provider-1', next.key)).resolves.toBe(
+    'modern-test-secret'
+  );
 });
 
 it('preserves a modern local secret binding across portable metadata restore', async () => {
@@ -451,10 +467,23 @@ async function installModernProviderSecret() {
 
 it('preserves a matching protected ciphertext while the key stays locked', async () => {
   const { provider } = await installModernProviderSecret();
-  const protection = await import('./provider-secret-protection.store.ts');
+  const { createAISecretProtectionParticipant } =
+    await import('./provider-secret-protection.store.ts');
+  const { createSecretProtectionProfile } = await import('../secret-protection/profile.store');
+  const protection = await createSecretProtectionProfile('portable-test-passphrase');
+  const participant = createAISecretProtectionParticipant();
   const owner = await import('./provider-secrets.store.ts');
-  await protection.enableStoredAISecretPassphraseProtection('portable-test-passphrase');
-  await protection.lockStoredAISecretProtection();
+  await participant.apply(
+    await participant.prepare({
+      action: 'protect',
+      sourceKey: null,
+      targetKey: protection.key,
+      sourceProfileBinding: null,
+      targetProfileBinding: 'profile',
+    }),
+    undefined,
+    protection.profile
+  );
   const encryptedBefore = structuredClone(localState[AI_PROVIDER_SECRETS_KEY]);
   const plan = await owner.prepareAIProviderTransferMutation({
     importedProviders: [
@@ -463,11 +492,12 @@ it('preserves a matching protected ciphertext while the key stays locked', async
   });
   await plan.commit();
   expect(localState[AI_PROVIDER_SECRETS_KEY]).toEqual(encryptedBefore);
-  await expectPassphraseProtectionStatus(protection.loadStoredAISecretProtectionStatus, false);
+  expectPassphraseProtectionMetadata();
   expectNoSessionPassphraseKeyMaterial();
   await expect(owner.loadStoredAIProviderSecret(provider.id)).resolves.toBeNull();
-  await protection.unlockStoredAISecretProtection('portable-test-passphrase');
-  await expect(owner.loadStoredAIProviderSecret(provider.id)).resolves.toBe('modern-test-secret');
+  await expect(owner.loadStoredAIProviderSecret(provider.id, protection.key)).resolves.toBe(
+    'modern-test-secret'
+  );
 });
 
 it('restores a modern binding after partial write refusal and permits explicit retry', async () => {
@@ -513,4 +543,45 @@ it('does not reuse an imported old incarnation after deletion and same-ID restor
   expect(second.id).toBe(first.id);
   expect(second.incarnation).toBeTruthy();
   expect(second.incarnation).not.toBe(first.incarnation);
+});
+
+it('uses the admitted operation key for provider upsert during protection transition', async () => {
+  const { createSecretProtectionProfile } = await import('../secret-protection/profile.store');
+  const { upsertStoredAIProviderRecord, loadStoredAIProviderSecret } =
+    await import('./provider-secrets.store');
+  const profile = await createSecretProtectionProfile('shared phrase');
+  installStorageState({ [AI_SECRET_PROTECTION_KEY]: profile.profile });
+  await upsertStoredAIProviderRecord(
+    { ...createStoredProvider(), apiKey: 'admitted-provider-secret' },
+    undefined,
+    profile.key
+  );
+  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeUndefined();
+  await expect(loadStoredAIProviderSecret('provider-1', profile.key)).resolves.toBe(
+    'admitted-provider-secret'
+  );
+  await expect(loadStoredAIProviderSecret('provider-1')).resolves.toBeNull();
+});
+
+it('rejects transfer commit after a newer credential publication', async () => {
+  const { provider } = await installModernProviderSecret();
+  const { prepareAIProviderTransferMutation, upsertStoredAIProviderRecord } =
+    await import('./provider-secrets.store');
+  const prepared = await prepareAIProviderTransferMutation({ importedProviders: [provider] });
+  await upsertStoredAIProviderRecord({ ...provider, apiKey: 'newer-secret' });
+  const current = structuredClone(localState);
+  await expect(prepared.commit()).rejects.toThrow('selection changed');
+  expect(localState).toEqual(current);
+});
+
+it('refuses transfer rollback over a newer completed credential publication', async () => {
+  const { provider } = await installModernProviderSecret();
+  const { prepareAIProviderTransferMutation, upsertStoredAIProviderRecord } =
+    await import('./provider-secrets.store');
+  const prepared = await prepareAIProviderTransferMutation({ importedProviders: [provider] });
+  await prepared.commit();
+  await upsertStoredAIProviderRecord({ ...provider, apiKey: 'newer-secret' });
+  const current = structuredClone(localState);
+  await expect(prepared.rollback()).rejects.toThrow('selection changed');
+  expect(localState).toEqual(current);
 });

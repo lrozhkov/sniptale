@@ -30,6 +30,7 @@ import {
 } from './sections';
 import { useSettingsRoute } from '../route/history';
 import { useSettingsStickyNavScrollPadding } from './sticky-nav-scroll';
+import { SettingsSecretProtectionProvider } from '../../secret-protection/context';
 import { RecordingMediaAccessProvider } from '../../runtime/recording-media-access/provider';
 
 function SettingsPageSurface(props: {
@@ -39,8 +40,10 @@ function SettingsPageSurface(props: {
 }) {
   const contentScrollRef = useRef<HTMLDivElement>(null);
   useSettingsStickyNavScrollPadding(contentScrollRef);
-  const content = renderSettingsRouteContent(props.route, (view) =>
-    props.onRouteChange(updateSettingsRouteView(props.route, view))
+  const content = renderSettingsRouteContent(
+    props.route,
+    (view) => props.onRouteChange(updateSettingsRouteView(props.route, view)),
+    (queueFilter) => props.onRouteChange({ section: 'saving', view: 'queue', queueFilter })
   );
   const header = renderSettingsRouteHeader(props.route.section);
 
@@ -147,18 +150,23 @@ function SettingsPageMain() {
         'text-[var(--sniptale-color-text-primary)]'
       }
     >
-      <SettingsPageSurface
+      <SettingsSecretProtectionProvider
         route={route}
-        navigationLocked={navigationLocked}
-        onRouteChange={navigate}
-      />
-      <SettingsCommandPalette
-        isOpen={commandPaletteOpen && !navigationLocked}
-        activeTab={route.section}
-        onClose={() => setCommandPaletteOpen(false)}
-        onTabChange={(section) => navigate({ section })}
-      />
-      <SettingsPageStyles />
+        onOpenConfiguration={() => navigate({ section: 'access-data', view: 'secret-protection' })}
+      >
+        <SettingsPageSurface
+          route={route}
+          navigationLocked={navigationLocked}
+          onRouteChange={navigate}
+        />
+        <SettingsCommandPalette
+          isOpen={commandPaletteOpen && !navigationLocked}
+          activeTab={route.section}
+          onClose={() => setCommandPaletteOpen(false)}
+          onTabChange={(section) => navigate({ section })}
+        />
+        <SettingsPageStyles />
+      </SettingsSecretProtectionProvider>
     </div>
   );
 }

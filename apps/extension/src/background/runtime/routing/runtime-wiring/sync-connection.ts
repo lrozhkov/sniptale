@@ -1,3 +1,21 @@
+import { sameSyncConnectionIdentity } from '../../../../composition/persistence/remote-connection/model';
+import { capturePreparedDatabase } from '../../../../composition/persistence/infrastructure/indexed-db/core';
+import { readSyncQueueSummary } from '../../../../composition/persistence/sync-capture/queue-summary';
+import { readPreparedSecretProtectionControl } from '../../../../composition/persistence/secret-protection/transition.store';
+import { createSyncRuntimeStatusReader } from '../../../sync-connection/runtime-status';
+import { readSecretProtectionControl } from '../../../../composition/persistence/secret-protection/transition.store';
+import { readSecretProtectionProfileBinding } from '../../../../composition/persistence/secret-protection/profile.store';
+import {
+  SecretProtectionLockedError,
+  type SecretProtectionService,
+} from '../../../../composition/persistence/secret-protection/model';
+import {
+  createSyncCredentialLeaseOwner,
+  createSyncCredentialRoute,
+} from '../../../sync-connection/credential-route';
+import { routeSyncConnectionOriginPermission } from '../../../sync-connection/route';
+import { hasOffscreenRuntimeCapability } from '../../../offscreen-document/sender-policy';
+import { materializeDueSyncCheckpoints } from '../../../../composition/persistence/sync-capture/checkpoint-schedule';
 import { deliverRetiringSyncQueueHistory } from '../../../../workflows/sync-transfer/queue-history';
 import { completeSyncLocalOnly } from '../../../../composition/persistence/remote-connection/local-only';
 import { subscribeToSyncQueueSettled } from '../../../../platform/runtime-messaging/sync-product-client';
@@ -6,7 +24,10 @@ import {
   createSyncWorkspaceAllocation,
   loadSyncWorkspaceAllocation,
 } from '../../../../composition/persistence/remote-connection/workspace-allocation';
-import { createSyncWorkspaceJoin } from '../../../../composition/persistence/remote-connection/workspace-join';
+import {
+  createSyncWorkspaceJoin,
+  loadSyncWorkspaceJoin,
+} from '../../../../composition/persistence/remote-connection/workspace-join';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { loadSyncWorkspaceSelection } from '../../../../composition/persistence/remote-connection/workspace-selection';
 import { revokeSyncWorkspaceJoin } from '../../../../composition/persistence/remote-connection/workspace-join';
@@ -17,6 +38,7 @@ import { createSyncOffscreenGateway } from '../../../sync-connection/offscreen-g
 import { createSyncQueueRetryWakeup } from '../../../sync-connection/retry-wakeup';
 import { subscribeToChromeEvent } from '@sniptale/platform/browser/callback';
 import {
+  resumeSecretLockedSyncQueuePage,
   loadSyncQueueScheduleProgress,
   initializeSyncQueueSchedulePage,
   discoverDueSyncQueueOperations,
@@ -26,7 +48,11 @@ import { discoverInitialSyncRoots } from '../../../../composition/persistence/sy
 import { reconcileSyncQueueCaptures } from '../../../../composition/persistence/sync-capture/queue-reconciliation';
 import { recoverInterruptedSyncQueueOperation } from '../../../../workflows/sync-transfer/queue';
 import {
+  beginSyncConnectionAuthUpdate,
+  commitSyncConnectionAuthentication,
   loadSyncConnection,
+  readPreparedSyncConnection,
+  loadSyncConnectionAuthentication,
   enrollSyncWorkspaceConnection,
   commandSyncConnection,
 } from '../../../../composition/persistence/remote-connection/store';
@@ -40,6 +66,7 @@ import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtim
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   configureSyncPrivacyErasurePort,
+  configureSecretProtectionPrivacyErasurePort,
   eraseLocalExtensionDataFromBackground,
 } from '../../../application/privacy-erasure/composition';
 import { registerSecurityE2EControl } from '../../../../platform/security-e2e-control';
@@ -73,9 +100,22 @@ function subscribeToPermissionRemoval(sync: Coordinator): void {
   });
 }
 
-function registerSyncRuntimeRoutes(sync: Coordinator, state: BackgroundModeState): void {
+function registerSyncRuntimeRoutes(
+  sync: Coordinator,
+  state: BackgroundModeState,
+  protection: SecretProtectionService,
+  onPrepared: () => Promise<void>
+) {
   const retryWakeup = createSyncQueueRetryWakeup({
     loadConnection: loadSyncConnection,
+    canDispatch: async () => {
+      try {
+        await protection.readKey('webdav');
+        return true;
+      } catch {
+        return false;
+      }
+    },
     discoverInitialRoots: discoverInitialSyncRoots,
     refreshIncoming: async () => {
       const current = await loadSyncConnection();
@@ -91,6 +131,7 @@ function registerSyncRuntimeRoutes(sync: Coordinator, state: BackgroundModeState
       await sync.productCommand(crypto.randomUUID(), { kind: 'automatic-sync' });
     },
     reconcileCaptures: reconcileSyncQueueCaptures,
+    flushCheckpoints: materializeDueSyncCheckpoints,
     loadProgress: loadSyncQueueScheduleProgress,
     initializePage: initializeSyncQueueSchedulePage,
     discoverDue: discoverDueSyncQueueOperations,
@@ -103,10 +144,31 @@ function registerSyncRuntimeRoutes(sync: Coordinator, state: BackgroundModeState
     subscribeAlarm: (listener) => subscribeToChromeEvent(chrome.alarms?.onAlarm, listener),
     subscribeStartup: (listener) => subscribeToChromeEvent(chrome.runtime?.onStartup, listener),
   });
-  configureSyncProductRoute(sync, () => {
-    void retryWakeup.run();
+  const readRuntimeStatus = createSyncRuntimeStatusReader({
+    captureDatabase: capturePreparedDatabase,
+    readSummary: readSyncQueueSummary,
+    readConnection: readPreparedSyncConnection,
+    readProtectionControl: readPreparedSecretProtectionControl,
+    readProtection: () => protection.readPreparedStatus(),
+    hasOriginPermission: (origin) => browserPermissions.contains({ origins: [origin + '/*'] }),
+    observeActivity: (binding) => sync.observeActivity(binding),
   });
-  void retryWakeup.run();
+  configureSyncProductRoute(
+    sync,
+    () => {
+      void retryWakeup.run();
+    },
+    readRuntimeStatus
+  );
+  const ready = protection
+    .prepare()
+    .then(async () => {
+      await onPrepared();
+      return retryWakeup.run();
+    })
+    .catch(() => {
+      logger.warn('Sync secret recovery refused');
+    });
   if (typeof __SNIPTALE_SECURITY_E2E__ !== 'undefined' && __SNIPTALE_SECURITY_E2E__) {
     registerSecurityE2EControl({
       ...sync,
@@ -128,11 +190,70 @@ function registerSyncRuntimeRoutes(sync: Coordinator, state: BackgroundModeState
         ).success,
     });
   }
+  return {
+    ready,
+    wake: () => {
+      void retryWakeup.run();
+    },
+  };
 }
 
 /** Compose one sync admission, privacy and executor lifetime for this service worker. */
-export function initializeSyncConnectionRuntime(state: BackgroundModeState): void {
+export function initializeSyncConnectionRuntime(
+  state: BackgroundModeState,
+  protection: SecretProtectionService
+) {
+  let protectionReady = false;
+  const leases = createSyncCredentialLeaseOwner({
+    protection,
+    workerEpoch: crypto.randomUUID(),
+    readControl: readSecretProtectionControl,
+    loadConnection: loadSyncConnection,
+    loadAuthentication: async (identity, key) =>
+      loadSyncConnectionAuthentication(
+        identity,
+        key,
+        key ? await readSecretProtectionProfileBinding() : null
+      ),
+    hasOriginPermission: (origin) => browserPermissions.contains({ origins: [origin + '/*'] }),
+    createId: () => crypto.randomUUID(),
+  });
+  const credentialRoute = createSyncCredentialRoute({
+    leases,
+    hasTrustedSender(sender, startupId) {
+      if (!hasOffscreenRuntimeCapability(sender) || !sender.url) return false;
+      try {
+        return new URL(sender.url).searchParams.get('offscreenStartupId') === startupId;
+      } catch {
+        return false;
+      }
+    },
+  });
+  const originPermissionRoute = (
+    input: unknown,
+    sender: chrome.runtime.MessageSender,
+    sendResponse: import('@sniptale/runtime-contracts/messaging/message-types').ResponseSender
+  ) =>
+    routeSyncConnectionOriginPermission(input, sender, sendResponse, {
+      loadConnection: loadSyncConnection,
+      loadWorkspace: loadSyncWorkspaceSelection,
+      contains: (permissions) => browserPermissions.contains(permissions),
+      checkLease: leases.check,
+      isLocked: async () => {
+        try {
+          await protection.readKey('webdav');
+          return false;
+        } catch (error) {
+          return error instanceof SecretProtectionLockedError;
+        }
+      },
+    });
   const syncGateway = createSyncOffscreenGateway({
+    issueCredentialLease: (target) => {
+      if (!protectionReady) return Promise.reject(new SecretProtectionLockedError());
+      return leases.issue(target);
+    },
+    revokeCredentialLeases: leases.revokeAll,
     ensureDocument: () => ensureOffscreenDocument('Transfer user-selected sync files'),
     waitForReady: () => waitForOffscreenReady(),
     getDocumentUrls: async () => {
@@ -148,6 +269,19 @@ export function initializeSyncConnectionRuntime(state: BackgroundModeState): voi
   });
   const sync = createSyncConnectionCoordinator({
     ...syncGateway,
+    startWorkspaceExecutor: async (input) => {
+      if (input.source.kind === 'join') {
+        const join = await loadSyncWorkspaceJoin();
+        if (
+          !join ||
+          !sameSyncConnectionIdentity(join.identity, input.source.identity) ||
+          (input.operation === 'discover' ? join.expected !== null : join.expected === null)
+        )
+          throw new Error('Sync workspace preparation refused');
+      } else if (input.operation === 'discover')
+        throw new Error('Sync workspace discovery refused');
+      return syncGateway.startWorkspaceExecutor(input);
+    },
     createWorkspaceSelection: async (input) => {
       if (input.kind === 'allocation') {
         const prior = await loadSyncWorkspaceAllocation();
@@ -157,14 +291,36 @@ export function initializeSyncConnectionRuntime(state: BackgroundModeState): voi
         );
         return { kind: 'allocation', identity: allocation.identity };
       }
-      const join = await createSyncWorkspaceJoin({
-        rootUrl: input.rootUrl,
-        accountId: input.accountId,
-        expected: null,
-      });
+      const join = await createSyncWorkspaceJoin(
+        {
+          rootUrl: input.rootUrl,
+          accountId: input.accountId,
+          expected: input.expected,
+        },
+        input.previous?.identity ?? null
+      );
       return { kind: 'join', identity: join.identity };
     },
     loadConnection: loadSyncConnection,
+    resumeConnection: async (expected) => {
+      await protection.withAdmission('webdav', (_key, permit) =>
+        commandSyncConnection(expected, 'resume', permit)
+      );
+    },
+    beginAuthenticationUpdate: (connection) =>
+      protection.withAdmission('webdav', (_key, permit) =>
+        beginSyncConnectionAuthUpdate(connection.binding, connection.identity, permit)
+      ),
+    commitAuthenticationUpdate: (reservation, authentication) =>
+      protection.withAdmission('webdav', async (key, permit) =>
+        commitSyncConnectionAuthentication(
+          reservation,
+          authentication,
+          key,
+          key ? await readSecretProtectionProfileBinding() : null,
+          permit
+        )
+      ),
     completeLocalOnly: async (connection) => {
       await deliverRetiringSyncQueueHistory(connection.binding);
       const history = await completeSyncLocalOnly(connection);
@@ -181,7 +337,17 @@ export function initializeSyncConnectionRuntime(state: BackgroundModeState): voi
         await revokeSyncWorkspaceAllocation(source.identity.incarnation);
       else await revokeSyncWorkspaceJoin(source.identity.incarnation);
     },
-    enrollConnection: enrollSyncWorkspaceConnection,
+    enrollConnection: (source, authentication, storagePolicy) =>
+      protection.withAdmission('webdav', async (key, permit) =>
+        enrollSyncWorkspaceConnection(
+          source,
+          authentication,
+          storagePolicy,
+          key,
+          key ? await readSecretProtectionProfileBinding() : null,
+          permit
+        )
+      ),
     hasOriginPermission: (origin) => browserPermissions.contains({ origins: [origin + '/*'] }),
     revokeConnection: async (identity) => {
       await commandSyncConnection(identity, 'pause');
@@ -189,7 +355,44 @@ export function initializeSyncConnectionRuntime(state: BackgroundModeState): voi
     createChallenge: () => crypto.randomUUID(),
   });
   configureSyncPrivacyErasurePort({ reserveErasureExclusion: () => sync.reserveErasure() });
+  configureSecretProtectionPrivacyErasurePort(protection);
   subscribeToPermissionRemoval(sync);
   void sync.inspect().catch(() => logger.warn('Sync executor adoption refused'));
-  registerSyncRuntimeRoutes(sync, state);
+  const { wake, ready } = registerSyncRuntimeRoutes(sync, state, protection, async () => {
+    protectionReady = true;
+    try {
+      await protection.readKey('webdav');
+    } catch {
+      return;
+    }
+    await resumeAfterUnlock(false);
+  });
+  async function resumeAfterUnlock(wakeAfter = true): Promise<void> {
+    const selected = await loadSyncConnection();
+    if (!selected || selected.phase === 'updating-auth') return;
+    const scope = {
+      spaceId: selected.binding.spaceId,
+      connectionGeneration: selected.binding.connectionGeneration,
+      profileCreatedAt: selected.binding.profileCreatedAt,
+    };
+    let afterKey: string | null = null;
+    for (;;) {
+      const page = await protection.withAdmission('webdav', () =>
+        resumeSecretLockedSyncQueuePage(scope, selected.identity, afterKey, 64)
+      );
+      if (page.complete) break;
+      if (page.afterKey === afterKey) throw new Error('Sync unlock continuation did not advance.');
+      afterKey = page.afterKey;
+    }
+    if (wakeAfter) wake();
+  }
+  return {
+    ready,
+    resumeAfterUnlock,
+    credentialRoute,
+    originPermissionRoute,
+    containForSecretProtection: sync.containForSecretProtection,
+    revokeCredentialLeases: leases.revokeAll,
+    wake,
+  };
 }

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
+  parseSyncLibraryBackupOptions,
+  parseSyncProductCommand,
   parseSyncProductRequest,
+  parseSyncProductWork,
   parseSyncProductExecutorRequest,
   parseSyncProductResponse,
 } from './sync-product';
@@ -81,6 +84,12 @@ describe('closed product sync contracts', () => {
       },
     };
     expect(parseSyncProductExecutorRequest(request)).not.toBeNull();
+    expect(
+      parseSyncProductExecutorRequest({
+        ...request,
+        command: { ...request.command, work: { kind: 'checkpoint-wake' } },
+      })
+    ).toBeNull();
     expect(parseSyncProductExecutorRequest({ ...request, capabilityToken: undefined })).toBeNull();
     expect(
       parseSyncProductExecutorRequest({
@@ -180,7 +189,12 @@ const workspaceJob = {
   requestId: id,
 };
 const productStatus = {
-  connection: { phase: 'active', rootUrl: 'https://dav.test/root/', accountId: 'alice' },
+  connection: {
+    expected: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 },
+    phase: 'active',
+    rootUrl: 'https://dav.test/root/',
+    accountId: 'alice',
+  },
   workspace: { source, phase: 'checking', rootUrl: 'https://dav.test/root/', accountId: 'alice' },
   workspaceJob,
   products: [],
@@ -198,9 +212,20 @@ it.each([
   { kind: 'cancel', requestId: id },
   { kind: 'catalog-refresh', bypassCache: true },
   { kind: 'thumbnail-read', selection },
-  { kind: 'workspace-join', rootUrl: 'https://dav.test/root/', accountId: 'alice', authentication },
+  {
+    kind: 'workspace-join',
+    source,
+    prefix: '',
+    expected: { spaceId: id, bootstrapId: id, fingerprint: 'a'.repeat(64) },
+    authentication,
+  },
   { kind: 'workspace-retry', source, authentication },
-  { kind: 'workspace-enroll', source, authentication },
+  {
+    kind: 'workspace-enroll',
+    source,
+    authentication,
+    storagePolicy: { version: 1, mode: 'on-demand' },
+  },
 ])('admits the finite $kind product command without widening its envelope', (command) => {
   const request = { ...envelope, command };
   expect(parseSyncProductRequest(request)).toEqual(request);
@@ -612,5 +637,694 @@ it('keeps completed detach distinct from incomplete diagnostic history', () => {
   expect(parseSyncProductResponse({ success: true, result: { kind: 'local-only' } })).toBeNull();
   expect(
     parseSyncProductResponse({ success: true, result: { kind: 'local-only', history: 'unknown' } })
+  ).toBeNull();
+});
+
+describe('local checkpoint commands', () => {
+  it.each([0, 60000, 300000, 900000, 1800000, 3600000])(
+    'accepts the fixed interval %s',
+    (intervalMs) => {
+      const command = { kind: 'checkpoint-interval', intervalMs };
+      expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+      const result = { kind: 'checkpoint-policy', intervalMs };
+      expect(parseSyncProductResponse({ success: true, result })).toEqual({
+        success: true,
+        result,
+      });
+    }
+  );
+  it.each([-1, 1, 60001, '300000', null, Infinity])(
+    'refuses unsupported interval %s',
+    (intervalMs) => {
+      expect(
+        parseSyncProductRequest({
+          ...envelope,
+          command: { kind: 'checkpoint-interval', intervalMs },
+        })
+      ).toBeNull();
+      expect(
+        parseSyncProductResponse({
+          success: true,
+          result: { kind: 'checkpoint-policy', intervalMs },
+        })
+      ).toBeNull();
+    }
+  );
+  it('refuses caller-supplied scope or credentials and validates safe flush counters', () => {
+    for (const kind of ['checkpoint-policy', 'checkpoint-flush']) {
+      expect(parseSyncProductRequest({ ...envelope, command: { kind } })).not.toBeNull();
+      for (const extra of [{ scope: 'space' }, { authentication: 'private' }, { rootId: 'other' }])
+        expect(parseSyncProductRequest({ ...envelope, command: { kind, ...extra } })).toBeNull();
+    }
+    const result = { kind: 'checkpoint-flushed', updated: 1, alreadyDue: 2 };
+    expect(parseSyncProductResponse({ success: true, result })).toEqual({ success: true, result });
+    for (const change of [{ updated: -1 }, { alreadyDue: 1.5 }, { credential: 'private' }])
+      expect(
+        parseSyncProductResponse({ success: true, result: { ...result, ...change } })
+      ).toBeNull();
+  });
+});
+
+it('accepts only the due-only checkpoint wake envelope and fixed receipt', () => {
+  const command = { kind: 'checkpoint-wake' };
+  expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  for (const authority of [
+    { intervalMs: 0 },
+    { deadlineAt: 0 },
+    { root: { rootKind: 'media', rootId: 'id' } },
+    { scope: { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 1 } },
+    { authorization: { incarnation: id, revision: 1 } },
+    { credentials: 'secret' },
+  ])
+    expect(
+      parseSyncProductRequest({ ...envelope, command: { ...command, ...authority } })
+    ).toBeNull();
+  expect(parseSyncProductResponse({ success: true, result: { kind: 'checkpoint-woken' } })).toEqual(
+    { success: true, result: { kind: 'checkpoint-woken' } }
+  );
+  for (const extra of [{ synchronized: true }, { updated: 1 }, { requestId: id }])
+    expect(
+      parseSyncProductResponse({ success: true, result: { kind: 'checkpoint-woken', ...extra } })
+    ).toBeNull();
+});
+
+it('admits only exact exit receipts and finite outcomes', () => {
+  const receipt = { rootKind: 'video-project', rootId: 'project', revision: id };
+  const command = { kind: 'checkpoint-exit', receipt };
+  expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  for (const extra of [
+    { scope: 'space' },
+    { authorization: { incarnation: id, revision: 1 } },
+    { credential: 'secret' },
+  ]) {
+    expect(parseSyncProductRequest({ ...envelope, command: { ...command, ...extra } })).toBeNull();
+    expect(
+      parseSyncProductRequest({
+        ...envelope,
+        command: { ...command, receipt: { ...receipt, ...extra } },
+      })
+    ).toBeNull();
+  }
+  for (const change of [
+    { rootKind: 'unknown' },
+    { rootId: '' },
+    { rootId: 1 },
+    { revision: 'old' },
+    { revision: 1 },
+    { revision: '11111111-1111-1111-8111-111111111111' },
+  ])
+    expect(
+      parseSyncProductRequest({
+        ...envelope,
+        command: { ...command, receipt: { ...receipt, ...change } },
+      })
+    ).toBeNull();
+  for (const outcome of ['requested', 'already-due', 'stale', 'not-pending', 'unconfigured']) {
+    const result = { kind: 'checkpoint-exit', outcome };
+    expect(parseSyncProductResponse({ success: true, result })).toEqual({ success: true, result });
+    expect(
+      parseSyncProductResponse({ success: true, result: { ...result, synchronized: true } })
+    ).toBeNull();
+  }
+  for (const outcome of ['published', '', null, 0])
+    expect(
+      parseSyncProductResponse({ success: true, result: { kind: 'checkpoint-exit', outcome } })
+    ).toBeNull();
+});
+
+const popupStatus = {
+  configuration: 'unknown',
+  connection: null,
+  localPublication: 'unknown',
+  activity: 'unknown',
+  remote: { knowledge: 'unknown' },
+  protection: 'unknown',
+  issue: null,
+  repair: null,
+};
+it('parses only the exact public popup runtime status without native authority', () => {
+  const command = { kind: 'runtime-status' };
+  expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  const reply = { success: true, result: { kind: 'runtime-status', status: popupStatus } };
+  expect(parseSyncProductResponse(reply)).toEqual(reply);
+  for (const key of [
+    'scope',
+    'authorization',
+    'rootUrl',
+    'accountId',
+    'credentialId',
+    'workspaceFingerprint',
+    'requestId',
+    'passphrase',
+    'native',
+  ]) {
+    expect(parseSyncProductRequest({ ...envelope, command: { ...command, [key]: id } })).toBeNull();
+    expect(
+      parseSyncProductResponse({
+        ...reply,
+        result: { ...reply.result, status: { ...popupStatus, [key]: id } },
+      })
+    ).toBeNull();
+  }
+  for (const remote of [
+    { knowledge: 'observed-pass', outcome: 'complete' },
+    { knowledge: 'observed-pass', outcome: 'deferred' },
+  ]) {
+    const result = { kind: 'runtime-status', status: { ...popupStatus, remote } };
+    expect(parseSyncProductResponse({ success: true, result })).toEqual({ success: true, result });
+  }
+  for (const status of [
+    { ...popupStatus, remote: { knowledge: 'unknown', outcome: 'complete' } },
+    { ...popupStatus, remote: { knowledge: 'observed-pass' } },
+    { ...popupStatus, issue: 'provider raw error' },
+    { ...popupStatus, repair: 'arbitrary' },
+    { ...popupStatus, configuration: undefined },
+  ]) {
+    expect(
+      parseSyncProductResponse({ success: true, result: { kind: 'runtime-status', status } })
+    ).toBeNull();
+  }
+});
+it('keeps detailed status separate from the popup summary', () => {
+  const status = {
+    connection: {
+      expected: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 1 },
+      phase: 'active',
+      rootUrl: 'https://example.com/sync/',
+      accountId: 'account',
+    },
+    workspace: null,
+    workspaceJob: null,
+    products: [],
+  };
+  const reply = { success: true, result: { kind: 'status', status } };
+  expect(parseSyncProductResponse(reply)).toEqual(reply);
+  expect(
+    parseSyncProductResponse({ success: true, result: { kind: 'status', status: popupStatus } })
+  ).toBeNull();
+  expect(
+    parseSyncProductResponse({ success: true, result: { kind: 'runtime-status', status } })
+  ).toBeNull();
+});
+
+const discoveredIdentity = { spaceId: id, bootstrapId: id, fingerprint: 'b'.repeat(64) };
+const discoverySource = { kind: 'join', identity: { incarnation: id, revision: 2 } };
+const discoveryStatus = {
+  sourceKind: 'join',
+  selectionIncarnation: id,
+  selectionRevision: 2,
+  state: 'discovered',
+  failureCode: null,
+  discovery: {
+    source: discoverySource,
+    scope: 'children',
+    complete: true,
+    candidates: [{ prefix: 'Library name/', identity: discoveredIdentity }],
+    issues: [],
+  },
+};
+it('admits explicit search, selected JOIN and atomic on-demand enrollment only', () => {
+  const discover = {
+    kind: 'workspace-discover',
+    rootUrl: 'https://dav.test/root/',
+    accountId: 'alice',
+    authentication,
+    previous: null,
+  };
+  const selected = {
+    kind: 'workspace-join',
+    source: discoverySource,
+    prefix: 'Library name/',
+    expected: discoveredIdentity,
+    authentication,
+  };
+  const enroll = {
+    kind: 'workspace-enroll',
+    source,
+    authentication,
+    storagePolicy: { version: 1, mode: 'on-demand' },
+  };
+  for (const command of [
+    discover,
+    { ...discover, previous: discoverySource },
+    selected,
+    { ...selected, prefix: '' },
+    enroll,
+    { kind: 'workspace-retry', source: discoverySource, authentication, operation: 'discover' },
+  ]) {
+    expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  }
+  for (const command of [
+    { ...discover, previous: { ...source, kind: 'allocation' } },
+    { ...discover, previous: undefined },
+    { ...discover, expected: discoveredIdentity },
+    { ...selected, source: { ...source, kind: 'allocation' } },
+    { ...selected, expected: null },
+    { ...selected, rootUrl: 'https://foreign.test/' },
+    { ...selected, prefix: '../' },
+    { ...selected, prefix: 'a/b/' },
+    { ...selected, prefix: '%2f/' },
+    { ...selected, prefix: 'a?b/' },
+    { ...selected, prefix: 'a'.repeat(4096) + '/' },
+    { ...enroll, storagePolicy: undefined },
+    { ...enroll, storagePolicy: { version: 1, mode: 'keep-local' } },
+    { ...enroll, storagePolicy: { version: 1, mode: 'on-demand', budget: 0 } },
+    {
+      kind: 'workspace-retry',
+      source: { ...source, kind: 'allocation' },
+      authentication,
+      operation: 'discover',
+    },
+    { kind: 'workspace-retry', source: discoverySource, authentication, operation: 'prepare' },
+  ])
+    expect(parseSyncProductRequest({ ...envelope, command })).toBeNull();
+});
+it('accepts bounded discovery as a separate terminal state without credentials or ready authority', () => {
+  const response = (workspaceJob: unknown) => ({
+    success: true,
+    result: {
+      kind: 'status',
+      status: { connection: null, workspace: null, workspaceJob, products: [] },
+    },
+  });
+  expect(parseSyncProductResponse(response(discoveryStatus))).toEqual(response(discoveryStatus));
+  for (const workspaceJob of [
+    { ...discoveryStatus, discovery: undefined },
+    { ...discoveryStatus, state: 'ready' },
+    { ...discoveryStatus, sourceKind: 'allocation' },
+    { ...discoveryStatus, selectionRevision: 1 },
+    { ...discoveryStatus, discovery: { ...discoveryStatus.discovery, authentication } },
+    {
+      ...discoveryStatus,
+      discovery: {
+        ...discoveryStatus.discovery,
+        candidates: [{ prefix: '', identity: { ...discoveredIdentity, credentialId: id } }],
+      },
+    },
+    {
+      ...discoveryStatus,
+      discovery: {
+        ...discoveryStatus.discovery,
+        candidates: Array.from({ length: 65 }, () => discoveryStatus.discovery.candidates[0]),
+      },
+    },
+    {
+      ...discoveryStatus,
+      discovery: {
+        ...discoveryStatus.discovery,
+        issues: Array.from({ length: 322 }, () => ({ prefix: '', code: 'invalid-response' })),
+      },
+    },
+    {
+      ...discoveryStatus,
+      discovery: {
+        ...discoveryStatus.discovery,
+        issues: [{ prefix: '', code: 'provider raw error' }],
+      },
+    },
+  ])
+    expect(parseSyncProductResponse(response(workspaceJob))).toBeNull();
+});
+
+it('enforces decoded prefix, marker, and discovery payload bounds at the IPC boundary', () => {
+  const selected = {
+    kind: 'workspace-join',
+    source: discoverySource,
+    prefix: '',
+    expected: discoveredIdentity,
+    authentication,
+  };
+  for (const prefix of ['', 'a/', 'Library name/', 'Личные файлы/', 'a'.repeat(4095) + '/']) {
+    const command = { ...selected, prefix };
+    expect(parseSyncProductRequest({ ...envelope, command })).toEqual({ ...envelope, command });
+  }
+  for (const prefix of [
+    'a',
+    '/',
+    './',
+    '../',
+    'a/b/',
+    'a\\b/',
+    'a:b/',
+    'a#b/',
+    'a?b/',
+    '%252f/',
+    '%5C/',
+    'a\u0000b/',
+    '\ud800/',
+    'a'.repeat(4096) + '/',
+  ]) {
+    expect(parseSyncProductRequest({ ...envelope, command: { ...selected, prefix } })).toBeNull();
+  }
+  for (const expected of [
+    null,
+    undefined,
+    { ...discoveredIdentity, fingerprint: 'F'.repeat(64) },
+    { ...discoveredIdentity, spaceId: 'foreign' },
+    { ...discoveredIdentity, authentication },
+  ]) {
+    expect(parseSyncProductRequest({ ...envelope, command: { ...selected, expected } })).toBeNull();
+  }
+  const reply = (discovery: unknown) => ({
+    success: true,
+    result: {
+      kind: 'status',
+      status: {
+        connection: null,
+        workspace: null,
+        products: [],
+        workspaceJob: { ...discoveryStatus, discovery },
+      },
+    },
+  });
+  const bounded = {
+    ...discoveryStatus.discovery,
+    complete: false,
+    candidates: Array.from({ length: 64 }, () => ({ prefix: '', identity: discoveredIdentity })),
+    issues: Array.from({ length: 321 }, () => ({ prefix: '', code: 'invalid-response' })),
+  };
+  expect(parseSyncProductResponse(reply(bounded))).toEqual(reply(bounded));
+  for (const extra of [
+    { rootUrl: 'https://foreign.test/' },
+    { credentialId: id },
+    { authentication },
+    { authorization: source.identity },
+  ]) {
+    expect(parseSyncProductResponse(reply({ ...discoveryStatus.discovery, ...extra }))).toBeNull();
+  }
+  expect(
+    parseSyncProductRequest({
+      ...envelope,
+      command: {
+        kind: 'workspace-join',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'alice',
+        authentication,
+      },
+    })
+  ).toBeNull();
+});
+
+const scenarioExportTarget = { projectId: 'scenario-project', exportId: 'saved-html' };
+it('admits only the exact logical Scenario saved HTML work in UI and executor contracts', () => {
+  const work = { kind: 'scenario-export-prepare', ...scenarioExportTarget };
+  expect(parseSyncProductWork(work)).toEqual(work);
+  expect(parseSyncProductRequest({ ...envelope, command: work })).toEqual({
+    ...envelope,
+    command: work,
+  });
+  const executor = {
+    type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+    requestId: id,
+    capabilityToken: 'token',
+    offscreenStartupId: id,
+    executorId: id,
+    executorRevision: 1,
+    command: {
+      kind: 'start',
+      operationRequestId: id,
+      binding: {
+        scope: { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 0 },
+        authorization: { incarnation: id, revision: 1 },
+      },
+      work,
+    },
+  };
+  expect(parseSyncProductExecutorRequest(executor)).toEqual(executor);
+  for (const field of ['projectId', 'exportId']) {
+    for (const value of ['', undefined, null, 1, {}, [], 'a'.repeat(257)]) {
+      const malformed = { ...work, [field]: value };
+      expect(parseSyncProductWork(malformed)).toBeNull();
+      expect(parseSyncProductRequest({ ...envelope, command: malformed })).toBeNull();
+      expect(
+        parseSyncProductExecutorRequest({
+          ...executor,
+          command: { ...executor.command, work: malformed },
+        })
+      ).toBeNull();
+    }
+  }
+  for (const extra of [
+    { root: { rootKind: 'scenario-project', rootId: 'scenario-project' } },
+    { url: 'https://foreign.test/' },
+    { remoteKey: 'object' },
+    { assetId: 'body' },
+    { authorization: source.identity },
+    { credentialId: id },
+    { authentication },
+  ]) {
+    expect(parseSyncProductWork({ ...work, ...extra })).toBeNull();
+    expect(parseSyncProductRequest({ ...envelope, command: { ...work, ...extra } })).toBeNull();
+    expect(
+      parseSyncProductExecutorRequest({
+        ...executor,
+        command: { ...executor.command, work: { ...work, ...extra } },
+      })
+    ).toBeNull();
+  }
+  expect(
+    parseSyncProductWork({ ...work, projectId: 'p'.repeat(256), exportId: 'e'.repeat(256) })
+  ).not.toBeNull();
+});
+it('keeps saved HTML completion distinct and exact in operation and status projections', () => {
+  const completion = { kind: 'scenario-export', ...scenarioExportTarget };
+  const job = { requestId: id, kind: 'scenario-export-prepare', state: 'ready', failureCode: null };
+  const reply = (done: unknown) => ({
+    success: true,
+    result: { kind: 'operation', job, completion: done },
+  });
+  expect(parseSyncProductResponse(reply(completion))).toEqual(reply(completion));
+  const status = {
+    success: true,
+    result: {
+      kind: 'status',
+      status: { connection: null, workspace: null, workspaceJob: null, products: [job] },
+    },
+  };
+  expect(parseSyncProductResponse(status)).toEqual(status);
+  for (const done of [
+    { ...completion, exportId: '' },
+    { ...completion, projectId: 'a'.repeat(257) },
+    { ...completion, exportId: null },
+    { ...completion, root: { rootKind: 'scenario-project', rootId: 'scenario-project' } },
+    { ...completion, credentialId: id },
+    { ...completion, assetId: 'body' },
+    { kind: 'scenario-export', projectId: scenarioExportTarget.projectId },
+    { kind: 'scenario-export-prepare', ...scenarioExportTarget },
+  ]) {
+    expect(parseSyncProductResponse(reply(done))).toBeNull();
+  }
+});
+
+const libraryExpected = { incarnation: id, revision: 1 };
+const libraryAll = {
+  includeDrafts: false,
+  includeSourceMetadata: true,
+  includeTelemetry: true,
+  includeWebSnapshots: false,
+  scope: 'all' as const,
+};
+const librarySelected = {
+  ...libraryAll,
+  scope: 'selected' as const,
+  selected: {
+    mediaAssetIds: ['image'],
+    scenarioProjectIds: ['guide'],
+    videoProjectIds: [] as string[],
+  },
+};
+it('accepts only canonical bounded Library batch options and detaches every selected array', () => {
+  expect(parseSyncLibraryBackupOptions(libraryAll)).toEqual(libraryAll);
+  const options = structuredClone(librarySelected);
+  const parsed = parseSyncLibraryBackupOptions(options);
+  expect(parsed).toEqual(options);
+  options.selected.mediaAssetIds.push('later');
+  expect(parsed?.selected?.mediaAssetIds).toEqual(['image']);
+  expect(
+    parseSyncLibraryBackupOptions({ ...libraryAll, selected: librarySelected.selected })
+  ).toBeNull();
+  for (const field of [
+    'includeDrafts',
+    'includeSourceMetadata',
+    'includeTelemetry',
+    'includeWebSnapshots',
+  ])
+    for (const value of [undefined, null, 1, 'true'])
+      expect(parseSyncLibraryBackupOptions({ ...libraryAll, [field]: value })).toBeNull();
+  for (const selected of [
+    undefined,
+    null,
+    {},
+    [],
+    { mediaAssetIds: [], scenarioProjectIds: [], videoProjectIds: [] },
+    { ...librarySelected.selected, mediaAssetIds: ['same', 'same'] },
+    { ...librarySelected.selected, mediaAssetIds: [''] },
+    { ...librarySelected.selected, mediaAssetIds: ['a'.repeat(257)] },
+    { ...librarySelected.selected, mediaAssetIds: [1] },
+    { ...librarySelected.selected, rootUrl: 'https://foreign/' },
+  ])
+    expect(parseSyncLibraryBackupOptions({ ...librarySelected, selected })).toBeNull();
+  for (const extra of [
+    { budgetBytes: 1 },
+    { downloadAllowance: {} },
+    { authentication: 'private' },
+    { rootUrl: 'https://foreign/' },
+  ])
+    expect(parseSyncLibraryBackupOptions({ ...libraryAll, ...extra })).toBeNull();
+});
+it('bounds the combined Library selection at the existing archive safety ceiling', () => {
+  const mediaAssetIds = Array.from({ length: 25000 }, (_, i) => `media-${i}`);
+  expect(
+    parseSyncLibraryBackupOptions({
+      ...librarySelected,
+      selected: { mediaAssetIds, scenarioProjectIds: [], videoProjectIds: [] },
+    })
+  ).not.toBeNull();
+  expect(
+    parseSyncLibraryBackupOptions({
+      ...librarySelected,
+      selected: { mediaAssetIds, scenarioProjectIds: ['extra'], videoProjectIds: [] },
+    })
+  ).toBeNull();
+  expect(
+    parseSyncLibraryBackupOptions({
+      ...librarySelected,
+      selected: {
+        mediaAssetIds: ['same-id'],
+        scenarioProjectIds: ['same-id'],
+        videoProjectIds: [],
+      },
+    })
+  ).not.toBeNull();
+});
+it('admits exact logical Library work and completion without endpoint or authentication authority', () => {
+  const work = {
+    kind: 'library-backup-prepare',
+    expected: libraryExpected,
+    options: librarySelected,
+  };
+  expect(parseSyncProductWork(work)).toEqual(work);
+  expect(parseSyncProductRequest({ ...envelope, command: work })).toEqual({
+    ...envelope,
+    command: work,
+  });
+  for (const extra of [
+    { authorization: libraryExpected },
+    { remoteKey: 'private' },
+    { budgetBytes: 1 },
+    { rootUrl: 'https://foreign/' },
+  ])
+    expect(parseSyncProductWork({ ...work, ...extra })).toBeNull();
+  for (const expected of [
+    null,
+    { ...libraryExpected, revision: 0 },
+    { ...libraryExpected, incarnation: 'bad' },
+    { ...libraryExpected, credentialId: id },
+  ])
+    expect(parseSyncProductWork({ ...work, expected })).toBeNull();
+  const job = { requestId: id, kind: 'library-backup-prepare', state: 'ready', failureCode: null };
+  const completion = {
+    kind: 'library-backup',
+    expected: libraryExpected,
+    options: librarySelected,
+  };
+  const response = { success: true, result: { kind: 'operation', job, completion } };
+  expect(parseSyncProductResponse(response)).toEqual(response);
+  expect(
+    parseSyncProductResponse({
+      ...response,
+      result: {
+        ...response.result,
+        completion: { ...completion, options: { ...libraryAll, capability: 'private' } },
+      },
+    })
+  ).toBeNull();
+});
+
+it('retains the exact Library batch choices in detached executor work and completion receipts', () => {
+  const work = {
+    kind: 'library-backup-prepare',
+    expected: { ...libraryExpected },
+    options: structuredClone(librarySelected),
+  };
+  const input = {
+    type: MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
+    requestId: id,
+    capabilityToken: 'capability',
+    offscreenStartupId: id,
+    executorId: id,
+    executorRevision: 1,
+    command: {
+      kind: 'start',
+      operationRequestId: id,
+      binding: {
+        scope: { spaceId: 'space', connectionGeneration: 1, profileCreatedAt: 0 },
+        authorization: { incarnation: id, revision: 1 },
+      },
+      work,
+    },
+  };
+  const parsed = parseSyncProductExecutorRequest(input);
+  expect(parsed).toEqual(input);
+  work.expected.revision = 2;
+  work.options.selected.mediaAssetIds.push('later');
+  expect(parsed?.command).toMatchObject({
+    kind: 'start',
+    work: { expected: libraryExpected, options: librarySelected },
+  });
+  const invalid = {
+    ...input,
+    command: {
+      ...input.command,
+      work: {
+        ...work,
+        options: {
+          ...librarySelected,
+          selected: { ...librarySelected.selected, downloadAllowance: 1 },
+        },
+      },
+    },
+  };
+  expect(parseSyncProductExecutorRequest(invalid)).toBeNull();
+  const response = {
+    success: true,
+    result: {
+      kind: 'operation',
+      job: { requestId: id, kind: 'library-backup-prepare', state: 'ready', failureCode: null },
+      completion: {
+        kind: 'library-backup',
+        expected: { ...libraryExpected },
+        options: structuredClone(librarySelected),
+      },
+    },
+  };
+  const receipt = parseSyncProductResponse(response);
+  expect(receipt).toEqual(response);
+  response.result.completion.options.selected.scenarioProjectIds.push('later');
+  response.result.completion.expected.revision = 2;
+  expect(receipt).toMatchObject({
+    result: { completion: { expected: libraryExpected, options: librarySelected } },
+  });
+});
+
+it('admits exact credential repair input and rejects extra credential authority', () => {
+  const command = {
+    kind: 'connection-authentication',
+    expected: { incarnation: '10000000-0000-4000-8000-000000000001', revision: 3 },
+    authentication: { kind: 'basic', username: 'alice', password: 'replacement' },
+  };
+  expect(parseSyncProductCommand(command)).toEqual(command);
+  expect(parseSyncProductCommand({ ...command, credentialId: 'private' })).toBeNull();
+  expect(
+    parseSyncProductCommand({ ...command, expected: { ...command.expected, revision: -1 } })
+  ).toBeNull();
+});
+
+it('admits only exact native resume selection', () => {
+  const command = { kind: 'connection-resume', expected: { incarnation: id, revision: 4 } };
+  expect(parseSyncProductCommand(command)).toEqual(command);
+  expect(parseSyncProductCommand({ ...command, paused: false })).toBeNull();
+  expect(
+    parseSyncProductCommand({ ...command, expected: { incarnation: id, revision: -1 } })
   ).toBeNull();
 });

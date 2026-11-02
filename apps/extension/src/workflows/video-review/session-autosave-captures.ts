@@ -29,6 +29,7 @@ export function createReviewAutosaveCaptures() {
     },
     cancel: (key: AutosaveKey) => producers.delete(key),
     keys: () => producers.keys(),
+    hasPending: () => [...producers.values()].some((producer) => producer.pending),
     clear: () => producers.clear(),
     invalidate() {
       // Reload may fail: invalidate old ACKs while retaining the authored warning.

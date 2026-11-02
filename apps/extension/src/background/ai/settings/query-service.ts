@@ -1,3 +1,4 @@
+import type { SecretProtectionService } from '../../../composition/persistence/secret-protection/model';
 import { loadAIScenarioSelection } from '../../../composition/persistence/ai-settings/scenario-selections';
 import {
   loadAudioTranscriptionSystemPrompt,
@@ -105,7 +106,9 @@ async function projectCurrentSettingsCatalog(
   });
 }
 
-async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataPayload> {
+async function loadSettingsPageRuntimeData(
+  protection?: Pick<SecretProtectionService, 'readStatus'>
+): Promise<AISettingsPageRuntimeDataPayload> {
   const [
     selectionBootstrap,
     scenarioEditorSystemPrompt,
@@ -115,7 +118,7 @@ async function loadSettingsPageRuntimeData(): Promise<AISettingsPageRuntimeDataP
   ] = await Promise.all([
     loadStoredModelSelection(),
     loadScenarioEditorSystemPrompt(),
-    loadAISecretProtectionStatus(),
+    protection ? protection.readStatus() : loadAISecretProtectionStatus(),
     loadAudioTranscriptionSystemPrompt(),
     loadVoiceInputCorrectionSystemPrompt(),
   ]);
@@ -144,7 +147,8 @@ async function loadChromeAiContentSystemPrompt(modelId: string): Promise<string>
 }
 
 export async function resolveAISettingsQueryResponse(
-  message: AiSettingsQueryMessage
+  message: AiSettingsQueryMessage,
+  protection?: Pick<SecretProtectionService, 'readStatus'>
 ): Promise<AiSettingsQueryResponse> {
   switch (message.operation) {
     case 'read-scenario-selection':
@@ -163,6 +167,6 @@ export async function resolveAISettingsQueryResponse(
         scenarioEditorSystemPrompt: await loadScenarioEditorSystemPrompt(),
       };
     case 'read-settings-page-runtime-data':
-      return { success: true, settingsRuntimeData: await loadSettingsPageRuntimeData() };
+      return { success: true, settingsRuntimeData: await loadSettingsPageRuntimeData(protection) };
   }
 }

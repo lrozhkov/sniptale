@@ -2,6 +2,8 @@ import { workspace as reviewTemplate } from '../review-workspaces/backup-restore
 import { materializeVideoWorkspaceProject } from '../review-workspaces/project-metadata';
 import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
 import { captureRootKey } from './contracts';
+import { createScenarioReplicaFixture } from './test-support/scenario-replica.test-support';
+import type { AssetRef } from '../assets';
 import { digestCapturedMediaRows } from './freeze';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -598,4 +600,40 @@ it('refuses malformed runtime authorization instead of treating it as a legacy j
     })
   ).rejects.toThrow('authorization');
   expect(f.table('media_library').has('project-asset:source')).toBe(false);
+});
+
+it('keeps absent deferred Scenario HTML out of ready journal physical claims', async () => {
+  setup();
+  const f = createScenarioReplicaFixture();
+  const ref: AssetRef = {
+    assetId: 'remote-html',
+    createdAt: 1,
+    mimeType: 'text/html;charset=utf-8',
+    size: 10,
+    sha256: 'd'.repeat(64),
+    location: { kind: 'opfs', objectKey: 'objects/remote-html' },
+  };
+  const entry = {
+    id: 'html-export',
+    projectId: f.input.root.entry.id,
+    format: 'html' as const,
+    filename: 'guide.html',
+    size: 10,
+    createdAt: 1,
+    html: { mode: 'guide' as const, assetId: ref.assetId },
+  };
+  f.input.root.exports = [entry];
+  f.input.root.exportRefs = [ref];
+  f.input.root.deferredExports = [
+    { entry, ref, remote: { key: 'objects/html', sha256: 'd'.repeat(64) } },
+  ];
+  const journal = await createPreparedReplicaJournal({ kind: 'scenario-project', input: f.input });
+  expect(journal.assetRefs).toEqual([]);
+  expect(journal.payload).toMatchObject({
+    kind: 'scenario-project',
+    input: { root: { exports: [entry], exportRefs: [ref], deferredExports: [{ entry, ref }] } },
+  });
+  await expect(publishPreparedReplicaJournal({ ...journal, assetRefs: [ref] })).rejects.toThrow(
+    'claims'
+  );
 });

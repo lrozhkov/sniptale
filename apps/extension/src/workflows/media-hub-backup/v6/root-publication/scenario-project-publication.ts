@@ -39,7 +39,11 @@ import {
 import { decodePortableTour } from '../root-codecs/scenario-tour';
 import { preparePortableAggregatePresentation } from './presentation';
 
-type ScenarioRestoreRoot = Parameters<typeof putScenarioProjectBackupRestore>[0]['root'];
+import type { PreparedScenarioReplicaExport } from '../../../../composition/persistence/sync-capture/prepared-scenario';
+
+type ScenarioRestoreRoot = Parameters<typeof putScenarioProjectBackupRestore>[0]['root'] & {
+  deferredExports?: PreparedScenarioReplicaExport[];
+};
 
 export interface PreparedScenarioPublication {
   assetIds: ReadonlyMap<string, string>;
@@ -285,19 +289,35 @@ function prepareScenarioExports(
   metadata: PortableScenarioProjectMetadata,
   exportIds: ReadonlyMap<string, string>,
   targetProjectId: string,
-  objects: ReadonlyMap<string, StagedArchiveObject>
+  objects: ReadonlyMap<string, StagedArchiveObject>,
+  deferredExports?: ReadonlyMap<string, PreparedScenarioReplicaExport>
 ) {
   return metadata.exports.map((item) => {
-    const ref = item.html ? required(objects, item.html.objectId).ref : undefined;
+    const deferred = deferredExports?.get(item.id);
+    const ref = item.html
+      ? deferred
+        ? parseAssetRef(deferred.ref)
+        : required(objects, item.html.objectId).ref
+      : undefined;
+    if (item.html && !ref) throw new Error('Deferred Scenario HTML reference is invalid.');
     if (ref && (ref.size !== item.size || !/^text\/html(?:;charset=utf-8)?$/iu.test(ref.mimeType)))
       throw new Error('Restored HTML export body differs from its catalogue.');
-    const entry = parseScenarioExportEntry({
-      ...item,
-      ...(item.html && ref ? { html: { mode: item.html.mode, assetId: ref.assetId } } : {}),
-      id: exportIds.get(item.id),
-      projectId: targetProjectId,
-    });
-    if (!entry) throw new Error('Restored scenario export metadata is invalid.');
+    const entry = parseScenarioExportEntry(
+      deferred?.entry ?? {
+        ...item,
+        ...(item.html && ref ? { html: { mode: item.html.mode, assetId: ref.assetId } } : {}),
+        id: exportIds.get(item.id),
+        projectId: targetProjectId,
+      }
+    );
+    if (
+      !entry ||
+      entry.id !== exportIds.get(item.id) ||
+      entry.projectId !== targetProjectId ||
+      entry.size !== item.size ||
+      (item.html && (entry.html?.mode !== item.html.mode || entry.html.assetId !== ref?.assetId))
+    )
+      throw new Error('Restored scenario export metadata is invalid.');
     return entry;
   });
 }
@@ -383,7 +403,18 @@ export async function prepareScenarioProjectPublication(args: {
   session: Pick<ArchiveRestoreSession, 'strategy' | 'rootIdMap'>;
   sourceExists: boolean;
   staged: StagedArchiveObject[];
+  omitPresentation?: boolean;
+  deferredExports?: ReadonlyMap<string, PreparedScenarioReplicaExport>;
 }): Promise<PreparedScenarioPublication> {
+  if (
+    args.deferredExports &&
+    (args.session.strategy !== 'replace' ||
+      args.deferredExports.size !== args.metadata.exports.filter((item) => item.html).length ||
+      [...args.deferredExports.keys()].some(
+        (id) => !args.metadata.exports.some((item) => item.id === id && item.html)
+      ))
+  )
+    throw new Error('Deferred Scenario HTML inventory is invalid.');
   const duplicate = args.session.strategy === 'duplicate';
   const targetProjectId = duplicate && args.sourceExists ? newId() : args.metadata.entry.id;
   const objects = new Map(args.staged.map((object) => [object.objectId, object]));
@@ -414,12 +445,22 @@ export async function prepareScenarioProjectPublication(args: {
   const sharedAssetRefs = new Map(
     args.metadata.assets.map((asset, index) => [asset.objectId, assets[index]!.ref])
   );
-  const exports = prepareScenarioExports(args.metadata, exportIds, targetProjectId, objects);
+  const exports = prepareScenarioExports(
+    args.metadata,
+    exportIds,
+    targetProjectId,
+    objects,
+    args.deferredExports
+  );
   const exportRefs = args.metadata.exports.flatMap((entry) =>
-    entry.html ? [required(objects, entry.html.objectId).ref] : []
+    entry.html
+      ? [args.deferredExports?.get(entry.id)?.ref ?? required(objects, entry.html.objectId).ref]
+      : []
   );
   const stepDocuments = prepareScenarioStepDocuments({ ...shared, sharedAssetRefs, stepIds });
-  const sidecars = await prepareScenarioSidecars({ ...shared, exportIds });
+  const sidecars = args.omitPresentation
+    ? { exportThumbnails: [], presentation: null, thumbnail: null }
+    : await prepareScenarioSidecars({ ...shared, exportIds });
   return {
     assetIds,
     metadata: args.metadata,
@@ -430,6 +471,14 @@ export async function prepareScenarioProjectPublication(args: {
       exportThumbnails: sidecars.exportThumbnails,
       exports,
       exportRefs,
+      ...(args.deferredExports
+        ? {
+            deferredExports: args.metadata.exports.flatMap((item) => {
+              const deferred = args.deferredExports?.get(item.id);
+              return deferred ? [deferred] : [];
+            }),
+          }
+        : {}),
       stepDocuments,
       ...(sidecars.thumbnail ? { thumbnail: sidecars.thumbnail } : {}),
       ...(sidecars.presentation ? { presentation: sidecars.presentation } : {}),

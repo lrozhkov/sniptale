@@ -11,6 +11,7 @@ import {
 import {
   flushPendingAutosave,
   persistAutosaveSnapshot,
+  prepareEditorCheckpointExit,
   queuePendingAutosave,
   schedulePendingAutosaveWrite,
   saveEditorSessionSnapshot,
@@ -18,11 +19,15 @@ import {
 } from './persistence';
 import { scheduleImagePresentation } from './presentation';
 import {
+  beginAutosaveCheckpointEdit,
+  endAutosaveCheckpointEdit,
+  settleAutosaveCheckpointEdit,
   cancelPendingAutosaveRequest,
   interruptImagePresentation,
   releaseAutosaveInteraction,
   createAutosaveState,
   type ActiveEditorSessionContext,
+  type EditorCheckpointExit,
   type EditorSessionAutosaveState,
 } from './state';
 
@@ -43,6 +48,8 @@ export interface EditorSessionAutosaveService {
   /** Defers presentation work; admitted immutable document captures remain eligible to save. */
   setInteractionActive: (active: boolean) => void;
   flushAutosave: (getDocument: () => EditorDocument) => Promise<void>;
+  /** Prepare a transient native receipt and a guard for an awaited normal-exit intent. */
+  prepareCheckpointExit?: (getDocument: () => EditorDocument) => Promise<EditorCheckpointExit>;
   persistSnapshot: (getDocument: () => EditorDocument) => Promise<void>;
   saveNow: (getDocument: () => EditorDocument) => Promise<void>;
   isEnabled: () => boolean;
@@ -55,7 +62,11 @@ export interface EditorSessionAutosaveService {
   dispose: () => void;
 }
 
-export type { ActiveEditorSessionContext, EditorSessionAutosaveState } from './state';
+export type {
+  ActiveEditorSessionContext,
+  EditorSessionAutosaveState,
+  EditorCheckpointExit,
+} from './state';
 
 function createEditorSessionAutosaveActions(
   state: EditorSessionAutosaveState
@@ -64,6 +75,7 @@ function createEditorSessionAutosaveActions(
     activate: (context, options) => activateAutosaveContext(state, context, options),
     beginHydration: (isCurrent) => {
       const hydration = { isCurrent };
+      state.lastCheckpointReceipt = null;
       state.hydration = hydration;
       state.hydrationGeneration += 1;
       cancelPendingAutosaveRequest(state);
@@ -94,16 +106,19 @@ function createEditorSessionAutosaveActions(
       state.interactionRevision += 1;
       state.interactionActive = active;
       if (active) {
+        beginAutosaveCheckpointEdit(state);
         interruptImagePresentation(state);
         return;
       }
       releaseAutosaveInteraction(state);
+      endAutosaveCheckpointEdit(state);
       const context = state.activeContext;
       if (context && state.presentationPending) {
         scheduleImagePresentation(context, context.durableRevision, state.autosaveRevision, state);
       }
     },
     flushAutosave: (getDocument) => flushPendingAutosave(state, getDocument),
+    prepareCheckpointExit: (getDocument) => prepareEditorCheckpointExit(state, getDocument),
     persistSnapshot: (getDocument) => persistAutosaveSnapshot(state, getDocument),
     saveNow: (getDocument) => saveEditorSessionSnapshot(state, getDocument),
     isEnabled: () => state.enabled,
@@ -117,6 +132,7 @@ function createEditorSessionAutosaveActions(
         queuePendingAutosave(state, getDocument());
       } else if (!enabled) {
         setEditorSaveState('idle');
+        settleAutosaveCheckpointEdit(state);
       }
     },
     discardDraft: (aggregateId) => discardAutosaveDraft(state, aggregateId),

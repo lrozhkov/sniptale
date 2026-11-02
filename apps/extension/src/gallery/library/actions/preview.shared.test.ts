@@ -20,6 +20,8 @@ import {
 } from './test-support/index';
 
 const {
+  preparePublicationMock,
+  ensureHtmlMock,
   readHtmlMock,
   renameHtmlMock,
   getMediaAssetBlobMock,
@@ -33,6 +35,8 @@ const {
   openScenarioEditorPageMock,
   openVideoEditorPageMock,
 } = vi.hoisted(() => ({
+  preparePublicationMock: vi.fn(),
+  ensureHtmlMock: vi.fn(),
   readHtmlMock: vi.fn(),
   renameHtmlMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
@@ -57,8 +61,8 @@ const {
 }));
 
 vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
-  runWithNativePublicationResources: async (_roots: unknown, operation: () => Promise<unknown>) =>
-    operation(),
+  ensureScenarioHtmlArtifactAvailable: ensureHtmlMock,
+  runWithNativePublicationResources: preparePublicationMock,
 }));
 
 vi.mock(
@@ -124,6 +128,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   anchorClickSpy = vi.fn();
   readHtmlMock.mockReset();
+  ensureHtmlMock.mockReset();
+  ensureHtmlMock.mockResolvedValue(undefined);
+  preparePublicationMock.mockImplementation(
+    async (_roots: unknown, operation: () => Promise<unknown>) => operation()
+  );
   renameHtmlMock.mockReset();
   clickedFilename = '';
   originalCreateElement = document.createElement.bind(document);
@@ -505,4 +514,61 @@ it('does not write unchanged quick-edit project metadata', async () => {
     })
   ).toBe(false);
   expect(rename).not.toHaveBeenCalled();
+});
+
+it('does not read or download saved HTML before its exact selected preparation ACK', async () => {
+  const item = createScenarioExportItem();
+  const { controller } = createController({ previewItem: item });
+  let finish!: () => void;
+  ensureHtmlMock.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  readHtmlMock.mockResolvedValueOnce({
+    entry: item.exportEntry,
+    blob: new Blob(['historical'], { type: 'text/html' }),
+  });
+  const pending = downloadPreviewItem(controller, createRunBusy(), async () => false);
+  await vi.waitFor(() =>
+    expect(ensureHtmlMock).toHaveBeenCalledWith({
+      projectId: item.exportEntry.projectId,
+      exportId: item.entityId,
+    })
+  );
+  expect(readHtmlMock).not.toHaveBeenCalled();
+  expect(anchorClickSpy).not.toHaveBeenCalled();
+  finish();
+  expect(await pending).toBe(true);
+  expect(readHtmlMock).toHaveBeenCalledExactlyOnceWith(item.entityId);
+});
+it.each([new DOMException('Cancelled', 'AbortError'), new Error('Selected HTML unavailable')])(
+  'does not read absent saved HTML after preparation refusal or cancellation',
+  async (failure) => {
+    const item = createScenarioExportItem();
+    const { controller } = createController({ previewItem: item });
+    ensureHtmlMock.mockRejectedValueOnce(failure);
+    expect(await downloadPreviewItem(controller, createRunBusy(), async () => false)).toBe(false);
+    expect(readHtmlMock).not.toHaveBeenCalled();
+    expect(anchorClickSpy).not.toHaveBeenCalled();
+  }
+);
+
+it('renames and downloads a chosen saved HTML without preparing the entire Scenario backup closure', async () => {
+  const item = createScenarioExportItem();
+  const { controller } = createController({
+    previewItem: item,
+    filenameDraft: 'Renamed saved HTML',
+  });
+  readHtmlMock.mockResolvedValueOnce({
+    entry: { ...item.exportEntry, filename: 'Renamed saved HTML.html' },
+    blob: new Blob(['historical'], { type: 'text/html' }),
+  });
+  expect(await downloadPreviewItem(controller, createRunBusy())).toBe(true);
+  expect(renameHtmlMock).toHaveBeenCalledExactlyOnceWith(item.entityId, 'Renamed saved HTML.html');
+  expect(ensureHtmlMock).toHaveBeenCalledExactlyOnceWith({
+    projectId: item.exportEntry.projectId,
+    exportId: item.entityId,
+  });
+  expect(preparePublicationMock).not.toHaveBeenCalled();
 });

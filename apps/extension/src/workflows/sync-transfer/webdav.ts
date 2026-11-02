@@ -237,27 +237,35 @@ function clientFetch(root: URL, options: WebdavRemoteStoreOptions): typeof fetch
     // Admit the exact encoded path before dispatch; URL normalization must not hide traversal.
     listedKey(input, root);
     options.signal.throwIfAborted();
-    const resolved = typeof authentication === 'function' ? await authentication() : authentication;
-    options.signal.throwIfAborted();
-    const authenticationHeaders =
-      resolved.kind === 'basic'
-        ? getBasicAuthHeaders({ username: resolved.username, password: resolved.password })
-        : { authorization: `Bearer ${resolved.accessToken}` };
-    const authorization = new Headers(authenticationHeaders).get('authorization');
-    if (!authorization) throw new SyncRemoteError('invalid-configuration');
     const requestHeaders = new Headers(options.headers);
-    requestHeaders.set('Authorization', authorization);
-    const response = nativeResponse(
-      await request(options.signal, (admittedSignal) =>
-        globalThis.fetch(input, {
-          ...options,
-          signal: admittedSignal,
-          headers: requestHeaders,
-          credentials: 'omit',
-          redirect: 'error',
-        })
-      )
-    );
+    {
+      const resolved =
+        typeof authentication === 'function' ? await authentication() : authentication;
+      options.signal.throwIfAborted();
+      const authenticationHeaders =
+        resolved.kind === 'basic'
+          ? getBasicAuthHeaders({ username: resolved.username, password: resolved.password })
+          : { authorization: `Bearer ${resolved.accessToken}` };
+      const authorization = new Headers(authenticationHeaders).get('authorization');
+      if (!authorization) throw new SyncRemoteError('invalid-configuration');
+      requestHeaders.set('Authorization', authorization);
+    }
+    let response: Response;
+    try {
+      response = nativeResponse(
+        await request(options.signal, (admittedSignal) =>
+          globalThis.fetch(input, {
+            ...options,
+            signal: admittedSignal,
+            headers: requestHeaders,
+            credentials: 'omit',
+            redirect: 'error',
+          })
+        )
+      );
+    } finally {
+      requestHeaders.delete('Authorization');
+    }
     if (!response.ok) {
       await discard(response);
       if (response.status >= 300 && response.status < 400)

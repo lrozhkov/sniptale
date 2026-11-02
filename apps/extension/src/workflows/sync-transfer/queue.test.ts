@@ -1,3 +1,5 @@
+import { createHarness } from '../../composition/persistence/assets/opfs-store.test-support';
+import { createMediaLibraryEntry } from '../../composition/persistence/projects/index.storage.test-support';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import { createNativeCapture } from '../../composition/persistence/sync-capture/test-support/frozen-snapshot-database';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -704,3 +706,62 @@ it('refreshes a nonempty catalog before publication without moving the durable q
   );
   expect(beforeAttempt.some((event) => event.stage === 'verifying')).toBe(false);
 });
+
+it(
+  'outgoing preparation refuses unavailable originals without a binary GET and keeps ' +
+    'its durable capture',
+  async () => {
+    const f = setup();
+    const base = f.capture('missing-original');
+    const rootId = 'project-asset:missing-source';
+    const ref = {
+      assetId: 'missing-original',
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: 'objects/missing-original' },
+      mimeType: 'video/webm',
+      size: 3,
+      sha256: null,
+    };
+    const capture = createNativeCapture({
+      ...base,
+      rootId,
+      rootKey: captureRootKey(scope.spaceId, 'media', rootId),
+      change: {
+        kind: 'media',
+        rows: {
+          ref,
+          projectAsset: {
+            id: 'missing-source',
+            assetId: ref.assetId,
+            mimeType: ref.mimeType,
+            size: ref.size,
+            createdAt: 1,
+          },
+          media: createMediaLibraryEntry({
+            id: rootId,
+            filename: 'source.webm',
+            source: { kind: 'project-asset', projectAssetId: 'missing-source' },
+            mimeType: ref.mimeType,
+            size: ref.size,
+            workspaceRevision: 0,
+            lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+          }),
+        },
+      },
+    });
+    f.table('sync_capture').set(capture.key, capture);
+    const retained = structuredClone(capture);
+    await enqueueSyncQueueOperation(capture);
+    const harness = createHarness();
+    vi.stubGlobal('navigator', {
+      locks: liveLocks(),
+      storage: { getDirectory: harness.options.getOriginRoot },
+    });
+    const remote = memoryRemote();
+    const result = await execute(capture, remote.adapter);
+    expect(result).toMatchObject({ status: 'finished', operation: { status: 'failed' } });
+    expect(remote.calls).toEqual([]);
+    expect(f.table('sync_capture').get(capture.key)).toEqual(retained);
+    expect(await loadPreparedOutgoingOperation(scope.spaceId, capture.operationId)).toBeNull();
+  }
+);

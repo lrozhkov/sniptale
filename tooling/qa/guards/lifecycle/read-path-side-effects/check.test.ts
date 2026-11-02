@@ -166,3 +166,59 @@ it('supports repo-wide mode without skipping when no explicit files are provided
   expect(result.skipped).toBe(false);
   expect(result.files.length).toBeGreaterThan(0);
 });
+
+it('uses the actual body of pure same-file sync helpers and their aliases', () => {
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/remote-connection/pure.ts',
+    [
+      'function syncConnectionSecretAdditionalData(identity) { return { identity }; }',
+      'const additionalData = syncConnectionSecretAdditionalData;',
+      'function parseCredential(value) { return additionalData(value); }',
+      'export function readAuthentication(value) { return parseCredential(value); }',
+    ].join('\n')
+  );
+
+  expect(collectReadPathSideEffectViolations([file])).toEqual([]);
+});
+
+it('keeps local sync mutations and aliased transitive callers blocked', () => {
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/remote-connection/write.ts',
+    [
+      'function syncCredential(value) { credentialStore.put(value); }',
+      'const persist = syncCredential;',
+      'function parseCredential(value) { return persist(value); }',
+      'export function readAuthentication(value) { return parseCredential(value); }',
+    ].join('\n')
+  );
+
+  expect(collectReadPathSideEffectViolations([file])).toEqual([
+    expect.objectContaining({ message: expect.stringContaining('"readAuthentication"') }),
+  ]);
+});
+
+it('keeps unresolved and property sync calls blocked even beside a pure local name', () => {
+  const root = createTempRoot();
+  const file = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/remote-connection/external.ts',
+    [
+      'import { syncUnknown } from "./external";',
+      'function syncCredential(value) { return value; }',
+      'const externalAlias = adapter.syncCredential;',
+      'export function readExternal(value) { return syncUnknown(value); }',
+      'export function readProperty(value) { return adapter.syncCredential(value); }',
+      'export function readPropertyAlias(value) { return externalAlias(value); }',
+    ].join('\n')
+  );
+
+  expect(collectReadPathSideEffectViolations([file])).toEqual([
+    expect.objectContaining({ message: expect.stringContaining('"readExternal"') }),
+    expect.objectContaining({ message: expect.stringContaining('"readProperty"') }),
+    expect.objectContaining({ message: expect.stringContaining('"readPropertyAlias"') }),
+  ]);
+});

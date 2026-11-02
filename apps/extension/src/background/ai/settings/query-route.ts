@@ -1,3 +1,4 @@
+import type { SecretProtectionService } from '../../../composition/persistence/secret-protection/model';
 import type {
   AiSettingsQueryMessage,
   AiSettingsQueryResponse,
@@ -29,7 +30,8 @@ export function routeAiSettingsQueryMessage(
   message: unknown,
   sender: chrome.runtime.MessageSender,
   sendResponse: ResponseSender<AiSettingsQueryResponse>,
-  routeContext: BackgroundOwnedRouteContext | null
+  routeContext: BackgroundOwnedRouteContext | null,
+  protection?: Pick<SecretProtectionService, 'readStatus'>
 ): boolean {
   if (!isAiSettingsQueryMessage(message)) {
     return false;
@@ -45,7 +47,10 @@ export function routeAiSettingsQueryMessage(
     return true;
   }
 
-  resolveAISettingsQueryResponse(message).then(sendResponse, (error) => {
+  (protection
+    ? resolveAISettingsQueryResponse(message, protection)
+    : resolveAISettingsQueryResponse(message)
+  ).then(sendResponse, (error) => {
     logger.error('AI settings query failed', error);
     sendResponse({
       success: false,

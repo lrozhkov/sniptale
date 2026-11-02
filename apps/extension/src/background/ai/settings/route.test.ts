@@ -42,7 +42,7 @@ vi.mock('./authorization/preauthorization', async (importOriginal) => ({
 }));
 
 import { routeAiSettingsMutationMessage } from './route';
-import { AISecretPassphraseLockedError } from '../../../composition/persistence/ai-settings/secret-protection.store.ts';
+import { SecretProtectionLockedError as AISecretPassphraseLockedError } from '../../../composition/persistence/secret-protection/model';
 
 beforeEach(() => {
   vi.clearAllMocks();

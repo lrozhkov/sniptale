@@ -9,6 +9,7 @@ import {
 } from '../projects/index.test-support';
 import { captureRootKey, type CapturedChange, type CapturedVideoProjectRows } from './contracts';
 import {
+  hashCaptureText,
   parseCapturedVideoProjectRows,
   parseSyncCaptureRecord,
   parseCapturedMediaRows,
@@ -351,4 +352,35 @@ it('preserves distinct image and media metadata policies for Blobs and null-prot
   cyclic['self'] = cyclic;
   expect(isBoundedImageMetadata(cyclic)).toBe(false);
   expect(parseCapturedMediaRows({ ...rows, cyclic })).toBeNull();
+});
+
+it('parses descriptor-only prepared references without claiming nonexistent native file ownership', () => {
+  const { change: _change, phase: _phase, ...header } = change();
+  const prepared = {
+    ...header,
+    phase: 'prepared',
+    prepared: {
+      recordText: '{}',
+      recordSha256: hashCaptureText('{}'),
+      objects: [],
+      retainedObjects: [{ objectId: 'original', remoteKey: 'Files/accepted/original.webm' }],
+    },
+  };
+  expect(parseSyncCaptureRecord(prepared)).toMatchObject({
+    phase: 'prepared',
+    prepared: { objects: [], retainedObjects: prepared.prepared.retainedObjects },
+  });
+  expect(collectSyncCaptureClaims([prepared])).toEqual({ valid: true, assetIds: new Set() });
+  expect(
+    parseSyncCaptureRecord({
+      ...prepared,
+      prepared: {
+        ...prepared.prepared,
+        retainedObjects: [
+          ...prepared.prepared.retainedObjects,
+          ...prepared.prepared.retainedObjects,
+        ],
+      },
+    })
+  ).toBeNull();
 });

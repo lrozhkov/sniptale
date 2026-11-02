@@ -1,3 +1,11 @@
+import type { CaptureRootKind, SyncCheckpointInterval } from './checkpoint-contracts';
+export {
+  DEFAULT_SYNC_CHECKPOINT_INTERVAL,
+  SYNC_CHECKPOINT_INTERVALS,
+  type CaptureRootKind,
+  type SyncCheckpointInterval,
+  type SyncCheckpointReceipt,
+} from './checkpoint-contracts';
 import { MAX_MEDIA_ARCHIVE_ENTRIES } from '../../archive-transfer/contracts';
 import type {
   ScenarioAssetEntry,
@@ -46,9 +54,33 @@ export interface SyncCaptureProfile {
   enabled: boolean;
   spaceId: string;
   connectionGeneration: number;
+  /** Device-local checkpoint policy; legacy profiles use the five-minute default. */
+  checkpointIntervalMs?: SyncCheckpointInterval;
 }
 
-export type CaptureRootKind = 'media' | 'video-project' | 'video-review' | 'scenario-project';
+/** Compact native work that has not yet acquired an immutable causal operation. */
+export interface SyncPendingCheckpoint {
+  version: 1;
+  kind: 'pending-checkpoint';
+  key: string;
+  createdAt: number;
+  spaceId: string;
+  profileCreatedAt: number;
+  connectionGeneration: number;
+  rootKind: CaptureRootKind;
+  rootId: string;
+  rootKey: string;
+  revision: string;
+  dueAt: number;
+  /** An explicit flush keeps its deadline when the automatic policy changes. */
+  flushRequested?: true;
+}
+
+/** The exact root key does not grant publication or deletion authority. */
+export function pendingCheckpointKey(rootKey: string): string {
+  return JSON.stringify(['pending-checkpoint', rootKey]);
+}
+
 export type CaptureOrigin = 'local-edit' | 'local-restore';
 
 /** Native accepted rows remain distinct from the portable backup representation. */
@@ -74,6 +106,7 @@ export interface CapturedVideoProjectRows {
 /** One immutable native screenshot aggregate, including inline source and presentation bytes. */
 export interface CapturedImageRows {
   media: MediaLibraryEntry;
+  projectAsset?: StoredProjectAssetEntry;
   originalRef?: AssetRef;
   workspace: StoredImageWorkspaceEntry | null;
   presentation: AggregatePresentationEntry | null;
@@ -254,6 +287,7 @@ export interface SyncCaptureAppliedOperation {
 }
 
 export type SyncCaptureRecord =
+  | SyncPendingCheckpoint
   | SyncCaptureProfile
   | SyncCaptureRootState
   | CaptureOperation

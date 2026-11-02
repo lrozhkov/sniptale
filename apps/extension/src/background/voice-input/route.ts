@@ -6,11 +6,12 @@ import {
   parseOffscreenVoiceInputRuntimeMessage,
   VoiceInputPortMessageType,
 } from '@sniptale/runtime-contracts/voice-input';
-import { handleVoiceInputOffscreenEvent } from './coordinator';
+import { handleVoiceInputOffscreenEvent, type createVoiceInputCoordinator } from './coordinator';
 
 export function routeVoiceInputOffscreenEvent(
   message: unknown,
-  sendResponse: ResponseSender
+  sendResponse: ResponseSender,
+  coordinator?: ReturnType<typeof createVoiceInputCoordinator>
 ): boolean {
   const parsed = parseOffscreenVoiceInputRuntimeMessage(message);
   if (
@@ -20,7 +21,7 @@ export function routeVoiceInputOffscreenEvent(
   ) {
     return false;
   }
-  handleVoiceInputOffscreenEvent(parsed);
+  handleVoiceInputOffscreenEvent(parsed, coordinator);
   sendResponse({ success: true, result: 'accepted' });
   return true;
 }

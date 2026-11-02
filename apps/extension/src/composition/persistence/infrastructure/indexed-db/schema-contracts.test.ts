@@ -1,6 +1,6 @@
 import { SUPPORTED_BETA_DATABASE_FIXTURES } from './fixtures';
 import { openDB } from 'idb';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DB_VERSION, EXPECTED_STORES, SCHEMA_CONTRACTS_STORE } from './core.stores.ts';
 import { executeDatabaseUpgrade, handleDatabaseUpgrade } from './upgrade/core';
 import { betaV4Fixture } from './fixtures/beta-v4';
@@ -20,7 +20,13 @@ import {
 
 vi.mock('idb', () => ({
   openDB: vi.fn(async () => ({
-    transaction: () => ({ store: { openCursor: async () => null } }),
+    transaction: () => ({
+      store: {
+        openCursor: async () => null,
+        count: async () => 0,
+        index: () => ({ count: async () => 0 }),
+      },
+    }),
     close: vi.fn(),
   })),
 }));
@@ -144,6 +150,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['sync_catalog_cache', { keyPath: 'key' }],
     ['sync_connection', { keyPath: 'key' }],
     ['asset_residency', { keyPath: 'id' }],
+    ['secret_protection', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -205,6 +212,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['sync_catalog_cache', { keyPath: 'key' }],
     ['sync_connection', { keyPath: 'key' }],
     ['asset_residency', { keyPath: 'id' }],
+    ['secret_protection', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual(
@@ -228,6 +236,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
 });
 
 it('upgrades each retained source contract only after all required stores validate', async () => {
+  vi.stubGlobal('IDBKeyRange', { bound: (lower: string, upper: string) => ({ lower, upper }) });
   for (const migration of buildDatabaseMigrationPlan(1, DB_VERSION)!) {
     const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
       (fixture) => fixture.databaseVersion === migration.fromDatabaseVersion
@@ -276,6 +285,10 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('asset_residency', {
         keyPath: 'id',
       });
+    else if (migration.fromDatabaseVersion === 49)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('secret_protection', {
+        keyPath: 'key',
+      });
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -308,6 +321,7 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['sync_catalog_cache', { keyPath: 'key' }],
     ['sync_connection', { keyPath: 'key' }],
     ['asset_residency', { keyPath: 'id' }],
+    ['secret_protection', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -346,6 +360,7 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['sync_catalog_cache', { keyPath: 'key' }],
     ['sync_connection', { keyPath: 'key' }],
     ['asset_residency', { keyPath: 'id' }],
+    ['secret_protection', { keyPath: 'key' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual(
@@ -546,8 +561,9 @@ it('creates the complete fresh schema with empty unindexed connection authority'
   const tx = { abort: vi.fn(), objectStore: vi.fn() };
   handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
   expect([...names].sort()).toEqual([...EXPECTED_STORES].sort());
-  expect(names).toHaveLength(42);
+  expect(names).toHaveLength(43);
   expect(db.createObjectStore).toHaveBeenCalledWith('sync_connection', { keyPath: 'key' });
+  expect(db.createObjectStore).toHaveBeenCalledWith('secret_protection', { keyPath: 'key' });
   expect(connectionIndex).not.toHaveBeenCalled();
   expect(connectionPut).not.toHaveBeenCalled();
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
@@ -727,7 +743,8 @@ it('creates the same exact nonunique due index for a fresh database', () => {
   };
   const tx = { abort: vi.fn(), objectStore: vi.fn() };
   handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
-  expect(dueIndex).toHaveBeenCalledExactlyOnceWith(
+  expect(dueIndex).toHaveBeenCalledTimes(2);
+  expect(dueIndex).toHaveBeenCalledWith(
     'syncQueueDue',
     [
       'spaceId',
@@ -741,3 +758,5 @@ it('creates the same exact nonunique due index for a fresh database', () => {
   );
   expect(tx.objectStore).not.toHaveBeenCalled();
 });
+
+afterEach(() => vi.unstubAllGlobals());

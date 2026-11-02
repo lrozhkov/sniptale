@@ -1,5 +1,27 @@
 export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
   {
+    owner: 'review-attachment-target-retention-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/assets/retention-index.ts',
+    allowCrossOwner: true,
+    reason:
+      'Review attachment cancellation and Library binding use the native target-retention index.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/presentation-attachment.test.ts',
+      'apps/extension/src/workflows/video-review/watermark-image.test.ts',
+    ],
+  },
+  {
+    owner: 'review-attachment-physical-cleanup-consumers',
+    productionFile: 'apps/extension/src/composition/persistence/assets/operations.ts',
+    allowCrossOwner: true,
+    reason:
+      'Review attachment cancellation uses checked physical cleanup and targeted ready claims.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/presentation-attachment.test.ts',
+      'apps/extension/src/workflows/video-review/watermark-image.test.ts',
+    ],
+  },
+  {
     owner: 'durable-asset-retention-consumers',
     productionFile: 'apps/extension/src/composition/persistence/assets/retention-authority.ts',
     allowCrossOwner: true,

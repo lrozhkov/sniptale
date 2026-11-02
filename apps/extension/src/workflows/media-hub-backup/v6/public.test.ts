@@ -4,6 +4,7 @@ vi.mock('../../sync-transfer/editing-admission', () => ({
 import { beforeEach, expect, it, vi } from 'vitest';
 const io = vi.hoisted(() => ({
   prepare: vi.fn(),
+  needsPreparation: vi.fn(),
   active: false,
   inventory: vi.fn(),
   write: vi.fn(),
@@ -29,10 +30,14 @@ vi.mock('../../../composition/persistence/scenario/resource-sessions', () => ({
     }
   },
 }));
+vi.mock('../../sync-transfer/native-residency', () => ({
+  needsNativeEditingPreparation: io.needsPreparation,
+}));
 import { exportMediaHubBackup } from './public';
 beforeEach(() => {
   vi.clearAllMocks();
   io.active = false;
+  io.needsPreparation.mockResolvedValue(false);
   io.pick.mockImplementation(async () => ({ abort: io.abort }));
   io.inventory.mockImplementation(async () => {
     expect(io.active).toBe(true);
@@ -123,6 +128,60 @@ it('aborts the archive without writing when selected native preparation fails', 
   } finally {
     vi.unstubAllGlobals();
   }
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.abort).toHaveBeenCalledOnce();
+});
+
+it('uses only readonly native readiness after batch preparation and never starts per-root IPC', async () => {
+  const root = { rootKind: 'media', rootId: 'selected' };
+  const signal = new AbortController().signal;
+  io.inventory.mockImplementationOnce(async (_options, admission) => {
+    await admission.prepareRoot(root);
+    return {};
+  });
+  await exportMediaHubBackup({}, { requirePreparedNative: true, signal });
+  expect(io.needsPreparation).toHaveBeenCalledExactlyOnceWith(root, 'backup');
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(io.write).toHaveBeenCalledOnce();
+});
+
+it('aborts the archive if a prepared resource became missing instead of downloading it again', async () => {
+  io.needsPreparation.mockResolvedValueOnce(true);
+  io.inventory.mockImplementationOnce(async (_options, admission) => {
+    await admission.prepareRoot({ rootKind: 'scenario-project', rootId: 'changed' });
+    return {};
+  });
+  await expect(exportMediaHubBackup({}, { requirePreparedNative: true })).rejects.toThrow(
+    'Native backup resources are unavailable.'
+  );
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.abort).toHaveBeenCalledOnce();
+});
+
+it('honors cancellation during readonly readiness without a second preparation or archive write', async () => {
+  const abort = new AbortController();
+  let enter!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    enter = resolve;
+  });
+  let finish!: (missing: boolean) => void;
+  io.needsPreparation.mockImplementationOnce(() => {
+    enter();
+    return new Promise<boolean>((resolve) => {
+      finish = resolve;
+    });
+  });
+  io.inventory.mockImplementationOnce(async (_options, admission) => {
+    await admission.prepareRoot({ rootKind: 'media', rootId: 'selected' });
+    return {};
+  });
+  const exporting = exportMediaHubBackup({}, { requirePreparedNative: true, signal: abort.signal });
+  await entered;
+  abort.abort();
+  finish(false);
+  await expect(exporting).rejects.toMatchObject({ name: 'AbortError' });
+  expect(io.prepare).not.toHaveBeenCalled();
   expect(io.write).not.toHaveBeenCalled();
   expect(io.abort).toHaveBeenCalledOnce();
 });

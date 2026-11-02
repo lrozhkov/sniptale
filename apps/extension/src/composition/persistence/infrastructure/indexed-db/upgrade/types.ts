@@ -40,7 +40,11 @@ export interface DatabaseMigrationSource {
     name: string,
     mode: 'readonly'
   ): {
-    store: { openCursor(): Promise<DatabaseMigrationCursor | null> };
+    store: {
+      openCursor(): Promise<DatabaseMigrationCursor | null>;
+      count?(query?: IDBValidKey | IDBKeyRange): Promise<number>;
+      index?(name: string): { count?(query?: IDBValidKey | IDBKeyRange): Promise<number> };
+    };
   };
 }
 interface DatabaseMigrationCursor {

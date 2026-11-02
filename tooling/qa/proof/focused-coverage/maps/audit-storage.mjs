@@ -1,5 +1,18 @@
 export const AUDIT_STORAGE_OWNER_MAPPINGS = [
   {
+    owner: 'background-secret-protection-composition',
+    productionFile: 'apps/extension/src/background/secret-protection/composition.ts',
+    allowCrossOwner: true,
+    reason:
+      'The sole worker service must bind both native participants to containment, lease revocation and unlock continuation.',
+    testFiles: [
+      'apps/extension/src/background/secret-protection/composition.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/service.test.ts',
+      'apps/extension/src/composition/persistence/remote-connection/protection.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-secret-protection.transition.test.ts',
+    ],
+  },
+  {
     owner: 'audit-ai-storage-secrets',
     productionPrefix: 'apps/extension/src/composition/persistence/ai-settings/',
     exclusive: true,
@@ -76,6 +89,30 @@ export const AUDIT_STORAGE_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/composition/persistence/editor-presets/scene-background-source-image.test.ts',
       'apps/extension/src/composition/persistence/editor-presets/state.test.ts',
+    ],
+  },
+  {
+    owner: 'common-secret-protection',
+    productionPrefix: 'apps/extension/src/composition/persistence/secret-protection/',
+    allowCrossOwner: true,
+    reason:
+      'Common transitions must execute participant, concurrency, reset and containment proof.',
+    testFiles: [
+      'apps/extension/src/background/ai/settings/mutations.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.lifecycle.test.ts',
+      'apps/extension/src/background/sync-connection/coordinator.test.ts',
+      'apps/extension/src/background/sync-connection/credential-route.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/alpha-reset.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/graph-mutations.settings.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-secrets.store.test.ts',
+      'apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.test.ts',
+      'apps/extension/src/composition/persistence/privacy-erasure/cleanup.test.ts',
+      'apps/extension/src/composition/persistence/remote-connection/protection.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/service.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/transition.store.test.ts',
+      'apps/extension/src/workflows/sync-transfer/connection-requests.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/model-graph.integration.test.ts',
+      'apps/extension/src/composition/persistence/ai-settings/provider-transfer.integration.test.ts',
     ],
   },
 ];

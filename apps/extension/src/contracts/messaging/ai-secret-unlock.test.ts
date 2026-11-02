@@ -26,3 +26,12 @@ it('keeps secret-unlock operations discriminated by their required payload', () 
     AISecretUnlockStatus | undefined
   >();
 });
+
+it('keeps sync start free of private selection fields', () => {
+  const start = {
+    operation: 'start',
+    purpose: 'sync',
+    type: MessageType.AI_SECRET_UNLOCK,
+  } satisfies AISecretUnlockMessage;
+  expect(Object.keys(start).sort()).toEqual(['operation', 'purpose', 'type']);
+});

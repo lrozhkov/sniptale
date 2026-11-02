@@ -17,9 +17,15 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 
 import { mediaLibraryRootPublisher } from './media';
 
-it.each([false, true])(
-  'retains the restored stored image original, workspace=%s',
-  async (edited) => {
+it.each([
+  [false, false],
+  [true, false],
+  [false, true],
+  [true, true],
+])(
+  'retains the restored image original, workspace=%s projectAsset=%s',
+  async (edited, imported) => {
+    const rootId = imported ? 'project-asset:imported-image' : 'scenario-asset:image';
     const createStore = () => ({
       get: vi.fn(),
       put: vi.fn(),
@@ -59,7 +65,7 @@ it.each([false, true])(
           mediaSubtype: 'library-item',
           metadataPath: '_sniptale/metadata/media/image.json',
           objectCount: staged.length,
-          rootId: 'scenario-asset:image',
+          rootId: rootId,
           rootKind: 'media',
           totalBytes: staged.length * 5,
         },
@@ -69,12 +75,14 @@ it.each([false, true])(
             duration: null,
             filename: 'image.png',
             height: 80,
-            id: 'scenario-asset:image',
+            id: rootId,
             kind: 'image',
             mimeType: 'image/png',
             originalFilename: 'image.png',
             size: 5,
-            source: { kind: 'stored-asset' },
+            source: imported
+              ? { kind: 'project-asset', projectAssetId: 'imported-image' }
+              : { kind: 'stored-asset' },
             sourceFavicon: null,
             sourceTitle: null,
             sourceUrl: null,
@@ -85,10 +93,20 @@ it.each([false, true])(
             lifecycle: { ...createLibraryLifecycle('temporary', 1), trashedAt: 3 },
           },
           originalObjectId: 'original',
+          ...(imported
+            ? {
+                projectAsset: {
+                  id: 'imported-image',
+                  createdAt: 1,
+                  mimeType: 'image/png',
+                  size: 5,
+                },
+              }
+            : {}),
           ...(edited
             ? {
                 workspace: {
-                  aggregateId: 'scenario-asset:image',
+                  aggregateId: rootId,
                   createdAt: 1,
                   document,
                   revision: 1,
@@ -109,7 +127,9 @@ it.each([false, true])(
     expect(result.retainedAssetIds).toEqual(staged.map(({ ref }) => ref.assetId));
     expect(storeFor('media_library').put).toHaveBeenCalledWith(
       expect.objectContaining({
-        source: { kind: 'stored-asset', assetId: 'restored-original' },
+        source: imported
+          ? { kind: 'project-asset', projectAssetId: 'imported-image' }
+          : { kind: 'stored-asset', assetId: 'restored-original' },
         lifecycle: expect.objectContaining({
           storageClass: edited ? 'library' : 'temporary',
           ...(edited ? { trashedAt: 3 } : {}),
@@ -119,10 +139,14 @@ it.each([false, true])(
     expect(storeFor('asset_owners').put).toHaveBeenCalledWith(
       expect.objectContaining({
         assetId: 'restored-original',
-        ownerKind: 'media-library',
-        role: 'source',
+        ownerKind: imported ? 'project-asset' : 'media-library',
+        role: imported ? 'body' : 'source',
       })
     );
     expect(storeFor('image_workspaces').put).toHaveBeenCalledTimes(edited ? 1 : 0);
+    if (imported)
+      expect(storeFor('project_assets').put).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'imported-image', assetId: 'restored-original' })
+      );
   }
 );

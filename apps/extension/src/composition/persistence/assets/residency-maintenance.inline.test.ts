@@ -14,7 +14,8 @@ import {
   restoreVerifiedAssetObject,
   type VerifiedAssetUnload,
 } from './residency-maintenance';
-import { assetResidencyCopyId } from './residency-records';
+import { assetResidencyCopyId, parseAssetResidencyRecord } from './residency-records';
+import { commitImagePresentation } from '../image-aggregates/mutations';
 
 const io = vi.hoisted(() => ({ db: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
@@ -112,6 +113,10 @@ function databaseFixture() {
                     (!range.lowerOpen || key !== range.lower)
                 )
                 .slice(0, count),
+            delete: async (key: IDBValidKey) => {
+              if (mode !== 'readwrite') throw new Error('Readonly fixture deletion');
+              store.delete(typeof key === 'string' ? key : JSON.stringify(key));
+            },
             put: (value: unknown) => write(value, false),
             add: (value: unknown) => write(value, true),
           };
@@ -376,17 +381,30 @@ it.each(['generation', 'digest', 'revision', 'lifetime', 'preview', 'disabled'] 
   }
 );
 
-it('protects a source with a real pending native capture', async () => {
-  const f = await fixture();
-  const tx = f.database.transaction([...EXPECTED_STORES], 'readwrite');
-  const native = tx as unknown as Parameters<typeof captureImageInTransaction>[0];
-  await captureImageInTransaction(native, f.media.id);
-  await tx.done;
-  await expect(f.unload()).rejects.toThrow('unfinished capture');
-  expect(f.image()).toEqual(f.media);
-  expect(f.preview()).toEqual(f.presentation);
-  expect(f.table('asset_residency').size).toBe(0);
-});
+it.each(['checkpoint', 'capture'] as const)(
+  'protects a source with real unfinished %s work',
+  async (mode) => {
+    const f = await fixture();
+    const tx = f.database.transaction([...EXPECTED_STORES], 'readwrite');
+    const native = tx as unknown as Parameters<typeof captureImageInTransaction>[0];
+    const captured = await captureImageInTransaction(
+      native,
+      f.media.id,
+      mode === 'capture' ? { checkpoint: 'freeze' } : {}
+    );
+    await tx.done;
+    if (mode === 'capture') expect(captured?.phase).toBe('native');
+    else expect(captured).toBeNull();
+    const beforeRefusal = structuredClone(f.rows);
+    await expect(f.unload()).rejects.toThrow(
+      mode === 'capture' ? 'unfinished capture' : 'pending checkpoint'
+    );
+    expect(f.rows).toEqual(beforeRefusal);
+    expect(f.image()).toEqual(f.media);
+    expect(f.preview()).toEqual(f.presentation);
+    expect(f.table('asset_residency').size).toBe(0);
+  }
+);
 
 it('protects an offline pin through the current native editing closure', async () => {
   const f = await fixture();
@@ -608,3 +626,148 @@ it('aborts inline restore if cancellation arrives before transaction commit', as
   ).rejects.toMatchObject({ name: 'AbortError' });
   expect(f.rows).toEqual(before);
 });
+
+it('restores an unloaded original after a late independently rendered presentation', async () => {
+  const f = await fixture();
+  const oldCopy = await f.unload();
+  if (oldCopy === 'busy') throw new Error('Expected unloaded source');
+  const preview = new Blob(['independently rendered later'], { type: 'image/png' });
+  const thumbnail = new Blob(['new thumbnail'], { type: 'image/png' });
+  await commitImagePresentation({
+    aggregateId: f.media.id,
+    expectedWorkspaceRevision: 0,
+    previewBlob: preview,
+    thumbnailBlob: thumbnail,
+  });
+  const rebased = parseAssetResidencyRecord(f.table('asset_residency').get(f.copyId));
+  if (!rebased || rebased.kind !== 'copy' || rebased.target.kind !== 'inline-image')
+    throw new Error('Missing rebased copy');
+  expect(rebased).toMatchObject({
+    phase: 'unloaded',
+    revision: oldCopy.revision + 1,
+    operationId: oldCopy.operationId,
+    remote: oldCopy.remote,
+    lastUsedAt: oldCopy.lastUsedAt,
+  });
+  expect(rebased.target).not.toHaveProperty('duplicatePreview');
+  expect(rebased.target.nativeDigest).not.toBe(f.state.nativeDigest);
+  expect(f.table('sync_capture').get(f.stateKey)).toEqual({
+    ...f.state,
+    nativeDigest: rebased.target.nativeDigest,
+  });
+  const missing = f.image();
+  expect(isRecord(missing) && missing['blob']).toBeUndefined();
+  await expect(
+    restoreVerifiedAssetObject(
+      { copy: oldCopy, sourceBlob: f.source, authorization: f.input.authorization },
+      f.options
+    )
+  ).rejects.toThrow('intent changed');
+  expect(
+    await restoreVerifiedAssetObject(
+      { copy: rebased, sourceBlob: f.source, authorization: f.input.authorization },
+      f.options
+    )
+  ).toMatchObject({ phase: 'resident', revision: rebased.revision + 1 });
+  const image = f.image();
+  const presentation = f.preview();
+  if (
+    !isRecord(image) ||
+    !(image['blob'] instanceof Blob) ||
+    !isRecord(presentation) ||
+    !(presentation['previewBlob'] instanceof Blob) ||
+    !(presentation['thumbnailBlob'] instanceof Blob)
+  )
+    throw new Error('Restored bytes missing');
+  expect(await image['blob'].text()).toBe('abc');
+  expect(image['blob'].type).toBe(f.source.type);
+  expect(await presentation['previewBlob'].text()).toBe('independently rendered later');
+  expect(await presentation['thumbnailBlob'].text()).toBe('new thumbnail');
+  const tx = f.database.transaction([...EXPECTED_STORES], 'readonly');
+  const native = tx as unknown as Parameters<typeof freezeImageInTransaction>[0];
+  expect(digestCapturedImageRows(await freezeImageInTransaction(native, f.media.id))).toBe(
+    rebased.target.nativeDigest
+  );
+  await tx.done;
+});
+
+it('rejects an unload or restore prepared before presentation rebasing', async () => {
+  const f = await fixture();
+  const oldCopy = await f.unload();
+  if (oldCopy === 'busy') throw new Error('Expected unloaded source');
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  io.db.mockImplementationOnce(async () => {
+    entered();
+    await gate;
+    return f.database;
+  });
+  const restoring = restoreVerifiedAssetObject(
+    { copy: oldCopy, sourceBlob: f.source, authorization: f.input.authorization },
+    f.options
+  );
+  await started;
+  await commitImagePresentation({
+    aggregateId: f.media.id,
+    expectedWorkspaceRevision: 0,
+    previewBlob: new Blob(['late preview'], { type: 'image/png' }),
+    thumbnailBlob: new Blob(['late thumbnail'], { type: 'image/png' }),
+  });
+  const before = structuredClone(f.rows);
+  release();
+  await expect(restoring).rejects.toThrow('intent changed');
+  await expect(f.unload()).rejects.toThrow('unload revision is stale');
+  expect(f.rows).toEqual(before);
+  const current = parseAssetResidencyRecord(f.table('asset_residency').get(f.copyId));
+  if (!current || current.kind !== 'copy') throw new Error('Missing current recovery record');
+  expect(
+    await restoreVerifiedAssetObject(
+      { copy: current, sourceBlob: f.source, authorization: f.input.authorization },
+      f.options
+    )
+  ).toMatchObject({ phase: 'resident' });
+  const presentation = f.preview();
+  if (!isRecord(presentation) || !(presentation['previewBlob'] instanceof Blob))
+    throw new Error('Missing preview');
+  expect(await presentation['previewBlob'].text()).toBe('late preview');
+});
+
+it.each(['aggregate_presentations', 'sync_capture', 'asset_residency'] as const)(
+  'rolls back the presentation, root digest and inline recovery target after %s refusal',
+  async (store) => {
+    const f = await fixture();
+    const copy = await f.unload();
+    if (copy === 'busy') throw new Error('Expected unloaded source');
+    const before = structuredClone(f.rows);
+    const input = {
+      aggregateId: f.media.id,
+      expectedWorkspaceRevision: 0,
+      previewBlob: new Blob(['late preview'], { type: 'image/png' }),
+      thumbnailBlob: new Blob(['late thumbnail'], { type: 'image/png' }),
+    };
+    f.fault(store);
+    await expect(commitImagePresentation(input)).rejects.toMatchObject({
+      name: 'QuotaExceededError',
+    });
+    expect(f.rows).toEqual(before);
+    f.allow();
+    await commitImagePresentation(input);
+    const current = parseAssetResidencyRecord(f.table('asset_residency').get(f.copyId));
+    if (!current || current.kind !== 'copy' || current.target.kind !== 'inline-image')
+      throw new Error('Missing inline recovery record');
+    expect(current.revision).toBe(copy.revision + 1);
+    expect(current.target).not.toHaveProperty('duplicatePreview');
+    await expect(
+      restoreVerifiedAssetObject(
+        { copy: current, sourceBlob: f.source, authorization: f.input.authorization },
+        f.options
+      )
+    ).resolves.toMatchObject({ phase: 'resident' });
+  }
+);

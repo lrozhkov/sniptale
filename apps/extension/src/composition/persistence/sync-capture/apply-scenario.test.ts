@@ -1,3 +1,4 @@
+import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import { createScenarioReplicaFixture } from './test-support/scenario-replica.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -12,12 +13,18 @@ import { applyCatalogDeletionNative, type ApplyCatalogDeletionInput } from './ap
 import { parseSyncCaptureRecord, hashCaptureText } from './guards';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { createMediaLibraryEntry } from '../projects/index.test-support';
-import { loadScenarioReplicaPredecessorAssets } from './apply-scenario';
+import { loadScenarioReplicaPredecessorAssets, loadScenarioReplicaExport } from './apply-scenario';
+import {
+  runWithPersistenceMutationPermit,
+  type PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
+import { assetResidencyCopyId } from '../assets/residency-records';
 import { captureRootKey } from './contracts';
 import { applyPreparedScenarioReplica } from './apply-scenario';
 
 const io = vi.hoisted(() => ({
   database: vi.fn(),
+  capture: vi.fn(),
   mutate: vi.fn(),
   read: vi.fn(),
   journals: vi.fn(),
@@ -27,6 +34,7 @@ const io = vi.hoisted(() => ({
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: io.database,
+  capturePreparedDatabase: io.capture,
 }));
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: (effect: unknown) => io.mutate(effect),
@@ -53,7 +61,11 @@ beforeEach(() => {
 function setup() {
   const data = createScenarioReplicaFixture();
   io.database.mockResolvedValue(data.database);
-  io.mutate.mockImplementation(data.mutate);
+  io.capture.mockReturnValue(data.database);
+  io.mutate.mockImplementation(
+    (effect: (db: typeof data.database, permit: PersistenceMutationPermit) => Promise<unknown>) =>
+      runWithPersistenceMutationPermit((permit) => data.mutate((db) => effect(db, permit)))
+  );
   io.read.mockImplementation(
     async (ref: { size: number; mimeType: string }) =>
       new File([new Uint8Array(ref.size)], 'metadata', { type: ref.mimeType })
@@ -755,3 +767,415 @@ it.each(['complete', 'missing', 'generation', 'retarget'] as const)(
     });
   }
 );
+
+it('refuses a pending checkpoint before the first causal Scenario state', async () => {
+  const f = setup();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'scenario-project', rootId: f.input.root.entry.id },
+    2
+  );
+  await tx.done;
+  expect(pending).not.toBeNull();
+  const before = structuredClone(f.fixture.rows);
+  await expect(applyPreparedScenarioReplica(f.input)).rejects.toThrow();
+  expect(f.fixture.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedScenarioReplica(f.input)).resolves.toMatchObject({ status: 'applied' });
+});
+
+it('refuses pending work with unchanged causal generation and native digest', async () => {
+  const f = await withDependentMontage();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'scenario-project', rootId: f.input.root.entry.id },
+    2
+  );
+  await tx.done;
+  const before = structuredClone(f.fixture.rows);
+  await expect(applyPreparedScenarioReplica(f.next)).rejects.toThrow();
+  expect(f.fixture.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedScenarioReplica(f.next)).resolves.toMatchObject({ status: 'applied' });
+});
+
+function deferredScenario() {
+  const f = setup();
+  const authorization = { incarnation: '22222222-2222-4222-8222-222222222222', revision: 1 };
+  const binding = {
+    provider: 'webdav' as const,
+    rootUrl: 'https://dav.example.test/root/',
+    accountId: 'alice',
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: 1,
+  };
+  f.input.authorization = authorization;
+  f.fixture.rows.get('sync_connection')!.set('connection', {
+    version: 1,
+    kind: 'sync-connection',
+    key: 'connection',
+    binding,
+    identity: authorization,
+    phase: 'active',
+    updateNonce: null,
+    credentialId: '33333333-3333-4333-8333-333333333333',
+  });
+  const ref: AssetRef = {
+    assetId: 'deferred-html',
+    createdAt: 1,
+    mimeType: 'text/html;charset=utf-8',
+    size: 11,
+    sha256: 'd'.repeat(64),
+    location: { kind: 'opfs', objectKey: 'objects/deferred-html' },
+  };
+  const entry = {
+    id: 'saved-html',
+    projectId: f.input.root.entry.id,
+    format: 'html' as const,
+    filename: 'guide.html',
+    size: ref.size,
+    createdAt: 1,
+    html: { mode: 'guide' as const, assetId: ref.assetId },
+  };
+  const descriptor = { entry, ref, remote: { key: 'objects/remote-html', sha256: ref.sha256! } };
+  f.input.root.exports = [entry];
+  f.input.root.exportRefs = [ref];
+  f.input.root.deferredExports = [descriptor];
+  const copyId = assetResidencyCopyId({ kind: 'opfs', ref });
+  return { ...f, descriptor, ref, entry, binding, authorization, copyId };
+}
+
+it(
+  'publishes deferred Scenario HTML metadata, owner and exact unloaded binding with ' +
+    'the accepted receipt',
+  async () => {
+    const f = deferredScenario();
+    expect(await applyPreparedScenarioReplica(f.input)).toMatchObject({
+      status: 'applied',
+      generation: 1,
+    });
+    expect(f.fixture.rows.get('asset_residency')!.get(f.copyId)).toMatchObject({
+      phase: 'unloaded',
+      target: { kind: 'opfs', ref: f.ref },
+      remote: { ...f.descriptor.remote, binding: f.binding },
+    });
+    expect(f.fixture.rows.get('asset_refs')!.get(f.ref.assetId)).toEqual(f.ref);
+    expect([...f.fixture.rows.get('asset_owners')!.values()]).toContainEqual({
+      assetId: f.ref.assetId,
+      ownerId: f.entry.id,
+      ownerKind: 'scenario-export',
+      role: 'body',
+    });
+    expect(io.read).not.toHaveBeenCalled();
+    const before = structuredClone(f.fixture.rows);
+    const replay = structuredClone(f.input);
+    replay.root.deferredExports![0]!.remote.key = 'objects/other';
+    expect(await applyPreparedScenarioReplica(replay)).toMatchObject({
+      status: 'duplicate',
+      generation: 1,
+    });
+    expect(f.fixture.rows).toEqual(before);
+  }
+);
+
+it('rolls back a deferred Scenario copy and descriptors when its receipt fails, then retries exactly', async () => {
+  const f = deferredScenario();
+  const before = structuredClone(f.fixture.rows);
+  f.fail();
+  await expect(applyPreparedScenarioReplica(f.input)).rejects.toThrow();
+  expect(f.fixture.rows).toEqual(before);
+  f.resume();
+  expect(await applyPreparedScenarioReplica(f.input)).toMatchObject({ status: 'applied' });
+  expect(f.fixture.rows.get('asset_residency')!.get(f.copyId)).toMatchObject({ phase: 'unloaded' });
+});
+
+it(
+  'reuses exact deferred Scenario export ownership through a successor without ' +
+    'deleting its retained ref',
+  async () => {
+    const f = deferredScenario();
+    await applyPreparedScenarioReplica(f.input);
+    const previous = (await f.current())!;
+    const copy = structuredClone(f.fixture.rows.get('asset_residency')!.get(f.copyId));
+    const successor = structuredClone(f.input);
+    successor.operationId = 'successor';
+    successor.sourceDigest = 'b'.repeat(64);
+    successor.expectedLocalGeneration = 1;
+    successor.expectedBasis = [f.input.operationId];
+    successor.expectedWorkspaceRevision = previous.workspaceRevision;
+    successor.root.deferredExports![0]!.reuseExisting = true;
+    expect(await applyPreparedScenarioReplica(successor)).toMatchObject({
+      status: 'applied',
+      generation: 2,
+    });
+    expect(f.fixture.rows.get('asset_refs')!.get(f.ref.assetId)).toEqual(f.ref);
+    expect(f.fixture.rows.get('asset_residency')!.get(f.copyId)).toEqual(copy);
+    expect(io.cleanup).not.toHaveBeenCalled();
+    expect(
+      await loadScenarioReplicaExport({
+        spaceId: 'space',
+        profileCreatedAt: 1,
+        connectionGeneration: 1,
+        authorization: f.authorization,
+        projectId: f.entry.projectId,
+        exportId: f.entry.id,
+        expectedLocalGeneration: 2,
+        expectedBasis: ['successor'],
+      })
+    ).toMatchObject({ entry: f.entry, ref: f.ref, copy });
+  }
+);
+
+async function deferredSuccessor() {
+  const f = deferredScenario();
+  await applyPreparedScenarioReplica(f.input);
+  const next = structuredClone(f.input);
+  next.operationId = 'deferred-successor';
+  next.sourceDigest = 'e'.repeat(64);
+  next.expectedLocalGeneration = 1;
+  next.expectedBasis = [f.input.operationId];
+  next.expectedWorkspaceRevision = (await f.current())!.workspaceRevision;
+  next.root.deferredExports![0]!.reuseExisting = true;
+  const selection = {
+    spaceId: 'space',
+    profileCreatedAt: 1,
+    connectionGeneration: 1,
+    authorization: f.authorization,
+    projectId: f.entry.projectId,
+    exportId: f.entry.id,
+    expectedLocalGeneration: 1,
+    expectedBasis: [f.input.operationId],
+  };
+  return { ...f, next, selection };
+}
+
+it.each(['export', 'ref', 'owner', 'copy'] as const)(
+  'refuses a fresh deferred Scenario %s collision before publication',
+  async (kind) => {
+    const f = deferredScenario();
+    if (kind === 'export')
+      f.fixture.rows.get('scenario_exports')!.set(f.entry.id, { ...f.entry, projectId: 'foreign' });
+    if (kind === 'ref') f.fixture.rows.get('asset_refs')!.set(f.ref.assetId, f.ref);
+    if (kind === 'owner')
+      f.fixture.rows.get('asset_owners')!.set(JSON.stringify(['foreign', 'retained', 'body']), {
+        assetId: f.ref.assetId,
+        ownerId: 'retained',
+        ownerKind: 'foreign',
+        role: 'body',
+      });
+    if (kind === 'copy')
+      f.fixture.rows.get('asset_residency')!.set(f.copyId, { id: f.copyId, kind: 'copy' });
+    const before = structuredClone(f.fixture.rows);
+    await expect(applyPreparedScenarioReplica(f.input)).rejects.toThrow();
+    expect(f.fixture.rows).toEqual(before);
+    expect(io.cleanup).not.toHaveBeenCalled();
+  }
+);
+
+it('preserves one exact deferred Scenario winning binding under parallel writers', async () => {
+  const f = deferredScenario();
+  const other = structuredClone(f.input);
+  other.operationId = 'parallel-deferred';
+  other.sourceDigest = 'f'.repeat(64);
+  other.root.deferredExports![0]!.remote.key = 'objects/parallel';
+  const results = await Promise.allSettled([
+    applyPreparedScenarioReplica(f.input),
+    applyPreparedScenarioReplica(other),
+  ]);
+  expect(results.filter((item) => item.status === 'fulfilled')).toHaveLength(1);
+  expect(results.filter((item) => item.status === 'rejected')).toHaveLength(1);
+  expect(f.fixture.rows.get('asset_residency')!.get(f.copyId)).toMatchObject({
+    remote: { ...f.descriptor.remote, binding: f.binding },
+  });
+  expect(
+    await loadScenarioReplicaExport({
+      spaceId: 'space',
+      profileCreatedAt: 1,
+      connectionGeneration: 1,
+      authorization: f.authorization,
+      projectId: f.entry.projectId,
+      exportId: f.entry.id,
+      expectedLocalGeneration: 1,
+      expectedBasis: [f.input.operationId],
+    })
+  ).toMatchObject({ entry: f.entry, ref: f.ref });
+});
+
+it.each(['owner', 'ref', 'copy', 'binding', 'authorization', 'basis', 'pending'] as const)(
+  'refuses retained deferred Scenario %s changes in publication and export selection',
+  async (kind) => {
+    const f = await deferredSuccessor();
+    if (kind === 'owner')
+      f.fixture.rows
+        .get('asset_owners')!
+        .delete(JSON.stringify(['scenario-export', f.entry.id, 'body']));
+    if (kind === 'ref')
+      f.fixture.rows.get('asset_refs')!.set(f.ref.assetId, { ...f.ref, createdAt: 2 });
+    if (kind === 'copy') {
+      const copy = f.fixture.rows.get('asset_residency')!.get(f.copyId);
+      if (!isRecord(copy) || !isRecord(copy['remote'])) throw new Error('Missing copy');
+      f.fixture.rows.get('asset_residency')!.set(f.copyId, {
+        ...copy,
+        remote: { ...copy['remote'], binding: { ...f.binding, accountId: 'foreign' } },
+      });
+    }
+    if (kind === 'binding' || kind === 'authorization') {
+      const connection = f.fixture.rows.get('sync_connection')!.get('connection');
+      if (!isRecord(connection)) throw new Error('Missing connection');
+      f.fixture.rows
+        .get('sync_connection')!
+        .set(
+          'connection',
+          kind === 'binding'
+            ? { ...connection, binding: { ...f.binding, rootUrl: 'https://other.example.test/' } }
+            : { ...connection, identity: { ...f.authorization, revision: 2 } }
+        );
+    }
+    if (kind === 'basis') {
+      f.next.expectedBasis = ['foreign'];
+      f.selection.expectedBasis = ['foreign'];
+    }
+    if (kind === 'pending') {
+      const tx = f.database.transaction(['sync_capture'], 'readwrite');
+      expect(
+        await deferCheckpointInTransaction(
+          tx,
+          { rootKind: 'scenario-project', rootId: f.entry.projectId },
+          2
+        )
+      ).not.toBeNull();
+      await tx.done;
+    }
+    const before = structuredClone(f.fixture.rows);
+    await expect(applyPreparedScenarioReplica(f.next)).rejects.toThrow();
+    await expect(loadScenarioReplicaExport(f.selection)).rejects.toThrow();
+    expect(f.fixture.rows).toEqual(before);
+  }
+);
+
+it('retains a local owned Scenario export without manufacturing unloaded evidence', async () => {
+  const f = await deferredSuccessor();
+  f.fixture.rows.get('asset_residency')!.delete(f.copyId);
+  expect(await loadScenarioReplicaExport(f.selection)).toMatchObject({
+    entry: f.entry,
+    ref: f.ref,
+    copy: null,
+  });
+  expect(await applyPreparedScenarioReplica(f.next)).toMatchObject({
+    status: 'applied',
+    generation: 2,
+  });
+  expect(f.fixture.rows.get('asset_residency')!.has(f.copyId)).toBe(false);
+  expect(f.fixture.rows.get('asset_refs')!.get(f.ref.assetId)).toEqual(f.ref);
+  expect(io.cleanup).not.toHaveBeenCalled();
+});
+
+it('refuses a delayed deferred Scenario publication after its database handle is replaced', async () => {
+  const f = deferredScenario();
+  let entered!: () => void;
+  let release!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  f.input.root.thumbnails = [
+    {
+      entry: { assetId: 'scenario:guide', createdAt: 1, updatedAt: 1, width: 1, height: 1 },
+      ref: {
+        ...f.ref,
+        assetId: 'thumb',
+        location: { kind: 'opfs', objectKey: 'objects/thumb' },
+        mimeType: 'image/png',
+        size: 1,
+        sha256: null,
+      },
+    },
+  ];
+  io.read.mockImplementationOnce(async () => {
+    entered();
+    await gate;
+    return new File(['x'], 'thumb', { type: 'image/png' });
+  });
+  const pending = applyPreparedScenarioReplica(f.input);
+  await started;
+  const replacement = { ...f.database };
+  io.capture.mockReturnValue(replacement);
+  io.mutate.mockImplementationOnce(
+    (effect: (db: typeof f.database, permit: PersistenceMutationPermit) => Promise<unknown>) =>
+      runWithPersistenceMutationPermit((permit) => effect(replacement, permit))
+  );
+  const before = structuredClone(f.fixture.rows);
+  release();
+  await expect(pending).rejects.toThrow();
+  expect(f.fixture.rows).toEqual(before);
+});
+
+it('restores a deleted Scenario with fresh deferred HTML while refusing its old predecessor', async () => {
+  const f = await deferredSuccessor();
+  const deletion = await scenarioDeletion(f);
+  expect(await applyCatalogDeletionNative(deletion)).toMatchObject({
+    status: 'applied',
+    generation: 2,
+  });
+  expect(
+    await loadScenarioReplicaExport({
+      ...f.selection,
+      expectedLocalGeneration: 2,
+      expectedBasis: [deletion.operationId],
+    })
+  ).toBeNull();
+  const restored = structuredClone(f.input);
+  restored.operationId = 'deferred-recreation';
+  restored.sourceDigest = 'f'.repeat(64);
+  restored.expectedLocalGeneration = 2;
+  restored.expectedBasis = [deletion.operationId];
+  restored.expectedWorkspaceRevision = null;
+  const ref = {
+    ...f.ref,
+    assetId: 'recreated-html',
+    location: { kind: 'opfs' as const, objectKey: 'objects/recreated-html' },
+  };
+  const entry = { ...f.entry, html: { ...f.entry.html, assetId: ref.assetId } };
+  restored.root.exports = [entry];
+  restored.root.exportRefs = [ref];
+  restored.root.deferredExports = [
+    { entry, ref, remote: { key: 'objects/recreated-remote', sha256: ref.sha256! } },
+  ];
+  expect(await applyPreparedScenarioReplica(restored)).toMatchObject({
+    status: 'applied',
+    generation: 3,
+  });
+  const before = structuredClone(f.fixture.rows);
+  await expect(applyPreparedScenarioReplica(f.next)).rejects.toThrow();
+  await expect(loadScenarioReplicaExport(f.selection)).rejects.toThrow();
+  expect(f.fixture.rows).toEqual(before);
+  expect(f.fixture.rows.get('asset_refs')!.get(ref.assetId)).toEqual(ref);
+});
+
+it('refuses deferred HTML publication behind a pending checkpoint before its first causal state', async () => {
+  const f = deferredScenario();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(
+    await deferCheckpointInTransaction(
+      tx,
+      { rootKind: 'scenario-project', rootId: f.entry.projectId },
+      2
+    )
+  ).not.toBeNull();
+  await tx.done;
+  const before = structuredClone(f.fixture.rows);
+  await expect(applyPreparedScenarioReplica(f.input)).rejects.toThrow();
+  expect(f.fixture.rows).toEqual(before);
+  expect(f.fixture.rows.get('asset_residency')!.has(f.copyId)).toBe(false);
+});

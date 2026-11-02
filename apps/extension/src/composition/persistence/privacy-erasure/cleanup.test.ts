@@ -323,3 +323,48 @@ it('erases private recovery records and claims through the canonical inventory',
   expect(local).toEqual({});
   expect(session).toEqual({});
 });
+
+it('removes shared protection with preferences retained', async () => {
+  const native = new Map<string, unknown>([
+    ['control', { key: 'control', phase: 'transitioning' }],
+    ['journal', { key: 'journal', envelope: 'encrypted-target', recoveryKey: 'opaque-native-key' }],
+  ]);
+  const local = new Map<string, unknown>([
+    ['sniptale_ai_secret_protection', { mode: 'passphrase', verifier: 'encrypted-verifier' }],
+    ['sniptale-theme-preference', 'dark'],
+  ]);
+  const session = new Map<string, unknown>([
+    [AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY, { requestId: 'pending' }],
+  ]);
+  function install(area: ReturnType<typeof createStorageArea>, values: Map<string, unknown>) {
+    area.get.mockImplementation(async (input: unknown) => {
+      const keys =
+        input === null ? [...values.keys()] : typeof input === 'string' ? [input] : input;
+      if (!Array.isArray(keys) || !keys.every((key): key is string => typeof key === 'string'))
+        throw new Error('Invalid fixture read');
+      return Object.fromEntries(
+        keys.filter((key) => values.has(key)).map((key) => [key, values.get(key)])
+      );
+    });
+    area.remove.mockImplementation(async (input) => {
+      for (const key of typeof input === 'string' ? [input] : input) values.delete(key);
+    });
+  }
+  install(deps.browserStorageAreas.local, local);
+  install(deps.browserStorageAreas.session, session);
+  deps.indexedDb.clearStores.mockImplementation(async (names) => {
+    if (names.includes('secret_protection')) native.clear();
+  });
+  deps.indexedDb.countStores.mockImplementation(async (names) =>
+    names.includes('secret_protection') ? native.size : 0
+  );
+  const result = await erasePersistentLocalExtensionData(
+    { includeAiProviderSecrets: true, preservePreferences: true },
+    deps
+  );
+  expect(result.success).toBe(true);
+  expect(native.size).toBe(0);
+  expect(local.has('sniptale_ai_secret_protection')).toBe(false);
+  expect(session.has(AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY)).toBe(false);
+  expect(local.get('sniptale-theme-preference')).toBe('dark');
+});

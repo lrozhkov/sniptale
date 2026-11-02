@@ -1,6 +1,21 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSyncProductExecution } from './product-execution';
+import { createSyncProductExecution as createProductExecution } from './product-execution';
+function createSyncProductExecution(...args: Parameters<typeof createProductExecution>) {
+  const [input, permission, onLibrary, onQueue, automatic, retirement, credentials] = args;
+  return createProductExecution(
+    input,
+    permission,
+    onLibrary,
+    onQueue,
+    automatic,
+    retirement,
+    credentials ?? {
+      resolveAuthentication: () => mocks.authentication(input.authorization),
+      checkProtection: async () => true,
+    }
+  );
+}
 const mocks = vi.hoisted(() => ({
   logInfo: vi.fn(),
   logWarn: vi.fn(),
@@ -20,6 +35,9 @@ const mocks = vi.hoisted(() => ({
   ready: vi.fn(),
   prepareEditing: vi.fn(),
   locallyReady: vi.fn(),
+  createAllowance: vi.fn(() => ({ reserveObject: vi.fn() })),
+  prepareScenarioExport: vi.fn(),
+  libraryBackup: vi.fn(),
 }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ info: mocks.logInfo, warn: mocks.logWarn }),
@@ -50,7 +68,12 @@ vi.mock('../../workflows/sync-transfer/catalog-refresh', () => ({
 vi.mock('../../workflows/sync-transfer/catalog-view', () => ({
   readCheckedPersistedSyncCatalog: mocks.cached,
 }));
+vi.mock('../../workflows/sync-transfer/retained-library', () => ({
+  prepareLibraryBackupInRuntime: mocks.libraryBackup,
+}));
 vi.mock('../../workflows/sync-transfer/native-residency', () => ({
+  createSyncDownloadAllowance: mocks.createAllowance,
+  prepareNativeScenarioExport: mocks.prepareScenarioExport,
   prepareNativeEditingRoot: mocks.prepareEditing,
   isNativeEditingRootReady: mocks.locallyReady,
 }));
@@ -111,6 +134,8 @@ beforeEach(() => {
   mocks.verify.mockResolvedValue(undefined);
   mocks.ready.mockResolvedValue(undefined);
   mocks.prepareEditing.mockResolvedValue({ downloaded: 0 });
+  mocks.prepareScenarioExport.mockResolvedValue({ downloaded: 0 });
+  mocks.libraryBackup.mockResolvedValue(undefined);
   mocks.locallyReady.mockResolvedValue(true);
   mocks.refresh.mockResolvedValue(catalog());
   mocks.cached.mockResolvedValue(catalog());
@@ -554,6 +579,7 @@ it('refreshes metadata and delegates automatic native work inside the checked co
       scope,
       authorization,
       catalog: expect.objectContaining({ roots: expect.any(Map) }),
+      binaryAdmission: 'resident',
       signal,
     })
   );
@@ -889,3 +915,209 @@ it('does not start retirement after current connection admission fails', async (
   ).run();
   expect(retire.run).not.toHaveBeenCalled();
 });
+
+it('preserves secrets-locked in the product execution projection', async () => {
+  const { SyncRemoteError } = await import('../../workflows/sync-transfer/remote-store');
+  mocks.webdav.mockRejectedValueOnce(new SyncRemoteError('secrets-locked'));
+  await expect(thumbnailExecution().run()).resolves.toMatchObject({
+    state: 'failed',
+    failureCode: 'secrets-locked',
+    containment: 'contained',
+  });
+});
+
+it.each([null, { version: 1, mode: 'keep-local' }, { version: 2, mode: 'on-demand' }])(
+  'refuses automatic native work under unsupported explicit native storage policy %j',
+  async (storagePolicy) => {
+    mocks.connection.mockResolvedValue({ ...metadata, storagePolicy });
+    const automatic = { run: vi.fn() };
+    const execution = createSyncProductExecution(
+      { ...scopeBinding(), work: { kind: 'automatic-sync' }, signal: new AbortController().signal },
+      async () => true,
+      undefined,
+      undefined,
+      automatic
+    );
+    await expect(execution.run()).resolves.toMatchObject({
+      state: 'failed',
+      failureCode: 'invalid-data',
+      containment: 'contained',
+    });
+    expect(automatic.run).not.toHaveBeenCalled();
+    expect(mocks.receive).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['native-prepare', 'backup-prepare'] as const)(
+  '%s creates one finite action allowance and passes it into native preparation',
+  async (kind) => {
+    const allowance = { reserveObject: vi.fn() };
+    mocks.createAllowance.mockReturnValueOnce(allowance);
+    const execution = createSyncProductExecution(
+      {
+        ...scopeBinding(),
+        work: { kind, root: { rootKind: 'video-project', rootId: 'project' } },
+        signal: new AbortController().signal,
+      },
+      async () => true
+    );
+    await expect(execution.run()).resolves.toMatchObject({ state: 'ready' });
+    expect(mocks.createAllowance).toHaveBeenCalledOnce();
+    expect(mocks.prepareEditing).toHaveBeenCalledWith(
+      expect.objectContaining({ downloadAllowance: allowance })
+    );
+  }
+);
+it('replica-prepare shares its allowance with receive and the final native readiness fallback', async () => {
+  const allowance = { reserveObject: vi.fn() };
+  mocks.createAllowance.mockReturnValueOnce(allowance);
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'replica-prepare', selection: selected },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  await expect(execution.run()).resolves.toMatchObject({ state: 'ready' });
+  expect(mocks.receive).toHaveBeenCalledWith(
+    expect.objectContaining({ downloadAllowance: allowance })
+  );
+  expect(mocks.prepareEditing).toHaveBeenCalledWith(
+    expect.objectContaining({ downloadAllowance: allowance })
+  );
+  expect(mocks.createAllowance).toHaveBeenCalledOnce();
+});
+
+it('prepares only the chosen saved HTML artifact with its own allowance and exact completion', async () => {
+  const allowance = { reserveObject: vi.fn() };
+  mocks.createAllowance.mockReturnValueOnce(allowance);
+  const target = { projectId: 'scenario', exportId: 'saved-html' };
+  const signal = new AbortController().signal;
+  const execution = createSyncProductExecution(
+    { ...scopeBinding(), work: { kind: 'scenario-export-prepare', ...target }, signal },
+    async () => true
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'ready',
+    completion: { kind: 'scenario-export', ...target },
+  });
+  expect(mocks.prepareScenarioExport).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      ...target,
+      signal,
+      binding: metadata.binding,
+      authorization,
+      downloadAllowance: allowance,
+    })
+  );
+  expect(mocks.refresh).not.toHaveBeenCalled();
+  expect(mocks.receive).not.toHaveBeenCalled();
+  expect(mocks.prepareEditing).not.toHaveBeenCalled();
+});
+it('preserves failed selected HTML preparation and drains without a ready artifact receipt', async () => {
+  mocks.prepareScenarioExport.mockRejectedValueOnce(new Error('Missing historical HTML'));
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: { kind: 'scenario-export-prepare', projectId: 'scenario', exportId: 'saved-html' },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'failed',
+    completion: null,
+    containment: 'contained',
+  });
+  expect(mocks.prepareScenarioExport).toHaveBeenCalledOnce();
+  expect(mocks.close).toHaveBeenCalledOnce();
+});
+
+const libraryOptions = {
+  includeDrafts: false,
+  includeSourceMetadata: true,
+  includeTelemetry: false,
+  includeWebSnapshots: false,
+  scope: 'all' as const,
+};
+it(
+  'library backup creates one action allowance and delegates final selected options ' +
+    'to its existing workflow',
+  async () => {
+    const signal = new AbortController().signal;
+    const execution = createSyncProductExecution(
+      {
+        ...scopeBinding(),
+        work: { kind: 'library-backup-prepare', expected: authorization, options: libraryOptions },
+        signal,
+      },
+      async () => true
+    );
+    await expect(execution.run()).resolves.toMatchObject({
+      state: 'ready',
+      completion: { kind: 'library-backup', expected: authorization, options: libraryOptions },
+      containment: 'contained',
+    });
+    expect(mocks.createAllowance).toHaveBeenCalledOnce();
+    expect(mocks.libraryBackup).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        catalog: expect.any(Object),
+        binding: metadata.binding,
+        authorization,
+        expected: authorization,
+        options: libraryOptions,
+        remote: expect.any(Object),
+        signal,
+        downloadAllowance: mocks.createAllowance.mock.results[0]?.value,
+      })
+    );
+    expect(mocks.receive).not.toHaveBeenCalled();
+    expect(mocks.prepareEditing).not.toHaveBeenCalled();
+    await execution.drain();
+  }
+);
+it('library backup refuses a changed native selection before transport allocation', async () => {
+  const execution = createSyncProductExecution(
+    {
+      ...scopeBinding(),
+      work: {
+        kind: 'library-backup-prepare',
+        expected: { ...authorization, revision: 2 },
+        options: libraryOptions,
+      },
+      signal: new AbortController().signal,
+    },
+    async () => true
+  );
+  await expect(execution.run()).resolves.toMatchObject({
+    state: 'failed',
+    failureCode: 'selection-changed',
+  });
+  expect(mocks.webdav).not.toHaveBeenCalled();
+  expect(mocks.libraryBackup).not.toHaveBeenCalled();
+  await execution.drain();
+});
+it(
+  'library backup cannot return ready after native connection replacement during its ' +
+    'asynchronous action',
+  async () => {
+    mocks.libraryBackup.mockImplementationOnce(async () => {
+      mocks.connection.mockResolvedValue({
+        ...metadata,
+        identity: { ...authorization, revision: 2 },
+      });
+    });
+    const execution = createSyncProductExecution(
+      {
+        ...scopeBinding(),
+        work: { kind: 'library-backup-prepare', expected: authorization, options: libraryOptions },
+        signal: new AbortController().signal,
+      },
+      async () => true
+    );
+    await expect(execution.run()).resolves.toMatchObject({ state: 'failed', completion: null });
+    expect(mocks.libraryBackup).toHaveBeenCalledOnce();
+    await execution.drain();
+  }
+);

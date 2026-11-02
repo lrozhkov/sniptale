@@ -405,3 +405,23 @@ it.each([false, true])(
     ).rejects.toThrow('admitted source');
   }
 );
+
+it('omits only disposable review presentation from the resident editing projection', async () => {
+  const f = fixture();
+  const parsed = await parsePortableSyncRoot(f.envelope, f.sourceMediaId);
+  expect(portableSyncEditingObjectIds(parsed, undefined, true)).toEqual([
+    'original',
+    'camera',
+    'music',
+  ]);
+  const refFor = vi.fn(f.refFor);
+  const root = await preparePortableVideoReviewRoot({
+    ...f,
+    refFor,
+    expectedLocalGeneration: 0,
+    omitPresentation: true,
+  });
+  expect(root.thumbnail).toBeUndefined();
+  expect(root.assets).toHaveLength(2);
+  expect(refFor).not.toHaveBeenCalledWith('thumbnail');
+});

@@ -2,6 +2,7 @@ import {
   preparePortableScenarioRoot,
   assertScenarioCausalDependencies,
   scenarioDependencyReferenceMaps,
+  type DeferredScenarioExport,
 } from './prepared-scenario';
 import { captureProfileBounds } from '../../composition/persistence/sync-capture/contracts';
 import {
@@ -129,9 +130,21 @@ export async function parsePortableSyncRoot(value: unknown, reviewSourceMediaId?
     if (
       metadata.entry.source.kind === 'screenshot' ||
       (metadata.entry.source.kind === 'stored-asset' &&
-        (metadata.entry.kind === 'image' || metadata.entry.kind === 'screenshot'))
+        (metadata.entry.kind === 'image' || metadata.entry.kind === 'screenshot')) ||
+      (metadata.entry.source.kind === 'project-asset' &&
+        (metadata.entry.kind === 'image' || metadata.entry.kind === 'screenshot') &&
+        (metadata.workspace !== undefined ||
+          metadata.presentation !== undefined ||
+          (metadata.entry.workspaceRevision ?? 0) > 0 ||
+          metadata.entry.imageContentState === 'edited'))
     ) {
-      exactKeys(metadata, ['entry', 'originalObjectId', 'workspace', 'presentation']);
+      exactKeys(metadata, [
+        'entry',
+        'originalObjectId',
+        'workspace',
+        'presentation',
+        ...(metadata.entry.source.kind === 'project-asset' ? ['projectAsset'] : []),
+      ]);
       if (metadata.entry.id !== envelope.descriptor.rootId)
         throw new Error('Portable image identity differs from its root.');
       await assertArchiveRootObjectInventory(envelope, metadataOnlyReader, []);
@@ -302,7 +315,8 @@ function editingProjectAssets(
 /** Editing closure includes retained private reviews and inline bytes, excluding saved exports. */
 export function portableSyncEditingObjectIds(
   parsed: ParsedPortableRoot,
-  retainedExportIds?: ReadonlySet<string>
+  retainedExportIds?: ReadonlySet<string>,
+  omitPresentation = false
 ): string[] {
   const retained =
     retainedExportIds ??
@@ -311,9 +325,31 @@ export function portableSyncEditingObjectIds(
         ? parsed.metadata.projectExports.map((item) => item.entry.id)
         : []
     );
-  if (parsed.kind === 'scenario-project')
-    return parsed.envelope.objects.map((object) => object.objectId);
-  if (parsed.kind === 'image') return parsed.envelope.objects.map((object) => object.objectId);
+  if (parsed.kind === 'scenario-project') {
+    const required = new Set([
+      ...parsed.metadata.assets.map((asset) => asset.objectId),
+      ...parsed.metadata.stepDocuments.flatMap((item) =>
+        item.document.assets.map((asset) => asset.objectId)
+      ),
+      ...(parsed.metadata.historyObjectId ? [parsed.metadata.historyObjectId] : []),
+    ]);
+    if (omitPresentation) return [...required];
+    const savedHtml = new Set(
+      parsed.metadata.exports.flatMap((item) => (item.html ? [item.html.objectId] : []))
+    );
+    return parsed.envelope.objects
+      .filter((object) => required.has(object.objectId) || !savedHtml.has(object.objectId))
+      .map((object) => object.objectId);
+  }
+  if (parsed.kind === 'image')
+    return omitPresentation
+      ? [
+          ...new Set([
+            parsed.metadata.originalObjectId,
+            ...(parsed.metadata.workspace?.document.assets.map((asset) => asset.objectId) ?? []),
+          ]),
+        ]
+      : parsed.envelope.objects.map((object) => object.objectId);
   if (parsed.kind === 'media')
     return [
       parsed.metadata.originalObjectId,
@@ -323,19 +359,25 @@ export function portableSyncEditingObjectIds(
     return [
       parsed.metadata.originalObjectId,
       ...(parsed.metadata.reviewAssets ?? []).map((asset) => asset.objectId),
-      ...(parsed.metadata.thumbnail ? [parsed.metadata.thumbnail.objectId] : []),
+      ...(!omitPresentation && parsed.metadata.thumbnail
+        ? [parsed.metadata.thumbnail.objectId]
+        : []),
     ];
   return [
     ...new Set([
       ...editingProjectAssets(parsed, retained).map((asset) => asset.objectId),
       ...parsed.metadata.projectExports.flatMap((item) =>
-        !retained.has(item.entry.id) && item.thumbnail ? [item.thumbnail.objectId] : []
+        !omitPresentation && !retained.has(item.entry.id) && item.thumbnail
+          ? [item.thumbnail.objectId]
+          : []
       ),
       ...(parsed.metadata.entry.project.effectSnapshots ?? []).flatMap((snapshot) =>
         snapshot.assets.map((asset) => asset.objectId)
       ),
-      ...(parsed.metadata.thumbnail ? [parsed.metadata.thumbnail.objectId] : []),
-      ...(parsed.metadata.presentation
+      ...(!omitPresentation && parsed.metadata.thumbnail
+        ? [parsed.metadata.thumbnail.objectId]
+        : []),
+      ...(!omitPresentation && parsed.metadata.presentation
         ? [
             parsed.metadata.presentation.thumbnailObjectId,
             ...(parsed.metadata.presentation.previewObjectId
@@ -508,7 +550,8 @@ async function prepareVideoRoot(
   local: PortableReplicaAdmission,
   sender: readonly PortableCausalDependency[],
   refFor: VerifiedObjectResolver,
-  deferredExports?: ReadonlyMap<string, DeferredProjectExport>
+  deferredExports?: ReadonlyMap<string, DeferredProjectExport>,
+  omitPresentation = false
 ): Promise<ApplyPreparedVideoProjectRevisionInput['root']> {
   const needed = new Set(portableSyncDependencyIds(parsed));
   // Later staging must not replace a predecessor child that another native root can retain.
@@ -644,7 +687,7 @@ async function prepareVideoRoot(
             remote: deferred.remote,
             ...(deferred.retainedEntry ? { reuseExisting: true } : {}),
             ...(videoReview ? { videoReview } : {}),
-            ...(!deferred.retainedEntry && item.thumbnail
+            ...(!omitPresentation && !deferred.retainedEntry && item.thumbnail
               ? {
                   thumbnail: {
                     entry: {
@@ -662,8 +705,8 @@ async function prepareVideoRoot(
         });
   for (const item of exports ?? [])
     if (item.videoReview) await verifyPreparedMediaReviewAnnotations(item.videoReview, assets);
-  const thumbnail = parsed.metadata.thumbnail;
-  const presentation = parsed.metadata.presentation;
+  const thumbnail = omitPresentation ? undefined : parsed.metadata.thumbnail;
+  const presentation = omitPresentation ? undefined : parsed.metadata.presentation;
   return parsePreparedVideoProjectReplicaRoot({
     entry: { ...parsed.entry, project },
     assets,
@@ -707,7 +750,9 @@ export async function preparePortableReplica(args: {
   envelope: unknown;
   reviewSourceMediaId?: string;
   verifiedObjects: ReadonlyMap<string, AssetRef>;
+  omitPresentation?: boolean;
   deferredExports?: ReadonlyMap<string, DeferredProjectExport>;
+  deferredScenarioExports?: ReadonlyMap<string, DeferredScenarioExport>;
   senderDependencies: readonly PortableCausalDependency[];
   senderRootDependencies?: readonly CausalRootDependency[];
   admission: PortableReplicaAdmission;
@@ -794,7 +839,7 @@ export async function preparePortableReplica(args: {
       input: {
         ...identity,
         expectedNativeRevision: local.expectedWorkspaceRevision,
-        ...preparePortableImageRows(parsed.metadata, refFor),
+        ...preparePortableImageRows(parsed.metadata, refFor, args.omitPresentation),
       },
     };
   } else {
@@ -822,7 +867,9 @@ export async function preparePortableReplica(args: {
         admission: local,
         refFor,
         stageNativeMetadata: args.stageNativeMetadata,
-        objectIds: parsed.envelope.objects.map((object) => object.objectId),
+        objectIds: portableSyncEditingObjectIds(parsed, undefined, args.omitPresentation),
+        omitPresentation: args.omitPresentation ?? false,
+        ...(args.deferredScenarioExports ? { deferredExports: args.deferredScenarioExports } : {}),
       });
       payload = {
         kind: 'scenario-project',
@@ -844,6 +891,7 @@ export async function preparePortableReplica(args: {
         sourceMediaId: parsed.sourceMediaId,
         dependencies: local.dependencies,
         expectedLocalGeneration: local.expectedLocalGeneration,
+        omitPresentation: args.omitPresentation ?? false,
         refFor,
       });
       payload = {
@@ -856,7 +904,14 @@ export async function preparePortableReplica(args: {
         },
       };
     } else {
-      const root = await prepareVideoRoot(parsed, local, sender, refFor, args.deferredExports);
+      const root = await prepareVideoRoot(
+        parsed,
+        local,
+        sender,
+        refFor,
+        args.deferredExports,
+        args.omitPresentation
+      );
       payload = {
         kind: 'video-project',
         input: {

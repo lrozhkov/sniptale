@@ -752,3 +752,122 @@ it('rechecks reader protection when an editor opens after the advisory precheck'
   expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
   expect(mocks.deleteObject).not.toHaveBeenCalled();
 });
+
+function ownedOriginalAndPreviewFixture() {
+  const f = publicationReleaseFixture();
+  const originalRef = { ...f.ref, size: 304 };
+  const preview = {
+    ...f.publication.objects[0]!,
+    objectId: 'preview',
+    filename: 'preview.png',
+    remoteKey: 'Files/published/preview.png',
+    sha256: 'e'.repeat(64),
+    ref: {
+      ...f.ref,
+      assetId: 'preview-output',
+      size: 1500,
+      sha256: 'e'.repeat(64),
+      location: { kind: 'opfs' as const, objectKey: 'objects/preview-output' },
+    },
+  };
+  const publication: PublishedCaptureOperation = {
+    ...f.publication,
+    objects: [{ ...f.publication.objects[0]!, ref: originalRef }, preview],
+  };
+  const owner = {
+    ownerKind: 'project-asset',
+    ownerId: 'native-original',
+    role: 'body',
+    assetId: originalRef.assetId,
+  };
+  f.table('asset_refs').set(originalRef.assetId, originalRef);
+  f.table('asset_owners').set('native-original', owner);
+  f.table('sync_capture').set(publication.key, publication);
+  return { ...f, publication, originalRef, preview, owner };
+}
+it('verifies only ownerless publication outputs without downloading a retained native original', async () => {
+  const f = ownedOriginalAndPreviewFixture();
+  const verify = vi.fn(async () => undefined);
+  const result = await releasePublishedOperationPins(f.publication, f.authorization, verify);
+  expect(verify).toHaveBeenCalledExactlyOnceWith(f.preview);
+  expect(result.released).toEqual([f.preview.ref.assetId]);
+  expect(mocks.deleteObject).toHaveBeenCalledExactlyOnceWith(f.preview.ref.assetId);
+  expect(f.table('asset_refs').get(f.originalRef.assetId)).toEqual(f.originalRef);
+  expect(f.table('asset_owners').get('native-original')).toEqual(f.owner);
+  expect(f.table('sync_capture').get(f.publication.key)).toMatchObject({
+    objects: [
+      { ref: f.originalRef, pinned: true },
+      { ref: f.preview.ref, pinned: false },
+    ],
+  });
+});
+
+it(
+  'keeps an initially retained original pinned when its native claims disappear ' +
+    'during output verification until the next pass',
+  async () => {
+    const f = ownedOriginalAndPreviewFixture();
+    const verify = vi.fn(async () => {
+      f.table('asset_refs').delete(f.originalRef.assetId);
+      f.table('asset_owners').delete('native-original');
+    });
+    const first = await releasePublishedOperationPins(f.publication, f.authorization, verify);
+    expect(verify).toHaveBeenCalledExactlyOnceWith(f.preview);
+    expect(first.released).toEqual([f.preview.ref.assetId]);
+    expect(mocks.deleteObject).toHaveBeenCalledExactlyOnceWith(f.preview.ref.assetId);
+    expect(f.table('sync_capture').get(f.publication.key)).toMatchObject({
+      objects: [
+        { ref: f.originalRef, pinned: true },
+        { ref: f.preview.ref, pinned: false },
+      ],
+    });
+    verify.mockClear();
+    const next = await releasePublishedOperationPins(
+      f.table('sync_capture').get(f.publication.key),
+      f.authorization,
+      verify
+    );
+    expect(verify).toHaveBeenCalledExactlyOnceWith(f.publication.objects[0]);
+    expect(next.released).toEqual([f.originalRef.assetId]);
+    expect(mocks.deleteObject.mock.calls).toEqual([
+      [f.preview.ref.assetId],
+      [f.originalRef.assetId],
+    ]);
+  }
+);
+it('retains a preverified output when a new native owner appears during remote verification', async () => {
+  const f = ownedOriginalAndPreviewFixture();
+  const adopted = {
+    ownerKind: 'project-asset',
+    ownerId: 'adopted-preview',
+    role: 'body',
+    assetId: f.preview.ref.assetId,
+  };
+  const verify = vi.fn(async () => {
+    f.table('asset_refs').set(f.preview.ref.assetId, f.preview.ref);
+    f.table('asset_owners').set('adopted-preview', adopted);
+  });
+  const result = await releasePublishedOperationPins(f.publication, f.authorization, verify);
+  expect(verify).toHaveBeenCalledExactlyOnceWith(f.preview);
+  expect(result).toEqual({ released: [], intent: null });
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+  expect(f.table('asset_operations').size).toBe(0);
+  expect(f.table('sync_capture').get(f.publication.key)).toEqual(f.publication);
+  expect(f.table('asset_refs').get(f.preview.ref.assetId)).toEqual(f.preview.ref);
+  expect(f.table('asset_owners').get('adopted-preview')).toEqual(adopted);
+});
+it('refuses uncertain native retention authority before any remote verification GET', async () => {
+  const f = ownedOriginalAndPreviewFixture();
+  f.table('project_assets').set('unknown-reference', {
+    id: 'unknown-reference',
+    assetId: f.preview.ref.assetId,
+  });
+  const before = structuredClone(f.rows);
+  const verify = vi.fn(async () => undefined);
+  await expect(
+    releasePublishedOperationPins(f.publication, f.authorization, verify)
+  ).rejects.toThrow('Invalid asset retention authority');
+  expect(verify).not.toHaveBeenCalled();
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+  expect(f.rows).toEqual(before);
+});

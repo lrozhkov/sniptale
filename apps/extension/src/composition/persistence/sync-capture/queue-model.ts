@@ -28,6 +28,7 @@ type SyncQueueStatus =
   | 'interrupted'
   | 'published';
 export type SyncQueueFailureCode =
+  | 'secrets-locked'
   | 'temporary'
   | 'authentication'
   | 'access-denied'
@@ -38,6 +39,7 @@ export type SyncQueueFailureCode =
   | 'internal'
   | 'interrupted';
 export const SYNC_QUEUE_FAILURE_CODES: readonly SyncQueueFailureCode[] = [
+  'secrets-locked',
   'temporary',
   'authentication',
   'access-denied',
@@ -101,6 +103,7 @@ export interface SyncQueueConnection extends SyncQueueScope, QueueHistory {
   paused: boolean;
   scheduleProgress: SyncQueueScheduleProgress | null;
   captureProgress?: SyncQueueCaptureProgress;
+  checkpointProgress?: SyncQueueCaptureProgress;
   enrollmentProgress?: SyncQueueEnrollmentProgress;
 }
 export interface SyncQueueOperation extends SyncQueueScope, QueueHistory {
@@ -331,6 +334,16 @@ export function parseSyncQueueConnection(value: unknown): SyncQueueConnection | 
     ? parseEnrollmentProgress(value['enrollmentProgress'])
     : undefined;
   if (enrollmentProgress === null) return null;
+  const checkpointProgress = Object.hasOwn(value, 'checkpointProgress')
+    ? parseCaptureProgress(value['checkpointProgress'])
+    : undefined;
+  if (
+    checkpointProgress === null ||
+    (checkpointProgress?.afterKey != null &&
+      (typeof checkpointProgress.afterKey !== 'string' ||
+        !checkpointProgress.afterKey.startsWith('["pending-checkpoint",')))
+  )
+    return null;
   const captureProgress = Object.hasOwn(value, 'captureProgress')
     ? parseCaptureProgress(value['captureProgress'])
     : undefined;
@@ -365,6 +378,7 @@ export function parseSyncQueueConnection(value: unknown): SyncQueueConnection | 
     paused: value['paused'],
     scheduleProgress,
     ...(captureProgress === undefined ? {} : { captureProgress }),
+    ...(checkpointProgress === undefined ? {} : { checkpointProgress }),
     ...(enrollmentProgress === undefined ? {} : { enrollmentProgress }),
   };
 }

@@ -1,3 +1,7 @@
+import { parseVideoProjectEntry } from './read-guards';
+import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
+import { captureRootKey, pendingCheckpointKey } from '../sync-capture/contracts';
+import { parseSyncCaptureRecord } from '../sync-capture/guards';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
@@ -151,6 +155,11 @@ async function verifyProjectReadListAndDelete() {
 
   await deleteVideoProject('project-1');
   expect(projectsDbMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
+}
+
+function requireSavedRevision(entry: { workspaceRevision?: number }): number {
+  if (entry.workspaceRevision === undefined) throw new Error('Saved workspace revision missing');
+  return entry.workspaceRevision;
 }
 
 describe('projects-db video project flows', () => {
@@ -792,4 +801,186 @@ describe('prepared annotation resources', () => {
     ).rejects.toThrow('new immutable identity');
     expect(projectsDbMocks.writeBlobToAssetMock).not.toHaveBeenCalled();
   });
+});
+
+describe('Montage native checkpoint ACK receipts', () => {
+  beforeEach(() => resetProjectsDbMocks(projectsDbMocks));
+  function nativeFixture() {
+    let refuseCapture = false;
+    const fixture = createReviewWorkspaceStoreFixture(
+      (name) => name === 'sync_capture' && refuseCapture
+    );
+    projectsDbMocks.initDBMock.mockResolvedValue(fixture.database);
+    fixture.rows.get('sync_capture')!.set('profile', {
+      version: 1,
+      kind: 'profile',
+      key: 'profile',
+      createdAt: 1,
+      enabled: true,
+      spaceId: 'receipt-space',
+      connectionGeneration: 1,
+      checkpointIntervalMs: 300000,
+    });
+    return {
+      ...fixture,
+      refuse: (value: boolean) => {
+        refuseCapture = value;
+      },
+    };
+  }
+
+  it('issues distinct exact pending receipts without persisting ACK metadata', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const fixture = nativeFixture();
+    const first = await saveVideoProject(
+      createVideoProject({ id: 'receipt-project', name: 'First edit' }),
+      { expectedWorkspaceRevision: null }
+    );
+    const key = pendingCheckpointKey(captureRootKey('receipt-space', 'video-project', first.id));
+    const firstPending = parseSyncCaptureRecord(fixture.rows.get('sync_capture')!.get(key));
+    if (firstPending?.kind !== 'pending-checkpoint')
+      throw new Error('Expected native pending work');
+    expect(first.checkpointReceipt).toEqual({
+      rootKind: 'video-project',
+      rootId: first.id,
+      revision: firstPending.revision,
+    });
+    const second = await saveVideoProject(
+      { ...first.project, name: 'Second edit' },
+      { expectedWorkspaceRevision: requireSavedRevision(first), expectedProject: first.project }
+    );
+    const secondPending = parseSyncCaptureRecord(fixture.rows.get('sync_capture')!.get(key));
+    if (secondPending?.kind !== 'pending-checkpoint')
+      throw new Error('Expected replacement pending work');
+    expect(second.checkpointReceipt).toEqual({
+      rootKind: 'video-project',
+      rootId: first.id,
+      revision: secondPending.revision,
+    });
+    expect(second.checkpointReceipt?.revision).not.toBe(first.checkpointReceipt?.revision);
+    const stored = fixture.rows.get('video_projects')!.get(first.id);
+    expect(stored).not.toHaveProperty('checkpointReceipt');
+    expect(second.project).not.toHaveProperty('checkpointReceipt');
+    const { checkpointReceipt: _receipt, ...entry } = second;
+    expect(parseVideoProjectEntry(stored)).toEqual(entry);
+    expect(firstPending.dueAt).toBe(secondPending.dueAt);
+    const { getVideoProject } = await import('./index');
+    const read = await getVideoProject(first.id);
+    expect(read).toMatchObject({ status: 'ready', project: second.project });
+    expect(read).not.toHaveProperty('checkpointReceipt');
+  });
+
+  it('exposes the pending receipt only after transaction completion', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const fixture = nativeFixture();
+    let entered!: () => void;
+    let finish!: () => void;
+    const reached = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const completion = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const original = fixture.database.transaction.bind(fixture.database);
+    vi.spyOn(fixture.database, 'transaction').mockImplementation((stores, mode) => {
+      const tx = original(stores, mode);
+      if (mode !== 'readwrite') return tx;
+      return {
+        objectStore: tx.objectStore.bind(tx),
+        abort: tx.abort.bind(tx),
+        get done() {
+          entered();
+          return completion.then(() => tx.done);
+        },
+      };
+    });
+    let acknowledged = false;
+    const saving = saveVideoProject(createVideoProject({ id: 'receipt-project' }), {
+      expectedWorkspaceRevision: null,
+    });
+    void saving.then(() => {
+      acknowledged = true;
+    });
+    await reached;
+    expect(acknowledged).toBe(false);
+    finish();
+    const saved = await saving;
+    expect(saved.checkpointReceipt).toBeDefined();
+    const key = pendingCheckpointKey(captureRootKey('receipt-space', 'video-project', saved.id));
+    const pending = parseSyncCaptureRecord(fixture.rows.get('sync_capture')!.get(key));
+    if (pending?.kind !== 'pending-checkpoint') throw new Error('Expected committed pending work');
+    expect(saved.checkpointReceipt?.revision).toBe(pending.revision);
+  });
+
+  it('refuses stale and aborted saves without issuing or consuming a receipt', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const fixture = nativeFixture();
+    const first = await saveVideoProject(createVideoProject({ id: 'receipt-project' }), {
+      expectedWorkspaceRevision: null,
+    });
+    const committed = structuredClone(fixture.rows);
+    await expect(
+      saveVideoProject(
+        { ...first.project, name: 'Stale edit' },
+        { expectedWorkspaceRevision: 0, expectedProject: first.project }
+      )
+    ).rejects.toMatchObject({ name: 'StaleVideoProjectSaveError' });
+    expect(fixture.rows).toEqual(committed);
+    fixture.refuse(true);
+    await expect(
+      saveVideoProject(
+        { ...first.project, name: 'Refused edit' },
+        { expectedWorkspaceRevision: requireSavedRevision(first), expectedProject: first.project }
+      )
+    ).rejects.toMatchObject({ name: 'QuotaExceededError' });
+    expect(fixture.rows).toEqual(committed);
+    fixture.refuse(false);
+    const retried = await saveVideoProject(
+      { ...first.project, name: 'Refused edit' },
+      { expectedWorkspaceRevision: requireSavedRevision(first), expectedProject: first.project }
+    );
+    expect(retried.checkpointReceipt).toBeDefined();
+    expect(first.checkpointReceipt).toBeDefined();
+    expect(retried.checkpointReceipt?.revision).not.toBe(first.checkpointReceipt?.revision);
+    expect(retried.project.name).toBe('Refused edit');
+  });
+
+  it.each(['unconfigured', 'immediate'] as const)(
+    'issues a due receipt only when immediate native work is configured: %s',
+    async (mode) => {
+      const { saveVideoProject } = await importProjectsDbModule();
+      const fixture = nativeFixture();
+      if (mode === 'unconfigured') fixture.rows.get('sync_capture')!.delete('profile');
+      else
+        fixture.rows.get('sync_capture')!.set('profile', {
+          version: 1,
+          kind: 'profile',
+          key: 'profile',
+          createdAt: 1,
+          enabled: true,
+          spaceId: 'receipt-space',
+          connectionGeneration: 1,
+          checkpointIntervalMs: 0,
+        });
+      const result = await saveVideoProject(createVideoProject({ id: 'receipt-project' }), {
+        expectedWorkspaceRevision: null,
+      });
+      const { checkpointReceipt, ...nativeResult } = result;
+      const stored = fixture.rows.get('video_projects')!.get(result.id);
+      expect(stored).not.toHaveProperty('checkpointReceipt');
+      expect(parseVideoProjectEntry(stored)).toEqual(nativeResult);
+      const pending = [...fixture.rows.get('sync_capture')!.values()]
+        .map(parseSyncCaptureRecord)
+        .filter((row) => row?.kind === 'pending-checkpoint');
+      if (mode === 'immediate') {
+        expect(checkpointReceipt).toBeDefined();
+        expect(pending).toHaveLength(1);
+        expect(pending[0]?.revision).toBe(checkpointReceipt?.revision);
+        expect(pending[0]?.dueAt).toBe(pending[0]?.createdAt);
+      } else {
+        expect(checkpointReceipt).toBeUndefined();
+        expect(pending).toHaveLength(0);
+      }
+    }
+  );
 });

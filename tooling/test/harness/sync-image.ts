@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from '../../../apps/extension/src/composition/persistence/sync-capture/checkpoints';
 import { updateMediaLibraryEntry } from '../../../apps/extension/src/composition/persistence/media-library/index.library';
 import {
   moveStoredItemsToTrash,
@@ -85,12 +86,30 @@ async function inspect(rootId: string) {
   const media = parseMediaLibraryEntry(await db.get('media_library', rootId));
   const workspace = await db.get('image_workspaces', rootId);
   const presentation = await db.get('aggregate_presentations', ['image', rootId]);
+  const selection = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+  const profile = parseSyncCaptureRecord(
+    await selection.objectStore(SYNC_CAPTURE_STORE).get('profile')
+  );
+  const pending =
+    profile?.kind === 'profile'
+      ? await readCheckpointInTransaction(
+          selection,
+          {
+            spaceId: profile.spaceId,
+            connectionGeneration: profile.connectionGeneration,
+            profileCreatedAt: profile.createdAt,
+          },
+          { rootKind: 'media', rootId }
+        )
+      : null;
+  await selection.done;
   const operations = (await db.getAll(SYNC_CAPTURE_STORE)).flatMap((raw) => {
     const value = parseSyncCaptureRecord(raw);
     return value?.kind === 'sync-operation' && value.rootId === rootId ? [value] : [];
   });
   return {
     exists: media !== null,
+    pending: pending ? { revision: pending.revision, dueAt: pending.dueAt } : null,
     lifecycle: media?.lifecycle ?? null,
     filename: media?.filename ?? null,
     revision: media?.workspaceRevision ?? null,
@@ -104,6 +123,7 @@ async function inspect(rootId: string) {
 }
 export const imageHarness = {
   inspect,
+  checkpoint: (rootId: string) => outgoing.checkpointRoot('media', rootId),
   async rename(rootId: string, filename: string) {
     await updateMediaLibraryEntry(rootId, { filename });
     return inspect(rootId);
@@ -145,7 +165,11 @@ export const imageHarness = {
   async publish(rootId: string, prior: { key: string; type: string; bytes: number[] }[] = []) {
     for (const item of prior)
       files.set(item.key, new Blob([new Uint8Array(item.bytes)], { type: item.type }));
-    const sent = await outgoing.sendHistory(rootId);
+    const predecessors = await outgoing.sendHistory(rootId, false, 'media');
+    const checkpoint = await outgoing.checkpointRoot('media', rootId);
+    if (checkpoint.outcome === 'busy' || checkpoint.outcome === 'refused')
+      throw new Error('Explicit image checkpoint is unavailable.');
+    const sent = [...predecessors, ...(await outgoing.sendHistory(rootId, false, 'media'))];
     const snapshot = await Promise.all(
       [...files].map(async ([key, body]) => ({
         key,
@@ -153,7 +177,7 @@ export const imageHarness = {
         bytes: [...new Uint8Array(await body.arrayBuffer())],
       }))
     );
-    return { sent, files: snapshot, native: await inspect(rootId) };
+    return { sent, checkpoint, files: snapshot, native: await inspect(rootId) };
   },
   async receive(
     rootId: string,

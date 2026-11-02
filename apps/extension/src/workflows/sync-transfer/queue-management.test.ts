@@ -121,3 +121,21 @@ it('detaches a continuation before waiting for enrollment admission', async () =
     cursor: { scope, afterOperationId: 'selected' },
   });
 });
+
+it.each(['all', 'problems', 'action-required'])(
+  'passes the selected global %s filter to the native page owner',
+  async (filter) => {
+    const f = fixture();
+    const cursor = { scope, filter, afterOperationId: 'selected' };
+    await f.service.read(cursor, filter);
+    expect(f.deps.page).toHaveBeenCalledWith(scope, { limit: 25, cursor, filter });
+  }
+);
+it('rejects an invalid filter before enrollment or native reads and propagates filtered storage failures', async () => {
+  const f = fixture();
+  await expect(f.service.read(null, 'bogus')).rejects.toThrow('filter');
+  expect(f.deps.enrollment).not.toHaveBeenCalled();
+  expect(f.deps.page).not.toHaveBeenCalled();
+  f.deps.page.mockRejectedValueOnce(new Error('Index unavailable'));
+  await expect(f.service.read(null, 'problems')).rejects.toThrow('Index unavailable');
+});

@@ -1,3 +1,4 @@
+import { installSyncQueueSummaryStoreIndexes } from '../sync-queue-index-migration';
 import {
   REFERENCE_INDEX_STORES,
   ROW_REFERENCE_INDEX,
@@ -40,6 +41,7 @@ import {
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
   SYNC_CONNECTION_STORE,
+  SECRET_PROTECTION_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -62,6 +64,7 @@ function createStore(
   indexes: readonly string[] = []
 ): void {
   const store = db.createObjectStore(name, { keyPath });
+  installSyncQueueSummaryStoreIndexes(name, store);
   if (REFERENCE_INDEX_STORES.some((indexed) => indexed === name))
     store.createIndex(ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true });
   for (const index of indexes) {
@@ -163,7 +166,9 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, ASSET_OPERATIONS_STORE, 'operationId', ['status', 'updatedAt']);
   createStore(db, VOICE_INPUT_HISTORY_STORE, 'id');
   createStore(db, SYNC_CAPTURE_STORE, 'key', ['kind', 'rootKey', 'createdAt']);
-  db.createObjectStore(SYNC_OUTBOX_STORE, { keyPath: 'key' }).createIndex(
+  const outbox = db.createObjectStore(SYNC_OUTBOX_STORE, { keyPath: 'key' });
+  installSyncQueueSummaryStoreIndexes(SYNC_OUTBOX_STORE, outbox);
+  outbox.createIndex(
     'syncQueueDue',
     [
       'spaceId',
@@ -178,6 +183,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, SYNC_CATALOG_CACHE_STORE, 'key');
   createStore(db, SYNC_CONNECTION_STORE, 'key');
   createStore(db, ASSET_RESIDENCY_STORE, 'id');
+  createStore(db, SECRET_PROTECTION_STORE, 'key');
   const contracts = db.createObjectStore(SCHEMA_CONTRACTS_STORE, { keyPath: 'domainId' });
   for (const contract of CURRENT_SCHEMA_CONTRACTS)
     void Promise.resolve(contracts.put(contract)).catch(() => undefined);

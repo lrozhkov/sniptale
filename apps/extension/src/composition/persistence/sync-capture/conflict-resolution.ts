@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from './checkpoints';
 import type { IDBPTransaction } from 'idb';
 import { capturePreparedDatabase } from '../infrastructure/indexed-db/core';
 import {
@@ -63,6 +64,8 @@ async function context(tx: Transaction, selection: Selection) {
   const connection = await readSyncQueueSourceInTransaction(tx, selection.scope, null);
   if (connection.kind !== 'queue-connection' || connection.paused)
     throw new Error('Conflict resolution paused.');
+  if (await readCheckpointInTransaction(tx, selection.scope, selection))
+    throw new Error('Conflict resolution native selection changed.');
   const rootKey = captureRootKey(selection.scope.spaceId, selection.rootKind, selection.rootId);
   const stateKey = JSON.stringify(['root-state', rootKey]);
   const raw: unknown = await tx.objectStore(SYNC_CAPTURE_STORE).get(stateKey);
@@ -191,8 +194,17 @@ export async function assertConflictResolutionCurrent(
     .objectStore(SYNC_CAPTURE_STORE)
     .get(JSON.stringify(['root-state', prepared.rootKey]));
   const state = raw === undefined ? null : parseSyncCaptureRecord(raw);
+  const capture = parseSyncCaptureRecord(
+    await tx.objectStore(SYNC_CAPTURE_STORE).get(prepared.captureKey)
+  );
+  if (!capture || capture.kind !== 'sync-operation' || capture.rootKey !== prepared.rootKey)
+    throw Object.assign(new Error('Conflict resolution native selection changed.'), {
+      code: 'selection-changed',
+    });
+  const pending = await readCheckpointInTransaction(tx, prepared, capture);
   await tx.done;
   if (
+    pending ||
     (raw !== undefined &&
       (!state || state.kind !== 'root-state' || state.rootKey !== prepared.rootKey)) ||
     (state?.kind === 'root-state' ? state.generation : 0) !== prepared.generation - 1

@@ -668,3 +668,16 @@ it('refuses a new Image project on a trashed source without changing any owner',
   expect(puts.media).not.toHaveBeenCalled();
   expect(puts.workspace).not.toHaveBeenCalled();
 });
+
+it('omits a transient checkpoint receipt when image persistence has no sync profile', async () => {
+  const media = root(2);
+  const puts = installTransaction({ media });
+  const result = await commitImageWorkspace({
+    aggregateId: media.id,
+    document: createEditorDocumentFixture(),
+    expectedRevision: 2,
+  });
+  expect(result).not.toHaveProperty('checkpointReceipt');
+  expect(puts.workspace.mock.calls[0]![0]).not.toHaveProperty('checkpointReceipt');
+  expect(puts.media.mock.calls[0]![0]).not.toHaveProperty('checkpointReceipt');
+});

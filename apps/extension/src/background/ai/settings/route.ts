@@ -8,7 +8,10 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { respondAsyncSuccess } from '../../routing-contracts/response';
 import { mutateAiSettings } from './mutations';
 import { AIModelProviderChangedError } from '../../../composition/persistence/ai-settings/graph-mutation-types';
-import { isAISecretPassphraseLockedError } from '../../../composition/persistence/ai-settings/secret-protection.store.ts';
+import {
+  SecretProtectionLockedError,
+  type SecretProtectionService,
+} from '../../../composition/persistence/secret-protection/model';
 import { loadAISecretProtectionStatus } from '../../../composition/persistence/ai-settings';
 import * as authorizationPreauthorization from './authorization/preauthorization';
 
@@ -26,7 +29,10 @@ function isAiSettingsMutationMessage(message: unknown): message is AiSettingsMut
 export function routeAiSettingsMutationMessage(
   message: unknown,
   sender: chrome.runtime.MessageSender,
-  sendResponse: ResponseSender<AiSettingsMutationResponse>
+  sendResponse: ResponseSender<AiSettingsMutationResponse>,
+  protection?: SecretProtectionService,
+  mutate = (message: Parameters<typeof mutateAiSettings>[0]) =>
+    protection ? mutateAiSettings(message, protection) : mutateAiSettings(message)
 ): boolean {
   if (!isAiSettingsMutationMessage(message)) {
     return false;
@@ -43,18 +49,19 @@ export function routeAiSettingsMutationMessage(
   }
 
   if (message.operation === 'read-secret-protection-status') {
-    respondAsyncAiSecretProtectionStatus(sendResponse);
+    respondAsyncAiSecretProtectionStatus(sendResponse, protection);
     return true;
   }
 
-  respondAsyncAiSettingsMutation(mutateAiSettings(message), sendResponse);
+  respondAsyncAiSettingsMutation(mutate(message), sendResponse);
   return true;
 }
 
 function respondAsyncAiSecretProtectionStatus(
-  sendResponse: ResponseSender<AiSettingsMutationResponse>
+  sendResponse: ResponseSender<AiSettingsMutationResponse>,
+  protection?: SecretProtectionService
 ): void {
-  loadAISecretProtectionStatus().then(
+  (protection ? protection.readStatus() : loadAISecretProtectionStatus()).then(
     (secretProtectionStatus) => {
       sendResponse({ success: true, secretProtectionStatus });
     },
@@ -73,11 +80,17 @@ function respondAsyncAiSettingsMutation(
       sendResponse({ success: true, result: 'accepted' });
     })
     .catch((error) => {
-      if (isAISecretPassphraseLockedError(error) || error instanceof AIModelProviderChangedError) {
+      if (
+        error instanceof SecretProtectionLockedError ||
+        error instanceof AIModelProviderChangedError
+      ) {
         sendResponse({
           success: false,
-          reason: error.reason,
-          error: error.message,
+          reason: error instanceof SecretProtectionLockedError ? 'ai-secrets-locked' : error.reason,
+          error:
+            error instanceof SecretProtectionLockedError
+              ? 'AI provider secrets are locked'
+              : error.message,
         });
         return;
       }

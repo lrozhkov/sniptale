@@ -1,3 +1,10 @@
+import { prepareLibraryBackupInRuntime } from '../../workflows/sync-transfer/retained-library';
+import {
+  parseSyncStoragePolicy,
+  sameSyncConnectionIdentity,
+} from '../../composition/persistence/remote-connection/model';
+import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
+import type { SyncConnectionAuthentication } from '../../composition/persistence/remote-connection/model';
 import type { createPublishedOutgoingRetirement } from '../../workflows/sync-transfer/outgoing-retirement';
 import { readCurrentExecutionConnection } from './connection-admission';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -6,14 +13,16 @@ import { trimNativeCache } from '../../workflows/sync-transfer/native-cache-poli
 import { indexCatalogCopies } from '../../workflows/sync-transfer/residency-copy';
 import {
   prepareNativeEditingRoot,
+  prepareNativeScenarioExport,
+  createSyncDownloadAllowance,
   isNativeEditingRootReady,
 } from '../../workflows/sync-transfer/native-residency';
 import type { createAutomaticCatalogSync } from '../../workflows/sync-transfer/automatic';
 import { resolveCatalogConflict } from '../../workflows/sync-transfer/conflict-resolution';
 import { readSyncProductThumbnail } from './product-thumbnail';
-import { loadSyncConnectionAuthentication } from '../../composition/persistence/remote-connection/store';
 import type {
   SyncExecutorBinding,
+  SyncCredentialLease,
   SyncProductCompletion,
   SyncProductFailureCode,
   SyncProductWork,
@@ -38,6 +47,7 @@ let thumbnailCatalog: {
 } | null = null;
 
 export interface SyncProductExecutionInput extends SyncExecutorBinding {
+  credentialLease?: SyncCredentialLease;
   work: SyncProductWork;
   signal: AbortSignal;
 }
@@ -48,9 +58,14 @@ export interface SyncProductExecutionResult {
   containment: 'contained' | 'unsafe';
 }
 function failure(error: unknown, signal: AbortSignal): SyncProductFailureCode {
-  if (signal.aborted) return 'interrupted';
+  if (signal.aborted)
+    return signal.reason instanceof SyncRemoteError && signal.reason.code === 'secrets-locked'
+      ? 'secrets-locked'
+      : 'interrupted';
   if (error instanceof Error && 'code' in error) {
     switch (error.code) {
+      case 'secrets-locked':
+        return 'secrets-locked';
       case 'authentication':
         return 'authentication';
       case 'access-denied':
@@ -112,7 +127,9 @@ function checkedSelectedCatalogOperation(
         | 'native-prepare'
         | 'native-release'
         | 'cache-trim'
-        | 'backup-prepare';
+        | 'backup-prepare'
+        | 'library-backup-prepare'
+        | 'scenario-export-prepare';
     }
   >
 ) {
@@ -142,10 +159,22 @@ export function createSyncProductExecution(
   onLibraryChanged: () => void = () => undefined,
   onQueueAvailable: (operationId: string) => void = () => undefined,
   automatic?: ReturnType<typeof createAutomaticCatalogSync>,
-  retirement?: ReturnType<typeof createPublishedOutgoingRetirement>
+  retirement?: ReturnType<typeof createPublishedOutgoingRetirement>,
+  credentials?: {
+    resolveAuthentication(): Promise<SyncConnectionAuthentication>;
+    checkProtection(): Promise<boolean>;
+  }
 ) {
   const selection = structuredClone({ scope: input.scope, authorization: input.authorization });
   const work = structuredClone(input.work);
+  const downloadAllowance =
+    work.kind === 'native-prepare' ||
+    work.kind === 'backup-prepare' ||
+    work.kind === 'library-backup-prepare' ||
+    work.kind === 'scenario-export-prepare' ||
+    work.kind === 'replica-prepare'
+      ? createSyncDownloadAllowance()
+      : undefined;
   const { signal } = input;
   function event(
     state: 'started' | 'ready' | 'failed' | 'interrupted',
@@ -172,22 +201,69 @@ export function createSyncProductExecution(
   const requests = createSyncConnectionRequests({
     identity: selection.authorization,
     hasOriginPermission,
+    ...(credentials ? { checkProtection: credentials.checkProtection } : {}),
   });
   async function current() {
     const connection = await readCurrentExecutionConnection(selection, signal);
     if (!connection) throw new Error('Sync product authorization refused');
+    if (
+      work.kind === 'library-backup-prepare' &&
+      !sameSyncConnectionIdentity(connection.identity, work.expected)
+    )
+      throw Object.assign(new Error('Library backup connection changed.'), {
+        code: 'selection-changed',
+      });
     return connection;
   }
   async function executeWork(
     remote: Awaited<ReturnType<typeof createWebdavRemoteStore>>,
     catalog: Awaited<ReturnType<typeof scanSyncCatalog>> | null
   ): Promise<SyncProductCompletion> {
+    if (work.kind === 'library-backup-prepare') {
+      if (!catalog || !downloadAllowance)
+        throw new Error('Library backup admission is unavailable.');
+      const connection = await current();
+      try {
+        await prepareLibraryBackupInRuntime({
+          catalog,
+          binding: connection.binding,
+          authorization: selection.authorization,
+          expected: work.expected,
+          options: work.options,
+          remote,
+          signal,
+          downloadAllowance,
+        });
+        await current();
+      } finally {
+        notifyLibraryChanged();
+      }
+      return { kind: 'library-backup', expected: work.expected, options: work.options };
+    }
+    if (work.kind === 'scenario-export-prepare') {
+      const connection = await current();
+      try {
+        await prepareNativeScenarioExport({
+          projectId: work.projectId,
+          exportId: work.exportId,
+          binding: connection.binding,
+          authorization: selection.authorization,
+          remote,
+          signal,
+          ...(downloadAllowance ? { downloadAllowance } : {}),
+        });
+      } finally {
+        notifyLibraryChanged();
+      }
+      return { kind: 'scenario-export', projectId: work.projectId, exportId: work.exportId };
+    }
     if (work.kind === 'native-prepare' || work.kind === 'backup-prepare') {
       const connection = await current();
       try {
         await prepareNativeEditingRoot({
           root: work.root,
           purpose: work.kind === 'backup-prepare' ? 'backup' : 'editing',
+          ...(downloadAllowance ? { downloadAllowance } : {}),
           remote,
           binding: connection.binding,
           authorization: selection.authorization,
@@ -222,7 +298,20 @@ export function createSyncProductExecution(
     }
     if (work.kind === 'automatic-sync') {
       if (!automatic) throw new Error('Automatic sync execution unavailable.');
-      const result = await automatic.run({ ...selection, remote, catalog, signal });
+      const connection = await current();
+      const policy = parseSyncStoragePolicy(
+        connection.storagePolicy === undefined
+          ? { version: 1, mode: 'on-demand' }
+          : connection.storagePolicy
+      );
+      if (!policy) throw new Error('Automatic sync storage policy is unavailable.');
+      const result = await automatic.run({
+        ...selection,
+        remote,
+        catalog,
+        signal,
+        binaryAdmission: 'resident',
+      });
       if (result.applied > 0) notifyLibraryChanged();
       return { kind: 'automatic', ...result };
     }
@@ -252,6 +341,7 @@ export function createSyncProductExecution(
         selection: selected,
         signal,
         ...(work.preserveNative ? { preserveNative: true as const } : {}),
+        ...(downloadAllowance ? { downloadAllowance } : {}),
       });
       const root = { rootKind: committed.rootKind, rootId: committed.rootId };
       try {
@@ -259,6 +349,7 @@ export function createSyncProductExecution(
         await prepareNativeEditingRoot({
           root,
           remote,
+          ...(downloadAllowance ? { downloadAllowance } : {}),
           binding: connection.binding,
           authorization: selection.authorization,
           signal,
@@ -290,7 +381,11 @@ export function createSyncProductExecution(
         const remote = await createWebdavRemoteStore(
           {
             rootUrl: connection.binding.rootUrl,
-            authentication: () => loadSyncConnectionAuthentication(selection.authorization),
+            authentication: () => {
+              if (!credentials)
+                return Promise.reject(new Error('Sync credential callback unavailable'));
+              return credentials.resolveAuthentication();
+            },
             request: requests.request,
           },
           signal
@@ -303,7 +398,9 @@ export function createSyncProductExecution(
           await current();
         }
         const catalog =
-          work.kind === 'native-prepare' || work.kind === 'backup-prepare'
+          work.kind === 'native-prepare' ||
+          work.kind === 'backup-prepare' ||
+          work.kind === 'scenario-export-prepare'
             ? null
             : await loadProductCatalog(remote, selection, work, signal);
         if (catalog && work.kind !== 'thumbnail-read') notifyLibraryChanged();

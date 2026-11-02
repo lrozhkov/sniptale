@@ -1,3 +1,7 @@
+import {
+  SecretProtectionLockedError,
+  type SecretProtectionPort,
+} from '../../../composition/persistence/secret-protection/model';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { translate } from '../../../platform/i18n';
@@ -422,3 +426,17 @@ it.each([0, 1])(
     }
   }
 );
+
+it('preserves the provider secret-locked recovery reason when common admission closes', async () => {
+  const protection: SecretProtectionPort = {
+    readKey: async () => {
+      throw new SecretProtectionLockedError();
+    },
+    withAdmission: async () => {
+      throw new SecretProtectionLockedError();
+    },
+  };
+  await expect(resolveModelConfig('model-1', undefined, protection)).rejects.toMatchObject({
+    reason: 'secret-locked',
+  });
+});

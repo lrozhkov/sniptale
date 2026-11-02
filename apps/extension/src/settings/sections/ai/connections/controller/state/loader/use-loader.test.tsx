@@ -9,7 +9,6 @@ const loaderMocks = vi.hoisted(() => ({
   loadAiProvidersRuntimeDataMock: vi.fn(),
   maintain: vi.fn(),
   applyLoadedAiProvidersRuntimeDataMock: vi.fn(),
-  ensureDefaultAiProvidersModelMock: vi.fn(),
   reportAiProvidersLoaderErrorMock: vi.fn(),
 }));
 
@@ -63,11 +62,8 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestReloadData: ReturnType<typeof useAiProvidersLoader> | null = null;
 
-function Harness(props: {
-  dataState: Parameters<typeof useAiProvidersLoader>[0];
-  secretProtectionState: Parameters<typeof useAiProvidersLoader>[1];
-}) {
-  latestReloadData = useAiProvidersLoader(props.dataState, props.secretProtectionState);
+function Harness(props: { dataState: Parameters<typeof useAiProvidersLoader>[0] }) {
+  latestReloadData = useAiProvidersLoader(props.dataState);
   return null;
 }
 
@@ -99,15 +95,8 @@ function createLoaderSetters() {
   };
 }
 
-function createSecretProtectionSetters() {
-  return { setSecretProtectionStatus: vi.fn() };
-}
-
-function renderLoaderHarness(
-  dataState: ReturnType<typeof createLoaderSetters>,
-  secretProtectionState = createSecretProtectionSetters()
-) {
-  return render(<Harness dataState={dataState} secretProtectionState={secretProtectionState} />);
+function renderLoaderHarness(dataState: ReturnType<typeof createLoaderSetters>) {
+  return render(<Harness dataState={dataState} />);
 }
 
 beforeEach(() => {
@@ -115,7 +104,6 @@ beforeEach(() => {
   loaderMocks.maintain.mockReset().mockResolvedValue(undefined);
   loaderMocks.loadAiProvidersRuntimeDataMock.mockReset();
   loaderMocks.applyLoadedAiProvidersRuntimeDataMock.mockReset();
-  loaderMocks.ensureDefaultAiProvidersModelMock.mockReset();
   loaderMocks.reportAiProvidersLoaderErrorMock.mockReset();
   loaderMocks.loadAiProvidersRuntimeDataMock.mockResolvedValue([
     [PROVIDER],
@@ -125,13 +113,10 @@ beforeEach(() => {
     'Shared global prompt',
     'Scenario editor prompt',
     false,
-    { isEnabled: false, isUnlocked: true, mode: 'transparent' },
   ]);
   loaderMocks.applyLoadedAiProvidersRuntimeDataMock.mockReturnValue({
-    loadedDefaultId: null,
     loadedModels: MODELS,
   });
-  loaderMocks.ensureDefaultAiProvidersModelMock.mockResolvedValue(undefined);
 });
 
 afterEach(async () => {
@@ -148,28 +133,19 @@ afterEach(async () => {
 
 it('loads runtime data on mount without changing model preferences', async () => {
   const setters = createLoaderSetters();
-  const secretSetters = createSecretProtectionSetters();
-
-  await renderLoaderHarness(setters, secretSetters);
+  await renderLoaderHarness(setters);
   await flushEffects();
 
   expect(loaderMocks.loadAiProvidersRuntimeDataMock).toHaveBeenCalledTimes(2);
-  expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).toHaveBeenCalledWith(
-    {
-      ...setters,
-      ...secretSetters,
-    },
-    [
-      [PROVIDER],
-      MODELS,
-      [PROVIDER],
-      MODELS,
-      'Shared global prompt',
-      'Scenario editor prompt',
-      false,
-      { isEnabled: false, isUnlocked: true, mode: 'transparent' },
-    ]
-  );
+  expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).toHaveBeenCalledWith(setters, [
+    [PROVIDER],
+    MODELS,
+    [PROVIDER],
+    MODELS,
+    'Shared global prompt',
+    'Scenario editor prompt',
+    false,
+  ]);
 
   expect(setters.setIsLoading).toHaveBeenNthCalledWith(1, true);
   expect(setters.setIsLoading).toHaveBeenLastCalledWith(false);
@@ -187,7 +163,6 @@ it('reports loader failures through the shared error handler', async () => {
 
   expect(loaderMocks.reportAiProvidersLoaderErrorMock).toHaveBeenCalledWith(loadError);
   expect(loaderMocks.applyLoadedAiProvidersRuntimeDataMock).not.toHaveBeenCalled();
-  expect(loaderMocks.ensureDefaultAiProvidersModelMock).not.toHaveBeenCalled();
   expect(setters.setIsLoading).toHaveBeenNthCalledWith(1, true);
   expect(setters.setIsLoading).toHaveBeenLastCalledWith(false);
 });

@@ -42,6 +42,30 @@
       "messageHash": "e65f923a68b7d7a94adcd0de39f1b44b843f51359d25743ef19ad4384b4ab6e2",
       "rule": "js/missing-await",
       "debtId": "noise.codeql.catalog-refresh-flight-identity"
+    },
+    {
+      "contentHash": "f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f",
+      "file": "apps/extension/src/composition/archive-transfer/writer.ts",
+      "line": 38,
+      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+      "rule": "js/superfluous-trailing-arguments",
+      "debtId": "noise.codeql.transform-stream-archive-transfer"
+    },
+    {
+      "contentHash": "0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705",
+      "file": "apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts",
+      "line": 16,
+      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+      "rule": "js/superfluous-trailing-arguments",
+      "debtId": "noise.codeql.transform-stream-remote-object-integrity"
+    },
+    {
+      "contentHash": "199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4",
+      "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
+      "line": 288,
+      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+      "rule": "js/superfluous-trailing-arguments",
+      "debtId": "noise.codeql.transform-stream-webdav"
     }
   ]
 }

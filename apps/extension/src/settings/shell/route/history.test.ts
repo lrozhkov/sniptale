@@ -109,3 +109,50 @@ it('keeps the mounted route for programmatic and browser navigation while blocke
   expect(latest?.route).toEqual({ section: 'settings-transfer' });
   expect(location.search).toContain('section=settings-transfer');
 });
+
+it('restores queue filters through actual back and forward history navigation', async () => {
+  history.replaceState(
+    null,
+    '',
+    '/settings.html?section=saving&view=queue&queueFilter=problems&keep=1'
+  );
+  act(() => root?.render(createElement(Harness)));
+  expect(latest?.route).toEqual({ section: 'saving', view: 'queue', queueFilter: 'problems' });
+  act(() => latest?.navigate({ section: 'saving', view: 'queue', queueFilter: 'action-required' }));
+  expect(location.search).toContain('queueFilter=action-required');
+  await act(async () => {
+    const popped = new Promise<void>((resolve) =>
+      addEventListener('popstate', () => resolve(), { once: true })
+    );
+    history.back();
+    await popped;
+  });
+  expect(latest?.route).toEqual({ section: 'saving', view: 'queue', queueFilter: 'problems' });
+  await act(async () => {
+    const popped = new Promise<void>((resolve) =>
+      addEventListener('popstate', () => resolve(), { once: true })
+    );
+    history.forward();
+    await popped;
+  });
+  expect(latest?.route).toEqual({
+    section: 'saving',
+    view: 'queue',
+    queueFilter: 'action-required',
+  });
+  expect(location.search).toContain('keep=1');
+});
+it('normalizes a stale nonqueue filter when browser navigation restores it', () => {
+  history.replaceState(null, '', '/settings.html?section=saving&view=queue&queueFilter=problems');
+  act(() => root?.render(createElement(Harness)));
+  act(() => {
+    history.replaceState(
+      null,
+      '',
+      '/settings.html?section=saving&view=connection&queueFilter=problems'
+    );
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  expect(latest?.route).toEqual({ section: 'saving', view: 'connection' });
+  expect(location.search).not.toContain('queueFilter');
+});

@@ -12,9 +12,9 @@ import type { SyncQueueDueCandidate } from '../../composition/persistence/sync-c
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { createSyncQueueRetryWakeup, type SyncQueueRetryWakeupDependencies } from './retry-wakeup';
 
-const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+const { warn, info } = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn() }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({ warn }),
+  createLogger: () => ({ warn, info }),
 }));
 const scope = {
   spaceId: '33333333-3333-4333-8333-333333333333',
@@ -886,3 +886,158 @@ it.each(['value', 'getter'] as const)(
     expect(deps.coordinator.start).toHaveBeenCalledTimes(2);
   }
 );
+
+it('materializes checkpoints before reconciliation and incoming refresh', async () => {
+  const deps = dependencies();
+  const flushCheckpoints = vi
+    .fn()
+    .mockResolvedValue({ captured: 1, skipped: 0, refused: 0, remaining: false, advanced: true });
+  const refreshIncoming = vi.fn().mockResolvedValue(undefined);
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints, refreshIncoming });
+  await owner.run();
+  expect(flushCheckpoints).toHaveBeenCalledExactlyOnceWith(
+    scope,
+    authorization,
+    expect.any(Function)
+  );
+  expect(flushCheckpoints.mock.invocationCallOrder[0]).toBeLessThan(
+    deps.reconcileCaptures.mock.invocationCallOrder[0]!
+  );
+  expect(deps.reconcileCaptures.mock.invocationCallOrder[0]).toBeLessThan(
+    refreshIncoming.mock.invocationCallOrder[0]!
+  );
+  owner.dispose();
+});
+
+it('finishes a refused checkpoint suffix once and stops at wrap', async () => {
+  const deps = dependencies();
+  const completed = deferred<void>();
+  const flushCheckpoints = vi
+    .fn()
+    .mockResolvedValueOnce({
+      captured: 0,
+      skipped: 63,
+      refused: 1,
+      remaining: true,
+      advanced: true,
+    })
+    .mockImplementationOnce(async () => {
+      completed.resolve();
+      return { captured: 0, skipped: 1, refused: 0, remaining: false, advanced: true };
+    });
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints });
+  await owner.run();
+  await completed.promise;
+  await owner.run();
+  expect(flushCheckpoints).toHaveBeenCalledTimes(2);
+  owner.dispose();
+});
+
+it('preserves queued retries after checkpoint refusal with fixed diagnostics', async () => {
+  const deps = dependencies();
+  const flushCheckpoints = vi.fn().mockRejectedValue(new Error('private endpoint credential'));
+  deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints });
+  await owner.run();
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  expect(warn).toHaveBeenCalledWith(
+    'sync.retry.deferred stage=checkpoint-capture reason=unexpected'
+  );
+  owner.dispose();
+});
+
+it('stops after disposal while checkpoint materialization is pending', async () => {
+  const deps = dependencies();
+  const entered = deferred<void>();
+  const release = deferred<{
+    captured: number;
+    skipped: number;
+    refused: number;
+    remaining: boolean;
+    advanced: boolean;
+  }>();
+  const flushCheckpoints = vi.fn().mockImplementationOnce(() => {
+    entered.resolve();
+    return release.promise;
+  });
+  const refreshIncoming = vi.fn();
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints, refreshIncoming });
+  const running = owner.run();
+  await entered.promise;
+  owner.dispose();
+  release.resolve({ captured: 1, skipped: 0, refused: 0, remaining: true, advanced: true });
+  await running;
+  expect(deps.reconcileCaptures).not.toHaveBeenCalled();
+  expect(refreshIncoming).not.toHaveBeenCalled();
+  expect(deps.discoverDue).not.toHaveBeenCalled();
+});
+
+it('does not retry or mutate native work while shared secrets are locked', async () => {
+  const deps = dependencies();
+  const canDispatch = vi.fn(async () => false);
+  const owner = createSyncQueueRetryWakeup({ ...deps, canDispatch });
+  await owner.run();
+  await owner.run();
+  await owner.run();
+  expect(deps.loadConnection).not.toHaveBeenCalled();
+  expect(deps.reconcileCaptures).not.toHaveBeenCalled();
+  expect(deps.discoverDue).not.toHaveBeenCalled();
+  expect(deps.deferDue).not.toHaveBeenCalled();
+  expect(deps.coordinator.start).not.toHaveBeenCalled();
+  canDispatch.mockResolvedValue(true);
+  await owner.run();
+  expect(deps.discoverDue).toHaveBeenCalledOnce();
+});
+
+it('logs one fixed checkpoint phase and aggregate root/pass counts without generic duplicate refusal', async () => {
+  const deps = dependencies();
+  const flushCheckpoints = vi.fn().mockImplementation(async (_scope, _identity, observe) => {
+    observe?.({ phase: 'preparing' });
+    observe?.({
+      phase: 'settled',
+      counts: {
+        capturedRoots: 1,
+        acknowledgedRoots: 1,
+        deadlineWaitingRoots: 2,
+        scopeMismatchRoots: 0,
+        invalidPendingRoots: 0,
+        revisionChangedRoots: 1,
+        predecessorWaitingRoots: 1,
+        admissionRefusedRoots: 1,
+        captureFailedRoots: 0,
+        deferredRoots: 0,
+        publicationBusyPasses: 0,
+        progressChangedPasses: 0,
+        admissionRefusedPasses: 0,
+        failedPasses: 0,
+      },
+    });
+    return { captured: 1, skipped: 4, refused: 1, remaining: false, advanced: true };
+  });
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints });
+  await owner.run();
+  expect(info).toHaveBeenCalledTimes(2);
+  expect(info).toHaveBeenCalledWith('sync.checkpoint.preparing');
+  expect(info).toHaveBeenCalledWith(expect.stringContaining('deadlineWaitingRoots=2'));
+  expect(info).toHaveBeenCalledWith(expect.stringContaining('revisionChangedRoots=1'));
+  expect(warn).not.toHaveBeenCalledWith(
+    'sync.retry.deferred stage=checkpoint-capture reason=refused'
+  );
+  owner.dispose();
+});
+
+it('contains checkpoint logger failure and continues queued retry dispatch', async () => {
+  const deps = dependencies();
+  info.mockImplementationOnce(() => {
+    throw new Error('private logger failure');
+  });
+  const flushCheckpoints = vi.fn().mockImplementation(async (_scope, _identity, observe) => {
+    observe?.({ phase: 'preparing' });
+    return { captured: 1, skipped: 0, refused: 0, remaining: false, advanced: true };
+  });
+  deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints });
+  await expect(owner.run()).resolves.toBeUndefined();
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  owner.dispose();
+});

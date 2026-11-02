@@ -1049,28 +1049,32 @@ unchanged project admission.',
     testFiles: ['apps/extension/src/offscreen/runtime/entrypoint.test.ts'],
   },
   {
-    owner: 'ai-secret-unlock-request-store',
+    owner: 'common-secret-unlock-request-store',
     productionFile:
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.ts',
     exclusive: true,
     allowCrossOwner: true,
     reason: 'Secret-unlock records require storage lifecycle and protected-provider route proof.',
     testFiles: [
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.test.ts',
       'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.lifecycle.test.ts',
+      'apps/extension/src/background/ai/settings/authorization/secret-unlock.test.ts',
     ],
   },
   {
-    owner: 'ai-secret-unlock-request-parser',
+    owner: 'common-secret-unlock-request-parser',
     productionFile:
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.parser.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.parser.ts',
     exclusive: true,
     allowCrossOwner: true,
     reason:
       'Secret-unlock admission requires storage lifecycle and protected-provider route proof.',
     testFiles: [
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.test.ts',
       'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.lifecycle.test.ts',
+      'apps/extension/src/background/ai/settings/authorization/secret-unlock.test.ts',
     ],
   },
   {

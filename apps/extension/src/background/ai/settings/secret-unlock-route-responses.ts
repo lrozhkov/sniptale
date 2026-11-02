@@ -2,7 +2,7 @@ import type {
   AISecretUnlockMessage,
   AISecretUnlockResponse,
 } from '../../../contracts/messaging/ai-secret-unlock';
-import type { StoredAISecretUnlockRequest } from '../../../composition/persistence/ai-settings/secret-unlock-requests.store.ts';
+import type { StoredAISecretUnlockRequest } from '../../../composition/persistence/secret-protection/secret-unlock-requests.store.ts';
 
 export function createNonPendingUnlockResponse(
   record: StoredAISecretUnlockRequest | null,
