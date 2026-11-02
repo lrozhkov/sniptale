@@ -224,3 +224,12 @@ it('renders a presentation status while retaining working footer actions', async
   expect(footerAction('popup.footer.github-button')).not.toBeNull();
   expect(container?.querySelector('[data-locale-preference]')).not.toBeNull();
 });
+
+it('keeps the status slot inside the utility row without an additional footer row', async () => {
+  await renderFooterWithProps({ status: <button data-ui="test.sync-control">Sync</button> });
+  const footer = container?.querySelector('footer');
+  expect(footer?.children).toHaveLength(1);
+  expect(
+    footer?.querySelector('[data-ui="popup.footer.actions"] [data-ui="test.sync-control"]')
+  ).not.toBeNull();
+});

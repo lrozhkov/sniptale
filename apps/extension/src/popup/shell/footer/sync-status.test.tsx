@@ -40,7 +40,12 @@ afterEach(() => {
   container.remove();
   vi.unstubAllGlobals();
 });
-function render(status: SyncPopupRuntimeStatus | null = base, pending = false, failed = false) {
+function render(
+  status: SyncPopupRuntimeStatus | null = base,
+  pending = false,
+  failed = false,
+  open = true
+) {
   act(() =>
     root.render(
       <PopupSyncStatus
@@ -54,9 +59,14 @@ function render(status: SyncPopupRuntimeStatus | null = base, pending = false, f
       />
     )
   );
+  const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]');
+  if (open && trigger?.getAttribute('aria-expanded') === 'false') act(() => trigger.click());
+}
+function actionButton() {
+  return document.querySelector<HTMLButtonElement>('[data-ui="popup.footer.sync-action"]');
 }
 function click() {
-  act(() => container.querySelector('button')?.click());
+  act(() => actionButton()?.click());
 }
 it('keeps an unconfigured or not yet observed connection out of the footer', () => {
   render(null);
@@ -66,28 +76,28 @@ it('keeps an unconfigured or not yet observed connection out of the footer', () 
 });
 it('offers one explicit sync for waiting edits and announces status separately from the action', () => {
   render();
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Waiting to sync');
-  expect(container.querySelector('button')?.textContent).toBe('Sync now');
-  expect(container.querySelector('[role="status"] button')).toBeNull();
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Waiting to sync');
+  expect(actionButton()?.textContent).toBe('Sync now');
+  expect(document.querySelector('[role="status"] button')).toBeNull();
   click();
   expect(sync).toHaveBeenCalledOnce();
   expect(unlock).not.toHaveBeenCalled();
 });
 it('does not call local publication complete remote synchronization', () => {
   render({ ...base, localPublication: 'published' });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Local changes sent');
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Local changes sent');
   render({
     ...base,
     localPublication: 'published',
     remote: { knowledge: 'observed-pass', outcome: 'deferred' },
   });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Local changes sent');
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Local changes sent');
   render({
     ...base,
     localPublication: 'published',
     remote: { knowledge: 'observed-pass', outcome: 'complete' },
   });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Synced');
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Synced');
 });
 it.each(['running', 'stopping'] as const)(
   'offers details without duplicate sync while %s',
@@ -100,14 +110,14 @@ it.each(['running', 'stopping'] as const)(
 );
 it('routes a locked session to explicit unlock', () => {
   render({ ...base, protection: 'locked', repair: 'security' });
-  expect(container.querySelector('button')?.textContent).toBe('Unlock');
+  expect(actionButton()?.textContent).toBe('Unlock');
   click();
   expect(unlock).toHaveBeenCalledOnce();
   expect(sync).not.toHaveBeenCalled();
 });
 it('preserves pause instead of offering unlock and sync', () => {
   render({ ...base, connection: 'paused', protection: 'locked' });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Sync paused');
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Sync paused');
   click();
   expect(details).toHaveBeenCalledOnce();
   expect(sync).not.toHaveBeenCalled();
@@ -115,7 +125,7 @@ it('preserves pause instead of offering unlock and sync', () => {
 });
 it('keeps unknown projection actionable without claiming an error or successful sync', () => {
   render({ ...base, localPublication: 'unknown' });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Sync status unknown');
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Sync status unknown');
   click();
   expect(details).toHaveBeenCalledOnce();
   expect(sync).not.toHaveBeenCalled();
@@ -128,18 +138,18 @@ it('offers repair for current missing credentials', () => {
 });
 it('disables repeat commands while awaiting acknowledgement', () => {
   render(base, true);
-  expect(container.querySelector('button')?.disabled).toBe(true);
-  expect(container.querySelector('button')?.getAttribute('aria-busy')).toBe('true');
+  expect(actionButton()?.disabled).toBe(true);
+  expect(actionButton()?.getAttribute('aria-busy')).toBe('true');
   click();
   expect(sync).not.toHaveBeenCalled();
 });
 
 it('shows a safe action failure and keeps explicit retry available', () => {
   render(base, false, true);
-  expect(container.querySelector('[role="status"]')?.textContent).toBe(
+  expect(document.querySelector('[role="status"]')?.textContent).toBe(
     'Could not complete the action. Try again.'
   );
-  expect(container.querySelector('button')?.disabled).toBe(false);
+  expect(actionButton()?.disabled).toBe(false);
   click();
   expect(sync).toHaveBeenCalledOnce();
 });
@@ -151,10 +161,10 @@ it('presents retained queue problems as neutral upload navigation instead of man
     issue: 'queue-problem',
     repair: 'queue-problems',
   });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe(
+  expect(document.querySelector('[role="status"]')?.textContent).toBe(
     'Some uploads are interrupted'
   );
-  expect(container.querySelector('button')?.textContent).toBe('View uploads');
+  expect(actionButton()?.textContent).toBe('View uploads');
   click();
   expect(repair).toHaveBeenCalledOnce();
   expect(sync).not.toHaveBeenCalled();
@@ -165,21 +175,21 @@ it('presents retained queue problems as neutral upload navigation instead of man
 it('keeps the retained upload navigation neutral in Russian', () => {
   activeLocale.current = 'ru';
   render({ ...base, issue: 'queue-problem', repair: 'queue-problems' });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe(
+  expect(document.querySelector('[role="status"]')?.textContent).toBe(
     'Некоторые отправки прерваны'
   );
-  expect(container.querySelector('button')?.textContent).toBe('Посмотреть отправки');
+  expect(actionButton()?.textContent).toBe('Посмотреть отправки');
   click();
   expect(repair).toHaveBeenCalledOnce();
   expect(sync).not.toHaveBeenCalled();
 });
 it('keeps explicit finite failures and active work ahead of the neutral retained upload hint', () => {
   render({ ...base, issue: 'temporary', repair: 'queue-problems' });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Sync needs attention');
-  expect(container.querySelector('button')?.textContent).toBe('Resolve');
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Sync needs attention');
+  expect(actionButton()?.textContent).toBe('Resolve');
   render({ ...base, activity: 'running', issue: 'queue-problem', repair: 'queue-problems' });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Syncing');
-  expect(container.querySelector('button')?.textContent).toBe('Details');
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Syncing');
+  expect(actionButton()?.textContent).toBe('Details');
   click();
   expect(details).toHaveBeenCalledOnce();
   expect(sync).not.toHaveBeenCalled();
@@ -193,18 +203,44 @@ it('offers permission repair while paused and returns to pause details after acc
     issue: 'permission-required',
     repair: 'connection',
   });
-  expect(container.querySelector('button')?.textContent).toBe('Resolve');
+  expect(actionButton()?.textContent).toBe('Resolve');
   click();
   expect(repair).toHaveBeenCalledOnce();
   expect(details).not.toHaveBeenCalled();
   expect(unlock).not.toHaveBeenCalled();
   expect(sync).not.toHaveBeenCalled();
   render({ ...base, connection: 'paused', protection: 'locked', issue: null });
-  expect(container.querySelector('[role="status"]')?.textContent).toBe('Sync paused');
-  expect(container.querySelector('button')?.textContent).toBe('Details');
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Sync paused');
+  expect(actionButton()?.textContent).toBe('Details');
   click();
   expect(details).toHaveBeenCalledOnce();
   expect(repair).toHaveBeenCalledOnce();
   expect(unlock).not.toHaveBeenCalled();
+  expect(sync).not.toHaveBeenCalled();
+});
+
+it('hides an unknown configuration instead of offering a sync control', () => {
+  render({ ...base, configuration: 'unknown', connection: null });
+  expect(container.querySelector('button')).toBeNull();
+});
+
+it('opens a compact disclosure without running a command and restores focus on Escape', () => {
+  render(base, false, false, false);
+  const trigger = container.querySelector<HTMLButtonElement>('button');
+  expect(trigger?.getAttribute('aria-label')).toBe('Waiting to sync');
+  expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  act(() => trigger?.click());
+  expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+  expect(document.activeElement).toBe(document.querySelector('[role="dialog"]'));
+  expect(sync).not.toHaveBeenCalled();
+  act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});
+it('dismisses the status disclosure on an outside pointer without running a command', () => {
+  render();
+  act(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(sync).not.toHaveBeenCalled();
 });

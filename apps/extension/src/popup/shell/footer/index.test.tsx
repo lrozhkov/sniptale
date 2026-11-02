@@ -50,6 +50,7 @@ function render(status: SyncPopupRuntimeStatus) {
     unlock: io.unlock,
   });
   act(() => root.render(<ProductPopupFooter onOpenGithub={vi.fn()} onOpenSettings={vi.fn()} />));
+  act(() => container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')?.click());
 }
 it.each([
   ['queue-problems', { section: 'saving', view: 'queue', queueFilter: 'problems' }],
@@ -63,7 +64,9 @@ it.each([
   'navigates finite repair target %s without starting a sync or unlock',
   async (repair, route) => {
     render({ ...base, repair });
-    await act(async () => container.querySelector('button')?.click());
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('[data-ui="popup.footer.sync-action"]')?.click()
+    );
     expect(io.open).toHaveBeenCalledExactlyOnceWith({ route });
     expect(io.sync).not.toHaveBeenCalled();
     expect(io.unlock).not.toHaveBeenCalled();
@@ -72,11 +75,15 @@ it.each([
 it('keeps a navigation failure recoverable and retries the same filtered destination', async () => {
   io.open.mockRejectedValueOnce(new Error('Tab unavailable'));
   render({ ...base, repair: 'queue-action-required' });
-  await act(async () => container.querySelector('button')?.click());
-  expect(container.querySelector('[role="status"]')?.textContent).toBe(
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-ui="popup.footer.sync-action"]')?.click()
+  );
+  expect(document.querySelector('[role="status"]')?.textContent).toBe(
     'Could not complete the action. Try again.'
   );
-  await act(async () => container.querySelector('button')?.click());
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-ui="popup.footer.sync-action"]')?.click()
+  );
   expect(io.open).toHaveBeenCalledTimes(2);
   expect(io.open).toHaveBeenLastCalledWith({
     route: { section: 'saving', view: 'queue', queueFilter: 'action-required' },
@@ -85,7 +92,17 @@ it('keeps a navigation failure recoverable and retries the same filtered destina
 });
 it('opens ordinary queue details without a stale repair filter', async () => {
   render({ ...base, issue: null, activity: 'running', repair: 'queue-problems' });
-  await act(async () => container.querySelector('button')?.click());
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-ui="popup.footer.sync-action"]')?.click()
+  );
   expect(io.open).toHaveBeenCalledExactlyOnceWith({ route: { section: 'saving', view: 'queue' } });
   expect(io.sync).not.toHaveBeenCalled();
 });
+
+it.each(['unknown', 'unconfigured'] as const)(
+  'hides the utility control when configuration is %s',
+  (configuration) => {
+    render({ ...base, configuration, connection: null });
+    expect(container.querySelector('button')).toBeNull();
+  }
+);

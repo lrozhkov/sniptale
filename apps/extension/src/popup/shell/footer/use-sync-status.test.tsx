@@ -286,6 +286,9 @@ it('opens the typed connection repair page while keeping ordinary Settings indep
       .querySelector<HTMLButtonElement>('[data-ui="popup.footer.sync-status"] button')
       ?.click();
   });
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-ui="popup.footer.sync-action"]')?.click()
+  );
   expect(io.openSettingsPage).toHaveBeenCalledWith({
     route: { section: 'saving', view: 'connection' },
   });
@@ -294,5 +297,17 @@ it('opens the typed connection repair page while keeping ordinary Settings indep
     container.querySelector<HTMLButtonElement>('[data-ui="popup.footer.settings-button"]')?.click()
   );
   expect(ordinarySettings).toHaveBeenCalledOnce();
+  expect(io.flushCheckpoints).not.toHaveBeenCalled();
+});
+
+it('keeps a failed initial observation out of the utility row', async () => {
+  io.readRuntimeStatus.mockRejectedValue(new Error('Synthetic observation failure'));
+  await act(async () => {
+    root.render(
+      <ProductPopupFooter onOpenGithub={() => undefined} onOpenSettings={() => undefined} />
+    );
+  });
+  expect(container.querySelector('[data-ui="popup.footer.sync-status"]')).toBeNull();
+  expect(container.querySelector('footer')?.children).toHaveLength(1);
   expect(io.flushCheckpoints).not.toHaveBeenCalled();
 });

@@ -12,9 +12,13 @@ export interface PopupFooterProps {
   status?: ReactNode;
 }
 
-function PopupFooterActions({ onOpenGithub }: Pick<PopupFooterProps, 'onOpenGithub'>) {
+function PopupFooterActions({
+  onOpenGithub,
+  status,
+}: Pick<PopupFooterProps, 'onOpenGithub' | 'status'>) {
   return (
     <div className="flex items-center justify-end gap-2">
+      {status}
       <PopupFooterAction
         onClick={onOpenGithub}
         icon={GitHubIcon}
@@ -43,11 +47,6 @@ export function PopupFooter({ onOpenGithub, onOpenSettings, status }: PopupFoote
         'text-[var(--sniptale-color-text-muted-strong)]',
       ].join(' ')}
     >
-      {status ? (
-        <div className="border-b border-[var(--sniptale-color-border-soft)] px-2.5 py-1.5">
-          {status}
-        </div>
-      ) : null}
       <div
         data-ui="popup.footer.actions"
         className="flex h-[42px] shrink-0 items-center justify-between px-2.5"
@@ -58,7 +57,7 @@ export function PopupFooter({ onOpenGithub, onOpenSettings, status }: PopupFoote
           label={translate('popup.common.footerSettings')}
           dataUi="popup.footer.settings-button"
         />
-        <PopupFooterActions onOpenGithub={onOpenGithub} />
+        <PopupFooterActions onOpenGithub={onOpenGithub} status={status} />
       </div>
     </footer>
   );

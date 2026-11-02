@@ -81,12 +81,13 @@ async function closePopup(context: BrowserContext, targetId: string) {
 
 for (const locale of ['ru', 'en'] as const)
   for (const theme of ['light', 'dark'] as const) {
-    test(`native popup sync authority and repair ${locale} ${theme}`, async ({}, info) => {
+    const viewport = PRIMARY_BROWSER_VIEWPORTS[theme === 'light' ? 0 : 1];
+    test(`native popup sync authority and repair ${locale} ${theme} ${viewport.size.width}x${viewport.size.height}`, async ({}, info) => {
       const host = await startHostServer();
       let launched: Awaited<ReturnType<typeof launchExtensionBrowser>> | null = null;
       try {
         launched = await launchExtensionBrowser({
-          viewport: PRIMARY_BROWSER_VIEWPORTS[1].size,
+          viewport: viewport.size,
           headlessScreen: { width: 1920, height: 1080 },
         });
         const { context, extensionId } = launched;
@@ -264,10 +265,14 @@ for (const locale of ['ru', 'en'] as const)
             evaluateInTarget(
               context,
               target,
-              `document.querySelector('[data-ui="popup.footer.sync-status"] button')?.textContent?.trim()`
+              `(() => {
+          const footer = document.querySelector('[data-ui="shared.ui.popup-footer"]');
+          const control = document.querySelector('[data-ui="popup.footer.sync-status"]');
+          return { rows: footer?.children.length, inActions: !!control?.closest('[data-ui="popup.footer.actions"]'), height: footer?.getBoundingClientRect().height };
+        })()`
             )
           )
-          .toBe(locale === 'ru' ? 'Исправить' : 'Resolve');
+          .toEqual({ rows: 1, inActions: true, height: 44 });
         const safe = await sendRuntimeMessageInTarget(context, target, statusCommand());
         for (const privateKey of ['credentialId', 'authorization', 'workspaceFingerprint', 'scope'])
           expect(JSON.stringify(safe)).not.toContain(privateKey);
@@ -337,6 +342,71 @@ for (const locale of ['ru', 'en'] as const)
           context,
           target,
           `document.querySelector('[data-ui="popup.footer.sync-status"] button').click()`
+        );
+        await expect
+          .poll(() =>
+            evaluateInTarget(
+              context,
+              target,
+              `document.querySelector('[data-ui="popup.footer.sync-action"]')?.textContent?.trim()`
+            )
+          )
+          .toBe(locale === 'ru' ? 'Исправить' : 'Resolve');
+        await expect
+          .poll(() =>
+            evaluateInTarget(
+              context,
+              target,
+              `(() => {
+          const rect = document.querySelector('[data-ui="popup.footer.sync-popover"]')?.getBoundingClientRect();
+          return !!rect && rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight;
+        })()`
+            )
+          )
+          .toBe(true);
+        await expect
+          .poll(() =>
+            evaluateInTarget(
+              context,
+              target,
+              `(() => {
+          const panel = document.querySelector('[data-ui="popup.footer.sync-popover"]');
+          if (!panel) return false;
+          const color = getComputedStyle(panel).backgroundColor;
+          return color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent';
+        })()`
+            )
+          )
+          .toBe(true);
+        await evaluateInTarget(
+          context,
+          target,
+          `Promise.all(document.querySelector('[data-ui="popup.footer.sync-popover"]').getAnimations({ subtree: true }).map(animation => animation.finished)).then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))`,
+          true
+        );
+        await screenshot(context, target, {
+          path: info.outputPath('sync-disclosure.png'),
+          fullPage: false,
+        });
+        await evaluateInTarget(
+          context,
+          target,
+          `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`
+        );
+        await expect
+          .poll(() =>
+            evaluateInTarget(
+              context,
+              target,
+              `({ closed: !document.querySelector('[role="dialog"]'), focused: document.activeElement === document.querySelector('[data-ui="popup.footer.sync-status"] button') })`
+            )
+          )
+          .toEqual({ closed: true, focused: true });
+        await evaluateInTarget(context, target, `document.activeElement.click()`);
+        await evaluateInTarget(
+          context,
+          target,
+          `document.querySelector('[data-ui="popup.footer.sync-action"]').click()`
         );
         await expect(settings).toHaveURL(
           `chrome-extension://${extensionId}/${settingsPath}?section=saving&view=connection`

@@ -25,7 +25,7 @@ export default function ProductPopupFooter(props: Omit<PopupFooterProps, 'status
     setNavigationFailed(false);
     void openSettingsPage({ route }).catch(() => setNavigationFailed(true));
   };
-  const configured = sync.status && sync.status.configuration !== 'unconfigured';
+  const configured = sync.status?.configuration === 'configured';
   return (
     <PopupFooter
       {...props}
