@@ -1,6 +1,6 @@
+import { matchesNativeHistorySource } from './source-binding';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { initDB } from '../../infrastructure/indexed-db/core';
-import { NATIVE_TRANSFER_SESSIONS_STORE } from '../../infrastructure/indexed-db/core.stores';
 import {
   runWithPersistenceMutationTransitionRecovery,
   type PersistenceMutationTransitionPermit,
@@ -8,8 +8,8 @@ import {
 import { createRecordingCursorTrajectoryStore } from '../cursor-trajectory/store';
 import { createRecordingEventsStore } from '../recording-events/store';
 import { saveNativeRecordingHistory } from '../telemetry';
-import { isNativeRecordingHistoryParent, isNativeRecordingHistoryIntent } from './guards';
-import { createNativeRecordingHistoryStore } from './store';
+import { isNativeRecordingHistoryIntent } from './guards';
+import { createNativeRecordingHistoryStore, nativeRecordingHistoryParents } from './store';
 import type { NativeRecordingHistoryIntent } from './contracts';
 
 const logger = createLogger({ namespace: 'NativeRecordingHistoryRecovery' });
@@ -60,9 +60,7 @@ async function recoverStream(
       const head = await store.getHead(writer);
       if (
         !head ||
-        head.writerGeneration !== writer.writerGeneration ||
-        head.stagingJournalId !== intent.operationId ||
-        head.sourceRecordingId !== intent.recordingId ||
+        !matchesNativeHistorySource(head, writer, intent) ||
         head.width !== intent.width ||
         head.height !== intent.height ||
         head.totalSamples !== descriptor.totalSamples ||
@@ -80,9 +78,7 @@ async function recoverStream(
       const head = await store.getHead(writer);
       if (
         !head ||
-        head.writerGeneration !== writer.writerGeneration ||
-        head.stagingJournalId !== intent.operationId ||
-        head.sourceRecordingId !== intent.recordingId ||
+        !matchesNativeHistorySource(head, writer, intent) ||
         !totalsMatch(head, descriptor)
       )
         return false;
@@ -100,19 +96,9 @@ export async function recoverNativeRecordingHistories(
 ): Promise<number> {
   const db = await initDB();
   return runWithPersistenceMutationTransitionRecovery(transitionPermit, async (permit) => {
-    let after: IDBValidKey | undefined;
     let recovered = 0;
-    for (;;) {
-      const tx = db.transaction(NATIVE_TRANSFER_SESSIONS_STORE, 'readonly');
-      const cursor = await tx.store.openCursor(
-        after === undefined ? undefined : IDBKeyRange.lowerBound(after, true)
-      );
-      const raw: unknown = cursor?.value;
-      after = cursor?.key;
-      await tx.done;
-      if (!cursor) return recovered;
+    for await (const raw of nativeRecordingHistoryParents(db)) {
       if (
-        !isNativeRecordingHistoryParent(raw) ||
         !isNativeRecordingHistoryIntent(raw.metadata.history) ||
         raw.metadata.history.phase !== 'pending'
       )
@@ -129,5 +115,6 @@ export async function recoverNativeRecordingHistories(
         }
       }
     }
+    return recovered;
   });
 }

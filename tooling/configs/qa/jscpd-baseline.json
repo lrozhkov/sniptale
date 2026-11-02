@@ -148,24 +148,6 @@
       }
     },
     {
-      "id": "0bfb4bd5557bb79634216bc19b1a6016a3921ce81d6ba48a009dc2500b58beff",
-      "classification": "tool-noise",
-      "owner": "offscreen/runtime/routing",
-      "reason": "The repeated case names classify two different outputs: error phase versus acknowledgement mode. The same message can have independent values in both policies. No effect or handler body is duplicated.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/offscreen/runtime/routing.ts",
-        "start": 115,
-        "end": 127
-      },
-      "secondFile": {
-        "path": "apps/extension/src/offscreen/runtime/routing.ts",
-        "start": 157,
-        "end": 169
-      }
-    },
-    {
       "classification": "tool-noise",
       "owner": "composition/persistence/sync-capture/prepared-project",
       "reason": "The exact match is bounded-array admission, a local ID accumulator, mapping, a record check and the opening of distinct allowed-key lists. Asset parsing then validates filenames, publication and source bindings. Export parsing validates project identity, remote bindings, thumbnails and export review. No matched source contains a duplicated asset or export validation algorithm. A generic record-mapping factory would hide these independent schemas.",
@@ -199,6 +181,24 @@
         "path": "apps/extension/src/design-system/previews/product-glass-controls/preview-layout-builders.tsx",
         "start": 101,
         "end": 115
+      }
+    },
+    {
+      "id": "0e0f94d50e65acf26f4b2adec3d3d1e5c993cfd727e83fa197626fab2d588b33",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/project/cursor-trajectory",
+      "reason": "Cursor checks its sample budget and gaps. Events checks gaps. Both delegate hashing and byte and record budgets to shared integrity, then map manifest fields. Only cursor supplies sampleCount.",
+      "removalCondition": "Remove when this exact finding disappears or both formats acquire one accepted manifest and admission contract.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-trajectory/stream.ts",
+        "start": 97,
+        "end": 106
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/recording-events/stream.ts",
+        "start": 79,
+        "end": 88
       }
     },
     {
@@ -652,6 +652,24 @@
       }
     },
     {
+      "id": "2e1cdc2768657faab8b738dd1342dc9b16b80c4c1493419b6cf5f419e4264c92",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "The matched props invoke ActionFeedbackFields for gesture appearance and gesture or click animation. Editing has one owner in the shared component. VisualPart differs.",
+      "removalCondition": "Remove when this exact finding disappears or either branch copies the shared editing implementation.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 338,
+        "end": 344
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 609,
+        "end": 615
+      }
+    },
+    {
       "id": "302a6361c8bf1f6c973b70854331ce71dabb6f517ea769f90b24d55bc1a90dbe",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/inspector/content-sections/content-body.tsx <-> apps/extension/src/editor/inspector/content-sections/document-panel.tsx",
@@ -721,6 +739,24 @@
         "path": "apps/extension/src/composition/persistence/surface-style-presets/catalog.ts",
         "start": 177,
         "end": 185
+      }
+    },
+    {
+      "id": "338d22408f73735a74283702b4a945552d6f1c9631f865467a12cb2d2995034f",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/project/cursor-trajectory",
+      "reason": "The adapters declare format-specific identity and source callbacks, then delegate framing to createRecordingHistoryFrameSource. Each retains its own identity admission and sink selection. The shared transfer algorithm has one owner.",
+      "removalCondition": "Remove when this exact finding disappears or one accepted public source contract replaces both declarations.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/cursor-trajectory/stream.ts",
+        "start": 138,
+        "end": 149
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/recording-events/stream.ts",
+        "start": 118,
+        "end": 129
       }
     },
     {
@@ -811,24 +847,6 @@
         "path": "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
         "start": 27,
         "end": 35
-      }
-    },
-    {
-      "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db/database-migrations",
-      "reason": "The former duplicated executable store-existence check now has one owner, requireMigrationStores at database-migrations.ts:23-29. Current endpoints declare separately numbered contiguous historical migration descriptors and delegate validation to that owner with descriptor-specific inputs. migrate only returns undefined. The matched span crosses into the next descriptor. It contains no remaining duplicated store-validation algorithm. Preserve explicit historical descriptors; no descriptor factory is required for this exact match.",
-      "removalCondition": "Remove this record if either historical descriptor changes or the exact finding disappears.",
-      "reviewBy": "2027-04-15",
-      "id": "3b76255b18501fc81fb2d9da029d8f28164e5ae5fa7656ef78abb14d6e81dfaf",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 846,
-        "end": 863
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 890,
-        "end": 907
       }
     },
     {
@@ -940,24 +958,6 @@
       }
     },
     {
-      "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db",
-      "reason": "Both ranges are import declarations from canonical store constants. Schema contracts describe stores; upgrade creates them. There is no duplicate executable migration or schema definition in this matched import span.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "id": "458e5d91323dfba7bdd88cdbb8899e289d710dddfc970721cef572ac52f46097",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
-        "start": 5,
-        "end": 35
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
-        "start": 1,
-        "end": 31
-      }
-    },
-    {
       "id": "47111a81f930caef1c62e218c759c831ce1785a5b660adb5b469e8cd000ffcf5",
       "classification": "tool-noise",
       "owner": "apps/extension/src/workflows/settings-transfer/style-domain-parser.ts",
@@ -1027,24 +1027,6 @@
         "path": "packages/ui/src/styles/overlays/countdown.css",
         "start": 43,
         "end": 48
-      }
-    },
-    {
-      "id": "4b2699375baed5dfcf1ab105e4903f3bb03af5c3068b74213c00d579c42a0605",
-      "classification": "tool-noise",
-      "owner": "Native action feedback panel",
-      "reason": "The two branches instantiate the existing ActionFeedbackFields for one mouse action, but select appearance versus timing panels with distinct IDs, semantics and visualPart values. This is shared-control invocation, not duplicate feedback editing logic.",
-      "removalCondition": "Remove this record if ActionFeedbackFields implementation is copied into panel branches.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 278,
-        "end": 288
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 295,
-        "end": 305
       }
     },
     {
@@ -1606,6 +1588,24 @@
       }
     },
     {
+      "id": "786239c9cdd0b2d9fcf3fb1ff38755e16869d517f0b9a9c4c2ff7edd3f3d26b4",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/project/validation",
+      "reason": "The shared prefix checks optional style and easing leaves. Complete presentation requires enabled, clickPreset, duration, offset, suppression interval, and showKeystrokes. Sparse override permits omissions and uses preset and optional point.",
+      "removalCondition": "Remove when this exact finding disappears or both validators acquire the same complete contract.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
+        "start": 258,
+        "end": 263
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
+        "start": 275,
+        "end": 280
+      }
+    },
+    {
       "id": "79fee99b537268e7a057172b1246e62f439b82a3543f5db158709c1de5f198fc",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal-content/fields.css",
@@ -1732,6 +1732,24 @@
       }
     },
     {
+      "id": "8a90473912d4e3487a3ff35a537cade1270247e36905a2b03ee3126b14342bf4",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "Click position and animation invoke ActionFeedbackFields with different visualPart and disabling policies. The match contains shared invocation props, not an editing algorithm.",
+      "removalCondition": "Remove when this exact finding disappears or either branch copies the shared editing implementation.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 420,
+        "end": 427
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 607,
+        "end": 614
+      }
+    },
+    {
       "id": "8b591fe6edbc7b1760ef4e0fb86577af0cfd0055a7958cf40154e7c4e030424b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
@@ -1783,6 +1801,24 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
         "start": 67,
         "end": 74
+      }
+    },
+    {
+      "id": "901c0993b8bfb16bb097b395f947d794094231f0fd524733d07b0075f30d023b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "Sound selects keyboard or mouse with part sound. Gesture appearance selects mouse with part visual. Repeated props bind the existing shared control to distinct panel contracts.",
+      "removalCondition": "Remove when this exact finding disappears or the distinct sound and appearance contracts cease to apply.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 132,
+        "end": 141
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 335,
+        "end": 342
       }
     },
     {
@@ -2128,42 +2164,6 @@
       }
     },
     {
-      "id": "9aac969d56062f079e1fb23f4e8026025898484de22945b9bdfc42a21daaabd1",
-      "classification": "tool-noise",
-      "owner": "features/video/project/validation/interaction",
-      "reason": "Complete presentation requires enabled,preset,duration,etc; sparse override admits omitted fields and a different preset key. The shared prefix is optional leaf validation. Existing baseline documents this distinction.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
-        "start": 253,
-        "end": 258
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
-        "start": 268,
-        "end": 273
-      }
-    },
-    {
-      "classification": "tool-noise",
-      "owner": "composition/persistence/infrastructure/indexed-db/database-migrations",
-      "reason": "The former duplicated executable store-existence check now has one owner, requireMigrationStores at database-migrations.ts:23-29. Current endpoints declare separately numbered contiguous historical migration descriptors and delegate validation to that owner with descriptor-specific inputs. migrate only returns undefined. The matched span crosses into the next descriptor. It contains no remaining duplicated store-validation algorithm. Preserve explicit historical descriptors; no descriptor factory is required for this exact match.",
-      "removalCondition": "Remove this record if either historical descriptor changes or the exact finding disappears.",
-      "reviewBy": "2027-04-15",
-      "id": "9bc52f69a9f516ec88375e9e37ad234d5ca731f7769cf92951d93e2b6d88ea4d",
-      "firstFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 846,
-        "end": 863
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
-        "start": 868,
-        "end": 885
-      }
-    },
-    {
       "id": "9c22d0595ab4de301f055725bc187bd87d63e58231f099570cb702c16c60f7dc",
       "classification": "tool-noise",
       "owner": "Gallery video-review inspector and shared compact inspector",
@@ -2251,6 +2251,24 @@
         "path": "packages/ui/src/styles/glass/popover-controls.css",
         "start": 179,
         "end": 189
+      }
+    },
+    {
+      "id": "9f5de746009a52e0f54b36b8caa9ffd5380b8cc9ef2e0e55e45a51b4b4595cc2",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db",
+      "reason": "Independent historical descriptors select database versions 36 to 37 and 37 to 38. Store validation already delegates to requireMigrationStores. Migrate returns undefined. The match crosses the next descriptor boundary.",
+      "removalCondition": "Remove when either historical descriptor changes or this exact finding disappears.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 849,
+        "end": 866
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 871,
+        "end": 888
       }
     },
     {
@@ -2413,24 +2431,6 @@
         "path": "tooling/design-reference/examples/shared/buttons.css",
         "start": 348,
         "end": 360
-      }
-    },
-    {
-      "id": "a97e39e0bd47906b620dfb8d909ce877c4a565934ec7a522cba33bd3eb1f26bd",
-      "classification": "tool-noise",
-      "owner": "Native action feedback panel",
-      "reason": "One branch requests gesture appearance while the other requests gesture-or-click animation from the same ActionFeedbackFields component. The overlapping anchor props are the shared component contract; actual editing logic is not duplicated.",
-      "removalCondition": "Remove this record if the shared feedback component is replaced with copied implementation.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 332,
-        "end": 339
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 601,
-        "end": 608
       }
     },
     {
@@ -2686,24 +2686,6 @@
       }
     },
     {
-      "id": "b9978786e54e40b28ad90bf0a6755042323b6b35c073e9901d01e6fed31e268f",
-      "classification": "tool-noise",
-      "owner": "Native action feedback panel",
-      "reason": "One block supplies click position feedback with positionDisabled, while the other supplies gesture/click animation with ordinary disabled. Both call ActionFeedbackFields; distinct visualPart and disabling policies remain outside its shared edit owner.",
-      "removalCondition": "Remove this record if position and animation edit implementations are copied.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 415,
-        "end": 421
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
-        "start": 601,
-        "end": 607
-      }
-    },
-    {
       "id": "b9c5649e5313c9e9642e5c269ef24accfe00d012cb27fc336de54bb356abe405",
       "classification": "tool-noise",
       "owner": "video-editor/project/history",
@@ -2812,6 +2794,24 @@
       }
     },
     {
+      "id": "c115179db2a6ecb858fb739fb89b7868707007e1b6204775d72f46a73ba1c5b2",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "Gesture appearance and click position invoke ActionFeedbackFields with distinct visual families, visual parts, and disabling policies. The match contains no editing algorithm.",
+      "removalCondition": "Remove when this exact finding disappears or these distinct control compositions acquire one accepted owner.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 336,
+        "end": 343
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 420,
+        "end": 427
+      }
+    },
+    {
       "id": "c1c080519524ad7325d7da4a168eebbe2d8398b2fca2f5e9de04b26fd083e0da",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
@@ -2863,6 +2863,24 @@
         "path": "packages/runtime-contracts/src/validation/data-url.ts",
         "start": 102,
         "end": 114
+      }
+    },
+    {
+      "id": "c6b3739e48aec2250bf21a38efc8a06303de086b1ba8cb3ad9a0427615f52791",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels",
+      "reason": "Separate click-style and click-timing groups select appearance and animation semantics. Both delegate editing to ActionFeedbackFields with different visualPart values.",
+      "removalCondition": "Remove when this exact finding disappears or these branches copy the shared editing implementation.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 280,
+        "end": 291
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
+        "start": 298,
+        "end": 309
       }
     },
     {
@@ -3010,6 +3028,24 @@
       }
     },
     {
+      "id": "d28775258acd4a47b3cc9a8d66ada3f3fe1d5dff091eb5851f70e313358d27a1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db",
+      "reason": "Independent historical descriptors select database versions 36 to 37 and 38 to 39. Store validation already delegates to requireMigrationStores. Migrate returns undefined. The match crosses the next descriptor boundary.",
+      "removalCondition": "Remove when either historical descriptor changes or this exact finding disappears.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 849,
+        "end": 866
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
+        "start": 893,
+        "end": 910
+      }
+    },
+    {
       "id": "d4af7f82bfad5e5d83775cb909127a3d5080c98de3df64efcd8f9427e8a66e9f",
       "classification": "tool-noise",
       "owner": "Gallery and Native camera-follow inspectors",
@@ -3154,6 +3190,24 @@
       }
     },
     {
+      "id": "e2714280633f093b585a28cfd4e263737134b7b5c28cc57e63b04bee4d302ff6",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/runtime",
+      "reason": "Repeated case names feed independent error-phase and response-mode policies. START_RECORDING selects runtime and immediate-ack. STOP_RECORDING selects stop and deferred-ack. The match contains no handler algorithm.",
+      "removalCondition": "Remove when this exact finding disappears or both policies acquire one accepted authority.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/runtime/routing.ts",
+        "start": 117,
+        "end": 129
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/runtime/routing.ts",
+        "start": 160,
+        "end": 172
+      }
+    },
+    {
       "id": "e2f834666b384c5f438036ee9e1beeee796785811afda6158d573f7966ec2550",
       "classification": "tool-noise",
       "owner": "packages/ui/src/product-glass-controls/buttons.tsx",
@@ -3226,6 +3280,24 @@
       }
     },
     {
+      "id": "e8d4ddc1ff99a4a10b493a5f61b1d4667043aefbe64d3c7834af03d6e493db04",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db",
+      "reason": "The entire matched fragment imports canonical store constants. Schema contracts describe stores, while upgrade creates them. The match contains no executable algorithm.",
+      "removalCondition": "Remove when this exact import finding disappears or either module stops requiring these imports.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.ts",
+        "start": 5,
+        "end": 38
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/infrastructure/indexed-db/upgrade/core.ts",
+        "start": 1,
+        "end": 34
+      }
+    },
+    {
       "id": "eacfb537ed2fa88094fa82d23cf66452b6a05f7005b3229df07dbd689a84b6e1",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/highlighter/frame-annotation/settings-parser.ts",
@@ -3259,6 +3331,24 @@
         "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
         "start": 42,
         "end": 46
+      }
+    },
+    {
+      "id": "f52f38f81fe59e255ec025715ffdf70494e7b5a8739dd38fe9e6dae8d977552e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/background/capture/native-app",
+      "reason": "Typed adapters forward to distinct stores. Cursor begin requires geometry and finalize takes descriptor state. Events has different signatures. Shared openHead owns generation, recording, and journal checks. No persistence or retry algorithm remains copied.",
+      "removalCondition": "Remove when this exact finding disappears or both stores acquire one accepted lifecycle API that eliminates these adapters.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/background/capture/native-app/history-pull.ts",
+        "start": 169,
+        "end": 180
+      },
+      "secondFile": {
+        "path": "apps/extension/src/background/capture/native-app/history-pull.ts",
+        "start": 227,
+        "end": 235
       }
     },
     {

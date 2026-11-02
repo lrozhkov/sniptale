@@ -1,4 +1,4 @@
-import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
+import { getClipSourceObservationTime, mapProjectTimeToSourcePoint } from '../timeline/source-time';
 import { resolvePreparedCursorTrajectoryPosition } from '../cursor-trajectory/project-window';
 import { getSourceTimedClipProjectOffset } from '../timeline/rate';
 import { deriveRecordedCursorFocusPath } from './recorded';
@@ -144,11 +144,7 @@ export function resolveProjectSourceCursorObservation(
   );
   if (!clip || clip.type !== 'VIDEO') return undefined;
   const group = groups.find((item) => item.sourceInstanceId === clip.sourceInstanceId)!;
-  const sourceTime = clip.playbackWindow
-    ? mapProjectTimeToSourcePoint([clip], time, clip.id)?.sourceTime
-    : time === clip.startTime + clip.duration
-      ? clip.sourceStart + clip.sourceDuration
-      : clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1);
+  const sourceTime = getClipSourceObservationTime(clip, time);
   if (sourceTime === undefined) return null;
   if (group.trajectory) {
     const point = resolvePreparedCursorTrajectoryPosition(

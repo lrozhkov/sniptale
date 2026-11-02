@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  hasExactKeys,
+  isStringMember,
   isBoolean,
   isNullable,
   isNumber,
@@ -12,6 +14,20 @@ import {
 } from './primitives';
 
 describe('shared validation primitives', () => {
+  it('checks closed own-key shapes without admitting inherited or extra fields', () => {
+    expect(hasExactKeys({ id: 1 }, ['id'])).toBe(true);
+    expect(hasExactKeys({ id: 1, secret: true }, ['id'])).toBe(false);
+    expect(hasExactKeys({}, ['id'])).toBe(false);
+    expect(hasExactKeys(Object.create({ id: 1 }), ['id'])).toBe(false);
+    expect(hasExactKeys({ other: 1 }, ['id'])).toBe(false);
+  });
+
+  it('admits only literal string members', () => {
+    expect(isStringMember('move', ['move', 'click'])).toBe(true);
+    expect(isStringMember('up', ['move', 'click'])).toBe(false);
+    expect(isStringMember(1, ['1'])).toBe(false);
+    expect(isStringMember(null, ['null'])).toBe(false);
+  });
   it('recognizes primitive scalar validators', () => {
     expect(isRecord({ ok: true })).toBe(true);
     expect(isRecord(null)).toBe(false);

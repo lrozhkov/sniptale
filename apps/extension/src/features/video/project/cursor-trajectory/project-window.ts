@@ -1,4 +1,4 @@
-import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
+import { getClipSourceObservationTime } from '../timeline/source-time';
 import { evaluateCursorTrajectory } from './evaluate';
 import type { VideoProject, VideoProjectCursorSample } from '../types';
 import type {
@@ -49,11 +49,7 @@ export async function prepareCursorTrajectoryProject(
     const group = groups.find((item) => item.sourceInstanceId === clip.sourceInstanceId);
     const descriptor = group?.trajectory;
     if (!group || !descriptor || descriptor.totalBlocks === 0) continue;
-    const sourceTime = clip.playbackWindow
-      ? mapProjectTimeToSourcePoint([clip], time, clip.id)?.sourceTime
-      : time === clip.startTime + clip.duration
-        ? clip.sourceStart + clip.sourceDuration
-        : clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1);
+    const sourceTime = getClipSourceObservationTime(clip, time);
     if (sourceTime === undefined) continue;
     const activeTimeUs = Math.round(sourceTime * 1_000_000);
     if (
@@ -117,11 +113,7 @@ export function cursorTrajectoryProjectCoversTime(
     const group = groups.find((item) => item.sourceInstanceId === clip.sourceInstanceId);
     const descriptor = group?.trajectory;
     if (!group || !descriptor || descriptor.totalBlocks === 0) return true;
-    const sourceTime = clip.playbackWindow
-      ? mapProjectTimeToSourcePoint([clip], time, clip.id)?.sourceTime
-      : time === clip.startTime + clip.duration
-        ? clip.sourceStart + clip.sourceDuration
-        : clip.sourceStart + (time - clip.startTime) * (clip.playbackRate ?? 1);
+    const sourceTime = getClipSourceObservationTime(clip, time);
     if (sourceTime === undefined) return true;
     const activeTimeUs = Math.round(sourceTime * 1_000_000);
     return (project[windowsKey] ?? []).some(

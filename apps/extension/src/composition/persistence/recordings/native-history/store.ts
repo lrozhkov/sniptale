@@ -2,7 +2,7 @@ import { verifyNativeRecordingBody } from './video-body';
 import { isCursorTrajectoryDescriptor } from '../../../../features/video/project/cursor-trajectory/records';
 import { isRecordingEventsDescriptor } from '../../../../features/video/project/recording-events/records';
 import { parseRecordingTelemetryEntry } from '../telemetry.guards';
-import type { IDBPTransaction } from 'idb';
+import type { IDBPTransaction, IDBPDatabase } from 'idb';
 import { initDB } from '../../infrastructure/indexed-db/core';
 import {
   STORE_NAME,
@@ -36,6 +36,40 @@ import {
   type NativeHistoryPullUpdate,
   type NativeHistoryPublicationGrant,
 } from './contracts';
+
+/** Updates the history field while retaining the complete operational parent. */
+export async function putNativeRecordingHistoryIntent(
+  tx: IDBPTransaction<unknown, string[], 'readwrite'>,
+  parent: NativeRecordingHistoryParent,
+  next: NativeRecordingHistoryIntent,
+  expiresAt?: number
+): Promise<void> {
+  if (!isNativeRecordingHistoryIntent(next)) throw new NativeRecordingHistoryError('invalid');
+  await tx.objectStore(NATIVE_TRANSFER_SESSIONS_STORE).put({
+    ...parent,
+    metadata: { ...parent.metadata, history: next },
+    updatedAt: Math.max(parent.updatedAt, next.updatedAt),
+    ...(expiresAt === undefined ? {} : { expiresAt }),
+  });
+}
+
+/** Reads and admits one operational parent at a time without retaining its history. */
+export async function* nativeRecordingHistoryParents(
+  db: IDBPDatabase
+): AsyncGenerator<NativeRecordingHistoryParent> {
+  let after: IDBValidKey | undefined;
+  for (;;) {
+    const tx = db.transaction(NATIVE_TRANSFER_SESSIONS_STORE, 'readonly');
+    const cursor = await tx.store.openCursor(
+      after === undefined ? undefined : IDBKeyRange.lowerBound(after, true)
+    );
+    const raw: unknown = cursor?.value;
+    after = cursor?.key;
+    await tx.done;
+    if (!cursor) return;
+    if (isNativeRecordingHistoryParent(raw)) yield raw;
+  }
+}
 
 const intentStores = [
   STORE_NAME,
@@ -261,13 +295,7 @@ export function createNativeRecordingHistoryStore(
           }
           next.revision++;
           next.updatedAt = Math.max(next.updatedAt, dependencies.now());
-          if (!isNativeRecordingHistoryIntent(next))
-            throw new NativeRecordingHistoryError('invalid');
-          await tx.objectStore(NATIVE_TRANSFER_SESSIONS_STORE).put({
-            ...parent,
-            metadata: { ...parent.metadata, history: next },
-            updatedAt: Math.max(parent.updatedAt, next.updatedAt),
-          });
+          await putNativeRecordingHistoryIntent(tx, parent, next);
           await tx.done;
           return structuredClone(next);
         } catch (error) {
@@ -277,18 +305,8 @@ export function createNativeRecordingHistoryStore(
     },
     async *candidates(controllerLeaseId: string, includePublished = false): AsyncGenerator<string> {
       const db = await dependencies.database();
-      let after: IDBValidKey | undefined;
-      for (;;) {
-        const tx = db.transaction(NATIVE_TRANSFER_SESSIONS_STORE, 'readonly');
-        const cursor = await tx.store.openCursor(
-          after === undefined ? undefined : IDBKeyRange.lowerBound(after, true)
-        );
-        const raw: unknown = cursor?.value;
-        after = cursor?.key;
-        await tx.done;
-        if (!cursor) return;
-        if (!isNativeRecordingHistoryParent(raw) || raw.controllerLeaseId !== controllerLeaseId)
-          continue;
+      for await (const raw of nativeRecordingHistoryParents(db)) {
+        if (raw.controllerLeaseId !== controllerLeaseId) continue;
         const intent = raw.metadata.history;
         if (intent === undefined) {
           if (

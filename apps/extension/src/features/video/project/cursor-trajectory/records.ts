@@ -1,4 +1,8 @@
-import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import {
+  hasExactKeys,
+  isStringMember,
+  isPlainRecord,
+} from '@sniptale/runtime-contracts/validation/primitives';
 import type {
   CursorTrajectoryDescriptor,
   CursorTrajectoryRecord,
@@ -49,27 +53,17 @@ function nullableInteger(value: unknown): boolean {
   return value === null || isTrajectoryInteger(value);
 }
 
-function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  return (
-    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
-  );
-}
-
-function member(value: unknown, values: readonly string[]): boolean {
-  return typeof value === 'string' && values.includes(value);
-}
-
 /** Both browser transport and canonical segment records use this exact clock shape. */
 export function isCursorTrajectoryClock(value: unknown): value is CursorTrajectorySegment['clock'] {
   return (
     isPlainRecord(value) &&
-    exactKeys(value, [
+    hasExactKeys(value, [
       'source',
       'timestampQuantumUs',
       'resolutionBoundUs',
       'mappingUncertaintyUs',
     ]) &&
-    member(value['source'], ['windows-message-time', 'dom-event-time']) &&
+    isStringMember(value['source'], ['windows-message-time', 'dom-event-time']) &&
     nullableInteger(value['timestampQuantumUs']) &&
     value['timestampQuantumUs'] !== 0 &&
     nullableInteger(value['resolutionBoundUs']) &&
@@ -84,7 +78,7 @@ export function isCursorTrajectoryRecord(value: unknown): value is CursorTraject
     case 'segment': {
       const clock = value['clock'];
       return (
-        exactKeys(value, [
+        hasExactKeys(value, [
           'kind',
           'segmentId',
           'activeTimeUs',
@@ -100,7 +94,7 @@ export function isCursorTrajectoryRecord(value: unknown): value is CursorTraject
         isTrajectoryInteger(value['height']) &&
         value['height'] > 0 &&
         value['height'] <= 0xffffffff &&
-        member(value['reason'], segmentReasons) &&
+        isStringMember(value['reason'], segmentReasons) &&
         isCursorTrajectoryClock(clock)
       );
     }
@@ -113,7 +107,7 @@ export function isCursorTrajectoryRecord(value: unknown): value is CursorTraject
       )
         return false;
       return (
-        exactKeys(value, [
+        hasExactKeys(value, [
           'kind',
           'segmentId',
           'observationSeq',
@@ -134,8 +128,8 @@ export function isCursorTrajectoryRecord(value: unknown): value is CursorTraject
         (value['observed']
           ? isTrajectoryInteger(value['xQ8']) && isTrajectoryInteger(value['yQ8'])
           : value['xQ8'] === null && value['yQ8'] === null) &&
-        member(value['event'], ['move', 'down', 'up', 'click']) &&
-        member(value['button'], ['none', 'left', 'middle', 'right', 'x1', 'x2']) &&
+        isStringMember(value['event'], ['move', 'down', 'up', 'click']) &&
+        isStringMember(value['button'], ['none', 'left', 'middle', 'right', 'x1', 'x2']) &&
         (related === null ||
           (value['event'] === 'click' &&
             isTrajectoryInteger(related) &&
@@ -143,21 +137,21 @@ export function isCursorTrajectoryRecord(value: unknown): value is CursorTraject
         anchors.length <= anchorValues.length &&
         anchors.every(
           (anchor, index) =>
-            member(anchor, anchorValues) && (index === 0 || anchors[index - 1]! < anchor)
+            isStringMember(anchor, anchorValues) && (index === 0 || anchors[index - 1]! < anchor)
         )
       );
     }
     case 'boundary':
       return (
-        exactKeys(value, ['kind', 'segmentId', 'activeTimeUs', 'reason']) &&
+        hasExactKeys(value, ['kind', 'segmentId', 'activeTimeUs', 'reason']) &&
         isTrajectoryInteger(value['activeTimeUs']) &&
-        member(value['reason'], boundaryReasons)
+        isStringMember(value['reason'], boundaryReasons)
       );
     case 'gap': {
       const first = value['firstLostObservationSeq'];
       const last = value['lastLostObservationSeq'];
       return (
-        exactKeys(value, [
+        hasExactKeys(value, [
           'kind',
           'segmentId',
           'fromTimeUs',
@@ -171,7 +165,7 @@ export function isCursorTrajectoryRecord(value: unknown): value is CursorTraject
           (isTrajectoryInteger(value['toTimeUs']) && value['toTimeUs'] >= value['fromTimeUs'])) &&
         ((first === null && last === null) ||
           (isTrajectoryInteger(first) && isTrajectoryInteger(last) && last >= first)) &&
-        member(value['reason'], [
+        isStringMember(value['reason'], [
           'input-overflow',
           'writer-backpressure',
           'source-unavailable',
@@ -213,7 +207,7 @@ export function trajectoryRecordTimes(record: CursorTrajectoryRecord): readonly 
 export function isCursorTrajectoryDescriptor(value: unknown): value is CursorTrajectoryDescriptor {
   if (
     !isPlainRecord(value) ||
-    !exactKeys(value, [
+    !hasExactKeys(value, [
       'format',
       'formatVersion',
       'algorithm',
@@ -237,7 +231,7 @@ export function isCursorTrajectoryDescriptor(value: unknown): value is CursorTra
     value['encoding'] === 'json-ascii-int-v1' &&
     typeof value['trajectoryId'] === 'string' &&
     /^[a-f0-9]{32}$/.test(value['trajectoryId']) &&
-    member(value['state'], ['complete', 'incomplete', 'unavailable']) &&
+    isStringMember(value['state'], ['complete', 'incomplete', 'unavailable']) &&
     typeof value['finalized'] === 'boolean' &&
     isTrajectoryInteger(totalBlocks) &&
     isTrajectoryInteger(totalRecords) &&

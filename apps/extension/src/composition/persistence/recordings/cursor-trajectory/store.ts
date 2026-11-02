@@ -1,3 +1,4 @@
+import { verifyCursorTrajectoryPrefix } from './guards';
 import { admitStoredCursorTrajectoryBlock as admitBlock } from './guards';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { retireCursorTrajectoryInTransaction } from './retirement';
@@ -157,6 +158,14 @@ export function createRecordingCursorTrajectoryStore(
       }
     });
   };
+  const openRead = async (identity: RecordingCursorTrajectoryIdentity) => {
+    const db = await dependencies.database();
+    const tx = db.transaction([HEADS, BLOCKS], 'readonly');
+    void tx.done.catch(() => undefined);
+    const head = headFrom(await tx.objectStore(HEADS).get(key(identity)), identity);
+    return { tx, head };
+  };
+
   return {
     begin: (
       identity: RecordingCursorTrajectoryIdentity,
@@ -306,11 +315,7 @@ export function createRecordingCursorTrajectoryStore(
           JSON.stringify(row.initialSegment) !== JSON.stringify(segment)
         )
           throw new RecordingCursorTrajectoryError('integrity');
-        const prefix = new Uint8Array(4);
-        new DataView(prefix.buffer).setUint32(0, row.bytes.byteLength, true);
-        digest.update(prefix).update(row.bytes);
-        if (hex(digest.clone().digest()) !== row.entry.prefixSha256)
-          throw new RecordingCursorTrajectoryError('integrity');
+        verifyCursorTrajectoryPrefix(digest, row);
         for (const record of block.records) {
           if (record.kind === 'gap') hasGap = true;
           if (record.kind === 'segment') segment = record;
@@ -387,10 +392,7 @@ export function createRecordingCursorTrajectoryStore(
       identityValid(identity);
       identity = keyIdentity(identity);
       if (!isTrajectoryInteger(fromSequence)) throw new RecordingCursorTrajectoryError('invalid');
-      const db = await dependencies.database();
-      const tx = db.transaction([HEADS, BLOCKS], 'readonly');
-      void tx.done.catch(() => undefined);
-      const head = headFrom(await tx.objectStore(HEADS).get(key(identity)), identity);
+      const { tx, head } = await openRead(identity);
       if (!head || head.retired) {
         await tx.done;
         return [];
@@ -414,10 +416,7 @@ export function createRecordingCursorTrajectoryStore(
       identityValid(identity);
       identity = keyIdentity(identity);
       if (!isTrajectoryInteger(sequence)) throw new RecordingCursorTrajectoryError('invalid');
-      const db = await dependencies.database();
-      const tx = db.transaction([HEADS, BLOCKS], 'readonly');
-      void tx.done.catch(() => undefined);
-      const head = headFrom(await tx.objectStore(HEADS).get(key(identity)), identity);
+      const { tx, head } = await openRead(identity);
       if (expectedGeneration !== undefined)
         requireWriter(head, { ...identity, writerGeneration: expectedGeneration });
       const raw: unknown =
@@ -434,10 +433,7 @@ export function createRecordingCursorTrajectoryStore(
       identityValid(identity);
       identity = keyIdentity(identity);
       if (!isTrajectoryInteger(activeTimeUs)) throw new RecordingCursorTrajectoryError('invalid');
-      const db = await dependencies.database();
-      const tx = db.transaction([HEADS, BLOCKS], 'readonly');
-      void tx.done.catch(() => undefined);
-      const head = headFrom(await tx.objectStore(HEADS).get(key(identity)), identity);
+      const { tx, head } = await openRead(identity);
       if (!head || head.retired) {
         await tx.done;
         return null;

@@ -1,6 +1,7 @@
 import { preparedCursorTrajectorySourceWindow } from '../project/cursor-trajectory/project-window';
 import {
   recordingEventProjectActions,
+  recordingSourceActionFacts,
   recordingEventProjectSignals,
   recordingEventProjectCadence,
 } from '../project/recording-events/project-facts';
@@ -100,20 +101,7 @@ export function projectActionFeedbackMarkers(
       anchor.sourceInstanceId !== group.sourceInstanceId
     )
       return [];
-    return [
-      {
-        id: anchor.sourceEventId,
-        kind: event.kind,
-        time: anchor.sourceTime,
-        duration: event.capturedDuration ?? 0,
-        point: event.point,
-        recordingPoint: event.point,
-        label: event.label,
-        data: event.data,
-        preset: 'NONE',
-        ...(event.keyboardRepeats ? { keyboardRepeats: event.keyboardRepeats } : {}),
-      },
-    ];
+    return recordingSourceActionFacts(event);
   });
   const rawTrack = geometry ? project.cursorTrack : null;
   const captured = rawTrack?.sourceObservations?.find(

@@ -1475,6 +1475,69 @@
         "rule": "generic-api-key"
       },
       "targetAction": "Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings."
+    },
+    {
+      "id": "noise.codeql.archive-source-transformer",
+      "classification": "tool-noise",
+      "owner": "archive-transfer",
+      "risk": "Removing the transformer would remove stream validation. The exception must stay limited to this exact source, location, rule and message.",
+      "reason": "The pinned CodeQL extern web/streamsapi.js:43 declares TransformStream with no parameters. The pinned TypeScript DOM declaration accepts a transformer object. This call passes one transformer argument. archive.test.ts proves successful byte-preserving copy and rejects a streamed source with a mismatched declared size. The 148 focused archive, WebDAV and residency-copy tests passed.",
+      "removalCondition": "Remove when the pinned CodeQL extern declares the constructor parameters or this exact transformer call changes.",
+      "reviewBy": "2027-05-02",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/composition/archive-transfer/writer.ts:38:88ba3700c4af5da36e8a9f67053af2510220849726b2c8ac2fd3f55535df5010:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "88ba3700c4af5da36e8a9f67053af2510220849726b2c8ac2fd3f55535df5010",
+        "file": "apps/extension/src/composition/archive-transfer/writer.ts",
+        "line": 38,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception."
+    },
+    {
+      "id": "noise.codeql.remote-integrity-transformer",
+      "classification": "tool-noise",
+      "owner": "sync-transfer",
+      "risk": "Removing the transformer would remove stream validation. The exception must stay limited to this exact source, location, rule and message.",
+      "reason": "The pinned CodeQL extern web/streamsapi.js:43 declares TransformStream with no parameters. The pinned TypeScript DOM declaration accepts a transformer object. This call passes one transformer argument. residency-copy.test.ts refuses corrupt, short and oversized remote bytes. The 148 focused archive, WebDAV and residency-copy tests passed.",
+      "removalCondition": "Remove when the pinned CodeQL extern declares the constructor parameters or this exact transformer call changes.",
+      "reviewBy": "2027-05-02",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts:16:0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705",
+        "file": "apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts",
+        "line": 16,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception."
+    },
+    {
+      "id": "noise.codeql.webdav-metadata-transformer",
+      "classification": "tool-noise",
+      "owner": "sync-transfer",
+      "risk": "Removing the transformer would remove stream validation. The exception must stay limited to this exact source, location, rule and message.",
+      "reason": "The pinned CodeQL extern web/streamsapi.js:43 declares TransformStream with no parameters. The pinned TypeScript DOM declaration accepts a transformer object. This call passes one transformer argument. webdav.test.ts bounds streamed metadata, including absent and misleading content-length headers. The 148 focused archive, WebDAV and residency-copy tests passed.",
+      "removalCondition": "Remove when the pinned CodeQL extern declares the constructor parameters or this exact transformer call changes.",
+      "reviewBy": "2027-05-02",
+      "source": {
+        "kind": "codeql",
+        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/webdav.ts:280:2a5a41ec32b8455a58f2e55e1650a6aeba5457133cc67466116b14a6793a4583:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+      },
+      "scope": {
+        "contentHash": "2a5a41ec32b8455a58f2e55e1650a6aeba5457133cc67466116b14a6793a4583",
+        "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
+        "line": 280,
+        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
+        "rule": "js/superfluous-trailing-arguments"
+      },
+      "targetAction": "Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception."
     }
   ]
 }

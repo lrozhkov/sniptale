@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  useRecordingHistoryReadLifetime,
+  runRecordingHistoryReads,
+} from '../../../runtime/recording-history-reader';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createRecordingCursorTrajectoryRenderer } from '../../../../workflows/video-review/cursor-trajectory';
 import { cursorTrajectoryProjectCoversTime } from '../../../../features/video/project/cursor-trajectory/project-window';
@@ -30,51 +34,31 @@ export function useCursorTrajectoryProject(
     project: VideoProject;
   } | null>(null);
   owner.latest = { project, time };
-  useEffect(() => {
-    owner.active = true;
-    owner.epoch++;
-    return () => {
-      owner.active = false;
-      owner.epoch++;
-      owner.pending = null;
-      owner.renderer.clear();
-    };
-  }, [owner]);
+  useRecordingHistoryReadLifetime(owner);
   useEffect(() => {
     if (!project.cursorTrack?.sourceObservations?.some((group) => group.trajectory)) return;
     owner.pending = { project, time };
-    const start = () => {
-      if (owner.running || !owner.active || !owner.pending) return;
-      const request = owner.pending;
-      const epoch = owner.epoch;
-      owner.pending = null;
-      owner.running = true;
-      void (async () => {
-        try {
-          const prepared = await owner.renderer.prepare(request.project, request.time);
-          if (
-            owner.active &&
-            owner.epoch === epoch &&
-            owner.latest.project === request.project &&
-            cursorTrajectoryProjectCoversTime(prepared, owner.latest.time)
-          ) {
-            owner.failedProject = null;
-            setCompleted({ source: request.project, project: prepared });
-          }
-        } catch {
-          if (owner.active && owner.epoch === epoch && owner.latest.project === request.project) {
-            if (owner.failedProject !== request.project)
-              logger.warn('Cursor trajectory preview is unavailable');
-            owner.failedProject = request.project;
-            setCompleted({ source: request.project, project: request.project });
-          }
-        } finally {
-          owner.running = false;
-          if (owner.pending && owner.active) start();
+    runRecordingHistoryReads(owner, async (request, epoch) => {
+      try {
+        const prepared = await owner.renderer.prepare(request.project, request.time);
+        if (
+          owner.active &&
+          owner.epoch === epoch &&
+          owner.latest.project === request.project &&
+          cursorTrajectoryProjectCoversTime(prepared, owner.latest.time)
+        ) {
+          owner.failedProject = null;
+          setCompleted({ source: request.project, project: prepared });
         }
-      })();
-    };
-    start();
+      } catch {
+        if (owner.active && owner.epoch === epoch && owner.latest.project === request.project) {
+          if (owner.failedProject !== request.project)
+            logger.warn('Cursor trajectory preview is unavailable');
+          owner.failedProject = request.project;
+          setCompleted({ source: request.project, project: request.project });
+        }
+      }
+    });
   }, [owner, project, time]);
   return completed?.source === project && cursorTrajectoryProjectCoversTime(completed.project, time)
     ? completed.project

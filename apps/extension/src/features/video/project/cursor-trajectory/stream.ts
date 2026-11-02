@@ -1,4 +1,8 @@
-import { sha256 } from '@noble/hashes/sha2.js';
+import {
+  createRecordingHistoryIntegrity,
+  createRecordingHistoryFrameSink,
+  createRecordingHistoryFrameSource,
+} from '../recording-history-stream';
 import { decodeCursorTrajectoryBlock, type PackedCursorTrajectoryBlock } from './blocks';
 import { isCursorTrajectoryDescriptor, trajectoryRecordTimes } from './records';
 import { CURSOR_TRAJECTORY_MAX_BLOCK_BYTES, type CursorTrajectorySegment } from './types';
@@ -9,9 +13,6 @@ export interface CursorTrajectoryStreamIdentity {
   height: number;
   descriptor: unknown;
 }
-
-const hex = (bytes: Uint8Array): string =>
-  Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
 function admitStreamIdentity(identity: CursorTrajectoryStreamIdentity) {
   const descriptor = structuredClone(identity.descriptor);
@@ -45,22 +46,19 @@ export function createCursorTrajectoryStreamSink(
   const sourceRecordingId = identity.sourceRecordingId;
   const width = identity.width;
   const height = identity.height;
-  const digest = sha256.create();
-  const prefix = new Uint8Array(4);
-  let prefixUsed = 0;
-  let payload: Uint8Array | null = null;
-  let payloadUsed = 0;
+  const integrity = createRecordingHistoryIntegrity(
+    descriptor,
+    'Cursor trajectory stream exceeds its descriptor.'
+  );
   let totalBlocks = 0;
-  let totalRecords = 0;
   let totalSamples = 0;
-  let totalBytes = 0;
   let segment: CursorTrajectorySegment | null = null;
   let lastSegmentId: number | null = null;
   let lastObservationSeq: number | null = null;
   let lastTimeUs = 0;
   let hasGap = false;
 
-  const accept = async (bytes: Uint8Array): Promise<void> => {
+  const accept = async (bytes: Uint8Array, prefix: Uint8Array): Promise<void> => {
     const block = decodeCursorTrajectoryBlock(bytes, segment);
     if (
       !block ||
@@ -95,18 +93,10 @@ export function createCursorTrajectoryStreamSink(
       if (record.kind === 'boundary' || record.kind === 'gap') segment = null;
     }
     totalBlocks += 1;
-    totalRecords += block.records.length;
     totalSamples += samples;
-    totalBytes += bytes.byteLength;
-    if (
-      totalBlocks > descriptor.totalBlocks ||
-      totalRecords > descriptor.totalRecords ||
-      totalSamples > descriptor.totalSamples ||
-      totalBytes > descriptor.totalBytes ||
-      (descriptor.state === 'complete' && hasGap)
-    )
+    if (totalSamples > descriptor.totalSamples || (descriptor.state === 'complete' && hasGap))
       throw new Error('Cursor trajectory stream exceeds its descriptor.');
-    digest.update(prefix).update(bytes);
+    const hashes = integrity.append(bytes, prefix, block.records.length);
     await onBlock({
       bytes,
       entry: {
@@ -116,64 +106,31 @@ export function createCursorTrajectoryStreamSink(
         recordCount: block.records.length,
         sampleCount: samples,
         byteLength: bytes.byteLength,
-        blockSha256: hex(sha256(bytes)),
-        prefixSha256: hex(digest.clone().digest()),
+        ...hashes,
       },
     });
     signal?.throwIfAborted();
   };
 
-  return new WritableStream<Uint8Array>({
-    async write(chunk) {
-      signal?.throwIfAborted();
-      if (!(chunk instanceof Uint8Array))
-        throw new Error('Invalid cursor trajectory stream chunk.');
-      let offset = 0;
-      while (offset < chunk.byteLength) {
-        signal?.throwIfAborted();
-        if (!payload) {
-          const count = Math.min(4 - prefixUsed, chunk.byteLength - offset);
-          prefix.set(chunk.subarray(offset, offset + count), prefixUsed);
-          prefixUsed += count;
-          offset += count;
-          if (prefixUsed !== 4) continue;
-          const length = new DataView(prefix.buffer).getUint32(0, true);
-          if (
-            length === 0 ||
-            length > CURSOR_TRAJECTORY_MAX_BLOCK_BYTES ||
-            totalBlocks >= descriptor.totalBlocks ||
-            length > descriptor.totalBytes - totalBytes
-          )
-            throw new Error('Invalid cursor trajectory stream frame length.');
-          payload = new Uint8Array(length);
-        }
-        const count = Math.min(payload.byteLength - payloadUsed, chunk.byteLength - offset);
-        payload.set(chunk.subarray(offset, offset + count), payloadUsed);
-        payloadUsed += count;
-        offset += count;
-        if (payloadUsed === payload.byteLength) {
-          await accept(payload);
-          payload = null;
-          payloadUsed = 0;
-          prefixUsed = 0;
-        }
-      }
+  return createRecordingHistoryFrameSink(
+    descriptor,
+    {
+      maxBlockBytes: CURSOR_TRAJECTORY_MAX_BLOCK_BYTES,
+      invalidChunk: 'Invalid cursor trajectory stream chunk.',
+      invalidLength: 'Invalid cursor trajectory stream frame length.',
+      consume: accept,
+      finish(complete) {
+        if (
+          !complete ||
+          totalSamples !== descriptor.totalSamples ||
+          !integrity.complete() ||
+          (descriptor.state === 'complete' && (segment !== null || hasGap))
+        )
+          throw new Error('Cursor trajectory stream is incomplete or corrupt.');
+      },
     },
-    close() {
-      signal?.throwIfAborted();
-      if (
-        prefixUsed !== 0 ||
-        payload !== null ||
-        totalBlocks !== descriptor.totalBlocks ||
-        totalRecords !== descriptor.totalRecords ||
-        totalSamples !== descriptor.totalSamples ||
-        totalBytes !== descriptor.totalBytes ||
-        hex(digest.digest()) !== descriptor.streamSha256 ||
-        (descriptor.state === 'complete' && (segment !== null || hasGap))
-      )
-        throw new Error('Cursor trajectory stream is incomplete or corrupt.');
-    },
-  });
+    signal
+  );
 }
 
 /** Rebuilds the frozen native framing from bounded original blocks. The caller owns read authority. */
@@ -186,48 +143,11 @@ export function createCursorTrajectoryStreamSource(args: {
   pipeTo(sink: WritableStream<Uint8Array>, signal?: AbortSignal): Promise<void>;
 } {
   const identity = admitStreamIdentity(args.identity);
-  const { descriptor } = identity;
-  const size = descriptor.totalBytes + descriptor.totalBlocks * 4;
-  if (!Number.isSafeInteger(size)) throw new Error('Invalid cursor trajectory stream size.');
-  const readBlock = args.readBlock;
-  const beforeClose = args.beforeClose;
-  return {
-    size,
-    async pipeTo(sink, signal) {
-      signal?.throwIfAborted();
-      const target = sink.getWriter();
-      const input = createCursorTrajectoryStreamSink(
-        identity,
-        async (block) => {
-          const prefix = new Uint8Array(4);
-          new DataView(prefix.buffer).setUint32(0, block.bytes.byteLength, true);
-          await target.write(prefix);
-          await target.write(block.bytes);
-        },
-        signal
-      ).getWriter();
-      try {
-        for (let sequence = 0; sequence < descriptor.totalBlocks; sequence += 1) {
-          signal?.throwIfAborted();
-          const bytes = await readBlock(sequence);
-          signal?.throwIfAborted();
-          const prefix = new Uint8Array(4);
-          new DataView(prefix.buffer).setUint32(0, bytes.byteLength, true);
-          await input.write(prefix);
-          await input.write(bytes);
-        }
-        await input.close();
-        await beforeClose?.();
-        signal?.throwIfAborted();
-        await target.close();
-      } catch (error) {
-        await input.abort(error).catch(() => undefined);
-        await target.abort(error).catch(() => undefined);
-        throw error;
-      } finally {
-        input.releaseLock();
-        target.releaseLock();
-      }
-    },
-  };
+  return createRecordingHistoryFrameSource(
+    identity.descriptor,
+    args,
+    (consume, signal) =>
+      createCursorTrajectoryStreamSink(identity, (block) => consume(block.bytes), signal),
+    'Invalid cursor trajectory stream size.'
+  );
 }

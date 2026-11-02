@@ -1,5 +1,9 @@
+import {
+  hasExactKeys,
+  isStringMember,
+  isPlainRecord,
+} from '@sniptale/runtime-contracts/validation/primitives';
 import { RECORDING_EVENT_LABELS } from './types';
-import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isCursorTrajectoryClock, isTrajectoryInteger } from '../cursor-trajectory/records';
 import type {
   RecordingEventCadence,
@@ -67,14 +71,6 @@ const warningCodes: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-function exact(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  return (
-    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
-  );
-}
-function member(value: unknown, values: readonly string[]): boolean {
-  return typeof value === 'string' && values.includes(value);
-}
 function identifier(value: unknown): value is string {
   return typeof value === 'string' && idPattern.test(value);
 }
@@ -94,7 +90,7 @@ function point(value: unknown): boolean {
   return (
     value === null ||
     (isPlainRecord(value) &&
-      exact(value, ['x', 'y']) &&
+      hasExactKeys(value, ['x', 'y']) &&
       ['x', 'y'].every(
         (key) =>
           typeof value[key] === 'number' &&
@@ -113,7 +109,7 @@ function keyCompletion(data: Record<string, unknown>): boolean {
       nullableInteger(data[key])
     ) &&
     isTrajectoryInteger(data['repeatCount']) &&
-    member(data['completion'], ['observed', 'released', 'lost', 'cancelled']) &&
+    isStringMember(data['completion'], ['observed', 'released', 'lost', 'cancelled']) &&
     (data['completion'] === 'released' ||
       (data['upTimeUs'] === null && data['pressDurationUs'] === null)) &&
     (data['pressDurationUs'] === null || data['upTimeUs'] !== null)
@@ -122,8 +118,8 @@ function keyCompletion(data: Record<string, unknown>): boolean {
 function clickCompletion(data: Record<string, unknown>): boolean {
   return (
     (data['gestureType'] === null ||
-      member(data['gestureType'], ['click', 'hold', 'drag', 'selection', 'native-drag'])) &&
-    member(data['completion'], ['observed', 'released', 'lost', 'cancelled', 'semantic']) &&
+      isStringMember(data['gestureType'], ['click', 'hold', 'drag', 'selection', 'native-drag'])) &&
+    isStringMember(data['completion'], ['observed', 'released', 'lost', 'cancelled', 'semantic']) &&
     [
       'upTimeUs',
       'pressDurationUs',
@@ -135,7 +131,7 @@ function clickCompletion(data: Record<string, unknown>): boolean {
     nullableBoolean(data['dropObserved']) &&
     point(data['upPoint']) &&
     modifiers(data) &&
-    (!member(data['completion'], ['lost', 'cancelled', 'observed']) ||
+    (!isStringMember(data['completion'], ['lost', 'cancelled', 'observed']) ||
       (data['upTimeUs'] === null &&
         data['pressDurationUs'] === null &&
         data['upPoint'] === null)) &&
@@ -157,7 +153,7 @@ export function isSafeRecordingKeyLabel(value: unknown): boolean {
   )
     return false;
   return (
-    member(terminal, [
+    isStringMember(terminal, [
       'ArrowDown',
       'ArrowLeft',
       'ArrowRight',
@@ -182,7 +178,16 @@ export function isSafeRecordingKeyLabel(value: unknown): boolean {
 function action(value: unknown): boolean {
   if (
     !isPlainRecord(value) ||
-    !exact(value, ['id', 'kind', 'timeUs', 'durationUs', 'point', 'label', 'data', 'preset']) ||
+    !hasExactKeys(value, [
+      'id',
+      'kind',
+      'timeUs',
+      'durationUs',
+      'point',
+      'label',
+      'data',
+      'preset',
+    ]) ||
     !identifier(value['id']) ||
     !isTrajectoryInteger(value['timeUs']) ||
     !isTrajectoryInteger(value['durationUs']) ||
@@ -196,7 +201,7 @@ function action(value: unknown): boolean {
     case 'KEY':
       return (
         isSafeRecordingKeyLabel(value['label']) &&
-        exact(data, [
+        hasExactKeys(data, [
           ...keyCompletionKeys,
           'downTimeUs',
           'keyboardAttackId',
@@ -214,7 +219,13 @@ function action(value: unknown): boolean {
     case 'CLICK':
       return (
         value['label'] === RECORDING_EVENT_LABELS.CLICK &&
-        exact(data, [...clickCompletionKeys, 'button', 'gestureId', 'downTimeUs', 'clickCount']) &&
+        hasExactKeys(data, [
+          ...clickCompletionKeys,
+          'button',
+          'gestureId',
+          'downTimeUs',
+          'clickCount',
+        ]) &&
         clickCompletion(data) &&
         isTrajectoryInteger(data['button']) &&
         data['button'] <= 31 &&
@@ -226,7 +237,7 @@ function action(value: unknown): boolean {
     case 'SCROLL': {
       if (
         value['label'] !== RECORDING_EVENT_LABELS.SCROLL ||
-        !exact(data, [
+        !hasExactKeys(data, [
           'eventType',
           'deltaX',
           'deltaY',
@@ -264,8 +275,8 @@ function action(value: unknown): boolean {
     case 'PAUSE':
       return (
         value['label'] === 'Pause' &&
-        exact(data, ['phase']) &&
-        member(data['phase'], ['pause', 'resume'])
+        hasExactKeys(data, ['phase']) &&
+        isStringMember(data['phase'], ['pause', 'resume'])
       );
     default:
       return false;
@@ -274,7 +285,7 @@ function action(value: unknown): boolean {
 function signal(value: unknown): boolean {
   if (
     !isPlainRecord(value) ||
-    !exact(value, ['id', 'kind', 'startTimeUs', 'endTimeUs', 'point', 'data']) ||
+    !hasExactKeys(value, ['id', 'kind', 'startTimeUs', 'endTimeUs', 'point', 'data']) ||
     !identifier(value['id']) ||
     !isTrajectoryInteger(value['startTimeUs']) ||
     !isTrajectoryInteger(value['endTimeUs']) ||
@@ -287,8 +298,8 @@ function signal(value: unknown): boolean {
   switch (value['kind']) {
     case 'typing':
       if (
-        !exact(data, ['eventCount', 'activity', 'privacy', 'groupId', 'continuationOf']) ||
-        !member(data['activity'], ['keyboard', 'input']) ||
+        !hasExactKeys(data, ['eventCount', 'activity', 'privacy', 'groupId', 'continuationOf']) ||
+        !isStringMember(data['activity'], ['keyboard', 'input']) ||
         !nullableId(data['groupId']) ||
         !nullableId(data['continuationOf'])
       )
@@ -303,14 +314,14 @@ function signal(value: unknown): boolean {
           value['endTimeUs'] % 1_000_000 === 0
         );
       return (
-        member(data['privacy'], ['normal', 'unknown']) &&
+        isStringMember(data['privacy'], ['normal', 'unknown']) &&
         isTrajectoryInteger(data['eventCount']) &&
         data['eventCount'] > 0 &&
         (data['privacy'] !== 'unknown' || value['point'] === null)
       );
     case 'keyboard-hold': {
       if (
-        !exact(data, [...keyCompletionKeys, 'privacy', 'downTimeUs']) ||
+        !hasExactKeys(data, [...keyCompletionKeys, 'privacy', 'downTimeUs']) ||
         data['privacy'] !== 'normal' ||
         value['point'] !== null ||
         data['completion'] === 'observed' ||
@@ -330,10 +341,13 @@ function signal(value: unknown): boolean {
       );
     }
     case 'cursor-idle':
-      return exact(data, ['source']) && member(data['source'], ['native-cursor', 'browser-cursor']);
+      return (
+        hasExactKeys(data, ['source']) &&
+        isStringMember(data['source'], ['native-cursor', 'browser-cursor'])
+      );
     case 'static-frame':
       return (
-        exact(data, ['source', 'code', 'severity']) &&
+        hasExactKeys(data, ['source', 'code', 'severity']) &&
         data['severity'] === 'warning' &&
         typeof data['code'] === 'string' &&
         (data['source'] === null
@@ -378,7 +392,15 @@ export function encodeRecordingEventCadence(
 export function decodeRecordingEventCadence(value: unknown): number[] | null {
   if (
     !isPlainRecord(value) ||
-    !exact(value, ['version', 'id', 'startTimeUs', 'quantumUs', 'count', 'encoding', 'ticks']) ||
+    !hasExactKeys(value, [
+      'version',
+      'id',
+      'startTimeUs',
+      'quantumUs',
+      'count',
+      'encoding',
+      'ticks',
+    ]) ||
     value['version'] !== 1 ||
     !identifier(value['id']) ||
     !isTrajectoryInteger(value['startTimeUs']) ||
@@ -428,9 +450,9 @@ export function isRecordingEventRecord(value: unknown): value is RecordingEventR
   switch (value['kind']) {
     case 'segment':
       return (
-        exact(value, [...base, 'clock', 'reason']) &&
+        hasExactKeys(value, [...base, 'clock', 'reason']) &&
         isCursorTrajectoryClock(value['clock']) &&
-        member(value['reason'], [
+        isStringMember(value['reason'], [
           'start',
           'resume',
           'visibility',
@@ -441,29 +463,35 @@ export function isRecordingEventRecord(value: unknown): value is RecordingEventR
       );
     case 'boundary':
       return (
-        exact(value, [...base, 'reason']) &&
-        member(value['reason'], ['pause', 'stop', 'visibility', 'privacy', 'clock-discontinuity'])
+        hasExactKeys(value, [...base, 'reason']) &&
+        isStringMember(value['reason'], [
+          'pause',
+          'stop',
+          'visibility',
+          'privacy',
+          'clock-discontinuity',
+        ])
       );
     case 'action':
-      return exact(value, [...base, 'action']) && action(value['action']);
+      return hasExactKeys(value, [...base, 'action']) && action(value['action']);
     case 'action-update':
       return (
-        exact(value, [...base, 'actionId', 'revision', 'data']) &&
+        hasExactKeys(value, [...base, 'actionId', 'revision', 'data']) &&
         identifier(value['actionId']) &&
         isTrajectoryInteger(value['revision']) &&
         value['revision'] > 0 &&
         isPlainRecord(value['data']) &&
-        ((exact(value['data'], keyCompletionKeys) && keyCompletion(value['data'])) ||
-          (exact(value['data'], clickCompletionKeys) && clickCompletion(value['data'])))
+        ((hasExactKeys(value['data'], keyCompletionKeys) && keyCompletion(value['data'])) ||
+          (hasExactKeys(value['data'], clickCompletionKeys) && clickCompletion(value['data'])))
       );
     case 'signal':
-      return exact(value, [...base, 'signal']) && signal(value['signal']);
+      return hasExactKeys(value, [...base, 'signal']) && signal(value['signal']);
     case 'keyboard-repeat-block':
       return (
-        exact(value, [...base, 'ownerKind', 'ownerId', 'phase', 'cadence']) &&
-        member(value['ownerKind'], ['action', 'signal']) &&
+        hasExactKeys(value, [...base, 'ownerKind', 'ownerId', 'phase', 'cadence']) &&
+        isStringMember(value['ownerKind'], ['action', 'signal']) &&
         identifier(value['ownerId']) &&
-        member(value['phase'], ['onset', 'repeat']) &&
+        isStringMember(value['phase'], ['onset', 'repeat']) &&
         decodeRecordingEventCadence(value['cadence']) !== null
       );
     case 'gap': {
@@ -471,7 +499,7 @@ export function isRecordingEventRecord(value: unknown): value is RecordingEventR
       const last = value['lastLostSourceSeq'];
       const count = value['lostCount'];
       return (
-        exact(value, [
+        hasExactKeys(value, [
           ...base,
           'source',
           'fromTimeUs',
@@ -481,7 +509,7 @@ export function isRecordingEventRecord(value: unknown): value is RecordingEventR
           'lostCount',
           'reason',
         ]) &&
-        member(value['source'], ['keyboard', 'signal', 'producer']) &&
+        isStringMember(value['source'], ['keyboard', 'signal', 'producer']) &&
         isTrajectoryInteger(value['fromTimeUs']) &&
         nullableInteger(value['toTimeUs']) &&
         (value['toTimeUs'] === null ||
@@ -493,7 +521,7 @@ export function isRecordingEventRecord(value: unknown): value is RecordingEventR
             isTrajectoryInteger(count) &&
             count > 0 &&
             count === last - first + 1)) &&
-        member(value['reason'], [
+        isStringMember(value['reason'], [
           'input-overflow',
           'writer-backpressure',
           'storage-failure',
@@ -513,7 +541,7 @@ export function isRecordingEventRecord(value: unknown): value is RecordingEventR
 export function isRecordingEventsDescriptor(value: unknown): value is RecordingEventsDescriptor {
   if (
     !isPlainRecord(value) ||
-    !exact(value, [
+    !hasExactKeys(value, [
       'format',
       'formatVersion',
       'algorithm',
@@ -535,7 +563,7 @@ export function isRecordingEventsDescriptor(value: unknown): value is RecordingE
     value['encoding'] === 'json-utf8-v1' &&
     typeof value['eventStreamId'] === 'string' &&
     streamPattern.test(value['eventStreamId']) &&
-    member(value['state'], ['complete', 'incomplete', 'unavailable']) &&
+    isStringMember(value['state'], ['complete', 'incomplete', 'unavailable']) &&
     typeof value['finalized'] === 'boolean' &&
     (value['state'] !== 'unavailable' || value['finalized']) &&
     isTrajectoryInteger(value['totalBlocks']) &&

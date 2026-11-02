@@ -101,6 +101,27 @@ function sameSummary(head: Head | null, descriptor: Descriptor) {
   );
 }
 
+async function openHead<H extends Head>(
+  intent: NativeRecordingHistoryIntent,
+  writerGeneration: string,
+  getHead: () => Promise<H | null>,
+  begin: () => Promise<unknown>
+): Promise<H> {
+  let head = await getHead();
+  if (!head) {
+    await begin();
+    head = await getHead();
+  }
+  if (
+    !head ||
+    head.writerGeneration !== writerGeneration ||
+    head.sourceRecordingId !== intent.recordingId ||
+    head.stagingJournalId !== intent.operationId
+  )
+    throw new NativeRecordingHistoryError('retired');
+  return head;
+}
+
 /** The ingestion controller serializes calls per recording. This owner never issues a durable ACK. */
 export function createNativeRecordingHistoryPuller(deps: NativeHistoryPullDependencies) {
   function lease(intent: NativeRecordingHistoryIntent, incoming = intent.controllerLeaseId) {
@@ -124,6 +145,7 @@ export function createNativeRecordingHistoryPuller(deps: NativeHistoryPullDepend
     lease(saved);
     return saved;
   }
+
   function cursor(
     intent: NativeRecordingHistoryIntent
   ): Driver<CursorTrajectoryDescriptor, CursorTrajectoryManifestEntry> {
@@ -137,24 +159,18 @@ export function createNativeRecordingHistoryPuller(deps: NativeHistoryPullDepend
       pull: slot.pull,
       async head() {
         if (!writer || !store) return null;
-        let head = await store.getHead(writer);
-        if (!head) {
-          await store.begin(
-            writer,
-            { width: intent.width, height: intent.height },
-            intent.recordingId,
-            intent.operationId
-          );
-          head = await store.getHead(writer);
-        }
-        if (
-          !head ||
-          head.writerGeneration !== writer.writerGeneration ||
-          head.sourceRecordingId !== intent.recordingId ||
-          head.stagingJournalId !== intent.operationId
-        )
-          throw new NativeRecordingHistoryError('retired');
-        return head;
+        return openHead(
+          intent,
+          writer.writerGeneration,
+          () => store.getHead(writer),
+          () =>
+            store.begin(
+              writer,
+              { width: intent.width, height: intent.height },
+              intent.recordingId,
+              intent.operationId
+            )
+        );
       },
       async append(entry, bytes) {
         if (!writer || !store) throw new NativeRecordingHistoryError('invalid');
@@ -204,19 +220,12 @@ export function createNativeRecordingHistoryPuller(deps: NativeHistoryPullDepend
       pull: slot.pull,
       async head() {
         if (!writer || !store) return null;
-        let head = await store.getHead(writer);
-        if (!head) {
-          await store.begin(writer, intent.recordingId, intent.operationId);
-          head = await store.getHead(writer);
-        }
-        if (
-          !head ||
-          head.writerGeneration !== writer.writerGeneration ||
-          head.sourceRecordingId !== intent.recordingId ||
-          head.stagingJournalId !== intent.operationId
-        )
-          throw new NativeRecordingHistoryError('retired');
-        return head;
+        return openHead(
+          intent,
+          writer.writerGeneration,
+          () => store.getHead(writer),
+          () => store.begin(writer, intent.recordingId, intent.operationId)
+        );
       },
       async append(entry, bytes) {
         if (!writer || !store) throw new NativeRecordingHistoryError('invalid');

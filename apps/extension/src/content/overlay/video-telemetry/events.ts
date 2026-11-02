@@ -13,7 +13,10 @@ import {
   VideoProjectActionPreset,
 } from '../../../features/video/project/types';
 import type { TelemetryListeners, TelemetryState } from './types';
-import type { CursorSourceMoment } from './cursor-source';
+import {
+  createTelemetrySourceMoment as cursorMoment,
+  getTelemetryElapsedSeconds as getElapsedSeconds,
+} from './observation-clock';
 import {
   finalizeTelemetrySignals,
   finalizeTypingSignal,
@@ -21,26 +24,6 @@ import {
   tickCursorIdleTelemetry,
   updatePointerIdleAnchor,
 } from './signals';
-
-function getElapsedSeconds(state: TelemetryState, timestampMs: number): number {
-  const runningDurationMs = state.isPaused ? 0 : timestampMs - state.segmentStartedAtTimestamp;
-  return Math.max(0, (state.accumulatedDurationMs + runningDurationMs) / 1000);
-}
-
-function cursorMoment(state: TelemetryState, timestampMs: number): CursorSourceMoment {
-  return {
-    sourceClockId: state.observationClock.id,
-    observationTimeSeconds: getElapsedSeconds(state, timestampMs),
-    viewport: {
-      width: window.innerWidth,
-      height: window.innerHeight,
-      devicePixelRatio: window.devicePixelRatio,
-      visualViewportScale: window.visualViewport?.scale ?? 1,
-      visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
-      visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
-    },
-  };
-}
 
 function ensureCursorTrack(state: TelemetryState): NonNullable<TelemetryState['cursorTrack']> {
   if (state.cursorTrack) {

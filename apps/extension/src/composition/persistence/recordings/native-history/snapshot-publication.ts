@@ -1,3 +1,4 @@
+import { discardHistorySnapshotCopies } from '../history-snapshot-binding';
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isNativeHistoryPublicationGrant } from './guards';
 import type { NativeHistoryPublicationGrant } from './contracts';
@@ -20,7 +21,6 @@ import {
   publishReadyJournalWithRetry,
   cancelAssetPublication,
   releaseAssetReadyProtection,
-  discardPreparedAsset,
   readAssetFile,
   SupersededAssetPublicationError,
   type AssetReadyJournal,
@@ -273,18 +273,7 @@ export async function publishNativeHistorySnapshotJournal(
     );
   } catch (error) {
     if (!ready) {
-      const cleanup = await Promise.allSettled(
-        refs.map((ref) => discardPreparedAsset(ref.assetId))
-      );
-      const failures = cleanup.flatMap((result) =>
-        result.status === 'rejected' ? [result.reason as unknown] : []
-      );
-      if (failures.length)
-        throw new AggregateError(
-          [error, ...failures],
-          'Native history preparation cleanup failed.',
-          { cause: error }
-        );
+      await discardHistorySnapshotCopies(refs, error, 'Native history preparation cleanup failed.');
     }
     throw error;
   }

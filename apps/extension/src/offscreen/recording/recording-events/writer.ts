@@ -1,4 +1,4 @@
-import { sha256 } from '@noble/hashes/sha2.js';
+import { createRecordingHistoryIntake, waitForRecordingHistoryStop } from '../history-intake';
 import {
   isRecordingEventObservationPacket,
   type RecordingEventObservationPacket,
@@ -66,14 +66,9 @@ export async function createBrowserRecordingEventsWriter(options: {
   let clockKey: string | null = null;
   let sourceStopped = false;
   let lastBoundary: Extract<RecordingEventRecord, { kind: 'boundary' }>['reason'] | null = null;
-  let failed = false;
   let hadGap = false;
   let unknownGeometry = false;
   let geometryWarning = false;
-  let closed = false;
-  let queued = 0;
-  let tail: Promise<void> = Promise.resolve();
-  let finishing: Promise<RecordingEventsDescriptor> | null = null;
   let signalStopped!: () => void;
   const stopped = new Promise<void>((resolve) => {
     signalStopped = resolve;
@@ -209,7 +204,7 @@ export async function createBrowserRecordingEventsWriter(options: {
     nativeDocumentId: string,
     digest: string
   ) {
-    if (failed) throw new Error('RECORDING_EVENTS_STORAGE_UNAVAILABLE');
+    if (intake.failed) throw new Error('RECORDING_EVENTS_STORAGE_UNAVAILABLE');
     const changedDocument = documentId !== nativeDocumentId;
     if (!changedDocument && packet.batchSequence === lastBatch) {
       if (digest !== lastDigest) throw new Error('RECORDING_EVENTS_CONFLICT');
@@ -296,56 +291,34 @@ export async function createBrowserRecordingEventsWriter(options: {
     lastDigest = digest;
   }
 
+  const intake = createRecordingHistoryIntake<
+    RecordingEventObservationPacket,
+    RecordingEventsDescriptor
+  >({
+    recordingId: identity.recordingId,
+    errorPrefix: 'RECORDING_EVENTS',
+    isPacket: isRecordingEventObservationPacket,
+    process,
+  });
+
   return {
-    append(value: unknown, nativeDocumentId: string): Promise<void> {
-      if (closed) return Promise.reject(new Error('RECORDING_EVENTS_CLOSED'));
-      if (queued >= 2) return Promise.reject(new Error('RECORDING_EVENTS_BACKPRESSURE'));
-      if (
-        !isRecordingEventObservationPacket(value) ||
-        value.recordingId !== identity.recordingId ||
-        !/^[A-Za-z0-9._:-]{1,128}$/.test(nativeDocumentId)
-      )
-        return Promise.reject(new Error('RECORDING_EVENTS_INVALID_INPUT'));
-      const packet = structuredClone(value);
-      const digest = Array.from(sha256(new TextEncoder().encode(JSON.stringify(packet))), (byte) =>
-        byte.toString(16).padStart(2, '0')
-      ).join('');
-      queued++;
-      const work = tail.then(() => process(packet, nativeDocumentId, digest));
-      tail = work.catch(() => {
-        failed = true;
-      });
-      return work.finally(() => {
-        queued--;
-      });
-    },
+    append: intake.append,
     finish(
       stop: { waitForSourceStop?: boolean; stoppedWhilePaused?: boolean } = {}
     ): Promise<RecordingEventsDescriptor> {
-      finishing ??= (async () => {
-        if (stop.waitForSourceStop && !sourceStopped && !failed) {
-          let timer: ReturnType<typeof setTimeout> | undefined;
-          try {
-            await Promise.race([
-              stopped,
-              new Promise<void>((resolve) => {
-                timer = setTimeout(resolve, 2000);
-              }),
-            ]);
-          } finally {
-            if (timer !== undefined) clearTimeout(timer);
-          }
+      return intake.finalize(async () => {
+        if (stop.waitForSourceStop && !sourceStopped && !intake.failed) {
+          await waitForRecordingHistoryStop(stopped);
         }
-        closed = true;
-        await tail;
+        await intake.closeAndDrain();
         const confirmedPause = stop.stoppedWhilePaused && lastBoundary === 'pause' && !sourceActive;
-        if (!failed) {
+        if (!intake.failed) {
           try {
             if (!sourceStopped && !confirmedPause && active)
               await gap(lastTime, null, active.clock);
             for (const block of packer.finish()) await options.store.append(writer, block);
           } catch {
-            failed = true;
+            intake.fail();
           }
         }
         const head = await options.store.getHead(identity);
@@ -353,7 +326,7 @@ export async function createBrowserRecordingEventsWriter(options: {
         const state =
           head.totalBlocks === 0
             ? 'unavailable'
-            : failed ||
+            : intake.failed ||
                 hadGap ||
                 unknownGeometry ||
                 head.activeInputs > 0 ||
@@ -361,16 +334,10 @@ export async function createBrowserRecordingEventsWriter(options: {
               ? 'incomplete'
               : 'complete';
         return descriptor(await options.store.finalize(writer, descriptor(head, state)));
-      })();
-      const attempt = finishing;
-      return attempt.catch((error: unknown) => {
-        if (finishing === attempt) finishing = null;
-        throw error;
       });
     },
     async discard(): Promise<void> {
-      closed = true;
-      await tail;
+      await intake.closeAndDrain();
       await options.store.retire(identity, writer.writerGeneration);
     },
   };

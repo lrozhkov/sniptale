@@ -1,15 +1,11 @@
+import { hasHistorySnapshotOwner } from '../history-snapshot-binding';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isTrajectoryInteger } from '../../../../features/video/project/cursor-trajectory/records';
 import { isRecordingEventsDescriptor } from '../../../../features/video/project/recording-events/records';
 import { applyRecordingEventFact } from './facts';
 import { admitStoredRecordingEventsBlock, recordingEventsHex } from './guards';
 import type { IndexedDbWriteTransaction } from '../../infrastructure/indexed-db/core';
-import {
-  RECORDING_EVENTS_STORE as STORE,
-  ASSET_REFS_STORE,
-  ASSET_OWNERS_STORE,
-} from '../../infrastructure/indexed-db/core.stores';
-import { parseAssetRef, parseAssetOwner } from '../../assets/guards';
+import { RECORDING_EVENTS_STORE as STORE } from '../../infrastructure/indexed-db/core.stores';
 import { isRecordingEventsHead, isRecordingEventsIdentity } from './guards';
 import {
   RECORDING_EVENTS_SNAPSHOT_ROLE,
@@ -37,23 +33,14 @@ export async function linkRecordingEventsSnapshotInTransaction(
     throw new RecordingEventsError('stale-writer');
   if (!head.finalized || head.totalBlocks === 0 || head.stagingJournalId !== undefined)
     throw new RecordingEventsError('invalid');
-  const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(assetId));
-  const owner = parseAssetOwner(
-    await tx
-      .objectStore(ASSET_OWNERS_STORE)
-      .get(['recording', writer.recordingId, RECORDING_EVENTS_SNAPSHOT_ROLE])
-  );
   if (
-    !ref ||
-    ref.assetId !== assetId ||
-    ref.sha256 !== head.streamSha256 ||
-    ref.size !== head.totalBytes + head.totalBlocks * 4 ||
-    ref.mimeType !== 'application/octet-stream' ||
-    !owner ||
-    owner.assetId !== assetId ||
-    owner.ownerKind !== 'recording' ||
-    owner.ownerId !== writer.recordingId ||
-    owner.role !== RECORDING_EVENTS_SNAPSHOT_ROLE
+    !(await hasHistorySnapshotOwner(
+      tx,
+      writer.recordingId,
+      RECORDING_EVENTS_SNAPSHOT_ROLE,
+      assetId,
+      head
+    ))
   )
     throw new RecordingEventsError('integrity');
   if (head.snapshotAssetId === assetId) return;

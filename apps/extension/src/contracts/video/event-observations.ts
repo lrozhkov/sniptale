@@ -1,4 +1,8 @@
-import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import {
+  hasExactKeys,
+  isNumber,
+  isPlainRecord,
+} from '@sniptale/runtime-contracts/validation/primitives';
 import {
   isCursorTrajectoryClock,
   isTrajectoryInteger,
@@ -26,13 +30,6 @@ export interface RecordingEventObservationPacket {
   viewport: RecordingViewportGeometry;
   records: RecordingEventRecord[];
 }
-function exact(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  return (
-    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
-  );
-}
-const finite = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
 const identifier = (value: unknown) =>
   typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
 
@@ -42,7 +39,7 @@ export function isRecordingEventObservationPacket(
 ): value is RecordingEventObservationPacket {
   if (
     !isPlainRecord(value) ||
-    !exact(value, [
+    !hasExactKeys(value, [
       'version',
       'recordingId',
       'batchSequence',
@@ -65,7 +62,7 @@ export function isRecordingEventObservationPacket(
     !isCursorTrajectoryClock(value['clock']) ||
     value['clock'].source !== 'dom-event-time' ||
     !isPlainRecord(viewport) ||
-    !exact(viewport, [
+    !hasExactKeys(viewport, [
       'width',
       'height',
       'devicePixelRatio',
@@ -74,10 +71,10 @@ export function isRecordingEventObservationPacket(
       'visualViewportOffsetY',
     ]) ||
     !['width', 'height', 'devicePixelRatio', 'visualViewportScale'].every(
-      (key) => finite(viewport[key]) && viewport[key] > 0
+      (key) => isNumber(viewport[key]) && viewport[key] > 0
     ) ||
-    !finite(viewport['visualViewportOffsetX']) ||
-    !finite(viewport['visualViewportOffsetY']) ||
+    !isNumber(viewport['visualViewportOffsetX']) ||
+    !isNumber(viewport['visualViewportOffsetY']) ||
     !Array.isArray(records) ||
     records.length < 1 ||
     records.length > RECORDING_EVENTS_PACKET_MAX_RECORDS ||

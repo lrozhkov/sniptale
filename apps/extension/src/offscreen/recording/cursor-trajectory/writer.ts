@@ -1,4 +1,4 @@
-import { sha256 } from '@noble/hashes/sha2.js';
+import { createRecordingHistoryIntake, waitForRecordingHistoryStop } from '../history-intake';
 import {
   isRecordingCursorObservationPacket,
   type RecordingCursorObservationPacket,
@@ -102,14 +102,9 @@ export async function createBrowserCursorTrajectoryWriter(options: {
   let lastLocalSequence = -1;
   let unknownLocalGap = false;
   let hadGap = false;
-  let failed = false;
-  let closed = false;
-  let queued = 0;
   let sourceStopped = false;
   let blockedClock = false;
   let unavailableGeometry = false;
-  let tail: Promise<void> = Promise.resolve();
-  let finishing: Promise<CursorTrajectoryDescriptor> | null = null;
   const releasedUps = new Map<
     CursorTrajectorySample['button'],
     { localSequence: number; observationSeq: number }
@@ -280,7 +275,7 @@ export async function createBrowserCursorTrajectoryWriter(options: {
     nativeDocumentId: string,
     digest: string
   ) => {
-    if (failed) throw new Error('CURSOR_TRAJECTORY_STORAGE_UNAVAILABLE');
+    if (intake.failed) throw new Error('CURSOR_TRAJECTORY_STORAGE_UNAVAILABLE');
     const changedDocument = documentId !== nativeDocumentId;
     if (!changedDocument && packet.batchSequence === lastBatchSequence) {
       if (digest !== lastBatchDigest) throw new Error('CURSOR_TRAJECTORY_CONFLICT');
@@ -355,64 +350,42 @@ export async function createBrowserCursorTrajectoryWriter(options: {
     lastBatchDigest = digest;
   };
 
+  const intake = createRecordingHistoryIntake<
+    RecordingCursorObservationPacket,
+    CursorTrajectoryDescriptor
+  >({
+    recordingId,
+    errorPrefix: 'CURSOR_TRAJECTORY',
+    isPacket: isRecordingCursorObservationPacket,
+    process,
+  });
+
   return {
-    append(value: unknown, nativeDocumentId: string): Promise<void> {
-      if (closed) return Promise.reject(new Error('CURSOR_TRAJECTORY_CLOSED'));
-      if (queued >= 2) return Promise.reject(new Error('CURSOR_TRAJECTORY_BACKPRESSURE'));
-      if (
-        !isRecordingCursorObservationPacket(value) ||
-        value.recordingId !== recordingId ||
-        !/^[A-Za-z0-9._:-]{1,128}$/.test(nativeDocumentId)
-      )
-        return Promise.reject(new Error('CURSOR_TRAJECTORY_INVALID_INPUT'));
-      const packet = structuredClone(value);
-      const digest = Array.from(sha256(new TextEncoder().encode(JSON.stringify(packet))), (byte) =>
-        byte.toString(16).padStart(2, '0')
-      ).join('');
-      queued += 1;
-      const work = tail.then(() => process(packet, nativeDocumentId, digest));
-      tail = work.catch(() => {
-        failed = true;
-      });
-      return work.finally(() => {
-        queued -= 1;
-      });
-    },
+    append: intake.append,
     finish(
       options: { waitForSourceStop?: boolean; stoppedWhilePaused?: boolean } = {}
     ): Promise<CursorTrajectoryDescriptor> {
-      finishing ??= (async () => {
-        if (options.waitForSourceStop && !sourceStopped && !failed) {
-          let timer: ReturnType<typeof setTimeout> | undefined;
-          try {
-            await Promise.race([
-              stopped,
-              new Promise<void>((resolve) => {
-                timer = setTimeout(resolve, 2000);
-              }),
-            ]);
-          } finally {
-            if (timer !== undefined) clearTimeout(timer);
-          }
+      return intake.finalize(async () => {
+        if (options.waitForSourceStop && !sourceStopped && !intake.failed) {
+          await waitForRecordingHistoryStop(stopped);
         }
-        closed = true;
-        await tail;
+        await intake.closeAndDrain();
         const confirmedPauseStop =
           options.stoppedWhilePaused && lastBoundary === 'pause' && active === null;
-        if (!failed) {
+        if (!intake.failed) {
           try {
             if (!sourceStopped && !confirmedPauseStop && active)
               await gap(lastTime, null, 'source-unavailable', active.clock);
             else await flush();
             for (const block of packer.finish()) await store.append(writer, block);
           } catch {
-            failed = true;
+            intake.fail();
           }
         }
         const head = await store.getHead(identity);
         if (!head) throw new Error('CURSOR_TRAJECTORY_STORAGE_UNAVAILABLE');
         const state =
-          hadGap || failed || (!sourceStopped && !confirmedPauseStop)
+          hadGap || intake.failed || (!sourceStopped && !confirmedPauseStop)
             ? head.totalBlocks === 0
               ? 'unavailable'
               : 'incomplete'
@@ -425,16 +398,10 @@ export async function createBrowserCursorTrajectoryWriter(options: {
           streamSha256: head.streamSha256,
         };
         return descriptor(await store.finalize(writer, expected, state));
-      })();
-      const attempt = finishing;
-      return attempt.catch((error: unknown) => {
-        if (finishing === attempt) finishing = null;
-        throw error;
       });
     },
     async discard(): Promise<void> {
-      closed = true;
-      await tail;
+      await intake.closeAndDrain();
       await store.retire(identity, writer.writerGeneration);
     },
   };

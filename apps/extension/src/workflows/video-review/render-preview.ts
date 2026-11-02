@@ -412,6 +412,27 @@ function retainedWindowRaster(
   return view;
 }
 
+async function recordingHistoryScene(
+  prepared: PreparedScene,
+  frame: Frame,
+  signal: AbortSignal
+): Promise<Scene> {
+  const history = await frame.recordingHistory?.read(
+    frame.sourceTime,
+    frame.resultTime,
+    { ...prepared.dimensions.backing, frameDuration: 1 / (frame.fps ?? 30) },
+    signal
+  );
+  return history
+    ? {
+        ...prepared.scene,
+        zoomRegions: history.effective.zoomRegions,
+        clicks: history.clickCues,
+        keys: history.keyCues,
+      }
+    : prepared.scene;
+}
+
 async function drawPreparedFrame(
   prepared: PreparedScene,
   assets: Assets,
@@ -421,20 +442,7 @@ async function drawPreparedFrame(
   signal: AbortSignal,
   admit: (frame: Frame, bitmaps: readonly Size[]) => void
 ) {
-  const history = await frame.recordingHistory?.read(
-    frame.sourceTime,
-    frame.resultTime,
-    { ...prepared.dimensions.backing, frameDuration: 1 / (frame.fps ?? 30) },
-    signal
-  );
-  const scene = history
-    ? {
-        ...prepared.scene,
-        zoomRegions: history.effective.zoomRegions,
-        clicks: history.clickCues,
-        keys: history.keyCues,
-      }
-    : prepared.scene;
+  const scene = await recordingHistoryScene(prepared, frame, signal);
   const request = sceneRequest({ ...prepared, scene }, frame);
   const { dimensions } = prepared;
   const { context, canvas } = output;
@@ -462,20 +470,7 @@ async function drawPreparedFrame(
       frame: Frame,
       sample: Drawable
     ) => {
-      const history = await frame.recordingHistory?.read(
-        frame.sourceTime,
-        frame.resultTime,
-        { ...dimensions.backing, frameDuration: 1 / (frame.fps ?? 30) },
-        signal
-      );
-      const scene = history
-        ? {
-            ...prepared.scene,
-            zoomRegions: history.effective.zoomRegions,
-            clicks: history.clickCues,
-            keys: history.keyCues,
-          }
-        : prepared.scene;
+      const scene = await recordingHistoryScene(prepared, frame, signal);
       const request = sceneRequest({ ...prepared, scene }, frame);
       if (request.layout.spatial && !assets.spatial)
         throw new Error('Preview spatial preparation is unavailable.');

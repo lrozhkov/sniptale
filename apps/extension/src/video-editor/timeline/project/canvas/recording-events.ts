@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  useRecordingHistoryReadLifetime,
+  runRecordingHistoryReads,
+} from '../../../runtime/recording-history-reader';
 import { createRecordingEventsRenderer } from '../../../../workflows/video-review/recording-events';
 import type { VideoProject } from '../../../../features/video/project/types';
 
@@ -45,46 +49,26 @@ export function useTimelineRecordingEvents(
   );
   const latest = { project, start, end, retry: retryVersion };
   owner.latest = latest;
-  useEffect(() => {
-    owner.active = true;
-    owner.epoch++;
-    return () => {
-      owner.active = false;
-      owner.epoch++;
-      owner.pending = null;
-      owner.renderer.clear();
-    };
-  }, [owner]);
+  useRecordingHistoryReadLifetime(owner);
   useEffect(() => {
     if (!enabled) return;
     owner.pending = { project, start, end, retry: retryVersion };
-    const run = () => {
-      if (!owner.active || owner.running || !owner.pending) return;
-      const request = owner.pending;
-      const epoch = owner.epoch;
-      owner.pending = null;
-      owner.running = true;
+    runRecordingHistoryReads(owner, async (request, epoch) => {
       const current = () =>
         owner.active &&
         owner.epoch === epoch &&
         owner.latest !== null &&
         matches(request, owner.latest);
-      void (async () => {
-        try {
-          const prepared = await owner.renderer.prepare(request.project, {
-            start: request.start,
-            end: request.end,
-          });
-          if (current()) setCompleted({ request, project: prepared });
-        } catch {
-          if (current()) setCompleted({ request, project: null });
-        } finally {
-          owner.running = false;
-          if (owner.active && owner.pending) run();
-        }
-      })();
-    };
-    run();
+      try {
+        const prepared = await owner.renderer.prepare(request.project, {
+          start: request.start,
+          end: request.end,
+        });
+        if (current()) setCompleted({ request, project: prepared });
+      } catch {
+        if (current()) setCompleted({ request, project: null });
+      }
+    });
   }, [owner, enabled, project, start, end, retryVersion]);
   const result = completed && matches(completed.request, latest) ? completed : null;
   return {

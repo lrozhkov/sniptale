@@ -9,6 +9,7 @@ import type {
 } from '../../features/video/project/types';
 import {
   recordingEventProjectActions,
+  recordingSourceActionFacts,
   recordingEventProjectSignals,
 } from '../../features/video/project/recording-events/project-facts';
 import {
@@ -64,20 +65,7 @@ export function createReviewRecordingHistoryProject(
 function capturedActions(project: VideoProject, recordingId: string): RecordingActionEvent[] {
   return recordingEventProjectActions(project).flatMap((event) =>
     event.anchor.kind === 'recording-source' && event.anchor.recordingId === recordingId
-      ? [
-          {
-            id: event.anchor.sourceEventId,
-            kind: event.kind,
-            time: event.anchor.sourceTime,
-            duration: event.capturedDuration ?? 0,
-            point: event.point,
-            recordingPoint: event.point,
-            label: event.label,
-            data: event.data,
-            preset: 'NONE',
-            ...(event.keyboardRepeats ? { keyboardRepeats: event.keyboardRepeats } : {}),
-          },
-        ]
+      ? recordingSourceActionFacts(event)
       : []
   );
 }

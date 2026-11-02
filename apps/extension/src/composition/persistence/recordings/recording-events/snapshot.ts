@@ -1,9 +1,5 @@
-import { sha256 } from '@noble/hashes/sha2.js';
-import {
-  createAssetObjectWriter,
-  readAssetFile,
-  type AssetOpfsOptions,
-} from '../../assets/opfs-store';
+import type { AssetOpfsOptions } from '../../assets/opfs-store';
+import { stageHistorySnapshot, prepareHistorySnapshot } from '../history-snapshot-io';
 import type { AssetRef } from '../../assets/contracts';
 import type { RecordingEventsDescriptor } from '../../../../features/video/project/recording-events/types';
 import {
@@ -54,46 +50,18 @@ export async function stageRecordingEventsStream(args: {
   );
   args.signal?.throwIfAborted();
   writer = await args.store.begin(args.identity, context.sourceRecordingId, args.stagingJournalId);
-  const sinkWriter = sink.getWriter();
-  let closed = false;
-  let received = 0;
-  try {
-    await args.source.pipeTo(
-      new WritableStream<Uint8Array>({
-        async write(chunk) {
-          args.signal?.throwIfAborted();
-          received += chunk.byteLength;
-          if (!Number.isSafeInteger(received) || received > args.source.size)
-            throw new RecordingEventsError('integrity');
-          await sinkWriter.write(chunk);
-        },
-        async close() {
-          await sinkWriter.close();
-          closed = true;
-        },
-        async abort(reason) {
-          await sinkWriter.abort(reason);
-        },
-      }),
-      args.signal
-    );
-    args.signal?.throwIfAborted();
-    if (!closed || received !== args.source.size) throw new RecordingEventsError('integrity');
-    await args.store.finalize(writer, descriptor);
-    return writer;
-  } catch (error) {
-    await sinkWriter.abort(error).catch(() => undefined);
-    try {
-      await args.store.retire(writer, writer.writerGeneration);
-    } catch (cleanup) {
-      throw new AggregateError([error, cleanup], 'Event staging and cleanup failed.', {
-        cause: cleanup,
-      });
-    }
-    throw error;
-  } finally {
-    sinkWriter.releaseLock();
-  }
+  await stageHistorySnapshot({
+    source: args.source,
+    sink,
+    signal: args.signal,
+    integrityError: () => new RecordingEventsError('integrity'),
+    finalize: async () => {
+      await args.store.finalize(writer, descriptor);
+    },
+    retire: () => args.store.retire(writer, writer.writerGeneration),
+    cleanupMessage: 'Event staging and cleanup failed.',
+  });
+  return writer;
 }
 
 export interface PreparedRecordingEventsSnapshot {
@@ -116,63 +84,29 @@ export async function prepareRecordingEventsSnapshot(
   args.signal?.throwIfAborted();
   const identity = { ...args.identity };
   const stream = await openRecordingEventsStream(args.store, identity, args.descriptor);
-  const writer = await createAssetObjectWriter(
-    { mimeType: 'application/octet-stream' },
-    assetOptions
-  );
-  try {
-    await stream.pipeTo(
-      new WritableStream<Uint8Array>({
-        async write(chunk) {
-          args.signal?.throwIfAborted();
-          const copy = new Uint8Array(chunk);
-          await writer.append(new Blob([copy.buffer]));
-        },
-      }),
-      args.signal
-    );
-    args.signal?.throwIfAborted();
-    const prepared = await writer.finalize();
-    args.signal?.throwIfAborted();
-    if (prepared.ref.size !== stream.size) throw new RecordingEventsError('integrity');
-    const file = await readAssetFile(prepared.ref, 'events.bin', assetOptions);
-    const digest = sha256.create();
-    await file.stream().pipeTo(
-      new WritableStream<Uint8Array>({
-        write(chunk) {
-          args.signal?.throwIfAborted();
-          digest.update(chunk);
-        },
-      }),
-      args.signal ? { signal: args.signal } : {}
-    );
-    const actual = Array.from(digest.digest(), (byte) => byte.toString(16).padStart(2, '0')).join(
-      ''
-    );
-    if (actual !== stream.source.descriptor.streamSha256)
-      throw new RecordingEventsError('integrity');
-    const head = await args.store.getHead(identity);
-    args.signal?.throwIfAborted();
-    if (
-      !head ||
-      head.writerGeneration !== stream.writerGeneration ||
-      !head.finalized ||
-      head.streamSha256 !== actual
-    )
-      throw new RecordingEventsError('stale-writer');
-    return {
-      ref: { ...prepared.ref, sha256: actual },
-      writer: { ...identity, writerGeneration: stream.writerGeneration },
-      ...stream.source,
-    };
-  } catch (error) {
-    try {
-      await writer.abort();
-    } catch (cleanup) {
-      throw new AggregateError([error, cleanup], 'Event snapshot preparation and cleanup failed.', {
-        cause: cleanup,
-      });
-    }
-    throw error;
-  }
+  return prepareHistorySnapshot({
+    stream,
+    expectedSha256: stream.source.descriptor.streamSha256,
+    filename: 'events.bin',
+    signal: args.signal,
+    assetOptions,
+    integrityError: () => new RecordingEventsError('integrity'),
+    cleanupMessage: 'Event snapshot preparation and cleanup failed.',
+    async admit(ref, actual) {
+      const head = await args.store.getHead(identity);
+      args.signal?.throwIfAborted();
+      if (
+        !head ||
+        head.writerGeneration !== stream.writerGeneration ||
+        !head.finalized ||
+        head.streamSha256 !== actual
+      )
+        throw new RecordingEventsError('stale-writer');
+      return {
+        ref: { ...ref, sha256: actual },
+        writer: { ...identity, writerGeneration: stream.writerGeneration },
+        ...stream.source,
+      };
+    },
+  });
 }

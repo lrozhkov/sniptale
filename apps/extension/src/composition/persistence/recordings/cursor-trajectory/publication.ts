@@ -1,4 +1,5 @@
-import { parseAssetRef, parseAssetOwner } from '../../assets/guards';
+import { hasHistorySnapshotOwner } from '../history-snapshot-binding';
+import { verifyCursorTrajectoryPrefix } from './guards';
 import { RECORDING_CURSOR_SNAPSHOT_ROLE } from './contracts';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { encodeCursorTrajectoryRecord } from '../../../../features/video/project/cursor-trajectory/blocks';
@@ -10,8 +11,6 @@ import type { CursorTrajectorySegment } from '../../../../features/video/project
 import type { IndexedDbWriteTransaction } from '../../infrastructure/indexed-db/core';
 import {
   RECORDING_CURSOR_TRAJECTORIES_STORE as HEADS,
-  ASSET_REFS_STORE,
-  ASSET_OWNERS_STORE,
   RECORDING_CURSOR_BLOCKS_STORE as BLOCKS,
 } from '../../infrastructure/indexed-db/core.stores';
 import {
@@ -120,11 +119,7 @@ export async function publishStagedCursorTrajectoryInTransaction(args: {
       segmentKey(row.initialSegment) !== segmentKey(segment)
     )
       throw new RecordingCursorTrajectoryError('integrity');
-    const prefix = new Uint8Array(4);
-    new DataView(prefix.buffer).setUint32(0, row.bytes.byteLength, true);
-    digest.update(prefix).update(row.bytes);
-    if (hex(digest.clone().digest()) !== row.entry.prefixSha256)
-      throw new RecordingCursorTrajectoryError('integrity');
+    verifyCursorTrajectoryPrefix(digest, row);
     for (const record of block.records) {
       if (record.kind === 'segment') {
         if (record.width !== source.width || record.height !== source.height)
@@ -179,23 +174,14 @@ export async function linkCursorTrajectorySnapshotInTransaction(
     throw new RecordingCursorTrajectoryError('stale-writer');
   if (!head.finalized || head.totalBlocks === 0 || head.stagingJournalId !== undefined)
     throw new RecordingCursorTrajectoryError('invalid');
-  const ref = parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(assetId));
-  const owner = parseAssetOwner(
-    await tx
-      .objectStore(ASSET_OWNERS_STORE)
-      .get(['recording', writer.recordingId, RECORDING_CURSOR_SNAPSHOT_ROLE])
-  );
   if (
-    !ref ||
-    ref.assetId !== assetId ||
-    ref.sha256 !== head.streamSha256 ||
-    ref.size !== head.totalBytes + head.totalBlocks * 4 ||
-    ref.mimeType !== 'application/octet-stream' ||
-    !owner ||
-    owner.assetId !== assetId ||
-    owner.ownerKind !== 'recording' ||
-    owner.ownerId !== writer.recordingId ||
-    owner.role !== RECORDING_CURSOR_SNAPSHOT_ROLE
+    !(await hasHistorySnapshotOwner(
+      tx,
+      writer.recordingId,
+      RECORDING_CURSOR_SNAPSHOT_ROLE,
+      assetId,
+      head
+    ))
   )
     throw new RecordingCursorTrajectoryError('integrity');
   if (head.snapshotAssetId === assetId) return;

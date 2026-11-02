@@ -19,7 +19,11 @@ import {
   MemoryFileHandle,
 } from '../../assets/opfs-store.test-support';
 import { createRecordingCursorTrajectoryStore } from './store';
-import { prepareRecordingCursorTrajectorySnapshot } from './snapshot';
+import {
+  prepareRecordingCursorTrajectorySnapshot,
+  stageRecordingCursorTrajectoryStream,
+} from './snapshot';
+import { openRecordingCursorTrajectoryStream } from './reader';
 
 const databases: { name: string; db: IDBPDatabase }[] = [];
 let sequence = 0;
@@ -180,4 +184,93 @@ it('refuses publication preparation when the source retires during OPFS finaliza
   expect(await listAssetObjectIds(harness.options)).toEqual([]);
   expect(await listWritingAssetIds(harness.options)).toEqual([]);
   expect(await store.getHead(identity)).toBeNull();
+});
+
+it('stages a verified cursor stream under a private identity and retains the exact original bytes', async () => {
+  const { store, identity, descriptor, blocks } = await fixture();
+  const originalHead = await store.getHead(identity);
+  const stream = await openRecordingCursorTrajectoryStream(store, identity, descriptor);
+  const target = { ...identity, recordingId: 'private-cursor-stage' };
+  const staged = await stageRecordingCursorTrajectoryStream({
+    store,
+    identity: target,
+    sourceIdentity: stream.source,
+    source: stream,
+    stagingJournalId: 'cursor-stage-journal',
+  });
+  expect(await store.getHead(target)).toMatchObject({
+    ...staged,
+    sourceRecordingId: identity.recordingId,
+    stagingJournalId: 'cursor-stage-journal',
+    finalized: true,
+    streamSha256: descriptor.streamSha256,
+    totalBlocks: descriptor.totalBlocks,
+  });
+  expect((await store.readBlock(target, 0, staged.writerGeneration))?.bytes).toEqual(
+    blocks[0]!.bytes
+  );
+  expect(await store.getHead(identity)).toEqual(originalHead);
+});
+
+it.each(['source', 'finalize', 'cleanup'] as const)(
+  'retires only the private cursor stream after a %s failure and preserves the original',
+  async (failure) => {
+    const { store, identity, descriptor, blocks } = await fixture();
+    const originalHead = await store.getHead(identity);
+    const stream = await openRecordingCursorTrajectoryStream(store, identity, descriptor);
+    const target = { ...identity, recordingId: 'failed-cursor-stage' };
+    const failureMessage = 'Cursor stage source failed';
+    const result = stageRecordingCursorTrajectoryStream({
+      store: {
+        ...store,
+        async finalize(...args: Parameters<typeof store.finalize>) {
+          if (failure === 'finalize') throw new Error('Cursor stage finalization failed');
+          return store.finalize(...args);
+        },
+        async retire(...args: Parameters<typeof store.retire>) {
+          await store.retire(...args);
+          if (failure === 'cleanup') throw new Error('Cursor stage cleanup failed');
+        },
+      },
+      identity: target,
+      sourceIdentity: stream.source,
+      source: {
+        size: stream.size,
+        async pipeTo(sink, signal) {
+          await stream.pipeTo(sink, signal);
+          if (failure !== 'finalize') throw new Error(failureMessage);
+        },
+      },
+    });
+    if (failure === 'cleanup') {
+      await expect(result).rejects.toMatchObject({
+        name: 'AggregateError',
+        errors: [new Error(failureMessage), new Error('Cursor stage cleanup failed')],
+      });
+    } else {
+      await expect(result).rejects.toThrow(
+        failure === 'source' ? failureMessage : 'Cursor stage finalization failed'
+      );
+    }
+    expect(await store.getHead(target)).toBeNull();
+    expect(await store.readBlock(target, 0)).toBeNull();
+    expect(await store.getHead(identity)).toEqual(originalHead);
+    expect((await store.readBlock(identity, 0))?.bytes).toEqual(blocks[0]!.bytes);
+  }
+);
+
+it('rejects an incorrect cursor stream size before creating its private head', async () => {
+  const { store, identity, descriptor } = await fixture();
+  const stream = await openRecordingCursorTrajectoryStream(store, identity, descriptor);
+  const target = { ...identity, recordingId: 'invalid-cursor-stage' };
+  await expect(
+    stageRecordingCursorTrajectoryStream({
+      store,
+      identity: target,
+      sourceIdentity: stream.source,
+      source: { ...stream, size: stream.size + 1 },
+    })
+  ).rejects.toMatchObject({ code: 'integrity' });
+  expect(await store.getHead(target)).toBeNull();
+  expect((await store.getHead(identity))?.finalized).toBe(true);
 });

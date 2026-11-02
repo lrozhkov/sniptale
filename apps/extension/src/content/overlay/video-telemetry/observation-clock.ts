@@ -1,3 +1,4 @@
+import type { CursorSourceMoment } from './cursor-source';
 import type { RecordingFrameClockAnchor } from '../../../contracts/video/recording-frame-clock';
 import type {
   RecordingObservationClock,
@@ -86,6 +87,43 @@ export function createObservationClock(timeOriginMs = performance.timeOrigin) {
           mapping && mapping.uncertaintyMs <= (mapping.maximumUncertaintyMs ?? 1000 / 120)
       );
       return { mode: bounded ? 'bounded' : 'approximate', accuracyMs };
+    },
+  };
+}
+
+interface TelemetryClockState {
+  isPaused: boolean;
+  segmentStartedAtTimestamp: number;
+  accumulatedDurationMs: number;
+  observationClock: { id: string };
+}
+
+/** Source time omits paused intervals and retains the observed viewport geometry. */
+export function getTelemetryElapsedSeconds(
+  state: TelemetryClockState,
+  timestampMs: number
+): number {
+  const runningDurationMs = state.isPaused ? 0 : timestampMs - state.segmentStartedAtTimestamp;
+  return Math.max(0, (state.accumulatedDurationMs + runningDurationMs) / 1000);
+}
+
+/** Events and derived signals use the same DOM source moment. */
+export function createTelemetrySourceMoment(
+  state: TelemetryClockState,
+  timestampMs: number,
+  sourceClockId = state.observationClock.id,
+  observationTimeSeconds = getTelemetryElapsedSeconds(state, timestampMs)
+): CursorSourceMoment {
+  return {
+    sourceClockId,
+    observationTimeSeconds,
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      visualViewportScale: window.visualViewport?.scale ?? 1,
+      visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
+      visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
     },
   };
 }

@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  useRecordingHistoryReadLifetime,
+  runRecordingHistoryReads,
+} from '../../../runtime/recording-history-reader';
 import { createRecordingEventsRenderer } from '../../../../workflows/video-review/recording-events';
 import { recordingEventsProjectCoversTime } from '../../../../features/video/project/recording-events/project-facts';
 import type { VideoProject } from '../../../../features/video/project/types';
@@ -32,57 +36,37 @@ export function useRecordingEventsProject(
     retryVersion: number;
   } | null>(null);
   owner.latest = { project, time, retryVersion };
-  useEffect(() => {
-    owner.active = true;
-    owner.epoch++;
-    return () => {
-      owner.active = false;
-      owner.epoch++;
-      owner.pending = null;
-      owner.renderer.clear();
-    };
-  }, [owner]);
+  useRecordingHistoryReadLifetime(owner);
   useEffect(() => {
     if (!project.actionFeedback?.some((group) => group.events && group.events.totalBlocks > 0))
       return;
     owner.pending = { project, start, retryVersion };
-    const run = () => {
-      if (!owner.active || owner.running || !owner.pending) return;
-      const request = owner.pending;
-      const epoch = owner.epoch;
-      owner.pending = null;
-      owner.running = true;
+    runRecordingHistoryReads(owner, async (request, epoch) => {
       const current = () =>
         owner.active &&
         owner.epoch === epoch &&
         owner.latest.project === request.project &&
         owner.latest.retryVersion === request.retryVersion;
-      void (async () => {
-        try {
-          const prepared = await owner.renderer.prepare(request.project, {
-            start: request.start,
-            end: request.start + 2,
+      try {
+        const prepared = await owner.renderer.prepare(request.project, {
+          start: request.start,
+          end: request.start + 2,
+        });
+        if (current() && recordingEventsProjectCoversTime(prepared, owner.latest.time)) {
+          setCompleted({
+            source: request.project,
+            project: prepared,
+            retryVersion: request.retryVersion,
           });
-          if (current() && recordingEventsProjectCoversTime(prepared, owner.latest.time)) {
-            setCompleted({
-              source: request.project,
-              project: prepared,
-              retryVersion: request.retryVersion,
-            });
-            onRecovery('recording-history');
-          }
-        } catch (error) {
-          if (current()) {
-            setCompleted(null);
-            onFailure('recording-history', error);
-          }
-        } finally {
-          owner.running = false;
-          if (owner.active && owner.pending) run();
+          onRecovery('recording-history');
         }
-      })();
-    };
-    run();
+      } catch (error) {
+        if (current()) {
+          setCompleted(null);
+          onFailure('recording-history', error);
+        }
+      }
+    });
   }, [owner, project, start, retryVersion, onFailure, onRecovery]);
   return completed?.source === project &&
     completed.retryVersion === retryVersion &&

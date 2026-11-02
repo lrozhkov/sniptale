@@ -31,3 +31,15 @@ export function isNullable<TValue>(
 ): (value: unknown) => value is TValue | null {
   return (value): value is TValue | null => value === null || validator(value);
 }
+
+/** Checks a closed record shape with own keys only. */
+export function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return (
+    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
+  );
+}
+
+/** Checks string membership without coercion. */
+export function isStringMember(value: unknown, values: readonly string[]): boolean {
+  return typeof value === 'string' && values.includes(value);
+}

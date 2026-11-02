@@ -1,4 +1,8 @@
 import {
+  createTelemetrySourceMoment,
+  getTelemetryElapsedSeconds as getElapsedSeconds,
+} from './observation-clock';
+import {
   normalizeRecordingSignals,
   RECORDING_TYPING_GAP_SECONDS,
 } from '../../../features/video/project/recording-actions';
@@ -14,11 +18,6 @@ import type { CursorIdleTelemetrySignal, TelemetryState, TypingTelemetrySignal }
 const CURSOR_IDLE_DWELL_MS = 1200;
 const CURSOR_IDLE_TOLERANCE_PX = 12;
 const TYPING_MERGE_GAP_MS = RECORDING_TYPING_GAP_SECONDS * 1000;
-
-function getElapsedSeconds(state: TelemetryState, timestampMs: number): number {
-  const runningDurationMs = state.isPaused ? 0 : timestampMs - state.segmentStartedAtTimestamp;
-  return Math.max(0, (state.accumulatedDurationMs + runningDurationMs) / 1000);
-}
 
 function resolveSignalPoint(state: TelemetryState) {
   return state.lastKnownPointerPosition === null ? null : { ...state.lastKnownPointerPosition };
@@ -44,18 +43,7 @@ function pushCompletedSignal(
         ? { x: signal.point.x / window.innerWidth, y: signal.point.y / window.innerHeight }
         : null;
     state.eventSource.emit(
-      {
-        sourceClockId: signal.data.observationClockId,
-        observationTimeSeconds: getElapsedSeconds(state, timestampMs),
-        viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          devicePixelRatio: window.devicePixelRatio,
-          visualViewportScale: window.visualViewport?.scale ?? 1,
-          visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
-          visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
-        },
-      },
+      createTelemetrySourceMoment(state, timestampMs, signal.data.observationClockId),
       {
         kind: 'signal',
         signal: {
@@ -353,18 +341,7 @@ export function recordProtectedActivity(state: TelemetryState, timestampMs: numb
   const startTime = Math.floor(getElapsedSeconds(state, timestampMs));
   if (state.eventSource) {
     state.eventSource.emit(
-      {
-        sourceClockId: state.observationClock.id,
-        observationTimeSeconds: startTime,
-        viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight,
-          devicePixelRatio: window.devicePixelRatio,
-          visualViewportScale: window.visualViewport?.scale ?? 1,
-          visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
-          visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
-        },
-      },
+      createTelemetrySourceMoment(state, timestampMs, state.observationClock.id, startTime),
       {
         kind: 'signal',
         signal: {

@@ -1,4 +1,9 @@
-import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import {
+  hasExactKeys,
+  isStringMember,
+  isNumber,
+  isPlainRecord,
+} from '@sniptale/runtime-contracts/validation/primitives';
 import {
   isCursorTrajectoryClock,
   isTrajectoryInteger,
@@ -59,18 +64,6 @@ export interface RecordingCursorObservationPacket {
   records: RecordingCursorObservation[];
 }
 
-function exact(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  return (
-    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
-  );
-}
-function finite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-function member(value: unknown, keys: readonly string[]): boolean {
-  return typeof value === 'string' && keys.includes(value);
-}
-
 /** Only geometric pointer facts enter this transport. */
 export function isRecordingCursorObservation(value: unknown): value is RecordingCursorObservation {
   if (!isPlainRecord(value)) return false;
@@ -78,7 +71,7 @@ export function isRecordingCursorObservation(value: unknown): value is Recording
     const seq = value['localSequence'];
     const related = value['relatedLocalSequence'];
     return (
-      exact(value, [
+      hasExactKeys(value, [
         'kind',
         'localSequence',
         'activeTimeUs',
@@ -95,19 +88,19 @@ export function isRecordingCursorObservation(value: unknown): value is Recording
       typeof value['observed'] === 'boolean' &&
       typeof value['visible'] === 'boolean' &&
       (value['observed']
-        ? finite(value['x']) && finite(value['y'])
+        ? isNumber(value['x']) && isNumber(value['y'])
         : value['x'] === null && value['y'] === null) &&
-      member(value['event'], ['move', 'down', 'up', 'click']) &&
-      member(value['button'], ['none', 'left', 'middle', 'right', 'x1', 'x2']) &&
+      isStringMember(value['event'], ['move', 'down', 'up', 'click']) &&
+      isStringMember(value['button'], ['none', 'left', 'middle', 'right', 'x1', 'x2']) &&
       (related === null ||
         (value['event'] === 'click' && isTrajectoryInteger(related) && related < seq))
     );
   }
   if (value['kind'] === 'boundary')
     return (
-      exact(value, ['kind', 'activeTimeUs', 'reason']) &&
+      hasExactKeys(value, ['kind', 'activeTimeUs', 'reason']) &&
       isTrajectoryInteger(value['activeTimeUs']) &&
-      member(value['reason'], [
+      isStringMember(value['reason'], [
         'pause',
         'stop',
         'visibility',
@@ -123,7 +116,7 @@ export function isRecordingCursorObservation(value: unknown): value is Recording
   const first = value['firstLostLocalSequence'];
   const last = value['lastLostLocalSequence'];
   return (
-    exact(value, [
+    hasExactKeys(value, [
       'kind',
       'fromTimeUs',
       'toTimeUs',
@@ -135,7 +128,7 @@ export function isRecordingCursorObservation(value: unknown): value is Recording
     (to === null || (isTrajectoryInteger(to) && to >= from)) &&
     ((first === null && last === null) ||
       (isTrajectoryInteger(first) && isTrajectoryInteger(last) && last >= first)) &&
-    member(value['reason'], ['input-overflow', 'source-unavailable'])
+    isStringMember(value['reason'], ['input-overflow', 'source-unavailable'])
   );
 }
 
@@ -145,7 +138,7 @@ export function isRecordingCursorObservationPacket(
 ): value is RecordingCursorObservationPacket {
   if (
     !isPlainRecord(value) ||
-    !exact(value, [
+    !hasExactKeys(value, [
       'version',
       'recordingId',
       'batchSequence',
@@ -170,7 +163,7 @@ export function isRecordingCursorObservationPacket(
     isCursorTrajectoryClock(value['clock']) &&
     value['clock'].source === 'dom-event-time' &&
     isPlainRecord(viewport) &&
-    exact(viewport, [
+    hasExactKeys(viewport, [
       'width',
       'height',
       'devicePixelRatio',
@@ -179,10 +172,10 @@ export function isRecordingCursorObservationPacket(
       'visualViewportOffsetY',
     ]) &&
     ['width', 'height', 'devicePixelRatio', 'visualViewportScale'].every(
-      (key) => finite(viewport[key]) && viewport[key] > 0
+      (key) => isNumber(viewport[key]) && viewport[key] > 0
     ) &&
-    finite(viewport['visualViewportOffsetX']) &&
-    finite(viewport['visualViewportOffsetY']) &&
+    isNumber(viewport['visualViewportOffsetX']) &&
+    isNumber(viewport['visualViewportOffsetY']) &&
     Array.isArray(records) &&
     records.length > 0 &&
     records.length <= RECORDING_CURSOR_PACKET_MAX_RECORDS &&

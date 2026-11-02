@@ -1,4 +1,4 @@
-import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { hasExactKeys, isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   connectionUuid,
   parseConnectionAuthentication,
@@ -148,17 +148,12 @@ export interface SecurityE2ESyncRuntime {
   erase?(): Promise<boolean>;
 }
 
-function exact(value: Record<string, unknown>, keys: readonly string[]): boolean {
-  return (
-    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key))
-  );
-}
 function parseSyncSelection(value: unknown): SecurityE2ESyncSelection | null {
   if (
     !isRecord(value) ||
-    !exact(value, ['scope', 'authorization', 'operationId', 'expectedRevision']) ||
+    !hasExactKeys(value, ['scope', 'authorization', 'operationId', 'expectedRevision']) ||
     !isRecord(value['scope']) ||
-    !exact(value['scope'], ['spaceId', 'connectionGeneration', 'profileCreatedAt'])
+    !hasExactKeys(value['scope'], ['spaceId', 'connectionGeneration', 'profileCreatedAt'])
   )
     return null;
   const scope = parseSyncQueueScope(value['scope']);
@@ -191,9 +186,9 @@ function parseSyncControlCommand(value: unknown): SyncControlCommand | null {
   if (!isRecord(value) || !connectionUuid(value['requestId'])) return null;
   const requestId = value['requestId'];
   if (value['type'] === 'sync-workspace-start' || value['type'] === 'sync-workspace-enroll') {
-    if (!exact(value, ['type', 'requestId', 'payload'])) return null;
+    if (!hasExactKeys(value, ['type', 'requestId', 'payload'])) return null;
     const payload = value['payload'];
-    if (!isRecord(payload) || !exact(payload, ['source', 'authentication'])) return null;
+    if (!isRecord(payload) || !hasExactKeys(payload, ['source', 'authentication'])) return null;
     const source = parseSyncWorkspaceSource(payload['source']);
     const rawAuthentication = payload['authentication'];
     if (!isRecord(rawAuthentication)) return null;
@@ -207,11 +202,11 @@ function parseSyncControlCommand(value: unknown): SyncControlCommand | null {
       : null;
   }
   if (value['type'] === 'sync-start') {
-    if (!exact(value, ['type', 'requestId', 'payload'])) return null;
+    if (!hasExactKeys(value, ['type', 'requestId', 'payload'])) return null;
     const selection = parseSyncSelection(value['payload']);
     return selection ? { type: 'sync-start', requestId, selection } : null;
   }
-  if (!exact(value, ['type', 'requestId'])) return null;
+  if (!hasExactKeys(value, ['type', 'requestId'])) return null;
   switch (value['type']) {
     case 'sync-inspect':
     case 'sync-stop':

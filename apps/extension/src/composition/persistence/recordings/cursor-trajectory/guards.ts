@@ -1,3 +1,4 @@
+import { isHistorySnapshotRef } from '../history-snapshot-ref';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { parseAssetRef } from '../../assets/guards';
 import type { RecordingTelemetryEntry } from '../contracts';
@@ -48,10 +49,7 @@ export function isRecordingCursorTrajectorySnapshot(
     return false;
   const ref = parseAssetRef(value['ref']);
   return (
-    ref !== null &&
-    ref.mimeType === 'application/octet-stream' &&
-    ref.sha256 === descriptor.streamSha256 &&
-    ref.size === descriptor.totalBytes + descriptor.totalBlocks * 4 &&
+    isHistorySnapshotRef(ref, descriptor) &&
     typeof value['sourceRecordingId'] === 'string' &&
     /^[A-Za-z0-9._:-]{1,128}$/.test(value['sourceRecordingId']) &&
     [value['width'], value['height']].every(
@@ -188,4 +186,18 @@ export function admitStoredCursorTrajectoryBlock(
   )
     throw new RecordingCursorTrajectoryError('integrity');
   return { row: raw, block };
+}
+
+/** Extends the canonical framed prefix and checks this block's committed digest. */
+export function verifyCursorTrajectoryPrefix(
+  digest: ReturnType<typeof sha256.create>,
+  row: StoredRecordingCursorBlock
+): void {
+  const prefix = new Uint8Array(4);
+  new DataView(prefix.buffer).setUint32(0, row.bytes.byteLength, true);
+  digest.update(prefix).update(row.bytes);
+  const actual = Array.from(digest.clone().digest(), (byte) =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
+  if (actual !== row.entry.prefixSha256) throw new RecordingCursorTrajectoryError('integrity');
 }

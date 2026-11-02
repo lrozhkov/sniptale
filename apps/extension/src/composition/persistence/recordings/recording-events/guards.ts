@@ -1,3 +1,4 @@
+import { isHistorySnapshotRef } from '../history-snapshot-ref';
 import { parseAssetRef } from '../../assets/guards';
 import { isRecordingEventsDescriptor } from '../../../../features/video/project/recording-events/records';
 import type { RecordingEventsSnapshot } from './contracts';
@@ -185,11 +186,7 @@ export function isRecordingEventsSnapshot(
     return false;
   const ref = parseAssetRef(value['ref']);
   return (
-    ref !== null &&
-    ref.mimeType === 'application/octet-stream' &&
-    ref.sha256 === descriptor.streamSha256 &&
-    ref.size === descriptor.totalBytes + descriptor.totalBlocks * 4 &&
-    recordingEventsIdentifier(value['sourceRecordingId'])
+    isHistorySnapshotRef(ref, descriptor) && recordingEventsIdentifier(value['sourceRecordingId'])
   );
 }
 

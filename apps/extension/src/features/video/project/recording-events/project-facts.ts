@@ -1,5 +1,10 @@
 import type { VideoProjectActionFeedback } from '../action-feedback/types';
-import type { VideoProject, VideoProjectActionEvent, RecordingTelemetrySignal } from '../types';
+import type {
+  VideoProject,
+  VideoProjectActionEvent,
+  RecordingTelemetrySignal,
+  RecordingActionEvent,
+} from '../types';
 import type {
   RecordingEventRecord,
   RecordingEventCadence,
@@ -111,6 +116,26 @@ export function projectRecordingEventAction(
     (item) => item.id === action.id
   )?.presentation;
   return presentation ? { ...event, presentation } : event;
+}
+
+/** Converts retained source actions for review without applying presentation edits. */
+export function recordingSourceActionFacts(event: VideoProjectActionEvent): RecordingActionEvent[] {
+  const anchor = event.anchor;
+  if (anchor.kind !== 'recording-source') return [];
+  return [
+    {
+      id: anchor.sourceEventId,
+      kind: event.kind,
+      time: anchor.sourceTime,
+      duration: event.capturedDuration ?? 0,
+      point: event.point,
+      recordingPoint: event.point,
+      label: event.label,
+      data: event.data,
+      preset: 'NONE',
+      ...(event.keyboardRepeats ? { keyboardRepeats: event.keyboardRepeats } : {}),
+    },
+  ];
 }
 
 /** Keeps source signal semantics, including anonymous holds and nullable aggregates. */

@@ -1,3 +1,5 @@
+import { putNativeRecordingHistoryIntent } from './store';
+import { readPrivateNativeHistoryHead } from './source-binding';
 import { runWithIndexedDbMutation } from '../../infrastructure/indexed-db/mutation';
 import { abortIndexedDbMutation } from '../../infrastructure/indexed-db/transaction';
 import { parseRecordingTelemetryEntry } from '../telemetry.guards';
@@ -228,82 +230,33 @@ async function markPublished(
     : 'pending';
   next.revision++;
   next.updatedAt = Math.max(next.updatedAt, Date.now());
-  if (!isNativeRecordingHistoryIntent(next)) throw new NativeRecordingHistoryError('invalid');
-  await tx.objectStore(NATIVE_TRANSFER_SESSIONS_STORE).put({
-    ...parent,
-    metadata: { ...parent.metadata, history: next },
-    updatedAt: Math.max(parent.updatedAt, next.updatedAt),
-    expiresAt:
-      next.phase === 'complete' ? next.updatedAt + 24 * 60 * 60 * 1000 : Number.MAX_SAFE_INTEGER,
-  });
+  await putNativeRecordingHistoryIntent(
+    tx,
+    parent,
+    next,
+    next.phase === 'complete' ? next.updatedAt + 24 * 60 * 60 * 1000 : Number.MAX_SAFE_INTEGER
+  );
 }
 async function retirePrivate(tx: IndexedDbWriteTransaction, grant: NativeHistoryPublicationGrant) {
-  if (grant.kind === 'cursor' && grant.writer) {
-    const head: unknown = await tx
-      .objectStore(RECORDING_CURSOR_TRAJECTORIES_STORE)
-      .get([grant.writer.recordingId, grant.writer.trajectoryId]);
-    if (
-      !isCursorTrajectoryHead(head) ||
-      head.writerGeneration !== grant.writer.writerGeneration ||
-      head.stagingJournalId !== grant.operationId ||
-      head.sourceRecordingId !== grant.recordingId
-    )
-      throw new SupersededAssetPublicationError();
+  await readPrivateNativeHistoryHead(tx, grant);
+  if (grant.kind === 'cursor' && grant.writer)
     await retireCursorTrajectoryInTransaction(
       tx,
       grant.writer,
       () => crypto.randomUUID(),
       grant.writer.writerGeneration
     );
-  }
-  if (grant.kind === 'events' && grant.writer) {
-    const head: unknown = await tx
-      .objectStore(RECORDING_EVENTS_STORE)
-      .get([grant.writer.recordingId, grant.writer.eventStreamId, 'head', 0]);
-    if (
-      !isRecordingEventsHead(head) ||
-      head.writerGeneration !== grant.writer.writerGeneration ||
-      head.stagingJournalId !== grant.operationId ||
-      head.sourceRecordingId !== grant.recordingId
-    )
-      throw new SupersededAssetPublicationError();
+  if (grant.kind === 'events' && grant.writer)
     await retireRecordingEventsInTransaction(
       tx,
       grant.writer,
       () => crypto.randomUUID(),
       grant.writer.writerGeneration
     );
-  }
 }
 async function assertPrivate(tx: IndexedDbWriteTransaction, grant: NativeHistoryPublicationGrant) {
-  if (grant.kind === 'cursor' && grant.writer) {
-    const head: unknown = await tx
-      .objectStore(RECORDING_CURSOR_TRAJECTORIES_STORE)
-      .get([grant.writer.recordingId, grant.writer.trajectoryId]);
-    if (
-      !isCursorTrajectoryHead(head) ||
-      head.retired ||
-      !head.finalized ||
-      head.writerGeneration !== grant.writer.writerGeneration ||
-      head.stagingJournalId !== grant.operationId ||
-      head.sourceRecordingId !== grant.recordingId
-    )
-      throw new SupersededAssetPublicationError();
-  }
-  if (grant.kind === 'events' && grant.writer) {
-    const head: unknown = await tx
-      .objectStore(RECORDING_EVENTS_STORE)
-      .get([grant.writer.recordingId, grant.writer.eventStreamId, 'head', 0]);
-    if (
-      !isRecordingEventsHead(head) ||
-      head.retired ||
-      !head.finalized ||
-      head.writerGeneration !== grant.writer.writerGeneration ||
-      head.stagingJournalId !== grant.operationId ||
-      head.sourceRecordingId !== grant.recordingId
-    )
-      throw new SupersededAssetPublicationError();
-  }
+  const head = await readPrivateNativeHistoryHead(tx, grant);
+  if (head && (head.retired || !head.finalized)) throw new SupersededAssetPublicationError();
 }
 type NativeHistoryPublicationResult =
   | { alreadyPublished: true }

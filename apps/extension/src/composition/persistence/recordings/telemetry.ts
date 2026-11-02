@@ -1,3 +1,4 @@
+import { putHistorySnapshotOwner, discardHistorySnapshotCopies } from './history-snapshot-binding';
 import {
   publishNativeHistoryInTransaction,
   createNativeHistoryPublicationGrant,
@@ -43,7 +44,6 @@ import { parseAssetRef, parseAssetOwner } from '../assets/guards';
 import {
   createAssetPublicationJournal,
   publishReadyJournalWithRetry,
-  discardPreparedAsset,
   readAssetFile,
   deleteReadyJournal,
   cancelAssetPublication,
@@ -358,31 +358,25 @@ async function mutateRecordingTelemetry(
         if (!condition)
           throw new Error('Cursor snapshot publication requires its source precondition.');
         const ref = entry.cursorTrajectorySnapshot.ref;
-        const existing: unknown = await tx.objectStore(ASSET_REFS_STORE).get(ref.assetId);
-        if (existing !== undefined && !sameRef(parseAssetRef(existing), ref))
-          throw new SupersededAssetPublicationError();
-        await tx.objectStore(ASSET_REFS_STORE).put(ref);
-        await tx.objectStore(ASSET_OWNERS_STORE).put({
-          assetId: ref.assetId,
-          ownerKind: 'recording',
-          ownerId: recordingId,
-          role: RECORDING_CURSOR_SNAPSHOT_ROLE,
-        });
+        await putHistorySnapshotOwner(
+          tx,
+          recordingId,
+          RECORDING_CURSOR_SNAPSHOT_ROLE,
+          ref,
+          sameRef
+        );
       }
       if (entry?.recordingEventsSnapshot) {
         if (!condition?.eventsWriter)
           throw new Error('Event publication requires its source generation.');
         const ref = entry.recordingEventsSnapshot.ref;
-        const existing: unknown = await tx.objectStore(ASSET_REFS_STORE).get(ref.assetId);
-        if (existing !== undefined && !sameRef(parseAssetRef(existing), ref))
-          throw new SupersededAssetPublicationError();
-        await tx.objectStore(ASSET_REFS_STORE).put(ref);
-        await tx.objectStore(ASSET_OWNERS_STORE).put({
-          assetId: ref.assetId,
-          ownerKind: 'recording',
-          ownerId: recordingId,
-          role: RECORDING_EVENTS_SNAPSHOT_ROLE,
-        });
+        await putHistorySnapshotOwner(
+          tx,
+          recordingId,
+          RECORDING_EVENTS_SNAPSHOT_ROLE,
+          ref,
+          sameRef
+        );
         await linkRecordingEventsSnapshotInTransaction(tx, condition.eventsWriter, ref.assetId);
       }
       if (entry?.cursorTrajectorySnapshot && condition?.writer)
@@ -831,16 +825,11 @@ async function publishTelemetryPreparation(
     await publishReadyJournalWithRetry(ready, publishCursorSnapshotJournal, lifecyclePermit);
   } catch (error) {
     if (!ready) {
-      const cleanup = await Promise.allSettled(
-        preparedRefs.map((ref) => discardPreparedAsset(ref.assetId))
+      await discardHistorySnapshotCopies(
+        preparedRefs,
+        error,
+        'History preparation and cleanup failed.'
       );
-      const failures = cleanup.flatMap((result) =>
-        result.status === 'rejected' ? [result.reason as unknown] : []
-      );
-      if (failures.length)
-        throw new AggregateError([error, ...failures], 'History preparation and cleanup failed.', {
-          cause: error,
-        });
     }
     throw error;
   }
