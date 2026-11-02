@@ -178,7 +178,14 @@ export function reviewCameraGapSignature(
     target: reviewCameraNominalDescriptor(input.target),
     from: input.from,
     to: input.to,
-    input: input.scene,
+    // Preview callers also carry playback time and pose; these do not change the gap proof.
+    input: {
+      source: input.scene.source,
+      output: input.scene.output,
+      canvas: input.scene.canvas,
+      background: input.scene.background,
+      windowHeader: input.scene.windowHeader,
+    },
     policy: input.policy,
   });
 }

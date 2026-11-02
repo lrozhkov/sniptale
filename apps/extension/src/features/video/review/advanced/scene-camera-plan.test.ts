@@ -1,7 +1,8 @@
 import { createQuickEditBorder } from '../../project/scene/focus-appearance';
 import { createReviewWorkingZoneCameraGeometry } from './camera-geometry';
 import { fitQuickEditSourceCrop } from './canvas';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import * as cameraGeometry from './camera-geometry';
 import {
   evaluateWorkingZoneCameraBoundary,
   planWorkingZoneCamera,
@@ -19,6 +20,82 @@ import {
 } from '../../project/camera/cursor-policy';
 import type { QuickEditZoomRegion } from './types';
 import { reviewCameraPlanObservations } from './cursor-focus-path';
+
+it.each([0.5, 0.05])(
+  'reuses the linked camera proof across playback snapshots with observed pointer x=%s',
+  (gapX) => {
+    const scene = {
+      source: { width: 1000, height: 600 },
+      background: { enabled: false as const, zoomBehavior: 'window' as const },
+    };
+    const path = {
+      version: 1 as const,
+      mode: 'follow' as const,
+      smoothing: 0,
+      sensitivity: 0.5,
+      gapPolicy: 'hold' as const,
+      segments: [
+        {
+          id: 'native',
+          start: 0,
+          end: 4,
+          binding: { kind: 'project' as const },
+          keys: [0, 1, 2, 3, 4].map((time) => ({
+            id: `point-${time}`,
+            time,
+            x: time === 2 ? gapX : 0.5,
+            y: 0.5,
+            anchor: 'movement' as const,
+            interpolation: 'linear' as const,
+          })),
+        },
+      ],
+    };
+    const from: QuickEditZoomRegion = {
+      id: 'from',
+      start: 0,
+      end: 1,
+      linkTo: 'to',
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+      cursorFocus: {
+        path,
+        observed: path,
+        scene,
+        policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') }),
+      },
+    };
+    const to: QuickEditZoomRegion = {
+      id: 'to',
+      start: 3,
+      end: 4,
+      transform: from.transform,
+      enter: from.enter,
+      exit: from.exit,
+    };
+    const regions = [from, to];
+    const prove = vi.spyOn(cameraGeometry, 'proveReviewCameraGap');
+    try {
+      for (const time of [1.2, 1.5, 1.8]) {
+        // Stage and mini-preview supply wider objects than the scene contract.
+        const preview = { ...scene, focus: { regions, time }, camera: { ...from.transform } };
+        evaluateQuickEditCameraAtTime(regions, time, preview);
+      }
+      expect(prove).toHaveBeenCalledTimes(1);
+      const conflicts = resolveReviewCameraConflicts(regions, scene, { start: 1.5, end: 2.5 });
+      expect(conflicts.length).toBe(gapX === 0.5 ? 0 : 1);
+      expect(prove).toHaveBeenCalledTimes(1);
+      evaluateQuickEditCameraAtTime(regions, 1.5, {
+        ...scene,
+        output: { width: 1280, height: 720 },
+      });
+      expect(prove).toHaveBeenCalledTimes(2);
+    } finally {
+      prove.mockRestore();
+    }
+  }
+);
 
 it('rejects a fragment inside a link gap when its captured pointer leaves the admitted output', () => {
   const focus = {
