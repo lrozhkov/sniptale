@@ -198,3 +198,68 @@ it('does not schedule image state updates for equivalent empty frame plans', () 
   act(() => root!.render(<Probe />));
   expect(renders).toBe(initial + 1);
 });
+
+it('reuses header preparation on ordinary frames and admits the pending image', () => {
+  const project = createEmptyVideoProject();
+  const clip = createVideoClip();
+  const assetUrls = {};
+  const requested: HTMLImageElement[] = [];
+  vi.mocked(projectWindowHeaderImages).mockClear();
+  vi.mocked(projectWindowHeaderImages).mockReturnValue([{ key: 'header', src: 'blob:header' }]);
+  vi.stubGlobal('Image', function () {
+    const image = document.createElement('img');
+    requested.push(image);
+    return image;
+  });
+  let images: Record<string, HTMLImageElement> = {};
+  function Probe({ snapshot = project }: { snapshot?: typeof project }) {
+    images = usePreviewStageImageBank(snapshot, [clip], assetUrls);
+    return null;
+  }
+  for (let frame = 0; frame < 30; frame++) act(() => root!.render(<Probe />));
+  expect(projectWindowHeaderImages).toHaveBeenCalledTimes(1);
+  expect(requested).toHaveLength(1);
+  act(() => root!.render(<Probe snapshot={{ ...project, name: 'Renamed' }} />));
+  expect(projectWindowHeaderImages).toHaveBeenCalledTimes(2);
+  expect(requested).toHaveLength(1);
+  act(() => requested[0]!.dispatchEvent(new Event('load')));
+  expect(images['header']).toBe(requested[0]);
+  vi.mocked(projectWindowHeaderImages).mockReturnValue([
+    { key: 'updated-header', src: 'blob:updated' },
+  ]);
+  act(() => root!.render(<Probe snapshot={{ ...project, name: 'Header changed' }} />));
+  expect(requested).toHaveLength(2);
+  expect(images['header']).toBeUndefined();
+  act(() => requested[1]!.dispatchEvent(new Event('load')));
+  expect(images['updated-header']).toBe(requested[1]);
+});
+
+it('replaces the image plan when seeking to another clip and prunes the previous images', () => {
+  const project = createEmptyVideoProject();
+  const first = createVideoClip();
+  const second = createVideoClip({ id: 'second-clip' });
+  const assetUrls = {};
+  const requested: HTMLImageElement[] = [];
+  vi.mocked(projectWindowHeaderImages).mockImplementation((_project, clips = []) =>
+    clips.map((clip) => ({ key: clip.id, src: `blob:${clip.id}` }))
+  );
+  vi.stubGlobal('Image', function () {
+    const image = document.createElement('img');
+    requested.push(image);
+    return image;
+  });
+  let images: Record<string, HTMLImageElement> = {};
+  function Probe({ clips }: { clips: VideoProjectVideoClip[] }) {
+    images = usePreviewStageImageBank(project, clips, assetUrls);
+    return null;
+  }
+  act(() => root!.render(<Probe clips={[first]} />));
+  act(() => root!.render(<Probe clips={[second]} />));
+  expect(requested).toHaveLength(2);
+  act(() => requested[0]!.dispatchEvent(new Event('load')));
+  expect(images[first.id]).toBeUndefined();
+  act(() => requested[1]!.dispatchEvent(new Event('load')));
+  expect(images[second.id]).toBe(requested[1]);
+  act(() => root!.render(<Probe clips={[]} />));
+  expect(images).toEqual({});
+});

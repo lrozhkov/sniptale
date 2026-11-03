@@ -1,5 +1,5 @@
 import { projectWindowHeaderImages } from '../../../../features/video/composition/draw/window-header';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getProjectSceneBackgroundImageAssetId } from '../../../../features/video/project/scene/background';
 import { isVideoClip } from '../../../../features/video/project/timeline';
 import type {
@@ -102,20 +102,47 @@ export function usePreviewStageImageBank(
 ): Record<string, HTMLImageElement> {
   const [images, setImages] = useState<Record<string, HTMLImageElement>>({});
   const cacheRef = useRef<Record<string, HTMLImageElement>>({});
-  const headerImages = projectWindowHeaderImages(project, activeClips);
-  const sources = {
-    ...assetUrls,
-    ...Object.fromEntries(headerImages.map(({ key, src }) => [key, src])),
-  };
-  const activeIds = resolveActiveImageAssetIds(project, activeClips);
-  headerImages.forEach(({ key }) => activeIds.add(key));
-  const nextPlan = [...activeIds].sort().map((assetId) => ({
-    assetId,
-    src: sources[assetId] ?? '',
-    header: headerImages.some(({ key }) => key === assetId),
-  }));
+  // Animated camera geometry does not supply image assets or window headers.
+  const imageClips = activeClips.filter(
+    (clip) =>
+      clip.type !== 'VIDEO' ||
+      !project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+  );
+  const retainedClips = useRef(imageClips);
+  if (
+    retainedClips.current.length !== imageClips.length ||
+    imageClips.some((clip, index) => clip !== retainedClips.current[index])
+  )
+    retainedClips.current = imageClips;
+  const clips = retainedClips.current;
+  const nextPlan = useMemo(() => {
+    const headerImages = projectWindowHeaderImages(project, clips);
+    const sources = {
+      ...assetUrls,
+      ...Object.fromEntries(headerImages.map(({ key, src }) => [key, src])),
+    };
+    const activeIds = resolveActiveImageAssetIds(project, clips);
+    headerImages.forEach(({ key }) => activeIds.add(key));
+    return [...activeIds].sort().map((assetId) => ({
+      assetId,
+      src: sources[assetId] ?? '',
+      header: headerImages.some(({ key }) => key === assetId),
+    }));
+  }, [project, clips, assetUrls]);
   const planRef = useRef(nextPlan);
-  if (JSON.stringify(planRef.current) !== JSON.stringify(nextPlan)) planRef.current = nextPlan;
+  if (
+    planRef.current.length !== nextPlan.length ||
+    nextPlan.some((entry, index) => {
+      const previous = planRef.current[index];
+      return (
+        !previous ||
+        entry.assetId !== previous.assetId ||
+        entry.src !== previous.src ||
+        entry.header !== previous.header
+      );
+    })
+  )
+    planRef.current = nextPlan;
   const imagePlan = planRef.current;
 
   useEffect(() => {
