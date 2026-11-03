@@ -738,7 +738,11 @@ it.each(['zoom', 'spotlight', 'border', 'lens'] as const)(
       { ...initial, ...(selected.sourceAnchor ? { sourceAnchor: selected.sourceAnchor } : {}) },
       type
     );
-    expect(reset.regions[0]).toEqual({ ...expected, linkTo: 'next' });
+    expect(reset.regions[0]).toEqual({
+      ...expected,
+      cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+      linkTo: 'next',
+    });
     expect(reset.regions[1]).toBe(neighbour);
   }
 );

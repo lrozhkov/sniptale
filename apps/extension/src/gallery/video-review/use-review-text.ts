@@ -153,20 +153,26 @@ export function useReviewText(args: {
         ? { kind: 'text', fragmentId: id, field: 'text' }
         : undefined
     );
-  const add = (select = true) =>
+  const add = (select = true, sourceRange?: { start: number; end: number }) =>
     guard(() => {
       args.pause();
       const id = crypto.randomUUID();
       const start = Math.max(
         0,
-        Math.min(projection.output(args.sourceTime), projection.resultDuration - 0.05)
+        Math.min(
+          projection.output(sourceRange?.start ?? args.sourceTime),
+          sourceRange ? projection.resultDuration : projection.resultDuration - 0.05
+        )
       );
       if (
         mutate((current) =>
           addReviewTextFragment(current, {
             id,
             start,
-            end: Math.min(projection.resultDuration, start + 3),
+            end: Math.min(
+              projection.resultDuration,
+              sourceRange ? projection.output(sourceRange.end) : start + 3
+            ),
           })
         )
       ) {

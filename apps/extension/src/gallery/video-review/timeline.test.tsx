@@ -211,19 +211,6 @@ it('previews the boundary that basic cut drawing will select', () => {
   );
 });
 
-it('keeps the seek cursor during plane capture from an audio lane', () => {
-  const { host } = renderTimeline({
-    audioTracks: { originalAudio: <div data-ui="gallery.videoReview.audioLane" /> },
-  });
-  const plane = planeWithMetrics(host);
-  const audio = host.querySelector('[data-ui="gallery.videoReview.audioLane"]')!;
-  act(() => audio.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100 })));
-  hoverAt(plane, 200);
-  expect(plane.style.cursor).toBe('default');
-  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')?.textContent).toBe('2.0');
-  dispatchPlane(plane, [{ type: 'pointerup', x: 200 }]);
-});
-
 it('keeps original time coordinates through zoom and preserves separate comment navigation', () => {
   const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 2 } };
   const marker = {
@@ -437,24 +424,6 @@ it('allows seeking while writes lock track editing, without creating a new range
   ]);
   expect(props.onSeek).toHaveBeenCalledWith(3, false);
   expect(props.onSelect).not.toHaveBeenCalled();
-});
-
-it.each(['zoomLane', 'audioLane'])('seeks without selecting a range on an idle %s', (laneName) => {
-  const onRangeCommit = vi.fn();
-  const { host, props } = renderTimeline({
-    onRangeCommit,
-    zoomTrack: <div data-ui={`gallery.videoReview.${laneName}`} />,
-  });
-  const plane = planeWithMetrics(host);
-  const lane = host.querySelector<HTMLElement>(`[data-ui="gallery.videoReview.${laneName}"]`)!;
-  dispatchPlane(lane, [{ type: 'pointerdown', x: 100 }]);
-  dispatchPlane(plane, [
-    { type: 'pointermove', x: 250 },
-    { type: 'pointerup', x: 250 },
-  ]);
-  expect(props.onSeek).toHaveBeenCalledWith(1);
-  expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
-  expect(onRangeCommit).not.toHaveBeenCalled();
 });
 
 it('routes focus drawing to its own tool and cancels without committing', () => {

@@ -14,7 +14,7 @@ import type { ReviewClickAnimation } from '../../features/video/review/advanced/
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
-import { Activity, Search, Filter, Eye, EyeOff } from 'lucide-react';
+import { Activity, Filter, Eye, EyeOff } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
@@ -39,7 +39,6 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   sourceId?: string | undefined;
   actionsEnabled?: boolean | undefined;
   onToggleActions?: (() => void) | undefined;
-  onOpenHistory?: (() => void) | undefined;
   keyAnimations?:
     | readonly import('../../features/video/project/action-feedback/key-animation').ReviewKeyAnimation[]
     | undefined;
@@ -78,6 +77,8 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   boundaries?: readonly number[];
   snapTimes?: readonly number[] | undefined;
   onRangeCommit?(range: ReviewAnchor): void;
+  onTextRangeCommit?: ((range: Extract<ReviewAnchor, { kind: 'range' }>) => void) | undefined;
+  onTrackRangeCommit?: ((range: Extract<ReviewAnchor, { kind: 'range' }>) => void) | undefined;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
   onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
   originalRangeTool?: boolean;
@@ -254,7 +255,7 @@ export function ReviewTimeline(props: TimelineProps) {
             onPointerLeave={hover.clear}
           >
             <ReviewPlaybackRangeOverlay
-              range={ruler.range}
+              range={plane.trackPreview ?? ruler.range}
               duration={props.duration}
               gutter={gutter}
               width={Math.max(1, width * zoom)}
@@ -325,7 +326,6 @@ function ReviewTimelineEvents(
     | 'time'
     | 'selectedTelemetryRef'
     | 'onMarker'
-    | 'onOpenHistory'
     | 'actionsEnabled'
     | 'onToggleActions'
     | 'keyAnimations'
@@ -350,13 +350,6 @@ function ReviewTimelineEvents(
       icon={<Activity size={14} aria-hidden="true" />}
       controls={
         <>
-          <ReviewButton
-            label={translate('gallery.videoReview.historyOpen')}
-            className={reviewIconButtonClassName}
-            onClick={props.onOpenHistory}
-          >
-            <Search size={14} aria-hidden="true" />
-          </ReviewButton>
           <ReviewButton
             label={translate('gallery.videoReview.historyAnimatedOnly')}
             className={reviewIconButtonClassName}

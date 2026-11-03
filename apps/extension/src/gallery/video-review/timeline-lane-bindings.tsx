@@ -74,16 +74,12 @@ export function ReviewAudioLane(props: {
   audio: ReturnType<typeof useReviewAudio>;
   busy: boolean;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
-  onRecordVoiceover(): void;
-  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
-  onOpenSpeech?: (() => void) | undefined;
 }) {
   return (
     <ReviewAudioTrack
       lane={props.lane}
       compact={props.compact}
       beforeAction={props.beforeAction}
-      onOpenSpeech={props.onOpenSpeech}
       originalEditor={props.audio}
       selectedEditId={props.selectedEditId}
       edits={props.edits}
@@ -105,8 +101,6 @@ export function ReviewAudioLane(props: {
       onTrimClip={props.audio.trimClip}
       onOriginal={props.audio.setOriginal}
       onImportFile={props.onImportFile}
-      onRecordVoiceover={props.onRecordVoiceover}
-      onOpenMusic={props.onOpenMusic}
     />
   );
 }

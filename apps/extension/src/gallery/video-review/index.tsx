@@ -116,6 +116,15 @@ function useEditorPresentationPreview(
   return usePresentationPreview(previewInput, preferences, () => state.video.current?.pause());
 }
 
+/** Keep text visibility on the same caption writer as the scene inspector. */
+function reviewTimelineTextCommands(state: ReturnType<typeof useReviewEditorState>) {
+  return {
+    text: state.text,
+    onToggleCaptions: () =>
+      state.setCaptions({ ...state.text.captions, enabled: !state.text.captions.enabled }),
+  };
+}
+
 /** Localize prepared window choices without adding scene/export policy to the workspace shell. */
 function ReviewEditor({
   resource,
@@ -245,7 +254,7 @@ function ReviewEditor({
               annotationToolCancellation={state.annotationToolCancellation}
               effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
               annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
-              text={state.text}
+              {...reviewTimelineTextCommands(state)}
               {...reviewTimelineInspectorCommands({
                 video: state.video,
                 select: state.setActiveSelection,

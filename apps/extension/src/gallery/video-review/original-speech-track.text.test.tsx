@@ -14,7 +14,7 @@ let host: HTMLDivElement;
 let current: ReviewTextDocument;
 let editor: ReturnType<typeof useReviewText>;
 const select = vi.fn();
-const open = vi.fn();
+const toggleCaptions = vi.fn();
 function Fixture({
   domain = 'result',
   busy = false,
@@ -87,7 +87,7 @@ function Fixture({
         compact={compact}
         selectedId="text"
         onSelect={select}
-        onOpenDocument={open}
+        onToggleCaptions={toggleCaptions}
       />
     </ReviewTimelineResizeGuide>
   );
@@ -98,7 +98,7 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   select.mockClear();
-  open.mockClear();
+  toggleCaptions.mockClear();
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -186,7 +186,7 @@ it.each(['source', 'result'] as const)(
     expect(current).toEqual(accepted);
   }
 );
-it('trims by handles, supports keyboard selection and opens the one track document', async () => {
+it('trims by handles, supports keyboard selection and toggles caption output', async () => {
   act(() => root.render(<Fixture />));
   const block = prepare();
   await pointer(block.querySelector('[data-text-edge="end"]')!, 'pointerdown', 400);
@@ -202,7 +202,8 @@ it('trims by handles, supports keyboard selection and opens the one track docume
   act(() => block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(select).toHaveBeenCalledWith('text');
   act(() => host.querySelector<HTMLButtonElement>('[data-track-controls] button')!.click());
-  expect(open).toHaveBeenCalledOnce();
+  expect(toggleCaptions).toHaveBeenCalledOnce();
+  expect(host.querySelector('[aria-label="gallery.videoReview.textTrackOpen"]')).toBeNull();
 });
 it('rejects gestures while an export or another blocking operation is busy', async () => {
   act(() => root.render(<Fixture busy />));
