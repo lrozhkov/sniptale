@@ -39,13 +39,16 @@ export function resolveNativeHandshakeFailure(
   ) {
     return 'extension-upgrade-required';
   }
+  const channel = resolveNativeAppChannel();
+  const unsignedDevHost = channel === 'dev' && !message.install.signedBinary;
   if (
     message.install.appCacheSchemaVersion < NATIVE_APP_CACHE_SCHEMA_VERSION ||
     message.install.nativeHostManifestVersion !== NATIVE_HOST_MANIFEST_VERSION ||
-    message.install.updateChannel !== resolveNativeAppChannel() ||
-    !message.install.signedBinary ||
+    message.install.updateChannel !== channel ||
+    (!message.install.signedBinary && channel !== 'dev') ||
     !message.install.rollbackProtected ||
-    message.install.packageIntegrity === 'invalid'
+    // Desktop reports a missing Authenticode signature as invalid package integrity.
+    (message.install.packageIntegrity === 'invalid' && !unsignedDevHost)
   ) {
     return 'repair-required';
   }

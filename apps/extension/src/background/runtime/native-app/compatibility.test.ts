@@ -71,3 +71,43 @@ it('resolves native host channels from manifest names and versions', async () =>
   mocks.getManifest.mockReturnValue({ name: 'Sniptale', version_name: '0.1.0-dev' });
   expect(resolveNativeHostName()).toBe('com.sniptale.dev.native_host');
 });
+
+it.each(['dev', 'beta', 'stable'] as const)(
+  'accepts an unsigned host only in the explicitly selected dev channel: %s',
+  async (channel) => {
+    const { resolveNativeHandshakeFailure } = await import('./compatibility');
+    mocks.getManifest.mockReturnValue({
+      name: 'Sniptale',
+      version: '0.5.2',
+      version_name: `0.5.2 ${channel}`,
+    });
+    const hello = createNativeHello({
+      install: { ...createNativeHello().install, updateChannel: channel, signedBinary: false },
+    });
+    expect(resolveNativeHandshakeFailure(hello)).toBe(channel === 'dev' ? null : 'repair-required');
+    expect(resolveNativeHandshakeFailure({ ...hello, supportedProtocolVersions: [] })).toBe(
+      'incompatible-protocol'
+    );
+    expect(resolveNativeHandshakeFailure({ ...hello, supportedSettingsSchemaVersions: [] })).toBe(
+      'incompatible-settings'
+    );
+    expect(
+      resolveNativeHandshakeFailure({
+        ...hello,
+        install: { ...hello.install, packageIntegrity: 'invalid' },
+      })
+    ).toBe(channel === 'dev' ? null : 'repair-required');
+    expect(
+      resolveNativeHandshakeFailure({
+        ...hello,
+        install: { ...hello.install, signedBinary: true, packageIntegrity: 'invalid' },
+      })
+    ).toBe('repair-required');
+    expect(
+      resolveNativeHandshakeFailure({
+        ...hello,
+        install: { ...hello.install, rollbackProtected: false },
+      })
+    ).toBe('repair-required');
+  }
+);
