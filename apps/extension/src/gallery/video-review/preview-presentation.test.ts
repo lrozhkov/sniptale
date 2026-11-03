@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import {
   createReviewPreviewPresentation,
+  createReviewPresentationPaintClock,
   type ReviewPresentationState,
 } from './preview-presentation';
 
@@ -444,4 +445,35 @@ it('publishes every available tick when no frame-rate limit is selected', async 
   for (let now = 0; now <= 30; now += 5) await f.step(now);
   expect(f.publishTimes).toEqual([0, 5, 10, 15, 20, 25, 30]);
   f.scheduler.dispose();
+});
+
+it('admits browser preparation after paint and cancels both callback phases', () => {
+  vi.useFakeTimers();
+  const frames = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (key: number) => frames.delete(key));
+  try {
+    const clock = createReviewPresentationPaintClock();
+    const run = vi.fn();
+    const cancelledFrame = clock.requestTick(run);
+    clock.cancelTick(cancelledFrame);
+    expect(frames.size).toBe(0);
+    const cancelledTask = clock.requestTick(run);
+    frames.get(id)!(0);
+    clock.cancelTick(cancelledTask);
+    vi.runOnlyPendingTimers();
+    expect(run).not.toHaveBeenCalled();
+    clock.requestTick(run);
+    frames.get(id)!(0);
+    expect(run).not.toHaveBeenCalled();
+    vi.runOnlyPendingTimers();
+    expect(run).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  }
 });

@@ -71,6 +71,8 @@ export interface PreviewEffectRuntimeFeedback {
 }
 
 export interface PreviewStageCanvasProps {
+  /** Published only for an accepted completed scene job. */
+  onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
   activeClips: VideoProjectClip[];
   audioBankClips: PreviewStageAudioBankClip[];
@@ -78,6 +80,8 @@ export interface PreviewStageCanvasProps {
   assetUrls: Record<string, string>;
   beginInteraction: PreviewStageInteractionHandler;
   camera: VideoCompositionCameraState;
+  /** A pending paused frame keeps media loading but blocks camera-relative editing. */
+  cameraInteractionEnabled?: boolean | undefined;
   cachedVideo: PreparedCachedVideoPreview | null;
   currentTime: number;
   effectRuntimeFeedback: PreviewEffectRuntimeFeedback;

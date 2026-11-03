@@ -20,6 +20,7 @@ import type { PreviewStageRootProps, PreviewStageRootSurfaceProps } from './type
 
 export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
   const canvasInteractionActive = usePreviewCanvasInteractionFocus(params.stageRef);
+  const cameraReady = params.cameraInteractionEnabled !== false;
   const gridProps = params.grid ? { grid: params.grid } : {};
   const onGuideChange = params.onGuideChange ?? (() => undefined);
   const { insertPointerHandlers, insertPreviewFrame } = usePreviewStageInsertSession(
@@ -33,12 +34,12 @@ export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
       data-canvas-interaction-active={canvasInteractionActive}
       className={[
         'relative m-auto shrink-0 overflow-hidden bg-[color:var(--sniptale-color-surface-panel)]',
-        params.activeInsertKind ? 'cursor-crosshair' : 'cursor-default',
+        params.activeInsertKind && cameraReady ? 'cursor-crosshair' : 'cursor-default',
       ].join(' ')}
       style={params.stageSizeStyle}
-      onPointerDownCapture={insertPointerHandlers.onPointerDownCapture}
-      onPointerDown={insertPointerHandlers.onPointerDown}
-      onKeyDown={insertPointerHandlers.onKeyDown}
+      onPointerDownCapture={cameraReady ? insertPointerHandlers.onPointerDownCapture : undefined}
+      onPointerDown={cameraReady ? insertPointerHandlers.onPointerDown : undefined}
+      onKeyDown={cameraReady ? insertPointerHandlers.onKeyDown : undefined}
       onPointerMove={insertPointerHandlers.onPointerMove}
       onPointerUp={insertPointerHandlers.onPointerUp}
       onPointerCancel={insertPointerHandlers.cancel}
@@ -51,10 +52,12 @@ export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
         onGuideChange={onGuideChange}
         params={params}
       />
-      <PreviewStageGuideOverlay guides={params.guides ?? []} project={params.project} />
+      {cameraReady ? (
+        <PreviewStageGuideOverlay guides={params.guides ?? []} project={params.project} />
+      ) : null}
       <PreviewStageInsertPreviewOverlay
         camera={params.camera}
-        frame={insertPreviewFrame}
+        frame={cameraReady ? insertPreviewFrame : null}
         project={params.project}
         stageRef={params.stageRef}
       />
@@ -66,7 +69,7 @@ function createPreviewStageInsertSessionParams(
   params: PreviewStageRootSurfaceProps
 ): PreviewStageInsertSessionParams {
   return {
-    activeInsertKind: params.activeInsertKind,
+    activeInsertKind: params.cameraInteractionEnabled === false ? null : params.activeInsertKind,
     camera: params.camera,
     fallbackPointerParams: createPreviewStageInsertFallbackPointerParams(params),
     onAddShapeOverlay: params.onAddShapeOverlay,
@@ -131,6 +134,8 @@ function PreviewStageRootOverlayLayer(props: {
   params: PreviewStageRootSurfaceProps;
 }) {
   const { gridProps, onGuideChange, params } = props;
+  if (params.cameraInteractionEnabled === false)
+    return <PreviewStageGridOverlay project={params.project} {...gridProps} />;
   return (
     <>
       <PreviewStageGridOverlay project={params.project} {...gridProps} />
@@ -187,6 +192,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
     activeClips: params.activeClips,
     assetUrls: params.assetUrls,
     canvasRef,
+    onCameraPresented: params.onCameraPresented,
     currentTime: params.currentTime,
     effectRuntimeFeedback: params.effectRuntimeFeedback,
     imageBank,

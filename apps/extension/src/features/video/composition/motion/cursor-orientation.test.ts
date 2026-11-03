@@ -421,3 +421,140 @@ it('drops nonfinite observations before normalization and uses the missing-track
     expect(compile([observation, valid])).toEqual(compile([valid]));
   }
 });
+
+it('activates cursor pose with independent C2 timing while preserving the authored zoom phase', async () => {
+  const { createCursorActivationPlan, cursorActivationAt, evaluateCursorActivation } =
+    await import('./cursor-orientation');
+  const { interpolateCameraSpatial } = await import('../../project/motion/spatial');
+  const activation = createCursorActivationPlan({
+    start: 0,
+    end: 3,
+    enterDuration: 0.15,
+    exitDuration: 0.15,
+  });
+  expect(activation.enter?.end).toBe(0.3);
+  expect(activation.exit?.start).toBe(2.7);
+  for (const span of [activation.enter!, activation.exit!])
+    for (const time of [span.start, span.end])
+      for (const order of [1, 2] as const)
+        expect(evaluateCameraTrajectoryDerivative(span, time, order).x).toBeCloseTo(0, 9);
+  const pose = cameraPerspectiveWithCursor({ cursorComposition: settings }, { x: -4, y: 12 });
+  const progress = evaluateCursorActivation(activation, 0.15);
+  expect(progress).toBeCloseTo(0.5, 9);
+  const frame = interpolateCameraSpatial(null, pose, 1, { from: false, to: true, progress });
+  expect(frame).toEqual(interpolateCameraSpatial(null, pose, 0.5, { from: false, to: true }));
+  expect(cursorActivationAt(activation, 1)).toBe(1);
+  expect(evaluateCursorActivation(activation, 3)).toBeCloseTo(0, 9);
+  expect(
+    evaluateCursorActivation(
+      createCursorActivationPlan({
+        start: 0,
+        end: 3,
+        enterDuration: 0.15,
+        exitDuration: 0.15,
+        connectedIn: true,
+        connectedOut: true,
+      }),
+      0
+    )
+  ).toBe(1);
+});
+
+it('retains the logical Native animation clock across a source-window slice', async () => {
+  const { projectCursorActivationPlan, evaluateCursorActivation } =
+    await import('./cursor-orientation');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'activation-slice',
+    filename: 'slice.webm',
+    width: 1000,
+    height: 600,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 1,
+  });
+  const region = {
+    ...createVideoProjectMotionRegion(project, 5),
+    startTime: 5,
+    duration: 5,
+    animation: { start: 5, end: 10, duration: 10 },
+    zoomInDuration: 0.15,
+    zoomOutDuration: 0.15,
+  };
+  const plan = projectCursorActivationPlan(project, region);
+  expect(plan.enter?.start).toBe(0);
+  expect(plan.exit?.end).toBe(10);
+  expect(evaluateCursorActivation(plan, 5)).toBe(1);
+  expect(plan.exit!.end - plan.exit!.start).toBeCloseTo(0.65, 9);
+  expect(evaluateCursorActivation(plan, (plan.exit!.start + plan.exit!.end) / 2)).toBeCloseTo(
+    0.5,
+    9
+  );
+});
+
+it('uses the resolved movement policy for the same Native and Gallery cursor activation curve', async () => {
+  const { createCameraFollowSettings, resolveCameraFollowPolicy } =
+    await import('../../project/camera/cursor-policy');
+  const { projectCursorSpatial, projectCursorActivationPlan } =
+    await import('./cursor-orientation');
+  const { applyReviewCameraSpatial } = await import('../../review/advanced/spatial');
+  const { createQuickEditZoomRegion } = await import('../../review/advanced/zoom');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'policy-parity',
+    filename: 'policy.webm',
+    width: 1000,
+    height: 600,
+    duration: 30,
+    mimeType: 'video/webm',
+    size: 1,
+  });
+  project.cameraFollowDefaults = { ...createCameraFollowSettings(), transitionDuration: 5 };
+  const base = {
+    ...createVideoProjectMotionRegion(project, 0),
+    duration: 30,
+    zoomInDuration: 0.15,
+    zoomOutDuration: 0.15,
+    focusMode: 'CURSOR' as const,
+    cursorComposition: settings,
+  };
+  for (const override of [
+    undefined,
+    { ...createCameraFollowSettings(), transitionDuration: 0.65 },
+  ]) {
+    const region = { ...base, ...(override ? { cameraFollow: override } : {}) };
+    const policy = resolveCameraFollowPolicy({
+      defaults: project.cameraFollowDefaults,
+      ...(override ? { override } : {}),
+    });
+    const activation = projectCursorActivationPlan(project, region);
+    expect(activation.enter!.end).toBe(policy.settings.transitionDuration);
+    const gallery = {
+      ...createQuickEditZoomRegion({ id: 'policy-parity', at: 0, duration: 30 }),
+      cursorComposition: settings,
+      enter: { type: 'ease-in-out' as const, duration: 0.15 },
+      exit: { type: 'ease-in-out' as const, duration: 0.15 },
+      cursorFocus: {
+        policy,
+        path: {
+          version: 1 as const,
+          mode: 'follow' as const,
+          smoothing: 0,
+          sensitivity: 0.5,
+          gapPolicy: 'hold' as const,
+          segments: [],
+        },
+      },
+    };
+    for (const time of [0.15, 0.3, 1, 29.7]) {
+      const native = projectCursorSpatial(project, region, time, 1)!;
+      const review = applyReviewCameraSpatial(
+        [gallery],
+        time,
+        { from: null, to: gallery, progress: 1, phase: 'enter' },
+        gallery.transform
+      ).spatial!;
+      expect(review.rotation).toEqual(native.rotation);
+      expect(review.perspective).toBe(native.perspective);
+      expect(review.windowMotion).toBe(native.windowMotion);
+    }
+  }
+});

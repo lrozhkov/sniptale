@@ -1,4 +1,5 @@
 import { createVideoPreviewCompositionJoinRenderer } from './joins';
+import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 import { createVideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
 import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
 import { createReviewSpatialSession } from '../../../../workflows/video-review/spatial-render-session';
@@ -61,6 +62,7 @@ function usePreviewStageRenderEffect(
     return renderSchedulerRef.current.enqueue(
       createPreviewStageCanvasRenderJob({
         canvas,
+        onCameraPresented: params.onCameraPresented,
         currentTime: params.currentTime,
         ...(params.assetUrls ? { assetUrls: params.assetUrls } : {}),
         effectRuntimeRef,
@@ -78,6 +80,7 @@ function usePreviewStageRenderEffect(
     );
   }, [
     params.canvasRef,
+    params.onCameraPresented,
     params.assetUrls,
     params.currentTime,
     effectRuntimeRef,
@@ -114,6 +117,7 @@ function usePreviewEffectRuntimeRetry(
 function createPreviewStageCanvasRenderJob(args: {
   canvas: HTMLCanvasElement;
   currentTime: number;
+  onCameraPresented: PreviewStageCanvasSceneParams['onCameraPresented'];
   assetUrls?: Record<string, string>;
   effectRuntimeRef: MutableRefObject<VideoEditorEffectRuntime | null>;
   imageBank: PreviewStageCanvasSceneParams['imageBank'];
@@ -130,6 +134,7 @@ function createPreviewStageCanvasRenderJob(args: {
   const controller = new AbortController();
   return {
     canvas: args.canvas,
+    onCameraPresented: args.onCameraPresented,
     controller,
     currentTime: args.currentTime,
     ...(args.assetUrls ? { assetUrls: args.assetUrls } : {}),
@@ -187,6 +192,10 @@ function usePreviewRenderSchedulerRef(
         feedbackRef.current.onFailure('visual', error);
       },
       onSuccess: (job) => {
+        job.onCameraPresented?.(
+          resolveVideoCompositionFrame(job.project, job.currentTime).camera,
+          job.currentTime
+        );
         feedbackRef.current.onRecovery('visual');
         if (job.isPlaybackFrame && job.previewMode !== 'cache') frameRateRef.current?.record();
       },

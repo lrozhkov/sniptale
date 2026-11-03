@@ -39,6 +39,7 @@ const areaRegion = {
 };
 
 beforeEach(() => {
+  vi.useFakeTimers();
   pending.length = 0;
   draw.mockClear();
   mocks.create.mockClear();
@@ -71,8 +72,19 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
-const render = (locked = false, nextProject = project, nextRegion = region, nextUrls = assetUrls) =>
+const admit = () =>
+  act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
+const render = async (
+  locked = false,
+  nextProject = project,
+  nextRegion = region,
+  nextUrls = assetUrls,
+  admitted = true
+) => {
   act(() =>
     root.render(
       <fieldset disabled={locked}>
@@ -86,8 +98,11 @@ const render = (locked = false, nextProject = project, nextRegion = region, next
       </fieldset>
     )
   );
+  if (admitted) await admit();
+};
 const ready = async (index = 0) =>
   act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
     pending[index]!.resolve(document.createElement('canvas'));
   });
 const button = () => host.querySelector<HTMLButtonElement>('[data-video-editor-local-navigation]')!;
@@ -104,7 +119,7 @@ function setupBounds() {
 }
 
 it('renders the framed composition and commits a gesture in its displayed scene coordinates', async () => {
-  render();
+  await render();
   expect(button().disabled).toBe(true);
   await ready();
   setupBounds();
@@ -118,7 +133,7 @@ it('renders the framed composition and commits a gesture in its displayed scene 
 });
 
 it('cancels a draft and respects the locked fieldset for pointer and keyboard edits', async () => {
-  render();
+  await render();
   await ready();
   setupBounds();
   pointer('pointerdown', 20, 30);
@@ -134,7 +149,7 @@ it('cancels a draft and respects the locked fieldset for pointer and keyboard ed
   );
   expect(commit).toHaveBeenCalledExactlyOnceWith({ x: 401, y: 300 });
   commit.mockClear();
-  render(true);
+  await render(true);
   setupBounds();
   pointer('pointerdown', 20, 30);
   pointer('pointerup', 100, 120);
@@ -145,9 +160,9 @@ it('cancels a draft and respects the locked fieldset for pointer and keyboard ed
 });
 
 it('disposes stale rendering, ignores its result and offers retry after a current failure', async () => {
-  render();
+  await render();
   const replacement = { ...project, backgroundColor: '#000000' };
-  render(false, replacement);
+  await render(false, replacement);
   expect(pending[0]!.signal.aborted).toBe(true);
   expect(pending[0]!.dispose).toHaveBeenCalledOnce();
   await ready(0);
@@ -157,13 +172,14 @@ it('disposes stale rendering, ignores its result and offers retry after a curren
   const retry = host.querySelectorAll('button')[3]!;
   expect(retry).toBeDefined();
   act(() => retry.click());
+  await admit();
   expect(pending[1]!.dispose).toHaveBeenCalledOnce();
   await ready(2);
   expect(button().disabled).toBe(false);
 });
 
 it('moves the selected area in scene coordinates with one commit and clamps it inside the scene', async () => {
-  render(false, project, areaRegion);
+  await render(false, project, areaRegion);
   await ready();
   setupBounds();
   pointer('pointerdown', 150, 100);
@@ -179,7 +195,7 @@ it('moves the selected area in scene coordinates with one commit and clamps it i
 });
 
 it('resizes from a corner while retaining the opposite corner and stops at minimum size', async () => {
-  render(false, project, areaRegion);
+  await render(false, project, areaRegion);
   await ready();
   setupBounds();
   const corner = host.querySelector('[data-framing-corner="nw"]')!;
@@ -196,7 +212,7 @@ it('resizes from a corner while retaining the opposite corner and stops at minim
 });
 
 it('cancels area resize and routes keyboard motion to area instead of point focus', async () => {
-  render(false, project, areaRegion);
+  await render(false, project, areaRegion);
   await ready();
   setupBounds();
   pointer('pointerdown', 300, 225, host.querySelector('[data-framing-corner="se"]')!);
@@ -212,7 +228,7 @@ it('cancels area resize and routes keyboard motion to area instead of point focu
   expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 210, y: 150, width: 400, height: 300 });
   expect(commit).not.toHaveBeenCalled();
   commitArea.mockClear();
-  render(true, project, areaRegion);
+  await render(true, project, areaRegion);
   pointer('pointerdown', 300, 225, host.querySelector('[data-framing-corner="se"]')!);
   pointer('pointerup', 350, 260);
   expect(commitArea).not.toHaveBeenCalled();
@@ -265,10 +281,10 @@ it.each([false, true])(
 );
 
 it('retains a decoded frame through focus edits and autosave metadata changes', async () => {
-  render(false, project, areaRegion);
+  await render(false, project, areaRegion);
   await ready();
   const editedRegion = { ...areaRegion, focusArea: { ...areaRegion.focusArea, x: 250 } };
-  render(
+  await render(
     false,
     { ...project, updatedAt: project.updatedAt + 1, motionRegions: [editedRegion] },
     editedRegion
@@ -280,8 +296,8 @@ it('retains a decoded frame through focus edits and autosave metadata changes', 
 });
 
 it('does not cancel a pending decode for focus-only changes', async () => {
-  render();
-  render(false, {
+  await render();
+  await render(false, {
     ...project,
     updatedAt: project.updatedAt + 1,
     motionRegions: [{ ...region, scale: 3 }],
@@ -294,9 +310,9 @@ it('does not cancel a pending decode for focus-only changes', async () => {
 
 it('refreshes the frame when the sampled zoom time changes', async () => {
   const timedProject = { ...project, duration: 10 };
-  render(false, timedProject, { ...region, startTime: 0, duration: 2 });
+  await render(false, timedProject, { ...region, startTime: 0, duration: 2 });
   await ready();
-  render(false, timedProject, { ...region, startTime: 4, duration: 2 });
+  await render(false, timedProject, { ...region, startTime: 4, duration: 2 });
   expect(button().disabled).toBe(true);
   expect(pending).toHaveLength(2);
   await ready(1);
@@ -304,12 +320,12 @@ it('refreshes the frame when the sampled zoom time changes', async () => {
 });
 
 it('reuses equivalent project snapshots but refreshes changed media URLs', async () => {
-  render();
+  await render();
   await ready();
-  render(false, structuredClone(project), region, {});
+  await render(false, structuredClone(project), region, {});
   expect(pending).toHaveLength(1);
   expect(button().disabled).toBe(false);
-  render(false, project, region, { source: 'blob:replacement' });
+  await render(false, project, region, { source: 'blob:replacement' });
   expect(pending).toHaveLength(2);
   expect(button().disabled).toBe(true);
   await ready(1);
@@ -317,13 +333,14 @@ it('reuses equivalent project snapshots but refreshes changed media URLs', async
 });
 
 it('coalesces camera edits during decoding and never presents a superseded composition', async () => {
-  render(false, project, { ...region, scale: 0.5 });
-  render(false, project, { ...region, scale: 0.75 });
-  render(false, project, { ...region, scale: 1 });
+  await render(false, project, { ...region, scale: 0.5 });
+  await render(false, project, { ...region, scale: 0.75 });
+  await render(false, project, { ...region, scale: 1 });
   expect(pending).toHaveLength(1);
   expect(mocks.create).toHaveBeenCalledOnce();
   await ready(0);
   expect(draw).not.toHaveBeenCalled();
+  await admit();
   expect(pending).toHaveLength(2);
   expect(pending[1]!.camera.scale).toBe(1);
   await ready(1);
@@ -334,7 +351,7 @@ it('coalesces camera edits during decoding and never presents a superseded compo
 it.each(['LOCK_OVERLAYS', 'FOLLOW_CAMERA'] as const)(
   'passes %s at 50 percent without shrinking the canvas',
   async (overlayZoomMode) => {
-    render(false, project, { ...region, scale: 0.5, overlayZoomMode });
+    await render(false, project, { ...region, scale: 0.5, overlayZoomMode });
     await ready();
     expect(pending[0]!.camera).toMatchObject({ scale: 0.5, overlayZoomMode });
     const canvas = host.querySelector('canvas')!;
@@ -345,12 +362,13 @@ it.each(['LOCK_OVERLAYS', 'FOLLOW_CAMERA'] as const)(
 );
 
 it('shows a full-scene navigator and switches to the composed result without another decoder', async () => {
-  render();
+  await render();
   await ready();
   setupBounds();
   expect(pending[0]!.camera.scale).toBe(1);
   const result = host.querySelectorAll('button')[1]!;
   act(() => result.click());
+  await admit();
   expect(pending[1]!.camera.scale).toBe(2);
   await ready(1);
   pointer('pointerdown', 100, 100);
@@ -388,6 +406,7 @@ it('uses the presented spatial region for the thumbnail without authoring its ac
     (node) => node.textContent === translate('videoEditor.sidebar.framingResultView')
   )!;
   act(() => result.click());
+  await admit();
   expect(pending.at(-1)!.camera).toMatchObject({
     spatial: {
       perspective: 0.5,
@@ -438,7 +457,7 @@ it.each(['available', 'outside', 'missing'] as const)(
     next.motionRegions = [selected];
     if (target === 'outside') clip.startTime = 5;
     const before = structuredClone(next);
-    render(false, next, selected);
+    await render(false, next, selected);
     await ready();
     setupBounds();
     if (target !== 'available') {
@@ -498,7 +517,7 @@ it('shows and resizes the actual rotated source-window area without changing the
   };
   next.motionRegions = [selected];
   const before = structuredClone(next);
-  render(false, next, selected);
+  await render(false, next, selected);
   await ready();
   setupBounds();
   const nw = host.querySelector<HTMLElement>('[data-framing-corner="nw"]')!;
@@ -547,7 +566,7 @@ it('fits every rotated area handle and freezes the overview while a corner follo
   };
   next.motionRegions = [selected];
   const before = structuredClone(next);
-  render(false, next, selected);
+  await render(false, next, selected);
   await ready();
   setupBounds();
   for (const corner of host.querySelectorAll<HTMLElement>('[data-framing-corner]')) {
@@ -585,7 +604,7 @@ it('resizes a converted scene area along its retained edges with one commit', as
   };
   next.motionRegions = [selected];
   const before = structuredClone(next);
-  render(false, next, selected);
+  await render(false, next, selected);
   await ready();
   setupBounds();
   const corner = host.querySelector<HTMLElement>('[data-framing-corner="se"]')!;
@@ -606,10 +625,10 @@ it('resizes a converted scene area along its retained edges with one commit', as
 });
 
 it('does not serialize the project identity again for framing camera updates', async () => {
-  render();
+  await render();
   await ready();
   const stringify = vi.spyOn(JSON, 'stringify');
-  render(false, project, { ...region, scale: 3 });
+  await render(false, project, { ...region, scale: 3 });
   const wrappedIdentities = stringify.mock.calls.filter(
     ([value]) =>
       Array.isArray(value) && typeof value[0] === 'string' && value[0].includes('"cursorTrack"')
@@ -620,20 +639,68 @@ it('does not serialize the project identity again for framing camera updates', a
 
 it('reuses immutable framing source identity through motion-only project updates', async () => {
   const identity = vi.spyOn(previewRevision, 'createVideoPreviewRenderIdentity');
-  render();
+  await render();
   await ready();
   identity.mockClear();
   for (const scale of [2.1, 2.2, 2.3]) {
     const next = { ...region, scale };
-    render(false, { ...project, motionRegions: [next], updatedAt: project.updatedAt + 1 }, next);
+    await render(
+      false,
+      { ...project, motionRegions: [next], updatedAt: project.updatedAt + 1 },
+      next
+    );
   }
   expect(identity).not.toHaveBeenCalled();
   expect(mocks.create).toHaveBeenCalledOnce();
   const changed = { ...project, backgroundColor: '#123456' };
-  render(false, changed, region);
+  await render(false, changed, region);
   expect(identity).toHaveBeenCalledOnce();
   expect(mocks.create).toHaveBeenCalledTimes(2);
   identity.mockClear();
-  render(false, { ...changed, cursorTrack: createVideoProjectCursorTrack() }, region);
+  await render(false, { ...changed, cursorTrack: createVideoProjectCursorTrack() }, region);
   expect(identity).toHaveBeenCalledOnce();
+});
+
+it('admits cursor planning after the urgent control update and coalesces pending drafts', async () => {
+  vi.useFakeTimers();
+  const planning = await import('../../../../../features/video/composition/motion/project-follow');
+  const spy = vi.spyOn(planning, 'resolveProjectCursorCameraPlan');
+  const following = { ...region, focusMode: VideoMotionFocusMode.CURSOR };
+  await render(false, { ...project, motionRegions: [following] }, following, assetUrls, false);
+  expect(spy).not.toHaveBeenCalled();
+  expect(pending).toHaveLength(0);
+  const latest = { ...following, scale: 3 };
+  await render(false, { ...project, motionRegions: [latest] }, latest, assetUrls, false);
+  expect(spy).not.toHaveBeenCalled();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
+  expect(spy).toHaveBeenCalledOnce();
+  expect(spy.mock.lastCall?.[1]).toBe(latest);
+  expect(pending).toHaveLength(1);
+  await ready();
+  expect(button().disabled).toBe(false);
+  vi.useRealTimers();
+});
+
+it('cancels cursor preparation before admission when its selected surface unmounts', async () => {
+  vi.useFakeTimers();
+  const planning = await import('../../../../../features/video/composition/motion/project-follow');
+  const spy = vi.spyOn(planning, 'resolveProjectCursorCameraPlan');
+  const following = { ...region, focusMode: VideoMotionFocusMode.CURSOR };
+  await render(false, { ...project, motionRegions: [following] }, following, assetUrls, false);
+  act(() => root.render(null));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
+  expect(spy).not.toHaveBeenCalled();
+  expect(pending).toHaveLength(0);
+  vi.useRealTimers();
+});
+
+it('keeps manual preview rendering outside the urgent control update', async () => {
+  await render(false, project, region, assetUrls, false);
+  expect(pending).toHaveLength(0);
+  await admit();
+  expect(pending).toHaveLength(1);
 });

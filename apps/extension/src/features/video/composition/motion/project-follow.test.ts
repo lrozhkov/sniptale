@@ -702,3 +702,33 @@ it.each(['content', 'fixed', 'follow-video'] as const)(
     expect(candidate).toEqual(before);
   }
 );
+
+it('uses continuous centering for cursor composition even with its 3D mode off', () => {
+  const { project, region } = fixture();
+  const following = {
+    ...region,
+    scale: 2,
+    cursorComposition: { mode: 'off' as const, amount: 0.5, smoothness: 0 },
+    cameraFollow: createCameraFollowSettings('fast'),
+  };
+  const changed = {
+    ...project,
+    motionRegions: [following],
+    cursorTrack: {
+      ...project.cursorTrack!,
+      samples: project.cursorTrack!.samples.map((sample, index) => ({
+        ...sample,
+        x: index ? 500 : 400,
+        recordingPoint: { x: index ? 0.5 : 0.4, y: 0.5 },
+      })),
+    },
+  };
+  const plan = resolveProjectCursorCameraPlan(changed, following);
+  expect(plan.status).toBe('ready');
+  if (plan.status !== 'ready') return;
+  expect(plan.spans.filter((span) => span.kind === 'transition').length).toBeGreaterThan(2);
+  expect(
+    resolveProjectFollowingCamera(changed, following, 2.4).focusPoint.x -
+      resolveProjectFollowingCamera(changed, following, 0.6).focusPoint.x
+  ).toBeGreaterThan(30);
+});

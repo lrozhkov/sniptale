@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 
 import type {
   VideoProject,
@@ -15,6 +16,7 @@ export interface PreviewStageCanvasSceneParams {
   assetUrls?: Record<string, string>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   currentTime: number;
+  onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   effectRuntimeFeedback: PreviewEffectRuntimeFeedback;
   imageBank: Record<string, HTMLImageElement>;
   isPlaying?: boolean;

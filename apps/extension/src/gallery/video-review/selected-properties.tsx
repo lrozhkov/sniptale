@@ -200,11 +200,12 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
             advanced={advanced}
             {...(cursorPath ? { cursorPath } : {})}
             zoom={zoom}
-            zoomPreview={(region) => (
+            zoomPreview={(region, previewing = false) => (
               <ReviewZoomPreview
                 key={region.id}
                 disabled={busy || editing.exporter.phase !== 'idle'}
                 region={zoom.previewRegion(region)}
+                previewing={previewing}
                 cursorFollowing={
                   !region.spotlight &&
                   !region.border &&

@@ -157,3 +157,217 @@ it('bounds the rendered cursor perspective when a linked endpoint has an enabled
   expect(clearance).toBeGreaterThanOrEqual(bounds.viewport!.low - 1e-7);
   expect(clearance).toBeLessThanOrEqual(bounds.viewport!.high + 1e-7);
 });
+
+it.each([
+  { amount: 0.41, x: 0.2, y: 0.5, preservePointer: true },
+  { amount: 1, x: 0.2, y: 0.5, preservePointer: true },
+  ...[0, 1].flatMap((x) => [0, 1].map((y) => ({ amount: 1, x, y, preservePointer: false }))),
+])(
+  'admits automatic orbit through a short authored exit without depending on zoom-out recovery (amount$amount,x$x,y$y)',
+  async ({ amount, x, y, preservePointer }) => {
+    const { createCursorOrientationPlan } = await import('./cursor-orientation');
+    const { planWorkingZoneCamera } = await import('./follow-cursor');
+    const settings = { mode: 'orbit' as const, amount, smoothness: 0.6 };
+    const defaults = resolveCameraFollowPolicy({});
+    const policy = { ...defaults, settings: { ...defaults.settings, preservePointer } };
+    const orientationPlan = createCursorOrientationPlan({
+      settings,
+      start: 0,
+      end: 3,
+      observations: [
+        { time: 0, x, y },
+        { time: 3, x, y },
+      ],
+    })!;
+    const geometry = createWindowCameraGeometry({
+      output: { width: 1904, height: 1072 },
+      window: { x: 77, y: 40, width: 1750, height: 992 },
+      video: { x: 77, y: 128, width: 1750, height: 904 },
+      cornerRadius: 12,
+      windowWeight: 'window',
+      policy,
+      orientationPlan,
+      region: {
+        start: 0,
+        end: 3,
+        cursorComposition: settings,
+        enter: { type: 'ease-in-out', duration: 0.3 },
+        exit: { type: 'ease-in-out', duration: 0.15 },
+      },
+      connectedIn: false,
+      connectedOut: false,
+    });
+    const frames = [0, 3].map((time) => ({
+      time,
+      x: 0.5,
+      y: 0.5,
+      actual: { x: 0.5, y: 0.5 },
+      segmentId: 'capture',
+    }));
+    for (const targetScale of [1.15, 1]) {
+      const plan = planWorkingZoneCamera({
+        frames,
+        start: 0,
+        end: 3,
+        targetScale,
+        policy,
+        geometry,
+      });
+      expect(plan.status, JSON.stringify({ targetScale, plan })).toBe('ready');
+    }
+  }
+);
+
+it.each(['window', 'content', 'spatial'] as const)(
+  'bounds the independently activated cursor pose rendered during the authored short exit (%s)',
+  async (windowWeight) => {
+    const {
+      createCursorActivationPlan,
+      createCursorOrientationPlan,
+      evaluateCursorActivation,
+      evaluateCursorOrientation,
+    } = await import('./cursor-orientation');
+    const { createCameraTrajectory, evaluateCameraTrajectory } =
+      await import('./camera-trajectory');
+    const { boundQuickEditCameraProjection } = await import('./spatial-projection-bounds');
+    const { cameraPerspectiveWithCursor, interpolateCameraSpatial } =
+      await import('../../project/motion/spatial');
+    const { quickEditPlaneProjection, projectQuickEditPoint } = await import('./spatial-geometry');
+    const settings = { mode: 'orbit' as const, amount: 0.41, smoothness: 0.6 };
+    const plan = createCursorOrientationPlan({
+      settings,
+      start: 0,
+      end: 3,
+      observations: [
+        { time: 0, x: 0.2, y: 0.5 },
+        { time: 3, x: 0.2, y: 0.5 },
+      ],
+    })!;
+    const activation = createCursorActivationPlan({
+      start: 0,
+      end: 3,
+      enterDuration: 0.15,
+      exitDuration: 0.15,
+    });
+    const nominal = createCameraTrajectory({
+      start: 2.85,
+      end: 3,
+      from: { x: 1, y: 0 },
+      to: { x: 0, y: 0 },
+    });
+    const window = { x: 77, y: 40, width: 1750, height: 992 },
+      video = { x: 77, y: 128, width: 1750, height: 904 };
+    const pan = { x: 131.25, y: 74.4 };
+    for (let index = 0; index <= 20; index++) {
+      const time = 2.85 + (index * 0.15) / 20,
+        progress = evaluateCameraTrajectory(nominal, time).x;
+      const proof = boundQuickEditCameraProjection({
+        start: time,
+        end: time,
+        window,
+        video,
+        output: { width: 1904, height: 1072 },
+        cornerRadius: 12,
+        targetScale: 1.15,
+        phase: nominal,
+        windowWeight,
+        pan: { minX: pan.x, maxX: pan.x, minY: pan.y, maxY: pan.y },
+        perspective: { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 1 },
+        orbit: { angles: plan.spans[0]!, phase: activation.exit! },
+        actual: { from: { x: 0.5, y: 0.5 }, to: { x: 0.5, y: 0.5 } },
+      })!;
+      const target = cameraPerspectiveWithCursor(
+        { cursorComposition: settings },
+        evaluateCursorOrientation(plan, time)
+      );
+      const spatial = interpolateCameraSpatial(null, target, progress, {
+        from: false,
+        to: true,
+        progress: evaluateCursorActivation(activation, time),
+      });
+      const scale = 1 + 0.15 * progress;
+      const weight =
+        windowWeight === 'window' ? 1 : windowWeight === 'content' ? 0 : spatial.windowMotion;
+      const k = 1 + weight * (scale - 1);
+      const targetWindow = {
+        x: window.x - weight * pan.x * progress,
+        y: window.y - weight * pan.y * progress,
+        width: window.width * k,
+        height: window.height * k,
+      };
+      const projection = quickEditPlaneProjection(window, targetWindow, spatial);
+      const actual = {
+        x: window.x + scale * (video.x + video.width / 2 - window.x) - pan.x * progress,
+        y: window.y + scale * (video.y + video.height / 2 - window.y) - pan.y * progress,
+      };
+      const point = projectQuickEditPoint(projection, {
+        x: window.x + (actual.x - targetWindow.x) / k,
+        y: window.y + (actual.y - targetWindow.y) / k,
+      })!;
+      const clearance = Math.min(point.x, point.y, 1904 - point.x, 1072 - point.y);
+      expect(clearance).toBeGreaterThanOrEqual(proof.viewport!.low - 1e-7);
+      expect(clearance).toBeLessThanOrEqual(proof.viewport!.high + 1e-7);
+    }
+  }
+);
+
+it.each([0.2, 0.65, 5])(
+  'respects the resolved movement duration %s during automatic activation at default strength and normalized corners',
+  async (movementDuration) => {
+    const { createCursorOrientationPlan } = await import('./cursor-orientation');
+    const { planWorkingZoneCamera } = await import('./follow-cursor');
+    const defaults = resolveCameraFollowPolicy({});
+    const policy = {
+      ...defaults,
+      settings: {
+        ...defaults.settings,
+        transitionDuration: movementDuration,
+        preservePointer: false,
+      },
+    };
+    const cases = [
+      { amount: 0.5, x: 0.2, y: 0.5 },
+      ...[0, 1].flatMap((x) => [0, 1].map((y) => ({ amount: 1, x, y }))),
+    ];
+    for (const { amount, x, y } of cases) {
+      const settings = { mode: 'orbit' as const, amount, smoothness: 0.6 };
+      const orientationPlan = createCursorOrientationPlan({
+        settings,
+        start: 0,
+        end: 30,
+        observations: [
+          { time: 0, x, y },
+          { time: 30, x, y },
+        ],
+      })!;
+      const geometry = createWindowCameraGeometry({
+        orientationPlan,
+        output: { width: 1904, height: 1072 },
+        window: { x: 77, y: 40, width: 1750, height: 992 },
+        video: { x: 77, y: 128, width: 1750, height: 904 },
+        cornerRadius: 12,
+        windowWeight: 'window',
+        policy,
+        region: {
+          start: 0,
+          end: 30,
+          cursorComposition: settings,
+          enter: { type: 'ease-in-out', duration: 0.15 },
+          exit: { type: 'ease-in-out', duration: 0.15 },
+        },
+        connectedIn: false,
+        connectedOut: false,
+      });
+      const frames = [0, 30].map((time) => ({ time, x: 0.5, y: 0.5, segmentId: 'capture' }));
+      const plan = planWorkingZoneCamera({
+        frames,
+        start: 0,
+        end: 30,
+        targetScale: 1.3,
+        policy,
+        geometry,
+      });
+      expect(plan.status, JSON.stringify({ movementDuration, amount, x, y, plan })).toBe('ready');
+    }
+  }
+);

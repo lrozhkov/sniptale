@@ -1,3 +1,8 @@
+import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
+import {
+  createCursorActivationPlan,
+  evaluateCursorActivation,
+} from '../../composition/motion/cursor-orientation';
 import { reviewCursorSpatialSettings } from './cursor-focus-path';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
@@ -96,6 +101,30 @@ export function applyReviewCameraSpatial(
         ...interpolateQuickEditSpatial(spatialFrom, spatialTo, sample.progress, {
           from: !!sample.from?.cursorFocus && hasCursorComposition(sample.from.cursorComposition),
           to: !!sample.to.cursorFocus && hasCursorComposition(sample.to.cursorComposition),
+          ...(sample.phase !== 'link' &&
+          sample.to.cursorFocus &&
+          hasCursorComposition(sample.to.cursorComposition)
+            ? {
+                progress: evaluateCursorActivation(
+                  createCursorActivationPlan({
+                    start: sample.to.start,
+                    end: sample.to.end,
+                    enterDuration: sample.to.enter.duration,
+                    exitDuration: sample.to.exit.duration,
+                    amount: sample.to.cursorComposition?.amount,
+                    movementDuration: (
+                      sample.to.cursorFocus?.policy ?? resolveCameraFollowPolicy({})
+                    ).settings.transitionDuration,
+                    connectedIn: regions.some(
+                      (item) =>
+                        resolveQuickEditFocusLink(regions, item.id)?.target.id === sample.to.id
+                    ),
+                    connectedOut: !!resolveQuickEditFocusLink(regions, sample.to.id),
+                  }),
+                  timelineTime
+                ),
+              }
+            : {}),
         }),
         lockBackground,
       },

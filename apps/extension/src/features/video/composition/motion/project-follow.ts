@@ -11,7 +11,11 @@ import {
   cropWindowCameraObservations,
 } from './window-camera-geometry';
 import { resolveMotionSourceWindow, motionWindowFocusToWindow } from './source-window';
-import { projectMotionSourcePhases } from '../../project/motion/source-binding';
+import {
+  projectMotionSourcePhases,
+  resolveMotionWindowCameraParts,
+  resolveMotionWindowCameraRegion,
+} from '../../project/motion/source-binding';
 import { resolveMotionSourcePlayback } from '../../project/motion/source-playback';
 import { isCameraMotionRegion } from '../../project/motion/normalization';
 import { cameraSourceGeometryBreaks } from './camera-source-geometry';
@@ -67,78 +71,6 @@ const plans = new WeakMap<VideoProject, Map<string, ProjectCameraPlanEntry>>();
 /** Split animation parts share the existing camera-connection topology. */
 export function resolveProjectCameraEdges(project: VideoProject, region: VideoProjectMotionRegion) {
   return resolveMotionConnectionEdges(project, region);
-}
-
-function windowCameraParts(project: VideoProject, region: VideoProjectMotionRegion) {
-  const binding = region.sourceBinding;
-  if (
-    binding?.coordinateSpace !== 'source-window' ||
-    !binding.animationGroupId ||
-    !region.animation
-  )
-    return [region];
-  const clip = project.clips.find((item) => item.id === binding.clipId);
-  if (clip?.type !== 'VIDEO') return [region];
-  const controls = (item: VideoProjectMotionRegion) => {
-    const {
-      id: _id,
-      startTime: _start,
-      duration: _duration,
-      animation: _animation,
-      sourceBinding: _binding,
-      incomingConnection: _connection,
-      ...settings
-    } = item;
-    return JSON.stringify(settings);
-  };
-  const geometry = (id: string) => {
-    const item = project.clips.find((entry) => entry.id === id);
-    return item?.type === 'VIDEO'
-      ? JSON.stringify({
-          asset: item.assetId,
-          instance: item.sourceInstanceId,
-          track: item.trackId,
-          transform: item.transform,
-          crop: item.sourceCrop,
-          header: item.windowHeader,
-          fit: item.fitMode,
-          corner: item.windowCornerRadius,
-        })
-      : null;
-  };
-  const signature = controls(region),
-    plane = geometry(clip.id);
-  const origin = region.startTime - region.animation.start;
-  return (project.motionRegions ?? [])
-    .filter(
-      (item) =>
-        item.duration > 0 &&
-        item.sourceBinding?.coordinateSpace === 'source-window' &&
-        item.sourceBinding.animationGroupId === binding.animationGroupId &&
-        item.animation?.duration === region.animation!.duration &&
-        Math.abs(item.startTime - item.animation.start - origin) < 1e-9 &&
-        controls(item) === signature &&
-        geometry(item.sourceBinding.clipId) === plane
-    )
-    .toSorted((a, b) => a.startTime - b.startTime);
-}
-
-function windowCameraPlanRegion(project: VideoProject, region: VideoProjectMotionRegion) {
-  if (region.sourceBinding?.coordinateSpace !== 'source-window' || !region.animation) return region;
-  const parts = windowCameraParts(project, region);
-  const first = parts[0] ?? region;
-  for (let i = 1; i < parts.length; i++)
-    if (Math.abs(parts[i - 1]!.startTime + parts[i - 1]!.duration - parts[i]!.startTime) > 1e-9)
-      return region;
-  const clock = first.animation!;
-  const clockScale = first.duration / (clock.end - clock.start);
-  const startTime = first.startTime - clock.start * clockScale;
-  return {
-    ...first,
-    startTime,
-    duration: clock.duration * clockScale,
-    animation: { start: 0, end: clock.duration, duration: clock.duration },
-  };
 }
 
 type ProjectCameraPreference = { x: number; y: number; segmentId: string; sourceClipId?: string };
@@ -289,7 +221,7 @@ function collectProjectCameraFrames(
     if (time >= region.startTime && time <= end) times.add(time);
   const frames: FollowCursorFrame[] = [];
   const bindings = new Map<string, ProjectCameraSourceBinding>();
-  const parts = windowCameraParts(project, region);
+  const parts = resolveMotionWindowCameraParts(project, region);
   let continuity = 0;
   let previousClipId: string | undefined;
   let previousFocus: { x: number; y: number; segmentId: string; sourceClipId?: string } | undefined;
@@ -335,7 +267,7 @@ function resolveProvisionalPlanEntry(
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
 ) {
-  region = windowCameraPlanRegion(project, region);
+  region = resolveMotionWindowCameraRegion(project, region);
   const viewport = output ?? { width: project.width, height: project.height };
   const key = `${region.id}:${viewport.width}:${viewport.height}:${output?.resolution ?? 'SOURCE'}`;
   const signature = JSON.stringify({
@@ -381,6 +313,7 @@ function resolveProvisionalPlanEntry(
     frames,
     geometry,
     policy,
+    ...(region.cursorComposition ? { tracking: 'continuous' as const } : {}),
     start: region.startTime,
     end: region.startTime + region.duration,
     targetScale: region.scale,
@@ -515,7 +448,7 @@ function resolvePlanEntry(
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
 ) {
-  region = windowCameraPlanRegion(project, region);
+  region = resolveMotionWindowCameraRegion(project, region);
   const provisional = resolveProvisionalPlanEntry(project, region, output);
   const boundaries: WorkingZoneCameraBoundaries = {};
   const neighbors = (project.motionRegions ?? [])

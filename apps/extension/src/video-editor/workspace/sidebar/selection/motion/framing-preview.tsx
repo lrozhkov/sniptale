@@ -1,6 +1,6 @@
 import { OptionButtonsField } from '../shared/option-buttons';
 import { InspectorActionButton } from '../shared/actions';
-import { useContext, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import {
   VideoMotionFocusMode,
@@ -8,10 +8,8 @@ import {
 } from '../../../../../features/video/project/types';
 import type { resolveCameraViewportFrame } from '../../../../../features/video/composition/motion/viewport';
 import { RuntimePreviewContext } from '../../../../runtime/controller/composition/contexts';
-import { isVideoProjectUtilityLaneVisible } from '../../../../../features/video/project/utility-lanes';
-import { resolveProjectCursorCameraPlan } from '../../../../../features/video/composition/motion/project-follow';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import { useFramingFrame } from './framing-preview-frame';
+import { resolveFramingRenderCamera, useFramingFrame } from './framing-preview-frame';
 import { useFramingInteraction, type FramingPreviewProps } from './framing-preview-interaction';
 
 export function MotionFramingPreview(props: {
@@ -49,15 +47,24 @@ export function MotionFramingPreview(props: {
 
 export function FramingPreviewSurface(props: FramingPreviewProps) {
   const following = props.region.focusMode === VideoMotionFocusMode.CURSOR;
-  const plan =
-    following && isVideoProjectUtilityLaneVisible(props.project, 'camera')
-      ? resolveProjectCursorCameraPlan(props.project, props.region)
-      : null;
   const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { areaPoints, camera, viewport, left, top, width, height, handlers } =
-    useFramingInteraction(props, overview);
-  const { ready, failed, reload } = useFramingFrame(props, canvasRef, camera);
+  const {
+    ready,
+    failed,
+    reload,
+    viewport: cursorViewport,
+    plan,
+    nominalScale,
+    update,
+  } = useFramingFrame(props, canvasRef);
+  const interaction = useFramingInteraction(props, overview, cursorViewport);
+  const { areaPoints, viewport, left, top, width, height, handlers } = interaction;
+  const camera = resolveFramingRenderCamera(props, overview, interaction, cursorViewport);
+  const cameraKey = JSON.stringify(camera);
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
+  useEffect(() => update(cameraRef.current, overview), [cameraKey, overview, update]);
 
   return (
     <div className="space-y-2" data-ui="video-editor.framing-preview">
@@ -65,7 +72,7 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
         <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('videoEditor.app.exportCameraConflict')}
         </p>
-      ) : plan?.status === 'ready' && plan.targetScale < props.region.scale ? (
+      ) : plan?.status === 'ready' && plan.targetScale < (nominalScale ?? props.region.scale) ? (
         <p role="status" className="text-xs">
           {translate('videoEditor.sidebar.cameraExpansionApplied')}
         </p>

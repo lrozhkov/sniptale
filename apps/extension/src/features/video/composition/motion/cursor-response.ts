@@ -137,12 +137,19 @@ function fitResponseRun(
     fromAcceleration: from.acceleration,
     toAcceleration: to.acceleration,
   });
-  const checks = [
-    start + (end - start) * 0.25,
-    (start + end) / 2,
-    start + (end - start) * 0.75,
-    ...run.knots.map((time) => time - lookahead).filter((time) => time > start && time < end),
-  ];
+  const checks = [start + (end - start) * 0.25, (start + end) / 2, start + (end - start) * 0.75];
+  let low = 0,
+    high = run.knots.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (run.knots[middle]! - lookahead <= start) low = middle + 1;
+    else high = middle;
+  }
+  for (let index = low; index < run.knots.length; index++) {
+    const time = run.knots[index]! - lookahead;
+    if (time >= end) break;
+    checks.push(time);
+  }
   let worst = 0,
     split = (start + end) / 2;
   for (const time of checks) {

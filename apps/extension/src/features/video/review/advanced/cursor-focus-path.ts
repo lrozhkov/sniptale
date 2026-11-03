@@ -230,6 +230,7 @@ export function resolveReviewCursorCameraPlan(
     context.policy ?? resolveCameraFollowPolicy({ legacySensitivity: context.path.sensitivity });
   const plan = planWorkingZoneCamera({
     frames: reviewCameraPlanObservations(region),
+    ...(region.cursorComposition ? { tracking: 'continuous' as const } : {}),
     start: region.start,
     end: region.end,
     targetScale: region.transform.scale,
@@ -381,6 +382,8 @@ export function resolveReviewCursorOrientation(region: QuickEditZoomRegion) {
     settings: region.cursorComposition,
     scene: context.scene,
     timeMap: context.timeMap,
+    start: region.start,
+    end: region.end,
   });
   if (plans.has(key)) return plans.get(key);
   const observations = reviewOrientationObservations(context);
@@ -401,8 +404,8 @@ export function resolveReviewCursorOrientation(region: QuickEditZoomRegion) {
           (header + crop.height * scene.source.height)
         : frame.y,
     })),
-    start: observations[0]?.time ?? region.start,
-    end: observations.at(-1)?.time ?? region.end,
+    start: region.start,
+    end: region.end,
   });
   plans.set(key, plan);
   return plan;

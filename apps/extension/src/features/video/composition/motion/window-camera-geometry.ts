@@ -1,5 +1,7 @@
 import {
   cursorOrientationInterval,
+  createCursorActivationPlan,
+  cursorActivationAt,
   createWindowCursorProjection,
   type CursorOrientationPlan,
 } from './cursor-orientation';
@@ -88,56 +90,44 @@ function mergeWindowProjectionBounds(
   };
 }
 
-/** Shared decorated-window geometry; each editor owns its topology and observations. */
-export function createWindowCameraGeometry(input: {
-  orientationPlan?: CursorOrientationPlan;
-  output: { width: number; height: number };
-  window: CameraSpatialRect;
-  video: CameraSpatialRect;
-  cornerRadius: number;
-  planeTransform?: QuickEditHomography;
-  intervalPlane?: (
-    start: number,
-    end: number
-  ) => Pick<QuickEditCameraProjectionInterval, 'planeTransform' | 'planeTransition'> | null;
-  planeBreaks?: readonly number[];
-  phaseHoldAt?: number;
-  windowWeight: 'window' | 'content' | 'spatial';
-  region: CameraSpatialSettings & {
-    start: number;
-    end: number;
-    enter: CameraTransition;
-    exit: CameraTransition;
-  };
-  connectedIn: boolean;
-  connectedOut: boolean;
-  policy: ResolvedCameraFollowPolicy;
-}): WorkingZoneCameraGeometry {
+type WindowCameraClockInput = Pick<
+  Parameters<typeof createWindowCameraGeometry>[0],
+  'region' | 'connectedIn' | 'connectedOut' | 'phaseHoldAt' | 'orientationPlan' | 'policy'
+>;
+
+/** Build one finite nominal phase; connected and instantaneous phases have no continuous trajectory. */
+function windowCameraPhase(input: WindowCameraClockInput, phase: 'enter' | 'exit') {
+  const entering = phase === 'enter';
+  const transition = input.region[phase];
+  const connected = entering ? input.connectedIn : input.connectedOut;
+  if (
+    connected ||
+    transition.type === 'none' ||
+    transition.type === 'instant' ||
+    transition.duration <= 0
+  )
+    return null;
+  const start = entering ? input.region.start : input.region.end - transition.duration;
+  return createWindowPhaseTrajectory(start, start + transition.duration, transition.type, entering);
+}
+
+/** Own nominal and automatic phase clocks independently of projection, including frozen-clock witnesses. */
+function createWindowCameraClock(input: WindowCameraClockInput) {
   const { region } = input;
-  const enter =
-    !input.connectedIn &&
-    region.enter.type !== 'none' &&
-    region.enter.type !== 'instant' &&
-    region.enter.duration > 0
-      ? createWindowPhaseTrajectory(
-          region.start,
-          region.start + region.enter.duration,
-          region.enter.type,
-          true
-        )
-      : null;
-  const exit =
-    !input.connectedOut &&
-    region.exit.type !== 'none' &&
-    region.exit.type !== 'instant' &&
-    region.exit.duration > 0
-      ? createWindowPhaseTrajectory(
-          region.end - region.exit.duration,
-          region.end,
-          region.exit.type,
-          false
-        )
-      : null;
+  const activationPlan = input.orientationPlan
+    ? createCursorActivationPlan({
+        start: region.start,
+        end: region.end,
+        enterDuration: region.enter.duration,
+        exitDuration: region.exit.duration,
+        amount: region.cursorComposition?.amount,
+        movementDuration: input.policy.settings.transitionDuration,
+        connectedIn: input.connectedIn,
+        connectedOut: input.connectedOut,
+      })
+    : undefined;
+  const enter = windowCameraPhase(input, 'enter');
+  const exit = windowCameraPhase(input, 'exit');
   const exitStart = region.end - region.exit.duration;
   const phaseTrajectoryAt = (time: number) => {
     if (
@@ -174,8 +164,116 @@ export function createWindowCameraGeometry(input: {
     const phase = phaseAt(time);
     return typeof phase === 'number' ? phase : evaluateCameraTrajectory(phase, time).x;
   };
+  const minimumScale = (start: number, end: number, targetScale: number) => {
+    const values = [phaseValue(start), phaseValue(end)];
+    end = Math.min(end, input.phaseHoldAt ?? Infinity);
+    for (const trajectory of [enter, exit]) {
+      if (trajectory && start < trajectory.end && end > trajectory.start)
+        values.push(
+          cameraTrajectoryBounds(
+            trajectory,
+            Math.max(start, trajectory.start),
+            Math.min(end, trajectory.end)
+          ).minX
+        );
+    }
+    return 1 + (targetScale - 1) * Math.max(0, Math.min(...values));
+  };
+  return {
+    enter,
+    exit,
+    exitStart,
+    activationPlan,
+    phaseAt,
+    phaseTrajectoryAt,
+    phaseValue,
+    instantBoundaries,
+    minimumScale,
+    breaks: [
+      region.start,
+      input.phaseHoldAt,
+      enter?.end,
+      exit?.start,
+      ...(!input.connectedOut && region.exit.type === 'instant' ? [exitStart] : []),
+      region.end,
+      ...(activationPlan?.breaks ?? []),
+    ].filter((time): time is number => time !== undefined),
+  };
+}
+
+/** A discontinuity witness records one-sided phase jets; it does not change the camera pose. */
+function windowCameraClockDiscontinuities(
+  input: WindowCameraClockInput,
+  clock: ReturnType<typeof createWindowCameraClock>,
+  targetScale: number
+) {
+  const { region } = input;
+  const { enter, exit, exitStart, phaseTrajectoryAt } = clock;
+  if (targetScale === 1 && !hasQuickEditPerspective(region.perspective) && !input.orientationPlan)
+    return [];
+  const times: number[] = [];
+  const hold = input.phaseHoldAt;
+  if (hold !== undefined) {
+    const phase = phaseTrajectoryAt(hold);
+    if (
+      typeof phase !== 'number' &&
+      [1, 2].some(
+        (order) =>
+          Math.abs(evaluateCameraTrajectoryDerivative(phase, hold, order === 1 ? 1 : 2).x) > 1e-9
+      )
+    )
+      times.push(hold);
+  }
+  for (const phase of [enter, exit]) {
+    if (!phase) continue;
+    for (const time of [phase.start, phase.end])
+      if (
+        [1, 2].some(
+          (order) =>
+            Math.abs(evaluateCameraTrajectoryDerivative(phase, time, order === 1 ? 1 : 2).x) > 1e-9
+        )
+      )
+        times.push(time);
+  }
+  if (!enter && !input.connectedIn) times.push(region.start);
+  if (!exit && !input.connectedOut)
+    times.push(region.exit.type === 'instant' && region.exit.duration > 0 ? exitStart : region.end);
+  return times;
+}
+
+/** Shared decorated-window geometry; each editor owns its topology and observations. */
+export function createWindowCameraGeometry(input: {
+  orientationPlan?: CursorOrientationPlan;
+  output: { width: number; height: number };
+  window: CameraSpatialRect;
+  video: CameraSpatialRect;
+  cornerRadius: number;
+  planeTransform?: QuickEditHomography;
+  intervalPlane?: (
+    start: number,
+    end: number
+  ) => Pick<QuickEditCameraProjectionInterval, 'planeTransform' | 'planeTransition'> | null;
+  planeBreaks?: readonly number[];
+  phaseHoldAt?: number;
+  windowWeight: 'window' | 'content' | 'spatial';
+  region: CameraSpatialSettings & {
+    start: number;
+    end: number;
+    enter: CameraTransition;
+    exit: CameraTransition;
+  };
+  connectedIn: boolean;
+  connectedOut: boolean;
+  policy: ResolvedCameraFollowPolicy;
+}): WorkingZoneCameraGeometry {
+  const { region } = input;
+  const clock = createWindowCameraClock(input);
+  const { activationPlan, phaseAt, phaseValue, instantBoundaries, minimumScale } = clock;
   const windowWeight = input.windowWeight;
-  const { perspective, at: projectionAt } = createWindowCursorProjection(input);
+  const { perspective, at: projectionAt } = createWindowCursorProjection({
+    ...input,
+    ...(activationPlan ? { activationPlan } : {}),
+  });
   const outputPlane = (time: number) => {
     const plane = input.intervalPlane?.(time, time);
     const transition = plane?.planeTransition;
@@ -242,80 +340,32 @@ export function createWindowCameraGeometry(input: {
       cornerRadius: input.cornerRadius,
       ...(input.planeTransform ? { planeTransform: input.planeTransform } : {}),
       perspective,
-      ...(orbit ? { orbit: { angles: orbit } } : {}),
+      ...(orbit
+        ? {
+            orbit: {
+              angles: orbit,
+              ...(activationPlan
+                ? { phase: cursorActivationAt(activationPlan, (start + end) / 2) }
+                : {}),
+            },
+          }
+        : {}),
       windowWeight,
       phase: phaseAt((start + end) / 2),
       ...plane,
     };
-  };
-  const minimumScale = (start: number, end: number, targetScale: number) => {
-    const values = [phaseValue(start), phaseValue(end)];
-    end = Math.min(end, input.phaseHoldAt ?? Infinity);
-    for (const trajectory of [enter, exit]) {
-      if (trajectory && start < trajectory.end && end > trajectory.start)
-        values.push(
-          cameraTrajectoryBounds(
-            trajectory,
-            Math.max(start, trajectory.start),
-            Math.min(end, trajectory.end)
-          ).minX
-        );
-    }
-    return 1 + (targetScale - 1) * Math.max(0, Math.min(...values));
   };
   return {
     supportsObservationBounds: true,
     viewport: { ...input.output },
     window: { width: input.window.width, height: input.window.height },
     breaks: [
-      region.start,
-      input.phaseHoldAt,
-      enter?.end,
-      exit?.start,
-      ...(!input.connectedOut && region.exit.type === 'instant' ? [exitStart] : []),
-      region.end,
+      ...clock.breaks,
       ...(input.planeBreaks ?? []),
       ...(input.orientationPlan?.breaks ?? []),
-    ].filter((time): time is number => time !== undefined),
+    ],
     discontinuities(targetScale) {
-      if (
-        targetScale === 1 &&
-        !hasQuickEditPerspective(region.perspective) &&
-        !input.orientationPlan
-      )
-        return [];
-      const times: number[] = [];
-      const hold = input.phaseHoldAt;
-      if (hold !== undefined) {
-        const phase = phaseTrajectoryAt(hold);
-        if (
-          typeof phase !== 'number' &&
-          [1, 2].some(
-            (order) =>
-              Math.abs(evaluateCameraTrajectoryDerivative(phase, hold, order === 1 ? 1 : 2).x) >
-              1e-9
-          )
-        )
-          times.push(hold);
-      }
-      for (const phase of [enter, exit]) {
-        if (!phase) continue;
-        for (const time of [phase.start, phase.end])
-          if (
-            [1, 2].some(
-              (order) =>
-                Math.abs(evaluateCameraTrajectoryDerivative(phase, time, order === 1 ? 1 : 2).x) >
-                1e-9
-            )
-          )
-            times.push(time);
-      }
-      if (!enter && !input.connectedIn) times.push(region.start);
-      if (!exit && !input.connectedOut)
-        times.push(
-          region.exit.type === 'instant' && region.exit.duration > 0 ? exitStart : region.end
-        );
-      return times;
+      return windowCameraClockDiscontinuities(input, clock, targetScale);
     },
     panDomain: (targetScale) => ({
       minX: 0,

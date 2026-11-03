@@ -665,3 +665,58 @@ it(
     expect(frame().disabled).toBe(false);
   }
 );
+
+it.each([
+  { local: true, inherited: false, suspended: true },
+  { local: undefined, inherited: true, suspended: true },
+  { local: false, inherited: true, suspended: false },
+])(
+  'keeps accepted scene identity during follow drafts (local=$local inherited=$inherited)',
+  async ({ local, inherited, suspended }) => {
+    const accepted = { ...region, ...(local === undefined ? {} : { followCursor: local }) };
+    state.zoom.selected = () => accepted;
+    state.advanced.cursorFocusPath = {
+      version: 1,
+      mode: inherited ? 'follow' : 'fixed',
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      gapPolicy: 'hold',
+      segments: [],
+    };
+    let draft: ReturnType<typeof state.zoom.previewChanges.read> = null;
+    const listeners = new Set<() => void>();
+    state.zoom.previewChanges = {
+      read: () => draft,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+    };
+    state.zoom.previewRegion = (value, snapshot = draft) =>
+      snapshot
+        ? {
+            ...value,
+            transform: { ...value.transform, scale: snapshot.patch.scale ?? value.transform.scale },
+          }
+        : value;
+    await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+    for (const scale of [1.1, 1.2, 1.3]) {
+      act(() => {
+        draft = { id: accepted.id, patch: { scale }, base: 'revision' };
+        listeners.forEach((listener) => listener());
+      });
+      expect(stage().preview?.interacting).toBe(true);
+      if (suspended) expect(stage().zoomOverlay?.region).toBe(accepted);
+      else expect(stage().zoomOverlay?.region.transform.scale).toBe(scale);
+    }
+    act(() => {
+      draft = null;
+      listeners.forEach((listener) => listener());
+    });
+    expect(stage().zoomOverlay?.region).toBe(accepted);
+    expect(stage().preview?.interacting).toBe(false);
+    expect(state.zoom.change).not.toHaveBeenCalled();
+  }
+);

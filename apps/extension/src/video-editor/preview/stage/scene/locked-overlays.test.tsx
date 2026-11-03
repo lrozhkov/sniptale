@@ -146,6 +146,9 @@ function SceneHarness() {
 
 async function renderSceneHarness() {
   await act(async () => root?.render(<SceneHarness />));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
 }
 
 function restoreDescriptor(target: object, key: string, descriptor?: PropertyDescriptor) {
@@ -158,6 +161,7 @@ function restoreDescriptor(target: object, key: string, descriptor?: PropertyDes
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -222,6 +226,7 @@ afterEach(() => {
   );
   restoreDescriptor(HTMLCanvasElement.prototype, 'getContext', originalCanvasGetContextDescriptor);
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function createLockedVisualLayers() {

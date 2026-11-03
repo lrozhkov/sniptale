@@ -34,6 +34,8 @@ function createPreviewStageCanvasOverlays(
   params: PreviewStageCanvasProps,
   mode: PreviewStageCanvasProps['mode']
 ) {
+  if (params.cameraInteractionEnabled === false)
+    return { selectionOverlay: null, targetOverlay: null };
   return {
     selectionOverlay: createPreviewStageSelectionOverlay({
       onUpdateEffectInstance: params.onUpdateEffectInstance,

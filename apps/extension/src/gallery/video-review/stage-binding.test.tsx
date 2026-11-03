@@ -155,7 +155,15 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
   }
 );
 
-it('retains applied camera regions while the transport advances without a selected focus', () => {
+it('retains applied camera regions while the transport advances without a selected focus', async () => {
+  vi.useFakeTimers();
+  const ticks = new Map<number, FrameRequestCallback>();
+  let tickId = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    ticks.set(++tickId, callback);
+    return tickId;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => ticks.delete(id));
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const root = createRoot(document.createElement('div'));
   const camera = createQuickEditZoomRegion({ id: 'camera', at: 5, duration: 3 });
@@ -221,6 +229,14 @@ it('retains applied camera regions while the transport advances without a select
   try {
     act(() => root.render(<ReviewStageBinding {...props} />));
     expect(scene?.focus?.regions).toBe(regions);
+    expect(readPath).not.toHaveBeenCalled();
+    act(() => {
+      const current = [...ticks.values()];
+      ticks.clear();
+      current.forEach((callback) => callback(0));
+    });
+    expect(readPath).not.toHaveBeenCalled();
+    await act(async () => vi.runOnlyPendingTimersAsync());
     expect(readPath).toHaveBeenCalled();
     const reads = readPath.mock.calls.length;
     act(() => root.render(<ReviewStageBinding {...props} outputTime={1} time={1} />));
@@ -229,6 +245,7 @@ it('retains applied camera regions while the transport advances without a select
     expect(readPath).toHaveBeenCalledTimes(reads);
   } finally {
     act(() => root.unmount());
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   }
 });

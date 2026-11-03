@@ -236,3 +236,11 @@ it.each(['Escape', 'pointercancel', 'unmount'])('cancels pending handle frames o
   act(() => frames[0]!(0));
   expect(props.onPreviewEffectAnchors).toHaveBeenCalledTimes(1);
 });
+
+it('withholds camera-relative handles until a paused destination frame is accepted', () => {
+  const props = fixture();
+  render({ ...props, cameraInteractionEnabled: false });
+  expect(container!.querySelector('[data-effect-handle="tip"]')).toBeNull();
+  act(() => root!.render(<PreviewStageCanvas {...props} cameraInteractionEnabled />));
+  expect(container!.querySelector('[data-effect-handle="tip"]')).not.toBeNull();
+});

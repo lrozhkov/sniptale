@@ -1,5 +1,5 @@
 import { OptionButtonsField } from '../shared/option-buttons';
-import { NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { DraftNumericRow } from '../../../../../ui/compact-inspector-controls/numeric-preview';
 import { motionTransitionSettings } from '../../../../../features/video/project/motion/timing';
 import { InspectCameraFollowSettings } from '../inspection/cursor-path';
 import { resolveCameraFollowPolicy } from '../../../../../features/video/project/camera/cursor-policy';
@@ -22,7 +22,6 @@ import {
 } from './fields';
 import { ManualFocusFields } from './focus';
 import { DetailItem, DetailList } from '../shared/panel';
-import { SliderField } from '../shared/sliders';
 import { MotionCursorCompositionFields } from './spatial';
 
 export function MotionCameraFields(props: {
@@ -63,6 +62,7 @@ export function MotionCameraFields(props: {
             label={translate('videoEditor.sidebar.inspectorMoreDetails')}
           >
             <InspectCameraFollowSettings
+              key={props.motionRegion.id}
               settings={
                 resolveCameraFollowPolicy({
                   legacySensitivity: resolveProjectCursorFocusPath(props.panel.project).sensitivity,
@@ -177,16 +177,18 @@ function MotionScaleFields(props: {
   }
 
   return (
-    <SliderField
+    <DraftNumericRow
+      key={props.motionRegion.id}
       label={translate('videoEditor.sidebar.motionScaleLabel')}
-      value={props.motionRegion.scale}
-      min={0.1}
-      max={4}
-      step={0.05}
+      value={Math.round(props.motionRegion.scale * 100)}
+      min={10}
+      max={400}
+      step={5}
+      precision={0}
+      unit="%"
       onChange={(value) =>
-        props.panel.onUpdateMotionRegion(props.motionRegion.id, { scale: value })
+        props.panel.onUpdateMotionRegion(props.motionRegion.id, { scale: value / 100 })
       }
-      formatValue={(value) => `${Math.round(value * 100)}%`}
     />
   );
 }
@@ -197,7 +199,8 @@ function MotionDurationField(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <SliderField
+    <DraftNumericRow
+      key={props.motionRegionId}
       label={translate('videoEditor.sidebar.motionDurationLabel')}
       value={props.duration}
       min={0.1}
@@ -206,7 +209,8 @@ function MotionDurationField(props: {
       onChange={(value) =>
         props.panel.onUpdateMotionRegion(props.motionRegionId, { duration: value })
       }
-      formatValue={(value) => `${value.toFixed(2)} s`}
+      precision={2}
+      unit="s"
     />
   );
 }
@@ -254,9 +258,8 @@ function MotionZoomFields(props: {
             >
               <MotionBlurField {...props} phase={phase} />
               <MotionTransitionTypeField {...props} phase={phase} />
-              <NumericRow
-                appearance="plain"
-                focusAppearance="accent-box"
+              <DraftNumericRow
+                key={props.motionRegion.id}
                 label={translate('gallery.videoReview.zoomTransitionDuration')}
                 value={setting.duration}
                 min={0}
@@ -264,14 +267,9 @@ function MotionZoomFields(props: {
                 precision={2}
                 step={0.01}
                 unit="s"
-                scrub={{
-                  min: 0,
-                  max: Math.min(5, Math.max(0, duration - other.duration)),
-                  step: 0.01,
-                }}
+                scrubMax={Math.min(5, Math.max(0, duration - other.duration))}
                 disabled={setting.type === 'none'}
-                onPreviewValue={changeDuration}
-                onCommitValue={changeDuration}
+                onChange={changeDuration}
               />
             </fieldset>
           </InspectorDetails>

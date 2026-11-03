@@ -31,6 +31,8 @@ function buildPreviewStageSurfaceProps(
     assetUrls: props.assetUrls,
     beginInteraction: runtime.surface.beginInteraction,
     camera: runtime.surface.camera,
+    cameraInteractionEnabled: runtime.surface.cameraInteractionEnabled,
+    onCameraPresented: runtime.render.onCameraPresented,
     cachedVideo: runtime.media.cachedVideo,
     currentTime: runtime.render.currentTime,
     effectRuntimeFeedback: runtime.render.effectRuntimeFeedback,

@@ -6,7 +6,10 @@ import {
   quickEditWebcamScreenPlacementAt,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
-import { createReviewPreviewPresentation } from './preview-presentation';
+import {
+  createReviewPreviewPresentation,
+  createReviewPresentationPaintClock,
+} from './preview-presentation';
 import type { useReviewCutTransitionProvider } from './cut-transition-preview';
 import { createReviewWebcamPreviewSource } from './webcam-preview';
 import { captureReviewPreviewFrame } from './preview-presentation-frame';
@@ -86,8 +89,7 @@ class ManualPresentationSession {
     );
     this.renderer = this.createRenderer();
     this.scheduler = createReviewPreviewPresentation({
-      requestTick: (callback) => requestAnimationFrame(callback),
-      cancelTick: (id) => cancelAnimationFrame(id),
+      ...createReviewPresentationPaintClock(),
       now: () => performance.now(),
       sampleTime: this.sampleTime,
       prepare: this.prepare,

@@ -104,7 +104,18 @@ export function ReviewPreviewBinding({
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
   onOpenPreviewSettings?: ((trigger: HTMLButtonElement) => void) | undefined;
 }) {
-  const zoom = useReviewZoomPreview(sourceState.zoom);
+  const observedZoom = useReviewZoomPreview(sourceState.zoom);
+  const zoom = {
+    ...observedZoom,
+    previewRegion: (region: Parameters<typeof observedZoom.previewRegion>[0]) => {
+      const following =
+        !region.border &&
+        !region.spotlight &&
+        (region.followCursor ?? sourceState.advanced.cursorFocusPath?.mode === 'follow');
+      // Follow planning waits for the authored gesture result; manual framing remains live.
+      return observedZoom.previewing && following ? region : observedZoom.previewRegion(region);
+    },
+  };
   const state = { ...sourceState, zoom };
   const { busy, audio } = state;
   return (

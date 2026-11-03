@@ -76,6 +76,7 @@ const assets = {
 };
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   time = 0;
   nextTick = 0;
@@ -160,6 +161,7 @@ afterEach(async () => {
   host.remove();
   vi.restoreAllMocks();
   vi.resetAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 function Harness() {
@@ -176,6 +178,7 @@ const step = async (value: number) => {
     const callbacks = [...ticks.values()];
     ticks.clear();
     callbacks.forEach((callback) => callback(time));
+    await vi.runOnlyPendingTimersAsync();
     await Promise.resolve();
     await Promise.resolve();
   });

@@ -38,7 +38,7 @@ type ReviewAdvancedPanelsProps = {
   cursorPath?: CursorFocusPath;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   /** Optional framing preview mounted inside the selected region inspector. */
-  zoomPreview?(region: QuickEditZoomRegion): ReactNode;
+  zoomPreview?(region: QuickEditZoomRegion, previewing?: boolean): ReactNode;
 };
 
 function applyZoomRegionPatch(
@@ -95,7 +95,7 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
                 part.sourceEnd > zoomRegion.sourceAnchor!.start
             )
           }
-          preview={args.zoomPreview?.(zoomRegion)}
+          preview={args.zoomPreview?.(zoomRegion, zoom.previewing)}
           onChange={applyZoomRegionPatch.bind(null, args, zoomRegion.id)}
           onReset={resetZoomRegion.bind(null, args, zoomRegion.id)}
           onDuplicate={() => args.zoom.duplicate(zoomRegion.id)}

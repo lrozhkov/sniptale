@@ -123,9 +123,13 @@ function SceneHarness() {
 
 async function renderSceneHarness() {
   await act(async () => root?.render(<SceneHarness />));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -215,6 +219,7 @@ afterEach(() => {
     originalDivGetBoundingClientRectDescriptor
   );
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function restorePrototypeDescriptor(

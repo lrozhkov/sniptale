@@ -298,3 +298,40 @@ it.each([true, false])(
     expect(duration.matches(':disabled')).toBe(cameraLocked);
   }
 );
+
+it.each([
+  'cameraZoneSize',
+  'cameraTransitionDuration',
+  'cameraMargin',
+  'cameraMinimumHold',
+  'cameraMinimumScale',
+] as const)('commits %s once and cancels its draft without adding history', (field) => {
+  const { project } = editableInspector();
+  act(() => root.render(<InspectCursorPathSettings project={project} />));
+  const input = host.querySelector<HTMLInputElement>(
+    `input[aria-label="videoEditor.sidebar.${field} range"]`
+  )!;
+  expect(input).not.toBeNull();
+  const before = useVideoEditorStore.getState().project;
+  const history = useVideoEditorStore.getState().projectHistory.past.length;
+  const baseline = input.value;
+  const key = (type: string, key: string) =>
+    act(() => input.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
+  key('keydown', 'ArrowRight');
+  key('keydown', 'ArrowRight');
+  expect(input.value).not.toBe(baseline);
+  expect(useVideoEditorStore.getState().project).toBe(before);
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(history);
+  key('keydown', 'Escape');
+  key('keyup', 'ArrowRight');
+  expect(input.value).toBe(baseline);
+  expect(useVideoEditorStore.getState().project).toBe(before);
+  key('keydown', 'ArrowRight');
+  key('keyup', 'ArrowRight');
+  key('keyup', 'ArrowRight');
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(history + 1);
+  act(() => useVideoEditorStore.getState().undoProject());
+  expect(useVideoEditorStore.getState().project?.cameraFollowDefaults).toEqual(
+    before?.cameraFollowDefaults
+  );
+});

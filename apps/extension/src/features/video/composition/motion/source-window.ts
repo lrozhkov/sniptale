@@ -1,4 +1,8 @@
-import { projectCursorSpatialSettings } from './cursor-orientation';
+import {
+  projectCursorSpatialSettings,
+  projectCursorActivationPlan,
+  evaluateCursorActivation,
+} from './cursor-orientation';
 import { resolveEffectSourceClip } from '../../project/effect-instance/placement';
 import type { VideoProjectClip } from '../../project/types';
 import { resolveCameraWindowWeight } from '../../project/motion/spatial';
@@ -190,7 +194,12 @@ export function resolveSourceWindowCamera(
         height: window.height / project.height,
       },
     },
-    progress
+    progress,
+    region.focusMode === 'CURSOR' &&
+      region.cursorComposition &&
+      region.cursorComposition.mode !== 'off'
+      ? evaluateCursorActivation(projectCursorActivationPlan(project, region), time)
+      : undefined
   );
   return {
     sourceClipId: geometry.clipId,

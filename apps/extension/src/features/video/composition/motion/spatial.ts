@@ -17,7 +17,8 @@ export function evaluateMotionSpatial(
   project: { width: number; height: number },
   from: (MotionSpatialSettings & { focusMode?: string }) | null,
   to: MotionSpatialSettings & { focusMode?: string },
-  progress: number
+  progress: number,
+  cursorActivation?: number
 ): VideoCompositionCameraState['spatial'] {
   if (
     !(from?.focusMode === 'CURSOR' && hasCursorComposition(from.cursorComposition)) &&
@@ -43,6 +44,7 @@ export function evaluateMotionSpatial(
   return {
     ...interpolateCameraSpatial(from, to, t, {
       from: from?.focusMode === 'CURSOR' && hasCursorComposition(from.cursorComposition),
+      ...(cursorActivation !== undefined ? { progress: cursorActivation } : {}),
       to: to.focusMode === 'CURSOR' && hasCursorComposition(to.cursorComposition),
     }),
     reference,

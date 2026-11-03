@@ -3,7 +3,7 @@ import { resolveVideoEditorPreviewFrameRate } from '../../../../features/video/p
 import { resolveCameraCanvasTransform } from './camera-transform';
 import React, { useEffect, useMemo, useRef } from 'react';
 
-import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
+import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
 import { usePreviewStageMediaRuntime } from '../media/runtime';
 import type { PreviewStageGridSettings } from '../types';
@@ -37,8 +37,45 @@ function usePreviewStageInteractionCleanup(
   );
 }
 
+function usePresentedStageCamera(project: VideoProject, time: number, playing: boolean) {
+  const [presented, setPresented] = React.useState<{
+    project: VideoProject;
+    camera: VideoCompositionCameraState;
+    time: number;
+  } | null>(null);
+  const onCameraPresented = React.useCallback(
+    (camera: VideoCompositionCameraState, completedTime: number) => {
+      setPresented({ project, camera, time: completedTime });
+    },
+    [project]
+  );
+  const camera: VideoCompositionCameraState =
+    presented?.project.id === project.id &&
+    presented.project.width === project.width &&
+    presented.project.height === project.height
+      ? presented.camera
+      : {
+          viewportX: 0,
+          viewportY: 0,
+          viewportWidth: project.width,
+          viewportHeight: project.height,
+          focusPoint: { x: project.width / 2, y: project.height / 2 },
+          scale: 1,
+          regionId: null,
+          motionBlurAmount: 0,
+        };
+  return {
+    camera,
+    onCameraPresented,
+    current: presented?.project === project && (playing || presented.time === time),
+    sameProject: presented?.project.id === project.id,
+  };
+}
+
 function usePreviewStageSurfaceState(params: {
   currentTime: number;
+  isPlaying: boolean;
+  interacting: boolean;
   gestureHooks: Parameters<typeof createPreviewStageInteraction>[0]['gestureHooks'];
   grid: PreviewStageGridSettings;
   onSelectClip: (clipId: string | null) => void;
@@ -59,35 +96,41 @@ function usePreviewStageSurfaceState(params: {
     selectedClipId: params.selectedClipId,
     selectedEffectInstanceId: params.selectedEffectInstanceId,
   });
-  const camera = React.useMemo(
-    () => resolveVideoCompositionFrame(params.project, params.currentTime).camera,
-    [params.currentTime, params.project]
+  const { camera, onCameraPresented, current, sameProject } = usePresentedStageCamera(
+    params.project,
+    params.currentTime,
+    params.isPlaying
   );
   usePreviewStageInteractionCleanup(interactionCleanupRef, interactionRef);
+  const beginInteraction = createPreviewStageInteraction({
+    camera,
+    currentTime: params.currentTime,
+    ...(params.gestureHooks ? { gestureHooks: params.gestureHooks } : {}),
+    interactionCleanupRef,
+    interactionRef,
+    onGuideChange: setGuides,
+    onSelectClip: params.onSelectClip,
+    onUpdateClipTransform: (clipId, transform) => {
+      const destination = resolveCameraCanvasTransform(
+        params.project,
+        clipId,
+        params.currentTime,
+        transform
+      );
+      if (destination) params.onUpdateClipTransform(clipId, destination);
+    },
+    project: params.project,
+    grid: params.grid,
+    stage: stageRef.current,
+  });
   return {
     activeClips,
-    beginInteraction: createPreviewStageInteraction({
-      camera,
-      currentTime: params.currentTime,
-      ...(params.gestureHooks ? { gestureHooks: params.gestureHooks } : {}),
-      interactionCleanupRef,
-      interactionRef,
-      onGuideChange: setGuides,
-      onSelectClip: params.onSelectClip,
-      onUpdateClipTransform: (clipId, transform) => {
-        const destination = resolveCameraCanvasTransform(
-          params.project,
-          clipId,
-          params.currentTime,
-          transform
-        );
-        if (destination) params.onUpdateClipTransform(clipId, destination);
-      },
-      project: params.project,
-      grid: params.grid,
-      stage: stageRef.current,
-    }),
+    beginInteraction: (...args: Parameters<typeof beginInteraction>) => {
+      if (current) beginInteraction(...args);
+    },
     camera,
+    cameraInteractionEnabled: current || (sameProject && params.interacting),
+    onCameraPresented,
     guides,
     onGuideChange: setGuides,
     selectedClip: selection.selectedClip,
@@ -150,6 +193,8 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
   const previewExactFrameCache = usePreviewSessionExactFrameCache();
   const surface = usePreviewStageSurfaceState({
     currentTime: transient.currentTime,
+    isPlaying: params.isPlaying,
+    interacting: transient.cacheBypass,
     gestureHooks: transient.gestureHooks,
     grid: params.grid,
     onSelectClip: params.onSelectClip,
@@ -185,6 +230,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     media,
     previewRasterSize,
     render: {
+      onCameraPresented: surface.onCameraPresented,
       onPreviewEffectAnchors: transient.onPreviewEffectAnchors,
       onPreviewEffectControls: transient.onPreviewEffectControls,
       currentTime: transient.currentTime,

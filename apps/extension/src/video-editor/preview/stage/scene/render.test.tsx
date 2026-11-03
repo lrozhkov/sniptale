@@ -212,3 +212,28 @@ it('keeps watermark preparation in the preview session and clears it on failure,
   root = null;
   expect(clear).toHaveBeenCalledTimes(3);
 });
+
+it('publishes the accepted job time with its camera receipt', async () => {
+  await act(async () => root?.render(<RenderHarness />));
+  const options = vi.mocked(createPreviewSceneRenderScheduler).mock.calls.at(-1)![0];
+  const controller = new AbortController();
+  const onCameraPresented = vi.fn();
+  options.onSuccess?.({
+    canvas: document.createElement('canvas'),
+    controller,
+    signal: controller.signal,
+    currentTime: 1.25,
+    imageBank: {},
+    isEffectRuntimeFrame: false,
+    isPlaybackFrame: false,
+    project: { ...createEmptyVideoProject('Accepted camera'), duration: 4 },
+    renderGeneration: 3,
+    stage: null,
+    videoRefs: { current: {} },
+    onCameraPresented,
+  });
+  expect(onCameraPresented).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ scale: 1, regionId: null }),
+    1.25
+  );
+});

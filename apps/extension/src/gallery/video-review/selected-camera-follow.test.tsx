@@ -13,6 +13,7 @@ import { createQuickEditAdvancedState } from '../../features/video/review/advanc
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 
 const preview = vi.hoisted(() => vi.fn());
+const transient = vi.hoisted(() => ({ previewing: false }));
 vi.mock('./zoom-preview', () => ({
   ReviewZoomPreview: (props: unknown) => {
     preview(props);
@@ -23,14 +24,15 @@ vi.mock('./use-zoom-preview-source', () => ({ useZoomPreviewSource: () => null }
 vi.mock('./advanced-panels', () => ({
   ReviewAdvancedPanels: (props: {
     advanced: ReturnType<typeof createQuickEditAdvancedState>;
-    zoomPreview(region: unknown): unknown;
-  }) => props.zoomPreview(props.advanced.zoom.regions[0]),
+    zoomPreview(region: unknown, previewing?: boolean): unknown;
+  }) => props.zoomPreview(props.advanced.zoom.regions[0], transient.previewing),
 }));
 
 let dispose: (() => void) | undefined;
 afterEach(() => {
   dispose?.();
   preview.mockClear();
+  transient.previewing = false;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -43,9 +45,11 @@ it.each([
   { followCursor: true, playing: false, type: 'spotlight' },
   { followCursor: true, playing: false, type: 'border' },
   { followCursor: true, playing: true, type: 'link' },
+  { followCursor: undefined, playing: false, previewing: true },
 ])(
   'maps the selected camera preview through edits and local policy $followCursor, playing=$playing',
-  ({ followCursor, playing, type }) => {
+  ({ followCursor, playing, type, previewing = false }) => {
+    transient.previewing = previewing;
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const advanced = createQuickEditAdvancedState();
     advanced.ui.mode = 'advanced';
@@ -120,6 +124,7 @@ it.each([
     act(() => root.render(<ReviewSelectedProperties {...props} />));
     expect(resolvePath).not.toHaveBeenCalled();
     const selected = preview.mock.lastCall![0] as ComponentProps<typeof ReviewZoomPreview>;
+    expect(selected.previewing).toBe(previewing);
     expect(selected.cursorFollowing).toBe(
       type === 'spotlight' || type === 'border' ? false : (followCursor ?? true)
     );

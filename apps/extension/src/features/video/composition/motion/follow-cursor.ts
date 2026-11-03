@@ -1,3 +1,4 @@
+import { compileCursorPanTracking } from './cursor-pan-tracking';
 import type { CursorFocusPoint } from '../../project/cursor-focus-path/types';
 import type { ResolvedCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import { createCameraTrajectory, evaluateCameraTrajectoryDerivative } from './camera-trajectory';
@@ -106,6 +107,8 @@ export function evaluateWorkingZoneCameraBoundary(
 }
 
 interface WorkingZoneCameraInput extends WorkingZoneCameraBoundaries {
+  /** New cursor composition follows continuously; omitted legacy policies retain activity holds. */
+  tracking?: 'continuous';
   frames: readonly FollowCursorFrame[];
   start: number;
   end: number;
@@ -685,6 +688,24 @@ function planWorkingZoneCameraAtScale(input: WorkingZoneCameraInput): WorkingZon
     segmentId: frame.segmentId,
     ...(frame.preferenceWeight !== undefined ? { preferenceWeight: frame.preferenceWeight } : {}),
   }));
+  if (input.tracking === 'continuous' && preferences.length) {
+    let result: WorkingZoneCameraPlan | undefined;
+    for (const factor of [1, 1.5, 2, 3]) {
+      const spans = compileCursorPanTracking({
+        preferences,
+        start: input.start,
+        end: input.end,
+        step:
+          input.policy.settings.transitionDuration *
+          (0.5 + input.policy.settings.zoneSize) *
+          factor,
+        domain,
+      });
+      result = admitCameraBoundaries(input, spans, discontinuities, fallback);
+      if (result.status === 'ready') return result;
+    }
+    if (result) return result;
+  }
   const zones = fitWorkingCameraZones(input, preferences, fallback);
   if (!Array.isArray(zones)) return zones;
   if (!zones.length)

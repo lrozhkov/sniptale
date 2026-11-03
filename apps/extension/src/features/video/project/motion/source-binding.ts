@@ -420,3 +420,83 @@ export function projectMotionSourcePhases(project: VideoProject): VideoProject {
 export function getMotionPhaseSource(project: VideoProject): VideoProject {
   return phaseSources.get(project) ?? project;
 }
+
+/** Resolve equivalent contiguous-animation candidates without mixing geometry or authored controls. */
+export function resolveMotionWindowCameraParts(
+  project: VideoProject,
+  region: VideoProjectMotionRegion
+) {
+  const binding = region.sourceBinding;
+  if (
+    binding?.coordinateSpace !== 'source-window' ||
+    !binding.animationGroupId ||
+    !region.animation
+  )
+    return [region];
+  const clip = project.clips.find((item) => item.id === binding.clipId);
+  if (clip?.type !== 'VIDEO') return [region];
+  const controls = (item: VideoProjectMotionRegion) => {
+    const {
+      id: _id,
+      startTime: _start,
+      duration: _duration,
+      animation: _animation,
+      sourceBinding: _binding,
+      incomingConnection: _connection,
+      ...settings
+    } = item;
+    return JSON.stringify(settings);
+  };
+  const geometry = (id: string) => {
+    const item = project.clips.find((entry) => entry.id === id);
+    return item?.type === 'VIDEO'
+      ? JSON.stringify({
+          asset: item.assetId,
+          instance: item.sourceInstanceId,
+          track: item.trackId,
+          transform: item.transform,
+          crop: item.sourceCrop,
+          header: item.windowHeader,
+          fit: item.fitMode,
+          corner: item.windowCornerRadius,
+        })
+      : null;
+  };
+  const signature = controls(region),
+    plane = geometry(clip.id);
+  const origin = region.startTime - region.animation.start;
+  return (project.motionRegions ?? [])
+    .filter(
+      (item) =>
+        item.duration > 0 &&
+        item.sourceBinding?.coordinateSpace === 'source-window' &&
+        item.sourceBinding.animationGroupId === binding.animationGroupId &&
+        item.animation?.duration === region.animation!.duration &&
+        Math.abs(item.startTime - item.animation.start - origin) < 1e-9 &&
+        controls(item) === signature &&
+        geometry(item.sourceBinding.clipId) === plane
+    )
+    .toSorted((a, b) => a.startTime - b.startTime);
+}
+
+/** Canonical output clock shared by follow admission, orientation activation and source projections. */
+export function resolveMotionWindowCameraRegion(
+  project: VideoProject,
+  region: VideoProjectMotionRegion
+) {
+  if (region.sourceBinding?.coordinateSpace !== 'source-window' || !region.animation) return region;
+  const parts = resolveMotionWindowCameraParts(project, region);
+  const first = parts[0] ?? region;
+  for (let i = 1; i < parts.length; i++)
+    if (Math.abs(parts[i - 1]!.startTime + parts[i - 1]!.duration - parts[i]!.startTime) > 1e-9)
+      return region;
+  const clock = first.animation!;
+  const clockScale = first.duration / (clock.end - clock.start);
+  const startTime = first.startTime - clock.start * clockScale;
+  return {
+    ...first,
+    startTime,
+    duration: clock.duration * clockScale,
+    animation: { start: 0, end: clock.duration, duration: clock.duration },
+  };
+}

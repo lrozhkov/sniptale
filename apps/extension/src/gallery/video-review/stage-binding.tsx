@@ -3,7 +3,11 @@ import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import type { ReviewCutPreviewBinding } from './cut-transition-preview';
 import type { RefObject } from 'react';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createReviewPreviewPresentation,
+  createReviewPresentationPaintClock,
+} from './preview-presentation';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import type {
   QuickEditBackgroundSettings,
@@ -83,6 +87,8 @@ type ReviewStageBindingProps = {
 function useReviewStageCamera(
   props: Pick<
     ReviewStageBindingProps,
+    | 'url'
+    | 'onError'
     | 'zoomOverlay'
     | 'focusTimeMap'
     | 'outputTime'
@@ -95,7 +101,10 @@ function useReviewStageCamera(
   >
 ) {
   const selected = props.zoomOverlay?.region;
-  const projected = selected ? projectReviewFocus([selected], props.focusTimeMap) : [];
+  const projected = useMemo(
+    () => (selected ? projectReviewFocus([selected], props.focusTimeMap) : []),
+    [selected, props.focusTimeMap]
+  );
   const framing =
     projected.length > 0 &&
     Math.abs(props.outputTime - (projected[0]!.start + projected.at(-1)!.end) / 2) < 0.05;
@@ -113,35 +122,38 @@ function useReviewStageCamera(
     )
       ? selected.transform
       : undefined;
-  const regions =
-    projected.length === 0
-      ? props.zoomRegions
-      : props.zoomRegions.map((region) => {
-          const target = projected.find((item) => item.id === region.id);
-          if (!target) return region;
-          // Resolved links belong to the complete scene, not the isolated selected projection.
-          // A framing draft changes the displayed pose, not neighboring playback trajectories.
-          const updated = {
-            ...region,
-            ...target,
-            ...(manualCamera ? { transform: region.transform } : {}),
-          };
-          if (!framing) return updated;
-          return {
-            ...updated,
-            enter: { type: 'none' as const, duration: 0 },
-            exit: { type: 'none' as const, duration: 0 },
-            ...(target.borderClock
-              ? {
-                  borderClock: {
-                    ...target.borderClock,
-                    enter: { type: 'none' as const, duration: 0 },
-                    exit: { type: 'none' as const, duration: 0 },
-                  },
-                }
-              : {}),
-          };
-        });
+  const regions = useMemo(
+    () =>
+      projected.length === 0
+        ? props.zoomRegions
+        : props.zoomRegions.map((region) => {
+            const target = projected.find((item) => item.id === region.id);
+            if (!target) return region;
+            // Resolved links belong to the complete scene, not the isolated selected projection.
+            // A framing draft changes the displayed pose, not neighboring playback trajectories.
+            const updated = {
+              ...region,
+              ...target,
+              ...(manualCamera ? { transform: region.transform } : {}),
+            };
+            if (!framing) return updated;
+            return {
+              ...updated,
+              enter: { type: 'none' as const, duration: 0 },
+              exit: { type: 'none' as const, duration: 0 },
+              ...(target.borderClock
+                ? {
+                    borderClock: {
+                      ...target.borderClock,
+                      enter: { type: 'none' as const, duration: 0 },
+                      exit: { type: 'none' as const, duration: 0 },
+                    },
+                  }
+                : {}),
+            };
+          }),
+    [projected, props.zoomRegions, manualCamera, framing]
+  );
   const cameraScene = useMemo(() => {
     const input = {
       source: props.source,
@@ -149,9 +161,60 @@ function useReviewStageCamera(
       background: props.background,
       windowHeader: props.windowHeader,
     };
-    prepareReviewCameraPlans(regions, input);
     return input;
-  }, [regions, props.source, props.canvas, props.background, props.windowHeader]);
+  }, [props.source, props.canvas, props.background, props.windowHeader]);
+  const request = useMemo(() => ({ regions, input: cameraScene }), [regions, cameraScene]);
+  const needsPlan = regions.some((region) => region.cursorFocus?.path.mode === 'follow');
+  const [completed, setCompleted] = useState<{ owner: object; request: typeof request } | null>(
+    null
+  );
+  const reportError = useRef(props.onError);
+  reportError.current = props.onError;
+  const lifetime = useMemo(
+    () => ({ url: props.url, width: props.source.width, height: props.source.height }),
+    [props.url, props.source.width, props.source.height]
+  );
+  const owner = useMemo(() => {
+    const identity = lifetime;
+    const lease = <T,>(value: T) => ({ value, release() {} });
+    const scheduler = createReviewPreviewPresentation<
+      typeof request,
+      typeof request,
+      null,
+      typeof request
+    >({
+      ...createReviewPresentationPaintClock(),
+      now: () => performance.now(),
+      sampleTime: () => 0,
+      prepare: async ({ scene }, signal) => {
+        signal.throwIfAborted();
+        prepareReviewCameraPlans(scene.regions, scene.input);
+        signal.throwIfAborted();
+        return lease(scene);
+      },
+      capture: () => lease(null),
+      render: (prepared) => lease(prepared),
+      publish: (value) => setCompleted({ owner: identity, request: value }),
+      onError: () => reportError.current(),
+    });
+    return { identity, scheduler };
+  }, [lifetime]);
+  useEffect(() => () => owner.scheduler.dispose(), [owner]);
+  useEffect(() => {
+    owner.scheduler.update({
+      scene: request,
+      generation: 'stage-camera',
+      visible: needsPlan,
+      playing: false,
+      interacting: false,
+      frameRate: null,
+      detailedPaused: false,
+      pausedTime: 0,
+    });
+  }, [owner, request, needsPlan]);
+  const ready =
+    !needsPlan || (completed?.owner === owner.identity && completed.request === request);
+  const lastCamera = useRef<{ owner: object; camera: QuickEditCameraTransform } | null>(null);
   // Evaluate the complete composition with the draft pose, without preparing new playback plans.
   const displayedRegions = manualCamera
     ? regions.map((region) =>
@@ -160,15 +223,21 @@ function useReviewStageCamera(
           : region
       )
     : regions;
-  const camera: QuickEditCameraTransform = displayedRegions.length
-    ? evaluateQuickEditCameraAtTime(displayedRegions, props.outputTime, cameraScene)
-    : { scale: 1, centerX: 0.5, centerY: 0.5 };
-  return { camera, regions };
+  const camera: QuickEditCameraTransform = !ready
+    ? lastCamera.current?.owner === owner.identity
+      ? lastCamera.current.camera
+      : { scale: 1, centerX: 0.5, centerY: 0.5 }
+    : displayedRegions.length
+      ? evaluateQuickEditCameraAtTime(displayedRegions, props.outputTime, cameraScene)
+      : { scale: 1, centerX: 0.5, centerY: 0.5 };
+  if (ready) lastCamera.current = { owner: owner.identity, camera };
+  const retained = !ready && completed?.owner === owner.identity ? completed.request : request;
+  return { camera, regions: retained.regions, sceneInput: retained.input };
 }
 
 export function ReviewStageBinding(props: ReviewStageBindingProps) {
-  const image = useReviewBackgroundImage(props.background, props.backgroundPending);
-  const { camera, regions } = useReviewStageCamera(props);
+  const { camera, regions, sceneInput } = useReviewStageCamera(props);
+  const image = useReviewBackgroundImage(sceneInput.background, props.backgroundPending);
   const geometryRef = useRef<{
     output: { width: number; height: number };
     projection?:
@@ -233,10 +302,10 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         drawing={props.drawing}
         region={props.region}
         scene={{
-          background: props.background,
+          background: sceneInput.background,
           camera,
-          canvas: props.canvas,
-          windowHeader: props.windowHeader,
+          canvas: sceneInput.canvas,
+          windowHeader: sceneInput.windowHeader,
           focus: { regions, time: props.outputTime },
         }}
         {...(props.zoomOverlay ? { zoom: props.zoomOverlay } : {})}

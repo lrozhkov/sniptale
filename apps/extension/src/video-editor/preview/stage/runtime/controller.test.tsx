@@ -30,6 +30,7 @@ function Harness(props: PreviewStageProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   usePreviewStageCanvasRender({
     canvasRef,
+    onCameraPresented: runtime.render.onCameraPresented,
     stageRef: runtime.surface.stageRef,
     activeClips: runtime.surface.activeClips,
     assetUrls: props.assetUrls,
@@ -47,6 +48,13 @@ function Harness(props: PreviewStageProps) {
   return (
     <div ref={runtime.surface.stageRef}>
       <canvas ref={canvasRef} />
+      <button
+        data-test="begin-gesture"
+        onPointerDown={(event) => {
+          const clip = runtime.surface.activeClips[0];
+          if (clip) runtime.surface.beginInteraction(event, clip, 'move');
+        }}
+      />
     </div>
   );
 }
@@ -167,4 +175,132 @@ it('invalidates when an optional render property is removed', async () => {
   scheduler.enqueue.mockClear();
   await render(input);
   expect(scheduler.enqueue).toHaveBeenCalledOnce();
+});
+
+it('does not prepare the composition camera while rendering inspector project changes', async () => {
+  const composition = await import('../../../../features/video/composition/timeline/frame');
+  const spy = vi.spyOn(composition, 'resolveVideoCompositionFrame');
+  const input = props();
+  await render(input);
+  await render({ ...input, project: { ...input.project, backgroundColor: '#123456' } });
+  expect(spy).not.toHaveBeenCalled();
+  spy.mockRestore();
+});
+
+it('uses the accepted scene camera for overlays without enqueueing another frame', async () => {
+  await render(props());
+  const job = scheduler.enqueue.mock.lastCall![0];
+  const camera = {
+    viewportX: 30,
+    viewportY: 20,
+    viewportWidth: 100,
+    viewportHeight: 80,
+    focusPoint: { x: 80, y: 60 },
+    scale: 2,
+    regionId: 'accepted',
+    motionBlurAmount: 0,
+  };
+  scheduler.enqueue.mockClear();
+  act(() => job.onCameraPresented?.(camera, job.currentTime));
+  expect(latest.surface.camera).toBe(camera);
+  expect(scheduler.enqueue).not.toHaveBeenCalled();
+});
+
+it('blocks a paused seek gesture until the same project and destination time are presented', async () => {
+  const surface = await import('./surface-state');
+  const begin = vi.fn();
+  const factory = vi.spyOn(surface, 'createPreviewStageInteraction').mockReturnValue(begin);
+  const input = props();
+  try {
+    await render(input);
+    const first = scheduler.enqueue.mock.lastCall![0];
+    const camera = { ...latest.surface.camera, viewportX: 30 };
+    act(() => first.onCameraPresented?.(camera, first.currentTime));
+    await render({ ...input, currentTime: 2 });
+    const destination = scheduler.enqueue.mock.lastCall![0];
+    act(() =>
+      container
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+    expect(begin).not.toHaveBeenCalled();
+    act(() => first.onCameraPresented?.(camera, first.currentTime));
+    act(() =>
+      container
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+    expect(begin).not.toHaveBeenCalled();
+    act(() => destination.onCameraPresented?.(camera, destination.currentTime));
+    act(() =>
+      container
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+    expect(begin).toHaveBeenCalledOnce();
+  } finally {
+    factory.mockRestore();
+  }
+});
+
+it('loads destination clips while a paused camera receipt is pending', async () => {
+  const input = props();
+  input.project = createProject([
+    createVideoClip({ id: 'origin', startTime: 0, duration: 1, sourceDuration: 1 }),
+    createVideoClip({ id: 'destination', startTime: 2, duration: 2, sourceDuration: 2 }),
+  ]);
+  input.currentTime = 0.5;
+  await render(input);
+  const first = scheduler.enqueue.mock.lastCall![0];
+  act(() => first.onCameraPresented?.(latest.surface.camera, first.currentTime));
+  await render({ ...input, currentTime: 2.5 });
+  expect(latest.surface.cameraInteractionEnabled).toBe(false);
+  expect(latest.surface.activeClips.map((clip) => clip.id)).toEqual(['destination']);
+  expect(latest.media.videoBankClips.map((clip) => clip.id)).toContain('destination');
+  expect(scheduler.enqueue.mock.lastCall![0].currentTime).toBe(2.5);
+});
+
+it('keeps playback handoff and its active frozen gesture usable while rendering catches up', async () => {
+  const surface = await import('./surface-state');
+  const begin = vi.fn();
+  const factory = vi
+    .spyOn(surface, 'createPreviewStageInteraction')
+    .mockImplementation((options) => (event, clip, mode) => {
+      begin(event, clip, mode);
+      options.gestureHooks?.onActivate?.(clip.id);
+      options.gestureHooks?.onCacheBypassChange?.(true);
+      options.gestureHooks?.onPreviewTransform?.(clip.id, { ...clip.transform, x: 30 });
+    });
+  const input = props();
+  input.onPausePlayback = vi.fn(() => 2);
+  try {
+    await render(input);
+    const first = scheduler.enqueue.mock.lastCall![0];
+    act(() => first.onCameraPresented?.(latest.surface.camera, first.currentTime));
+    await render({ ...input, isPlaying: true, currentTime: 2 });
+    expect(latest.surface.cameraInteractionEnabled).toBe(true);
+    act(() =>
+      container
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+    expect(begin).toHaveBeenCalledOnce();
+    expect(input.onPausePlayback).toHaveBeenCalledOnce();
+    await render({ ...input, isPlaying: false, currentTime: 2 });
+    expect(latest.cache.bypass).toBe(true);
+    expect(latest.surface.cameraInteractionEnabled).toBe(true);
+    const hooks = factory.mock.lastCall![0].gestureHooks!;
+    act(() => {
+      hooks.onRestore?.('video');
+      hooks.onSettle?.('cancel');
+      hooks.onCacheBypassChange?.(false);
+    });
+    expect(latest.cache.bypass).toBe(false);
+    expect(latest.surface.cameraInteractionEnabled).toBe(false);
+    const completed = scheduler.enqueue.mock.lastCall![0];
+    act(() => completed.onCameraPresented?.(latest.surface.camera, completed.currentTime));
+    expect(latest.surface.cameraInteractionEnabled).toBe(true);
+  } finally {
+    factory.mockRestore();
+  }
 });

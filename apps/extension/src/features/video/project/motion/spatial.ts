@@ -251,11 +251,12 @@ export function interpolateCameraSpatial(
   from: CameraSpatialSettings | null,
   to: CameraSpatialSettings,
   progress: number,
-  cursor?: { from: boolean; to: boolean }
+  cursor?: { from: boolean; to: boolean; progress?: number }
 ): CameraSpatialFrame {
   const a = activeSpatialPerspective(from, cursor?.from);
   const b = activeSpatialPerspective(to, cursor?.to);
   const t = Math.max(0, Math.min(1, progress));
+  const spatialT = cursor?.progress === undefined ? t : Math.max(0, Math.min(1, cursor.progress));
   const start = a?.enabled ? a.strength : 0;
   const end = b?.enabled ? b.strength : 0;
   const focus: { settings: CameraDepthOfField; weight: number }[] = [];
@@ -283,9 +284,9 @@ export function interpolateCameraSpatial(
     });
   }
   return {
-    rotation: interpolateRotation(a, b, t),
-    perspective: start + (end - start) * t,
-    windowMotion: (a?.enabled ? 1 - t : 0) + (b?.enabled ? t : 0),
+    rotation: interpolateRotation(a, b, spatialT),
+    perspective: start + (end - start) * spatialT,
+    windowMotion: (a?.enabled ? 1 - spatialT : 0) + (b?.enabled ? spatialT : 0),
     lockBackground: !!(a?.enabled || b?.enabled),
     focus,
   };

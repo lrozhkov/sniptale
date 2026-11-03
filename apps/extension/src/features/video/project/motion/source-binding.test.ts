@@ -7,6 +7,8 @@ import { createProject, createVideoClip } from '../timeline/project-meta.test.he
 import { createVideoProjectMotionRegion, normalizeVideoProjectMotionRegion } from './index';
 import { isExportReadyVideoProject, isHydratableVideoProject } from '../validation/root';
 import {
+  resolveMotionWindowCameraParts,
+  resolveMotionWindowCameraRegion,
   parseMotionSourceBinding,
   projectMotionSourcePhases,
   projectMotionSourceBinding,
@@ -684,4 +686,87 @@ it('keeps explicit project focus on its physical clock inside disposable source 
     expect(actual.y).toBeCloseTo(expected.y, 9);
   }
   expect(candidate).toEqual(before);
+});
+
+function rateFourWindowParts() {
+  const firstClip = createVideoClip({
+    id: 'clock:first',
+    sourceInstanceId: 'clock:source',
+    startTime: 20,
+    duration: 2,
+    sourceStart: 0,
+    playbackRate: 4,
+  });
+  const secondClip = { ...firstClip, id: 'clock:second', startTime: 22, sourceStart: 8 };
+  const project = createProject([firstClip, secondClip]);
+  project.duration = 24;
+  project.assets = project.assets.map((asset) => ({
+    ...asset,
+    metadata: { ...asset.metadata, duration: 16 },
+  }));
+  const bound = bindMotionRegionToClip(createVideoProjectMotionRegion(project, 20), firstClip);
+  const first = {
+    ...bound,
+    id: 'clock:region:first',
+    startTime: 20,
+    duration: 2,
+    zoomInDuration: 0.15,
+    zoomOutDuration: 0.15,
+    animation: { start: 0, end: 8, duration: 16 },
+    sourceBinding: {
+      ...bound.sourceBinding!,
+      animationGroupId: 'clock:group',
+      coordinateSpace: 'source-window' as const,
+    },
+  };
+  const second = {
+    ...first,
+    id: 'clock:region:second',
+    startTime: 22,
+    animation: { start: 8, end: 16, duration: 16 },
+    sourceBinding: { ...first.sourceBinding, clipId: secondClip.id },
+  };
+  project.motionRegions = [first, second];
+  return { project, first, second };
+}
+
+it('uses the admitted output clock for cursor activation across contiguous rate-four window parts', async () => {
+  const { projectCursorActivationPlan } =
+    await import('../../composition/motion/cursor-orientation');
+  const { project, first, second } = rateFourWindowParts();
+  const left = projectCursorActivationPlan(project, first),
+    right = projectCursorActivationPlan(project, second);
+  expect(left.enter?.start).toBe(20);
+  expect(left.exit?.end).toBe(24);
+  expect(right).toEqual(left);
+});
+
+it('normalizes matching parts and rejects control, geometry and continuity mismatches', () => {
+  const { project, first, second } = rateFourWindowParts();
+  first.animation = { start: 0, end: 2, duration: 4 };
+  second.animation = { start: 2, end: 4, duration: 4 };
+  expect(resolveMotionWindowCameraParts(project, second)).toEqual([first, second]);
+  expect(resolveMotionWindowCameraRegion(project, second)).toMatchObject({
+    startTime: 20,
+    duration: 4,
+    animation: { start: 0, end: 4, duration: 4 },
+  });
+  const changedControls = {
+    ...project,
+    motionRegions: [first, { ...second, scale: second.scale + 0.2 }],
+  };
+  expect(resolveMotionWindowCameraParts(changedControls, first)).toEqual([first]);
+  const changedGeometry = {
+    ...project,
+    clips: project.clips.map((clip) =>
+      clip.id === second.sourceBinding.clipId
+        ? { ...clip, transform: { ...clip.transform, x: clip.transform.x + 10 } }
+        : clip
+    ),
+  };
+  expect(resolveMotionWindowCameraParts(changedGeometry, first)).toEqual([first]);
+  const gapFirst = { ...first, animation: { start: 0, end: 2, duration: 5 } };
+  const gapSecond = { ...second, startTime: 23, animation: { start: 3, end: 5, duration: 5 } };
+  const gap = { ...project, motionRegions: [gapFirst, gapSecond] };
+  expect(resolveMotionWindowCameraRegion(gap, gapFirst)).toBe(gapFirst);
 });

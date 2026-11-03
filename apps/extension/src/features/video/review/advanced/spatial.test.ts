@@ -220,7 +220,7 @@ it('uses effective cursor spatial activation while retaining legacy and manual s
   );
 });
 
-it('uses raw observed positions outside the crop and shares history across adjacent cursor regions', () => {
+it('uses raw observed positions outside the crop and shares history across adjacent cursor regions', async () => {
   const path = (x: number): CursorFocusPath => ({
     version: 1,
     mode: 'follow',
@@ -258,7 +258,12 @@ it('uses raw observed positions outside the crop and shares history across adjac
   };
   const second = { ...first, id: 'second', start: 3, end: 6 };
   const plan = resolveReviewCursorOrientation(first)!;
-  expect(resolveReviewCursorOrientation(second)).toBe(plan);
+  const next = resolveReviewCursorOrientation(second)!;
+  expect(next).not.toBe(plan);
+  expect(plan.spans[0]!.start).toBe(0);
+  expect(plan.spans.at(-1)!.end).toBe(3);
+  expect(next.spans[0]!.start).toBe(3);
+  expect(next.spans.at(-1)!.end).toBe(6);
   const expected = createCursorOrientationPlan({
     settings: first.cursorComposition!,
     start: 0,
@@ -270,14 +275,20 @@ it('uses raw observed positions outside the crop and shares history across adjac
     ],
   });
   for (const time of [0, 0.05, 0.1, 0.3, 1, 3, 5.9]) {
-    expect(evaluateCursorOrientation(plan, time)).toEqual(
-      evaluateCursorOrientation(expected, time)
-    );
-    expect(evaluateCursorOrientation(resolveReviewCursorOrientation(second), time)).toEqual(
-      evaluateCursorOrientation(plan, time)
-    );
+    const actual = evaluateCursorOrientation(time <= 3 ? plan : next, time);
+    const reference = evaluateCursorOrientation(expected, time);
+    expect(Math.hypot(actual.x - reference.x, actual.y - reference.y)).toBeLessThanOrEqual(0.1);
   }
-  expect(evaluateCursorOrientation(plan, 5.9).y).toBeCloseTo(-22, 5);
+  expect(evaluateCursorOrientation(plan, 3)).toEqual(evaluateCursorOrientation(next, 3));
+  const { evaluateCameraTrajectoryDerivative } =
+    await import('../../composition/motion/camera-trajectory');
+  for (const order of [1, 2] as const) {
+    const left = evaluateCameraTrajectoryDerivative(plan.spans.at(-1)!, 3, order);
+    const right = evaluateCameraTrajectoryDerivative(next.spans[0]!, 3, order);
+    expect(left.x).toBeCloseTo(right.x, 9);
+    expect(left.y).toBeCloseTo(right.y, 9);
+  }
+  expect(evaluateCursorOrientation(next, 5.9).y).toBeCloseTo(-22, 5);
 });
 
 it('starts an independent Gallery response at the exact source cut without anticipating the next run', () => {

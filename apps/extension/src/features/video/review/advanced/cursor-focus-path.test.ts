@@ -426,3 +426,47 @@ it('applies current crop and path revisions after retained observation derivatio
   }
   expect(reviewCameraPlanObservations(region)).toEqual(original);
 });
+
+it('continuously centers the new Gallery cursor workflow when 3D is off', () => {
+  const path: CursorFocusPath = {
+    version: 1,
+    smoothing: 0,
+    sensitivity: 0.5,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'sweep',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 4,
+        keys: [
+          { id: 'a', time: 0, x: 0.4, y: 0.5, anchor: 'boundary', interpolation: 'linear' },
+          { id: 'b', time: 4, x: 0.5, y: 0.5, anchor: 'boundary', interpolation: 'linear' },
+        ],
+      },
+    ],
+  };
+  const region: QuickEditZoomRegion = {
+    id: 'continuous',
+    start: 0,
+    end: 4,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'linear', duration: 0 },
+    exit: { type: 'linear', duration: 0 },
+    cursorComposition: { mode: 'off', amount: 0.5, smoothness: 0 },
+    cursorFocus: {
+      scene: { source, background: { enabled: false } },
+      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('fast') }),
+      path,
+    },
+  };
+  const plan = resolveReviewSceneCameraPlan([region], region);
+  expect(plan?.status).toBe('ready');
+  if (plan?.status !== 'ready') return;
+  expect(plan.spans.filter((span) => span.kind === 'transition').length).toBeGreaterThan(2);
+  expect(
+    evaluateQuickEditCameraAtTime([region], 3).centerX -
+      evaluateQuickEditCameraAtTime([region], 1).centerX
+  ).toBeGreaterThan(0.03);
+});

@@ -1,3 +1,9 @@
+import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
+import {
+  resolveMotionWindowCameraParts,
+  resolveMotionWindowCameraRegion,
+} from '../../project/motion/source-binding';
+import { motionTransitionSettings } from '../../project/motion/timing';
 import { getSourceTimedClipProjectOffset } from '../../project/timeline/rate';
 import { createCursorResponse, compileCursorResponse } from './cursor-response';
 import { evaluateMotionSpatial } from './spatial';
@@ -24,6 +30,7 @@ import type { CursorCompositionSettings } from '../../project/motion/spatial';
 import { hasCursorComposition, cameraPerspectiveWithCursor } from '../../project/motion/spatial';
 import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
 import {
+  createCameraTrajectory,
   evaluateCameraTrajectory,
   type CameraTrajectory,
   type CameraPanPoint,
@@ -37,6 +44,112 @@ export interface CursorOrientationPlan {
 interface CursorOrientationObservation extends CameraPanPoint {
   time: number;
   segmentId?: string;
+}
+
+/** Disposable cursor-only phase; nominal zoom and authored manual perspective keep their own clocks. */
+export function createCursorActivationPlan(input: {
+  start: number;
+  end: number;
+  enterDuration: number;
+  exitDuration: number;
+  connectedIn?: boolean;
+  connectedOut?: boolean;
+  amount?: number | undefined;
+  movementDuration?: number | undefined;
+}) {
+  // Activation obeys the same movement budget as follow admission, including projective cross terms.
+  const minimumDuration =
+    Math.max(0.3, input.movementDuration ?? 0) * Math.max(1, 2 * (input.amount ?? 0.5));
+  const duration = (value: number) =>
+    value > 0 ? Math.min((input.end - input.start) / 2, Math.max(minimumDuration, value)) : 0;
+  const enterDuration = input.connectedIn ? 0 : duration(input.enterDuration);
+  const exitDuration = input.connectedOut ? 0 : duration(input.exitDuration);
+  const enter =
+    enterDuration > 0
+      ? createCameraTrajectory({
+          start: input.start,
+          end: input.start + enterDuration,
+          from: { x: 0, y: 0 },
+          to: { x: 1, y: 0 },
+        })
+      : undefined;
+  const exit =
+    exitDuration > 0
+      ? createCameraTrajectory({
+          start: input.end - exitDuration,
+          end: input.end,
+          from: { x: 1, y: 0 },
+          to: { x: 0, y: 0 },
+        })
+      : undefined;
+  return {
+    enter,
+    exit,
+    breaks: [...(enter ? [enter.start, enter.end] : []), ...(exit ? [exit.start, exit.end] : [])],
+  };
+}
+
+/** A proof cell selects the same activation polynomial that absolute rendering evaluates. */
+export function cursorActivationAt(
+  plan: ReturnType<typeof createCursorActivationPlan>,
+  time: number
+): number | CameraTrajectory {
+  if (plan.enter && time < plan.enter.end) return time < plan.enter.start ? 0 : plan.enter;
+  if (plan.exit && time > plan.exit.start) return time > plan.exit.end ? 0 : plan.exit;
+  return 1;
+}
+
+/** Exact output-clock activation value; no state survives a seek. */
+export function evaluateCursorActivation(
+  plan: ReturnType<typeof createCursorActivationPlan>,
+  time: number
+) {
+  const phase = cursorActivationAt(plan, time);
+  return typeof phase === 'number' ? phase : evaluateCameraTrajectory(phase, time).x;
+}
+
+function projectCursorClockRange(project: VideoProject, region: VideoProjectMotionRegion) {
+  if (region.sourceBinding?.coordinateSpace === 'source-window') {
+    const normalized = resolveMotionWindowCameraRegion(project, region);
+    return { start: normalized.startTime, end: normalized.startTime + normalized.duration };
+  }
+  const start = region.startTime - (region.animation?.start ?? 0);
+  return { start, end: start + (region.animation?.duration ?? region.duration) };
+}
+
+/** Source projections retain the complete camera animation clock across clip slices. */
+export function projectCursorActivationPlan(
+  project: VideoProject,
+  region: VideoProjectMotionRegion
+) {
+  const { start, end } = projectCursorClockRange(project, region);
+  const group = region.sourceBinding?.animationGroupId;
+  const members =
+    region.sourceBinding?.coordinateSpace === 'source-window'
+      ? resolveMotionWindowCameraParts(project, region)
+      : (project.motionRegions ?? []).filter(
+          (item) =>
+            item.id === region.id || (group && item.sourceBinding?.animationGroupId === group)
+        );
+  const ids = new Set(members.map((item) => item.id));
+  const policy = resolveCameraFollowPolicy({
+    ...(project.cameraFollowDefaults ? { defaults: project.cameraFollowDefaults } : {}),
+    ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
+  });
+  return createCursorActivationPlan({
+    start,
+    end,
+    amount: region.cursorComposition?.amount,
+    movementDuration: policy.settings.transitionDuration,
+    enterDuration: motionTransitionSettings(region, 'enter').duration,
+    exitDuration: motionTransitionSettings(region, 'exit').duration,
+    connectedIn: members.some(
+      (item) => item.incomingConnection && !ids.has(item.incomingConnection.fromRegionId)
+    ),
+    connectedOut: (project.motionRegions ?? []).some(
+      (item) => item.incomingConnection && ids.has(item.incomingConnection.fromRegionId)
+    ),
+  });
 }
 
 /** Compile the position-driven response once, independently of camera activation and pan planning. */
@@ -100,10 +213,13 @@ export function resolveProjectCursorOrientation(
 ) {
   if (region.focusMode !== 'CURSOR' || !hasCursorComposition(region.cursorComposition))
     return undefined;
+  const { start, end } = projectCursorClockRange(project, region);
   const key = JSON.stringify({
     settings: region.cursorComposition,
     clipId: region.sourceBinding?.clipId,
     coordinateSpace: region.sourceBinding?.coordinateSpace,
+    start,
+    end,
   });
   let plans = projectPlans.get(project);
   if (!plans) {
@@ -184,9 +300,20 @@ export function resolveProjectCursorOrientation(
   const plan = createCursorOrientationPlan({
     settings: region.cursorComposition!,
     observations,
-    start: 0,
-    end: project.duration,
+    start,
+    end,
   });
+  if (plan)
+    plan.breaks = [
+      ...new Set([
+        ...plan.breaks,
+        ...(project.motionRegions ?? [])
+          .filter(
+            (item) => item.focusMode === 'CURSOR' && hasCursorComposition(item.cursorComposition)
+          )
+          .flatMap((item) => projectCursorActivationPlan(project, item).breaks),
+      ]),
+    ].sort((a, b) => a - b);
   plans.set(key, plan);
   return plan;
 }
@@ -246,8 +373,9 @@ export function createWindowCursorProjection(input: {
   region: CameraSpatialSettings;
   window: CameraSpatialRect;
   orientationPlan?: CursorOrientationPlan;
+  activationPlan?: ReturnType<typeof createCursorActivationPlan>;
 }) {
-  const { region, window, orientationPlan } = input;
+  const { region, window, orientationPlan, activationPlan } = input;
   const effective = orientationPlan ? cameraPerspectiveWithCursor(region, { x: 0, y: 0 }) : region;
   const pose = effective.perspective;
   const perspective =
@@ -273,7 +401,11 @@ export function createWindowCursorProjection(input: {
             ? cameraPerspectiveWithCursor(region, evaluateCursorOrientation(orientationPlan, time))
             : region,
           progress,
-          { from: false, to: !!orientationPlan }
+          {
+            from: false,
+            to: !!orientationPlan,
+            ...(activationPlan ? { progress: evaluateCursorActivation(activationPlan, time) } : {}),
+          }
         )
       );
       projections.set(key, projection);
@@ -295,7 +427,10 @@ export function projectCursorSpatial(
     project,
     null,
     projectCursorSpatialSettings(project, region, time),
-    progress
+    progress,
+    hasCursorComposition(region.cursorComposition)
+      ? evaluateCursorActivation(projectCursorActivationPlan(project, region), time)
+      : undefined
   );
 }
 
@@ -327,6 +462,7 @@ export function createProjectCursorProjection(input: {
   phaseAt(time: number): number | CameraTrajectory;
 }) {
   const { project, region, orientationPlan, window, output, offset, phaseAt } = input;
+  const activationPlan = orientationPlan ? projectCursorActivationPlan(project, region) : undefined;
   const ref = region.spatialReference ?? { x: 0, y: 0, width: 1, height: 1 };
   const reference = {
     x: ref.x * window.width,
@@ -355,7 +491,8 @@ export function createProjectCursorProjection(input: {
       project,
       null,
       projectCursorSpatialSettings(project, region, time),
-      progress
+      progress,
+      activationPlan ? evaluateCursorActivation(activationPlan, time) : undefined
     )!;
     const scale = 1 + (targetScale - 1) * progress;
     const projection = quickEditPlaneProjection(
@@ -391,7 +528,16 @@ export function createProjectCursorProjection(input: {
         targetScale,
         pan,
         perspective,
-        ...(orbit ? { orbit: { angles: orbit } } : {}),
+        ...(orbit
+          ? {
+              orbit: {
+                angles: orbit,
+                ...(activationPlan
+                  ? { phase: cursorActivationAt(activationPlan, (start + end) / 2) }
+                  : {}),
+              },
+            }
+          : {}),
         ...(trajectory ? { trajectory } : {}),
         motion: true,
         reference,

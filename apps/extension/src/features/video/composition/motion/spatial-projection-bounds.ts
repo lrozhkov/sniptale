@@ -235,7 +235,7 @@ export interface QuickEditCameraProjectionInterval {
     phase: number | CameraTrajectory;
   };
   orbit?:
-    | { angles: CameraTrajectory }
+    | { angles: CameraTrajectory; phase?: number | CameraTrajectory }
     | { from: { x: number; y: number }; to: { x: number; y: number } };
   targetScale: number;
   phase: number | CameraTrajectory;
@@ -267,6 +267,16 @@ function projectionPhaseJet(
   return motion ? trajectoryJet(bounds, 'x') : boxed([bounds[0]!.minX, bounds[0]!.maxX]);
 }
 
+function cursorActivationJet(
+  input: Pick<QuickEditCameraProjectionInterval, 'orbit' | 'start' | 'end'>,
+  nominal: ProjectionJet,
+  motion: boolean
+) {
+  return input.orbit && 'angles' in input.orbit && input.orbit.phase !== undefined
+    ? projectionPhaseJet(input.orbit.phase, input.start, input.end, motion)
+    : nominal;
+}
+
 function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boolean) {
   const g = projectionPhaseJet(input.phase, input.start, input.end, motion);
   const panBounds =
@@ -286,6 +296,7 @@ function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boo
     ty = translation('y');
   const scale = add(constant(startScale), multiply(constant(input.targetScale - startScale), g));
   const startWeight = input.from?.windowMotion ?? 0;
+  const activation = cursorActivationJet(input, g, motion);
   const weight =
     input.windowWeight === 'window'
       ? constant(1)
@@ -293,7 +304,7 @@ function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boo
         ? constant(0)
         : add(
             constant(startWeight),
-            multiply(constant((input.targetWindowMotion ?? 1) - startWeight), g)
+            multiply(constant((input.targetWindowMotion ?? 1) - startWeight), activation)
           );
   const k = add(constant(1), multiply(weight, subtract(scale, constant(1))));
   const inverseK = reciprocal(k);
@@ -445,11 +456,12 @@ function projectPlaneJets(
   motion = false
 ) {
   const windowRect = input.window;
+  const activation = cursorActivationJet(input, g, motion);
   const angle = (axis: 'rotateX' | 'rotateY' | 'rotateZ') => {
     const start = input.from?.perspective[axis] ?? 0;
     const delta = input.perspective[axis] - start;
     const arc = axis === 'rotateZ' ? ((delta + 540) % 360) - 180 : delta;
-    let angle = add(constant(start), multiply(constant(arc), g));
+    let angle = add(constant(start), multiply(constant(arc), activation));
     if (input.orbit && axis !== 'rotateZ') {
       const coordinate = axis === 'rotateX' ? 'x' : 'y';
       const orbit = input.orbit;
@@ -471,7 +483,7 @@ function projectPlaneJets(
               constant(orbit.from[coordinate]),
               multiply(g, constant(orbit.to[coordinate] - orbit.from[coordinate]))
             );
-      const contribution = 'angles' in orbit ? multiply(g, offset) : offset;
+      const contribution = 'angles' in orbit ? multiply(activation, offset) : offset;
       // The complete cursor contribution, including its phase envelope, is added follow movement.
       angle = add(angle, { ...contribution, nominal: zeros, follow: contribution.derivatives });
     }
@@ -497,7 +509,10 @@ function projectPlaneJets(
   const startStrength = input.from?.perspective.strength ?? 0;
   const focal = multiply(
     constant(0.7 / Math.hypot(windowRect.width, windowRect.height)),
-    add(constant(startStrength), multiply(constant(input.perspective.strength - startStrength), g))
+    add(
+      constant(startStrength),
+      multiply(constant(input.perspective.strength - startStrength), activation)
+    )
   );
   const denominator = subtract(
     constant(1),

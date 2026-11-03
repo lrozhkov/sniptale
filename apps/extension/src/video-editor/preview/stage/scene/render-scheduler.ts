@@ -1,7 +1,9 @@
 import type { renderPreviewScene } from './render-preview';
+import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 
 export type PreviewSceneRenderJob = Parameters<typeof renderPreviewScene>[0] & {
   controller: AbortController;
+  onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   isEffectRuntimeFrame: boolean;
   isPlaybackFrame: boolean;
   renderGeneration: number;
@@ -17,6 +19,7 @@ interface PreviewSceneRenderSchedulerState {
   lastPlaybackRenderStartedAt: number | null;
   pendingJob: PreviewSceneRenderJob | null;
   scheduledStartTimeout: ReturnType<typeof setTimeout> | null;
+  scheduledStartFrame: number | null;
 }
 
 interface PreviewSceneRenderSchedulerOptions {
@@ -33,6 +36,7 @@ export function createPreviewSceneRenderScheduler(
     lastPlaybackRenderStartedAt: null,
     pendingJob: null,
     scheduledStartTimeout: null,
+    scheduledStartFrame: null,
   };
 
   return {
@@ -123,10 +127,25 @@ function scheduleNextPreviewSceneRender(
   state: PreviewSceneRenderSchedulerState,
   args: PreviewSceneRenderSchedulerOptions
 ): void {
-  if (state.activeJob || !state.pendingJob || state.scheduledStartTimeout) {
+  if (
+    state.activeJob ||
+    !state.pendingJob ||
+    state.scheduledStartTimeout !== null ||
+    state.scheduledStartFrame !== null
+  ) {
     return;
   }
   const waitMs = resolveNextPreviewRenderDelay(state);
+  if (!state.pendingJob.isPlaybackFrame) {
+    state.scheduledStartFrame = requestAnimationFrame(() => {
+      state.scheduledStartFrame = null;
+      state.scheduledStartTimeout = setTimeout(() => {
+        state.scheduledStartTimeout = null;
+        startNextPreviewSceneRender(state, args);
+      }, 0);
+    });
+    return;
+  }
   if (waitMs <= 0) {
     startNextPreviewSceneRender(state, args);
     return;
@@ -146,7 +165,11 @@ function resolveNextPreviewRenderDelay(state: PreviewSceneRenderSchedulerState):
 }
 
 function clearScheduledStart(state: PreviewSceneRenderSchedulerState): void {
-  if (state.scheduledStartTimeout) {
+  if (state.scheduledStartFrame !== null) {
+    cancelAnimationFrame(state.scheduledStartFrame);
+    state.scheduledStartFrame = null;
+  }
+  if (state.scheduledStartTimeout !== null) {
     clearTimeout(state.scheduledStartTimeout);
     state.scheduledStartTimeout = null;
   }

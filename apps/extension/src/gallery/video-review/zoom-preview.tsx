@@ -1,4 +1,3 @@
-import { evaluateReviewFollowCursor } from '../../features/video/review/advanced/cursor-focus-path';
 import {
   quickEditPlaneProjection,
   quickEditProjectionCss,
@@ -14,8 +13,6 @@ import {
   ReviewSpatialToolContext,
 } from './spatial-controls';
 import type { SpatialTool, SpatialAxis } from './spatial-gesture';
-import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
-import { resolveQuickEditFocusLink } from '../../features/video/review/advanced/focus-layout';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { ReviewBorderOverlay } from './border-overlay';
@@ -26,6 +23,11 @@ import { useReviewWindowHeader } from './use-window-header';
 import { ZoomPreviewCanvas } from './zoom-preview-canvas';
 import { ReviewSpotlightPreview } from './spotlight-preview';
 import { useContext, useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  usePreparedZoomCamera,
+  type PreparedZoomCamera,
+  type ZoomPreviewProps,
+} from './zoom-preview-camera';
 import { useReviewBackgroundImage } from './use-review-background';
 import { translate } from '../../platform/i18n';
 import type {
@@ -34,108 +36,23 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneCamera,
-  resolveReviewCameraGeometry,
-  resolveReviewSceneCameraPlan,
-  resolveReviewCameraConflicts,
   computeQuickEditSpatialWindow,
   computeQuickEditSourceWindowTransform,
   computeQuickEditSceneLayout,
   quickEditCropCamera,
   computeQuickEditSceneSize,
 } from '../../features/video/review/advanced/scene';
-import {
-  createQuickEditZoomRegion,
-  type QuickEditZoomRegionPatch,
-} from '../../features/video/review/advanced/zoom';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { ReviewButton } from './controls';
 import { previewBackgroundPaint } from './zoom-preview-paint';
-import { useZoomPreviewFrame, type ZoomPreviewFrameLoader } from './use-zoom-preview-source';
+import { useZoomPreviewFrame } from './use-zoom-preview-source';
 
 /** Bounded canvas size; scene geometry scales padding into these output pixels. */
 const PREVIEW_WIDTH_PX = 480;
-/**
- * Selected-region framing preview: the real source frame at the region midpoint, the
- * scene layout the export applies (background padding plus fitted video), and the zoom
- * footprint through one interactive canvas.
- */
-type ZoomPreviewProps = {
-  region: QuickEditZoomRegion;
-  cursorFollowing?: boolean;
-  spatialEdit?: {
-    region: QuickEditZoomRegion;
-    revision: string;
-    enabled?: boolean;
-    onCommit(revision: string, patch: QuickEditZoomRegionPatch): void;
-  };
-  focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
-  background: QuickEditBackgroundSettings;
-  source: { width: number; height: number };
-  canvas?: { width: number; height: number } | undefined;
-  windowHeader?:
-    | import('../../features/video/review/advanced/types').QuickEditWindowHeader
-    | undefined;
-  /** Result-time region midpoint mapped through cuts/speed; null while it has no frame. */
-  sourceTime: number | null;
-  loadFrame: ZoomPreviewFrameLoader | null;
-  /** Read-only transport sample while playing; paused editing retains the selected target. */
-  playback?: { video: HTMLVideoElement; camera: QuickEditZoomRegion['transform'] } | undefined;
-  onInteract?: ((sourceTime: number) => void) | undefined;
-  onChange(patch: QuickEditZoomRegionPatch): void;
-  onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
-  disabled?: boolean;
-};
-
-function resolvePreviewCameraAdmission(props: ZoomPreviewProps) {
-  const region = props.region;
-  const followRegion =
-    !region.border && !region.spotlight
-      ? props.focus?.regions.find(
-          (item) => item.id === region.id || item.id.startsWith(`${region.id}:slice:`)
-        )
-      : undefined;
-  const followGeometry =
-    followRegion &&
-    resolveReviewCameraGeometry(props.focus?.regions ?? [followRegion], followRegion, {
-      source: props.source,
-      canvas: props.canvas,
-      windowHeader: props.windowHeader,
-      background: props.background,
-    });
-  const followPlan =
-    followRegion && followGeometry
-      ? resolveReviewSceneCameraPlan(props.focus?.regions ?? [followRegion], followRegion, {
-          source: props.source,
-          canvas: props.canvas,
-          windowHeader: props.windowHeader,
-          background: props.background,
-        })
-      : null;
-
-  const topology = props.focus?.regions ?? [region];
-  const outgoing = resolveQuickEditFocusLink(topology, followRegion?.id ?? region.id);
-  const incoming = topology.find(
-    (item) =>
-      resolveQuickEditFocusLink(topology, item.id)?.target.id === (followRegion?.id ?? region.id)
-  );
-  const cameraConflicts = topology.some((item) => item.cursorFocus)
-    ? resolveReviewCameraConflicts(
-        topology,
-        {
-          source: props.source,
-          canvas: props.canvas,
-          windowHeader: props.windowHeader,
-          background: props.background,
-        },
-        { start: incoming?.end ?? region.start, end: outgoing?.target.start ?? region.end }
-      )
-    : [];
-  return { followPlan, cameraConflicts };
-}
-
 function PreviewCameraFollowStatus(props: {
-  cameraConflicts: ReturnType<typeof resolvePreviewCameraAdmission>['cameraConflicts'];
-  followPlan: ReturnType<typeof resolvePreviewCameraAdmission>['followPlan'];
+  cameraConflicts: PreparedZoomCamera['admission']['cameraConflicts'];
+  followPlan: PreparedZoomCamera['admission']['followPlan'];
   nominalScale: number;
 }) {
   const { cameraConflicts, followPlan, nominalScale } = props;
@@ -165,7 +82,51 @@ function resolvePreviewInteraction(
   };
 }
 
+/**
+ * Selected-region framing preview: the real source frame at the region midpoint, the
+ * scene layout the export applies (background padding plus fitted video), and the zoom
+ * footprint through one interactive canvas.
+ */
 export function ReviewZoomPreview(props: ZoomPreviewProps) {
+  const prepared = usePreparedZoomCamera(props);
+  if (!prepared.value)
+    return (
+      <section
+        data-ui="gallery.videoReview.zoomPreview"
+        data-status={prepared.failed ? 'failed' : 'loading'}
+        aria-label={translate('gallery.videoReview.zoomPreview')}
+      >
+        <ZoomPreviewFeedback
+          status={prepared.failed ? 'failed' : 'loading'}
+          imageFailed={false}
+          onRetry={prepared.retry}
+        />
+      </section>
+    );
+  const snapshot = prepared.value.snapshot;
+  return (
+    <PreparedZoomPreview
+      {...snapshot}
+      disabled={props.disabled || prepared.pending}
+      {...(props.cursorFollowing === undefined ? {} : { cursorFollowing: props.cursorFollowing })}
+      onChange={props.onChange}
+      onPreview={props.onPreview}
+      onInteract={props.onInteract}
+      {...(props.spatialEdit ? { spatialEdit: props.spatialEdit } : {})}
+      preparationFailed={prepared.failed}
+      retryPreparation={prepared.retry}
+      prepared={prepared.value}
+    />
+  );
+}
+
+function PreparedZoomPreview(
+  props: ZoomPreviewProps & {
+    prepared: PreparedZoomCamera;
+    preparationFailed: boolean;
+    retryPreparation(): void;
+  }
+) {
   const { loadFrame, region, sourceTime } = props;
   const image = useReviewBackgroundImage(props.background);
   const header = useReviewWindowHeader(props.windowHeader, props.source.width, props.source.height);
@@ -174,24 +135,23 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
   const bounds = useRef<HTMLDivElement>(null);
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
   const playback = props.playback;
-  const camera = resolvePreviewCamera(props);
-  const { followPlan, cameraConflicts } = resolvePreviewCameraAdmission(props);
+  const camera = props.prepared.camera;
   const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(props, camera);
-  const previewStatus = playback ? 'ready' : status;
+  const previewStatus = props.preparationFailed ? 'failed' : playback ? 'ready' : status;
   const { positionInteractive, spatialInteractive } = resolvePreviewInteraction(props, status);
   const background = props.background;
-  const resultOverlays =
-    !overlay && (view === 'result' || playback)
-      ? resolveZoomResultOverlays({
-          region,
-          focus: props.focus,
-          background,
-          output,
-          layout,
-          scale: previewScale * camera.scale,
-          cornerRadius,
-        })
-      : null;
+  const resultOverlays = resolveZoomResultOverlays({
+    region,
+    focus: props.focus,
+    background,
+    output,
+    layout,
+    scale: previewScale * camera.scale,
+    cornerRadius,
+    view,
+    overlay,
+    playing: !!playback,
+  });
   const authoredCenter = (patch: { centerX: number; centerY: number; scale?: number }) => {
     const mapped = quickEditCropCamera({ ...camera, ...patch }, props, true);
     return { ...patch, centerX: mapped.centerX, centerY: mapped.centerY };
@@ -220,21 +180,14 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
       aria-label={translate('gallery.videoReview.zoomPreview')}
       className="space-y-2"
     >
-      <PreviewCameraFollowStatus
-        cameraConflicts={cameraConflicts}
-        followPlan={followPlan}
-        nominalScale={region.transform.scale}
+      <ZoomPreviewNavigation
+        region={region}
+        cursorFollowing={props.cursorFollowing}
+        edit={props.spatialEdit}
+        controls={controls}
+        interactive={spatialInteractive}
+        admission={props.prepared.admission}
       />
-      {overlay || !props.spatialEdit || props.cursorFollowing ? (
-        <ZoomPreviewHeading region={region} controls={controls} />
-      ) : null}
-      {!overlay && props.spatialEdit && !props.cursorFollowing ? (
-        <ZoomPreviewTools
-          controls={controls}
-          edit={props.spatialEdit}
-          interactive={spatialInteractive}
-        />
-      ) : null}
       <div
         ref={bounds}
         {...previewInteractionHandlers(
@@ -265,22 +218,17 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
             onPreview={(patch) => props.onPreview?.(patch ? authoredCenter(patch) : null)}
           />
         )}
-        {!overlay && (view === 'result' || playback) ? (
-          <ReviewMotionBlurPreview
-            scene={props}
-            hasSpatialBase={view === 'result'}
-            focus={props.focus}
-            camera={camera}
-            layout={layout}
-            output={output}
-            background={background}
-            imageUrl={image.url}
-            headerImage={header.image}
-            sceneScale={previewScale}
-            getFrame={() => playback?.video ?? frame?.image ?? null}
-          />
-        ) : null}
-        {resultOverlays ? <ZoomResultOverlays value={resultOverlays} /> : null}
+        <ZoomPreviewResultLayers
+          scene={props}
+          view={view}
+          overlay={overlay}
+          camera={camera}
+          geometry={{ output, layout, previewScale, cornerRadius }}
+          imageUrl={image.url}
+          headerImage={header.image}
+          frame={frame}
+          result={resultOverlays}
+        />
         {!overlay && props.spatialEdit && tool !== 'position' ? (
           <ZoomSpatialEditor
             edit={props.spatialEdit}
@@ -305,9 +253,73 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
           image.retry();
           header.retry();
           retry();
+          props.retryPreparation();
         }}
       />
     </section>
+  );
+}
+
+/** Result decoration owns blur and composed masks separately from interactive canvas gestures. */
+function ZoomPreviewResultLayers(props: {
+  scene: ZoomPreviewProps;
+  view: 'area' | 'result';
+  overlay: boolean;
+  camera: PreparedZoomCamera['camera'];
+  geometry: ReturnType<typeof useZoomPreviewGeometry>;
+  imageUrl: ReturnType<typeof useReviewBackgroundImage>['url'];
+  headerImage: ReturnType<typeof useReviewWindowHeader>['image'];
+  frame: ReturnType<typeof useZoomPreviewFrame>['frame'];
+  result: ReturnType<typeof resolveZoomResultOverlays> | null;
+}) {
+  const { scene, view, overlay, camera, geometry, imageUrl, headerImage, frame, result } = props;
+  const playback = scene.playback;
+  return (
+    <>
+      {!overlay && (view === 'result' || playback) ? (
+        <ReviewMotionBlurPreview
+          scene={scene}
+          hasSpatialBase={view === 'result'}
+          focus={scene.focus}
+          camera={camera}
+          layout={geometry.layout}
+          output={geometry.output}
+          background={scene.background}
+          imageUrl={imageUrl}
+          headerImage={headerImage}
+          sceneScale={geometry.previewScale}
+          getFrame={() => playback?.video ?? frame?.image ?? null}
+        />
+      ) : null}
+      {result ? <ZoomResultOverlays value={result} /> : null}
+    </>
+  );
+}
+
+/** Tool navigation follows accepted availability without changing the canvas lifecycle. */
+function ZoomPreviewNavigation(props: {
+  region: QuickEditZoomRegion;
+  cursorFollowing: ZoomPreviewProps['cursorFollowing'];
+  edit: ZoomPreviewProps['spatialEdit'];
+  controls: ReturnType<typeof usePreviewToolSelection>;
+  interactive: boolean;
+  admission: PreparedZoomCamera['admission'];
+}) {
+  const { overlay } = props.controls;
+  return (
+    <>
+      <PreviewCameraFollowStatus {...props.admission} nominalScale={props.region.transform.scale} />
+      {overlay || !props.edit || props.cursorFollowing ? (
+        <ZoomPreviewHeading region={props.region} controls={props.controls} />
+      ) : null}
+      {!overlay && props.edit && !props.cursorFollowing ? (
+        <ZoomPreviewTools
+          controls={props.controls}
+          edit={props.edit}
+          interactive={props.interactive}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -553,45 +565,11 @@ function ZoomPreviewHeading(props: {
   );
 }
 
-/** Overlay framing stays unzoomed; Zoom follows the sampled playback camera. */
-function resolvePreviewCamera(props: ZoomPreviewProps) {
-  if (props.region.spotlight || props.region.border)
-    return { scale: 1, centerX: 0.5, centerY: 0.5 };
-  if (props.playback) return props.playback.camera;
-  const time = props.focus?.time ?? (props.region.start + props.region.end) / 2;
-  const effective = props.focus?.regions.find(
-    (region) =>
-      (region.id === props.region.id || region.id.startsWith(`${props.region.id}:slice:`)) &&
-      time >= region.start &&
-      time < region.end
-  );
-  const target = quickEditCropCamera(
-    quickEditSpatialTargetCamera(effective ?? props.region, time),
-    props
-  );
-  return effective
-    ? evaluateReviewFollowCursor(
-        effective,
-        time,
-        target,
-        resolveReviewCameraGeometry(props.focus?.regions ?? [effective], effective, {
-          source: props.source,
-          canvas: props.canvas,
-          windowHeader: props.windowHeader,
-          background: props.background,
-        }),
-        resolveReviewSceneCameraPlan(props.focus?.regions ?? [effective], effective, {
-          source: props.source,
-          canvas: props.canvas,
-          windowHeader: props.windowHeader,
-          background: props.background,
-        }) ?? undefined
-      )
-    : target;
-}
-
 /** Results composite all sampled masks before source-attached strokes in the same window. */
 function resolveZoomResultOverlays(props: {
+  view: 'area' | 'result';
+  overlay: boolean;
+  playing: boolean;
   region: QuickEditZoomRegion;
   focus: ZoomPreviewProps['focus'];
   background: QuickEditBackgroundSettings;
@@ -605,7 +583,8 @@ function resolveZoomResultOverlays(props: {
   borders: ReturnType<typeof evaluateQuickEditBordersAtTime>;
   clip: { rect: { x: number; y: number; width: number; height: number }; radius: number };
   projection: ReturnType<typeof quickEditPlaneProjection> | undefined;
-} {
+} | null {
+  if (props.overlay || (props.view !== 'result' && !props.playing)) return null;
   const sample = {
     regions: props.focus?.regions ?? [props.region],
     time: props.focus?.time ?? (props.region.start + props.region.end) / 2,
@@ -635,7 +614,9 @@ function resolveZoomResultOverlays(props: {
   };
 }
 
-function ZoomResultOverlays(props: { value: ReturnType<typeof resolveZoomResultOverlays> }) {
+function ZoomResultOverlays(props: {
+  value: NonNullable<ReturnType<typeof resolveZoomResultOverlays>>;
+}) {
   const { spotlights, borders, clip, projection, output } = props.value;
   return (
     <>

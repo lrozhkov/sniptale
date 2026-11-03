@@ -44,6 +44,34 @@ interface Dependencies<Scene, Prepared, Captured, Completed> {
   onError(error: unknown): void;
 }
 
+/** Admit preparation in a task after the next paint; cancellation owns both browser callbacks. */
+export function createReviewPresentationPaintClock() {
+  let nextId = 0;
+  const ticks = new Map<number, { frame: number; task?: ReturnType<typeof setTimeout> }>();
+  return {
+    requestTick(callback: () => void) {
+      const id = ++nextId;
+      const tick: { frame: number; task?: ReturnType<typeof setTimeout> } = {
+        frame: requestAnimationFrame(() => {
+          tick.task = setTimeout(() => {
+            ticks.delete(id);
+            callback();
+          }, 0);
+        }),
+      };
+      ticks.set(id, tick);
+      return id;
+    },
+    cancelTick(id: number) {
+      const tick = ticks.get(id);
+      if (!tick) return;
+      cancelAnimationFrame(tick.frame);
+      if (tick.task !== undefined) clearTimeout(tick.task);
+      ticks.delete(id);
+    },
+  };
+}
+
 /** One preparation and one pending description; native transport remains an injected read. */
 export function createReviewPreviewPresentation<Scene, Prepared, Captured, Completed>(
   dependencies: Dependencies<Scene, Prepared, Captured, Completed>

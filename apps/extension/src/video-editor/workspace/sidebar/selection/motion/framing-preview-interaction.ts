@@ -10,12 +10,8 @@ import {
   resolveSourceWindowCamera,
   resolveMotionSourceWindow,
 } from '../../../../../features/video/composition/motion/source-window';
-import { evaluateMotionSpatial } from '../../../../../features/video/composition/motion/spatial';
 import { useEffect, useRef, useState } from 'react';
-import {
-  createMotionFocusAreaFromPointScale,
-  resolveMotionOverlayZoomMode,
-} from '../../../../../features/video/project/motion';
+import { createMotionFocusAreaFromPointScale } from '../../../../../features/video/project/motion';
 import {
   clampFocusAreaSize,
   normalizeMotionFocusArea,
@@ -27,7 +23,7 @@ import {
   type VideoProjectMotionArea,
 } from '../../../../../features/video/project/types';
 import { resolveCameraViewportFrame } from '../../../../../features/video/composition/motion/viewport';
-import { resolveVideoCompositionCamera } from '../../../../../features/video/composition/motion';
+import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
 type AreaGesture = { area: VideoProjectMotionArea; start: Point; corner: Corner | null };
@@ -41,7 +37,11 @@ export interface FramingPreviewProps {
   onCommitArea?: (area: VideoProjectMotionArea) => void;
 }
 
-export function useFramingInteraction(props: FramingPreviewProps, overview = true) {
+export function useFramingInteraction(
+  props: FramingPreviewProps,
+  overview = true,
+  cursorViewport?: VideoCompositionCameraState
+) {
   const { project, region, assetUrls } = props;
   const targetAvailable =
     region.sourceBinding?.coordinateSpace !== 'source-window' ||
@@ -60,7 +60,8 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
     draft,
     areaDraft,
     overview,
-    gesture.current.world
+    gesture.current.world,
+    cursorViewport
   );
 
   useEffect(() => {
@@ -111,25 +112,11 @@ export function useFramingInteraction(props: FramingPreviewProps, overview = tru
     setAreaDraft(null);
   };
 
-  const spatial = overview ? undefined : evaluateMotionSpatial(project, null, region, 1);
   return {
     areaMode,
     areaPoints: area
       ? motionWindowAreaPoints(project, region, area, region.startTime + region.duration / 2)
       : null,
-    camera: {
-      ...(spatial ? { spatial } : {}),
-      viewportX: left,
-      viewportY: top,
-      viewportWidth: width,
-      viewportHeight: height,
-      focusPoint: { x: left + width / 2, y: top + height / 2 },
-      scale: project.width / width,
-      regionId: region.id,
-      motionBlurAmount: 0,
-      overlayZoomMode: resolveMotionOverlayZoomMode(region.overlayZoomMode),
-      ...(!overview && region.sourceBinding?.coordinateSpace === 'source-window' ? viewport : {}),
-    },
     viewport,
     left,
     top,
@@ -320,27 +307,16 @@ function resolveFramingView(
   draft: Point | null,
   areaDraft: VideoProjectMotionArea | null,
   overview: boolean,
-  fixedWorld: { left: number; top: number; width: number; height: number } | null
+  fixedWorld: { left: number; top: number; width: number; height: number } | null,
+  cursorViewport?: VideoCompositionCameraState
 ) {
   if (region.focusMode === VideoMotionFocusMode.CURSOR) {
-    const viewport = resolveVideoCompositionCamera({
+    return resolveCursorFramingView(
       project,
-      currentTime: Math.min(project.duration, region.startTime + region.duration / 2),
-      actions: [],
-      cursorSample: null,
-    });
-    const width = overview ? project.width : viewport.viewportWidth;
-    const height = overview ? project.height : viewport.viewportHeight;
-    return {
-      areaMode: false,
-      area: null,
-      focus: viewport.focusPoint,
-      viewport,
-      left: overview ? 0 : viewport.viewportX,
-      top: overview ? 0 : viewport.viewportY,
-      width,
-      height,
-    };
+      overview,
+      cursorViewport ??
+        resolveCameraViewportFrame(project, { x: project.width / 2, y: project.height / 2 }, 1)
+    );
   }
   const areaMode = region.focusMode === VideoMotionFocusMode.MANUAL_AREA;
   const area = areaMode
@@ -387,4 +363,25 @@ function resolveFramingView(
   if (overview && fixedWorld) ({ left, top, width, height } = fixedWorld);
 
   return { areaMode, area, focus, viewport, left, top, width, height };
+}
+
+/** The admitted cursor viewport owns both the displayed world and its render camera. */
+export function resolveCursorFramingView(
+  project: VideoProject,
+  overview: boolean,
+  viewport: ReturnType<typeof resolveCameraViewportFrame> & { focusPoint?: Point }
+) {
+  return {
+    areaMode: false,
+    area: null,
+    focus: viewport.focusPoint ?? {
+      x: viewport.viewportX + viewport.viewportWidth / 2,
+      y: viewport.viewportY + viewport.viewportHeight / 2,
+    },
+    viewport,
+    left: overview ? 0 : viewport.viewportX,
+    top: overview ? 0 : viewport.viewportY,
+    width: overview ? project.width : viewport.viewportWidth,
+    height: overview ? project.height : viewport.viewportHeight,
+  };
 }

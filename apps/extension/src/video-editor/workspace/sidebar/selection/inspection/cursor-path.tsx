@@ -8,7 +8,7 @@ import {
   resolveCameraFollowPolicy,
   type CameraFollowSettings,
 } from '../../../../../features/video/project/camera/cursor-policy';
-import { SliderField } from '../shared/sliders';
+import { DraftNumericRow } from '../../../../../ui/compact-inspector-controls/numeric-preview';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
 import {
   projectCursorFocusTimelineKeys,
@@ -226,6 +226,7 @@ export function InspectCursorPathSettings({ project }: { project: VideoProject }
         onChange={(mode) => change({ ...path, mode })}
       />
       <InspectCameraFollowSettings
+        key={project.id}
         global
         settings={
           resolveCameraFollowPolicy({
@@ -430,7 +431,7 @@ export function InspectCameraFollowSettings(props: {
     factor = 1,
     unit: '' | '%' | 's' = ''
   ) => (
-    <NumberInput
+    <DraftNumericRow
       key={name}
       label={label(key)}
       value={settings[name] * factor}
@@ -477,7 +478,7 @@ export function InspectCameraFollowSettings(props: {
         preferenceId="camera-follow-advanced"
       >
         {props.children}
-        <SliderField
+        <DraftNumericRow
           label={label('videoEditor.sidebar.cameraZoneSize')}
           value={settings.zoneSize * 100}
           min={10}

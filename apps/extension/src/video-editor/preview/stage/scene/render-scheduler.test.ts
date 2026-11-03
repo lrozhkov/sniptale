@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
+const admit = () => vi.advanceTimersByTimeAsync(20);
 import { createPreviewSceneRenderScheduler, type PreviewSceneRenderJob } from './render-scheduler';
 
 it('runs one preview render at a time and keeps only the latest pending frame', async () => {
@@ -18,6 +22,7 @@ it('runs one preview render at a time and keeps only the latest pending frame', 
   const third = createJob(3);
 
   const cleanupFirst = scheduler.enqueue(first);
+  await admit();
   scheduler.enqueue(second);
   scheduler.enqueue(third);
   cleanupFirst();
@@ -31,6 +36,7 @@ it('runs one preview render at a time and keeps only the latest pending frame', 
   await Promise.resolve();
   await Promise.resolve();
 
+  await admit();
   expect(render).toHaveBeenCalledTimes(2);
   expect(render).toHaveBeenLastCalledWith(expect.objectContaining({ currentTime: 3 }));
   expect(onError).not.toHaveBeenCalled();
@@ -147,6 +153,7 @@ it('aborts superseded active work and suppresses its stale recovery signal', asy
   const second = createJob(2);
 
   const cleanupFirst = scheduler.enqueue(first);
+  await admit();
   scheduler.enqueue(second);
   cleanupFirst();
 
@@ -157,6 +164,7 @@ it('aborts superseded active work and suppresses its stale recovery signal', asy
   await Promise.resolve();
   await Promise.resolve();
 
+  await admit();
   expect(render).toHaveBeenCalledTimes(2);
   expect(render).toHaveBeenLastCalledWith(expect.objectContaining({ currentTime: 2 }));
   expect(onError).not.toHaveBeenCalled();
@@ -194,6 +202,7 @@ it('reports recovery only after a non-aborted render succeeds', async () => {
   });
 
   scheduler.enqueue(createJob(1));
+  await admit();
   await Promise.resolve();
   await Promise.resolve();
 
@@ -237,5 +246,20 @@ it.each(['rejected', 'not-presented'])('does not count a %s playback render', as
   await Promise.resolve();
   expect(onSuccess).not.toHaveBeenCalled();
   expect(onError).toHaveBeenCalledTimes(outcome === 'rejected' ? 1 : 0);
+  scheduler.dispose();
+});
+
+it('returns before paused preparation and admits only the latest control snapshot', async () => {
+  const render = vi.fn(async () => undefined);
+  const scheduler = createPreviewSceneRenderScheduler({ onError: vi.fn(), render });
+  const first = createJob(1),
+    latest = createJob(2);
+  scheduler.enqueue(first);
+  scheduler.enqueue(latest);
+  expect(render).not.toHaveBeenCalled();
+  expect(first.controller.signal.aborted).toBe(true);
+  await admit();
+  expect(render).toHaveBeenCalledOnce();
+  expect(render).toHaveBeenCalledWith(expect.objectContaining({ currentTime: 2 }));
   scheduler.dispose();
 });
