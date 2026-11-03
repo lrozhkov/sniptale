@@ -5,6 +5,27 @@ void main() {
   gl_Position = vec4(position.x * 2.0 - 1.0, 1.0 - position.y * 2.0, 0.0, 1.0);
 }`;
 
+/** Exact level-zero path selected only when the CPU bound excludes filtering everywhere. */
+export const REVIEW_SPATIAL_BASE_FRAGMENT = `
+precision highp float;
+uniform highp sampler2D surface0;
+uniform mat3 inverseProjection;
+uniform vec2 outputSize;
+uniform vec4 sourceRect;
+vec4 transparentSample(highp sampler2D image, vec2 point, vec2 size) {
+  vec2 coverage = clamp(point * size + 0.5, 0.0, 1.0)
+                 * clamp((1.0 - point) * size + 0.5, 0.0, 1.0);
+  return texture2D(image, point) * coverage.x * coverage.y;
+}
+void main() {
+  vec2 point = vec2(gl_FragCoord.x, outputSize.y - gl_FragCoord.y);
+  vec3 projected = inverseProjection * vec3(point, 1.0);
+  if (projected.z <= 0.000001) { gl_FragColor = vec4(0.0); return; }
+  vec2 scenePoint = projected.xy / projected.z;
+  vec2 uv = (scenePoint - sourceRect.xy) / sourceRect.zw;
+  gl_FragColor = transparentSample(surface0, uv, sourceRect.zw);
+}`;
+
 export const REVIEW_SPATIAL_FRAGMENT = `
 precision highp float;
 uniform highp sampler2D surface0;
@@ -63,6 +84,7 @@ vec4 smoothLevel(highp sampler2D image, vec2 size) {
 }
 // Interpolated low-pass levels remove sparse-tap ghosts and the retained sharp center.
 vec4 filtered(float level) {
+  if (level <= 0.0) return transparentSample(surface0, uv, levelSize[0]);
   if (level < 1.0) return mix(transparentSample(surface0, uv, levelSize[0]),
                               smoothLevel(surface1, levelSize[1]), level);
   if (level < 2.0) return mix(smoothLevel(surface1, levelSize[1]), smoothLevel(surface2, levelSize[2]), level - 1.0);
