@@ -1,3 +1,9 @@
+import { resolveReviewCursorOrientation } from './cursor-focus-path';
+import {
+  createCursorOrientationPlan,
+  evaluateCursorOrientation,
+} from '../../composition/motion/cursor-orientation';
+import type { CursorFocusPath } from '../../project/cursor-focus-path/types';
 import {
   createQuickEditSpotlight,
   createQuickEditBorder,
@@ -212,4 +218,118 @@ it('uses effective cursor spatial activation while retaining legacy and manual s
   expect(quickEditRegionNeedsSpatialRenderer({ ...region, border: createQuickEditBorder() })).toBe(
     false
   );
+});
+
+it('uses raw observed positions outside the crop and shares history across adjacent cursor regions', () => {
+  const path = (x: number): CursorFocusPath => ({
+    version: 1,
+    mode: 'follow',
+    smoothing: 1,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'capture',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 6,
+        keys: [
+          { time: 0, x, y: 0.5 },
+          { time: 0.2, x: 1 - x, y: 0.5 },
+          { time: 6, x: 1 - x, y: 0.5 },
+        ].map((point, index) => ({
+          ...point,
+          id: `key${index}`,
+          anchor: 'movement',
+          interpolation: 'linear',
+        })),
+      },
+    ],
+  });
+  const first = createQuickEditZoomRegion({ id: 'first', at: 0, duration: 3 });
+  first.cursorFocus = {
+    path: path(0.9),
+    observed: path(0.1),
+    scene: {
+      source: { width: 1000, height: 600 },
+      background: createQuickEditAdvancedState().background,
+      canvas: { width: 500, height: 300, crop: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } },
+    },
+  };
+  const second = { ...first, id: 'second', start: 3, end: 6 };
+  const plan = resolveReviewCursorOrientation(first)!;
+  expect(resolveReviewCursorOrientation(second)).toBe(plan);
+  const expected = createCursorOrientationPlan({
+    settings: first.cursorComposition!,
+    start: 0,
+    end: 6,
+    observations: [
+      { time: 0, x: -0.3, y: 0.5 },
+      { time: 0.2, x: 1.3, y: 0.5 },
+      { time: 6, x: 1.3, y: 0.5 },
+    ],
+  });
+  for (const time of [0, 0.05, 0.1, 0.3, 1, 3, 5.9]) {
+    expect(evaluateCursorOrientation(plan, time)).toEqual(
+      evaluateCursorOrientation(expected, time)
+    );
+    expect(evaluateCursorOrientation(resolveReviewCursorOrientation(second), time)).toEqual(
+      evaluateCursorOrientation(plan, time)
+    );
+  }
+  expect(evaluateCursorOrientation(plan, 5.9).y).toBeCloseTo(-22, 5);
+});
+
+it('starts an independent Gallery response at the exact source cut without anticipating the next run', () => {
+  const region = createQuickEditZoomRegion({ id: 'cut', at: 0, duration: 4 });
+  const path: CursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    smoothing: 0,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'before',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 2,
+        keys: [0, 2].map((time) => ({
+          id: `a${time}`,
+          time,
+          x: 0,
+          y: 0.5,
+          anchor: 'boundary',
+          interpolation: 'linear',
+        })),
+      },
+      {
+        id: 'after',
+        binding: { kind: 'project' },
+        start: 4,
+        end: 6,
+        keys: [4, 6].map((time) => ({
+          id: `b${time}`,
+          time,
+          x: 1,
+          y: 0.5,
+          anchor: 'boundary',
+          interpolation: 'linear',
+        })),
+      },
+    ],
+  };
+  region.cursorFocus = {
+    path,
+    observed: path,
+    timeMap: [
+      { kind: 'keep', sourceStart: 0, sourceEnd: 2, resultStart: 0, resultEnd: 2, rate: 1 },
+      { kind: 'cut', sourceStart: 2, sourceEnd: 4, resultStart: 2, resultEnd: 2, rate: 1 },
+      { kind: 'keep', sourceStart: 4, sourceEnd: 6, resultStart: 2, resultEnd: 4, rate: 1 },
+    ],
+  };
+  const plan = resolveReviewCursorOrientation(region)!;
+  expect(evaluateCursorOrientation(plan, 1.99).y).toBeCloseTo(22, 9);
+  expect(evaluateCursorOrientation(plan, 2).y).toBeCloseTo(-22, 9);
+  expect(evaluateCursorOrientation(plan, 3.99).y).toBeCloseTo(-22, 9);
 });

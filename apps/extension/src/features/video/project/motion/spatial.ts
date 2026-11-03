@@ -28,6 +28,9 @@ export interface CursorCompositionSettings {
   smoothness: number;
 }
 
+/** Cursor composition keeps one focal strength across renderer and interval proof. */
+export const CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH = 1;
+
 export const DEFAULT_CURSOR_COMPOSITION: CursorCompositionSettings = {
   mode: 'orbit',
   amount: 0.5,
@@ -188,6 +191,15 @@ export function cameraPerspectiveWithCursor(
       enabled: true,
       rotateX: offset.x,
       rotateY: offset.y,
+      rotateZ:
+        ((settings.cursorComposition.mode === 'left'
+          ? -2
+          : settings.cursorComposition.mode === 'right'
+            ? 2
+            : 0) *
+          settings.cursorComposition.amount) /
+        0.5,
+      strength: CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH,
     },
   };
 }

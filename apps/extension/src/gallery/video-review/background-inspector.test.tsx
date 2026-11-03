@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -75,15 +76,10 @@ it('selects independent background motion and commits its bounded intensity', as
   await act(async () =>
     root.render(<ReviewBackgroundInspector background={background} onChange={change} />)
   );
-  const trigger = host.querySelector<HTMLButtonElement>(
-    '[aria-label="editor.scene.backgroundMotion"]'
+  const option = host.querySelector<HTMLButtonElement>(
+    '[title="editor.scene.backgroundMotionGlow"]'
   )!;
-  expect(trigger).not.toBeNull();
-  await act(async () => trigger.click());
-  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((node) =>
-    node.textContent?.includes('editor.scene.backgroundMotionGlow')
-  )!;
-  expect(option).toBeDefined();
+  expect(option).not.toBeNull();
   await act(async () => option.click());
   expect(change).toHaveBeenLastCalledWith({ motion: { mode: 'glow', speed: 50, intensity: 50 } });
   await act(async () =>
@@ -392,3 +388,98 @@ it('places scaling before the labeled background type selector', () => {
   expect(zoom.compareDocumentPosition(type) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(host.textContent).toContain('gallery.videoReview.backgroundType');
 });
+
+it('adapts background motion choices while retaining speed and intensity', async () => {
+  const resize = mockChoiceWidth();
+  const change = vi.fn();
+  let motion = { mode: 'drift' as 'drift' | 'glow' | 'none', speed: 37, intensity: 82 };
+  const render = () =>
+    act(() =>
+      root.render(
+        <InspectorLayout>
+          <ReviewBackgroundInspector
+            background={{
+              enabled: true,
+              type: 'image',
+              assetId: 'image',
+              imageFit: 'contain',
+              layout,
+              motion,
+            }}
+            onChange={change}
+          />
+        </InspectorLayout>
+      )
+    );
+  const group = () =>
+    host.querySelector('[role="group"][aria-label="editor.scene.backgroundMotion"]');
+  render();
+  expect(group()?.querySelectorAll('button')).toHaveLength(4);
+  act(() =>
+    group()!
+      .querySelector<HTMLButtonElement>('[title="editor.scene.backgroundMotionGlow"]')!
+      .click()
+  );
+  expect(change).toHaveBeenCalledExactlyOnceWith({ motion: { ...motion, mode: 'glow' } });
+  motion = { ...motion, mode: 'glow' };
+  render();
+  resize(100);
+  expect(group()).toBeNull();
+  expect(change).toHaveBeenCalledTimes(1);
+  const trigger = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="editor.scene.backgroundMotion"]'
+  )!;
+  expect(trigger.textContent).toContain('editor.scene.backgroundMotionGlow');
+  await act(async () => trigger.click());
+  await act(async () =>
+    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      .find((option) => option.textContent?.includes('editor.scene.backgroundMotionNone'))!
+      .click()
+  );
+  expect(change).toHaveBeenLastCalledWith({ motion: { ...motion, mode: 'none' } });
+  motion = { ...motion, mode: 'none' };
+  render();
+  act(() =>
+    (document.activeElement instanceof window.HTMLElement ? document.activeElement : null)?.blur()
+  );
+  resize(2000);
+  expect(
+    group()!
+      .querySelector('[title="editor.scene.backgroundMotionNone"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(host.querySelector('input[aria-label="editor.scene.backgroundMotionSpeed"]')).toBeNull();
+  act(() =>
+    group()!
+      .querySelector<HTMLButtonElement>('[title="editor.scene.backgroundMotionDrift"]')!
+      .click()
+  );
+  expect(change).toHaveBeenLastCalledWith({ motion: { mode: 'drift', speed: 37, intensity: 82 } });
+  expect(change).toHaveBeenCalledTimes(3);
+});
+
+function mockChoiceWidth() {
+  let width = 2000;
+  const callbacks = new Set<() => void>();
+  vi.spyOn(window.HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    font: '',
+    measureText: (text: string) => ({ width: text.length * 6 }),
+  } as unknown as CanvasRenderingContext2D);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(private readonly callback: () => void) {
+        callbacks.add(callback);
+      }
+      observe() {}
+      disconnect() {
+        callbacks.delete(this.callback);
+      }
+    }
+  );
+  return (next: number) => {
+    width = next;
+    act(() => callbacks.forEach((callback) => callback()));
+  };
+}

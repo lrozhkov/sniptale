@@ -325,42 +325,84 @@ const orientationPlans = new WeakMap<
   NonNullable<QuickEditZoomRegion['cursorFocus']>,
   Map<string, CursorOrientationPlan | undefined>
 >();
-/** Use the same source-to-output observation clock for orientation and pan admission. */
+
+/** Observe immutable recording keys before framing preferences or crop visibility filtering. */
+function reviewOrientationObservations(context: NonNullable<QuickEditZoomRegion['cursorFocus']>) {
+  const path = context.observed ?? context.path;
+  const start = Math.min(...path.segments.map((segment) => segment.start));
+  const end = Math.max(...path.segments.map((segment) => segment.end));
+  const runs = context.timeMap?.filter((run) => run.kind !== 'cut') ?? [
+    { resultStart: start, resultEnd: end, sourceStart: start, sourceEnd: end, rate: 1 },
+  ];
+  const frames: { time: number; x: number; y: number; segmentId: string }[] = [];
+  let continuity = 0;
+  for (let index = 0; index < runs.length; index++) {
+    const run = runs[index]!,
+      previous = runs[index - 1];
+    if (
+      previous &&
+      (previous.sourceEnd !== run.sourceStart || previous.resultEnd !== run.resultStart)
+    )
+      continuity++;
+    for (const segment of path.segments) {
+      const low = Math.max(run.sourceStart, segment.start),
+        high = Math.min(run.sourceEnd, segment.end);
+      if (high < low) continue;
+      const times = new Set([
+        low,
+        high,
+        ...segment.keys.map((key) => key.time).filter((time) => time > low && time < high),
+      ]);
+      for (const sourceTime of [...times].sort((a, b) => a - b)) {
+        const point = evaluateCursorFocusSegment(segment, sourceTime, 0);
+        if (!point) continue;
+        frames.push({
+          time: run.resultStart + (sourceTime - run.sourceStart) / run.rate,
+          x: point.x,
+          y: point.y,
+          segmentId: `${segment.id}:${continuity}`,
+        });
+      }
+    }
+  }
+  return frames;
+}
+
+/** History belongs to the continuous source run, independently of the active camera region. */
 export function resolveReviewCursorOrientation(region: QuickEditZoomRegion) {
-  if (!region.cursorFocus || !hasCursorComposition(region.cursorComposition)) return undefined;
-  let plans = orientationPlans.get(region.cursorFocus);
+  const context = region.cursorFocus;
+  if (!context || !hasCursorComposition(region.cursorComposition)) return undefined;
+  let plans = orientationPlans.get(context);
   if (!plans) {
     plans = new Map();
-    orientationPlans.set(region.cursorFocus, plans);
+    orientationPlans.set(context, plans);
   }
   const key = JSON.stringify({
     settings: region.cursorComposition,
-    perspective: region.perspective,
-    start: region.start,
-    end: region.end,
+    scene: context.scene,
+    timeMap: context.timeMap,
   });
   if (plans.has(key)) return plans.get(key);
+  const observations = reviewOrientationObservations(context);
+  const scene = context.scene;
+  const crop = scene?.canvas?.crop
+    ? fitQuickEditSourceCrop(scene.source, scene.canvas, scene.canvas.crop)
+    : { x: 0, y: 0, width: 1, height: 1 };
+  const header = scene?.windowHeader
+    ? windowHeaderGeometry(scene.windowHeader, scene.source).height
+    : 0;
   const plan = createCursorOrientationPlan({
     settings: region.cursorComposition!,
-    observations: reviewCameraPlanObservations(region).map((frame) => {
-      const scene = region.cursorFocus?.scene;
-      if (!scene) return frame;
-      const crop = scene.canvas?.crop
-        ? fitQuickEditSourceCrop(scene.source, scene.canvas, scene.canvas.crop)
-        : { x: 0, y: 0, width: 1, height: 1 };
-      const header = scene.windowHeader
-        ? windowHeaderGeometry(scene.windowHeader, scene.source).height
-        : 0;
-      return {
-        ...frame,
-        x: (frame.x - crop.x) / crop.width,
-        y:
-          (header + (frame.y - crop.y) * scene.source.height) /
-          (header + crop.height * scene.source.height),
-      };
-    }),
-    start: region.start,
-    end: region.end,
+    observations: observations.map((frame) => ({
+      ...frame,
+      x: (frame.x - crop.x) / crop.width,
+      y: scene
+        ? (header + (frame.y - crop.y) * scene.source.height) /
+          (header + crop.height * scene.source.height)
+        : frame.y,
+    })),
+    start: observations[0]?.time ?? region.start,
+    end: observations.at(-1)?.time ?? region.end,
   });
   plans.set(key, plan);
   return plan;

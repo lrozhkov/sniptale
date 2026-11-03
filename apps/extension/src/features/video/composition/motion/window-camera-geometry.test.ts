@@ -118,3 +118,42 @@ it.each(['window', 'content', 'spatial'] as const)(
       }
   }
 );
+
+it('bounds the rendered cursor perspective when a linked endpoint has an enabled neutral base', async () => {
+  const { createWindowCameraLinkGeometry } = await import('./window-camera-geometry');
+  const { quickEditPlaneProjection, projectQuickEditPoint } = await import('./spatial-geometry');
+  const { interpolateCameraSpatial } = await import('../../project/motion/spatial');
+  const window = { x: 100, y: 80, width: 800, height: 450 };
+  const base = { enabled: true, rotateX: 0, rotateY: 0, rotateZ: 0, strength: 1 };
+  const offset = { x: -12, y: -18 };
+  const adapter = createWindowCameraLinkGeometry({
+    output: { width: 1000, height: 650 },
+    window,
+    video: window,
+    cornerRadius: 0,
+    windowWeight: 'window',
+    type: 'linear',
+    policy: resolveCameraFollowPolicy({}),
+    from: { end: 0, scale: 1, pan: { x: 0, y: 0 }, perspective: base, cursorOffset: offset },
+    to: { start: 1, scale: 1, pan: { x: 0, y: 0 }, perspective: base, cursorOffset: offset },
+  });
+  const actual = { x: 0.8, y: 0.2 };
+  const bounds = adapter.geometry.clearanceBounds({
+    start: 0.5,
+    end: 0.5,
+    segmentId: 'cursor',
+    targetScale: 1,
+    pan: { minX: 0, maxX: 0, minY: 0, maxY: 0 },
+    actual: { from: actual, to: actual },
+  })!;
+  const settings = { perspective: { ...base, rotateX: offset.x, rotateY: offset.y } };
+  const rendered = interpolateCameraSpatial(settings, settings, 0.5);
+  const projection = quickEditPlaneProjection(window, window, rendered);
+  const point = projectQuickEditPoint(projection, {
+    x: window.x + actual.x * window.width,
+    y: window.y + actual.y * window.height,
+  })!;
+  const clearance = Math.min(point.x, point.y, 1000 - point.x, 650 - point.y);
+  expect(clearance).toBeGreaterThanOrEqual(bounds.viewport!.low - 1e-7);
+  expect(clearance).toBeLessThanOrEqual(bounds.viewport!.high + 1e-7);
+});

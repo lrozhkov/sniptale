@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { hideAllToasts } from '@sniptale/ui/product-feedback/toast-service';
+import { InspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -44,6 +45,7 @@ afterEach(async () => {
   root = null;
   container?.remove();
   container = null;
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -352,3 +354,105 @@ it.each(['fixed', 'follow-video'] as const)(
     );
   }
 );
+
+it('adapts background motion choices and preserves the image through Off and restore', async () => {
+  const resize = mockChoiceWidth();
+  const props = createProps();
+  props.sceneBackground = {
+    ...props.sceneBackground,
+    blur: 4,
+    motion: { mode: 'waves', speed: 35, intensity: 80 },
+  };
+  act(() =>
+    root?.render(
+      <InspectorLayout>
+        <SceneBackgroundHarness {...props} />
+      </InspectorLayout>
+    )
+  );
+  const group = () =>
+    container!.querySelector('[role="group"][aria-label="editor.scene.backgroundMotion"]');
+  expect(group()?.querySelectorAll('button')).toHaveLength(4);
+  act(() =>
+    group()!
+      .querySelector<HTMLButtonElement>('[title="editor.scene.backgroundMotionGlow"]')!
+      .click()
+  );
+  expect(props.onSetSceneBackground).toHaveBeenCalledExactlyOnceWith({
+    ...props.sceneBackground,
+    motion: { mode: 'glow', speed: 35, intensity: 80 },
+  });
+  resize(100);
+  expect(group()).toBeNull();
+  expect(props.onSetSceneBackground).toHaveBeenCalledTimes(1);
+  const trigger = container!.querySelector<HTMLButtonElement>(
+    'button[aria-label="editor.scene.backgroundMotion"]'
+  )!;
+  expect(trigger.textContent).toContain('editor.scene.backgroundMotionGlow');
+  await act(async () => trigger.click());
+  await act(async () =>
+    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      .find((option) => option.textContent?.includes('editor.scene.backgroundMotionNone'))!
+      .click()
+  );
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith({
+    ...props.sceneBackground,
+    motion: { mode: 'none', speed: 35, intensity: 80 },
+  });
+  act(() =>
+    (document.activeElement instanceof window.HTMLElement ? document.activeElement : null)?.blur()
+  );
+  resize(2000);
+  expect(
+    group()!
+      .querySelector('[title="editor.scene.backgroundMotionNone"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(
+    container!.querySelector('input[aria-label="editor.scene.backgroundMotionSpeed"]')
+  ).toBeNull();
+  act(() =>
+    group()!
+      .querySelector<HTMLButtonElement>('[title="editor.scene.backgroundMotionWaves"]')!
+      .click()
+  );
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith(props.sceneBackground);
+  expect(
+    container!.querySelector<HTMLInputElement>(
+      'input[aria-label="editor.scene.backgroundMotionSpeed"]'
+    )?.value
+  ).toBe('35');
+  expect(
+    container!.querySelector<HTMLInputElement>(
+      'input[aria-label="editor.scene.backgroundMotionIntensity"]'
+    )?.value
+  ).toBe('80');
+  expect(props.onSetSceneBackground).toHaveBeenCalledTimes(3);
+  expect(props.onResetSceneBackgroundPreview).toHaveBeenCalledTimes(3);
+});
+
+function mockChoiceWidth() {
+  let width = 2000;
+  const callbacks = new Set<() => void>();
+  vi.spyOn(window.HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    font: '',
+    measureText: (text: string) => ({ width: text.length * 6 }),
+  } as unknown as CanvasRenderingContext2D);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(private readonly callback: () => void) {
+        callbacks.add(callback);
+      }
+      observe() {}
+      disconnect() {
+        callbacks.delete(this.callback);
+      }
+    }
+  );
+  return (next: number) => {
+    width = next;
+    act(() => callbacks.forEach((callback) => callback()));
+  };
+}

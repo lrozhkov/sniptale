@@ -1,3 +1,5 @@
+import { getSourceTimedClipProjectOffset } from '../../project/timeline/rate';
+import { createCursorResponse, compileCursorResponse } from './cursor-response';
 import { evaluateMotionSpatial } from './spatial';
 import {
   quickEditPlaneProjection,
@@ -15,18 +17,13 @@ import {
 import { getFittedMediaContentFrame, getFittedMediaWindowFrame } from '../draw/fitted-media';
 import {
   resolveCursorSourcePointMapping,
+  resolveObservedCursorPosition,
   mapCursorFocusControlPoint,
 } from '../timeline/frame/cursor';
 import type { CursorCompositionSettings } from '../../project/motion/spatial';
 import { hasCursorComposition, cameraPerspectiveWithCursor } from '../../project/motion/spatial';
 import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
 import {
-  resolveProjectCursorFocusSamples,
-  resolveProjectCursorFocusPath,
-  resolveProjectCursorFocus,
-} from '../../project/cursor-focus-path/projection';
-import {
-  createCameraTrajectory,
   evaluateCameraTrajectory,
   type CameraTrajectory,
   type CameraPanPoint,
@@ -42,66 +39,7 @@ interface CursorOrientationObservation extends CameraPanPoint {
   segmentId?: string;
 }
 
-/** Cursor targets use a finite observation window without joining separate captured segments. */
-function cursorOrientationTarget(
-  points: readonly CursorOrientationObservation[],
-  settings: CursorCompositionSettings,
-  step: number
-) {
-  const observations = points
-    .filter(
-      (point) => Number.isFinite(point.time) && Number.isFinite(point.x) && Number.isFinite(point.y)
-    )
-    .toSorted((a, b) => a.time - b.time);
-  const lowerBound = (time: number) => {
-    let low = 0,
-      high = observations.length;
-    while (low < high) {
-      const mid = Math.floor((low + high) / 2);
-      if (observations[mid]!.time < time) low = mid + 1;
-      else high = mid;
-    }
-    return low;
-  };
-  return (time: number): CameraPanPoint => {
-    let x = 0,
-      y = 0,
-      total = 0;
-    const center = Math.min(observations.length - 1, lowerBound(time));
-    const segmentId = observations[center]?.segmentId;
-    for (
-      let index = lowerBound(time - step);
-      index < observations.length && observations[index]!.time <= time + step;
-      index++
-    ) {
-      const point = observations[index]!;
-      if (point.segmentId !== segmentId) continue;
-      const distance = Math.abs(point.time - time);
-      if (distance > step) continue;
-      const weight = 1 - distance / step;
-      x += point.x * weight;
-      y += point.y * weight;
-      total += weight;
-    }
-    if (total > 0) {
-      x /= total;
-      y /= total;
-    } else {
-      const held = observations[Math.max(0, lowerBound(time) - 1)];
-      x = held?.x ?? 0.5;
-      y = held?.y ?? 0.5;
-    }
-    const unit = (value: number) => Math.max(-1, Math.min(1, 2 * value - 1));
-    const pitch = -unit(y) * 8 * settings.amount;
-    const yaw =
-      (settings.mode === 'left' ? -1 : settings.mode === 'right' ? 1 : unit(x)) *
-      12 *
-      settings.amount;
-    return { x: pitch, y: yaw };
-  };
-}
-
-/** Precompute cursor-only orientation before pan admission; no camera pose feeds this curve. */
+/** Compile the position-driven response once, independently of camera activation and pan planning. */
 export function createCursorOrientationPlan(input: {
   settings: CursorCompositionSettings;
   observations: readonly CursorOrientationObservation[];
@@ -110,37 +48,23 @@ export function createCursorOrientationPlan(input: {
 }): CursorOrientationPlan | undefined {
   if (!hasCursorComposition(input.settings) || input.end <= input.start) return undefined;
   const { settings } = input;
-  const step = 0.25 + settings.smoothness * 0.75;
-  const target = cursorOrientationTarget(input.observations, settings, step);
-  const count = Math.max(1, Math.ceil((input.end - input.start) / step));
-  const stepSize = (input.end - input.start) / count;
-  const targets = Array.from({ length: count + 1 }, (_, index) =>
-    target(input.start + index * stepSize)
-  );
-  const velocities = targets.map((point, index) => {
-    if (index === 0 || index === targets.length - 1) return { x: 0, y: 0 };
-    const axis = (axis: 'x' | 'y') => {
-      const left = (point[axis] - targets[index - 1]![axis]) / stepSize;
-      const right = (targets[index + 1]![axis] - point[axis]) / stepSize;
-      return left * right > 0 ? (2 * left * right) / (left + right) : 0;
-    };
-    return { x: axis('x'), y: axis('y') };
-  });
-  const spans: CameraTrajectory[] = [];
-  for (let index = 0; index < count; index++) {
-    const start = input.start + stepSize * index;
-    const end = index === count - 1 ? input.end : input.start + stepSize * (index + 1);
-    spans.push(
-      createCameraTrajectory({
-        start,
-        end,
-        from: targets[index]!,
-        to: targets[index + 1]!,
-        fromVelocity: velocities[index]!,
-        toVelocity: velocities[index + 1]!,
-      })
-    );
-  }
+  const gain = settings.amount / 0.5;
+  const fixed = settings.mode === 'left' || settings.mode === 'right';
+  const observations = fixed
+    ? [{ time: input.start, x: -12 * gain, y: (settings.mode === 'left' ? -18 : 18) * gain }]
+    : input.observations
+        .filter(
+          (point) =>
+            Number.isFinite(point.time) && Number.isFinite(point.x) && Number.isFinite(point.y)
+        )
+        .map((point) => ({
+          ...point,
+          x: (-4 + 24 * (Math.max(0, Math.min(1, point.y)) - 0.5)) * gain,
+          y: -44 * (Math.max(0, Math.min(1, point.x)) - 0.5) * gain,
+        }));
+  if (!observations.length) observations.push({ time: input.start, x: -4 * gain, y: 0 });
+  const response = createCursorResponse(observations, 8 - 5 * settings.smoothness);
+  const spans = compileCursorResponse(response, input.start, input.end);
   return { spans, breaks: [input.start, ...spans.map((span) => span.end)] };
 }
 
@@ -153,7 +77,7 @@ export function cursorOrientationInterval(
   if (!plan) return undefined;
   if (plan.breaks.some((time) => start < time && time < end)) return null;
   return (
-    plan.spans.find((span) => start >= span.start && end <= span.end) ??
+    plan.spans.findLast((span) => start >= span.start && end <= span.end) ??
     (end <= plan.spans[0]!.start ? plan.spans[0] : plan.spans.at(-1))
   );
 }
@@ -187,22 +111,53 @@ export function resolveProjectCursorOrientation(
     projectPlans.set(project, plans);
   }
   if (plans.has(key)) return plans.get(key);
-  const path = resolveProjectCursorFocusPath(project);
-  const times = new Set(
-    resolveProjectCursorFocusSamples(project, true).map((sample) => sample.time)
+  const clipId = region.sourceBinding?.clipId;
+  const times = new Set((project.cursorTrack?.samples ?? []).map((sample) => sample.time));
+  const clips = project.clips.filter(
+    (clip) => clip.type === 'VIDEO' && (!clipId || clip.id === clipId)
   );
-  const step = Math.max(1 / 30, project.duration / 18000);
-  for (let time = 0; time < project.duration; time += step) times.add(time);
-  times.add(project.duration);
+  for (const clip of clips) {
+    if (clip.type !== 'VIDEO') continue;
+    times.add(clip.startTime);
+    times.add(clip.startTime + clip.duration);
+    const group = project.cursorTrack?.sourceObservations?.find(
+      (group) => group.sourceInstanceId === clip.sourceInstanceId
+    );
+    for (const sample of group?.samples ?? []) {
+      const time =
+        clip.startTime + getSourceTimedClipProjectOffset(clip, sample.time - clip.sourceStart);
+      if (time >= clip.startTime && time <= clip.startTime + clip.duration) times.add(time);
+    }
+    if (group?.trajectory && !group.samples.length)
+      for (let time = clip.startTime; time < clip.startTime + clip.duration; time += 1 / 30)
+        times.add(time);
+  }
+  let visit = 0,
+    covered = false;
   const observations = [...times]
+    .filter((time) => time >= 0 && time <= project.duration)
     .sort((a, b) => a - b)
     .flatMap((time) => {
-      const point = resolveProjectCursorFocus(project, time, path, region.sourceBinding?.clipId);
-      if (!point) return [];
-      const native = { x: point.x / project.width, y: point.y / project.height };
+      const owner =
+        clips.find((clip) => time >= clip.startTime && time < clip.startTime + clip.duration) ??
+        clips.findLast((clip) => time === clip.startTime + clip.duration);
+      const point =
+        resolveObservedCursorPosition(project, time, clipId ?? owner?.id, {
+          includeSourceEnd: true,
+        }) ?? (!clipId ? resolveObservedCursorPosition(project, time) : null);
+      if (!point) {
+        if (covered) visit++;
+        covered = false;
+        return [];
+      }
+      covered = true;
+      const native = point.recordingPoint ?? {
+        x: point.x / project.width,
+        y: point.y / project.height,
+      };
       const mapping = resolveCursorSourcePointMapping(
         project,
-        region.sourceBinding?.clipId ?? point.sourceClipId,
+        clipId ?? point.sourceAnchor?.sourceClipId,
         time
       );
       let normalized = native;
@@ -217,7 +172,14 @@ export function resolveProjectCursorOrientation(
         const projected = mapCursorFocusControlPoint(mapping, native);
         normalized = { x: projected.x / project.width, y: projected.y / project.height };
       }
-      return [{ time, ...normalized, segmentId: point.segmentId }];
+      const sourceIdentity = point.sourceAnchor?.sourceClipId ?? clipId ?? 'project';
+      return [
+        {
+          time,
+          ...normalized,
+          segmentId: `${sourceIdentity}:${point.captureSegment ?? ''}:${visit}`,
+        },
+      ];
     });
   const plan = createCursorOrientationPlan({
     settings: region.cursorComposition!,
@@ -286,15 +248,17 @@ export function createWindowCursorProjection(input: {
   orientationPlan?: CursorOrientationPlan;
 }) {
   const { region, window, orientationPlan } = input;
+  const effective = orientationPlan ? cameraPerspectiveWithCursor(region, { x: 0, y: 0 }) : region;
+  const pose = effective.perspective;
   const perspective =
-    (orientationPlan && region.perspective?.enabled) || hasQuickEditPerspective(region.perspective)
+    pose && ((orientationPlan && pose.enabled) || hasQuickEditPerspective(pose))
       ? {
-          rotateX: region.perspective.rotateX,
-          rotateY: region.perspective.rotateY,
-          rotateZ: ((region.perspective.rotateZ + 540) % 360) - 180,
-          strength: region.perspective.strength,
+          rotateX: pose.rotateX,
+          rotateY: pose.rotateY,
+          rotateZ: ((pose.rotateZ + 540) % 360) - 180,
+          strength: pose.strength,
         }
-      : { rotateX: 0, rotateY: 0, rotateZ: 0, strength: orientationPlan ? 0.5 : 0 };
+      : { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 };
   const projections = new Map<string, QuickEditHomography>();
   const at = (progress: number, scale: number, time: number) => {
     const key = `${progress}:${scale}:${orientationPlan ? time : 0}`;
@@ -370,12 +334,12 @@ export function createProjectCursorProjection(input: {
     width: ref.width * window.width,
     height: ref.height * window.height,
   };
+  const effective = orientationPlan ? cameraPerspectiveWithCursor(region, { x: 0, y: 0 }) : region;
   const perspective =
-    (orientationPlan && region.perspective?.enabled) || hasQuickEditPerspective(region.perspective)
-      ? region.perspective
-      : orientationPlan
-        ? { enabled: true, rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0.5 }
-        : null;
+    (orientationPlan && effective.perspective?.enabled) ||
+    hasQuickEditPerspective(effective.perspective)
+      ? effective.perspective
+      : null;
   const projectPoint = (
     point: CameraPanPoint,
     targetScale: number,

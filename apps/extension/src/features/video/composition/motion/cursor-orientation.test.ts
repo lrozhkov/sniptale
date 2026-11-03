@@ -18,6 +18,7 @@ import {
 } from './spatial-projection-bounds';
 import {
   DEFAULT_CURSOR_COMPOSITION,
+  CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH,
   parseCursorCompositionSettings,
   cameraPerspectiveWithCursor,
   DEFAULT_CAMERA_PERSPECTIVE,
@@ -50,6 +51,15 @@ it.each([false, true])(
       })),
     };
     const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    project.cursorTrack!.samples = project.cursorTrack!.samples.map((sample) => ({
+      ...sample,
+      sourceAnchor: {
+        kind: 'recording-source',
+        recordingId: 'orbit-spaces',
+        sourceClipId: clip.id,
+        sourceTime: sample.time,
+      },
+    }));
     clip.transform = { ...clip.transform, x: 200, y: 120, width: 600, height: 360 };
     const canvas = bindMotionRegionToClip(
       {
@@ -114,14 +124,16 @@ it('evaluates matching C2 boundaries and random seeks without repeated velocity 
   for (const time of [10, 5, 0, 8, 2, 5])
     expect(evaluateCursorOrientation(plan, time)).toEqual(chronological.get(time));
   const middle = plan.spans[Math.floor(plan.spans.length / 2)]!;
-  const velocity = [0, 0.25, 0.5, 0.75, 1].map(
-    (phase) =>
-      evaluateCameraTrajectoryDerivative(
-        middle,
-        middle.start + phase * (middle.end - middle.start),
-        1
-      ).y
-  );
+  const velocity = [0, 0.25, 0.5, 0.75, 1]
+    .map(
+      (phase) =>
+        evaluateCameraTrajectoryDerivative(
+          middle,
+          middle.start + phase * (middle.end - middle.start),
+          1
+        ).y
+    )
+    .map(Math.abs);
   expect(Math.min(...velocity)).toBeGreaterThan(0.9 * Math.max(...velocity));
   expect(cursorOrientationInterval(plan, plan.spans[0]!.start, plan.spans[1]!.end)).toBeNull();
 });
@@ -196,7 +208,12 @@ it('includes orbit-only movement in both decorated-window and general-canvas con
     phase: 1,
     pan: { minX: 400, maxX: 400, minY: 250, maxY: 250 },
     windowWeight: 'window' as const,
-    perspective: { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0.5 },
+    perspective: {
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
+      strength: CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH,
+    },
     orbit: { angles: span },
     actual: { from: { x: 0.5, y: 0.5 }, to: { x: 0.5, y: 0.5 } },
   };
@@ -248,7 +265,12 @@ it('continuously bounds the same moving decorated-window projection rendered at 
     phase: 1,
     pan: { minX: 400, maxX: 400, minY: 250, maxY: 250 },
     windowWeight: 'window',
-    perspective: { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0.5 },
+    perspective: {
+      rotateX: 0,
+      rotateY: 0,
+      rotateZ: 0,
+      strength: CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH,
+    },
     orbit: { angles: span },
     actual: { from: { x: 0.5, y: 0.5 }, to: { x: 0.5, y: 0.5 } },
   })!;
@@ -271,5 +293,131 @@ it('continuously bounds the same moving decorated-window projection rendered at 
     const clearance = Math.min(point.x, point.y, 1000 - point.x, 640 - point.y);
     expect(clearance).toBeGreaterThanOrEqual(proof.viewport!.low - 1e-8);
     expect(clearance).toBeLessThanOrEqual(proof.viewport!.high + 1e-8);
+  }
+});
+
+it('retains visible position-driven rocking and fixed direction poses after the cursor rests', () => {
+  const observations = [
+    { time: 0, x: 1, y: 0.5 },
+    { time: 3, x: 1, y: 0.5 },
+  ];
+  const plan = createCursorOrientationPlan({ settings, observations, start: 0, end: 3 });
+  expect(evaluateCursorOrientation(plan, 2)).toEqual({ x: -4, y: -22 });
+  for (const [mode, expected] of [
+    ['left', { x: -12, y: -18 }],
+    ['right', { x: -12, y: 18 }],
+  ] as const) {
+    const fixed = createCursorOrientationPlan({
+      settings: { ...settings, mode },
+      observations,
+      start: 0,
+      end: 3,
+    });
+    expect(evaluateCursorOrientation(fixed, 0.1)).toEqual(expected);
+    expect(evaluateCursorOrientation(fixed, 2.9)).toEqual(expected);
+  }
+});
+
+it('selects the rendered right-hand polynomial for an exact discontinuous capture cut', () => {
+  const plan = createCursorOrientationPlan({
+    settings,
+    start: 0,
+    end: 4,
+    observations: [
+      { time: 0, x: 0, y: 0.5, segmentId: 'a' },
+      { time: 2, x: 0, y: 0.5, segmentId: 'a' },
+      { time: 2, x: 1, y: 0.5, segmentId: 'b' },
+      { time: 4, x: 1, y: 0.5, segmentId: 'b' },
+    ],
+  })!;
+  const span = cursorOrientationInterval(plan, 2, 2)!;
+  expect(span.start).toBe(2);
+  expect(evaluateCursorOrientation(plan, 2)).toEqual({ x: -4, y: -22 });
+  expect(evaluateCursorOrientation({ spans: [span], breaks: [span.start, span.end] }, 2)).toEqual(
+    evaluateCursorOrientation(plan, 2)
+  );
+  expect(evaluateCursorOrientation(plan, 1.99).y).toBeCloseTo(22, 9);
+});
+
+it.each(['left', 'right'] as const)(
+  'shares fixed %s roll and strength between rendering and continuous projection',
+  async (mode) => {
+    const { createWindowCursorProjection, createProjectCursorProjection } =
+      await import('./cursor-orientation');
+    const region = {
+      cursorComposition: { ...settings, mode },
+      perspective: {
+        ...DEFAULT_CAMERA_PERSPECTIVE,
+        enabled: true,
+        rotateX: 40,
+        rotateY: 35,
+        rotateZ: 60,
+        strength: 0.2,
+      },
+    };
+    const plan = createCursorOrientationPlan({
+      settings: region.cursorComposition,
+      observations: [],
+      start: 0,
+      end: 2,
+    })!;
+    const rendered = cameraPerspectiveWithCursor(
+      region,
+      evaluateCursorOrientation(plan, 1)
+    ).perspective!;
+    const windowProof = createWindowCursorProjection({
+      region,
+      orientationPlan: plan,
+      window: { x: 0, y: 0, width: 1000, height: 600 },
+    });
+    expect(windowProof.perspective.strength).toBe(rendered.strength);
+    expect(windowProof.perspective.rotateZ).toBe(rendered.rotateZ);
+    expect(rendered.rotateZ).toBe(mode === 'left' ? -2 : 2);
+    const project = createVideoProjectFromRecording({
+      recordingId: 'proof',
+      filename: 'proof.webm',
+      width: 1000,
+      height: 600,
+      duration: 2,
+      mimeType: 'video/webm',
+      size: 10,
+    });
+    const projectRegion = {
+      ...createVideoProjectMotionRegion(project, 0),
+      ...region,
+      focusMode: 'CURSOR' as const,
+    };
+    const projectProof = createProjectCursorProjection({
+      project,
+      region: projectRegion,
+      orientationPlan: plan,
+      window: { width: 1000, height: 600 },
+      output: { width: 1000, height: 600 },
+      offset: { x: 0, y: 0 },
+      phaseAt: () => 1,
+    });
+    expect(projectProof.perspective?.strength).toBe(rendered.strength);
+    expect(projectProof.perspective?.rotateZ).toBe(rendered.rotateZ);
+    expect(windowProof.perspective.rotateX).toBe(0);
+    expect(windowProof.perspective.rotateY).toBe(0);
+  }
+);
+
+it('drops nonfinite observations before normalization and uses the missing-track resting pose', () => {
+  const compile = (observations: { time: number; x: number; y: number }[]) =>
+    createCursorOrientationPlan({ settings, observations, start: 0, end: 1 })!;
+  const empty = compile([]);
+  for (const observation of [
+    { time: 0, x: NaN, y: NaN },
+    { time: 0, x: Infinity, y: 0.5 },
+    { time: 0, x: 0.5, y: -Infinity },
+    { time: NaN, x: 0.5, y: 0.5 },
+  ]) {
+    const plan = compile([observation]);
+    expect(plan.spans.length).toBeGreaterThan(0);
+    for (const time of [0, 0.5, 1])
+      expect(evaluateCursorOrientation(plan, time)).toEqual(evaluateCursorOrientation(empty, time));
+    const valid = { time: 0.5, x: 0.8, y: 0.2 };
+    expect(compile([observation, valid])).toEqual(compile([valid]));
   }
 });

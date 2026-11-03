@@ -1,4 +1,4 @@
-import { NumericRow, SelectField } from '../../../../../ui/compact-inspector-controls';
+import { NumericRow, SegmentedRow } from '../../../../../ui/compact-inspector-controls';
 import { DEFAULT_BACKGROUND_MOTION } from '../../../../../features/video/project/scene/background-motion';
 import { useEffect, useState } from 'react';
 import { BackgroundImagePicker } from '../../../../../composition/background-resources/picker';
@@ -109,7 +109,9 @@ function SceneBackgroundMotionControls(props: SceneBackgroundFieldProps) {
   };
   return (
     <div className="sniptale-parameter-stack">
-      <SelectField<typeof value.mode>
+      <SegmentedRow<typeof value.mode>
+        columns={4}
+        ariaLabel={translate('editor.scene.backgroundMotion')}
         label={translate('editor.scene.backgroundMotion')}
         value={value.mode}
         options={[

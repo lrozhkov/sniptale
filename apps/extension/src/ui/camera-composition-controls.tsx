@@ -3,7 +3,7 @@ import {
   DEFAULT_CURSOR_COMPOSITION,
   type CursorCompositionSettings,
 } from '../features/video/project/motion/spatial';
-import { SegmentedRow, SelectField } from './compact-inspector-controls';
+import { SegmentedRow } from './compact-inspector-controls';
 import { PreviewNumericRow } from './compact-inspector-controls/numeric-preview';
 
 /** Both editors retain their own mutation and preview transactions. */
@@ -80,7 +80,9 @@ export function CameraCompositionControls(props: {
   );
   return (
     <div className="sniptale-parameter-stack" data-ui="camera.composition">
-      <SelectField<CursorCompositionSettings['mode']>
+      <SegmentedRow<CursorCompositionSettings['mode']>
+        columns={4}
+        ariaLabel={translate('editor.scene.cameraComposition')}
         label={translate('editor.scene.cameraComposition')}
         value={value.mode}
         options={(['off', 'orbit', 'left', 'right'] as const).map((mode) => ({

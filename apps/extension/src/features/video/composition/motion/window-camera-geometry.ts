@@ -20,6 +20,7 @@ import {
 } from '../../project/camera/cursor-policy';
 import {
   hasCameraPerspective as hasQuickEditPerspective,
+  CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH,
   type CameraSpatialRect,
   type CameraSpatialSettings,
 } from '../../project/motion/spatial';
@@ -540,15 +541,23 @@ export function createWindowCameraLinkGeometry(input: {
     input.type === 'instant' || input.type === 'none'
       ? 1
       : createWindowPhaseTrajectory(start, end, input.type, true);
-  const perspective = (value: CameraSpatialSettings['perspective']) =>
-    hasQuickEditPerspective(value)
+  const perspective = (
+    value: CameraSpatialSettings['perspective'],
+    cursorOffset: { x: number; y: number } | undefined
+  ) =>
+    (cursorOffset && value?.enabled) || hasQuickEditPerspective(value)
       ? {
           rotateX: value.rotateX,
           rotateY: value.rotateY,
           rotateZ: value.rotateZ,
           strength: value.strength,
         }
-      : { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 };
+      : {
+          rotateX: 0,
+          rotateY: 0,
+          rotateZ: 0,
+          strength: cursorOffset ? CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH : 0,
+        };
   const interval = (
     a: number,
     b: number,
@@ -565,10 +574,7 @@ export function createWindowCameraLinkGeometry(input: {
     phase: input.type === 'instant' && b === start ? 0 : phase,
     pan,
     windowWeight: input.windowWeight,
-    perspective: {
-      ...perspective(input.to.perspective),
-      ...(input.to.cursorOffset && !input.to.perspective?.enabled ? { strength: 0.5 } : {}),
-    },
+    perspective: perspective(input.to.perspective, input.to.cursorOffset),
     ...(input.from.cursorOffset || input.to.cursorOffset
       ? {
           orbit: {
@@ -582,10 +588,7 @@ export function createWindowCameraLinkGeometry(input: {
     from: {
       scale: input.from.scale,
       pan: input.from.pan,
-      perspective: {
-        ...perspective(input.from.perspective),
-        ...(input.from.cursorOffset && !input.from.perspective?.enabled ? { strength: 0.5 } : {}),
-      },
+      perspective: perspective(input.from.perspective, input.from.cursorOffset),
       windowMotion:
         hasQuickEditPerspective(input.from.perspective) || input.from.cursorOffset ? 1 : 0,
     },

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { InspectorLayout } from './compact-inspector-controls/layout';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -23,6 +24,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 it('keeps Manual available when captured cursor data is missing', () => {
@@ -43,15 +45,10 @@ it('shows legacy absence as Off and offers the four authored modes', async () =>
   await act(async () => root.render(<CameraCompositionControls onChange={change} />));
   expect(host.textContent).toContain('editor.scene.cameraCompositionOff');
   expect(host.querySelector('[aria-label="editor.scene.cameraCompositionAmount"]')).toBeNull();
-  await act(async () =>
-    host.querySelector<HTMLButtonElement>('[aria-label="editor.scene.cameraComposition"]')!.click()
-  );
-  const choices = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
+  const choices = [...host.querySelectorAll<HTMLButtonElement>('[aria-pressed]')];
   expect(choices).toHaveLength(4);
   await act(async () =>
-    choices
-      .find((choice) => choice.textContent?.includes('editor.scene.cameraCompositionOrbit'))!
-      .click()
+    choices.find((choice) => choice.title === 'editor.scene.cameraCompositionOrbit')!.click()
   );
   expect(change).toHaveBeenCalledExactlyOnceWith(DEFAULT_CURSOR_COMPOSITION);
 });
@@ -84,3 +81,93 @@ it('previews rotation amount, cancels Escape and commits one following gesture',
   key('keyup', 'ArrowRight');
   expect(change).toHaveBeenCalledExactlyOnceWith({ ...DEFAULT_CURSOR_COMPOSITION, amount: 0.51 });
 });
+
+it('adapts composition choices without changing retained camera settings', async () => {
+  const resize = mockChoiceWidth();
+  const change = vi.fn();
+  let value = { ...DEFAULT_CURSOR_COMPOSITION, amount: 0.73, smoothness: 0.29 };
+  const render = () =>
+    act(() =>
+      root.render(
+        <InspectorLayout>
+          <CameraCompositionControls value={value} onChange={change} />
+        </InspectorLayout>
+      )
+    );
+  const group = () =>
+    host.querySelector('[role="group"][aria-label="editor.scene.cameraComposition"]');
+  render();
+  expect(group()?.querySelectorAll('button')).toHaveLength(4);
+  act(() =>
+    group()!
+      .querySelector<HTMLButtonElement>('[title="editor.scene.cameraCompositionLeft"]')!
+      .click()
+  );
+  expect(change).toHaveBeenCalledExactlyOnceWith({ ...value, mode: 'left' });
+  value = { ...value, mode: 'left' };
+  render();
+  resize(100);
+  expect(group()).toBeNull();
+  expect(change).toHaveBeenCalledTimes(1);
+  const trigger = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="editor.scene.cameraComposition"]'
+  )!;
+  expect(trigger.textContent).toContain('editor.scene.cameraCompositionLeft');
+  await act(async () => trigger.click());
+  await act(async () =>
+    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      .find((option) => option.textContent?.includes('editor.scene.cameraCompositionOff'))!
+      .click()
+  );
+  expect(change).toHaveBeenLastCalledWith({ ...value, mode: 'off' });
+  value = { ...value, mode: 'off' };
+  render();
+  act(() =>
+    (document.activeElement instanceof window.HTMLElement ? document.activeElement : null)?.blur()
+  );
+  resize(2000);
+  expect(
+    group()!
+      .querySelector('[title="editor.scene.cameraCompositionOff"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(host.querySelector('input[aria-label="editor.scene.cameraCompositionAmount"]')).toBeNull();
+  expect(
+    host.querySelector<HTMLInputElement>(
+      'input[aria-label="editor.scene.cameraCompositionSmoothness"]'
+    )?.value
+  ).toBe('29');
+  act(() =>
+    group()!
+      .querySelector<HTMLButtonElement>('[title="editor.scene.cameraCompositionRight"]')!
+      .click()
+  );
+  expect(change).toHaveBeenLastCalledWith({ ...value, mode: 'right' });
+  expect(change).toHaveBeenCalledTimes(3);
+});
+
+function mockChoiceWidth() {
+  let width = 2000;
+  const callbacks = new Set<() => void>();
+  vi.spyOn(window.HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    font: '',
+    measureText: (text: string) => ({ width: text.length * 6 }),
+  } as unknown as CanvasRenderingContext2D);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(private readonly callback: () => void) {
+        callbacks.add(callback);
+      }
+      observe() {}
+      disconnect() {
+        callbacks.delete(this.callback);
+      }
+    }
+  );
+  return (next: number) => {
+    width = next;
+    act(() => callbacks.forEach((callback) => callback()));
+  };
+}

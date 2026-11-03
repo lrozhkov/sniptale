@@ -135,7 +135,9 @@ function ReviewBackgroundMotionControls(props: {
     );
   return (
     <div className="sniptale-parameter-stack">
-      <SelectField<typeof value.mode>
+      <SegmentedRow<typeof value.mode>
+        columns={4}
+        ariaLabel={translate('editor.scene.backgroundMotion')}
         label={translate('editor.scene.backgroundMotion')}
         value={value.mode}
         options={[
