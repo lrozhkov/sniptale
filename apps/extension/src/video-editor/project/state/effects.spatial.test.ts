@@ -221,3 +221,31 @@ it('retains spatial settings through source split rate and duplicate without cou
   ).toEqual(spedRegion.perspective);
   expect(isHydratableVideoProject(store.getState().project)).toBe(true);
 });
+
+it('retains cursor composition through canonical edits, undo, redo, and strict hydration', () => {
+  const { store, region } = setup();
+  store.getState().updateMotionRegion(region.id, {
+    spatialEdit: { kind: 'cursor-composition', mode: 'right', amount: 0.7 },
+  });
+  const after = store.getState().project!;
+  expect(after.version).toBe(51);
+  expect(after.motionRegions?.[0]?.cursorComposition).toEqual({
+    mode: 'right',
+    amount: 0.7,
+    smoothness: 0.6,
+  });
+  expect(isHydratableVideoProject(after)).toBe(true);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, after);
+  if (undo?.status !== 'applied') throw new Error('Expected cursor composition undo');
+  expect(undo.project.motionRegions?.[0]?.cursorComposition).toBeUndefined();
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected cursor composition redo');
+  expect(redo.project.motionRegions?.[0]?.cursorComposition).toEqual(
+    after.motionRegions?.[0]?.cursorComposition
+  );
+  const beforeInvalid = store.getState().project;
+  store
+    .getState()
+    .updateMotionRegion(region.id, { spatialEdit: { kind: 'cursor-composition', amount: 5 } });
+  expect(store.getState().project).toBe(beforeInvalid);
+});

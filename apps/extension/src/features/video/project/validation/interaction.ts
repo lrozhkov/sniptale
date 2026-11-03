@@ -2,6 +2,7 @@ import { isMotionFocusArea } from '../motion/focus-area';
 import { isCursorTrajectoryDescriptor } from '../cursor-trajectory/records';
 import { parseQuickEditBorder, parseQuickEditSpotlight } from '../scene/focus-appearance';
 import {
+  parseCursorCompositionSettings,
   parseCameraPerspective,
   parseCameraDepth,
   parseMotionSpatialReference,
@@ -308,6 +309,7 @@ export function isMotionRegion(value: unknown): boolean {
             value['spotlightTarget'] === 'scene' ||
             value['spotlightTarget'] === 'source-scene') &&
             value['sourceBinding'] !== undefined))) &&
+    parseCursorCompositionSettings(value['cursorComposition']) !== null &&
     parseCameraPerspective(value['perspective']) !== null &&
     parseCameraDepth(value['depthOfField']) !== null &&
     parseMotionSpatialReference(value['spatialReference']) !== null &&

@@ -1,4 +1,7 @@
+import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
 import { ReviewButton } from './controls';
+import { ReviewBackgroundBlurPreview } from './background-blur-preview';
+import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
 import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
 import { createReviewSpatialSession } from '../../workflows/video-review/spatial-render-session';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -27,6 +30,7 @@ import {
 } from '../../features/video/composition/draw/spotlight';
 
 type ZoomCanvasProps = {
+  currentTime?: number | undefined;
   background: QuickEditBackgroundSettings;
   imageUrl: string | null | undefined;
   headerImage?: CanvasImageSource | null | undefined;
@@ -72,6 +76,8 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
         offsetX={offsetX}
         offsetY={offsetY}
         scale={motion.backgroundScale}
+        currentTime={props.currentTime}
+        output={props.output}
       />
       {spatialFailure ? (
         <div role="alert" className="relative z-20 p-2 text-xs">
@@ -152,6 +158,8 @@ function ZoomPreviewBackground({
   offsetX,
   offsetY,
   scale,
+  currentTime,
+  output,
 }: {
   background: QuickEditBackgroundSettings;
   imageUrl: string | null | undefined;
@@ -160,6 +168,8 @@ function ZoomPreviewBackground({
   offsetX: number;
   offsetY: number;
   scale: number;
+  currentTime?: number | undefined;
+  output: { width: number; height: number };
 }) {
   return (
     <div
@@ -171,7 +181,17 @@ function ZoomPreviewBackground({
           view === 'result' ? `translate(${offsetX}%, ${offsetY}%) scale(${scale})` : undefined,
       }}
     >
-      {imageUrl && background.enabled && background.type === 'image' ? (
+      {background.enabled &&
+      background.type !== 'solid' &&
+      hasSceneBackgroundMotion(background.motion) ? (
+        <ReviewBackgroundBlurPreview
+          background={background}
+          imageUrl={imageUrl ?? undefined}
+          width={output.width}
+          height={output.height}
+          currentTime={currentTime}
+        />
+      ) : imageUrl && background.enabled && background.type === 'image' ? (
         <img
           src={imageUrl}
           alt=""
@@ -386,7 +406,8 @@ function useZoomCanvasPaint(
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
-    const paint = () => {
+    const controller = new AbortController();
+    const paint = (frame = props.frame) => {
       const cacheLensBase = props.view === 'result' && !props.live && !!props.lensFrames?.length;
       if (!cacheLensBase) releaseZoomLensBase(cache.current);
       const key = zoomPaintKey(props, canvas, retry);
@@ -401,7 +422,7 @@ function useZoomCanvasPaint(
           camera: props.camera,
           cornerRadius: props.cornerRadius,
           previewScale: props.previewScale ?? 1,
-          frame: props.frame,
+          frame,
           headerImage: props.headerImage,
           height: canvas.height,
           layout: props.layout,
@@ -423,15 +444,33 @@ function useZoomCanvasPaint(
         setFailure(true);
       }
     };
-    paint();
-    if (!props.live) return;
-    let request: number;
-    const tick = () => {
-      paint();
-      request = requestAnimationFrame(tick);
+    let request: number | undefined;
+    const tick = async () => {
+      try {
+        if (props.frame?.image instanceof HTMLVideoElement) {
+          const captured = await prepareDecodedVideoFrame(
+            new VideoFrame(props.frame.image),
+            controller.signal
+          );
+          try {
+            if (!controller.signal.aborted) paint({ ...props.frame, image: captured });
+          } finally {
+            captured.close();
+          }
+        } else if (!controller.signal.aborted) paint();
+      } catch {
+        if (!controller.signal.aborted) setFailure(true);
+      }
+      if (!controller.signal.aborted && props.live)
+        request = requestAnimationFrame(() => {
+          void tick();
+        });
     };
-    request = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(request);
+    void tick();
+    return () => {
+      controller.abort();
+      if (request !== undefined) cancelAnimationFrame(request);
+    };
   }, [
     canvasRef,
     props,

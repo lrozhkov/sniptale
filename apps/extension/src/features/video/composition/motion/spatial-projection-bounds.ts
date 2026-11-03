@@ -234,6 +234,9 @@ export interface QuickEditCameraProjectionInterval {
     to: QuickEditHomography;
     phase: number | CameraTrajectory;
   };
+  orbit?:
+    | { angles: CameraTrajectory }
+    | { from: { x: number; y: number }; to: { x: number; y: number } };
   targetScale: number;
   phase: number | CameraTrajectory;
   pan: CameraPanBounds;
@@ -272,11 +275,7 @@ function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boo
       : null;
   const pan = (axis: 'x' | 'y') =>
     panBounds
-      ? trajectoryJet(
-          panBounds,
-          axis,
-          typeof input.phase !== 'number' || input.planeTransition !== undefined
-        )
+      ? trajectoryJet(panBounds, axis, true)
       : boxed(axis === 'x' ? [input.pan.minX, input.pan.maxX] : [input.pan.minY, input.pan.maxY]);
   const startScale = input.from?.scale ?? 1;
   const translation = (axis: 'x' | 'y') => {
@@ -365,6 +364,7 @@ function projectWindowInterval(input: QuickEditCameraProjectionInterval, motion:
     qy = cameraRasterCoordinate(input, motion, jets, 'y');
   if (qx.value[0] > qx.value[1] || qy.value[0] > qy.value[1]) return null;
   if (
+    !input.orbit &&
     input.perspective.rotateX === 0 &&
     input.perspective.rotateY === 0 &&
     input.perspective.rotateZ === 0 &&
@@ -390,7 +390,8 @@ function projectWindowInterval(input: QuickEditCameraProjectionInterval, motion:
     qy,
     k,
     center(windowRect.x, windowRect.width, tx),
-    center(windowRect.y, windowRect.height, ty)
+    center(windowRect.y, windowRect.height, ty),
+    motion
   );
 }
 
@@ -431,20 +432,50 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
 }
 
 function projectPlaneJets(
-  input: Pick<QuickEditCameraProjectionInterval, 'window' | 'perspective' | 'from'>,
+  input: Pick<
+    QuickEditCameraProjectionInterval,
+    'window' | 'perspective' | 'from' | 'orbit' | 'start' | 'end'
+  >,
   g: ProjectionJet,
   qx: ProjectionJet,
   qy: ProjectionJet,
   k: ProjectionJet,
   centerX: ProjectionJet,
-  centerY: ProjectionJet
+  centerY: ProjectionJet,
+  motion = false
 ) {
   const windowRect = input.window;
   const angle = (axis: 'rotateX' | 'rotateY' | 'rotateZ') => {
     const start = input.from?.perspective[axis] ?? 0;
     const delta = input.perspective[axis] - start;
     const arc = axis === 'rotateZ' ? ((delta + 540) % 360) - 180 : delta;
-    return multiply(constant(Math.PI / 180), add(constant(start), multiply(constant(arc), g)));
+    let angle = add(constant(start), multiply(constant(arc), g));
+    if (input.orbit && axis !== 'rotateZ') {
+      const coordinate = axis === 'rotateX' ? 'x' : 'y';
+      const orbit = input.orbit;
+      const offset =
+        'angles' in orbit
+          ? (() => {
+              const bounds = motion
+                ? trajectoryIntervalBounds(orbit.angles, input.start, input.end)
+                : [cameraTrajectoryBounds(orbit.angles, input.start, input.end)];
+              return motion
+                ? trajectoryJet(bounds, coordinate)
+                : boxed(
+                    coordinate === 'x'
+                      ? [bounds[0]!.minX, bounds[0]!.maxX]
+                      : [bounds[0]!.minY, bounds[0]!.maxY]
+                  );
+            })()
+          : add(
+              constant(orbit.from[coordinate]),
+              multiply(g, constant(orbit.to[coordinate] - orbit.from[coordinate]))
+            );
+      const contribution = 'angles' in orbit ? multiply(g, offset) : offset;
+      // The complete cursor contribution, including its phase envelope, is added follow movement.
+      angle = add(angle, { ...contribution, nominal: zeros, follow: contribution.derivatives });
+    }
+    return multiply(constant(Math.PI / 180), angle);
   };
   const ax = angle('rotateX'),
     ay = angle('rotateY'),
@@ -537,17 +568,17 @@ export function boundQuickEditCameraProjection(
 
 /** Bound added follow movement, including its cross derivatives with authored nominal phases. */
 export function boundQuickEditCameraMotion(input: QuickEditCameraProjectionInterval) {
-  if (!input.trajectory) return { speed: 0, acceleration: 0, jerk: 0 };
+  if (!input.trajectory && !input.orbit) return { speed: 0, acceleration: 0, jerk: 0 };
   const result = projectInterval(input, true);
   if (!result) return null;
   const norm = (order: 0 | 1 | 2) => {
     const x = (
-      typeof input.phase === 'number' && !input.planeTransition
+      typeof input.phase === 'number' && !input.planeTransition && !input.orbit
         ? result.outX.derivatives
         : (result.outX.follow ?? zeros)
     )[order];
     const y = (
-      typeof input.phase === 'number' && !input.planeTransition
+      typeof input.phase === 'number' && !input.planeTransition && !input.orbit
         ? result.outY.derivatives
         : (result.outY.follow ?? zeros)
     )[order];
@@ -567,17 +598,21 @@ export function boundCameraPlaneProjection(input: {
   targetScale: number;
   pan: CameraPanBounds;
   perspective: QuickEditCameraProjectionInterval['perspective'];
+  orbit?: QuickEditCameraProjectionInterval['orbit'];
+  trajectory?: CameraTrajectory;
+  motion?: boolean;
   reference: QuickEditRect;
   source: { x: Range; y: Range };
   output: { width: number; height: number };
   offset: { x: number; y: number };
-}): Pick<CameraProjectionProof, 'denominator' | 'viewport'> | null {
-  const bounds =
-    typeof input.phase === 'number'
-      ? null
-      : cameraTrajectoryBounds(input.phase, input.start, input.end);
-  const g =
-    typeof input.phase === 'number' ? constant(input.phase) : boxed([bounds!.minX, bounds!.maxX]);
+}):
+  | (Pick<CameraProjectionProof, 'denominator' | 'viewport'> & {
+      speed: number;
+      acceleration: number;
+      jerk: number;
+    })
+  | null {
+  const g = projectionPhaseJet(input.phase, input.start, input.end, input.motion === true);
   const scale = add(constant(1), multiply(constant(input.targetScale - 1), g));
   const { reference } = input;
   const center = (axis: 'x' | 'y', size: 'width' | 'height') =>
@@ -588,20 +623,43 @@ export function boundCameraPlaneProjection(input: {
       ),
       multiply(
         g,
-        boxed(axis === 'x' ? [input.pan.minX, input.pan.maxX] : [input.pan.minY, input.pan.maxY])
+        input.motion && input.trajectory
+          ? trajectoryJet(
+              trajectoryIntervalBounds(input.trajectory, input.start, input.end),
+              axis,
+              true
+            )
+          : boxed(
+              axis === 'x' ? [input.pan.minX, input.pan.maxX] : [input.pan.minY, input.pan.maxY]
+            )
       )
     );
   const result = projectPlaneJets(
-    { window: reference, perspective: input.perspective },
+    {
+      window: reference,
+      perspective: input.perspective,
+      start: input.start,
+      end: input.end,
+      ...(input.orbit ? { orbit: input.orbit } : {}),
+    },
     g,
     subtract(boxed(input.source.x), constant(reference.x)),
     subtract(boxed(input.source.y), constant(reference.y)),
     scale,
     center('x', 'width'),
-    center('y', 'height')
+    center('y', 'height'),
+    input.motion
   );
   if (!result) return null;
+  const norm = (order: 0 | 1 | 2) => {
+    const x = (result.outX.follow ?? zeros)[order],
+      y = (result.outY.follow ?? zeros)[order];
+    return Math.hypot(Math.max(...x.map(Math.abs)), Math.max(...y.map(Math.abs)));
+  };
   return {
+    speed: norm(0),
+    acceleration: norm(1),
+    jerk: norm(2),
     denominator: { low: result.denominator.value[0], high: result.denominator.value[1] },
     viewport: {
       low: Math.min(

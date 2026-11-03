@@ -644,6 +644,12 @@ function reviewBackgroundPlaneProps(props: ReviewStageProps) {
       ? computeQuickEditSceneSize({ ...props.scene, source: props.source })
       : props.source,
     imageUrl: props.backgroundImageUrl,
+    currentTime: props.scene?.focus?.time ?? 0,
+    playing: props.preview?.playing,
+    getCurrentTime: () =>
+      props.preview?.sourceToResult(props.video.current?.currentTime ?? 0) ??
+      props.scene?.focus?.time ??
+      0,
   };
 }
 

@@ -15,6 +15,13 @@ afterEach(() => {
 function mountSource(readyState = 2) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const video = document.createElement('video');
+  const normalized = { format: 'RGBA', close: vi.fn() };
+  vi.stubGlobal(
+    'VideoFrame',
+    vi.fn(function () {
+      return normalized;
+    })
+  );
   Object.defineProperties(video, {
     readyState: { value: readyState, configurable: true },
     duration: { value: 12 },
@@ -44,7 +51,12 @@ function mountSource(readyState = 2) {
     act(() => root.unmount());
     dispose = undefined;
   };
-  return { load: (time: number, signal: AbortSignal) => loader!(time, signal), video, revoke };
+  return {
+    load: (time: number, signal: AbortSignal) => loader!(time, signal),
+    video,
+    revoke,
+    normalized,
+  };
 }
 
 it('reuses an already decoded timestamp without waiting for a seek event that never fires', async () => {
@@ -86,4 +98,12 @@ it('times out a source which produces neither data nor an error', async () => {
   );
   await vi.advanceTimersByTimeAsync(10_000);
   await rejected;
+});
+
+it('converts a captured frame before materializing the framing source canvas', async () => {
+  const source = mountSource();
+  await source.load(0, new AbortController().signal);
+  const context = document.createElement('canvas').getContext('2d')!;
+  expect(context.drawImage).toHaveBeenCalledWith(source.normalized, 0, 0);
+  expect(source.normalized.close).toHaveBeenCalledOnce();
 });

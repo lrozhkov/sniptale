@@ -1,3 +1,4 @@
+import { projectCursorSpatialSettings, projectCursorSpatial } from './cursor-orientation';
 import { resolveVideoCompositionActions } from '../timeline/frame/actions';
 import { resolveCursorSample } from '../timeline/frame/cursor';
 import { applySourceWindowCameraMode } from './source-window';
@@ -131,7 +132,7 @@ export function resolveVideoCompositionCamera(params: {
     edges.connectedIn,
     edges.connectedOut
   );
-  const spatial = evaluateMotionSpatial(params.project, null, activeRegion, progress);
+  const spatial = projectCursorSpatial(params.project, activeRegion, params.currentTime, progress);
   const following =
     activeRegion.focusMode === VideoMotionFocusMode.CURSOR
       ? resolveProjectFollowingCamera(
@@ -280,8 +281,11 @@ function resolveConnectingCamera(
       };
       const spatial = evaluateMotionSpatial(
         params.project,
-        { ...source, spatialReference },
-        { ...destination, spatialReference },
+        { ...projectCursorSpatialSettings(params.project, source, start), spatialReference },
+        {
+          ...projectCursorSpatialSettings(params.project, destination, destination.startTime),
+          spatialReference,
+        },
         progress
       );
       return {
@@ -323,7 +327,12 @@ function resolveConnectingCamera(
       resolveMotionTargetScale(params.project, destination),
       progress
     );
-    const spatial = evaluateMotionSpatial(params.project, source, destination, progress);
+    const spatial = evaluateMotionSpatial(
+      params.project,
+      projectCursorSpatialSettings(params.project, source, start),
+      projectCursorSpatialSettings(params.project, destination, destination.startTime),
+      progress
+    );
     return {
       focusPoint,
       scale,

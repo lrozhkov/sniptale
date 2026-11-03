@@ -1,7 +1,15 @@
+import {
+  createQuickEditSpotlight,
+  createQuickEditBorder,
+} from '../../project/scene/focus-appearance';
 import { describe, expect, it } from 'vitest';
 import { evaluateQuickEditCameraAtTime } from './scene';
 import { createQuickEditZoomRegion, updateQuickEditZoomRegion } from './zoom';
-import { quickEditSpatialSpan, quickEditSpatialTargetCamera } from './spatial';
+import {
+  quickEditSpatialSpan,
+  quickEditSpatialTargetCamera,
+  quickEditRegionNeedsSpatialRenderer,
+} from './spatial';
 import {
   DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
   DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
@@ -148,4 +156,60 @@ it('preserves the visual anchor when switching a projected comment between conte
   )!;
   expect(restored.position.x).toBeCloseTo(content.position.x, 6);
   expect(restored.position.y).toBeCloseTo(content.position.y, 6);
+});
+
+it('retains explicit cursor composition through strict reads and refuses older-schema claims', () => {
+  const state = createQuickEditAdvancedState();
+  const cursorComposition = { mode: 'left' as const, amount: 0.7, smoothness: 0.4 };
+  state.zoom = {
+    enabled: true,
+    regions: updateQuickEditZoomRegion([a], a.id, { cursorComposition }),
+  };
+  expect(
+    loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))?.zoom.regions[0]
+      ?.cursorComposition
+  ).toEqual(cursorComposition);
+  expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 27 })).toBeNull();
+  expect(
+    updateQuickEditZoomRegion(state.zoom.regions, a.id, {
+      cursorComposition: { ...cursorComposition, smoothness: NaN },
+    })
+  ).toEqual(state.zoom.regions);
+});
+
+it('uses effective cursor spatial activation while retaining legacy and manual settings', () => {
+  const region = createQuickEditZoomRegion({ id: 'default-cursor', at: 0 });
+  region.cursorFocus = {
+    path: {
+      version: 1,
+      mode: 'follow',
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      gapPolicy: 'hold',
+      segments: [],
+    },
+  };
+  expect(region.perspective).toBeUndefined();
+  expect(quickEditRegionNeedsSpatialRenderer(region)).toBe(true);
+  const manual = {
+    ...region,
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: 20 },
+    depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true },
+  };
+  const off = {
+    ...manual,
+    cursorComposition: { ...region.cursorComposition!, mode: 'off' as const },
+  };
+  expect(quickEditRegionNeedsSpatialRenderer(off)).toBe(false);
+  const { cursorFocus: _cursor, ...manualMode } = off;
+  expect(quickEditRegionNeedsSpatialRenderer(manualMode)).toBe(true);
+  const { cursorComposition: _composition, ...legacy } = manual;
+  expect(quickEditRegionNeedsSpatialRenderer(legacy)).toBe(true);
+  expect(quickEditRegionNeedsSpatialRenderer({ ...region, dormant: true })).toBe(false);
+  expect(
+    quickEditRegionNeedsSpatialRenderer({ ...region, spotlight: createQuickEditSpotlight() })
+  ).toBe(false);
+  expect(quickEditRegionNeedsSpatialRenderer({ ...region, border: createQuickEditBorder() })).toBe(
+    false
+  );
 });

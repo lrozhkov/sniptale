@@ -5,6 +5,11 @@ import {
   type CameraFollowSettings,
 } from '../../features/video/project/camera/cursor-policy';
 import { ReviewSpatialInspector } from './spatial-inspector';
+import {
+  CameraCompositionControls,
+  CameraFollowTargetControls,
+} from '../../ui/camera-composition-controls';
+import { DEFAULT_CURSOR_COMPOSITION } from '../../features/video/project/motion/spatial';
 import { useContext, useState } from 'react';
 import { ReviewSpatialToolContext } from './spatial-controls';
 import type { SpatialTool } from './spatial-gesture';
@@ -129,6 +134,14 @@ export function ReviewZoomInspector(props: {
   const [resetTarget, setResetTarget] = useState<HTMLDivElement | null>(null);
   const map = useContext(ReviewIntervalMap);
   const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
+  const following = region.followCursor ?? props.cursorPath?.mode === 'follow';
+  const cursorAvailable =
+    props.cursorPath?.segments.some(
+      (segment) =>
+        segment.keys.length > 0 &&
+        segment.end >= (sourceRange?.start ?? region.start) &&
+        segment.start <= (sourceRange?.end ?? region.end)
+    ) ?? false;
   return (
     <ReviewSpatialToolContext.Provider value={{ tool, onTool, resetTarget }}>
       <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
@@ -159,6 +172,20 @@ export function ReviewZoomInspector(props: {
                       onChange={onChange}
                       blocked={props.zoomConversionBlocked ?? false}
                     />
+                    {!region.border && !region.spotlight ? (
+                      <CameraFollowTargetControls
+                        following={following}
+                        cursorAvailable={cursorAvailable}
+                        onChange={(followCursor) =>
+                          onChange({
+                            followCursor,
+                            ...(followCursor && !region.cursorComposition
+                              ? { cursorComposition: { ...DEFAULT_CURSOR_COMPOSITION } }
+                              : {}),
+                          })
+                        }
+                      />
+                    ) : null}
                     {props.preview}
                   </div>
                   <div className="min-w-0 space-y-2">
@@ -166,36 +193,32 @@ export function ReviewZoomInspector(props: {
                       region={region}
                       previewRegion={props.spatialPreview}
                       tool={tool}
-                      followCursor={region.followCursor ?? props.cursorPath?.mode === 'follow'}
-                      cursorAvailable={
-                        props.cursorPath?.segments.some(
-                          (segment) =>
-                            segment.keys.length > 0 &&
-                            segment.end >= (sourceRange?.start ?? region.start) &&
-                            segment.start <= (sourceRange?.end ?? region.end)
-                        ) ?? false
-                      }
+                      followCursor={following}
+                      cursorAvailable={cursorAvailable}
                       onChange={onChange}
                       onPreview={props.onPreview}
                     />
-                    {!region.border &&
-                    !region.spotlight &&
-                    (region.followCursor ?? props.cursorPath?.mode === 'follow') ? (
-                      <ReviewCameraFollowSettings
-                        settings={
-                          resolveCameraFollowPolicy({
-                            legacySensitivity: props.cursorPath?.sensitivity ?? 0.5,
-                            ...(props.cameraFollowDefaults
-                              ? { defaults: props.cameraFollowDefaults }
-                              : {}),
-                            ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
-                          }).settings
-                        }
-                        inherited={!region.cameraFollow}
-                        legacySensitivity={props.cursorPath?.sensitivity ?? 0.5}
-                        onChange={(cameraFollow) => onChange({ cameraFollow })}
-                        onReset={() => onChange({ cameraFollow: null })}
-                      />
+                    {!region.border && !region.spotlight && following ? (
+                      <ReviewDetails
+                        preferenceId="gallery.videoReview.cameraFollowPolicy"
+                        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+                      >
+                        <ReviewCameraFollowSettings
+                          settings={
+                            resolveCameraFollowPolicy({
+                              legacySensitivity: props.cursorPath?.sensitivity ?? 0.5,
+                              ...(props.cameraFollowDefaults
+                                ? { defaults: props.cameraFollowDefaults }
+                                : {}),
+                              ...(region.cameraFollow ? { override: region.cameraFollow } : {}),
+                            }).settings
+                          }
+                          inherited={!region.cameraFollow}
+                          legacySensitivity={props.cursorPath?.sensitivity ?? 0.5}
+                          onChange={(cameraFollow) => onChange({ cameraFollow })}
+                          onReset={() => onChange({ cameraFollow: null })}
+                        />
+                      </ReviewDetails>
                     ) : null}
                     {props.preview && !region.border && !region.spotlight ? (
                       <div ref={setResetTarget} />
@@ -311,6 +334,20 @@ function ReviewFocusParameters(props: FocusParameterProps) {
         />
       </>
     );
+  if (props.followCursor)
+    return (
+      <>
+        <ReviewZoomPositionFields {...props} />
+        <CameraCompositionControls
+          value={region.cursorComposition}
+          previewValue={props.previewRegion?.cursorComposition}
+          onPreview={(cursorComposition) =>
+            props.onPreview?.(cursorComposition ? { cursorComposition } : null)
+          }
+          onChange={(cursorComposition) => onChange({ cursorComposition })}
+        />
+      </>
+    );
   if (props.tool === 'position') return <ReviewZoomPositionFields {...props} />;
   return (
     <ReviewSpatialInspector
@@ -328,25 +365,6 @@ function ReviewZoomPositionFields(props: FocusParameterProps) {
   const { region, onChange } = props;
   return (
     <>
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('videoEditor.sidebar.cursorFocusMode')}
-        value={props.followCursor ? 'follow' : 'fixed'}
-        options={[
-          { value: 'fixed', label: translate('videoEditor.sidebar.cursorFocusFixed') },
-          {
-            value: 'follow',
-            label: translate('videoEditor.sidebar.cursorFocusFollow'),
-            disabled: !props.cursorAvailable,
-          },
-        ]}
-        onChange={(mode) => onChange({ followCursor: mode === 'follow' })}
-      />
-      {!props.cursorAvailable ? (
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('videoEditor.sidebar.cursorFocusUnavailable')}
-        </p>
-      ) : null}
       <ReviewPreviewNumberRow
         enterBehavior="blur"
         label={translate('gallery.videoReview.zoomScale')}
@@ -359,47 +377,53 @@ function ReviewZoomPositionFields(props: FocusParameterProps) {
         value={region.transform.scale}
         previewValue={props.previewRegion?.transform.scale}
         onPreview={(scale) => {
-          if (!props.followCursor) props.onPreview?.(scale === null ? null : { scale });
+          props.onPreview?.(scale === null ? null : { scale });
         }}
         onChange={(scale) => onChange({ scale })}
       />
-      <ReviewDetails
-        preferenceId="gallery.videoReview.precisePosition"
-        label={translate('gallery.videoReview.precisePosition')}
-      >
-        <ReviewPreviewNumberRow
-          enterBehavior="blur"
-          label={translate('gallery.videoReview.zoomFocusX')}
-          disabled={props.followCursor ?? false}
-          unit="%"
-          min={0}
-          max={100}
-          step={1}
-          precision={1}
-          value={region.transform.centerX * 100}
-          previewValue={
-            props.previewRegion ? props.previewRegion.transform.centerX * 100 : undefined
-          }
-          onPreview={(value) => props.onPreview?.(value === null ? null : { centerX: value / 100 })}
-          onChange={(value) => onChange({ centerX: value / 100 })}
-        />
-        <ReviewPreviewNumberRow
-          enterBehavior="blur"
-          label={translate('gallery.videoReview.zoomFocusY')}
-          disabled={props.followCursor ?? false}
-          unit="%"
-          min={0}
-          max={100}
-          step={1}
-          precision={1}
-          value={region.transform.centerY * 100}
-          previewValue={
-            props.previewRegion ? props.previewRegion.transform.centerY * 100 : undefined
-          }
-          onPreview={(value) => props.onPreview?.(value === null ? null : { centerY: value / 100 })}
-          onChange={(value) => onChange({ centerY: value / 100 })}
-        />
-      </ReviewDetails>
+      {!props.followCursor ? (
+        <ReviewDetails
+          preferenceId="gallery.videoReview.precisePosition"
+          label={translate('gallery.videoReview.precisePosition')}
+        >
+          <ReviewPreviewNumberRow
+            enterBehavior="blur"
+            label={translate('gallery.videoReview.zoomFocusX')}
+            disabled={props.followCursor ?? false}
+            unit="%"
+            min={0}
+            max={100}
+            step={1}
+            precision={1}
+            value={region.transform.centerX * 100}
+            previewValue={
+              props.previewRegion ? props.previewRegion.transform.centerX * 100 : undefined
+            }
+            onPreview={(value) =>
+              props.onPreview?.(value === null ? null : { centerX: value / 100 })
+            }
+            onChange={(value) => onChange({ centerX: value / 100 })}
+          />
+          <ReviewPreviewNumberRow
+            enterBehavior="blur"
+            label={translate('gallery.videoReview.zoomFocusY')}
+            disabled={props.followCursor ?? false}
+            unit="%"
+            min={0}
+            max={100}
+            step={1}
+            precision={1}
+            value={region.transform.centerY * 100}
+            previewValue={
+              props.previewRegion ? props.previewRegion.transform.centerY * 100 : undefined
+            }
+            onPreview={(value) =>
+              props.onPreview?.(value === null ? null : { centerY: value / 100 })
+            }
+            onChange={(value) => onChange({ centerY: value / 100 })}
+          />
+        </ReviewDetails>
+      ) : null}
     </>
   );
 }

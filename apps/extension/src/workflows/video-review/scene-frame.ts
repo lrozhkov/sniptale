@@ -337,6 +337,7 @@ function drawReviewSceneSample(
     deferComments?: boolean;
     comments?: readonly CanvasCommentExport[];
     sourceTime?: number;
+    currentTime?: number | undefined;
     cameraScale?: number;
     sceneScale?: number;
   },
@@ -392,6 +393,7 @@ function drawReviewSceneBackground(
     image,
     backgroundCacheContext,
     backgroundPainter,
+    currentTime,
   }: Parameters<typeof drawReviewSceneSample>[1]
 ) {
   context.fillStyle = '#000000';
@@ -403,7 +405,7 @@ function drawReviewSceneBackground(
     context.scale(motion.backgroundScale, motion.backgroundScale);
   }
   try {
-    const paint = { background, image, width: canvas.width, height: canvas.height };
+    const paint = { background, image, width: canvas.width, height: canvas.height, currentTime };
     if (backgroundPainter) backgroundPainter.draw(context, paint);
     else drawReviewBackgroundPaint(context, paint, backgroundCacheContext);
   } finally {

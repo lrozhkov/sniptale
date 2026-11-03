@@ -568,6 +568,7 @@ function mergeMotionRegionProperties(
     ...properties
   } = patch;
   const {
+    cursorComposition: _cursorComposition,
     perspective: _perspective,
     depthOfField: _depth,
     spatialReference: _reference,
@@ -575,6 +576,7 @@ function mergeMotionRegionProperties(
   } = transition ?? region;
   let updated = {
     ...(spatial ? withoutSpatial : (transition ?? region)),
+    ...(spatial?.cursorComposition ? { cursorComposition: spatial.cursorComposition } : {}),
     ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
     ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
     ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),

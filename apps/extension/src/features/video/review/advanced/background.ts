@@ -22,6 +22,7 @@ const clampLayout = (layout: QuickEditBackgroundLayout): QuickEditBackgroundLayo
 });
 
 export interface QuickEditBackgroundPatch {
+  motion?: QuickEditBackgroundSettings['motion'];
   zoomBehavior?: QuickEditBackgroundSettings['zoomBehavior'];
   enabled?: boolean;
   type?: 'solid' | 'gradient' | 'image';
@@ -41,7 +42,10 @@ export function updateQuickEditBackground(
   patch: QuickEditBackgroundPatch
 ): QuickEditBackgroundSettings {
   const zoomBehavior = patch.zoomBehavior ?? background.zoomBehavior;
-  const motion = zoomBehavior ? { zoomBehavior } : {};
+  const motion = {
+    ...(zoomBehavior ? { zoomBehavior } : {}),
+    ...((patch.motion ?? background.motion) ? { motion: patch.motion ?? background.motion } : {}),
+  };
   const image =
     background.enabled && background.type === 'image'
       ? { assetId: background.assetId, imageFit: background.imageFit }

@@ -15,6 +15,7 @@ import {
   VideoMotionFocusMode,
   VideoCursorCaptureMode,
   VideoTemporalEasing,
+  type VideoProjectMotionRegion,
 } from '../../project/types';
 import { resolveProjectCursorCameraPlan, resolveProjectFollowingCamera } from './project-follow';
 
@@ -572,6 +573,132 @@ it.each([0, 3.05, 0.05])(
     expect(actual.scale).toBeCloseTo(expected.scale, 6);
     expect(actual.viewportX).toBeCloseTo(expected.viewportX, 6);
     expect(actual.viewportY).toBeCloseTo(expected.viewportY, 6);
+    expect(candidate).toEqual(before);
+  }
+);
+
+it.each(['canvas', 'window'] as const)(
+  'admits and renders deterministic cursor orbit with saved manual values retained (%s)',
+  (target) => {
+    const { project, region } = fixture();
+    const manual = { enabled: true, rotateX: 25, rotateY: 35, rotateZ: 15, strength: 0.8 };
+    let authored: VideoProjectMotionRegion = {
+      ...region,
+      perspective: manual,
+      cursorComposition: { mode: 'orbit' as const, amount: 0.5, smoothness: 0.6 },
+    };
+    if (target === 'window') {
+      const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+      const bound = bindMotionRegionToClip(authored, clip);
+      authored = {
+        ...authored,
+        ...bound,
+        sourceBinding: { ...bound.sourceBinding!, coordinateSpace: 'source-window' },
+      };
+    }
+    const samples = project.cursorTrack!.samples.map((sample, index) => ({
+      ...sample,
+      x: 530 + index * 60,
+      recordingPoint: { x: 0.53 + index * 0.06, y: 0.5 },
+    }));
+    const candidate = {
+      ...project,
+      cursorTrack: { ...project.cursorTrack!, samples },
+      motionRegions: [authored],
+    };
+    const before = structuredClone(candidate);
+    expect(resolveProjectCursorCameraPlan(candidate, authored).status).toBe('ready');
+    const render = (time: number) =>
+      resolveVideoCompositionCamera({
+        project: candidate,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+    const first = render(0.5),
+      last = render(2.5);
+    expect(first.spatial).toBeDefined();
+    expect(last.spatial?.rotation).not.toEqual(first.spatial?.rotation);
+    expect(render(0.5)).toEqual(first);
+    expect(candidate).toEqual(before);
+    const offRegion = {
+      ...authored,
+      cursorComposition: { mode: 'off' as const, amount: 0.5, smoothness: 0.6 },
+    };
+    const off = resolveVideoCompositionCamera({
+      project: { ...candidate, motionRegions: [offRegion] },
+      currentTime: 1.5,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(off.spatial).toBeUndefined();
+    const manualRegion = { ...authored, focusMode: VideoMotionFocusMode.MANUAL };
+    const restored = resolveVideoCompositionCamera({
+      project: { ...candidate, motionRegions: [manualRegion] },
+      currentTime: 1.5,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(restored.spatial?.rotation).not.toEqual(first.spatial?.rotation);
+  }
+);
+
+it.each(['content', 'fixed', 'follow-video'] as const)(
+  'ignores retained manual spatial settings for Cursor Off across window policy and admission (%s)',
+  (zoomBehavior) => {
+    const { project, region } = fixture();
+    const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+    const bound = bindMotionRegionToClip(region, clip);
+    const saved: VideoProjectMotionRegion = {
+      ...bound,
+      sourceBinding: { ...bound.sourceBinding!, coordinateSpace: 'source-window' },
+      cursorComposition: { mode: 'off', amount: 0.5, smoothness: 0.6 },
+      perspective: { enabled: true, rotateX: 25, rotateY: 35, rotateZ: 15, strength: 0.8 },
+      depthOfField: {
+        enabled: true,
+        mode: 'depth',
+        x: 0.5,
+        y: 0.5,
+        width: 0.2,
+        softness: 0.3,
+        strength: 0.7,
+      },
+    };
+    const { perspective: _perspective, depthOfField: _depth, ...clean } = saved;
+    const candidate = {
+      ...project,
+      motionRegions: [saved],
+      sceneBackground: { kind: 'solid' as const, color: '#111111', zoomBehavior },
+    };
+    const reference = { ...candidate, motionRegions: [clean] };
+    const before = structuredClone(candidate);
+    expect(resolveProjectCursorCameraPlan(candidate, saved)).toEqual(
+      resolveProjectCursorCameraPlan(reference, clean)
+    );
+    const render = (input: typeof candidate, time: number) =>
+      resolveVideoCompositionCamera({
+        project: input,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+    for (const time of [0.25, 1.5, 2.75]) {
+      const camera = render(candidate, time);
+      expect(camera).toEqual(render(reference, time));
+      expect(camera.spatial).toBeUndefined();
+      if (zoomBehavior === 'follow-video') expect(camera.backgroundCamera).toBeDefined();
+      else {
+        expect(camera.scale).toBe(1);
+        expect(camera.sourceContentTransform).toBeDefined();
+        expect(camera.backgroundCamera).toBeUndefined();
+      }
+    }
+    const manual = { ...saved, focusMode: VideoMotionFocusMode.MANUAL };
+    const { cursorComposition: _composition, ...originalManual } = manual;
+    const restored = render({ ...candidate, motionRegions: [manual] }, 1.5);
+    expect(restored).toEqual(render({ ...candidate, motionRegions: [originalManual] }, 1.5));
+    expect(restored.spatial?.lockBackground).toBe(true);
+    expect(restored.spatial?.focus[0]?.settings.enabled).toBe(true);
     expect(candidate).toEqual(before);
   }
 );

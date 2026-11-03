@@ -4,6 +4,8 @@ import {
 } from '../../project/scene/focus-appearance';
 import { fitCameraTransitionDurations } from '../../project/motion/transitions';
 import {
+  DEFAULT_CURSOR_COMPOSITION,
+  parseCursorCompositionSettings,
   parseCameraPerspective as parseQuickEditPerspective,
   parseCameraDepth as parseQuickEditDepth,
 } from '../../project/motion/spatial';
@@ -77,6 +79,7 @@ export function createQuickEditZoomRegion(args: {
   const start = args.at;
   return fitQuickEditZoomTransitions({
     id: args.id,
+    cursorComposition: { ...DEFAULT_CURSOR_COMPOSITION },
     ...(args.sourceAnchor ? { sourceAnchor: args.sourceAnchor } : {}),
     start,
     end: Math.min(start + duration, endMax),
@@ -89,6 +92,7 @@ export function createQuickEditZoomRegion(args: {
 export type QuickEditZoomRegionPatch = {
   cameraFollow?: QuickEditZoomRegion['cameraFollow'] | null;
   followCursor?: boolean;
+  cursorComposition?: QuickEditZoomRegion['cursorComposition'];
   perspective?: QuickEditZoomRegion['perspective'];
   depthOfField?: QuickEditZoomRegion['depthOfField'];
   motionBlur?: QuickEditZoomRegion['motionBlur'];
@@ -112,6 +116,7 @@ export function updateQuickEditZoomRegion(
   patch: QuickEditZoomRegionPatch
 ): QuickEditZoomRegion[] {
   if (
+    parseCursorCompositionSettings(patch.cursorComposition) === null ||
     parseQuickEditPerspective(patch.perspective) === null ||
     parseQuickEditDepth(patch.depthOfField) === null
   )
@@ -145,6 +150,7 @@ export function updateQuickEditZoomRegion(
       ...rest,
       ...(cameraFollow ? { cameraFollow } : {}),
       ...(patch.followCursor === undefined ? {} : { followCursor: patch.followCursor }),
+      ...(patch.cursorComposition ? { cursorComposition: patch.cursorComposition } : {}),
       ...(patch.perspective ? { perspective: patch.perspective } : {}),
       ...(patch.depthOfField ? { depthOfField: patch.depthOfField } : {}),
       ...(patch.motionBlur ? { motionBlur: normalizeMotionBlur(patch.motionBlur) } : {}),

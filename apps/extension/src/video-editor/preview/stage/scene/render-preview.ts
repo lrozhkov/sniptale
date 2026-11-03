@@ -1,3 +1,4 @@
+import { prepareDecodedVideoFrame } from '../../../../features/video/composition/draw/decoded-sample';
 import {
   isVideoCompositionFrameSource,
   type VideoCompositionMediaSource,
@@ -189,6 +190,36 @@ export async function renderPreviewScene(params: PreviewSceneParams): Promise<vo
   }
 }
 
+/** A capture owns its normalized frames until all composition consumers finish. */
+function capturePreviewSceneVideos(
+  media: Map<string, VideoCompositionMediaSource>,
+  videos: readonly HTMLMediaElement[],
+  signal?: AbortSignal
+) {
+  const frames: VideoFrame[] = [];
+  const release = () => {
+    for (const frame of frames) frame.close();
+  };
+  const captureSignal = signal ?? new AbortController().signal;
+  const sources = [...media].filter(
+    (entry): entry is [string, HTMLVideoElement] =>
+      entry[1] instanceof HTMLVideoElement && entry[1].videoWidth > 0 && videos.includes(entry[1])
+  );
+  const prepare = async () => {
+    for (const [clipId, source] of sources) {
+      const captured = await prepareDecodedVideoFrame(new VideoFrame(source), captureSignal);
+      frames.push(captured);
+      captureSignal.throwIfAborted();
+      media.set(clipId, {
+        sourceWidth: captured.displayWidth,
+        sourceHeight: captured.displayHeight,
+        draw: (context, x, y, width, height) => context.drawImage(captured, x, y, width, height),
+      });
+    }
+  };
+  return { ready: sources.length ? prepare() : undefined, release };
+}
+
 async function renderPreparedPreviewScene(
   params: PreviewSceneParams,
   watermark?: Awaited<ReturnType<VideoProjectWatermarkRenderer['prepare']>>
@@ -215,7 +246,9 @@ async function renderPreparedPreviewScene(
   };
   for (const video of videos) video.addEventListener('seeking', invalidate);
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
+  const capture = capturePreviewSceneVideos(clipMediaElements, videos, params.signal);
   try {
+    if (capture.ready) await capture.ready;
     if (params.prepareImages) {
       await params.prepareImages([
         renderPasses.overlayFrame,
@@ -233,7 +266,14 @@ async function renderPreparedPreviewScene(
       renderPasses,
       clipMediaElements
     );
-    if (mediaChanged || !arePreviewSceneVideosReady(renderPasses, clipMediaElements)) return false;
+    if (
+      mediaChanged ||
+      videos.some(
+        (video) => video.seeking || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+      ) ||
+      !arePreviewSceneVideosReady(renderPasses, clipMediaElements)
+    )
+      return false;
     if (params.signal?.aborted) return;
     const drawn = await drawResolvedPreviewScene({
       clipMediaElements,
@@ -247,7 +287,11 @@ async function renderPreparedPreviewScene(
     if (!drawn) return false;
   } finally {
     for (const video of videos) video.removeEventListener('seeking', invalidate);
-    disposeEffectRuntimeComposition(effectRuntimeFrames);
+    try {
+      disposeEffectRuntimeComposition(effectRuntimeFrames);
+    } finally {
+      capture.release();
+    }
   }
 }
 

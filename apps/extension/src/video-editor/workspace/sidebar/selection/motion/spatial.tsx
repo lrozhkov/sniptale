@@ -11,6 +11,7 @@ import { ToggleField } from '../../../../../ui/compact-inspector-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { InspectorActionButton } from '../shared/actions';
 import { OptionButtonsField } from '../shared/option-buttons';
+import { CameraCompositionControls } from '../../../../../ui/camera-composition-controls';
 
 type SpatialFieldProps = {
   motionRegion: VideoProjectMotionRegion;
@@ -40,6 +41,21 @@ const perspectiveLabels = {
   rotateZ: 'gallery.videoReview.perspectiveZ',
   strength: 'gallery.videoReview.perspectiveStrength',
 } as const;
+
+/** Automatic settings use the same disposable preview and single history commit as manual poses. */
+export function MotionCursorCompositionFields(props: SpatialFieldProps) {
+  const editing = useMotionSpatialEditing(props);
+  return (
+    <CameraCompositionControls
+      value={props.motionRegion.cursorComposition}
+      previewValue={editing.presented.cursorComposition}
+      onPreview={(value) =>
+        editing.preview(value ? { kind: 'cursor-composition', ...value } : null)
+      }
+      onChange={(value) => editing.commit({ kind: 'cursor-composition', ...value })}
+    />
+  );
+}
 
 export function MotionPerspectiveFields(props: SpatialFieldProps) {
   const editing = useMotionSpatialEditing(props);

@@ -1,4 +1,9 @@
 import {
+  cursorOrientationInterval,
+  createWindowCursorProjection,
+  type CursorOrientationPlan,
+} from './cursor-orientation';
+import {
   proveCameraPlan,
   type CameraPlanSpan,
   type CameraProofGeometry,
@@ -14,7 +19,6 @@ import {
   type ResolvedCameraFollowPolicy,
 } from '../../project/camera/cursor-policy';
 import {
-  interpolateCameraSpatial as interpolateQuickEditSpatial,
   hasCameraPerspective as hasQuickEditPerspective,
   type CameraSpatialRect,
   type CameraSpatialSettings,
@@ -34,7 +38,6 @@ import {
 import {
   invertQuickEditProjection,
   projectQuickEditPoint,
-  quickEditPlaneProjection,
   type QuickEditHomography,
 } from './spatial-geometry';
 
@@ -86,6 +89,7 @@ function mergeWindowProjectionBounds(
 
 /** Shared decorated-window geometry; each editor owns its topology and observations. */
 export function createWindowCameraGeometry(input: {
+  orientationPlan?: CursorOrientationPlan;
   output: { width: number; height: number };
   window: CameraSpatialRect;
   video: CameraSpatialRect;
@@ -169,30 +173,8 @@ export function createWindowCameraGeometry(input: {
     const phase = phaseAt(time);
     return typeof phase === 'number' ? phase : evaluateCameraTrajectory(phase, time).x;
   };
-  const perspective = hasQuickEditPerspective(region.perspective)
-    ? {
-        rotateX: region.perspective.rotateX,
-        rotateY: region.perspective.rotateY,
-        rotateZ: ((region.perspective.rotateZ + 540) % 360) - 180,
-        strength: region.perspective.strength,
-      }
-    : { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 };
   const windowWeight = input.windowWeight;
-  const projections = new Map<string, QuickEditHomography>();
-  const projectionAt = (progress: number, scale: number) => {
-    const key = `${progress}:${scale}`;
-    let projection = projections.get(key);
-    if (!projection) {
-      projection = quickEditPlaneProjection(
-        input.window,
-        { ...input.window, width: input.window.width * scale, height: input.window.height * scale },
-        interpolateQuickEditSpatial(null, region, progress)
-      );
-      projections.set(key, projection);
-      if (projections.size > 32) projections.delete(projections.keys().next().value ?? '');
-    }
-    return projection;
-  };
+  const { perspective, at: projectionAt } = createWindowCursorProjection(input);
   const outputPlane = (time: number) => {
     const plane = input.intervalPlane?.(time, time);
     const transition = plane?.planeTransition;
@@ -245,6 +227,8 @@ export function createWindowCameraGeometry(input: {
     // Proof cells must split where the camera clock stops.
     if (input.phaseHoldAt !== undefined && start < input.phaseHoldAt && end > input.phaseHoldAt)
       return null;
+    const orbit = cursorOrientationInterval(input.orientationPlan, start, end);
+    if (orbit === null) return null;
     const plane = input.intervalPlane?.(start, end);
     if (input.intervalPlane && !plane) return null;
     return {
@@ -257,6 +241,7 @@ export function createWindowCameraGeometry(input: {
       cornerRadius: input.cornerRadius,
       ...(input.planeTransform ? { planeTransform: input.planeTransform } : {}),
       perspective,
+      ...(orbit ? { orbit: { angles: orbit } } : {}),
       windowWeight,
       phase: phaseAt((start + end) / 2),
       ...plane,
@@ -289,9 +274,15 @@ export function createWindowCameraGeometry(input: {
       ...(!input.connectedOut && region.exit.type === 'instant' ? [exitStart] : []),
       region.end,
       ...(input.planeBreaks ?? []),
+      ...(input.orientationPlan?.breaks ?? []),
     ].filter((time): time is number => time !== undefined),
     discontinuities(targetScale) {
-      if (targetScale === 1 && !hasQuickEditPerspective(region.perspective)) return [];
+      if (
+        targetScale === 1 &&
+        !hasQuickEditPerspective(region.perspective) &&
+        !input.orientationPlan
+      )
+        return [];
       const times: number[] = [];
       const hold = input.phaseHoldAt;
       if (hold !== undefined) {
@@ -347,10 +338,14 @@ export function createWindowCameraGeometry(input: {
         x: input.video.x + frame.actual.x * input.video.width,
         y: input.video.y + frame.actual.y * input.video.height,
       };
-      if (windowWeight !== 'window' && hasQuickEditPerspective(region.perspective)) return null;
+      if (
+        windowWeight !== 'window' &&
+        (hasQuickEditPerspective(region.perspective) || input.orientationPlan)
+      )
+        return null;
       const point =
         windowWeight === 'window'
-          ? projectQuickEditPoint(projectionAt(progress, scale), native)
+          ? projectQuickEditPoint(projectionAt(progress, scale, frame.time), native)
           : {
               x: input.window.x + scale * (native.x - input.window.x),
               y: input.window.y + scale * (native.y - input.window.y),
@@ -385,7 +380,7 @@ export function createWindowCameraGeometry(input: {
         y: input.video.y + frame.y * input.video.height,
       };
       if (windowWeight === 'content') {
-        const inverse = invertQuickEditProjection(projectionAt(1, 1));
+        const inverse = invertQuickEditProjection(projectionAt(1, 1, frame.time));
         const desired =
           inverse &&
           projectQuickEditPoint(inverse, { x: input.output.width / 2, y: input.output.height / 2 });
@@ -396,7 +391,7 @@ export function createWindowCameraGeometry(input: {
             }
           : { x: 0, y: 0 };
       }
-      const projected = projectQuickEditPoint(projectionAt(1, targetScale), basePoint);
+      const projected = projectQuickEditPoint(projectionAt(1, targetScale, frame.time), basePoint);
       return projected
         ? {
             x: projected.x - (outputCenter?.x ?? input.output.width / 2),
@@ -528,12 +523,14 @@ export function createWindowCameraLinkGeometry(input: {
     scale: number;
     pan: { x: number; y: number };
     perspective?: CameraSpatialSettings['perspective'];
+    cursorOffset?: { x: number; y: number };
   };
   to: {
     start: number;
     scale: number;
     pan: { x: number; y: number };
     perspective?: CameraSpatialSettings['perspective'];
+    cursorOffset?: { x: number; y: number };
   };
   policy: ResolvedCameraFollowPolicy;
 }) {
@@ -568,13 +565,29 @@ export function createWindowCameraLinkGeometry(input: {
     phase: input.type === 'instant' && b === start ? 0 : phase,
     pan,
     windowWeight: input.windowWeight,
-    perspective: perspective(input.to.perspective),
-    targetWindowMotion: hasQuickEditPerspective(input.to.perspective) ? 1 : 0,
+    perspective: {
+      ...perspective(input.to.perspective),
+      ...(input.to.cursorOffset && !input.to.perspective?.enabled ? { strength: 0.5 } : {}),
+    },
+    ...(input.from.cursorOffset || input.to.cursorOffset
+      ? {
+          orbit: {
+            from: input.from.cursorOffset ?? { x: 0, y: 0 },
+            to: input.to.cursorOffset ?? { x: 0, y: 0 },
+          },
+        }
+      : {}),
+    targetWindowMotion:
+      hasQuickEditPerspective(input.to.perspective) || input.to.cursorOffset ? 1 : 0,
     from: {
       scale: input.from.scale,
       pan: input.from.pan,
-      perspective: perspective(input.from.perspective),
-      windowMotion: hasQuickEditPerspective(input.from.perspective) ? 1 : 0,
+      perspective: {
+        ...perspective(input.from.perspective),
+        ...(input.from.cursorOffset && !input.from.perspective?.enabled ? { strength: 0.5 } : {}),
+      },
+      windowMotion:
+        hasQuickEditPerspective(input.from.perspective) || input.from.cursorOffset ? 1 : 0,
     },
   });
   const geometry: CameraProofGeometry = {

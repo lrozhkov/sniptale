@@ -77,6 +77,7 @@ function cameraControlKey(region: VideoProjectMotionRegion) {
     easing: region.easing,
     targetAction: region.targetAction,
     cameraFollow: region.cameraFollow,
+    cursorComposition: region.cursorComposition,
     phaseTransitions: region.phaseTransitions,
     perspective: region.perspective,
     depthOfField: region.depthOfField,

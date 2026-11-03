@@ -23,6 +23,7 @@ import {
 import { ManualFocusFields } from './focus';
 import { DetailItem, DetailList } from '../shared/panel';
 import { SliderField } from '../shared/sliders';
+import { MotionCursorCompositionFields } from './spatial';
 
 export function MotionCameraFields(props: {
   motionRegion: VideoProjectMotionRegion;
@@ -30,6 +31,7 @@ export function MotionCameraFields(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
+      <MotionFocusModeField motionRegion={props.motionRegion} panel={props.panel} />
       {props.motionRegion.sourceBinding ? (
         <OptionButtonsField<'scene' | 'window'>
           label={translate('videoEditor.sidebar.motionCoverage')}
@@ -53,28 +55,35 @@ export function MotionCameraFields(props: {
         <MotionFramingPreview {...props} />
       ) : null}
       <MotionScaleFields motionRegion={props.motionRegion} panel={props.panel} />
-      <MotionFocusModeField motionRegion={props.motionRegion} panel={props.panel} />
       {props.motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? (
-        <InspectCameraFollowSettings
-          settings={
-            resolveCameraFollowPolicy({
-              legacySensitivity: resolveProjectCursorFocusPath(props.panel.project).sensitivity,
-              ...(props.panel.project.cameraFollowDefaults
-                ? { defaults: props.panel.project.cameraFollowDefaults }
-                : {}),
-              ...(props.motionRegion.cameraFollow
-                ? { override: props.motionRegion.cameraFollow }
-                : {}),
-            }).settings
-          }
-          legacySensitivity={resolveProjectCursorFocusPath(props.panel.project).sensitivity}
-          inherited={!props.motionRegion.cameraFollow}
-          onChange={(cameraFollow) =>
-            props.panel.onUpdateMotionRegion(props.motionRegion.id, {
-              cameraFollow: cameraFollow ?? null,
-            })
-          }
-        />
+        <>
+          <MotionCursorCompositionFields {...props} />
+          <InspectorDetails
+            preferenceId="motion:camera-follow-policy"
+            label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+          >
+            <InspectCameraFollowSettings
+              settings={
+                resolveCameraFollowPolicy({
+                  legacySensitivity: resolveProjectCursorFocusPath(props.panel.project).sensitivity,
+                  ...(props.panel.project.cameraFollowDefaults
+                    ? { defaults: props.panel.project.cameraFollowDefaults }
+                    : {}),
+                  ...(props.motionRegion.cameraFollow
+                    ? { override: props.motionRegion.cameraFollow }
+                    : {}),
+                }).settings
+              }
+              legacySensitivity={resolveProjectCursorFocusPath(props.panel.project).sensitivity}
+              inherited={!props.motionRegion.cameraFollow}
+              onChange={(cameraFollow) =>
+                props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+                  cameraFollow: cameraFollow ?? null,
+                })
+              }
+            />
+          </InspectorDetails>
+        </>
       ) : null}
       <MotionPlacementFields motionRegion={props.motionRegion} panel={props.panel} />
     </div>

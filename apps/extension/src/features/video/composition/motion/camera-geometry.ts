@@ -1,3 +1,9 @@
+import {
+  resolveProjectCursorOrientation,
+  createProjectCursorProjection,
+  cursorOrientationInterval,
+  projectCursorSpatialSettings,
+} from './cursor-orientation';
 import { createWindowCameraGeometry } from './window-camera-geometry';
 import { resolveMotionSourceWindow } from './source-window';
 import {
@@ -5,12 +11,7 @@ import {
   type QuickEditCameraProjectionInterval,
 } from './spatial-projection-bounds';
 import { hasCameraPerspective, resolveCameraWindowWeight } from '../../project/motion/spatial';
-import { evaluateMotionSpatial } from './spatial';
-import {
-  type QuickEditHomography,
-  projectQuickEditPoint,
-  quickEditPlaneProjection,
-} from './spatial-geometry';
+import { type QuickEditHomography } from './spatial-geometry';
 import { cameraTransitionDerivative } from '../../project/motion/transitions';
 import type { CameraTransitionType } from '../../project/motion/transitions';
 import { motionTransitionSettings, getMotionAnimationRate } from '../../project/motion/timing';
@@ -531,6 +532,11 @@ export function createProjectWorkingZoneCameraGeometry(input: {
   output?: CameraOutputViewport;
 }): WorkingZoneCameraGeometry {
   const { project } = input;
+  input = {
+    ...input,
+    region: projectCursorSpatialSettings(project, input.region, input.region.startTime, true),
+  };
+  const orientationPlan = resolveProjectCursorOrientation(project, input.region);
   const size = input.output ?? { width: project.width, height: project.height };
   const output = { width: size.width, height: size.height };
   const transform = resolveProjectOutputTransform(project, size);
@@ -566,6 +572,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     const clip = project.clips.find((item) => item.id === sourceWindow.clipId);
     return createWindowCameraGeometry({
       output,
+      ...(orientationPlan ? { orientationPlan } : {}),
       ...(phaseHoldAt !== undefined ? { phaseHoldAt } : {}),
       window: mapRect(sourceWindow.window),
       ...createProjectWindowPlaneProjection(project, region, size),
@@ -575,8 +582,9 @@ export function createProjectWorkingZoneCameraGeometry(input: {
         project.sceneBackground?.zoomBehavior ?? 'window',
         project.sceneBackground?.enabled !== false &&
           project.sceneBackground?.zoomBehavior === 'follow-video' &&
-          !hasCameraPerspective(region.perspective),
-        hasCameraPerspective(region.perspective)
+          !hasCameraPerspective(region.perspective) &&
+          !orientationPlan,
+        hasCameraPerspective(region.perspective) || !!orientationPlan
       ),
       region: {
         ...region,
@@ -591,36 +599,16 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     });
   }
   const phase = nominalPhase(project, input.region, input.connectedIn, input.connectedOut);
-  const perspective = hasCameraPerspective(input.region.perspective)
-    ? input.region.perspective
-    : null;
-  const ref = input.region.spatialReference ?? { x: 0, y: 0, width: 1, height: 1 };
-  const reference = {
-    x: ref.x * window.width,
-    y: ref.y * window.height,
-    width: ref.width * window.width,
-    height: ref.height * window.height,
-  };
-  const projectPoint = (point: CameraPanPoint, targetScale: number, progress: number) => {
-    if (!perspective)
-      return {
-        x: point.x * (1 + (targetScale - 1) * progress),
-        y: point.y * (1 + (targetScale - 1) * progress),
-      };
-    const spatial = evaluateMotionSpatial(project, null, input.region, progress)!;
-    const scale = 1 + (targetScale - 1) * progress;
-    const projection = quickEditPlaneProjection(
-      reference,
-      {
-        x: reference.x * scale,
-        y: reference.y * scale,
-        width: reference.width * scale,
-        height: reference.height * scale,
-      },
-      spatial
-    );
-    return projectQuickEditPoint(projection, point);
-  };
+  const cursorProjection = createProjectCursorProjection({
+    project,
+    region: input.region,
+    orientationPlan,
+    window,
+    output,
+    offset: { x: transform.offsetX, y: transform.offsetY },
+    phaseAt: phase.at,
+  });
+  const { perspective, reference, projectPoint } = cursorProjection;
 
   const transitions = buildProjectTransitionSegments(project);
   const clips = new Map(project.clips.map((clip) => [clip.id, clip]));
@@ -744,6 +732,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     discontinuities: (targetScale) => (targetScale === 1 ? [] : phase.discontinuities),
     breaks: [
       ...phase.breaks,
+      ...(orientationPlan?.breaks ?? []),
       ...project.clips.flatMap((clip) => [clip.startTime, clip.startTime + clip.duration]),
       ...transitions.flatMap((transition) => [
         transition.start,
@@ -761,7 +750,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
     panDomain: domain,
     preferredPan(frame, scale) {
       const point = worldPoint(frame, frame.segmentId, frame.time);
-      const projected = point && projectPoint(point, scale, 1);
+      const projected = point && projectPoint(point, scale, 1, frame.time);
       return projected
         ? {
             x: transform.offsetX + projected.x - output.width / 2,
@@ -778,7 +767,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       const progress =
         typeof curve === 'number' ? curve : evaluateCameraTrajectory(curve, frame.time).x;
       if (progress <= 1e-12) return bounds;
-      const projected = projectPoint(point, scale, progress);
+      const projected = projectPoint(point, scale, progress, frame.time);
       if (!projected) return null;
       const mx = output.width * marginFraction,
         my = output.height * marginFraction;
@@ -818,6 +807,8 @@ export function createProjectWorkingZoneCameraGeometry(input: {
         [source.raster.low, source.raster.high],
         product(source.rasterScale, [1 + (targetScale - 1) * g[0], 1 + (targetScale - 1) * g[1]])
       );
+      const orbit = cursorOrientationInterval(orientationPlan, start, end);
+      if (orbit === null) return null;
       const spatial = perspective
         ? boundCameraPlaneProjection({
             start,
@@ -826,6 +817,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
             targetScale,
             pan,
             perspective,
+            ...(orbit ? { orbit: { angles: orbit } } : {}),
             reference,
             source: { x: source.x, y: source.y },
             output,
@@ -843,7 +835,10 @@ export function createProjectWorkingZoneCameraGeometry(input: {
         },
       };
     },
-    motionBounds({ start, end, trajectory }) {
+    motionBounds(bounds) {
+      const cursorMotion = cursorProjection.motionBounds(bounds);
+      if (cursorMotion !== undefined) return cursorMotion;
+      const { start, end, trajectory } = bounds;
       if (!trajectory) return { speed: 0, acceleration: 0, jerk: 0 };
       const curve = phase.at((start + end) / 2);
       const g = [0, 1, 2].map((order) =>

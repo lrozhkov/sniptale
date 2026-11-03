@@ -154,6 +154,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/audio`
 - `apps/extension/src/ui/background-thumbnails`
 - `apps/extension/src/ui/callout-background-settings`
+- `apps/extension/src/ui/camera-composition-controls.test.tsx`
+- `apps/extension/src/ui/camera-composition-controls.tsx`
 - `apps/extension/src/ui/camera-follow-segment-controls.test.tsx`
 - `apps/extension/src/ui/camera-follow-segment-controls.tsx`
 - `apps/extension/src/ui/color-selector`

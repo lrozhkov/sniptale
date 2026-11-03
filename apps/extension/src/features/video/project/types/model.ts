@@ -417,7 +417,8 @@ export interface VideoProject {
     | 47
     | 48
     | 49
-    | 50;
+    | 50
+    | 51;
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

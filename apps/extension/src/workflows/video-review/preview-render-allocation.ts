@@ -1,6 +1,7 @@
 import { calculateSpatialRenderAllocations } from './spatial-render-allocation';
+import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
-import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
+import { quickEditRegionNeedsSpatialRenderer } from '../../features/video/review/advanced/spatial';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,
@@ -485,13 +486,7 @@ function focusAllocation(
         (layout.spatial ? spatialWindow.width / layout.windowRect.width : motion.scale)
       : 0,
   };
-  const spatialRetained = scene.zoomRegions.some(
-    (region) =>
-      !region.dormant &&
-      !region.border &&
-      !region.spotlight &&
-      (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
-  );
+  const spatialRetained = scene.zoomRegions.some(quickEditRegionNeedsSpatialRenderer);
   return {
     spatial: spatialRetained
       ? {
@@ -530,12 +525,16 @@ function backgroundAllocation(
   const dense = background.enabled && background.type === 'gradient';
   const blur =
     background.enabled && background.type !== 'solid' ? (background.layout.blur ?? 0) : 0;
+  const animated =
+    background.enabled &&
+    background.type !== 'solid' &&
+    hasSceneBackgroundMotion(background.motion);
   const cacheScale = Math.min(1, 2048 / Math.max(backing.width, backing.height));
   return {
     dense,
-    gradient: dense && blur <= 0 ? backing : null,
+    gradient: dense && blur <= 0 && !animated ? backing : null,
     cache:
-      blur > 0
+      blur > 0 || animated
         ? {
             cache: {
               width: Math.max(1, Math.round(backing.width * cacheScale)),

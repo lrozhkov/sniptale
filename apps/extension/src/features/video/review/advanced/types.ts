@@ -1,4 +1,6 @@
+import type { CursorCompositionSettings } from '../../project/motion/spatial';
 import type { SourceAudioGainRange } from '../../audio/source-envelope';
+import type { VideoSceneBackgroundMotion } from '../../project/types/layout';
 import type {
   CameraPerspective as QuickEditPerspective,
   CameraDepthOfField as QuickEditDepthOfField,
@@ -18,7 +20,7 @@ export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 27;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 28;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -107,6 +109,7 @@ export interface QuickEditZoomRegion {
     observed?: import('../../project/cursor-focus-path/types').CursorFocusPath;
     timeMap?: readonly ReviewTimeSegment[];
   };
+  cursorComposition?: CursorCompositionSettings;
   perspective?: QuickEditPerspective;
   depthOfField?: QuickEditDepthOfField;
   /** Optional camera exposure; absent or disabled leaves legacy rendering unchanged. */
@@ -151,6 +154,7 @@ export interface QuickEditBackgroundLayout {
 }
 
 export type QuickEditBackgroundSettings = {
+  motion?: VideoSceneBackgroundMotion;
   /** Last authored fill retained in image/disabled mode. */
   rememberedPaint?: Paint;
   /** Last authored geometry retained while the background is disabled. */

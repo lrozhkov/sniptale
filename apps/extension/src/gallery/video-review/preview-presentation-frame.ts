@@ -1,7 +1,24 @@
+import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import type { ReviewWebcamFrameLease } from './webcam-preview';
 import type { useReviewCutTransitionProvider } from './cut-transition-preview';
 import type { Description, RenderFrame } from './preview-presentation-state';
+
+/** Admission includes the overlapping raw frame, native plane copy and packed frame. */
+function previewSourceFrameBytes(source: VideoFrame) {
+  const bytes = source.allocationSize();
+  if (!Number.isSafeInteger(bytes) || bytes <= 0 || !Number.isFinite(source.timestamp))
+    throw new Error('Invalid source frame allocation');
+  const visible = source.visibleRect;
+  const packsPlanes =
+    source.format === 'NV12' &&
+    visible &&
+    (visible.x !== 0 ||
+      visible.y !== 0 ||
+      visible.width !== source.codedWidth ||
+      visible.height !== source.codedHeight);
+  return bytes * (packsPlanes ? 3 : 1);
+}
 
 /** Capture and release one immutable source/camera transaction; partial admission rolls back here. */
 export function captureReviewPreviewFrame(args: {
@@ -25,16 +42,17 @@ export function captureReviewPreviewFrame(args: {
   }
   let reservation: { release(): void } | undefined;
   let camera: ReviewWebcamFrameLease | undefined;
+  let sourceClosed = false;
   const release = () => {
     camera?.release();
-    source.close();
+    if (!sourceClosed) {
+      source.close();
+      sourceClosed = true;
+    }
     reservation?.release();
   };
   try {
-    const bytes = source.allocationSize();
-    if (!Number.isSafeInteger(bytes) || bytes <= 0 || !Number.isFinite(source.timestamp))
-      throw new Error('Invalid source frame allocation');
-    reservation = args.reserveSource(bytes);
+    reservation = args.reserveSource(previewSourceFrameBytes(source));
     camera = args.captureCamera();
     const frame: RenderFrame = {
       generation: args.sequence,
@@ -42,6 +60,14 @@ export function captureReviewPreviewFrame(args: {
       sourceTime: args.sourceTime(),
       resultTime: args.time,
       source: {
+        prepare: async (signal) => {
+          try {
+            source = await prepareDecodedVideoFrame(source, signal);
+          } catch (error) {
+            sourceClosed = true;
+            throw error;
+          }
+        },
         timestamp: source.timestamp / 1e6,
         backing: previewTransitionBacking(args.description, args.time),
         draw: (context, x, y, width, height) => context.drawImage(source, x, y, width, height),

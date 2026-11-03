@@ -1,3 +1,4 @@
+import { projectCursorSpatialSettings } from './cursor-orientation';
 import { resolveEffectSourceClip } from '../../project/effect-instance/placement';
 import type { VideoProjectClip } from '../../project/types';
 import { resolveCameraWindowWeight } from '../../project/motion/spatial';
@@ -181,7 +182,7 @@ export function resolveSourceWindowCamera(
     project,
     null,
     {
-      ...region,
+      ...projectCursorSpatialSettings(project, region, time),
       spatialReference: {
         x: window.x / project.width,
         y: window.y / project.height,

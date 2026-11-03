@@ -7,9 +7,85 @@ import {
 } from './preview-render-resources';
 import {
   calculatePreviewRenderAllocation,
+  resolvePreviewRenderAllocation,
   type PreviewRenderAllocationInput,
 } from './preview-render-allocation';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
+
+it('admits and releases the animated background raster through the real preview resource ledger', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+    this: HTMLCanvasElement
+  ) {
+    return {
+      canvas: this,
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
+  });
+  const background: QuickEditBackgroundSettings = {
+    enabled: true,
+    type: 'image',
+    assetId: 'image',
+    imageFit: 'cover',
+    layout: { padding: 40, cornerRadius: 12 },
+    motion: { mode: 'waves', speed: 50, intensity: 75 },
+  };
+  const graph = resolvePreviewRenderAllocation({
+    scene: {
+      source: { width: 1920, height: 1080 },
+      background,
+      zoomRegions: [],
+      comments: [],
+      keys: [],
+      clicks: [],
+    },
+    dimensions: { canonical: { width: 1920, height: 1080 }, backing: { width: 640, height: 360 } },
+    sourceTime: 1,
+    resultTime: 1,
+    sourceAllocationBytes: null,
+    sourceBacking: { width: 640, height: 360 },
+    camera: { retainedBytes: null, activeBytes: null },
+    transitionBytes: null,
+    previousFront: null,
+    assets: {
+      backgroundBitmap: null,
+      headerBitmap: null,
+      watermark: null,
+      previousWatermarkCache: null,
+    },
+  });
+  expect(graph.background?.cache).toEqual({ width: 640, height: 360 });
+  const plan = calculatePreviewRenderAllocation(graph);
+  const resources = createPreviewRenderResources(plan);
+  const staging = resources.canvas('staging', { width: 640, height: 360 });
+  const painter = createReviewBackgroundPainter(resources);
+  try {
+    for (const currentTime of [1, 9, 1])
+      painter.draw(staging.context, {
+        background,
+        image: null,
+        width: 640,
+        height: 360,
+        currentTime,
+      });
+    expect(painter.retainedCacheSize).toEqual(graph.background?.cache);
+    expect(resources.counters.peakManagedBytes).toBeLessThanOrEqual(plan.maximumManagedBytes);
+    expect(resources.counters.peakCanvasCount).toBeLessThanOrEqual(plan.maximumCanvases);
+    expect(staging.context.drawImage).toHaveBeenCalledTimes(96 * 3);
+  } finally {
+    painter.dispose();
+    staging.release();
+    resources.dispose();
+  }
+  expect(resources.counters.managedBytes).toBe(0);
+});
 
 afterEach(() => vi.restoreAllMocks());
 for (const size of [

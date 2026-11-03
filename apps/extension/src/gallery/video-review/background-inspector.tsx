@@ -8,6 +8,7 @@ import type { QuickEditBackgroundSettings } from '../../features/video/review/ad
 import type { QuickEditBackgroundPatch } from '../../features/video/review/advanced/background';
 import { createSolidPaint, type Paint } from '@sniptale/foundation/paint';
 import { ReviewBackgroundPaints } from './background-paints';
+import { DEFAULT_BACKGROUND_MOTION } from '../../features/video/project/scene/background-motion';
 
 const kinds = [
   { key: 'none', label: 'gallery.videoReview.backgroundNone' },
@@ -114,6 +115,59 @@ export function ReviewBackgroundInspector(props: {
           onPreview={props.onPreview}
         />
       ) : null}
+      {background.enabled ? <ReviewBackgroundMotionControls {...props} /> : null}
+    </div>
+  );
+}
+
+function ReviewBackgroundMotionControls(props: {
+  background: QuickEditBackgroundSettings;
+  onChange(patch: QuickEditBackgroundPatch): void;
+  onPreview?: ((patch: QuickEditBackgroundPatch | null) => void) | undefined;
+}) {
+  const value = props.background.motion ?? DEFAULT_BACKGROUND_MOTION;
+  if (!props.background.enabled) return null;
+  if (props.background.type === 'solid')
+    return (
+      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+        {translate('editor.scene.backgroundMotionSolidHint')}
+      </p>
+    );
+  return (
+    <div className="sniptale-parameter-stack">
+      <SelectField<typeof value.mode>
+        label={translate('editor.scene.backgroundMotion')}
+        value={value.mode}
+        options={[
+          { value: 'none', label: translate('editor.scene.backgroundMotionNone') },
+          { value: 'drift', label: translate('editor.scene.backgroundMotionDrift') },
+          { value: 'glow', label: translate('editor.scene.backgroundMotionGlow') },
+          { value: 'waves', label: translate('editor.scene.backgroundMotionWaves') },
+        ]}
+        onChange={(mode) => props.onChange({ motion: { ...value, mode } })}
+      />
+      {value.mode !== 'none'
+        ? (['speed', 'intensity'] as const).map((key) => (
+            <ReviewPreviewNumberRow
+              key={key}
+              enterBehavior="blur"
+              label={translate(
+                key === 'speed'
+                  ? 'editor.scene.backgroundMotionSpeed'
+                  : 'editor.scene.backgroundMotionIntensity'
+              )}
+              value={value[key]}
+              min={0}
+              max={100}
+              step={1}
+              unit="%"
+              onPreview={(number) =>
+                props.onPreview?.(number === null ? null : { motion: { ...value, [key]: number } })
+              }
+              onChange={(number) => props.onChange({ motion: { ...value, [key]: number } })}
+            />
+          ))
+        : null}
     </div>
   );
 }

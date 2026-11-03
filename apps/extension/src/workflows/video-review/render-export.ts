@@ -2,13 +2,12 @@ import type { ReviewRecordingRenderSource } from './recording-render';
 import { ownReviewOutputCancellation } from './render-output-lifetime';
 import { paintReviewExportScene, type ReviewRenderScene } from './render-export-scene';
 import type { ReviewFrameExportInput } from './render-export-input';
-import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
+import { quickEditRegionNeedsSpatialRenderer } from '../../features/video/review/advanced/spatial';
 import { writeReviewPresentationFrames } from './render-presentation-export';
 import type { createReviewPresentationMain } from './presentation-main';
 import type { WatermarkRenderer } from '../../features/video/composition/canvas/watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
-import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
 import { createReviewSpatialSession } from './spatial-render-session';
 import {
   createAdaptiveFrameWriter,
@@ -543,12 +542,7 @@ export async function renderRenderWindowFrames(
     Math.min(lastTick, Math.round(time * resolution) / resolution)
   );
   const blurEnabled = hasQuickEditMotionBlur(args.zoomRegions);
-  const spatialRenderer = args.zoomRegions.some(
-    (r) =>
-      !r.dormant &&
-      quickEditFocusType(r) === 'zoom' &&
-      (hasQuickEditPerspective(r.perspective) || r.depthOfField?.enabled)
-  )
+  const spatialRenderer = args.zoomRegions.some(quickEditRegionNeedsSpatialRenderer)
     ? createReviewSpatialSession()
     : undefined;
   let dissolve: HTMLCanvasElement | undefined;

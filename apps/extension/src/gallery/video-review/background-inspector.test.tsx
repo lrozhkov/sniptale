@@ -63,6 +63,51 @@ afterEach(async () => {
 
 const layout: QuickEditBackgroundLayout = { padding: 24, cornerRadius: 12 };
 
+it('selects independent background motion and commits its bounded intensity', async () => {
+  const change = vi.fn();
+  const background: QuickEditBackgroundSettings = {
+    enabled: true,
+    type: 'image',
+    assetId: 'image',
+    imageFit: 'cover',
+    layout,
+  };
+  await act(async () =>
+    root.render(<ReviewBackgroundInspector background={background} onChange={change} />)
+  );
+  const trigger = host.querySelector<HTMLButtonElement>(
+    '[aria-label="editor.scene.backgroundMotion"]'
+  )!;
+  expect(trigger).not.toBeNull();
+  await act(async () => trigger.click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((node) =>
+    node.textContent?.includes('editor.scene.backgroundMotionGlow')
+  )!;
+  expect(option).toBeDefined();
+  await act(async () => option.click());
+  expect(change).toHaveBeenLastCalledWith({ motion: { mode: 'glow', speed: 50, intensity: 50 } });
+  await act(async () =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{ ...background, motion: { mode: 'glow', speed: 50, intensity: 50 } }}
+        onChange={change}
+      />
+    )
+  );
+  const intensity = host.querySelector<HTMLInputElement>(
+    '[aria-label="editor.scene.backgroundMotionIntensity"]'
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      intensity,
+      '75'
+    );
+    intensity.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => intensity.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(change).toHaveBeenLastCalledWith({ motion: { mode: 'glow', speed: 50, intensity: 75 } });
+});
+
 it('keeps a held background slider outside authored changes until release', async () => {
   const change = vi.fn();
   await act(async () =>

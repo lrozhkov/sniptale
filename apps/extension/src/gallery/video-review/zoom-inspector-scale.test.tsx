@@ -11,7 +11,7 @@ vi.mock('../../platform/i18n', async (original) => ({
 }));
 
 it.each([true, false])(
-  'keeps scale scrubbing local only for following cameras (%s)',
+  'previews scale without committing and cancels the next gesture (follow=%s)',
   async (followCursor) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     const host = document.createElement('div');
@@ -50,8 +50,7 @@ it.each([true, false])(
       await type(slider, '2');
       expect(slider.value).toBe('2');
       expect(change).not.toHaveBeenCalled();
-      if (followCursor) expect(preview).not.toHaveBeenCalled();
-      else expect(preview).toHaveBeenLastCalledWith({ scale: 2 });
+      expect(preview).toHaveBeenLastCalledWith({ scale: 2 });
       act(() => slider.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
       expect(change).toHaveBeenCalledExactlyOnceWith({ scale: 2 });
       change.mockClear();

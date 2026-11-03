@@ -1,9 +1,19 @@
+import { reviewCursorSpatialSettings } from './cursor-focus-path';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
 import {
   hasCameraPerspective as hasQuickEditPerspective,
+  hasCursorComposition,
   interpolateCameraSpatial as interpolateQuickEditSpatial,
 } from '../../project/motion/spatial';
+
+/** Admit the renderer for effective zoom settings, including disposable cursor composition. */
+export function quickEditRegionNeedsSpatialRenderer(region: QuickEditZoomRegion): boolean {
+  if (region.dormant || quickEditFocusType(region) !== 'zoom') return false;
+  if (region.cursorFocus && region.cursorComposition)
+    return hasCursorComposition(region.cursorComposition);
+  return hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled === true;
+}
 
 /** Fixed-background spans use the complete projected topology, including ordinary linked zooms. */
 export function quickEditSpatialSpan(
@@ -26,7 +36,13 @@ export function quickEditSpatialSpan(
     if (
       time >= active[start]!.start &&
       time < active[end]!.end &&
-      active.slice(start, end + 1).some((r) => hasQuickEditPerspective(r.perspective))
+      active
+        .slice(start, end + 1)
+        .some((r) =>
+          r.cursorFocus && r.cursorComposition
+            ? hasCursorComposition(r.cursorComposition)
+            : hasQuickEditPerspective(r.perspective)
+        )
     )
       return true;
     start = end + 1;
@@ -36,12 +52,53 @@ export function quickEditSpatialSpan(
 
 /** Target authoring deliberately bypasses enter/exit without altering saved timing. */
 export function quickEditSpatialTargetCamera(
-  region: QuickEditZoomRegion
+  region: QuickEditZoomRegion,
+  timelineTime = region.start
 ): QuickEditCameraTransform {
-  if (
-    quickEditFocusType(region) !== 'zoom' ||
-    (!hasQuickEditPerspective(region.perspective) && !region.depthOfField?.enabled)
-  )
-    return region.transform;
-  return { ...region.transform, spatial: interpolateQuickEditSpatial(null, region, 1) };
+  region = reviewCursorSpatialSettings(region, timelineTime);
+  if (!quickEditRegionNeedsSpatialRenderer(region)) return region.transform;
+  return {
+    ...region.transform,
+    spatial: interpolateQuickEditSpatial(null, region, 1, {
+      from: false,
+      to: !!region.cursorFocus && hasCursorComposition(region.cursorComposition),
+    }),
+  };
+}
+
+/** Spatial activation and endpoint clocks use the same effective settings as the renderer. */
+export function applyReviewCameraSpatial(
+  regions: readonly QuickEditZoomRegion[],
+  timelineTime: number,
+  sample: {
+    from: QuickEditZoomRegion | null;
+    to: QuickEditZoomRegion;
+    progress: number;
+    phase: string;
+  },
+  camera: QuickEditCameraTransform
+): QuickEditCameraTransform {
+  const spatialFrom = sample.from
+    ? reviewCursorSpatialSettings(
+        sample.from,
+        sample.phase === 'link' ? sample.from.end : timelineTime
+      )
+    : null;
+  const spatialTo = reviewCursorSpatialSettings(
+    sample.to,
+    sample.phase === 'link' ? sample.to.start : timelineTime
+  );
+  const lockBackground = quickEditSpatialSpan(regions, timelineTime);
+  if (lockBackground || spatialFrom?.depthOfField?.enabled || spatialTo.depthOfField?.enabled)
+    return {
+      ...camera,
+      spatial: {
+        ...interpolateQuickEditSpatial(spatialFrom, spatialTo, sample.progress, {
+          from: !!sample.from?.cursorFocus && hasCursorComposition(sample.from.cursorComposition),
+          to: !!sample.to.cursorFocus && hasCursorComposition(sample.to.cursorComposition),
+        }),
+        lockBackground,
+      },
+    };
+  return camera;
 }

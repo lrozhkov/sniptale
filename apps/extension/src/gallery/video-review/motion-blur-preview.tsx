@@ -110,6 +110,7 @@ function MotionBlurCanvas(
       context.imageSmoothingQuality = 'high';
       try {
         drawReviewSceneFrame(context, {
+          currentTime: props.focus?.time ?? 0,
           spatialRenderer: renderer.current ?? undefined,
           canvas: props.output,
           layout: props.layout,

@@ -95,6 +95,29 @@ function createProps(): SceneBackgroundFieldProps {
   };
 }
 
+it('commits background motion while retaining image and legacy common settings', async () => {
+  const props = createProps();
+  props.sceneBackground = {
+    ...props.sceneBackground,
+    blur: 4,
+    motion: { mode: 'waves', speed: 35, intensity: 80 },
+  };
+  await act(async () => root?.render(<SceneBackgroundFields {...props} />));
+  const input = container!.querySelector<HTMLInputElement>(
+    '[aria-label="editor.scene.backgroundMotionSpeed"]'
+  )!;
+  expect(input).not.toBeNull();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '60');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(props.onSetSceneBackground).toHaveBeenLastCalledWith({
+    ...props.sceneBackground,
+    motion: { mode: 'waves', speed: 60, intensity: 80 },
+  });
+});
+
 it('builds canonical background kind options for the shared select surface', () => {
   expect(getSceneBackgroundKindOptions(createProps().imageAssets)).toEqual([
     { value: 'none', label: 'gallery.videoReview.backgroundNone' },

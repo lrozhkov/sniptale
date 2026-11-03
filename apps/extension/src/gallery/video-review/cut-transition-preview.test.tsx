@@ -19,7 +19,9 @@ vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
   BlobSource: class {},
   Input: class {
-    getPrimaryVideoTrack = async () => ({});
+    getPrimaryVideoTrack = async () => ({
+      getDecoderConfig: async () => ({ codec: 'avc1.640028' }),
+    });
     dispose = state.dispose;
   },
   VideoSampleSink: class {
@@ -48,6 +50,12 @@ const sample = (timestamp: number): ReviewTransitionSample => ({
   close: vi.fn(),
 });
 function mount() {
+  vi.stubGlobal(
+    'VideoFrame',
+    vi.fn(function () {
+      return { format: 'RGBA', close: vi.fn() };
+    })
+  );
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.dispose.mockClear();
   const context = {
@@ -116,7 +124,7 @@ it('conceals loading, rejects a stale removed native frame, and releases decoder
   await view.render();
   expect(view.host.querySelector('canvas')).not.toBeNull();
   expect(view.host.querySelector('[role=status]')).toBeNull();
-  act(() =>
+  await act(async () =>
     view.callbacks.at(-1)!(0, {
       mediaTime: 3,
       presentationTime: 0,
@@ -175,7 +183,9 @@ it('never rereads a live video using a timestamp from a previous frame callback'
   const view = mount();
   view.binding.time = 1.7;
   await view.render();
-  act(() => view.callbacks.at(-1)!(0, { mediaTime: 1.7 } as VideoFrameCallbackMetadata));
+  await act(async () =>
+    view.callbacks.at(-1)!(0, { mediaTime: 1.7 } as VideoFrameCallbackMetadata)
+  );
   view.context.drawImage.mockClear();
   // A seek may finish before the next presentation callback. Only the captured
   // raster has the old callback's timestamp; the live video no longer does.
@@ -221,7 +231,9 @@ it('keeps transition phase on the result clock when a VFR frame began before the
   await view.render();
   vi.mocked(left.draw).mockClear();
   vi.mocked(right.draw).mockClear();
-  act(() => view.callbacks.at(-1)!(0, { mediaTime: 1.4 } as VideoFrameCallbackMetadata));
+  await act(async () =>
+    view.callbacks.at(-1)!(0, { mediaTime: 1.4 } as VideoFrameCallbackMetadata)
+  );
   expect(left.draw).not.toHaveBeenCalled();
   expect(right.draw).toHaveBeenCalledOnce();
   expect(view.context.globalAlpha).toBe(0.25);
@@ -490,4 +502,27 @@ it('releases endpoint reservations on source replacement and unmount', async () 
   cleanup?.();
   cleanup = undefined;
   expect(events).toEqual(['admit', 'release', 'admit', 'release']);
+});
+
+it('normalizes permitted immutable native transition captures before drawing and releases them', async () => {
+  state.sample.mockResolvedValue(sample(1.9));
+  state.right.mockReturnValue(sample(4.1));
+  const view = mount();
+  const normalized = { format: 'RGBA', close: vi.fn() };
+  vi.stubGlobal(
+    'VideoFrame',
+    vi.fn(function () {
+      return normalized;
+    })
+  );
+  view.binding.time = 1.7;
+  await view.render();
+  await act(async () =>
+    view.callbacks.at(-1)!(0, { mediaTime: 1.7 } as VideoFrameCallbackMetadata)
+  );
+  expect(view.context.drawImage).toHaveBeenCalledWith(normalized, 0, 0, 100, 60);
+  expect(view.context.drawImage.mock.calls.some(([source]) => source === view.video.current)).toBe(
+    false
+  );
+  expect(normalized.close).toHaveBeenCalledOnce();
 });

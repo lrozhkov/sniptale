@@ -15,6 +15,29 @@ import {
 } from '../validation/root';
 import type { VideoProjectSceneBackground } from '../types';
 
+it('retains common motion independently of paints and legacy gradient animation', () => {
+  const motion = { mode: 'glow' as const, speed: 80, intensity: 65 };
+  let background: VideoProjectSceneBackground = {
+    ...createSceneGradientBackground('#111111ff'),
+    motion,
+    animation: { mode: 'rotate', speed: 12, intensity: 25 },
+  };
+  for (const kind of ['image', 'solid', 'gradient'] as const) {
+    background = retainSceneBackgroundVariants(
+      background,
+      resolveSceneBackgroundKind(background, kind, 'image')!
+    );
+    expect(background.motion).toEqual(motion);
+    expect(parseSceneBackgroundSettings(JSON.parse(JSON.stringify(background)))).toEqual(
+      background
+    );
+  }
+  expect(background).toMatchObject({ animation: { mode: 'rotate', speed: 12, intensity: 25 } });
+  expect(
+    parseSceneBackgroundSettings({ ...background, motion: { ...motion, speed: Infinity } })
+  ).toBeNull();
+});
+
 it('retains all three authored variants, animation and fit without recursive memory', () => {
   let project = {
     backgroundColor: '#123456',

@@ -1,3 +1,4 @@
+import { reviewCursorSpatialSettings } from './cursor-focus-path';
 import { cameraTransitionProgress } from '../../project/motion/transitions';
 import { insetMediaCanvas } from '../../project/window-geometry';
 import { uncropMediaSourceRect } from '../../project/media-crop';
@@ -21,11 +22,8 @@ import type {
 import type { WorkingZoneCameraGeometry } from '../../composition/motion/follow-cursor';
 import type { WorkingZoneCameraPlan } from '../../composition/motion/follow-cursor';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
-import { quickEditSpatialSpan } from './spatial';
-import {
-  interpolateCameraSpatial as interpolateQuickEditSpatial,
-  hasCameraPerspective as hasQuickEditPerspective,
-} from '../../project/motion/spatial';
+import { applyReviewCameraSpatial } from './spatial';
+import { hasCameraPerspective as hasQuickEditPerspective } from '../../project/motion/spatial';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
@@ -77,7 +75,8 @@ export type QuickEditCameraLinkPlan = {
   discontinuities: readonly { time: number; reason: 'nominal' }[];
 } & ({ status: 'ready' } | ({ status: 'conflict' } & QuickEditCameraConflict));
 
-function cameraPerspectiveValues(region: QuickEditZoomRegion) {
+function cameraPerspectiveValues(region: QuickEditZoomRegion, time = region.start) {
+  region = reviewCursorSpatialSettings(region, time);
   return hasQuickEditPerspective(region.perspective)
     ? [
         region.perspective!.rotateX,
@@ -101,7 +100,8 @@ function compatibleReviewCameraPhases(left: QuickEditZoomRegion, right: QuickEdi
     exit.duration === enter.duration;
   if ((!held && !matchedEase) || left.transform.scale !== right.transform.scale) return false;
   if (
-    JSON.stringify(cameraPerspectiveValues(left)) !== JSON.stringify(cameraPerspectiveValues(right))
+    JSON.stringify(cameraPerspectiveValues(left, left.end)) !==
+    JSON.stringify(cameraPerspectiveValues(right))
   )
     return false;
   return true;
@@ -229,7 +229,7 @@ export function resolveReviewCameraLinkPlan(
     from.scale !== to.scale ||
     a.x !== b.x ||
     a.y !== b.y ||
-    JSON.stringify(cameraPerspectiveValues(source)) !==
+    JSON.stringify(cameraPerspectiveValues(source, source.end)) !==
       JSON.stringify(cameraPerspectiveValues(target));
   const discontinuities = changed
     ? [source.end, target.start].map((time) => ({ time, reason: 'nominal' as const }))
@@ -705,19 +705,7 @@ export function evaluateQuickEditCameraAtTime(
         )
       : QUICK_EDIT_IDENTITY_CAMERA);
   const camera = interpolateCamera(from, target, sample.progress);
-  if (
-    quickEditSpatialSpan(regions, timelineTime) ||
-    sample.from?.depthOfField?.enabled ||
-    sample.to.depthOfField?.enabled
-  )
-    return {
-      ...camera,
-      spatial: {
-        ...interpolateQuickEditSpatial(sample.from, sample.to, sample.progress),
-        lockBackground: quickEditSpatialSpan(regions, timelineTime),
-      },
-    };
-  return camera;
+  return applyReviewCameraSpatial(regions, timelineTime, sample, camera);
 }
 
 /** Shared camera bounds: following backgrounds and rounded video edges move together. */

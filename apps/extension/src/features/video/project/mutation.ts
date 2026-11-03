@@ -14,7 +14,8 @@ function getMutationSchemaVersion(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
-  const requirements = [
+  const requirements: VideoProject['version'][] = [
+    (patch.sceneBackground ?? project.sceneBackground)?.motion !== undefined ? 51 : 2,
     project.version,
     motionSchemaRequirement(patch.motionRegions ?? project.motionRegions),
     clipSchemaRequirement(patch.clips ?? project.clips),
@@ -27,6 +28,7 @@ function getMutationSchemaVersion(
 }
 
 function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoProject['version'] {
+  if (regions?.some((region) => region.cursorComposition !== undefined)) return 51;
   if (regions?.some((region) => requiresExtendedBorderSchema(region.border))) return 48;
   if (regions?.some((region) => region.spotlightTarget === 'source-scene')) return 39;
   if (
@@ -175,6 +177,7 @@ function projectSchemaRequirement(
   )
     return 40;
   const sceneBackground = patch.sceneBackground ?? project.sceneBackground;
+  if (sceneBackground?.motion !== undefined) return 51;
   if (sceneBackground?.zoomBehavior !== undefined) return 37;
   if (
     project.watermarkEnabled !== undefined ||

@@ -187,9 +187,31 @@ it('prepares follow-camera plans before playback reaches an effect', async () =>
   };
   const input = { ...scene(), zoomRegions: [region] };
   const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
+  expect(region.perspective).toBeUndefined();
+  expect(region.cursorComposition?.mode).toBe('orbit');
+  expect(io.spatial).toHaveBeenCalledOnce();
   expect(io.cameraPlan).toHaveBeenCalled();
   const count = io.cameraPlan.mock.calls.length;
   (await renderer.render(prepared, { ...frame(), resultTime: 6 })).release();
   expect(io.cameraPlan).toHaveBeenCalledTimes(count);
+  renderer.dispose();
+});
+
+it('awaits captured source normalization before composing the publication', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const prepared = await renderer.prepare(scene(), dimensions, new AbortController().signal);
+  const captured = frame();
+  const prepare = vi.fn(async () => {
+    io.order.push('source-ready');
+  });
+  captured.source.prepare = prepare;
+  io.frame.mockImplementationOnce(() => {
+    expect(io.order).toContain('source-ready');
+  });
+  const completed = await renderer.render(prepared, captured);
+  expect(prepare).toHaveBeenCalledOnce();
+  completed.release();
+  prepared.release();
   renderer.dispose();
 });

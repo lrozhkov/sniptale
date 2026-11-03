@@ -1,6 +1,6 @@
+import { projectCursorLinkSettings, smoothCursorCameraPreferences } from './cursor-orientation';
 import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../project/types/export';
 import type { VideoProjectRenderScope } from '../../project/export/render-scope';
-import { hasCameraPerspective, resolveCameraWindowWeight } from '../../project/motion/spatial';
 import { motionFocusAreaPoint } from '../../project/motion/focus-area';
 import { resolveManualMotionFocusPoint, resolveMotionTargetScale } from './focus-target';
 import { motionTransitionTypeForEasing } from '../../project/motion/timing';
@@ -325,7 +325,9 @@ function collectProjectCameraFrames(
     region.sourceBinding?.coordinateSpace === 'source-window' && clip?.type === 'VIDEO'
       ? clip.sourceCrop
       : undefined;
-  return { frames: crop ? cropWindowCameraObservations(retained, crop) : retained, bindings, path };
+  const visibleFrames = crop ? cropWindowCameraObservations(retained, crop) : retained;
+  const preferred = smoothCursorCameraPreferences(visibleFrames, region.cursorComposition);
+  return { frames: preferred, bindings, path };
 }
 
 function resolveProvisionalPlanEntry(
@@ -688,32 +690,26 @@ function resolveProjectWindowLinkConflict(
     ...(project.cameraFollowDefaults ? { defaults: project.cameraFollowDefaults } : {}),
     ...(context.cameraFollow ? { override: context.cameraFollow } : {}),
   });
+  const spatial = projectCursorLinkSettings(project, source, destination, start, end);
   const adapter = createWindowCameraLinkGeometry({
     output: size,
     window,
     ...createProjectWindowPlaneProjection(project, target, size),
     video: mapRect(layout.video),
     cornerRadius: (clip.windowCornerRadius ?? 0) * transform.scale,
-    windowWeight: resolveCameraWindowWeight(
-      project.sceneBackground?.zoomBehavior ?? 'window',
-      project.sceneBackground?.enabled !== false &&
-        project.sceneBackground?.zoomBehavior === 'follow-video' &&
-        !hasCameraPerspective(source.perspective) &&
-        !hasCameraPerspective(destination.perspective),
-      hasCameraPerspective(source.perspective) || hasCameraPerspective(destination.perspective)
-    ),
+    windowWeight: spatial.windowWeight,
     type: motionTransitionTypeForEasing(destination.incomingConnection?.easing ?? 'EASE_IN_OUT'),
     from: {
       end: start,
       scale: from.scale,
       pan: { x: from.pan.x * window.width, y: from.pan.y * window.height },
-      ...(source.perspective ? { perspective: source.perspective } : {}),
+      ...spatial.from,
     },
     to: {
       start: end,
       scale: to.scale,
       pan: { x: to.pan.x * window.width, y: to.pan.y * window.height },
-      ...(destination.perspective ? { perspective: destination.perspective } : {}),
+      ...spatial.to,
     },
     policy,
   });

@@ -74,6 +74,29 @@ function planSceneImages(
   return images;
 }
 
+/** Preserve shared motion, zoom and blur settings independently of the selected fill. */
+function convertedBackgroundSettings(
+  background: QuickEditAdvancedContent['background'],
+  enabled: boolean,
+  inactiveLayout: QuickEditAdvancedContent['background']['rememberedLayout']
+) {
+  return {
+    ...(background.motion ? { motion: structuredClone(background.motion) } : {}),
+    ...(background.zoomBehavior !== 'window'
+      ? { zoomBehavior: background.zoomBehavior ?? 'fixed' }
+      : {}),
+    ...(!enabled ? { enabled: false as const } : {}),
+    ...(background.enabled && background.layout.blur !== undefined
+      ? { blur: background.layout.blur }
+      : inactiveLayout?.blur !== undefined
+        ? { blur: inactiveLayout.blur }
+        : {}),
+    ...(background.enabled && background.rememberedLayout?.blur !== undefined
+      ? { rememberedBlur: background.rememberedLayout.blur }
+      : {}),
+  };
+}
+
 /** Map supported authored scene fields into the existing editable Native scene and media fields. */
 export function planReviewProjectScene(args: {
   content: QuickEditAdvancedContent;
@@ -184,18 +207,7 @@ export function planReviewProjectScene(args: {
         : {}),
       sceneBackground: {
         ...retainedFill,
-        ...(background.zoomBehavior !== 'window'
-          ? { zoomBehavior: background.zoomBehavior ?? 'fixed' }
-          : {}),
-        ...(!enabled ? { enabled: false as const } : {}),
-        ...(background.enabled && background.layout.blur !== undefined
-          ? { blur: background.layout.blur }
-          : inactiveLayout?.blur !== undefined
-            ? { blur: inactiveLayout.blur }
-            : {}),
-        ...(background.enabled && background.rememberedLayout?.blur !== undefined
-          ? { rememberedBlur: background.rememberedLayout.blur }
-          : {}),
+        ...convertedBackgroundSettings(background, enabled, inactiveLayout),
         ...(Object.keys(remembered).length ? { remembered } : {}),
       },
     },

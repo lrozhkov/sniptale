@@ -150,6 +150,21 @@ function PreviewCameraFollowStatus(props: {
   ) : null;
 }
 
+function resolvePreviewInteraction(
+  props: ZoomPreviewProps,
+  status: ReturnType<typeof useZoomPreviewFrame>['status']
+) {
+  const positionInteractive =
+    !props.disabled && !props.playback && status === 'ready' && !props.cursorFollowing;
+  return {
+    positionInteractive,
+    spatialInteractive:
+      positionInteractive &&
+      props.spatialEdit?.enabled !== false &&
+      !props.spatialEdit?.region.dormant,
+  };
+}
+
 export function ReviewZoomPreview(props: ZoomPreviewProps) {
   const { loadFrame, region, sourceTime } = props;
   const image = useReviewBackgroundImage(props.background);
@@ -163,10 +178,7 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
   const { followPlan, cameraConflicts } = resolvePreviewCameraAdmission(props);
   const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(props, camera);
   const previewStatus = playback ? 'ready' : status;
-  const interactive = !props.disabled && !playback && status === 'ready';
-  const positionInteractive = interactive && !props.cursorFollowing;
-  const spatialInteractive =
-    interactive && props.spatialEdit?.enabled !== false && !props.spatialEdit?.region.dormant;
+  const { positionInteractive, spatialInteractive } = resolvePreviewInteraction(props, status);
   const background = props.background;
   const resultOverlays =
     !overlay && (view === 'result' || playback)
@@ -185,6 +197,7 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
     return { ...patch, centerX: mapped.centerX, centerY: mapped.centerY };
   };
   const surface = {
+    currentTime: props.focus?.time ?? (props.region.start + props.region.end) / 2,
     background,
     headerImage: header.image,
     imageUrl: image.url,
@@ -212,10 +225,10 @@ export function ReviewZoomPreview(props: ZoomPreviewProps) {
         followPlan={followPlan}
         nominalScale={region.transform.scale}
       />
-      {overlay || !props.spatialEdit ? (
+      {overlay || !props.spatialEdit || props.cursorFollowing ? (
         <ZoomPreviewHeading region={region} controls={controls} />
       ) : null}
-      {!overlay && props.spatialEdit ? (
+      {!overlay && props.spatialEdit && !props.cursorFollowing ? (
         <ZoomPreviewTools
           controls={controls}
           edit={props.spatialEdit}
@@ -325,7 +338,8 @@ function ZoomPreviewTools({
 
 /** Owns temporary tool/view choices without changing the authored target or transport. */
 function usePreviewToolSelection(props: ZoomPreviewProps) {
-  const [zoomView, setView] = useState<'area' | 'result'>('area');
+  const [zoomView, setZoomView] = useState<'area' | 'result'>('area');
+  const [followView, setFollowView] = useState<'area' | 'result'>('result');
   const [localTool, setLocalTool] = useState<SpatialTool>('position');
   const shared = useContext(ReviewSpatialToolContext);
   const selectedTool = shared?.tool ?? localTool;
@@ -333,10 +347,25 @@ function usePreviewToolSelection(props: ZoomPreviewProps) {
   const [axis, setAxis] = useState<SpatialAxis>('both');
   const { region } = props;
   const overlay = !!(region.spotlight || region.border);
-  const unavailable = !props.spatialEdit || overlay;
+  const unavailable = !props.spatialEdit || overlay || props.cursorFollowing;
   const tool = unavailable ? 'position' : selectedTool;
-  const view = overlay ? 'area' : tool === 'position' ? zoomView : 'result';
-  return { tool, axis, overlay, view, setTool, setAxis, setView, resetTarget: shared?.resetTarget };
+  const view = overlay
+    ? 'area'
+    : props.cursorFollowing
+      ? followView
+      : tool === 'position'
+        ? zoomView
+        : 'result';
+  return {
+    tool,
+    axis,
+    overlay,
+    view,
+    setTool,
+    setAxis,
+    setView: props.cursorFollowing ? setFollowView : setZoomView,
+    resetTarget: shared?.resetTarget,
+  };
 }
 
 /** Binds the authored edit to its rendered plane and cancels capture when the scene changes. */
@@ -529,13 +558,16 @@ function resolvePreviewCamera(props: ZoomPreviewProps) {
   if (props.region.spotlight || props.region.border)
     return { scale: 1, centerX: 0.5, centerY: 0.5 };
   if (props.playback) return props.playback.camera;
-  const target = quickEditCropCamera(quickEditSpatialTargetCamera(props.region), props);
   const time = props.focus?.time ?? (props.region.start + props.region.end) / 2;
   const effective = props.focus?.regions.find(
     (region) =>
       (region.id === props.region.id || region.id.startsWith(`${props.region.id}:slice:`)) &&
       time >= region.start &&
       time < region.end
+  );
+  const target = quickEditCropCamera(
+    quickEditSpatialTargetCamera(effective ?? props.region, time),
+    props
   );
   return effective
     ? evaluateReviewFollowCursor(

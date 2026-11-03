@@ -87,6 +87,7 @@ export function paintReviewExportScene({
     deferComments: true,
     comments: burned,
     sourceTime: sourceTime,
+    currentTime: resultTime,
     cameraScale: camera.scale,
     motionBlur: blurEnabled
       ? quickEditMotionBlurCameras(scene.zoomRegions, resultTime, {

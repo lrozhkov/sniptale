@@ -184,11 +184,19 @@ export interface VideoProjectBackgroundVariants {
   image?: VideoProjectImageBackground;
 }
 
+/** Programme-time motion of the scene paint, independent of legacy gradient animation. */
+export interface VideoSceneBackgroundMotion {
+  mode: 'none' | 'drift' | 'glow' | 'waves';
+  speed: number;
+  intensity: number;
+}
+
 export type VideoProjectSceneBackground = (
   | VideoProjectSolidBackground
   | VideoProjectGradientBackground
   | VideoProjectImageBackground
 ) & {
+  motion?: VideoSceneBackgroundMotion;
   /** Disabled paint retains its authored variants without entering composition. */
   enabled?: false;
   blur?: number;

@@ -1,3 +1,11 @@
+import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
+import { hasCursorComposition, cameraPerspectiveWithCursor } from '../../project/motion/spatial';
+import {
+  createCursorOrientationPlan,
+  evaluateCursorOrientation,
+  smoothCursorCameraPreferences,
+  type CursorOrientationPlan,
+} from '../../composition/motion/cursor-orientation';
 import { reviewRecordingWindow } from '../telemetry';
 import { cropWindowCameraObservations as cropCameraObservations } from '../../composition/motion/window-camera-geometry';
 import { resolveAuthoredCursorFocusPath } from '../../project/cursor-focus-path/authoring';
@@ -114,15 +122,17 @@ export function reviewCameraPlanObservations(region: QuickEditZoomRegion): Follo
   }
   const scene = context.scene;
   const crop = scene?.canvas?.crop;
-  return crop && scene
-    ? cropCameraObservations(
-        retained.frames,
-        fitQuickEditSourceCrop(scene.source, scene.canvas!, crop)
-      )
-    : retained.frames.map((frame) => ({
-        ...frame,
-        ...(frame.actual ? { actual: { ...frame.actual } } : {}),
-      }));
+  const frames =
+    crop && scene
+      ? cropCameraObservations(
+          retained.frames,
+          fitQuickEditSourceCrop(scene.source, scene.canvas!, crop)
+        )
+      : retained.frames.map((frame) => ({
+          ...frame,
+          ...(frame.actual ? { actual: { ...frame.actual } } : {}),
+        }));
+  return smoothCursorCameraPreferences(frames, region.cursorComposition);
 }
 
 /** Native path segments are immutable. Scene geometry is applied after source-clock derivation. */
@@ -309,4 +319,67 @@ export function hasContinuousReviewCameraSource(
   )
     return false;
   return true;
+}
+
+const orientationPlans = new WeakMap<
+  NonNullable<QuickEditZoomRegion['cursorFocus']>,
+  Map<string, CursorOrientationPlan | undefined>
+>();
+/** Use the same source-to-output observation clock for orientation and pan admission. */
+export function resolveReviewCursorOrientation(region: QuickEditZoomRegion) {
+  if (!region.cursorFocus || !hasCursorComposition(region.cursorComposition)) return undefined;
+  let plans = orientationPlans.get(region.cursorFocus);
+  if (!plans) {
+    plans = new Map();
+    orientationPlans.set(region.cursorFocus, plans);
+  }
+  const key = JSON.stringify({
+    settings: region.cursorComposition,
+    perspective: region.perspective,
+    start: region.start,
+    end: region.end,
+  });
+  if (plans.has(key)) return plans.get(key);
+  const plan = createCursorOrientationPlan({
+    settings: region.cursorComposition!,
+    observations: reviewCameraPlanObservations(region).map((frame) => {
+      const scene = region.cursorFocus?.scene;
+      if (!scene) return frame;
+      const crop = scene.canvas?.crop
+        ? fitQuickEditSourceCrop(scene.source, scene.canvas, scene.canvas.crop)
+        : { x: 0, y: 0, width: 1, height: 1 };
+      const header = scene.windowHeader
+        ? windowHeaderGeometry(scene.windowHeader, scene.source).height
+        : 0;
+      return {
+        ...frame,
+        x: (frame.x - crop.x) / crop.width,
+        y:
+          (header + (frame.y - crop.y) * scene.source.height) /
+          (header + crop.height * scene.source.height),
+      };
+    }),
+    start: region.start,
+    end: region.end,
+  });
+  plans.set(key, plan);
+  return plan;
+}
+
+/** Apply a disposable cursor pose while retaining every authored manual property. */
+export function reviewCursorSpatialSettings(
+  region: QuickEditZoomRegion,
+  time: number,
+  base = false
+): QuickEditZoomRegion {
+  const plan = resolveReviewCursorOrientation(region);
+  if (!region.cursorFocus || !region.cursorComposition) return region;
+  const { perspective: _perspective, depthOfField: _depth, ...retained } = region;
+  return {
+    ...retained,
+    ...cameraPerspectiveWithCursor(
+      region,
+      base ? { x: 0, y: 0 } : evaluateCursorOrientation(plan, time)
+    ),
+  };
 }

@@ -168,12 +168,49 @@ function minimumClipSchemaVersion(value: unknown): number {
   return 2;
 }
 
+/** Minimum schema for motion fields. Shape admission remains with the motion parser. */
+function minimumMotionSchemaVersion(value: unknown): number {
+  if (!isRecord(value)) return 2;
+  if (value['cursorComposition'] !== undefined) return 51;
+  if (requiresExtendedBorderSchema(value['border'])) return 48;
+  if (value['spotlightTarget'] === 'source-scene') return 39;
+  if (
+    (isRecord(value['focusArea']) && value['focusArea']['axes'] !== undefined) ||
+    (isRecord(value['sourceBinding']) &&
+      (value['sourceBinding']['unresolvedLinkTo'] !== undefined ||
+        value['sourceBinding']['dormant'] !== undefined ||
+        value['sourceBinding']['phaseProjection'] !== undefined ||
+        value['sourceBinding']['coordinateSpace'] !== undefined)) ||
+    (isRecord(value['phaseTransitions']) && value['phaseTransitions']['link'] !== undefined)
+  )
+    return 34;
+  if (value['spotlight'] !== undefined || value['spotlightTarget'] !== undefined) return 22;
+  if (value['border'] !== undefined || value['borderTarget'] !== undefined) return 21;
+  if (
+    value['perspective'] !== undefined ||
+    value['depthOfField'] !== undefined ||
+    value['spatialReference'] !== undefined
+  )
+    return 19;
+  if (value['phaseTransitions'] !== undefined) return 18;
+  if (value['motionBlur'] !== undefined) return 17;
+  if (value['cameraFollow'] !== undefined) return 4;
+  return 2;
+}
+
 /** Refuse fields that the declared reader version does not support. */
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 50) &&
+    isBoundedNumber(version, 2, 51) &&
     Number.isInteger(version) &&
+    (version >= 51 ||
+      !isRecord(value['sceneBackground']) ||
+      value['sceneBackground']['motion'] === undefined) &&
+    (!Array.isArray(value['motionRegions']) ||
+      value['motionRegions'].every(
+        (region: unknown) => version >= minimumMotionSchemaVersion(region)
+      )) &&
     (version >= 50 ||
       !Array.isArray(value['actionFeedback']) ||
       value['actionFeedback'].every(
@@ -184,11 +221,6 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
       !Array.isArray(value['cursorTrack']['sourceObservations']) ||
       value['cursorTrack']['sourceObservations'].every(
         (group: unknown) => !isRecord(group) || group['trajectory'] === undefined
-      )) &&
-    (version >= 48 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) => !isRecord(region) || !requiresExtendedBorderSchema(region['border'])
       )) &&
     (version >= 47 ||
       !Array.isArray(value['clips']) ||
@@ -223,11 +255,6 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
       value['compositionJoins'].every(
         (join: unknown) => !isRecord(join) || join['sampling'] === undefined
       )) &&
-    (version >= 39 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) => !isRecord(region) || region['spotlightTarget'] !== 'source-scene'
-      )) &&
     (version >= 37 ||
       !isRecord(value['sceneBackground']) ||
       value['sceneBackground']['zoomBehavior'] === undefined) &&
@@ -237,20 +264,6 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
           (value['sceneBackground']['enabled'] === undefined &&
             value['sceneBackground']['rememberedBlur'] === undefined)))) &&
     (version >= 35 || value['rememberedCanvas'] === undefined) &&
-    (version >= 34 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) =>
-          !isRecord(region) ||
-          ((!isRecord(region['focusArea']) || region['focusArea']['axes'] === undefined) &&
-            (!isRecord(region['sourceBinding']) ||
-              (region['sourceBinding']['unresolvedLinkTo'] === undefined &&
-                region['sourceBinding']['dormant'] === undefined &&
-                region['sourceBinding']['phaseProjection'] === undefined &&
-                region['sourceBinding']['coordinateSpace'] === undefined)) &&
-            (!isRecord(region['phaseTransitions']) ||
-              region['phaseTransitions']['link'] === undefined))
-      )) &&
     (version >= 33 ||
       !isRecord(value['cursorTrack']) ||
       value['cursorTrack']['sourceObservations'] === undefined) &&
@@ -275,47 +288,9 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
     (version >= 24 || value['sceneEdges'] === undefined) &&
     (version >= 23 || value['commentDocuments'] === undefined) &&
     (version >= 20 || value['watermark'] === undefined) &&
-    (version >= 22 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) =>
-          !isRecord(region) ||
-          (region['spotlight'] === undefined && region['spotlightTarget'] === undefined)
-      )) &&
-    (version >= 21 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) =>
-          !isRecord(region) ||
-          (region['border'] === undefined && region['borderTarget'] === undefined)
-      )) &&
     (version >= 3 ||
       (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&
-    (version >= 4 ||
-      (value['cameraFollowDefaults'] === undefined &&
-        (!Array.isArray(value['motionRegions']) ||
-          value['motionRegions'].every(
-            (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
-          )))) &&
-    (version >= 19 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) =>
-          !isRecord(region) ||
-          (region['perspective'] === undefined &&
-            region['depthOfField'] === undefined &&
-            region['spatialReference'] === undefined)
-      )) &&
-    (version >= 18 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) => !isRecord(region) || region['phaseTransitions'] === undefined
-      )) &&
-    (version >= 17 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) => !isRecord(region) || region['motionBlur'] === undefined
-      )) &&
+    (version >= 4 || value['cameraFollowDefaults'] === undefined) &&
     (version >= 16 ||
       !isRecord(value['sceneBackground']) ||
       value['sceneBackground']['blur'] === undefined) &&

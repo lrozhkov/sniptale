@@ -588,3 +588,39 @@ it.each([true, false])(
     expect(phase(calculatePreviewRenderAllocation(graph), 'scene').bytes).toBe(1200 + bytes);
   }
 );
+
+it('reserves default cursor Orbit before activation and suppresses saved manual effects for explicit Off', () => {
+  const runtime = runtimeInput();
+  const region = createQuickEditZoomRegion({ id: 'new-cursor', at: 5, duration: 3 });
+  region.cursorFocus = {
+    path: {
+      version: 1,
+      mode: 'follow',
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      gapPolicy: 'hold',
+      segments: [],
+    },
+  };
+  runtime.scene.zoomRegions = [region];
+  runtime.resultTime = 0;
+  expect(region.perspective).toBeUndefined();
+  expect(resolvePreviewRenderAllocation(runtime).scene.spatial).not.toBeNull();
+  runtime.scene.zoomRegions = [
+    {
+      ...region,
+      cursorComposition: { ...region.cursorComposition!, mode: 'off' },
+      perspective: { enabled: true, rotateX: 10, rotateY: 20, rotateZ: 0, strength: 0.5 },
+      depthOfField: {
+        enabled: true,
+        mode: 'depth',
+        x: 0.5,
+        y: 0.5,
+        width: 0.2,
+        softness: 0.3,
+        strength: 0.5,
+      },
+    },
+  ];
+  expect(resolvePreviewRenderAllocation(runtime).scene.spatial).toBeNull();
+});

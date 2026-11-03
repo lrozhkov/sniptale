@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { isVideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -628,3 +629,54 @@ it.each(['abort', 'seek'] as const)(
     expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
   }
 );
+
+it('packs padded native preview frames before composition and releases them after drawing', async () => {
+  const { video, job } = setup();
+  Object.defineProperty(video, 'videoWidth', { value: 1904 });
+  const raw = {
+    format: 'NV12',
+    visibleRect: { x: 0, y: 0, width: 1904, height: 984 },
+    codedWidth: 1904,
+    codedHeight: 992,
+    displayWidth: 1904,
+    displayHeight: 984,
+    colorSpace: {},
+    timestamp: 15_000_000,
+    duration: null,
+    allocationSize: () => 1904 * 984 * 1.5,
+    copyTo: vi.fn(async () => [
+      { offset: 0, stride: 1904 },
+      { offset: 1904 * 984, stride: 1904 },
+    ]),
+    close: vi.fn(),
+  };
+  const packed = { displayWidth: 1904, displayHeight: 984, close: vi.fn() };
+  let created = false;
+  vi.stubGlobal(
+    'VideoFrame',
+    vi.fn(function () {
+      if (!created) {
+        created = true;
+        return raw;
+      }
+      return packed;
+    })
+  );
+  const drawImage = vi.fn();
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ clipMediaElements }) => {
+    const source = clipMediaElements.values().next().value;
+    if (!source || !isVideoCompositionFrameSource(source))
+      throw new Error('Unnormalized native preview source');
+    source.draw({ drawImage } as unknown as CanvasRenderingContext2D, 0, 0, 1280, 720);
+    return null;
+  });
+  try {
+    await renderPreviewScene(job);
+    expect(raw.copyTo).toHaveBeenCalledOnce();
+    expect(drawImage).toHaveBeenCalledWith(packed, 0, 0, 1280, 720);
+    expect(raw.close).toHaveBeenCalledOnce();
+    expect(packed.close).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

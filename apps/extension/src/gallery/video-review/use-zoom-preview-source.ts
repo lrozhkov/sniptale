@@ -1,3 +1,4 @@
+import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
 import { useEffect, useState } from 'react';
 
 /** One materialized source frame, independent of the main playback element. */
@@ -92,7 +93,13 @@ export function useZoomPreviewSource(file: File | null): ZoomPreviewFrameLoader 
         canvas.height = Math.max(1, video.videoHeight);
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Preview canvas is unavailable.');
-        context.drawImage(video, 0, 0);
+        const frame = await prepareDecodedVideoFrame(new VideoFrame(video), signal);
+        try {
+          signal.throwIfAborted();
+          context.drawImage(frame, 0, 0);
+        } finally {
+          frame.close();
+        }
         return { image: canvas, width: canvas.width, height: canvas.height };
       });
       queue = task.catch(() => undefined);

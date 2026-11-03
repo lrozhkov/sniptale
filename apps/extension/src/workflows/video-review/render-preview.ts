@@ -11,7 +11,7 @@ import {
   type PreviewScene as Scene,
   type PreviewSceneDimensions as Dimensions,
 } from './preview-scene';
-import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
+import { quickEditRegionNeedsSpatialRenderer } from '../../features/video/review/advanced/spatial';
 import {
   paintPreviewOuterFade,
   paintReviewCameraSplitScreen,
@@ -86,7 +86,11 @@ type Frame = {
   generation: number;
   sourceTime: number;
   resultTime: number;
-  source: Drawable & { timestamp: number; backing: Size };
+  source: Drawable & {
+    timestamp: number;
+    backing: Size;
+    prepare?(signal: AbortSignal): Promise<void>;
+  };
   camera?: {
     representedMediaTime: number;
     generation: number;
@@ -442,6 +446,8 @@ async function drawPreparedFrame(
   signal: AbortSignal,
   admit: (frame: Frame, bitmaps: readonly Size[]) => void
 ) {
+  await frame.source.prepare?.(signal);
+  signal.throwIfAborted();
   const scene = await recordingHistoryScene(prepared, frame, signal);
   const request = sceneRequest({ ...prepared, scene }, frame);
   const { dimensions } = prepared;
@@ -489,6 +495,7 @@ async function drawPreparedFrame(
             scene.showEditorComments ? { ...comment, renderToVideo: true } : comment
           ),
         sourceTime: frame.sourceTime,
+        currentTime: frame.resultTime,
         cameraScale: request.camera.scale,
         sceneScale: request.sceneScale,
         resources,
@@ -691,15 +698,8 @@ function admitRender(
   });
 }
 
-function needsSpatialRenderer(scene: Scene) {
-  return scene.zoomRegions.some(
-    (region) =>
-      !region.dormant &&
-      !region.border &&
-      !region.spotlight &&
-      (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
-  );
-}
+const needsSpatialRenderer = (scene: Scene) =>
+  scene.zoomRegions.some(quickEditRegionNeedsSpatialRenderer);
 
 /** One prepared scene owner; transport, immutable capture and publication remain with the caller. */
 export function createReviewPreviewRenderer(args: {
