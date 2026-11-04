@@ -54,6 +54,175 @@ function group(layers: readonly GpuPreviewLayer[]): GpuPreviewGroup {
   };
 }
 
+function nativeFrames() {
+  const frames: NativeFrame[] = [];
+  const layout = [
+    { offset: 0, stride: 32 },
+    { offset: 576, stride: 32 },
+  ];
+  const copy = vi.fn<VideoFrame['copyTo']>(async () => layout);
+  class NativeFrame {
+    format: VideoPixelFormat;
+    codedWidth: number;
+    codedHeight: number;
+    displayWidth: number;
+    displayHeight: number;
+    timestamp: number;
+    duration: number;
+    colorSpace: VideoColorSpaceInit;
+    visibleRect: { x: number; y: number; width: number; height: number };
+    close = vi.fn();
+    clone = vi.fn(() => new NativeFrame());
+    copyTo = copy;
+    allocationSize = vi.fn(() => 864);
+    constructor(_source?: unknown, init?: VideoFrameBufferInit) {
+      this.format = init?.format ?? 'NV12';
+      this.codedWidth = init?.codedWidth ?? 32;
+      this.codedHeight = init?.codedHeight ?? 32;
+      this.displayWidth = init?.displayWidth ?? 32;
+      this.displayHeight = init?.displayHeight ?? 18;
+      this.timestamp = init?.timestamp ?? 1_000_000;
+      this.duration = init?.duration ?? 33_333;
+      this.colorSpace = init?.colorSpace ?? { matrix: 'bt709', fullRange: false };
+      this.visibleRect = {
+        x: 0,
+        y: 0,
+        width: this.codedWidth,
+        height: init ? this.codedHeight : 18,
+      };
+      frames.push(this);
+    }
+  }
+  vi.stubGlobal('VideoFrame', NativeFrame);
+  return { frames, copy, layout };
+}
+
+it('packs one borrowed padded NV12 source before all imports and retains it through the GPU fence', async () => {
+  const g = graphics();
+  const native = nativeFrames();
+  const renderer = await owner({ reserve: g.reserve });
+  const source = new VideoFrame(raster());
+  const fence = deferred<void>();
+  g.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
+  const drawing = renderer.render(request([layer(source), layer(group([layer(source)]))]));
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+  const packed = native.frames[2];
+  expect(packed).toBeDefined();
+  expect(packed).not.toBe(source);
+  expect(packed).toMatchObject({ codedWidth: 32, codedHeight: 18, timestamp: 1_000_000 });
+  expect(g.device.importExternalTexture).toHaveBeenCalledTimes(2);
+  expect(g.device.importExternalTexture).toHaveBeenNthCalledWith(1, { source: packed });
+  expect(g.device.importExternalTexture).toHaveBeenNthCalledWith(2, { source: packed });
+  expect(native.copy).toHaveBeenCalledOnce();
+  expect(native.frames[0]!.clone).toHaveBeenCalledOnce();
+  expect(native.frames[0]!.close).not.toHaveBeenCalled();
+  expect(native.frames[1]!.close).toHaveBeenCalledOnce();
+  expect(native.frames[2]!.close).not.toHaveBeenCalled();
+  expect(g.reserve).toHaveBeenCalledWith(1728);
+  fence.resolve(undefined);
+  expect(await drawing).toBe(g.bitmap);
+  expect(native.frames[2]!.close).toHaveBeenCalledOnce();
+  expect(native.frames[0]!.close).not.toHaveBeenCalled();
+});
+
+it.each(['NV12', 'I420'] as const)(
+  'does not copy %s frames without affected native padding',
+  async (format) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner();
+    const source = new VideoFrame(raster());
+    native.frames[0]!.format = format;
+    if (format === 'NV12') native.frames[0]!.codedHeight = 18;
+    await renderer.render(request([layer(source)]));
+    expect(g.device.importExternalTexture).toHaveBeenCalledWith({ source });
+    expect(native.frames[0]!.clone).not.toHaveBeenCalled();
+    expect(native.copy).not.toHaveBeenCalled();
+    expect(native.frames[0]!.close).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['abort', 'dispose', 'queue failure'] as const)(
+  'retains packed storage through GPU settlement after %s',
+  async (ending) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner({ reserve: g.reserve });
+    const source = new VideoFrame(raster());
+    const controller = new AbortController();
+    const fence = deferred<void>();
+    g.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
+    const outcome = renderer
+      .render(request([layer(source)], controller.signal))
+      .catch((error: unknown) => error);
+    await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+    if (ending === 'abort') controller.abort();
+    if (ending === 'dispose') renderer.dispose();
+    expect(native.frames[2]!.close).not.toHaveBeenCalled();
+    if (ending === 'queue failure') fence.reject(new Error('Lost queue'));
+    else fence.resolve(undefined);
+    const error = await outcome;
+    expect(error).toBeInstanceOf(Error);
+    expect(native.frames[2]!.close).toHaveBeenCalledOnce();
+    expect(native.frames[0]!.close).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(renderer.allocatedBytes).toBe(0);
+  }
+);
+
+it.each(['abort', 'copy failure'] as const)(
+  'releases clone and storage after normalization %s',
+  async (ending) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner({ reserve: g.reserve });
+    const source = new VideoFrame(raster());
+    const controller = new AbortController();
+    const copied = deferred<PlaneLayout[]>();
+    native.copy.mockReturnValue(copied.promise);
+    const outcome = renderer
+      .render(request([layer(source)], controller.signal))
+      .catch((error: unknown) => error);
+    await vi.waitFor(() => expect(native.copy).toHaveBeenCalledOnce());
+    if (ending === 'abort') {
+      controller.abort();
+      copied.resolve(native.layout);
+    } else copied.reject(new Error('Native copy failed'));
+    expect(await outcome).toBeInstanceOf(Error);
+    expect(native.frames).toHaveLength(2);
+    expect(native.frames[1]!.close).toHaveBeenCalledOnce();
+    expect(native.frames[0]!.close).not.toHaveBeenCalled();
+    expect(g.device.importExternalTexture).not.toHaveBeenCalled();
+    expect(g.queue.submit).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(renderer.allocatedBytes).toBe(0);
+  }
+);
+
+it.each(['budget', 'reservation'] as const)(
+  'refuses native storage before copying on %s failure',
+  async (failure) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner({ reserve: g.reserve });
+    const source = new VideoFrame(raster());
+    if (failure === 'budget') native.frames[0]!.allocationSize.mockReturnValue(256 * 1024 * 1024);
+    else
+      g.reserve.mockImplementation(() => {
+        throw new Error('Reservation refused');
+      });
+    await expect(renderer.render(request([layer(source)]))).rejects.toThrow(
+      failure === 'budget' ? 'source budget' : 'Reservation refused'
+    );
+    expect(native.frames[0]!.clone).not.toHaveBeenCalled();
+    expect(native.copy).not.toHaveBeenCalled();
+    expect(native.frames[0]!.close).not.toHaveBeenCalled();
+    expect(g.device.importExternalTexture).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(renderer.allocatedBytes).toBe(0);
+  }
+);
+
 it('keeps the current preview when WebGPU or an adapter is unavailable', async () => {
   vi.stubGlobal('navigator', {});
   expect(await createGpuPreviewRenderer()).toBeNull();

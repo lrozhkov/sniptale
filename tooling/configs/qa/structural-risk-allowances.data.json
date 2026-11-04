@@ -5011,10 +5011,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. The same frame transaction owns temporary packed sources and releases them after GPU settlement.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "e8f1a2c5fb752976aaee0c583c0a4352a219fb580abcafc639fd50b6ecd5dc0b",
+      "astHash": "1c46d67e7f47941802e0a28d0147607f7204d6fe362fdbd81ee420fc344181a7",
       "signatureHash": "7785ef850d9bfb99fd0a13cdce56e60cfb51eee4462f53d94142dee6cf9f4525"
     },
     {
@@ -5022,11 +5022,11 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.encodeFrame",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One encoder orders child groups before parent passes within one command buffer. Sources, filters, masks, bind groups and uniform slots share this operation. The method adds no asynchronous cleanup authority.",
+      "reason": "tool-noise: One encoder orders child groups before parent passes within one command buffer. Sources, filters, masks, bind groups and uniform slots share this operation. The method adds no asynchronous cleanup authority. External imports use the frame transaction map without owning its packed sources.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes command ordering or source lifetime. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-04",
-      "astHash": "1951632ddbba408b39dd5842c8cb830ea1ff902c9789302fb09158b1d35be1c1",
-      "signatureHash": "36c3b3f534fd39ef9df216605d34095efc6fdf48bc73c3a1f64dba2b99dd4bd3"
+      "astHash": "84d98d35dc3f960573b41f35e22aebe22d0367c8242c78aa74d6d7d10ae61e58",
+      "signatureHash": "3a28fc6dddac0844ca3106e320d3faad7a4b93c34237eb1aad06facc50ca25f8"
     },
     {
       "rule": "structural-function-risk",
@@ -5275,21 +5275,21 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. The same frame transaction owns temporary packed sources and releases them after GPU settlement.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "352aa260866166bc6e24bf64f443112ca82519db5f856e1b8e49d4011f530154",
-      "signatureHash": "3be5416a85b05e8e2d02299675735e5633ef89890d2406f3992dbc506b2cabc4"
+      "astHash": "fe7f1df1d6770d841caaee281fa6dc97f4673d498c7962522d0d2b0ce6a675de",
+      "signatureHash": "f00d9c5df2a7a158107a83280797f66378df0f54200d9122d12f1df0d970e705"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.render",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One frame transaction checks the graph, prepares pipelines, submits work and collects validation errors. Cleanup drains the GPU before borrowed resources leave scope. Nested finally blocks preserve that invariant.",
+      "reason": "tool-noise: One frame transaction checks the graph, prepares pipelines, submits work and collects validation errors. Cleanup drains the GPU before borrowed resources leave scope. Nested finally blocks preserve that invariant. The same frame transaction owns temporary packed sources and releases them after GPU settlement.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes submission or fence lifetime. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-04",
-      "astHash": "b9a35c0910e1868d19181d92f7bdc9c2ae2ab2a54e5960878435860601f19c11",
+      "astHash": "8623c7c96a334b02ee8ba59b9fe94ad2ceda8ba765894bcdbb41a6686e0c9346",
       "signatureHash": "3dfcbd61878f8639bd6c32b92b7e07949ed93dc291f476336e44205e2b409899"
     },
     {
@@ -5792,10 +5792,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This fixture checks one compositor resource lifetime. New cases use the same fake device and controlled completion barriers. Mock configuration creates no product authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "reason": "tool-noise: This fixture checks one compositor resource lifetime. New cases use the same fake device and controlled completion barriers. Mock configuration creates no product authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Padded source cases use the existing GPU fixture and controlled completion barriers.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "65bb316c5b37a7f0526937058f52d5af7d8fe4bcb9894f192cb7bb03a0e55646",
+      "astHash": "c82bfa88a5a5b0830e875bc43d5a44b7beec47fa5314f355b0105672b3797694",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {

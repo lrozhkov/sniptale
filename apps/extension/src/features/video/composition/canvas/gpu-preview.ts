@@ -4,6 +4,7 @@ import { quickEditRotationMatrix } from '../motion/spatial-geometry';
 import { gpuPreviewShader } from './gpu-preview-shaders';
 import { createGpuPreviewFilter } from './gpu-preview-filter';
 import { createGpuPreviewCssFilter } from './gpu-preview-css-filter';
+import { prepareDecodedVideoFrame } from '../draw/decoded-sample';
 
 type Size = { width: number; height: number };
 type Reservation = { release(): void };
@@ -351,6 +352,7 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
   let hasMaskedEffects = false;
   let layerCount = 0;
   const operations = new Map<string, GpuPreviewLayer>();
+  const nativeFrames = new Set<VideoFrame>();
   const retainRaster = (
     raster: { source: Raster; cache?: GpuPreviewLayer['cache'] },
     path: string
@@ -403,13 +405,23 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
         validateLayers(group.layers, group.output, group.logical, path, depth + 1);
         visiting.delete(group);
         validatedGroups.add(group);
-      } else if (!(layer.source instanceof VideoFrame)) {
+      } else if (layer.source instanceof VideoFrame) {
+        nativeFrames.add(layer.source);
+      } else {
         retainRaster({ source: layer.source, cache: layer.cache }, path);
       }
     });
   };
   validateLayers(request.layers, request.output, request.logical, '', 0);
-  return { retainedKeys, targetKeys, hasEffects, hasMasked, hasMaskedEffects, operations };
+  return {
+    retainedKeys,
+    targetKeys,
+    hasEffects,
+    hasMasked,
+    hasMaskedEffects,
+    operations,
+    nativeFrames,
+  };
 }
 
 function requestHasCssFilter(layers: readonly GpuPreviewLayer[]): boolean {
@@ -586,7 +598,11 @@ export async function createGpuPreviewRenderer(
     };
 
     /** Encode child targets before their parent pass without changing frame lifetime authority. */
-    const encodeFrame = (request: GpuPreviewRequest, families: PreviewPipelineFamilies) => {
+    const encodeFrame = (
+      request: GpuPreviewRequest,
+      families: PreviewPipelineFamilies,
+      packedFrames: ReadonlyMap<VideoFrame, VideoFrame>
+    ) => {
       const { effects, masked, maskedEffects } = families;
       const encoder = device.createCommandEncoder();
       let uniformIndex = 0;
@@ -643,7 +659,9 @@ export async function createGpuPreviewRenderer(
             }
           } else if (layer.source instanceof VideoFrame) {
             if (!requiresRasterSource(layer))
-              return device.importExternalTexture({ source: layer.source });
+              return device.importExternalTexture({
+                source: packedFrames.get(layer.source) ?? layer.source,
+              });
             const size = {
               width: layer.source.displayWidth,
               height: layer.source.displayHeight,
@@ -776,7 +794,34 @@ export async function createGpuPreviewRenderer(
         busy = true;
         device.pushErrorScope('validation');
         let scopeOpen = true;
+        const packedFrames = new Map<VideoFrame, VideoFrame>();
+        const packedSources: { frame: VideoFrame; reservation: Reservation }[] = [];
         try {
+          for (const source of plan.nativeFrames) {
+            const visible = source.visibleRect;
+            if (
+              source.format !== 'NV12' ||
+              !visible ||
+              (visible.x === 0 &&
+                visible.y === 0 &&
+                visible.width === source.codedWidth &&
+                visible.height === source.codedHeight)
+            )
+              continue;
+            // Native copy storage and the packed frame overlap during construction.
+            const count = source.allocationSize() * 2;
+            if (bytes + count > MAX_TEXTURE_BYTES)
+              throw new Error('GPU preview source budget exceeded.');
+            const reservation = reserve(count);
+            try {
+              const frame = await prepareDecodedVideoFrame(source.clone(), request.signal);
+              packedSources.push({ frame, reservation });
+              packedFrames.set(source, frame);
+            } catch (error) {
+              reservation.release();
+              throw error;
+            }
+          }
           if (plan.hasEffects) effectPipelines ??= createPreviewPipelines(device, format, true);
           const effects = plan.hasEffects ? await effectPipelines : null;
           if (plan.hasMasked)
@@ -837,7 +882,7 @@ export async function createGpuPreviewRenderer(
               entry.reservation.release();
             }
           device.queue.submit([
-            encodeFrame(request, { effects, masked, maskedEffects, operations }),
+            encodeFrame(request, { effects, masked, maskedEffects, operations }, packedFrames),
           ]);
           scopeOpen = false;
           // Both completions retain borrowed sources; a rejection must not release the other barrier.
@@ -859,6 +904,10 @@ export async function createGpuPreviewRenderer(
             try {
               if (scopeOpen) await device.popErrorScope();
             } finally {
+              for (const source of packedSources) {
+                source.frame.close();
+                source.reservation.release();
+              }
               busy = false;
               filter.endFrame();
               cssFilter?.endFrame();
