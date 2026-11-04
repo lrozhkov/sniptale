@@ -326,6 +326,19 @@ it.each(['circle', 'rounded'] as const)(
       'preview-gpu-click-ring',
       'preview-gpu-click',
     ]);
+    for (const role of ['preview-gpu-click-shadow', 'preview-gpu-click-ring']) {
+      const allocation = vi.mocked(f.resources.canvas).mock.calls.find(([name]) => name === role)!;
+      expect(allocation[1].width * allocation[1].height).toBeLessThan(
+        (size.width * size.height) / 4
+      );
+      const index = vi.mocked(f.resources.canvas).mock.calls.indexOf(allocation);
+      const source = vi.mocked(f.resources.canvas).mock.results[index]!.value.canvas;
+      const layer = visit(result.contentLayers).find((item) => item.source === source)!;
+      expect(layer.rect.width).toBe(source.width);
+      expect(layer.rect.height).toBe(source.height);
+      expect(layer.rect.x).toBeGreaterThan(0);
+      expect(layer.rect.y).toBeGreaterThan(0);
+    }
     expect(release).toHaveBeenCalledOnce();
     f.primitives.dispose();
     expect(f.release).toHaveBeenCalledTimes(5);

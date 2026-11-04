@@ -5377,7 +5377,7 @@
       "reason": "tool-noise: One content operation orders borders, clicks, annotations and comments. It retains annotation batches before yielding their raw bitmaps to the GPU graph. The caller owns fence settlement. One finally block requests batch release.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes annotation borrow or overlay order. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-04",
-      "astHash": "497b1bb29bd2c076a4f9769a2b9e603f380e820e7aeeafbacfd6aee98e989cfa",
+      "astHash": "2a13b25a4b9f2084eb15afe10d9edf435eb0673f44f1ec00d5ffff1799be7972",
       "signatureHash": "e5883e63d84fbde34307868357d06b0c385b565c72b95a21656c1e66fb4dd865"
     },
     {

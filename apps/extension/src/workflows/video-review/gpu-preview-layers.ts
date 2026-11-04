@@ -86,6 +86,17 @@ export type ReviewGpuPrimitives = ReturnType<typeof createReviewGpuPrimitives>;
 function texture(source: HTMLCanvasElement, rect: Rect, inverse = identity): GpuPreviewLayer {
   return { source, rect, inverse };
 }
+
+function clickPaintBounds(bounds: Rect, padding: number, size: Size): Rect {
+  const x = Math.max(0, Math.min(size.width - 1, Math.floor(bounds.x - padding)));
+  const y = Math.max(0, Math.min(size.height - 1, Math.floor(bounds.y - padding)));
+  const right = Math.max(x + 1, Math.min(size.width, Math.ceil(bounds.x + bounds.width + padding)));
+  const bottom = Math.max(
+    y + 1,
+    Math.min(size.height, Math.ceil(bounds.y + bounds.height + padding))
+  );
+  return { x, y, width: right - x, height: bottom - y };
+}
 /** Uniform fields sample only texel centres, outside the source-edge antialiasing ramp. */
 function uniformViewportLayer(source: HTMLCanvasElement, output: Size): GpuPreviewLayer {
   return texture(source, { x: 0, y: 0, ...output }, [
@@ -247,28 +258,25 @@ export async function reviewGpuContentLayers(args: {
         if (click.lens!.shape === 'circle') context.arc(point.x, point.y, radius, 0, Math.PI * 2);
         else context.roundRect(bounds.x, bounds.y, bounds.width, bounds.height, radius * 0.18);
       };
-      const shadow = primitives.raster(
-        'preview-gpu-click-shadow',
-        dimensions.canonical,
-        (context) => {
-          clipCroppedContent(context, base);
-          context.beginPath();
-          context.roundRect(
-            clip.rect.x,
-            clip.rect.y,
-            clip.rect.width,
-            clip.rect.height,
-            clip.radius
-          );
-          context.clip();
-          trace(context);
-          context.shadowColor = `rgba(0,0,0,${click.lens!.shadow / 100})`;
-          context.shadowBlur = radius * 0.16;
-          context.shadowOffsetY = radius * 0.04;
-          context.fillStyle = '#000000';
-          context.fill();
-        }
+      // Keep canonical pixel density and a conservative blur tail inside the original canvas clip.
+      const shadowBounds = clickPaintBounds(
+        bounds,
+        radius * (0.16 * 3 + 0.04) + 2,
+        dimensions.canonical
       );
+      const shadow = primitives.raster('preview-gpu-click-shadow', shadowBounds, (context) => {
+        context.translate(-shadowBounds.x, -shadowBounds.y);
+        clipCroppedContent(context, base);
+        context.beginPath();
+        context.roundRect(clip.rect.x, clip.rect.y, clip.rect.width, clip.rect.height, clip.radius);
+        context.clip();
+        trace(context);
+        context.shadowColor = `rgba(0,0,0,${click.lens!.shadow / 100})`;
+        context.shadowBlur = radius * 0.16;
+        context.shadowOffsetY = radius * 0.04;
+        context.fillStyle = '#000000';
+        context.fill();
+      });
       const lens: GpuPreviewLayer = {
         source: args.original,
         rect: full,
@@ -294,11 +302,17 @@ export async function reviewGpuContentLayers(args: {
         context.fill();
       });
       const lensGroup = group(
-        [texture(shadow, full), lens, { ...texture(mask, full), blend: 'mask' }],
+        [texture(shadow, shadowBounds), lens, { ...texture(mask, full), blend: 'mask' }],
         { canonical: dimensions.canonical, backing: dimensions.canonical }
       );
       contentLayers.push({ source: lensGroup, rect: full, inverse: geometry.inverse });
-      const ring = primitives.raster('preview-gpu-click-ring', dimensions.canonical, (context) => {
+      const ringBounds = clickPaintBounds(
+        bounds,
+        (click.stroke * sourceScale) / 2 + 2,
+        dimensions.canonical
+      );
+      const ring = primitives.raster('preview-gpu-click-ring', ringBounds, (context) => {
+        context.translate(-ringBounds.x, -ringBounds.y);
         clipCroppedContent(context, base);
         context.beginPath();
         context.roundRect(clip.rect.x, clip.rect.y, clip.rect.width, clip.rect.height, clip.radius);
@@ -309,7 +323,7 @@ export async function reviewGpuContentLayers(args: {
         context.lineWidth = click.stroke * sourceScale;
         context.stroke();
       });
-      contentLayers.push(texture(ring, full, geometry.inverse));
+      contentLayers.push(texture(ring, ringBounds, geometry.inverse));
     }
     flushClicks();
     if (content.length) {
