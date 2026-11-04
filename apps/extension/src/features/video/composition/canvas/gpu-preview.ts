@@ -839,9 +839,15 @@ export async function createGpuPreviewRenderer(
           device.queue.submit([
             encodeFrame(request, { effects, masked, maskedEffects, operations }),
           ]);
-          await drain();
           scopeOpen = false;
-          const error = await device.popErrorScope();
+          // Both completions retain borrowed sources; a rejection must not release the other barrier.
+          const [submitted, validation] = await Promise.allSettled([
+            drain(),
+            Promise.resolve().then(() => device.popErrorScope()),
+          ]);
+          if (submitted.status === 'rejected') throw submitted.reason;
+          if (validation.status === 'rejected') throw validation.reason;
+          const error = validation.value;
           if (error) throw new Error(error.message);
           check(request.signal);
           return surface.transferToImageBitmap();

@@ -292,3 +292,22 @@ it('clears cancellation failure after a successful repeat cancellation', () => {
   expect(cancelled.status?.phase).toBe(VideoProjectExportPhase.CANCELLED);
   expect(cancelled.settings).toEqual(running.settings);
 });
+
+it.each(['off', 'bicubic-sharpen', 'clark-x2'] as const)(
+  'retains session-only %s across encoding choices and inspector reopen',
+  (detailEnhancement) => {
+    const project = createEmptyVideoProject('Details', 1920, 1080);
+    const original = JSON.stringify(project);
+    let state = openExportDialogState({ exportState: createInitialExportState(), project });
+    state = updateExportSettingsState(state, { detailEnhancement });
+    state = updateExportSettingsState(state, {
+      format: 'WEBM',
+      webmVideoCodec: 'VP8',
+      quality: 'ULTRA',
+    });
+    state = openExportDialogState({ exportState: closeExportDialogState(state), project });
+    expect(state.settings?.detailEnhancement).toBe(detailEnhancement);
+    expect(state.settings?.format).toBe('WEBM');
+    expect(JSON.stringify(project)).toBe(original);
+  }
+);

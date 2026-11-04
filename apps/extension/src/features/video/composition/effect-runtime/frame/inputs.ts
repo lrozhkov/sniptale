@@ -11,7 +11,7 @@ import { segmentVisualLayersByViewportLock } from '../../motion/layer-camera';
 import type { ReviewSpatialRenderer } from '../../canvas/spatial-renderer';
 import { shouldLockVisualLayerToViewport } from '../../motion/layer-camera';
 import type { VideoCompositionCameraState } from '../../types';
-import type { EffectRuntimeRenderedFrameMap } from '../runtime/types';
+import type { EffectRuntimeRenderedFrameMap, EffectRuntimeFramePlan } from '../runtime/types';
 import { acquireVideoCompositionBuffer } from '../../canvas/buffer-pool';
 import {
   createEffectRuntimeDrawState,
@@ -49,6 +49,7 @@ export type EffectRuntimeInputComposer = (
 ) => Promise<ImageBitmap>;
 
 export function createEffectRuntimeInputMaterializer(args: {
+  mediaForPlan?: (plan: EffectRuntimeFramePlan) => ReadonlyMap<string, VideoCompositionMediaSource>;
   composeInput?: EffectRuntimeInputComposer;
   drawBackground?: BackgroundPainter;
   scene?: SourceSceneInput;
@@ -74,12 +75,26 @@ export function createEffectRuntimeInputMaterializer(args: {
   return {
     materializeTargetSource: (plan, frames) =>
       materializeTargetSource(
-        { ...args, createBitmap, ownerDocument, resourceScope, frames: frames ?? new Map() },
+        {
+          ...args,
+          clipMediaElements: args.mediaForPlan?.(plan) ?? args.clipMediaElements,
+          createBitmap,
+          ownerDocument,
+          resourceScope,
+          frames: frames ?? new Map(),
+        },
         plan
       ),
     materializeTransitionInputs: (plan, frames) =>
       materializeTransitionInputs(
-        { ...args, createBitmap, ownerDocument, resourceScope, frames: frames ?? new Map() },
+        {
+          ...args,
+          clipMediaElements: args.mediaForPlan?.(plan) ?? args.clipMediaElements,
+          createBitmap,
+          ownerDocument,
+          resourceScope,
+          frames: frames ?? new Map(),
+        },
         plan
       ),
   };

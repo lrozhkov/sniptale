@@ -581,3 +581,54 @@ it('cancels a second decoder failure without reloading again', () => {
     vi.useRealTimers();
   }
 });
+
+it('keeps native playback exact while the current manual publication owns the display clock', () => {
+  const test = playbackHarness();
+  let frame: FrameRequestCallback | undefined;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frame = callback;
+    return 1;
+  });
+  const video = test.hook.video.current!;
+  Object.defineProperty(video, 'paused', { configurable: true, value: false });
+  try {
+    act(() => test.hook.setPlaying(true));
+    const active = test.hook.setPresentationActive;
+    const publish = test.hook.onPresentedTime;
+    act(() => active('first', true));
+    video.currentTime = 2.7;
+    act(() => frame!(0));
+    expect(video.currentTime).toBe(4);
+    expect(video.playbackRate).toBe(2);
+    expect(video.muted).toBe(true);
+    expect(test.hook.time).toBe(0);
+    act(() => publish('first', 3.9));
+    expect(test.hook.time).toBe(3.9);
+    expect(test.hook.setPresentationActive).toBe(active);
+    expect(test.hook.onPresentedTime).toBe(publish);
+    act(() => {
+      active('second', true);
+      active('first', false);
+      publish('first', 1);
+    });
+    video.currentTime = 6.5;
+    act(() => frame!(1));
+    expect(test.hook.time).toBe(3.9);
+    act(() => publish('second', 6.4));
+    expect(test.hook.time).toBe(6.4);
+    act(() => active('second', false));
+    act(() => frame!(2));
+    expect(test.hook.time).toBe(6.5);
+    act(() => active('second', true));
+    video.currentTime = 6.8;
+    Object.defineProperty(video, 'paused', { configurable: true, value: true });
+    act(() => video.dispatchEvent(new Event('pause')));
+    expect(test.hook.time).toBe(6.8);
+    act(() => publish('second', 6.4));
+    expect(test.hook.time).toBe(6.8);
+    act(() => test.hook.seek(7.1, false));
+    expect(test.hook.time).toBe(7.1);
+  } finally {
+    test.dispose();
+  }
+});

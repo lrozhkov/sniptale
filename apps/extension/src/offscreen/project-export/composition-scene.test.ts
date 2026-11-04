@@ -268,3 +268,55 @@ it.each(['job', 'signal'] as const)(
     expect(owners.draw).not.toHaveBeenCalled();
   }
 );
+
+it.each(['success', 'draw-failure', 'late-cancel'] as const)(
+  'retains the single source pass through %s and releases it after the frame settles',
+  async (mode) => {
+    const args = input();
+    const releasePass = vi.fn();
+    const sourceSampling = { releasePass } as unknown as NonNullable<
+      typeof args.job.sourceSampling
+    >;
+    args.job.sourceSampling = sourceSampling;
+    args.sourceSamplingFallback = 'first';
+    const gate = Promise.withResolvers<void>();
+    const started = Promise.withResolvers<void>();
+    owners.draw.mockImplementationOnce(() => {
+      started.resolve();
+      return gate.promise;
+    });
+    const rendering = renderProjectCompositionScene(args);
+    await started.promise;
+    expect(owners.draw).toHaveBeenCalledOnce();
+    expect(owners.effects).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceSampling, sourceSamplingFallback: 'first' })
+    );
+    expect(owners.draw.mock.lastCall![6]).toEqual(
+      expect.objectContaining({ sourceSampling, sourceSamplingFallback: 'first' })
+    );
+    expect(releasePass).not.toHaveBeenCalled();
+    if (mode === 'late-cancel') args.job.cancelled = true;
+    if (mode === 'draw-failure') gate.reject(new Error('render failure'));
+    else gate.resolve();
+    if (mode === 'draw-failure') await expect(rendering).rejects.toThrow('render failure');
+    else if (mode === 'late-cancel')
+      await expect(rendering).rejects.toThrow('PROJECT_EXPORT_CANCELLED');
+    else await rendering;
+    expect(releasePass).toHaveBeenCalledOnce();
+    expect(owners.dispose.mock.invocationCallOrder.at(-1)).toBeLessThan(
+      releasePass.mock.invocationCallOrder[0]!
+    );
+    if (mode !== 'success') expect(owners.mark).not.toHaveBeenCalled();
+  }
+);
+it('releases a prepared source pass when the FX wave fails before drawing starts', async () => {
+  const args = input(),
+    releasePass = vi.fn();
+  args.job.sourceSampling = { releasePass } as unknown as NonNullable<
+    typeof args.job.sourceSampling
+  >;
+  owners.effects.mockRejectedValueOnce(new Error('FX wave failed'));
+  await expect(renderProjectCompositionScene(args)).rejects.toThrow('FX wave failed');
+  expect(releasePass).toHaveBeenCalledOnce();
+  expect(owners.draw).not.toHaveBeenCalled();
+});

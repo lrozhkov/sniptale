@@ -291,6 +291,8 @@ beforeEach(() => {
     },
     onTime: (time: number) => time + 1,
     setPlaying: vi.fn(),
+    setPresentationActive: vi.fn(),
+    onPresentedTime: vi.fn(),
     onEnded: vi.fn(),
     onMediaError: vi.fn(),
     recovering: false,
@@ -465,6 +467,8 @@ it('routes local preview preferences and inspector entry without changing editin
   );
   expect(stage().preview?.preferences).toBe(preferences);
   expect(stage().preview?.playing).toBe(state.playing);
+  expect(stage().preview?.onPresentationActive).toBe(state.setPresentationActive);
+  expect(stage().preview?.onPresentedTime).toBe(state.onPresentedTime);
   expect(stage().preview?.sourceToResult(1)).toBe(state.timeline.timeMap.sourceToTimeline(1));
   stage().preview?.onRaster?.({ width: 1280, height: 720 });
   expect(raster).toHaveBeenCalledWith({ width: 1280, height: 720 });

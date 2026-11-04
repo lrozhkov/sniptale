@@ -14,6 +14,7 @@ vi.mock('../../features/video/composition/canvas/spatial-renderer', () => ({
 }));
 function rawRenderer() {
   return {
+    allocations: [{ role: 'spatial-plane', bytes: 1024, canvases: 1 }],
     validateSizes: vi.fn<ReviewSpatialRenderer['validateSizes']>(),
     surface: vi.fn<ReviewSpatialRenderer['surface']>(),
     draw: vi.fn<ReviewSpatialRenderer['draw']>(),
@@ -185,5 +186,14 @@ it('closes context loss before notification and suppresses stale callbacks', () 
   lost();
   owner.dispose();
   expect(callback).toHaveBeenCalledOnce();
+  expect(raw.dispose).toHaveBeenCalledOnce();
+});
+
+it('forwards owned spatial allocation descriptors without creating another resource owner', () => {
+  const owner = session();
+  expect(owner.allocations).toEqual(raw.allocations);
+  raw.allocations = [{ role: 'spatial-overlay', bytes: 4096, canvases: 1 }];
+  expect(owner.allocations).toEqual(raw.allocations);
+  owner.dispose();
   expect(raw.dispose).toHaveBeenCalledOnce();
 });

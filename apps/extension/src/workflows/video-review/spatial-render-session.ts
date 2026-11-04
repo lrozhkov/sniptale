@@ -28,7 +28,7 @@ export function createReviewSpatialSession(onContextLost?: () => void) {
     return { maximumCanvases: 3, maximumManagedBytes };
   };
   const resources = createPreviewRenderResources(limits());
-  let renderer: ReviewSpatialRenderer | undefined;
+  let renderer: ReturnType<typeof createReviewSpatialRenderer> | undefined;
   let disposed = false;
   const dispose = () => {
     if (disposed) return;
@@ -63,6 +63,9 @@ export function createReviewSpatialSession(onContextLost?: () => void) {
     resources.replaceLimits(limits());
   };
   return {
+    get allocations() {
+      return current.allocations;
+    },
     /** Counts managed estimates. Browser decoder and driver storage remain outside this ledger. */
     get resourceCounters() {
       return resources.counters;

@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createTimelineProjection, timelineScrollLeftToTime } from './projection';
 
 /** Owns precise view time and the native scrollbar acknowledgement lifecycle. */
@@ -9,7 +9,17 @@ export function useTimelineNavigation(params: {
   timelineRef: RefObject<HTMLDivElement | null>;
 }) {
   const [startTime, setStartTime] = useState(0);
-  const projection = createTimelineProjection({ ...params, startTime });
+  const { extentSeconds, pixelsPerSecond, viewportWidth } = params;
+  const projection = useMemo(
+    () =>
+      createTimelineProjection({
+        extentSeconds,
+        pixelsPerSecond,
+        viewportWidth,
+        startTime,
+      }),
+    [extentSeconds, pixelsPerSecond, viewportWidth, startTime]
+  );
   const projectionRef = useRef(projection);
   projectionRef.current = projection;
   const acknowledgedScroll = useRef(0);

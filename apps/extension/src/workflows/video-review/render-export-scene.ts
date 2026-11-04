@@ -13,11 +13,12 @@ import {
   evaluateReviewClicks,
   type ReviewClickCue,
 } from '../../features/video/review/click-animation';
-import { drawReviewSceneFrame } from './scene-frame';
+import { drawReviewSceneFrame, drawReviewExportSharpStage } from './scene-frame';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
 import { reviewWindowRasterBacking } from './window-header';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
 import type { ReviewTransitionSample } from './cut-transition-frames';
+import type { ReviewExportSamplingFrame } from './export-source-sampling';
 
 /** Graphical frame input contains no encoder, media sink, transport or publication authority. */
 export interface ReviewRenderScene {
@@ -44,6 +45,7 @@ export function paintReviewExportScene({
   spatialRenderer,
   scratch,
   blurEnabled,
+  exportSampling,
 }: {
   scene: Readonly<ReviewRenderScene>;
   context: CanvasRenderingContext2D;
@@ -54,29 +56,34 @@ export function paintReviewExportScene({
   spatialRenderer: ReviewSpatialRenderer | undefined;
   scratch: HTMLCanvasElement | null;
   blurEnabled: boolean;
+  exportSampling?: ReviewExportSamplingFrame;
 }) {
-  const camera = evaluateQuickEditCameraAtTime(scene.zoomRegions, resultTime, {
-    source: scene.sourceSize,
-    canvas: scene.baseCanvas ?? canvas,
-    background: scene.background,
-    windowHeader: scene.windowHeader,
-    output: canvas,
-  });
-  const layout = computeQuickEditSceneLayout({
-    output: canvas,
-    source: scene.sourceSize,
-    canvas: scene.baseCanvas ?? canvas,
-    windowHeader: scene.windowHeader,
-    background: scene.background,
-    camera,
-  });
+  const camera =
+    exportSampling?.plan.camera ??
+    evaluateQuickEditCameraAtTime(scene.zoomRegions, resultTime, {
+      source: scene.sourceSize,
+      canvas: scene.baseCanvas ?? canvas,
+      background: scene.background,
+      windowHeader: scene.windowHeader,
+      output: canvas,
+    });
+  const layout =
+    exportSampling?.plan.layout ??
+    computeQuickEditSceneLayout({
+      output: canvas,
+      source: scene.sourceSize,
+      canvas: scene.baseCanvas ?? canvas,
+      windowHeader: scene.windowHeader,
+      background: scene.background,
+      camera,
+    });
   const burned = scene.comments.filter(
     (comment) => comment.renderToVideo && isCanvasCommentVisibleAt(comment, sourceTime)
   );
   const magnify = evaluateReviewClicks(scene.clickCues ?? [], resultTime).some(
     (click) => (click.lens?.scale ?? 1) > 1
   );
-  drawReviewSceneFrame(context, {
+  const frameArgs: Parameters<typeof drawReviewSceneFrame>[1] = {
     spatialRenderer,
     canvas,
     layout,
@@ -89,15 +96,18 @@ export function paintReviewExportScene({
     sourceTime: sourceTime,
     currentTime: resultTime,
     cameraScale: camera.scale,
-    motionBlur: blurEnabled
-      ? quickEditMotionBlurCameras(scene.zoomRegions, resultTime, {
-          source: scene.sourceSize,
-          canvas: scene.baseCanvas ?? canvas,
-          background: scene.background,
-          windowHeader: scene.windowHeader,
-          output: canvas,
-        })
-      : undefined,
+    ...(exportSampling ? { exportSampling: { frame: exportSampling } } : {}),
+    motionBlur: exportSampling
+      ? exportSampling.plan.exposures
+      : blurEnabled
+        ? quickEditMotionBlurCameras(scene.zoomRegions, resultTime, {
+            source: scene.sourceSize,
+            canvas: scene.baseCanvas ?? canvas,
+            background: scene.background,
+            windowHeader: scene.windowHeader,
+            output: canvas,
+          })
+        : undefined,
     sceneScale: scene.sceneScale ?? 1,
     windowRasterBacking: magnify
       ? reviewWindowRasterBacking({
@@ -128,6 +138,16 @@ export function paintReviewExportScene({
         sourceWidth: scene.sourceSize.width,
         clicks: scene.clickCues,
         windowRaster,
+        ...(exportSampling
+          ? {
+              exportSampling,
+              sharpPaint: (
+                target: CanvasRenderingContext2D,
+                lens: ReviewExportSamplingFrame['plan']['lenses'][number]
+              ) => drawReviewExportSharpStage(target, frameArgs, exportSampling, lens),
+            }
+          : {}),
       }),
-  });
+  };
+  drawReviewSceneFrame(context, frameArgs);
 }

@@ -123,12 +123,18 @@ it('isolates source pixels at full alpha and publishes once under accepted alpha
   expect(f.sourceContext.globalAlpha).toBe(1);
   expect(f.sourceContext.filter).toBe('none');
   expect(f.sourceContext.setTransform).toHaveBeenNthCalledWith(1, f.transform);
-  expect(drawSceneSpotlights).toHaveBeenCalledWith(f.sourceContext, f.surfaces[0], null, [
-    expect.objectContaining({
-      dim: 0.65,
-      projection: [2, 0, 40, 0, 2, 20, 0, 0, 1],
-    }),
-  ]);
+  expect(drawSceneSpotlights).toHaveBeenCalledWith(
+    f.sourceContext,
+    f.surfaces[0],
+    null,
+    [
+      expect.objectContaining({
+        dim: 0.65,
+        projection: [2, 0, 40, 0, 2, 20, 0, 0, 1],
+      }),
+    ],
+    undefined
+  );
   expect(f.destination.drawImage).toHaveBeenCalledExactlyOnceWith(f.surfaces[0], 0, 0);
   expect(f.destination.globalAlpha).toBe(0.37);
   expect(f.destination.filter).toBe('blur(2px)');

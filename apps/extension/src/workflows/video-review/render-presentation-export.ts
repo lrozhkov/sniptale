@@ -1,5 +1,7 @@
 import { ownReviewOutputCancellation } from './render-output-lifetime';
 import { reviewFrameDecorations } from './render-export-input';
+import { createReviewExportSampling } from './export-source-sampling';
+import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 import type { AudioSample, Output } from 'mediabunny';
 import type { ReviewFrameExportInput } from './render-export-input';
 import type { ReviewPacketReceipt } from './packet-export';
@@ -251,11 +253,17 @@ function audioRanges(
 }
 
 /** Assemble source-clock inputs once for export, preview and sparse probes. */
-function createRenderer(args: Args, prepared: Preparation, preview?: PresentationExportPreview) {
+function createRenderer(
+  args: Args,
+  prepared: Preparation,
+  preview?: PresentationExportPreview,
+  exportEnhancer?: ExportEnhancer
+) {
   return createReviewPresentationRenderer({
     plan: prepared.plan,
     settings: prepared.settings,
     main: {
+      ...(exportEnhancer ? { exportEnhancer } : {}),
       *plannedCandidates() {
         for (const { candidate } of iteratePresentationVideoFrames(prepared.plan, {
           window: preview?.window,
@@ -372,6 +380,9 @@ export async function writeReviewPresentationFrames(
   let output: Output | null = null;
   let outputLifetime: ReturnType<typeof ownReviewOutputCancellation> | undefined;
   const audioState: { audio: AsyncGenerator<AudioSample> | null } = { audio: null };
+  const enhancement = preview
+    ? null
+    : createReviewExportSampling(args.renderSettings?.detailEnhancement);
   const disposeEncoder = () => {
     const current = encoder;
     encoder = null;
@@ -379,7 +390,7 @@ export async function writeReviewPresentationFrames(
   };
   try {
     renderer = await reviewExportPhase(args.signal, 'compose', () =>
-      createRenderer(args, prepared, preview)
+      createRenderer(args, prepared, preview, enhancement ?? undefined)
     );
     const onProgress = preview ? args.onProgress : progress(args, prepared);
     if (args.frameProbe) {
@@ -464,6 +475,7 @@ export async function writeReviewPresentationFrames(
     disposeEncoder();
     return await cleanupReviewExportFailure(error, () => outputLifetime?.cancel());
   } finally {
+    if (enhancement) await enhancement.dispose();
     try {
       await audioState.audio?.return(undefined);
     } finally {

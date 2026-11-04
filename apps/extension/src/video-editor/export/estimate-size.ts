@@ -14,6 +14,8 @@ export async function estimateProjectExportSize(args: {
   signal: AbortSignal;
 }) {
   const { settings, signal } = args;
+  if (settings.detailEnhancement !== undefined && settings.detailEnhancement !== 'off')
+    throw new Error('Enhanced export size estimate is unavailable.');
   if (settings.frameRateMode === 'adaptive')
     throw new Error('Adaptive export size estimate is unavailable.');
   const scoped = resolveProjectRenderScope(args.project, settings);

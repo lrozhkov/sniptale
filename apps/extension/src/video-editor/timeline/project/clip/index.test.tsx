@@ -17,6 +17,14 @@ import {
   type VideoProjectVideoClip,
 } from '../../../../features/video/project/types';
 import { ProjectTimelineClip } from './index';
+import { buildProjectTimelineClipViewModel } from './model';
+vi.mock('./model', async (original) => {
+  const actual = await original<typeof import('./model')>();
+  return {
+    ...actual,
+    buildProjectTimelineClipViewModel: vi.fn(actual.buildProjectTimelineClipViewModel),
+  };
+});
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -414,4 +422,40 @@ it('places camera thumbnails only over actual media coverage in authored timelin
   const frame = container?.querySelector<HTMLElement>('[data-timeline-frame-source]');
   expect(frame?.style.left).toBe('72px');
   expect(frame?.style.width).toBe('96px');
+});
+
+it('reuses clip geometry across handler changes and invalidates selection, trim and zoom', () => {
+  const project = createEmptyVideoProject('Stable clip');
+  const clip = createClip(project.tracks[0]!.id);
+  project.clips = [clip];
+  const input: React.ComponentProps<typeof ProjectTimelineClip> = {
+    clip,
+    project,
+    isHovered: false,
+    isSelected: false,
+    pixelsPerSecond: 90,
+    trackLocked: false,
+    onSelectClip: vi.fn(),
+    onClipHoverChange: vi.fn(),
+    onBeginClipInteraction: vi.fn(),
+  };
+  act(() => root?.render(<ProjectTimelineClip {...input} />));
+  vi.mocked(buildProjectTimelineClipViewModel).mockClear();
+  const second = vi.fn();
+  act(() => root?.render(<ProjectTimelineClip {...input} onSelectClip={second} />));
+  expect(buildProjectTimelineClipViewModel).not.toHaveBeenCalled();
+  act(() =>
+    container
+      ?.querySelector('[data-project-timeline-clip]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  );
+  expect(second).toHaveBeenCalled();
+  act(() => root?.render(<ProjectTimelineClip {...input} isSelected />));
+  expect(buildProjectTimelineClipViewModel).toHaveBeenCalledOnce();
+  act(() =>
+    root?.render(
+      <ProjectTimelineClip {...input} clip={{ ...clip, duration: 2 }} pixelsPerSecond={180} />
+    )
+  );
+  expect(buildProjectTimelineClipViewModel).toHaveBeenCalledTimes(2);
 });

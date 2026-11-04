@@ -2,7 +2,7 @@ import { ReviewTrackVisibilityButton } from './track-row';
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState, useMemo } from 'react';
 import { REVIEW_TRACK_ORDER } from './track-order';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import {
@@ -334,13 +334,25 @@ function ReviewTimelineEvents(
   > & { width: number; zoom: number }
 ) {
   const [animatedOnly, setAnimatedOnly] = useState(false);
-  const animated = new Set([
-    ...(props.clickAnimations ?? []).filter((item) => item.effect !== 'off').map((item) => item.id),
-    ...(props.keyAnimations ?? []).filter((item) => item.enabled).map((item) => item.id),
-  ]);
-  const markers = animatedOnly
-    ? props.markers.filter((marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id))
-    : props.markers;
+  const animated = useMemo(
+    () =>
+      new Set([
+        ...(props.clickAnimations ?? [])
+          .filter((item) => item.effect !== 'off')
+          .map((item) => item.id),
+        ...(props.keyAnimations ?? []).filter((item) => item.enabled).map((item) => item.id),
+      ]),
+    [props.clickAnimations, props.keyAnimations]
+  );
+  const markers = useMemo(
+    () =>
+      animatedOnly
+        ? props.markers.filter(
+            (marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id)
+          )
+        : props.markers,
+    [animatedOnly, props.markers, animated]
+  );
   return props.actionsTrackVisible !== false &&
     (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable) ? (
     <ReviewTrackRow

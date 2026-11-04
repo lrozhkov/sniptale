@@ -188,6 +188,7 @@ function useExportSizeEstimate(
           settings.height,
           settings.fps,
           settings.quality,
+          settings.detailEnhancement ?? 'off',
           settings.scope,
           settings.selectedClipIds,
           settings.burnInSubtitles,

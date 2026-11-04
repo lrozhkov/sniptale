@@ -619,3 +619,23 @@ it.each([0, 90, -35])(
     expect(mapWindowNormalizedPointToVisualLayer(visible)).not.toEqual(displayed);
   }
 );
+
+it('shares exact joined-header raster rounding and source crop geometry with demand planning', async () => {
+  const { resolveFittedWindowRaster } = await import('./fitted-media');
+  const frame = { x: 10.25, y: 20.125, width: 321.5, height: 181.25 };
+  const base = {
+    frame,
+    sourceWidth: 160,
+    sourceHeight: 90,
+    fitMode: 'CONTAIN' as const,
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, enabled: true },
+    sourceCrop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+  };
+  const raster = resolveFittedWindowRaster(base, 2);
+  expect(raster.width).toBe(643);
+  expect(raster.height).toBe(363);
+  expect(raster.join).toBe(Math.round((raster.visible.y - frame.y) * raster.scaleY));
+  expect(raster.visible.y).toBe(frame.y + raster.join / raster.scaleY);
+  expect(raster.source.width).toBeCloseTo(raster.visible.width / 0.8, 10);
+  expect(raster.source.height).toBeCloseTo(raster.visible.height / 0.8, 10);
+});

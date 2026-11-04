@@ -699,10 +699,10 @@
       "file": "apps/extension/src/gallery/video-review/audio-track.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One existing audio-track fixture adds a source-to-output loop-edge projection assertion. It adds no fixture lifecycle, writer, or runtime authority; cohesion remains 1 and score 2 has delta 0. Main inspected the exact candidate. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, gesture authority, writer, resource, recovery or fixture lifetime. Remove when the analyzer models this cohesive binding or fixture. Fresh independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-17",
-      "astHash": "7e2d2b794ecd3c7e3c8bde9a45a85abe69f0c2f4d3cb04d47302ea07425807d1",
+      "reason": "tool-noise: This suite tests one mounted audio track. Waveform reuse and invalidation use the existing fixture and interaction contract. Fixture documents create no production writer. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "ed2a4f1a9f8695c085140b67c115b62794d47350c3f687c0801643f20fc62bb0",
       "signatureHash": "5db2d10abfe2d70bcd3e2a3e835001c5484a5f1995470afc8acd983f1e7ca443"
     },
     {
@@ -831,11 +831,11 @@
       "file": "apps/extension/src/gallery/video-review/timeline.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: Gallery composes existing editor bindings. The history hook owns one reader, one active request, one latest request, disposal, retry and pinned selection. It is not a durable writer. Independent read-only topology diagnosis inspected this owner and change reason. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent subject, state authority, writer, transaction, privileged effect, resource lifetime or recovery contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-01",
-      "astHash": "6337a3ffde2cc9122fe56d4105a5a621b5bbe6216cb67ddd72a3ae431bea36c1",
-      "signatureHash": "6d14988c43fe02bd1a02df766364f4669728095295cbbe97e4fa2d6a84fe21ed"
+      "reason": "tool-noise: This suite tests one mounted timeline. Animation membership reuse and invalidation use the existing projection fixture. Viewport and environment receivers are test setup. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "d96e25718604f50afe18d254efb5c801f0a32856bdf70481d7d6bd1212e154fe",
+      "signatureHash": "66e753c9b6ccfd89c3ac40a2b8605118de422a60d95f0e4ece579c366d44a6c5"
     },
     {
       "rule": "structural-file-risk",
@@ -973,12 +973,12 @@
       "rule": "structural-file-risk",
       "file": "apps/extension/src/video-editor/preview/cache/materializer.test.ts",
       "symbol": "<file>",
-      "owner": "extension:video-editor",
-      "reason": "tool-noise: Materializer tests share DOM mocks and one resource lifetime. Camera reuse, history preparation, exact-frame refusal and disposal exercise the same preview-cache owner. They add no product writer. Independent topology diagnosis inspected this exact combined scope.",
-      "removalCondition": "Remove when the bound AST or signature changes. Reassess a new subject, state authority, writer, transaction, transport, privileged effect, resource lifetime, recovery policy, or independent test lifecycle. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-02",
-      "astHash": "f98a871f916956e97fc1be19531cf28fdcc2455e41097449d8feae045808b746",
-      "signatureHash": "c0553538f6257090e25613c49fc4683d2e250dcf770fd2207e535c333bf2d548"
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: This suite tests one exact frame materializer. It extends existing media, GPU, cancellation and join fixtures with camera receipts. Test receivers create no production authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "13cb6a61aa46b6a5d66b520af2dd3ea2628018491302e7fa582a986ccad4571f",
+      "signatureHash": "3ba7d0319dc10ec888ac7e6d8db044ce1c2f8ae4f540dff1ab5be2ca67d986b0"
     },
     {
       "rule": "structural-file-risk",
@@ -1276,28 +1276,6 @@
       "signatureHash": "73d38cdece704fb98cfaf833ff3ba22461ebf6a00ce0686e6216bd70f67b02fc",
       "reason": "tool-noise: The file tests writeReviewFrames with the existing decoder/output fixture. The annotation route proves no extra legacy decode, exact fractional cadence and shared painter; existing transition/window/audio cases are variants of the same muxed-frame contract. Fixtures reset before tests. Splitting only to satisfy the file cap would duplicate decoder/output mocks or introduce a fixture-only forwarding boundary. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
       "reviewDate": "2026-10-11"
-    },
-    {
-      "rule": "structural-file-risk",
-      "file": "apps/extension/src/workflows/video-review/render-export.ts",
-      "symbol": "<file>",
-      "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: Decoder input, frame and audio clocks, output cancellation and cleanup share one export lifetime. Supplied history cues grant no source authority. Spatial resource admission remains separate. Independent readonly topology diagnosis inspected this exact scope against original main and both parents.",
-      "removalCondition": "Remove when the bound AST or signature changes. Reassess a new independent subject, state receiver, writer, transaction, privileged effect, recovery contract or resource lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-02",
-      "astHash": "e3db02cfb691b341655f0e261c8127ed20aa37bcadefed056cffff03d5f6cc3a",
-      "signatureHash": "286dac65801f47ee1ea790bd9a0f0f2cb691c877ab762edc781a00c244575ed0"
-    },
-    {
-      "rule": "structural-file-risk",
-      "file": "apps/extension/src/workflows/video-review/render-preview.ts",
-      "symbol": "<file>",
-      "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One existing workflow owns prepared assets, leases, generations and publication. Geometry imports preserve this boundary. Its structural score does not increase. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
-      "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
-      "reviewDate": "2026-11-04",
-      "astHash": "a8aeeaa0dfb53d3186151e806e4174f48fb014d65bc0c61d6ba35dedce3384de",
-      "signatureHash": "10cec98061cd1cb0891c07a1968e580df3c076e70602be2b5b798bd2007d0f34"
     },
     {
       "rule": "structural-file-risk",
@@ -2676,28 +2654,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/composition/canvas/spatial-renderer.ts",
-      "symbol": "createReviewSpatialRenderer",
-      "owner": "composition:canvas",
-      "reason": "tool-noise: One WebGL context owns its surfaces, leases, texture pipeline and idempotent disposal. The candidate passes projection uniforms to the existing draw method. Context acquisition, cancellation and cleanup stay together. Score1 and delta0 confirm unchanged control structure. Main inspected this exact implementation. Independent architecture review must check this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "ecc2ea050a77b815d3f35470bc5bcad30b8cdb68c3b6e3b2552444425b0514db",
-      "signatureHash": "b2deda953026a032a900354e8c5f4a78cc6488a2e9bf83977461ed0e4cf0002c"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/composition/draw/video.ts",
-      "symbol": "drawVideoLayer",
-      "owner": "composition:draw",
-      "reason": "tool-noise: One video-window paint operation owns these callbacks. Media, clipping, borders and source feedback share the same pose. Deferred source borders reuse that operation. The function adds no writer or resource lifetime. Separate forwarding functions would retain the same receiver.",
-      "astHash": "5b170ed11dd2d80eee76223c22cdf2c9fa537c657eb4cd3e176b922cbbc8ef63",
-      "signatureHash": "d67cfcddcc16554f55303e45841f1db78c56524c9f4f2c4c8d9ce5a3d5591405",
-      "reviewDate": "2026-10-22",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result, or recovery. Remove when analysis models this cohesive operation. Independent architecture review must assess this classification."
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/features/video/composition/motion/camera-geometry.test.ts",
       "symbol": "it.each(\n  Object.values(VideoTransitionKind).flatMap((kind) =>\n    (['LINEAR', 'EASE_IN_OUT'] as const).flatMap((easing) =>\n      [false, true].map((trailing) => [kind, easing, trailing] as const)\n    )\n  )\n) callback",
       "owner": "composition:motion:proof",
@@ -3328,10 +3284,10 @@
       "file": "apps/extension/src/gallery/video-review/preview-binding.tsx",
       "symbol": "ReviewPreviewStage",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: Gallery composes existing editor bindings. The history hook owns one reader, one active request, one latest request, disposal, retry and pinned selection. It is not a durable writer. Independent read-only topology diagnosis inspected this owner and change reason. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent subject, state authority, writer, transaction, privileged effect, resource lifetime or recovery contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-01",
-      "astHash": "52199f9a63f9141ffe11bfba717e08c000e44e4d6740fa276f6d187396a49bf1",
+      "reason": "tool-noise: This view binds existing playback, presentation, history and authoring owners. Completion callbacks connect their existing ports. The view creates no resource or writer authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "6db4df7bbb3056fba3f151f6970c164922e3087ae51603c6ccf7cdef7280df97",
       "signatureHash": "f5efa281eaba052ed28bf28a188e57a94feaeafc219e47c31b43b9c5064923ab"
     },
     {
@@ -3339,10 +3295,10 @@
       "file": "apps/extension/src/gallery/video-review/preview-presentation.ts",
       "symbol": "createReviewPreviewPresentation",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One scheduler owns one active frame, one pending description, and its cadence. The completed frame stays in that transaction until publication or cancellation. Preparation, capture, publication, and cleanup share one generation and AbortController. The outer body has eighteen statements and one cyclomatic path. A split would distribute the same lease and cancellation authority. Independent architecture review must check this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new state authority, writer, resource lifetime, or recovery policy. Remove when the analyzer models this cohesive scheduler. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-30",
-      "astHash": "e8b92412bd6b89685299cc9417b82362863997cc3fef757c23863ae4f566a474",
+      "reason": "tool-noise: One epoch owns preparation, captured frames, publication and cancellation. The published epoch selects scheduling within this transaction. Resource release remains adjacent to completion and failure. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "7628b5316a76fdbd31fc3db40f57c018c1b621eb38e902b3bcee1c0193b936b6",
       "signatureHash": "ec40dae1374f57359d2066465a45eceb2af3ee9b69f9cd6a3b4752503139cb35"
     },
     {
@@ -3608,17 +3564,6 @@
       "reviewDate": "2026-10-23",
       "astHash": "a77b59a1600c7db0eeb290828eba3596bba2b798e5c137325595e64b6a36ec81",
       "signatureHash": "b59ea619d04c191a40d798478559f34e6bfd23dd905786a97e49ba589f47da6f"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/offscreen/project-export/composition-joins.ts",
-      "symbol": "createProjectExportCompositionJoinRenderer",
-      "owner": "offscreen:project-export",
-      "reason": "tool-noise: This existing sampler factory owns one export operation and its decoder lifetime. The bounded-window branch reuses its cut sampler, cancellation signal and canvas release. Three adapter owners feed the same render result. No additional writer, runtime or recovery authority applies. Main inspected this exact implementation. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "982a9a0b3a983f840b9e7dc9b4cb41a59d145bf227a658ef7568d5a5aa0890a5",
-      "signatureHash": "3e3aac676fafdc23b6a94224f2aea7ccf3955812b51827e6a6018f6f0e1b0775"
     },
     {
       "rule": "structural-function-risk",
@@ -3955,11 +3900,11 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
       "symbol": "createMaterializedJoinPresentation",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One serialized endpoint lifetime owns cut sampling, conversion, cache invalidation and busy admission. The extracted composer owns GPU initialization, composition and disposal. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
-      "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
+      "reason": "tool-noise: One join transaction owns endpoint sampling, cuts, cache and release. Completed camera data is result metadata. Failure cleanup remains inside this transaction. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "151374477601b3584315f48d5edc90b294d67158850f471d231a4c8dc1006a43",
-      "signatureHash": "cd62735830284b47717064ff7ac4a0eab741447e9bfeb5f4e0b47d37d29ea869"
+      "astHash": "17d555d91ac7acd5749cbdbd32ccb93b85fc91faea860d666da9ea72b9b70a54",
+      "signatureHash": "fc7e7e554d488c4fbfbe486cf34eb1e387fcc1776effc24ea4cb5224f46a37e7"
     },
     {
       "rule": "structural-function-risk",
@@ -4109,10 +4054,10 @@
       "file": "apps/extension/src/video-editor/timeline/project/effect-lanes/telemetry-lane.tsx",
       "symbol": "ProjectTimelineTelemetryLane",
       "owner": "extension:video-editor:timeline",
-      "reason": "tool-noise: The timeline lane adapts prepared facts and passes a validated observation to existing selection callbacks. It owns no persistent reader or writer. Independent read-only topology diagnosis inspected this owner and change reason. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent subject, state authority, writer, transaction, privileged effect, resource lifetime or recovery contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-01",
-      "astHash": "fb42149fc2d15f87261cb055beb06fa10931c57027254b66eefaf414815f3008",
+      "reason": "tool-noise: Memoized layout, presentations and groups are derived values for one lane. Selection and drag remain caller callbacks. This lane creates no persistent reader or writer. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "68ec6637a94335f8eef109d2883edb298ffda7c25d7a040bf96fc6136def8948",
       "signatureHash": "080e06d784fb1489c3dc70a331fee6e3ec10175babb16f5e8ee78921f7f79437"
     },
     {
@@ -4296,11 +4241,11 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "createReviewPreviewRenderer",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One preparation lifetime owns generations, cancellation, assets, leases and stale-result admission. Nested methods share this authority. Its structural score does not increase. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
-      "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
+      "reason": "tool-noise: One renderer owns preparation, leases, cancellation and stale-result admission. It borrows sampling through substantive adapters. It does not create or dispose the job enhancer. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "46f9143e9c39158e76c244d24218192e4e3545bfe05acc3d490c512eff21ec21",
-      "signatureHash": "d7f57fe082b1ba8c068746bfd925235d6703826902782cd2634e5e1b11f20997"
+      "astHash": "9350cde285089524676f33f3eeab48bd91b06cb7df4ba4d95e40b8f9e9abd3b6",
+      "signatureHash": "4ea1b85e38865202564b15b5f3b5823b979b50dff4219809701d003d6a22234a"
     },
     {
       "rule": "structural-function-risk",
@@ -5066,10 +5011,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One factory owns the device, surface, textures, targets, uniforms and filter collaborators. Failure observation and disposal share the same drain authority. Caller publication policy remains outside this owner.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes device disposal or drain. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "23e0f4790a02c1fc09ae09dbce2e99a995daf1bb9b9370b80b9ce8cca5cd9cdc",
+      "astHash": "e8f1a2c5fb752976aaee0c583c0a4352a219fb580abcafc639fd50b6ecd5dc0b",
       "signatureHash": "7785ef850d9bfb99fd0a13cdce56e60cfb51eee4462f53d94142dee6cf9f4525"
     },
     {
@@ -5088,10 +5033,10 @@
       "file": "apps/extension/src/gallery/video-review/stage.tsx",
       "symbol": "ReviewStage",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One stage view binds completed geometry to visual and interaction children. Existing presentation and gesture owners retain publication and authoring authority. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
-      "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
+      "reason": "tool-noise: One stage receives completed geometry and source time. Source identity checks reject stale receipts before display updates. Presentation and authoring retain their existing owners. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "ea07a6cf511fa1027b92c7232641e3b85f4e090598eb244629734f4fefbb97ae",
+      "astHash": "b69d4618e9cf7ac1a5c022179a483105acffee35fcf1405dfbb0c5f7472116a2",
       "signatureHash": "25f6a795e84bbf4f2ecc983277ca56be3560a879b56918727aa5e0f29e19f3ca"
     },
     {
@@ -5176,10 +5121,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
       "symbol": "buildNativeGpuPreviewLayers",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One graph builder handles effect inputs and final preview through shared coordinate primitives. Source spotlight underlays and camera segments preserve target semantics. Both branches share the retained artwork ledger without another queue.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes effect-input coordinates or ordering. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One graph builder preserves composition order, projection and resource cleanup. Tight artwork bounds share the existing release ledger. No second cache or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "64b064ec86a3fcedd830531c1a59633cf45cedef2afbc8fcbb330106a566db9c",
+      "astHash": "f3ceefb0eb61443a344bc4d974b2769bd9c03cbe80b1699ffb0c1ae03741a6c7",
       "signatureHash": "8ec9e6c43e09eb3a4cb6232647fbc8df9ccedc28e69db976b6badfa6101cdd0e"
     },
     {
@@ -5330,10 +5275,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One compositor owns layer contracts, uniform packing, graph checks and device resources. CSS and DOF caches remain separate collaborators. Submission and disposal share one GPU fence. The operationKey helper names the existing filter predicate before interpolation. The predicate and resulting key remain identical. This local expression change adds no authority.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes device or graph contract. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "b8655bc8427995273514fd52eb5dbe14da5f8af42fd9eeaa5c39b1573e3d539b",
+      "astHash": "352aa260866166bc6e24bf64f443112ca82519db5f856e1b8e49d4011f530154",
       "signatureHash": "3be5416a85b05e8e2d02299675735e5633ef89890d2406f3992dbc506b2cabc4"
     },
     {
@@ -5346,28 +5291,6 @@
       "reviewDate": "2026-11-04",
       "astHash": "b9a35c0910e1868d19181d92f7bdc9c2ae2ab2a54e5960878435860601f19c11",
       "signatureHash": "3dfcbd61878f8639bd6c32b92b7e07949ed93dc291f476336e44205e2b409899"
-    },
-    {
-      "rule": "structural-file-risk",
-      "file": "apps/extension/src/features/video/composition/effect-runtime/frame/inputs.test.ts",
-      "symbol": "<file>",
-      "owner": "extension:app-core:features",
-      "reason": "tool-noise: One materializer fixture tests normalized GPU input, transition failure and wrong-size cleanup. Added cases use existing fixtures. Counted mock state does not create production authority. The file score did not increase.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes materializer fixture lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "7487e5e0dd9de14d48a45d3ca077d74f1a9e95342294990f197d5a23581926f9",
-      "signatureHash": "f7b5e9e1a5ff6a404bf7c5e40bcb0eadaed7f852a63431aa1b899308918784e6"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/composition/effect-runtime/render/wave.ts",
-      "symbol": "renderEffectRuntimeComposition",
-      "owner": "extension:app-core:features",
-      "reason": "tool-noise: One composition lifetime retains overlay and sampled frames under the existing ledger. The injected composeInput function uses the materializer boundary. Sample release and disposal share the same frame map.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes sample retention or disposal. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "68d1b73054465fc9e4167bcb73ca6d74e8c0736c7584297eb0096887cd2b19ca",
-      "signatureHash": "411725d150a415d87318888e751835455fee836bb83800b6d09be00ce1b67a95"
     },
     {
       "rule": "structural-function-risk",
@@ -5544,6 +5467,512 @@
       "reviewDate": "2026-11-04",
       "astHash": "56d166d90699b1c7e648f5df48804f19d5498a250cc41818d783c5e2a0914a04",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/spatial-renderer.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This suite tests one spatial renderer and its context lifetime. Physical density and allocation cases use the same graphics fixtures. Assertions create no product authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "b16814aac3598eff6a4db05a2f3f4cd55c839b26000308375c8366b154c70bdf",
+      "signatureHash": "9d9571eb876248764b4c9972c5c9ce53b43ba393d446e4669f7559b46eecbd57"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/spatial-renderer.ts",
+      "symbol": "createReviewSpatialRenderer",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One renderer owns the GL context and its disposal. Allocation getters return descriptors without changing allocation authority. Existing helpers own textures, uniforms and validation. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "bd36638dca5e31943cfee6dc2d17bba42c87089ce4b3515f39d7cc3ae716ac17",
+      "signatureHash": "052dc61406e366a4c3bda4a2088cf4cd2f670c9806fab13aa09c8f23fa304536"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/draw/spatial.ts",
+      "symbol": "resolveSharpSpatialCapture",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: Validated sharp capture geometry. Input SharpSpatialGeometry exposes camera/raster density/output width/source bounds/sharp flag only. stage is immutable projection/output aperture. It has no renderer, context, source lease, IO, async boundary, resource allocation or external mutable state. The ready result transports exact sourceRect/physical size/grid transform/evaluated frame/plane inverse. inactive/empty are explicit geometric outcomes. Seven guards reject invalid output/horizon/density before allocation. The previous meaningful split is complete. Further splitting guards and rounded grid equations would divide one proven coordinate calculation with no independent owner/change reason. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reconsider if helper gains renderer/context/source leases, persistence/backend selection, new mutable authority, or another geometric contract not used to produce this capture plan.",
+      "reviewDate": "2026-11-04",
+      "astHash": "9fef85a11870ef88a1958b024dc9405a552be43e89db5a923f86e5aec608c830",
+      "signatureHash": "40257f57f69c0398d56262e3a3357c204662303ec903091cb00cf381d85eea27"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/draw/video.ts",
+      "symbol": "drawVideoLayer",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One synchronous source-window transaction paints body/decorations/isolated masks/borders/sharp source feedback in fixed order. Its only new mutable selection is stack-local samplingDemand, restored by withDemand try/finally. Closures deliberately share the same source/window and demand selection. no enhancer factory, decoding, awaited lifetime, project writer or job publication occurs here. Existing named helpers own media resolution, source actions, isolated composition and prepared window raster. No separate state service/facade is justified. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reconsider if selection outlives the draw stack, the function acquires decoder/enhancer/job ownership, or an unrelated layer/interaction workflow is added.",
+      "reviewDate": "2026-11-04",
+      "astHash": "73e697b4adaf783cf3881721e5bc71d0c7c34a0830baa4bb15e311f65ed8431f",
+      "signatureHash": "d67cfcddcc16554f55303e45841f1db78c56524c9f4f2c4c8d9ce5a3d5591405"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/effect-runtime/frame/inputs.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This suite tests one effect input materializer. Its fixtures cover physical dimensions, source isolation, bitmap adoption and cleanup. Mock receivers create no production authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "4a9b30e957935c1d7000707fcacade593b58cb609e60711387a6b19e8f5e55eb",
+      "signatureHash": "f7b5e9e1a5ff6a404bf7c5e40bcb0eadaed7f852a63431aa1b899308918784e6"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/effect-runtime/render/wave.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: Single renderEffectRuntimeComposition SUT, shared driver mock and FakeBitmap disposal observer. Unique-time, overlay, bounded multiple exposures, source preparation and late-dispose/failure tests all exercise this one composition lifetime. Current62 lines add only exact-source/physical-density and overflow-before-execution cases. Report score delta0. Mutable test fixtures do not establish a second product authority. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reconsider if tests introduce another SUT, independent fixture lifetime or different runtime owner. remove exact-hash disposition on content change.",
+      "reviewDate": "2026-11-04",
+      "astHash": "3d0c9162cdd2baf40840dc4f50c7a8ee216841811ac71729499b94be4008e9d3",
+      "signatureHash": "9e2abf3abcc0e56e7ca87156cf0136e6e23a2e2230514afc9b5122f3fd4b5801"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/effect-runtime/render/wave.ts",
+      "symbol": "renderEffectRuntimeComposition",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One composition lifetime owns overlay/sampled maps, one active exposure, prepare/dispose and late-output cleanup. New prepareSourcePass/renderDimensions is an injected source capability, not model/backend creation here. Named same-file helpers already separate exposure selection, order, raster scaling and consumed-output release. Outer score delta0 and one state authority domain. Splitting the lifetime map from prepare/dispose would duplicate or weaken exact ordering. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reconsider if a second independent composition/time-map owner, source decoder/model/device authority, writer or unrelated recovery protocol is added.",
+      "reviewDate": "2026-11-04",
+      "astHash": "9f7fd6291611614ee89b660ff2aa9a51fbfc64942744a1982a543a4a6f5c0c8b",
+      "signatureHash": "c40de3b2bc1a00476cad68c3b29078a1f3e8cbd915727d921a5770d50776b83b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/export-enhancement/enhancer.ts",
+      "symbol": "createExportEnhancer",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One job owns active state, backend instances, input canvas, cancellation checks, and drain before disposal. Lines74-96 declare one session. Private bicubicTile/clarkTile operations now own synchronous backend output checks and crop calculation. Lines150-253 retain the single active operation. Lines254-265 set closed, await active, then destroy both backend resources and input. The factory has no second queue, persistence writer, publication, or fallback mode. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if a new owner, queue, session lifetime, or independent backend policy enters this factory. Any changed body hash invalidates an exact record.",
+      "reviewDate": "2026-11-04",
+      "astHash": "1f2036955bc5d9934f9c55cf50d543ac63f4f4b83e0a079912514366240c993b",
+      "signatureHash": "db0d725401b30dd32a511bd79265493bd2b5a0d5603d539a78e7cbccc6674faf"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/export-enhancement/enhancer.ts",
+      "symbol": "createExportEnhancer.withEnhancedRegion",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: The borrowed source and active tile stay alive until backend work and the consumer settle. Source painting, selected backend initialization, temporary VideoFrame ownership, and consumption are one ordered transaction. Every nested catch only classifies and rethrows an error. It does not introduce a retry, fallback algorithm, scheduler, or publication authority. The inference frame closes in its finally. The outer finally releases active only after consume. A trial async wrapper added one Promise boundary and failed the existing controlled consumer test. The final synchronous helpers preserve all original await positions. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if independent recovery, retry, scheduling, or source ownership appears. Do not preserve a record after an await-order or body-hash change.",
+      "reviewDate": "2026-11-04",
+      "astHash": "ef928b426ade54ebf3be545bf4f6c4d7ff8d4352939241f18b0e3eeba26193d5",
+      "signatureHash": "4616021d0d089f09f49551556af38c9007b4424c495b1499b32b94b76e96d21f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/export-enhancement/prepared-source.ts",
+      "symbol": "prepareSourceSampling",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: Validate all demands and reserve the complete physical budget before inference. Retain copied tiles until the shared pass is disposed. Lines112-175 freeze identity and validate demand geometry before resources are acquired. Lines177-194 close one demand map and one release ledger behind idempotent disposal and guarded entry. Lines197-280 reserve destinations before inference and copy each transient backend image before its callback returns. Lines282-328 expose guarded reads of those same retained tiles. Failure uses the same dispose operation. The draw intersection arithmetic is part of the retained original-ROI contract. It does not have an independent state or lifecycle owner. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if another lease owner, cache lifetime, or independently retained tile store is introduced. Exact body-hash changes require review.",
+      "reviewDate": "2026-11-04",
+      "astHash": "8b4dbbf388e8a3831d95bf2afa1ced06d8ba135e9f3a9ed89983819c65a0562f",
+      "signatureHash": "4e0081605d2b25d36a64683cc32a59abd293619b607a1e18d47c0217db5be4b1"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.js",
+      "symbol": "createRealtimeVideoUpscaler",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One acquired GPU device owns the model buffers, pipelines, canvas context, inference fence, and destruction. Lines255-329 construct resources for the one device. Returned enhance/destroy methods close over those exact resources. The outer catch destroys the acquired device after initialization failure. No independent host/session authority is added. This is copied third-party source with exact upstream/current identities and reviewed narrow adaptations. A mechanical split would change provenance without creating a needed boundary. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if vendor code changes beyond the reviewed adaptation, or if device/context/buffer ownership separates. A changed hash requires fresh provenance and structural assessment.",
+      "reviewDate": "2026-11-04",
+      "astHash": "806c58fb074cfa3c65310917f019743a1dcdced057f191196ce5a3da27b56ccd",
+      "signatureHash": "f1e326e1eb7f051da76fa492e6d0c806809eba2cbc3069f12f5d07c01ced6f2e"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/composition-joins.ts",
+      "symbol": "createProjectExportCompositionJoinRenderer",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One endpoint transaction owns media acquisition, cached endpoints, cancellation and cleanup. Its structural score delta is zero. The added field carries the existing retained endpoint policy through the same renderer. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "e710fbfb6dcde714766c67889557ee9d240e4d5775cd539295a6d49a752f20a6",
+      "signatureHash": "3e3aac676fafdc23b6a94224f2aea7ccf3955812b51827e6a6018f6f0e1b0775"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/frame.ts",
+      "symbol": "drawVisualPasses",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One ordered frame operation segments visual passes and publishes lens output at the required fences. Separate ordinary and stage FX maps enforce exposure deduplication. The maps serve the same frame publication contract. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "2c72acddb9107249c271c8868a43bd9e31e6737a70df098ca2669ba5a1625763",
+      "signatureHash": "e2b85277de2dbd367442d6a9bfa42932b31332782221b35ef44e08e0a2ece0aa"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/frame.ts",
+      "symbol": "paintExportVisualSample",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One synchronous pixel painter applies affine or spatial projection to the same target sample. Its counted state is the drawing context. The pass owner retains decoder, budget, queue and resource cleanup. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "7e45efb545b7fd3235cb24af50b49a60534944bdb4b2b74dc0b3c84853e6b4cd",
+      "signatureHash": "121a8c269afa66d9fa304e0f599094606fbce606d0505dd5c579cbcecc9c9af8"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/frame.ts",
+      "symbol": "drawUnlockedOverlayGroup",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One overlay transaction owns shutter buffer acquisition, rollback, exposure weighting, flush and disposal. The synchronous pixel calculation has its private helper. Resource cleanup remains adjacent to acquisition. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "62339ce19457ae70d322f8b60256d4c592e5495cebe0d20e5cff9d1fff3e705b",
+      "signatureHash": "7326532c90c25af273e79a33ba3303f12b1f706b8445d079a47024e09a29dbf7"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/frame.ts",
+      "symbol": "drawProjectFrame",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One frame operation owns composition order and final cleanup. Narrow drawing adapters retain their existing responsibilities. Layer, overlay and transition fences share the same output frame and release boundary. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "428f2ab42ff3ced376d4c51157e4e4be00d4ea2bb5bf7b42ed548020ca39f7d0",
+      "signatureHash": "177e4fc0d360c6d70763971da0b25764587bde796d12005df57743037a008148"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling-plan.ts",
+      "symbol": "resolveNativeSourceSamplingDemands",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One pure source-plan calculation combines source identity, projection and required density. The counted receiver is a newly allocated result record. Independent aperture calculations have private pure helpers. One append fold owns ROI merging and the guarded header replan. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "7bc8248a0971ff10e14782e349c1e5e1ae15c263cfa6d8b3435f141fd392e8e6",
+      "signatureHash": "91fbb130b953a633102179433471700bdb3b3f4f5670cad0d3b0ee1032f338cc"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: These fixtures test one export sampling boundary and its sharp stages. They cover original regions, endpoint identity, admission and release. Separate fixtures name distinct resource lifetimes. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "963e02ec33c88ab34f512ee81a52d2223662900f7a8d2eb2de75cdfbe507bdd9",
+      "signatureHash": "d69b99c50c34f704bd24e99d2f724cdc2ea794c5d012a6c95bb85e0dcb6f3ff7"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.ts",
+      "symbol": "createProjectExportSourceSampling",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One job owns the enhancer, decoder, active operation, current pass, shared budget and drain. Private helpers separate normalization and scoped view construction. Splitting the remaining authority would separate acquisition from cancellation and cleanup. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "153d4c976471ad93964fac38ca62f1483cbb6b5bc6a5438dd5f752fac3e652be",
+      "signatureHash": "b5f5a27e025177ff30ac340de1cf0da1a8a9f74bf6b5b0188fbefeda79fadf33"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.ts",
+      "symbol": "createProjectExportSourceSampling.prepare",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One prepared-pass transaction owns input admission, source acquisition, preparation and lease adoption. Abort and disposal checks precede publication. All failure paths use the same release closure and provider budget. Private helpers own raw display normalization and scoped view construction. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "f72e59d25e4c472d7e33b6f52f7e349bc4ae619894f6e152d7dd0a43da14bb87",
+      "signatureHash": "8742661b09c0b6151ef020c9b7d8ca77168a8d581056c85de0c331b45f53c92c"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/source-sharp-stage.ts",
+      "symbol": "createNativeSharpStages",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One sharp-stage canvas transaction validates geometry, reserves memory, constructs surfaces and publishes them. Partial construction rolls back through the same raster release owner. Geometry and publication use that concrete surface lifetime. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
+      "reviewDate": "2026-11-04",
+      "astHash": "5cb6ba7b5636d3b7a39b2a20f50a00251dca2006e53399d08e0b34f235d6690f",
+      "signatureHash": "10d63b347ca4cbe08b1fa5e42a7c4562003bab476faffda1c6ba6f519f62f6fa"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/render-export.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: 853 lines, delta score0, cohesion.98. existing ordinary export owner holds input/output lifetimes, audio/window loop and finalization. New model sampling is already substantive separate owner export-source-sampling.ts. new pure demand geometry is export-source-plan.ts. No independent model or UI authority added here. Only writeReviewFrames creates/disposes job enhancer. disposal awaited before source/input cleanup. No helper should acquire that owner. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
+      "reviewDate": "2026-11-04",
+      "astHash": "5db84d62663bfed288d69a83955a65914dbcd79f5d0c768bccba23110e98906a",
+      "signatureHash": "b9b7780145cf2865cbb9846f1f2a05d038cb2b34b5862dcccdc30dc2fd4ecdb6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/render-export.ts",
+      "symbol": "renderRenderWindowFrames",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: Same frame/window transaction: timestamp/source-clock quantization, original endpoint selection, camera-history sampling, source normalization/prepared lease, composition, webcam/keys/captions, adaptive encoding. sample.close is outer finally. Prepared lease is inner finally before writer.add. dissolve calls same draw operation sequentially. Splitting an endpoint branch or paint closure to a new module would pass the same writer/resources/scene/source lifetimes across a broad contract.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
+      "reviewDate": "2026-11-04",
+      "astHash": "17af4127b1504bbe55a5c19817751c097a9df459a262b0ce05ced840e41b1ab7",
+      "signatureHash": "36f7666a44835d9022fd4673d43e32abbcbdeac78b9770ace39bfdfe3b173f81"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/render-preview.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One renderer owns preparation, leases, cancellation and stale-result admission. It borrows sampling through substantive adapters. It does not create or dispose the job enhancer. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "57754298fa34564ee5b5937eecb80fe45a201914d46ef60644cfca707c319eb1",
+      "signatureHash": "d1479386014944b917ffdeba9e6e925617d600cee9a8d37e3eff8ce0b82858ac"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/render-preview.ts",
+      "symbol": "drawPreparedFrame",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: Score delta0, cohesion.97. One async output transaction: history/request, GPU preview or existing spatial branch, transition lease, annotation admission/acquisition, export source lease, scene/sharp replay, outer decorations. Both prepared source and annotation release remain adjacent in a single finally. transition release remains outer finally. No new async queue/publication state.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
+      "reviewDate": "2026-11-04",
+      "astHash": "623a36536bc2e1bf7a8dccbc51a4258fdcd9239be34f58a07ed875738d327a97",
+      "signatureHash": "7ea8b2b86e9990896749393c794dbe3e99e10be6da1a4437f8779d64a4426a73"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/render-scene-overlays.ts",
+      "symbol": "drawReviewSceneOverlays",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: Ordering is required: scene spotlights before sharp content plane. border/click/content annotations/comments rendered into common plane. plane projected once. viewport comments/annotations follow projection. Dense backing scale preserves logical coordinates. exportSampling callbacks are synchronous borrowed views. no effect or lifetime authority moves into this function.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
+      "reviewDate": "2026-11-04",
+      "astHash": "e77f086d6698c72a5bd5c74a263885dcc800495c00d8be4f3768ead3d6b695ea",
+      "signatureHash": "ebb09c93ec75f28a1894c527a920170e7362bd6b25b2abb4e9b3a07ec35e3928"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/release/dependency-legal/validation.mjs",
+      "symbol": "validateDependencyLegalClosure",
+      "owner": "tooling:release:dependency-legal",
+      "reason": "tool-noise: One reviewed policy determines the expected npm/font/model legal closure and generated outputs. Lines105-122 read one policy and generate its expected closure. Lines123-143 validate declared bundled payloads. detailed file/hash work already resides in validateBundledAssetNotices. Lines144-175 compare the manifest, artifacts, notices and source URL requirements. Four reported owner groups are fs, path, release policy, and dependency legal code. These are read-only dependencies of one release diagnostic, not four state or publication authorities. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess if this function acquires writing/publication authority or validates an unrelated release contract. Changed hashes need renewed review.",
+      "reviewDate": "2026-11-04",
+      "astHash": "49bcf0abdf5cf3ec8ad392b6957c4bc1c1936dd8a8a5980454b7fd87168cdde2",
+      "signatureHash": "5fa2a7a852754541984926d09d2a490f57184a665c54335597ac88c2959fe381"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/harness/export-enhancement.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:harness",
+      "reason": "tool-noise: One source and pose contract drives fixture construction, export and inspection. Container grammar has a separate pure owner. The serial spec saves each retained output before replacement. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "01b1aaa30a4153a852cfeb97845b55f3aa1e4a420a99605465bc0e5af383c0fa",
+      "signatureHash": "a2489125d1a196f6224c59c6fc48e812c246ced5a377baf9afd7bf9725db6921"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/harness/export-enhancement.ts",
+      "symbol": "inspectEnhancementOutput",
+      "owner": "tooling:test:harness",
+      "reason": "tool-noise: One transaction inspects a completed encoded artifact. Timing, detail, packet, audio and seek evidence share the same buffers. Each decoder and sample retains its existing cleanup. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "e9c901a5eda1f661108a4392b607fca8cd88b9a31dab96cf86c58e076a542cfb",
+      "signatureHash": "7d32867fa527d2d3646e8eebf53c8e9e099097f9033da9643ccdcc652a54b233"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This fixture checks one compositor resource lifetime. New cases use the same fake device and controlled completion barriers. Mock configuration creates no product authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "65bb316c5b37a7f0526937058f52d5af7d8fe4bcb9894f192cb7bb03a0e55646",
+      "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/spatial-textures.ts",
+      "symbol": "createReviewSpatialTextures",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This operation owns one texture pool and its allocation reservations. New descriptors expose existing storage. Replacement, failure and release retain the same resource owner. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "3086015f25f8a432788e0cb239150821a38d6a2b02c74d6a9f284ea217fb40a6",
+      "signatureHash": "d43543498b81ab1818c101a0d9ee28c7201d019ec2f09bca1717309ee5717d97"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/edit-actions.tsx",
+      "symbol": "ReviewRenderOptions",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One settings form delegates export choices to the existing exporter. The enhancement field owns no model or export job. The estimate effect belongs to this form. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "a6415a1e8cb6719198778d8140c08bd692e55ad75d3b9bbc2242ff2412e6f55c",
+      "signatureHash": "52a845b6ccb19ca26bbcbe296e32996edd481134c3bf14c76462602f0b1a94ea"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/selected-properties.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This mounted inspector fixture uses canonical archive storage. Its cases cover availability, source replacement, late results and reader reuse. Fixture writers create no production authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "5c7aecd390dd6a0917b8b39e89b09fc70c42a3ea3b71fb8f64634e4c33a249b1",
+      "signatureHash": "02b3978725664cd8025e950cde8e8beceb854f7ac16dee855321405230c4783c"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/selected-properties.tsx",
+      "symbol": "ReviewSelectedProperties",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This inspector routes selected objects through existing workflow readers. Availability and render facts use different request identities. Each reader retains its own cancellation lifecycle. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "559644a1bb480e477282be4626c6f6c08b803e23ac40131b357f86bc67bf46aa",
+      "signatureHash": "42726d1ae80095a18371b2f9c58ee75527b82fc2d4431a3e18c87a9bb80ec598"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/use-export.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This fixture tests one export hook and its session lifetime. New cases test reuse while playback advances. Spies and fixture updates create no production writer. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "fd84261a496de86ca309c1627de2a883c97104f6de8849ed34f6cac348de0971",
+      "signatureHash": "28bb7aba928848cd690f56937bee617e977285147a84e47921efc2f9edbda0fe"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/use-playback.ts",
+      "symbol": "useReviewPlayback",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One playback hook owns time, range, seeking and recovery. Presentation updates use the same displayed time. Media synchronization retains the existing playback path. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "852be0aec2b430f34ab1a3a82b8bf4efb994b6952df8f56907a8952c14138eb7",
+      "signatureHash": "7ec54c6faac49a40a881e5150cadc2e284b707939ab3e4c39ca2829af4151ec2"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/export/dialog/select-fields.tsx",
+      "symbol": "ExportDialogSelectFields",
+      "owner": "extension:video-editor:export",
+      "reason": "tool-noise: One settings form derives export choices and calls its existing change callback. The enhancement field creates no runtime authority. Existing helpers own capability decisions. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "707eca9c76fd94fed2d650c9e56e8dfdf9baa8e67e848e276c4c3447c9d55f22",
+      "signatureHash": "b9f6d5326739f8daba53e9e83853f6d107679c57f85ed6d25c82ae657234b565"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: One materializer owns media, staging and the frame transaction. Camera metadata follows completed pixels through the same operation. The existing Canvas API delegates within this owner. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "bbbdec092108b2ae5699d509e64ff8280bfc63fe6e25fe945f74e806369c38a8",
+      "signatureHash": "d1c710e30da09be73ff451ef318c419b4d263dbdd09d5186e6659989c5f844fd"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
+      "symbol": "createMaterializedJoinPresentation.renderFrameWithPresentation",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: This method replaces the previous frame method in the same join owner. It returns camera metadata beside completed pixels. It adds no publication, queue or writer. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "4f58251290ba78bb8ed29056ff4df2d2f83d086aa99fd68a8ad8995ea090d6e7",
+      "signatureHash": "f7fd6353250f60733d6256d421452048e75ccb0936deb2d1b77046b03cbf0bad"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: This suite tests one ordered GPU graph builder. Tight bounds cases retain existing projection, resource and release fixtures. Graphics contexts and spies are test data. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "0452012a09aa4d967f272ca95bf29920b19c72bbc707bb5960f2db72d166d9b3",
+      "signatureHash": "15994d320b6f948133f8c595d75a310b51e133652add1fe4058e7ff0db945184"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: This scene fixture tests visible publication after completion. New cases bind the camera to overrides and prepared archive facts. Failure and cancellation use existing fixtures. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "934d43087e17a6a53d02e00431d50fc3dc360b861e710db7b5997dc94278b983",
+      "signatureHash": "ca752b15005dfce1ab9b1349520d5d84c03bb64a30398ee93ca257a626b4b8e9"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/timeline/project/canvas/index.tsx",
+      "symbol": "ProjectTimelineCanvasContent",
+      "owner": "extension:video-editor:timeline",
+      "reason": "tool-noise: One timeline view composes lanes, feedback and playhead. A local callback adapter forwards committed props. The view creates no new state or publication owner. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "d5dd1a9190951f0b29c353674062038fb6694b17e6356dcc75c075a0be7fc760",
+      "signatureHash": "7a62d9c041a8fffcfc7bf4448526fdb14247c3b76ecd5a10366cafdae674b857"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/timeline/project/effect-lanes/telemetry-lane.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:timeline",
+      "reason": "tool-noise: This suite tests one telemetry lane and its selection contract. Real clock updates reuse derived data. Authored and viewport edits invalidate the same fixture. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "2845151f7fc88424babd70eabf58f2d5f2f8874ea626bfc7f8195ada5ba55490",
+      "signatureHash": "b9e3593219fa55686c08a3616676834a2c87ee65469e7bc2b9539cc37dbdf00d"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-export-enhancement.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One serial comparison uses a shared fixture and reference across export adapters. Clock, detail, audio and seek assertions inspect those artifacts. Host cleanup remains in finally. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "cfa8335635754272c7c90ddece94e7182661dbb2bb86288cf2b2d0e5245b1b36",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-presentation.spec.ts",
+      "symbol": "test.describe callback.test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One Gallery session tests full canvas fades, authored perspective and Undo at each viewport. Local helpers preserve that interaction contract. Host cleanup remains in finally. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "d1d4c727b9896cfc39cfe3e8a83993b8621a35a13646027211b8415788d0d89c",
+      "signatureHash": "5480bd18109aad3fb000331a6cac8edaabb2362cd596ee1f072ffb00151ca135"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/frame.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: This suite tests one export frame composition operation. Locked media selection and sharp resource cleanup use the existing fixture. Graphics buffers and mocks are test data. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-04",
+      "astHash": "d8cdf41a63f8fe63ce26c7f94349f3165552aac881e89ee83ef6ce48ef6ce6b9",
+      "signatureHash": "993dab7fa1946676fc5e091a22644c5133af8ab650d8fa2349348475d4545a54"
     }
   ]
 }

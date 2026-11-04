@@ -374,3 +374,25 @@ it('rejects a collapsed canonical interval and missing windows without invented 
   const missing = vi.fn<ReadCursorTrajectoryWindow>(async () => null);
   expect(await motionRegionHasAvailableCursor(project, region, missing)).toBe(false);
 });
+
+it('accepts a plain selected interval while preserving source and clip ownership checks', async () => {
+  const { project, region, read } = fixture();
+  expect(
+    await motionRegionHasAvailableCursor(
+      project,
+      { startTime: region.startTime, duration: region.duration },
+      read
+    )
+  ).toBe(true);
+  expect(
+    await motionRegionHasAvailableCursor(
+      project,
+      {
+        startTime: region.startTime,
+        duration: region.duration,
+        sourceBinding: { ...region.sourceBinding!, clipId: 'missing' },
+      },
+      read
+    )
+  ).toBe(false);
+});

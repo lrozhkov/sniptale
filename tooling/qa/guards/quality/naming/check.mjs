@@ -29,6 +29,11 @@ const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/naming-repository-baseline.
 const REPEATED_PREFIX_ENTRYPOINT_EXCEPTIONS = new Set([
   'apps/extension/src/offscreen/offscreen.ts',
 ]);
+// TypeScript resolves this declaration by the paired, pinned JavaScript module name.
+// Remove the exception when that module is removed or renamed.
+const PINNED_MODULE_DECLARATIONS = new Set([
+  'apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.d.ts',
+]);
 
 function isNamingTarget(relativePath) {
   return isProductionSrcTypeScriptFile(relativePath);
@@ -71,6 +76,9 @@ function getRepeatedPrefixMatch(normalizedPath, stem) {
 
 function classifyNamingViolation(relativePath) {
   const normalizedPath = normalizeRepoSrcPath(relativePath);
+  if (PINNED_MODULE_DECLARATIONS.has(normalizedPath)) {
+    return null;
+  }
   const fileName = normalizedPath.split('/').pop();
   if (!fileName) {
     return null;

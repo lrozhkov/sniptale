@@ -71,6 +71,8 @@ export interface PreviewEffectRuntimeFeedback {
 }
 
 export interface PreviewStageCanvasProps {
+  /** Borrows the mounted renderer's playback request until its cleanup runs. */
+  registerPlaybackRequest?: ((request: (time: number) => void) => () => void) | undefined;
   /** Published only for an accepted completed scene job. */
   onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;

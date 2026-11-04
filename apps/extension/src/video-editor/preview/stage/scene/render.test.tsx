@@ -1,3 +1,4 @@
+import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -5,6 +6,11 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createProject,
+  createVideoClip,
+} from '../../../../features/video/project/timeline/project-meta.test.helpers';
+import type { PreviewStageCanvasSceneParams } from './types';
 
 const schedulerMocks = vi.hoisted(() => ({
   disposeMock: vi.fn(),
@@ -218,22 +224,240 @@ it('publishes the accepted job time with its camera receipt', async () => {
   const options = vi.mocked(createPreviewSceneRenderScheduler).mock.calls.at(-1)![0];
   const controller = new AbortController();
   const onCameraPresented = vi.fn();
-  options.onSuccess?.({
-    canvas: document.createElement('canvas'),
-    controller,
-    signal: controller.signal,
-    currentTime: 1.25,
-    imageBank: {},
-    isEffectRuntimeFrame: false,
-    isPlaybackFrame: false,
-    project: { ...createEmptyVideoProject('Accepted camera'), duration: 4 },
-    renderGeneration: 3,
-    stage: null,
-    videoRefs: { current: {} },
-    onCameraPresented,
-  });
-  expect(onCameraPresented).toHaveBeenCalledExactlyOnceWith(
-    expect.objectContaining({ scale: 1, regionId: null }),
-    1.25
+  const camera = {
+    ...resolveVideoCompositionFrame(createEmptyVideoProject(), 1.25).camera,
+    scale: 2.4,
+    viewportX: 123,
+  };
+  const frames = await import('../../../../features/video/composition/timeline/frame');
+  const recompute = vi.spyOn(frames, 'resolveVideoCompositionFrame');
+  options.onSuccess?.(
+    {
+      canvas: document.createElement('canvas'),
+      controller,
+      signal: controller.signal,
+      currentTime: 1.25,
+      imageBank: {},
+      isEffectRuntimeFrame: false,
+      isPlaybackFrame: false,
+      project: { ...createEmptyVideoProject('Accepted camera'), duration: 4 },
+      renderGeneration: 3,
+      stage: null,
+      videoRefs: { current: {} },
+      onCameraPresented,
+    },
+    { camera, time: 1.25 }
   );
+  expect(onCameraPresented).toHaveBeenCalledExactlyOnceWith(camera, 1.25);
+  expect(recompute).not.toHaveBeenCalled();
+  recompute.mockRestore();
+});
+
+type PlaybackRequest = (time: number) => void;
+const bridgeProject = createEmptyVideoProject('Direct playback', 200, 100);
+const bridgeFeedback = createPreviewEffectRuntimeFeedbackTestStub();
+const bridgeImages = {};
+const bridgeVideos: PreviewStageCanvasSceneParams['videoRefs'] = { current: {} };
+const bridgeReady = { canRender: true, version: 0 };
+let playbackRequest: PlaybackRequest | undefined;
+const registerPlaybackRequest = vi.fn((request: PlaybackRequest) => {
+  playbackRequest = request;
+  return () => {
+    if (playbackRequest === request) playbackRequest = undefined;
+  };
+});
+function BridgeHarness({
+  time = 0,
+  playing = true,
+  project = bridgeProject,
+  resize = 0,
+  ready = bridgeReady,
+  registered = true,
+  generation = 0,
+  clips = [],
+}: {
+  time?: number;
+  playing?: boolean;
+  project?: typeof bridgeProject;
+  resize?: number;
+  ready?: typeof bridgeReady;
+  registered?: boolean;
+  generation?: number;
+  clips?: PreviewStageCanvasSceneParams['activeClips'];
+}) {
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const stageRef = React.useRef<HTMLDivElement | null>(null);
+  const generationRef = React.useRef(generation);
+  generationRef.current = generation;
+  usePreviewStageCanvasRender({
+    activeClips: clips,
+    canvasRef,
+    stageRef,
+    currentTime: time,
+    isPlaying: playing,
+    project,
+    effectRuntimeFeedback: bridgeFeedback,
+    imageBank: bridgeImages,
+    videoRefs: bridgeVideos,
+    videoFrameState: ready,
+    resizeVersion: resize,
+    ...{
+      registerPlaybackRequest: registered ? registerPlaybackRequest : undefined,
+      renderGenerationRef: generationRef,
+    },
+  });
+  return (
+    <div ref={stageRef}>
+      <canvas ref={canvasRef} />
+    </div>
+  );
+}
+it('requests playback directly without a React commit and ignores clock-only commits', async () => {
+  await act(async () => {
+    root?.render(<BridgeHarness />);
+  });
+  schedulerMocks.enqueueMock.mockClear();
+  expect(playbackRequest).toBeTypeOf('function');
+  playbackRequest?.(1.25);
+  expect(schedulerMocks.enqueueMock).toHaveBeenCalledOnce();
+  expect(schedulerMocks.enqueueMock.mock.calls[0]?.[0]).toMatchObject({
+    currentTime: 1.25,
+    project: bridgeProject,
+  });
+  await act(async () => {
+    root?.render(<BridgeHarness time={1.25} />);
+  });
+  expect(schedulerMocks.enqueueMock).toHaveBeenCalledOnce();
+  expect(registerPlaybackRequest).toHaveBeenCalledOnce();
+});
+it('refreshes committed edits, resize and readiness at the last direct time and unregisters on pause', async () => {
+  await act(async () => {
+    root?.render(<BridgeHarness />);
+  });
+  playbackRequest?.(2);
+  const undoProject = { ...bridgeProject, name: 'Undo revision' };
+  schedulerMocks.enqueueMock.mockClear();
+  await act(async () => {
+    root?.render(<BridgeHarness project={undoProject} generation={3} />);
+  });
+  expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({
+    project: undoProject,
+    renderGeneration: 3,
+  });
+  playbackRequest?.(3);
+  schedulerMocks.enqueueMock.mockClear();
+  await act(async () => {
+    root?.render(<BridgeHarness project={undoProject} generation={3} resize={1} />);
+  });
+  expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({ currentTime: 3 });
+  const stale = playbackRequest;
+  await act(async () => {
+    root?.render(<BridgeHarness project={undoProject} time={4} playing={false} />);
+  });
+  expect(playbackRequest).toBeUndefined();
+  schedulerMocks.enqueueMock.mockClear();
+  stale?.(9);
+  expect(schedulerMocks.enqueueMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root?.render(<BridgeHarness project={undoProject} time={5} playing={false} />);
+  });
+  expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({ currentTime: 5 });
+});
+it('keeps unregistered previews on the React time path and rejects late unmounted requests', async () => {
+  await act(async () => {
+    root?.render(<BridgeHarness registered={false} />);
+  });
+  schedulerMocks.enqueueMock.mockClear();
+  await act(async () => {
+    root?.render(<BridgeHarness registered={false} time={1} />);
+  });
+  expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({ currentTime: 1 });
+  await act(async () => {
+    root?.render(<BridgeHarness />);
+  });
+  const stale = playbackRequest;
+  await act(async () => {
+    root?.unmount();
+  });
+  root = null;
+  schedulerMocks.enqueueMock.mockClear();
+  stale?.(8);
+  expect(schedulerMocks.enqueueMock).not.toHaveBeenCalled();
+});
+
+it('holds a dependency transition until the committed media is ready, then refreshes the requested time', async () => {
+  const first = createVideoClip({ id: 'first', duration: 1 });
+  const second = createVideoClip({ id: 'second', startTime: 1, duration: 2 });
+  const project = createProject([first, second]);
+  const video = document.createElement('video');
+  Object.defineProperty(video, 'readyState', { value: 2 });
+  bridgeVideos.current['first'] = video;
+  await act(async () => {
+    root?.render(<BridgeHarness project={project} clips={[first]} />);
+  });
+  schedulerMocks.enqueueMock.mockClear();
+  playbackRequest?.(1.5);
+  expect(schedulerMocks.enqueueMock).not.toHaveBeenCalled();
+  await act(async () => {
+    root?.render(<BridgeHarness project={project} clips={[second]} time={1.5} />);
+  });
+  expect(schedulerMocks.enqueueMock).not.toHaveBeenCalled();
+  bridgeVideos.current['second'] = video;
+  await act(async () => {
+    root?.render(
+      <BridgeHarness
+        project={project}
+        clips={[second]}
+        time={1.5}
+        ready={{ canRender: true, version: 1 }}
+      />
+    );
+  });
+  expect(schedulerMocks.enqueueMock).toHaveBeenCalledOnce();
+  expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({
+    currentTime: 1.5,
+    project,
+  });
+  delete bridgeVideos.current['first'];
+  delete bridgeVideos.current['second'];
+});
+it('retains the React time path for cache playback', async () => {
+  let request: PlaybackRequest | undefined;
+  function CacheHarness({ time }: { time: number }) {
+    const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+    const stageRef = React.useRef<HTMLDivElement | null>(null);
+    usePreviewStageCanvasRender({
+      activeClips: [],
+      canvasRef,
+      stageRef,
+      currentTime: time,
+      isPlaying: true,
+      project: bridgeProject,
+      previewMode: 'cache',
+      imageBank: bridgeImages,
+      effectRuntimeFeedback: bridgeFeedback,
+      videoRefs: bridgeVideos,
+      videoFrameState: bridgeReady,
+      resizeVersion: 0,
+      registerPlaybackRequest: (next) => {
+        request = next;
+        return () => {
+          request = undefined;
+        };
+      },
+    });
+    return <canvas ref={canvasRef} />;
+  }
+  await act(async () => {
+    root?.render(<CacheHarness time={0} />);
+  });
+  expect(request).toBeUndefined();
+  schedulerMocks.enqueueMock.mockClear();
+  await act(async () => {
+    root?.render(<CacheHarness time={1} />);
+  });
+  expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({
+    currentTime: 1,
+    previewMode: 'cache',
+  });
 });

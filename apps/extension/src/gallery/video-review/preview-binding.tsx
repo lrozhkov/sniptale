@@ -38,6 +38,8 @@ type PreviewState = Pick<
   | 'onTime'
   | 'setSelection'
   | 'setPlaying'
+  | 'setPresentationActive'
+  | 'onPresentedTime'
   | 'onEnded'
   | 'onMediaError'
   | 'recovering'
@@ -308,6 +310,8 @@ function ReviewPreviewStage({
           ? {
               preferences: previewPreferences,
               playing: state.playing,
+              onPresentationActive: state.setPresentationActive,
+              onPresentedTime: state.onPresentedTime,
               interacting: focusInteracting,
               sourceToResult: state.timeline.timeMap.sourceToTimeline,
               onRaster: onPreviewRaster,

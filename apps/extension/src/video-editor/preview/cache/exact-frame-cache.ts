@@ -1,15 +1,22 @@
+import type { PreviewScenePresentation } from '../stage/scene/types';
 export const VIDEO_PREVIEW_EXACT_FRAME_CACHE_MAX_BYTES = 320 * 1024 * 1024;
 const VIDEO_PREVIEW_EXACT_FRAME_CACHE_KEY_VERSION = 1;
 
 interface ExactFrameEntry {
   bitmap: ImageBitmap;
+  presentation: PreviewScenePresentation | undefined;
   byteLength: number;
 }
 
 export interface VideoPreviewExactFrameCache {
   clear(): void;
   get(key: string): ImageBitmap | null;
-  set(key: string, bitmap: ImageBitmap): 'stored' | 'capacity-limited';
+  getPresentation(key: string): PreviewScenePresentation | null;
+  set(
+    key: string,
+    bitmap: ImageBitmap,
+    presentation?: PreviewScenePresentation
+  ): 'stored' | 'capacity-limited';
   readonly byteLength: number;
 }
 
@@ -41,7 +48,10 @@ export function createVideoPreviewExactFrameCache(
       entries.set(key, entry);
       return entry.bitmap;
     },
-    set(key, bitmap) {
+    getPresentation(key) {
+      return entries.get(key)?.presentation ?? null;
+    },
+    set(key, bitmap, presentation) {
       const byteLength = bitmap.width * bitmap.height * 4;
       if (!Number.isSafeInteger(byteLength) || byteLength <= 0 || byteLength > maxBytes) {
         bitmap.close();
@@ -53,7 +63,7 @@ export function createVideoPreviewExactFrameCache(
         if (!oldestKey) break;
         deleteEntry(oldestKey);
       }
-      entries.set(key, { bitmap, byteLength });
+      entries.set(key, { bitmap, byteLength, presentation });
       retainedBytes += byteLength;
       return 'stored';
     },

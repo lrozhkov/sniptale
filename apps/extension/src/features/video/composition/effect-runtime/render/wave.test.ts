@@ -795,3 +795,65 @@ it('binds GPU input composition to each exposure frame and its exact timestamp',
   );
   disposeEffectRuntimeComposition(rendered);
 });
+it('prepares exact original sources before each FX wave and preserves physical input/output density', async () => {
+  const order: string[] = [];
+  const original = new Map();
+  const prepared = new Map();
+  const materializer = vi.mocked(createEffectRuntimeInputMaterializer);
+  renderPlans.mockImplementation(async ({ plans }) => {
+    order.push(`fx:${plans[0].effectInstanceId}`);
+    return createFrames(plans[0].effectInstanceId);
+  });
+  const overlay = createFrame([createPlan('overlay')]);
+  const exposure = createFrame([createPlan('exposure')]);
+  const prepareSourcePass = vi.fn(async (_frame: VideoCompositionFrame, time: number) => {
+    order.push(`source:${time}`);
+    return {
+      media: prepared,
+      effectMedia: () => prepared,
+      renderDimensions: (plan: EffectRuntimeFramePlan) => ({
+        width: plan.dimensions.width * 2,
+        height: plan.dimensions.height * 3,
+      }),
+    };
+  });
+  const rendered = await renderEffectRuntimeComposition({
+    clipMediaElements: original,
+    executor,
+    imageBank: {},
+    overlayFrame: overlay,
+    overlayTime: 1,
+    visualPasses: [createPass(0.95, exposure)],
+    streamVisualPasses: true,
+    prepareSourcePass,
+  });
+  expect(order).toEqual(['source:1', 'fx:overlay']);
+  await rendered.prepareVisualPass!(0.95);
+  expect(order).toEqual(['source:1', 'fx:overlay', 'source:0.95', 'fx:exposure']);
+  for (const [request] of renderPlans.mock.calls) {
+    expect(request.plans[0].dimensions).toEqual({ width: 10, height: 10 });
+    expect(request.plans[0].renderDimensions).toEqual({ width: 20, height: 30 });
+  }
+  expect(materializer.mock.calls.every(([request]) => request.clipMediaElements === prepared)).toBe(
+    true
+  );
+  disposeEffectRuntimeComposition(rendered);
+});
+it('rejects selected physical FX extent overflow before materialization or execution', async () => {
+  const overlay = createFrame([createPlan('too-large')]);
+  await expect(
+    renderEffectRuntimeComposition({
+      clipMediaElements: new Map(),
+      executor,
+      imageBank: {},
+      overlayFrame: overlay,
+      overlayTime: 0,
+      visualPasses: [],
+      prepareSourcePass: async () => ({
+        media: new Map(),
+        renderDimensions: () => ({ width: 100_000, height: 100_000 }),
+      }),
+    })
+  ).rejects.toMatchObject({ code: 'runtimeResourceLimit' });
+  expect(renderPlans).not.toHaveBeenCalled();
+});

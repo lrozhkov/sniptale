@@ -1,5 +1,5 @@
 import type { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
-import type { VideoProjectExportTimeEstimate } from '../types/export';
+import type { VideoExportDetailMode, VideoProjectExportTimeEstimate } from '../types/export';
 
 const HISTORY_LIMIT = 10;
 const CHECKPOINT_LIMIT = 12;
@@ -23,6 +23,7 @@ export function createExportTimeProfile(settings: {
   height: number;
   fps: number;
   quality: VideoQuality;
+  detailEnhancement?: VideoExportDetailMode | undefined;
   complexity: number;
 }): string {
   const bounded = (value: number, max: number) =>
@@ -30,7 +31,7 @@ export function createExportTimeProfile(settings: {
   const pixels = bounded(Math.ceil((settings.width * settings.height) / 262144), 256);
   const fps = bounded(Math.round(settings.fps), 240);
   const complexity = bounded(Math.ceil(settings.complexity), 16);
-  return [
+  const profile = [
     settings.editor,
     settings.route,
     settings.container,
@@ -40,6 +41,9 @@ export function createExportTimeProfile(settings: {
     `q${settings.quality}`,
     `c${complexity}`,
   ].join('-');
+  return settings.detailEnhancement && settings.detailEnhancement !== 'off'
+    ? `${profile}-e${settings.detailEnhancement}`
+    : profile;
 }
 
 /** Calibrates raw predictions; callers record history only after successful measured work. */

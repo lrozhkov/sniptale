@@ -5,7 +5,7 @@ import {
   type ReviewPlaybackRange,
 } from './playback-range';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useReviewPlaybackRecovery } from './use-playback-recovery';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
@@ -29,6 +29,24 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const presentation = useRef<{ source: string; active: boolean } | null>(null);
+  const setPresentationActive = useCallback((source: string, active: boolean) => {
+    if (active) presentation.current = { source, active };
+    else if (presentation.current?.source === source) presentation.current.active = false;
+  }, []);
+  const onPresentedTime = useCallback((source: string, value: number) => {
+    const node = video.current;
+    if (
+      presentation.current?.source !== source ||
+      !presentation.current.active ||
+      !node ||
+      node.paused ||
+      node.error ||
+      !Number.isFinite(value)
+    )
+      return;
+    setTime(value);
+  }, []);
   const [playbackRange, updateRange] = useState<ReviewPlaybackRange | null>(null);
   const rangeRef = useRef(playbackRange);
   const [seekRevision, reviseSeek] = useState(0);
@@ -72,7 +90,15 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
       if (restoreSource) node.currentTime = next;
       applyReviewPlaybackSample(node, effective, value, latest.current);
     }
-    setTime(next);
+    if (
+      !applyEdits ||
+      restoreSource ||
+      !presentation.current?.active ||
+      !node ||
+      node.paused ||
+      node.error
+    )
+      setTime(next);
     return next;
   };
   const audioSettingsKey = JSON.stringify([
@@ -111,6 +137,8 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
     time,
     playing,
     setPlaying,
+    setPresentationActive,
+    onPresentedTime,
     playbackRange,
     seekRevision,
     navigationRevision,
@@ -198,7 +226,15 @@ function usePlaybackFrames(
       if (node && !node.paused) tick.current(node.currentTime, true);
       frame = requestAnimationFrame(advance);
     };
+    const node = video.current;
+    const paused = () => {
+      if (node) tick.current(node.currentTime, false);
+    };
+    node?.addEventListener('pause', paused);
     frame = requestAnimationFrame(advance);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      node?.removeEventListener('pause', paused);
+    };
   }, [playing, video, tick]);
 }

@@ -10,6 +10,8 @@ import {
   sha256,
 } from '../policy/oss-release-policy.mjs';
 import { generateDependencyLegalClosure, writeDependencyLegalClosure } from './index.mjs';
+import { validateBundledAssetNotices } from './validation.mjs';
+import { normalizeBundledAssetNotices } from './output.mjs';
 
 function interfaceFontMetadata(policy) {
   const interfaceFont = policy.bundledAssets.find((asset) => asset.id === 'golos-ui');
@@ -30,6 +32,9 @@ export async function generateRepositoryDependencyLegal(repoRoot = process.cwd()
   const policy = JSON.parse(
     await readFile(path.resolve(repoRoot, OSS_RELEASE_POLICY_PATH), 'utf8')
   );
+  const bundledAssets = normalizeBundledAssetNotices(policy.dependencyLegal.bundledAssets);
+  const assetErrors = await validateBundledAssetNotices(repoRoot, bundledAssets);
+  if (assetErrors.length) throw new Error(assetErrors.join('\n'));
   for (const asset of policy.bundledAssets) {
     if (!asset.licensePath || releaseLegalArchivePath(asset.licensePath) === asset.licensePath)
       continue;
@@ -52,12 +57,18 @@ export async function generateRepositoryDependencyLegal(repoRoot = process.cwd()
     manifestPath: policy.dependencyLegal.manifestPath,
     interfaceFont: interfaceFontMetadata(policy),
     documentFont: policy.bundledAssets.find((asset) => asset.id === 'golos-text'),
+    bundledAssets,
     outputRoot: repoRoot,
   });
   const legalPaths = [
     ...new Set([
       ...REQUIRED_RELEASE_LEGAL_PATHS,
       ...policy.bundledAssets.flatMap((asset) => (asset.licensePath ? [asset.licensePath] : [])),
+      ...bundledAssets.flatMap((asset) => [
+        asset.licensePath,
+        asset.noticePath,
+        asset.provenancePath,
+      ]),
       policy.dependencyLegal.manifestPath,
       ...closure.entries.map((entry) => entry.archivePath),
       ...(closure.sourceFiles ?? []).map((file) => file.archivePath),

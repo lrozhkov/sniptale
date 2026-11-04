@@ -36,7 +36,25 @@ vi.mock('../../../features/video/composition/canvas/spatial-renderer', () => ({
   createReviewSpatialRenderer: spatial.create,
 }));
 
-vi.mock('../stage/scene/render-preview', () => ({ renderPreviewScene }));
+vi.mock('../stage/scene/render-preview', async () => {
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  return {
+    renderPreviewScene: async (
+      input: Parameters<typeof import('../stage/scene/render-preview').renderPreviewScene>[0]
+    ) => {
+      const result = await renderPreviewScene(input);
+      return result === false
+        ? false
+        : {
+            camera:
+              input.cameraOverride ??
+              resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+            time: input.currentTime,
+          };
+    },
+  };
+});
 
 import { createVideoPreviewFrameMaterializer } from './materializer';
 
@@ -937,4 +955,28 @@ it('fails an exact frame when recording history cannot be prepared', async () =>
   await expect(materializer.renderFrame(0.1, new AbortController().signal)).rejects.toBe(error);
   expect(renderPreviewScene).not.toHaveBeenCalled();
   materializer.dispose();
+});
+
+it('returns the prepared camera beside pixels while the canvas-only API uses the same operation', async () => {
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  const project = { ...createEmptyVideoProject('Materialized pose', 8, 4), duration: 2 };
+  const camera = { ...resolveVideoCompositionFrame(project, 1).camera, scale: 2.4, viewportX: 123 };
+  const owner = createVideoPreviewFrameMaterializer({
+    project,
+    assetUrls: {},
+    ownerDocument: document,
+    rasterSize: { width: 8, height: 4 },
+  });
+  try {
+    const result = await owner.renderFrameWithPresentation(1, new AbortController().signal, camera);
+    expect(result.canvas).toBe(owner.canvas);
+    expect(result.presentation).toEqual({ camera, time: 1 });
+    expect(result.presentation.camera).toBe(camera);
+    await expect(owner.renderFrame(1, new AbortController().signal, camera)).resolves.toBe(
+      owner.canvas
+    );
+  } finally {
+    owner.dispose();
+  }
 });

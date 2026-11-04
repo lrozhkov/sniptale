@@ -7,6 +7,7 @@ import {
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { usePreviewStageRuntime } from './controller';
+import { usePreviewStagePresentationTime } from './presentation';
 import { usePreviewStageCanvasRender } from '../scene/render';
 import type { PreviewSceneRenderJob } from '../scene/render-scheduler';
 import type { PreviewStageProps } from './view-types';
@@ -24,13 +25,19 @@ let latest: ReturnType<typeof usePreviewStageRuntime>;
 let root: Root;
 let container: HTMLDivElement;
 
-function Harness(props: PreviewStageProps) {
+function Harness(props: PreviewStageProps & { direct?: boolean }) {
   const runtime = usePreviewStageRuntime(props);
   latest = runtime;
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   usePreviewStageCanvasRender({
     canvasRef,
     onCameraPresented: runtime.render.onCameraPresented,
+    ...(props.direct
+      ? {
+          registerPlaybackRequest: runtime.render.registerPlaybackRequest,
+          renderGenerationRef: runtime.render.renderGenerationRef,
+        }
+      : {}),
     stageRef: runtime.surface.stageRef,
     activeClips: runtime.surface.activeClips,
     assetUrls: props.assetUrls,
@@ -303,4 +310,62 @@ it('keeps playback handoff and its active frozen gesture usable while rendering 
   } finally {
     factory.mockRestore();
   }
+});
+
+it('borrows playback requests without a React time commit and restores the unregistered clock path', async () => {
+  let presentation: ReturnType<typeof usePreviewStagePresentationTime>;
+  let renders = 0;
+  function PresentationHarness({ time = 0 }: { time?: number }) {
+    renders++;
+    presentation = usePreviewStagePresentationTime({
+      currentTime: time,
+      isPlaying: true,
+      projectId: 'p',
+    });
+    return null;
+  }
+  await act(async () => {
+    root.render(<PresentationHarness />);
+  });
+  const first = vi.fn();
+  const second = vi.fn();
+  const releaseFirst = presentation!.registerPlaybackRequest(first);
+  const before = renders;
+  act(() => presentation!.present(1));
+  expect(first).toHaveBeenCalledExactlyOnceWith(1);
+  expect(renders).toBe(before);
+  const releaseSecond = presentation!.registerPlaybackRequest(second);
+  releaseFirst();
+  act(() => presentation!.present(2));
+  expect(second).toHaveBeenCalledExactlyOnceWith(2);
+  await act(async () => {
+    root.render(<PresentationHarness time={2} />);
+  });
+  expect(presentation!.currentTime).toBe(2);
+  releaseSecond();
+  act(() => presentation!.present(3));
+  expect(presentation!.currentTime).toBe(3);
+});
+
+it('routes the actual playback runtime directly to the existing scene scheduler', async () => {
+  const input = { ...props(), project: createProject([]), isPlaying: true };
+  const holder: { runtime: Parameters<PreviewStageProps['registerPreviewRuntime']>[0] } = {
+    runtime: null,
+  };
+  input.registerPreviewRuntime = (runtime) => {
+    holder.runtime = runtime;
+  };
+  await act(async () => {
+    root.render(<Harness {...input} direct />);
+  });
+  expect(holder.runtime).not.toBeNull();
+  scheduler.enqueue.mockClear();
+  act(() => holder.runtime?.present(1.5));
+  expect(scheduler.enqueue).toHaveBeenCalledOnce();
+  expect(scheduler.enqueue.mock.lastCall![0].currentTime).toBe(1.5);
+  expect(latest.render.currentTime).toBe(input.currentTime);
+  await act(async () => {
+    root.render(<Harness {...input} currentTime={1.5} direct />);
+  });
+  expect(scheduler.enqueue).toHaveBeenCalledOnce();
 });

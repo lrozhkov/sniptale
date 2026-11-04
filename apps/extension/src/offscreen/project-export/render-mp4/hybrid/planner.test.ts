@@ -458,3 +458,41 @@ it('keeps hybrid span boundaries on the shared output lattice after a fractional
   });
   expect(spans.at(-1)?.end).toBe(project.duration);
 });
+
+it.each(['bicubic-sharpen', 'clark-x2'] as const)(
+  'keeps proven no-growth clean spans and routes growth or uncertainty to composite for %s',
+  async (detailEnhancement) => {
+    const actual = await vi.importActual<
+      typeof import('../../../../features/video/composition/timeline/render')
+    >('../../../../features/video/composition/timeline/render');
+    resolveVideoCompositionRenderPassesMock.mockImplementation(
+      actual.resolveVideoCompositionRenderPasses
+    );
+    const project = createProject();
+    const settings = { ...createSettings(), detailEnhancement };
+    expect(planMp4VideoRenderSpans(project, settings)).toEqual([
+      expect.objectContaining({ kind: 'clean-source', start: 0, end: 4 }),
+    ]);
+    expect(planMp4VideoRenderSpans(project, { ...settings, width: 2560, height: 1440 })).toEqual([
+      expect.objectContaining({ kind: 'composite', start: 0, end: 4 }),
+    ]);
+    project.assets[0]!.metadata.mimeType = 'video/webm';
+    expect(planMp4VideoRenderSpans(project, settings)).toEqual([
+      expect.objectContaining({ kind: 'accelerated-composite', start: 0, end: 4 }),
+    ]);
+    const clip = project.clips[0]!;
+    if (clip.type !== VideoProjectClipType.VIDEO) throw new Error('Expected video fixture');
+    clip.cameraPositions = [
+      {
+        id: 'camera',
+        sourceTime: 0,
+        transform: clip.transform,
+        fitMode: clip.fitMode,
+        transition: { kind: 'instant', duration: 0 },
+      },
+    ];
+    expect(planMp4VideoRenderSpans(project, settings)).toEqual([
+      expect.objectContaining({ kind: 'composite', start: 0, end: 4 }),
+    ]);
+  }
+);

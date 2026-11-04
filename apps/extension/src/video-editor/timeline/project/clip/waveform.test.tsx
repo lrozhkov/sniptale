@@ -2,8 +2,13 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AudioClipWaveform } from './waveform';
+import { buildAudioClipWaveformPath } from '../canvas/render-data';
+vi.mock('../canvas/render-data', async (original) => {
+  const actual = await original<typeof import('../canvas/render-data')>();
+  return { ...actual, buildAudioClipWaveformPath: vi.fn(actual.buildAudioClipWaveformPath) };
+});
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -51,3 +56,16 @@ function renderWaveform(props: { muted?: boolean; peaks: number[] }) {
     );
   });
 }
+
+it('reuses waveform geometry while mute and envelope styling change, and replaces it for new peaks', () => {
+  const peaks = [0.2, 0.75];
+  vi.mocked(buildAudioClipWaveformPath).mockClear();
+  renderWaveform({ peaks });
+  const path = container?.querySelector('path[fill="currentColor"]')?.getAttribute('d');
+  renderWaveform({ peaks, muted: true });
+  expect(buildAudioClipWaveformPath).toHaveBeenCalledOnce();
+  expect(container?.querySelector('path[fill="currentColor"]')?.getAttribute('d')).toBe(path);
+  renderWaveform({ peaks: [0.9, 0.1] });
+  expect(buildAudioClipWaveformPath).toHaveBeenCalledTimes(2);
+  expect(container?.querySelector('path[fill="currentColor"]')?.getAttribute('d')).not.toBe(path);
+});

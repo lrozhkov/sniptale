@@ -208,11 +208,16 @@ it('mixes the complete region when its outgoing anchor is a short split descenda
 
 it('samples moving cut sides at their own clocks and keeps the held join contract unchanged', async () => {
   const args = input();
+  args.job.sourceSampling = {} as NonNullable<typeof args.job.sourceSampling>;
   args.project.compositionJoins![0]!.sampling = 'cut';
   args.project.version = 40;
   await renderProjectCompositionFrame({ ...args, currentTime: 0.85 });
   expect(owners.scene.mock.calls.map(([sample]) => sample.currentTime)).toEqual([0.85, 1]);
   expect(owners.scene.mock.calls.map(([sample]) => sample.captionSampleTime)).toEqual([0.85, 1]);
+  expect(owners.scene.mock.calls.map(([sample]) => sample.sourceSamplingFallback)).toEqual([
+    'last',
+    'first',
+  ]);
   owners.scene.mockClear();
   await renderProjectCompositionFrame({ ...args, currentTime: 1.1 });
   const clocks = owners.scene.mock.calls.map(([sample]) => sample.currentTime);
@@ -225,6 +230,10 @@ it('samples moving cut sides at their own clocks and keeps the held join contrac
     [1, 'first'],
     [clocks[0], 'last'],
     [1.1, 'first'],
+  ]);
+  expect(owners.scene.mock.calls.map(([sample]) => sample.sourceSamplingFallback)).toEqual([
+    'last',
+    'first',
   ]);
   expect(owners.cutRelease).toHaveBeenCalledTimes(4);
   expect(args.project.duration).toBe(2);

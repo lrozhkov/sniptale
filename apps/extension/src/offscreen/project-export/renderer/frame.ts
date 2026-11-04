@@ -1,3 +1,7 @@
+import { createNativeSharpStages, type NativeSharpStage } from './source-sharp-stage';
+import type { ProjectExportSourceSampling } from './source-sampling';
+import { motionCameraProjection } from '../../../features/video/composition/motion/spatial';
+import { multiplyQuickEditProjections } from '../../../features/video/composition/motion/spatial-geometry';
 import { drawCompositionSceneSpotlights } from '../../../features/video/composition/draw/project-spotlight';
 import {
   drawDeferredCameraSplitSpotlights,
@@ -81,6 +85,10 @@ async function drawVisualPasses(params: {
   project: VideoProject;
   logicalSize: { width: number; height: number };
   spatialRenderer?: () => ReviewSpatialRenderer;
+  sourceSampling?: ProjectExportSourceSampling;
+  sourceSamplingFallback?: 'first' | 'last';
+  sharpStages?: readonly NativeSharpStage[];
+  signal?: AbortSignal;
 }) {
   const splitClipId = resolveActiveCameraSplit(
     params.project,
@@ -96,6 +104,12 @@ async function drawVisualPasses(params: {
   );
   const overlayEffectState = createEffectRuntimeDrawState();
   const passEffectStates = new Map<number, EffectRuntimeDrawState>();
+  const sharpEffectStates = new Map<NativeSharpStage, Map<number, EffectRuntimeDrawState>>();
+  const sharpOverlayStates = new Map<NativeSharpStage, EffectRuntimeDrawState>();
+  for (const stage of params.sharpStages ?? []) {
+    sharpEffectStates.set(stage, new Map());
+    sharpOverlayStates.set(stage, createEffectRuntimeDrawState());
+  }
 
   for (const segment of segments) {
     for (const part of splitVisualLayersForSourceSpotlights(
@@ -103,19 +117,53 @@ async function drawVisualPasses(params: {
       params.renderPasses.overlayFrame.sceneSpotlights
     )) {
       if (segment.isLocked) {
+        const prepared = await params.sourceSampling?.prepare({
+          project: params.project,
+          ...(params.sourceSamplingFallback ? { fallback: params.sourceSamplingFallback } : {}),
+          frame: params.renderPasses.overlayFrame,
+          time: params.time,
+          media: params.clipMediaElements,
+          images: params.loadedImages,
+          ...(params.signal ? { signal: params.signal } : {}),
+        });
         drawLockedOverlayLayers(
           params.context,
           part.layers,
           params.renderPasses.overlayFrame,
-          params,
+          prepared ? { ...params, clipMediaElements: prepared.media } : params,
           params.effectRuntimeFrames?.overlayFrames,
           overlayEffectState
         );
-      } else await drawUnlockedOverlayGroup(part.layers, params, passEffectStates);
+        for (const stage of params.sharpStages ?? [])
+          if (!stage.finished)
+            stage.paint((context) =>
+              drawLockedOverlayLayers(
+                context,
+                part.layers,
+                params.renderPasses.overlayFrame,
+                {
+                  ...params,
+                  clipMediaElements: prepared?.forDemand(stage.id) ?? params.clipMediaElements,
+                },
+                params.effectRuntimeFrames?.overlayFrames,
+                sharpOverlayStates.get(stage)!
+              )
+            );
+      } else
+        await drawUnlockedOverlayGroup(part.layers, params, passEffectStates, sharpEffectStates);
       if (part.afterClipId)
         drawCompositionSceneSpotlights({
           context: params.context,
           afterClipId: part.afterClipId,
+          ...(params.sharpStages
+            ? {
+                sharpPaint: (id, context) => {
+                  const stage = params.sharpStages!.find((item) => item.id === `sceneLens:${id}`);
+                  if (!stage) throw new Error('Prepared scene lens stage is unavailable.');
+                  stage.publish(context);
+                },
+              }
+            : {}),
           frame: params.renderPasses.overlayFrame,
           project: params.project,
           images: params.loadedImages,
@@ -200,10 +248,115 @@ function drawLockedOverlayLayers(
   context.restore();
 }
 
+function paintExportVisualSample(args: {
+  drawContext: CanvasRenderingContext2D;
+  pass: VisualPass;
+  layers: VisualLayer[];
+  params: Pick<
+    DrawParams,
+    | 'loadedImages'
+    | 'offsetX'
+    | 'offsetY'
+    | 'scaleX'
+    | 'scaleY'
+    | 'logicalSize'
+    | 'settings'
+    | 'spatialRenderer'
+  >;
+  media: ClipMediaSources;
+  buffered: boolean;
+  effectState: EffectRuntimeDrawState;
+  frames?: EffectRuntimeRenderedFrameMap;
+  sourceRasterScale?: number;
+  sharpTarget?: Pick<NativeSharpStage, 'output' | 'transform'>;
+}) {
+  const {
+    drawContext,
+    pass,
+    layers,
+    params,
+    media,
+    buffered,
+    effectState,
+    frames,
+    sourceRasterScale,
+    sharpTarget,
+  } = args;
+  if (pass.frame.camera.spatial) {
+    if (!params.spatialRenderer) throw new Error('Perspective renderer is unavailable.');
+    drawContext.save();
+    try {
+      drawContext.globalAlpha *= buffered ? 1 : pass.alpha;
+      drawSpatialCompositionGroup({
+        camera: pass.frame.camera,
+        context: drawContext,
+        renderer: params.spatialRenderer(),
+        clipMediaElements: media,
+        ...(sourceRasterScale !== undefined ? { sourceRasterScale } : {}),
+        ...(sharpTarget || sourceRasterScale !== undefined
+          ? {
+              sharpOutput: {
+                output: sharpTarget?.output ?? {
+                  width: params.settings.width,
+                  height: params.settings.height,
+                },
+                destination: {
+                  x: 0,
+                  y: 0,
+                  ...(sharpTarget?.output ?? {
+                    width: params.settings.width,
+                    height: params.settings.height,
+                  }),
+                },
+                projection: multiplyQuickEditProjections(
+                  sharpTarget?.transform ?? [1, 0, 0, 0, 1, 0, 0, 0, 1],
+                  multiplyQuickEditProjections(
+                    [1, 0, params.offsetX, 0, 1, params.offsetY, 0, 0, 1],
+                    motionCameraProjection(pass.frame.camera, params.scaleX)!
+                  )
+                ),
+              },
+            }
+          : {}),
+        imageBank: params.loadedImages,
+        layers: resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
+        effectState,
+        ...(frames ? { frames } : {}),
+        logicalSize: params.logicalSize,
+        rasterScale: params.scaleX,
+        output: {
+          width: Math.max(1, Math.ceil(params.logicalSize.width * params.scaleX)),
+          height: Math.max(1, Math.ceil(params.logicalSize.height * params.scaleY)),
+        },
+        destination: {
+          x: params.offsetX,
+          y: params.offsetY,
+          width: params.logicalSize.width * params.scaleX,
+          height: params.logicalSize.height * params.scaleY,
+        },
+      });
+    } finally {
+      drawContext.restore();
+    }
+    return;
+  }
+  beginExportCameraPass(drawContext, pass, params);
+  drawVisualPassLayers(
+    drawContext,
+    resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
+    buffered ? { ...pass, alpha: 1 } : pass,
+    { ...params, clipMediaElements: media },
+    frames,
+    effectState
+  );
+  drawContext.restore();
+}
+
 async function drawUnlockedOverlayGroup(
   layers: VisualLayer[],
   params: DrawParams,
-  effectRuntimeStates: Map<number, EffectRuntimeDrawState>
+  effectRuntimeStates: Map<number, EffectRuntimeDrawState>,
+  sharpEffectStates: Map<NativeSharpStage, Map<number, EffectRuntimeDrawState>>
 ) {
   const ownerDocument =
     typeof HTMLCanvasElement !== 'undefined' && params.context.canvas instanceof HTMLCanvasElement
@@ -221,6 +374,63 @@ async function drawUnlockedOverlayGroup(
         })
       : null;
   const drawContext = passBuffer?.context ?? params.context;
+  const stageBuffers: Array<{
+    stage: NativeSharpStage;
+    buffer: ReturnType<typeof createVideoCompositionPassBuffer>;
+    release(): void;
+  }> = [];
+  try {
+    for (const stage of params.sharpStages ?? []) {
+      if (stage.finished) continue;
+      const releases: (() => void)[] = [];
+      let buffer: ReturnType<typeof createVideoCompositionPassBuffer> = null;
+      try {
+        if (params.renderPasses.visualPasses.length > 1) {
+          releases.push(
+            params.sourceSampling!.reserveRaster(stage.output.width, stage.output.height)
+          );
+          releases.push(
+            params.sourceSampling!.reserveRaster(stage.output.width, stage.output.height)
+          );
+          buffer = createVideoCompositionPassBuffer({
+            bufferWidth: stage.output.width,
+            bufferHeight: stage.output.height,
+            drawWidth: stage.output.width,
+            drawHeight: stage.output.height,
+            ownerDocument,
+            targetContext: stage.context,
+          });
+          if (!buffer) throw new Error('Sharp motion blur buffer is unavailable.');
+          buffer.context.setTransform(
+            stage.transform[0],
+            stage.transform[3],
+            stage.transform[1],
+            stage.transform[4],
+            stage.transform[2],
+            stage.transform[5]
+          );
+        }
+        stageBuffers.push({
+          stage,
+          buffer,
+          release() {
+            for (const release of releases) release();
+          },
+        });
+      } catch (error) {
+        buffer?.dispose();
+        for (const release of releases) release();
+        throw error;
+      }
+    }
+  } catch (error) {
+    for (const item of stageBuffers) {
+      item.buffer?.dispose();
+      item.release();
+    }
+    passBuffer?.dispose();
+    throw error;
+  }
 
   try {
     if (
@@ -231,63 +441,61 @@ async function drawUnlockedOverlayGroup(
       throw new Error('Motion blur buffer is unavailable.');
     for (const pass of params.renderPasses.visualPasses) {
       await params.effectRuntimeFrames?.prepareVisualPass?.(pass.time);
-      const paint = (drawContext: CanvasRenderingContext2D) => {
-        if (pass.frame.camera.spatial) {
-          if (!params.spatialRenderer) throw new Error('Perspective renderer is unavailable.');
-          drawContext.save();
-          try {
-            drawContext.globalAlpha *= passBuffer ? 1 : pass.alpha;
-            drawSpatialCompositionGroup({
-              camera: pass.frame.camera,
-              context: drawContext,
-              renderer: params.spatialRenderer(),
-              clipMediaElements: params.clipMediaElements,
-              imageBank: params.loadedImages,
-              layers: resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
-              effectState: resolveExportEffectDrawState(effectRuntimeStates, pass.time),
-              ...(getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time)
-                ? {
-                    frames: getEffectRuntimeVisualPassFrames(
-                      params.effectRuntimeFrames,
-                      pass.time
-                    )!,
-                  }
-                : {}),
-              logicalSize: params.logicalSize,
-              rasterScale: params.scaleX,
-              output: {
-                width: Math.max(1, Math.ceil(params.logicalSize.width * params.scaleX)),
-                height: Math.max(1, Math.ceil(params.logicalSize.height * params.scaleY)),
-              },
-              destination: {
-                x: params.offsetX,
-                y: params.offsetY,
-                width: params.logicalSize.width * params.scaleX,
-                height: params.logicalSize.height * params.scaleY,
-              },
-            });
-          } finally {
-            drawContext.restore();
-          }
-          return;
-        }
-        beginExportCameraPass(drawContext, pass, params);
-        drawVisualPassLayers(
+      const prepared = await params.sourceSampling?.prepare({
+        project: params.project,
+        ...(params.sourceSamplingFallback ? { fallback: params.sourceSamplingFallback } : {}),
+        frame: pass.frame,
+        sceneTime: params.time,
+        lensFrame: params.renderPasses.overlayFrame,
+        time: pass.time,
+        media: params.clipMediaElements,
+        images: params.loadedImages,
+        ...(params.signal ? { signal: params.signal } : {}),
+      });
+      const passParams = prepared ? { ...params, clipMediaElements: prepared.media } : params;
+      const frames = getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time);
+      const paint = (
+        drawContext: CanvasRenderingContext2D,
+        media = passParams.clipMediaElements,
+        stage?: NativeSharpStage
+      ) =>
+        paintExportVisualSample({
           drawContext,
-          resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
-          passBuffer ? { ...pass, alpha: 1 } : pass,
+          pass,
+          layers,
           params,
-          getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
-          resolveExportEffectDrawState(effectRuntimeStates, pass.time)
-        );
-        drawContext.restore();
-      };
+          media,
+          buffered: !!passBuffer,
+          effectState: resolveExportEffectDrawState(
+            stage ? sharpEffectStates.get(stage)! : effectRuntimeStates,
+            pass.time
+          ),
+          ...(frames ? { frames } : {}),
+          ...(prepared
+            ? {
+                sourceRasterScale: stage
+                  ? prepared.rasterScaleForDemand(stage.id)
+                  : prepared.sourceRasterScale,
+              }
+            : {}),
+          ...(stage ? { sharpTarget: stage } : {}),
+        });
       if (passBuffer) passBuffer.drawPass(pass.alpha, paint);
       else paint(drawContext);
+      for (const { stage, buffer } of stageBuffers) {
+        const media = prepared?.forDemand(stage.id) ?? params.clipMediaElements;
+        if (buffer) buffer.drawPass(pass.alpha, (context) => paint(context, media, stage));
+        else stage.paint((context) => paint(context, media, stage));
+      }
     }
 
     passBuffer?.flush();
+    for (const { buffer } of stageBuffers) buffer?.flush();
   } finally {
+    for (const item of stageBuffers) {
+      item.buffer?.dispose();
+      item.release();
+    }
     passBuffer?.dispose();
   }
 }
@@ -304,6 +512,9 @@ export async function drawProjectFrame(
     spatialRenderer?: () => ReviewSpatialRenderer;
     compositionIndex?: VideoCompositionTimelineIndex;
     effectRuntimeFrames?: EffectRuntimeRenderedComposition;
+    sourceSampling?: ProjectExportSourceSampling;
+    sourceSamplingFallback?: 'first' | 'last';
+    signal?: AbortSignal;
   } = {}
 ): Promise<void> {
   const { offsetX, offsetY, scale } = resolveProjectOutputTransform(project, settings);
@@ -317,23 +528,41 @@ export async function drawProjectFrame(
     ...(options.compositionIndex ? { timelineIndex: options.compositionIndex } : {}),
   });
 
+  const sharpStages = options.sourceSampling
+    ? createNativeSharpStages({
+        project,
+        settings,
+        frame: renderPasses.overlayFrame,
+        images: loadedImages,
+        sampling: options.sourceSampling,
+      })
+    : [];
   context.save();
   try {
     context.clearRect(0, 0, settings.width, settings.height);
-    drawExportSceneBackground({
-      ...(renderPasses.overlayFrame.camera.backgroundCamera
-        ? { backgroundCamera: renderPasses.overlayFrame.camera.backgroundCamera }
-        : {}),
-      ...(options.backgroundCache ? { cache: options.backgroundCache } : {}),
-      context,
-      currentTime,
-      height: settings.height,
-      loadedImages,
-      project,
-      width: settings.width,
-    });
+    const paintBackground = (target: CanvasRenderingContext2D) =>
+      drawExportSceneBackground({
+        ...(renderPasses.overlayFrame.camera.backgroundCamera
+          ? { backgroundCamera: renderPasses.overlayFrame.camera.backgroundCamera }
+          : {}),
+        ...(options.backgroundCache ? { cache: options.backgroundCache } : {}),
+        context: target,
+        currentTime,
+        height: settings.height,
+        loadedImages,
+        project,
+        width: settings.width,
+      });
+    paintBackground(context);
+    for (const stage of sharpStages) stage.paint(paintBackground);
     await drawVisualPasses({
       time: currentTime,
+      ...(sharpStages.length ? { sharpStages } : {}),
+      ...(options.sourceSampling ? { sourceSampling: options.sourceSampling } : {}),
+      ...(options.sourceSamplingFallback
+        ? { sourceSamplingFallback: options.sourceSamplingFallback }
+        : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
       clipMediaElements,
       context,
       ...(options.effectRuntimeFrames ? { effectRuntimeFrames: options.effectRuntimeFrames } : {}),
@@ -354,8 +583,45 @@ export async function drawProjectFrame(
       settings,
       options.effectRuntimeFrames
     );
+    for (const stage of sharpStages)
+      if (!stage.finished) {
+        stage.context.save();
+        try {
+          stage.context.setTransform(
+            stage.transform[0],
+            stage.transform[3],
+            stage.transform[1],
+            stage.transform[4],
+            stage.transform[2],
+            stage.transform[5]
+          );
+          await drawExportTransitionOverlayPasses(
+            stage.context,
+            renderPasses.visualPasses,
+            settings,
+            options.effectRuntimeFrames,
+            {
+              size: stage.output,
+              transform: stage.transform,
+              reserveRaster: (width, height) =>
+                options.sourceSampling!.reserveRaster(width, height),
+            }
+          );
+        } finally {
+          stage.context.restore();
+        }
+      }
     drawCompositionSceneSpotlights({
       context,
+      ...(sharpStages.length
+        ? {
+            sharpPaint: (id, target) => {
+              const stage = sharpStages.find((item) => item.id === `sceneLens:${id}`);
+              if (!stage) throw new Error('Prepared scene lens stage is unavailable.');
+              stage.publish(target);
+            },
+          }
+        : {}),
       frame: renderPasses.overlayFrame,
       project,
       images: loadedImages,
@@ -383,6 +649,15 @@ export async function drawProjectFrame(
       renderPasses.overlayFrame.visualLayers
     );
     if (split) {
+      const prepared = await options.sourceSampling?.prepare({
+        project,
+        ...(options.sourceSamplingFallback ? { fallback: options.sourceSamplingFallback } : {}),
+        frame: renderPasses.overlayFrame,
+        time: currentTime,
+        media: clipMediaElements,
+        images: loadedImages,
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
       paintCameraSplitScreen(
         context,
         {
@@ -412,7 +687,7 @@ export async function drawProjectFrame(
             scale,
             scale,
             loadedImages,
-            clipMediaElements,
+            prepared?.media ?? clipMediaElements,
             1
           );
       } finally {
@@ -429,6 +704,8 @@ export async function drawProjectFrame(
       });
     }
   } finally {
+    for (const stage of sharpStages) stage.dispose();
+    options.sourceSampling?.releasePass();
     context.restore();
   }
 }

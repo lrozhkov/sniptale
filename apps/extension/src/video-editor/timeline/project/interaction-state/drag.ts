@@ -169,7 +169,7 @@ export function useProjectTimelineDrag({
 }: UseProjectTimelineDragOptions) {
   const interactionRef = useRef<TimelineInteraction | null>(null);
   const refreshRef = useRef<(() => void) | null>(null);
-  const viewportStart = readTimelineStartTime?.();
+  const viewportStart = interactionRef.current ? readTimelineStartTime?.() : undefined;
   useLayoutEffect(() => refreshRef.current?.(), [viewportStart]);
   const localCleanupRef = useRef<(() => void) | null>(null);
   const cleanupRef = pointerSessionCleanupRef ?? localCleanupRef;

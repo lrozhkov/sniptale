@@ -1,7 +1,26 @@
 // @vitest-environment jsdom
 import { MAX_TIMELINE_PIXELS_PER_SECOND } from '../../../../contracts/timeline-scale';
 import { isExportReadyVideoProject } from '../../../../../features/video/project/validation/root';
-import { act } from 'react';
+import { act, useRef } from 'react';
+import { useVideoEditorStore } from '../../../../state/store';
+import { useTimelineNavigation } from '../../interaction-state/navigation';
+import { projectSourceVoiceoverViews } from '../../../../../features/video/project/source-voiceover-views';
+import { getProjectAudioWaveformPeaks } from '../../../../../features/video/project/timeline/audio';
+import { buildAudioClipWaveformPath } from '../render-data';
+vi.mock('../../../../../features/video/project/source-voiceover-views', async (original) => {
+  const actual =
+    await original<typeof import('../../../../../features/video/project/source-voiceover-views')>();
+  return { ...actual, projectSourceVoiceoverViews: vi.fn(actual.projectSourceVoiceoverViews) };
+});
+vi.mock('../../../../../features/video/project/timeline/audio', async (original) => {
+  const actual =
+    await original<typeof import('../../../../../features/video/project/timeline/audio')>();
+  return { ...actual, getProjectAudioWaveformPeaks: vi.fn(actual.getProjectAudioWaveformPeaks) };
+});
+vi.mock('../render-data', async (original) => {
+  const actual = await original<typeof import('../render-data')>();
+  return { ...actual, buildAudioClipWaveformPath: vi.fn(actual.buildAudioClipWaveformPath) };
+});
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import {
@@ -16,11 +35,15 @@ import { createTimelineProjection } from '../../interaction-state/projection';
 import { ProjectTimelineSourceVoiceoverViews } from './source-voiceover';
 
 const callbacks = vi.hoisted(() => ({ select: vi.fn() }));
-vi.mock('../../../../runtime/controller/composition/hooks', () => ({
-  useVideoEditorTimelineController: () => ({
-    actions: { onSelectSourceVoiceover: callbacks.select },
-  }),
-}));
+vi.mock('../../../../runtime/controller/composition/hooks', async () => {
+  const { useVideoEditorPlaybackPort } = await import('../../../../runtime/controller/store');
+  return {
+    useVideoEditorTimelineController: () => {
+      useVideoEditorPlaybackPort((port) => port);
+      return { actions: { onSelectSourceVoiceover: callbacks.select } };
+    },
+  };
+});
 
 function fixture() {
   let project = createVideoProjectFromRecording({
@@ -179,6 +202,95 @@ it('keeps muted disabled and hidden occurrences selectable and bounds geometry t
     expect(host.querySelector('[data-source-voiceover-view]')).toBeNull();
   } finally {
     act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('retains source voiceover placement, peaks and path across real store clock updates', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const { project, track } = fixture();
+  const prior = useVideoEditorStore.getState();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let renderedProject = project;
+  let selected = false;
+  const previousSelect = callbacks.select;
+  let navigation!: ReturnType<typeof useTimelineNavigation>;
+  function Clock({ zoom = 100 }: { zoom?: number }) {
+    const time = useVideoEditorStore((state) => state.currentTime);
+    const timelineRef = useRef<HTMLDivElement | null>(null);
+    navigation = useTimelineNavigation({
+      timelineRef,
+      extentSeconds: 20,
+      pixelsPerSecond: zoom,
+      viewportWidth: 400,
+    });
+    return (
+      <div ref={timelineRef} data-clock={time}>
+        <ProjectTimelineSourceVoiceoverViews
+          project={renderedProject}
+          trackId={track.id}
+          selection={
+            selected ? { kind: 'source-voiceover', documentId: 'document' } : { kind: 'scene' }
+          }
+          pixelsPerSecond={zoom}
+          projection={navigation.projection}
+          height={48}
+        />
+      </div>
+    );
+  }
+  try {
+    act(() => useVideoEditorStore.getState().setProject(project));
+    act(() => root.render(<Clock />));
+    expect(host.querySelector('path[fill="currentColor"]')).not.toBeNull();
+    vi.mocked(projectSourceVoiceoverViews).mockClear();
+    vi.mocked(getProjectAudioWaveformPeaks).mockClear();
+    vi.mocked(buildAudioClipWaveformPath).mockClear();
+    for (const time of [0.1, 0.2, 0.3])
+      act(() => useVideoEditorStore.getState().setCurrentTime(time));
+    expect(host.firstElementChild?.getAttribute('data-clock')).toBe('0.3');
+    expect.soft(projectSourceVoiceoverViews).not.toHaveBeenCalled();
+    expect.soft(getProjectAudioWaveformPeaks).not.toHaveBeenCalled();
+    expect(buildAudioClipWaveformPath).not.toHaveBeenCalled();
+    callbacks.select = vi.fn();
+    act(() => useVideoEditorStore.getState().setCurrentTime(0.4));
+    act(() => host.querySelector<HTMLButtonElement>('[data-source-voiceover-view]')?.click());
+    expect(callbacks.select).toHaveBeenCalledExactlyOnceWith('document');
+    selected = true;
+    act(() => root.render(<Clock />));
+    expect(host.querySelector('[data-source-voiceover-view]')?.getAttribute('aria-pressed')).toBe(
+      'true'
+    );
+    expect(getProjectAudioWaveformPeaks).not.toHaveBeenCalled();
+    act(() => root.render(<Clock zoom={200} />));
+    expect(getProjectAudioWaveformPeaks).toHaveBeenCalled();
+    act(() => navigation.navigateTo(10));
+    expect(host.querySelector('[data-source-voiceover-view]')).toBeNull();
+    act(() => navigation.navigateTo(0));
+    expect(host.querySelector('[data-source-voiceover-view]')).not.toBeNull();
+    const documents = project.sourceVoiceoverDocuments;
+    if (!documents) throw new Error('Missing fixture voiceover');
+    renderedProject = {
+      ...project,
+      sourceVoiceoverDocuments: documents.map((document) => ({
+        ...document,
+        take: { ...document.take, muted: true },
+      })),
+    };
+    act(() => root.render(<Clock zoom={200} />));
+    expect(projectSourceVoiceoverViews).toHaveBeenCalled();
+    expect(
+      host
+        .querySelector('[data-source-voiceover-view]')
+        ?.getAttribute('data-source-voiceover-inactive')
+    ).toBe('true');
+  } finally {
+    callbacks.select = previousSelect;
+    act(() => root.unmount());
+    act(() => useVideoEditorStore.setState(prior, true));
+    host.remove();
     vi.unstubAllGlobals();
   }
 });

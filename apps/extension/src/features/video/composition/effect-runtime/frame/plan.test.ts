@@ -482,3 +482,15 @@ it('retains a standalone content clock through a held placement and reopen', () 
     expect.objectContaining({ time: 2.9 }),
   ]);
 });
+it('changes physical extent and retains logical target and external bounds', async () => {
+  const { applyEffectRuntimeRasterDimensions } = await import('./plan');
+  const plan = resolveEffectRuntimeFramePlans(createProject(), 2.5)[1]!;
+  const original = structuredClone(plan);
+  const physical = applyEffectRuntimeRasterDimensions(plan, { width: 3200, height: 1800 });
+  expect(physical.renderDimensions).toEqual({ width: 3200, height: 1800 });
+  expect({ ...physical, renderDimensions: plan.renderDimensions }).toEqual(original);
+  expect(plan).toEqual(original);
+  expect(() =>
+    applyEffectRuntimeRasterDimensions(plan, { width: 100_000, height: 100_000 })
+  ).toThrow();
+});

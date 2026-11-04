@@ -24,8 +24,12 @@ interface ReviewPresentationRequest<Scene> {
   time: number;
 }
 
+type ReviewPresentationTickPhase = 'after-paint' | 'prepared-playing-frame';
+
 interface Dependencies<Scene, Prepared, Captured, Completed> {
-  requestTick(callback: () => void): number;
+  /** Only opted-in owners can admit a published playing generation on its animation frame. */
+  allowPreparedPlayingFrames?: boolean;
+  requestTick(callback: () => void, phase?: ReviewPresentationTickPhase): number;
   cancelTick(id: number): void;
   now(): number;
   sampleTime(): number;
@@ -44,15 +48,20 @@ interface Dependencies<Scene, Prepared, Captured, Completed> {
   onError(error: unknown): void;
 }
 
-/** Admit preparation in a task after the next paint; cancellation owns both browser callbacks. */
+/** New preparation waits until after paint. Prepared playing frames can use the animation frame. */
 export function createReviewPresentationPaintClock() {
   let nextId = 0;
   const ticks = new Map<number, { frame: number; task?: ReturnType<typeof setTimeout> }>();
   return {
-    requestTick(callback: () => void) {
+    requestTick(callback: () => void, phase: ReviewPresentationTickPhase = 'after-paint') {
       const id = ++nextId;
       const tick: { frame: number; task?: ReturnType<typeof setTimeout> } = {
         frame: requestAnimationFrame(() => {
+          if (phase === 'prepared-playing-frame') {
+            ticks.delete(id);
+            callback();
+            return;
+          }
           tick.task = setTimeout(() => {
             ticks.delete(id);
             callback();
@@ -86,6 +95,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
   let failed = false;
   let lastPublished = -Infinity;
   let lastAdmitted = -Infinity;
+  let publishedEpoch = -1;
   const current = (version: number) => !disposed && !failed && state?.visible && epoch === version;
   // Browser frame clocks can round a 30 FPS interval to 33.3 ms.
   const due = (since: number) =>
@@ -104,20 +114,28 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
   const schedule = () => {
     if (disposed || failed || !state?.visible || tick !== null) return;
     if (!state.playing && !state.interacting && (!pending || active)) return;
-    tick = dependencies.requestTick(() => {
-      tick = null;
-      if (!state?.visible || failed || disposed) return;
-      if (publication && due(lastPublished)) publication();
-      if (state.playing) pending = state;
-      // A paused request is one-shot: wait until it can publish before consuming it.
-      const admissionClock = state.playing || state.interacting ? lastAdmitted : lastPublished;
-      if (!active && pending && due(admissionClock)) {
-        const next = pending;
-        pending = null;
-        void present(next);
-      }
-      schedule();
-    });
+    tick = dependencies.requestTick(
+      () => {
+        tick = null;
+        if (!state?.visible || failed || disposed) return;
+        if (publication && due(lastPublished)) publication();
+        if (state.playing) pending = state;
+        // A paused request is one-shot: wait until it can publish before consuming it.
+        const admissionClock = state.playing || state.interacting ? lastAdmitted : lastPublished;
+        if (!active && pending && due(admissionClock)) {
+          const next = pending;
+          pending = null;
+          void present(next);
+        }
+        schedule();
+      },
+      dependencies.allowPreparedPlayingFrames &&
+        state.playing &&
+        !state.interacting &&
+        publishedEpoch === epoch
+        ? 'prepared-playing-frame'
+        : 'after-paint'
+    );
   };
   const present = async (description: ReviewPresentationState<Scene>) => {
     const version = epoch;
@@ -169,7 +187,18 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         if (!current(version)) return;
       }
       dependencies.publish(completed.value, request);
-      if (current(version)) lastPublished = advanceClock(lastPublished);
+      if (current(version)) {
+        lastPublished = advanceClock(lastPublished);
+        const firstPublication = publishedEpoch !== version;
+        publishedEpoch = version;
+        if (
+          firstPublication &&
+          dependencies.allowPreparedPlayingFrames &&
+          state?.playing &&
+          !state.interacting
+        )
+          cancelTick();
+      }
     } catch (error) {
       if (current(version)) {
         failed = true;

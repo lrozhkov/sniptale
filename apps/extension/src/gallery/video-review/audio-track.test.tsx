@@ -765,3 +765,38 @@ it('projects loop magnets to the audio axis and excludes a removed source bounda
   });
   expect(snap).toEqual([4]);
 });
+
+it('reuses music waveform samples across unchanged owner rerenders but refreshes a changed source', () => {
+  let reads = 0;
+  const peaks = new Proxy(new Array<number>(1000).fill(0.5), {
+    get(target, key, receiver) {
+      if (typeof key === 'string' && /^\d+$/.test(key)) reads++;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const waveform = { duration: 10, peaks };
+  const waves = new Map([['asset:1', waveform]]);
+  const projection = createTrackProjection(10, [
+    { id: 'cut', kind: 'cut', start: 3, end: 4, requestedStart: 3, requestedEnd: 4 },
+  ]);
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [],
+    music: [clip('music', 0, 8)],
+  };
+  renderTrack(audio, false, [], true, undefined, projection, waves);
+  const initial = reads;
+  expect(initial).toBeGreaterThan(0);
+  renderTrack(audio, false, [], true, undefined, projection, waves);
+  expect(reads).toBe(initial);
+  const changed = new Map([['asset:1', { duration: 10, peaks: [0, 1, 0, 1] }]]);
+  const before = host
+    .querySelector('[data-audio-id="music"] [data-ui="gallery.videoReview.waveform"] path')!
+    .getAttribute('d');
+  renderTrack(audio, false, [], true, undefined, projection, changed);
+  expect(
+    host
+      .querySelector('[data-audio-id="music"] [data-ui="gallery.videoReview.waveform"] path')!
+      .getAttribute('d')
+  ).not.toBe(before);
+});

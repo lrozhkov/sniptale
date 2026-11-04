@@ -27,7 +27,23 @@ beforeEach(() => {
     paintScene();
   });
 });
-vi.mock('../stage/scene/render-preview', () => ({ renderPreviewScene }));
+vi.mock('../stage/scene/render-preview', async () => {
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  return {
+    renderPreviewScene: async (
+      input: Parameters<typeof import('../stage/scene/render-preview').renderPreviewScene>[0]
+    ) => {
+      await renderPreviewScene(input);
+      return {
+        camera:
+          input.cameraOverride ??
+          resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+        time: input.currentTime,
+      };
+    },
+  };
+});
 
 afterEach(() => {
   renderPreviewScene.mockClear();

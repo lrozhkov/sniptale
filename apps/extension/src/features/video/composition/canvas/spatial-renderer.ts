@@ -74,10 +74,9 @@ function validateSpatialSize(
 function validateSpatialDraw(gl: WebGLRenderingContext, args: ReviewSpatialDrawRequest) {
   const { source, sourceRect, output } = args;
   if (
-    !Number.isSafeInteger(sourceRect.x) ||
-    !Number.isSafeInteger(sourceRect.y) ||
-    sourceRect.width !== source.width ||
-    sourceRect.height !== source.height
+    ![sourceRect.x, sourceRect.y, sourceRect.width, sourceRect.height].every(Number.isFinite) ||
+    sourceRect.width <= 0 ||
+    sourceRect.height <= 0
   )
     throw new Error('Perspective output size is unavailable.');
   validateSpatialSize(gl, 'source', source);
@@ -186,6 +185,7 @@ function setSpatialFrameUniforms(
     sharp: boolean;
     output: { width: number; height: number };
     sourceRect: QuickEditRect;
+    sourceRasterSize: { width: number; height: number };
     inverse: QuickEditHomography;
     baseOnly: boolean;
   }
@@ -211,6 +211,11 @@ function setSpatialFrameUniforms(
   gl.uniform2f(uniform('outputSize'), output.width, output.height);
   const source = args.sourceRect;
   gl.uniform4f(uniform('sourceRect'), source.x, source.y, source.width, source.height);
+  gl.uniform2f(
+    uniform('sourceRasterSize'),
+    args.sourceRasterSize.width,
+    args.sourceRasterSize.height
+  );
   if (args.baseOnly) return;
   matrix('inversePlane', args.planeInverse ?? [1, 0, 0, 0, 1, 0, 0, 0, 1]);
   gl.uniform4f(uniform('windowRect'), base.x, base.y, base.width, base.height);
@@ -248,6 +253,16 @@ function createSpatialRenderStorage(resources: RenderResources) {
   // CPU vertex/matrix arrays plus the explicit GL vertex-buffer storage.
   const arrays = resources.bytes('spatial-vertex-and-matrices', 48 + 48 + 36);
   return {
+    get allocations() {
+      return [
+        { role: 'spatial-vertex-and-matrices', bytes: 132, canvases: 0 },
+        ...Array.from(leases, ([kind, lease]) => ({
+          role: `spatial-${kind}`,
+          bytes: lease.canvas.width * lease.canvas.height * 4,
+          canvases: 1,
+        })),
+      ];
+    },
     surface(kind: 'plane' | 'overlay' | 'exposure', width: number, height: number) {
       let lease = leases.get(kind);
       if (lease && (lease.canvas.width !== width || lease.canvas.height !== height)) {
@@ -332,6 +347,23 @@ export function createReviewSpatialRenderer(
       retained.dispose();
     };
     return {
+      /** Reports owned dimensions without granting allocation authority to callers. */
+      get allocations() {
+        if (disposed) return [];
+        return [
+          ...retained.allocations,
+          ...textures.allocations,
+          ...(canvas.width && canvas.height
+            ? [
+                {
+                  role: 'spatial-drawing-buffer',
+                  bytes: canvas.width * canvas.height * 4,
+                  canvases: 0,
+                },
+              ]
+            : []),
+        ];
+      },
       /** Admit all dimensions before a caller allocates either capture or output surfaces. */
       validateSizes(
         source: { width: number; height: number },
@@ -374,6 +406,10 @@ export function createReviewSpatialRenderer(
             inverse,
             output,
             precision,
+            sourceScale: {
+              x: source.width / sourceRect.width,
+              y: source.height / sourceRect.height,
+            },
             blurWeights: sharp
               ? []
               : frame.focus.map((focus) => focus.settings.strength * focus.weight),
@@ -388,6 +424,7 @@ export function createReviewSpatialRenderer(
             sharp,
             output,
             sourceRect,
+            sourceRasterSize: source,
             inverse,
             baseOnly: levelCount === 1,
             ...(args.projection ? { projection: args.projection } : {}),
@@ -422,4 +459,8 @@ export function createReviewSpatialRenderer(
   }
 }
 
-export type ReviewSpatialRenderer = ReturnType<typeof createReviewSpatialRenderer>;
+/** Painting borrows operations; allocation descriptors remain with the concrete renderer owner. */
+export type ReviewSpatialRenderer = Pick<
+  ReturnType<typeof createReviewSpatialRenderer>,
+  'validateSizes' | 'surface' | 'draw' | 'dispose'
+>;

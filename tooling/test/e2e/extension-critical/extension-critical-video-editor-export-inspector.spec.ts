@@ -47,6 +47,9 @@ for (const variant of [
         (locale) => localStorage.setItem('sniptale-locale-preference', locale),
         variant.locale
       );
+      await page.addInitScript(() =>
+        Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined })
+      );
       await page.goto(
         `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${variant.theme}`
       );
@@ -60,6 +63,36 @@ for (const variant of [
       const panel = inspector.locator('[data-ui="video-editor.export.inspector"]');
       await expect(panel).toBeVisible();
       await expect(page.getByRole('dialog')).toHaveCount(0);
+      const detailField = panel.locator('[data-ui="video.exportDetailEnhancement"]');
+      const detailChoice = detailField.getByRole('button', {
+        name: label('videoEditor.exportDialog.detailEnhancementLabel'),
+        exact: true,
+      });
+      await detailChoice.scrollIntoViewIfNeeded();
+      await expect(detailField).toContainText(
+        label('videoEditor.exportDialog.detailEnhancementHint')
+      );
+      await expect(detailField).toContainText(
+        label('videoEditor.exportDialog.detailEnhancementWebGpuUnavailable')
+      );
+      await detailChoice.focus();
+      await page.keyboard.press('Enter');
+      await expect(
+        page.getByRole('option', {
+          name: label('videoEditor.exportDialog.detailEnhancementClark'),
+          exact: true,
+        })
+      ).toBeDisabled();
+      await page
+        .getByRole('option', {
+          name: label('videoEditor.exportDialog.detailEnhancementBicubic'),
+          exact: true,
+        })
+        .click();
+      await expect(detailChoice).toContainText(
+        label('videoEditor.exportDialog.detailEnhancementBicubic')
+      );
+
       const timelineClip = page.locator(`[data-project-timeline-clip="${clip.id}"]`);
       await timelineClip.click();
       await page.keyboard.press('Delete');
@@ -142,6 +175,9 @@ for (const variant of [
       await page.keyboard.press('Control+m');
       await expect(panel).toBeVisible();
       await expect(page.getByRole('listbox')).toHaveCount(0);
+      await expect(detailChoice).toContainText(
+        label('videoEditor.exportDialog.detailEnhancementBicubic')
+      );
       await inspector.locator('[data-ui="video-editor.inspector.close"]').click();
       await expect(inspector).toHaveCount(0);
       await page.locator('[data-ui="video-editor.viewer.open-inspector"]').click();

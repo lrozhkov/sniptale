@@ -134,6 +134,7 @@ beforeEach(() => {
       context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
       release,
       generation: frame.generation,
+      sourceTime: frame.sourceTime,
     };
   });
   io.factory.mockImplementation(() => ({
@@ -763,9 +764,9 @@ it('publishes geometry only with the matching completed front frame', async () =
   await render();
   expect(report).not.toHaveBeenCalled();
   await step(0);
-  expect(report).toHaveBeenLastCalledWith(geometry);
+  expect(report).toHaveBeenLastCalledWith(geometry, props.pausedSourceTime, props.sourceIdentity);
   expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBeNull();
   props.visible = false;
   await render();
-  expect(report).toHaveBeenLastCalledWith(null);
+  expect(report).toHaveBeenLastCalledWith(null, undefined, props.sourceIdentity);
 });

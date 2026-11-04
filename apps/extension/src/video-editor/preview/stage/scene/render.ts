@@ -1,5 +1,4 @@
 import { createVideoPreviewCompositionJoinRenderer } from './joins';
-import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 import { createVideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
 import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
 import { createReviewSpatialSession } from '../../../../workflows/video-review/spatial-render-session';
@@ -19,6 +18,8 @@ import { createVideoPreviewRenderRevision } from '../../cache/revision';
 import { renderPreviewSceneWithExactCache } from '../../cache/render';
 import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
+import { resolveActivePreviewClips } from '../runtime/index';
+import { canRenderActivePreviewVideos } from './video-frame';
 
 export function usePreviewStageCanvasRender(
   params: PreviewStageCanvasSceneParams & {
@@ -54,40 +55,97 @@ function usePreviewStageRenderEffect(
   renderRevision: Promise<string>,
   renderSchedulerRef: ReturnType<typeof usePreviewRenderSchedulerRef>
 ): void {
+  const registerPlaybackRequest = params.registerPlaybackRequest;
+  const direct =
+    !!registerPlaybackRequest && params.isPlaying === true && params.previewMode !== 'cache';
+  const committed = useRef({ params, renderRevision });
+  const lastRequest = useRef<{ projectId: string; generation: number; time: number } | null>(null);
+  const cancelDirect = useRef<(() => void) | null>(null);
   useLayoutEffect(() => {
-    const canvas = params.canvasRef.current;
-    if (!canvas || !params.videoFrameState.canRender) {
-      return;
-    }
+    committed.current = { params, renderRevision };
+  });
 
+  const enqueue = (time: number, requireCurrentDependencies: boolean) => {
+    const { params: current, renderRevision: revision } = committed.current;
+    const canvas = current.canvasRef.current;
+    if (!canvas || !current.videoFrameState.canRender) return;
+    if (requireCurrentDependencies) {
+      const needed = resolveActivePreviewClips(current.project, time);
+      if (
+        needed.length !== current.activeClips.length ||
+        needed.some((clip, index) => clip.id !== current.activeClips[index]?.id) ||
+        !canRenderActivePreviewVideos(needed, current.videoRefs)
+      )
+        return;
+    }
     return renderSchedulerRef.current.enqueue(
       createPreviewStageCanvasRenderJob({
         canvas,
-        onCameraPresented: params.onCameraPresented,
-        currentTime: params.currentTime,
-        ...(params.assetUrls ? { assetUrls: params.assetUrls } : {}),
+        onCameraPresented: current.onCameraPresented,
+        currentTime: time,
+        ...(current.assetUrls ? { assetUrls: current.assetUrls } : {}),
         effectRuntimeRef,
-        imageBank: params.imageBank,
-        isPlaying: params.isPlaying === true,
-        previewRasterSize: params.previewRasterSize,
-        previewCacheBypass: params.previewCacheBypass,
-        previewMode: params.previewMode,
-        project: params.project,
-        renderGeneration: params.renderGeneration ?? 0,
-        renderRevision,
-        stage: params.stageRef.current,
-        videoRefs: params.videoRefs,
+        imageBank: current.imageBank,
+        isPlaying: current.isPlaying === true,
+        previewRasterSize: current.previewRasterSize,
+        previewCacheBypass: current.previewCacheBypass,
+        previewMode: current.previewMode,
+        project: current.project,
+        renderGeneration: current.renderGenerationRef?.current ?? current.renderGeneration ?? 0,
+        renderRevision: revision,
+        stage: current.stageRef.current,
+        videoRefs: current.videoRefs,
       })
     );
+  };
+  const enqueueRef = useRef(enqueue);
+  useLayoutEffect(() => {
+    enqueueRef.current = enqueue;
+  });
+  useLayoutEffect(() => {
+    if (!direct || !registerPlaybackRequest) return;
+    let active = true;
+    const release = registerPlaybackRequest((time) => {
+      if (!active) return;
+      const current = committed.current.params;
+      lastRequest.current = {
+        projectId: current.project.id,
+        generation: current.renderGenerationRef?.current ?? current.renderGeneration ?? 0,
+        time,
+      };
+      cancelDirect.current = enqueueRef.current(time, true) ?? cancelDirect.current;
+    });
+    return () => {
+      active = false;
+      release();
+      cancelDirect.current?.();
+      cancelDirect.current = null;
+      lastRequest.current = null;
+    };
+  }, [direct, registerPlaybackRequest]);
+
+  const effectTime = direct ? null : params.currentTime;
+  const activeClipKey = params.activeClips.map((clip) => clip.id).join('|');
+  useLayoutEffect(() => {
+    const current = committed.current.params;
+    const generation = current.renderGenerationRef?.current ?? current.renderGeneration ?? 0;
+    const last = lastRequest.current;
+    const time =
+      direct && last?.projectId === current.project.id && last.generation === generation
+        ? last.time
+        : current.currentTime;
+    return enqueueRef.current(time, direct);
   }, [
+    direct,
+    effectTime,
     params.canvasRef,
     params.onCameraPresented,
     params.assetUrls,
-    params.currentTime,
     effectRuntimeRef,
     params.imageBank,
     params.isPlaying,
     params.project,
+    activeClipKey,
     params.previewMode,
     params.previewCacheBypass,
     params.previewRasterSize,
@@ -195,11 +253,8 @@ function usePreviewRenderSchedulerRef(
         gpuRef.current = null;
         feedbackRef.current.onFailure('visual', error);
       },
-      onSuccess: (job) => {
-        job.onCameraPresented?.(
-          resolveVideoCompositionFrame(job.project, job.currentTime).camera,
-          job.currentTime
-        );
+      onSuccess: (job, presentation) => {
+        if (presentation) job.onCameraPresented?.(presentation.camera, presentation.time);
         feedbackRef.current.onRecovery('visual');
         if (job.isPlaybackFrame && job.previewMode !== 'cache') frameRateRef.current?.record();
       },

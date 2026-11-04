@@ -688,7 +688,7 @@ it.each(['viewport', 'framebuffer', 'accepted-buffer', 'source-rect', 'unsafe-by
       );
     if (failure === 'accepted-buffer')
       Object.defineProperty(gl, 'drawingBufferWidth', { get: () => 300 });
-    if (failure === 'source-rect') request.sourceRect.width++;
+    if (failure === 'source-rect') request.sourceRect.width = 0;
     if (failure === 'unsafe-bytes') request.output.width = Number.MAX_SAFE_INTEGER;
     expect(() => renderer.draw(context, request)).toThrow('output size');
     expect(gl.texImage2D).not.toHaveBeenCalled();
@@ -764,4 +764,68 @@ it('uses the composed source projection and resets local depth coordinates for l
     new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1])
   );
   renderer.dispose();
+});
+
+it('accepts fractional logical source bounds independently of retained high-density texels', () => {
+  const { gl, context } = graphics();
+  const renderer = createReviewSpatialRenderer(undefined, resourceSession());
+  const plane = renderer.surface('plane', 640, 360);
+  renderer.draw(context, {
+    source: plane.canvas,
+    sourceRect: { x: -12.25, y: -20.5, width: 320, height: 180 },
+    output: { width: 321, height: 181 },
+    base: rect,
+    target: rect,
+    frame,
+    sharp: true,
+  });
+  expect(gl.uniform4f).toHaveBeenCalledWith('sourceRect', -12.25, -20.5, 320, 180);
+  expect(gl.uniform2f).toHaveBeenCalledWith('sourceRasterSize', 640, 360);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  renderer.dispose();
+});
+
+it('scales filters in physical texels and retains the unit-density path', async () => {
+  const { resolveReviewSpatialFilterLevels } = await import('./spatial-filter-levels');
+  const input = {
+    inverse: [0.2, 0, 0, 0, 0.2, 0, 0, 0, 1] as const,
+    output: { width: 1920, height: 1080 },
+    precision: 23,
+    blurWeights: [],
+  };
+  expect(resolveReviewSpatialFilterLevels(input)).toBe(1);
+  expect(resolveReviewSpatialFilterLevels({ ...input, sourceScale: { x: 1, y: 1 } })).toBe(1);
+  expect(resolveReviewSpatialFilterLevels({ ...input, sourceScale: { x: 8, y: 8 } })).toBe(2);
+  const depth = { ...input, blurWeights: [0.3] };
+  expect(resolveReviewSpatialFilterLevels({ ...depth, sourceScale: { x: 4, y: 4 } })).toBe(
+    resolveReviewSpatialFilterLevels(depth) + 2
+  );
+});
+
+it('reports only owned texture level geometry through upload, replacement and disposal', () => {
+  const { gl } = graphics();
+  const resources = resourceSession();
+  const textures = createReviewSpatialTextures(gl as unknown as WebGLRenderingContext, resources);
+  const source = document.createElement('canvas');
+  source.width = 32;
+  source.height = 18;
+  textures.upload(source, 3);
+  expect(textures.allocations).toContainEqual({
+    role: 'spatial-texture-0',
+    bytes: 32 * 18 * 4,
+    canvases: 0,
+  });
+  const copy = textures.allocations;
+  copy[0]!.bytes = 0;
+  expect(textures.allocations[0]!.bytes).toBe(64);
+  source.width = 16;
+  source.height = 10;
+  textures.upload(source, 1);
+  expect(textures.allocations).toEqual([
+    { role: 'spatial-level-sizes', bytes: 64, canvases: 0 },
+    { role: 'spatial-texture-0', bytes: 16 * 10 * 4, canvases: 0 },
+  ]);
+  textures.dispose();
+  expect(textures.allocations).toEqual([]);
+  resources.dispose();
 });

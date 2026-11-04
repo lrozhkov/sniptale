@@ -783,3 +783,35 @@ it('keeps an archived cursor row available without inventing motion markers', ()
   ).toBe('gallery.videoReview.recordingCursorArchived');
   expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).not.toBeNull();
 });
+
+it('does not rebuild animation membership on playhead ticks and refreshes changed effects', async () => {
+  const { REVIEW_CLICK_DEFAULT } =
+    await import('../../features/video/review/advanced/click-animation');
+  let reads = 0;
+  const click = {
+    ...REVIEW_CLICK_DEFAULT,
+    id: 'event',
+    get effect() {
+      reads++;
+      return 'ripple' as const;
+    },
+  };
+  const markers = [
+    { ref: { kind: 'action' as const, id: 'event' }, eventType: 'CLICK', start: 1, end: 1 },
+  ];
+  const clickAnimations = [click],
+    onMarker = vi.fn();
+  const { host } = renderTimeline({ markers, clickAnimations, onMarker, time: 0 });
+  const before = reads;
+  renderTimeline({ markers, clickAnimations, onMarker, time: 0.1 });
+  renderTimeline({ markers, clickAnimations, onMarker, time: 0.2 });
+  expect(reads).toBe(before);
+  expect(host.querySelector('[data-animated="true"]')).not.toBeNull();
+  renderTimeline({
+    markers,
+    clickAnimations: [{ ...REVIEW_CLICK_DEFAULT, id: 'event', effect: 'off' }],
+    onMarker,
+    time: 0.2,
+  });
+  expect(host.querySelector('[data-animated="true"]')).toBeNull();
+});

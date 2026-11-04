@@ -639,7 +639,7 @@ it('admits the GPU transaction before Canvas normalization and skips legacy draw
   try {
     expect(
       await renderPreviewScene({ ...job, gpuPreview: { render, dispose: vi.fn() } })
-    ).toBeUndefined();
+    ).toMatchObject({ time: 1, camera: expect.objectContaining({ scale: 1 }) });
     expect(render).toHaveBeenCalledOnce();
     expect(constructor).not.toHaveBeenCalled();
     expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
@@ -697,4 +697,143 @@ it('packs padded native preview frames before composition and releases them afte
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+it('returns the exact evaluated GPU camera override only after a completed frame', async () => {
+  const { job } = setup();
+  const { resolveVideoCompositionFrame } =
+    await import('../../../../features/video/composition/timeline/frame');
+  const camera = {
+    ...resolveVideoCompositionFrame(job.project, 1).camera,
+    viewportX: 123,
+    scale: 2.4,
+  };
+  const gpuPreview = {
+    dispose: vi.fn(),
+    render: vi.fn(async (_input, passes) => {
+      expect(passes.overlayFrame.camera).toBe(camera);
+      return true;
+    }),
+  };
+  await expect(renderPreviewScene({ ...job, cameraOverride: camera, gpuPreview })).resolves.toEqual(
+    { camera, time: 1 }
+  );
+  gpuPreview.render.mockResolvedValueOnce(false);
+  await expect(renderPreviewScene({ ...job, cameraOverride: camera, gpuPreview })).resolves.toBe(
+    false
+  );
+});
+
+it('returns the camera evaluated from a bounded archive window without expanding inline samples', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../../features/video/project/factories/creation');
+  const { normalizeVideoProjectCursorSkin } =
+    await import('../../../../features/video/project/cursor');
+  const { prepareCursorTrajectoryProject } =
+    await import('../../../../features/video/project/cursor-trajectory/project-window');
+  const { resolveVideoCompositionFrame } =
+    await import('../../../../features/video/composition/timeline/frame');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'archive-camera',
+    filename: 'capture.webm',
+    width: 100,
+    height: 100,
+    duration: 2,
+    mimeType: 'video/webm',
+    size: 10,
+  });
+  const clip = project.clips[0];
+  if (!clip || clip.type !== 'VIDEO') throw new Error('Missing video clip');
+  const descriptor: import('../../../../features/video/project/cursor-trajectory/types').CursorTrajectoryDescriptor =
+    {
+      format: 'cursor-trajectory-v1',
+      formatVersion: 1,
+      algorithm: 'sed-window-v1',
+      encoding: 'json-ascii-int-v1',
+      trajectoryId: 'a'.repeat(32),
+      state: 'complete',
+      finalized: true,
+      totalBlocks: 1,
+      totalRecords: 3,
+      totalSamples: 2,
+      totalBytes: 1000,
+      streamSha256: 'b'.repeat(64),
+    };
+  project.cursorTrack = {
+    captureMode: 'embedded-fallback',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'archive-camera',
+        sourceInstanceId: clip.sourceInstanceId!,
+        trajectory: descriptor,
+        samples: [],
+      },
+    ],
+  };
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 2,
+      scale: 2,
+      focusMode: 'CURSOR',
+      zoomInDuration: 0,
+      zoomOutDuration: 0,
+    },
+  ];
+  const records: import('../../../../features/video/project/cursor-trajectory/types').CursorTrajectoryRecord[] =
+    [
+      {
+        kind: 'segment',
+        segmentId: 0,
+        activeTimeUs: 0,
+        width: 100,
+        height: 100,
+        reason: 'start',
+        clock: {
+          source: 'dom-event-time',
+          timestampQuantumUs: null,
+          resolutionBoundUs: null,
+          mappingUncertaintyUs: null,
+        },
+      },
+      ...[10, 90].map((x, i) => ({
+        kind: 'sample' as const,
+        segmentId: 0,
+        observationSeq: i,
+        activeTimeUs: i * 1_000_000,
+        xQ8: x * 256,
+        yQ8: 20 * 256,
+        observed: true,
+        visible: true,
+        event: 'move' as const,
+        button: 'none' as const,
+        relatedObservationSeq: null,
+        anchors: [],
+      })),
+    ];
+  const prepared = await prepareCursorTrajectoryProject(project, 0.75, async () => ({
+    fromTimeUs: 0,
+    toTimeUs: 2_000_000,
+    records,
+    initialSegment: null,
+  }));
+  const camera = resolveVideoCompositionFrame(prepared, 0.75).camera;
+  expect(camera.viewportX).not.toBe(resolveVideoCompositionFrame(project, 0.75).camera.viewportX);
+  const source = { sourceWidth: 100, sourceHeight: 100, draw() {} };
+  const gpuPreview = { dispose: vi.fn(), render: vi.fn(async () => true) };
+  const result = await renderPreviewScene({
+    canvas: document.createElement('canvas'),
+    stage: null,
+    project: prepared,
+    currentTime: 0.75,
+    imageBank: {},
+    videoRefs: { current: {} },
+    decodedVideoFrames: new Map([[clip.id, source]]),
+    gpuPreview,
+  });
+  expect(result).toEqual({ camera, time: 0.75 });
+  expect(prepared.cursorTrack?.samples).toEqual([]);
+  expect(JSON.stringify(prepared)).toBe(JSON.stringify(project));
 });

@@ -134,3 +134,26 @@ it('admits adaptive sampling only at 60 fps and preserves legacy constant settin
     ).toThrow('Invalid video project export settings');
   }
 });
+
+it.each([undefined, 'off', 'bicubic-sharpen', 'clark-x2'])(
+  'admits export-only detail mode %s',
+  (detailEnhancement) => {
+    expect(() =>
+      assertVideoProjectExportSettingsCompatibleWithProject(project, {
+        ...createSettings(),
+        detailEnhancement,
+      })
+    ).not.toThrow();
+  }
+);
+it.each([null, 1, {}, 'Clark-x2', 'automatic', false])(
+  'rejects unknown detail mode %s before rendering',
+  (detailEnhancement) => {
+    expect(() =>
+      assertVideoProjectExportSettingsCompatibleWithProject(project, {
+        ...createSettings(),
+        detailEnhancement,
+      })
+    ).toThrow('Invalid video project export settings');
+  }
+);

@@ -203,3 +203,14 @@ it('refuses a generation change between head admission and window acquisition', 
   reader.clear();
   expect(await reader.available(project, region)).toBe(true);
 });
+
+it('uses the same bounded reader for a standalone selected source interval without a camera pose', async () => {
+  const { dependencies, project, region } = await fixture();
+  const reader = createRecordingCursorAvailabilityReader(dependencies);
+  const before = JSON.stringify(project);
+  expect(
+    await reader.available(project, { startTime: region.startTime, duration: region.duration })
+  ).toBe(true);
+  expect(JSON.stringify(project)).toBe(before);
+  reader.clear();
+});

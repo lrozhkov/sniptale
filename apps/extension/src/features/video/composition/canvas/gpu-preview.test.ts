@@ -727,3 +727,171 @@ it.each(['internal', 'validation'] as const)(
     await expect(renderer.render(request())).resolves.toBe(mock.bitmap);
   }
 );
+
+it.each(['scope-first', 'fence-first'] as const)(
+  'starts scope completion beside the submitted-work fence and waits for both: %s',
+  async (order) => {
+    const { device, queue, transfer, bitmap } = graphics();
+    const fence = deferred<void>(),
+      scope = deferred<{ message: string } | null>();
+    queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+    device.popErrorScope.mockReturnValueOnce(scope.promise);
+    const renderer = await owner();
+    const pending = renderer.render(request());
+    let settled = false;
+    void pending.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      }
+    );
+    try {
+      await Promise.resolve();
+      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      expect(queue.submit).toHaveBeenCalledOnce();
+      if (order === 'scope-first') scope.resolve(null);
+      else fence.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      expect(transfer).not.toHaveBeenCalled();
+      await expect(renderer.render(request())).rejects.toThrow('frame in flight');
+      if (order === 'scope-first') fence.resolve();
+      else scope.resolve(null);
+      await expect(pending).resolves.toBe(bitmap);
+      expect(transfer).toHaveBeenCalledOnce();
+      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      expect(queue.onSubmittedWorkDone).toHaveBeenCalledOnce();
+    } finally {
+      fence.resolve();
+      scope.resolve(null);
+      await pending.catch(() => {});
+    }
+  }
+);
+
+it.each(['fence-reject', 'scope-reject', 'validation', 'sync-pop', 'both-reject'] as const)(
+  'holds the opposite completion barrier before reporting %s',
+  async (mode) => {
+    const { device, queue, transfer } = graphics();
+    const fence = deferred<void>(),
+      scope = deferred<{ message: string } | null>();
+    const fenceFailure = new Error('queue completion failed'),
+      scopeFailure = new Error('scope completion failed');
+    queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+    if (mode === 'sync-pop')
+      device.popErrorScope.mockImplementationOnce(() => {
+        throw scopeFailure;
+      });
+    else device.popErrorScope.mockReturnValueOnce(scope.promise);
+    const renderer = await owner(),
+      pending = renderer.render(request());
+    let settled = false;
+    void pending.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      }
+    );
+    try {
+      await Promise.resolve();
+      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      if (mode === 'fence-reject' || mode === 'both-reject') fence.reject(fenceFailure);
+      else if (mode === 'scope-reject') scope.reject(scopeFailure);
+      else if (mode === 'validation') scope.resolve({ message: 'invalid submitted frame' });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      expect(transfer).not.toHaveBeenCalled();
+      await expect(renderer.render(request())).rejects.toThrow('frame in flight');
+      if (mode === 'fence-reject') scope.resolve(null);
+      else if (mode === 'both-reject') scope.reject(scopeFailure);
+      else fence.resolve();
+      if (mode === 'fence-reject' || mode === 'both-reject') {
+        await expect(pending).rejects.toBeInstanceOf(GpuPreviewDeviceError);
+        await expect(pending).rejects.toMatchObject({ cause: fenceFailure });
+      } else if (mode === 'validation') {
+        await expect(pending).rejects.toThrow('invalid submitted frame');
+        await expect(pending).rejects.not.toBeInstanceOf(GpuPreviewDeviceError);
+      } else await expect(pending).rejects.toBe(scopeFailure);
+      expect(transfer).not.toHaveBeenCalled();
+      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      expect(queue.onSubmittedWorkDone).toHaveBeenCalledOnce();
+      await renderer.render(request());
+      expect(transfer).toHaveBeenCalledOnce();
+    } finally {
+      fence.resolve();
+      scope.resolve(null);
+      await pending.catch(() => {});
+    }
+  }
+);
+
+it.each([
+  ['abort', 'scope-first'],
+  ['abort', 'fence-first'],
+  ['dispose', 'scope-first'],
+  ['dispose', 'fence-first'],
+] as const)(
+  'retains submitted resources until both barriers settle after %s (%s)',
+  async (action, order) => {
+    const { device, queue, reserve, transfer } = graphics();
+    const fence = deferred<void>(),
+      scope = deferred<{ message: string } | null>();
+    queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+    device.popErrorScope.mockReturnValueOnce(scope.promise);
+    const renderer = await owner({ reserve }),
+      controller = new AbortController();
+    const frame = new VideoFrame(raster());
+    const pending = renderer.render(request([layer(frame)], controller.signal));
+    let settled = false;
+    void pending.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      }
+    );
+    try {
+      await Promise.resolve();
+      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      if (action === 'abort') controller.abort();
+      else {
+        renderer.dispose();
+        renderer.dispose();
+      }
+      if (order === 'scope-first') scope.resolve(null);
+      else fence.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      expect(transfer).not.toHaveBeenCalled();
+      expect(device.destroy).not.toHaveBeenCalled();
+      expect(renderer.allocatedBytes).toBeGreaterThan(0);
+      expect(frame.close).not.toHaveBeenCalled();
+      if (order === 'scope-first') fence.resolve();
+      else scope.resolve(null);
+      if (action === 'abort') await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      else await expect(pending).rejects.toThrow('disposed');
+      expect(transfer).not.toHaveBeenCalled();
+      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      renderer.dispose();
+      expect(device.destroy).toHaveBeenCalledOnce();
+      expect(renderer.allocatedBytes).toBe(0);
+      for (const admission of reserve.mock.results)
+        expect(admission.value.release).toHaveBeenCalledOnce();
+      expect(frame.close).not.toHaveBeenCalled();
+    } finally {
+      fence.resolve();
+      scope.resolve(null);
+      await pending.catch(() => {});
+      frame.close();
+    }
+  }
+);

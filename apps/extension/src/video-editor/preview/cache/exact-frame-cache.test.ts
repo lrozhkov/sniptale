@@ -39,3 +39,22 @@ it('keys frames by revision, raster, and exact canonical frame index', () => {
     })
   ).toBe('preview-frame-v1:sha256:test:30:1280x720:12');
 });
+
+it('retains camera metadata with its bitmap and releases both on eviction or clear', async () => {
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  const { createEmptyVideoProject } =
+    await import('../../../features/video/project/factories/creation');
+  const presentation = {
+    camera: resolveVideoCompositionFrame(createEmptyVideoProject(), 1).camera,
+    time: 1,
+  };
+  const cache = createVideoPreviewExactFrameCache(400);
+  cache.set('one', new FakeImageBitmap(10, 10), presentation);
+  expect(cache.getPresentation('one')).toBe(presentation);
+  cache.set('two', new FakeImageBitmap(10, 10), presentation);
+  expect(cache.getPresentation('one')).toBeNull();
+  expect(cache.getPresentation('two')).toBe(presentation);
+  cache.clear();
+  expect(cache.getPresentation('two')).toBeNull();
+});

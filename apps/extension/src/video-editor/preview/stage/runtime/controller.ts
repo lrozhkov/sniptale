@@ -231,6 +231,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     previewRasterSize,
     render: {
       onCameraPresented: surface.onCameraPresented,
+      registerPlaybackRequest: presentation.registerPlaybackRequest,
       onPreviewEffectAnchors: transient.onPreviewEffectAnchors,
       onPreviewEffectControls: transient.onPreviewEffectControls,
       currentTime: transient.currentTime,

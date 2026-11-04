@@ -40,6 +40,7 @@ type PresentationProps = {
     | {
         preferences: PreviewInput['preferences'];
         playing: boolean;
+        onPresentationActive?: PreviewInput['onPresentationActive'];
         interacting?: boolean;
         sourceToResult: PreviewInput['sourceToResult'];
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
@@ -130,6 +131,9 @@ export function useStagePresentation(
     ...(onGeometry ? { onGeometry } : {}),
     host: publication,
     sourceIdentity: props.url,
+    ...(props.preview?.onPresentationActive
+      ? { onPresentationActive: props.preview.onPresentationActive }
+      : {}),
     ...(props.readAsset ? { readAsset: props.readAsset } : {}),
     sourceFrameRate: props.preview?.sourceFrameRate,
     backgroundPending: props.backgroundPending,

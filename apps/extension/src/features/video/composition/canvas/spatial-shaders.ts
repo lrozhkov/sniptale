@@ -12,6 +12,7 @@ uniform highp sampler2D surface0;
 uniform mat3 inverseProjection;
 uniform vec2 outputSize;
 uniform vec4 sourceRect;
+uniform vec2 sourceRasterSize;
 vec4 transparentSample(highp sampler2D image, vec2 point, vec2 size) {
   vec2 coverage = clamp(point * size + 0.5, 0.0, 1.0)
                  * clamp((1.0 - point) * size + 0.5, 0.0, 1.0);
@@ -23,7 +24,7 @@ void main() {
   if (projected.z <= 0.000001) { gl_FragColor = vec4(0.0); return; }
   vec2 scenePoint = projected.xy / projected.z;
   vec2 uv = (scenePoint - sourceRect.xy) / sourceRect.zw;
-  gl_FragColor = transparentSample(surface0, uv, sourceRect.zw);
+  gl_FragColor = transparentSample(surface0, uv, sourceRasterSize);
 }`;
 
 export const REVIEW_SPATIAL_FRAGMENT = `
@@ -41,6 +42,7 @@ uniform mat3 inversePlane;
 uniform vec2 levelSize[8];
 uniform vec2 outputSize;
 uniform vec4 sourceRect;
+uniform vec2 sourceRasterSize;
 uniform vec4 windowRect;
 uniform vec2 depthAxis;
 uniform vec4 focusA;
@@ -105,10 +107,11 @@ void main() {
   scenePoint = projected.xy / projected.z;
   uv = (scenePoint - sourceRect.xy) / sourceRect.zw;
   float blur = blurAmount(focusA, blurSettings.x, modes.x) + blurAmount(focusB, blurSettings.y, modes.y);
-  float radius = blur * 24.0 * outputSize.x / 1920.0;
+  vec2 sourceDensity = sourceRasterSize / sourceRect.zw;
+  float radius = blur * 24.0 * outputSize.x / 1920.0 * max(sourceDensity.x, sourceDensity.y);
   vec2 center = scenePoint;
-  float footprint = max(length(sourcePoint(point + vec2(1.0, 0.0)) - center),
-                        length(sourcePoint(point + vec2(0.0, 1.0)) - center));
+  float footprint = max(length((sourcePoint(point + vec2(1.0, 0.0)) - center) * sourceDensity),
+                        length((sourcePoint(point + vec2(0.0, 1.0)) - center) * sourceDensity));
   float level = log2(max(1.0, max(footprint, radius)));
   gl_FragColor = filtered(level);
 }`;

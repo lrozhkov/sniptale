@@ -624,3 +624,28 @@ it('reserves default cursor Orbit before activation and suppresses saved manual 
   ];
   expect(resolvePreviewRenderAllocation(runtime).scene.spatial).toBeNull();
 });
+
+it('budgets physical plane/overlay and retained texture geometry per replaced role', () => {
+  const graph = input();
+  graph.scene.spatial = {
+    output: size,
+    plane: { width: 40, height: 20 },
+    overlay: { width: 30, height: 15 },
+    halfFloat: true,
+    retained: [
+      { role: 'spatial-plane', bytes: 4000, canvases: 1 },
+      { role: 'spatial-texture-0', bytes: 5000, canvases: 0 },
+    ],
+  };
+  const allocations = calculateSpatialRenderAllocations(graph.scene.spatial);
+  expect(allocations.find((x) => x.role === 'spatial-plane')!.bytes).toBe(4000);
+  expect(allocations.find((x) => x.role === 'spatial-overlay')!.bytes).toBe(1800);
+  expect(allocations.find((x) => x.role === 'spatial-texture-0')!.bytes).toBe(5000);
+  expect(allocations.filter((x) => x.role === 'spatial-plane')).toHaveLength(1);
+  const plan = calculatePreviewRenderAllocation(graph);
+  const resources = createPreviewRenderResources(plan);
+  const lease = resources.bytes('exact-phase', plan.maximumManagedBytes);
+  expect(() => resources.bytes('one-extra-byte', 1)).toThrow('resource allocation failed');
+  lease.release();
+  resources.dispose();
+});

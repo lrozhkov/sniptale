@@ -8,6 +8,9 @@ it('prepares spatial export for a newly created cursor Orbit without authored ma
   const draw = vi.fn(),
     dispose = vi.fn();
   const open = vi.spyOn(spatialSession, 'createReviewSpatialSession').mockImplementation(() => ({
+    get allocations() {
+      return [];
+    },
     resourceCounters: { managedBytes: 0, peakManagedBytes: 0, canvasCount: 0, peakCanvasCount: 0 },
     validateSizes: vi.fn(),
     draw,

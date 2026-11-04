@@ -19,6 +19,13 @@ const FULL_SCAN_TRIGGER_PATTERNS = [
 ];
 
 const EXCLUDED_PATTERNS = [
+  // These pinned capability labels are not consumed by the product UI.
+  // Remove this exclusion if the vendored capability module is removed or replaced.
+  new RegExp(
+    '^apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/' +
+      'runtimeCapabilities\\.js$',
+    'u'
+  ),
   /^apps\/extension\/src\/platform\/i18n\//u,
   /^apps\/extension\/src\/(?:contracts|composition\/persistence)\//u,
   /^apps\/extension\/src\/design-system\/(?:parity|previews)\//u,

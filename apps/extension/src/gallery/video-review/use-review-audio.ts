@@ -11,7 +11,7 @@ import {
   anchorReviewVoiceover,
   isReviewVoiceoverCut,
 } from '../../features/video/review/voiceover-edits';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import type {
   QuickEditAudioClip,
   QuickEditAudioState,
@@ -293,7 +293,15 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
     'too-short' | 'overlap' | 'cut' | 'limit' | null
   >(null);
   const originalRanges = args.audio.original.ranges ?? [];
-  const originalViews = originalAudioRangeViews(args.audio, args.voiceoverEnabled !== false);
+  const includeTakes = args.voiceoverEnabled !== false;
+  const originalViews = useMemo(
+    () => originalAudioRangeViews(args.audio, includeTakes),
+    [args.audio, includeTakes]
+  );
+  const originalPlayback = useMemo(
+    () => resolveOriginalSourceAudio(args.audio, includeTakes),
+    [args.audio, includeTakes]
+  );
   const changeMute = (
     id: string,
     patch: Parameters<typeof changeOriginalAudioMute>[0]['patch']
@@ -333,7 +341,7 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
     args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ranges } }));
   return {
     originalRanges: originalViews,
-    originalPlayback: resolveOriginalSourceAudio(args.audio, args.voiceoverEnabled !== false),
+    originalPlayback,
     defaultOriginalVolume,
     setDefaultOriginalVolume: (volume: number) => {
       if (Number.isFinite(volume) && volume >= 0 && volume <= 2) setDefaultOriginalVolume(volume);

@@ -245,6 +245,7 @@ function createReviewExportTiming(
     height: outputProfile.height,
     fps: outputProfile.fps,
     quality: renderSettings?.quality ?? 'HIGH',
+    detailEnhancement: renderSettings?.detailEnhancement,
     complexity:
       1 +
       (effective.zoomRegions.some((region) => region.spotlight?.effect === 'blur') ? 1 : 0) +
@@ -361,6 +362,7 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     );
   const plan = configuredReviewExportPlan({
     includeBookends,
+    recordingHistory: !!original.historyProject,
     index,
     renderSettings,
     document: { ...document, edits },

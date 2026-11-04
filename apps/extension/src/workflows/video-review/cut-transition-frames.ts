@@ -238,12 +238,7 @@ export function paintReviewCutTransition(
   moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw'>
 ) {
   const before = blend.beforeSeam;
-  const range = before ? blend.plan.left : blend.plan.right;
-  const current = isReviewTransitionFrame(moving.timestamp, range)
-    ? moving
-    : before
-      ? frames.left
-      : frames.right;
+  const current = selectReviewCutTransitionSource(blend, frames, moving);
   const draw = (frame: Pick<ReviewTransitionSample, 'draw'>) =>
     frame.draw(context, 0, 0, size.width, size.height);
   context.save();
@@ -262,6 +257,22 @@ export function paintReviewCutTransition(
   } finally {
     context.restore();
   }
+}
+
+/** The retained endpoint, not the requested timestamp, owns the source pixels. */
+export function selectReviewCutTransitionSource<
+  T extends Pick<ReviewTransitionSample, 'timestamp' | 'draw'>,
+>(
+  blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>,
+  frames: ReviewTransitionFrames,
+  moving: T
+): T | ReviewTransitionSample {
+  const range = blend.beforeSeam ? blend.plan.left : blend.plan.right;
+  return isReviewTransitionFrame(moving.timestamp, range)
+    ? moving
+    : blend.beforeSeam
+      ? frames.left
+      : frames.right;
 }
 
 /** Apply after all scene layers so header, background and overlays share one fade. */

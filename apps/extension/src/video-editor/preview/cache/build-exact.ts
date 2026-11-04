@@ -17,11 +17,11 @@ export async function buildExactVideoPreviewFrames(
     if (hasExactVideoPreviewFrame(context, frameIndex)) {
       exactFramesCached += 1;
     } else {
-      const canvas = await context.materializer.renderFrame(
+      const frame = await context.materializer.renderFrameWithPresentation(
         frameIndex / context.params.project.fps,
         context.params.signal
       );
-      if (await cacheExactVideoPreviewFrame(context, frameIndex, canvas)) {
+      if (await cacheExactVideoPreviewFrame(context, frameIndex, frame)) {
         exactFramesCached += 1;
       }
     }

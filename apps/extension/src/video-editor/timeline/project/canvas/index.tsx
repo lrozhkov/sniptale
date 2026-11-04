@@ -8,7 +8,15 @@ import { ProjectTimelineCursorLane } from '../effect-lanes/cursor-lane';
 import { projectTimelinePoint, type TimelineProjection } from '../interaction-state/projection';
 import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import { useCallback, useContext, useState, type MutableRefObject } from 'react';
+import {
+  useCallback,
+  useContext,
+  useState,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type MutableRefObject,
+} from 'react';
 import type { VideoProject } from '../../../../features/video/project/types';
 import type { VideoEditorImportPlacement } from '../../../contracts/insertion';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
@@ -231,12 +239,17 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
     props.projection ?? viewport,
     props.project.fps
   );
-  const trackLayoutModel = resolveTimelineTrackLayoutModel({
-    project: props.project,
-    trackHeightByTrackId: {},
-    trackLayoutModel: props.trackLayoutModel,
-    tracks: props.tracks,
-  });
+  const { project, trackLayoutModel: suppliedTrackLayout, tracks } = props;
+  const trackLayoutModel = useMemo(
+    () =>
+      resolveTimelineTrackLayoutModel({
+        project,
+        trackHeightByTrackId: {},
+        trackLayoutModel: suppliedTrackLayout,
+        tracks,
+      }),
+    [project, suppliedTrackLayout, tracks]
+  );
   const cursorLaneVisible =
     props.telemetryLaneVisible &&
     props.cursorLaneVisible !== false &&
@@ -302,6 +315,50 @@ function ProjectTimelineCanvasContent(
     rulerMarkers: ProjectTimelineRulerMarker[];
   }
 ) {
+  const effectKind = props.selectedEffectSelection?.kind;
+  const effectSegmentId = props.selectedEffectSelection?.segmentId;
+  const selectedEffectSelection = useMemo(
+    () =>
+      effectKind !== undefined && effectSegmentId !== undefined
+        ? { kind: effectKind, segmentId: effectSegmentId }
+        : null,
+    [effectKind, effectSegmentId]
+  );
+  const latest = useRef(props);
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
+  const laneEvents = useMemo<
+    Pick<
+      React.ComponentProps<typeof ProjectTimelineTrackLanes>,
+      | 'onBeginClipInteraction'
+      | 'onBeginEffectInteraction'
+      | 'onBeginTrackRangeSelection'
+      | 'onCloseTrackGap'
+      | 'onDropEffectDocument'
+      | 'onSelectClip'
+      | 'onSelectTransition'
+      | 'onSetHoveredClipId'
+      | 'onUnsupportedTimelineFileDrop'
+      | 'onDropTimelineFile'
+    >
+  >(
+    () => ({
+      onBeginClipInteraction: (...args) => latest.current.onBeginClipInteraction(...args),
+      onBeginEffectInteraction: (...args) => latest.current.onBeginEffectInteraction(...args),
+      onBeginTrackRangeSelection: (...args) => latest.current.onBeginTrackRangeSelection(...args),
+      onCloseTrackGap: (...args) => latest.current.onCloseTrackGap(...args),
+      onDropEffectDocument: (...args) => latest.current.onDropEffectDocument?.(...args),
+      onSelectClip: (...args) => latest.current.onSelectClip(...args),
+      onSelectTransition: (...args) => latest.current.onSelectTransition(...args),
+      onSetHoveredClipId: (...args) => latest.current.onSetHoveredClipId(...args),
+      onUnsupportedTimelineFileDrop: (...args) =>
+        latest.current.onUnsupportedTimelineFileDrop(...args),
+      onDropTimelineFile: (input) => createTimelineFileDropHandler(latest.current)(input),
+    }),
+    []
+  );
+
   return (
     <div
       className="relative"
@@ -384,9 +441,23 @@ function ProjectTimelineCanvasContent(
           />
         ) : null}
         <ProjectTimelineTrackLanes
-          {...props}
-          onDropTimelineFile={createTimelineFileDropHandler(props)}
-          onUnsupportedTimelineFileDrop={props.onUnsupportedTimelineFileDrop}
+          hiddenClipNamesByTrackId={props.hiddenClipNamesByTrackId}
+          pixelsPerSecond={props.pixelsPerSecond}
+          projection={props.projection}
+          project={props.project}
+          dragGhost={props.dragGhost}
+          selection={props.selection}
+          hoveredClipId={props.hoveredClipId}
+          selectedClipId={props.selectedClipId}
+          selectedEffectSelection={selectedEffectSelection}
+          selectedTrackId={props.selectedTrackId}
+          timelinePreviews={props.timelinePreviews}
+          trackLayoutModel={props.trackLayoutModel}
+          tracks={props.tracks}
+          {...laneEvents}
+          onDropEffectDocument={
+            props.onDropEffectDocument ? laneEvents.onDropEffectDocument : undefined
+          }
         />
         <ProjectTimelineCanvasEffectRows {...props} />
       </div>

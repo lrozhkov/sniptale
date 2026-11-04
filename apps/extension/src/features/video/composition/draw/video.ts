@@ -5,12 +5,14 @@ import { cameraWindowFrame } from '../../project/camera/appearance';
 import { traceCameraShape } from './media-shadow';
 import type { PointerFeedbackSource } from './pointer-feedback';
 import { admittedVisualWindowHeader } from './window-header';
-import { drawActionCompositionState } from './effects/actions';
+import { drawActionCompositionState, sourceClickSamplingDemandId } from './effects/actions';
 import type { VideoCompositionActionState, VideoCompositionVisualLayer } from '../types';
 import {
   drawFittedMediaLayer,
   drawCameraMediaSource,
   getFittedMediaWindowFrame,
+  getFittedMediaContentFrame,
+  resolveFittedWindowRaster,
   getFittedMediaOriginalWindowFrame,
 } from './fitted-media';
 import {
@@ -20,7 +22,7 @@ import {
 } from './media-source';
 import { drawSceneSpotlights } from './spotlight';
 import { sampleCompositionSpotlightLayer } from './project-spotlight';
-import type { RenderCanvasLease } from '../canvas/render-resources';
+import type { RenderCanvasLease, RenderResources } from '../canvas/render-resources';
 import type { QuickEditHomography } from '../motion/spatial-geometry';
 
 type VideoFrame = Pick<VideoCompositionVisualLayer, 'x' | 'y' | 'width' | 'height'>;
@@ -37,6 +39,24 @@ export function drawVideoLayer(
   const source = clipMediaElements.get(layer.clipId);
   if (!isReadyVideoSource(source)) return;
   const media = resolveVideoWindowMedia(layer, source, displayScale, loadedImages);
+  let samplingDemand = 'body';
+  const drawSampledWindow = (params: Parameters<typeof drawFittedMediaLayer>[0]) =>
+    paintPreparedVideoWindow(
+      params,
+      isVideoCompositionFrameSource(source) &&
+        !!source.preparedSampling &&
+        samplingDemand !== 'original'
+    );
+  const withDemand = (id: string, paint: () => void) => {
+    const previous = samplingDemand;
+    samplingDemand =
+      previous.startsWith('sceneLens:') && id.startsWith('clickLens:') ? `${previous}/${id}` : id;
+    try {
+      paint();
+    } finally {
+      samplingDemand = previous;
+    }
+  };
   const paintSource = (
     target: CanvasRenderingContext2D,
     destination: typeof frame,
@@ -50,6 +70,26 @@ export function drawVideoLayer(
       destination,
       layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true,
       () => {
+        const sampling =
+          samplingDemand !== 'original' && isVideoCompositionFrameSource(source)
+            ? source.preparedSampling
+            : undefined;
+        const prepared = sampling?.visitPreparedTiles(samplingDemand, (tile) => {
+          const roi = tile.originalPixelROI,
+            physical = tile.physicalSourceRect;
+          target.drawImage(
+            tile.image,
+            physical.x,
+            physical.y,
+            physical.width,
+            physical.height,
+            x + (roi.x / sampling.sourceSize.width) * width,
+            y + (roi.y / sampling.sourceSize.height) * height,
+            (roi.width / sampling.sourceSize.width) * width,
+            (roi.height / sampling.sourceSize.height) * height
+          );
+        });
+        if (prepared) return;
         if (source instanceof HTMLVideoElement) target.drawImage(source, x, y, width, height);
         else source.draw(target, x, y, width, height);
       }
@@ -86,11 +126,17 @@ export function drawVideoLayer(
       target.restore();
     }
   };
-  const feedbackSource: PointerFeedbackSource = {
-    rect: frame,
-    draw: (target, x, y, width, height) => {
+  const drawFeedback = (
+    target: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    demand: string
+  ) =>
+    withDemand(demand, () => {
       const destination = { x, y, width, height };
-      drawFittedMediaLayer({
+      drawSampledWindow({
         ...media,
         context: target,
         frame: destination,
@@ -99,14 +145,59 @@ export function drawVideoLayer(
         render: (drawX, drawY, drawWidth, drawHeight, drawContext = target) =>
           paintSource(drawContext, destination, drawX, drawY, drawWidth, drawHeight),
       });
-    },
-  };
+    });
+  const feedbackSource: PointerFeedbackSource & { forDemand?(id: string): PointerFeedbackSource } =
+    {
+      rect: frame,
+      draw: (target, x, y, width, height) => drawFeedback(target, x, y, width, height, 'original'),
+    };
+  if (isVideoCompositionFrameSource(source) && source.preparedSampling) {
+    feedbackSource.forDemand = (id) => ({
+      ...feedbackSource,
+      sharpPaint: (target) => {
+        // The pointer owner supplies the lens clip; its normal sharp mapping is selected below.
+        const action = (layer.actions ?? []).find(
+          (item) => sourceClickSamplingDemandId(item) === id
+        );
+        const lens = action?.gestureFeedback?.lens;
+        const point = action?.point;
+        if (!lens || !point) throw new Error('Prepared click sampling demand is unavailable.');
+        const transform = target.getTransform?.();
+        const density = transform
+          ? Math.max(Math.hypot(transform.a, transform.b), Math.hypot(transform.c, transform.d))
+          : 1;
+        const fitted = media.windowHeaderImage
+          ? resolveFittedWindowRaster(
+              { ...media, frame },
+              density * lens.scale,
+              media.windowHeaderImage.naturalHeight
+            ).source
+          : getFittedMediaContentFrame({ ...media, frame });
+        const rawX = fitted.x + point.x * fitted.width;
+        const center = {
+          x:
+            layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored
+              ? 2 * frame.x + frame.width - rawX
+              : rawX,
+          y: fitted.y + point.y * fitted.height,
+        };
+        drawFeedback(
+          target,
+          center.x + (frame.x - center.x) * lens.scale,
+          center.y + (frame.y - center.y) * lens.scale,
+          frame.width * lens.scale,
+          frame.height * lens.scale,
+          id
+        );
+      },
+    });
+  }
   const deferActions =
     (!layer.effectActionsOnly || layer.deferSourceBorders) &&
     (!!layer.borders?.length || !!layer.spotlights?.length) &&
     !!layer.actions?.length;
   const paintWindow = (target: CanvasRenderingContext2D) =>
-    drawFittedMediaLayer({
+    drawSampledWindow({
       ...media,
       ...(layer.sourceContentTransform
         ? { sourceContentTransform: layer.sourceContentTransform }
@@ -136,12 +227,23 @@ export function drawVideoLayer(
         ),
     });
   if (!layer.effectActionsOnly && layer.spotlights?.length)
-    drawIsolatedVideoWindow(context, layer, media, frame, displayScale, paintWindow);
+    drawIsolatedVideoWindow(
+      context,
+      layer,
+      media,
+      frame,
+      displayScale,
+      paintWindow,
+      isVideoCompositionFrameSource(source) && source.preparedSampling
+        ? (id, paint) => withDemand(id, paint)
+        : undefined,
+      isVideoCompositionFrameSource(source) ? source.renderResources : undefined
+    );
   else paintWindow(context);
   if (!layer.effectActionsOnly || layer.deferSourceBorders)
     drawVideoWindowBorders(context, layer, media, frame, displayScale);
   if (deferActions)
-    drawFittedMediaLayer({
+    drawSampledWindow({
       ...media,
       ...(layer.sourceContentTransform
         ? { sourceContentTransform: layer.sourceContentTransform }
@@ -365,8 +467,10 @@ function projectVideoGestureFeedback(
 /** Destination-sized surfaces bound allocation even when source coordinates extend far outside it. */
 function videoSpotlightSurface(
   ownerDocument: Document,
-  size: { width: number; height: number }
+  size: { width: number; height: number },
+  resources?: RenderResources
 ): RenderCanvasLease {
+  if (resources) return resources.canvas('video.source-spotlight', size);
   const canvas = ownerDocument.createElement('canvas');
   try {
     canvas.width = size.width;
@@ -392,10 +496,13 @@ function drawIsolatedVideoWindow(
   media: Omit<Parameters<typeof drawFittedMediaLayer>[0], 'context' | 'frame' | 'render'>,
   frame: VideoFrame,
   displayScale: number,
-  paintWindow: (target: CanvasRenderingContext2D) => void
+  paintWindow: (target: CanvasRenderingContext2D) => void,
+  sampleDemand?: (id: string, paint: () => void) => void,
+  sourceFrameResources?: RenderResources
 ) {
   const ownerDocument = context.canvas.ownerDocument ?? document;
-  const isolated = videoSpotlightSurface(ownerDocument, context.canvas);
+  const original = sourceFrameResources;
+  const isolated = videoSpotlightSurface(ownerDocument, context.canvas, original);
   try {
     const target = isolated.context;
     const transform = context.getTransform();
@@ -426,8 +533,8 @@ function drawIsolatedVideoWindow(
     ];
     const density =
       (Math.hypot(transform.a, transform.b) + Math.hypot(transform.c, transform.d)) / 2;
-    const layers = layer.spotlights!.map((state) =>
-      sampleCompositionSpotlightLayer({
+    const layers = layer.spotlights!.map((state) => {
+      const sampled = sampleCompositionSpotlightLayer({
         state,
         window:
           state.coordinateSpace === 'source-window'
@@ -437,8 +544,42 @@ function drawIsolatedVideoWindow(
         scale: displayScale * density,
         projection,
         clip: { rect: window, radius },
-      })
-    );
+      });
+      if (sampleDemand && sampled.lens && sampled.lens.scale > 1) {
+        const center = {
+          x: sampled.opening.x + sampled.opening.width / 2,
+          y: sampled.opening.y + sampled.opening.height / 2,
+        };
+        const projected = {
+          x: transform.a * center.x + transform.c * center.y + transform.e,
+          y: transform.b * center.x + transform.d * center.y + transform.f,
+        };
+        const lensScale = sampled.lens.scale;
+        return {
+          ...sampled,
+          sharpPaint: (sharp: CanvasRenderingContext2D) => {
+            sharp.save();
+            try {
+              sharp.translate(projected.x, projected.y);
+              sharp.scale(lensScale, lensScale);
+              sharp.translate(-projected.x, -projected.y);
+              sharp.transform(
+                transform.a,
+                transform.b,
+                transform.c,
+                transform.d,
+                transform.e,
+                transform.f
+              );
+              sampleDemand(`sceneLens:${state.id}`, () => paintWindow(sharp));
+            } finally {
+              sharp.restore();
+            }
+          },
+        };
+      }
+      return sampled;
+    });
     target.save();
     try {
       if (media.cameraAppearance) traceCameraShape(target, window, media.cameraAppearance);
@@ -448,7 +589,7 @@ function drawIsolatedVideoWindow(
       }
       target.clip();
       target.setTransform(1, 0, 0, 1, 0, 0);
-      drawSceneSpotlights(target, isolated.canvas, null, layers);
+      drawSceneSpotlights(target, isolated.canvas, null, layers, original);
     } finally {
       target.restore();
     }
@@ -461,5 +602,60 @@ function drawIsolatedVideoWindow(
     }
   } finally {
     isolated.release();
+  }
+}
+
+/** Prepared video bypasses the bounded decoration raster; the existing helper still paints its header/shadow. */
+function paintPreparedVideoWindow(
+  params: Parameters<typeof drawFittedMediaLayer>[0],
+  prepared: boolean
+): void {
+  if (!prepared || !params.windowHeaderImage) {
+    drawFittedMediaLayer(params);
+    return;
+  }
+  const context = params.context,
+    header = params.windowHeaderImage;
+  const transform = context.getTransform();
+  const density = Math.max(
+    Math.hypot(transform.a, transform.b),
+    Math.hypot(transform.c, transform.d)
+  );
+  const raster = resolveFittedWindowRaster(params, density, header.naturalHeight);
+  drawFittedMediaLayer({ ...params, render() {} });
+  const window = getFittedMediaWindowFrame(params);
+  const radius = roundedWindowRadius(
+    window.width,
+    window.height,
+    (params.windowCornerRadius ?? 0) * params.displayScale
+  );
+  context.save();
+  try {
+    context.beginPath();
+    context.roundRect(window.x, window.y, window.width, window.height, radius);
+    context.clip();
+    const inner = params.sourceContentTransform;
+    if (inner)
+      context.transform(
+        inner[0],
+        inner[3],
+        inner[1],
+        inner[4],
+        inner[2] * params.displayScale,
+        inner[5] * params.displayScale
+      );
+    context.beginPath();
+    context.rect(raster.visible.x, raster.visible.y, raster.visible.width, raster.visible.height);
+    context.clip();
+    params.render(
+      raster.source.x,
+      raster.source.y,
+      raster.source.width,
+      raster.source.height,
+      context,
+      raster.visible
+    );
+  } finally {
+    context.restore();
   }
 }

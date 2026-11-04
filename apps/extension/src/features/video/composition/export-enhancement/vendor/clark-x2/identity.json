@@ -1,0 +1,8 @@
+{
+  "model.bin": "c6b4f22d8c38270225b809e97d233eb68d7a48eef17595ac17a60b4540c72dce",
+  "realtimeVideoUpscaler.js": "c096435fa3aab07a086e72b26a819312383e29f2bd807131c6c190f90f9aa86c",
+  "runtimeCapabilities.js": "d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6",
+  "originalRuntimeSha256": "58dd6544858039b4f8ba7a6cf469a4ed22aadc8588c7483ca7b4af2901ac4742",
+  "runtimeModification": "Add a read-only unavailable getter. Destroy the acquired GPU device if initialization fails. Qualify browser globals with globalThis. Add this modification notice to the source. Model weights and WGSL remain unchanged.",
+  "preparedRuntimeSha256": "82c1ba7f9b097bb828ac077f2d1c80bfc0452f7634526586aab8d8fb85f1ea23"
+}

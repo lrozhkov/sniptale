@@ -3,8 +3,10 @@ import { createRecordingCursorTrajectoryStore } from '../../composition/persiste
 import { createRecordingCursorTrajectoryReader } from '../../composition/persistence/recordings/cursor-trajectory/reader';
 import { prepareCursorTrajectoryProject } from '../../features/video/project/cursor-trajectory/project-window';
 import type { RecordingCursorTrajectoryStoreDependencies } from '../../composition/persistence/recordings/cursor-trajectory/contracts';
-import { motionRegionHasAvailableCursor } from '../../features/video/project/cursor-trajectory/availability';
-import type { VideoProjectMotionRegion } from '../../features/video/project/types';
+import {
+  motionRegionHasAvailableCursor,
+  type CursorAvailabilityInterval,
+} from '../../features/video/project/cursor-trajectory/availability';
 import type { VideoProject } from '../../features/video/project/types';
 
 /** A preview session or export job owns this bounded, disposable recording reader. */
@@ -51,7 +53,7 @@ export function createRecordingCursorAvailabilityReader(
   const store = createRecordingCursorTrajectoryStore(dependencies);
   let reader = createRecordingCursorTrajectoryReader(store);
   return {
-    available(project: VideoProject, region: VideoProjectMotionRegion, signal?: AbortSignal) {
+    available(project: VideoProject, region: CursorAvailabilityInterval, signal?: AbortSignal) {
       const current = reader;
       return motionRegionHasAvailableCursor(
         project,

@@ -63,9 +63,16 @@ export interface PreviewRenderAllocationInput {
     transitionRaster: Size | null;
     splitRaster?: Size | null;
     windowRaster: Size | null;
+    exportWindowRaster?: Size | null;
     clickLens?: boolean;
     motionPass: Size | null;
-    spatial: null | { output: Size; plane: Size; halfFloat: boolean };
+    spatial: null | {
+      output: Size;
+      plane: Size;
+      halfFloat: boolean;
+      overlay?: Size;
+      retained?: readonly { role: string; bytes: number; canvases: number }[];
+    };
     spotlight: null | { backing: Size; frameCount: number; blurRadius: number; fastPath: boolean };
     border: Size | null;
     denseCommentGradient: Size | null;
@@ -266,7 +273,10 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
   ];
   const cached = optionalCanvas('background-cache', input.background?.cache ?? null);
   const normal = [...retained, ...cached];
-  const window = optionalCanvas('decorated-window', input.scene.windowRaster);
+  const window = [
+    ...optionalCanvas('decorated-window', input.scene.windowRaster),
+    ...optionalCanvas('export-decorated-window', input.scene.exportWindowRaster ?? null),
+  ];
   const motion = input.scene.motionPass
     ? [
         canvas('motion-accumulator', input.scene.motionPass),

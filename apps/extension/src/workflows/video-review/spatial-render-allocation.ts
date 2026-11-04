@@ -24,13 +24,20 @@ function canvas(role: string, size: Size): Allocation {
 
 /** Declares explicit spatial surfaces, texture levels, drawing buffer and matrix storage. */
 export function calculateSpatialRenderAllocations(
-  value: { output: Size; plane: Size; halfFloat: boolean } | null
+  value: {
+    output: Size;
+    plane: Size;
+    halfFloat: boolean;
+    overlay?: Size;
+    retained?: readonly Allocation[];
+  } | null
 ): Allocation[] {
   if (!value) return [];
   const { output, plane, halfFloat } = value;
   const result = [
     canvas('spatial-plane', plane),
-    ...['exposure', 'overlay'].map((role) => canvas(`spatial-${role}`, output)),
+    canvas('spatial-exposure', output),
+    canvas('spatial-overlay', value.overlay ?? output),
   ];
   result.push(
     bytes('spatial-drawing-buffer', pixels(output) * 4),
@@ -47,6 +54,15 @@ export function calculateSpatialRenderAllocations(
     );
     width = Math.max(1, Math.ceil(width / 2));
     height = Math.max(1, Math.ceil(height / 2));
+  }
+  for (const old of value.retained ?? []) {
+    checked(old.bytes);
+    checked(old.canvases + 1);
+    const existing = result.find((item) => item.role === old.role);
+    if (existing) {
+      existing.bytes = Math.max(existing.bytes, old.bytes);
+      existing.canvases = Math.max(existing.canvases, old.canvases);
+    } else result.push({ ...old });
   }
   return result;
 }

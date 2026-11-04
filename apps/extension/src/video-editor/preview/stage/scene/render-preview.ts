@@ -1,3 +1,4 @@
+import type { PreviewScenePresentation } from './types';
 import type { EffectRuntimeInputComposer } from '../../../../features/video/composition/effect-runtime/frame/inputs';
 import { VideoSample } from 'mediabunny';
 import {
@@ -140,7 +141,9 @@ function drawPreviewSceneOverlays(params: {
   }
 }
 
-export async function renderPreviewScene(params: PreviewSceneRenderInput): Promise<void | false> {
+export async function renderPreviewScene(
+  params: PreviewSceneRenderInput
+): Promise<PreviewScenePresentation | void | false> {
   if (!params.project.watermark || params.project.watermark.mode === 'none') {
     params.watermarkRenderer?.clear();
     return renderPreparedPreviewScene(params);
@@ -205,7 +208,7 @@ function capturePreviewSceneVideos(
 async function renderPreparedPreviewScene(
   params: PreviewSceneRenderInput,
   watermark?: Awaited<ReturnType<VideoProjectWatermarkRenderer['prepare']>>
-): Promise<void | false> {
+): Promise<PreviewScenePresentation | void | false> {
   const renderPasses = resolveVideoCompositionRenderPasses(params.project, params.currentTime);
   if (params.cameraOverride) {
     renderPasses.overlayFrame.camera = params.cameraOverride;
@@ -270,7 +273,10 @@ async function renderPreparedPreviewScene(
           return effectRuntimeFrames;
         }
       );
-      if (accelerated !== undefined) return accelerated === false ? false : undefined;
+      if (accelerated !== undefined)
+        return accelerated === false
+          ? false
+          : { camera: renderPasses.overlayFrame.camera, time: params.currentTime };
       disposeEffectRuntimeComposition(effectRuntimeFrames);
       effectRuntimeFrames = undefined;
     }
@@ -312,6 +318,7 @@ async function renderPreparedPreviewScene(
       isInvalidated: () => mediaChanged,
     });
     if (!drawn) return false;
+    return { camera: renderPasses.overlayFrame.camera, time: params.currentTime };
   } finally {
     for (const video of videos) video.removeEventListener('seeking', invalidate);
     try {

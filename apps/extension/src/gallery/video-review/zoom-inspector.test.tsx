@@ -774,3 +774,24 @@ it('selects Cursor before framing, enables orbit by default and retains manual s
   expect(choice('editor.scene.cameraFollowCursor').disabled).toBe(true);
   expect(field('gallery.videoReview.zoomFocusX').disabled).toBe(false);
 });
+
+it('keeps authored follow while explicit archive availability changes without inline cursor data', () => {
+  const change = vi.fn();
+  const props = {
+    region: { ...region, followCursor: true },
+    onChange: change,
+    onReset: vi.fn(),
+    onDelete: vi.fn(),
+  };
+  const cursor = () =>
+    [...host.querySelectorAll<HTMLButtonElement>('[data-ui="camera.followTarget"] button')].find(
+      (b) => b.textContent === 'editor.scene.cameraFollowCursor'
+    )!;
+  act(() => root.render(<ReviewZoomInspector {...props} cursorAvailable />));
+  expect(cursor().disabled).toBe(false);
+  expect(cursor().getAttribute('aria-pressed')).toBe('true');
+  act(() => root.render(<ReviewZoomInspector {...props} cursorAvailable={false} />));
+  expect(cursor().disabled).toBe(true);
+  expect(cursor().getAttribute('aria-pressed')).toBe('true');
+  expect(change).not.toHaveBeenCalled();
+});

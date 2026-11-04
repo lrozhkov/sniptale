@@ -10,7 +10,7 @@ export function drawActionCompositionState(
   fallbackPoint: { x: number; y: number } | null,
   sizeScale = 1,
   bounds?: { x: number; y: number; width: number; height: number },
-  source?: PointerFeedbackSource
+  source?: PointerFeedbackSource & { forDemand?(id: string): PointerFeedbackSource }
 ): void {
   if (action.renderKind === null) return;
   if (action.renderKind === 'keystroke') {
@@ -30,7 +30,7 @@ export function drawActionCompositionState(
           radius: frame.radius * sizeScale,
           stroke: frame.stroke * Math.max(0.2, sizeScale),
         },
-        source
+        source?.forDemand?.(sourceClickSamplingDemandId(action)) ?? source
       );
       return;
     }
@@ -246,4 +246,12 @@ export function drawSceneActionCompositionStates(
         : null;
     drawActionCompositionState(context, { ...action, point }, null, sizeScale, bounds);
   }
+}
+
+/** Event occurrence identity distinguishes repeated appearances of the same authored click. */
+export function sourceClickSamplingDemandId(action: VideoCompositionActionState): string {
+  const { event, occurrence } = action;
+  const source = occurrence.sourceInstanceId ?? '';
+  const run = occurrence.playbackRun?.id ?? '';
+  return `clickLens:${event.id}:${source}:${run}:${occurrence.time}`;
 }

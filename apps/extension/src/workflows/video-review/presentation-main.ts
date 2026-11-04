@@ -14,10 +14,7 @@ import { createReviewTransitionFrames } from './cut-transition-frames';
 import { createReviewWebcamRenderer } from './render-webcam';
 import { createReviewPreviewRenderer } from './render-preview';
 import { createPreviewRenderResources } from './preview-render-resources';
-import {
-  calculatePreviewRenderAllocation,
-  resolvePreviewRenderAllocation,
-} from './preview-render-allocation';
+import { resolvePreviewRenderAllocation } from './preview-render-allocation';
 import type { PreviewRenderAllocationInput } from './preview-render-allocation';
 import type { ReviewMediaIndex } from './media-index';
 import { QuickEditExportUnavailable } from './export-unavailable';
@@ -29,8 +26,10 @@ type Scene = Parameters<Renderer['prepare']>[0];
 type Frame = Parameters<Renderer['render']>[1];
 type SampleSink = ReturnType<typeof createReviewDecodedSampleSink>;
 type Camera = Awaited<ReturnType<typeof createReviewWebcamRenderer>>;
+import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 
 export interface ReviewPresentationMainInput {
+  exportEnhancer?: ExportEnhancer;
   recordingHistory?: ReviewRecordingRenderSource;
   file: Blob;
   index: ReviewMediaIndex;
@@ -112,6 +111,7 @@ class PresentationMain {
     this.input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
     this.renderer = createReviewPreviewRenderer({
       resources: this.resources,
+      ...(args.exportEnhancer ? { exportEnhancer: args.exportEnhancer } : {}),
       readAsset: args.readAsset,
       allocation: {
         describe: this.graph,
@@ -368,15 +368,8 @@ class PresentationMain {
       this.transitionBytes = endpoints
         ? [endpoints.left.allocationSize!(), endpoints.right.allocationSize!()]
         : null;
-      this.resources.replaceLimits(calculatePreviewRenderAllocation(this.graph()));
-      leases.push(this.resources.bytes('main-source', this.sourceBytes));
-      if (this.cameraBytes !== null)
-        leases.push(this.resources.bytes('main-camera', this.cameraBytes));
-      if (this.transitionBytes)
-        leases.push(
-          this.resources.bytes('main-transition', this.transitionBytes[0] + this.transitionBytes[1])
-        );
       const frame: Frame = {
+        ...(this.args.exportEnhancer ? { exportEnhancer: this.args.exportEnhancer } : {}),
         ...(this.args.recordingHistory ? { recordingHistory: this.args.recordingHistory } : {}),
         generation,
         fps: this.args.fps ?? this.args.index.frameRate ?? 30,
@@ -403,6 +396,14 @@ class PresentationMain {
           ? { transition: { blend, frames: endpoints, resultOffset: this.args.fragmentOffset } }
           : {}),
       };
+      this.renderer.admit(prepared, frame);
+      leases.push(this.resources.bytes('main-source', this.sourceBytes));
+      if (this.cameraBytes !== null)
+        leases.push(this.resources.bytes('main-camera', this.cameraBytes));
+      if (this.transitionBytes)
+        leases.push(
+          this.resources.bytes('main-transition', this.transitionBytes[0] + this.transitionBytes[1])
+        );
       const output = await this.renderer.render(prepared, frame, signal);
       this.front = output;
       let released = false;

@@ -672,3 +672,26 @@ it('keeps a held clip under the pointer when the visible time window scrolls and
   act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenCalledWith(clip.id, 7, clip.trackId, 'line-1');
 });
+
+it('does not read gesture viewport during idle parent clock commits', () => {
+  const project = createEmptyVideoProject('Idle drag');
+  const read = vi.fn(() => 0);
+  const props = {
+    project,
+    currentTime: 0,
+    readTimelineStartTime: read,
+    onMoveClip: vi.fn(),
+    onTrimClipEnd: vi.fn(),
+    onTrimClipStart: vi.fn(),
+    onReady: vi.fn(),
+  };
+  const Harness = createTimelineHarness(props);
+  act(() => root?.render(<Harness />));
+  expect.soft(read).not.toHaveBeenCalled();
+  read.mockClear();
+  for (const time of [0.1, 0.2, 0.3]) {
+    props.currentTime = time;
+    act(() => root?.render(<Harness />));
+  }
+  expect(read).not.toHaveBeenCalled();
+});

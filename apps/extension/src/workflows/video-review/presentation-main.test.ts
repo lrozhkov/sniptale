@@ -9,6 +9,7 @@ import { createQuickEditWebcam } from '../../features/video/review/advanced/webc
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
 import type { ReviewCaptionConflict } from '../../features/video/review/caption-plan';
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
+import { calculatePreviewRenderAllocation } from './preview-render-allocation';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 const io = vi.hoisted(() => ({
@@ -28,6 +29,7 @@ const io = vi.hoisted(() => ({
   prepare: vi.fn(),
   render: vi.fn(),
   realRenderer: false,
+  retainedSpatialBytes: 0,
   resolution: 1000,
   missingTrack: false,
   decode: true,
@@ -35,6 +37,20 @@ const io = vi.hoisted(() => ({
   allocation: 4096,
   captionConflicts: [] as ReviewCaptionConflict[],
 }));
+
+it('forwards the borrowed export enhancer without transferring its job ownership', async () => {
+  const enhancer = { withEnhancedRegion: vi.fn(), dispose: vi.fn(async () => undefined) };
+  const main = await createReviewPresentationMain({ ...fixture(), exportEnhancer: enhancer });
+  try {
+    const frame = await main.renderAtTime(0);
+    expect(io.render).toHaveBeenCalledWith(expect.objectContaining({ exportEnhancer: enhancer }));
+    frame.release();
+  } finally {
+    main.dispose();
+  }
+  expect(enhancer.dispose).not.toHaveBeenCalled();
+  for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
   BlobSource: class {},
@@ -91,6 +107,13 @@ vi.mock('./render-preview', async (importOriginal) => {
         : {
             prepare: async (...input: unknown[]) => {
               await io.prepare(...input);
+              if (io.retainedSpatialBytes) {
+                args.allocation!.replaceLimits({
+                  maximumManagedBytes: 100_000_000,
+                  maximumCanvases: 10,
+                });
+                args.resources.bytes('retained-dense-spatial', io.retainedSpatialBytes);
+              }
               return {
                 captionConflicts: io.captionConflicts,
                 allocationAssets: {
@@ -101,6 +124,13 @@ vi.mock('./render-preview', async (importOriginal) => {
                 },
                 release: vi.fn(),
               };
+            },
+            admit: () => {
+              const graph = calculatePreviewRenderAllocation(args.allocation!.describe());
+              args.allocation!.replaceLimits({
+                ...graph,
+                maximumManagedBytes: graph.maximumManagedBytes + io.retainedSpatialBytes,
+              });
             },
             render: (_prepared: unknown, frame: unknown) => {
               io.render(frame);
@@ -157,6 +187,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   io.samples.length = io.times.length = io.inputs.length = io.canvases.length = 0;
   io.realRenderer = false;
+  io.retainedSpatialBytes = 0;
   io.resolution = 1000;
   io.missingTrack = false;
   io.decode = true;
@@ -637,4 +668,14 @@ it('closes the decoder when the first archived frame fails admission', async () 
   };
   await expect(open({ ...fixture(), recordingHistory })).rejects.toThrow('history-unavailable');
   expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+});
+
+it('admits retained dense spatial resources before reserving the next decoded source without GPU', async () => {
+  vi.stubGlobal('navigator', {});
+  io.retainedSpatialBytes = 75_346_756;
+  const owner = await open();
+  const output = await owner.render(candidate(0.2));
+  expect(io.render).toHaveBeenCalledOnce();
+  output.release();
+  expect(io.samples.at(-1)!.close).toHaveBeenCalledOnce();
 });

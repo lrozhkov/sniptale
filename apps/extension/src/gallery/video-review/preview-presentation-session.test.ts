@@ -23,7 +23,11 @@ vi.mock('../../workflows/video/effect-runtime-sandbox', () => ({
 }));
 vi.mock('./preview-presentation', () => ({
   createReviewPresentationPaintClock: () => ({}),
-  createReviewPreviewPresentation: () => ({ dispose: vi.fn(), invalidate: vi.fn() }),
+  createReviewPreviewPresentation: () => ({
+    dispose: vi.fn(),
+    invalidate: vi.fn(),
+    update: vi.fn(),
+  }),
 }));
 it('selects the Gallery GPU annotation sandbox and preserves retry teardown', () => {
   io.renderer.mockReturnValue({ dispose: io.dispose });
@@ -43,4 +47,33 @@ it('selects the Gallery GPU annotation sandbox and preserves retry teardown', ()
   owner.dispose();
   owner.dispose();
   expect(io.dispose).toHaveBeenCalledOnce();
+});
+
+it('releases its original source clock on device failure and disposal after the latest source changes', () => {
+  io.renderer.mockReturnValue({ dispose: io.dispose });
+  const active = vi.fn();
+  const input = {
+    sourceIdentity: 'first',
+    video: { current: null },
+    playing: true,
+    onPresentationActive: active,
+    preferences: { frameRate: 'current', pausedQuality: 'same' },
+    pausedResultTime: 0,
+  };
+  const latest = () => ({ input, placement: null });
+  const owner = createManualPresentationOwner(
+    latest as unknown as Parameters<typeof createManualPresentationOwner>[0],
+    vi.fn(),
+    vi.fn(),
+    vi.fn()
+  );
+  owner.update({} as Parameters<typeof owner.update>[0], 1, false);
+  expect(active).toHaveBeenLastCalledWith('first', true);
+  io.renderer.mock.lastCall![0].onContextLost!();
+  expect(active).toHaveBeenLastCalledWith('first', false);
+  owner.retry();
+  expect(active).toHaveBeenLastCalledWith('first', true);
+  input.sourceIdentity = 'second';
+  owner.dispose();
+  expect(active).toHaveBeenLastCalledWith('first', false);
 });

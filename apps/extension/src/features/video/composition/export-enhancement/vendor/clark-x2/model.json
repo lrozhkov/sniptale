@@ -1,0 +1,38 @@
+{
+  "format": "backdropkit-realtime-luma-student-f16-v1",
+  "channels": 12,
+  "blocks": 3,
+  "residual_scale": 1.0,
+  "color_mode": "rgb",
+  "parameters": 8496,
+  "bytes": 16992,
+  "tensors": {
+    "input_projection": {
+      "offset": 0,
+      "bytes": 288,
+      "elements": 144
+    },
+    "block_0": {
+      "offset": 288,
+      "bytes": 5184,
+      "elements": 2592
+    },
+    "block_1": {
+      "offset": 5472,
+      "bytes": 5184,
+      "elements": 2592
+    },
+    "block_2": {
+      "offset": 10656,
+      "bytes": 5184,
+      "elements": 2592
+    },
+    "output_projection": {
+      "offset": 15840,
+      "bytes": 1152,
+      "elements": 576
+    }
+  },
+  "sha256": "c6b4f22d8c38270225b809e97d233eb68d7a48eef17595ac17a60b4540c72dce",
+  "source_checkpoint_sha256": "3cbb8a3358bbeaa239c517f1171dbb7706c2d453c961d17a4e6166aefde8c692"
+}

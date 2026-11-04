@@ -191,3 +191,77 @@ it('adds Text font provenance without changing the UI section or dependency clos
     original.split('## Production dependency licenses')[0].trim()
   );
 });
+
+it('includes the model and runtime notices without creating an npm dependency', () => {
+  const asset = {
+    id: 'clark-x2',
+    name: 'Clark Realtime UI Video Upscaler x2',
+    attribution: 'Clark Labs',
+    license: 'Apache-2.0',
+    sourceUrl: 'https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2',
+    licensePath: 'vendor/clark/LICENSE',
+    licenseSha256: 'a'.repeat(64),
+    noticePath: 'vendor/clark/NOTICE.txt',
+    noticeSha256: 'b'.repeat(64),
+    provenancePath: 'vendor/clark/identity.json',
+    provenanceSha256: 'c'.repeat(64),
+    modifications:
+      'The runtime adds initialization cleanup. The model weights and shaders do not change.',
+    artifacts: [
+      {
+        path: 'vendor/clark/model.bin',
+        sha256: 'd'.repeat(64),
+        sourceUrl:
+          'https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/model.bin',
+        sourceSha256: 'd'.repeat(64),
+      },
+    ],
+  };
+  const notices = formatThirdPartyNotices({
+    entries: [ENTRY],
+    interfaceFont: TEST_INTERFACE_FONT,
+    bundledAssets: [asset],
+  });
+  expect(notices).toContain('## Clark Realtime UI Video Upscaler x2');
+  expect(notices).toContain('Apache-2.0');
+  expect(notices).toContain('[`vendor/clark/LICENSE`](vendor/clark/LICENSE)');
+  expect(notices).toContain('[`vendor/clark/NOTICE.txt`](vendor/clark/NOTICE.txt)');
+  expect(notices).toContain('[`vendor/clark/identity.json`](vendor/clark/identity.json)');
+  expect(notices).toContain(asset.sourceUrl);
+  expect(notices).toContain(asset.modifications);
+  expect(notices).toContain(asset.artifacts[0]!.sourceSha256);
+  expect(notices).not.toContain('`clark-x2` 1.0.0');
+});
+
+it('keeps existing font and npm notices byte-identical when the optional asset list is empty', () => {
+  const previous = formatThirdPartyNotices({
+    entries: [ENTRY],
+    interfaceFont: TEST_INTERFACE_FONT,
+  });
+  expect(
+    formatThirdPartyNotices({
+      entries: [ENTRY],
+      interfaceFont: TEST_INTERFACE_FONT,
+      bundledAssets: [],
+    })
+  ).toBe(previous);
+});
+
+it('rejects invalid bundled metadata before replacing completed legal outputs', async () => {
+  const outputRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'sniptale-bundled-legal-invalid-'));
+  const preserved = path.join(outputRoot, 'LICENSES/dependencies/completed.txt');
+  await fs.mkdir(path.dirname(preserved), { recursive: true });
+  await fs.writeFile(preserved, 'completed');
+  await expect(
+    writeDependencyLegalClosure({
+      closure: {
+        entries: [ENTRY],
+        licenseFiles: [{ archivePath: ENTRY.archivePath, contents: LICENSE_TEXT }],
+      },
+      interfaceFont: TEST_INTERFACE_FONT,
+      outputRoot,
+      bundledAssets: [{ id: 'clark-x2', artifacts: [] }],
+    })
+  ).rejects.toThrow('Bundled asset artifacts are required.');
+  expect(await fs.readFile(preserved, 'utf8')).toBe('completed');
+});

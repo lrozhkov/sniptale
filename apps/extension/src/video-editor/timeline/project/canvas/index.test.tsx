@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createTimelineProjection } from '../interaction-state/projection';
 
-import { act } from 'react';
+import { act, startTransition, Suspense } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -11,7 +11,25 @@ import {
 import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { createSceneSelection } from '../../../project/selection/model';
 import { ProjectTimelineCanvas } from './';
+import { useTimelineNavigation } from '../interaction-state/navigation';
+import {
+  createAudioClip,
+  createProject,
+} from '../../../../features/video/project/timeline/project-meta.test.helpers';
+import { buildAudioClipWaveformPath } from './render-data';
+vi.mock('./render-data', async (original) => {
+  const actual = await original<typeof import('./render-data')>();
+  return { ...actual, buildAudioClipWaveformPath: vi.fn(actual.buildAudioClipWaveformPath) };
+});
 import type { ProjectTimelineInsertionActions } from '../types';
+import { buildProjectTimelineClipViewModel } from '../clip/model';
+vi.mock('../clip/model', async (original) => {
+  const actual = await original<typeof import('../clip/model')>();
+  return {
+    ...actual,
+    buildProjectTimelineClipViewModel: vi.fn(actual.buildProjectTimelineClipViewModel),
+  };
+});
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -536,4 +554,152 @@ it('focuses the timeline before a clip pointer handler cancels the default focus
     )
   );
   expect(document.activeElement).toBe(canvas);
+});
+
+it('moves the playhead without rebuilding clips and uses the last committed interaction callback', () => {
+  const project = createVideoProjectFromRecording({
+    duration: 10,
+    filename: 'static.webm',
+    height: 720,
+    width: 1280,
+    recordingId: 'static',
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const input = {
+    ...createCanvasProps(project, {}),
+    selectedEffectSelection: { kind: 'motion' as const, segmentId: 'stable-selection' },
+  };
+  const first = vi.fn();
+  const second = vi.fn();
+  act(() => root?.render(<ProjectTimelineCanvas {...input} onSelectClip={first} />));
+  vi.mocked(buildProjectTimelineClipViewModel).mockClear();
+  for (const time of [0.1, 0.2, 0.3]) {
+    act(() =>
+      root?.render(
+        <ProjectTimelineCanvas
+          {...input}
+          currentTime={time}
+          selectedEffectSelection={{ kind: 'motion', segmentId: 'stable-selection' }}
+          onSelectClip={second}
+        />
+      )
+    );
+  }
+  expect(buildProjectTimelineClipViewModel).not.toHaveBeenCalled();
+  const playhead = container?.querySelector<HTMLElement>(
+    '[data-ui="video-editor.timeline.playhead-line"]'
+  );
+  expect(playhead?.style.left).toBe('27px');
+  const clip = container?.querySelector('[data-timeline-object="true"]');
+  act(() => clip?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  expect(first).not.toHaveBeenCalled();
+  expect(second).toHaveBeenCalled();
+  act(() =>
+    root?.render(<ProjectTimelineCanvas {...input} currentTime={0.3} pixelsPerSecond={180} />)
+  );
+  expect(buildProjectTimelineClipViewModel).toHaveBeenCalled();
+});
+
+it('keeps the committed clip handler while a replacement render is suspended', () => {
+  const project = createVideoProjectFromRecording({
+    duration: 10,
+    filename: 'commit.webm',
+    height: 720,
+    width: 1280,
+    recordingId: 'commit',
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const input = createCanvasProps(project, {});
+  const committed = vi.fn();
+  const uncommitted = vi.fn();
+  const pending = new Promise<void>(() => {});
+  function Hold({ blocked }: { blocked: boolean }) {
+    if (blocked) throw pending;
+    return null;
+  }
+  const render = (blocked: boolean, handler: typeof committed) => (
+    <Suspense fallback={null}>
+      <ProjectTimelineCanvas {...input} onSelectClip={handler} />
+      <Hold blocked={blocked} />
+    </Suspense>
+  );
+  act(() => root?.render(render(false, committed)));
+  act(() => startTransition(() => root?.render(render(true, uncommitted))));
+  act(() =>
+    container
+      ?.querySelector('[data-project-timeline-clip]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  );
+  expect(committed).toHaveBeenCalledOnce();
+  expect(uncommitted).not.toHaveBeenCalled();
+  act(() => root?.render(render(false, uncommitted)));
+  act(() =>
+    container
+      ?.querySelector('[data-project-timeline-clip]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  );
+  expect(uncommitted).toHaveBeenCalledOnce();
+});
+
+it('retains clip and waveform work through the real navigation producer during parent clock commits', () => {
+  const project = createProject([createAudioClip()]);
+  project.assets = project.assets.map((asset) => ({
+    ...asset,
+    metadata: { ...asset.metadata, audioPeaks: [0.1, 0.8, 0.3, 0.6] },
+  }));
+  const input = createCanvasProps(project, {});
+  let navigation!: ReturnType<typeof useTimelineNavigation>;
+  function Connected({
+    time = 0,
+    zoom = 90,
+    width = 900,
+  }: {
+    time?: number;
+    zoom?: number;
+    width?: number;
+  }) {
+    navigation = useTimelineNavigation({
+      timelineRef: input.timelineRef,
+      extentSeconds: 20,
+      pixelsPerSecond: zoom,
+      viewportWidth: width,
+    });
+    return (
+      <ProjectTimelineCanvas
+        {...input}
+        currentTime={time}
+        pixelsPerSecond={zoom}
+        timelineWidth={width}
+        projection={navigation.projection}
+        readTimelineStartTime={navigation.readStartTime}
+      />
+    );
+  }
+  act(() => root?.render(<Connected />));
+  expect(container?.querySelector('path[fill="currentColor"]')).not.toBeNull();
+  vi.mocked(buildProjectTimelineClipViewModel).mockClear();
+  vi.mocked(buildAudioClipWaveformPath).mockClear();
+  for (const time of [0.1, 0.2, 0.3]) act(() => root?.render(<Connected time={time} />));
+  expect.soft(buildProjectTimelineClipViewModel).not.toHaveBeenCalled();
+  expect.soft(buildAudioClipWaveformPath).not.toHaveBeenCalled();
+  expect(
+    container?.querySelector<HTMLElement>('[data-ui="video-editor.timeline.playhead-line"]')?.style
+      .left
+  ).toBe('27px');
+  act(() => root?.render(<Connected time={0.3} zoom={180} />));
+  expect(buildProjectTimelineClipViewModel).toHaveBeenCalled();
+  expect(buildAudioClipWaveformPath).toHaveBeenCalled();
+  vi.mocked(buildProjectTimelineClipViewModel).mockClear();
+  act(() => root?.render(<Connected time={0.3} zoom={180} width={450} />));
+  expect(buildProjectTimelineClipViewModel).toHaveBeenCalled();
+  vi.mocked(buildProjectTimelineClipViewModel).mockClear();
+  act(() => navigation.navigateTo(0.5));
+  expect(buildProjectTimelineClipViewModel).toHaveBeenCalled();
+  expect(navigation.readStartTime()).toBe(0.5);
+  expect(
+    container?.querySelector<HTMLElement>('[data-ui="video-editor.timeline.playhead-line"]')?.style
+      .left
+  ).toBe('-36px');
 });

@@ -26,6 +26,8 @@ export interface PreviewStageCanvasSceneParams {
   assetUrls?: Record<string, string>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   currentTime: number;
+  /** Borrows the mounted renderer's playback request until its cleanup runs. */
+  registerPlaybackRequest?: ((request: (time: number) => void) => () => void) | undefined;
   onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   effectRuntimeFeedback: PreviewEffectRuntimeFeedback;
   imageBank: Record<string, HTMLImageElement>;
@@ -36,6 +38,7 @@ export interface PreviewStageCanvasSceneParams {
   previewMode?: VideoEditorPreviewMode;
   project: VideoProject;
   renderGeneration?: number;
+  renderGenerationRef?: React.MutableRefObject<number> | undefined;
   stageRef: React.RefObject<HTMLDivElement | null>;
   videoRefs: PreviewStageVideoRefs;
 }
@@ -43,6 +46,12 @@ export interface PreviewStageCanvasSceneParams {
 type PreviewEffectRuntimeExecutorInput =
   | EffectRuntimeSandboxExecutor
   | (() => EffectRuntimeSandboxExecutor);
+
+/** Camera evaluated for one completed frame; the outer caller owns visible publication. */
+export interface PreviewScenePresentation {
+  camera: VideoCompositionCameraState;
+  time: number;
+}
 
 export type PreviewSceneRenderInput = {
   gpuPreview?: NativeGpuPreviewRenderer;

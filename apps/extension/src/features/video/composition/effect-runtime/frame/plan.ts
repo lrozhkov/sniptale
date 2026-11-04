@@ -1,3 +1,4 @@
+import { assertEffectDecodedRaster } from '../runtime/resource-limits';
 import { resolveEffectV1ObjectRenderBounds } from '@sniptale/runtime-contracts/effect-v1';
 import { resolveEffectObjectControls } from '../../../project/effect-instance/layout';
 import { parseEffectLogicalDimensions } from '../../../../../contracts/effect-runtime/dimensions';
@@ -221,4 +222,13 @@ function takeChainIndex(indexes: Map<string, number>, clipId: string): number {
 
 function fail(code: EffectRuntimePlanErrorCode): never {
   throw new EffectRuntimePlanError(code);
+}
+
+/** Change physical sampling only; program coordinates and external object bounds remain logical. */
+export function applyEffectRuntimeRasterDimensions(
+  plan: EffectRuntimeFramePlan,
+  dimensions: { width: number; height: number }
+): EffectRuntimeFramePlan {
+  assertEffectDecodedRaster(dimensions.width, dimensions.height);
+  return { ...plan, renderDimensions: { ...dimensions } };
 }

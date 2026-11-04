@@ -146,6 +146,7 @@ beforeEach(() => {
       context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
       release,
       generation: frame.generation,
+      sourceTime: frame.sourceTime,
     };
   });
   io.factory.mockImplementation(() => ({
@@ -253,6 +254,7 @@ it('replaces the retained canvas only when the completed frame needs a different
       context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
       release,
       generation: frame.generation,
+      sourceTime: frame.sourceTime,
     };
   });
   props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
@@ -377,4 +379,104 @@ it('publishes through a bounded reusable pair without front pixel copies or warm
   for (const context of contexts) expect(context.drawImage).not.toHaveBeenCalled();
   for (const release of releases.slice(0, -1)) expect(release).toHaveBeenCalledOnce();
   expect(releases.at(-1)).not.toHaveBeenCalled();
+});
+
+it('owns the playing clock before capture and releases it on pending, fallback and teardown', async () => {
+  const active = vi.fn();
+  const geometry = vi.fn();
+  props = { ...props, playing: true, onPresentationActive: active, onGeometry: geometry };
+  await render();
+  expect(active).toHaveBeenLastCalledWith('source', true);
+  expect(io.render).not.toHaveBeenCalled();
+  await step(0);
+  expect(geometry).toHaveBeenLastCalledWith(null, 1.234567, 'source');
+  expect(active).toHaveBeenLastCalledWith('source', false); // The legacy raster has no GPU geometry receipt.
+  const before = active.mock.calls.length;
+  await render();
+  await step(40);
+  expect(active.mock.calls.length).toBe(before);
+  props = { ...props, sourceToResult: () => null };
+  await render();
+  act(() => props.video.current!.dispatchEvent(new Event('seeking')));
+  await step(80);
+  expect(active).toHaveBeenLastCalledWith('source', false);
+  props = { ...props, visible: false };
+  await render();
+  expect(active).toHaveBeenLastCalledWith('source', false);
+});
+
+it('keeps one active clock registration while playing rerenders and GPU receipts advance', async () => {
+  const active = vi.fn();
+  const draw = io.render.getMockImplementation()!;
+  io.render.mockImplementation((...args: unknown[]) => ({
+    ...draw(...args),
+    geometry: { resultTime: 1 },
+  }));
+  props = { ...props, playing: true, onPresentationActive: active };
+  await render();
+  await step(0);
+  expect(active.mock.calls).toEqual([['source', true]]);
+  props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75 };
+  props.video.current!.currentTime = 2;
+  await render();
+  await step(40);
+  expect(io.render.mock.calls.length).toBeGreaterThan(1);
+  expect(active.mock.calls).toEqual([['source', true]]);
+  props = { ...props, visible: false };
+  await render();
+  expect(active.mock.calls).toEqual([
+    ['source', true],
+    ['source', false],
+  ]);
+});
+
+it('uses prepared playing RAF admission but keeps retry, visibility and latest scenes after paint', async () => {
+  props = { ...props, playing: true };
+  const frameOnly = async (value: number) => {
+    time = value;
+    await act(async () => {
+      const callbacks = [...ticks.values()];
+      ticks.clear();
+      callbacks.forEach((callback) => callback(time));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  };
+  const tasks = () =>
+    act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+  await render();
+  await frameOnly(0);
+  expect(io.render).not.toHaveBeenCalled();
+  await tasks();
+  expect(io.render).toHaveBeenCalledOnce();
+  await frameOnly(40);
+  expect(io.render).toHaveBeenCalledTimes(2);
+  act(() => result.retry());
+  await frameOnly(80);
+  expect(io.render).toHaveBeenCalledTimes(2);
+  await tasks();
+  expect(io.render).toHaveBeenCalledTimes(3);
+  props = { ...props, visible: false };
+  await render();
+  expect(ticks.size).toBe(0);
+  props = {
+    ...props,
+    visible: true,
+    scene: {
+      ...props.scene,
+      comments: props.scene.comments.map((comment) => ({
+        ...comment,
+        resolvedText: 'latest scene',
+      })),
+    },
+  };
+  await render();
+  await frameOnly(120);
+  expect(io.render).toHaveBeenCalledTimes(3);
+  await tasks();
+  expect(io.render).toHaveBeenCalledTimes(4);
+  expect(io.prepare.mock.lastCall![0].comments[0].resolvedText).toBe('latest scene');
 });

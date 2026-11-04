@@ -1,3 +1,4 @@
+import { classifyNativeExportSamplingDemand } from '../../renderer/source-sampling-plan';
 import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 import { createVideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
 import {
@@ -81,6 +82,19 @@ export function planMp4VideoRenderSpans(
     const start = boundaries[index]!;
     const end = boundaries[index + 1]!;
     if (end - start <= 0) {
+      continue;
+    }
+
+    if (
+      settings.detailEnhancement !== undefined &&
+      settings.detailEnhancement !== 'off' &&
+      classifyNativeExportSamplingDemand(project, settings, {
+        start,
+        end,
+        duration: end - start,
+      }) !== 'none'
+    ) {
+      spans.push({ kind: 'composite', reason: 'visual-effect', start, end });
       continue;
     }
 

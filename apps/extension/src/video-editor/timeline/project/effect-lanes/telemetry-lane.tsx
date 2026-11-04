@@ -413,32 +413,43 @@ interface TimelineHistoryLaneProps {
 export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
   const coverageId = useId();
   const draft = useContext(TimelineEffectDraftContext);
-  const layout = getTimelineHistoryLayout(
-    props.project,
-    props.recordingTelemetry,
-    props.cursorLaneVisible
+  const { project, recordingTelemetry, cursorLaneVisible, projection, pixelsPerSecond } = props;
+  const layout = useMemo(
+    () => getTimelineHistoryLayout(project, recordingTelemetry, cursorLaneVisible),
+    [project, recordingTelemetry, cursorLaneVisible]
   );
   const spans = useMemo(
     () =>
-      buildProjectTimelineTelemetryLaneData(props.project, props.recordingTelemetry).spans.filter(
+      buildProjectTimelineTelemetryLaneData(project, recordingTelemetry).spans.filter(
         (span) => span.kind === 'typing'
       ),
-    [props.project, props.recordingTelemetry]
+    [project, recordingTelemetry]
   );
-  const items = resolveVideoProjectActionPresentations(props.project);
-  const byId = new Map(
-    items.map((item) => [JSON.stringify([item.occurrence.eventId, item.occurrence.clipId]), item])
+  const items = useMemo(() => resolveVideoProjectActionPresentations(project), [project]);
+  const byId = useMemo(
+    () =>
+      new Map(
+        items.map((item) => [
+          JSON.stringify([item.occurrence.eventId, item.occurrence.clipId]),
+          item,
+        ])
+      ),
+    [items]
   );
-  const spansById = new Map(spans.map((span) => [span.id, span]));
-  const { actionLeft, actionWidths, groups } = buildHistoryTargetGroups({
-    items,
-    spans,
-    project: props.project,
-    projection: props.projection,
-    pixelsPerSecond: props.pixelsPerSecond,
-    draft,
-    layout,
-  });
+  const spansById = useMemo(() => new Map(spans.map((span) => [span.id, span])), [spans]);
+  const { actionLeft, actionWidths, groups } = useMemo(
+    () =>
+      buildHistoryTargetGroups({
+        items,
+        spans,
+        project,
+        projection,
+        pixelsPerSecond,
+        draft,
+        layout,
+      }),
+    [items, spans, project, projection, pixelsPerSecond, draft, layout]
+  );
   const selectTyping = (id: string) => {
     const span = spansById.get(id);
     if (!span?.signalId) return;

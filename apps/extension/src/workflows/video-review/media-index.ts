@@ -1,3 +1,4 @@
+import type { VideoExportDetailMode } from '../../features/video/project/types/export';
 import {
   getVideoExportConfigCandidates,
   supportsVideoExportConfig,
@@ -20,6 +21,7 @@ export interface ReviewRenderSettings {
   resolution?: VideoResolutionPreset;
   /** Missing quality preserves source packets when no other choice requires rendering. */
   quality?: VideoQuality;
+  detailEnhancement?: VideoExportDetailMode;
   frameRate: 0 | 24 | 30 | 60;
   frameRateMode?: 'constant' | 'adaptive';
 }

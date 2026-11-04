@@ -263,3 +263,26 @@ it('returns before paused preparation and admits only the latest control snapsho
   expect(render).toHaveBeenCalledWith(expect.objectContaining({ currentTime: 2 }));
   scheduler.dispose();
 });
+
+it('forwards a completed rendered-camera receipt without evaluating a second frame', async () => {
+  const job = createJob(1, true);
+  const camera = {
+    scale: 2,
+    viewportX: 123,
+    viewportY: 9,
+    focusPoint: { x: 0, y: 0 },
+    motionBlurAmount: 0,
+    regionId: null,
+    viewportHeight: 100,
+    viewportWidth: 200,
+  };
+  const presentation = { camera, time: 1 };
+  const onSuccess = vi.fn();
+  const render = vi.fn(async () => presentation);
+  const scheduler = createPreviewSceneRenderScheduler({ onError: vi.fn(), onSuccess, render });
+  scheduler.enqueue(job);
+  await admit();
+  expect(onSuccess).toHaveBeenCalledWith(job, presentation);
+  expect(render).toHaveBeenCalledOnce();
+  scheduler.dispose();
+});

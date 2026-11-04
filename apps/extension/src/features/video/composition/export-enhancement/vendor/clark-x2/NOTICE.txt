@@ -1,0 +1,7 @@
+Clark Realtime UI Video Upscaler x2, Clark Labs, Apache 2.0.
+Источник: https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2
+Локальное изменение: добавлен read-only getter unavailable, чтобы экспорт обнаруживал device lost и не использовал старый canvas. Веса, шейдеры и вычисления не изменены.
+
+Sniptale local change: Destroy the acquired GPU device if initialization fails.
+Model weights and WGSL remain unchanged.
+Browser globals use globalThis. The modified runtime source includes a change notice.

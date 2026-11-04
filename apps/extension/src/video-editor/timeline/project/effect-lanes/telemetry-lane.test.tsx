@@ -15,7 +15,27 @@ import {
   createTrack,
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { act } from 'react';
+import { act, useRef } from 'react';
+import { useVideoEditorStore } from '../../../state/store';
+import { useTimelineNavigation } from '../interaction-state/navigation';
+import { resolveVideoProjectActionPresentations } from '../../../../features/video/project/action-presentation';
+import { getTimelineHistoryLayout, buildHistoryTargetGroups } from './history-layout';
+vi.mock('../../../../features/video/project/action-presentation', async (original) => {
+  const actual =
+    await original<typeof import('../../../../features/video/project/action-presentation')>();
+  return {
+    ...actual,
+    resolveVideoProjectActionPresentations: vi.fn(actual.resolveVideoProjectActionPresentations),
+  };
+});
+vi.mock('./history-layout', async (original) => {
+  const actual = await original<typeof import('./history-layout')>();
+  return {
+    ...actual,
+    getTimelineHistoryLayout: vi.fn(actual.getTimelineHistoryLayout),
+    buildHistoryTargetGroups: vi.fn(actual.buildHistoryTargetGroups),
+  };
+});
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
@@ -796,4 +816,61 @@ it('passes a streamed typing interval to the source-range owner without legacy t
     resolveTypingSpanSource(project, [], select.mock.calls[0]![0])?.signal.data['eventCount']
   ).toBe(3);
   expect(project.actionFeedback![0]!.signals).toEqual([]);
+});
+
+it('retains telemetry on clock updates and invalidates authored and viewport edits', () => {
+  const project = createEmptyVideoProject('Static telemetry');
+  project.duration = 10;
+  project.actionEvents = [action('static', 2)];
+  const telemetry: RecordingTelemetryEntry[] = [];
+  const select = vi.fn();
+  const seek = vi.fn();
+  let renderedProject = project;
+  function Clock({ zoom = 100 }: { zoom?: number }) {
+    const time = useVideoEditorStore((state) => state.currentTime);
+    const timelineRef = useRef<HTMLDivElement | null>(null);
+    const navigation = useTimelineNavigation({
+      timelineRef,
+      extentSeconds: 20,
+      pixelsPerSecond: zoom,
+      viewportWidth: 800,
+    });
+    return (
+      <div ref={timelineRef} data-clock={time}>
+        <ProjectTimelineTelemetryLane
+          project={renderedProject}
+          recordingTelemetry={telemetry}
+          projection={navigation.projection}
+          pixelsPerSecond={zoom}
+          onSelectActionOccurrence={select}
+          onSeek={seek}
+        />
+      </div>
+    );
+  }
+  const prior = useVideoEditorStore.getState();
+  act(() => useVideoEditorStore.getState().setProject(project));
+  try {
+    act(() => root.render(<Clock />));
+    vi.mocked(resolveVideoProjectActionPresentations).mockClear();
+    vi.mocked(getTimelineHistoryLayout).mockClear();
+    vi.mocked(buildHistoryTargetGroups).mockClear();
+    for (const time of [0.1, 0.2, 0.3])
+      act(() => useVideoEditorStore.getState().setCurrentTime(time));
+    expect(container.firstElementChild?.getAttribute('data-clock')).toBe('0.3');
+    expect.soft(resolveVideoProjectActionPresentations).not.toHaveBeenCalled();
+    expect.soft(getTimelineHistoryLayout).not.toHaveBeenCalled();
+    expect(buildHistoryTargetGroups).not.toHaveBeenCalled();
+    act(() => container.querySelector<HTMLButtonElement>('[data-action-id="static"]')?.click());
+    expect(select).toHaveBeenCalledWith('static', null);
+    act(() => root.render(<Clock zoom={200} />));
+    expect(buildHistoryTargetGroups).toHaveBeenCalled();
+    renderedProject = { ...project, actionEvents: [action('replacement', 3)] };
+    act(() => root.render(<Clock zoom={200} />));
+    expect(resolveVideoProjectActionPresentations).toHaveBeenCalled();
+    expect(getTimelineHistoryLayout).toHaveBeenCalled();
+    expect(container.querySelector('[data-action-id="replacement"]')).not.toBeNull();
+  } finally {
+    act(() => useVideoEditorStore.setState(prior, true));
+  }
 });

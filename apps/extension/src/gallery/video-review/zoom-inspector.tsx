@@ -119,6 +119,7 @@ export function ReviewZoomInspector(props: {
   region: QuickEditZoomRegion;
   cameraFollowDefaults?: CameraFollowSettings | undefined;
   cursorPath?: CursorFocusPath | undefined;
+  cursorAvailable?: boolean | undefined;
   spatialPreview?: QuickEditZoomRegion;
   cutSuppressed?: boolean;
   zoomConversionBlocked?: boolean;
@@ -136,12 +137,14 @@ export function ReviewZoomInspector(props: {
   const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
   const following = region.followCursor ?? props.cursorPath?.mode === 'follow';
   const cursorAvailable =
+    props.cursorAvailable ??
     props.cursorPath?.segments.some(
       (segment) =>
         segment.keys.length > 0 &&
         segment.end >= (sourceRange?.start ?? region.start) &&
         segment.start <= (sourceRange?.end ?? region.end)
-    ) ?? false;
+    ) ??
+    false;
   return (
     <ReviewSpatialToolContext.Provider value={{ tool, onTool, resetTarget }}>
       <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">

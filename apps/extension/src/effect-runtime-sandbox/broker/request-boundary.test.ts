@@ -285,3 +285,10 @@ describe('EffectV1 parent to broker asset and lifetime checks', () => {
     expect(unexpected.close).toHaveBeenCalledOnce();
   });
 });
+it('admits FX density with unchanged logical extent and refuses oversized rasters', () => {
+  expect(parseRenderDimensions(1280, 720, { width: 640, height: 360 })).toEqual({
+    width: 1280,
+    height: 720,
+  });
+  expect(parseRenderDimensions(100_000, 100_000, { width: 640, height: 360 })).toBeNull();
+});

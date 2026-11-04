@@ -43,7 +43,12 @@ export interface PresentationInput {
   cameraTransform?: RenderFrame['cameraTransform'];
   cut?: ReviewCutPreviewBinding | undefined;
   webcam?: ReviewWebcamStageBinding | undefined;
-  onGeometry?(geometry: ReviewPresentedGeometry | null): void;
+  onGeometry?(
+    geometry: ReviewPresentedGeometry | null,
+    sourceTime?: number,
+    sourceIdentity?: string
+  ): void;
+  onPresentationActive?(sourceIdentity: string, active: boolean): void;
   onStatistics?(status: ReviewPreviewPresentationStatus): void;
 }
 

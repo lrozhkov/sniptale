@@ -17,7 +17,9 @@ const {
   renderCompositeToWebmMock,
   sendProgressMock,
 } = vi.hoisted(() => ({
-  historyReadMock: vi.fn(async (): Promise<readonly number[]> => []),
+  historyReadMock: vi.fn(
+    async (_profile: string, _signal: AbortSignal): Promise<readonly number[]> => []
+  ),
   historyRecordMock: vi.fn(async () => undefined),
   finalizeExportMock: vi.fn(),
   preloadClipVideosMock: vi.fn(),
@@ -316,3 +318,41 @@ it.each(['failure', 'cancelled', 'aborted'] as const)(
     expect(finalizeExportMock).not.toHaveBeenCalled();
   }
 );
+it.each(['bicubic-sharpen', 'clark-x2'] as const)(
+  'owns one %s sampling session and records its distinct ETA profile',
+  async (detailEnhancement) => {
+    const { renderCompositeExport } = await import('./render');
+    vi.stubGlobal('document', createDocumentStub({}));
+    const job = createJob();
+    let sampling: ExportJobState['sourceSampling'];
+    renderCompositeToMp4Mock.mockImplementation(async () => {
+      sampling = job.sourceSampling;
+      expect(sampling).toBeDefined();
+      return new Blob(['mp4']);
+    });
+    await renderCompositeExport(
+      job,
+      createEmptyVideoProject('Enhanced'),
+      { ...createSettings(), detailEnhancement },
+      {}
+    );
+    expect(job.sourceSampling).toBeUndefined();
+    expect(sampling).toBeDefined();
+    expect(historyReadMock.mock.calls[0]![0]).toContain(`-e${detailEnhancement}`);
+  }
+);
+it('keeps the default and explicit off ETA profile and render path identical', async () => {
+  const { renderCompositeExport } = await import('./render');
+  vi.stubGlobal('document', createDocumentStub({}));
+  renderCompositeToMp4Mock.mockResolvedValue(new Blob(['mp4']));
+  const project = createEmptyVideoProject('Off');
+  await renderCompositeExport(createJob(), project, createSettings(), {});
+  const baseline = historyReadMock.mock.calls[0]![0];
+  await renderCompositeExport(
+    createJob(),
+    project,
+    { ...createSettings(), detailEnhancement: 'off' },
+    {}
+  );
+  expect(historyReadMock.mock.calls[1]![0]).toBe(baseline);
+});

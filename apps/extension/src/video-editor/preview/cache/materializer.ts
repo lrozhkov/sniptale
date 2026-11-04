@@ -1,3 +1,5 @@
+import type { PreviewScenePresentation } from '../stage/scene/types';
+import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 import { createMaterializerGpuComposer } from './materializer-gpu';
 import { createRecordingEventsRenderer } from '../../../workflows/video-review/recording-events';
 import { createCompositionCutSampleSource } from '../../../workflows/video-review/decoded-video-sample';
@@ -46,8 +48,19 @@ const MEDIA_LOAD_TIMEOUT_MS = 2_000;
 const VIDEO_SEEK_TIMEOUT_MS = 5_000;
 const MEDIA_READY_FOR_CURRENT_FRAME = 2;
 
+export interface MaterializedPreviewFrame {
+  canvas: HTMLCanvasElement;
+  presentation: PreviewScenePresentation;
+}
+
 export interface VideoPreviewFrameMaterializer {
   readonly canvas: HTMLCanvasElement;
+  /** Returns completed pixels and their camera; this operation does not publish visible UI. */
+  renderFrameWithPresentation(
+    time: number,
+    signal: AbortSignal,
+    cameraOverride?: VideoCompositionCameraState
+  ): Promise<MaterializedPreviewFrame>;
   /** Replaces composition only between frames; false requires a new resource owner. */
   updateProject(project: VideoProject): boolean;
   dispose(): void;
@@ -258,6 +271,22 @@ export function createVideoPreviewFrameMaterializer(params: {
     ? createMaterializedJoinPresentation(params, state, canvas, stage, joinPlans)
     : null;
 
+  const renderFrameWithPresentation = async (
+    time: number,
+    signal: AbortSignal,
+    cameraOverride?: VideoCompositionCameraState
+  ): Promise<MaterializedPreviewFrame> => {
+    if (busy) throw new Error('Composition frame is already being materialized.');
+    busy = true;
+    try {
+      return await (presentation
+        ? presentation.renderFrameWithPresentation(time, signal, cameraOverride)
+        : renderMaterializedFrame(params, state, canvas, stage, time, signal, cameraOverride));
+    } finally {
+      busy = false;
+    }
+  };
+
   return {
     canvas,
     updateProject(project) {
@@ -280,16 +309,9 @@ export function createVideoPreviewFrameMaterializer(params: {
       disposeMaterializer(state, stage);
     },
     async renderFrame(time, signal, cameraOverride) {
-      if (busy) throw new Error('Composition frame is already being materialized.');
-      busy = true;
-      try {
-        return await (presentation
-          ? presentation.renderFrame(time, signal, cameraOverride)
-          : renderMaterializedFrame(params, state, canvas, stage, time, signal, cameraOverride));
-      } finally {
-        busy = false;
-      }
+      return (await renderFrameWithPresentation(time, signal, cameraOverride)).canvas;
     },
+    renderFrameWithPresentation,
   };
 }
 
@@ -300,7 +322,7 @@ function createMaterializedJoinPresentation(
   stage: HTMLDivElement,
   plans: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>,
   sceneEdges: 'include' | 'omit' = 'include'
-): Pick<VideoPreviewFrameMaterializer, 'dispose' | 'renderFrame'> & {
+): Pick<VideoPreviewFrameMaterializer, 'dispose' | 'renderFrameWithPresentation'> & {
   updateProject(
     project: VideoProject,
     plans: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>
@@ -334,7 +356,7 @@ function createMaterializedJoinPresentation(
           cutPlans,
           'omit'
         );
-        return nestedCuts.renderFrame(time, signal, cameraOverride);
+        return nestedCuts.renderFrameWithPresentation(time, signal, cameraOverride);
       }
       return renderMaterializedFrame(
         params,
@@ -409,7 +431,7 @@ function createMaterializedJoinPresentation(
       );
     },
     renderSample: async (time, signal) => ({
-      canvas: await renderSample(time, signal),
+      canvas: (await renderSample(time, signal)).canvas,
       release() {},
     }),
   });
@@ -431,7 +453,11 @@ function createMaterializedJoinPresentation(
       resources.dispose();
       gpuComposer.dispose();
     },
-    async renderFrame(time: number, signal: AbortSignal, nextCamera?: VideoCompositionCameraState) {
+    async renderFrameWithPresentation(
+      time: number,
+      signal: AbortSignal,
+      nextCamera?: VideoCompositionCameraState
+    ) {
       throwIfAborted(signal);
       if (disposed || state.disposed)
         throw new DOMException('Preview preparation was cancelled', 'AbortError');
@@ -463,6 +489,15 @@ function createMaterializedJoinPresentation(
             sceneEdges === 'omit' ? 'omit' : undefined
           );
         }
+        const framePresentation: PreviewScenePresentation = {
+          camera:
+            cameraOverride ??
+            resolveVideoCompositionFrame(
+              await prepareMaterializerRenderProject(params.project, state, time, signal),
+              time
+            ).camera,
+          time,
+        };
         const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Preview frame context is unavailable.');
@@ -525,7 +560,7 @@ function createMaterializedJoinPresentation(
         } finally {
           artwork.width = artwork.height = 0;
         }
-        return canvas;
+        return { canvas, presentation: framePresentation };
       } catch (error) {
         endpoints.clear();
         throw error;
@@ -601,6 +636,24 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
   stage.remove();
 }
 
+async function prepareMaterializerRenderProject(
+  project: VideoProject,
+  state: VideoPreviewMaterializerState,
+  time: number,
+  signal: AbortSignal
+) {
+  const eventsProject = await state.recordingEventsRenderer.prepare(
+    project,
+    { start: time, end: time },
+    signal
+  );
+  signal.throwIfAborted();
+  const renderProject = await state.cursorTrajectoryRenderer.prepare(eventsProject, time);
+  signal.throwIfAborted();
+  if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
+  return renderProject;
+}
+
 async function renderMaterializedFrame(
   params: Parameters<typeof createVideoPreviewFrameMaterializer>[0],
   state: VideoPreviewMaterializerState,
@@ -611,7 +664,7 @@ async function renderMaterializedFrame(
   cameraOverride?: VideoCompositionCameraState,
   sceneEdges: 'apply' | 'omit' = 'apply',
   decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>
-): Promise<HTMLCanvasElement> {
+): Promise<MaterializedPreviewFrame> {
   const assertActive = () => {
     throwIfAborted(signal);
     if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
@@ -645,13 +698,12 @@ async function renderMaterializedFrame(
     if (!decodedVideoFrames) await prepareMaterializedVideos(params, state, stage, time, signal);
     else state.videoRefs = {};
     assertActive();
-    const eventsProject = await state.recordingEventsRenderer.prepare(
+    const renderProject = await prepareMaterializerRenderProject(
       params.project,
-      { start: time, end: time },
+      state,
+      time,
       signal
     );
-    assertActive();
-    const renderProject = await state.cursorTrajectoryRenderer.prepare(eventsProject, time);
     assertActive();
     const drawn = await renderPreviewScene({
       gpuPreview: state.gpuPreview,
@@ -695,8 +747,8 @@ async function renderMaterializedFrame(
       ...(decodedVideoFrames ? { decodedVideoFrames } : {}),
     });
     assertActive();
-    if (drawn === false) throw new Error('Preview frame is unavailable.');
-    return canvas;
+    if (!drawn) throw new Error('Preview frame is unavailable.');
+    return { canvas, presentation: drawn };
   } catch (error) {
     state.playbackSampler?.dispose();
     state.playbackSampler = null;

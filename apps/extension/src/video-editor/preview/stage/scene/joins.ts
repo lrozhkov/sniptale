@@ -97,13 +97,14 @@ export function createVideoPreviewCompositionJoinRenderer(
         ? AbortSignal.any([input.signal, current.controller.signal])
         : current.controller.signal;
       try {
-        const frame = await current.materializer.renderFrame(
+        const frame = await current.materializer.renderFrameWithPresentation(
           input.currentTime,
           signal,
           input.cameraOverride
         );
         signal.throwIfAborted();
-        return publishPreviewCompositionFrame({ ...input, signal }, frame);
+        const published = publishPreviewCompositionFrame({ ...input, signal }, frame.canvas);
+        return published === false ? false : frame.presentation;
       } catch (error) {
         if (signal.aborted) return false;
         releaseSampler();

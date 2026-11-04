@@ -75,6 +75,22 @@ type VideoLayer = Extract<Layer, { kind: 'video' }>;
 const IDENTITY: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const PADDING = 128;
 
+function integerArtworkBounds(bounds: GpuPreviewLayer['rect'] | null) {
+  if (
+    !bounds ||
+    ![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite) ||
+    bounds.width <= 0 ||
+    bounds.height <= 0
+  )
+    return null;
+  const x = Math.floor(bounds.x),
+    y = Math.floor(bounds.y);
+  const right = Math.ceil(bounds.x + bounds.width),
+    bottom = Math.ceil(bounds.y + bounds.height);
+  if (!Number.isFinite(right) || !Number.isFinite(bottom) || right <= x || bottom <= y) return null;
+  return { x, y, width: right - x, height: bottom - y };
+}
+
 /** Describes ordered GPU work; vector artwork and alpha masks never read back video pixels. */
 export async function buildNativeGpuPreviewLayers(args: {
   snapshotGroup?: (group: GpuPreviewGroup) => Promise<ImageBitmap>;
@@ -143,11 +159,11 @@ export async function buildNativeGpuPreviewLayers(args: {
     measure.width = measure.height = 0;
   }
   const extraBounds = passes.overlayFrame.actions.flatMap((action) => {
-    const bounds = resolveActionCompositionPaintBounds(action, 1);
+    const bounds = integerArtworkBounds(resolveActionCompositionPaintBounds(action, 1));
     return bounds ? [bounds] : [];
   });
   const cursorBounds = passes.overlayFrame.cursor
-    ? resolveCursorCompositionPaintBounds(passes.overlayFrame.cursor)
+    ? integerArtworkBounds(resolveCursorCompositionPaintBounds(passes.overlayFrame.cursor))
     : null;
   if (cursorBounds) extraBounds.push(cursorBounds);
   const left = Math.floor(Math.min(-PADDING, paintBounds.x, ...extraBounds.map((rect) => rect.x)));
@@ -169,9 +185,10 @@ export async function buildNativeGpuPreviewLayers(args: {
   const plane = { x: left, y: top, width: right - left, height: bottom - top };
   const raster = (
     paint: (context: CanvasRenderingContext2D) => void,
-    padded = false
+    padded = false,
+    artworkBounds?: GpuPreviewLayer['rect'] | null
   ): GpuPreviewLayer => {
-    const bounds = padded ? plane : { x: 0, y: 0, ...logical };
+    const bounds = artworkBounds ?? (padded ? plane : { x: 0, y: 0, ...logical });
     const canvas = input.canvas.ownerDocument.createElement('canvas');
     canvas.width = Math.ceil(bounds.width);
     canvas.height = Math.ceil(bounds.height);
@@ -684,7 +701,10 @@ export async function buildNativeGpuPreviewLayers(args: {
                 scaleY: 1,
               })
             : drawActionCompositionState(context, action, null, 1),
-        true
+        true,
+        action.renderKind === 'keystroke'
+          ? null
+          : integerArtworkBounds(resolveActionCompositionPaintBounds(action, 1))
       );
       layers.push(
         ...(action.renderKind === 'keystroke'
@@ -698,7 +718,8 @@ export async function buildNativeGpuPreviewLayers(args: {
           [
             raster(
               (context) => drawCursorCompositionState(context, passes.overlayFrame.cursor!),
-              true
+              true,
+              cursorBounds
             ),
           ],
           passes.overlayFrame.camera,

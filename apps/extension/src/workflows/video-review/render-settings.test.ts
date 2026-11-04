@@ -245,3 +245,25 @@ it('retains the source crop when an export resolution scales the canvas', () => 
   );
   expect(scene.canvas.crop).toEqual(canvas.crop);
 });
+
+it.each([undefined, 'off', 'bicubic-sharpen', 'clark-x2'] as const)(
+  'preserves the encoding profile for detail mode %s',
+  (detailEnhancement) => {
+    const advanced = createQuickEditAdvancedState();
+    expect(
+      resolveReviewOutputProfile(index, advanced, {
+        frameRate: 0,
+        ...(detailEnhancement === undefined ? {} : { detailEnhancement }),
+      })
+    ).toEqual(resolveReviewOutputProfile(index, advanced, { frameRate: 0 }));
+  }
+);
+it.each([null, 0, {}, 'unknown'])('rejects invalid Gallery detail mode %s', (detailEnhancement) => {
+  expect(() =>
+    Reflect.apply(resolveReviewOutputProfile, undefined, [
+      index,
+      createQuickEditAdvancedState(),
+      { frameRate: 0, detailEnhancement },
+    ])
+  ).toThrow('Invalid enhancement mode');
+});

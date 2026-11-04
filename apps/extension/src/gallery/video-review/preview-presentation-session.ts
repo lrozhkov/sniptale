@@ -67,6 +67,8 @@ class ManualPresentationSession {
   private cameraState: PresentationCameraState = { phase: 'loading', duration: 0, ready: false };
   private readonly publications: number[] = [];
   private readonly video: HTMLVideoElement | null;
+  private readonly sourceIdentity: string;
+  private clockActive = false;
   private readonly admission: ReturnType<typeof createPresentationAdmission>;
   private contextLost = false;
   private sourceFrameCallback: number | null = null;
@@ -82,6 +84,7 @@ class ManualPresentationSession {
     private readonly reportCamera: (state: PresentationCameraState) => void
   ) {
     this.video = latest().input.video.current;
+    this.sourceIdentity = latest().input.sourceIdentity;
     this.admission = createPresentationAdmission(
       () => ({ playing: this.latest().input.playing, video: this.latest().input.video.current }),
       () => this.current,
@@ -91,6 +94,7 @@ class ManualPresentationSession {
     this.renderer = this.createRenderer();
     this.scheduler = createReviewPreviewPresentation({
       ...createReviewPresentationPaintClock(),
+      allowPreparedPlayingFrames: true,
       now: () => performance.now(),
       sampleTime: this.sampleTime,
       prepare: this.prepare,
@@ -102,11 +106,17 @@ class ManualPresentationSession {
     this.connectSources();
   }
 
+  private reportClock(active: boolean) {
+    if (this.clockActive === active) return;
+    this.clockActive = active;
+    this.latest().input.onPresentationActive?.(this.sourceIdentity, active);
+  }
+
   private clearFront() {
     this.front?.canvas.parentElement?.replaceChildren();
     this.front?.release();
     this.front = null;
-    this.latest().input.onGeometry?.(null);
+    this.latest().input.onGeometry?.(null, undefined, this.sourceIdentity);
   }
 
   private status(phase: ReviewPreviewPresentationStatus['phase']) {
@@ -139,6 +149,7 @@ class ManualPresentationSession {
       onContextLost: () => {
         if (!this.disposed) {
           this.contextLost = true;
+          this.reportClock(false);
           this.scheduler.invalidate();
           this.status('failed');
         }
@@ -303,13 +314,19 @@ class ManualPresentationSession {
     if (!cadenceRequested) this.publications.length = 0;
     while (this.publications.length > 2 && this.publications[0]! < performance.now() - 1000)
       this.publications.shift();
-    this.latest().input.onGeometry?.(value.completed.geometry ?? null);
+    this.reportClock(this.playing && value.completed.geometry != null);
+    this.latest().input.onGeometry?.(
+      value.completed.geometry ?? null,
+      value.completed.sourceTime,
+      this.sourceIdentity
+    );
     this.reportBounds(value.prepared.watermarkBounds);
     this.status('ready');
   };
 
   private onError = (error: unknown) => {
     this.waiting = error instanceof PendingPresentation;
+    this.reportClock(false);
     if (!this.waiting) {
       this.diagnostics.reportFailure(error);
       this.diagnosed = true;
@@ -320,6 +337,7 @@ class ManualPresentationSession {
   readonly ready = () => {
     if (!this.disposed && this.waiting) {
       this.waiting = false;
+      this.reportClock(this.playing && !this.contextLost);
       this.scheduler.invalidate();
     }
   };
@@ -327,6 +345,7 @@ class ManualPresentationSession {
   private seeking = () => {
     this.publications.length = 0;
     this.waiting = true;
+    this.reportClock(false);
     this.scheduler.invalidate();
     this.status('pending');
   };
@@ -381,6 +400,7 @@ class ManualPresentationSession {
     const deferFrames = !input.playing && !!input.deferFrames;
     if (this.playing !== input.playing || !active) this.publications.length = 0;
     this.playing = active && input.playing;
+    this.reportClock(this.playing && !this.waiting && !this.diagnosed && !this.contextLost);
     this.scheduler.update({
       scene: description,
       generation: String(generation),
@@ -414,12 +434,14 @@ class ManualPresentationSession {
     this.renderer = this.createRenderer();
     this.admission.resetAssets();
     this.contextLost = false;
+    this.reportClock(this.playing);
     this.status('pending');
   }
 
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.reportClock(false);
     this.cancelSourceFrameCallback();
     this.scheduler.dispose();
     for (const event of ['loadeddata', 'seeked', 'timeupdate'])

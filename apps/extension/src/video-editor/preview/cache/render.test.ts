@@ -1,3 +1,4 @@
+import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 // @vitest-environment jsdom
 
 import { expect, it, vi } from 'vitest';
@@ -24,6 +25,11 @@ it('presents only an exact cache hit without invoking the renderer', async () =>
   const bitmap = new FakeImageBitmap(1280, 720);
   const cache = createVideoPreviewExactFrameCache(1024);
   vi.spyOn(cache, 'get').mockReturnValue(bitmap);
+  const presentation = {
+    camera: resolveVideoCompositionFrame(createEmptyVideoProject(), 1).camera,
+    time: 1,
+  };
+  vi.spyOn(cache, 'getPresentation').mockReturnValue(presentation);
   const render = vi.fn();
 
   await renderPreviewSceneWithExactCache({
@@ -72,6 +78,49 @@ it('does not cache a retained old frame when the renderer defers an unavailable 
     expect(capture).not.toHaveBeenCalled();
     expect(set).not.toHaveBeenCalled();
   } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('refuses cached pixels without a camera and retains the newly rendered pose', async () => {
+  const canvas = document.createElement('canvas');
+  const draw = vi.spyOn(canvas.getContext('2d')!, 'drawImage').mockImplementation(() => {});
+  canvas.width = canvas.height = 2;
+  const cache = createVideoPreviewExactFrameCache(64);
+  const project = createEmptyVideoProject('Camera receipt', 2, 2);
+  const presentation = {
+    camera: { ...resolveVideoCompositionFrame(project, 1).camera, scale: 2.4, viewportX: 123 },
+    time: 1,
+  };
+  const key = 'preview-frame-v1:revision:30:2x2:30';
+  cache.set(key, new FakeImageBitmap(2, 2));
+  const render = vi.fn(async () => presentation);
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async () => new FakeImageBitmap(2, 2))
+  );
+  try {
+    const args = {
+      cache,
+      render,
+      job: {
+        canvas,
+        currentTime: 1,
+        imageBank: {},
+        previewMode: 'cache' as const,
+        previewRasterSize: { width: 2, height: 2 },
+        project,
+        renderRevision: Promise.resolve('revision'),
+        stage: null,
+        videoRefs: { current: {} },
+      },
+    };
+    await expect(renderPreviewSceneWithExactCache(args)).resolves.toBe(presentation);
+    expect(cache.getPresentation(key)).toBe(presentation);
+    await expect(renderPreviewSceneWithExactCache(args)).resolves.toBe(presentation);
+    expect(render).toHaveBeenCalledOnce();
+  } finally {
+    draw.mockRestore();
     vi.unstubAllGlobals();
   }
 });

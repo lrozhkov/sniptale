@@ -113,7 +113,10 @@ it.each([false, true])(
   'clips spotlight corners to the same decorated window with perspective=%s',
   (spatial) => {
     const canvas = { width: 800, height: 450 } as HTMLCanvasElement;
-    const context = {} as CanvasRenderingContext2D;
+    const context = {
+      save: vi.fn(),
+      restore: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
     const background = {
       enabled: true as const,
       type: 'solid' as const,
@@ -153,6 +156,8 @@ it.each([false, true])(
     expect(clip.rect).toEqual(window);
     expect(clip.radius).toBeCloseTo((24 * window.width) / layout.windowRect.width);
     if (spatial) expect(clip.radius).toBeGreaterThan(24);
+    expect(context.save).toHaveBeenCalledTimes(spatial ? 0 : 1);
+    expect(context.restore).toHaveBeenCalledTimes(spatial ? 0 : 1);
   }
 );
 
@@ -181,7 +186,10 @@ it('forwards managed resources and uses canonical spatial content before viewpor
     camera,
   });
   const context = {} as CanvasRenderingContext2D;
-  const overlayContext = {} as CanvasRenderingContext2D;
+  const overlayContext = {
+    save: vi.fn(),
+    restore: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
   const resources = { canvas: vi.fn(), bytes: vi.fn() };
   const renderer = {
     validateSizes: vi.fn(),
@@ -228,6 +236,8 @@ it('forwards managed resources and uses canonical spatial content before viewpor
   const calls = vi.mocked(drawReviewSceneComments).mock.invocationCallOrder;
   expect(calls[0]).toBeLessThan(renderer.draw.mock.invocationCallOrder[0]!);
   expect(calls[1]).toBeGreaterThan(renderer.draw.mock.invocationCallOrder[0]!);
+  expect(overlayContext.save).toHaveBeenCalledOnce();
+  expect(overlayContext.restore).toHaveBeenCalledOnce();
 });
 
 it.each(['absent', 'hidden', 'outside-time', 'not-exported'] as const)(

@@ -99,6 +99,8 @@ type ReviewStageProps = {
     | {
         preferences: QuickPreviewPreferences;
         playing: boolean;
+        onPresentationActive?: (sourceIdentity: string, active: boolean) => void;
+        onPresentedTime?: (sourceIdentity: string, sourceTime: number) => void;
         interacting?: boolean;
         sourceToResult(time: number): number | null;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
@@ -201,15 +203,18 @@ export function ReviewStage(props: ReviewStageProps) {
     source: string;
     geometry: ReviewPresentedGeometry | null;
   } | null>(null);
+  const onPresentedTime = props.preview?.onPresentedTime;
   const receiveGeometry = useCallback(
-    (geometry: ReviewPresentedGeometry | null) => {
+    (geometry: ReviewPresentedGeometry | null, sourceTime?: number, sourceIdentity?: string) => {
+      if (sourceIdentity !== undefined && sourceIdentity !== props.url) return;
       setReceipt((previous) =>
         previous?.source === props.url && previous.geometry === geometry
           ? previous
           : { source: props.url, geometry }
       );
+      if (geometry && sourceTime !== undefined) onPresentedTime?.(props.url, sourceTime);
     },
-    [props.url]
+    [props.url, onPresentedTime]
   );
   const presented = receipt?.source === props.url ? receipt.geometry : null;
   const representedProps =

@@ -17,7 +17,7 @@ import {
   createVideoPreviewExactFrameKey,
   type VideoPreviewExactFrameCache,
 } from './exact-frame-cache';
-import type { VideoPreviewFrameMaterializer } from './materializer';
+import type { VideoPreviewFrameMaterializer, MaterializedPreviewFrame } from './materializer';
 import type { VideoPreviewCacheSegmentPlanEntry } from './segments';
 import type { PreparedCachedVideoPreview } from './types';
 
@@ -177,12 +177,15 @@ export function isStoredVideoPreviewCompatible(
 export async function cacheExactVideoPreviewFrame(
   context: FreshVideoPreviewBuildContext,
   frameIndex: number,
-  canvas: HTMLCanvasElement
+  frame: MaterializedPreviewFrame
 ): Promise<boolean> {
   if (typeof createImageBitmap !== 'function') return false;
-  const bitmap = await createImageBitmap(canvas);
+  const bitmap = await createImageBitmap(frame.canvas);
   const { params } = context;
-  return params.cache.set(createExactFrameKey(context, frameIndex), bitmap) === 'stored';
+  return (
+    params.cache.set(createExactFrameKey(context, frameIndex), bitmap, frame.presentation) ===
+    'stored'
+  );
 }
 
 export function reportVideoPreviewBuildProgress(

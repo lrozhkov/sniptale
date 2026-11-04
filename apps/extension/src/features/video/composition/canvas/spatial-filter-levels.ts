@@ -5,6 +5,7 @@ type FilterInput = {
   output: { width: number; height: number };
   precision: number;
   blurWeights: readonly number[];
+  sourceScale?: { x: number; y: number };
 };
 
 function validFilterInput(args: FilterInput) {
@@ -13,6 +14,10 @@ function validFilterInput(args: FilterInput) {
   );
   return (
     validSize &&
+    (!args.sourceScale ||
+      [args.sourceScale.x, args.sourceScale.y].every(
+        (value) => Number.isFinite(value) && value > 0
+      )) &&
     Number.isInteger(args.precision) &&
     args.precision >= 16 &&
     args.precision <= 32 &&
@@ -83,13 +88,17 @@ function footprintUpperBound(
 /** A finite-step footprint bound for the exact inverse projection used by the fragment shader. */
 export function resolveReviewSpatialFilterLevels(args: FilterInput) {
   if (!validFilterInput(args)) return 8;
-  const matrix = args.inverse.map(Math.fround);
+  const scale = args.sourceScale ?? { x: 1, y: 1 };
+  const matrix = args.inverse.map(
+    (value, index) => Math.fround(value) * (index < 3 ? scale.x : index < 6 ? scale.y : 1)
+  );
   if (!finiteHomography(matrix)) return 8;
   const epsilon = 2 ** -Math.min(23, args.precision);
   const footprint = footprintUpperBound(matrix, args.output, epsilon);
   // smoothstep contributes at most one times each nonnegative, float32 focus weight.
   const weight = args.blurWeights.reduce((sum, value) => sum + Math.max(0, Math.fround(value)), 0);
-  const blur = ((weight * 24 * args.output.width) / 1920) * (1 + 16 * epsilon);
+  const blur =
+    ((weight * 24 * args.output.width) / 1920) * Math.max(scale.x, scale.y) * (1 + 16 * epsilon);
   const bound = Math.max(footprint, blur) * (1 + 1e-10);
   if (!Number.isFinite(bound)) return 8;
   if (bound <= 1) return 1;

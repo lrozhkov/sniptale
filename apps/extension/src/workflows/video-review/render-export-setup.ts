@@ -16,6 +16,7 @@ import {
   type ReviewRenderPreparation,
 } from './render-settings';
 import { cleanupReviewExportFailure } from './export-diagnostics';
+import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 
 type Dimensions = Parameters<typeof createReviewPresentationMain>[0]['dimensions'];
 
@@ -23,7 +24,8 @@ type Dimensions = Parameters<typeof createReviewPresentationMain>[0]['dimensions
 export async function prepareReviewFrameDecorations(
   args: ReviewFrameExportInput,
   preparation: ReviewRenderPreparation,
-  source: { dimensions: Dimensions; sourceSize: { width: number; height: number } }
+  source: { dimensions: Dimensions; sourceSize: { width: number; height: number } },
+  exportEnhancer?: ExportEnhancer
 ) {
   let main: Awaited<ReturnType<typeof createReviewPresentationMain>> | null = null;
   let watermark: WatermarkRenderer | null = null;
@@ -31,6 +33,7 @@ export async function prepareReviewFrameDecorations(
   try {
     if (preparation.effective.annotationEffects)
       main = await createReviewPresentationMain({
+        ...(exportEnhancer ? { exportEnhancer } : {}),
         file: args.file,
         index: args.index,
         edits: args.edits,

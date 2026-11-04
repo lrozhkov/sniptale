@@ -20,8 +20,10 @@ export interface ProjectCompositionSceneInput {
   context: CanvasRenderingContext2D;
   currentTime: number;
   captionSampleTime?: number;
+  sourceSamplingFallback?: 'first' | 'last';
   job: Pick<
     ExportJobState,
+    | 'sourceSampling'
     | 'cancelled'
     | 'cameraSpatialRenderer'
     | 'captionRenderer'
@@ -86,16 +88,19 @@ export async function renderProjectCompositionScene(
     ...(args.compositionIndex ? { compositionIndex: args.compositionIndex } : {}),
     clipMediaElements: args.clipMediaElements,
     currentTime,
+    ...(args.sourceSamplingFallback ? { sourceSamplingFallback: args.sourceSamplingFallback } : {}),
     loadedImages: args.loadedImages,
     ...(ownerDocument ? { ownerDocument } : {}),
     project: renderProject,
     ...(signal ? { signal } : {}),
     spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
+    ...(job.sourceSampling ? { sourceSampling: job.sourceSampling } : {}),
   };
-  const frames = await (args.effectRuntime
-    ? args.effectRuntime.renderProjectFrames(frameArgs)
-    : renderOffscreenProjectEffectFrames(frameArgs));
+  let frames: Awaited<ReturnType<typeof renderOffscreenProjectEffectFrames>>;
   try {
+    frames = await (args.effectRuntime
+      ? args.effectRuntime.renderProjectFrames(frameArgs)
+      : renderOffscreenProjectEffectFrames(frameArgs));
     assertLive();
     await drawProjectFrame(
       context,
@@ -106,6 +111,12 @@ export async function renderProjectCompositionScene(
       args.clipMediaElements,
       {
         spatialRenderer: frameArgs.spatialRenderer,
+        ...(args.sourceSamplingFallback
+          ? { sourceSamplingFallback: args.sourceSamplingFallback }
+          : {}),
+        ...(job.sourceSampling
+          ? { sourceSampling: job.sourceSampling, ...(signal ? { signal } : {}) }
+          : {}),
         ...(args.compositionIndex ? { compositionIndex: args.compositionIndex } : {}),
         ...(frames ? { effectRuntimeFrames: frames } : {}),
         ...(args.backgroundCache ? { backgroundCache: args.backgroundCache } : {}),
@@ -116,5 +127,6 @@ export async function renderProjectCompositionScene(
     watermark?.draw(context);
   } finally {
     disposeEffectRuntimeComposition(frames);
+    job.sourceSampling?.releasePass();
   }
 }

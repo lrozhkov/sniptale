@@ -489,3 +489,79 @@ it('preserves annotation and comment order with shared per-draw coverage and fre
   );
   f.primitives.dispose();
 });
+
+import { projectQuickEditPoint } from '../../features/video/composition/motion/spatial-geometry';
+
+function expectUniformFillSupport(layer: GpuPreviewLayer) {
+  if (
+    !('width' in layer.source) ||
+    !('height' in layer.source) ||
+    typeof layer.source.width !== 'number' ||
+    typeof layer.source.height !== 'number'
+  )
+    throw new Error('Expected raster fill.');
+  for (let y = 0; y < 12; y++)
+    for (let x = 0; x < 20; x++) {
+      const point = projectQuickEditPoint(layer.inverse, {
+        x: ((x + 0.5) * size.width) / 20,
+        y: ((y + 0.5) * size.height) / 12,
+      });
+      if (!point) throw new Error('Viewport fill sampling is unavailable.');
+      const sourceX = ((point.x - layer.rect.x) / layer.rect.width) * layer.source.width;
+      const sourceY = ((point.y - layer.rect.y) / layer.rect.height) * layer.source.height;
+      // A uniform field must sample inside texel centres, where transparent-edge AA is exactly one.
+      expect(sourceX).toBeGreaterThanOrEqual(0.5);
+      expect(sourceX).toBeLessThanOrEqual(layer.source.width - 0.5);
+      expect(sourceY).toBeGreaterThanOrEqual(0.5);
+      expect(sourceY).toBeLessThanOrEqual(layer.source.height - 0.5);
+    }
+}
+
+it.each([1, 0.5])(
+  'keeps every viewport sample fully supported for a uniform fade opacity%s',
+  (opacity) => {
+    const f = fixture();
+    const layers = reviewGpuFinishLayers({
+      scene,
+      dimensions,
+      main: f.main,
+      sourceTime: 0,
+      resultTime: 0,
+      primitives: f.primitives,
+      caption: f.caption,
+      watermark: null,
+      blackout: { opacity, color: '#000000' },
+    });
+    expect(layers.at(-2)).toBe(f.caption);
+    expectUniformFillSupport(layers.at(-1)!);
+    expect(layers.at(-1)!.source).toMatchObject({ width: 2, height: 2 });
+    f.primitives.dispose();
+  }
+);
+
+it('keeps split-screen background uniform while zero fade adds no layer or geometry change', () => {
+  const f = fixture();
+  const webcam = createQuickEditWebcam('camera', size, size);
+  webcam.split = 'left';
+  const camera = {
+    source: size,
+    placement: webcam.placement,
+    drawable: { videoFrame: () => ({}) as VideoFrame },
+  };
+  const layers = reviewGpuFinishLayers({
+    scene: { ...scene, webcam },
+    dimensions,
+    main: f.main,
+    camera,
+    sourceTime: 0,
+    resultTime: 0,
+    primitives: f.primitives,
+    caption: f.caption,
+    watermark: null,
+    blackout: { opacity: 0, color: '#000000' },
+  });
+  expectUniformFillSupport(layers[0]!);
+  expect(layers.at(-1)).toBe(f.caption);
+  expect(layers.some((layer) => layer.source === f.main)).toBe(true);
+  f.primitives.dispose();
+});

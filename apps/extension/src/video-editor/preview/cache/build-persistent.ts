@@ -47,14 +47,14 @@ async function renderPersistentSegment(params: {
     endFrame: segment.endFrame,
     fps: context.params.project.fps,
     onFrame: async (frameIndex) => {
-      const canvas = await context.materializer.renderFrame(
+      const frame = await context.materializer.renderFrameWithPresentation(
         frameIndex / context.params.project.fps,
         context.params.signal
       );
       if (
         state.exactFramesCached < context.exactFrameCapacity &&
         (hasExactVideoPreviewFrame(context, frameIndex) ||
-          (await cacheExactVideoPreviewFrame(context, frameIndex, canvas)))
+          (await cacheExactVideoPreviewFrame(context, frameIndex, frame)))
       ) {
         state.exactFramesCached += 1;
       }

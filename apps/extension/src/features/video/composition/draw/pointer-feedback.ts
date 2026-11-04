@@ -3,6 +3,8 @@ import type { ReviewClickFrame } from '../../review/click-animation';
 
 /** Original media pixels in the same coordinate plane as the feedback frame. */
 export interface PointerFeedbackSource {
+  /** Paints enhanced sharp content; the original draw remains the optical rim source. */
+  sharpPaint?(context: CanvasRenderingContext2D): void;
   rect: { x: number; y: number; width: number; height: number };
   draw(
     context: CanvasRenderingContext2D,
@@ -93,13 +95,15 @@ function drawLens(
     try {
       context.clip();
       const sharp = () =>
-        source.draw(
-          context,
-          x + (source.rect.x - x) * lens.scale,
-          y + (source.rect.y - y) * lens.scale,
-          source.rect.width * lens.scale,
-          source.rect.height * lens.scale
-        );
+        source.sharpPaint
+          ? source.sharpPaint(context)
+          : source.draw(
+              context,
+              x + (source.rect.x - x) * lens.scale,
+              y + (source.rect.y - y) * lens.scale,
+              source.rect.width * lens.scale,
+              source.rect.height * lens.scale
+            );
       if (lens.optics === 'optical') {
         const bounds = { x: x - radius, y: y - radius, width: radius * 2, height: radius * 2 };
         drawOpticalGlass(

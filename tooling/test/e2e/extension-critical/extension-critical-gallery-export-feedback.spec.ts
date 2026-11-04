@@ -5,8 +5,8 @@ import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
-  { locale: 'en', theme: 'light' },
-  { locale: 'ru', theme: 'dark' },
+  { locale: 'en', theme: 'light', viewport: { width: 1280, height: 560 } },
+  { locale: 'ru', theme: 'dark', viewport: { width: 1920, height: 900 } },
   { locale: 'en', theme: 'light', viewport: { width: 1200, height: 560 } },
 ] as const) {
   test(
@@ -14,7 +14,7 @@ for (const variant of [
       'export feedback locks editing and playback and releases after ',
       'completion/cancel/error (',
       String(variant.locale),
-      String('viewport' in variant ? ', narrow' : ''),
+      String(variant.viewport.width),
       ')',
     ].join(''),
     async ({ page }, info) => {
@@ -32,6 +32,9 @@ for (const variant of [
             'sniptale-theme-preference': variant.theme,
           },
         });
+        await page.addInitScript(() =>
+          Object.defineProperty(navigator, 'gpu', { configurable: true, value: undefined })
+        );
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
         await page.locator('[data-ui="gallery.page.root"]').waitFor();
         await seedReviewVideo(page, 'review-cut-vfr.webm', { width: 160, height: 90, duration: 6 });
@@ -41,6 +44,45 @@ for (const variant of [
         await button('gallery.videoReview.advancedEditing').click();
         await button('gallery.videoReview.scene').click();
         await button('gallery.videoReview.backgroundSolid').click();
+        await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+        const detailField = dialog.locator('[data-ui="video.exportDetailEnhancement"]');
+        const detailChoice = detailField.getByRole('button', {
+          name: label('videoEditor.exportDialog.detailEnhancementLabel'),
+          exact: true,
+        });
+        await detailChoice.scrollIntoViewIfNeeded();
+        await expect(detailField).toContainText(
+          label('videoEditor.exportDialog.detailEnhancementHint')
+        );
+        await expect(detailField).toContainText(
+          label('videoEditor.exportDialog.detailEnhancementWebGpuUnavailable')
+        );
+        await detailChoice.focus();
+        await page.keyboard.press('Enter');
+        await expect(
+          page.getByRole('option', {
+            name: label('videoEditor.exportDialog.detailEnhancementClark'),
+            exact: true,
+          })
+        ).toBeDisabled();
+        await page
+          .getByRole('option', {
+            name: label('videoEditor.exportDialog.detailEnhancementBicubic'),
+            exact: true,
+          })
+          .click();
+        await expect(detailChoice).toContainText(
+          label('videoEditor.exportDialog.detailEnhancementBicubic')
+        );
+        await detailChoice.click();
+        await page
+          .getByRole('option', {
+            name: label('videoEditor.exportDialog.detailEnhancementOff'),
+            exact: true,
+          })
+          .click();
+        await button('gallery.videoReview.scene').click();
+
         // Hold the real encoder flush so every busy state can be inspected deterministically.
         await page.evaluate(() => {
           const flush = VideoEncoder.prototype.flush;

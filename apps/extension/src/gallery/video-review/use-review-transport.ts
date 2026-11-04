@@ -43,6 +43,8 @@ export function useReviewTransport(args: {
     onTime,
     playing,
     setPlaying,
+    setPresentationActive,
+    onPresentedTime,
     seek,
     play,
     playbackRange,
@@ -141,6 +143,8 @@ export function useReviewTransport(args: {
     onTime,
     playing,
     setPlaying,
+    setPresentationActive,
+    onPresentedTime,
     seek,
     play: async () => {
       if (video.current?.paused && !args.silent) {

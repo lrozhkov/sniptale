@@ -1,3 +1,4 @@
+import type { PreviewScenePresentation } from './types';
 import type { renderPreviewScene } from './render-preview';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 
@@ -24,7 +25,7 @@ interface PreviewSceneRenderSchedulerState {
 
 interface PreviewSceneRenderSchedulerOptions {
   onError: (error: unknown) => void;
-  onSuccess?: (job: PreviewSceneRenderJob) => void;
+  onSuccess?: (job: PreviewSceneRenderJob, presentation?: PreviewScenePresentation) => void;
   render: (job: Parameters<typeof renderPreviewScene>[0]) => ReturnType<typeof renderPreviewScene>;
 }
 
@@ -106,7 +107,7 @@ function startNextPreviewSceneRender(
     .then(
       (presented) => {
         if (presented !== false && !controller.signal.aborted) {
-          args.onSuccess?.(job);
+          args.onSuccess?.(job, presented || undefined);
         }
       },
       (error: unknown) => {

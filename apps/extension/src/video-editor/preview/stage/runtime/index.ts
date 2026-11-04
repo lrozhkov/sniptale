@@ -104,30 +104,32 @@ function syncPreviewVideoElement(params: {
   }
 }
 
-export function useActivePreviewClips(project: VideoProject, currentTime: number) {
-  return useMemo(() => {
-    const result: VideoProjectClip[] = [];
-    const sortedTracks = getSortedTracks(project).toReversed();
+export function resolveActivePreviewClips(project: VideoProject, currentTime: number) {
+  const result: VideoProjectClip[] = [];
+  const sortedTracks = getSortedTracks(project).toReversed();
 
-    for (const track of sortedTracks) {
-      if (!track.visible) {
-        continue;
-      }
-
-      const clips = getTrackClips(project, track.id);
-      for (const clip of clips) {
-        if (
-          isVisualClip(clip) &&
-          isClipActiveAtTime(clip, currentTime) &&
-          hasCameraMediaAt(project, clip, currentTime)
-        ) {
-          result.push(resolveCameraVisualClip(project, clip, currentTime));
-        }
-      }
+  for (const track of sortedTracks) {
+    if (!track.visible) {
+      continue;
     }
 
-    return result;
-  }, [currentTime, project]);
+    const clips = getTrackClips(project, track.id);
+    for (const clip of clips) {
+      if (
+        isVisualClip(clip) &&
+        isClipActiveAtTime(clip, currentTime) &&
+        hasCameraMediaAt(project, clip, currentTime)
+      ) {
+        result.push(resolveCameraVisualClip(project, clip, currentTime));
+      }
+    }
+  }
+
+  return result;
+}
+
+export function useActivePreviewClips(project: VideoProject, currentTime: number) {
+  return useMemo(() => resolveActivePreviewClips(project, currentTime), [currentTime, project]);
 }
 
 export function usePreviewStageVideoSync(params: PreviewStageVideoSyncParams) {

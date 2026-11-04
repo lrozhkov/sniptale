@@ -347,3 +347,25 @@ it.each([false, true])(
     }
   }
 );
+
+it('binds sharp replay to each evaluated Native lens identity without changing geometry or order', () => {
+  const args = sceneFixture();
+  const original = args.frame.sceneSpotlights![0]!;
+  args.frame.sceneSpotlights = ['first', 'second'].map((id) => ({
+    ...original,
+    id,
+    spotlight: { ...original.spotlight, effect: 'magnify' as const, magnification: 2 },
+  }));
+  const sharpPaint = vi.fn();
+  const plain = resolveCompositionSceneSpotlights(args);
+  const enhanced = resolveCompositionSceneSpotlights({ ...args, sharpPaint });
+  const context = {} as CanvasRenderingContext2D;
+  enhanced[0]!.sharpPaint!(context);
+  enhanced[1]!.sharpPaint!(context);
+  expect(sharpPaint.mock.calls).toEqual([
+    ['first', context],
+    ['second', context],
+  ]);
+  expect(enhanced.map(({ sharpPaint: _paint, ...layer }) => layer)).toEqual(plain);
+  expect(plain.every((layer) => layer.sharpPaint === undefined)).toBe(true);
+});

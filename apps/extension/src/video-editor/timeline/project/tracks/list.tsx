@@ -8,8 +8,8 @@ import { Activity, ChevronDown, ChevronRight, Rows3, Text } from 'lucide-react';
 import { TimelineIconButton } from '../controls/icon-button';
 import { ProjectTimelineAddTrackControl } from '../toolbar/sections/add-controls';
 import type { ProjectTimelineInsertionActions } from '../types';
-import type { MutableRefObject } from 'react';
-import { translate } from '../../../../platform/i18n';
+import { useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import { translate, useAppLocale } from '../../../../platform/i18n';
 import type { VideoProjectUtilityLaneKind } from '../../../../features/video/project/utility-lanes';
 import {
   VideoProjectTrackRole,
@@ -49,22 +49,153 @@ interface ProjectTimelineTrackListProps {
 }
 
 export function ProjectTimelineTrackList(props: ProjectTimelineTrackListProps) {
-  return (
-    <div
-      className={[
-        'flex min-h-0 flex-col border-r',
-        props.trackPanelPrefs.prefs.hideTrackNames ? '[&_[data-timeline-track-name]]:sr-only' : '',
-        'border-[color:var(--sniptale-color-border-soft)]',
-        'bg-[color:var(--sniptale-color-surface-overlay)]',
-      ].join(' ')}
+  const locale = useAppLocale();
+  const latest = useRef(props);
+  useLayoutEffect(() => {
+    latest.current = props;
+  });
+  const events = useMemo<
+    Pick<
+      ProjectTimelineTrackListProps,
+      | 'onAddTrack'
+      | 'onClearUtilityLane'
+      | 'onScroll'
+      | 'onSelectTrack'
+      | 'onSelectHistoryLane'
+      | 'onSelectMotionLane'
+      | 'onToggleTrackLock'
+      | 'onToggleTrackVisibility'
+      | 'onToggleUtilityLaneLock'
+      | 'onToggleUtilityLaneVisibility'
+      | 'onDropEffectDocument'
     >
-      <ProjectTimelineTrackListHeader {...props} />
-      <ProjectTimelineTrackListScrollArea {...props} />
-    </div>
+  >(
+    () => ({
+      onAddTrack: (...args) => latest.current.onAddTrack(...args),
+      onClearUtilityLane: (...args) => latest.current.onClearUtilityLane(...args),
+      onScroll: (...args) => latest.current.onScroll(...args),
+      onSelectTrack: (...args) => latest.current.onSelectTrack(...args),
+      onSelectHistoryLane: (...args) => latest.current.onSelectHistoryLane?.(...args),
+      onSelectMotionLane: (...args) => latest.current.onSelectMotionLane?.(...args),
+      onToggleTrackLock: (...args) => latest.current.onToggleTrackLock(...args),
+      onToggleTrackVisibility: (...args) => latest.current.onToggleTrackVisibility(...args),
+      onToggleUtilityLaneLock: (...args) => latest.current.onToggleUtilityLaneLock(...args),
+      onToggleUtilityLaneVisibility: (...args) =>
+        latest.current.onToggleUtilityLaneVisibility(...args),
+      onDropEffectDocument: (...args) => latest.current.onDropEffectDocument?.(...args),
+    }),
+    []
   );
+  const preferenceActions = useMemo<
+    Pick<
+      ReturnType<typeof useProjectTimelinePanelPrefs>,
+      | 'setCollapsedCursorLaneVisible'
+      | 'setCollapsedTelemetryLaneVisible'
+      | 'setCompactRows'
+      | 'setHideTrackNames'
+      | 'setTrackHeight'
+      | 'setFxCollapsed'
+      | 'setClipNamesHidden'
+    >
+  >(
+    () => ({
+      setCollapsedCursorLaneVisible: (...args) =>
+        latest.current.trackPanelPrefs.setCollapsedCursorLaneVisible(...args),
+      setCollapsedTelemetryLaneVisible: (...args) =>
+        latest.current.trackPanelPrefs.setCollapsedTelemetryLaneVisible(...args),
+      setCompactRows: (...args) => latest.current.trackPanelPrefs.setCompactRows(...args),
+      setHideTrackNames: (...args) => latest.current.trackPanelPrefs.setHideTrackNames(...args),
+      setTrackHeight: (...args) => latest.current.trackPanelPrefs.setTrackHeight(...args),
+      setFxCollapsed: (...args) => latest.current.trackPanelPrefs.setFxCollapsed(...args),
+      setClipNamesHidden: (...args) => latest.current.trackPanelPrefs.setClipNamesHidden(...args),
+    }),
+    []
+  );
+  const {
+    recordingTelemetry,
+    canShowTelemetryLane,
+    cursorLaneVisible,
+    project,
+    selectedTrackId,
+    showTelemetryLane,
+    trackLayoutModel,
+    trackListRef,
+    tracks,
+    historyLaneSelected,
+    motionLaneSelected,
+  } = props;
+  const {
+    prefs,
+    cursorLaneVisible: panelCursor,
+    telemetryLaneVisible: panelTelemetry,
+  } = props.trackPanelPrefs;
+  const hasSelectMotionLane = props.onSelectMotionLane !== undefined;
+  const hasDropEffectDocument = props.onDropEffectDocument !== undefined;
+  const hasSelectHistoryLane = props.onSelectHistoryLane !== undefined;
+  return useMemo(() => {
+    const stableProps: ProjectTimelineTrackListProps = {
+      ...(recordingTelemetry === undefined ? {} : { recordingTelemetry }),
+      canShowTelemetryLane,
+      cursorLaneVisible,
+      project,
+      selectedTrackId,
+      showTelemetryLane,
+      trackLayoutModel,
+      trackListRef,
+      tracks,
+      historyLaneSelected,
+      motionLaneSelected,
+      ...events,
+      onSelectMotionLane: hasSelectMotionLane ? events.onSelectMotionLane : undefined,
+      onDropEffectDocument: hasDropEffectDocument ? events.onDropEffectDocument : undefined,
+      onSelectHistoryLane: hasSelectHistoryLane ? events.onSelectHistoryLane : undefined,
+      trackPanelPrefs: {
+        prefs,
+        cursorLaneVisible: panelCursor,
+        telemetryLaneVisible: panelTelemetry,
+        ...preferenceActions,
+      },
+    };
+    return (
+      <div
+        className={[
+          'flex min-h-0 flex-col border-r',
+          prefs.hideTrackNames ? '[&_[data-timeline-track-name]]:sr-only' : '',
+          'border-[color:var(--sniptale-color-border-soft)]',
+          'bg-[color:var(--sniptale-color-surface-overlay)]',
+        ].join(' ')}
+      >
+        <ProjectTimelineTrackListHeader {...stableProps} locale={locale} />
+        <ProjectTimelineTrackListScrollArea {...stableProps} />
+      </div>
+    );
+  }, [
+    recordingTelemetry,
+    canShowTelemetryLane,
+    cursorLaneVisible,
+    project,
+    selectedTrackId,
+    showTelemetryLane,
+    trackLayoutModel,
+    trackListRef,
+    tracks,
+    historyLaneSelected,
+    motionLaneSelected,
+    prefs,
+    panelCursor,
+    panelTelemetry,
+    events,
+    preferenceActions,
+    locale,
+    hasSelectMotionLane,
+    hasDropEffectDocument,
+    hasSelectHistoryLane,
+  ]);
 }
 
-function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
+function ProjectTimelineTrackListHeader(
+  props: ProjectTimelineTrackListProps & { locale: ReturnType<typeof useAppLocale> }
+) {
   const { drag } = useEffectDocumentDrag();
   const owner = resolveEffectOwner(props.project, { kind: 'video-group' });
   const canDrop = drag?.kind === 'targetEffect' && owner && !owner.locked && owner.duration > 0;
@@ -96,7 +227,8 @@ function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
     >
       <span className={collapsed ? 'sr-only' : undefined}>
         {translate(
-          canDrop ? 'videoEditor.effectsLibrary.wholeVideo' : 'videoEditor.timeline.tracksTitle'
+          canDrop ? 'videoEditor.effectsLibrary.wholeVideo' : 'videoEditor.timeline.tracksTitle',
+          props.locale
         )}
       </span>
       <div
@@ -111,7 +243,7 @@ function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
           onClick={() =>
             props.trackPanelPrefs.setHideTrackNames(!props.trackPanelPrefs.prefs.hideTrackNames)
           }
-          title={translate('videoEditor.timeline.hideTrackNames')}
+          title={translate('videoEditor.timeline.hideTrackNames', props.locale)}
         />
         <TimelineIconButton
           frameless
@@ -121,7 +253,7 @@ function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
           onClick={() =>
             props.trackPanelPrefs.setCompactRows(!props.trackPanelPrefs.prefs.compactRows)
           }
-          title={translate('videoEditor.timeline.trackPanelCompactToggle')}
+          title={translate('videoEditor.timeline.trackPanelCompactToggle', props.locale)}
         />
         <TimelineIconButton
           frameless
@@ -136,7 +268,7 @@ function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
               !props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible
             )
           }
-          title={translate('videoEditor.timeline.telemetryLane')}
+          title={translate('videoEditor.timeline.telemetryLane', props.locale)}
         />
         <ProjectTimelineAddTrackControl onAddTrack={props.onAddTrack} />
       </div>

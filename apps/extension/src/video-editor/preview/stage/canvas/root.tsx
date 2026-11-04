@@ -193,6 +193,8 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
     assetUrls: params.assetUrls,
     canvasRef,
     onCameraPresented: params.onCameraPresented,
+    registerPlaybackRequest: params.registerPlaybackRequest,
+    renderGenerationRef: params.renderGenerationRef,
     currentTime: params.currentTime,
     effectRuntimeFeedback: params.effectRuntimeFeedback,
     imageBank,

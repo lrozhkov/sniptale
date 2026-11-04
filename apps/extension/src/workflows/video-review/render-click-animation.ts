@@ -12,7 +12,8 @@ export function drawReviewClicks(
   video: QuickEditRect,
   sourceWidth: number,
   clip: { rect: QuickEditRect; radius: number },
-  source?: PointerFeedbackSource
+  source?: PointerFeedbackSource,
+  sharpPaint?: (index: number) => ((context: CanvasRenderingContext2D) => void) | undefined
 ) {
   if (!frames.length) return;
   const scale = video.width / Math.max(1, sourceWidth);
@@ -21,7 +22,8 @@ export function drawReviewClicks(
     context.beginPath();
     context.roundRect(clip.rect.x, clip.rect.y, clip.rect.width, clip.rect.height, clip.radius);
     context.clip();
-    for (const frame of frames) {
+    for (const [index, frame] of frames.entries()) {
+      const preparedSharp = sharpPaint?.(index);
       // Gallery paints an opaque original lens inside its already composed window.
       context.globalAlpha = 1;
       drawPointerFeedbackFrame(
@@ -53,7 +55,7 @@ export function drawReviewClicks(
               }
             : {}),
         },
-        source
+        source && preparedSharp ? { ...source, sharpPaint: preparedSharp } : source
       );
     }
   } finally {

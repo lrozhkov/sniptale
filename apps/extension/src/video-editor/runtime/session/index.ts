@@ -91,7 +91,11 @@ export function useVideoEditorRuntime(
   params: UseVideoEditorRuntimeParams
 ): VideoEditorRuntimeController {
   const assetUrls = useVideoEditorAssetUrls(params.project);
-  const timelinePreviewRuntime = useTimelinePreviewRuntime(params.project, assetUrls);
+  const timelinePreviewRuntime = useTimelinePreviewRuntime(
+    params.project,
+    assetUrls,
+    params.playback.isPlaying
+  );
   const applyLoadedProject = useApplyLoadedProject(
     params.projectState.setProject,
     params.projectState.setError
@@ -145,7 +149,8 @@ export function useVideoEditorRuntime(
 
 function useTimelinePreviewRuntime(
   project: UseVideoEditorRuntimeParams['project'],
-  assetUrls: Record<string, string>
+  assetUrls: Record<string, string>,
+  playing: boolean
 ) {
   const [timelinePreviewViewport, setTimelinePreviewViewportState] =
     useState<TimelinePreviewViewport | null>(null);
@@ -158,7 +163,7 @@ function useTimelinePreviewRuntime(
     );
   }, []);
   const timelinePreviews = useTimelineClipPreviews(project, assetUrls, {
-    suspended: timelinePreviewSuspended,
+    suspended: playing || timelinePreviewSuspended,
     viewport: timelinePreviewViewport,
   });
   const effects = useEffectClipPreviews(project, timelinePreviewViewport);

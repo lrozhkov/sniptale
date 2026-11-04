@@ -166,6 +166,12 @@ function createProjectExportCompositionJoinRenderer(
           ...args,
           context: sample.context,
           currentTime: time,
+          ...(args.job.sourceSampling
+            ? {
+                sourceSamplingFallback:
+                  !cutPlan || time < cutPlan.seam ? ('last' as const) : ('first' as const),
+              }
+            : {}),
           captionSampleTime: time,
           clipMediaElements: frames?.media ?? videos,
           ownerDocument,

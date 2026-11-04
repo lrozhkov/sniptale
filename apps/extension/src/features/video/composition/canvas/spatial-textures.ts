@@ -88,6 +88,23 @@ export function createReviewSpatialTextures(
     };
     return {
       supportsDepth,
+      get allocations() {
+        if (disposed) return [];
+        return [
+          { role: 'spatial-level-sizes', bytes: 64, canvases: 0 },
+          ...dimensions.flatMap((size, index) =>
+            size && reservations.has(index)
+              ? [
+                  {
+                    role: `spatial-texture-${index}`,
+                    bytes: size.width * size.height * (index === 0 || !supportsDepth ? 4 : 8),
+                    canvases: 0,
+                  },
+                ]
+              : []
+          ),
+        ];
+      },
       upload(source: HTMLCanvasElement, levelCount = 8) {
         if (disposed) throw new Error('Perspective textures were disposed.');
         if (!Number.isInteger(levelCount) || levelCount < 1 || levelCount > 8)

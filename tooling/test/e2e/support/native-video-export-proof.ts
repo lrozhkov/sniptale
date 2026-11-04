@@ -26,7 +26,8 @@ export async function encodedNativeVideoSamples(
   points: readonly { time: number; x: number; y: number; expected: readonly number[] }[],
   range?: { start: number; end: number },
   preparedInput?: ProjectExportInputReference,
-  preparedSettings?: VideoProjectExportSettings
+  preparedSettings?: VideoProjectExportSettings,
+  completionTimeoutMs = 120_000
 ) {
   const settings: VideoProjectExportSettings = preparedSettings ?? {
     burnInSubtitles: false,
@@ -98,7 +99,7 @@ export async function encodedNativeVideoSamples(
           await getRuntimeMessagesByType(page, VideoMessageType.PROJECT_EXPORT_COMPLETED)
         ).some((message) => message.jobId === jobId);
       },
-      { timeout: 120000 }
+      { timeout: completionTimeoutMs }
     )
     .toBe(true);
   const completion = (

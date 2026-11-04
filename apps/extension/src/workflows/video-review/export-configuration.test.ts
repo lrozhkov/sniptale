@@ -404,3 +404,44 @@ it('ignores alpha replacements and requires an encoder only for ordinary audio o
     audio: 'copy',
   });
 });
+
+it.each(['bicubic-sharpen', 'clark-x2'] as const)(
+  'preserves proven no-growth copy but renders historical or missing geometry for %s',
+  (detailEnhancement) => {
+    const args = fixture();
+    const renderSettings = { frameRate: 0 as const, detailEnhancement };
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings, recordingHistory: false })
+    ).toMatchObject({ kind: 'ready', video: 'copy' });
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings, recordingHistory: true })
+    ).toMatchObject({ kind: 'ready', video: 'render' });
+    expect(configuredReviewExportPlan({ ...args, renderSettings })).toMatchObject({
+      kind: 'ready',
+      video: 'render',
+    });
+    const { width: _width, ...unknownGeometry } = args.index;
+    expect(
+      configuredReviewExportPlan({
+        ...args,
+        index: unknownGeometry,
+        renderSettings,
+        recordingHistory: false,
+      })
+    ).toMatchObject({ kind: 'ready', video: 'render' });
+    args.index.outputCodecs = { mp4: [], webm: [] };
+    expect(
+      configuredReviewExportPlan({ ...args, renderSettings, recordingHistory: false })
+    ).toMatchObject({ kind: 'ready', video: 'copy' });
+    expect(configuredReviewExportPlan({ ...args, renderSettings, recordingHistory: true })).toEqual(
+      { kind: 'unavailable', reasons: ['video-encoder'] }
+    );
+    expect(
+      configuredReviewExportPlan({
+        ...args,
+        renderSettings: { frameRate: 0, detailEnhancement: 'off' },
+        recordingHistory: true,
+      })
+    ).toMatchObject({ kind: 'ready', video: 'copy' });
+  }
+);

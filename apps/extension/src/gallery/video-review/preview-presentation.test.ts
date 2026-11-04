@@ -18,7 +18,7 @@ const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
-function fixture() {
+function fixture(allowPreparedPlayingFrames = false) {
   let time = 0;
   let id = 0;
   const ticks = new Map<number, () => void>();
@@ -34,6 +34,7 @@ function fixture() {
   const completed = lease('completed');
   const publishTimes: number[] = [];
   const dependencies = {
+    allowPreparedPlayingFrames,
     requestTick: (callback: () => void) => {
       ticks.set(++id, callback);
       return id;
@@ -475,5 +476,132 @@ it('admits browser preparation after paint and cancels both callback phases', ()
   } finally {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  }
+});
+
+function browserClockFixture(allowPreparedPlayingFrames: boolean) {
+  vi.useFakeTimers();
+  const frames = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  let now = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (key: number) => frames.delete(key));
+  const f = fixture(allowPreparedPlayingFrames);
+  Object.assign(f.dependencies, createReviewPresentationPaintClock());
+  return {
+    ...f,
+    frames,
+    async frame(time: number) {
+      f.advance(time - now);
+      now = time;
+      const callbacks = [...frames.values()];
+      frames.clear();
+      callbacks.forEach((callback) => callback(time));
+      await flush();
+    },
+    async task() {
+      await vi.runOnlyPendingTimersAsync();
+      await flush();
+    },
+    dispose() {
+      f.scheduler.dispose();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    },
+  };
+}
+
+it('admits only opted-in successfully published steady playing frames without another task', async () => {
+  const f = browserClockFixture(true);
+  try {
+    f.scheduler.update(f.state);
+    await f.frame(0);
+    expect(f.dependencies.prepare).not.toHaveBeenCalled();
+    await f.task();
+    expect(f.dependencies.publish).toHaveBeenCalledOnce();
+    await f.frame(40);
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+    f.scheduler.update({ ...f.state, generation: '2', scene: 'latest' });
+    await f.frame(80);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(2);
+    await f.task();
+    expect(f.dependencies.prepare.mock.lastCall![0]).toMatchObject({
+      generation: '2',
+      scene: 'latest',
+    });
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(3);
+    f.scheduler.invalidate();
+    await f.frame(120);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(3);
+    await f.task();
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(4);
+    f.scheduler.dispose();
+    expect(f.frames.size).toBe(0);
+  } finally {
+    f.dispose();
+  }
+});
+
+it('keeps non-opted-in playing producers behind the after-paint task', async () => {
+  const f = browserClockFixture(false);
+  try {
+    f.scheduler.update(f.state);
+    await f.frame(0);
+    await f.task();
+    await f.frame(40);
+    expect(f.dependencies.publish).toHaveBeenCalledOnce();
+    await f.task();
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+  } finally {
+    f.dispose();
+  }
+});
+
+it.each([
+  { playing: false, interacting: false, detailedPaused: true },
+  { playing: true, interacting: true, detailedPaused: false },
+])('keeps paused and interacting admission after paint: %j', async (mode) => {
+  const f = browserClockFixture(true);
+  try {
+    f.scheduler.update({ ...f.state, ...mode });
+    await f.frame(0);
+    expect(f.dependencies.prepare).not.toHaveBeenCalled();
+    await f.task();
+    f.scheduler.update({ ...f.state, ...mode, scene: 'changed', generation: '2' });
+    await f.frame(40);
+    expect(f.dependencies.prepare).toHaveBeenCalledOnce();
+    await f.task();
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+  } finally {
+    f.dispose();
+  }
+});
+
+it('revokes prepared frame admission across visibility and failed publication', async () => {
+  const f = browserClockFixture(true);
+  try {
+    f.scheduler.update(f.state);
+    await f.frame(0);
+    await f.task();
+    f.scheduler.update({ ...f.state, visible: false });
+    f.scheduler.update(f.state);
+    await f.frame(40);
+    expect(f.dependencies.publish).toHaveBeenCalledOnce();
+    f.dependencies.publish.mockImplementationOnce(() => {
+      throw new Error('publication failed');
+    });
+    await f.task();
+    expect(f.dependencies.onError).toHaveBeenCalledOnce();
+    f.scheduler.invalidate();
+    await f.frame(80);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(2);
+    await f.task();
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(3);
+  } finally {
+    f.dispose();
   }
 });

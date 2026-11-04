@@ -261,3 +261,23 @@ it('keeps non-lens feedback strokes and fills separate from optical sampling', (
   expect(context.fill).toHaveBeenCalledTimes(2);
   expect(stack).toHaveLength(0);
 });
+
+it.each(['flat', 'optical'] as const)(
+  'uses prepared sharp pixels with the original %s rim and unchanged cue alpha',
+  (optics) => {
+    const { canvas, context, original, strokes } = surface();
+    if (optics === 'optical') mockOpticalCanvases();
+    const source = {
+      rect: { x: 0, y: 0, width: 100, height: 100 },
+      draw: vi.fn(),
+      sharpPaint: vi.fn(),
+    };
+    const frame = lens();
+    frame.lens = { ...frame.lens!, optics };
+    drawPointerFeedbackFrame(canvas, frame, source);
+    expect(source.sharpPaint).toHaveBeenCalledExactlyOnceWith(context);
+    expect(source.draw).toHaveBeenCalledTimes(optics === 'optical' ? 1 : 0);
+    expect(strokes[0]).toBeCloseTo(0.08, 12);
+    expect(context.globalAlpha).toBe(original.globalAlpha);
+  }
+);

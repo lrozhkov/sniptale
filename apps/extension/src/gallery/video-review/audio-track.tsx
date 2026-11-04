@@ -16,6 +16,7 @@ import {
 } from '../../features/video/review/voiceover-edits';
 import {
   useCallback,
+  useMemo,
   useEffect,
   useRef,
   useState,
@@ -131,6 +132,19 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     clip: QuickEditAudioClip;
     guide: number | null;
   } | null>(null);
+  const clipGeometry = useMemo(
+    () =>
+      props.clips.map((stored) => {
+        const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
+        const shown = preview?.clip.id === clip.id ? preview.clip : clip;
+        const pieces =
+          props.lane === 'music' && props.projection
+            ? props.projection.slices(shown.timelineStart, shown.timelineStart + shown.duration)
+            : [undefined];
+        return { clip, shown, pieces };
+      }),
+    [props.clips, props.voiceoverSegments, props.lane, props.projection, preview]
+  );
   const dropTarget = useAudioLaneDrop(props);
   const drag = useRef<AudioDragState | null>(null);
   const boundary = drag.current;
@@ -214,13 +228,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
         {...dropTarget}
         style={{ height: rowCount * reviewTrackMetrics(props.compact).step }}
       >
-        {props.clips.flatMap((stored) => {
-          const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
-          const shown = preview?.clip.id === clip.id ? preview.clip : clip;
-          const pieces =
-            props.lane === 'music' && props.projection
-              ? props.projection.slices(shown.timelineStart, shown.timelineStart + shown.duration)
-              : [undefined];
+        {clipGeometry.flatMap(({ clip, shown, pieces }) => {
           return (
             <ReviewAudioClipBlock
               compact={props.compact}

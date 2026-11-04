@@ -1,3 +1,4 @@
+import { applyEffectRuntimeRasterDimensions } from '../frame/plan';
 import { shouldLockVisualLayerToViewport } from '../../motion/layer-camera';
 import { drawSceneBackground, getProjectSceneBackground } from '../../../project/scene/background';
 import { resolveSceneBackgroundAudioEnvelope } from '../../../project/scene/background-audio';
@@ -28,6 +29,14 @@ import type {
 const EMPTY_EFFECT_RUNTIME_FRAMES: EffectRuntimeRenderedFrameMap = new Map();
 
 export async function renderEffectRuntimeComposition(args: {
+  prepareSourcePass?: (
+    frame: VideoCompositionFrame,
+    time: number
+  ) => Promise<{
+    media: ReadonlyMap<string, VideoCompositionMediaSource>;
+    renderDimensions(plan: EffectRuntimeFramePlan): { width: number; height: number };
+    effectMedia?(plan: EffectRuntimeFramePlan): ReadonlyMap<string, VideoCompositionMediaSource>;
+  }>;
   composeInput?: (
     request: EffectRuntimeInputComposition & { frame: VideoCompositionFrame; time: number }
   ) => Promise<ImageBitmap>;
@@ -124,9 +133,15 @@ export async function renderEffectRuntimeComposition(args: {
     }
     if (frame.sceneSpotlights?.some((state) => state.afterClipId) && !args.project)
       throw new Error('EFFECT_RUNTIME_SOURCE_SCENE_CONTEXT_MISSING');
+    const sourcePass = await args.prepareSourcePass?.(frame, time);
+    args.signal?.throwIfAborted();
     const resourceScope = resourceLedger.createFrameScope();
     const plans = orderBackdropTrackPlans(
-      selected.map((plan) => scaleEffectRuntimeFramePlan(plan, args.rasterScale)),
+      selected.map((plan) =>
+        sourcePass
+          ? applyEffectRuntimeRasterDimensions(plan, sourcePass.renderDimensions(plan))
+          : scaleEffectRuntimeFramePlan(plan, args.rasterScale)
+      ),
       frame
     );
     const frames = await renderEffectRuntimeFramePlans({
@@ -155,7 +170,10 @@ export async function renderEffectRuntimeComposition(args: {
           });
         },
         ...(args.spatialRenderer ? { spatialRenderer: args.spatialRenderer } : {}),
-        clipMediaElements: args.clipMediaElements,
+        clipMediaElements: sourcePass?.media ?? args.clipMediaElements,
+        ...(sourcePass?.effectMedia
+          ? { mediaForPlan: (plan) => sourcePass.effectMedia!(plan) }
+          : {}),
         imageBank: args.imageBank,
         ...(args.ownerDocument ? { ownerDocument: args.ownerDocument } : {}),
         visualLayers: frame.effectInputLayers,

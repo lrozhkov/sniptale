@@ -1,3 +1,4 @@
+import { DetailEnhancementField } from '../../ui/video-export/detail-enhancement-field';
 import { VideoExportTimeHint } from '../../ui/video-export/time-estimate';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { VideoExportSizeHint } from '../../ui/video-export/size-estimate';
@@ -211,8 +212,7 @@ export function ReviewSpeedOptions(props: {
   );
 }
 
-/** Export settings and destination actions share one inspector scroll body. */
-export function ReviewEditActions(props: {
+type ReviewEditActionProps = {
   available: boolean;
   hasEdits: boolean;
   busy: boolean;
@@ -220,6 +220,7 @@ export function ReviewEditActions(props: {
   progress: number;
   timeEstimate?: VideoProjectExportTimeEstimate | null;
   failed: boolean;
+  failureDetail?: string | null | undefined;
   hasResult: boolean;
   completion?: ReturnType<typeof import('./use-export').useReviewExport>['completion'];
   onOpenResult?: (mediaId: string) => void;
@@ -231,7 +232,10 @@ export function ReviewEditActions(props: {
   onExport(): void;
   onCancel(): void;
   onDownload(): void;
-}) {
+};
+
+/** Export settings and destination actions share one inspector scroll body. */
+export function ReviewEditActions(props: ReviewEditActionProps) {
   const running = props.phase !== 'idle';
   const completion = !running && !props.failed ? props.completion : null;
   const displayedProgress = completion || props.phase === 'publishing' ? 100 : props.progress;
@@ -338,7 +342,7 @@ export function ReviewEditActions(props: {
       </div>
       {props.failed ? (
         <p role="alert" className="text-xs">
-          {translate('gallery.videoReview.exportFailed')}
+          {props.failureDetail ?? translate('gallery.videoReview.exportFailed')}
         </p>
       ) : null}
       {props.audioUnavailable ? (
@@ -566,6 +570,13 @@ export function ReviewRenderOptions({
               } else exporter.setRenderSettings({ ...settings, quality });
             }}
           />
+          <DetailEnhancementField
+            value={settings.detailEnhancement}
+            disabled={busy}
+            onChange={(detailEnhancement) =>
+              exporter.setRenderSettings({ ...settings, detailEnhancement })
+            }
+          />
         </div>
       </fieldset>
       {exporter.presentationDuration && exporter.hasBookends && (
@@ -655,6 +666,7 @@ export function ReviewInspectorActions({
         progress={exporter.progress}
         timeEstimate={exporter.timeEstimate}
         failed={exporter.failed}
+        failureDetail={exporter.failureDetail}
         hasResult={!!exporter.result}
         completion={exporter.completion}
         onOpenResult={onOpenResult}

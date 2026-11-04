@@ -12,7 +12,23 @@ import { createVideoPreviewFrameMaterializer } from './materializer';
 
 type SceneInput = Parameters<typeof import('../stage/scene/render-preview').renderPreviewScene>[0];
 const scene = vi.hoisted(() => vi.fn<(input: SceneInput) => Promise<void>>(async () => {}));
-vi.mock('../stage/scene/render-preview', () => ({ renderPreviewScene: scene }));
+vi.mock('../stage/scene/render-preview', async () => {
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  return {
+    renderPreviewScene: async (
+      input: Parameters<typeof import('../stage/scene/render-preview').renderPreviewScene>[0]
+    ) => {
+      await scene(input);
+      return {
+        camera:
+          input.cameraOverride ??
+          resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+        time: input.currentTime,
+      };
+    },
+  };
+});
 const sample = vi.hoisted(() => ({ sample: vi.fn(), dispose: vi.fn(), release: vi.fn() }));
 vi.mock('../../../workflows/video-review/decoded-video-sample', () => ({
   createCompositionCutSampleSource: () => sample,

@@ -2,7 +2,7 @@ import { CursorFocusTimelineKeys } from '../../ui/cursor-focus-timeline-keys';
 import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone } from './controls';
-import { useEffect, useMemo, useState, useId } from 'react';
+import { useEffect, useMemo, useState, useId, useRef, useLayoutEffect, useCallback } from 'react';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import {
   Activity,
@@ -14,7 +14,7 @@ import {
   MessageSquare,
   Clock,
 } from 'lucide-react';
-import { translate } from '../../platform/i18n';
+import { useAppLocale, translate } from '../../platform/i18n';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
@@ -60,6 +60,15 @@ type TelemetryStripProps = ReviewCursorTimelineInteractions & {
 /** Populated semantic rows stay stable while groups repack after zoom settles. */
 export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   const coverageId = useId();
+  const locale = useAppLocale();
+  const markerCommand = useRef(props.onMarker);
+  useLayoutEffect(() => {
+    markerCommand.current = props.onMarker;
+  }, [props.onMarker]);
+  const onMarker = useCallback(
+    (marker: ReviewTelemetryMarker) => markerCommand.current(marker),
+    []
+  );
   const [settled, setSettled] = useState({ width: props.width, zoom: props.zoom });
   useEffect(() => {
     const timer = setTimeout(() => setSettled({ width: props.width, zoom: props.zoom }), 250);
@@ -76,14 +85,86 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   );
   const ratio =
     (Math.max(1, props.width) * props.zoom) / (Math.max(1, settled.width) * settled.zoom);
-  const lanes = [0, 1, 2].filter(
-    (lane) =>
-      layout.items.some((item) => item.lane === lane) ||
-      (lane === 2 && !!props.cursorFocusKeys?.length)
+  const lanes = useMemo(
+    () =>
+      [0, 1, 2].filter(
+        (lane) =>
+          layout.items.some((item) => item.lane === lane) ||
+          (lane === 2 && !!props.cursorFocusKeys?.length)
+      ),
+    [layout, props.cursorFocusKeys?.length]
   );
   const cursorRow = lanes.indexOf(2);
   const cursorTop = Math.max(0, cursorRow) * ACTION_LANE_PITCH_PX;
   const height = Math.max(1, lanes.length) * ACTION_LANE_PITCH_PX - ACTION_LANE_GAP_PX;
+  const eventRows = useMemo(
+    () =>
+      lanes.map((lane, row) => (
+        <div
+          key={lane}
+          role="group"
+          className="contents"
+          data-history-family={['keyboard', 'mouse', 'cursor'][lane]}
+          data-history-coverage={reviewHistoryCaptureStatus(
+            props.captureCapabilities,
+            lane === 0 ? 'keyboard' : lane === 1 ? 'mouse' : 'cursor'
+          )}
+          title={
+            lane === 0
+              ? translate('gallery.videoReview.historyKeyboardCoverage', locale)
+              : undefined
+          }
+          aria-describedby={lane === 0 ? coverageId : undefined}
+          aria-label={translate(
+            lane === 0
+              ? 'gallery.videoReview.historyKeyboard'
+              : lane === 1
+                ? 'gallery.videoReview.historyMouse'
+                : 'gallery.videoReview.historyCursor',
+            locale
+          )}
+        >
+          {lane === 0 ? (
+            <span id={coverageId} className="sr-only">
+              {translate('gallery.videoReview.historyKeyboardCoverage', locale)}
+            </span>
+          ) : null}
+          <span
+            aria-hidden="true"
+            className={['pointer-events-none absolute inset-x-0', ''].join(' ')}
+            style={{ top: row * ACTION_LANE_PITCH_PX, height: ACTION_MARKER_HEIGHT_PX }}
+          />
+          {layout.items
+            .filter((item) => item.lane === lane)
+            .map((item) => {
+              return (
+                <ReviewHistoryItem
+                  key={`${item.marker.ref.kind}:${item.marker.ref.id}`}
+                  item={item}
+                  props={{
+                    selectedTelemetryRef: props.selectedTelemetryRef,
+                    animatedIds: props.animatedIds,
+                    onMarker,
+                  }}
+                  ratio={ratio}
+                  top={row * ACTION_LANE_PITCH_PX}
+                />
+              );
+            })}
+        </div>
+      )),
+    [
+      lanes,
+      layout,
+      ratio,
+      coverageId,
+      props.captureCapabilities,
+      props.selectedTelemetryRef,
+      props.animatedIds,
+      onMarker,
+      locale,
+    ]
+  );
   return (
     <div
       data-ui="gallery.videoReview.historyStrip"
@@ -110,51 +191,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
       {cursorRow >= 0 || lanes.length === 0 ? (
         <ReviewCursorKeyRow props={props} top={cursorTop} />
       ) : null}
-      {lanes.map((lane, row) => (
-        <div
-          key={lane}
-          role="group"
-          className="contents"
-          data-history-family={['keyboard', 'mouse', 'cursor'][lane]}
-          data-history-coverage={reviewHistoryCaptureStatus(
-            props.captureCapabilities,
-            lane === 0 ? 'keyboard' : lane === 1 ? 'mouse' : 'cursor'
-          )}
-          title={lane === 0 ? translate('gallery.videoReview.historyKeyboardCoverage') : undefined}
-          aria-describedby={lane === 0 ? coverageId : undefined}
-          aria-label={translate(
-            lane === 0
-              ? 'gallery.videoReview.historyKeyboard'
-              : lane === 1
-                ? 'gallery.videoReview.historyMouse'
-                : 'gallery.videoReview.historyCursor'
-          )}
-        >
-          {lane === 0 ? (
-            <span id={coverageId} className="sr-only">
-              {translate('gallery.videoReview.historyKeyboardCoverage')}
-            </span>
-          ) : null}
-          <span
-            aria-hidden="true"
-            className={['pointer-events-none absolute inset-x-0', ''].join(' ')}
-            style={{ top: row * ACTION_LANE_PITCH_PX, height: ACTION_MARKER_HEIGHT_PX }}
-          />
-          {layout.items
-            .filter((item) => item.lane === lane)
-            .map((item) => {
-              return (
-                <ReviewHistoryItem
-                  key={`${item.marker.ref.kind}:${item.marker.ref.id}`}
-                  item={item}
-                  props={props}
-                  ratio={ratio}
-                  top={row * ACTION_LANE_PITCH_PX}
-                />
-              );
-            })}
-        </div>
-      ))}
+      {eventRows}
     </div>
   );
 }
@@ -275,12 +312,29 @@ function ReviewHistoryCluster(props: {
 }
 
 function ReviewCursorKeyRow({ props, top }: { props: TelemetryStripProps; top: number }) {
-  const coverage = new Map(
-    (props.cursorFocusKeys ?? [])
-      .filter((key) => (key.anchor === 'manual' || key.authored) && key.sourceCoverage)
-      .map((key) => [key.segmentId, key.sourceCoverage!])
+  const coverage = useMemo(
+    () =>
+      new Map(
+        (props.cursorFocusKeys ?? [])
+          .filter((key) => (key.anchor === 'manual' || key.authored) && key.sourceCoverage)
+          .map((key) => [key.segmentId, key.sourceCoverage!])
+      ),
+    [props.cursorFocusKeys]
   );
   const ratio = Math.max(1, props.width * props.zoom) / Math.max(0.000001, props.duration);
+  const coverageNodes = useMemo(
+    () =>
+      [...coverage].map(([id, span]) => (
+        <span
+          key={id}
+          aria-hidden="true"
+          data-ui="cursorFocusPath.authoredCoverage"
+          className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-[var(--sniptale-color-border-soft)]"
+          style={{ left: span.start * ratio, width: Math.max(0, span.end - span.start) * ratio }}
+        />
+      )),
+    [coverage, ratio]
+  );
   return props.onCursorFocusKey && props.onAddCursorFocusKey ? (
     <CursorFocusTimelineKeys
       top={top}
@@ -296,15 +350,7 @@ function ReviewCursorKeyRow({ props, top }: { props: TelemetryStripProps; top: n
       {...(props.onMoveCursorFocus ? { onMove: props.onMoveCursorFocus } : {})}
       onAdd={props.onAddCursorFocusKey}
     >
-      {[...coverage].map(([id, span]) => (
-        <span
-          key={id}
-          aria-hidden="true"
-          data-ui="cursorFocusPath.authoredCoverage"
-          className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-[var(--sniptale-color-border-soft)]"
-          style={{ left: span.start * ratio, width: Math.max(0, span.end - span.start) * ratio }}
-        />
-      ))}
+      {coverageNodes}
     </CursorFocusTimelineKeys>
   ) : null;
 }
@@ -319,7 +365,11 @@ function ReviewHistoryItem({
   top,
 }: {
   item: ReturnType<typeof layoutReviewActionLanes>['items'][number];
-  props: TelemetryStripProps;
+  props: {
+    selectedTelemetryRef: TelemetryStripProps['selectedTelemetryRef'];
+    animatedIds: TelemetryStripProps['animatedIds'];
+    onMarker: TelemetryStripProps['onMarker'];
+  };
   ratio: number;
   top: number;
 }) {

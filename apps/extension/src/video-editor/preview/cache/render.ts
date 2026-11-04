@@ -1,3 +1,4 @@
+import type { PreviewScenePresentation } from '../stage/scene/types';
 import type { VideoEditorPreviewMode } from '../../contracts/preview-runtime';
 import type { renderPreviewScene } from '../stage/scene/render-preview';
 import {
@@ -27,7 +28,7 @@ export async function renderPreviewSceneWithExactCache(params: {
   cache: VideoPreviewExactFrameCache;
   job: PreviewRenderParams;
   render: typeof renderPreviewScene;
-}): Promise<void | false> {
+}): Promise<PreviewScenePresentation | void | false> {
   const { job } = params;
   if (
     job.previewMode !== 'cache' ||
@@ -47,15 +48,18 @@ export async function renderPreviewSceneWithExactCache(params: {
     width: job.previewRasterSize.width,
   });
   const cached = params.cache.get(key);
-  if (cached && presentCachedFrame(job.canvas, cached)) return;
+  const presentation = params.cache.getPresentation(key);
+  if (cached && presentation && presentCachedFrame(job.canvas, cached)) return presentation;
 
   const presented = await params.render(job);
   if (presented === false) return false;
-  if (job.signal?.aborted || typeof createImageBitmap !== 'function') return;
+  if (job.signal?.aborted) return;
+  if (typeof createImageBitmap !== 'function') return presented;
   const bitmap = await createImageBitmap(job.canvas);
   if (job.signal?.aborted) {
     bitmap.close();
     return;
   }
-  params.cache.set(key, bitmap);
+  params.cache.set(key, bitmap, presented || undefined);
+  return presented;
 }

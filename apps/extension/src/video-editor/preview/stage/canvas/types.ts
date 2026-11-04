@@ -32,6 +32,7 @@ export type PreviewStageRootSurfaceProps = Pick<
   | 'currentTime'
   | 'effectRuntimeFeedback'
   | 'onCameraPresented'
+  | 'registerPlaybackRequest'
   | 'grid'
   | 'guides'
   | 'mode'

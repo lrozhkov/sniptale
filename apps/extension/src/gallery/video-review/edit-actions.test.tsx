@@ -284,6 +284,9 @@ it('offers independent initial downloads and shows actionable processing failure
     expect(host.querySelector('[role="status"]')?.textContent).toBe(
       translate('gallery.videoReview.speedAudioUnavailable')
     );
+    const failureDetail = translate('videoEditor.exportDialog.detailEnhancementDeviceLost');
+    act(() => root.render(<ReviewEditActions {...props} failed failureDetail={failureDetail} />));
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(failureDetail);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();
@@ -392,6 +395,7 @@ it('applies export frame rate and quality options without adding section divider
     phase: 'idle',
     progress: 0,
     failed: false,
+    failureDetail: null,
     blocked: [],
     cameraConflicts: [],
     result: null,
@@ -444,8 +448,23 @@ it('applies export frame rate and quality options without adding section divider
       frameRate: 0,
       quality: 'LOW',
     });
+    const enhancement = host.querySelector<HTMLButtonElement>(
+      '[data-ui="video.exportDetailEnhancement"] button[aria-haspopup="listbox"]'
+    )!;
+    await act(async () => enhancement.click());
+    const sharpen = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (option) =>
+        option.textContent === translate('videoEditor.exportDialog.detailEnhancementBicubic')
+    )!;
+    await act(async () => sharpen.click());
+    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({
+      frameRate: 0,
+      quality: 'HIGH',
+      detailEnhancement: 'bicubic-sharpen',
+    });
     await act(async () => root.render(<ReviewRenderOptions exporter={exporter} busy />));
     expect(rate!.disabled).toBe(true);
+    expect(enhancement.disabled).toBe(true);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

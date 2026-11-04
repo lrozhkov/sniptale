@@ -36,6 +36,7 @@ import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
 type ReviewAdvancedPanelsProps = {
   advanced: QuickEditAdvancedState;
   cursorPath?: CursorFocusPath;
+  cursorAvailable?: boolean | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   /** Optional framing preview mounted inside the selected region inspector. */
   zoomPreview?(region: QuickEditZoomRegion, previewing?: boolean): ReactNode;
@@ -83,6 +84,7 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
           region={zoomRegion}
           cameraFollowDefaults={args.advanced.cameraFollowDefaults}
           cursorPath={args.cursorPath}
+          cursorAvailable={args.cursorAvailable}
           spatialPreview={args.zoom.previewRegion(zoomRegion)}
           zoomConversionBlocked={!args.zoom.canConvertToZoom(zoomRegion)}
           onPreview={(patch) => args.zoom.preview(zoomRegion.id, patch)}

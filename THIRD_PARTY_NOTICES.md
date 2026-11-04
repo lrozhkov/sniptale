@@ -30,6 +30,26 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 
 The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
 
+## Clark Realtime UI Video Upscaler x2
+
+- Attribution: Clark Labs
+- Source: https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2
+- License: `Apache-2.0`
+- License text: [`apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE`](apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE)
+- License SHA-256: `d66ccc11682c7458b19b376e1335e8665cbe412ff71f554bfec25f1791cddfa0`
+- Notice text: [`apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/NOTICE.txt`](apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/NOTICE.txt)
+- Notice SHA-256: `42f678c58f65a4ecf1aeb9c5d3b5bcab455932231ef60070c6084ea2616e10d0`
+- Provenance record: [`apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json`](apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json)
+- Provenance SHA-256: `27425919296cb19185ab1de022f9a5016c3bf4911cdd25b65f006a0c5c93c53e`
+- Local changes: The runtime exposes an unavailable getter. It uses explicit browser globals. It destroys the GPU device if initialization fails. Model weights and WGSL do not change.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/model.bin` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/model.bin | `c6b4f22d8c38270225b809e97d233eb68d7a48eef17595ac17a60b4540c72dce` | `c6b4f22d8c38270225b809e97d233eb68d7a48eef17595ac17a60b4540c72dce` |
+| `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/model.json` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/model.json | `eba342bf8f54749490fecb9df43f399595c07b291d5188d67bb0f4448d38f09c` | `eba342bf8f54749490fecb9df43f399595c07b291d5188d67bb0f4448d38f09c` |
+| `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/realtimeVideoUpscaler.js | `58dd6544858039b4f8ba7a6cf469a4ed22aadc8588c7483ca7b4af2901ac4742` | `c096435fa3aab07a086e72b26a819312383e29f2bd807131c6c190f90f9aa86c` |
+| `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/runtimeCapabilities.js | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` |
+
 ## Production dependency licenses
 
 ### `@ai-sdk/alibaba` 2.0.69

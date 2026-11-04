@@ -1,3 +1,6 @@
+import { translate } from '../../platform/i18n';
+import type { ExportEnhancementErrorCode } from '../../features/video/composition/export-enhancement/enhancer';
+import type { VideoExportDetailMode } from '../../features/video/project/types/export';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { buildReviewTimeMap, mapReviewAnchor } from '../../features/video/review/timeline';
 import { buildReviewActionAudioPlan } from '../../features/video/review/action-audio';
@@ -116,12 +119,48 @@ function useReviewSourceIndex(file: File) {
   return { sourceIndex, indexing };
 }
 
+type EnhancementFailure = { mode: VideoExportDetailMode; code: ExportEnhancementErrorCode };
+
+async function readEnhancementFailure(error: unknown): Promise<EnhancementFailure | null> {
+  const seen = new Set<Error>();
+  let current = error;
+  while (current instanceof Error && seen.size < 8 && !seen.has(current)) {
+    seen.add(current);
+    if (current.name === 'ExportEnhancementError') {
+      try {
+        const { ExportEnhancementError } =
+          await import('../../features/video/composition/export-enhancement/enhancer');
+        if (current instanceof ExportEnhancementError)
+          return { mode: current.mode, code: current.code };
+      } catch {
+        return null;
+      }
+    }
+    current = current.cause;
+  }
+  return null;
+}
+
+function enhancementFailureDetail(code: ExportEnhancementErrorCode): string {
+  switch (code) {
+    case 'unavailable':
+      return translate('videoEditor.exportDialog.detailEnhancementUnavailable');
+    case 'initialization-failed':
+      return translate('videoEditor.exportDialog.detailEnhancementInitFailed');
+    case 'device-lost':
+      return translate('videoEditor.exportDialog.detailEnhancementDeviceLost');
+    default:
+      return translate('videoEditor.exportDialog.detailEnhancementFailed');
+  }
+}
+
 /** Keeps dismissible feedback independent from the retained report receipt. */
 function useReviewExportCompletion({
   setProgress,
   setTimeEstimate,
 }: Pick<ReturnType<typeof useReviewExportProgress>, 'setProgress' | 'setTimeEstimate'>) {
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<EnhancementFailure | 'generic' | null>(null);
+  const setFailed = useCallback((value: boolean) => setFailure(value ? 'generic' : null), []);
   const [completion, setCompletion] = useState<{
     destination: 'gallery' | 'download';
     mediaId: string | null;
@@ -146,12 +185,21 @@ function useReviewExportCompletion({
     return completionGeneration.current;
   };
   return {
-    completion,
+    view: {
+      completion,
+      dismissCompletion,
+      failed: failure !== null,
+      failureDetail:
+        failure && failure !== 'generic' ? enhancementFailureDetail(failure.code) : null,
+    },
     completionGeneration,
     dismissCompletion,
     showCompletion,
-    failed,
     setFailed,
+    reportFailure: async (error: unknown, current: () => boolean) => {
+      const detail = await readEnhancementFailure(error);
+      if (current()) setFailure(detail ?? 'generic');
+    },
     beginAttempt,
   };
 }
@@ -312,7 +360,9 @@ export function useReviewExport(resource: LoadedReview) {
             reasons: error.reasons,
             cameraConflicts: error.cameraConflicts,
           });
-      } else if (mounted.current && !controller.signal.aborted) feedback.setFailed(true);
+      } else {
+        await feedback.reportFailure(error, () => mounted.current && !controller.signal.aborted);
+      }
     } finally {
       active.current = null;
       publishing.current = false;
@@ -327,15 +377,13 @@ export function useReviewExport(resource: LoadedReview) {
     phase,
     progress,
     timeEstimate,
-    failed: feedback.failed,
+    ...feedback.view,
     blocked: blocked?.context === context ? blocked.reasons : null,
     cameraConflicts: blocked?.context === context ? (blocked.cameraConflicts ?? []) : [],
     checkingCodecs,
     sizeEstimate: sizeEstimate.status,
     setSizeEstimateVisible: sizeEstimate.setVisible,
     result,
-    completion: feedback.completion,
-    dismissCompletion: feedback.dismissCompletion,
     plan,
     sourceVideoAvailable: choices.sourceVideoAvailable,
     renderSettings,

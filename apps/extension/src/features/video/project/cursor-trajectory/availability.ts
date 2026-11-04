@@ -83,10 +83,16 @@ async function archiveAvailable(
   return false;
 }
 
+/** Source-bound admission requires interval identity, not camera appearance or authored pose. */
+export type CursorAvailabilityInterval = Pick<
+  VideoProjectMotionRegion,
+  'startTime' | 'duration' | 'sourceBinding'
+>;
+
 /** Checks one selected interval without copying archived observations into the authored project. */
 export async function motionRegionHasAvailableCursor(
   project: VideoProject,
-  region: VideoProjectMotionRegion,
+  region: CursorAvailabilityInterval,
   read: ReadCursorTrajectoryWindow,
   signal?: AbortSignal
 ): Promise<boolean> {

@@ -19,6 +19,7 @@ export type SceneSpotlightClip = {
 
 /** Each opening retains its own decorated-window clip and output projection. */
 export interface SceneSpotlightLayer extends SceneSpotlightFrame {
+  sharpPaint?: (context: CanvasRenderingContext2D) => void;
   /** Mutually exclusive source appearances blend coverage. Independent masks retain union coverage. */
   blend?: { groupId: string; weight: number };
   clip?: SceneSpotlightClip | undefined;
@@ -31,10 +32,12 @@ export function drawSceneSpotlight(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   scratch: HTMLCanvasElement | OffscreenCanvas | null,
   frame: SceneSpotlightFrame | null,
-  resources?: RenderResources
+  resources?: RenderResources,
+  sharpPaint?: (context: CanvasRenderingContext2D) => void
 ) {
   if (!frame) return;
-  if (frame.lens) drawSpotlightLenses(context, canvas, [frame]);
+  if (frame.lens)
+    drawSpotlightLenses(context, canvas, sharpPaint ? [{ ...frame, sharpPaint }] : [frame]);
   if (frame.dim <= 0 && frame.blur <= 0) return;
   context.save();
   try {
@@ -353,7 +356,14 @@ export function drawSceneSpotlights(
     !frames[0]?.blend &&
     (!frames[0] || (!frames[0].projection && !sceneSpotlightNeedsClip(frames[0], frames[0].clip)))
   ) {
-    drawSceneSpotlight(context, canvas, scratch, frames[0] ?? null, resources);
+    drawSceneSpotlight(
+      context,
+      canvas,
+      scratch,
+      frames[0] ?? null,
+      resources,
+      frames[0]?.sharpPaint
+    );
     return;
   }
   if (!frames.length) return;
@@ -416,7 +426,9 @@ function drawSpotlightLenses(
           context.clip(clip);
         }
         context.clip(opening);
-        drawSceneLens(context, source, bounds, frame.lens!, frame.radius);
+        if (frame.sharpPaint)
+          drawSceneLens(context, source, bounds, frame.lens!, frame.radius, frame.sharpPaint);
+        else drawSceneLens(context, source, bounds, frame.lens!, frame.radius);
       } finally {
         context.restore();
       }

@@ -426,8 +426,23 @@
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "396ab54ae7db3699268891e3aa4c1d5012a52e4f51777c4fdc59ef0381e6cc0b",
+      "sha256": "ade08a2bd7861ecb97ff23fd36df0d187422d2576f08b42d0f37003c911ba2f2",
       "source": "THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE",
+      "sha256": "d66ccc11682c7458b19b376e1335e8665cbe412ff71f554bfec25f1791cddfa0",
+      "source": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/NOTICE.txt",
+      "sha256": "42f678c58f65a4ecf1aeb9c5d3b5bcab455932231ef60070c6084ea2616e10d0",
+      "source": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json",
+      "sha256": "27425919296cb19185ab1de022f9a5016c3bf4911cdd25b65f006a0c5c93c53e",
+      "source": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json"
     }
   ],
   "bundledAssets": [
@@ -551,6 +566,48 @@
         "packageName": "mediabunny",
         "version": "1.61.6",
         "owner": "tooling/ci/mediabunny"
+      }
+    ],
+    "bundledAssets": [
+      {
+        "id": "clark-x2",
+        "name": "Clark Realtime UI Video Upscaler x2",
+        "attribution": "Clark Labs",
+        "license": "Apache-2.0",
+        "sourceUrl": "https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2",
+        "licensePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE",
+        "licenseSha256": "d66ccc11682c7458b19b376e1335e8665cbe412ff71f554bfec25f1791cddfa0",
+        "noticePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/NOTICE.txt",
+        "noticeSha256": "42f678c58f65a4ecf1aeb9c5d3b5bcab455932231ef60070c6084ea2616e10d0",
+        "provenancePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json",
+        "provenanceSha256": "27425919296cb19185ab1de022f9a5016c3bf4911cdd25b65f006a0c5c93c53e",
+        "modifications": "The runtime exposes an unavailable getter. It uses explicit browser globals. It destroys the GPU device if initialization fails. Model weights and WGSL do not change.",
+        "artifacts": [
+          {
+            "path": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/model.bin",
+            "sha256": "c6b4f22d8c38270225b809e97d233eb68d7a48eef17595ac17a60b4540c72dce",
+            "sourceUrl": "https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/model.bin",
+            "sourceSha256": "c6b4f22d8c38270225b809e97d233eb68d7a48eef17595ac17a60b4540c72dce"
+          },
+          {
+            "path": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/model.json",
+            "sha256": "eba342bf8f54749490fecb9df43f399595c07b291d5188d67bb0f4448d38f09c",
+            "sourceUrl": "https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/model.json",
+            "sourceSha256": "eba342bf8f54749490fecb9df43f399595c07b291d5188d67bb0f4448d38f09c"
+          },
+          {
+            "path": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.js",
+            "sha256": "c096435fa3aab07a086e72b26a819312383e29f2bd807131c6c190f90f9aa86c",
+            "sourceUrl": "https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/realtimeVideoUpscaler.js",
+            "sourceSha256": "58dd6544858039b4f8ba7a6cf469a4ed22aadc8588c7483ca7b4af2901ac4742"
+          },
+          {
+            "path": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js",
+            "sha256": "d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6",
+            "sourceUrl": "https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/runtimeCapabilities.js",
+            "sourceSha256": "d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6"
+          }
+        ]
       }
     ]
   },

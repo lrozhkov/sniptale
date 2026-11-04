@@ -859,3 +859,37 @@ it('refuses an incorrectly sized GPU input and closes its unadopted bitmap', asy
   expect(bitmap.close).toHaveBeenCalledOnce();
   expect(drawLayer).not.toHaveBeenCalled();
 });
+it('separates FX sampling from the visible body and retains physical dimensions', async () => {
+  const plan = createPlan({
+    kind: 'clip',
+    clipId: 'clip',
+    chainIndex: 0,
+    placement: { x: 0, y: 0, width: 20, height: 10, rotation: 0, opacity: 1 },
+  });
+  plan.renderDimensions = { width: 80, height: 40 };
+  const bodyMedia = new Map(),
+    fullInput = new Map();
+  const marker = { outsideCameraROI: true };
+  fullInput.set('marker', marker);
+  const bitmap = new FakeBitmap(80, 40);
+  const createBitmap = vi.fn(async () => bitmap);
+  const mediaForPlan = vi.fn(() => fullInput);
+  const materializer = createEffectRuntimeInputMaterializer({
+    clipMediaElements: bodyMedia,
+    mediaForPlan,
+    createBitmap,
+    imageBank: {},
+    visualLayers: [createLayer('clip')],
+  });
+  await expect(materializer.materializeTargetSource(plan)).resolves.toBe(bitmap);
+  expect(mediaForPlan).toHaveBeenCalledWith(plan);
+  expect(drawLayer).toHaveBeenCalledWith(
+    context,
+    expect.objectContaining({ width: 20, height: 10 }),
+    4,
+    4,
+    {},
+    fullInput
+  );
+  expect(createBitmap).toHaveBeenCalledWith(expect.objectContaining({ width: 80, height: 40 }));
+});

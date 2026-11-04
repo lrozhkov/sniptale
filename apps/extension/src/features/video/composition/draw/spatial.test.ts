@@ -396,3 +396,213 @@ it('paints a deferred source border in the sharp projection without replaying so
     expect.anything()
   );
 });
+
+import type { ReviewSpatialRenderer } from '../canvas/spatial-renderer';
+import type { VideoCompositionCameraState } from '../types';
+import { DEFAULT_CAMERA_DEPTH } from '../../project/motion/spatial';
+import { projectQuickEditPoint } from '../motion/spatial-geometry';
+
+function sharpRenderer() {
+  const surface = vi.fn<ReviewSpatialRenderer['surface']>((_kind, width, height) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return { canvas, context: canvas.getContext('2d')! };
+  });
+  const draw = vi.fn<ReviewSpatialRenderer['draw']>((context, request) => {
+    const h = request.projection!;
+    context.save();
+    context.setTransform(h[0], h[3], h[1], h[4], h[2], h[5]);
+    context.drawImage(
+      request.source,
+      request.sourceRect.x,
+      request.sourceRect.y,
+      request.sourceRect.width,
+      request.sourceRect.height
+    );
+    context.restore();
+  });
+  return {
+    surface,
+    draw,
+    validateSizes: vi.fn<ReviewSpatialRenderer['validateSizes']>(),
+    dispose: vi.fn(),
+  };
+}
+
+it('projects a dense3D lens ROI with unchanged geometry and evaluated DOF compensation', () => {
+  const { args } = setup([video()]);
+  const renderer = sharpRenderer();
+  const camera: VideoCompositionCameraState = {
+    ...args.camera,
+    spatial: {
+      ...args.camera.spatial,
+      perspective: 0.5,
+      rotation: [0, Math.sin(Math.PI / 12), 0, Math.cos(Math.PI / 12)],
+      focus: [{ settings: { ...DEFAULT_CAMERA_DEPTH, enabled: true }, weight: 0.4 }],
+    },
+  };
+  const before = structuredClone(camera);
+  const projection = [3, 0.1, -30, 0.2, 3, -20, 0.001, 0.0005, 1] as const;
+  drawSpatialCompositionGroup({
+    ...args,
+    camera,
+    renderer,
+    sourceRasterScale: 3,
+    sharpOutput: {
+      projection,
+      output: { width: 50, height: 20 },
+      destination: { x: 0, y: 0, width: 50, height: 20 },
+    },
+  });
+  expect(drawSpatialCameraGroup).not.toHaveBeenCalled();
+  expect(renderer.surface.mock.calls.filter(([kind]) => kind === 'exposure')).toEqual([
+    ['exposure', 50, 20],
+    ['exposure', 50, 20],
+  ]);
+  for (const [, request] of renderer.draw.mock.calls) {
+    expect(request.projection).toEqual(projection);
+    expect(request.output).toEqual({ width: 50, height: 20 });
+    expect(projectQuickEditPoint(request.projection!, { x: 20, y: 10 })).toEqual({
+      x: 31 / 1.025,
+      y: 14 / 1.025,
+    });
+    expect(request.frame.focus[0]!.weight).toBeCloseTo((0.4 * 80) / 50, 12);
+    expect(request.source.width / request.sourceRect.width).toBeCloseTo(3, 12);
+    expect(request.source.height / request.sourceRect.height).toBeCloseTo(3, 12);
+  }
+  expect(camera).toEqual(before);
+  const body = renderer.draw.mock.calls[0]![1];
+  expect(body.frame.focus[0]!.weight * body.output.width).toBeCloseTo(0.4 * args.output.width, 12);
+});
+
+it('retains translucent higher-layer occlusion and sharp action alpha in the direct ROI path', () => {
+  const lower = video(),
+    clip = createImageClip({ shadowIntensity: 0 });
+  const higher: VideoCompositionVisualLayer = {
+    clip,
+    clipId: clip.id,
+    kind: 'image',
+    x: 0,
+    y: 0,
+    ...output,
+    rotation: 0,
+    opacity: 0.5,
+    zIndex: 1,
+    renderState: IDENTITY_TRANSITION_VISUAL_STATE,
+  };
+  const { args, context } = setup([lower, higher]);
+  const before = context.getTransform();
+  drawSpatialCompositionGroup({
+    ...args,
+    renderer: sharpRenderer(),
+    sourceRasterScale: 2,
+    sharpOutput: {
+      projection: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+      output,
+      destination: { x: 0, y: 0, ...output },
+    },
+  });
+  expect(pixel(context)).toEqual([127, 0, 128, 255]);
+  expect(context.getTransform()).toEqual(before);
+  expect(
+    vi.mocked(drawCompositionVisualLayer).mock.calls.filter(([, layer]) => layer.effectActionsOnly)
+  ).toHaveLength(1);
+});
+
+it.each(['zero-output', 'singular-projection', 'device-admission'] as const)(
+  'refuses %s before sharp-stage allocation or publication',
+  (failure) => {
+    const { args, context } = setup([video()]);
+    const renderer = sharpRenderer();
+    if (failure === 'device-admission')
+      renderer.validateSizes.mockImplementation(() => {
+        throw new Error('Device admission failed');
+      });
+    const sharpOutput = {
+      projection:
+        failure === 'singular-projection'
+          ? ([0, 0, 0, 0, 0, 0, 0, 0, 1] as const)
+          : ([2, 0, 0, 0, 2, 0, 0, 0, 1] as const),
+      output: { width: failure === 'zero-output' ? 0 : 40, height: 20 },
+      destination: { x: 0, y: 0, width: 40, height: 20 },
+    };
+    expect(() => drawSpatialCompositionGroup({ ...args, renderer, sharpOutput })).toThrow();
+    expect(renderer.surface).not.toHaveBeenCalled();
+    expect(renderer.draw).not.toHaveBeenCalled();
+    expect(pixel(context)).toEqual([0, 0, 0, 0]);
+  }
+);
+
+it('crops a small final-density ROI rather than allocating a full enlarged scene', () => {
+  const { args } = setup([]);
+  const renderer = sharpRenderer();
+  drawSpatialCompositionGroup({
+    ...args,
+    renderer,
+    logicalSize: { width: 1920, height: 1080 },
+    sourceRasterScale: 4,
+    sharpOutput: {
+      projection: [4, 0, -2000, 0, 4, -1000, 0, 0, 1],
+      output: { width: 100, height: 80 },
+      destination: { x: 0, y: 0, width: 100, height: 80 },
+    },
+  });
+  const source = renderer.surface.mock.calls.find(([kind]) => kind === 'plane')!;
+  expect(source[1]).toBeLessThan(300);
+  expect(source[2]).toBeLessThan(300);
+  expect(renderer.surface.mock.calls.filter(([kind]) => kind === 'exposure')).toEqual([
+    ['exposure', 100, 80],
+  ]);
+});
+
+import { resolveCompositionPaintBounds } from './paint-bounds';
+import { resolveReviewSpatialFilterLevels } from '../canvas/spatial-filter-levels';
+
+it.each([1.5, 3])(
+  'retains the ordinary fractional capture grid and selected reduction origin at density%s',
+  (density) => {
+    const layer = { ...video(), x: -2.125, width: 83.25 };
+    const { args } = setup([layer]);
+    const renderer = sharpRenderer();
+    const bounds = resolveCompositionPaintBounds({
+      context: args.context,
+      layers: args.layers,
+      output: args.logicalSize,
+      rasterScale: args.rasterScale,
+    });
+    const left = Math.floor(bounds.x),
+      top = Math.floor(bounds.y),
+      right = Math.ceil(bounds.x + bounds.width),
+      bottom = Math.ceil(bounds.y + bounds.height);
+    const fullX = Math.ceil((right - left) * density) / (right - left),
+      fullY = Math.ceil((bottom - top) * density) / (bottom - top);
+    const stage = {
+      projection: [1, 0, -20, 0, 1, -10, 0, 0, 1] as const,
+      output: { width: 20, height: 10 },
+      destination: { x: 0, y: 0, width: 20, height: 10 },
+    };
+    drawSpatialCompositionGroup({
+      ...args,
+      renderer,
+      sourceRasterScale: density,
+      sharpOutput: stage,
+    });
+    const request = renderer.draw.mock.calls[0]![1];
+    expect(request.source.width / request.sourceRect.width).toBeCloseTo(fullX, 12);
+    expect(request.source.height / request.sourceRect.height).toBeCloseTo(fullY, 12);
+    const inverse = [1, 0, 20, 0, 1, 10, 0, 0, 1] as const;
+    const levels = resolveReviewSpatialFilterLevels({
+      inverse,
+      output: stage.output,
+      precision: 16,
+      sourceScale: { x: fullX, y: fullY },
+      blurWeights: [],
+    });
+    const alignment = 2 ** (levels - 1);
+    const offsetX = (request.sourceRect.x - left) * fullX,
+      offsetY = (request.sourceRect.y - top) * fullY;
+    expect(offsetX / alignment).toBeCloseTo(Math.round(offsetX / alignment), 12);
+    expect(offsetY / alignment).toBeCloseTo(Math.round(offsetY / alignment), 12);
+  }
+);

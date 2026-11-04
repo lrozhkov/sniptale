@@ -86,6 +86,20 @@ export type ReviewGpuPrimitives = ReturnType<typeof createReviewGpuPrimitives>;
 function texture(source: HTMLCanvasElement, rect: Rect, inverse = identity): GpuPreviewLayer {
   return { source, rect, inverse };
 }
+/** Uniform fields sample only texel centres, outside the source-edge antialiasing ramp. */
+function uniformViewportLayer(source: HTMLCanvasElement, output: Size): GpuPreviewLayer {
+  return texture(source, { x: 0, y: 0, ...output }, [
+    0.5,
+    0,
+    output.width / 4,
+    0,
+    0.5,
+    output.height / 4,
+    0,
+    0,
+    1,
+  ]);
+}
 function group(
   layers: readonly GpuPreviewLayer[],
   dimensions: PreviewSceneDimensions
@@ -458,11 +472,11 @@ export function reviewGpuFinishLayers(args: {
   const split = screen && (screen.width < 1 || screen.height < 1 || screen.clip);
   const layers: GpuPreviewLayer[] = [];
   if (split) {
-    const fill = primitives.raster('preview-gpu-split-fill', { width: 1, height: 1 }, (context) => {
+    const fill = primitives.raster('preview-gpu-split-fill', { width: 2, height: 2 }, (context) => {
       context.fillStyle = '#101014';
-      context.fillRect(0, 0, 1, 1);
+      context.fillRect(0, 0, 2, 2);
     });
-    layers.push(texture(fill, full));
+    layers.push(uniformViewportLayer(fill, output));
     const inverse: QuickEditHomography = [
       1 / screen.width,
       0,
@@ -507,21 +521,21 @@ export function reviewGpuFinishLayers(args: {
   if ((args.blackout?.opacity ?? 0) > 0 || outer > 0) {
     const fill = primitives.raster(
       'preview-gpu-final-fades',
-      { width: 1, height: 1 },
+      { width: 2, height: 2 },
       (context) => {
         if (args.blackout) {
           context.globalAlpha = args.blackout.opacity;
           context.fillStyle = args.blackout.color;
-          context.fillRect(0, 0, 1, 1);
+          context.fillRect(0, 0, 2, 2);
         }
         if (scene.outerFadePlan) {
           context.globalAlpha = outer;
           context.fillStyle = presentationMainColor(scene.outerFadePlan, args.resultTime);
-          context.fillRect(0, 0, 1, 1);
+          context.fillRect(0, 0, 2, 2);
         }
       }
     );
-    layers.push(texture(fill, full));
+    layers.push(uniformViewportLayer(fill, output));
   }
   return layers;
 }

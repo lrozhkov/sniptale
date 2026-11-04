@@ -1,3 +1,4 @@
+import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -49,7 +50,20 @@ function fixture() {
   const renderFrame = vi.fn<VideoPreviewFrameMaterializer['renderFrame']>(async () => frame);
   const dispose = vi.fn();
   const updateProject = vi.fn(() => true);
-  media.create.mockReturnValue({ canvas: frame, renderFrame, dispose, updateProject });
+  media.create.mockReturnValue({
+    canvas: frame,
+    renderFrame,
+    dispose,
+    updateProject,
+    renderFrameWithPresentation: async (
+      time: number,
+      signal: AbortSignal,
+      camera?: import('../../../../features/video/composition/types').VideoCompositionCameraState
+    ) => ({
+      canvas: await renderFrame(time, signal, camera),
+      presentation: { camera: camera ?? resolveVideoCompositionFrame(project, time).camera, time },
+    }),
+  });
   const live = document.createElement('video');
   live.src = 'blob:source-one';
   const raw = vi.fn<typeof renderPreviewScene>(async () => {});
@@ -214,4 +228,25 @@ it('cannot publish a late frame after an incompatible snapshot replaces its owne
   expect(await old).toBe(false);
   expect(f.pixel(8, 5)).toEqual([0, 255, 0, 255]);
   expect(f.dispose).toHaveBeenCalledOnce();
+});
+
+it('returns the materialized pose only after final join publication', async () => {
+  const f = fixture();
+  const camera = {
+    ...resolveVideoCompositionFrame(f.input.project, 1).camera,
+    scale: 2.4,
+    viewportX: 123,
+  };
+  const presentation = { camera, time: 1 };
+  const materializer = media.create;
+  const original = materializer.getMockImplementation();
+  materializer.mockReturnValueOnce({
+    canvas: f.frame,
+    dispose: vi.fn(),
+    updateProject: () => true,
+    renderFrameWithPresentation: async () => ({ canvas: f.frame, presentation }),
+  });
+  await expect(f.owner.render(f.input)).resolves.toBe(presentation);
+  expect(f.pixel(8, 5)).toEqual([255, 0, 0, 128]);
+  if (original) materializer.mockImplementation(original);
 });

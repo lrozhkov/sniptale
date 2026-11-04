@@ -100,6 +100,95 @@ function fixture() {
   };
 }
 
+it('uploads tight cursor artwork with its original paint origin and camera projection', async () => {
+  const f = fixture();
+  f.input.project.width = 1904;
+  f.input.project.height = 1072;
+  f.passes.overlayFrame.cursor = {
+    animationPreset: 'NONE',
+    captureMode: 'separate',
+    color: '#fff',
+    preset: 'ARROW',
+    scale: 1,
+    shadow: true,
+    time: 0,
+    visible: true,
+    x: 20.25,
+    y: 30.5,
+  };
+  f.passes.overlayFrame.camera.scale = 2;
+  f.passes.overlayFrame.camera.viewportX = 3;
+  f.passes.overlayFrame.camera.viewportY = 4;
+  const draw = await import('../../../../features/video/composition/draw/effects/cursor');
+  let origin: { x: number; y: number } | undefined;
+  const paint = vi.spyOn(draw, 'drawCursorCompositionState').mockImplementation((context) => {
+    const transform = context.getTransform();
+    origin = { x: transform.e, y: transform.f };
+  });
+  try {
+    const plan = await buildNativeGpuPreviewLayers(f);
+    plans.push(plan);
+    const artwork = plan.layers.at(-1)!;
+    expect(artwork.rect).toEqual({ x: -38, y: -27, width: 140, height: 155 });
+    expect(origin).toEqual({ x: 38, y: 27 });
+    expect(artwork.inverse).toEqual([0.5, 0, 3, 0, 0.5, 4, 0, 0, 1]);
+    if (!(artwork.source instanceof HTMLCanvasElement)) throw new Error('Expected cursor raster');
+    expect(artwork.source.width * artwork.source.height * 4).toBe(86_800);
+    expect(artwork.source.width * artwork.source.height * 4).toBeLessThan(11_473_920);
+    expect(f.source.close).not.toHaveBeenCalled();
+    plan.release();
+    expect(artwork.source.width).toBe(0);
+    expect(artwork.source.height).toBe(0);
+  } finally {
+    paint.mockRestore();
+  }
+});
+
+it('bounds accent artwork without changing action order or the keystroke fallback', async () => {
+  const f = fixture();
+  const accent = { ...clickAction('click'), point: { x: 20.25, y: 30.5 } };
+  f.passes.overlayFrame.actions = [accent, { ...accent, renderKind: 'keystroke' }];
+  const draw = await import('../../../../features/video/composition/draw/effects/actions');
+  const expected = draw.resolveActionCompositionPaintBounds(accent, 1)!;
+  const x = Math.floor(expected.x),
+    y = Math.floor(expected.y);
+  const rect = {
+    x,
+    y,
+    width: Math.ceil(expected.x + expected.width) - x,
+    height: Math.ceil(expected.y + expected.height) - y,
+  };
+  const plan = await buildNativeGpuPreviewLayers(f);
+  plans.push(plan);
+  const [first, second] = plan.layers.slice(-2);
+  expect(first!.rect).toEqual(rect);
+  expect(second!.rect).toEqual({ x: -128, y: -128, width: 288, height: 272 });
+  expect(first!.inverse).toEqual(second!.inverse);
+  if (!(first!.source instanceof HTMLCanvasElement)) throw new Error('Expected action raster');
+  const transform = first!.source.getContext('2d')!.getTransform();
+  expect([transform.e, transform.f]).toEqual([-x, -y]);
+  expect(first!.source.width * first!.source.height * 4).toBe(rect.width * rect.height * 4);
+  plan.release();
+  expect(first!.source.width).toBe(0);
+});
+
+it.each([null, { x: NaN, y: 0, width: 8, height: 8 }, { x: 0, y: 0, width: 0, height: 8 }])(
+  'keeps full-plane artwork when paint bounds are unavailable or invalid: %j',
+  async (bounds) => {
+    const f = fixture();
+    f.passes.overlayFrame.actions = [clickAction('click')];
+    const draw = await import('../../../../features/video/composition/draw/effects/actions');
+    const resolve = vi.spyOn(draw, 'resolveActionCompositionPaintBounds').mockReturnValue(bounds);
+    try {
+      const plan = await buildNativeGpuPreviewLayers(f);
+      plans.push(plan);
+      expect(plan.layers.at(-1)!.rect).toEqual({ x: -128, y: -128, width: 288, height: 272 });
+    } finally {
+      resolve.mockRestore();
+    }
+  }
+);
+
 it('weights complete exposures once across video and decoration', async () => {
   const f = fixture();
   const first = f.passes.visualPasses[0]!;

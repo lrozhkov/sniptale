@@ -63,6 +63,89 @@ The font files remain under ${interfaceFont.license}. The rest of Sniptale is no
   );
 }
 
+function bundledAssetPath(value, label) {
+  const relativePath = requireText(value, label);
+  if (
+    path.isAbsolute(relativePath) ||
+    relativePath.includes('\\') ||
+    relativePath.split('/').includes('..')
+  )
+    throw new Error(`${label} must be a relative repository path.`);
+  return relativePath;
+}
+
+/** Checks metadata for bundled assets that are not npm packages or fonts. */
+export function normalizeBundledAssetNotices(assets = []) {
+  if (!Array.isArray(assets)) throw new Error('Bundled asset metadata must be an array.');
+  const result = assets.map((asset) => {
+    if (!asset || typeof asset !== 'object') throw new Error('Bundled asset metadata is required.');
+    if (!Array.isArray(asset.artifacts) || asset.artifacts.length === 0)
+      throw new Error('Bundled asset artifacts are required.');
+    const normalized = {
+      id: requireText(asset.id, 'Bundled asset ID'),
+      name: requireText(asset.name, 'Bundled asset name'),
+      attribution: requireText(asset.attribution, 'Bundled asset attribution'),
+      license: requireText(asset.license, 'Bundled asset license'),
+      sourceUrl: requireText(asset.sourceUrl, 'Bundled asset source URL'),
+      licensePath: bundledAssetPath(asset.licensePath, 'Bundled asset license path'),
+      licenseSha256: requireSha256(asset.licenseSha256, 'Bundled asset license SHA-256'),
+      noticePath: bundledAssetPath(asset.noticePath, 'Bundled asset notice path'),
+      noticeSha256: requireSha256(asset.noticeSha256, 'Bundled asset notice SHA-256'),
+      provenancePath: bundledAssetPath(asset.provenancePath, 'Bundled asset provenance path'),
+      provenanceSha256: requireSha256(asset.provenanceSha256, 'Bundled asset provenance SHA-256'),
+      modifications: requireText(asset.modifications, 'Bundled asset changes'),
+      artifacts: asset.artifacts
+        .map((artifact) => ({
+          path: bundledAssetPath(artifact.path, 'Bundled asset artifact path'),
+          sha256: requireSha256(artifact.sha256, 'Bundled asset artifact SHA-256'),
+          sourceUrl: requireText(artifact.sourceUrl, 'Bundled asset artifact source URL'),
+          sourceSha256: requireSha256(
+            artifact.sourceSha256,
+            'Bundled asset artifact source SHA-256'
+          ),
+        }))
+        .sort((left, right) => compareText(left.path, right.path)),
+    };
+    const paths = [
+      normalized.licensePath,
+      normalized.noticePath,
+      normalized.provenancePath,
+      ...normalized.artifacts.map((artifact) => artifact.path),
+    ];
+    if (new Set(paths).size !== paths.length)
+      throw new Error('Bundled asset file paths must be unique.');
+    return normalized;
+  });
+  if (new Set(result.map((asset) => asset.id)).size !== result.length)
+    throw new Error('Bundled asset IDs must be unique.');
+  return result.sort((left, right) => compareText(left.id, right.id));
+}
+
+function formatBundledAssetSection(asset) {
+  const rows = asset.artifacts
+    .map(
+      (artifact) =>
+        `| \`${artifact.path}\` | ${artifact.sourceUrl} | \`${artifact.sourceSha256}\` | \`${artifact.sha256}\` |`
+    )
+    .join('\n');
+  return `## ${asset.name}
+
+- Attribution: ${asset.attribution}
+- Source: ${asset.sourceUrl}
+- License: \`${asset.license}\`
+- License text: [\`${asset.licensePath}\`](${asset.licensePath})
+- License SHA-256: \`${asset.licenseSha256}\`
+- Notice text: [\`${asset.noticePath}\`](${asset.noticePath})
+- Notice SHA-256: \`${asset.noticeSha256}\`
+- Provenance record: [\`${asset.provenancePath}\`](${asset.provenancePath})
+- Provenance SHA-256: \`${asset.provenanceSha256}\`
+- Local changes: ${asset.modifications}
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+${rows}`;
+}
+
 function formatDependencySection(entry) {
   const sourceLine = entry.correspondingSourceUrl
     ? `\n- MPL-2.0 corresponding source: ${entry.correspondingSourceUrl}`
@@ -100,11 +183,15 @@ function formatDependencySection(entry) {
 }
 
 /** Formats the deterministic notices document for the complete production dependency closure. */
-export function formatThirdPartyNotices({ entries, interfaceFont, documentFont }) {
+export function formatThirdPartyNotices({ entries, interfaceFont, documentFont, bundledAssets }) {
   const normalizedInterfaceFont = validateInterfaceFont(interfaceFont);
   const documentSection = documentFont
     ? `\n\n${formatInterfaceFontSection(validateInterfaceFont(documentFont), 'Golos Text')}`
     : '';
+  const assetSections = normalizeBundledAssetNotices(bundledAssets)
+    .map(formatBundledAssetSection)
+    .map((section) => `\n\n${section}`)
+    .join('');
   const dependencySections = [...entries]
     .sort(
       (left, right) =>
@@ -117,7 +204,7 @@ export function formatThirdPartyNotices({ entries, interfaceFont, documentFont }
 
 This file is generated from the installed production dependency closure, package-lock, and reviewed pinned sources.
 
-${formatInterfaceFontSection(normalizedInterfaceFont)}${documentSection}
+${formatInterfaceFontSection(normalizedInterfaceFont)}${documentSection}${assetSections}
 
 ## Production dependency licenses
 
@@ -229,10 +316,17 @@ export async function writeDependencyLegalClosure({
   manifestPath = 'THIRD_PARTY_DEPENDENCIES.json',
   interfaceFont,
   documentFont,
+  bundledAssets,
   noticesPath = 'THIRD_PARTY_NOTICES.md',
   outputRoot,
 }) {
   const normalized = normalizeClosure(closure);
+  const notices = formatThirdPartyNotices({
+    entries: normalized.entries,
+    interfaceFont,
+    documentFont,
+    bundledAssets,
+  });
   await assertCanonicalLicenseFiles(outputRoot, normalized.canonicalEntries);
   const licenseRoot = resolveOutputPath(outputRoot, 'LICENSES/dependencies');
   await fs.rm(licenseRoot, { force: true, recursive: true });
@@ -247,8 +341,5 @@ export async function writeDependencyLegalClosure({
     resolveOutputPath(outputRoot, manifestPath),
     `${JSON.stringify(manifest, null, 2)}\n`
   );
-  await fs.writeFile(
-    resolveOutputPath(outputRoot, noticesPath),
-    formatThirdPartyNotices({ entries: normalized.entries, interfaceFont, documentFont })
-  );
+  await fs.writeFile(resolveOutputPath(outputRoot, noticesPath), notices);
 }

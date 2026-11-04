@@ -1,3 +1,4 @@
+import { parseEnhancementMode } from '../../features/video/composition/export-enhancement/mode';
 import type { VideoSample } from 'mediabunny';
 import type { ReviewFrameExportInput } from './render-export-input';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -153,6 +154,7 @@ function resolveRenderProfile(
   advanced: QuickEditAdvancedState,
   settings?: ReviewRenderSettings
 ) {
+  parseEnhancementMode(settings?.detailEnhancement);
   if (
     settings &&
     ((settings.quality !== undefined && !Object.values(VideoQuality).includes(settings.quality)) ||
