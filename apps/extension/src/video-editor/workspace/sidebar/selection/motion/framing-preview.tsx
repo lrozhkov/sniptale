@@ -1,3 +1,4 @@
+import { useCursorTrajectoryProject } from '../../../../preview/stage/runtime/cursor-trajectory';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { InspectorActionButton } from '../shared/actions';
 import { useContext, useEffect, useRef, useState } from 'react';
@@ -46,6 +47,9 @@ export function MotionFramingPreview(props: {
 }
 
 export function FramingPreviewSurface(props: FramingPreviewProps) {
+  const time = Math.min(props.project.duration, props.region.startTime + props.region.duration / 2);
+  const project = useCursorTrajectoryProject(props.project, time);
+  const renderProps = { ...props, project };
   const following = props.region.focusMode === VideoMotionFocusMode.CURSOR;
   const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,10 +61,10 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
     plan,
     nominalScale,
     update,
-  } = useFramingFrame(props, canvasRef);
-  const interaction = useFramingInteraction(props, overview, cursorViewport);
+  } = useFramingFrame(renderProps, canvasRef);
+  const interaction = useFramingInteraction(renderProps, overview, cursorViewport);
   const { areaPoints, viewport, left, top, width, height, handlers } = interaction;
-  const camera = resolveFramingRenderCamera(props, overview, interaction, cursorViewport);
+  const camera = resolveFramingRenderCamera(renderProps, overview, interaction, cursorViewport);
   const cameraKey = JSON.stringify(camera);
   const cameraRef = useRef(camera);
   cameraRef.current = camera;

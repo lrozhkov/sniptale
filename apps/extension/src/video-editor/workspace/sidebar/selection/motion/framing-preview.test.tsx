@@ -13,7 +13,11 @@ import { FramingPreviewSurface, MotionFramingPreview } from './framing-preview';
 import { createMotionPanelProps } from './test-support';
 import { RuntimePreviewContext } from '../../../../runtime/controller/composition/contexts';
 
-const mocks = vi.hoisted(() => ({ create: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), trajectory: vi.fn() }));
+vi.mock('../../../../../workflows/video-review/cursor-trajectory', async (load) => ({
+  ...(await load<typeof import('../../../../../workflows/video-review/cursor-trajectory')>()),
+  createRecordingCursorTrajectoryRenderer: mocks.trajectory,
+}));
 vi.mock('../../../../preview/cache/materializer', () => ({
   createVideoPreviewFrameMaterializer: mocks.create,
 }));
@@ -43,6 +47,10 @@ beforeEach(() => {
   pending.length = 0;
   draw.mockClear();
   mocks.create.mockClear();
+  mocks.trajectory.mockReturnValue({
+    prepare: async (source: typeof project) => source,
+    clear: vi.fn(),
+  });
   commit.mockClear();
   commitArea.mockClear();
   host = document.createElement('div');
@@ -703,4 +711,196 @@ it('keeps manual preview rendering outside the urgent control update', async () 
   expect(pending).toHaveLength(0);
   await admit();
   expect(pending).toHaveLength(1);
+});
+
+import { createVideoProjectFromRecording } from '../../../../../features/video/project/factories/creation';
+import { normalizeVideoProjectCursorSkin } from '../../../../../features/video/project/cursor';
+import {
+  createCursorTrajectoryBlockPacker,
+  decodeCursorTrajectoryBlock,
+} from '../../../../../features/video/project/cursor-trajectory/blocks';
+import { createRecordingCursorTrajectoryReader } from '../../../../../composition/persistence/recordings/cursor-trajectory/reader';
+import type { RecordingCursorTrajectoryHead } from '../../../../../composition/persistence/recordings/cursor-trajectory/contracts';
+import type {
+  CursorTrajectoryDescriptor,
+  CursorTrajectoryRecord,
+  CursorTrajectorySegment,
+} from '../../../../../features/video/project/cursor-trajectory/types';
+import {
+  prepareCursorTrajectoryProject,
+  type ReadCursorTrajectoryWindow,
+} from '../../../../../features/video/project/cursor-trajectory/project-window';
+import { resolveVideoCompositionCamera } from '../../../../../features/video/composition/motion';
+
+const identity = { recordingId: 'recording', trajectoryId: 'a'.repeat(32) };
+function sample(time: number, visible = true): CursorTrajectoryRecord {
+  return {
+    kind: 'sample',
+    segmentId: 0,
+    observationSeq: time,
+    activeTimeUs: time,
+    xQ8: visible ? 2560 : null,
+    yQ8: visible ? 5120 : null,
+    observed: visible,
+    visible,
+    event: 'move',
+    button: 'none',
+    relatedObservationSeq: null,
+    anchors: [],
+  };
+}
+function archiveFixture(records: CursorTrajectoryRecord[] = [sample(1000000), sample(2000000)]) {
+  const segment: CursorTrajectorySegment = {
+    kind: 'segment',
+    segmentId: 0,
+    activeTimeUs: 0,
+    reason: 'start',
+    width: 100,
+    height: 100,
+    clock: {
+      source: 'dom-event-time',
+      timestampQuantumUs: null,
+      resolutionBoundUs: null,
+      mappingUncertaintyUs: null,
+    },
+  };
+  const writer = createCursorTrajectoryBlockPacker(identity.recordingId, identity.trajectoryId);
+  const packed = writer.append(segment);
+  for (const record of records) packed.push(...writer.append(record));
+  packed.push(...writer.finish());
+  const descriptor: CursorTrajectoryDescriptor = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: identity.trajectoryId,
+    state: 'complete',
+    finalized: true,
+    ...writer.summary(),
+  };
+  const head: RecordingCursorTrajectoryHead = {
+    ...identity,
+    ...writer.summary(),
+    sourceRecordingId: identity.recordingId,
+    writerGeneration: 'generation',
+    revision: 1,
+    width: 100,
+    height: 100,
+    retired: false,
+    finalized: true,
+    state: 'complete',
+    activeSegment: segment,
+    lastObservationSeq: null,
+    lastSegmentId: 0,
+    lastTimeUs: 2000000,
+  };
+  let initial: CursorTrajectorySegment | null = null;
+  const rows = packed.map((block) => {
+    const row = {
+      ...identity,
+      sequence: block.entry.sequence,
+      startTimeUs: block.entry.startTimeUs,
+      entry: block.entry,
+      initialSegment: initial,
+      bytes: block.bytes,
+    };
+    const decoded = decodeCursorTrajectoryBlock(block.bytes, initial);
+    if (!decoded) throw new Error('Invalid packed fixture.');
+    for (const record of decoded.records) {
+      if (record.kind === 'segment') initial = record;
+      if (record.kind === 'boundary' || record.kind === 'gap') initial = null;
+    }
+    return row;
+  });
+  const readWindow = vi.fn(async (_identity: typeof identity, time: number) => {
+    const current = Math.max(
+      0,
+      rows.findLastIndex((row) => row.startTimeUs <= time)
+    );
+    return {
+      head,
+      blocks: rows.slice(Math.max(0, current - 1), current + 2),
+      fromTimeUs: rows[current]?.startTimeUs ?? 0,
+      toTimeUs: rows[current + 1]?.startTimeUs ?? null,
+    };
+  });
+  const reader = createRecordingCursorTrajectoryReader({ getHead: async () => head, readWindow });
+  const read = vi.fn<ReadCursorTrajectoryWindow>((...args) => reader.read(...args));
+  const project = createVideoProjectFromRecording({
+    recordingId: identity.recordingId,
+    filename: 'capture.webm',
+    width: 100,
+    height: 100,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const clip = project.clips.find((item) => item.type === 'VIDEO');
+  if (!clip || clip.type !== 'VIDEO') throw new Error('Missing source.');
+  clip.sourceInstanceId = 'instance';
+  project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [
+      { ...identity, sourceInstanceId: 'instance', samples: [], trajectory: descriptor },
+    ],
+  };
+  const region = {
+    ...createVideoProjectMotionRegion(project, 0),
+    startTime: 0,
+    duration: 3,
+    sourceBinding: {
+      clipId: clip.id,
+      coordinateSpace: 'source-window' as const,
+      sourceStart: 0,
+      sourceEnd: 3,
+      animation: { start: 0, end: 3, duration: 3 },
+    },
+  };
+  return { project, clip, region, read, reader, readWindow };
+}
+
+it('uses the real archived midpoint for Result geometry without hydrating the authoring project', async () => {
+  const archive = archiveFixture();
+  const following = { ...archive.region, focusMode: VideoMotionFocusMode.CURSOR, scale: 2 };
+  archive.project.motionRegions = [following];
+  const before = JSON.stringify(archive.project);
+  const prepare = vi.fn((source: typeof project, time: number) =>
+    prepareCursorTrajectoryProject(source, time, archive.read)
+  );
+  mocks.trajectory.mockReturnValue({ prepare, clear: () => archive.reader.clear() });
+  await render(false, archive.project, following);
+  expect(prepare).toHaveBeenCalledWith(archive.project, 1.5);
+  const prepared = await prepareCursorTrajectoryProject(archive.project, 1.5, archive.read);
+  const expected = resolveVideoCompositionCamera({
+    project: prepared,
+    currentTime: 1.5,
+    actions: [],
+    cursorSample: null,
+  });
+  const unprepared = resolveVideoCompositionCamera({
+    project: archive.project,
+    currentTime: 1.5,
+    actions: [],
+    cursorSample: null,
+  });
+  expect(expected.focusPoint).not.toEqual(unprepared.focusPoint);
+  await ready(pending.length - 1);
+  act(() => host.querySelectorAll('button')[1]!.click());
+  await admit();
+  expect(pending.at(-1)?.camera).toEqual(
+    expect.objectContaining({
+      viewportX: expected.viewportX,
+      viewportY: expected.viewportY,
+      viewportWidth: expected.viewportWidth,
+      viewportHeight: expected.viewportHeight,
+    })
+  );
+  expect(mocks.create.mock.lastCall?.[0].project).not.toBe(archive.project);
+  expect(JSON.stringify(archive.project)).toBe(before);
+  expect(archive.project.cursorTrack?.samples).toEqual([]);
+  expect(archive.project.cursorTrack?.sourceObservations?.[0]?.samples).toEqual([]);
+  expect(commit).not.toHaveBeenCalled();
+  expect(commitArea).not.toHaveBeenCalled();
 });

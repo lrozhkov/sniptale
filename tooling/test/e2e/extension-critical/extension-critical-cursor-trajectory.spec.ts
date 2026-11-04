@@ -1,3 +1,14 @@
+import {
+  BufferTarget,
+  EncodedPacket,
+  EncodedVideoPacketSource,
+  Output,
+  WebMOutputFormat,
+} from 'mediabunny';
+import { writeFile } from 'node:fs/promises';
+import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
 import eventsFixture from '../../../../apps/extension/src/features/video/project/recording-events/fixtures.json' with { type: 'json' };
@@ -34,6 +45,81 @@ import {
   GALLERY_HARNESS_PATH,
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
+
+enableGpuPreviewProof();
+
+/** Static source pixels make camera movement observable independently of source animation. */
+async function staticCameraSource(page: Page) {
+  const packets = await page.evaluate(async () => {
+    const packets: {
+      data: number[];
+      type: 'key' | 'delta';
+      timestamp: number;
+      duration: number;
+    }[] = [];
+    let failed: Error | null = null;
+    const encoder = new VideoEncoder({
+      output(chunk) {
+        const data = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(data);
+        packets.push({
+          data: [...data],
+          type: chunk.type,
+          timestamp: chunk.timestamp,
+          duration: chunk.duration ?? 100000,
+        });
+      },
+      error(error) {
+        failed = error;
+      },
+    });
+    try {
+      encoder.configure({
+        codec: 'vp8',
+        width: 160,
+        height: 90,
+        framerate: 10,
+        bitrate: 2000000,
+        hardwareAcceleration: 'prefer-software',
+      });
+      const canvas = new OffscreenCanvas(160, 90);
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#142040';
+      context.fillRect(0, 0, 160, 90);
+      context.fillStyle = '#ff36bd';
+      context.fillRect(56, 56, 8, 8);
+      for (let frame = 0; frame < 120; frame++) {
+        const sample = new VideoFrame(canvas, { timestamp: frame * 100000, duration: 100000 });
+        encoder.encode(sample, { keyFrame: frame % 20 === 0 });
+        sample.close();
+      }
+      await encoder.flush();
+      if (failed) throw failed;
+      return packets;
+    } finally {
+      encoder.close();
+    }
+  });
+  const target = new BufferTarget();
+  const output = new Output({ target, format: new WebMOutputFormat() });
+  const video = new EncodedVideoPacketSource('vp8');
+  output.addVideoTrack(video);
+  await output.start();
+  for (const packet of packets)
+    await video.add(
+      new EncodedPacket(
+        Uint8Array.from(packet.data),
+        packet.type,
+        packet.timestamp / 1e6,
+        packet.duration / 1e6
+      ),
+      { decoderConfig: { codec: 'vp8', codedWidth: 160, codedHeight: 90 } }
+    );
+  video.close();
+  await output.finalize();
+  if (!target.buffer) throw new Error('Missing static camera source.');
+  return new Uint8Array(target.buffer);
+}
 
 function sourceFixture(mediaSize: number) {
   const recording = betaV1Fixture.records.recordings[0]!;
@@ -238,7 +324,7 @@ async function eventSourceFixture() {
   };
 }
 
-async function seekLate(page: Page) {
+async function seekProjectTime(page: Page, time: number) {
   const ruler = page.locator('[data-ui="video-editor.timeline.ruler"]');
   await expect(ruler).toBeVisible();
   await expect.poll(() => ruler.locator(':scope > div > span').count()).toBeGreaterThan(1);
@@ -261,7 +347,7 @@ async function seekLate(page: Page) {
   if (!first || !next || !bounds) throw new Error('Missing timeline ruler.');
   await ruler.click({
     position: {
-      x: first.x - bounds.x + ((11 - first.time) * (next.x - first.x)) / (next.time - first.time),
+      x: first.x - bounds.x + ((time - first.time) * (next.x - first.x)) / (next.time - first.time),
       y: 8,
     },
   });
@@ -270,7 +356,7 @@ async function seekLate(page: Page) {
     .poll(async () => {
       const text = await page.locator('[data-playback-counter="true"]').textContent();
       const match = /^(\d+):(\d+\.\d+|\d+)/.exec(text?.trim() ?? '');
-      return match ? Math.abs(Number(match[1]) * 60 + Number(match[2]) - 11) : Infinity;
+      return match ? Math.abs(Number(match[1]) * 60 + Number(match[2]) - time) : Infinity;
     })
     .toBeLessThanOrEqual(1 / 30 + 0.001);
 }
@@ -297,14 +383,13 @@ async function paintedCursor(page: Page) {
   });
 }
 
-for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
-  test(`block cursor beyond 4096 observations survives seek and reopen ${viewport.name}`, async ({
+for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+  test(`archived cursor follows camera through preview, reopen and export ${viewport.name}`, async ({
     page,
   }, info) => {
+    test.setTimeout(180000);
     await page.setViewportSize(viewport.size);
     const server = await startHostServer();
-    const media = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
-    const fixture = sourceFixture(media.byteLength);
     try {
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
@@ -313,11 +398,20 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       });
       await page.goto(`${server.origin}${GALLERY_HARNESS_PATH}?theme=light`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
-      await seedReviewVideo(page, 'review-vp8-opus.webm', {
-        width: 160,
-        height: 90,
-        duration: 12.01,
-      });
+      const media = await staticCameraSource(page);
+      const fixture = sourceFixture(media.byteLength);
+      await seedReviewVideo(
+        page,
+        'review-vp8-opus.webm',
+        {
+          width: 160,
+          height: 90,
+          duration: 12.01,
+        },
+        false,
+        false,
+        { bytes: media, mimeType: 'video/webm' }
+      );
       await page.evaluate(
         async ({ databaseName, fixture }) => {
           const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -361,7 +455,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       ).toContainText(/Archived cursor history|История курсора в архиве/);
       await expect.poll(async () => (await paintedCursor(page)).count).toBeGreaterThan(10);
       await expect.poll(async () => (await paintedCursor(page)).x ?? 1).toBeLessThan(0.3);
-      await seekLate(page);
+      await seekProjectTime(page, 11);
       await expect.poll(async () => (await paintedCursor(page)).x ?? 0).toBeGreaterThan(0.7);
       await page.screenshot({
         path: info.outputPath('cursor-trajectory-late.png'),
@@ -371,7 +465,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(
         page.locator('[data-ui="video-editor.timeline.history-cursor-row"]')
       ).toContainText(/Archived cursor history|История курсора в архиве/);
-      await seekLate(page);
+      await seekProjectTime(page, 11);
       await expect.poll(async () => (await paintedCursor(page)).x ?? 0).toBeGreaterThan(0.7);
       const saved = await readNativeVideoProject(page, fixture.project.id);
       expect(saved?.cursorTrack?.samples).toEqual([]);
@@ -381,14 +475,247 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         path: info.outputPath('cursor-trajectory-reopened.png'),
         fullPage: false,
       });
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+      const category = (key: Parameters<typeof translate>[0]) =>
+        page
+          .locator('nav')
+          .getByRole('button', { name: label(key), exact: true })
+          .click();
+      await page.locator('[data-ui="video-editor.timeline.playhead-handle"]').press('Home');
+      await page.locator('[data-ui="video-editor.timeline.toolbar.add-zoom"]').click();
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page, fixture.project.id))?.motionRegions?.length
+        )
+        .toBe(1);
+      await category('videoEditor.sidebar.inspectorGroupTiming');
+      const duration = page.getByRole('textbox', {
+        name: label('videoEditor.sidebar.motionDurationLabel'),
+        exact: true,
+      });
+      await duration.fill('5');
+      await duration.press('Enter');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page, fixture.project.id))?.motionRegions?.[0]?.duration
+        )
+        .toBe(5);
+      await category('videoEditor.sidebar.inspectorGroupFraming');
+      const cursorChoice = page
+        .locator('[data-ui="camera.followTarget"]')
+        .getByRole('button', { name: label('editor.scene.cameraFollowCursor'), exact: true });
+      await expect(cursorChoice).toBeEnabled();
+      await cursorChoice.click();
+      const scale = page.getByRole('textbox', {
+        name: label('videoEditor.sidebar.motionScaleLabel'),
+        exact: true,
+      });
+      await scale.fill('200');
+      await scale.press('Enter');
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page, fixture.project.id))?.motionRegions?.[0]?.scale
+        )
+        .toBe(2);
+      await chooseInspectorValue(
+        page,
+        page.locator('[data-ui="camera.composition"]'),
+        label('editor.scene.cameraComposition'),
+        label('editor.scene.cameraCompositionOff')
+      );
+      await expect
+        .poll(
+          async () =>
+            (await readNativeVideoProject(page, fixture.project.id))?.motionRegions?.[0]?.focusMode
+        )
+        .toBe('CURSOR');
+      const sampleCanvasPoint = async (selector: string, point: { x: number; y: number }) =>
+        page.locator(selector).evaluate((canvas: HTMLCanvasElement, point) => {
+          const scale = Math.min(canvas.width / 160, canvas.height / 90);
+          const x = (canvas.width - 160 * scale) / 2 + point.x * scale;
+          const y = (canvas.height - 90 * scale) / 2 + point.y * scale;
+          return Array.from(
+            canvas.getContext('2d')!.getImageData(Math.round(x), Math.round(y), 1, 1).data
+          ).slice(0, 3);
+        }, point);
+      const landmark = async () =>
+        page.locator('[data-preview-stage-canvas]').evaluate((canvas: HTMLCanvasElement) => {
+          const context = canvas.getContext('2d')!;
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          const factor = Math.min(canvas.width / 160, canvas.height / 90);
+          const offsetX = (canvas.width - 160 * factor) / 2;
+          const offsetY = (canvas.height - 90 * factor) / 2;
+          const row = Math.round(offsetY + 75 * factor);
+          const runs: { start: number; end: number }[] = [];
+          let start: number | null = null;
+          for (let x = 0; x <= 160; x++) {
+            const index =
+              (row * canvas.width + Math.round(offsetX + Math.min(x, 159) * factor)) * 4;
+            const matchesMarker =
+              x < 160 &&
+              pixels[index]! > 220 &&
+              pixels[index + 1]! < 100 &&
+              pixels[index + 2]! > 140;
+            if (matchesMarker && start === null) start = x;
+            if (!matchesMarker && start !== null) {
+              runs.push({ start, end: x });
+              start = null;
+            }
+          }
+          const widest = runs.sort((a, b) => b.end - b.start - (a.end - a.start))[0];
+          if (!widest) return null;
+          return { ...widest, y: 75 };
+        });
+      await chooseInspectorValue(
+        page,
+        page.locator('[data-ui="video-editor.framing-preview"]'),
+        label('videoEditor.sidebar.framingPreviewLabel'),
+        label('videoEditor.sidebar.framingResultView')
+      );
+      await seekProjectTime(page, 2.5);
+      await expect.poll(async () => (await paintedCursor(page)).x ?? 0).toBeGreaterThan(0.45);
+      await expect.poll(landmark).not.toBeNull();
+      const midpoint = (await landmark())!;
+      const miniPoint = { x: midpoint.start + 5, y: midpoint.y };
+      const stageColor = await sampleCanvasPoint('[data-preview-stage-canvas]', miniPoint);
+      await expect
+        .poll(async () => {
+          const miniColor = await sampleCanvasPoint(
+            '[data-ui="video-editor.framing-preview"] canvas',
+            miniPoint
+          );
+          return Math.max(...stageColor.map((value, index) => Math.abs(value - miniColor[index]!)));
+        })
+        .toBeLessThan(4);
+      await page.screenshot({
+        path: info.outputPath('archive-follow-inspector-result.png'),
+        fullPage: false,
+      });
+      await seekProjectTime(page, 2);
+      await expect.poll(async () => (await paintedCursor(page)).x ?? 0).toBeGreaterThan(0.35);
+      await expect.poll(async () => (await paintedCursor(page)).x ?? 1).toBeLessThan(0.55);
+      await expect.poll(landmark).not.toBeNull();
+      const first = (await landmark())!;
+      await seekProjectTime(page, 4);
+      await expect
+        .poll(async () => (await landmark())?.start ?? Infinity)
+        .toBeLessThan(first.start - 4);
+      const last = (await landmark())!;
+      expect(last.end - last.start).toBeGreaterThan(8);
+      await page.screenshot({
+        path: info.outputPath('archive-follow-camera.png'),
+        fullPage: false,
+      });
+      const point = {
+        x: Math.round(
+          last.start + Math.min((first.start - last.start) / 2, (last.end - last.start) / 2)
+        ),
+        y: last.y,
+      };
+      const samplePoint = () => sampleCanvasPoint('[data-preview-stage-canvas]', point);
+      const lateColor = await samplePoint();
+      await writeFile(
+        info.outputPath('archive-camera-landmarks.json'),
+        JSON.stringify({ first, last, point, lateColor }, null, 2)
+      );
+      await seekProjectTime(page, 2);
+      await expect
+        .poll(async () => {
+          const color = await samplePoint();
+          return color.reduce((sum, value, i) => sum + Math.abs(value - lateColor[i]!), 0);
+        })
+        .toBeGreaterThan(80);
+      const earlyColor = await samplePoint();
+      await page.reload();
+      await expect(page.locator('[data-preview-stage-canvas]')).toBeVisible();
+      const followed = (await readNativeVideoProject(page, fixture.project.id))!;
+      expect(followed.motionRegions?.[0]?.focusMode).toBe('CURSOR');
+      expect(followed.cursorTrack?.samples).toEqual([]);
+      expect(followed.cursorTrack?.sourceObservations?.[0]?.samples).toEqual([]);
+      const encoded = await encodedNativeVideoSamples(
+        page,
+        server.origin,
+        followed,
+        index === 0 ? 'WEBM' : 'MP4',
+        [
+          { time: 2, ...point, expected: earlyColor },
+          { time: 4, ...point, expected: lateColor },
+        ],
+        { start: 0, end: 5 }
+      );
+      await writeFile(
+        info.outputPath('archive-follow-camera-export.json'),
+        JSON.stringify({ first, last, point, earlyColor, lateColor, encoded }, null, 2)
+      );
+      expect(encoded.samples).toHaveLength(2);
+      for (const pixel of encoded.samples) expect(pixel.error).toBeLessThan(12);
+      await page.evaluate(
+        async ({ databaseName, recordingId, trajectoryId }) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open(databaseName);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const transaction = db.transaction('recording_cursor_trajectories', 'readwrite');
+              transaction
+                .objectStore('recording_cursor_trajectories')
+                .delete([recordingId, trajectoryId]);
+              transaction.oncomplete = () => resolve();
+              transaction.onabort = () => reject(transaction.error);
+            });
+          } finally {
+            db.close();
+          }
+        },
+        {
+          databaseName: betaV1Fixture.databaseName,
+          recordingId: fixture.head.recordingId,
+          trajectoryId: fixture.head.trajectoryId,
+        }
+      );
+      await page.goto(
+        `${server.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${fixture.project.id}&theme=light`
+      );
+      await expect(page.locator('[data-preview-stage-canvas]')).toBeVisible();
+      await page
+        .locator(`[data-timeline-effect-segment="${followed.motionRegions![0]!.id}"]`)
+        .getByRole('button', {
+          name: label('videoEditor.timeline.motionSegment') + ' · 2.00x',
+          exact: true,
+        })
+        .click();
+      await category('videoEditor.sidebar.inspectorGroupFraming');
+      await expect(cursorChoice).toBeDisabled();
+      const unavailable = (await readNativeVideoProject(page, fixture.project.id))!;
+      expect(unavailable.motionRegions?.[0]?.focusMode).toBe('CURSOR');
+      expect(unavailable.cursorTrack?.samples).toEqual([]);
+      expect(unavailable.cursorTrack?.sourceObservations?.[0]?.samples).toEqual([]);
+      await expect
+        .poll(
+          async () => {
+            const color = await sampleCanvasPoint('[data-preview-stage-canvas]', { x: 20, y: 20 });
+            return color[0]! > 10 && color[1]! > 15 && color[2]! > 40;
+          },
+          { message: 'Missing cursor history must preserve the valid source video.' }
+        )
+        .toBe(true);
+      await page.screenshot({
+        path: info.outputPath('archive-unavailable-follow.png'),
+        fullPage: false,
+      });
     } finally {
+      await page.close();
       await new Promise<void>((resolve, reject) =>
         server.server.close((error) => (error ? reject(error) : resolve()))
       );
     }
   });
 }
-
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   test(`Quick Edit reads archived history and late cursor keys after reopen ${viewport.name}`, async ({
     page,
@@ -492,10 +819,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await open();
       const dialog = page.locator('dialog');
       await dialog
-        .getByRole('button', {
-          name: translate('gallery.videoReview.historyOpen', 'en'),
-          exact: true,
-        })
+        .locator('[data-review-header-track="actions"] [data-review-track-select]')
         .click();
       await expect(dialog.locator('[title="Ctrl+S"]').first()).toBeVisible();
       const late = async () => {
@@ -544,6 +868,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         fullPage: false,
       });
     } finally {
+      await page.close();
       await new Promise<void>((resolve, reject) =>
         server.server.close((error) => (error ? reject(error) : resolve()))
       );

@@ -5511,6 +5511,39 @@
       "reviewDate": "2026-11-04",
       "astHash": "4b328d4a2367ace13e11009062ef7f07cab1898824a562111d784360aede3abf",
       "signatureHash": "30cc8d3fd0d00e00c5b307a7cf623adae9dda38bd5bbb385fe2de15a678352b4"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: One mounted Framing fixture checks rendering, interaction, stale results and cleanup. The archive case reuses its root, materializer queue and commit spies. A local canonical archive supplies the existing trajectory hook. Render-only geometry and unchanged authoring data share this proof.",
+      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes the Framing fixture, trajectory preparation or authoring callbacks. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-04",
+      "astHash": "97c09f3696d2faec619162b12b08c4d58790f2cd98e65ae605dcf50275d11d6c",
+      "signatureHash": "38bb08155783009d6181ecc5f7bf6c09b095963241661d199bb8b941de53c6d1"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-cursor-trajectory.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One cursor archive suite seeds canonical history and exercises its existing editor consumers. Static source pixels separate camera movement from painted cursor movement. Export uses the existing encoded-video helper. Native and Quick Edit cases retain their own page and server cleanup.",
+      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes the archive fixture, export helper or editor lifecycle. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-04",
+      "astHash": "e67a184ac77c6f54f37dae50689e1abe4d0da6f93eb1d207377e1487705c9ce7",
+      "signatureHash": "95e223c62d3d7883aa2453ce48d7e2eb22946cc8234e193e621a7077cc236a15"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-cursor-trajectory.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One Native archive scenario follows the same recording and saved project through selection, preview, inspector, reopen and encoded export. It then removes that archive to check refusal without authoring changes. Server and page cleanup enclose the full scenario. Separate export machinery remains in its existing helper.",
+      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes the saved-project identity, archive teardown or scenario cleanup. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-04",
+      "astHash": "56d166d90699b1c7e648f5df48804f19d5498a250cc41818d783c5e2a0914a04",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     }
   ]
 }

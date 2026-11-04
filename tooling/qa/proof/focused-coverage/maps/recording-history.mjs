@@ -123,10 +123,17 @@ recording controller suites.`,
     owner: 'recording-cursor-renderer-consumers',
     productionFile: 'apps/extension/src/workflows/video-review/cursor-trajectory.ts',
     exclusive: true,
-    reason: 'Real archive readers cover bounded cursor preparation and export source windows.',
+    allowCrossOwner: true,
+    reason:
+      'Archive and Native consumers cover bounded reads, interval availability, cancellation and camera geometry.',
     testFiles: [
       'apps/extension/src/workflows/video-review/recording-review.test.ts',
       'apps/extension/src/workflows/video-review/recording-render.test.ts',
+      'apps/extension/src/workflows/video-review/cursor-trajectory.test.ts',
+      'apps/extension/src/video-editor/runtime/cursor-availability.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/cursor-trajectory.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/fields.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx',
     ],
   },
   {

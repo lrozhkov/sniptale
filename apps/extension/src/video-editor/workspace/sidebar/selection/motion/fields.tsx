@@ -22,11 +22,7 @@ import { SliderField } from '../shared/sliders';
 import { getAreaCenter, getDefaultFocusArea } from './utils';
 import { CameraFollowTargetControls } from '../../../../../ui/camera-composition-controls';
 import { DEFAULT_CURSOR_COMPOSITION } from '../../../../../features/video/project/motion/spatial';
-import {
-  resolveProjectCursorFocus,
-  resolveProjectCursorFocusPath,
-  resolveProjectCursorFocusSamples,
-} from '../../../../../features/video/project/cursor-focus-path/projection';
+import { useMotionRegionCursorAvailable } from '../../../../runtime/cursor-availability';
 
 function handleMotionFocusModeChange(
   panel: WorkspaceSidebarSelectionPanelProps,
@@ -54,34 +50,18 @@ function handleMotionFocusModeChange(
   });
 }
 
-function motionRegionHasCursor(
-  project: WorkspaceSidebarSelectionPanelProps['project'],
-  motionRegion: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedMotionRegion']>
-) {
-  const path = resolveProjectCursorFocusPath(project);
-  const start = motionRegion.startTime;
-  const end = start + motionRegion.duration;
-  return (
-    [start, (start + end) / 2, Math.max(start, end - 1e-6)].some((time) =>
-      resolveProjectCursorFocus(project, time, path, motionRegion.sourceBinding?.clipId)
-    ) ||
-    resolveProjectCursorFocusSamples(project, true).some(
-      (sample) => sample.visible && sample.time >= start && sample.time < end
-    )
-  );
-}
-
 export function MotionFocusModeField(props: {
   motionRegion: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedMotionRegion']>;
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   const { motionRegion, panel } = props;
+  const cursorAvailable = useMotionRegionCursorAvailable(panel.project, motionRegion);
   const following = motionRegion.focusMode === VideoMotionFocusMode.CURSOR;
   return (
     <div className="sniptale-parameter-stack">
       <CameraFollowTargetControls
         following={following}
-        cursorAvailable={motionRegionHasCursor(panel.project, motionRegion)}
+        cursorAvailable={cursorAvailable}
         onChange={(follow) =>
           handleMotionFocusModeChange(
             panel,
