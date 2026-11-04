@@ -630,7 +630,14 @@ it('forwards inspector draft interaction to the preview and clears it after canc
 
 it('shows a retryable history failure while keeping the existing video transport available', async () => {
   const retry = vi.fn();
-  state.history = { telemetry: null, pending: false, failed: true, incomplete: false, retry };
+  state.history = {
+    telemetry: null,
+    pending: false,
+    initialLoading: false,
+    failed: true,
+    incomplete: false,
+    retry,
+  };
   await render();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain(
     'gallery.videoReview.recordingHistoryFailed'
@@ -642,12 +649,26 @@ it('shows a retryable history failure while keeping the existing video transport
   await act(async () => button!.click());
   expect(retry).toHaveBeenCalledOnce();
   expect(frame().disabled).toBe(false);
-  state.history = { ...state.history, failed: false, pending: true };
+  state.history = { ...state.history, failed: false, pending: true, initialLoading: true };
   await render();
   expect(host.querySelector('[role="status"]')?.textContent).toContain(
     'gallery.videoReview.recordingHistoryLoading'
   );
   expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
+it('keeps background history refresh out of the stage layout', async () => {
+  state.history = {
+    telemetry: null,
+    pending: true,
+    initialLoading: false,
+    failed: false,
+    incomplete: false,
+    retry: vi.fn(),
+  };
+  await render();
+  expect(host.textContent).not.toContain('gallery.videoReview.recordingHistoryLoading');
+  expect(frame().disabled).toBe(false);
 });
 
 it(
@@ -658,6 +679,7 @@ it(
       telemetry: null,
       failed: false,
       pending: false,
+      initialLoading: false,
       incomplete: true,
       retry: vi.fn(),
     };

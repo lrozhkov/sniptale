@@ -10,10 +10,15 @@ import { PreviewNumericRow } from './compact-inspector-controls/numeric-preview'
 export function CameraFollowTargetControls(props: {
   following: boolean;
   cursorAvailable: boolean;
+  cursorPending?: boolean | undefined;
   onChange(following: boolean): void;
 }) {
   return (
-    <div className="sniptale-parameter-stack" data-ui="camera.followTarget">
+    <div
+      className="sniptale-parameter-stack"
+      data-ui="camera.followTarget"
+      aria-busy={props.cursorPending}
+    >
       <SegmentedRow<'cursor' | 'manual'>
         label={translate('editor.scene.cameraFollowTarget')}
         columns={2}
@@ -29,8 +34,12 @@ export function CameraFollowTargetControls(props: {
         ]}
         onChange={(value) => props.onChange(value === 'cursor')}
       />
-      {!props.cursorAvailable ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+      {!props.cursorAvailable && !props.cursorPending ? (
+        <p
+          role="status"
+          data-ui="camera.cursorStatus"
+          className="text-xs text-[var(--sniptale-color-text-muted)]"
+        >
           {translate('videoEditor.sidebar.cursorFocusUnavailable')}
         </p>
       ) : null}

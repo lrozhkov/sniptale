@@ -546,6 +546,9 @@ async function mountDesktop(options: { retired?: boolean; playback?: boolean } =
     tick: (time: number) => {
       clock = time;
     },
+    refreshEquivalentEdits: () => {
+      snapshot.document.edits = [...snapshot.document.edits];
+    },
     selectRange: (start: number, end: number) => {
       advanced = {
         ...advanced,
@@ -604,6 +607,22 @@ it('enables Cursor for a Desktop archive with null cursorTrack and prepares mini
   expect(view.setZoom).toHaveBeenCalledOnce();
 });
 
+it('keeps Cursor enabled when an equivalent edit snapshot preserves the selected source interval', async () => {
+  const view = await mountDesktop();
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(view.cursor().disabled).toBe(false);
+  });
+  const reads = archive.calls.length;
+  const pending = Promise.withResolvers<boolean>();
+  archive.override = async () => pending.promise;
+  view.refreshEquivalentEdits();
+  await view.render();
+  expect(view.cursor().disabled).toBe(false);
+  expect(archive.calls).toHaveLength(reads);
+  pending.resolve(false);
+});
+
 it('excludes a late selected-interval result and aborts the detached request on unmount', async () => {
   const finishes: ((available: boolean) => void)[] = [];
   archive.override = async () => new Promise<boolean>((resolve) => finishes.push(resolve));
@@ -613,6 +632,7 @@ it('excludes a late selected-interval result and aborts the detached request on 
     duration: 4.335718703592214,
   });
   expect(view.cursor().disabled).toBe(true);
+  expect(view.host.querySelector('[data-ui="camera.cursorStatus"]')).toBeNull();
   view.selectRange(0, 0.5);
   await view.render();
   expect(archive.calls[0]![2]!.aborted).toBe(true);
@@ -621,6 +641,9 @@ it('excludes a late selected-interval result and aborts the detached request on 
   expect(view.cursor().disabled).toBe(true);
   await act(async () => finishes[1]!(false));
   expect(view.cursor().disabled).toBe(true);
+  expect(view.host.querySelector('[data-ui="camera.cursorStatus"]')?.textContent).toContain(
+    'videoEditor.sidebar.cursorFocusUnavailable'
+  );
   view.selectRange(2.5, 6.5);
   await view.render();
   const signal = archive.calls.at(-1)![2]!;

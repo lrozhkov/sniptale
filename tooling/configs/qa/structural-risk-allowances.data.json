@@ -3427,10 +3427,10 @@
       "file": "apps/extension/src/gallery/video-review/use-editor-state.ts",
       "symbol": "useReviewEditorCore",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: Gallery composes existing editor bindings. The history hook owns one reader, one active request, one latest request, disposal, retry and pinned selection. It is not a durable writer. Independent read-only topology diagnosis inspected this owner and change reason. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent subject, state authority, writer, transaction, privileged effect, resource lifetime or recovery contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-01",
-      "astHash": "1f5e2d06d11d01a4c8a04b600e40216446187ea3c6264533de76e3afa240132e",
+      "reason": "tool-noise: One Gallery core composes existing editor bindings. The initial loading flag derives from two existing history readers. It creates no cache, request or writer. Preview and timeline readers retain separate ranges and cancellation owners.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a separate request owner, writer, publisher or recovery lifetime. Remove when the analyzer models this cohesive owner. Final architecture review must check the binding.",
+      "reviewDate": "2026-11-04",
+      "astHash": "af550ac29918c452de64eeabd9a69a7ec8e60bdbf340f5dad00b69b2a7a3a7d1",
       "signatureHash": "44f3b7fa47a8eada4bfd992898ca3df77e90bae39300e465ab3361c1f1ae2f12"
     },
     {
@@ -3460,10 +3460,10 @@
       "file": "apps/extension/src/gallery/video-review/use-recording-history.ts",
       "symbol": "useReviewRecordingHistory",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: Gallery composes existing editor bindings. The history hook owns one reader, one active request, one latest request, disposal, retry and pinned selection. It is not a durable writer. Independent read-only topology diagnosis inspected this owner and change reason. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent subject, state authority, writer, transaction, privileged effect, resource lifetime or recovery contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-01",
-      "astHash": "6bdd4bdb53d9d2fd1a18448f1ea4deb015db8727df5aee57e702a4abae54bfec",
+      "reason": "tool-noise: One bounded history hook owns its reader and active and latest requests. Initial loading derives from the existing completed view and failure state. It adds no state authority or read. Disposal, retry and pinned selection remain in this owner.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a separate request owner, writer, publisher or recovery lifetime. Remove when the analyzer models this cohesive owner. Final architecture review must check the binding.",
+      "reviewDate": "2026-11-04",
+      "astHash": "0d127a4f0b8e6846a4ec658de647603b4a28476cd80468efc006dc7e88f3ee17",
       "signatureHash": "4fc8ef5c842738154a2ed120570bcabd099c1d1e088673e52de378081efa670a"
     },
     {
@@ -5836,10 +5836,10 @@
       "file": "apps/extension/src/gallery/video-review/selected-properties.tsx",
       "symbol": "ReviewSelectedProperties",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This inspector routes selected objects through existing workflow readers. Availability and render facts use different request identities. Each reader retains its own cancellation lifecycle. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One inspector routes selection through existing readers. A stable source query retains cursor admission across camera edits. Pending status stays separate from a confirmed refusal. Each reader retains its existing cancellation lifetime. No writer or preview publisher is added.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a separate request owner, writer, publisher or recovery lifetime. Remove when the analyzer models this cohesive owner. Final architecture review must check the binding.",
       "reviewDate": "2026-11-04",
-      "astHash": "559644a1bb480e477282be4626c6f6c08b803e23ac40131b357f86bc67bf46aa",
+      "astHash": "7158e9876a7590c9bdcfb75a6a1d79a2660b1dab5b803f2c37a674cfe0f47a88",
       "signatureHash": "42726d1ae80095a18371b2f9c58ee75527b82fc2d4431a3e18c87a9bb80ec598"
     },
     {

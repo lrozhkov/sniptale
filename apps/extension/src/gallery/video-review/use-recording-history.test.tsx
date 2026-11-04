@@ -113,6 +113,24 @@ it('retains one selected source marker outside the read window', async () => {
   await act(async () => root.render(<Probe time={12} />));
   expect(projectReviewTelemetry(value.telemetry!, 20).markers).toEqual([]);
 });
+
+it('distinguishes initial loading from a later bounded history refresh', async () => {
+  const owner = reader();
+  const initial = Promise.withResolvers<Prepared>();
+  const refresh = Promise.withResolvers<Prepared>();
+  owner.read.mockReturnValueOnce(initial.promise).mockReturnValueOnce(refresh.promise);
+  io.create.mockReturnValue(owner);
+  await act(async () => root.render(<Probe />));
+  expect(value.initialLoading).toBe(true);
+  await act(async () => initial.resolve(prepared(0)));
+  expect(value.initialLoading).toBe(false);
+  await act(async () => root.render(<Probe time={2} />));
+  expect(value.pending).toBe(true);
+  expect(value.initialLoading).toBe(false);
+  await act(async () => refresh.resolve(prepared(2)));
+  expect(value.pending).toBe(false);
+  expect(value.initialLoading).toBe(false);
+});
 it('preserves the source after a failed read and retries only on request', async () => {
   const owner = reader();
   owner.read.mockRejectedValueOnce(new Error('unavailable'));

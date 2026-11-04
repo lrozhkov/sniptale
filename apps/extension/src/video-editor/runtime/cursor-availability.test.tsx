@@ -5,7 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectFromRecording } from '../../features/video/project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../features/video/project/motion';
 import type { VideoProject, VideoProjectMotionRegion } from '../../features/video/project/types';
-import { useMotionRegionCursorAvailable } from './cursor-availability';
+import { useMotionRegionCursorAvailability } from './cursor-availability';
+import { createVideoEditorProjectTestStore } from '../project/state/test-store.test-support';
 
 function deferred() {
   let resolve!: (value: boolean) => void;
@@ -18,6 +19,7 @@ function deferred() {
 }
 let root: Root | null, host: HTMLDivElement;
 let latest = false;
+let latestPending = false;
 const reads: ReturnType<typeof deferred>[] = [];
 const available =
   vi.fn<
@@ -30,7 +32,9 @@ const available =
 const clear = vi.fn();
 const createReader = () => ({ available, clear });
 function Harness({ project, region }: { project: VideoProject; region: VideoProjectMotionRegion }) {
-  latest = useMotionRegionCursorAvailable(project, region, createReader);
+  const result = useMotionRegionCursorAvailability(project, region, createReader);
+  latest = result.available;
+  latestPending = result.pending;
   return <span>{String(latest)}</span>;
 }
 function fixture() {
@@ -48,6 +52,7 @@ function fixture() {
 }
 beforeEach(() => {
   latest = false;
+  latestPending = false;
   reads.splice(0);
   available.mockReset();
   clear.mockReset();
@@ -72,15 +77,40 @@ it('publishes only the completed pair and never changes the authored project', a
     before = JSON.stringify(props.project);
   await act(async () => root!.render(<Harness {...props} />));
   expect(latest).toBe(false);
+  expect(latestPending).toBe(true);
   expect(available).toHaveBeenCalledOnce();
   await act(async () => reads[0]!.resolve(true));
   expect(latest).toBe(true);
+  expect(latestPending).toBe(false);
   expect(JSON.stringify(props.project)).toBe(before);
   const region = { ...props.region, id: 'next' };
   await act(async () => root!.render(<Harness project={props.project} region={region} />));
   expect(latest).toBe(false);
   await act(async () => reads[1]!.resolve(false));
   expect(latest).toBe(false);
+});
+
+it('keeps confirmed cursor admission while a real camera command changes only scale', async () => {
+  const data = fixture();
+  data.project.motionRegions = [data.region];
+  const store = createVideoEditorProjectTestStore();
+  store.getState().setProject(data.project);
+  const before = store.getState().project!;
+  await act(async () =>
+    root!.render(<Harness project={before} region={before.motionRegions![0]!} />)
+  );
+  await act(async () => reads[0]!.resolve(true));
+  expect(latest).toBe(true);
+  store.getState().updateMotionRegion(data.region.id, { scale: 2 });
+  const after = store.getState().project!;
+  expect(after.motionRegions![0]!.scale).toBe(2);
+  expect(after.clips).toEqual(before.clips);
+  expect(after.cursorTrack).toEqual(before.cursorTrack);
+  await act(async () =>
+    root!.render(<Harness project={after} region={after.motionRegions![0]!} />)
+  );
+  expect(latest).toBe(true);
+  expect(available).toHaveBeenCalledOnce();
 });
 
 it('aborts stale selection and runs only the latest replaceable pending request', async () => {

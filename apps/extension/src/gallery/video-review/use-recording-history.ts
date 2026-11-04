@@ -199,6 +199,7 @@ export function useReviewRecordingHistory(
   return {
     telemetry,
     pending: !!owner && !prepared && !owner.failed,
+    initialLoading: !!owner && !owner.failed && !(view?.owner === owner && view.prepared),
     failed: !!owner && view?.owner === owner && view.failed,
     incomplete: !!(
       (resource.telemetry?.cursorTrajectory &&

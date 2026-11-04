@@ -40,6 +40,33 @@ it('keeps Manual available when captured cursor data is missing', () => {
   act(() => buttons[1]!.click());
   expect(change).toHaveBeenCalledExactlyOnceWith(false);
 });
+
+it('reports only completed cursor absence without an empty status row', () => {
+  const change = vi.fn();
+  const render = (available: boolean, pending: boolean) =>
+    act(() =>
+      root.render(
+        <CameraFollowTargetControls
+          following
+          cursorAvailable={available}
+          cursorPending={pending}
+          onChange={change}
+        />
+      )
+    );
+  render(false, true);
+  expect(host.querySelector('[data-ui="camera.cursorStatus"]')).toBeNull();
+  expect(host.querySelector('[data-ui="camera.followTarget"]')?.getAttribute('aria-busy')).toBe(
+    'true'
+  );
+  render(false, false);
+  expect(host.querySelector('[data-ui="camera.cursorStatus"]')?.textContent).toContain(
+    'videoEditor.sidebar.cursorFocusUnavailable'
+  );
+  render(true, false);
+  expect(host.querySelector('[data-ui="camera.cursorStatus"]')).toBeNull();
+  expect(change).not.toHaveBeenCalled();
+});
 it('shows legacy absence as Off and offers the four authored modes', async () => {
   const change = vi.fn();
   await act(async () => root.render(<CameraCompositionControls onChange={change} />));

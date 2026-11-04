@@ -89,6 +89,29 @@ export type CursorAvailabilityInterval = Pick<
   'startTime' | 'duration' | 'sourceBinding'
 >;
 
+/** Compares immutable authored inputs used by cursor admission, independently of camera appearance. */
+export function sameCursorAvailabilitySource(
+  left: VideoProject | undefined,
+  right: VideoProject | undefined
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  const fields = [
+    'id',
+    'baseRecordingId',
+    'width',
+    'height',
+    'duration',
+    'assets',
+    'clips',
+    'cursorTrack',
+    'cursorFocusPath',
+    'actionEvents',
+    'actionFeedback',
+  ] as const;
+  return fields.every((field) => left[field] === right[field]);
+}
+
 /** Checks one selected interval without copying archived observations into the authored project. */
 export async function motionRegionHasAvailableCursor(
   project: VideoProject,

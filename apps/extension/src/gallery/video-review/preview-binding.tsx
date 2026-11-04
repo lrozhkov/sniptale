@@ -125,7 +125,7 @@ export function ReviewPreviewBinding({
       aria-busy={state.recovering}
       className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3"
     >
-      {state.history?.failed || state.history?.pending || state.history?.incomplete ? (
+      {state.history?.failed || state.history?.initialLoading || state.history?.incomplete ? (
         <div
           role={state.history.failed ? 'alert' : 'status'}
           className="flex items-center gap-2 text-xs"
@@ -134,7 +134,7 @@ export function ReviewPreviewBinding({
             {translate(
               state.history.failed
                 ? 'gallery.videoReview.recordingHistoryFailed'
-                : state.history.pending
+                : state.history.initialLoading
                   ? 'gallery.videoReview.recordingHistoryLoading'
                   : 'gallery.videoReview.recordingHistoryIncomplete'
             )}

@@ -1,5 +1,8 @@
 import { createRecordingCursorAvailabilityReader } from '../../workflows/video-review/cursor-trajectory';
-import type { CursorAvailabilityInterval } from '../../features/video/project/cursor-trajectory/availability';
+import {
+  sameCursorAvailabilitySource,
+  type CursorAvailabilityInterval,
+} from '../../features/video/project/cursor-trajectory/availability';
 import { reviewFocusSourceRange } from '../../features/video/review/focus-edits';
 import { useReviewRecordingHistory } from './use-recording-history';
 import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
@@ -174,10 +177,11 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
         : undefined,
     [cameraSelected, resource.telemetry, resource.source, advanced.cursorFocusPath]
   );
-  const cursorAvailable = useSelectedCursorAvailable(
+  const cursor = useSelectedCursorAvailability(
     resource.historyProject,
     sourceInterval,
-    inlineCursorPath
+    inlineCursorPath,
+    regionId
   );
   return (
     <>
@@ -256,7 +260,8 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
           <ReviewAdvancedPanels
             advanced={advanced}
             {...(cursorPath ? { cursorPath } : {})}
-            cursorAvailable={cursorAvailable}
+            cursorAvailable={cursor.available}
+            cursorPending={cursor.pending}
             zoom={zoom}
             zoomPreview={(region, previewing = false) => (
               <ReviewZoomPreview
@@ -679,11 +684,23 @@ export function ReviewSelectedTextProperties(props: {
 }
 
 /** The selected source interval owns admission; the playhead supplies only mini render facts. */
-function useSelectedCursorAvailable(
+function useSelectedCursorAvailability(
   project: LoadedReview['historyProject'],
   interval: CursorAvailabilityInterval | null,
-  path: ReturnType<typeof resolveReviewCursorFocusPath> | undefined
+  path: ReturnType<typeof resolveReviewCursorFocusPath> | undefined,
+  selectionId: string | undefined
 ) {
+  const retained = useRef({ project, interval, selectionId });
+  const previous = retained.current;
+  if (
+    !sameCursorAvailabilitySource(previous.project, project) ||
+    previous.selectionId !== selectionId ||
+    previous.interval?.startTime !== interval?.startTime ||
+    previous.interval?.duration !== interval?.duration ||
+    previous.interval?.sourceBinding?.clipId !== interval?.sourceBinding?.clipId
+  )
+    retained.current = { project, interval, selectionId };
+  const query = retained.current;
   const reader = useMemo(() => createRecordingCursorAvailabilityReader(), []);
   const [completed, setCompleted] = useState<{
     project: LoadedReview['historyProject'];
@@ -691,6 +708,7 @@ function useSelectedCursorAvailable(
     available: boolean;
   } | null>(null);
   useEffect(() => {
+    const { project, interval } = query;
     if (!project || !interval) return;
     const controller = new AbortController();
     let active = true;
@@ -708,7 +726,7 @@ function useSelectedCursorAvailable(
       controller.abort();
       reader.clear();
     };
-  }, [project, interval, reader]);
+  }, [query, reader]);
   const inline =
     !!interval &&
     !!path?.segments.some(
@@ -717,13 +735,10 @@ function useSelectedCursorAvailable(
         segment.end >= interval.startTime &&
         segment.start <= interval.startTime + interval.duration
     );
-  return (
-    inline ||
-    !!(
-      completed &&
-      completed.project === project &&
-      completed.interval === interval &&
-      completed.available
-    )
-  );
+  const ready =
+    !!completed && completed.project === query.project && completed.interval === query.interval;
+  return {
+    available: inline || (ready && completed.available),
+    pending: !inline && !!project && !!interval && !ready,
+  };
 }

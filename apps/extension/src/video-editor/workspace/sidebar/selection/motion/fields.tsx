@@ -22,7 +22,7 @@ import { SliderField } from '../shared/sliders';
 import { getAreaCenter, getDefaultFocusArea } from './utils';
 import { CameraFollowTargetControls } from '../../../../../ui/camera-composition-controls';
 import { DEFAULT_CURSOR_COMPOSITION } from '../../../../../features/video/project/motion/spatial';
-import { useMotionRegionCursorAvailable } from '../../../../runtime/cursor-availability';
+import { useMotionRegionCursorAvailability } from '../../../../runtime/cursor-availability';
 
 function handleMotionFocusModeChange(
   panel: WorkspaceSidebarSelectionPanelProps,
@@ -55,13 +55,14 @@ export function MotionFocusModeField(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   const { motionRegion, panel } = props;
-  const cursorAvailable = useMotionRegionCursorAvailable(panel.project, motionRegion);
+  const cursor = useMotionRegionCursorAvailability(panel.project, motionRegion);
   const following = motionRegion.focusMode === VideoMotionFocusMode.CURSOR;
   return (
     <div className="sniptale-parameter-stack">
       <CameraFollowTargetControls
         following={following}
-        cursorAvailable={cursorAvailable}
+        cursorAvailable={cursor.available}
+        cursorPending={cursor.pending}
         onChange={(follow) =>
           handleMotionFocusModeChange(
             panel,

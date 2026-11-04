@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { sameCursorAvailabilitySource } from '../../features/video/project/cursor-trajectory/availability';
 import type { VideoProject, VideoProjectMotionRegion } from '../../features/video/project/types';
 import { createRecordingCursorAvailabilityReader } from '../../workflows/video-review/cursor-trajectory';
 import {
@@ -13,11 +14,22 @@ type Request = {
 };
 
 /** Keeps interval admission local to the mounted selection; authoring remains with existing commands. */
-export function useMotionRegionCursorAvailable(
+export function useMotionRegionCursorAvailability(
   project: VideoProject,
   region: VideoProjectMotionRegion,
   createReader = createRecordingCursorAvailabilityReader
-): boolean {
+) {
+  const retained = useRef({ project, region });
+  const previous = retained.current;
+  if (
+    !sameCursorAvailabilitySource(previous.project, project) ||
+    previous.region.id !== region.id ||
+    previous.region.startTime !== region.startTime ||
+    previous.region.duration !== region.duration ||
+    previous.region.sourceBinding?.clipId !== region.sourceBinding?.clipId
+  )
+    retained.current = { project, region };
+  const query = retained.current;
   const owner = useMemo(
     () => ({
       renderer: createReader(),
@@ -32,7 +44,7 @@ export function useMotionRegionCursorAvailable(
     }),
     [createReader]
   );
-  owner.latest = { project, region };
+  owner.latest = query;
   const [completed, setCompleted] = useState<{
     project: VideoProject;
     region: VideoProjectMotionRegion;
@@ -40,7 +52,7 @@ export function useMotionRegionCursorAvailable(
   } | null>(null);
   useRecordingHistoryReadLifetime(owner);
   useEffect(() => {
-    const request = { project, region, controller: new AbortController() };
+    const request = { ...query, controller: new AbortController() };
     owner.pending = request;
     runRecordingHistoryReads(owner, async (next, epoch) => {
       let available = false;
@@ -63,8 +75,7 @@ export function useMotionRegionCursorAvailable(
         setCompleted({ project: next.project, region: next.region, available });
     });
     return () => request.controller.abort();
-  }, [owner, project, region]);
-  return completed?.project === project && completed.region === region
-    ? completed.available
-    : false;
+  }, [owner, query]);
+  const ready = completed?.project === query.project && completed.region === query.region;
+  return { available: ready && completed.available, pending: !ready };
 }

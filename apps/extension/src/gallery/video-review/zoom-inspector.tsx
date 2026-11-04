@@ -120,6 +120,7 @@ export function ReviewZoomInspector(props: {
   cameraFollowDefaults?: CameraFollowSettings | undefined;
   cursorPath?: CursorFocusPath | undefined;
   cursorAvailable?: boolean | undefined;
+  cursorPending?: boolean | undefined;
   spatialPreview?: QuickEditZoomRegion;
   cutSuppressed?: boolean;
   zoomConversionBlocked?: boolean;
@@ -179,6 +180,7 @@ export function ReviewZoomInspector(props: {
                       <CameraFollowTargetControls
                         following={following}
                         cursorAvailable={cursorAvailable}
+                        cursorPending={props.cursorPending}
                         onChange={(followCursor) =>
                           onChange({
                             followCursor,

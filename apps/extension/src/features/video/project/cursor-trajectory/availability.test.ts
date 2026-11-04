@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { motionRegionHasAvailableCursor } from './availability';
+import { motionRegionHasAvailableCursor, sameCursorAvailabilitySource } from './availability';
 import { createCursorTrajectoryBlockPacker, decodeCursorTrajectoryBlock } from './blocks';
 import { createRecordingCursorTrajectoryReader } from '../../../../composition/persistence/recordings/cursor-trajectory/reader';
 import type { RecordingCursorTrajectoryHead } from '../../../../composition/persistence/recordings/cursor-trajectory/contracts';
@@ -395,4 +395,36 @@ it('accepts a plain selected interval while preserving source and clip ownership
       read
     )
   ).toBe(false);
+});
+
+it('keeps camera-only updates separate from recording and source-time admission', () => {
+  const { project, region, clip } = fixture();
+  const before = JSON.stringify(project);
+  expect(sameCursorAvailabilitySource(project, project)).toBe(true);
+  expect(
+    sameCursorAvailabilitySource(project, {
+      ...project,
+      updatedAt: project.updatedAt + 1,
+      motionRegions: [{ ...region, scale: 2 }],
+    })
+  ).toBe(true);
+  expect(
+    sameCursorAvailabilitySource(project, {
+      ...project,
+      clips: [{ ...clip, sourceStart: clip.sourceStart + 1 }],
+    })
+  ).toBe(false);
+  const group = project.cursorTrack!.sourceObservations![0]!;
+  expect(
+    sameCursorAvailabilitySource(project, {
+      ...project,
+      cursorTrack: {
+        ...project.cursorTrack!,
+        sourceObservations: [{ ...group, recordingId: 'another-recording' }],
+      },
+    })
+  ).toBe(false);
+  expect(sameCursorAvailabilitySource(undefined, project)).toBe(false);
+  expect(sameCursorAvailabilitySource(undefined, undefined)).toBe(true);
+  expect(JSON.stringify(project)).toBe(before);
 });

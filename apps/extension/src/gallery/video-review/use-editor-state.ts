@@ -156,6 +156,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     ...previewHistory,
     failed: previewHistory.failed || timelineHistory.failed,
     pending: previewHistory.pending || timelineHistory.pending,
+    initialLoading: previewHistory.initialLoading || timelineHistory.initialLoading,
     retry() {
       previewHistory.retry();
       timelineHistory.retry();
