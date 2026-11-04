@@ -81,7 +81,7 @@ afterEach(async () => {
 });
 const output = { width: 200, height: 100 };
 const rect = { x: 0, y: 0, ...output };
-it('reuses the paused source frame while the lens opening moves', () => {
+it('reuses the paused source frame while the lens opening moves', async () => {
   const initial = createQuickEditSpotlight();
   const region = {
     ...createQuickEditZoomRegion({ id: 'lens', at: 0 }),
@@ -90,7 +90,7 @@ it('reuses the paused source frame while the lens opening moves', () => {
   const frame = { image: document.createElement('canvas'), ...output };
   const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
   const renderLens = (area: typeof initial.area) =>
-    act(() =>
+    act(async () =>
       root.render(
         <ReviewSpotlightPreview
           region={{ ...region, spotlight: { ...region.spotlight, area } }}
@@ -106,9 +106,9 @@ it('reuses the paused source frame while the lens opening moves', () => {
         />
       )
     );
-  renderLens(initial.area);
+  await renderLens(initial.area);
   expect(paint).toHaveBeenCalledOnce();
-  renderLens({ ...initial.area, x: 0.3 });
+  await renderLens({ ...initial.area, x: 0.3 });
   expect(paint).toHaveBeenCalledOnce();
 });
 
@@ -762,13 +762,13 @@ it.each([0.5, 0.01])(
 
 it.each(['border', 'spotlight'] as const)(
   'does not repaint a paused source for %s area-only drafts',
-  (kind) => {
+  async (kind) => {
     const appearance = kind === 'border' ? createQuickEditBorder() : createQuickEditSpotlight();
     const frame = { image: document.createElement('canvas'), ...output };
     const region = { ...createQuickEditZoomRegion({ id: 'focus', at: 0 }), [kind]: appearance };
     const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
     const renderFrame = (area: typeof appearance.area, source = frame, scale = 1) =>
-      act(() =>
+      act(async () =>
         root.render(
           <ReviewSpotlightPreview
             region={{ ...region, [kind]: { ...appearance, area } }}
@@ -784,13 +784,13 @@ it.each(['border', 'spotlight'] as const)(
           />
         )
       );
-    renderFrame(appearance.area);
+    await renderFrame(appearance.area);
     expect(paint).toHaveBeenCalledOnce();
-    renderFrame({ ...appearance.area, x: 0.3 });
+    await renderFrame({ ...appearance.area, x: 0.3 });
     expect(paint).toHaveBeenCalledOnce();
-    renderFrame(appearance.area, { ...frame, image: document.createElement('canvas') });
+    await renderFrame(appearance.area, { ...frame, image: document.createElement('canvas') });
     expect(paint).toHaveBeenCalledTimes(2);
-    renderFrame(appearance.area, frame, 2);
+    await renderFrame(appearance.area, frame, 2);
     expect(paint).toHaveBeenCalledTimes(3);
   }
 );

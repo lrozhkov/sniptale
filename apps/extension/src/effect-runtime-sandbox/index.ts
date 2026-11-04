@@ -1,16 +1,26 @@
 import EffectRuntimeWorker from './worker/index?worker&inline';
 
-import { readEffectRuntimeSandboxConnectionNonce } from '../contracts/effect-runtime/sandbox-connection';
+import {
+  readEffectRuntimeCompositionBackend,
+  readEffectRuntimeSandboxConnectionNonce,
+} from '../contracts/effect-runtime/sandbox-connection';
 import { installEffectRuntimeSandboxGuards } from './policy/guards';
 import { attachEffectRuntimeSandbox } from './broker/runtime';
 import { createEffectRuntimeBrokerSession } from './broker/session';
+import { createEffectRuntimeGpuPlanRenderer } from './broker/gpu-plan-renderer';
 
 installEffectRuntimeSandboxGuards(window);
 const connectionNonce = readEffectRuntimeSandboxConnectionNonce(window.location.hash);
-if (connectionNonce) {
+const compositionBackend = readEffectRuntimeCompositionBackend(window.location.search);
+if (connectionNonce && compositionBackend) {
   attachEffectRuntimeSandbox(
     window,
-    createEffectRuntimeBrokerSession({ workerFactory: () => new EffectRuntimeWorker() }),
+    createEffectRuntimeBrokerSession({
+      workerFactory: () => new EffectRuntimeWorker(),
+      ...(compositionBackend === 'gpu-preview'
+        ? { gpu: createEffectRuntimeGpuPlanRenderer() }
+        : {}),
+    }),
     connectionNonce
   );
 }

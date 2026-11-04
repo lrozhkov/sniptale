@@ -1,3 +1,4 @@
+import type { ReviewPresentedGeometry } from '../../workflows/video-review/gpu-preview-geometry';
 import {
   reviewPreviewSceneKey,
   sameReviewPreviewSceneKey,
@@ -32,6 +33,8 @@ export interface PresentationInput {
   preferences: QuickPreviewPreferences;
   playing: boolean;
   interacting?: boolean;
+  /** A paused inspector draft retains the displayed frame while its smaller preview renders. */
+  deferFrames?: boolean;
   visible?: boolean;
   seekRevision?: number;
   pausedSourceTime: number;
@@ -40,6 +43,7 @@ export interface PresentationInput {
   cameraTransform?: RenderFrame['cameraTransform'];
   cut?: ReviewCutPreviewBinding | undefined;
   webcam?: ReviewWebcamStageBinding | undefined;
+  onGeometry?(geometry: ReviewPresentedGeometry | null): void;
   onStatistics?(status: ReviewPreviewPresentationStatus): void;
 }
 
@@ -97,6 +101,7 @@ export function resolvePresentationDescription(
     input.seekRevision,
     input.backgroundPending,
     input.playing,
+    input.deferFrames,
     interacting,
     !input.playing && input.cameraTransform,
     !input.playing && input.pausedSourceTime,

@@ -15,6 +15,8 @@ type CameraGestureProps = {
     | { matrix: QuickEditHomography; output: { width: number; height: number } }
     | undefined;
   camera: QuickEditCameraTransform;
+  /** Keyboard commands use current authored values while pointer geometry can retain a displayed pose. */
+  keyboardCamera?: QuickEditCameraTransform | undefined;
   videoRect: QuickEditRect;
   /** Actual Area footprint in normalized source coordinates, when the scene supplies it. */
   visibleArea?: QuickEditRect;
@@ -130,9 +132,10 @@ export function useReviewCameraGesture(props: CameraGestureProps) {
     event.stopPropagation();
     if (drag.current) return;
     props.onInteract?.();
+    const camera = props.keyboardCamera ?? props.camera;
     props.onCommit({
-      centerX: clamp01(props.camera.centerX + delta.x),
-      centerY: clamp01(props.camera.centerY + delta.y),
+      centerX: clamp01(camera.centerX + delta.x),
+      centerY: clamp01(camera.centerY + delta.y),
     });
   };
   return {
@@ -146,7 +149,8 @@ export function useReviewCameraGesture(props: CameraGestureProps) {
       onPointerCancel: cancel,
       onLostPointerCapture: cancel,
       onFocus: () => {
-        baseline.current = { centerX: props.camera.centerX, centerY: props.camera.centerY };
+        const camera = props.keyboardCamera ?? props.camera;
+        baseline.current = { centerX: camera.centerX, centerY: camera.centerY };
       },
       onBlur: () => {
         baseline.current = null;

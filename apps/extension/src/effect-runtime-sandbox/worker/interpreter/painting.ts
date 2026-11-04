@@ -5,6 +5,7 @@ import type {
 } from '@sniptale/runtime-contracts/effect-v1';
 
 import { getLogicalCanvasScale } from '../canvas/logical-canvas.js';
+import type { PrimitiveGeometry } from '../canvas/primitive-bounds';
 import type { RuntimeCanvasContext, RuntimeLayerState } from '../model/types.js';
 import { isRecord, n, type RenderState, v, valueOr } from './model.js';
 
@@ -18,19 +19,23 @@ interface CommandStyleSource {
   shadow?: EffectV1Shadow;
 }
 
-export function paintPath(command: PaintedCommand, state: RenderState): void {
+export function paintPath(
+  command: PaintedCommand,
+  state: RenderState,
+  bounds?: PrimitiveGeometry
+): void {
   const context = state.context;
   const fill = command.op === 'polyline' ? undefined : command.fill;
   if (fill != null) {
     context.fillStyle = resolvePaint(fill, context, state);
-    context.fill();
+    paintPrimitive(state, () => context.fill(), bounds);
   }
   if (command.stroke != null) {
     context.strokeStyle = resolvePaint(command.stroke, context, state);
     context.lineWidth = valueOr(command.lineWidth, 1, state);
     context.lineCap = command.op === 'shape' ? 'butt' : (command.lineCap ?? 'butt');
     context.lineJoin = command.op === 'shape' ? 'miter' : (command.lineJoin ?? 'miter');
-    context.stroke();
+    paintPrimitive(state, () => context.stroke(), bounds, true);
   }
 }
 
@@ -38,15 +43,33 @@ export function withCommandStyle(
   command: CommandStyleSource,
   layer: RuntimeLayerState | null,
   state: RenderState,
-  draw: () => void
+  draw: () => void,
+  primitive = false
 ): void {
   state.context.save();
   try {
     applyCommandStyle(command, layer, state);
-    draw();
+    if (primitive && state.target) state.target.primitive(state, draw);
+    else draw();
   } finally {
     state.context.restore();
   }
+}
+
+export function paintPrimitive(
+  state: RenderState,
+  draw: () => void,
+  bounds?: PrimitiveGeometry,
+  stroke = false
+): void {
+  if (state.target)
+    state.target.paint(
+      state,
+      draw,
+      bounds,
+      stroke ? state.context.lineWidth * (state.context.lineJoin === 'miter' ? 5 : 1) : 0
+    );
+  else draw();
 }
 
 function applyCommandStyle(

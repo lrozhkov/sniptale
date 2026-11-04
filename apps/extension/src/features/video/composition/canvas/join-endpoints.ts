@@ -8,6 +8,15 @@ export function createCompositionJoinEndpoints(params: {
     time: number,
     signal: AbortSignal
   ): Promise<{ canvas: CanvasImageSource; release(): void }>;
+  /** Optional completed-frame compositor; false permits the existing Canvas hardware fallback. */
+  compose?(args: {
+    context: CanvasRenderingContext2D;
+    outgoing: HTMLCanvasElement;
+    incoming: HTMLCanvasElement;
+    incomingWeight: number;
+    sampling: 'cut' | undefined;
+    signal: AbortSignal;
+  }): Promise<boolean>;
 }) {
   let generation = 0;
   let disposed = false;
@@ -91,6 +100,20 @@ export function createCompositionJoinEndpoints(params: {
           }
         }
         assertLive(signal, generation);
+        if (
+          params.compose &&
+          (await params.compose({
+            context,
+            outgoing: pair.outgoing.canvas,
+            incoming: pair.incoming.canvas,
+            incomingWeight,
+            sampling: request.sampling,
+            signal,
+          }))
+        ) {
+          assertLive(signal, generation);
+          return;
+        }
         context.save();
         try {
           context.setTransform(1, 0, 0, 1, 0, 0);

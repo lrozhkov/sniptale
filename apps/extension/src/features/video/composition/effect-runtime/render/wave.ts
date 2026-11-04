@@ -12,7 +12,10 @@ import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effe
 import type { VideoCompositionMediaSource } from '../../draw/media-source';
 import type { VideoCompositionFrame, VideoCompositionVisualPass } from '../../types';
 import { renderEffectRuntimeFramePlans } from '../runtime/driver';
-import { createEffectRuntimeInputMaterializer } from '../frame/inputs';
+import {
+  type EffectRuntimeInputComposition,
+  createEffectRuntimeInputMaterializer,
+} from '../frame/inputs';
 import { disposeEffectRuntimeComposition } from './rendered';
 import { createEffectRuntimeCompositionResourceLedger } from '../runtime/resource-limits';
 import type {
@@ -25,6 +28,9 @@ import type {
 const EMPTY_EFFECT_RUNTIME_FRAMES: EffectRuntimeRenderedFrameMap = new Map();
 
 export async function renderEffectRuntimeComposition(args: {
+  composeInput?: (
+    request: EffectRuntimeInputComposition & { frame: VideoCompositionFrame; time: number }
+  ) => Promise<ImageBitmap>;
   project?: VideoProject;
   clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>;
   executor: EffectRuntimeSandboxExecutor;
@@ -126,6 +132,12 @@ export async function renderEffectRuntimeComposition(args: {
     const frames = await renderEffectRuntimeFramePlans({
       executor: args.executor,
       inputMaterializer: createEffectRuntimeInputMaterializer({
+        ...(args.composeInput
+          ? {
+              composeInput: (request: EffectRuntimeInputComposition) =>
+                args.composeInput!({ ...request, frame, time }),
+            }
+          : {}),
         camera: frame.camera,
         ...(args.project ? { scene: { project: args.project, frame } } : {}),
         drawBackground: (context, dimensions) => {

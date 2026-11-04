@@ -10,6 +10,7 @@ import {
 import type {
   EffectRuntimeFrameResult,
   EffectRuntimeWorkerRequest,
+  EffectRuntimeWorkerResult,
 } from '../../contracts/effect-runtime/types';
 import { createLogicalCanvasFactory } from './canvas/logical-canvas';
 import type { EffectRuntimeCanvasPool } from './canvas/pool';
@@ -18,6 +19,7 @@ import type { RuntimeCanvas } from './model/types';
 import type { EffectRuntimePreparedRenderModel } from './render-context';
 import { createEffectRuntimeRenderContext } from './render-context';
 import { clearSvgVectorCache } from './svg/vector-parser';
+import { createEffectRuntimeGpuTarget } from './interpreter/gpu-target';
 
 export interface PreparedEffectRuntimeModel {
   document: EffectRuntimeWorkerRequest['document'];
@@ -29,9 +31,12 @@ export async function executePreparedEffectRuntimeWorkerRequest(
   request: EffectRuntimeWorkerRequest,
   model: PreparedEffectRuntimeModel,
   canvasPool: EffectRuntimeCanvasPool
-): Promise<EffectRuntimeFrameResult> {
+): Promise<EffectRuntimeWorkerResult> {
+  let adoptedInputs = false;
   try {
-    return await renderEffectRuntimeFrame(request, model, canvasPool);
+    const result = await renderEffectRuntimeFrame(request, model, canvasPool);
+    adoptedInputs = result.kind === 'gpu-plan';
+    return result;
   } catch (error) {
     return createEffectRuntimeFailure(
       request,
@@ -39,7 +44,7 @@ export async function executePreparedEffectRuntimeWorkerRequest(
     );
   } finally {
     clearSvgVectorCache();
-    closeEffectRuntimeBitmaps(request.inputFrames);
+    if (!adoptedInputs) closeEffectRuntimeBitmaps(request.inputFrames);
   }
 }
 
@@ -47,7 +52,7 @@ async function renderEffectRuntimeFrame(
   request: EffectRuntimeWorkerRequest,
   model: PreparedEffectRuntimeModel,
   canvasPool: EffectRuntimeCanvasPool
-): Promise<EffectRuntimeFrameResult> {
+): Promise<EffectRuntimeWorkerResult> {
   if (
     request.document.assets.some(({ kind }) => kind === 'svg') &&
     typeof globalThis.Path2D !== 'function'
@@ -55,11 +60,33 @@ async function renderEffectRuntimeFrame(
     throw new Error('SVG_PATH_RUNTIME_UNAVAILABLE');
   }
   const releases: Array<() => void> = [];
-  const createCanvas = createRuntimeCanvasFactory(request, canvasPool, releases);
+  const canvasBudget = createEffectFrameCanvasBudget();
+  let liveCanvasBytes = 0;
+  let gpu: ReturnType<typeof createEffectRuntimeGpuTarget> | null = null;
+  const allocate = (width: number, height: number) => {
+    const bytes = width * height * 4;
+    gpu?.admitCanvas(bytes);
+    const release = canvasBudget.allocate(width, height);
+    liveCanvasBytes += bytes;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      liveCanvasBytes -= bytes;
+      release();
+    };
+  };
+  const createCanvas = createRuntimeCanvasFactory(request, canvasPool, releases, allocate);
+  gpu =
+    request.renderTarget === 'gpu-plan'
+      ? createEffectRuntimeGpuTarget(request, allocate, () => liveCanvasBytes)
+      : null;
   try {
     const context = createEffectRuntimeRenderContext(request, createCanvas, model.normalized);
-    return createFrameResult(request, await model.renderer.renderFrame(context));
+    const output = await model.renderer.renderFrame(context, gpu?.target);
+    return gpu ? await gpu.finish(output) : createFrameResult(request, output);
   } finally {
+    gpu?.dispose();
     releases.forEach((release) => release());
   }
 }
@@ -67,12 +94,12 @@ async function renderEffectRuntimeFrame(
 function createRuntimeCanvasFactory(
   request: EffectRuntimeWorkerRequest,
   canvasPool: EffectRuntimeCanvasPool,
-  releases: Array<() => void>
+  releases: Array<() => void>,
+  allocate: (width: number, height: number) => () => void
 ) {
-  const canvasBudget = createEffectFrameCanvasBudget();
   let slot = 0;
   const createPhysicalCanvas = (width: number, height: number): RuntimeCanvas => {
-    const releaseBudget = canvasBudget.allocate(width, height);
+    const releaseBudget = allocate(width, height);
     try {
       const lease = canvasPool.lease({
         effectInstanceId: request.effectInstanceId,

@@ -1,3 +1,5 @@
+import { createReviewGpuPreview } from './gpu-preview';
+import { reviewGpuPreviewAllocation, reviewPresentedGeometry } from './gpu-preview-geometry';
 import type { ReviewRecordingRenderSource } from './recording-render';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { reviewWatermarkAssets } from './asset-bytes';
@@ -72,6 +74,7 @@ import {
 
 type Size = { width: number; height: number };
 type Drawable = {
+  videoFrame?(): VideoFrame;
   draw(
     context: CanvasRenderingContext2D,
     x: number,
@@ -90,6 +93,8 @@ type Frame = {
     timestamp: number;
     backing: Size;
     prepare?(signal: AbortSignal): Promise<void>;
+    /** Borrowed until the captured frame lease is released, after render completion. */
+    videoFrame?(): VideoFrame;
   };
   camera?: {
     representedMediaTime: number;
@@ -120,6 +125,8 @@ type Allocation = {
   replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }): void;
 };
 type Assets = {
+  onContextLost: (() => void) | undefined;
+  gpu: ReturnType<typeof createReviewGpuPreview> | null;
   annotations: Awaited<ReturnType<typeof createReviewAnnotationRenderer>> | null;
   captions: Awaited<ReturnType<typeof prepareReviewCaptions>> | null;
   allocation: PreviewRenderAllocationInput['assets'];
@@ -148,6 +155,8 @@ function validSize(size: Size) {
 }
 
 function disposeAssets(assets: Assets) {
+  assets.gpu?.dispose();
+  assets.gpu = null;
   assets.windowRaster?.lease.release();
   assets.windowRaster = null;
   assets.annotations?.dispose();
@@ -446,12 +455,47 @@ async function drawPreparedFrame(
   signal: AbortSignal,
   admit: (frame: Frame, bitmaps: readonly Size[]) => void
 ) {
-  await frame.source.prepare?.(signal);
   signal.throwIfAborted();
   const scene = await recordingHistoryScene(prepared, frame, signal);
   const request = sceneRequest({ ...prepared, scene }, frame);
   const { dimensions } = prepared;
   const { context, canvas } = output;
+  const raw = frame.source.videoFrame?.();
+  if (raw && assets.gpu) {
+    const geometry = reviewPresentedGeometry(
+      scene,
+      dimensions,
+      frame.resultTime,
+      frame.cameraTransform
+    );
+    const rendered = await assets.gpu.render({
+      scene,
+      dimensions,
+      geometry,
+      frame: raw,
+      sourceTime: frame.sourceTime,
+      context,
+      header: assets.header,
+      image: assets.background,
+      painter: assets.painter,
+      captions: assets.captions,
+      annotations: assets.annotations,
+      watermark: assets.watermark,
+      fps: frame.fps ?? 30,
+      ...(frame.camera ? { camera: frame.camera } : {}),
+      ...(frame.cameraTransform ? { cameraOverride: frame.cameraTransform } : {}),
+      ...(frame.transition ? { transition: frame.transition } : {}),
+      admit: (bitmaps) => admit(frame, bitmaps),
+      sceneAt: (resultTime, sourceTime) =>
+        recordingHistoryScene(prepared, { ...frame, resultTime, sourceTime }, signal),
+      signal,
+    });
+    if (rendered) return geometry;
+  }
+  await frame.source.prepare?.(signal);
+  signal.throwIfAborted();
+  if (request.layout.spatial && !assets.spatial)
+    assets.spatial = createReviewSpatialRenderer(assets.onContextLost, resources);
   let transition: RenderCanvasLease | undefined;
   try {
     let sample: Drawable = frame.source;
@@ -688,13 +732,20 @@ function admitRender(
       );
     }
   }
+  const gpu =
+    typeof navigator !== 'undefined' && navigator.gpu
+      ? reviewGpuPreviewAllocation(prepared.scene, prepared.dimensions)
+      : { maximumManagedBytes: 0, maximumCanvases: 0 };
   allocation.replaceLimits({
     // Caption refresh retains the scene resources while borrowing one 1×1 measurement canvas.
     maximumManagedBytes:
       Math.max(...candidates.map((value) => value.maximumManagedBytes)) +
-      (captionMeasurement ? 4 : 0),
+      (captionMeasurement ? 4 : 0) +
+      gpu.maximumManagedBytes,
     maximumCanvases:
-      Math.max(...candidates.map((value) => value.maximumCanvases)) + (captionMeasurement ? 1 : 0),
+      Math.max(...candidates.map((value) => value.maximumCanvases)) +
+      (captionMeasurement ? 1 : 0) +
+      gpu.maximumCanvases,
   });
 }
 
@@ -809,6 +860,14 @@ export function createReviewPreviewRenderer(args: {
       };
       prepareSceneCameraPlans(prepared);
       const assets: Assets = {
+        onContextLost: args.onContextLost,
+        gpu:
+          typeof navigator !== 'undefined' && navigator.gpu
+            ? createReviewGpuPreview({
+                resources: args.resources,
+                reserve: (bytes) => args.resources.bytes('preview-gpu', bytes),
+              })
+            : null,
         annotations: null,
         captions: null,
         allocation: {
@@ -855,7 +914,7 @@ export function createReviewPreviewRenderer(args: {
         );
         controller.signal.throwIfAborted();
         admitRender(args.allocation, prepared, assets);
-        if (needsSpatialRenderer(prepared.scene))
+        if (needsSpatialRenderer(prepared.scene) && !assets.gpu)
           assets.spatial = createReviewSpatialRenderer(args.onContextLost, args.resources);
         current = { prepared, assets, key, preparationKey: assetsKey };
         return lease(prepared, assets, signal);
@@ -885,7 +944,7 @@ export function createReviewPreviewRenderer(args: {
       );
       rendering = true;
       try {
-        await drawPreparedFrame(
+        const geometry = await drawPreparedFrame(
           captured.prepared,
           captured.assets,
           output,
@@ -911,6 +970,9 @@ export function createReviewPreviewRenderer(args: {
           cameraMediaTime: frame.camera?.representedMediaTime ?? null,
           cameraGeneration: frame.camera?.generation ?? null,
           captionConflicts: prepared.captionConflicts,
+          geometry: geometry
+            ? { ...geometry, generation: frame.generation, sceneGeneration: prepared.generation }
+            : null,
         };
       } catch (failure) {
         output.release();

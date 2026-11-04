@@ -1507,3 +1507,23 @@ it('reads archive history for both dissolve endpoint clocks before drawing their
   prepared.release();
   renderer.dispose();
 });
+
+it('preserves explicit annotation executor ownership during prepared-scene replacement', async () => {
+  const f = await annotationsFixture();
+  const { resources } = setup();
+  const factory = vi.fn(() => f.executor);
+  const renderer = createReviewPreviewRenderer({ resources, annotationExecutor: factory });
+  const first = await renderer.prepare(f.input, dimensions, new AbortController().signal);
+  const completed = await renderer.render(first, frame());
+  completed.release();
+  expect(factory).toHaveBeenCalledWith();
+  expect(factory).toHaveBeenCalledOnce();
+  const changed = structuredClone(f.input);
+  changed.annotationEffects!.lane.enabled = false;
+  const replacement = await renderer.prepare(changed, dimensions, new AbortController().signal);
+  await expect(renderer.render(first, frame())).rejects.toThrow('stale');
+  (await renderer.render(replacement, frame())).release();
+  renderer.dispose();
+  expect(f.executor.dispose).toHaveBeenCalledOnce();
+  expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
+});

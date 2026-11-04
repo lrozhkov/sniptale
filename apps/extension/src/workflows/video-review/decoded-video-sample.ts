@@ -6,7 +6,7 @@ import type { VideoProject, VideoProjectVideoClip } from '../../features/video/p
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import { readRetainedTransitionSample } from './cut-transition-frames';
 import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
-import type { VideoSampleSink } from 'mediabunny';
+import type { VideoSample, VideoSampleSink } from 'mediabunny';
 import { classifyReviewExportFailure, reviewExportPhase } from './export-diagnostics';
 
 type ReviewSampleSink = Pick<VideoSampleSink, 'getSample' | 'samples' | 'samplesAtTimestamps'>;
@@ -15,24 +15,33 @@ type ReviewSampleSink = Pick<VideoSampleSink, 'getSample' | 'samples' | 'samples
 export function createReviewDecodedSampleSink(
   sink: ReviewSampleSink,
   signal: AbortSignal,
-  config?: VideoDecoderConfig | null
+  config?: VideoDecoderConfig | null,
+  conversion: 'canvas' | 'native' = 'canvas'
 ) {
   // VP8 defaults to BT.601. The SDK assumes BT.709 when container metadata is absent.
   const colorSpace =
     config?.codec === 'vp8' && !config.colorSpace?.matrix
       ? { matrix: 'smpte170m' as const }
       : undefined;
+  const prepare = (sample: VideoSample) => {
+    if (signal.aborted) {
+      sample.close();
+      signal.throwIfAborted();
+    }
+    return conversion === 'native' && !colorSpace
+      ? sample
+      : prepareDecodedVideoSample(sample, signal, colorSpace);
+  };
   return {
     async getSample(time: number) {
       return reviewExportPhase(signal, 'decode', async () => {
         const sample = await sink.getSample(time);
-        return sample ? prepareDecodedVideoSample(sample, signal, colorSpace) : null;
+        return sample ? prepare(sample) : null;
       });
     },
     async *samples(start: number, end: number) {
       try {
-        for await (const sample of sink.samples(start, end))
-          yield await prepareDecodedVideoSample(sample, signal, colorSpace);
+        for await (const sample of sink.samples(start, end)) yield await prepare(sample);
       } catch (error) {
         throw classifyReviewExportFailure(signal, 'decode', error);
       }
@@ -40,7 +49,7 @@ export function createReviewDecodedSampleSink(
     async *samplesAtTimestamps(times: Iterable<number> | AsyncIterable<number>) {
       try {
         for await (const sample of sink.samplesAtTimestamps(times))
-          yield sample ? await prepareDecodedVideoSample(sample, signal, colorSpace) : null;
+          yield sample ? await prepare(sample) : null;
       } catch (error) {
         throw classifyReviewExportFailure(signal, 'decode', error);
       }
@@ -52,6 +61,8 @@ export function createReviewDecodedSampleSink(
 export function createCompositionCutSampleSource(params: {
   project: VideoProject;
   sourceUrl(clip: VideoProjectVideoClip): string | undefined;
+  /** GPU sampling preserves the original external texture; Canvas callers retain plane packing. */
+  conversion?: 'canvas' | 'native';
 }) {
   const controller = new AbortController();
   const inputs = new Set<{ dispose(): void }>();
@@ -73,7 +84,8 @@ export function createCompositionCutSampleSource(params: {
         return createReviewDecodedSampleSink(
           new sdk.VideoSampleSink(track),
           controller.signal,
-          await track.getDecoderConfig()
+          await track.getDecoderConfig(),
+          params.conversion
         );
       } catch (error) {
         if (inputs.delete(input)) input.dispose();
@@ -159,6 +171,8 @@ export function createCompositionCutSampleSource(params: {
           media.set(clip.id, {
             sourceWidth: sample.displayWidth,
             sourceHeight: sample.displayHeight,
+            orientation: { rotation: sample.rotation, flip: sample.flip },
+            toVideoFrame: () => sample.toVideoFrame(),
             draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
           });
         }

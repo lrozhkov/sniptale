@@ -14,6 +14,23 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+// Gesture tests need a completed frame; jsdom does not provide a WebGL device.
+// Pixel projection is covered by the renderer/browser tests rather than this input fixture.
+vi.mock('../../workflows/video-review/spatial-render-session', () => ({
+  createReviewSpatialSession: () => ({
+    surface(_role: string, width: number, height: number) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      return { canvas, context: canvas.getContext('2d')! };
+    },
+    draw(context: CanvasRenderingContext2D, args: { source: HTMLCanvasElement }) {
+      context.drawImage(args.source, 0, 0);
+    },
+    dispose() {},
+  }),
+}));
+
 let root: Root;
 let host: HTMLDivElement;
 

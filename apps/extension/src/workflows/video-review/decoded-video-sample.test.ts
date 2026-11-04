@@ -100,7 +100,12 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function setup(format: VideoPixelFormat = 'NV12', height = 16, config?: VideoDecoderConfig) {
+function setup(
+  format: VideoPixelFormat = 'NV12',
+  height = 16,
+  config?: VideoDecoderConfig,
+  conversion?: 'canvas' | 'native'
+) {
   const sample = new VideoSample(
     new VideoFrame(new Uint8Array(384), {
       format,
@@ -126,10 +131,28 @@ function setup(format: VideoPixelFormat = 'NV12', height = 16, config?: VideoDec
       },
     },
     controller.signal,
-    config
+    config,
+    conversion
   );
   return { sample, controller, sink };
 }
+
+it.each(['getSample', 'samples', 'samplesAtTimestamps'] as const)(
+  'preserves the original padded texture for native GPU %s without a pixel copy',
+  async (method) => {
+    const { sample, sink } = setup('NV12', 16, undefined, 'native');
+    const decoded =
+      method === 'getSample'
+        ? await sink.getSample(1)
+        : method === 'samples'
+          ? (await sink.samples(0, 2).next()).value
+          : (await sink.samplesAtTimestamps([1]).next()).value;
+    expect(decoded).toBe(sample);
+    expect(copy).not.toHaveBeenCalled();
+    expect(frames[0]!.close).not.toHaveBeenCalled();
+    sample.close();
+  }
+);
 
 it.each(['getSample', 'samples', 'samplesAtTimestamps'] as const)(
   'packs visible NV12 planes for %s, preserving sample metadata',
@@ -164,10 +187,20 @@ it.each([
   ['NV12', 10],
 ] as const)('passes through %s height %i without a pixel copy', async (format, height) => {
   const { sample, sink } = setup(format, height);
-  expect(await sink.getSample(1)).toBe(sample);
+  const prepared = await sink.getSample(1);
+  if (!prepared) throw new Error('Missing sample');
+  if (format === 'I420') expect(prepared).toBe(sample);
+  else {
+    expect(prepared.rotation).toBe(sample.rotation);
+    expect(prepared.timestamp).toBe(sample.timestamp);
+    expect(prepared.displayWidth).toBe(sample.displayWidth);
+    expect(prepared.displayHeight).toBe(sample.displayHeight);
+  }
   expect(copy).not.toHaveBeenCalled();
-  expect(frames[0]!.close).not.toHaveBeenCalled();
-  sample.close();
+  if (format === 'I420') expect(frames[0]!.close).not.toHaveBeenCalled();
+  else expect(frames[0]!.close).toHaveBeenCalledOnce();
+  prepared.close();
+  expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
 });
 
 it.each(['failure', 'abort'] as const)(

@@ -332,6 +332,8 @@ export function useSpatialGesture(props: Props) {
     if (!pending) return null;
     transaction.current = pending;
     setActive(handle);
+    // Admit the unchanged draft before a seek can schedule full-scene rendering.
+    latest.current.onPreview(pending.patch);
     latest.current.onInteract();
     return pending;
   };

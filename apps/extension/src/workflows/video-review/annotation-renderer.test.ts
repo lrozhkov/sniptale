@@ -1,3 +1,4 @@
+import * as sandboxRuntime from '../video/effect-runtime-sandbox';
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import {
@@ -554,4 +555,62 @@ it('updates callout anchor controls and body geometry without replacing verified
   expect(f.executor.dispose).not.toHaveBeenCalled();
   renderer.dispose();
   expect(f.managed()).toBe(0);
+});
+
+it('defers prepared disposal and bitmap reservations until a GPU batch borrower releases after its fence', async () => {
+  const f = await fixture();
+  const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
+  const batch = await renderer.render(6, density, 30, f.deps.signal);
+  const retained = f.managed();
+  const hold = batch.retain();
+  const otherHold = batch.retain();
+  batch.release();
+  renderer.dispose();
+  expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+  expect(renderer.counters().liveRasterResources).toBe(1);
+  expect(f.managed()).toBeGreaterThan(0);
+  expect(f.managed()).toBeLessThan(retained);
+  hold.release();
+  expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+  otherHold.release();
+  hold.release();
+  batch.release();
+  expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+  expect(renderer.counters().liveRasterResources).toBe(0);
+  expect(f.managed()).toBe(0);
+});
+it('retains the one-batch admission guard until its last GPU borrower releases', async () => {
+  const f = await fixture();
+  const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
+  const batch = await renderer.render(6, density, 30, f.deps.signal);
+  const hold = batch.retain();
+  batch.release();
+  await expect(renderer.render(6, density, 30, f.deps.signal)).rejects.toThrow('already admitted');
+  hold.release();
+  const next = await renderer.render(6, density, 30, f.deps.signal);
+  next.release();
+  renderer.dispose();
+  expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
+});
+
+it('preserves the no-argument sandbox factory for default annotation consumers', async () => {
+  const f = await fixture();
+  const factory = vi
+    .spyOn(sandboxRuntime, 'createEffectRuntimeSandboxExecutor')
+    .mockReturnValue(f.executor);
+  try {
+    const renderer = await createReviewAnnotationRenderer(f.scene, {
+      resources: f.deps.resources,
+      signal: f.deps.signal,
+      readAsset: f.deps.readAsset,
+    });
+    const batch = await renderer.render(6, density, 30, f.deps.signal);
+    expect(factory).toHaveBeenCalledOnce();
+    expect(factory).toHaveBeenCalledWith();
+    batch.release();
+    renderer.dispose();
+    expect(f.executor.dispose).toHaveBeenCalledOnce();
+  } finally {
+    factory.mockRestore();
+  }
 });

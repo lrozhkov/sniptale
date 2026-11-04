@@ -1,7 +1,7 @@
 import { returnEffectRuntimeRetryInputs } from '../../contracts/effect-runtime/retry-inputs';
 import { createEffectRuntimeFailure } from '../../contracts/effect-runtime/identity';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
-import type { EffectRuntimeFrameResult } from '../../contracts/effect-runtime/types';
+import type { EffectRuntimeWorkerResult } from '../../contracts/effect-runtime/types';
 import { drawImageAsset } from './assets/render-assets';
 import { createEffectRuntimeWorkerAssetCache } from './cache/assets';
 import { createEffectRuntimePreparedModelCache } from './cache/models';
@@ -32,7 +32,7 @@ interface EffectRuntimeWorkerExecutionResources {
 
 interface EffectRuntimeWorkerExecutionState {
   dispose(): void;
-  execute(value: unknown): Promise<EffectRuntimeFrameResult>;
+  execute(value: unknown): Promise<EffectRuntimeWorkerResult>;
   snapshot(): {
     assets: { bytes: number; entries: number; selections: number };
     canvases: { entries: number; leases: number };
@@ -75,7 +75,7 @@ function disposeExecutionResources(resources: EffectRuntimeWorkerExecutionResour
 async function executeWithResources(
   value: unknown,
   resources: EffectRuntimeWorkerExecutionResources
-): Promise<EffectRuntimeFrameResult> {
+): Promise<EffectRuntimeWorkerResult> {
   const resolution = resolveEffectRuntimeWorkerRequest(value, {
     getAssets: (id) => resources.assets.get(id),
     getDocument: (id) => resources.models.get(id)?.document ?? null,
@@ -100,7 +100,7 @@ async function executeWithResources(
 function createResolutionFailure(
   value: unknown,
   resolution: Exclude<ReturnType<typeof resolveEffectRuntimeWorkerRequest>, { ok: true }>
-): EffectRuntimeFrameResult {
+): EffectRuntimeWorkerResult {
   if (resolution.code === 'cacheMiss')
     return returnEffectRuntimeRetryInputs(value, resolution.missingRef);
   closeEffectRuntimeBitmaps(value);
@@ -113,7 +113,7 @@ export function executeEffectRuntimeWorkerRequest(
     createCanvas: (width, height) => new OffscreenCanvas(width, height),
   },
   state?: EffectRuntimeWorkerExecutionState
-): Promise<EffectRuntimeFrameResult> {
+): Promise<EffectRuntimeWorkerResult> {
   if (state) return state.execute(value);
   const ownedState = createEffectRuntimeWorkerExecutionState(dependencies);
   return ownedState.execute(value).finally(() => ownedState.dispose());

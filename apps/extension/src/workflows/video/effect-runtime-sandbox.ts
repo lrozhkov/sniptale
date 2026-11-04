@@ -7,7 +7,11 @@ export { EFFECT_RUNTIME_SANDBOX_PAGE_PATH } from './effect-runtime-sandbox-sessi
 export type { EffectRuntimeSandboxExecutor } from '../../contracts/effect-runtime/types';
 
 export function createEffectRuntimeSandboxExecutor(
-  args: { ownerDocument?: Document; timeoutMs?: number } = {}
+  args: {
+    ownerDocument?: Document;
+    timeoutMs?: number;
+    compositionBackend?: 'gpu-preview';
+  } = {}
 ): EffectRuntimeSandboxExecutor {
   const ownerDocument = args.ownerDocument ?? document;
   const loadTimeoutMs = resolveTimeout(
@@ -21,6 +25,7 @@ export function createEffectRuntimeSandboxExecutor(
   const manager = new EffectRuntimeSandboxSessionManager(ownerDocument, {
     loadTimeoutMs,
     requestTimeoutMs,
+    ...(args.compositionBackend ? { compositionBackend: args.compositionBackend } : {}),
   });
   return {
     dispose: () => manager.dispose(),

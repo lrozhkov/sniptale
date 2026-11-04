@@ -1,5 +1,82 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'gallery-camera-preview-gestures',
+    productionFile: 'apps/extension/src/gallery/video-review/camera-gesture.ts',
+    reason:
+      'Mounted inspectors exercise pointer projection, keyboard edits, cancellation and accepted camera revisions.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/stage-focus.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-preview-canvas.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/spotlight-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-editor.revision.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-preview-gpu.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-presentation-admission',
+    productionFile: 'apps/extension/src/gallery/video-review/preview-presentation-admission.ts',
+    reason:
+      'Mounted presentation proves source, frame and camera reservations, failures and cleanup.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-captions.test.tsx',
+      'apps/extension/src/gallery/video-review/preview-presentation-frame.test.ts',
+    ],
+  },
+  {
+    owner: 'gallery-presentation-description',
+    productionFile: 'apps/extension/src/gallery/video-review/preview-presentation-state.ts',
+    reason:
+      'Presentation and stage consumers prove draft identity, completed geometry, source timing and invalidation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-captions.test.tsx',
+      'apps/extension/src/gallery/video-review/preview-presentation-frame.test.ts',
+      'apps/extension/src/gallery/video-review/stage-presentation.test.tsx',
+      'apps/extension/src/gallery/video-review/stage.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-mini-gpu-artwork',
+    productionFile: 'apps/extension/src/gallery/video-review/zoom-preview-gpu-artwork.ts',
+    reason:
+      'Renderer and mounted previews prove retained artwork, source replacement, effects and disposal.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/zoom-preview-gpu.test.ts',
+      'apps/extension/src/gallery/video-review/zoom-preview-canvas.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/spotlight-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-mini-presentation-queue',
+    productionFile: 'apps/extension/src/gallery/video-review/zoom-preview-paint-owner.ts',
+    reason:
+      'Queue and mounted inspectors prove coalescing, stale cancellation, revisions, retries and publication.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/zoom-preview-gpu.test.ts',
+      'apps/extension/src/gallery/video-review/zoom-preview-canvas.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/zoom-editor.revision.test.tsx',
+      'apps/extension/src/gallery/video-review/spotlight-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-review-gpu-endpoint-scene',
+    productionFile: 'apps/extension/src/workflows/video-review/gpu-preview-scene.ts',
+    reason:
+      'Renderer consumers prove endpoint time, geometry, exposures, animated backgrounds and frame cleanup.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/gpu-preview.test.ts',
+      'apps/extension/src/workflows/video-review/gpu-preview-layers.test.ts',
+      'apps/extension/src/workflows/video-review/gpu-preview-geometry.test.ts',
+      'apps/extension/src/workflows/video-review/render-preview.test.ts',
+      'apps/extension/src/workflows/video-review/render-preview-performance.test.ts',
+      'apps/extension/src/workflows/video-review/cut-transition-frames.test.ts',
+    ],
+  },
+  {
     owner: 'video-preview-canvas-region-gestures',
     productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/editor-region/gesture.ts',
     reason:

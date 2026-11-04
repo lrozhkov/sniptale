@@ -56,6 +56,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const interacting = input.interacting || placement !== null || Object.keys(comments).length > 0;
   // A raw-source dissolve cannot represent two independently decorated camera poses.
   const manual =
+    (typeof navigator !== 'undefined' && !!navigator.gpu) ||
     isReviewPreviewManual(input.preferences, input.playing) ||
     !!(
       input.scene.webcam?.enabled &&

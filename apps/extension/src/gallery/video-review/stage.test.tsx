@@ -8,6 +8,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewStageFocus } from './stage-focus';
 import { ReviewStage } from './stage';
+import {
+  reviewPresentedGeometry,
+  reviewPresentedStageProjection,
+} from '../../workflows/video-review/gpu-preview-geometry';
+import { quickEditProjectionCss } from '../../features/video/composition/motion/spatial-geometry';
 import * as headerPreview from './use-window-header';
 import type {
   QuickEditBackgroundSettings,
@@ -907,4 +912,65 @@ it('retains the decoded native header across detailed pause and playback handoff
     renderStage(props);
     expect(header.mock.lastCall![0]).toEqual(windowHeader);
   }
+});
+
+it('keeps the camera grab surface on the completed outer window rather than the inner content zoom', () => {
+  presentation.active = true;
+  const camera: QuickEditCameraTransform = {
+    scale: 1.7,
+    centerX: 0.6,
+    centerY: 0.4,
+    spatial: {
+      rotation: [0, Math.sin(0.15), 0, Math.cos(0.15)],
+      perspective: 0.7,
+      windowMotion: 0.5,
+      lockBackground: true,
+      focus: [],
+    },
+  };
+  const zoom: ReviewStageFocus = {
+    region: {
+      id: 'window',
+      start: 0,
+      end: 4,
+      transform: camera,
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+    },
+    onPreview: vi.fn(),
+    onChange: vi.fn(),
+    onInteract: vi.fn(),
+  };
+  renderStage({ scene: { background: disabled, camera }, zoom });
+  const receipt = reviewPresentedGeometry(
+    {
+      source,
+      background: disabled,
+      zoomRegions: [zoom.region],
+      comments: [],
+      keys: [],
+      clicks: [],
+    },
+    { canonical: source, backing: { width: 800, height: 450 } },
+    1,
+    camera
+  );
+  const input: unknown = presentation.input.mock.lastCall?.[0];
+  if (
+    typeof input !== 'object' ||
+    input === null ||
+    !('onGeometry' in input) ||
+    typeof input.onGeometry !== 'function'
+  )
+    throw new Error('Expected the mounted presentation geometry callback');
+  const receiveGeometry = input.onGeometry;
+  act(() => receiveGeometry(receipt));
+  const expected = quickEditProjectionCss(
+    reviewPresentedStageProjection(receipt, { width: 800, height: 450 }, 'window')
+  );
+  const target = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomTarget"]')!;
+  const transforms: string[] = [];
+  for (let node: HTMLElement | null = target; node && node !== host; node = node.parentElement)
+    if (node.style.transform) transforms.push(node.style.transform);
+  expect(transforms).toEqual([expected]);
 });

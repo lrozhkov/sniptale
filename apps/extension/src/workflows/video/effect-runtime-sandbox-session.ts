@@ -31,7 +31,11 @@ export class EffectRuntimeSandboxSessionManager {
 
   constructor(
     private readonly ownerDocument: Document,
-    private readonly timeouts: { loadTimeoutMs: number; requestTimeoutMs: number }
+    private readonly configuration: {
+      loadTimeoutMs: number;
+      requestTimeoutMs: number;
+      compositionBackend?: 'gpu-preview';
+    }
   ) {}
 
   dispose(): void {
@@ -57,21 +61,29 @@ export class EffectRuntimeSandboxSessionManager {
       ensureSession: () => this.ensureSession(),
       isCurrentSession: (session) => this.session === session,
       isDisposed: () => this.disposed,
-      requestTimeoutMs: this.timeouts.requestTimeoutMs,
+      requestTimeoutMs: this.configuration.requestTimeoutMs,
     };
   }
 
   private ensureSession(): EffectRuntimeSandboxSession {
     if (this.session) return this.session;
     const connectionNonce = createEffectRuntimeSandboxConnectionNonce();
-    const iframe = createSandboxIframe(this.ownerDocument, connectionNonce);
+    const iframe = createSandboxIframe(
+      this.ownerDocument,
+      connectionNonce,
+      this.configuration.compositionBackend
+    );
     const created: EffectRuntimeSandboxSession = {
       cancelLoad: () => {},
       controlPort: null,
       iframe,
       load: Promise.resolve(),
     };
-    created.load = initializeSandboxSession(created, connectionNonce, this.timeouts.loadTimeoutMs);
+    created.load = initializeSandboxSession(
+      created,
+      connectionNonce,
+      this.configuration.loadTimeoutMs
+    );
     this.session = created;
     void created.load.catch(() => this.clearSession(created));
     (this.ownerDocument.body ?? this.ownerDocument.documentElement).append(iframe);
@@ -94,14 +106,17 @@ export class EffectRuntimeSandboxSessionManager {
   }
 }
 
-function createSandboxIframe(ownerDocument: Document, connectionNonce: string): HTMLIFrameElement {
+function createSandboxIframe(
+  ownerDocument: Document,
+  connectionNonce: string,
+  compositionBackend?: 'gpu-preview'
+): HTMLIFrameElement {
   const iframe = ownerDocument.createElement('iframe');
   iframe.hidden = true;
   iframe.setAttribute('sandbox', 'allow-scripts');
-  iframe.src = createEffectRuntimeSandboxUrl(
-    runtimeInfo.getURL(EFFECT_RUNTIME_SANDBOX_PAGE_PATH),
-    connectionNonce
-  );
+  const url = new URL(runtimeInfo.getURL(EFFECT_RUNTIME_SANDBOX_PAGE_PATH));
+  if (compositionBackend) url.searchParams.set('composition', compositionBackend);
+  iframe.src = createEffectRuntimeSandboxUrl(url.href, connectionNonce);
   return iframe;
 }
 

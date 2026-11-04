@@ -24,7 +24,11 @@ An effect application creates or reuses an immutable content-addressed project s
 
 Preview and export share frame and audio plans. Before sandbox evaluation, resolve instance time, target visibility, transitions, and target-effect ordering.
 
-The manifest sandbox and inline Worker interpret only the EffectV1 vocabulary. Never convert imported bytes to script. Bind protocol version, request and sequence, snapshot and document identity, dimensions, time, controls, assets, and input frames. Enforce queue, timeout, canvas, raster, SVG, decoded-media, and failure budgets in both broker and Worker. Fail without a renderer fallback.
+The manifest sandbox and inline Worker interpret only the EffectV1 vocabulary. Never convert imported bytes to script. Bind protocol version, request and sequence, snapshot and document identity, dimensions, time, controls, assets, and input frames. Enforce queue, timeout, canvas, raster, SVG, decoded-media, and failure budgets in both broker and Worker. Evaluation, validation, and resource failures must not select another renderer.
+
+Native live preview explicitly selects GPU composition through the sandbox connection configuration. The Worker evaluates the same EffectV1 program and transfers a bounded numeric drawing plan and its bitmap resources to the existing sandbox frame. The broker checks the plan before the shared WebGPU compositor executes it. The host receives the existing frame result, not the plan. Export and other consumers retain their default renderer.
+
+If WebGPU is unavailable, preview uses the existing Canvas renderer. A typed GPU device failure permits one Canvas retry with the returned original input bitmaps. Keep those inputs alive until GPU work finishes. The original request deadline also applies to this retry. A timeout prevents late publication. Resource cleanup waits for GPU completion. Do not retry an unsupported operation, invalid plan, or resource failure through Canvas.
 
 Use the shared audio plan for preview, MP4, and WebM. Apply ordinary host-clip visibility and interval rules to standalone effect audio. Preview owns a disposable Web Audio graph with stale-decode protection and cleanup. Check decoded PCM limits after browser decode.
 

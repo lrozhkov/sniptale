@@ -1,4 +1,9 @@
-import { prepareDecodedVideoFrame } from '../../../../features/video/composition/draw/decoded-sample';
+import type { EffectRuntimeInputComposer } from '../../../../features/video/composition/effect-runtime/frame/inputs';
+import { VideoSample } from 'mediabunny';
+import {
+  prepareDecodedVideoFrame,
+  prepareDecodedVideoSample,
+} from '../../../../features/video/composition/draw/decoded-sample';
 import {
   isVideoCompositionFrameSource,
   type VideoCompositionMediaSource,
@@ -24,10 +29,7 @@ import {
 import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
 import { drawSpatialSceneOverlays } from '../../../../features/video/composition/draw/spatial';
 import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
-import type {
-  VideoCompositionCameraState,
-  VideoCompositionFrame,
-} from '../../../../features/video/composition/types';
+
 import {
   createEffectRuntimeDrawState,
   drawCompositionVisualLayer,
@@ -40,24 +42,20 @@ import {
   renderEffectRuntimeComposition,
   type EffectRuntimeRenderedComposition,
 } from '../../../../features/video/composition/effect-runtime';
-import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
+
 import { mapCompositionPointThroughCamera } from '../../../../features/video/composition/motion';
 import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 import type { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
-import type { VideoProject } from '../../../../features/video/project/types/index';
+
 import { drawPreviewVisualPasses } from './render-visual';
 import type { PreviewSceneViewport, PreviewStageVideoRefs } from '../types';
 import { resolvePreviewEffectRuntimeRasterScale } from './canvas';
-import type { VideoEditorPreviewRasterSize } from '../sizing/raster';
-import type { VideoEditorPreviewMode } from '../../../contracts/preview-runtime';
+
+import type { PreviewSceneRenderInput } from './types';
 import {
   createVideoProjectCaptionRenderer,
   type VideoProjectCaptionRenderer,
 } from '../../../../workflows/video-review/project-captions';
-
-type PreviewEffectRuntimeExecutorInput =
-  | EffectRuntimeSandboxExecutor
-  | (() => EffectRuntimeSandboxExecutor);
 
 function createPreviewSceneMediaMap(
   videoRefs: PreviewStageVideoRefs,
@@ -142,39 +140,7 @@ function drawPreviewSceneOverlays(params: {
   }
 }
 
-type PreviewSceneParams = {
-  /** Held composition samples exclude outer fades; their caller applies presentation once. */
-  sceneEdges?: 'omit';
-  /** Output sampling for size estimation; absence retains the project cadence. */
-  sampleFps?: number;
-  watermarkRenderer?: VideoProjectWatermarkRenderer;
-  cameraOverride?: VideoCompositionCameraState;
-  canvas: HTMLCanvasElement;
-  captionRenderer?: VideoProjectCaptionRenderer;
-  /** The preview runtime owns this reusable transaction canvas. */
-  stagingCanvas?: () => HTMLCanvasElement;
-  spatialRenderer?: () => ReviewSpatialRenderer;
-  currentTime: number;
-  /** Complete borrowed source map for composition endpoint sampling. */
-  assetUrls?: Record<string, string>;
-  imageBank: Record<string, HTMLImageElement>;
-  /** The media owner prepares dependencies from this same plan before any raster work. */
-  prepareImages?: (frames: readonly VideoCompositionFrame[]) => Promise<void>;
-  effectRuntimeExecutor?: PreviewEffectRuntimeExecutorInput;
-  isPlaybackFrame?: boolean;
-  previewRasterSize?: VideoEditorPreviewRasterSize;
-  previewCacheBypass?: boolean;
-  previewMode?: VideoEditorPreviewMode;
-  renderRevision?: Promise<string>;
-  project: VideoProject;
-  signal?: AbortSignal;
-  stage: HTMLDivElement | null;
-  videoRefs: PreviewStageVideoRefs;
-  /** Borrowed immutable decoded frames for bounded cut sampling. */
-  decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>;
-};
-
-export async function renderPreviewScene(params: PreviewSceneParams): Promise<void | false> {
+export async function renderPreviewScene(params: PreviewSceneRenderInput): Promise<void | false> {
   if (!params.project.watermark || params.project.watermark.mode === 'none') {
     params.watermarkRenderer?.clear();
     return renderPreparedPreviewScene(params);
@@ -196,17 +162,33 @@ function capturePreviewSceneVideos(
   videos: readonly HTMLMediaElement[],
   signal?: AbortSignal
 ) {
-  const frames: VideoFrame[] = [];
+  const frames: Array<{ close(): void }> = [];
   const release = () => {
     for (const frame of frames) frame.close();
   };
   const captureSignal = signal ?? new AbortController().signal;
   const sources = [...media].filter(
-    (entry): entry is [string, HTMLVideoElement] =>
-      entry[1] instanceof HTMLVideoElement && entry[1].videoWidth > 0 && videos.includes(entry[1])
+    ([, source]) =>
+      (source instanceof HTMLVideoElement && source.videoWidth > 0 && videos.includes(source)) ||
+      (isVideoCompositionFrameSource(source) && source.toVideoFrame !== undefined)
   );
   const prepare = async () => {
     for (const [clipId, source] of sources) {
+      if (isVideoCompositionFrameSource(source) && source.toVideoFrame) {
+        const sample = await prepareDecodedVideoSample(
+          new VideoSample(source.toVideoFrame(), source.orientation),
+          captureSignal
+        );
+        frames.push(sample);
+        captureSignal.throwIfAborted();
+        media.set(clipId, {
+          sourceWidth: sample.displayWidth,
+          sourceHeight: sample.displayHeight,
+          draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
+        });
+        continue;
+      }
+      if (!(source instanceof HTMLVideoElement)) continue;
       const captured = await prepareDecodedVideoFrame(new VideoFrame(source), captureSignal);
       frames.push(captured);
       captureSignal.throwIfAborted();
@@ -221,7 +203,7 @@ function capturePreviewSceneVideos(
 }
 
 async function renderPreparedPreviewScene(
-  params: PreviewSceneParams,
+  params: PreviewSceneRenderInput,
   watermark?: Awaited<ReturnType<VideoProjectWatermarkRenderer['prepare']>>
 ): Promise<void | false> {
   const renderPasses = resolveVideoCompositionRenderPasses(params.project, params.currentTime);
@@ -246,8 +228,53 @@ async function renderPreparedPreviewScene(
   };
   for (const video of videos) video.addEventListener('seeking', invalidate);
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
-  const capture = capturePreviewSceneVideos(clipMediaElements, videos, params.signal);
+  let capture: ReturnType<typeof capturePreviewSceneVideos> | undefined;
   try {
+    if (params.gpuPreview) {
+      if (params.prepareImages) {
+        await params.prepareImages([
+          renderPasses.overlayFrame,
+          ...renderPasses.visualPasses.map((pass) => pass.frame),
+        ]);
+        params.signal?.throwIfAborted();
+      }
+      const captions = await (
+        params.captionRenderer ?? createVideoProjectCaptionRenderer()
+      ).prepare(params.project, params.project, params.signal);
+      const accelerated = await params.gpuPreview.render(
+        params,
+        renderPasses,
+        (prepared, phase) =>
+          drawResolvedPreviewSceneOverlays(
+            {
+              clipMediaElements,
+              captions,
+              watermark,
+              effectRuntimeFrames,
+              params,
+              renderPasses,
+              isInvalidated: () => mediaChanged,
+            },
+            prepared,
+            true,
+            phase
+          ),
+        () => mediaChanged,
+        async (composeInput) => {
+          effectRuntimeFrames = await resolvePreviewEffectRuntimeFrames(
+            params,
+            renderPasses,
+            clipMediaElements,
+            composeInput
+          );
+          return effectRuntimeFrames;
+        }
+      );
+      if (accelerated !== undefined) return accelerated === false ? false : undefined;
+      disposeEffectRuntimeComposition(effectRuntimeFrames);
+      effectRuntimeFrames = undefined;
+    }
+    capture ??= capturePreviewSceneVideos(clipMediaElements, videos, params.signal);
     if (capture.ready) await capture.ready;
     if (params.prepareImages) {
       await params.prepareImages([
@@ -290,7 +317,7 @@ async function renderPreparedPreviewScene(
     try {
       disposeEffectRuntimeComposition(effectRuntimeFrames);
     } finally {
-      capture.release();
+      capture?.release();
     }
   }
 }
@@ -320,7 +347,7 @@ type ResolvedPreviewSceneArgs = {
   captions: Awaited<ReturnType<VideoProjectCaptionRenderer['prepare']>>;
   clipMediaElements: Map<string, VideoCompositionMediaSource>;
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
-  params: Parameters<typeof renderPreviewScene>[0];
+  params: PreviewSceneRenderInput;
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>;
   isInvalidated(): boolean;
 };
@@ -401,49 +428,65 @@ async function drawResolvedPreviewSceneContent(
 
   if (!overlayPrepared || args.params.signal?.aborted) return false;
 
-  drawCompositionSceneSpotlights({
-    context: overlayPrepared.context,
-    frame: args.renderPasses.overlayFrame,
-    project: args.params.project,
-    images: args.params.imageBank,
-    viewport: {
-      x: overlayPrepared.viewport.offsetX,
-      y: overlayPrepared.viewport.offsetY,
-      width: overlayPrepared.viewport.width,
-      height: overlayPrepared.viewport.height,
-    },
-    composition: {
-      x: overlayPrepared.viewport.offsetX,
-      y: overlayPrepared.viewport.offsetY,
-      scale: overlayPrepared.viewport.scale,
-    },
-  });
-  drawCompositionBorders(
-    overlayPrepared.context,
-    args.renderPasses.overlayFrame.viewportBorders,
-    {
-      x: overlayPrepared.viewport.offsetX,
-      y: overlayPrepared.viewport.offsetY,
-      width: overlayPrepared.viewport.width,
-      height: overlayPrepared.viewport.height,
-    },
-    overlayPrepared.viewport.scale
-  );
-  drawPreviewSceneOverlays({
-    camera: args.renderPasses.overlayFrame.camera,
-    context: overlayPrepared.context,
-    frame: args.renderPasses.overlayFrame,
-    viewport: overlayPrepared.viewport,
-    logicalSize: { width: args.params.project.width, height: args.params.project.height },
-    rasterScale: overlayPrepared.viewport.scale * overlayPrepared.dpr,
-    spatialRenderer: args.params.spatialRenderer,
-  });
+  drawResolvedPreviewSceneOverlays(args, overlayPrepared);
+  return true;
+}
+
+function drawResolvedPreviewSceneOverlays(
+  args: ResolvedPreviewSceneArgs,
+  overlayPrepared: PreparedPreviewSceneCanvas,
+  viewportArtworkOnly = false,
+  artworkPhase: 'borders' | 'final' = 'final'
+) {
+  if (!viewportArtworkOnly)
+    drawCompositionSceneSpotlights({
+      context: overlayPrepared.context,
+      frame: args.renderPasses.overlayFrame,
+      project: args.params.project,
+      images: args.params.imageBank,
+      viewport: {
+        x: overlayPrepared.viewport.offsetX,
+        y: overlayPrepared.viewport.offsetY,
+        width: overlayPrepared.viewport.width,
+        height: overlayPrepared.viewport.height,
+      },
+      composition: {
+        x: overlayPrepared.viewport.offsetX,
+        y: overlayPrepared.viewport.offsetY,
+        scale: overlayPrepared.viewport.scale,
+      },
+    });
+  if (!viewportArtworkOnly || artworkPhase === 'borders')
+    drawCompositionBorders(
+      overlayPrepared.context,
+      args.renderPasses.overlayFrame.viewportBorders,
+      {
+        x: overlayPrepared.viewport.offsetX,
+        y: overlayPrepared.viewport.offsetY,
+        width: overlayPrepared.viewport.width,
+        height: overlayPrepared.viewport.height,
+      },
+      overlayPrepared.viewport.scale
+    );
+  if (viewportArtworkOnly && artworkPhase === 'borders') return;
+  if (!viewportArtworkOnly)
+    drawPreviewSceneOverlays({
+      camera: args.renderPasses.overlayFrame.camera,
+      context: overlayPrepared.context,
+      frame: args.renderPasses.overlayFrame,
+      viewport: overlayPrepared.viewport,
+      logicalSize: { width: args.params.project.width, height: args.params.project.height },
+      rasterScale: overlayPrepared.viewport.scale * overlayPrepared.dpr,
+      spatialRenderer: args.params.spatialRenderer,
+    });
   const { context, viewport } = overlayPrepared;
-  const split = resolveActiveCameraSplit(
-    args.params.project,
-    args.params.currentTime,
-    args.renderPasses.overlayFrame.visualLayers
-  );
+  const split = viewportArtworkOnly
+    ? null
+    : resolveActiveCameraSplit(
+        args.params.project,
+        args.params.currentTime,
+        args.renderPasses.overlayFrame.visualLayers
+      );
   if (split) {
     paintCameraSplitScreen(
       context,
@@ -505,13 +548,13 @@ async function drawResolvedPreviewSceneContent(
       },
       args.params.sampleFps ?? args.params.project.fps
     );
-  return true;
 }
 
 async function resolvePreviewEffectRuntimeFrames(
-  params: Parameters<typeof renderPreviewScene>[0],
+  params: PreviewSceneRenderInput,
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>,
-  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>
+  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>,
+  composeInput?: EffectRuntimeInputComposer
 ): Promise<EffectRuntimeRenderedComposition | undefined> {
   const hasPlans =
     (renderPasses.overlayFrame.effectRuntimePlans ?? []).length > 0 ||
@@ -525,6 +568,7 @@ async function resolvePreviewEffectRuntimeFrames(
   return renderEffectRuntimeComposition({
     project: params.project,
     streamVisualPasses: true,
+    ...(composeInput ? { composeInput } : {}),
     clipMediaElements,
     executor,
     imageBank: params.imageBank,

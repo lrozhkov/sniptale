@@ -1,0 +1,202 @@
+import type { EffectRuntimeGpuPlanResult } from '../../contracts/effect-runtime/types';
+import type { EffectRuntimeGpuPass } from '../../contracts/effect-runtime/gpu-plan';
+import {
+  createGpuPreviewRenderer,
+  GpuPreviewDeviceError,
+  type GpuPreviewGroup,
+  type GpuPreviewLayer,
+  type GpuPreviewRenderer,
+} from '../../features/video/composition/canvas/gpu-preview';
+import {
+  EFFECT_RUNTIME_RESOURCE_LIMITS,
+  EffectRuntimeResourceError,
+} from '../../features/video/composition/effect-runtime/runtime/resource-limits';
+import { buildEffectRuntimeGpuOperationLayers } from './gpu-plan-layers';
+
+type Factory = () => Promise<GpuPreviewRenderer | null>;
+
+/** Own only completed pass/chunk bitmaps. The request owner retains every borrowed wire resource. */
+export function createEffectRuntimeGpuPlanRenderer(options: { rendererFactory?: Factory } = {}) {
+  let pending: Promise<GpuPreviewRenderer | null> | undefined;
+  let renderer: GpuPreviewRenderer | null = null;
+  let disposed = false;
+  let busy = false;
+  let deviceFailed = false;
+  const lifetime = new AbortController();
+  const acquire = () =>
+    (pending ??= (options.rendererFactory ?? createGpuPreviewRenderer)().then((value) => {
+      if (disposed) {
+        value?.dispose();
+        throw new Error('Effect GPU renderer is disposed.');
+      }
+      renderer = value;
+      return value;
+    }));
+  return {
+    async isAvailable(): Promise<boolean> {
+      if (disposed || deviceFailed) return false;
+      try {
+        return (await acquire()) !== null;
+      } catch (error) {
+        if (error instanceof GpuPreviewDeviceError) {
+          deviceFailed = true;
+          return false;
+        }
+        throw error;
+      }
+    },
+    async render(plan: EffectRuntimeGpuPlanResult, signal: AbortSignal): Promise<ImageBitmap> {
+      if (disposed) throw new Error('Effect GPU renderer is disposed.');
+      if (busy) throw new Error('Effect GPU renderer already has a frame in flight.');
+      busy = true;
+      const owned = new Set<ImageBitmap>();
+      const combined = AbortSignal.any([signal, lifetime.signal]);
+      try {
+        combined.throwIfAborted();
+        const gpu = await acquire();
+        combined.throwIfAborted();
+        if (!gpu || deviceFailed)
+          throw new GpuPreviewDeviceError('Effect GPU device is unavailable.');
+        const resources = new Map(plan.resources.map((resource) => [resource.id, resource]));
+        const completed = new Map<number, ImageBitmap>();
+        const lastUse = new Map<number, number>();
+        plan.passes.forEach((pass, index) =>
+          pass.operations.forEach((operation) => {
+            if (operation.op === 'draw' && operation.source.kind === 'pass')
+              lastUse.set(operation.source.id, index);
+          })
+        );
+        const borrowedBytes = plan.resources.reduce(
+          (sum, resource) => sum + resource.width * resource.height * 4,
+          0
+        );
+        const close = (bitmap: ImageBitmap) => {
+          owned.delete(bitmap);
+          bitmap.close();
+        };
+        const submit = async (pass: EffectRuntimeGpuPass, layers: readonly GpuPreviewLayer[]) => {
+          combined.throwIfAborted();
+          const retainedBytes = [...owned].reduce(
+            (sum, bitmap) => sum + bitmap.width * bitmap.height * 4,
+            borrowedBytes
+          );
+          if (
+            retainedBytes + pass.width * pass.height * 4 >
+            EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes
+          )
+            throw new EffectRuntimeResourceError();
+          // The shared renderer settles only after its queue fence, including failed/aborted encodes.
+          const bitmap = await gpu.render({
+            output: { width: pass.width, height: pass.height },
+            logical: { width: pass.width, height: pass.height },
+            layers,
+            signal: combined,
+          });
+          owned.add(bitmap);
+          combined.throwIfAborted();
+          return bitmap;
+        };
+        for (const [index, pass] of plan.passes.entries()) {
+          combined.throwIfAborted();
+          let accumulated: ImageBitmap | undefined;
+          let layers: GpuPreviewLayer[] = [];
+          let recursiveLayers = 0;
+          const flush = async () => {
+            const bitmap = await submit(pass, layers);
+            if (accumulated) close(accumulated);
+            accumulated = bitmap;
+            layers = [bitmapLayer(bitmap, pass)];
+            recursiveLayers = 1;
+          };
+          for (const operation of pass.operations) {
+            const operationLayers = buildEffectRuntimeGpuOperationLayers(
+              operation,
+              { width: pass.width, height: pass.height },
+              (source) => {
+                if (source.kind === 'resource') {
+                  const resource = resources.get(source.id);
+                  if (!resource) throw new Error('Effect GPU resource reference is unavailable.');
+                  return {
+                    source: resource.bitmap,
+                    width: resource.width,
+                    height: resource.height,
+                  };
+                }
+                const bitmap = completed.get(source.id);
+                if (!bitmap) throw new Error('Effect GPU pass reference is unavailable.');
+                return { source: bitmap, width: bitmap.width, height: bitmap.height };
+              },
+              (id) => {
+                const resource = resources.get(id);
+                if (!resource || resource.kind !== 'coverage')
+                  throw new Error('Effect GPU coverage reference is unavailable.');
+                return resource.bitmap;
+              }
+            );
+            if (operationLayers.clear) {
+              layers = [];
+              recursiveLayers = 0;
+              if (accumulated) {
+                close(accumulated);
+                accumulated = undefined;
+              }
+              continue;
+            }
+            const count = countLayers(operationLayers.layers);
+            if (operationLayers.layers.length > 63 || count > 511)
+              throw new Error('Effect GPU operation layer budget exceeded.');
+            if (layers.length + operationLayers.layers.length > 64 || recursiveLayers + count > 512)
+              await flush();
+            layers.push(...operationLayers.layers);
+            recursiveLayers += count;
+          }
+          if (!accumulated || layers.length > 1 || layers[0]?.source !== accumulated) await flush();
+          if (!accumulated) throw new Error('Effect GPU pass did not complete.');
+          completed.set(pass.id, accumulated);
+          for (const [id, bitmap] of completed) {
+            if (id !== plan.rootPass && (lastUse.get(id) ?? -1) <= index) {
+              completed.delete(id);
+              close(bitmap);
+            }
+          }
+        }
+        const root = completed.get(plan.rootPass);
+        if (!root) throw new Error('Effect GPU root pass is unavailable.');
+        combined.throwIfAborted();
+        owned.delete(root);
+        return root;
+      } catch (error) {
+        if (error instanceof GpuPreviewDeviceError) deviceFailed = true;
+        throw error;
+      } finally {
+        for (const bitmap of owned) bitmap.close();
+        busy = false;
+      }
+    },
+    dispose(): void {
+      if (disposed) return;
+      disposed = true;
+      lifetime.abort();
+      renderer?.dispose();
+    },
+  };
+}
+function bitmapLayer(
+  bitmap: ImageBitmap,
+  size: { width: number; height: number }
+): GpuPreviewLayer {
+  return {
+    source: bitmap,
+    rect: { x: 0, y: 0, width: size.width, height: size.height },
+    inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  };
+}
+function countLayers(layers: readonly GpuPreviewLayer[]): number {
+  return layers.reduce(
+    (sum, layer) => sum + 1 + (isGroup(layer.source) ? countLayers(layer.source.layers) : 0),
+    0
+  );
+}
+function isGroup(source: GpuPreviewLayer['source']): source is GpuPreviewGroup {
+  return 'kind' in source && source.kind === 'group';
+}

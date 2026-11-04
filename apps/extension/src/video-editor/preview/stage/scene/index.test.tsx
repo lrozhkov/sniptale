@@ -108,12 +108,28 @@ function createRenderPass() {
 
   return {
     overlayFrame: {
+      effectInputLayers: [],
+      effectRuntimePlans: [],
       actions: [],
       camera,
       cursor: null,
       visualLayers: [],
     },
-    visualPasses: [{ alpha: 1, frame: { camera, visualLayers: [] }, time: 0 }],
+    visualPasses: [
+      {
+        alpha: 1,
+        frame: {
+          actions: [],
+          camera,
+          cursor: null,
+          effectInputLayers: [],
+          effectRuntimePlans: [],
+          visualLayers: [],
+        },
+        time: 0,
+        transitionOverlays: [],
+      },
+    ],
   };
 }
 
@@ -154,6 +170,9 @@ async function renderSceneHarness(
         videoRefs={videoRefs}
       />
     );
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
   });
 }
 
@@ -224,6 +243,7 @@ function installSceneHarnessEnvironment() {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   installSceneHarnessEnvironment();
 });
 
@@ -237,6 +257,7 @@ afterEach(() => {
   canvasContextMock = null;
   restoreCanvasEnvironment();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function restoreDescriptor(target: object, key: string, descriptor?: PropertyDescriptor) {
@@ -258,6 +279,9 @@ describe('preview-stage/scene', () => {
     await act(async () => {
       video.dispatchEvent(new Event('seeked'));
     });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
 
     expect(resolveVideoCompositionRenderPassesMock.mock.calls.length).toBeGreaterThan(
       initialCallCount
@@ -275,10 +299,41 @@ describe('preview-stage/scene', () => {
 
     vi.stubGlobal('OffscreenCanvas', OffscreenCanvasMock as unknown as typeof OffscreenCanvas);
     resolveVideoCompositionRenderPassesMock.mockReturnValue({
-      overlayFrame: { actions: [], camera, cursor: null, visualLayers: [] },
+      overlayFrame: {
+        actions: [],
+        camera,
+        cursor: null,
+        effectInputLayers: [],
+        effectRuntimePlans: [],
+        visualLayers: [],
+      },
       visualPasses: [
-        { alpha: 0.4, frame: { camera, visualLayers: [] }, time: 0 },
-        { alpha: 0.6, frame: { camera, visualLayers: [] }, time: 0.04 },
+        {
+          alpha: 0.4,
+          frame: {
+            actions: [],
+            camera,
+            cursor: null,
+            effectInputLayers: [],
+            effectRuntimePlans: [],
+            visualLayers: [],
+          },
+          time: 0,
+          transitionOverlays: [],
+        },
+        {
+          alpha: 0.6,
+          frame: {
+            actions: [],
+            camera,
+            cursor: null,
+            effectInputLayers: [],
+            effectRuntimePlans: [],
+            visualLayers: [],
+          },
+          time: 0.04,
+          transitionOverlays: [],
+        },
       ],
     });
 

@@ -21,11 +21,15 @@ self.onmessage = (event: MessageEvent<unknown>) => {
     return;
   }
   void executionState.execute(event.data).then((result) => {
-    const transfer = collectEffectRuntimeResultBitmaps(result);
+    const transfer =
+      result.kind === 'gpu-plan'
+        ? [...new Set(result.resources.map(({ bitmap }) => bitmap))]
+        : collectEffectRuntimeResultBitmaps(result);
     try {
       self.postMessage({ result, type: EFFECT_RUNTIME_WORKER_RESPONSE }, { transfer });
     } catch {
-      closeEffectRuntimeBitmaps(result);
+      if (result.kind === 'gpu-plan') for (const bitmap of transfer) bitmap.close();
+      else closeEffectRuntimeBitmaps(result);
     }
   });
 };

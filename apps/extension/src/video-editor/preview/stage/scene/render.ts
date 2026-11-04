@@ -18,6 +18,7 @@ import type { PreviewStageCanvasSceneParams } from './types';
 import { createVideoPreviewRenderRevision } from '../../cache/revision';
 import { renderPreviewSceneWithExactCache } from '../../cache/render';
 import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
+import { createNativeGpuPreviewRenderer } from './gpu-preview';
 
 export function usePreviewStageCanvasRender(
   params: PreviewStageCanvasSceneParams & {
@@ -176,6 +177,7 @@ function usePreviewRenderSchedulerRef(
   );
   const stagingRef = useRef<HTMLCanvasElement | null>(null);
   const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
+  const gpuRef = useRef<ReturnType<typeof createNativeGpuPreviewRenderer> | null>(null);
   const retryRef = useRef(retryVersion);
   if (!schedulerRef.current) {
     const captionRenderer = createVideoProjectCaptionRenderer();
@@ -189,6 +191,8 @@ function usePreviewRenderSchedulerRef(
         const spatial = spatialRef.current;
         spatialRef.current = null;
         spatial?.dispose();
+        gpuRef.current?.dispose();
+        gpuRef.current = null;
         feedbackRef.current.onFailure('visual', error);
       },
       onSuccess: (job) => {
@@ -202,8 +206,10 @@ function usePreviewRenderSchedulerRef(
       render: (job) => {
         const render = (input: Parameters<typeof renderPreviewScene>[0]) => {
           joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(renderPreviewScene);
+          gpuRef.current ??= createNativeGpuPreviewRenderer();
           return joinsRef.current.render({
             ...input,
+            gpuPreview: gpuRef.current,
             captionRenderer,
             watermarkRenderer,
             spatialRenderer: () => {
@@ -249,6 +255,8 @@ function usePreviewRenderSchedulerRef(
     const spatial = spatialRef.current;
     spatialRef.current = null;
     spatial?.dispose();
+    gpuRef.current?.dispose();
+    gpuRef.current = null;
   }, [retryVersion]);
   useEffect(() => {
     const scheduler = schedulerRef.current;
@@ -261,6 +269,8 @@ function usePreviewRenderSchedulerRef(
       const spatial = spatialRef.current;
       spatialRef.current = null;
       spatial?.dispose();
+      gpuRef.current?.dispose();
+      gpuRef.current = null;
       if (stagingRef.current) {
         stagingRef.current.width = 0;
         stagingRef.current.height = 0;

@@ -23,36 +23,24 @@ export function drawEffectRuntimeVisualLayer(args: {
   state: EffectRuntimeDrawState;
 }): boolean {
   if (args.layer.effectActionsOnly) return false;
-  const group = findGroupFrame(args.frames, args.layer.clipId);
-  if (group) {
-    const key = `group:${group.effectInstanceId}`;
-    if (!args.state.drawnTransitionIds.has(key)) {
-      args.state.drawnTransitionIds.add(key);
-      drawFullFrame(args.context, group, args.scaleX, args.scaleY, args.alpha ?? 1);
-    }
-    return true;
+  const selected = resolveEffectRuntimeVisualLayerFrame(args.frames, args.layer);
+  if (!selected) return false;
+  if (selected.deduplicationKey) {
+    if (args.state.drawnTransitionIds.has(selected.deduplicationKey)) return true;
+    args.state.drawnTransitionIds.add(selected.deduplicationKey);
   }
-  const transition = findTransitionFrame(args.frames, args.layer.clipId);
-  if (transition && transition.target.kind === 'transition') {
-    if (!args.state.drawnTransitionIds.has(transition.target.transitionId)) {
-      args.state.drawnTransitionIds.add(transition.target.transitionId);
-      drawFullFrame(args.context, transition, args.scaleX, args.scaleY, args.alpha ?? 1);
-    }
-    return true;
-  }
-  const frame =
-    findTargetFrame(args.frames, args.layer.clipId) ??
-    findStandaloneFrame(args.frames, args.layer.clipId);
-  if (!frame) return false;
-  drawCompositionVisualLayerBitmap(
-    args.context,
-    args.layer,
-    frame.bitmap,
-    args.scaleX,
-    args.scaleY,
-    args.alpha,
-    frame.bitmapBounds
-  );
+  if (selected.fullFrame)
+    drawFullFrame(args.context, selected.frame, args.scaleX, args.scaleY, args.alpha ?? 1);
+  else
+    drawCompositionVisualLayerBitmap(
+      args.context,
+      args.layer,
+      selected.frame.bitmap,
+      args.scaleX,
+      args.scaleY,
+      args.alpha,
+      selected.frame.bitmapBounds
+    );
   return true;
 }
 
@@ -162,4 +150,20 @@ export function resolveEffectRuntimeVisualLayers(
     seen.add(group.effectInstanceId);
     return [{ ...layer, effectViewportRaster: true }, ...actions];
   });
+}
+
+/** Resolves draw precedence only; full-frame transition rasters are not implicitly viewport-locked. */
+export function resolveEffectRuntimeVisualLayerFrame(
+  frames: EffectRuntimeRenderedFrameMap | undefined,
+  layer: VideoCompositionVisualLayer
+): { frame: EffectRuntimeRenderedFrame; fullFrame: boolean; deduplicationKey?: string } | null {
+  if (layer.effectActionsOnly) return null;
+  const group = findGroupFrame(frames, layer.clipId);
+  if (group)
+    return { frame: group, fullFrame: true, deduplicationKey: `group:${group.effectInstanceId}` };
+  const transition = findTransitionFrame(frames, layer.clipId);
+  if (transition?.target.kind === 'transition')
+    return { frame: transition, fullFrame: true, deduplicationKey: transition.target.transitionId };
+  const frame = findTargetFrame(frames, layer.clipId) ?? findStandaloneFrame(frames, layer.clipId);
+  return frame ? { frame, fullFrame: false } : null;
 }

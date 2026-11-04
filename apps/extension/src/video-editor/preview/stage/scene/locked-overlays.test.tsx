@@ -108,12 +108,28 @@ function createRenderPass() {
 
   return {
     overlayFrame: {
+      effectInputLayers: [],
+      effectRuntimePlans: [],
       actions: [],
       camera,
       cursor: null,
       visualLayers: [],
     },
-    visualPasses: [{ alpha: 1, frame: { camera, visualLayers: [] }, time: 0 }],
+    visualPasses: [
+      {
+        alpha: 1,
+        frame: {
+          actions: [],
+          camera,
+          cursor: null,
+          effectInputLayers: [],
+          effectRuntimePlans: [],
+          visualLayers: [],
+        },
+        time: 0,
+        transitionOverlays: [],
+      },
+    ],
   };
 }
 
@@ -246,6 +262,8 @@ function createLockedVisualLayers() {
 function setLockedAnnotationRenderPass() {
   const baseCamera = createRenderPass().overlayFrame.camera;
   const overlayFrame = {
+    effectInputLayers: [],
+    effectRuntimePlans: [],
     actions: [],
     camera: {
       ...baseCamera,

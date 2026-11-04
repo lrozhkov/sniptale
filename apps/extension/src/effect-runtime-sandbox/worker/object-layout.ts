@@ -8,7 +8,8 @@ import type { EffectRuntimeGraphFrameContext, RuntimeCanvasContext } from './mod
 export function applyEffectObjectLayout(
   layout: EffectV1ObjectLayout | undefined,
   context: EffectRuntimeGraphFrameContext,
-  canvas: RuntimeCanvasContext
+  canvas: RuntimeCanvasContext,
+  observeClip?: (rect: { x: number; y: number; width: number; height: number }) => void
 ): EffectRuntimeGraphFrameContext {
   if (!layout) return context;
   const scaled = layout.resize === 'scale';
@@ -22,6 +23,7 @@ export function applyEffectObjectLayout(
   );
   canvas.scale(scale, scale);
   canvas.beginPath();
+  observeClip?.(bounds);
   canvas.rect(bounds.x, bounds.y, bounds.width, bounds.height);
   canvas.clip();
   return scaled ? { ...context, width: layout.width, height: layout.height } : context;

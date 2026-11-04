@@ -1,3 +1,4 @@
+import { createMaterializerGpuComposer } from './materializer-gpu';
 import { createRecordingEventsRenderer } from '../../../workflows/video-review/recording-events';
 import { createCompositionCutSampleSource } from '../../../workflows/video-review/decoded-video-sample';
 import { createRecordingCursorTrajectoryRenderer } from '../../../workflows/video-review/cursor-trajectory';
@@ -35,6 +36,8 @@ import {
 import type { VideoProject } from '../../../features/video/project/types';
 import { createVideoEditorEffectRuntime } from '../../runtime/effect-runtime';
 import { renderPreviewScene } from '../stage/scene/render-preview';
+import { createNativeGpuPreviewRenderer } from '../stage/scene/gpu-preview';
+
 import { createVideoProjectCaptionRenderer } from '../../../workflows/video-review/project-captions';
 import type { VideoEditorPreviewRasterSize } from '../stage/sizing/raster';
 
@@ -58,6 +61,8 @@ export interface VideoPreviewFrameMaterializer {
 interface VideoPreviewMaterializerState {
   disposed: boolean;
   playbackSampler: ReturnType<typeof createCompositionCutSampleSource> | null;
+  playbackSamplerConversion: 'canvas' | 'native';
+  gpuPreview: ReturnType<typeof createNativeGpuPreviewRenderer>;
   spatialRenderer: ReviewSpatialRenderer | null;
   stagingCanvas: HTMLCanvasElement | null;
   captionRenderer: ReturnType<typeof createVideoProjectCaptionRenderer>;
@@ -307,12 +312,17 @@ function createMaterializedJoinPresentation(
     createCanvas: () => params.ownerDocument.createElement('canvas'),
   });
   let cutSampler: ReturnType<typeof createCompositionCutSampleSource> | undefined;
+  let cutSamplerConversion: 'canvas' | 'native' = 'canvas';
   let cutPlan: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>[number] | undefined;
   let cutPlans = plans.filter(({ boundary }) => boundary.sampling === 'cut');
   let nestedCuts: ReturnType<typeof createMaterializedJoinPresentation> | undefined;
   let disposed = false;
   let cameraOverride: VideoCompositionCameraState | undefined;
   let busy = false;
+  const gpuComposer = createMaterializerGpuComposer(
+    params.rasterSize,
+    () => disposed || state.disposed
+  );
   const renderSample = async (time: number, signal: AbortSignal) => {
     if (!cutPlan) {
       if (resolveActiveVideoProjectCompositionJoinPlan(cutPlans, time)) {
@@ -337,7 +347,14 @@ function createMaterializedJoinPresentation(
         'omit'
       );
     }
+    const conversion = state.gpuPreview.acceptsNativeFrames ? 'native' : 'canvas';
+    if (cutSamplerConversion !== conversion) {
+      cutSampler?.dispose();
+      cutSampler = undefined;
+      cutSamplerConversion = conversion;
+    }
     cutSampler ??= createCompositionCutSampleSource({
+      conversion,
       project: params.project,
       sourceUrl: (clip) => params.assetUrls[clip.assetId],
     });
@@ -373,6 +390,24 @@ function createMaterializedJoinPresentation(
   const endpoints = createCompositionJoinEndpoints({
     resources,
     size: params.rasterSize,
+    compose: ({ context, outgoing, incoming, incomingWeight, sampling, signal }) => {
+      const rect = { x: 0, y: 0, ...params.rasterSize };
+      const inverse = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
+      return gpuComposer.compose(
+        context,
+        [
+          { source: outgoing, rect, inverse, opacity: sampling === 'cut' ? 1 : 1 - incomingWeight },
+          {
+            source: incoming,
+            rect,
+            inverse,
+            opacity: incomingWeight,
+            blend: sampling === 'cut' ? 'over' : 'add',
+          },
+        ],
+        signal
+      );
+    },
     renderSample: async (time, signal) => ({
       canvas: await renderSample(time, signal),
       release() {},
@@ -394,6 +429,7 @@ function createMaterializedJoinPresentation(
       nestedCuts?.dispose();
       cutSampler?.dispose();
       resources.dispose();
+      gpuComposer.dispose();
     },
     async renderFrame(time: number, signal: AbortSignal, nextCamera?: VideoCompositionCameraState) {
       throwIfAborted(signal);
@@ -449,23 +485,46 @@ function createMaterializedJoinPresentation(
         } else {
           endpoints.clear();
           await renderSample(time, signal);
-          drawCompositionColorOverlay(
-            context,
-            blend.black,
-            plan.boundary.transition?.color ?? '#000000'
-          );
         }
         throwIfAborted(signal);
         if (state.disposed)
           throw new DOMException('Preview preparation was cancelled', 'AbortError');
-        if (sceneEdges !== 'omit')
-          drawVideoProjectSceneEdges(
-            context,
-            params.project,
-            time,
-            undefined,
-            params.sampleFps ?? params.project.fps
-          );
+        const artwork = params.ownerDocument.createElement('canvas');
+        artwork.width = params.rasterSize.width;
+        artwork.height = params.rasterSize.height;
+        try {
+          const overlay = artwork.getContext('2d');
+          if (!overlay) throw new Error('Composition edge artwork is unavailable.');
+          if (plan.boundary.transition?.type !== 'dissolve')
+            drawCompositionColorOverlay(
+              overlay,
+              blend.black,
+              plan.boundary.transition?.color ?? '#000000'
+            );
+          if (sceneEdges !== 'omit')
+            drawVideoProjectSceneEdges(
+              overlay,
+              params.project,
+              time,
+              undefined,
+              params.sampleFps ?? params.project.fps
+            );
+          const rect = { x: 0, y: 0, ...params.rasterSize };
+          const inverse = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
+          if (
+            !(await gpuComposer.compose(
+              context,
+              [
+                { source: canvas, rect, inverse },
+                { source: artwork, rect, inverse },
+              ],
+              signal
+            ))
+          )
+            context.drawImage(artwork, 0, 0);
+        } finally {
+          artwork.width = artwork.height = 0;
+        }
         return canvas;
       } catch (error) {
         endpoints.clear();
@@ -483,6 +542,8 @@ function createMaterializerMediaState(
   const state: VideoPreviewMaterializerState = {
     disposed: false,
     playbackSampler: null,
+    playbackSamplerConversion: 'canvas',
+    gpuPreview: createNativeGpuPreviewRenderer(),
     spatialRenderer: null,
     stagingCanvas: null,
     captionRenderer: createVideoProjectCaptionRenderer(),
@@ -531,6 +592,7 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
   state.effectRuntime?.dispose();
   state.playbackSampler?.dispose();
   state.playbackSampler = null;
+  state.gpuPreview.dispose();
   state.captionRenderer.clear();
   state.cursorTrajectoryRenderer.clear();
   state.recordingEventsRenderer.clear();
@@ -565,7 +627,14 @@ async function renderMaterializedFrame(
         (clip) => clip.type === 'VIDEO' && clip.playbackWindow && isClipActiveAtTime(clip, time)
       )
     ) {
+      const conversion = state.gpuPreview.acceptsNativeFrames ? 'native' : 'canvas';
+      if (state.playbackSamplerConversion !== conversion) {
+        state.playbackSampler?.dispose();
+        state.playbackSampler = null;
+        state.playbackSamplerConversion = conversion;
+      }
       state.playbackSampler ??= createCompositionCutSampleSource({
+        conversion,
         project: params.project,
         sourceUrl: (clip) => params.assetUrls[clip.assetId],
       });
@@ -585,6 +654,7 @@ async function renderMaterializedFrame(
     const renderProject = await state.cursorTrajectoryRenderer.prepare(eventsProject, time);
     assertActive();
     const drawn = await renderPreviewScene({
+      gpuPreview: state.gpuPreview,
       sampleFps: params.sampleFps ?? params.project.fps,
       ...(sceneEdges === 'omit' ? { sceneEdges } : {}),
       captionRenderer: state.captionRenderer,

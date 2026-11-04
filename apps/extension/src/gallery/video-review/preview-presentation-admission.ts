@@ -1,3 +1,4 @@
+import { reviewGpuPreviewAllocation } from '../../workflows/video-review/gpu-preview-geometry';
 import { createPreviewRenderResources } from '../../workflows/video-review/preview-render-resources';
 import {
   calculatePreviewRenderAllocation,
@@ -50,7 +51,18 @@ export function createPresentationAdmission(
       assets,
     });
   };
-  const admit = () => resources.replaceLimits(calculatePreviewRenderAllocation(graph()));
+  const admit = () => {
+    const limits = calculatePreviewRenderAllocation(graph());
+    const current = description();
+    const gpu =
+      current && typeof navigator !== 'undefined' && navigator.gpu
+        ? reviewGpuPreviewAllocation(current.scene, current.dimensions)
+        : { maximumManagedBytes: 0, maximumCanvases: 0 };
+    resources.replaceLimits({
+      maximumManagedBytes: limits.maximumManagedBytes + gpu.maximumManagedBytes,
+      maximumCanvases: limits.maximumCanvases + gpu.maximumCanvases,
+    });
+  };
   const cameraResources: RenderResources = {
     canvas: (role, size, options) => resources.canvas(role, size, options),
     bytes(role, count) {

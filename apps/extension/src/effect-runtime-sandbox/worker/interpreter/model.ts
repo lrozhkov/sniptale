@@ -30,7 +30,40 @@ export type RenderState = {
   passes: Map<string, RuntimeCanvas>;
   runtime: EffectRuntimeInterpreter;
   scope: EffectV1EvaluationScope<EffectRuntimeGraphFrameContext>;
+  target?: EffectRuntimeDrawingTarget;
 };
+
+export interface EffectRuntimeDrawingTarget {
+  primitive(state: Pick<RenderState, 'canvas' | 'context'>, draw: () => void): void;
+  paint(
+    state: Pick<RenderState, 'canvas' | 'context'>,
+    draw: () => void,
+    bounds?: import('../canvas/primitive-bounds').PrimitiveGeometry,
+    stroke?: number
+  ): void;
+  image(
+    state: Pick<RenderState, 'canvas' | 'context'>,
+    asset: RuntimeBitmapAsset,
+    args: DrawImageAssetArgs
+  ): void;
+  composite(
+    state: Pick<RenderState, 'canvas' | 'context'>,
+    pass: RuntimeCanvas,
+    destination: { x: number; y: number; width: number; height: number }
+  ): void;
+  clip(
+    state: Pick<RenderState, 'canvas' | 'context'>,
+    rect: { x: number; y: number; width: number; height: number },
+    draw: () => void
+  ): void;
+  observeClip(
+    canvas: RuntimeCanvas,
+    context: RuntimeCanvasContext,
+    rect: { x: number; y: number; width: number; height: number }
+  ): void;
+  clear(state: Pick<RenderState, 'canvas' | 'context'>): void;
+  isRawContext(context: RuntimeCanvasContext): boolean;
+}
 
 export function resolveCommandLayer(
   command: EffectV1Command,

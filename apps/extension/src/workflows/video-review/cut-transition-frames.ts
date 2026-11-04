@@ -6,8 +6,13 @@ import type {
 /** Decoded raster with its actual presentation timestamp; a seek request is not frame authority. */
 export interface ReviewTransitionSample {
   timestamp: number;
+  /** SDK orientation is separate from the owned VideoFrame clone. */
+  readonly rotation?: 0 | 90 | 180 | 270;
+  readonly flip?: boolean;
   /** Actual decoded payload accounting, available on native VideoSample instances. */
   allocationSize?(): number;
+  /** Returns an owned frame clone; the GPU consumer closes it after completion. */
+  toVideoFrame?(): VideoFrame;
   draw(
     context: CanvasRenderingContext2D,
     x: number,
@@ -153,7 +158,7 @@ export function createReviewTransitionFrames(sink: FrameSink, signal: AbortSigna
 export function reviewCutTransitionSides(
   blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>,
   frames: ReviewTransitionFrames,
-  moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw'>,
+  moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw' | 'toVideoFrame' | 'rotation' | 'flip'>,
   resultTime: number,
   resultOffset = 0
 ) {

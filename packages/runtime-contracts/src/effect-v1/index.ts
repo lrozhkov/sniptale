@@ -9,6 +9,7 @@ export { resolveEffectV1InputContract } from './model/inputs.js';
 export { normalizeEffectV1ToTemplate } from './model/normalization.js';
 export { EFFECT_V1_JSON_SCHEMA } from './model/schema.js';
 export { parseEffectV1Source, validateEffectV1Document } from './validation/index.js';
+export { EFFECT_V1_GRAPH_LIMITS } from './graph/command.js';
 export type {
   ControlDefinition,
   EffectClip,

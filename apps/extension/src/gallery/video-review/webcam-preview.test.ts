@@ -253,6 +253,8 @@ it.each([10, Infinity])(
     expect(capture.status).toBe('ready');
     if (capture.status !== 'ready') throw new Error('Expected admitted frame');
     expect(capture.frame.representedMediaTime).toBe(0.01);
+    expect(capture.frame.drawable.videoFrame?.()).toBe(frames.instances[1]);
+    expect(frames.instances[1]!.close).not.toHaveBeenCalled();
     const drawImage = vi.fn();
     const context = { drawImage } as unknown as CanvasRenderingContext2D;
     frames.timestamp(900000);

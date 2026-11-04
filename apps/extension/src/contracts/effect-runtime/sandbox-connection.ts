@@ -29,6 +29,17 @@ export function readEffectRuntimeSandboxConnectionNonce(hash: string): string | 
   return isEffectRuntimeSandboxConnectionNonce(nonce) ? nonce : null;
 }
 
+/** The owned page query selects composition without changing the nonce capability. */
+export function readEffectRuntimeCompositionBackend(
+  search: string
+): 'canvas' | 'gpu-preview' | null {
+  const fields = [...new URLSearchParams(search)];
+  if (fields.length === 0) return 'canvas';
+  if (fields.length === 1 && fields[0]?.[0] === 'composition' && fields[0][1] === 'gpu-preview')
+    return 'gpu-preview';
+  return null;
+}
+
 export function isEffectRuntimeSandboxReady(value: unknown, connectionNonce: string): boolean {
   return (
     isRecord(value) &&

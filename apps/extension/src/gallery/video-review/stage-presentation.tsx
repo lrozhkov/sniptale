@@ -105,7 +105,8 @@ export function useStagePresentation(
   props: PresentationProps,
   publication: RefObject<HTMLDivElement | null>,
   watermarkOutput: { width: number; height: number },
-  size: { width: number; height: number }
+  size: { width: number; height: number },
+  onGeometry?: PreviewInput['onGeometry']
 ) {
   const [interacting, setInteracting] = useState(false);
   useEffect(() => {
@@ -126,6 +127,7 @@ export function useStagePresentation(
   }, []);
   const presentation = useReviewPreviewPresentation({
     video: props.video,
+    ...(onGeometry ? { onGeometry } : {}),
     host: publication,
     sourceIdentity: props.url,
     ...(props.readAsset ? { readAsset: props.readAsset } : {}),
@@ -137,6 +139,7 @@ export function useStagePresentation(
     preferences: props.preview?.preferences ?? DEFAULT_QUICK_PREVIEW_PREFERENCES,
     playing: props.preview?.playing ?? false,
     interacting: interacting || !!props.preview?.interacting,
+    deferFrames: !(props.preview?.playing ?? false) && !!props.preview?.interacting && !interacting,
     visible: true,
     pausedSourceTime: props.comments?.time ?? props.video.current?.currentTime ?? 0,
     pausedResultTime: props.scene?.focus?.time ?? 0,

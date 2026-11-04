@@ -1,91 +1,80 @@
-import type { EffectV1Command, EffectV1PathSegment } from '@sniptale/runtime-contracts/effect-v1';
-
+import type { EffectV1Command } from '@sniptale/runtime-contracts/effect-v1';
+import { primitivePointBounds, type PrimitiveGeometry } from '../canvas/primitive-bounds';
 import { n, type RenderState } from './model.js';
 
 type PathCommand = Extract<EffectV1Command, { op: 'path' }>;
-type Segment<Kind extends EffectV1PathSegment['kind']> = Extract<
-  EffectV1PathSegment,
-  { kind: Kind }
->;
 
-export function drawCanvasPathSegments(command: PathCommand, state: RenderState): void {
-  if (!command.segments) return;
-  state.context.beginPath();
-  for (const segment of command.segments) drawSegment(segment, state);
-  if (command.closed) state.context.closePath();
-}
-
-function drawSegment(segment: EffectV1PathSegment, state: RenderState): void {
-  const context = state.context;
-  if (segment.kind === 'moveTo') context.moveTo(n(segment.x, state), n(segment.y, state));
-  else if (segment.kind === 'lineTo') context.lineTo(n(segment.x, state), n(segment.y, state));
-  else if (segment.kind === 'quadraticTo') drawQuadratic(segment, state);
-  else if (segment.kind === 'cubicTo') drawCubic(segment, state);
-  else if (segment.kind === 'arc') drawArc(segment, state);
-  else if (segment.kind === 'ellipse') drawEllipse(segment, state);
-  else if (segment.kind === 'rect') drawRect(segment, state);
-  else if (segment.kind === 'roundRect') drawRoundRect(segment, state);
-}
-
-function drawQuadratic(segment: Segment<'quadraticTo'>, state: RenderState): void {
-  state.context.quadraticCurveTo(
-    n(segment.cpx, state),
-    n(segment.cpy, state),
-    n(segment.x, state),
-    n(segment.y, state)
-  );
-}
-
-function drawCubic(segment: Segment<'cubicTo'>, state: RenderState): void {
-  state.context.bezierCurveTo(
-    n(segment.cp1x, state),
-    n(segment.cp1y, state),
-    n(segment.cp2x, state),
-    n(segment.cp2y, state),
-    n(segment.x, state),
-    n(segment.y, state)
-  );
-}
-
-function drawArc(segment: Segment<'arc'>, state: RenderState): void {
-  state.context.arc(
-    n(segment.centerX, state),
-    n(segment.centerY, state),
-    n(segment.radius, state),
-    n(segment.start, state),
-    n(segment.end, state),
-    segment.counterclockwise === true
-  );
-}
-
-function drawEllipse(segment: Segment<'ellipse'>, state: RenderState): void {
-  state.context.ellipse(
-    n(segment.centerX, state),
-    n(segment.centerY, state),
-    n(segment.radiusX, state),
-    n(segment.radiusY, state),
-    n(segment.rotation, state),
-    n(segment.start, state),
-    n(segment.end, state),
-    segment.counterclockwise === true
-  );
-}
-
-function drawRect(segment: Segment<'rect'>, state: RenderState): void {
-  state.context.rect(
-    n(segment.x, state),
-    n(segment.y, state),
-    n(segment.width, state),
-    n(segment.height, state)
-  );
-}
-
-function drawRoundRect(segment: Segment<'roundRect'>, state: RenderState): void {
-  state.context.roundRect(
-    n(segment.x, state),
-    n(segment.y, state),
-    n(segment.width, state),
-    n(segment.height, state),
-    n(segment.radius, state)
-  );
+/** Draw the original native path and retain the hull of the same evaluated operands. */
+export function drawCanvasPathSegments(
+  command: PathCommand,
+  state: RenderState
+): PrimitiveGeometry {
+  if (!command.segments) return null;
+  const points: { x: number; y: number }[] = [];
+  const c = state.context;
+  const add = (x: number, y: number) => {
+    points.push({ x, y });
+  };
+  c.beginPath();
+  for (const segment of command.segments) {
+    if (segment.kind === 'moveTo' || segment.kind === 'lineTo') {
+      const x = n(segment.x, state),
+        y = n(segment.y, state);
+      add(x, y);
+      if (segment.kind === 'moveTo') c.moveTo(x, y);
+      else c.lineTo(x, y);
+    } else if (segment.kind === 'quadraticTo') {
+      const cx = n(segment.cpx, state),
+        cy = n(segment.cpy, state),
+        x = n(segment.x, state),
+        y = n(segment.y, state);
+      add(cx, cy);
+      add(x, y);
+      c.quadraticCurveTo(cx, cy, x, y);
+    } else if (segment.kind === 'cubicTo') {
+      const x1 = n(segment.cp1x, state),
+        y1 = n(segment.cp1y, state),
+        x2 = n(segment.cp2x, state),
+        y2 = n(segment.cp2y, state),
+        x = n(segment.x, state),
+        y = n(segment.y, state);
+      add(x1, y1);
+      add(x2, y2);
+      add(x, y);
+      c.bezierCurveTo(x1, y1, x2, y2, x, y);
+    } else if (segment.kind === 'arc') {
+      const x = n(segment.centerX, state),
+        y = n(segment.centerY, state),
+        r = n(segment.radius, state),
+        start = n(segment.start, state),
+        end = n(segment.end, state);
+      add(x - r, y - r);
+      add(x + r, y + r);
+      c.arc(x, y, r, start, end, segment.counterclockwise === true);
+    } else if (segment.kind === 'ellipse') {
+      const x = n(segment.centerX, state),
+        y = n(segment.centerY, state),
+        rx = n(segment.radiusX, state),
+        ry = n(segment.radiusY, state),
+        rotation = n(segment.rotation, state),
+        start = n(segment.start, state),
+        end = n(segment.end, state);
+      const ex = Math.hypot(rx * Math.cos(rotation), ry * Math.sin(rotation)),
+        ey = Math.hypot(rx * Math.sin(rotation), ry * Math.cos(rotation));
+      add(x - ex, y - ey);
+      add(x + ex, y + ey);
+      c.ellipse(x, y, rx, ry, rotation, start, end, segment.counterclockwise === true);
+    } else if (segment.kind === 'rect' || segment.kind === 'roundRect') {
+      const x = n(segment.x, state),
+        y = n(segment.y, state),
+        w = n(segment.width, state),
+        h = n(segment.height, state);
+      add(x, y);
+      add(x + w, y + h);
+      if (segment.kind === 'rect') c.rect(x, y, w, h);
+      else c.roundRect(x, y, w, h, n(segment.radius, state));
+    }
+  }
+  if (command.closed) c.closePath();
+  return points.length ? primitivePointBounds(points) : null;
 }

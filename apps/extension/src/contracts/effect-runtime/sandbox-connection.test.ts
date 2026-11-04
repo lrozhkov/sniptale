@@ -3,11 +3,39 @@ import { expect, it } from 'vitest';
 import {
   createEffectRuntimeSandboxUrl,
   isEffectRuntimeSandboxReady,
+  readEffectRuntimeCompositionBackend,
   readEffectRuntimeSandboxConnectionNonce,
 } from './sandbox-connection';
 import { EFFECT_RUNTIME_SANDBOX_READY_MESSAGE } from './types';
 
 const CONNECTION_NONCE = '133a130d-543f-4b31-a4ba-52ec1c16505d';
+
+it.each([
+  ['', 'canvas'],
+  ['?', 'canvas'],
+  ['?composition=gpu-preview', 'gpu-preview'],
+  ['?composition=canvas', null],
+  ['?composition=unknown', null],
+  ['?composition=gpu-preview&composition=gpu-preview', null],
+  ['?composition=gpu-preview&extra=1', null],
+  ['?extra=1', null],
+])('admits only the owned composition selector %s', (query, expected) => {
+  expect(readEffectRuntimeCompositionBackend(query)).toBe(expected);
+});
+
+it('keeps composition selection separate from the exact connection nonce', () => {
+  const url = new URL(
+    createEffectRuntimeSandboxUrl(
+      'chrome-extension://test/effect-runtime-sandbox.html?composition=gpu-preview',
+      CONNECTION_NONCE
+    )
+  );
+  expect(readEffectRuntimeCompositionBackend(url.search)).toBe('gpu-preview');
+  expect(readEffectRuntimeSandboxConnectionNonce(url.hash)).toBe(CONNECTION_NONCE);
+  expect([...new URLSearchParams(url.hash.slice(1))]).toEqual([
+    ['connectionNonce', CONNECTION_NONCE],
+  ]);
+});
 
 it('round-trips one authenticated sandbox capability in the URL fragment', () => {
   const url = createEffectRuntimeSandboxUrl(

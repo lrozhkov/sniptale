@@ -3,6 +3,7 @@ import { createEffectHostClip } from '../../../project/factories/overlay-clip';
 import { disposeEffectRuntimeComposition } from './rendered';
 import {
   EFFECT_RUNTIME_RESOURCE_LIMITS,
+  closeEffectRuntimeBitmap,
   type EffectRuntimeFrameResourceScope,
 } from '../runtime/resource-limits';
 import { createEffectRuntimeInputMaterializer } from '../frame/inputs';
@@ -753,3 +754,44 @@ it.each(['dispose', 'failure'] as const)(
     for (const scope of scopes) expect(scope.snapshot().liveRasterResources).toBe(0);
   }
 );
+
+it('binds GPU input composition to each exposure frame and its exact timestamp', async () => {
+  const composeInput = vi.fn(async () => new FakeBitmap(10, 10));
+  const frame = createFrame([createPlan('reader')]);
+  const sampled = { ...frame, camera: { ...frame.camera, scale: 2 } };
+  const args = {
+    executor,
+    imageBank: {},
+    clipMediaElements: new Map(),
+    overlayFrame: frame,
+    overlayTime: 1,
+    visualPasses: [createPass(0.9, sampled)],
+    composeInput,
+  };
+  renderPlans.mockImplementation(
+    async ({
+      inputMaterializer,
+    }: {
+      inputMaterializer: ReturnType<typeof createEffectRuntimeInputMaterializer>;
+    }) => {
+      const plan = {
+        ...createPlan('input'),
+        kind: 'targetEffect' as const,
+        target: { kind: 'video-group' as const, clipIds: [] },
+      };
+      const bitmap = await inputMaterializer.materializeTargetSource(plan);
+      closeEffectRuntimeBitmap(bitmap);
+      return new Map();
+    }
+  );
+  const rendered = await renderEffectRuntimeComposition(args);
+  expect(composeInput).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ frame, time: 1, camera: frame.camera })
+  );
+  expect(composeInput).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ frame: sampled, time: 0.9, camera: sampled.camera })
+  );
+  disposeEffectRuntimeComposition(rendered);
+});

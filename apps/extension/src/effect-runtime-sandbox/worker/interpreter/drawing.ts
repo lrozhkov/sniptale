@@ -1,10 +1,11 @@
 import type { EffectV1Command } from '@sniptale/runtime-contracts/effect-v1';
 
-import type { RuntimeBitmapAsset } from '../assets/render-assets.js';
+import type { RuntimeBitmapAsset, DrawImageAssetArgs } from '../assets/render-assets.js';
 import type { RuntimeCanvasContext, RuntimeLayerState } from '../model/types.js';
 import { n, type RenderState, valueOr } from './model.js';
 import { paintPath, withCommandStyle } from './painting.js';
 import { drawCanvasPathSegments } from './path-drawing.js';
+import { primitivePointBounds } from '../canvas/primitive-bounds';
 
 export { drawText } from './drawing-text.js';
 
@@ -21,18 +22,24 @@ export function drawShape(
   layer: RuntimeLayerState | null,
   state: RenderState
 ): void {
-  withCommandStyle(command, layer, state, () => {
-    const context = state.context;
-    const x = n(command.x, state);
-    const y = n(command.y, state);
-    const width = n(command.width, state);
-    const height = n(command.height, state);
-    context.translate(x + width / 2, y + height / 2);
-    context.rotate(n(command.rotation, state));
-    context.beginPath();
-    drawShapeGeometry(context, command, width, height, state);
-    paintPath(command, state);
-  });
+  withCommandStyle(
+    command,
+    layer,
+    state,
+    () => {
+      const context = state.context;
+      const x = n(command.x, state);
+      const y = n(command.y, state);
+      const width = n(command.width, state);
+      const height = n(command.height, state);
+      context.translate(x + width / 2, y + height / 2);
+      context.rotate(n(command.rotation, state));
+      context.beginPath();
+      drawShapeGeometry(context, command, width, height, state);
+      paintPath(command, state, { x: -width / 2, y: -height / 2, width, height });
+    },
+    true
+  );
 }
 
 function drawShapeGeometry(
@@ -73,7 +80,7 @@ export function drawImage(
       : undefined;
   if (!asset) return;
   withCommandStyle(command, layer, state, () => {
-    state.runtime.drawImageAsset(state.context, asset, {
+    const args: DrawImageAssetArgs = {
       alpha: 1,
       composite: state.context.globalCompositeOperation,
       filter: state.context.filter,
@@ -85,7 +92,9 @@ export function drawImage(
       width: n(command.width, state),
       x: n(command.x, state),
       y: n(command.y, state),
-    });
+    };
+    if (state.target) state.target.image(state, asset, args);
+    else state.runtime.drawImageAsset(state.context, asset, args);
   });
 }
 
@@ -107,14 +116,20 @@ export function drawPath(
     points,
     command.op === 'polyline' ? valueOr(command.progress, 1, state) : 1
   );
-  withCommandStyle(command, layer, state, () => {
-    const context = state.context;
-    context.beginPath();
-    context.moveTo(visible[0]!.x, visible[0]!.y);
-    for (const point of visible.slice(1)) context.lineTo(point.x, point.y);
-    if (command.op === 'path' && command.closed) context.closePath();
-    paintPath(command, state);
-  });
+  withCommandStyle(
+    command,
+    layer,
+    state,
+    () => {
+      const context = state.context;
+      context.beginPath();
+      context.moveTo(visible[0]!.x, visible[0]!.y);
+      for (const point of visible.slice(1)) context.lineTo(point.x, point.y);
+      if (command.op === 'path' && command.closed) context.closePath();
+      paintPath(command, state, primitivePointBounds(visible));
+    },
+    true
+  );
 }
 
 function drawSegmentPath(
@@ -123,10 +138,16 @@ function drawSegmentPath(
   state: RenderState
 ): void {
   if (!command.segments?.length) return;
-  withCommandStyle(command, layer, state, () => {
-    drawCanvasPathSegments(command, state);
-    paintPath(command, state);
-  });
+  withCommandStyle(
+    command,
+    layer,
+    state,
+    () => {
+      const bounds = drawCanvasPathSegments(command, state);
+      paintPath(command, state, bounds);
+    },
+    true
+  );
 }
 
 function trimPolyline(points: Point[], progress: number): Point[] {

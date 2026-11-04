@@ -60,6 +60,7 @@ export function captureReviewPreviewFrame(args: {
       sourceTime: args.sourceTime(),
       resultTime: args.time,
       source: {
+        videoFrame: () => source,
         prepare: async (signal) => {
           try {
             source = await prepareDecodedVideoFrame(source, signal);

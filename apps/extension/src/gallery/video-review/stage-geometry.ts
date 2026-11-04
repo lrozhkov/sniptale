@@ -1,3 +1,7 @@
+import {
+  reviewPresentedStageProjection,
+  type ReviewPresentedGeometry,
+} from '../../workflows/video-review/gpu-preview-geometry';
 import { uncropMediaSourceRect } from '../../features/video/project/media-crop';
 import { createReviewAnnotationGeometry } from './annotation-effects-geometry';
 import { useEffect, useState, type RefObject } from 'react';
@@ -129,23 +133,26 @@ function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout
 /** Pure scene geometry keeps CSS fitting separate from canonical output pixels. */
 function resolveStageGeometry(
   props: ReviewStageGeometryInput,
-  viewport: { width: number; height: number }
+  viewport: { width: number; height: number },
+  presented?: ReviewPresentedGeometry | null
 ) {
   const sceneSize = props.scene
     ? computeQuickEditSceneSize({ ...props.scene, source: props.source })
     : props.source;
   const fitted = fitVideoRect(viewport, sceneSize);
   const size = snapPreviewRect(fitted);
-  const sceneLayout = props.scene
-    ? previewSceneLayout({
-        output: fitted,
-        canvas: props.scene?.canvas,
-        windowHeader: props.scene?.windowHeader,
-        source: props.source,
-        background: props.scene.background,
-        camera: props.scene.camera,
-      })
-    : null;
+  const sceneLayout = presented
+    ? scalePresentedLayout(presented, size)
+    : props.scene
+      ? previewSceneLayout({
+          output: fitted,
+          canvas: props.scene?.canvas,
+          windowHeader: props.scene?.windowHeader,
+          source: props.source,
+          background: props.scene.background,
+          camera: props.scene.camera,
+        })
+      : null;
   const zoomLayout = props.zoom
     ? previewSceneLayout({
         output: fitted,
@@ -189,6 +196,30 @@ function resolveStageGeometry(
     backgroundPaint,
     content,
     ...decorations,
+  };
+}
+
+/** Reuse published layout values; CSS fitting must not evaluate another camera pose. */
+function scalePresentedLayout(
+  presented: ReviewPresentedGeometry,
+  output: { width: number; height: number }
+) {
+  const x = output.width / presented.logical.width;
+  const y = output.height / presented.logical.height;
+  const rect = (value: ReviewRegion) => ({
+    x: value.x * x,
+    y: value.y * y,
+    width: value.width * x,
+    height: value.height * y,
+  });
+  const layout = presented.layout;
+  return {
+    ...layout,
+    contentRect: rect(layout.contentRect),
+    windowRect: rect(layout.windowRect),
+    videoRect: rect(layout.videoRect),
+    videoTransform: rect(layout.videoTransform),
+    ...(layout.visibleVideoRect ? { visibleVideoRect: rect(layout.visibleVideoRect) } : {}),
   };
 }
 
@@ -264,31 +295,55 @@ export function resolveReviewClickRaster(
 /** Measures and reports the preview through the same scene model as export. */
 export function useReviewStageGeometry(
   props: ReviewStageGeometryInput,
-  host: RefObject<HTMLDivElement | null>
+  host: RefObject<HTMLDivElement | null>,
+  presented?: ReviewPresentedGeometry | null
 ) {
   const viewport = useStageMeasure(host);
-  const geometry = resolveStageGeometry(props, viewport);
+  const represented =
+    presented && props.scene
+      ? {
+          ...props,
+          scene: {
+            ...props.scene,
+            ...presented.scene,
+            camera: presented.camera,
+            ...(props.scene.focus
+              ? {
+                  focus: {
+                    ...props.scene.focus,
+                    regions: presented.scene.zoomRegions,
+                    time: presented.resultTime,
+                  },
+                }
+              : {}),
+          },
+        }
+      : props;
+  const geometry = resolveStageGeometry(represented, viewport, presented);
   const { size, sceneLayout } = geometry;
   const reportGeometry = props.comments?.onGeometry;
   useEffect(() => {
     if (reportGeometry && sceneLayout)
       reportGeometry({
         output: size,
-        projection: sceneLayout.spatial
-          ? quickEditPlaneProjection(
-              computeQuickEditSpatialWindow(
-                sceneLayout,
-                props.scene?.background ?? { enabled: false }
-              ),
-              computeQuickEditSpatialWindow(
-                sceneLayout,
-                props.scene?.background ?? { enabled: false }
-              ),
-              sceneLayout.spatial
-            )
-          : undefined,
+        projection:
+          sceneLayout.spatial && presented
+            ? reviewPresentedStageProjection(presented, size)
+            : sceneLayout.spatial
+              ? quickEditPlaneProjection(
+                  computeQuickEditSpatialWindow(
+                    sceneLayout,
+                    props.scene?.background ?? { enabled: false }
+                  ),
+                  computeQuickEditSpatialWindow(
+                    sceneLayout,
+                    props.scene?.background ?? { enabled: false }
+                  ),
+                  sceneLayout.spatial
+                )
+              : undefined,
         videoTransform: sceneLayout.videoTransform,
       });
-  }, [size, sceneLayout, reportGeometry, props.scene?.background]);
+  }, [size, sceneLayout, reportGeometry, props.scene?.background, presented]);
   return geometry;
 }

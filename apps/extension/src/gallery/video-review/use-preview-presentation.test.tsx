@@ -259,6 +259,89 @@ it('publishes a complete manual frame at exact paused clocks and retains only it
   expect(result.status.presentedFPS).toBeNull();
 });
 
+it.each(['commit', 'cancel'] as const)(
+  'retains the published frame during inspector drafts and resumes the latest %s scene',
+  async (completion) => {
+    const geometry = vi.fn();
+    props = { ...props, onGeometry: geometry };
+    await render();
+    await step(0);
+    const initialScene = props.scene;
+    const front = props.host.current!.querySelector('canvas[data-preview-front="true"]');
+    expect(front).not.toBeNull();
+    const preparations = io.prepare.mock.calls.length;
+    const captures = closed.mock.calls.length;
+    geometry.mockClear();
+    for (const value of ['draft-first', 'draft-latest']) {
+      props = {
+        ...props,
+        interacting: true,
+        deferFrames: true,
+        scene: {
+          ...initialScene,
+          comments: [{ ...initialScene.comments[0]!, resolvedText: value }],
+        },
+      };
+      await render();
+      await step(50);
+    }
+    expect(io.prepare).toHaveBeenCalledTimes(preparations);
+    expect(closed).toHaveBeenCalledTimes(captures);
+    expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBe(front);
+    expect(releases[0]).not.toHaveBeenCalled();
+    expect(geometry).not.toHaveBeenCalled();
+    expect(io.dispose).not.toHaveBeenCalled();
+    expect(result.status.phase).toBe('ready');
+    props = {
+      ...props,
+      deferFrames: false,
+      interacting: false,
+      scene: completion === 'cancel' ? initialScene : props.scene,
+    };
+    await render();
+    await step(100);
+    expect(io.prepare).toHaveBeenCalledTimes(preparations + 1);
+    expect(io.prepare.mock.lastCall![0].comments[0].resolvedText).toBe(
+      completion === 'cancel' ? 'Live' : 'draft-latest'
+    );
+    expect(releases[0]).toHaveBeenCalledOnce();
+    expect(result.status.phase).toBe('ready');
+  }
+);
+
+it('drains an in-flight frame without publishing it when inspector priority starts', async () => {
+  await render();
+  await step(0);
+  const front = props.host.current!.querySelector('canvas[data-preview-front="true"]');
+  const draw = io.render.getMockImplementation()!;
+  let finish!: () => void;
+  io.render.mockImplementationOnce(
+    (...args: unknown[]) =>
+      new Promise((resolve) => {
+        finish = () => resolve(draw(...args));
+      })
+  );
+  props = { ...props, pausedResultTime: 1.1 };
+  await render();
+  await step(50);
+  expect(io.render).toHaveBeenCalledTimes(2);
+  const signal = io.render.mock.lastCall![2] as AbortSignal;
+  expect(signal.aborted).toBe(false);
+  props = { ...props, interacting: true, deferFrames: true, pausedResultTime: 1.2 };
+  await render();
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish());
+  expect(releases[1]).toHaveBeenCalledOnce();
+  expect(releases[0]).not.toHaveBeenCalled();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBe(front);
+  props = { ...props, interacting: false, deferFrames: false, pausedResultTime: 1.3 };
+  await render();
+  await step(100);
+  expect(io.render).toHaveBeenCalledTimes(3);
+  expect(io.render.mock.lastCall![1].resultTime).toBe(1.3);
+  expect(releases[0]).toHaveBeenCalledOnce();
+});
+
 it('does not capture stale source pixels after asynchronous preparation finishes for a replaced source', async () => {
   let resolve!: (value: unknown) => void;
   io.prepare.mockImplementationOnce(
@@ -658,4 +741,31 @@ it('does not publish again when persistence only reorders scene properties', asy
   await render();
   await step(3200);
   expect(io.render).toHaveBeenCalledTimes(3);
+});
+
+it('routes Current mode through the retained compositor when WebGPU is exposed', async () => {
+  vi.stubGlobal('navigator', { gpu: {} });
+  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
+  await render();
+  expect(result.active).toBe(true);
+  await step(0);
+  expect(io.render).toHaveBeenCalledOnce();
+  expect(io.render.mock.calls[0]![1].source.videoFrame()).toBeDefined();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBeNull();
+});
+
+it('publishes geometry only with the matching completed front frame', async () => {
+  const geometry = { resultTime: props.pausedResultTime };
+  const report = vi.fn();
+  props.onGeometry = report;
+  const draw = io.render.getMockImplementation()!;
+  io.render.mockImplementationOnce((...args: unknown[]) => ({ ...draw(...args), geometry }));
+  await render();
+  expect(report).not.toHaveBeenCalled();
+  await step(0);
+  expect(report).toHaveBeenLastCalledWith(geometry);
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBeNull();
+  props.visible = false;
+  await render();
+  expect(report).toHaveBeenLastCalledWith(null);
 });

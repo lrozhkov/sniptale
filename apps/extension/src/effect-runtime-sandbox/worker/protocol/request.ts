@@ -33,6 +33,7 @@ function createResolvedWorkerRequest(params: {
 }): EffectRuntimeWorkerRequest {
   const { assets, document, envelope, fields } = params;
   return {
+    ...(fields.renderTarget ? { renderTarget: fields.renderTarget } : {}),
     ...envelope.identity,
     assets,
     assetSelectionId: envelope.assetSelectionRef.id,

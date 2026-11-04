@@ -92,3 +92,13 @@ it('releases the capture and its overlapping source reservation after cancelled 
   expect(raw.close).toHaveBeenCalledOnce();
   expect(reservation.release).toHaveBeenCalledOnce();
 });
+
+it('exposes a borrowed original frame before normalization for direct GPU sampling', () => {
+  const { raw, captured, reservation } = setup();
+  expect(captured.value.source.videoFrame?.()).toBe(raw);
+  expect(raw.copyTo).not.toHaveBeenCalled();
+  expect(raw.close).not.toHaveBeenCalled();
+  captured.release();
+  expect(raw.close).toHaveBeenCalledOnce();
+  expect(reservation.release).toHaveBeenCalledOnce();
+});

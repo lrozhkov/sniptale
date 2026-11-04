@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { drawCompositionVisualLayer } from './index';
+import { isVideoCompositionFrameSource } from './media-source';
 import { drawActionCompositionState } from './effects/actions';
 import { createVideoProjectFromRecording } from '../../project/factories/creation';
 import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
@@ -55,6 +56,13 @@ function createVideoLayer() {
 beforeEach(() => {
   vi.stubGlobal('HTMLMediaElement', FakeHTMLMediaElement);
   vi.stubGlobal('HTMLVideoElement', class extends FakeHTMLMediaElement {});
+});
+
+it('accepts optional owned GPU frame access only when it is callable', () => {
+  const source = { sourceWidth: 80, sourceHeight: 50, draw: vi.fn() };
+  expect(isVideoCompositionFrameSource(source)).toBe(true);
+  expect(isVideoCompositionFrameSource({ ...source, toVideoFrame: vi.fn() })).toBe(true);
+  expect(isVideoCompositionFrameSource({ ...source, toVideoFrame: 'frame' })).toBe(false);
 });
 
 it('renders decoded frame sources through the video layer path', () => {

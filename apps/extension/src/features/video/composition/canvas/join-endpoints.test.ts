@@ -37,7 +37,9 @@ function surface() {
   };
   return { canvas, context: context as unknown as CanvasRenderingContext2D };
 }
-function fixture() {
+function fixture(
+  compose?: NonNullable<Parameters<typeof createCompositionJoinEndpoints>[0]['compose']>
+) {
   const target = surface();
   const source = surface();
   const leases: RenderCanvasLease[] = [];
@@ -66,6 +68,7 @@ function fixture() {
     resources,
     size: { width: 1, height: 1 },
     renderSample: sample,
+    ...(compose ? { compose } : {}),
   });
   const request = { key: {}, outgoingTime: 1, incomingTime: 2, incomingWeight: 0.5 };
   return {
@@ -81,6 +84,31 @@ function fixture() {
     signal: new AbortController().signal,
   };
 }
+
+it('passes immutable endpoints to an asynchronous compositor without Canvas blending', async () => {
+  const completion = Promise.withResolvers<boolean>();
+  const compose = vi.fn<
+    NonNullable<Parameters<typeof createCompositionJoinEndpoints>[0]['compose']>
+  >(() => completion.promise);
+  const f = fixture(compose);
+  const drawing = f.owner.draw(f.target.context, f.request, f.signal);
+  await vi.waitFor(() => expect(compose).toHaveBeenCalledOnce());
+  expect(f.active.size).toBe(2);
+  expect(f.target.context.drawImage).not.toHaveBeenCalled();
+  expect(compose.mock.calls[0]![0]).toMatchObject({ incomingWeight: 0.5, signal: f.signal });
+  completion.resolve(true);
+  await drawing;
+  expect(f.target.context.drawImage).not.toHaveBeenCalled();
+  f.owner.dispose();
+  expect(f.active.size).toBe(0);
+});
+
+it('retains Canvas composition only when the injected compositor reports hardware unavailability', async () => {
+  const f = fixture(async () => false);
+  await f.owner.draw(f.target.context, f.request, f.signal);
+  expect(f.target.canvas.pixel).toEqual([0.5, 0, 0.5, 1]);
+  f.owner.dispose();
+});
 
 it('copies both completed samples before reusing a borrowed canvas and retains only one endpoint pair', async () => {
   const f = fixture();

@@ -630,6 +630,24 @@ it.each(['abort', 'seek'] as const)(
   }
 );
 
+it('admits the GPU transaction before Canvas normalization and skips legacy drawing after publication', async () => {
+  const { video, job } = setup();
+  Object.defineProperty(video, 'videoWidth', { value: 1904 });
+  const constructor = vi.fn();
+  vi.stubGlobal('VideoFrame', constructor);
+  const render = vi.fn(async () => true);
+  try {
+    expect(
+      await renderPreviewScene({ ...job, gpuPreview: { render, dispose: vi.fn() } })
+    ).toBeUndefined();
+    expect(render).toHaveBeenCalledOnce();
+    expect(constructor).not.toHaveBeenCalled();
+    expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 it('packs padded native preview frames before composition and releases them after drawing', async () => {
   const { video, job } = setup();
   Object.defineProperty(video, 'videoWidth', { value: 1904 });

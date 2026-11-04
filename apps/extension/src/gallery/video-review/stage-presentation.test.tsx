@@ -51,15 +51,25 @@ it('keeps inspector draft interaction active independently of local stage pointe
   try {
     render(false);
     expect(io.present.mock.lastCall![0].interacting).toBe(false);
+    expect(io.present.mock.lastCall![0].deferFrames).toBe(false);
+    render(true);
+    expect(io.present.mock.lastCall![0].deferFrames).toBe(true);
+    render(false);
     act(() =>
       host.firstElementChild!.dispatchEvent(
         new MouseEvent('pointerdown', { bubbles: true, button: 0 })
       )
     );
     expect(io.present.mock.lastCall![0].interacting).toBe(true);
+    expect(io.present.mock.lastCall![0].deferFrames).toBe(false);
     render(true);
     act(() => window.dispatchEvent(new Event('pointerup')));
     expect(io.present.mock.lastCall![0].interacting).toBe(true);
+    expect(io.present.mock.lastCall![0].deferFrames).toBe(true);
+    props.preview = { ...props.preview!, playing: true };
+    render(true);
+    expect(io.present.mock.lastCall![0].deferFrames).toBe(false);
+    props.preview = { ...props.preview!, playing: false };
     render(false);
     expect(io.present.mock.lastCall![0].interacting).toBe(false);
   } finally {

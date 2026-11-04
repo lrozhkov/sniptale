@@ -10,7 +10,10 @@ export interface VideoEditorEffectRuntime {
 export function createVideoEditorEffectRuntime(args: {
   ownerDocument: Document;
 }): VideoEditorEffectRuntime {
-  const executor = createEffectRuntimeSandboxExecutor({ ownerDocument: args.ownerDocument });
+  const executor = createEffectRuntimeSandboxExecutor({
+    ownerDocument: args.ownerDocument,
+    compositionBackend: 'gpu-preview',
+  });
   return {
     dispose: () => executor.dispose(),
     executor,

@@ -82,6 +82,20 @@ it('accepts bounded controls and exact target input while rejecting value drift'
   expect(parseEffectRuntimeWorkerRequest(request)).toBeNull();
 });
 
+it('accepts only the explicit GPU plan selector and preserves the default request shape', () => {
+  const request = createRequest();
+  expect(parseEffectRuntimeWorkerRequest(request)?.renderTarget).toBeUndefined();
+  expect(parseEffectRuntimeWorkerRequest({ ...request, renderTarget: 'gpu-plan' })).toMatchObject({
+    renderTarget: 'gpu-plan',
+  });
+  for (const renderTarget of ['canvas', '', null, 1, {}]) {
+    expect(parseEffectRuntimeWorkerRequest({ ...request, renderTarget })).toBeNull();
+  }
+  expect(
+    parseEffectRuntimeWorkerRequest({ ...request, renderTarget: 'gpu-plan', extra: true })
+  ).toBeNull();
+});
+
 it('parses exact image, SVG, and ignored audio declarations', () => {
   const image = new FakeBitmap(10, 10);
   const document = createAssetDocument();

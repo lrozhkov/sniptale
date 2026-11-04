@@ -163,9 +163,10 @@ it('coalesces transient movement and commits the final unflushed pointerup sampl
   for (let x = 111; x <= 150; x++) pointer('pointermove', x, 60);
   expect(props.onInteract).toHaveBeenCalledTimes(1);
   expect(callbacks.size).toBe(1);
-  expect(props.onPreview).not.toHaveBeenCalled();
+  expect(props.onPreview).toHaveBeenCalledOnce();
+  expect(props.onPreview).toHaveBeenLastCalledWith({ perspective: props.region.perspective });
   tick();
-  expect(props.onPreview).toHaveBeenCalledTimes(1);
+  expect(props.onPreview).toHaveBeenCalledTimes(2);
   pointer('pointermove', 160, 60);
   pointer('pointerup', 170, 50);
   expect(props.onCommit).toHaveBeenCalledTimes(1);
@@ -179,6 +180,35 @@ it('coalesces transient movement and commits the final unflushed pointerup sampl
   tick();
   expect(props.onCommit).toHaveBeenCalledTimes(1);
 });
+
+it.each(['tilt', 'rotation', 'focus'] as const)(
+  'admits the unchanged %s draft before transport and clears a no-op gesture',
+  async (tool) => {
+    props.tool = tool;
+    handle = tool === 'focus' ? 'center' : tool;
+    props.region.perspective = { ...DEFAULT_QUICK_EDIT_PERSPECTIVE };
+    props.region.depthOfField = { ...DEFAULT_QUICK_EDIT_DEPTH, mode: 'area' };
+    const authored = structuredClone(props.region);
+    await render();
+    pointer('pointerdown', 110, 70);
+    const preview = vi.mocked(props.onPreview);
+    expect(preview).toHaveBeenCalledOnce();
+    expect(preview.mock.calls[0]![0]).toEqual(
+      tool === 'focus'
+        ? { depthOfField: authored.depthOfField }
+        : { perspective: authored.perspective }
+    );
+    expect(preview.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(props.onInteract).mock.invocationCallOrder[0]!
+    );
+    expect(props.region).toEqual(authored);
+    expect(props.onCommit).not.toHaveBeenCalled();
+    pointer('pointerup', 110, 70);
+    expect(preview).toHaveBeenLastCalledWith(null);
+    expect(props.onCommit).not.toHaveBeenCalled();
+    expect(props.region).toEqual(authored);
+  }
+);
 
 it.each(['tilt', 'rotation', 'focus'] as const)(
   'does not enable %s on a cancelled or net-zero gesture',

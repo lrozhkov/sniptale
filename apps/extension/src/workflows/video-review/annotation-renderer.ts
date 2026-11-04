@@ -230,7 +230,7 @@ export async function createReviewAnnotationRenderer(
     describe,
     counters: ledger.snapshot,
     dispose,
-    /** Caller retains this batch only until painting; release closes every bitmap exactly once. */
+    /** A consumer can borrow a batch through its GPU fence; disposal waits for those borrows. */
     async render(
       time: number,
       density: Record<Plane, Size>,
@@ -245,13 +245,32 @@ export async function createReviewAnnotationRenderer(
       const frameReservations: { release(): void }[] = [];
       let frames: EffectRuntimeRenderedFrameMap | undefined;
       let released = false;
-      const release = () => {
-        if (released) return;
+      let releaseRequested = false;
+      let borrowers = 0;
+      const releaseWhenReady = () => {
+        if (released || !releaseRequested || borrowers > 0) return;
         released = true;
         if (frames) for (const frame of frames.values()) closeEffectRuntimeBitmap(frame.bitmap);
         for (const reservation of frameReservations.splice(0)) reservation.release();
         releases.delete(release);
         active = false;
+      };
+      const release = () => {
+        releaseRequested = true;
+        releaseWhenReady();
+      };
+      const retain = () => {
+        if (releaseRequested || disposed) throw new Error('Annotation bitmap batch is released.');
+        borrowers += 1;
+        let returned = false;
+        return {
+          release() {
+            if (returned) return;
+            returned = true;
+            borrowers -= 1;
+            releaseWhenReady();
+          },
+        };
       };
       // A cancelled frame releases its late output; the prepared owner retains the sandbox.
       releases.add(release);
@@ -298,6 +317,7 @@ export async function createReviewAnnotationRenderer(
             return { ...entry, bitmap: frame.bitmap };
           }),
           release,
+          retain,
         };
       } catch (error) {
         release();

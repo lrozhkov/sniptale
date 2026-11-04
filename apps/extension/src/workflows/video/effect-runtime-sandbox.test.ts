@@ -8,6 +8,7 @@ import {
 } from '../../contracts/effect-runtime/types';
 import { PendingEffectRuntimeRequest } from './effect-runtime-sandbox-request';
 import { EffectRuntimeSandboxSessionManager } from './effect-runtime-sandbox-session';
+import { readEffectRuntimeSandboxConnectionNonce } from '../../contracts/effect-runtime/sandbox-connection';
 import {
   createSandboxInputBitmap as createInputBitmap,
   createSandboxRenderRequest as createRequest,
@@ -37,6 +38,25 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('selects preview composition without changing sandbox or nonce authority', async () => {
+  const input = createInputBitmap();
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-preview',
+  });
+  const pending = manager.renderFrame(createRequest(input));
+  const iframe = document.querySelector('iframe');
+  if (!iframe) throw new Error('Expected a sandbox iframe');
+  const url = new URL(iframe.src);
+  expect(url.searchParams.get('composition')).toBe('gpu-preview');
+  expect(readEffectRuntimeSandboxConnectionNonce(url.hash)).not.toBeNull();
+  expect(iframe.getAttribute('sandbox')).toBe('allow-scripts');
+  manager.dispose();
+  await expect(pending).resolves.toMatchObject({ kind: 'error', code: 'crashed' });
+  expect(input.close).toHaveBeenCalledOnce();
+});
+
 it('fails closed and removes a sandbox iframe when its isolated page cannot load', async () => {
   const manager = new EffectRuntimeSandboxSessionManager(document, {
     loadTimeoutMs: 1,
@@ -47,6 +67,7 @@ it('fails closed and removes a sandbox iframe when its isolated page cannot load
   const iframe = document.querySelector('iframe');
 
   expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts');
+  expect(new URL(iframe!.src).search).toBe('');
   await expect(resultPromise).resolves.toEqual(
     expect.objectContaining({ code: 'crashed', kind: 'error' })
   );

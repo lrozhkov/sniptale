@@ -33,6 +33,8 @@ export interface ReviewWebcamFrameLease {
   placement: QuickEditWebcamPlacement;
   crop?: Pick<QuickEditWebcam['appearance'], 'zoom' | 'panX' | 'panY'> | undefined;
   drawable: {
+    /** Borrowed until this camera lease is released, including asynchronous GPU completion. */
+    videoFrame?(): VideoFrame;
     draw(
       context: CanvasRenderingContext2D,
       x: number,
@@ -332,6 +334,7 @@ function cloneWebcamFrame(
       placement: request.placement ?? mapped.placement,
       crop: request.crop ?? mapped.crop,
       drawable: {
+        videoFrame: () => frame,
         draw: (context, x, y, width, height) => context.drawImage(frame, x, y, width, height),
       },
       release: () => {

@@ -1,4 +1,5 @@
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
+import { createEffectRuntimeSandboxExecutor } from '../../workflows/video/effect-runtime-sandbox';
 import { createReviewPreviewRenderer } from '../../workflows/video-review/render-preview';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import {
@@ -105,6 +106,7 @@ class ManualPresentationSession {
     this.front?.canvas.parentElement?.replaceChildren();
     this.front?.release();
     this.front = null;
+    this.latest().input.onGeometry?.(null);
   }
 
   private status(phase: ReviewPreviewPresentationStatus['phase']) {
@@ -130,6 +132,8 @@ class ManualPresentationSession {
     const readAsset = this.latest().input.readAsset;
     return createReviewPreviewRenderer({
       resources,
+      annotationExecutor: () =>
+        createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-preview' }),
       ...(readAsset ? { readAsset } : {}),
       allocation: { describe: graph, replaceLimits: (limits) => resources.replaceLimits(limits) },
       onContextLost: () => {
@@ -299,6 +303,7 @@ class ManualPresentationSession {
     if (!cadenceRequested) this.publications.length = 0;
     while (this.publications.length > 2 && this.publications[0]! < performance.now() - 1000)
       this.publications.shift();
+    this.latest().input.onGeometry?.(value.completed.geometry ?? null);
     this.reportBounds(value.prepared.watermarkBounds);
     this.status('ready');
   };
@@ -373,12 +378,13 @@ class ManualPresentationSession {
     this.current = description;
     this.sequence = generation;
     const input = this.latest().input;
+    const deferFrames = !input.playing && !!input.deferFrames;
     if (this.playing !== input.playing || !active) this.publications.length = 0;
     this.playing = active && input.playing;
     this.scheduler.update({
       scene: description,
       generation: String(generation),
-      visible: active,
+      visible: active && !deferFrames,
       playing: input.playing,
       interacting,
       frameRate:
@@ -395,7 +401,7 @@ class ManualPresentationSession {
     } else if (!this.cameraSource) {
       this.connectCamera();
     }
-    this.status(active ? 'pending' : 'inactive');
+    this.status(active ? (deferFrames && this.front ? 'ready' : 'pending') : 'inactive');
   }
 
   retry() {

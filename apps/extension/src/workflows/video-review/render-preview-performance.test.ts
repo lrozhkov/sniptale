@@ -17,6 +17,7 @@ const io = vi.hoisted(() => ({
   spatial: vi.fn(),
   background: vi.fn(),
   captionPreparation: vi.fn(),
+  gpu: vi.fn(),
 }));
 vi.mock('../../features/video/composition/motion/follow-cursor', async (original) => {
   const actual =
@@ -39,6 +40,10 @@ vi.mock('./render-captions', async (original) => {
     },
   };
 });
+vi.mock('../../features/video/composition/canvas/gpu-preview', async (original) => ({
+  ...(await original<typeof import('../../features/video/composition/canvas/gpu-preview')>()),
+  createGpuPreviewRenderer: io.gpu,
+}));
 vi.mock('./scene-frame', () => ({ drawReviewSceneFrame: io.frame }));
 vi.mock('./render-scene-overlays', () => ({ drawReviewSceneOverlays: io.overlays }));
 vi.mock('./render-webcam', () => ({ drawReviewWebcam: io.webcam }));
@@ -94,6 +99,8 @@ function setup() {
       const context = {
         save: vi.fn(),
         restore: vi.fn(),
+        translate: vi.fn(),
+        clearRect: vi.fn(),
         scale: vi.fn(),
         drawImage: vi.fn(),
         fillRect: vi.fn(() => io.order.push('outer-fade')),
@@ -215,3 +222,113 @@ it('awaits captured source normalization before composing the publication', asyn
   prepared.release();
   renderer.dispose();
 });
+
+it('composes video, 3D, depth and temporal exposure on GPU before source normalization', async () => {
+  vi.stubGlobal('navigator', { gpu: {} });
+  const bitmap = { close: vi.fn() };
+  const gpuRender = vi.fn(async () => bitmap);
+  io.gpu.mockResolvedValue({ render: gpuRender, dispose: vi.fn(), allocatedBytes: 0 });
+  const { resources, leases } = setup();
+  const owner = createReviewPreviewRenderer({ resources });
+  const region = createQuickEditZoomRegion({ id: 'gpu-camera', at: 0, duration: 4 });
+  region.transform.scale = 1.5;
+  region.enter.duration = 2;
+  region.motionBlur = { enter: { enabled: true, strength: 1 } };
+  region.perspective = { enabled: true, rotateX: 0.1, rotateY: 0.3, rotateZ: 0, strength: 0.5 };
+  region.depthOfField = {
+    enabled: true,
+    mode: 'depth',
+    x: 0.5,
+    y: 0.5,
+    width: 0.2,
+    softness: 0.3,
+    strength: 0.5,
+  };
+  const prepared = await owner.prepare(
+    { ...scene(), zoomRegions: [region] },
+    dimensions,
+    new AbortController().signal
+  );
+  const raw = { timestamp: 1_000_000, close: vi.fn(), copyTo: vi.fn() } as unknown as VideoFrame;
+  const prepare = vi.fn();
+  const source = {
+    timestamp: 1,
+    backing: dimensions.backing,
+    draw: vi.fn(),
+    videoFrame: () => raw,
+    prepare,
+  };
+  const result = await owner.render(prepared, { ...frame(), source, sourceTime: 1, resultTime: 1 });
+  expect(gpuRender).toHaveBeenCalledOnce();
+  expect(prepare).not.toHaveBeenCalled();
+  expect(source.draw).not.toHaveBeenCalled();
+  expect(raw.copyTo).not.toHaveBeenCalled();
+  expect(raw.close).not.toHaveBeenCalled();
+  expect(io.frame).not.toHaveBeenCalled();
+  expect(io.spatial).not.toHaveBeenCalled();
+  expect(result.geometry?.resultTime).toBe(1);
+  expect(result.geometry?.generation).toBe(frame().generation);
+  expect(result.geometry?.sceneGeneration).toBe(prepared.generation);
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  result.release();
+  prepared.release();
+  owner.dispose();
+  expect(leases.every((lease) => lease.release.mock.calls.length === 1)).toBe(true);
+});
+
+it.each(['no-adapter', 'device-failure'] as const)(
+  'lazily restores the complete spatial Canvas backend after GPU %s',
+  async (failure) => {
+    vi.stubGlobal('navigator', { gpu: {} });
+    const { GpuPreviewDeviceError } =
+      await import('../../features/video/composition/canvas/gpu-preview');
+    io.gpu.mockResolvedValue(
+      failure === 'no-adapter'
+        ? null
+        : {
+            render: vi.fn(async () => {
+              throw new GpuPreviewDeviceError('Device lost');
+            }),
+            dispose: vi.fn(),
+            allocatedBytes: 0,
+          }
+    );
+    const { resources } = setup();
+    const owner = createReviewPreviewRenderer({ resources });
+    const region = createQuickEditZoomRegion({ id: 'fallback-camera', at: 0, duration: 4 });
+    region.perspective = { enabled: true, rotateX: 0.1, rotateY: 0.3, rotateZ: 0, strength: 0.5 };
+    const prepared = await owner.prepare(
+      { ...scene(), zoomRegions: [region] },
+      dimensions,
+      new AbortController().signal
+    );
+    expect(io.spatial).not.toHaveBeenCalled();
+    const raw = { timestamp: 2_000_000, close: vi.fn() } as unknown as VideoFrame;
+    const prepare = vi.fn();
+    const source = {
+      timestamp: 2,
+      backing: dimensions.backing,
+      draw: vi.fn(),
+      prepare,
+      videoFrame: () => raw,
+    };
+    io.frame.mockImplementationOnce((_context, request) => {
+      expect(request.spatialRenderer).toBeDefined();
+      expect(request.layout.spatial).toBeDefined();
+    });
+    const result = await owner.render(prepared, {
+      ...frame(),
+      source,
+      sourceTime: 2,
+      resultTime: 2,
+    });
+    expect(io.spatial).toHaveBeenCalledOnce();
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(io.frame).toHaveBeenCalledOnce();
+    expect(raw.close).not.toHaveBeenCalled();
+    expect(result.geometry).toBeNull();
+    result.release();
+    prepared.release();
+    owner.dispose();
+  }
+);
