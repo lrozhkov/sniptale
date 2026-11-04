@@ -57,6 +57,27 @@ function renderTimeline(overrides: Partial<Parameters<typeof ReviewTimeline>[0]>
 
 type PlaneEvent = { type: string; x: number; button?: number };
 
+it('keeps the archived history row and timeline height budget across empty window refreshes', () => {
+  const { host } = renderTimeline({
+    sourceId: 'recording-a',
+    cursorArchiveAvailable: true,
+    markers: [{ ref: { kind: 'action', id: 'click' }, eventType: 'CLICK', start: 1, end: 1 }],
+  });
+  const timeline = host.querySelector('[data-ui="gallery.videoReview.timeline"]')!;
+  const budget = timeline.className;
+  const height = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')!
+    .style.height;
+  renderTimeline({ sourceId: 'recording-a', cursorArchiveAvailable: true });
+  expect(timeline.className).toBe(budget);
+  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).not.toBeNull();
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')!.style.height
+  ).toBe(height);
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(2);
+  renderTimeline({ sourceId: 'recording-b', cursorArchiveAvailable: false });
+  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
+});
+
 it('shows hundredths in playback time with correct minute rollover', () => {
   const { host } = renderTimeline({ time: 59.999, duration: 72.345 });
   expect(host.querySelector('[data-toolbar-transport]')?.textContent).toContain(

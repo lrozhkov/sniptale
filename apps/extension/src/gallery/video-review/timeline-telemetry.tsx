@@ -44,6 +44,8 @@ export type ReviewCursorTimelineInteractions = {
 };
 
 type TelemetryStripProps = ReviewCursorTimelineInteractions & {
+  cursorArchiveAvailable?: boolean | undefined;
+  sourceId?: string | undefined;
   captureCapabilities?: RecordingTelemetryCapabilities | null | undefined;
   animatedIds?: ReadonlySet<string>;
   markers: readonly ReviewTelemetryMarker[];
@@ -85,15 +87,25 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   );
   const ratio =
     (Math.max(1, props.width) * props.zoom) / (Math.max(1, settled.width) * settled.zoom);
+  const retainedLanes = useRef<{ sourceId: string | undefined; lanes: number[] } | null>(null);
   const lanes = useMemo(
     () =>
       [0, 1, 2].filter(
         (lane) =>
           layout.items.some((item) => item.lane === lane) ||
-          (lane === 2 && !!props.cursorFocusKeys?.length)
+          (lane === 2 && (!!props.cursorFocusKeys?.length || props.cursorArchiveAvailable)) ||
+          (props.cursorArchiveAvailable &&
+            retainedLanes.current?.sourceId === props.sourceId &&
+            retainedLanes.current?.lanes.includes(lane))
       ),
-    [layout, props.cursorFocusKeys?.length]
+    [layout, props.cursorFocusKeys?.length, props.cursorArchiveAvailable, props.sourceId]
   );
+  useLayoutEffect(() => {
+    // Retain only committed row presence, never markers from an expired archive window.
+    retainedLanes.current = props.cursorArchiveAvailable
+      ? { sourceId: props.sourceId, lanes }
+      : null;
+  }, [props.cursorArchiveAvailable, props.sourceId, lanes]);
   const cursorRow = lanes.indexOf(2);
   const cursorTop = Math.max(0, cursorRow) * ACTION_LANE_PITCH_PX;
   const height = Math.max(1, lanes.length) * ACTION_LANE_PITCH_PX - ACTION_LANE_GAP_PX;

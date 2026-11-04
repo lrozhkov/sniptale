@@ -831,10 +831,10 @@
       "file": "apps/extension/src/gallery/video-review/timeline.test.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This suite tests one mounted timeline. Animation membership reuse and invalidation use the existing projection fixture. Viewport and environment receivers are test setup. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "reason": "tool-noise: This suite tests one mounted timeline. Animation membership reuse and invalidation use the existing projection fixture. Viewport and environment receivers are test setup. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Archive refresh and source replacement cases retain the same mounted timeline fixture.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "d96e25718604f50afe18d254efb5c801f0a32856bdf70481d7d6bd1212e154fe",
+      "astHash": "a7e9c067928040a573dc71f014e4765aeb73931a544d0660fe88cf5751157b59",
       "signatureHash": "66e753c9b6ccfd89c3ac40a2b8605118de422a60d95f0e4ece579c366d44a6c5"
     },
     {

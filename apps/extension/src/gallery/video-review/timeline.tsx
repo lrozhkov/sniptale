@@ -299,11 +299,16 @@ export function ReviewTimeline(props: TimelineProps) {
 function reviewTimelineHeightClass(
   props: Pick<
     TimelineProps,
-    'fillHeight' | 'markers' | 'onAddCursorFocusKey' | 'actionsTrackVisible'
+    | 'fillHeight'
+    | 'markers'
+    | 'onAddCursorFocusKey'
+    | 'actionsTrackVisible'
+    | 'cursorArchiveAvailable'
   >
 ) {
   if (props.fillHeight) return 'h-full';
-  return props.actionsTrackVisible !== false && (props.markers.length || props.onAddCursorFocusKey)
+  return props.actionsTrackVisible !== false &&
+    (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable)
     ? 'max-h-[max(160px,min(42dvh,calc(100dvh-420px)))]'
     : 'max-h-[min(42dvh,calc(100dvh-420px))]';
 }
@@ -331,6 +336,7 @@ function ReviewTimelineEvents(
     | 'keyAnimations'
     | 'clickAnimations'
     | 'cursorArchiveAvailable'
+    | 'sourceId'
   > & { width: number; zoom: number }
 ) {
   const [animatedOnly, setAnimatedOnly] = useState(false);
@@ -394,6 +400,8 @@ function ReviewTimelineEvents(
           </div>
         ) : null}
         <ReviewTelemetryStrip
+          cursorArchiveAvailable={props.cursorArchiveAvailable}
+          sourceId={props.sourceId}
           captureCapabilities={props.captureCapabilities}
           markers={markers}
           animatedIds={animated}

@@ -47,7 +47,11 @@ const marker = (
   end,
 });
 
-const render = (markers: ReviewTelemetryMarker[]) =>
+const render = (
+  markers: ReviewTelemetryMarker[],
+  cursorArchiveAvailable = false,
+  sourceId = 'recording-a'
+) =>
   act(() => {
     root.render(
       <ReviewTelemetryStrip
@@ -57,6 +61,8 @@ const render = (markers: ReviewTelemetryMarker[]) =>
         width={1000}
         zoom={1}
         onMarker={vi.fn()}
+        cursorArchiveAvailable={cursorArchiveAvailable}
+        sourceId={sourceId}
       />
     );
   });
@@ -80,6 +86,28 @@ it('packs populated families in semantic order without empty rows', () => {
   expect(host.querySelector<HTMLElement>('[data-history-family="cursor"] button')!.style.top).toBe(
     '24px'
   );
+});
+
+it('retains archived semantic rows while bounded history windows refresh without retaining markers', () => {
+  const markers: ReviewTelemetryMarker[] = [
+    { ...marker('action', 'mouse', 1), eventType: 'CLICK' },
+    { ref: { kind: 'cursor', id: 'cursor' }, eventType: 'cursor', start: 2, end: 3 },
+  ];
+  render(markers, true);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  render([], true);
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(2);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  expect(host.querySelector('[data-history-family="cursor"]')).not.toBeNull();
+  expect(host.querySelector('[data-history-family="mouse"] button')).toBeNull();
+  render(markers, true);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  render([], true, 'recording-b');
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(1);
+  expect(host.querySelector('[data-history-family="cursor"]')).not.toBeNull();
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
+  render([], false, 'recording-b');
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(0);
 });
 
 it('reserves semantic row pitch and groups collisions within the mouse row', () => {
