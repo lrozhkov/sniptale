@@ -21,6 +21,10 @@ import {
   resolveActiveCameraSplit,
 } from '../../../../features/video/composition/camera-split';
 import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
+import {
+  presentationEnvelopeOpacity,
+  resolveVideoProjectSceneEdgePlan,
+} from '../../../../features/video/project/scene/edge-fades';
 import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
 import { drawCompositionBorders } from '../../../../features/video/composition/draw/border';
 import {
@@ -271,7 +275,17 @@ async function renderPreparedPreviewScene(
             composeInput
           );
           return effectRuntimeFrames;
-        }
+        },
+        captions.plan.cues.length > 0 ||
+          Boolean(watermark) ||
+          (params.sceneEdges !== 'omit' &&
+            presentationEnvelopeOpacity(
+              resolveVideoProjectSceneEdgePlan(
+                params.project,
+                params.sampleFps ?? params.project.fps
+              ).visualEnvelope,
+              params.currentTime
+            ) > 0)
       );
       if (accelerated !== undefined)
         return accelerated === false

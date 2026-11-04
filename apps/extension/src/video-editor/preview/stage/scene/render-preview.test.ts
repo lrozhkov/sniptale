@@ -11,6 +11,7 @@ import { createVideoClipFromAsset } from '../../../../features/video/project/fac
 import { VideoProjectAssetType } from '../../../../features/video/project/types';
 import { drawPreviewVisualPasses } from './render-visual';
 import { renderPreviewScene } from './render-preview';
+import type { NativeGpuPreviewRenderer } from './types';
 const splitProof = vi.hoisted(() => ({
   resolve: vi.fn(() => null),
   paint: vi.fn(),
@@ -627,6 +628,50 @@ it.each(['abort', 'seek'] as const)(
       event === 'abort' ? expect.objectContaining({ name: 'AbortError' }) : false
     );
     expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  ['empty', 1, false],
+  ['caption', 1, true],
+  ['watermark', 1, true],
+  ['fade', 0, true],
+  ['fade', 4.9, true],
+  ['fade', 1, false],
+  ['omitted-fade', 0, false],
+] as const)(
+  'admits final GPU artwork for %s at %s only when required',
+  async (kind, time, required) => {
+    const { job } = setup();
+    job.project.duration = 5;
+    job.project.sceneEdges = {
+      intro: { enabled: true, duration: 0.4 },
+      outro: { enabled: true, duration: 0.4 },
+    };
+    if (kind === 'watermark')
+      job.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+    const render = vi.fn<NativeGpuPreviewRenderer['render']>(async () => true);
+    await renderPreviewScene({
+      ...job,
+      currentTime: time,
+      ...(kind === 'omitted-fade' ? { sceneEdges: 'omit' } : {}),
+      captionRenderer: {
+        prepare: vi
+          .fn()
+          .mockResolvedValue({ plan: { cues: kind === 'caption' ? [{}] : [] }, draw: vi.fn() }),
+        clear: vi.fn(),
+      },
+      watermarkRenderer: {
+        prepare: vi.fn(async () => ({
+          bounds: { x: 0, y: 0, width: 20, height: 10 },
+          draw: vi.fn(),
+        })),
+        clear: vi.fn(),
+      },
+      gpuPreview: { render, dispose: vi.fn() },
+    });
+    expect(render).toHaveBeenCalledOnce();
+    expect(render.mock.calls[0]![5]).toBe(required);
   }
 );
 

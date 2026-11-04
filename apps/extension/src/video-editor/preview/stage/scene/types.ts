@@ -98,7 +98,9 @@ export interface NativeGpuPreviewRenderer {
       | EffectRuntimeRenderedComposition
       | ((
           composeInput: EffectRuntimeInputComposer
-        ) => Promise<EffectRuntimeRenderedComposition | undefined>)
+        ) => Promise<EffectRuntimeRenderedComposition | undefined>),
+    /** Omission conservatively retains the raster for callers without producer admission. */
+    finalArtworkRequired?: boolean
   ): Promise<boolean | undefined>;
   dispose(): void;
 }

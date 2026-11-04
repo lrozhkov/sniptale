@@ -95,6 +95,19 @@ it('composes raw frames and publishes only after GPU completion and final overla
   expect(f.render.mock.calls[0]![0].layers[2]!.source).toBe(f.captured[0]);
 });
 
+it('omits the final raster when the scene owner proves its producers have no output', async () => {
+  const f = fixture();
+  const published = vi.fn();
+  f.input.canvas.addEventListener('sniptale-preview-frame', published);
+  expect(await f.owner.render(f.input, f.passes, f.finish, () => false, undefined, false)).toBe(
+    true
+  );
+  expect(f.finish).not.toHaveBeenCalled();
+  expect(f.render.mock.calls[0]![0].layers).toHaveLength(3);
+  expect(published).toHaveBeenCalledOnce();
+  expect(f.captured[0]!.close).toHaveBeenCalledOnce();
+});
+
 it.each(['abort', 'seek'] as const)(
   'does not publish a completed obsolete GPU frame after %s',
   async (reason) => {

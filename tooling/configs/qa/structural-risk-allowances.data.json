@@ -5143,10 +5143,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One preview session owns backend availability, material caches and disposal. The factory span includes one render transaction. It adds no separate queue or resource lifetime.",
+      "reason": "tool-noise: One preview session owns backend availability, material caches and disposal. The factory span includes one render transaction. It adds no separate queue or resource lifetime. One optional admission flag omits empty artwork without adding a resource owner.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes preview queue or material lifetime. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-04",
-      "astHash": "1ca590320bb158211b45d9d19e68fb6a17d705b9beb2579be8a30f1fcd1094fb",
+      "astHash": "b452f2daf6f67f593b560125504b1d2d5bc55c464192b4e4a8e9f0e8c3400964",
       "signatureHash": "7d9a217fc23fc3f6a09d3c448ae47b3c7039b7957a843146613711295e84297a"
     },
     {
@@ -5154,11 +5154,11 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer.render",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One preview transaction captures raw frames, composes effect inputs and presents the completed scene. Both composition stages share captured sources, backend and materials. One finally block releases temporary resources after GPU settlement.",
+      "reason": "tool-noise: One preview transaction captures raw frames, composes effect inputs and presents the completed scene. Both composition stages share captured sources, backend and materials. One finally block releases temporary resources after GPU settlement. Final artwork admission preserves the same capture, settlement and publication transaction.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes capture or publication lifetime. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-04",
-      "astHash": "a040ef7dd7facf0269fcd8f19a6348a31fcb9f49a39eff0da4f4a027bec16b74",
-      "signatureHash": "83678f657fe40891764b6841a20813fc90eabe278bf3395518c62bb5c4f385ec"
+      "astHash": "6675781002d76e2624e63884610e1a9514b00eb83a912afda83d503c25fe708e",
+      "signatureHash": "7fbf6998a3988df89e02a05370e5486d9adf627b6e933b9dcfaf360518055ae2"
     },
     {
       "rule": "structural-function-risk",
@@ -5913,11 +5913,11 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: This scene fixture tests visible publication after completion. New cases bind the camera to overrides and prepared archive facts. Failure and cancellation use existing fixtures. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "reason": "tool-noise: This scene fixture tests visible publication after completion. New cases bind the camera to overrides and prepared archive facts. Failure and cancellation use existing fixtures. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Final artwork cases use the same scene fixture and assert absent and present producers.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "934d43087e17a6a53d02e00431d50fc3dc360b861e710db7b5997dc94278b983",
-      "signatureHash": "ca752b15005dfce1ab9b1349520d5d84c03bb64a30398ee93ca257a626b4b8e9"
+      "astHash": "96ec242247917d3c0b13f61d5b8d468148cf54ac1aea0d86f5d4c8e6ba8853b0",
+      "signatureHash": "a3c58f0455473a9f92d91faf7c2b782fd9921904e009349e1a26417f417f0692"
     },
     {
       "rule": "structural-function-risk",

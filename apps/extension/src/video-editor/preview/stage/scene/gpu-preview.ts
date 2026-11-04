@@ -143,7 +143,7 @@ export function createNativeGpuPreviewRenderer(
       disposed = true;
       release();
     },
-    async render(input, passes, finish, isInvalidated, effects) {
+    async render(input, passes, finish, isInvalidated, effects, finalArtworkRequired = true) {
       const layer = admittedLayer(input, passes);
       const depthLayer = admittedLayer(input, passes, true);
       if (disposed || unavailable || typeof VideoFrame === 'undefined') return undefined;
@@ -368,12 +368,14 @@ export function createNativeGpuPreviewRenderer(
             rect: { x: 0, y: 0, width: bordersArtwork.width, height: bordersArtwork.height },
             inverse: IDENTITY,
           });
-        artwork = createArtwork('final');
-        layers.push({
-          source: artwork,
-          rect: { x: 0, y: 0, width: artwork.width, height: artwork.height },
-          inverse: IDENTITY,
-        });
+        if (finalArtworkRequired) {
+          artwork = createArtwork('final');
+          layers.push({
+            source: artwork,
+            rect: { x: 0, y: 0, width: artwork.width, height: artwork.height },
+            inverse: IDENTITY,
+          });
+        }
         staging = input.stagingCanvas?.() ?? input.canvas.ownerDocument.createElement('canvas');
         const prepared = resolvePreparedPreviewSceneCanvas({
           ...input,
