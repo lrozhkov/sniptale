@@ -85,6 +85,7 @@ class PresentationMain {
   private decoder: ReturnType<typeof createPresentationDecoder> | null = null;
   private camera: Camera | null = null;
   private resolution = 0;
+  private firstTimestamp = 0;
   private disposed = false;
   private busy = false;
   private frameGeneration = 0;
@@ -145,7 +146,9 @@ class PresentationMain {
       throw new QuickEditExportUnavailable(['video-encoder']);
     const source = { width: await video.getDisplayWidth(), height: await video.getDisplayHeight() };
     this.resolution = await video.getTimeResolution();
+    this.firstTimestamp = await video.getFirstTimestamp();
     if (
+      !Number.isFinite(this.firstTimestamp) ||
       ![source.width, source.height, this.resolution].every(
         (value) => Number.isFinite(value) && value > 0
       )
@@ -260,7 +263,7 @@ class PresentationMain {
         candidate.mapping.holdLast
       )
         continue;
-      yield { tick: candidate.tick, time: this.map(candidate, undefined).sourceTime };
+      yield { tick: candidate.tick, time: this.map(candidate, undefined).sampleTime };
     }
   }
 
@@ -292,7 +295,18 @@ class PresentationMain {
       Math.max(firstTick, Math.round(requested * this.resolution) / this.resolution)
     );
     if (firstTick > lastTick) throw new Error('Main source interval has no representable tick');
+    // Capture encoders can place the first video sample one frame after the media origin.
+    // Decode that sample only inside the retained interval; scene and audio clocks keep their origin.
+    const frameRate = this.args.index.frameRate ?? this.args.fps ?? 30;
+    const leadingLimit = 1 / frameRate + 1 / this.resolution;
+    const sampleTime =
+      sourceTime < this.firstTimestamp &&
+      this.firstTimestamp <= leadingLimit &&
+      this.firstTimestamp < segment.sourceEnd
+        ? this.firstTimestamp
+        : sourceTime;
     return {
+      sampleTime,
       sourceTime,
       resultTime: this.args.fragmentOffset + localTime,
       localTime,
@@ -352,8 +366,8 @@ class PresentationMain {
       signal.throwIfAborted();
       this.assets = prepared.allocationAssets;
       source = await (this.decoder
-        ? this.decoder.read(plannedTick, this.sourceTime)
-        : this.sink!.getSample(this.sourceTime));
+        ? this.decoder.read(plannedTick, mapped.sampleTime)
+        : this.sink!.getSample(mapped.sampleTime));
       signal.throwIfAborted();
       if (!source) throw new Error('Main source frame is unavailable');
       const blend = reviewCutTransitionAt(mapped.localTime, this.transitions);

@@ -31,6 +31,7 @@ const io = vi.hoisted(() => ({
   realRenderer: false,
   retainedSpatialBytes: 0,
   resolution: 1000,
+  firstTimestamp: 0,
   missingTrack: false,
   decode: true,
   missingSample: false,
@@ -72,6 +73,7 @@ vi.mock('mediabunny', () => ({
             getDisplayWidth: async () => 64,
             getDisplayHeight: async () => 36,
             getTimeResolution: async () => io.resolution,
+            getFirstTimestamp: async () => io.firstTimestamp,
             computeDuration: async () => 3,
           };
     }
@@ -189,6 +191,7 @@ beforeEach(() => {
   io.realRenderer = false;
   io.retainedSpatialBytes = 0;
   io.resolution = 1000;
+  io.firstTimestamp = 0;
   io.missingTrack = false;
   io.decode = true;
   io.missingSample = false;
@@ -294,6 +297,7 @@ it('holds the complete last output composition using its lattice clock and actua
 
 it('clamps a last-in-range request to the final actual track tick without crossing the edit boundary', async () => {
   io.resolution = 1000;
+  io.firstTimestamp = 0;
   const owner = await open();
   const frame = await owner.render(candidate(2.9999));
   expect(io.times).toEqual([2.999]);
@@ -679,3 +683,53 @@ it('admits retained dense spatial resources before reserving the next decoded so
   output.release();
   expect(io.samples.at(-1)!.close).toHaveBeenCalledOnce();
 });
+
+it.each(['ordinary', 'planned'] as const)(
+  'admits a one-frame leading video gap without moving %s export clocks',
+  async (route) => {
+    io.resolution = 60_000;
+    io.firstTimestamp = 1 / 60;
+    const make = io.sample.getMockImplementation()!;
+    io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+    const first = candidate(0);
+    const args = fixture();
+    args.index.frameRate = 60;
+    if (route === 'planned') args.plannedCandidates = () => [first];
+    const owner = await open(args);
+    const frame = await (route === 'planned' ? owner.render(first) : owner.renderAtTime(0));
+    expect(io.times).toEqual([1 / 60]);
+    expect(io.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sourceTime: 0, resultTime: 7 })
+    );
+    frame.release();
+    expect(io.samples[0]!.close).toHaveBeenCalledOnce();
+    if (route === 'planned') expect(io.stream).toHaveBeenCalledOnce();
+  }
+);
+
+it.each(['long-leading-gap', 'outside-retained-interval'] as const)(
+  'keeps missing video a failure for %s',
+  async (reason) => {
+    io.firstTimestamp = reason === 'long-leading-gap' ? 0.2 : 1 / 60;
+    io.resolution = 60_000;
+    const make = io.sample.getMockImplementation()!;
+    io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+    const args = fixture();
+    args.index.frameRate = 60;
+    if (reason === 'outside-retained-interval')
+      args.edits = [
+        {
+          id: 'cut',
+          kind: 'cut',
+          start: 0.01,
+          end: 3,
+          requestedStart: 0.01,
+          requestedEnd: 3,
+        },
+      ];
+    const owner = await open(args);
+    await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+    expect(io.render).not.toHaveBeenCalled();
+    expect(io.samples).toEqual([]);
+  }
+);
