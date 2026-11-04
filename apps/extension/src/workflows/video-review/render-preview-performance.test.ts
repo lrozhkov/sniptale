@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { createReviewPreviewRenderer } from './render-preview';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { createPreviewRenderResources } from './preview-render-resources';
+import { resolvePreviewRenderAllocation } from './preview-render-allocation';
 
 const io = vi.hoisted(() => ({
   order: [] as string[],
@@ -377,4 +379,101 @@ it('admits export frames without an unrelated WebGPU allocation allowance', asyn
   expect(io.gpu).not.toHaveBeenCalled();
   prepared.release();
   owner.dispose();
+});
+
+it('keeps the GPU device across prepared scene and backing replacements', async () => {
+  vi.stubGlobal('navigator', { gpu: {} });
+  const bitmap = { close: vi.fn() };
+  const gpuRender = vi.fn(async () => bitmap);
+  const dispose = vi.fn();
+  io.gpu.mockResolvedValue({ render: gpuRender, dispose, allocatedBytes: 0 });
+  const { resources, leases } = setup();
+  const owner = createReviewPreviewRenderer({ resources });
+  const raw = { timestamp: 1_000_000, close: vi.fn() } as unknown as VideoFrame;
+  for (const backing of [dimensions.backing, { width: 600, height: 338 }, dimensions.backing]) {
+    const prepared = await owner.prepare(
+      scene(),
+      { ...dimensions, backing },
+      new AbortController().signal
+    );
+    const source = { ...frame().source, videoFrame: () => raw, backing };
+    const result = await owner.render(prepared, { ...frame(), source });
+    result.release();
+    prepared.release();
+  }
+  expect(gpuRender).toHaveBeenCalledTimes(3);
+  expect(io.gpu).toHaveBeenCalledOnce();
+  expect(dispose).not.toHaveBeenCalled();
+  owner.dispose();
+  expect(dispose).toHaveBeenCalledOnce();
+  expect(raw.close).not.toHaveBeenCalled();
+  expect(leases.every((lease) => lease.release.mock.calls.length === 1)).toBe(true);
+});
+
+it('admits retained GPU allocations while preparing the next scene', async () => {
+  vi.stubGlobal('navigator', { gpu: {} });
+  const f = setup();
+  const resources = createPreviewRenderResources({
+    maximumManagedBytes: 1,
+    maximumCanvases: 1,
+    createCanvas: () => {
+      const lease = f.resources.canvas('test', { width: 1, height: 1 });
+      return Object.assign(lease.canvas, { getContext: () => lease.context });
+    },
+  });
+  const input = scene();
+  const graph = resolvePreviewRenderAllocation({
+    scene: input,
+    dimensions,
+    resultTime: 1,
+    sourceTime: 1,
+    sourceAllocationBytes: null,
+    sourceBacking: size,
+    camera: { retainedBytes: null, activeBytes: null },
+    transitionBytes: null,
+    previousFront: null,
+    assets: {
+      backgroundBitmap: null,
+      headerBitmap: null,
+      watermark: null,
+      previousWatermarkCache: null,
+    },
+  });
+  const retainedBytes = 4 * 1024 * 1024;
+  let retained: { release(): void } | null = null;
+  io.gpu.mockResolvedValue({
+    get allocatedBytes() {
+      return retained ? retainedBytes : 0;
+    },
+    render: vi.fn(async () => {
+      retained ??= resources.bytes('test-gpu-texture', retainedBytes);
+      return { close: vi.fn() };
+    }),
+    dispose: () => {
+      retained?.release();
+      retained = null;
+    },
+  });
+  const owner = createReviewPreviewRenderer({
+    resources,
+    allocation: { describe: () => graph, replaceLimits: (next) => resources.replaceLimits(next) },
+  });
+  const first = await owner.prepare(input, dimensions, new AbortController().signal);
+  const source = {
+    ...frame().source,
+    videoFrame: () => ({ timestamp: 1_000_000 }) as VideoFrame,
+  };
+  (await owner.render(first, { ...frame(), source })).release();
+  first.release();
+  const next = await owner.prepare(
+    input,
+    { ...dimensions, backing: { width: 600, height: 338 } },
+    new AbortController().signal
+  );
+  expect(io.gpu).toHaveBeenCalledOnce();
+  next.release();
+  owner.dispose();
+  expect(retained).toBeNull();
+  resources.dispose();
+  expect(resources.counters.managedBytes).toBe(0);
 });

@@ -164,7 +164,7 @@ function validSize(size: Size) {
 }
 
 function disposeAssets(assets: Assets) {
-  assets.gpu?.dispose();
+  assets.gpu?.releaseScene();
   assets.gpu = null;
   assets.windowRaster?.lease.release();
   assets.windowRaster = null;
@@ -865,7 +865,7 @@ function admitRender(
 const needsSpatialRenderer = (scene: Scene) =>
   scene.zoomRegions.some(quickEditRegionNeedsSpatialRenderer);
 
-/** One prepared scene owner; transport, immutable capture and publication remain with the caller. */
+/** Owns prepared scenes and one session GPU; callers retain capture and publication. */
 export function createReviewPreviewRenderer(args: {
   resources: RenderResources;
   exportEnhancer?: ExportEnhancer;
@@ -886,6 +886,7 @@ export function createReviewPreviewRenderer(args: {
   let preparation: AbortController | null = null;
   let captionRefresh: AbortController | null = null;
   let rendering = false;
+  let gpu: ReturnType<typeof createReviewGpuPreview> | null = null;
   const leases = new Set<Prepared>();
   const clear = () => {
     if (current) disposeAssets(current.assets);
@@ -990,15 +991,15 @@ export function createReviewPreviewRenderer(args: {
         dimensions: structuredClone(dimensions),
       };
       prepareSceneCameraPlans(prepared);
+      const useGpu = !args.exportEnhancer && typeof navigator !== 'undefined' && !!navigator.gpu;
+      if (useGpu && !gpu)
+        gpu = createReviewGpuPreview({
+          resources: args.resources,
+          reserve: (bytes) => args.resources.bytes('preview-gpu', bytes),
+        });
       const assets: Assets = {
         onContextLost: args.onContextLost,
-        gpu:
-          !args.exportEnhancer && typeof navigator !== 'undefined' && navigator.gpu
-            ? createReviewGpuPreview({
-                resources: args.resources,
-                reserve: (bytes) => args.resources.bytes('preview-gpu', bytes),
-              })
-            : null,
+        gpu: useGpu ? gpu : null,
         annotations: null,
         captions: null,
         allocation: {
@@ -1028,18 +1029,21 @@ export function createReviewPreviewRenderer(args: {
             controller.signal.throwIfAborted();
             if (!args.allocation) return;
             const input = args.allocation.describe();
-            args.allocation.replaceLimits(
-              calculatePreviewPreparationAllocation({
-                previousFront: input.publication.previousFront,
-                retainedCamera: input.admission.camera.retained,
-                retainedTransition: input.admission.transition,
-                backgroundBitmap: assets.allocation.backgroundBitmap,
-                headerBitmap: assets.allocation.headerBitmap,
-                watermark: assets.allocation.watermark,
-                measurement,
-                annotationSourceBytes: assets.allocation.annotationSourceBytes ?? 0,
-              })
-            );
+            const limits = calculatePreviewPreparationAllocation({
+              previousFront: input.publication.previousFront,
+              retainedCamera: input.admission.camera.retained,
+              retainedTransition: input.admission.transition,
+              backgroundBitmap: assets.allocation.backgroundBitmap,
+              headerBitmap: assets.allocation.headerBitmap,
+              watermark: assets.allocation.watermark,
+              measurement,
+              annotationSourceBytes: assets.allocation.annotationSourceBytes ?? 0,
+            });
+            args.allocation.replaceLimits({
+              ...limits,
+              // The session GPU retains tracked textures/buffers during scene preparation.
+              maximumManagedBytes: limits.maximumManagedBytes + (gpu?.allocatedBytes ?? 0),
+            });
           },
           args.annotationExecutor
         );
@@ -1159,6 +1163,8 @@ export function createReviewPreviewRenderer(args: {
       preparation?.abort();
       preparation = null;
       clear();
+      gpu?.dispose();
+      gpu = null;
     },
   };
 }

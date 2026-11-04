@@ -4241,10 +4241,10 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "createReviewPreviewRenderer",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One renderer owns preparation, leases, cancellation and stale-result admission. It borrows sampling through substantive adapters. It does not create or dispose the job enhancer. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One preview renderer owns the GPU session and prepared scene leases. Scene replacement cancels old work and releases scene artwork. Final disposal releases the device. Existing sampling and geometry adapters retain their owners. This change adds no writer or publication authority.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "9350cde285089524676f33f3eeab48bd91b06cb7df4ba4d95e40b8f9e9abd3b6",
+      "astHash": "c326da8183a0f620edbd404f38209b8e3ef4ede893c55e91a5ef3043ba51e864",
       "signatureHash": "4ea1b85e38865202564b15b5f3b5823b979b50dff4219809701d003d6a22234a"
     },
     {
@@ -5396,10 +5396,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One prepared-scene factory owns backend initialization, retained artwork and device failure. Annotation holds and endpoint outputs share its existing frame transaction. Separate scene and geometry adapters remain outside this resource owner.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes backend or artwork lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One preview session owns the GPU device and scene cancellation. Scene release retains borrowed artwork until the frame settles. Texture revisions belong to that same resource owner. This factory adds no writer, publication owner or independent queue.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "26f9d503157c18bc0472b98448685fd0c9fb7390b7e5a23f584c10cb25e0f404",
+      "astHash": "e86675df5e5788dbd3d094e7ef443d7f7be87c2c4511b8cb281592707d53e8df",
       "signatureHash": "f6b7a0055e947ccb3c6887c17939a0d23709ecb18a06b6aeb0d7048751d524c0"
     },
     {
@@ -5418,10 +5418,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One GPU preview fixture tests output, cancellation, fallback and borrowed-resource cleanup. Added controlled fences cover annotation endpoints within that fixture. Sequential endpoint admission and final cleanup share the existing renderer lifetime.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes fixture setup or fence lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One GPU fixture checks scene replacement, cancellation, fallback and borrowed artwork. Controlled promises establish the resource release order. Pooled canvas tests check texture revisions. These cases share the existing renderer fixture and create no product authority.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "9b0d43d661feba2d2f0d3b991ff8d164c9a18263f4b551ebee78cddaf4f5af9e",
+      "astHash": "10abb8d2c771b5b4ef9420c080168cd97c9cd8a48bbb72aa38fac7c766190328",
       "signatureHash": "46f612d31df51c8dbb4650c243cf7039a4996bddb99bb6492497bfd9dee3a55c"
     },
     {
@@ -5726,10 +5726,10 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One renderer owns preparation, leases, cancellation and stale-result admission. It borrows sampling through substantive adapters. It does not create or dispose the job enhancer. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One preview renderer owns preparation, leases and stale-result checks. Its GPU session survives scene replacement. Preparation accounts for the tracked GPU bytes that remain allocated. Capture and publication remain with callers. Final architecture review must check this binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-04",
-      "astHash": "57754298fa34564ee5b5937eecb80fe45a201914d46ef60644cfca707c319eb1",
+      "astHash": "98e643b006d3d72bb93d00ba6e0e620feea7290351e4f4a007d33223ada816af",
       "signatureHash": "d1479386014944b917ffdeba9e6e925617d600cee9a8d37e3eff8ce0b82858ac"
     },
     {

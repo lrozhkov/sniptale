@@ -36,7 +36,7 @@ const identity: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 type Captions = Awaited<ReturnType<typeof prepareReviewCaptions>>;
 type Dimensions = PreviewSceneDimensions;
 
-/** One prepared Gallery scene owns cached artwork, GPU resources and failure fallback. */
+/** One Gallery preview session owns its GPU resources and failure fallback. */
 export function createReviewGpuPreview(args: {
   resources: RenderResources;
   reserve(bytes: number): { release(): void };
@@ -46,7 +46,10 @@ export function createReviewGpuPreview(args: {
   let disabled = false;
   let disposed = false;
   let active = false;
+  let sceneReleased = false;
+  let artworkRevision = 0;
   const lifetime = new AbortController();
+  let sceneLifetime = new AbortController();
   let artwork: {
     background: RenderCanvasLease;
     decoration: RenderCanvasLease;
@@ -63,8 +66,12 @@ export function createReviewGpuPreview(args: {
     artwork?.decoration.release();
     artwork?.overlay.release();
     artwork = null;
+    sceneReleased = false;
   };
   return {
+    get allocatedBytes() {
+      return renderer?.allocatedBytes ?? 0;
+    },
     async render(input: {
       scene: PreviewScene;
       dimensions: Dimensions;
@@ -92,7 +99,7 @@ export function createReviewGpuPreview(args: {
     }) {
       if (disabled || disposed) return false;
       const { scene, dimensions, geometry } = input;
-      const signal = AbortSignal.any([input.signal, lifetime.signal]);
+      const signal = AbortSignal.any([input.signal, lifetime.signal, sceneLifetime.signal]);
       active = true;
       const primitives = createReviewGpuPrimitives(args.resources);
       const ownedFrames: VideoFrame[] = [];
@@ -196,7 +203,7 @@ export function createReviewGpuPreview(args: {
             ...dimensions.backing,
             currentTime: geometry.resultTime,
           });
-          art.backgroundRevision++;
+          art.backgroundRevision = ++artworkRevision;
         }
         const captionKey =
           input.captions?.plan.cues
@@ -219,7 +226,7 @@ export function createReviewGpuPreview(args: {
           ctx.restore();
           art.captionOwner = input.captions;
           art.captionKey = captionKey;
-          art.captionRevision++;
+          art.captionRevision = ++artworkRevision;
         }
         const full = { x: 0, y: 0, ...dimensions.canonical };
         const radius = background.enabled ? background.layout.cornerRadius : 0;
@@ -409,8 +416,15 @@ export function createReviewGpuPreview(args: {
         primitives.dispose();
         for (const frame of ownedFrames) frame.close();
         active = false;
-        if (disposed) clear();
+        if (disposed || sceneReleased) clear();
       }
+    },
+    releaseScene() {
+      sceneLifetime.abort();
+      sceneLifetime = new AbortController();
+      // Borrowed artwork remains valid until the active GPU transaction settles.
+      if (active) sceneReleased = true;
+      else clear();
     },
     dispose() {
       disposed = true;

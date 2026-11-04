@@ -118,7 +118,82 @@ it('retains the Canvas path when no adapter is available without allocating GPU 
   expect(await f.owner.render(f.input)).toBe(false);
   expect(f.allocate).not.toHaveBeenCalled();
   expect(f.frame.close).not.toHaveBeenCalled();
+  f.owner.releaseScene();
   expect(await f.owner.render(f.input)).toBe(false);
+  expect(io.create).toHaveBeenCalledOnce();
+  f.owner.dispose();
+});
+
+it('refreshes pooled scene artwork without reusing a previous texture revision', async () => {
+  const f = fixture();
+  await f.owner.render(f.input);
+  const firstLayers = io.render.mock.calls[0]![0].layers as GpuPreviewLayer[];
+  const revisions = (layers: GpuPreviewLayer[]): (object | string | number)[] =>
+    layers.flatMap((layer) => [
+      ...(layer.cache ? [layer.cache.revision] : []),
+      ...('layers' in layer.source ? revisions([...layer.source.layers]) : []),
+    ]);
+  const previousRevisions = revisions(firstLayers).filter((value) => typeof value === 'number');
+  const pooled = f.allocate.mock.results.map((result) => result.value);
+  let next = 0;
+  f.allocate.mockImplementation(() => pooled[next++ % pooled.length]!);
+  f.owner.releaseScene();
+  expect(f.released).toHaveBeenCalledTimes(3);
+  expect(io.dispose).not.toHaveBeenCalled();
+  const image = { width: 320, height: 180 } as ImageBitmap;
+  await f.owner.render({ ...f.input, image });
+  expect(io.create).toHaveBeenCalledOnce();
+  expect(f.input.painter.draw).toHaveBeenCalledTimes(2);
+  expect(f.input.painter.draw.mock.calls[1]![1]).toEqual(expect.objectContaining({ image }));
+  const nextRevisions = revisions(io.render.mock.calls[1]![0].layers).filter(
+    (value) => typeof value === 'number'
+  );
+  expect(previousRevisions).toHaveLength(2);
+  expect(nextRevisions).toHaveLength(2);
+  expect(nextRevisions.every((value) => !previousRevisions.includes(value))).toBe(true);
+  f.owner.dispose();
+  expect(f.released).toHaveBeenCalledTimes(6);
+});
+
+it('retains released scene artwork until the active GPU render settles', async () => {
+  const f = fixture();
+  const completion = Promise.withResolvers<typeof f.bitmap>();
+  const entered = Promise.withResolvers<void>();
+  io.render.mockImplementationOnce(() => {
+    entered.resolve();
+    return completion.promise;
+  });
+  const controller = new AbortController();
+  const pending = f.owner.render({ ...f.input, signal: controller.signal });
+  await entered.promise;
+  f.owner.releaseScene();
+  expect(f.released).not.toHaveBeenCalled();
+  expect(io.dispose).not.toHaveBeenCalled();
+  completion.resolve(f.bitmap);
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  expect(f.released).toHaveBeenCalledTimes(3);
+  expect(f.context.drawImage).not.toHaveBeenCalled();
+  expect(f.bitmap.close).toHaveBeenCalledOnce();
+  expect(await f.owner.render(f.input)).toBe(true);
+  expect(io.create).toHaveBeenCalledOnce();
+  f.owner.dispose();
+});
+
+it('reuses initialization after the requesting scene is cancelled', async () => {
+  const f = fixture();
+  const renderer = { render: io.render, dispose: io.dispose, allocatedBytes: 0 };
+  const initialization = Promise.withResolvers<typeof renderer>();
+  io.create.mockReturnValueOnce(initialization.promise);
+  const controller = new AbortController();
+  const pending = f.owner.render({ ...f.input, signal: controller.signal });
+  expect(io.create).toHaveBeenCalledOnce();
+  controller.abort();
+  f.owner.releaseScene();
+  initialization.resolve(renderer);
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  expect(io.dispose).not.toHaveBeenCalled();
+  expect(f.context.drawImage).not.toHaveBeenCalled();
+  expect(await f.owner.render(f.input)).toBe(true);
   expect(io.create).toHaveBeenCalledOnce();
   f.owner.dispose();
 });
@@ -150,6 +225,7 @@ it('falls back after GPU failure and releases artwork while preserving the borro
   expect(await f.owner.render(f.input)).toBe(false);
   expect(f.released).toHaveBeenCalledTimes(3);
   expect(f.frame.close).not.toHaveBeenCalled();
+  f.owner.releaseScene();
   expect(await f.owner.render(f.input)).toBe(false);
   expect(io.render).toHaveBeenCalledOnce();
   f.owner.dispose();
