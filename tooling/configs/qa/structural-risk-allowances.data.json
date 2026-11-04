@@ -3463,7 +3463,7 @@
       "reason": "tool-noise: One bounded history hook owns its reader and active and latest requests. Initial loading derives from the existing completed view and failure state. It adds no state authority or read. Disposal, retry and pinned selection remain in this owner.",
       "removalCondition": "Remove when this AST or signature changes. Reassess a separate request owner, writer, publisher or recovery lifetime. Remove when the analyzer models this cohesive owner. Final architecture review must check the binding.",
       "reviewDate": "2026-11-04",
-      "astHash": "0d127a4f0b8e6846a4ec658de647603b4a28476cd80468efc006dc7e88f3ee17",
+      "astHash": "10ef979db7a55b772426712eff45b10ed77ae804fd2fbb37badaab71b1d0e34f",
       "signatureHash": "4fc8ef5c842738154a2ed120570bcabd099c1d1e088673e52de378081efa670a"
     },
     {

@@ -8,6 +8,7 @@ import {
 } from '../../features/video/review/telemetry';
 import type { ReviewSelection } from '../../features/video/review/types';
 import type { LoadedReview } from './use-session';
+import { cursorTrajectoryProjectCoversTime } from '../../features/video/project/cursor-trajectory/project-window';
 
 type Resource = Pick<LoadedReview, 'historyProject' | 'telemetry' | 'source'>;
 type Range = { start: number; end: number };
@@ -143,6 +144,18 @@ export function useReviewRecordingHistory(
     })();
   }, [owner, request, retryGeneration, view]);
   const prepared = owner && covers(view, owner, request) ? view?.prepared : undefined;
+  // Event refresh cannot withdraw cursor facts that still have independent source coverage.
+  const retainedCursor =
+    owner &&
+    !prepared &&
+    !owner.failed &&
+    includeCursor &&
+    resource.telemetry?.cursorTrajectory &&
+    view?.owner === owner &&
+    view.prepared &&
+    cursorTrajectoryProjectCoversTime(view.prepared.project, request.time)
+      ? view.prepared.telemetry
+      : undefined;
   const pinned = useRef<{ owner: Owner; marker: ReviewTelemetryMarker } | null>(null);
   const telemetry = useMemo(() => {
     const base = resource.telemetry;
@@ -155,14 +168,17 @@ export function useReviewRecordingHistory(
             signals: base.signals.filter((signal) => signal.kind === 'static-frame'),
           }
         : {}),
-      ...(!includeCursor
-        ? { cursorTrack: null }
-        : base.cursorTrajectory && base.cursorTrack
-          ? { cursorTrack: { ...base.cursorTrack, samples: [] } }
-          : {}),
+      ...(retainedCursor
+        ? { cursorTrack: retainedCursor.cursorTrack }
+        : !includeCursor
+          ? { cursorTrack: null }
+          : base.cursorTrajectory && base.cursorTrack
+            ? { cursorTrack: { ...base.cursorTrack, samples: [] } }
+            : {}),
     };
     const selected = selection.kind === 'telemetry' ? selection.ref : null;
     const window = reviewRecordingWindow(facts);
+    const cursorEndSeconds = reviewRecordingWindow(retainedCursor ?? null)?.cursorEndSeconds;
     const markers =
       window?.markers ?? projectReviewTelemetry(facts, resource.source.duration).markers;
     const same = (marker: ReviewTelemetryMarker) =>
@@ -185,6 +201,7 @@ export function useReviewRecordingHistory(
     const keep = pinned.current?.marker;
     return attachReviewRecordingWindow(facts, {
       ...window,
+      ...(cursorEndSeconds === undefined ? {} : { cursorEndSeconds }),
       markers: keep && !visible ? [...markers, keep] : markers,
     });
   }, [
@@ -195,6 +212,7 @@ export function useReviewRecordingHistory(
     selection,
     view,
     includeCursor,
+    retainedCursor,
   ]);
   return {
     telemetry,
