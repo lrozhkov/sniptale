@@ -445,6 +445,7 @@ it('restores annotation anchors on media readiness and restricts drawing to an i
 
 it('routes local preview preferences and inspector entry without changing editing or transport', async () => {
   const preferences = {
+    renderer: 'gpu',
     rasterPreset: '720p',
     frameRate: '30',
     pausedQuality: 'detailed',

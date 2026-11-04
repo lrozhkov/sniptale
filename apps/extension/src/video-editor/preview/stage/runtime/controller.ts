@@ -219,6 +219,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     playbackRange: params.playbackRange,
     previewExactFrameCache,
     previewMode: params.previewMode,
+    previewRenderer: params.previewRenderer ?? 'gpu',
     previewRasterSize,
     project: previewProject,
     recordingProject: transient.previewProject,

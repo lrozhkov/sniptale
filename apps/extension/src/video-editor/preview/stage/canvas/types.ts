@@ -54,6 +54,7 @@ export type PreviewStageRootSurfaceProps = Pick<
   | 'previewCacheBypass'
   | 'previewExactFrameCache'
   | 'previewMode'
+  | 'previewRenderer'
   | 'previewRasterSize'
   | 'project'
   | 'renderGenerationRef'

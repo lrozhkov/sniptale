@@ -32,7 +32,11 @@ async function restorePersistentVideoPreview(params: {
   range: ReturnType<typeof resolveVideoPreviewFrameRange>;
   storageKey: string;
 }) {
-  const plan = await createVideoPreviewCacheSegmentPlan(params.build.project, params.range);
+  const plan = await createVideoPreviewCacheSegmentPlan(
+    params.build.project,
+    params.range,
+    params.build.previewRenderer
+  );
   const stored = await loadVideoPreviewCacheRecord(params.storageKey).catch(() => null);
   const compatible = isStoredVideoPreviewCompatible(stored, {
     project: params.build.project,
@@ -73,6 +77,7 @@ function createFreshBuildContext(
   return {
     exactFrameCapacity,
     materializer: createVideoPreviewFrameMaterializer({
+      previewRenderer: params.previewRenderer ?? 'gpu',
       assetUrls: params.assetUrls,
       ownerDocument: params.ownerDocument,
       project: params.project,
@@ -88,8 +93,12 @@ export async function buildVideoPreviewCache(
   params: VideoPreviewCacheBuildParams
 ): Promise<VideoPreviewCacheBuildResult> {
   const range = resolveVideoPreviewFrameRange(params.project, params.playbackRange);
-  const renderRevision = await createVideoPreviewRenderRevision(params.project);
+  const renderRevision = await createVideoPreviewRenderRevision(
+    params.project,
+    params.previewRenderer
+  );
   const storageKey = await createVideoPreviewStorageKey({
+    previewRenderer: params.previewRenderer ?? 'gpu',
     project: params.project,
     range,
     rasterSize: params.rasterSize,

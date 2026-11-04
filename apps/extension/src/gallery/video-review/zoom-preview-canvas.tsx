@@ -1,3 +1,5 @@
+import { useContext } from 'react';
+import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { createZoomPreviewPaintOwner } from './zoom-preview-paint-owner';
 import { zoomPreviewGpuPointerProjection, type ZoomPreviewGpuInput } from './zoom-preview-gpu';
 import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
@@ -405,8 +407,9 @@ export function useZoomPreviewCanvasPaint(
   latest.current = props;
   const cache = useRef<ZoomPaintCache>({ painted: null, lensBase: null });
   const [spatialFailure, setFailure] = useState(false);
+  const backend = useContext(ReviewPreviewRendererContext);
   const [gpuActive, setGpuActive] = useState(
-    () => typeof navigator !== 'undefined' && !!navigator.gpu
+    () => backend === 'gpu' && typeof navigator !== 'undefined' && !!navigator.gpu
   );
   const [painted, setPainted] = useState<ZoomPreviewGpuInput | null>(null);
   const paintReady =
@@ -419,6 +422,7 @@ export function useZoomPreviewCanvasPaint(
   const owner = useMemo(
     () =>
       createZoomPreviewPaintOwner({
+        backend,
         publish(bitmap) {
           const canvas = canvasRef.current;
           const context = canvas?.getContext('2d');
@@ -498,7 +502,7 @@ export function useZoomPreviewCanvasPaint(
           setFailure(true);
         },
       }),
-    [canvasRef, retry]
+    [canvasRef, retry, backend]
   );
   useEffect(
     () => () => {

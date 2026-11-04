@@ -171,6 +171,9 @@ function createWorkspacePreviewSelection(args: CreateWorkspacePreviewArgs) {
 function createWorkspacePreviewPreferences(workspace: Pick<VideoEditorWorkspaceState, 'preview'>) {
   const previewPreferences = workspace.preview.preferences;
   return {
+    renderer: previewPreferences.preferences.renderer,
+    onRendererChange: (renderer: typeof previewPreferences.preferences.renderer) =>
+      previewPreferences.updatePreferences({ renderer }),
     mode: previewPreferences.preferences.mode,
     onModeChange: (mode: typeof previewPreferences.preferences.mode) =>
       previewPreferences.updatePreferences({ mode }),

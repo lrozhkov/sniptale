@@ -134,3 +134,12 @@ it('restores context and closes the bitmap when publication fails', async () => 
   expect(f.bitmap.close).toHaveBeenCalledOnce();
   f.composer.dispose();
 });
+
+it('does not acquire WebGPU for an explicit Standard endpoint composition', async () => {
+  const f = fixture();
+  const composer = createMaterializerGpuComposer({ width: 4, height: 2 }, () => false, 'legacy');
+  expect(await composer.compose(f.context, [], new AbortController().signal)).toBe(false);
+  composer.dispose();
+  expect(createGpuPreviewRenderer).not.toHaveBeenCalled();
+  expect(f.draw).not.toHaveBeenCalled();
+});

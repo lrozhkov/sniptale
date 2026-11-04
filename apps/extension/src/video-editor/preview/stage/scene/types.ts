@@ -20,6 +20,10 @@ import type { PreviewEffectRuntimeFeedback } from '../types';
 import type { VideoEditorPreviewRasterSize } from '../sizing/raster';
 import type { VideoEditorPreviewMode } from '../../../contracts/preview-runtime';
 import type { VideoPreviewExactFrameCache } from '../../cache/exact-frame-cache';
+import type {
+  PreviewRendererStatus,
+  VideoPreviewRenderer,
+} from '../../../../features/video/preview/preferences';
 
 export interface PreviewStageCanvasSceneParams {
   activeClips: VideoProjectClip[];
@@ -36,6 +40,7 @@ export interface PreviewStageCanvasSceneParams {
   previewExactFrameCache?: VideoPreviewExactFrameCache;
   previewRasterSize?: VideoEditorPreviewRasterSize;
   previewMode?: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer;
   project: VideoProject;
   renderGeneration?: number;
   renderGenerationRef?: React.MutableRefObject<number> | undefined;
@@ -51,9 +56,11 @@ type PreviewEffectRuntimeExecutorInput =
 export interface PreviewScenePresentation {
   camera: VideoCompositionCameraState;
   time: number;
+  renderer?: PreviewRendererStatus;
 }
 
 export type PreviewSceneRenderInput = {
+  previewRenderer?: VideoPreviewRenderer;
   gpuPreview?: NativeGpuPreviewRenderer;
   /** Held composition samples exclude outer fades; their caller applies presentation once. */
   sceneEdges?: 'omit';
@@ -88,6 +95,7 @@ export type PreviewSceneRenderInput = {
 
 /** GPU output is optional: undefined delegates the complete frame to the existing renderer. */
 export interface NativeGpuPreviewRenderer {
+  readonly fallbackReason?: PreviewRendererStatus['fallback'];
   readonly acceptsNativeFrames?: boolean;
   render(
     input: PreviewSceneRenderInput,

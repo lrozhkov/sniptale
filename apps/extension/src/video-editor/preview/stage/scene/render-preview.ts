@@ -237,7 +237,7 @@ async function renderPreparedPreviewScene(
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   let capture: ReturnType<typeof capturePreviewSceneVideos> | undefined;
   try {
-    if (params.gpuPreview) {
+    if (params.previewRenderer !== 'legacy' && params.gpuPreview) {
       if (params.prepareImages) {
         await params.prepareImages([
           renderPasses.overlayFrame,
@@ -290,7 +290,11 @@ async function renderPreparedPreviewScene(
       if (accelerated !== undefined)
         return accelerated === false
           ? false
-          : { camera: renderPasses.overlayFrame.camera, time: params.currentTime };
+          : {
+              camera: renderPasses.overlayFrame.camera,
+              time: params.currentTime,
+              renderer: { backend: 'gpu' },
+            };
       disposeEffectRuntimeComposition(effectRuntimeFrames);
       effectRuntimeFrames = undefined;
     }
@@ -332,7 +336,17 @@ async function renderPreparedPreviewScene(
       isInvalidated: () => mediaChanged,
     });
     if (!drawn) return false;
-    return { camera: renderPasses.overlayFrame.camera, time: params.currentTime };
+    return {
+      camera: renderPasses.overlayFrame.camera,
+      time: params.currentTime,
+      renderer: {
+        backend: 'legacy',
+        ...((params.previewRenderer === 'gpu' || params.gpuPreview) &&
+        params.previewRenderer !== 'legacy'
+          ? { fallback: params.gpuPreview?.fallbackReason ?? 'unavailable' }
+          : {}),
+      },
+    };
   } finally {
     for (const video of videos) video.removeEventListener('seeking', invalidate);
     try {

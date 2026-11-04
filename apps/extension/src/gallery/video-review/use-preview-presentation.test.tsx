@@ -176,6 +176,7 @@ it('preserves Current mode and allocates no manual renderer for an FPS readout',
   props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, showFrameRate: true };
   await render();
   expect(result.active).toBe(false);
+  expect(result.status.renderer).toEqual({ backend: 'legacy', fallback: 'unavailable' });
   expect(io.factory).not.toHaveBeenCalled();
   expect(io.prepare).not.toHaveBeenCalled();
   expect(isReviewPreviewManual({ ...props.preferences, pausedQuality: 'detailed' }, false)).toBe(

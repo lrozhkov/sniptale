@@ -203,6 +203,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
     previewExactFrameCache: params.previewExactFrameCache,
     previewRasterSize: params.previewRasterSize,
     previewMode: params.previewMode,
+    previewRenderer: params.previewRenderer ?? 'gpu',
     project: params.project,
     renderGeneration: params.renderGenerationRef?.current ?? 0,
     stageRef: params.stageRef,

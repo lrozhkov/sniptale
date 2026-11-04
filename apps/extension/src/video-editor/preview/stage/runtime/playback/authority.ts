@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../../../contracts/preview-runtime';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 
 import type { VideoProject } from '../../../../../features/video/project/types';
@@ -20,6 +21,7 @@ export interface UsePreviewStagePlaybackPreviewRuntimeParams extends PreviewStag
   renderGenerationRef: MutableRefObject<number>;
   previewExactFrameCache: VideoPreviewExactFrameCache;
   previewMode: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer;
   onPresentationTime: (time: number) => void;
   playbackRange: VideoEditorPlaybackRange | null;
   previewRasterSize: VideoEditorPreviewRasterSize;

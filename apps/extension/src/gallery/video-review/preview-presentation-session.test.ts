@@ -32,7 +32,10 @@ vi.mock('./preview-presentation', () => ({
 it('selects the Gallery GPU annotation sandbox and preserves retry teardown', () => {
   io.renderer.mockReturnValue({ dispose: io.dispose });
   const readAsset = vi.fn();
-  const latest = () => ({ input: { video: { current: null }, readAsset }, placement: null });
+  const latest = () => ({
+    input: { video: { current: null }, readAsset, preferences: { renderer: 'gpu' } },
+    placement: null,
+  });
   const owner = createManualPresentationOwner(
     latest as unknown as Parameters<typeof createManualPresentationOwner>[0],
     vi.fn(),
@@ -76,4 +79,25 @@ it('releases its original source clock on device failure and disposal after the 
   input.sourceIdentity = 'second';
   owner.dispose();
   expect(active).toHaveBeenLastCalledWith('first', false);
+});
+
+it('selects the Standard Gallery annotation path without GPU composition', () => {
+  io.renderer.mockClear();
+  io.executor.mockClear();
+  io.renderer.mockReturnValue({ dispose: vi.fn() });
+  const latest = () => ({
+    input: { video: { current: null }, preferences: { renderer: 'legacy' } },
+    placement: null,
+  });
+  const owner = createManualPresentationOwner(
+    latest as unknown as Parameters<typeof createManualPresentationOwner>[0],
+    vi.fn(),
+    vi.fn(),
+    vi.fn()
+  );
+  const args = io.renderer.mock.calls[0]![0];
+  expect(args.renderer).toBe('legacy');
+  args.annotationExecutor!();
+  expect(io.executor).toHaveBeenCalledExactlyOnceWith({});
+  owner.dispose();
 });

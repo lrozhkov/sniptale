@@ -1,4 +1,8 @@
 import type { VideoEditorPreviewMode } from '../../features/video/preview/preferences';
+export type {
+  VideoPreviewRenderer,
+  PreviewRendererStatus,
+} from '../../features/video/preview/preferences';
 
 export {
   VideoEditorPreviewMode,

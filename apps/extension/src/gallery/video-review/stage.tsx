@@ -1,3 +1,4 @@
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import {
   reviewPresentedStageProjection,
   type ReviewPresentedGeometry,
@@ -103,6 +104,7 @@ type ReviewStageProps = {
         onPresentedTime?: (sourceIdentity: string, sourceTime: number) => void;
         interacting?: boolean;
         sourceToResult(time: number): number | null;
+        onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
       }

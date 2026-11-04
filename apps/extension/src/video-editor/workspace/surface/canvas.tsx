@@ -377,6 +377,7 @@ function createWorkspacePreviewProps(
     placementMode: preview.selection.placementMode,
     project: preview.project,
     previewMode: preview.preferences.mode,
+    previewRenderer: preview.preferences.renderer,
     previewPreferencesSaveFailed: preview.preferences.saveFailed,
     previewShowFrameRate: preview.preferences.showFrameRate,
     onPreviewShowFrameRateChange: preview.preferences.onShowFrameRateChange,
@@ -456,6 +457,7 @@ function createWorkspacePreviewActions(
   | 'onClearPlacementMode'
   | 'onPausePlayback'
   | 'onPreviewModeChange'
+  | 'onPreviewRendererChange'
   | 'onPreviewPreferencesRetry'
   | 'onPreviewFrameRateChange'
   | 'onPreviewRasterPresetChange'
@@ -474,6 +476,7 @@ function createWorkspacePreviewActions(
     onClearPlacementMode: preview.pointAuthoring.onClearPlacementMode,
     onPausePlayback: preview.transport.onPausePlayback,
     onPreviewModeChange: preview.preferences.onModeChange,
+    onPreviewRendererChange: preview.preferences.onRendererChange,
     onPreviewPreferencesRetry: preview.preferences.onRetrySave,
     onPreviewFrameRateChange: preview.preferences.onFrameRateChange,
     onPreviewRasterPresetChange: preview.preferences.onRasterPresetChange,

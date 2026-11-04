@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES } from '../../../../../composition/persistence/video-editor-preview-preferences/model';
 import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
 import * as previewRevision from '../../../../preview/cache/revision';
 import { DEFAULT_CAMERA_PERSPECTIVE } from '../../../../../features/video/project/motion/spatial';
@@ -11,7 +12,10 @@ import { createEmptyVideoProject } from '../../../../../features/video/project/f
 import { createVideoProjectMotionRegion } from '../../../../../features/video/project/motion';
 import { FramingPreviewSurface, MotionFramingPreview } from './framing-preview';
 import { createMotionPanelProps } from './test-support';
-import { RuntimePreviewContext } from '../../../../runtime/controller/composition/contexts';
+import {
+  WorkspacePreviewContext,
+  RuntimePreviewContext,
+} from '../../../../runtime/controller/composition/contexts';
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), trajectory: vi.fn() }));
 vi.mock('../../../../../workflows/video-review/cursor-trajectory', async (load) => ({
@@ -901,6 +905,54 @@ it('uses the real archived midpoint for Result geometry without hydrating the au
   expect(JSON.stringify(archive.project)).toBe(before);
   expect(archive.project.cursorTrack?.samples).toEqual([]);
   expect(archive.project.cursorTrack?.sourceObservations?.[0]?.samples).toEqual([]);
+  expect(commit).not.toHaveBeenCalled();
+  expect(commitArea).not.toHaveBeenCalled();
+});
+
+it('switches inspector renderers and rejects the obsolete completed frame', async () => {
+  const show = async (renderer: 'gpu' | 'legacy') => {
+    act(() =>
+      root.render(
+        <WorkspacePreviewContext.Provider
+          value={{
+            sourceViewerActive: false,
+            setSourceViewerActive: vi.fn(),
+            resetPaneHeight: vi.fn(),
+            handleVerticalResizeKeyDown: vi.fn(),
+            handleStartVerticalResize: vi.fn(),
+            paneHeight: null,
+            workspaceSplitRef: { current: null },
+            preferences: {
+              preferences: { ...DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES, renderer },
+              retrySave: vi.fn(),
+              saveFailed: false,
+              updatePreferences: vi.fn(),
+            },
+          }}
+        >
+          <FramingPreviewSurface
+            project={project}
+            region={region}
+            assetUrls={assetUrls}
+            onCommit={commit}
+            onCommitArea={commitArea}
+          />
+        </WorkspacePreviewContext.Provider>
+      )
+    );
+    await admit();
+  };
+  await show('gpu');
+  expect(mocks.create.mock.lastCall?.[0].previewRenderer).toBe('gpu');
+  await show('legacy');
+  expect(mocks.create).toHaveBeenCalledTimes(2);
+  expect(mocks.create.mock.lastCall?.[0].previewRenderer).toBe('legacy');
+  expect(pending[0]!.signal.aborted).toBe(true);
+  await ready(0);
+  expect(draw).not.toHaveBeenCalled();
+  await ready(1);
+  expect(draw).toHaveBeenCalledOnce();
+  expect(button().disabled).toBe(false);
   expect(commit).not.toHaveBeenCalled();
   expect(commitArea).not.toHaveBeenCalled();
 });

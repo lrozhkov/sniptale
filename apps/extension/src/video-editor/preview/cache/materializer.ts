@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import type { PreviewScenePresentation } from '../stage/scene/types';
 import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 import { createMaterializerGpuComposer } from './materializer-gpu';
@@ -75,7 +76,7 @@ interface VideoPreviewMaterializerState {
   disposed: boolean;
   playbackSampler: ReturnType<typeof createCompositionCutSampleSource> | null;
   playbackSamplerConversion: 'canvas' | 'native';
-  gpuPreview: ReturnType<typeof createNativeGpuPreviewRenderer>;
+  gpuPreview: ReturnType<typeof createNativeGpuPreviewRenderer> | null;
   spatialRenderer: ReviewSpatialRenderer | null;
   stagingCanvas: HTMLCanvasElement | null;
   captionRenderer: ReturnType<typeof createVideoProjectCaptionRenderer>;
@@ -258,6 +259,7 @@ function materializerMediaIdentity(project: VideoProject): string {
 export function createVideoPreviewFrameMaterializer(params: {
   assetUrls: Record<string, string>;
   sampleFps?: number;
+  previewRenderer?: VideoPreviewRenderer;
   ownerDocument: Document;
   project: VideoProject;
   rasterSize: VideoEditorPreviewRasterSize;
@@ -343,7 +345,8 @@ function createMaterializedJoinPresentation(
   let busy = false;
   const gpuComposer = createMaterializerGpuComposer(
     params.rasterSize,
-    () => disposed || state.disposed
+    () => disposed || state.disposed,
+    params.previewRenderer
   );
   const renderSample = async (time: number, signal: AbortSignal) => {
     if (!cutPlan) {
@@ -369,7 +372,7 @@ function createMaterializedJoinPresentation(
         'omit'
       );
     }
-    const conversion = state.gpuPreview.acceptsNativeFrames ? 'native' : 'canvas';
+    const conversion = state.gpuPreview?.acceptsNativeFrames ? 'native' : 'canvas';
     if (cutSamplerConversion !== conversion) {
       cutSampler?.dispose();
       cutSampler = undefined;
@@ -546,17 +549,23 @@ function createMaterializedJoinPresentation(
             );
           const rect = { x: 0, y: 0, ...params.rasterSize };
           const inverse = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
-          if (
-            !(await gpuComposer.compose(
-              context,
-              [
-                { source: canvas, rect, inverse },
-                { source: artwork, rect, inverse },
-              ],
-              signal
-            ))
-          )
-            context.drawImage(artwork, 0, 0);
+          const gpuComposed = await gpuComposer.compose(
+            context,
+            [
+              { source: canvas, rect, inverse },
+              { source: artwork, rect, inverse },
+            ],
+            signal
+          );
+          if (!gpuComposed) context.drawImage(artwork, 0, 0);
+          framePresentation.renderer = gpuComposed
+            ? { backend: 'gpu' }
+            : {
+                backend: 'legacy',
+                ...(params.previewRenderer !== 'legacy'
+                  ? { fallback: gpuComposer.fallbackReason }
+                  : {}),
+              };
         } finally {
           artwork.width = artwork.height = 0;
         }
@@ -578,7 +587,7 @@ function createMaterializerMediaState(
     disposed: false,
     playbackSampler: null,
     playbackSamplerConversion: 'canvas',
-    gpuPreview: createNativeGpuPreviewRenderer(),
+    gpuPreview: params.previewRenderer === 'legacy' ? null : createNativeGpuPreviewRenderer(),
     spatialRenderer: null,
     stagingCanvas: null,
     captionRenderer: createVideoProjectCaptionRenderer(),
@@ -627,7 +636,7 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
   state.effectRuntime?.dispose();
   state.playbackSampler?.dispose();
   state.playbackSampler = null;
-  state.gpuPreview.dispose();
+  state.gpuPreview?.dispose();
   state.captionRenderer.clear();
   state.cursorTrajectoryRenderer.clear();
   state.recordingEventsRenderer.clear();
@@ -680,7 +689,7 @@ async function renderMaterializedFrame(
         (clip) => clip.type === 'VIDEO' && clip.playbackWindow && isClipActiveAtTime(clip, time)
       )
     ) {
-      const conversion = state.gpuPreview.acceptsNativeFrames ? 'native' : 'canvas';
+      const conversion = state.gpuPreview?.acceptsNativeFrames ? 'native' : 'canvas';
       if (state.playbackSamplerConversion !== conversion) {
         state.playbackSampler?.dispose();
         state.playbackSampler = null;
@@ -706,7 +715,8 @@ async function renderMaterializedFrame(
     );
     assertActive();
     const drawn = await renderPreviewScene({
-      gpuPreview: state.gpuPreview,
+      previewRenderer: params.previewRenderer ?? 'gpu',
+      ...(state.gpuPreview ? { gpuPreview: state.gpuPreview } : {}),
       sampleFps: params.sampleFps ?? params.project.fps,
       ...(sceneEdges === 'omit' ? { sceneEdges } : {}),
       captionRenderer: state.captionRenderer,
@@ -734,6 +744,7 @@ async function renderMaterializedFrame(
         assertActive();
         state.effectRuntime ??= createVideoEditorEffectRuntime({
           ownerDocument: params.ownerDocument,
+          renderer: params.previewRenderer ?? 'gpu',
         });
         return state.effectRuntime.executor;
       },

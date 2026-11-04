@@ -61,6 +61,7 @@ it('uses the original late sequence lattice and a bounded unpublished writer', a
     readProjectAsset: async () => null,
   };
   const plan = preparePresentationPreview(input, 'outro', {
+    renderer: 'gpu',
     rasterPreset: 'current',
     frameRate: 'current',
     pausedQuality: 'same',
@@ -180,6 +181,7 @@ it('keeps ordinary voiceover offsets and authored mute source-native in a bounde
     readProjectAsset: async () => new Blob(['accepted']),
   };
   const plan = preparePresentationPreview(input, 'outro', {
+    renderer: 'gpu',
     rasterPreset: 'current',
     frameRate: 'current',
     pausedQuality: 'same',

@@ -3020,6 +3020,11 @@
       "toolSubtitle": "Current tool parameters"
     },
     "scene": {
+      "previewRenderer": "Preview renderer",
+      "previewRendererGpu": "WebGPU",
+      "previewRendererLegacy": "Standard",
+      "previewRendererUnavailable": "WebGPU is unavailable. Standard rendering is active. Check browser hardware acceleration and your graphics driver.",
+      "previewRendererFailed": "WebGPU failed. Standard rendering is active.",
       "resetBackground": "Reset",
       "backgroundNone": "None",
       "backgroundPanelSection": "Background and image",

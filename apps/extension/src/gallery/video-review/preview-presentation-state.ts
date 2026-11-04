@@ -1,3 +1,7 @@
+import type {
+  PreviewRendererStatus,
+  VideoPreviewRenderer,
+} from '../../features/video/preview/preferences';
 import type { ReviewPresentedGeometry } from '../../workflows/video-review/gpu-preview-geometry';
 import {
   reviewPreviewSceneKey,
@@ -55,6 +59,7 @@ export interface PresentationInput {
 /** Requested FPS counts completed manual publications; native transport statistics are separate. */
 export interface ReviewPreviewPresentationStatus {
   captionConflicts?: Prepared['captionConflicts'];
+  renderer?: PreviewRendererStatus;
   phase: 'inactive' | 'pending' | 'ready' | 'failed';
   actualRaster: Size | null;
   presentedFPS: number | null;
@@ -62,6 +67,7 @@ export interface ReviewPreviewPresentationStatus {
 }
 
 export type Description = {
+  renderer?: VideoPreviewRenderer;
   scene: Scene;
   dimensions: { canonical: Size; backing: Size };
   cameraTransform: RenderFrame['cameraTransform'];
@@ -128,6 +134,7 @@ export function resolvePresentationDescription(
       key,
       generation: (previous?.generation ?? 0) + 1,
       description: {
+        renderer: input.preferences.renderer,
         scene,
         dimensions: { canonical: input.canonical, backing },
         cameraTransform: !input.playing ? input.cameraTransform : undefined,
@@ -153,6 +160,8 @@ function samePresentationMetadata(
 ) {
   return (
     left.phase === right.phase &&
+    left.renderer?.backend === right.renderer?.backend &&
+    left.renderer?.fallback === right.renderer?.fallback &&
     left.nativeVideoFPS === right.nativeVideoFPS &&
     left.actualRaster?.width === right.actualRaster?.width &&
     left.actualRaster?.height === right.actualRaster?.height &&

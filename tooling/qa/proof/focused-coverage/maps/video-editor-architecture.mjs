@@ -67,6 +67,16 @@ const spatialResourceMappings = [
 }));
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
+  {
+    owner: 'video-editor-framing-preview-frame',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview-frame.ts',
+    reason:
+      'The framing surface tests exercise renderer selection, cancellation and completed frame publication.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx',
+    ],
+  },
   ...spatialResourceMappings,
   {
     owner: 'video-editor-project-state-admission',

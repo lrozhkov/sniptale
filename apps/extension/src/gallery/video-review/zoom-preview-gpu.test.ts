@@ -575,3 +575,22 @@ it('preserves successive keyboard edits while the next GPU frame is pending', as
     host.remove();
   }
 });
+
+it('uses Standard painting without acquiring a GPU inspector renderer', async () => {
+  const fallback = vi.fn();
+  const publish = vi.fn();
+  const onBackend = vi.fn();
+  const owner = createZoomPreviewPaintOwner({
+    backend: 'legacy',
+    fallback,
+    publish,
+    onBackend,
+    onError: vi.fn(),
+  });
+  owners.push(owner);
+  owner.update(input());
+  await vi.waitFor(() => expect(onBackend).toHaveBeenCalledWith(false));
+  expect(fallback).toHaveBeenCalledOnce();
+  expect(publish).not.toHaveBeenCalled();
+  expect(io.create).not.toHaveBeenCalled();
+});

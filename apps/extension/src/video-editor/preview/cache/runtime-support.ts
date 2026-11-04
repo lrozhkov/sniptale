@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import { createSha256Digest } from '@sniptale/platform/security/digest';
 
 import type {
@@ -34,6 +35,7 @@ export interface VideoPreviewCacheBuildParams {
   onProgress: (phase: VideoEditorPreviewPhase, completed: number, total: number) => void;
   ownerDocument: Document;
   playbackRange: VideoEditorPlaybackRange | null;
+  previewRenderer?: VideoPreviewRenderer;
   project: VideoProject;
   rasterSize: VideoEditorPreviewRasterSize;
   signal: AbortSignal;
@@ -66,12 +68,14 @@ export function resolveVideoPreviewFrameRange(
 }
 
 export async function createVideoPreviewStorageKey(params: {
+  previewRenderer?: VideoPreviewRenderer;
   project: VideoProject;
   range: VideoPreviewCacheFrameRange;
   rasterSize: VideoEditorPreviewRasterSize;
 }): Promise<string> {
   return createSha256Digest(
     JSON.stringify({
+      renderer: params.previewRenderer ?? 'gpu',
       fps: params.project.fps,
       height: params.rasterSize.height,
       projectId: params.project.id,
@@ -158,6 +162,7 @@ export function restoreMatchingSegments(
 export function isStoredVideoPreviewCompatible(
   record: VideoPreviewCacheRecord | null,
   params: {
+    previewRenderer?: VideoPreviewRenderer;
     project: VideoProject;
     range: VideoPreviewCacheFrameRange;
     rasterSize: VideoEditorPreviewRasterSize;

@@ -7,12 +7,23 @@ import {
 } from '../../../features/video/preview/quick-preferences';
 import { parseCompleteQuickPreviewPreferences, parseQuickPreviewPreferences } from './model';
 
+it('defaults the renderer to GPU and admits only the explicit workstation renderer choices', () => {
+  expect(parseQuickPreviewPreferences(undefined).preferences).toMatchObject({ renderer: 'gpu' });
+  const legacy = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, renderer: 'legacy' };
+  expect(parseCompleteQuickPreviewPreferences(legacy)).toEqual(legacy);
+  expect(parseQuickPreviewPreferences({ renderer: 'cpu' })).toMatchObject({
+    preferences: { renderer: 'gpu' },
+    invalidFieldCount: 1,
+  });
+  expect(parseCompleteQuickPreviewPreferences({ ...legacy, renderer: 'cpu' })).toBeNull();
+});
+
 it('admits every finite choice and materializes independent preference snapshots', () => {
   for (const rasterPreset of QUICK_PREVIEW_RASTER_PRESETS)
     for (const frameRate of QUICK_PREVIEW_FRAME_RATES)
       for (const pausedQuality of QUICK_PREVIEW_PAUSED_QUALITIES)
         for (const showFrameRate of [false, true]) {
-          const input = { rasterPreset, frameRate, pausedQuality, showFrameRate };
+          const input = { renderer: 'gpu', rasterPreset, frameRate, pausedQuality, showFrameRate };
           expect(parseCompleteQuickPreviewPreferences(input)).toEqual(input);
           expect(parseQuickPreviewPreferences(input)).toEqual({
             preferences: input,

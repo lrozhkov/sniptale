@@ -516,3 +516,14 @@ it('invalidates cached frames when full cursor facts outside the segment change'
   group.samples[0] = { ...group.samples[0]!, recordingPoint: { x: 0.8, y: 1 } };
   await expect(createVideoPreviewSegmentRevision(project, range)).resolves.not.toBe(before);
 });
+
+it('isolates exact-frame and persistent segment revisions by selected preview renderer', async () => {
+  const project = createEmptyVideoProject('Renderer partition', 4, 2);
+  const range = { startFrame: 0, endFrame: 20 };
+  expect(await createVideoPreviewRenderRevision(project, 'gpu')).not.toBe(
+    await createVideoPreviewRenderRevision(project, 'legacy')
+  );
+  expect(await createVideoPreviewSegmentRevision(project, range, 'gpu')).not.toBe(
+    await createVideoPreviewSegmentRevision(project, range, 'legacy')
+  );
+});

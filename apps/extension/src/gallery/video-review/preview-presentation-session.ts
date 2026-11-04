@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { createEffectRuntimeSandboxExecutor } from '../../workflows/video/effect-runtime-sandbox';
 import { createReviewPreviewRenderer } from '../../workflows/video-review/render-preview';
@@ -73,6 +74,7 @@ class ManualPresentationSession {
   private contextLost = false;
   private sourceFrameCallback: number | null = null;
   private renderer: Renderer;
+  private rendererPreference: VideoPreviewRenderer;
   private readonly scheduler: ReturnType<
     typeof createReviewPreviewPresentation<Description, Prepared, RenderFrame, Publication>
   >;
@@ -91,6 +93,7 @@ class ManualPresentationSession {
       () => this.resultTime,
       () => this.front
     );
+    this.rendererPreference = this.latest().input.preferences.renderer ?? 'gpu';
     this.renderer = this.createRenderer();
     this.scheduler = createReviewPreviewPresentation({
       ...createReviewPresentationPaintClock(),
@@ -125,6 +128,7 @@ class ManualPresentationSession {
       first = this.publications[0];
     this.report({
       phase,
+      ...(this.front?.renderer ? { renderer: this.front.renderer } : {}),
       captionConflicts: this.front?.captionConflicts ?? [],
       nativeVideoFPS: null,
       actualRaster: this.front
@@ -142,8 +146,11 @@ class ManualPresentationSession {
     const readAsset = this.latest().input.readAsset;
     return createReviewPreviewRenderer({
       resources,
+      renderer: this.rendererPreference,
       annotationExecutor: () =>
-        createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-preview' }),
+        createEffectRuntimeSandboxExecutor(
+          this.rendererPreference === 'gpu' ? { compositionBackend: 'gpu-preview' } : {}
+        ),
       ...(readAsset ? { readAsset } : {}),
       allocation: { describe: graph, replaceLimits: (limits) => resources.replaceLimits(limits) },
       onContextLost: () => {
@@ -167,6 +174,14 @@ class ManualPresentationSession {
   private prepare = async (request: { scene: Description; time: number }, signal: AbortSignal) => {
     if (this.contextLost) throw new Error('Preview context lost');
     if (this.latest().input.backgroundPending) throw new PendingPresentation();
+    const rendererPreference = request.scene.renderer ?? 'gpu';
+    if (this.rendererPreference !== rendererPreference) {
+      // The presentation scheduler drains the previous render before preparing this scene.
+      this.renderer.dispose();
+      this.rendererPreference = rendererPreference;
+      this.renderer = this.createRenderer();
+      this.admission.resetAssets();
+    }
     if (this.cameraDescription !== request.scene) {
       prepareReviewCameraPlans(request.scene.scene.zoomRegions, {
         ...request.scene.scene,

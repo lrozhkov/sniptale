@@ -1,3 +1,4 @@
+import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { zoomPreviewGpuProjection, type ZoomPreviewGpuInput } from './zoom-preview-gpu';
 import {
   quickEditMotionBlurCameras,
@@ -134,8 +135,9 @@ function PreparedZoomPreview(
   }
 ) {
   const { loadFrame, region, sourceTime } = props;
+  const backend = useContext(ReviewPreviewRendererContext);
   const [gpuActive, setGpuActive] = useState(
-    () => typeof navigator !== 'undefined' && !!navigator.gpu
+    () => backend === 'gpu' && typeof navigator !== 'undefined' && !!navigator.gpu
   );
   const [presented, setPresented] = useState<ZoomPreviewGpuInput | null>(null);
   const image = useReviewBackgroundImage(props.background);

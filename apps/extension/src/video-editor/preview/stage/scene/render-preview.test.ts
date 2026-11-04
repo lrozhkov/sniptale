@@ -693,6 +693,18 @@ it('admits the GPU transaction before Canvas normalization and skips legacy draw
   }
 });
 
+it('honors the Standard preview choice without entering the available GPU transaction', async () => {
+  const { job } = setup();
+  const render = vi.fn<NativeGpuPreviewRenderer['render']>(async () => true);
+  await renderPreviewScene({
+    ...job,
+    previewRenderer: 'legacy',
+    gpuPreview: { render, dispose: vi.fn() },
+  });
+  expect(render).not.toHaveBeenCalled();
+  expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
+});
+
 it('packs padded native preview frames before composition and releases them after drawing', async () => {
   const { video, job } = setup();
   Object.defineProperty(video, 'videoWidth', { value: 1904 });
@@ -761,7 +773,7 @@ it('returns the exact evaluated GPU camera override only after a completed frame
     }),
   };
   await expect(renderPreviewScene({ ...job, cameraOverride: camera, gpuPreview })).resolves.toEqual(
-    { camera, time: 1 }
+    { camera, time: 1, renderer: { backend: 'gpu' } }
   );
   gpuPreview.render.mockResolvedValueOnce(false);
   await expect(renderPreviewScene({ ...job, cameraOverride: camera, gpuPreview })).resolves.toBe(
@@ -878,7 +890,7 @@ it('returns the camera evaluated from a bounded archive window without expanding
     decodedVideoFrames: new Map([[clip.id, source]]),
     gpuPreview,
   });
-  expect(result).toEqual({ camera, time: 0.75 });
+  expect(result).toEqual({ camera, time: 0.75, renderer: { backend: 'gpu' } });
   expect(prepared.cursorTrack?.samples).toEqual([]);
   expect(JSON.stringify(prepared)).toBe(JSON.stringify(project));
 });

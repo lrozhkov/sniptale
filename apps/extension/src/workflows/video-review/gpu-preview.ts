@@ -1,4 +1,5 @@
 import { buildReviewGpuScene } from './gpu-preview-scene';
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { reviewPresentedGeometry, type ReviewPresentedGeometry } from './gpu-preview-geometry';
 import {
   createGpuPreviewRenderer,
@@ -44,6 +45,7 @@ export function createReviewGpuPreview(args: {
   let renderer: GpuPreviewRenderer | null = null;
   let initialization: Promise<GpuPreviewRenderer | null> | null = null;
   let disabled = false;
+  let fallbackReason: PreviewRendererStatus['fallback'];
   let disposed = false;
   let active = false;
   let sceneReleased = false;
@@ -69,6 +71,9 @@ export function createReviewGpuPreview(args: {
     sceneReleased = false;
   };
   return {
+    get fallbackReason() {
+      return fallbackReason;
+    },
     get allocatedBytes() {
       return renderer?.allocatedBytes ?? 0;
     },
@@ -115,12 +120,14 @@ export function createReviewGpuPreview(args: {
         } catch (error) {
           if (signal.aborted || !(error instanceof GpuPreviewDeviceError)) throw error;
           disabled = true;
+          fallbackReason = 'device-failed';
           return false;
         }
         signal.throwIfAborted();
         if (!renderer || disposed) {
           renderer?.dispose();
           disabled = true;
+          fallbackReason = 'unavailable';
           return false;
         }
         const scale = dimensions.canonical.width / (scene.canvas?.width ?? scene.source.width);
@@ -405,6 +412,7 @@ export function createReviewGpuPreview(args: {
         renderer?.dispose();
         renderer = null;
         disabled = true;
+        fallbackReason = 'device-failed';
         clear();
         return false;
       } finally {

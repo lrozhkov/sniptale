@@ -72,7 +72,11 @@ export function createVideoPreviewCompositionJoinRenderer(
       const rasterSize = resolvePreviewCompositionFrameSize(input);
       if (!rasterSize) return false;
       const assetUrls = input.assetUrls ?? {};
-      const key = JSON.stringify({ rasterSize, assetUrls });
+      const key = JSON.stringify({
+        rasterSize,
+        assetUrls,
+        renderer: input.previewRenderer ?? 'gpu',
+      });
       if (
         !sampler ||
         sampler.document !== input.canvas.ownerDocument ||
@@ -85,6 +89,7 @@ export function createVideoPreviewCompositionJoinRenderer(
           key,
           controller: new AbortController(),
           materializer: createVideoPreviewFrameMaterializer({
+            previewRenderer: input.previewRenderer ?? 'gpu',
             assetUrls,
             ownerDocument: input.canvas.ownerDocument,
             project: input.project,

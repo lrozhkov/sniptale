@@ -155,9 +155,9 @@ function usePreviewRuntimeConfigurationReset(
     // Live gestures need conservative invalidation without serializing recorded telemetry.
     () =>
       params.previewMode === VideoEditorPreviewMode.CACHE
-        ? createVideoPreviewRenderIdentity(params.project)
+        ? createVideoPreviewRenderIdentity(params.project, params.previewRenderer)
         : params.project,
-    [params.project, params.previewMode]
+    [params.project, params.previewMode, params.previewRenderer]
   );
   useLayoutEffect(() => {
     authority.completedCacheRef.current = null;
@@ -176,6 +176,7 @@ function usePreviewRuntimeConfigurationReset(
     params.playbackRange?.end,
     params.playbackRange?.start,
     params.previewMode,
+    params.previewRenderer,
     params.previewRasterSize.height,
     params.previewRasterSize.width,
     projectRenderIdentity,

@@ -3020,6 +3020,11 @@
       "toolSubtitle": "Параметры текущего инструмента"
     },
     "scene": {
+      "previewRenderer": "Рендер превью",
+      "previewRendererGpu": "WebGPU",
+      "previewRendererLegacy": "Стандартный",
+      "previewRendererUnavailable": "WebGPU недоступен. Используется стандартный рендер. Проверьте аппаратное ускорение браузера и драйвер видеокарты.",
+      "previewRendererFailed": "Сбой WebGPU. Используется стандартный рендер.",
       "resetBackground": "Сбросить",
       "backgroundNone": "Нет",
       "backgroundPanelSection": "Фон и изображение",

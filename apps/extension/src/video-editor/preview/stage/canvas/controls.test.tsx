@@ -14,6 +14,8 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 it('presents cache preparation failure separately from unavailable capability', () => {
   const markup = renderToStaticMarkup(
     <PreviewStageControls
+      renderer="gpu"
+      onRendererChange={vi.fn()}
       mode="cache"
       onModeChange={vi.fn()}
       onPreferencesRetry={vi.fn()}
@@ -58,6 +60,8 @@ it('changes each display setting independently and restores focus when dismissed
       useState<import('../../../contracts/preview-runtime').VideoEditorPreviewZoom>('fit');
     return (
       <PreviewStageControls
+        renderer="gpu"
+        onRendererChange={vi.fn()}
         mode={mode}
         onModeChange={(value) => {
           modeChanged(value);
@@ -85,8 +89,8 @@ it('changes each display setting independently and restores focus when dismissed
       '[data-ui="video.preview.display-settings"]'
     )!;
     act(() => trigger.click());
-    expect(document.querySelectorAll('fieldset')).toHaveLength(4);
-    expect(document.querySelectorAll('input:checked')).toHaveLength(4);
+    expect(document.querySelectorAll('fieldset')).toHaveLength(5);
+    expect(document.querySelectorAll('input:checked')).toHaveLength(5);
     expect(document.activeElement).toBe(document.querySelector('input:checked'));
     for (const value of ['1080p', '75%', 'cache']) {
       act(() => document.querySelector<HTMLInputElement>(`input[value="${value}"]`)!.click());
@@ -123,6 +127,8 @@ it('keeps the cache hint and its node stable while the percentage changes', () =
     act(() =>
       root.render(
         <PreviewStageControls
+          renderer="gpu"
+          onRendererChange={vi.fn()}
           mode="cache"
           onModeChange={vi.fn()}
           onPreferencesRetry={vi.fn()}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_QUICK_PREVIEW_PREFERENCES,
   type QuickPreviewPreferences,
@@ -7,6 +7,11 @@ import {
   createQuickPreviewPreferencesStorage,
   type QuickPreviewPreferencesStorage,
 } from '../../composition/persistence/quick-preview-preferences/storage';
+
+import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
+
+/** Read-only projection of this editor's existing preference owner for inspector canvases. */
+export const ReviewPreviewRendererContext = createContext<VideoPreviewRenderer>('gpu');
 
 type PreferenceStatus = 'loading' | 'ready' | 'saving' | 'session-only';
 

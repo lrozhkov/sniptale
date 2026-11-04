@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import {
   createGpuPreviewRenderer,
   GpuPreviewDeviceError,
@@ -8,16 +9,18 @@ import type { VideoEditorPreviewRasterSize } from '../stage/sizing/raster';
 /** Owns GPU availability and completion for materialized endpoint composition. */
 export function createMaterializerGpuComposer(
   rasterSize: VideoEditorPreviewRasterSize,
-  isCancelled: () => boolean
+  isCancelled: () => boolean,
+  rendererPreference: VideoPreviewRenderer = 'gpu'
 ) {
   let joinGpu: Promise<GpuPreviewRenderer | null> | null = null;
   let joinGpuUnavailable = false;
+  let fallback: 'unavailable' | 'device-failed' = 'unavailable';
   const compose = async (
     context: CanvasRenderingContext2D,
     layers: readonly GpuPreviewLayer[],
     signal: AbortSignal
   ) => {
-    if (joinGpuUnavailable) return false;
+    if (rendererPreference === 'legacy' || joinGpuUnavailable) return false;
     let bitmap: ImageBitmap | undefined;
     try {
       joinGpu ??= createGpuPreviewRenderer();
@@ -52,6 +55,7 @@ export function createMaterializerGpuComposer(
       if (signal.aborted || isCancelled()) throw error;
       if (!(error instanceof GpuPreviewDeviceError)) throw error;
       joinGpuUnavailable = true;
+      fallback = 'device-failed';
       void joinGpu?.then(
         (renderer) => renderer?.dispose(),
         () => {}
@@ -63,6 +67,9 @@ export function createMaterializerGpuComposer(
   };
   return {
     compose,
+    get fallbackReason() {
+      return fallback;
+    },
     dispose() {
       void joinGpu?.then(
         (renderer) => renderer?.dispose(),

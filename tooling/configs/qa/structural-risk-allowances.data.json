@@ -83,7 +83,7 @@
       "file": "apps/extension/src/background/sync-connection/retry-wakeup.test.ts",
       "symbol": "<file>",
       "owner": "extension:background:sync-connection",
-      "reason": "tool-noise: One dependencies fixture proves wakeup order and lifetime: checkpoint\u2192reconcile\u2192incoming, bounded suffix continuation, disposal during waits, locked refusal before native loads and contained diagnostics. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
+      "reason": "tool-noise: One dependencies fixture proves wakeup order and lifetime: checkpoint→reconcile→incoming, bounded suffix continuation, disposal during waits, locked refusal before native loads and contained diagnostics. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
       "removalCondition": "Remove when this exact body or signature changes. Reassess a new independent writer, state receiver, transport, recovery or resource lifetime, or independent fixture setup/cleanup. Remove when the analyzer models this cohesive owner. Final AST/signature binding and independent architecture review are required; this report does not renew an allowance.",
       "reviewDate": "2026-11-02",
       "astHash": "d6727bd14d1a857ad13b6f2441656553f775ea524e25fd637ebe3b343bbe4238",
@@ -149,7 +149,7 @@
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One ordered migration registry adds syncCapture7\u21928, secretProtection0\u21921 and syncCapture8\u21929 descriptors. Index implementation remains delegated to sync-queue-index-migration; no second migration authority. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
+      "reason": "tool-noise: One ordered migration registry adds syncCapture7→8, secretProtection0→1 and syncCapture8→9 descriptors. Index implementation remains delegated to sync-queue-index-migration; no second migration authority. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
       "removalCondition": "Remove when this exact body or signature changes. Reassess a new independent writer, state receiver, transport, recovery or resource lifetime, or independent fixture setup/cleanup. Remove when the analyzer models this cohesive owner. Final AST/signature binding and independent architecture review are required; this report does not renew an allowance.",
       "reviewDate": "2026-11-02",
       "astHash": "4c09a7b58dd9a597540fdbd718f4e347155e8b4c0237d43b7c0f4833cdc5ad81",
@@ -391,7 +391,7 @@
       "file": "apps/extension/src/composition/persistence/sync-capture/capture.integration.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One native-writer integration fixture connects accepted local saves, dependency capture, immutable preparation and queue publication. Root helpers close causal proof, including ten imported Image saves\u2192one checkpoint and native/pending preservation on refusal. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
+      "reason": "tool-noise: One native-writer integration fixture connects accepted local saves, dependency capture, immutable preparation and queue publication. Root helpers close causal proof, including ten imported Image saves→one checkpoint and native/pending preservation on refusal. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
       "removalCondition": "Remove when this exact body or signature changes. Reassess a new independent writer, state receiver, transport, recovery or resource lifetime, or independent fixture setup/cleanup. Remove when the analyzer models this cohesive owner. Final AST/signature binding and independent architecture review are required; this report does not renew an allowance.",
       "reviewDate": "2026-11-02",
       "astHash": "7cc27d260021ae4fd01f1ef0f1bf673d50dfdddcdd834d80bbe3ef3c104b8363",
@@ -1777,7 +1777,7 @@
       "file": "apps/extension/src/background/sync-connection/coordinator.test.ts",
       "symbol": "describe callback#8",
       "owner": "extension:background:sync-connection",
-      "reason": "tool-noise: Actual describe body933\u20131265 shares activityFixture/automatic/expectNoEffects. Controlled snapshot/completion/final-observation gates reject binding/attempt/executor/phase/generation changes within one advisory observation protocol. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
+      "reason": "tool-noise: Actual describe body933–1265 shares activityFixture/automatic/expectNoEffects. Controlled snapshot/completion/final-observation gates reject binding/attempt/executor/phase/generation changes within one advisory observation protocol. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
       "removalCondition": "Remove when this exact body or signature changes. Reassess a new independent writer, state receiver, transport, recovery or resource lifetime, or independent fixture setup/cleanup. Remove when the analyzer models this cohesive owner. Final AST/signature binding and independent architecture review are required; this report does not renew an allowance.",
       "reviewDate": "2026-11-02",
       "astHash": "1859fed595e726d36c83d69b2d2d7ccd475e8d1a817ffd0476f8ff48c51b84c4",
@@ -2448,8 +2448,8 @@
       "file": "apps/extension/src/content/overlay/toolbar/controls/page-layout-controller.tsx",
       "symbol": "PageToolbarLayoutProvider",
       "owner": "extension:content:overlay",
-      "reason": "tool-noise: \u041a\u043e\u043d\u0442\u0440\u043e\u043b\u043b\u0435\u0440 \u043e\u0434\u043d\u043e\u0433\u043e \u0436\u0435\u0441\u0442\u0430 \u0440\u0430\u0437\u0434\u0435\u043b\u044f\u0435\u0442 provisional preview, \u0437\u0430\u0445\u0432\u0430\u0442 \u0443\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u044f, \u043e\u0442\u043c\u0435\u043d\u0443 \u0438 \u0435\u0434\u0438\u043d\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u0439 callback \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f. Canonical settings writer \u043e\u0441\u0442\u0430\u0451\u0442\u0441\u044f \u0432 usePageToolbarControls. \u0411\u043b\u043e\u043a\u0438\u0440\u0443\u0435\u0442\u0441\u044f \u0442\u043e\u043b\u044c\u043a\u043e \u0440\u043e\u0441\u0442 outer line-count: 199 \u0441\u0442\u0440\u043e\u043a, score1 delta0, 17 statements, cyclomatic6, cognitive5, nesting1, recovery0, durable state authorities0. \u0414\u0432\u0435 \u0433\u0440\u0443\u043f\u043f\u044b \u2014 overlay \u0438 React, cohesion0.79. \u0412\u043b\u043e\u0436\u0435\u043d\u043d\u044b\u0435 \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u0447\u0438\u043a\u0438 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u044e\u0442 \u043e\u0434\u0438\u043d gesture receiver \u0438 \u043e\u0434\u0438\u043d \u0441\u0440\u043e\u043a \u0436\u0438\u0437\u043d\u0438. \u0422\u0435\u043a\u0441\u0442\u043e\u0432\u043e\u0435 \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0432\u043e\u0437\u0432\u0440\u0430\u0449\u0435\u043d\u043e \u0432 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044e\u0449\u0438\u0439 view owner. \u041c\u0435\u0445\u0430\u043d\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u0440\u0430\u0437\u0434\u0435\u043b\u0435\u043d\u0438\u0435 closure \u0440\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0438\u0442 \u0442\u0443 \u0436\u0435 authority \u0431\u0435\u0437 \u043d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0439 \u043e\u0431\u044f\u0437\u0430\u043d\u043d\u043e\u0441\u0442\u0438. Main \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u043b \u0442\u043e\u0447\u043d\u043e\u0435 \u0442\u0435\u043b\u043e \u0438 negative/native proof. \u041d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0435 \u043f\u043e\u043b\u043d\u043e\u0435 \u0430\u0440\u0445\u0438\u0442\u0435\u043a\u0442\u0443\u0440\u043d\u043e\u0435 \u0440\u0435\u0432\u044c\u044e \u0434\u043e\u043b\u0436\u043d\u043e \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u044d\u0442\u0443 \u043a\u043b\u0430\u0441\u0441\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u044e.",
-      "removalCondition": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043f\u0440\u0438 \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0438 \u0442\u043e\u0447\u043d\u043e\u0433\u043e AST \u0438\u043b\u0438 signature. \u041f\u0435\u0440\u0435\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u043f\u0440\u0438 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0438 \u043d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0433\u043e runtime, receiver, durable writer, resource, recovery \u0438\u043b\u0438 gesture lifetime. \u0423\u0434\u0430\u043b\u0438\u0442\u044c, \u043a\u043e\u0433\u0434\u0430 analyzer \u043c\u043e\u0434\u0435\u043b\u0438\u0440\u0443\u0435\u0442 \u044d\u0442\u043e\u0442 \u0441\u0432\u044f\u0437\u043d\u044b\u0439 gesture closure. \u041d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0435 \u043f\u043e\u043b\u043d\u043e\u0435 \u0430\u0440\u0445\u0438\u0442\u0435\u043a\u0442\u0443\u0440\u043d\u043e\u0435 \u0440\u0435\u0432\u044c\u044e \u0434\u043e\u043b\u0436\u043d\u043e \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u043a\u043b\u0430\u0441\u0441\u0438\u0444\u0438\u043a\u0430\u0446\u0438\u044e.",
+      "reason": "tool-noise: Контроллер одного жеста разделяет provisional preview, захват указателя, отмену и единственный callback сохранения. Canonical settings writer остаётся в usePageToolbarControls. Блокируется только рост outer line-count: 199 строк, score1 delta0, 17 statements, cyclomatic6, cognitive5, nesting1, recovery0, durable state authorities0. Две группы — overlay и React, cohesion0.79. Вложенные обработчики используют один gesture receiver и один срок жизни. Текстовое представление возвращено в существующий view owner. Механическое разделение closure распределит ту же authority без независимой обязанности. Main проверил точное тело и negative/native proof. Независимое полное архитектурное ревью должно проверить эту классификацию.",
+      "removalCondition": "Удалить при изменении точного AST или signature. Пересмотреть при добавлении независимого runtime, receiver, durable writer, resource, recovery или gesture lifetime. Удалить, когда analyzer моделирует этот связный gesture closure. Независимое полное архитектурное ревью должно проверить классификацию.",
       "reviewDate": "2026-10-27",
       "astHash": "3c370f092739f18a98f663a8fce5d48186119c4323d899afdb178b01bd08d05b",
       "signatureHash": "d37ee75ed607dc2d65a997c648dc58feb7aaabca0d6b5afc13f7f615ba5f75a5"
@@ -3196,10 +3196,10 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: Gallery composes existing editor bindings. The history hook owns one reader, one active request, one latest request, disposal, retry and pinned selection. It is not a durable writer. Independent read-only topology diagnosis inspected this owner and change reason. Fresh complete-candidate architecture review must validate this exact binding.",
+      "reason": "tool-noise: Gallery composes existing editor bindings. The history hook owns one reader, one active request, one latest request, disposal, retry and pinned selection. It is not a durable writer. Independent read-only topology diagnosis inspected this owner and change reason. Fresh complete-candidate architecture review must validate this exact binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent subject, state authority, writer, transaction, privileged effect, resource lifetime or recovery contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-01",
-      "astHash": "233881e75992e601725fe43a21776c38458c5eb4100fc7aeeaed4b7d1eb1cf50",
+      "reviewDate": "2026-11-05",
+      "astHash": "cbfaa6eba0f72176472beb57bf8d061a562630c162806f786364e4d3694276a4",
       "signatureHash": "e03bd8f2bf77d46621b01aca0b5dc15281cedc8bf0ee59bb978065ea1a00acab"
     },
     {
@@ -3284,11 +3284,11 @@
       "file": "apps/extension/src/gallery/video-review/preview-binding.tsx",
       "symbol": "ReviewPreviewStage",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This view binds existing playback, presentation, history and authoring owners. Completion callbacks connect their existing ports. The view creates no resource or writer authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "reason": "tool-noise: This view binds existing playback, presentation, history and authoring owners. Completion callbacks connect their existing ports. The view creates no resource or writer authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "6db4df7bbb3056fba3f151f6970c164922e3087ae51603c6ccf7cdef7280df97",
-      "signatureHash": "f5efa281eaba052ed28bf28a188e57a94feaeafc219e47c31b43b9c5064923ab"
+      "reviewDate": "2026-11-05",
+      "astHash": "3f0cd64c28910e7562c03c9d7e27875656b0c6d3880f03ecd09e462a426ccb78",
+      "signatureHash": "87ab9dc8c2b4d7490784f113f7e3093ff476cdfe38fa53dc3e17a1dec276aac4"
     },
     {
       "rule": "structural-function-risk",
@@ -3856,7 +3856,7 @@
       "file": "apps/extension/src/settings/sections/capture/saving/sync-connection.tsx",
       "symbol": "SyncConnectionForm",
       "owner": "extension:settings:sections",
-      "reason": "tool-noise: The form owns transient credentials, selected candidate, consent and endpointEdited. Native URL/account synchronization depends on primitive URL/account and source kind/incarnation/revision, not changing status object references. Discovery source/candidates still reset selected candidate; field edits and mode/source changes still clear selection/consent/password exactly through existing handlers. The displayed presenceKind is state.localPresence with no local async effect. The existing controller imports the canonical readRetainedNativePresence workflow and stores an optional readLocalPresence port once in its constructor. The view imports neither reader nor workflow and consumes only safe localPresence enum state. updateLocalPresence at controller582 selects only active, disconnected, ready, non-invalidated setup. The key contains source kind, incarnation and revision; equal key returns without another read. A changed key advances presenceRevision and resets projection to loading. Both deferred IO startup and success/failure publication check active, selected key and captured presenceRevision. dispose advances the generation, clears key and projection, so a reactivated same identity gets a new read and cannot accept an old result. Promise rejection projects unavailable and drops private error content. Presence is advisory and grants no enrollment/download authority: existing explicit storageConfirmed checkbox and native source/generation checks remain the command admission. Unavailable presence does not add an enrollment gate. All state patches pass through publish\u2192updateLocalPresence before onChange, so readiness/source loss invalidates older observations before the visible snapshot. The queued microtask rechecks current after an onChange observer can synchronously dispose. Seven controlled-order controller test bodies inspect old-source result, same-source no reread, rejection without canary leak, checking/invalidation, disposal, reactivation, connected-state transition and close-before-start. Existing UI tests1379+ verify visible stale response/no reread/unmount; preceding unavailable/empty test verifies consent remains required and sufficient. Focused log records134 tests passed in5files; this diagnosis did not rerun tests. Keep one setup interaction owner. Remaining conditional JSX describes create/search/select/retry/enroll states of this same form; extracting branches would introduce forwarding-only presentation modules without removing authority. Fresh complete-candidate architecture review must validate this exact classification.",
+      "reason": "tool-noise: The form owns transient credentials, selected candidate, consent and endpointEdited. Native URL/account synchronization depends on primitive URL/account and source kind/incarnation/revision, not changing status object references. Discovery source/candidates still reset selected candidate; field edits and mode/source changes still clear selection/consent/password exactly through existing handlers. The displayed presenceKind is state.localPresence with no local async effect. The existing controller imports the canonical readRetainedNativePresence workflow and stores an optional readLocalPresence port once in its constructor. The view imports neither reader nor workflow and consumes only safe localPresence enum state. updateLocalPresence at controller582 selects only active, disconnected, ready, non-invalidated setup. The key contains source kind, incarnation and revision; equal key returns without another read. A changed key advances presenceRevision and resets projection to loading. Both deferred IO startup and success/failure publication check active, selected key and captured presenceRevision. dispose advances the generation, clears key and projection, so a reactivated same identity gets a new read and cannot accept an old result. Promise rejection projects unavailable and drops private error content. Presence is advisory and grants no enrollment/download authority: existing explicit storageConfirmed checkbox and native source/generation checks remain the command admission. Unavailable presence does not add an enrollment gate. All state patches pass through publish→updateLocalPresence before onChange, so readiness/source loss invalidates older observations before the visible snapshot. The queued microtask rechecks current after an onChange observer can synchronously dispose. Seven controlled-order controller test bodies inspect old-source result, same-source no reread, rejection without canary leak, checking/invalidation, disposal, reactivation, connected-state transition and close-before-start. Existing UI tests1379+ verify visible stale response/no reread/unmount; preceding unavailable/empty test verifies consent remains required and sufficient. Focused log records134 tests passed in5files; this diagnosis did not rerun tests. Keep one setup interaction owner. Remaining conditional JSX describes create/search/select/retry/enroll states of this same form; extracting branches would introduce forwarding-only presentation modules without removing authority. Fresh complete-candidate architecture review must validate this exact classification.",
       "removalCondition": "Remove or reassess when this exact AST/body or signature changes, the view regains native workflow IO or independent source/lifetime authority, the controller gains a second native writer/transport/recovery owner, or form draft/consent identity semantics change. Remove when analyzer models this cohesive existing view/controller boundary. Final normalized AST/signature binding and independent final architecture review remain required after checkpoint passes.",
       "reviewDate": "2026-11-02",
       "astHash": "048a46979420e4f3e8f90f191f1f071b879dd3866ad746a7d85f920991bf593a",
@@ -3867,7 +3867,7 @@
       "file": "apps/extension/src/settings/sections/capture/saving/sync-connection.tsx",
       "symbol": "SyncConnectionSection",
       "owner": "extension:settings:sections",
-      "reason": "tool-noise: The section creates one existing controller, subscribes via onChange, activates/disposes it in one effect and owns local focus-return refs. Ready and disabled state derive from the safe status; child form, checkpoint controls, protection summary and local-only confirmation delegate commands to existing owners. No native observation or source generation is retained by this shell. The existing controller imports the canonical readRetainedNativePresence workflow and stores an optional readLocalPresence port once in its constructor. The view imports neither reader nor workflow and consumes only safe localPresence enum state. updateLocalPresence at controller582 selects only active, disconnected, ready, non-invalidated setup. The key contains source kind, incarnation and revision; equal key returns without another read. A changed key advances presenceRevision and resets projection to loading. Both deferred IO startup and success/failure publication check active, selected key and captured presenceRevision. dispose advances the generation, clears key and projection, so a reactivated same identity gets a new read and cannot accept an old result. Promise rejection projects unavailable and drops private error content. Presence is advisory and grants no enrollment/download authority: existing explicit storageConfirmed checkbox and native source/generation checks remain the command admission. Unavailable presence does not add an enrollment gate. All state patches pass through publish\u2192updateLocalPresence before onChange, so readiness/source loss invalidates older observations before the visible snapshot. The queued microtask rechecks current after an onChange observer can synchronously dispose. Seven controlled-order controller test bodies inspect old-source result, same-source no reread, rejection without canary leak, checking/invalidation, disposal, reactivation, connected-state transition and close-before-start. Existing UI tests1379+ verify visible stale response/no reread/unmount; preceding unavailable/empty test verifies consent remains required and sufficient. Focused log records134 tests passed in5files; this diagnosis did not rerun tests. Keep the mounted connection shell and its existing controller/focus lifetime. Multiple child/control imports and JSX branches are composition dependencies, not a second persistence/transport/recovery authority. Fresh complete-candidate architecture review must validate this exact classification. CodeQL correction removes only an unreachable status-null comparison inside the already non-null branch. The disabled value, authority and ownership remain the same. Final repair diagnosis: The section composes the existing controller and shared unlock UI port. ConnectedCredentialControls owns only the transient empty password draft. The controller and background retain command, permission and persistence authority. The section does not read native stores or hold secret keys. Fresh independent architecture review must validate this exact changed body after checkpoint.",
+      "reason": "tool-noise: The section creates one existing controller, subscribes via onChange, activates/disposes it in one effect and owns local focus-return refs. Ready and disabled state derive from the safe status; child form, checkpoint controls, protection summary and local-only confirmation delegate commands to existing owners. No native observation or source generation is retained by this shell. The existing controller imports the canonical readRetainedNativePresence workflow and stores an optional readLocalPresence port once in its constructor. The view imports neither reader nor workflow and consumes only safe localPresence enum state. updateLocalPresence at controller582 selects only active, disconnected, ready, non-invalidated setup. The key contains source kind, incarnation and revision; equal key returns without another read. A changed key advances presenceRevision and resets projection to loading. Both deferred IO startup and success/failure publication check active, selected key and captured presenceRevision. dispose advances the generation, clears key and projection, so a reactivated same identity gets a new read and cannot accept an old result. Promise rejection projects unavailable and drops private error content. Presence is advisory and grants no enrollment/download authority: existing explicit storageConfirmed checkbox and native source/generation checks remain the command admission. Unavailable presence does not add an enrollment gate. All state patches pass through publish→updateLocalPresence before onChange, so readiness/source loss invalidates older observations before the visible snapshot. The queued microtask rechecks current after an onChange observer can synchronously dispose. Seven controlled-order controller test bodies inspect old-source result, same-source no reread, rejection without canary leak, checking/invalidation, disposal, reactivation, connected-state transition and close-before-start. Existing UI tests1379+ verify visible stale response/no reread/unmount; preceding unavailable/empty test verifies consent remains required and sufficient. Focused log records134 tests passed in5files; this diagnosis did not rerun tests. Keep the mounted connection shell and its existing controller/focus lifetime. Multiple child/control imports and JSX branches are composition dependencies, not a second persistence/transport/recovery authority. Fresh complete-candidate architecture review must validate this exact classification. CodeQL correction removes only an unreachable status-null comparison inside the already non-null branch. The disabled value, authority and ownership remain the same. Final repair diagnosis: The section composes the existing controller and shared unlock UI port. ConnectedCredentialControls owns only the transient empty password draft. The controller and background retain command, permission and persistence authority. The section does not read native stores or hold secret keys. Fresh independent architecture review must validate this exact changed body after checkpoint.",
       "removalCondition": "Remove or reassess when this exact AST/body or signature changes, the view regains native workflow IO or independent source/lifetime authority, the controller gains a second native writer/transport/recovery owner, or form draft/consent identity semantics change. Remove when analyzer models this cohesive existing view/controller boundary. Final normalized AST/signature binding and independent final architecture review remain required after checkpoint passes.",
       "reviewDate": "2026-11-02",
       "astHash": "1db117c39de7343e11fb5cb2343baae6eb014639f858038b05c971185ea43bcb",
@@ -3900,10 +3900,10 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
       "symbol": "createMaterializedJoinPresentation",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One join transaction owns endpoint sampling, cuts, cache and release. Completed camera data is result metadata. Failure cleanup remains inside this transaction. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "reason": "tool-noise: One join transaction owns endpoint sampling, cuts, cache and release. Completed camera data is result metadata. Failure cleanup remains inside this transaction. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "17d555d91ac7acd5749cbdbd32ccb93b85fc91faea860d666da9ea72b9b70a54",
+      "reviewDate": "2026-11-05",
+      "astHash": "a7f7cd937ae0e55df62765232275083c319e65b12546ab1eceadcf625610b8e6",
       "signatureHash": "fc7e7e554d488c4fbfbe486cf34eb1e387fcc1776effc24ea4cb5224f46a37e7"
     },
     {
@@ -4241,11 +4241,11 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "createReviewPreviewRenderer",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One preview renderer owns the GPU session and prepared scene leases. Scene replacement cancels old work and releases scene artwork. Final disposal releases the device. Existing sampling and geometry adapters retain their owners. This change adds no writer or publication authority.",
+      "reason": "tool-noise: One preview renderer owns the GPU session and prepared scene leases. Scene replacement cancels old work and releases scene artwork. Final disposal releases the device. Existing sampling and geometry adapters retain their owners. This change adds no writer or publication authority. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "c326da8183a0f620edbd404f38209b8e3ef4ede893c55e91a5ef3043ba51e864",
-      "signatureHash": "4ea1b85e38865202564b15b5f3b5823b979b50dff4219809701d003d6a22234a"
+      "reviewDate": "2026-11-05",
+      "astHash": "fedcb47b0afb81353e634d8b4dbb6b945717a756be49a29e6d11be11469f2ee8",
+      "signatureHash": "51e8d4ae7b576b4eeb5ca43ba270c1bd89e8e3048dc4581617f87dae92c38b60"
     },
     {
       "rule": "structural-function-risk",
@@ -4824,7 +4824,7 @@
       "file": "tooling/test/e2e/providers/webdav-checkpoints.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:providers",
-      "reason": "tool-noise: The exact383-line callback owns one sender and optional independent receiver. It seeds an enrolled root, performs ten actual mixed editor changes, checks each durable digest while immutable count stays fixed, triggers manual/deadline/exit publication, proves one successor and no original reupload, reopens the independent receiver and verifies UI/native hashes. The Image case then closes browser readers and proves only disposable output pins retire with exact verification GETs; finally closes both contexts. Keep one sender\u2192native ACK\u2192single checkpoint\u2192remote bytes\u2192receiver\u2192retirement acceptance lifetime. The cleanup branch proves preservation of the same original resources, not a separate product owner. Moving phases into forwarding helpers would hide the evidence chain. Fresh complete-candidate architecture review must validate this exact classification.",
+      "reason": "tool-noise: The exact383-line callback owns one sender and optional independent receiver. It seeds an enrolled root, performs ten actual mixed editor changes, checks each durable digest while immutable count stays fixed, triggers manual/deadline/exit publication, proves one successor and no original reupload, reopens the independent receiver and verifies UI/native hashes. The Image case then closes browser readers and proves only disposable output pins retire with exact verification GETs; finally closes both contexts. Keep one sender→native ACK→single checkpoint→remote bytes→receiver→retirement acceptance lifetime. The cleanup branch proves preservation of the same original resources, not a separate product owner. Moving phases into forwarding helpers would hide the evidence chain. Fresh complete-candidate architecture review must validate this exact classification.",
       "removalCondition": "Remove when this exact AST/body or signature changes. Reassess any new independent writer, state receiver, transport, recovery, resource, fixture setup/cleanup or protocol authority. Remove when analyzer models this cohesive transaction, registry or fixture shape. This investigation does not renew allowances: main must bind final normalized AST/signature hashes and obtain independent final architecture review after checkpoint passes.",
       "reviewDate": "2026-11-02",
       "astHash": "613e6de18274e2659d7687a7e273c57ff2c88f815c61e83d0a8b9da698112793",
@@ -5088,21 +5088,21 @@
       "file": "apps/extension/src/gallery/video-review/zoom-preview-paint-owner.ts",
       "symbol": "createZoomPreviewPaintOwner",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One latest-request queue owns scheduling, cancellation, revisions and accepted-frame publication. Its nested update and drain methods mutate that same queue. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
+      "reason": "tool-noise: One latest-request queue owns scheduling, cancellation, revisions and accepted-frame publication. Its nested update and drain methods mutate that same queue. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
-      "reviewDate": "2026-11-04",
-      "astHash": "53e814c501675ab2012b60d78e9edd4610b5f376073bfb40610354361d0f5cb5",
-      "signatureHash": "b637e1e507b214e184b8c5179d946e6e23bc56da4c9d2f9af9c4fba0f496218a"
+      "reviewDate": "2026-11-05",
+      "astHash": "68960101c63c38f5ba574f3943cfcdbf18f131060e0a14d41891230069f9e091",
+      "signatureHash": "1817e8f3161700f42da7beb211afcade39900fcc8f4d0d6adba6fd3257afbe22"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/gallery/video-review/zoom-preview.tsx",
       "symbol": "PreparedZoomPreview",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One inspector view binds tools, prepared inputs, paint readiness and completed geometry. Existing owners retain effects, history and queue execution. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
+      "reason": "tool-noise: One inspector view binds tools, prepared inputs, paint readiness and completed geometry. Existing owners retain effects, history and queue execution. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
-      "reviewDate": "2026-11-04",
-      "astHash": "1e87bb4f40f5b38dbf59316180aefb4d441b8a6192e60b6e52538309f685e7b6",
+      "reviewDate": "2026-11-05",
+      "astHash": "dd733094c783ed6952e7acb1994af831f626fccc5d86faad689a5cb2eb2a521f",
       "signatureHash": "7c44831b4025de8885552b21d17cc3166a87a4cd297249376666d53c5ef57d97"
     },
     {
@@ -5143,10 +5143,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One preview session owns backend availability, material caches and disposal. The factory span includes one render transaction. It adds no separate queue or resource lifetime. One optional admission flag omits empty artwork without adding a resource owner.",
+      "reason": "tool-noise: One preview session owns backend availability, material caches and disposal. The factory span includes one render transaction. It adds no separate queue or resource lifetime. One optional admission flag omits empty artwork without adding a resource owner. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes preview queue or material lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "b452f2daf6f67f593b560125504b1d2d5bc55c464192b4e4a8e9f0e8c3400964",
+      "reviewDate": "2026-11-05",
+      "astHash": "5837b152bc704b2ed219f4925eed8a6e95de089f1cbccd1cfa9fdfd0f1709ce8",
       "signatureHash": "7d9a217fc23fc3f6a09d3c448ae47b3c7039b7957a843146613711295e84297a"
     },
     {
@@ -5154,10 +5154,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer.render",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One preview transaction captures raw frames, composes effect inputs and presents the completed scene. Both composition stages share captured sources, backend and materials. One finally block releases temporary resources after GPU settlement. Final artwork admission preserves the same capture, settlement and publication transaction.",
+      "reason": "tool-noise: One preview transaction captures raw frames, composes effect inputs and presents the completed scene. Both composition stages share captured sources, backend and materials. One finally block releases temporary resources after GPU settlement. Final artwork admission preserves the same capture, settlement and publication transaction. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes capture or publication lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "6675781002d76e2624e63884610e1a9514b00eb83a912afda83d503c25fe708e",
+      "reviewDate": "2026-11-05",
+      "astHash": "565d463363b50cd2471a30904b21a36314f38d0f652dff9f29a2209c8d11ea12",
       "signatureHash": "7fbf6998a3988df89e02a05370e5486d9adf627b6e933b9dcfaf360518055ae2"
     },
     {
@@ -5396,10 +5396,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One preview session owns the GPU device and scene cancellation. Scene release retains borrowed artwork until the frame settles. Texture revisions belong to that same resource owner. This factory adds no writer, publication owner or independent queue.",
+      "reason": "tool-noise: One preview session owns the GPU device and scene cancellation. Scene release retains borrowed artwork until the frame settles. Texture revisions belong to that same resource owner. This factory adds no writer, publication owner or independent queue. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "e86675df5e5788dbd3d094e7ef443d7f7be87c2c4511b8cb281592707d53e8df",
+      "reviewDate": "2026-11-05",
+      "astHash": "6eaa5cc08909d1a5d80711d14d35941cd7ac4a73c2fa447414ef093c9aea0b25",
       "signatureHash": "f6b7a0055e947ccb3c6887c17939a0d23709ecb18a06b6aeb0d7048751d524c0"
     },
     {
@@ -5407,10 +5407,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview.render",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One frame transaction retains annotation batches until each endpoint fence settles. It owns temporary endpoint outputs until the final blend settles. The existing finally block releases holds, outputs, frames and primitives. This ordering prevents premature batch reuse.",
+      "reason": "tool-noise: One frame transaction retains annotation batches until each endpoint fence settles. It owns temporary endpoint outputs until the final blend settles. The existing finally block releases holds, outputs, frames and primitives. This ordering prevents premature batch reuse. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes endpoint ordering or GPU drain. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "61083d964b3c7d8b2094fc4643f871d51c7582eaaa98ca02a478355ba006cd2c",
+      "reviewDate": "2026-11-05",
+      "astHash": "945eca26c92bae97efcc50563e4f305dd8c97f2ecca35ba28501e6abb5329453",
       "signatureHash": "71c67f135ecd6a09286c1d7fd27c90f89b001f55b68a5f06115d8d7d37af42c8"
     },
     {
@@ -5440,11 +5440,11 @@
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx",
       "symbol": "<file>",
       "owner": "extension:video-editor:workspace",
-      "reason": "tool-noise: One mounted Framing fixture checks rendering, interaction, stale results and cleanup. The archive case reuses its root, materializer queue and commit spies. A local canonical archive supplies the existing trajectory hook. Render-only geometry and unchanged authoring data share this proof.",
+      "reason": "tool-noise: One mounted Framing fixture checks rendering, interaction, stale results and cleanup. The archive case reuses its root, materializer queue and commit spies. A local canonical archive supplies the existing trajectory hook. Render-only geometry and unchanged authoring data share this proof. Renderer switch proof uses the same surface and materializer fixture. Controlled completion rejects the obsolete frame before publishing the selected backend. No new fixture lifetime is added. Fresh architecture review must validate this binding.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes the Framing fixture, trajectory preparation or authoring callbacks. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "97c09f3696d2faec619162b12b08c4d58790f2cd98e65ae605dcf50275d11d6c",
-      "signatureHash": "38bb08155783009d6181ecc5f7bf6c09b095963241661d199bb8b941de53c6d1"
+      "reviewDate": "2026-11-05",
+      "astHash": "23b7db72f2d20025763278cb1583ec5868b5f884c03706715aadd552aad0f93c",
+      "signatureHash": "02cf6ac88cd13ee2b910c13f86742338ea435aa0727888664911e713f95aa46f"
     },
     {
       "rule": "structural-file-risk",
@@ -5726,22 +5726,22 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One preview renderer owns preparation, leases and stale-result checks. Its GPU session survives scene replacement. Preparation accounts for the tracked GPU bytes that remain allocated. Capture and publication remain with callers. Final architecture review must check this binding.",
+      "reason": "tool-noise: One preview renderer owns preparation, leases and stale-result checks. Its GPU session survives scene replacement. Preparation accounts for the tracked GPU bytes that remain allocated. Capture and publication remain with callers. Final architecture review must check this binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "98e643b006d3d72bb93d00ba6e0e620feea7290351e4f4a007d33223ada816af",
-      "signatureHash": "d1479386014944b917ffdeba9e6e925617d600cee9a8d37e3eff8ce0b82858ac"
+      "reviewDate": "2026-11-05",
+      "astHash": "20466f9ef25367e78dae3fb7af7d972b1bbe22d3e3ae7d21a25d4a95b341cfc1",
+      "signatureHash": "96b6ef53ddb51dcab617d28e7eb6176970b7eb507ed750d7eaa52370a13cfed6"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "drawPreparedFrame",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: Score delta0, cohesion.97. One async output transaction: history/request, GPU preview or existing spatial branch, transition lease, annotation admission/acquisition, export source lease, scene/sharp replay, outer decorations. Both prepared source and annotation release remain adjacent in a single finally. transition release remains outer finally. No new async queue/publication state.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
+      "reason": "tool-noise: Score delta0, cohesion.97. One async output transaction: history/request, GPU preview or existing spatial branch, transition lease, annotation admission/acquisition, export source lease, scene/sharp replay, outer decorations. Both prepared source and annotation release remain adjacent in a single finally. transition release remains outer finally. No new async queue/publication state.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
-      "reviewDate": "2026-11-04",
-      "astHash": "623a36536bc2e1bf7a8dccbc51a4258fdcd9239be34f58a07ed875738d327a97",
-      "signatureHash": "7ea8b2b86e9990896749393c794dbe3e99e10be6da1a4437f8779d64a4426a73"
+      "reviewDate": "2026-11-05",
+      "astHash": "8cf9bd02889650a8c709967d04d8ef8f7f3a4abafdbf4799976b842439c915a5",
+      "signatureHash": "90251aa5da40a6d099524888bf57cce293f56c2af223b9392dd194da9701fe20"
     },
     {
       "rule": "structural-function-risk",
@@ -5880,11 +5880,11 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One materializer owns media, staging and the frame transaction. Camera metadata follows completed pixels through the same operation. The existing Canvas API delegates within this owner. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
+      "reason": "tool-noise: One materializer owns media, staging and the frame transaction. Camera metadata follows completed pixels through the same operation. The existing Canvas API delegates within this owner. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "bbbdec092108b2ae5699d509e64ff8280bfc63fe6e25fe945f74e806369c38a8",
-      "signatureHash": "d1c710e30da09be73ff451ef318c419b4d263dbdd09d5186e6659989c5f844fd"
+      "reviewDate": "2026-11-05",
+      "astHash": "c8ba527d37882d3ea9612fa545da2316049e506564f880a0194cf55cdacb79d9",
+      "signatureHash": "4bd2ead5ecd40af4292bee3f1dadcd5592020ba0775a7eaddfd90ae236664130"
     },
     {
       "rule": "structural-function-risk",
@@ -5913,10 +5913,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: This scene fixture tests visible publication after completion. New cases bind the camera to overrides and prepared archive facts. Failure and cancellation use existing fixtures. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Final artwork cases use the same scene fixture and assert absent and present producers.",
+      "reason": "tool-noise: This scene fixture tests visible publication after completion. New cases bind the camera to overrides and prepared archive facts. Failure and cancellation use existing fixtures. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Final artwork cases use the same scene fixture and assert absent and present producers. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "96ec242247917d3c0b13f61d5b8d468148cf54ac1aea0d86f5d4c8e6ba8853b0",
+      "reviewDate": "2026-11-05",
+      "astHash": "79004bddec29f38cda9b53a902da9973b35e2ef1ac8c904c572add0f5edda03c",
       "signatureHash": "a3c58f0455473a9f92d91faf7c2b782fd9921904e009349e1a26417f417f0692"
     },
     {
@@ -5973,6 +5973,17 @@
       "reviewDate": "2026-11-04",
       "astHash": "d8cdf41a63f8fe63ce26c7f94349f3165552aac881e89ee83ef6ce48ef6ce6b9",
       "signatureHash": "993dab7fa1946676fc5e091a22644c5133af8ab650d8fa2349348475d4545a54"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.ts",
+      "symbol": "renderPreparedPreviewScene",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: One prepared frame transaction selects GPU or Standard composition, captures ready media and releases effects and captured frames in one finally block. Renderer selection and completed backend metadata use this same transaction. Source inspection found no independent writer, queue, publication lifetime or recovery authority. The score remains seven. Fresh architecture review must validate this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent writer, queue, resource lifetime, publication authority or recovery operation. Remove when the analyzer models this cohesive frame transaction.",
+      "astHash": "84358f7e810f33cf0ddd9b467fd5ce4a5f80e9385e8080a2c39b1f5c0d80a3f5",
+      "signatureHash": "084a1b2312c4568a47f85b4608e3ec489241a489cc4774c140accadc29612e03",
+      "reviewDate": "2026-11-05"
     }
   ]
 }

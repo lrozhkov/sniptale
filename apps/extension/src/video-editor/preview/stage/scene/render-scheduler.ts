@@ -82,6 +82,7 @@ function shouldAbortActivePreviewJob(
   nextJob: PreviewSceneRenderJob
 ): boolean {
   return (
+    (activeJob.previewRenderer ?? 'gpu') !== (nextJob.previewRenderer ?? 'gpu') ||
     activeJob.renderGeneration !== nextJob.renderGeneration ||
     !activeJob.isPlaybackFrame ||
     !nextJob.isPlaybackFrame

@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../../contracts/preview-runtime';
 import { useRef, type MutableRefObject } from 'react';
 
 import type {
@@ -30,6 +31,7 @@ interface PreviewStageMediaRuntimeParams {
   playbackRange: VideoEditorPlaybackRange | null;
   previewExactFrameCache: VideoPreviewExactFrameCache;
   previewMode: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer;
   previewRasterSize: VideoEditorPreviewRasterSize;
   project: VideoProject;
   recordingProject?: VideoProject;
@@ -64,6 +66,7 @@ export function usePreviewStageMediaRuntime(params: PreviewStageMediaRuntimePara
     audioRefs,
     previewExactFrameCache: params.previewExactFrameCache,
     previewMode: params.previewMode,
+    previewRenderer: params.previewRenderer ?? 'gpu',
     playbackRange: params.playbackRange,
     onPresentationTime: params.onPresentationTime,
     previewRasterSize: params.previewRasterSize,

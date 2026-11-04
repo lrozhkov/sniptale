@@ -20,6 +20,7 @@ import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-r
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
 import { resolveActivePreviewClips } from '../runtime/index';
 import { canRenderActivePreviewVideos } from './video-frame';
+import type { VideoPreviewRenderer } from '../../../../features/video/preview/preferences';
 
 export function usePreviewStageCanvasRender(
   params: PreviewStageCanvasSceneParams & {
@@ -34,16 +35,17 @@ export function usePreviewStageCanvasRender(
   const renderRevision = useMemo(
     () =>
       params.previewMode === 'cache' && !params.previewCacheBypass
-        ? createVideoPreviewRenderRevision(params.project)
+        ? createVideoPreviewRenderRevision(params.project, params.previewRenderer)
         : Promise.resolve('preview-cache-bypass'),
-    [params.previewCacheBypass, params.previewMode, params.project]
+    [params.previewCacheBypass, params.previewMode, params.previewRenderer, params.project]
   );
   usePreviewEffectRuntimeRetry(effectRuntimeRef, params.effectRuntimeFeedback.retryVersion);
   const renderSchedulerRef = usePreviewRenderSchedulerRef(
     params.effectRuntimeFeedback.onFailure,
     params.effectRuntimeFeedback.onRecovery,
     params.previewExactFrameCache,
-    params.effectRuntimeFeedback.retryVersion
+    params.effectRuntimeFeedback.retryVersion,
+    params.previewRenderer ?? 'gpu'
   );
 
   usePreviewStageRenderEffect(params, effectRuntimeRef, renderRevision, renderSchedulerRef);
@@ -90,6 +92,7 @@ function usePreviewStageRenderEffect(
         previewRasterSize: current.previewRasterSize,
         previewCacheBypass: current.previewCacheBypass,
         previewMode: current.previewMode,
+        previewRenderer: current.previewRenderer ?? 'gpu',
         project: current.project,
         renderGeneration: current.renderGenerationRef?.current ?? current.renderGeneration ?? 0,
         renderRevision: revision,
@@ -147,6 +150,7 @@ function usePreviewStageRenderEffect(
     params.project,
     activeClipKey,
     params.previewMode,
+    params.previewRenderer,
     params.previewCacheBypass,
     params.previewRasterSize,
     params.renderGeneration,
@@ -184,6 +188,7 @@ function createPreviewStageCanvasRenderJob(args: {
   previewRasterSize: PreviewStageCanvasSceneParams['previewRasterSize'];
   previewCacheBypass: PreviewStageCanvasSceneParams['previewCacheBypass'];
   previewMode: PreviewStageCanvasSceneParams['previewMode'];
+  previewRenderer: PreviewStageCanvasSceneParams['previewRenderer'];
   project: PreviewStageCanvasSceneParams['project'];
   renderGeneration: number;
   renderRevision: Promise<string>;
@@ -196,9 +201,14 @@ function createPreviewStageCanvasRenderJob(args: {
     onCameraPresented: args.onCameraPresented,
     controller,
     currentTime: args.currentTime,
+    previewRenderer: args.previewRenderer ?? 'gpu',
     ...(args.assetUrls ? { assetUrls: args.assetUrls } : {}),
     effectRuntimeExecutor: () =>
-      resolvePreviewEffectRuntime(args.effectRuntimeRef, args.canvas.ownerDocument).executor,
+      resolvePreviewEffectRuntime(
+        args.effectRuntimeRef,
+        args.canvas.ownerDocument,
+        args.previewRenderer ?? 'gpu'
+      ).executor,
     imageBank: args.imageBank,
     isEffectRuntimeFrame: args.project.effectInstances?.some(({ enabled }) => enabled) === true,
     isPlaybackFrame: args.isPlaying === true,
@@ -220,7 +230,8 @@ function usePreviewRenderSchedulerRef(
   onFailure: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onFailure'],
   onRecovery: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onRecovery'],
   exactFrameCache: PreviewStageCanvasSceneParams['previewExactFrameCache'],
-  retryVersion: number
+  retryVersion: number,
+  renderer: VideoPreviewRenderer
 ): MutableRefObject<ReturnType<typeof createPreviewSceneRenderScheduler>> {
   const frameRate = usePreviewFrameRate();
   const frameRateRef = useRef(frameRate);
@@ -236,7 +247,7 @@ function usePreviewRenderSchedulerRef(
   const stagingRef = useRef<HTMLCanvasElement | null>(null);
   const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
   const gpuRef = useRef<ReturnType<typeof createNativeGpuPreviewRenderer> | null>(null);
-  const retryRef = useRef(retryVersion);
+  const retryRef = useRef({ version: retryVersion, renderer });
   if (!schedulerRef.current) {
     const captionRenderer = createVideoProjectCaptionRenderer();
     captionsRef.current = captionRenderer;
@@ -254,17 +265,21 @@ function usePreviewRenderSchedulerRef(
         feedbackRef.current.onFailure('visual', error);
       },
       onSuccess: (job, presentation) => {
-        if (presentation) job.onCameraPresented?.(presentation.camera, presentation.time);
+        if (presentation) {
+          job.onCameraPresented?.(presentation.camera, presentation.time);
+          if (presentation.renderer) frameRateRef.current?.reportRenderer(presentation.renderer);
+        }
         feedbackRef.current.onRecovery('visual');
         if (job.isPlaybackFrame && job.previewMode !== 'cache') frameRateRef.current?.record();
       },
       render: (job) => {
         const render = (input: Parameters<typeof renderPreviewScene>[0]) => {
           joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(renderPreviewScene);
-          gpuRef.current ??= createNativeGpuPreviewRenderer();
+          if (input.previewRenderer !== 'legacy')
+            gpuRef.current ??= createNativeGpuPreviewRenderer();
           return joinsRef.current.render({
             ...input,
-            gpuPreview: gpuRef.current,
+            ...(gpuRef.current ? { gpuPreview: gpuRef.current } : {}),
             captionRenderer,
             watermarkRenderer,
             spatialRenderer: () => {
@@ -303,8 +318,8 @@ function usePreviewRenderSchedulerRef(
     });
   }
   useLayoutEffect(() => {
-    if (retryRef.current === retryVersion) return;
-    retryRef.current = retryVersion;
+    if (retryRef.current.version === retryVersion && retryRef.current.renderer === renderer) return;
+    retryRef.current = { version: retryVersion, renderer };
     watermarkRef.current?.clear();
     joinsRef.current?.clear();
     const spatial = spatialRef.current;
@@ -312,7 +327,7 @@ function usePreviewRenderSchedulerRef(
     spatial?.dispose();
     gpuRef.current?.dispose();
     gpuRef.current = null;
-  }, [retryVersion]);
+  }, [retryVersion, renderer]);
   useEffect(() => {
     const scheduler = schedulerRef.current;
     return () => {
@@ -350,10 +365,15 @@ function usePreviewEffectRuntimeRef(): MutableRefObject<VideoEditorEffectRuntime
 
 function resolvePreviewEffectRuntime(
   runtimeRef: MutableRefObject<VideoEditorEffectRuntime | null>,
-  ownerDocument: Document
+  ownerDocument: Document,
+  renderer: VideoPreviewRenderer
 ): VideoEditorEffectRuntime {
-  if (runtimeRef.current?.ownerDocument === ownerDocument) return runtimeRef.current;
+  if (
+    runtimeRef.current?.ownerDocument === ownerDocument &&
+    runtimeRef.current.renderer === renderer
+  )
+    return runtimeRef.current;
   runtimeRef.current?.dispose();
-  runtimeRef.current = createVideoEditorEffectRuntime({ ownerDocument });
+  runtimeRef.current = createVideoEditorEffectRuntime({ ownerDocument, renderer });
   return runtimeRef.current;
 }

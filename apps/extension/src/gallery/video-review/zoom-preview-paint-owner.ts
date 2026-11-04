@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import {
   createZoomPreviewGpuRenderer,
   PendingZoomPreviewFrame,
@@ -8,6 +9,7 @@ import {
 /** One running frame and one latest request; only owner revisions can replace a visible frame. */
 export function createZoomPreviewPaintOwner(args: {
   renderer?: MiniRenderer;
+  backend?: VideoPreviewRenderer;
   fallback(input: ZoomPreviewGpuInput, signal: AbortSignal): Promise<void> | void;
   publish(bitmap: ImageBitmap, input: ZoomPreviewGpuInput): void;
   onBackend(gpu: boolean): void;
@@ -16,7 +18,8 @@ export function createZoomPreviewPaintOwner(args: {
   requestTick?(callback: () => void): number;
   cancelTick?(id: number): void;
 }) {
-  const renderer = args.renderer ?? createZoomPreviewGpuRenderer();
+  const renderer =
+    args.backend === 'legacy' ? null : (args.renderer ?? createZoomPreviewGpuRenderer());
   let current: ZoomPreviewGpuInput | null = null;
   let pending: ZoomPreviewGpuInput | null = null;
   let active: AbortController | null = null;
@@ -71,7 +74,7 @@ export function createZoomPreviewPaintOwner(args: {
       const bitmap =
         !args.renderer && (typeof navigator === 'undefined' || !navigator.gpu)
           ? null
-          : await renderer.render(input, controller.signal);
+          : await renderer?.render(input, controller.signal);
       try {
         if (disposed || generation !== revision || controller.signal.aborted) return;
         if (bitmap) {
@@ -160,7 +163,13 @@ export function createZoomPreviewPaintOwner(args: {
     current = input;
     key = next;
     presentationIdentity = identity;
-    if (!input.frame && !args.renderer && typeof navigator !== 'undefined' && navigator.gpu) {
+    if (
+      renderer &&
+      !input.frame &&
+      !args.renderer &&
+      typeof navigator !== 'undefined' &&
+      navigator.gpu
+    ) {
       pending = null;
       return;
     }
@@ -178,7 +187,7 @@ export function createZoomPreviewPaintOwner(args: {
       pending = null;
       active?.abort();
       if (scheduled !== null) cancelTick(scheduled);
-      renderer.dispose();
+      renderer?.dispose();
     },
   };
 }

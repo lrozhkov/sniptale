@@ -163,9 +163,19 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     ...camera,
     onPreviewPlacement: onWebcamPreview,
   };
+  const presentationStatus: ReviewPreviewPresentationStatus = manual
+    ? status
+    : {
+        ...status,
+        // The DOM compositor owns Current mode when WebGPU is unavailable.
+        renderer: {
+          backend: 'legacy',
+          ...(input.preferences.renderer === 'gpu' ? { fallback: 'unavailable' } : {}),
+        },
+      };
   return {
     active: manual,
-    status,
+    status: presentationStatus,
     retry,
     onCommentPreview,
     onWebcamPreview,

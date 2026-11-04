@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useContext, useCallback, useEffect, useRef, useState } from 'react';
+import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
 import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 import { createVideoPreviewFrameMaterializer } from '../../../../preview/cache/materializer';
 import { createVideoPreviewRenderIdentity } from '../../../../preview/cache/revision';
@@ -33,9 +34,11 @@ export function useFramingFrame(
   canvasRef: React.RefObject<HTMLCanvasElement | null>
 ) {
   const { project, region, assetUrls } = props;
+  const renderer = useContext(WorkspacePreviewContext)?.preferences.preferences.renderer ?? 'gpu';
   const identity = useFramingSourceIdentity(project);
   const time = Math.min(project.duration, region.startTime + region.duration / 2);
   const key = JSON.stringify([
+    renderer,
     time,
     Object.entries(assetUrls).sort(([a], [b]) => a.localeCompare(b)),
   ]);
@@ -59,6 +62,7 @@ export function useFramingFrame(
     if (!canvas) return;
     const controller = new AbortController();
     const materializer = createVideoPreviewFrameMaterializer({
+      previewRenderer: renderer,
       assetUrls: request.assetUrls,
       ownerDocument: canvas.ownerDocument,
       project: { ...request.project, motionRegions: [] },
@@ -106,7 +110,7 @@ export function useFramingFrame(
       controller.abort();
       materializer.dispose();
     };
-  }, [request, retry, canvasRef]);
+  }, [request, retry, canvasRef, renderer]);
   const update = useCallback(
     (camera: VideoCompositionCameraState, overview: boolean) => {
       const next = { project, region, overview, camera, key: JSON.stringify(camera) };

@@ -9,6 +9,7 @@ import type { VideoEditorRuntimeController } from '../../session';
 import type { VideoEditorInsertionActions } from './insertion';
 import type {
   VideoEditorPreviewMode,
+  VideoPreviewRenderer,
   VideoEditorPreviewFrameRate,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
@@ -39,6 +40,8 @@ export interface VideoEditorPreviewController {
     onUpsertObjectTrackCorrectionAnchor: VideoEditorProjectActions['upsertObjectTrackCorrectionAnchor'];
   };
   preferences: {
+    renderer: VideoPreviewRenderer;
+    onRendererChange: (renderer: VideoPreviewRenderer) => void;
     mode: VideoEditorPreviewMode;
     onModeChange: (mode: VideoEditorPreviewMode) => void;
     onRasterPresetChange: (rasterPreset: VideoEditorPreviewRasterPreset) => void;

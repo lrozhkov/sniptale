@@ -206,6 +206,8 @@ function createPreviewController(
 
 function createFloatingPreviewPreferences() {
   return {
+    renderer: 'gpu' as const,
+    onRendererChange: noop(),
     frameRate: 'project' as const,
     onFrameRateChange: noop(),
     mode: 'live' as const,

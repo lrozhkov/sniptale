@@ -381,6 +381,29 @@ it('admits export frames without an unrelated WebGPU allocation allowance', asyn
   owner.dispose();
 });
 
+it('honors Standard without acquiring the available GPU backend', async () => {
+  vi.stubGlobal('navigator', { gpu: {} });
+  io.gpu.mockResolvedValue({
+    render: vi.fn(async () => ({ close: vi.fn() })),
+    dispose: vi.fn(),
+    allocatedBytes: 0,
+  });
+  const { resources } = setup();
+  const owner = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const prepared = await owner.prepare(scene(), dimensions, new AbortController().signal);
+  const raw = { timestamp: 1_000_000, close: vi.fn() } as unknown as VideoFrame;
+  const result = await owner.render(prepared, {
+    ...frame(),
+    source: { ...frame().source, videoFrame: () => raw },
+  });
+  expect(io.gpu).not.toHaveBeenCalled();
+  expect(io.frame).toHaveBeenCalled();
+  result.release();
+  prepared.release();
+  owner.dispose();
+  expect(raw.close).not.toHaveBeenCalled();
+});
+
 it('keeps the GPU device across prepared scene and backing replacements', async () => {
   vi.stubGlobal('navigator', { gpu: {} });
   const bitmap = { close: vi.fn() };

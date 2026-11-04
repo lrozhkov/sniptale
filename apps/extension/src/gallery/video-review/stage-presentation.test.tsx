@@ -27,6 +27,7 @@ it('keeps inspector draft interaction active independently of local stage pointe
     source: { width: 640, height: 360, duration: 10, mimeType: 'video/webm', size: 1 },
     preview: {
       preferences: {
+        renderer: 'gpu',
         rasterPreset: 'current',
         frameRate: 'current',
         pausedQuality: 'same',
@@ -142,6 +143,7 @@ it('reports raster dimensions only when their values or receiver change', () => 
     source: { width: 640, height: 360, duration: 10, mimeType: 'video/webm', size: 1 },
     preview: {
       preferences: {
+        renderer: 'gpu',
         rasterPreset: 'current',
         frameRate: 'current',
         pausedQuality: 'same',
@@ -227,6 +229,7 @@ it('batches the exact published stage geometry and root display clock and reject
         preview={{
           playing: true,
           preferences: {
+            renderer: 'gpu',
             rasterPreset: 'current',
             frameRate: 'current',
             pausedQuality: 'same',

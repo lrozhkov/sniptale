@@ -1,3 +1,4 @@
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import { useEffect, useState, type RefObject, type PointerEvent } from 'react';
 import { sameQuickEditCamera } from '../../features/video/review/advanced/motion-blur';
@@ -43,6 +44,7 @@ type PresentationProps = {
         onPresentationActive?: PreviewInput['onPresentationActive'];
         interacting?: boolean;
         sourceToResult: PreviewInput['sourceToResult'];
+        onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
       }
@@ -156,6 +158,16 @@ export function useStagePresentation(
     cut: props.cutPreview,
     webcam: props.webcam,
   });
+  const onRendererStatus = props.preview?.onRendererStatus;
+  const rendererBackend = presentation.status.renderer?.backend;
+  const rendererFallback = presentation.status.renderer?.fallback;
+  useEffect(() => {
+    onRendererStatus?.(
+      rendererBackend
+        ? { backend: rendererBackend, ...(rendererFallback ? { fallback: rendererFallback } : {}) }
+        : null
+    );
+  }, [onRendererStatus, rendererBackend, rendererFallback]);
   const onRaster = props.preview?.onRaster;
   const rasterWidth = presentation.status.actualRaster?.width;
   const rasterHeight = presentation.status.actualRaster?.height;

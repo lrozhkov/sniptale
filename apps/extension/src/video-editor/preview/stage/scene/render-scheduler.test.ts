@@ -286,3 +286,21 @@ it('forwards a completed rendered-camera receipt without evaluating a second fra
   expect(render).toHaveBeenCalledOnce();
   scheduler.dispose();
 });
+
+it('rejects an old backend publication while a playing renderer switch waits for completion', async () => {
+  const firstCompletion = Promise.withResolvers<void>();
+  const render = vi.fn().mockReturnValueOnce(firstCompletion.promise).mockResolvedValue(undefined);
+  const onSuccess = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({ render, onSuccess, onError: vi.fn() });
+  const gpu = { ...createJob(1, true), previewRenderer: 'gpu' as const };
+  const standard = { ...createJob(2, true), previewRenderer: 'legacy' as const };
+  scheduler.enqueue(gpu);
+  scheduler.enqueue(standard);
+  expect(gpu.controller.signal.aborted).toBe(true);
+  expect(render).toHaveBeenCalledOnce();
+  firstCompletion.resolve();
+  await vi.advanceTimersByTimeAsync(40);
+  expect(onSuccess).toHaveBeenCalledExactlyOnceWith(standard, undefined);
+  expect(render).toHaveBeenCalledTimes(2);
+  scheduler.dispose();
+});

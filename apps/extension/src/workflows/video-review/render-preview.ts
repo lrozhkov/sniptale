@@ -1,6 +1,14 @@
 import { planReviewExportSource } from './export-source-plan';
 import { createReviewGpuPreview } from './gpu-preview';
-import { reviewGpuPreviewAllocation, reviewPresentedGeometry } from './gpu-preview-geometry';
+import {
+  reviewGpuPreviewAllocation,
+  reviewPresentedGeometry,
+  type ReviewPresentedGeometry,
+} from './gpu-preview-geometry';
+import type {
+  PreviewRendererStatus,
+  VideoPreviewRenderer,
+} from '../../features/video/preview/preferences';
 import type { ReviewRecordingRenderSource } from './recording-render';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { reviewWatermarkAssets } from './asset-bytes';
@@ -134,6 +142,7 @@ type Allocation = {
   replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }): void;
 };
 type Assets = {
+  renderer: VideoPreviewRenderer;
   onContextLost: (() => void) | undefined;
   gpu: ReturnType<typeof createReviewGpuPreview> | null;
   annotations: Awaited<ReturnType<typeof createReviewAnnotationRenderer>> | null;
@@ -466,7 +475,7 @@ async function drawPreparedFrame(
   resources: RenderResources,
   signal: AbortSignal,
   admit: (frame: Frame, bitmaps: readonly Size[]) => void
-) {
+): Promise<{ geometry?: ReviewPresentedGeometry; renderer: PreviewRendererStatus }> {
   signal.throwIfAborted();
   const scene = await recordingHistoryScene(prepared, frame, signal);
   const request = sceneRequest({ ...prepared, scene }, frame);
@@ -502,7 +511,7 @@ async function drawPreparedFrame(
         recordingHistoryScene(prepared, { ...frame, resultTime, sourceTime }, signal),
       signal,
     });
-    if (rendered) return geometry;
+    if (rendered) return { geometry, renderer: { backend: 'gpu' } };
   }
   await frame.source.prepare?.(signal);
   signal.throwIfAborted();
@@ -723,6 +732,14 @@ async function drawPreparedFrame(
   } finally {
     transition?.release();
   }
+  return {
+    renderer: {
+      backend: 'legacy',
+      ...(assets.renderer === 'gpu' && !frame.exportEnhancer
+        ? { fallback: assets.gpu?.fallbackReason ?? 'unavailable' }
+        : {}),
+    },
+  };
 }
 
 function admitRender(
@@ -846,7 +863,11 @@ function admitRender(
     }
   }
   const gpu =
-    !exportEnhancer && !frame?.exportEnhancer && typeof navigator !== 'undefined' && navigator.gpu
+    assets.renderer === 'gpu' &&
+    !exportEnhancer &&
+    !frame?.exportEnhancer &&
+    typeof navigator !== 'undefined' &&
+    navigator.gpu
       ? reviewGpuPreviewAllocation(prepared.scene, prepared.dimensions)
       : { maximumManagedBytes: 0, maximumCanvases: 0 };
   allocation.replaceLimits({
@@ -867,6 +888,7 @@ const needsSpatialRenderer = (scene: Scene) =>
 
 /** Owns prepared scenes and one session GPU; callers retain capture and publication. */
 export function createReviewPreviewRenderer(args: {
+  renderer?: VideoPreviewRenderer;
   resources: RenderResources;
   exportEnhancer?: ExportEnhancer;
   allocation?: Allocation;
@@ -991,13 +1013,18 @@ export function createReviewPreviewRenderer(args: {
         dimensions: structuredClone(dimensions),
       };
       prepareSceneCameraPlans(prepared);
-      const useGpu = !args.exportEnhancer && typeof navigator !== 'undefined' && !!navigator.gpu;
+      const useGpu =
+        args.renderer !== 'legacy' &&
+        !args.exportEnhancer &&
+        typeof navigator !== 'undefined' &&
+        !!navigator.gpu;
       if (useGpu && !gpu)
         gpu = createReviewGpuPreview({
           resources: args.resources,
           reserve: (bytes) => args.resources.bytes('preview-gpu', bytes),
         });
       const assets: Assets = {
+        renderer: args.exportEnhancer ? 'legacy' : (args.renderer ?? 'gpu'),
         onContextLost: args.onContextLost,
         gpu: useGpu ? gpu : null,
         annotations: null,
@@ -1109,7 +1136,7 @@ export function createReviewPreviewRenderer(args: {
       );
       rendering = true;
       try {
-        const geometry = await drawPreparedFrame(
+        const presentation = await drawPreparedFrame(
           captured.prepared,
           captured.assets,
           output,
@@ -1143,8 +1170,13 @@ export function createReviewPreviewRenderer(args: {
           cameraMediaTime: frame.camera?.representedMediaTime ?? null,
           cameraGeneration: frame.camera?.generation ?? null,
           captionConflicts: prepared.captionConflicts,
-          geometry: geometry
-            ? { ...geometry, generation: frame.generation, sceneGeneration: prepared.generation }
+          renderer: presentation.renderer,
+          geometry: presentation.geometry
+            ? {
+                ...presentation.geometry,
+                generation: frame.generation,
+                sceneGeneration: prepared.generation,
+              }
             : null,
         };
       } catch (failure) {

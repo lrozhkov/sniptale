@@ -26,6 +26,7 @@ import type { PreviewStageGuide } from './canvas/snap';
 import type { PreviewStageImportHandlers } from '../../contracts/insertion';
 import type {
   VideoEditorPreviewMode,
+  VideoPreviewRenderer,
   VideoEditorPreviewFrameRate,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
@@ -121,6 +122,7 @@ export interface PreviewStageCanvasProps {
   placementMode: VideoEditorPlacementMode | null;
   previewRasterSize: VideoEditorPreviewRasterSize;
   previewMode: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer | undefined;
   previewCacheBypass: boolean;
   previewExactFrameCache: VideoPreviewExactFrameCache;
   renderGenerationRef?: React.MutableRefObject<number>;
@@ -158,6 +160,7 @@ export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
   onEnableCursorTrack: () => void;
   onImport: PreviewStageImportHandlers;
   onPreviewModeChange: (mode: VideoEditorPreviewMode) => void;
+  onPreviewRendererChange?: ((renderer: VideoPreviewRenderer) => void) | undefined;
   onPreviewPreferencesRetry: () => void;
   onPreviewFrameRateChange?: ((frameRate: VideoEditorPreviewFrameRate) => void) | undefined;
   onPreviewRasterPresetChange: (preset: VideoEditorPreviewRasterPreset) => void;
@@ -166,6 +169,7 @@ export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
   onSelectScene: () => void;
   onTogglePlay: () => void;
   previewMode: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer | undefined;
   previewPreferencesSaveFailed: boolean;
   previewShowFrameRate?: boolean | undefined;
   onPreviewShowFrameRateChange?: ((value: boolean) => void) | undefined;

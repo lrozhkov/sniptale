@@ -52,7 +52,7 @@ it('shows current defaults and actual raster, commits local settings and offers 
     );
     expect(actual.closest('.sniptale-parameter-row')?.querySelector('[aria-haspopup]')).toBeNull();
     expect(host.textContent?.match(/gallery.videoReview.previewCurrent/g)).toHaveLength(2);
-    const select = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
+    const select = host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]')[1]!;
     act(() => select.click());
     const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((node) =>
       node.textContent?.includes('720p')
@@ -76,9 +76,11 @@ it('shows current defaults and actual raster, commits local settings and offers 
         await Promise.resolve();
       });
     };
-    await choose(1, '≤ 15 FPS');
+    await choose(0, 'editor.scene.previewRendererLegacy');
+    expect(onChange).toHaveBeenLastCalledWith({ renderer: 'legacy' });
+    await choose(2, '≤ 15 FPS');
     expect(onChange).toHaveBeenLastCalledWith({ frameRate: '15' });
-    await choose(2, 'gallery.videoReview.previewPausedDetailed');
+    await choose(3, 'gallery.videoReview.previewPausedDetailed');
     expect(onChange).toHaveBeenLastCalledWith({ pausedQuality: 'detailed' });
     act(() =>
       host

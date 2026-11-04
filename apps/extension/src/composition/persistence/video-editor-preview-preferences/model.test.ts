@@ -3,7 +3,21 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES,
   parseVideoEditorPreviewPreferences,
+  parseCompleteVideoEditorPreviewPreferences,
 } from './model';
+
+it('defaults missing renderer selection to GPU and validates explicit renderer writes', () => {
+  expect(parseVideoEditorPreviewPreferences(undefined).preferences).toMatchObject({
+    renderer: 'gpu',
+  });
+  const legacy = { ...DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES, renderer: 'legacy' };
+  expect(parseCompleteVideoEditorPreviewPreferences(legacy)).toEqual(legacy);
+  expect(parseVideoEditorPreviewPreferences({ renderer: 'cpu' })).toMatchObject({
+    preferences: { renderer: 'gpu' },
+    invalidFieldCount: 1,
+  });
+  expect(parseCompleteVideoEditorPreviewPreferences({ ...legacy, renderer: 'cpu' })).toBeNull();
+});
 
 describe('video editor preview preference parsing', () => {
   it('accepts the complete validated preference contract', () => {
@@ -18,6 +32,7 @@ describe('video editor preview preference parsing', () => {
     ).toEqual({
       invalidFieldCount: 0,
       preferences: {
+        renderer: 'gpu',
         showFrameRate: false,
         frameRate: 'project',
         mode: 'cache',

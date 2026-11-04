@@ -1,4 +1,5 @@
 import { createNativeGpuPreviewMaterials } from './gpu-preview-materials';
+import type { PreviewRendererStatus } from '../../../../features/video/preview/preferences';
 import {
   createGpuPreviewRenderer,
   GpuPreviewDeviceError,
@@ -128,6 +129,7 @@ export function createNativeGpuPreviewRenderer(
   let backend: GpuPreviewRenderer | null = null;
   let preparation: Promise<GpuPreviewRenderer | null> | null = null;
   let unavailable = false;
+  let fallbackReason: PreviewRendererStatus['fallback'];
   let disposed = false;
   const materials = createNativeGpuPreviewMaterials();
   const release = () => {
@@ -136,6 +138,9 @@ export function createNativeGpuPreviewRenderer(
     materials.dispose();
   };
   return {
+    get fallbackReason() {
+      return fallbackReason;
+    },
     get acceptsNativeFrames() {
       return backend !== null && !unavailable && !disposed;
     },
@@ -171,6 +176,7 @@ export function createNativeGpuPreviewRenderer(
         backend = resolved;
         if (!backend) {
           unavailable = true;
+          fallbackReason = 'unavailable';
           return undefined;
         }
         if (input.signal?.aborted || isInvalidated()) return false;
@@ -437,6 +443,7 @@ export function createNativeGpuPreviewRenderer(
         if (input.signal?.aborted || disposed || isInvalidated()) return false;
         if (error instanceof GpuPreviewDeviceError || inputDeviceFailure) {
           unavailable = true;
+          fallbackReason = 'device-failed';
           release();
           return undefined;
         }

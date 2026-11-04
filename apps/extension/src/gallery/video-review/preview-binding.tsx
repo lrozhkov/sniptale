@@ -1,3 +1,4 @@
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { useReviewZoomPreview } from './zoom-editor';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
@@ -96,6 +97,7 @@ export function ReviewPreviewBinding({
   sceneActive,
   previewPreferences,
   onPreviewRaster,
+  onPreviewRendererStatus,
   onOpenPreviewSettings,
 }: {
   resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
@@ -103,6 +105,7 @@ export function ReviewPreviewBinding({
   state: PreviewState;
   sceneActive: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
+  onPreviewRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
   onOpenPreviewSettings?: ((trigger: HTMLButtonElement) => void) | undefined;
 }) {
@@ -201,6 +204,7 @@ export function ReviewPreviewBinding({
             focusInteracting={zoom.previewing}
             previewPreferences={previewPreferences}
             onPreviewRaster={onPreviewRaster}
+            onPreviewRendererStatus={onPreviewRendererStatus}
           />
         )}
       </ReviewPreviewFrame>
@@ -242,6 +246,7 @@ function ReviewPreviewStage({
   focusInteracting,
   previewPreferences,
   onPreviewRaster,
+  onPreviewRendererStatus,
 }: {
   resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
     Partial<Pick<LoadedReview, 'telemetry'>>;
@@ -250,6 +255,7 @@ function ReviewPreviewStage({
   fullscreen: boolean;
   focusInteracting: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
+  onPreviewRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
 }) {
   const { busy, features, composer, snapshot, canvasComments } = state;
@@ -315,6 +321,7 @@ function ReviewPreviewStage({
               interacting: focusInteracting,
               sourceToResult: state.timeline.timeMap.sourceToTimeline,
               onRaster: onPreviewRaster,
+              onRendererStatus: onPreviewRendererStatus,
               sourceFrameRate: state.exporter.index?.frameRate,
             }
           : undefined
