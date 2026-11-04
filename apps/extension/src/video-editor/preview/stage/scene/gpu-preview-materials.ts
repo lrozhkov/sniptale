@@ -238,10 +238,11 @@ function backgroundLayer(
   const image =
     sceneBackground.kind === 'image' ? input.imageBank[sceneBackground.assetId] : undefined;
   const animated =
-    hasSceneBackgroundMotion(sceneBackground.motion) ||
-    (sceneBackground.kind === 'gradient' &&
-      sceneBackground.animation?.mode !== undefined &&
-      sceneBackground.animation.mode !== 'none');
+    sceneBackground.enabled !== false &&
+    (hasSceneBackgroundMotion(sceneBackground.motion) ||
+      (sceneBackground.kind === 'gradient' &&
+        sceneBackground.animation?.mode !== undefined &&
+        sceneBackground.animation.mode !== 'none'));
   const key = JSON.stringify([
     size.width,
     size.height,

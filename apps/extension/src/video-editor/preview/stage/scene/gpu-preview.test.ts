@@ -11,6 +11,7 @@ import {
 } from '../../../../features/video/composition/canvas/gpu-preview';
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
 import type { renderPreviewScene } from './render-preview';
+import { createSceneGradientBackground } from '../../../../features/video/project/scene/background-gradient';
 
 vi.mock('../../../../features/video/composition/draw/video', () => ({ drawVideoLayer: vi.fn() }));
 const owners: ReturnType<typeof createNativeGpuPreviewRenderer>[] = [];
@@ -158,6 +159,46 @@ it('reuses immutable raster texture revisions and applies authored rotation to v
   expect(first[1]!.inverse).toEqual(first[2]!.inverse);
   expect(first[2]!.inverse).not.toEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 });
+
+it.each(['motion', 'gradient'] as const)(
+  'reuses a disabled background with remembered %s animation and invalidates when enabled',
+  async (kind) => {
+    const f = fixture();
+    f.input.project.sceneBackground =
+      kind === 'motion'
+        ? {
+            kind: 'solid',
+            color: '#123456',
+            enabled: false,
+            motion: { mode: 'drift', intensity: 100, speed: 100 },
+          }
+        : {
+            ...createSceneGradientBackground(),
+            enabled: false,
+            animation: { mode: 'breathe', intensity: 100, speed: 100 },
+          };
+    const original = structuredClone(f.input.project);
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    f.input.currentTime = 1.5;
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    const background = (index: number) => f.render.mock.calls[index]![0].layers[0]!;
+    expect(background(1).source).toBe(background(0).source);
+    expect(background(1).cache).toEqual(background(0).cache);
+    delete f.input.project.sceneBackground.enabled;
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    expect(background(2).cache).not.toEqual(background(1).cache);
+    f.input.currentTime = 2;
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    expect(background(3).cache).not.toEqual(background(2).cache);
+    f.input.project.sceneBackground.enabled = false;
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    expect(background(4).cache).not.toEqual(background(3).cache);
+    f.input.currentTime = 2.5;
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    expect(background(5).cache).toEqual(background(4).cache);
+    expect(f.input.project).toEqual(original);
+  }
+);
 
 it('keeps identity decoded frames on the direct texture route and reuses static raster revisions', async () => {
   const f = fixture();
