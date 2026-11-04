@@ -48,3 +48,45 @@ it.each(['section', 'group'] as const)(
     }
   }
 );
+
+it('supplies the owned expansion state without unmounting ordinary render children', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const states: boolean[] = [];
+  try {
+    await act(async () =>
+      root.render(
+        <InspectorDetails preferenceId="media" label="Media">
+          {(open) => {
+            states.push(open);
+            return (
+              <>
+                <input defaultValue="draft" />
+                {open && <video />}
+              </>
+            );
+          }}
+        </InspectorDetails>
+      )
+    );
+    const details = host.querySelector('details')!;
+    const input = host.querySelector('input')!;
+    input.value = 'pending';
+    expect(states.at(-1)).toBe(false);
+    expect(host.querySelector('video')).toBeNull();
+    for (const open of [true, false, true]) {
+      await act(async () => {
+        details.open = open;
+        details.dispatchEvent(new Event('toggle'));
+      });
+      expect(states.at(-1)).toBe(open);
+      expect(host.querySelector('input')).toBe(input);
+      expect(input.value).toBe('pending');
+      expect(host.querySelectorAll('video')).toHaveLength(open ? 1 : 0);
+    }
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

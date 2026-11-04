@@ -61,56 +61,62 @@ export function MediaCropControls(props: {
       preferenceId="media-frame:source-crop"
       label={translate('videoEditor.sidebar.mediaCrop')}
     >
-      <div className="sniptale-parameter-stack space-y-1" data-ui="video-editor.media-crop">
-        <MediaCropPreview
-          key={`${props.clip.id}:${runtime?.assetUrls[props.clip.assetId] ?? ''}`}
-          url={runtime?.assetUrls[props.clip.assetId]}
-          kind={props.clip.type}
-          width={asset?.metadata.width ?? 1}
-          height={asset?.metadata.height ?? 1}
-          sourceTime={
-            props.clip.type === 'VIDEO' ? getMediaClipSourceTime(props.clip, props.currentTime) : 0
-          }
-          crop={crop}
-          disabled={disabled}
-          onChange={change}
-        />
-        {fields.map((field) => (
-          <NumericRow
-            key={field.key}
-            label={field.label}
-            value={crop[field.key] * 100}
-            min={Math.min(field.min, crop[field.key]) * 100}
-            max={Math.max(field.max, crop[field.key]) * 100}
-            step={0.1}
-            precision={2}
-            unit="%"
-            disabled={disabled}
-            normalizeValue={(value) =>
-              value === Number((crop[field.key] * 100).toFixed(2)) ? crop[field.key] * 100 : value
-            }
-            onPreviewValue={() => undefined}
-            onCommitValue={(value) => change({ ...crop, [field.key]: value / 100 })}
-          />
-        ))}
-        <InspectorActionButton
-          separated
-          disabled={disabled || (!props.clip.sourceCrop && !props.clip.rememberedSourceCrop)}
-          onClick={() =>
-            props.onEdit?.(props.clip.id, {
-              kind: 'source-crop',
-              crop: props.clip.sourceCrop ? null : (props.clip.rememberedSourceCrop ?? null),
-            })
-          }
-        >
-          <RotateCcw size={14} aria-hidden="true" />
-          {translate(
-            !props.clip.sourceCrop && props.clip.rememberedSourceCrop
-              ? 'gallery.videoReview.sourceCropRestore'
-              : 'gallery.videoReview.sourceCropReset'
+      {(open) => (
+        <div className="sniptale-parameter-stack space-y-1" data-ui="video-editor.media-crop">
+          {open && (
+            <MediaCropPreview
+              key={`${props.clip.id}:${runtime?.assetUrls[props.clip.assetId] ?? ''}`}
+              url={runtime?.assetUrls[props.clip.assetId]}
+              kind={props.clip.type}
+              width={asset?.metadata.width ?? 1}
+              height={asset?.metadata.height ?? 1}
+              sourceTime={
+                props.clip.type === 'VIDEO'
+                  ? getMediaClipSourceTime(props.clip, props.currentTime)
+                  : 0
+              }
+              crop={crop}
+              disabled={disabled}
+              onChange={change}
+            />
           )}
-        </InspectorActionButton>
-      </div>
+          {fields.map((field) => (
+            <NumericRow
+              key={field.key}
+              label={field.label}
+              value={crop[field.key] * 100}
+              min={Math.min(field.min, crop[field.key]) * 100}
+              max={Math.max(field.max, crop[field.key]) * 100}
+              step={0.1}
+              precision={2}
+              unit="%"
+              disabled={disabled}
+              normalizeValue={(value) =>
+                value === Number((crop[field.key] * 100).toFixed(2)) ? crop[field.key] * 100 : value
+              }
+              onPreviewValue={() => undefined}
+              onCommitValue={(value) => change({ ...crop, [field.key]: value / 100 })}
+            />
+          ))}
+          <InspectorActionButton
+            separated
+            disabled={disabled || (!props.clip.sourceCrop && !props.clip.rememberedSourceCrop)}
+            onClick={() =>
+              props.onEdit?.(props.clip.id, {
+                kind: 'source-crop',
+                crop: props.clip.sourceCrop ? null : (props.clip.rememberedSourceCrop ?? null),
+              })
+            }
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            {translate(
+              !props.clip.sourceCrop && props.clip.rememberedSourceCrop
+                ? 'gallery.videoReview.sourceCropRestore'
+                : 'gallery.videoReview.sourceCropReset'
+            )}
+          </InspectorActionButton>
+        </div>
+      )}
     </InspectorDetails>
   );
 }
