@@ -31,6 +31,7 @@ function fixture() {
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
+    moveTo: vi.fn(),
     roundRect: vi.fn(),
     translate: vi.fn(),
     rotate: vi.fn(),
@@ -310,8 +311,10 @@ it.each(['circle', 'rounded'] as const)(
       signal: new AbortController().signal,
       sourceClip,
     });
-    expect(result.contentLayers).toHaveLength(4);
-    expect(result.contentLayers.every((layer) => layer.clip === sourceClip)).toBe(true);
+    expect(result.contentLayers).toHaveLength(3);
+    expect(result.contentLayers[0]!.clip).toBe(sourceClip);
+    expect(result.contentLayers[1]!.clip).toBeUndefined();
+    expect(result.contentLayers[2]!.clip).toBe(sourceClip);
     expect(result.viewportLayers).toHaveLength(1);
     expect(result.viewportLayers[0]!.clip).toBeUndefined();
     const lens = visit(result.contentLayers).find((layer) => layer.lens)!;
@@ -322,7 +325,6 @@ it.each(['circle', 'rounded'] as const)(
     expect(vi.mocked(f.resources.canvas).mock.calls.map(([role]) => role)).toEqual([
       'preview-gpu-click',
       'preview-gpu-click-shadow',
-      'preview-gpu-click-mask',
       'preview-gpu-click-ring',
       'preview-gpu-click',
     ]);
@@ -341,7 +343,7 @@ it.each(['circle', 'rounded'] as const)(
     }
     expect(release).toHaveBeenCalledOnce();
     f.primitives.dispose();
-    expect(f.release).toHaveBeenCalledTimes(5);
+    expect(f.release).toHaveBeenCalledTimes(4);
   }
 );
 
@@ -576,5 +578,48 @@ it('keeps split-screen background uniform while zero fade adds no layer or geome
   expectUniformFillSupport(layers[0]!);
   expect(layers.at(-1)).toBe(f.caption);
   expect(layers.some((layer) => layer.source === f.main)).toBe(true);
+  f.primitives.dispose();
+});
+
+it('retains a magnifier outside the canonical source plane for later camera projection', async () => {
+  const f = fixture();
+  const current: PreviewScene = {
+    ...scene,
+    clicks: [
+      {
+        point: { x: 0.01, y: 0.5 },
+        anchor: 1.8,
+        start: 1.8,
+        end: 2.4,
+        settings: { ...REVIEW_CLICK_DEFAULT, effect: 'magnify', magnification: 2 },
+      },
+    ],
+  };
+  const geometry = reviewPresentedGeometry(current, dimensions, 2);
+  const result = await reviewGpuContentLayers({
+    scene: current,
+    dimensions,
+    base: geometry.layout,
+    geometry,
+    sourceTime: 2,
+    fps: 30,
+    original: f.main,
+    primitives: f.primitives,
+    annotations: null,
+    admit() {},
+    signal: new AbortController().signal,
+    sourceClip: { rect: { x: 0, y: 0, ...size }, radius: 8 },
+  });
+  const outer = result.contentLayers[0]!;
+  expect(outer.rect.x).toBeLessThan(0);
+  expect(outer.clip).toBeUndefined();
+  expect('kind' in outer.source && outer.source.kind).toBe('group');
+  const lens = visit(result.contentLayers).find((layer) => layer.lens)!;
+  expect(outer.rect.x).toBeLessThan(lens.lens!.bounds.x);
+  expect(outer.rect.x + outer.rect.width).toBeGreaterThan(
+    lens.lens!.bounds.x + lens.lens!.bounds.width
+  );
+  for (const item of vi.mocked(f.resources.canvas).mock.results)
+    for (const call of item.value.context.clip.mock.calls) expect(call).toEqual(['evenodd']);
   f.primitives.dispose();
 });

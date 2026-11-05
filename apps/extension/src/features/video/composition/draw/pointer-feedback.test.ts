@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { drawPointerFeedbackFrame } from './pointer-feedback';
+import { drawPointerFeedbackFrame, pointerFeedbackLensPaintBounds } from './pointer-feedback';
 import type { ReviewClickFrame } from '../../review/click-animation';
 
 function surface() {
@@ -281,3 +281,40 @@ it.each(['flat', 'optical'] as const)(
     expect(context.globalAlpha).toBe(original.globalAlpha);
   }
 );
+
+it('keeps a lens outline and shadow outside its sampled source rectangle', () => {
+  const { canvas, context, stack } = surface();
+  const frame = lens({ x: 2, y: 3 });
+  const source = { rect: { x: 0, y: 0, width: 100, height: 100 }, draw: vi.fn() };
+  drawPointerFeedbackFrame(canvas, frame, source);
+  expect(context.rect).not.toHaveBeenCalledWith(0, 0, 100, 100);
+  expect(context.clip).toHaveBeenCalledTimes(2);
+  expect(source.draw).toHaveBeenCalledExactlyOnceWith(context, -2, -3, 200, 200);
+  expect(stack).toHaveLength(0);
+});
+
+it('retains negative lens artwork bounds including the blur tail and thick outline', () => {
+  const frame = lens({ x: 2, y: 3 });
+  expect(pointerFeedbackLensPaintBounds(frame)).toEqual({ x: -31, y: -30, width: 66, height: 66 });
+  expect(pointerFeedbackLensPaintBounds({ ...frame, stroke: 80 })).toEqual({
+    x: -60,
+    y: -59,
+    width: 124,
+    height: 124,
+  });
+  expect(pointerFeedbackLensPaintBounds({ ...frame, effect: 'press' })).toBeNull();
+  expect(pointerFeedbackLensPaintBounds({ ...frame, radius: 0 })).toBeNull();
+});
+
+it('excludes the solid shadow caster from the lens interior when source pixels are absent', () => {
+  const { canvas, context, stack } = surface();
+  drawPointerFeedbackFrame(canvas, lens(), {
+    rect: { x: 0, y: 0, width: 100, height: 100 },
+    draw() {},
+  });
+  expect(context.clip).toHaveBeenCalledWith('evenodd');
+  expect(context.clip.mock.invocationCallOrder[0]).toBeLessThan(
+    context.fill.mock.invocationCallOrder[0]!
+  );
+  expect(stack).toHaveLength(0);
+});

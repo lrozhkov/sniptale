@@ -23,6 +23,7 @@ import {
   drawFittedMediaLayer,
 } from '../../../../features/video/composition/draw/fitted-media';
 import { resolveVideoWindowMedia } from '../../../../features/video/composition/draw/video';
+import { drawPointerFeedbackLensShadow } from '../../../../features/video/composition/draw/pointer-feedback';
 import {
   DEFAULT_CAMERA_APPEARANCE,
   cameraWindowFrame,
@@ -107,7 +108,6 @@ export function buildNativeGpuVideoLayers(args: {
     sourceHeight: isVideoCompositionFrameSource(borrowed)
       ? borrowed.sourceHeight
       : source.displayHeight,
-    draw() {},
   };
   const media = {
     ...resolveVideoWindowMedia(layer, dimensions, 1, args.imageBank),
@@ -145,9 +145,11 @@ export function buildNativeGpuVideoLayers(args: {
   const sourceLayers: GpuPreviewLayer[] = [
     { source, rect: content, inverse: sourceInverse, ...(orientation ? { orientation } : {}) },
   ];
-  const header = layer.effectActionsOnly
-    ? null
-    : nativeGpuWindowHeader(media, raster, sourceInverse);
+  const header =
+    layer.effectActionsOnly &&
+    !layer.actions?.some((action) => action.gestureFeedback?.effect === 'magnify')
+      ? null
+      : nativeGpuWindowHeader(media, raster, sourceInverse);
   const traceWindow = (context: CanvasRenderingContext2D) => {
     context.fillStyle = '#fff';
     if (appearance) traceCameraShape(context, window, appearance);
@@ -266,19 +268,16 @@ export function buildNativeGpuVideoLayers(args: {
       else context.roundRect(bounds.x, bounds.y, bounds.width, bounds.height, radius * 0.18);
     };
     body.push(
-      raster((context) => {
-        context.save();
-        context.beginPath();
-        context.rect(layer.x, layer.y, layer.width, layer.height);
-        context.clip();
-        trace(context);
-        context.shadowColor = `rgba(0,0,0,${feedback.lens!.shadow / 100})`;
-        context.shadowBlur = radius * 0.16;
-        context.shadowOffsetY = radius * 0.04;
-        context.fillStyle = '#000';
-        context.fill();
-        context.restore();
-      }, true)
+      raster(
+        (context) =>
+          drawPointerFeedbackLensShadow(context, {
+            ...feedback,
+            point: projected,
+            radius,
+            stroke: feedback.stroke * Math.max(0.2, actionScale) * innerScale,
+          }),
+        true
+      )
     );
     body.push(
       groupLayer(
@@ -298,7 +297,6 @@ export function buildNativeGpuVideoLayers(args: {
               ...(shape === 'circle' ? { shape: 'ellipse' } : {}),
             },
           },
-          { ...mask, blend: 'mask' },
         ],
         true
       )
@@ -306,9 +304,6 @@ export function buildNativeGpuVideoLayers(args: {
     body.push(
       raster((context) => {
         context.save();
-        context.beginPath();
-        context.rect(layer.x, layer.y, layer.width, layer.height);
-        context.clip();
         trace(context);
         context.globalAlpha = feedback.opacity;
         context.strokeStyle = feedback.color;

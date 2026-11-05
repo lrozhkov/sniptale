@@ -88,6 +88,8 @@ export function resolveCompositionPaintBounds(args: {
   layers: readonly VideoCompositionVisualLayer[];
   output: { width: number; height: number };
   rasterScale: number;
+  /** Logical source-plane footprints keyed by rendered instance, before its layer transform. */
+  sourceFeedbackBounds?: ReadonlyMap<VideoCompositionVisualLayer, Rect>;
 }): Rect {
   const scale = args.rasterScale;
   if (!Number.isFinite(scale) || scale <= 0)
@@ -118,6 +120,14 @@ export function resolveCompositionPaintBounds(args: {
         state.translateY * scale
       );
       let bounds = layerBounds(args.context, layer, frame, scale, matrix);
+      const feedback = args.sourceFeedbackBounds?.get(layer);
+      if (feedback)
+        bounds = union(bounds, {
+          x: feedback.x * scale,
+          y: feedback.y * scale,
+          width: feedback.width * scale,
+          height: feedback.height * scale,
+        });
       const effects = layerEffectBounds(layer.clipId, bounds, frame, scale, args.frames);
       bounds = effects.source;
       if (effects.viewport) result = union(result, effects.viewport);

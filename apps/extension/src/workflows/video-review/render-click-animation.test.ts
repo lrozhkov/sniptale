@@ -11,9 +11,9 @@ it('paints the observed path and authored area in the fitted video while the hel
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
+    moveTo: vi.fn(),
     roundRect: vi.fn(),
     clip: vi.fn(),
-    moveTo: vi.fn(),
     lineTo: vi.fn(),
     strokeRect: vi.fn(),
     stroke: vi.fn(),
@@ -72,6 +72,7 @@ it.each(['fixed', 'follow-video'] as const)(
       save: vi.fn(),
       restore: vi.fn(),
       beginPath: vi.fn(),
+      moveTo: vi.fn(),
       roundRect: vi.fn(),
       clip: vi.fn(),
       arc: vi.fn(),
@@ -120,6 +121,7 @@ it('renders press and glow fills, and skips an empty frame without touching the 
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
+    moveTo: vi.fn(),
     roundRect: vi.fn(),
     clip: vi.fn(),
     arc: vi.fn(),
@@ -156,6 +158,7 @@ it.each(['circle', 'rounded'] as const)(
       save: vi.fn(),
       restore: vi.fn(),
       beginPath: vi.fn(),
+      moveTo: vi.fn(),
       roundRect: vi.fn(),
       rect: vi.fn(),
       clip: vi.fn(),
@@ -184,7 +187,7 @@ it.each(['circle', 'rounded'] as const)(
       { rect: video, draw }
     );
     expect(draw).toHaveBeenCalledWith(context, -300, -120, 1280, 720);
-    expect(context.rect).toHaveBeenCalledWith(20, 60, 640, 360);
+    expect(context.rect).not.toHaveBeenCalledWith(video.x, video.y, video.width, video.height);
     expect(context.save.mock.calls.length).toBe(context.restore.mock.calls.length);
     draw.mockClear();
     drawReviewClicks(
@@ -218,6 +221,7 @@ it('keeps the event center in video coordinates while sampling the whole decorat
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
+    moveTo: vi.fn(),
     roundRect: vi.fn(),
     rect: vi.fn(),
     clip: vi.fn(),
@@ -247,6 +251,52 @@ it('keeps the event center in video coordinates while sampling the whole decorat
     { rect: window, draw }
   );
   expect(context.arc).toHaveBeenCalledWith(340, 60, 100, 0, Math.PI * 2);
-  expect(context.rect).toHaveBeenCalledWith(20, 0, 640, 420);
+  expect(context.rect).not.toHaveBeenCalledWith(video.x, video.y, video.width, video.height);
   expect(draw).toHaveBeenCalledWith(context, -300, -60, 1280, 840);
+});
+
+it('lets magnifiers cross source and crop edges while retaining those clips for other feedback', () => {
+  const events: string[] = [];
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    roundRect: vi.fn(() => events.push('window')),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    globalAlpha: 1,
+  };
+  const video = { x: 20, y: 20, width: 100, height: 100 };
+  drawReviewClicks(
+    context as unknown as CanvasRenderingContext2D,
+    [
+      {
+        effect: 'magnify',
+        point: { x: 0.02, y: 0.02 },
+        radius: 20,
+        stroke: 2,
+        color: '#ffffff',
+        opacity: 1,
+        lens: { scale: 2, shape: 'circle', shadow: 20 },
+      },
+      {
+        effect: 'ripple',
+        point: { x: 0.02, y: 0.02 },
+        radius: 20,
+        stroke: 2,
+        color: '#ffffff',
+        opacity: 1,
+      },
+    ],
+    video,
+    100,
+    { rect: video, radius: 8, contentRect: { x: 25, y: 30, width: 70, height: 60 } },
+    { rect: video, draw: vi.fn(() => events.push('lens')) }
+  );
+  expect(events).toEqual(['lens', 'window']);
+  expect(context.rect).toHaveBeenCalledWith(25, 30, 70, 60);
 });

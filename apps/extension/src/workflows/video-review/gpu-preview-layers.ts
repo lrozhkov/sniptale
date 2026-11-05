@@ -38,6 +38,10 @@ import {
 } from '../../features/video/review/presentation-sequence';
 import { drawReviewComments } from './render-comments';
 import { drawReviewClicks } from './render-click-animation';
+import {
+  drawPointerFeedbackLensShadow,
+  pointerFeedbackLensPaintBounds,
+} from '../../features/video/composition/draw/pointer-feedback';
 import { drawReviewKeys } from './render-key-animation';
 import { type createReviewAnnotationRenderer } from './annotation-renderer';
 import { reviewGpuAnnotationLayer } from './gpu-preview-annotations';
@@ -87,14 +91,11 @@ function texture(source: HTMLCanvasElement, rect: Rect, inverse = identity): Gpu
   return { source, rect, inverse };
 }
 
-function clickPaintBounds(bounds: Rect, padding: number, size: Size): Rect {
-  const x = Math.max(0, Math.min(size.width - 1, Math.floor(bounds.x - padding)));
-  const y = Math.max(0, Math.min(size.height - 1, Math.floor(bounds.y - padding)));
-  const right = Math.max(x + 1, Math.min(size.width, Math.ceil(bounds.x + bounds.width + padding)));
-  const bottom = Math.max(
-    y + 1,
-    Math.min(size.height, Math.ceil(bounds.y + bounds.height + padding))
-  );
+function clickPaintBounds(bounds: Rect, padding: number): Rect {
+  const x = Math.floor(bounds.x - padding);
+  const y = Math.floor(bounds.y - padding);
+  const right = Math.ceil(bounds.x + bounds.width + padding);
+  const bottom = Math.ceil(bounds.y + bounds.height + padding);
   return { x, y, width: right - x, height: bottom - y };
 }
 /** Uniform fields sample only texel centres, outside the source-edge antialiasing ramp. */
@@ -207,6 +208,7 @@ export async function reviewGpuContentLayers(args: {
       radius: scene.background.enabled ? scene.background.layout.cornerRadius * scale : 0,
     };
     const contentLayers: GpuPreviewLayer[] = [];
+    const overflowLayers = new Set<GpuPreviewLayer>();
     const viewportLayers: GpuPreviewLayer[] = [];
     const full = { x: 0, y: 0, ...dimensions.canonical };
     if (borders.length)
@@ -258,24 +260,22 @@ export async function reviewGpuContentLayers(args: {
         if (click.lens!.shape === 'circle') context.arc(point.x, point.y, radius, 0, Math.PI * 2);
         else context.roundRect(bounds.x, bounds.y, bounds.width, bounds.height, radius * 0.18);
       };
-      // Keep canonical pixel density and a conservative blur tail inside the original canvas clip.
-      const shadowBounds = clickPaintBounds(
-        bounds,
-        radius * (0.16 * 3 + 0.04) + 2,
-        dimensions.canonical
-      );
+      const artworkBounds = pointerFeedbackLensPaintBounds({
+        ...click,
+        point,
+        radius,
+        stroke: click.stroke * sourceScale,
+      });
+      if (!artworkBounds) continue;
+      const shadowBounds = clickPaintBounds(bounds, radius * (0.16 * 3 + 0.04) + 2);
       const shadow = primitives.raster('preview-gpu-click-shadow', shadowBounds, (context) => {
         context.translate(-shadowBounds.x, -shadowBounds.y);
-        clipCroppedContent(context, base);
-        context.beginPath();
-        context.roundRect(clip.rect.x, clip.rect.y, clip.rect.width, clip.rect.height, clip.radius);
-        context.clip();
-        trace(context);
-        context.shadowColor = `rgba(0,0,0,${click.lens!.shadow / 100})`;
-        context.shadowBlur = radius * 0.16;
-        context.shadowOffsetY = radius * 0.04;
-        context.fillStyle = '#000000';
-        context.fill();
+        drawPointerFeedbackLensShadow(context, {
+          ...click,
+          point,
+          radius,
+          stroke: click.stroke * sourceScale,
+        });
       });
       const lens: GpuPreviewLayer = {
         source: args.original,
@@ -294,36 +294,38 @@ export async function reviewGpuContentLayers(args: {
           corner: click.lens.shape === 'circle' ? 'circle' : 0.18,
         },
       };
-      const mask = primitives.raster('preview-gpu-click-mask', dimensions.canonical, (context) => {
-        clipCroppedContent(context, base);
-        context.fillStyle = '#ffffff';
-        context.beginPath();
-        context.roundRect(clip.rect.x, clip.rect.y, clip.rect.width, clip.rect.height, clip.radius);
-        context.fill();
-      });
-      const lensGroup = group(
-        [texture(shadow, shadowBounds), lens, { ...texture(mask, full), blend: 'mask' }],
-        { canonical: dimensions.canonical, backing: dimensions.canonical }
-      );
-      contentLayers.push({ source: lensGroup, rect: full, inverse: geometry.inverse });
-      const ringBounds = clickPaintBounds(
-        bounds,
-        (click.stroke * sourceScale) / 2 + 2,
-        dimensions.canonical
-      );
+      const ringBounds = clickPaintBounds(bounds, (click.stroke * sourceScale) / 2 + 2);
       const ring = primitives.raster('preview-gpu-click-ring', ringBounds, (context) => {
         context.translate(-ringBounds.x, -ringBounds.y);
-        clipCroppedContent(context, base);
-        context.beginPath();
-        context.roundRect(clip.rect.x, clip.rect.y, clip.rect.width, clip.rect.height, clip.radius);
-        context.clip();
         trace(context);
         context.globalAlpha = click.opacity;
         context.strokeStyle = click.color;
         context.lineWidth = click.stroke * sourceScale;
         context.stroke();
       });
-      contentLayers.push(texture(ring, ringBounds, geometry.inverse));
+      const localToScene: QuickEditHomography = [
+        1,
+        0,
+        artworkBounds.x,
+        0,
+        1,
+        artworkBounds.y,
+        0,
+        0,
+        1,
+      ];
+      const lensGroup: GpuPreviewGroup = {
+        kind: 'group',
+        logical: { width: artworkBounds.width, height: artworkBounds.height },
+        output: { width: artworkBounds.width, height: artworkBounds.height },
+        layers: [texture(shadow, shadowBounds), lens, texture(ring, ringBounds)].map((layer) => ({
+          ...layer,
+          inverse: localToScene,
+        })),
+      };
+      const layer = { source: lensGroup, rect: artworkBounds, inverse: geometry.inverse };
+      contentLayers.push(layer);
+      overflowLayers.add(layer);
     }
     flushClicks();
     if (content.length) {
@@ -394,7 +396,9 @@ export async function reviewGpuContentLayers(args: {
     const sourceClip = args.sourceClip;
     return {
       contentLayers: sourceClip
-        ? contentLayers.map((layer) => ({ ...layer, clip: sourceClip }))
+        ? contentLayers.map((layer) =>
+            overflowLayers.has(layer) ? layer : { ...layer, clip: sourceClip }
+          )
         : contentLayers,
       viewportLayers,
     };

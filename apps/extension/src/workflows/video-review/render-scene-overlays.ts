@@ -13,6 +13,7 @@ import {
   computeQuickEditSpatialRasterLayout,
   computeQuickEditWindowTransform,
   computeQuickEditSourceWindowTransform,
+  quickEditVisibleVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import {
   clipReviewSceneContent,
@@ -21,6 +22,7 @@ import {
 } from './scene-frame';
 import { drawReviewAnnotationFrame } from './annotation-renderer';
 import { drawReviewClicks } from './render-click-animation';
+import { pointerFeedbackLensPaintBounds } from '../../features/video/composition/draw/pointer-feedback';
 import { drawSceneBorders } from '../../features/video/composition/draw/border';
 import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
@@ -146,22 +148,47 @@ export function drawReviewSceneOverlays(args: {
     return;
   }
   const overlayDensity = args.exportSampling ? args.exportSampling.plan.overlayDensity : 1;
+  let overlayBounds = { x: 0, y: 0, width: canvas.width, height: canvas.height };
+  if (spatial) {
+    const video = overlayLayout.videoTransform;
+    const scale = video.width / Math.max(1, args.sourceWidth);
+    for (const click of clicks) {
+      const bounds = pointerFeedbackLensPaintBounds({
+        ...click,
+        point: {
+          x: video.x + click.point.x * video.width,
+          y: video.y + click.point.y * video.height,
+        },
+        radius: click.radius * scale,
+        stroke: click.stroke * scale,
+      });
+      if (!bounds) continue;
+      const x = Math.min(overlayBounds.x, bounds.x),
+        y = Math.min(overlayBounds.y, bounds.y);
+      overlayBounds = {
+        x,
+        y,
+        width: Math.max(overlayBounds.x + overlayBounds.width, bounds.x + bounds.width) - x,
+        height: Math.max(overlayBounds.y + overlayBounds.height, bounds.y + bounds.height) - y,
+      };
+    }
+  }
   const overlay = spatial
     ? spatial.surface(
         'overlay',
-        Math.ceil(canvas.width * overlayDensity),
-        Math.ceil(canvas.height * overlayDensity)
+        Math.ceil(overlayBounds.width * overlayDensity),
+        Math.ceil(overlayBounds.height * overlayDensity)
       )
     : null;
   const overlayContext = overlay?.context ?? context;
-  const overlayCanvas = overlayDensity === 1 ? (overlay?.canvas ?? canvas) : canvas;
+  const overlayCanvas = canvas;
   overlayContext.save();
   try {
-    if (overlay && overlayDensity !== 1)
-      overlayContext.scale(
-        overlay.canvas.width / canvas.width,
-        overlay.canvas.height / canvas.height
-      );
+    if (overlay) {
+      if (overlayDensity !== 1) overlayContext.scale(overlayDensity, overlayDensity);
+      if (overlayBounds.x !== 0 || overlayBounds.y !== 0)
+        overlayContext.translate(-overlayBounds.x, -overlayBounds.y);
+    }
     drawSceneBorders(
       overlayContext,
       overlayCanvas,
@@ -172,57 +199,53 @@ export function drawReviewSceneOverlays(args: {
       },
       scene.resources
     );
-    if (overlayLayout.sourceCrop) overlayContext.save();
-    try {
-      if (overlayLayout.sourceCrop)
-        clipReviewSceneContent(overlayContext, overlayLayout, overlayBackground);
-      drawReviewClicks(
-        overlayContext,
-        clicks,
-        overlayLayout.videoTransform,
-        args.sourceWidth,
-        {
-          rect: motion.windowClip,
-          radius: background.enabled ? background.layout.cornerRadius * motion.scale : 0,
-        },
-        args.windowRaster
-          ? {
-              rect: computeQuickEditWindowTransform(overlayLayout),
-              draw: (target, x, y, width, height) => {
-                const raster = args.windowRaster!;
-                target.drawImage(
-                  raster.image,
-                  0,
-                  0,
-                  raster.width,
-                  raster.height,
-                  x,
-                  y,
-                  width,
-                  height
-                );
-              },
-            }
-          : {
-              rect: overlayLayout.videoTransform,
-              draw: (target, x, y, width, height) => scene.sample.draw(target, x, y, width, height),
+    drawReviewClicks(
+      overlayContext,
+      clicks,
+      overlayLayout.videoTransform,
+      args.sourceWidth,
+      {
+        rect: motion.windowClip,
+        radius: background.enabled ? background.layout.cornerRadius * motion.scale : 0,
+        ...(overlayLayout.sourceCrop
+          ? { contentRect: quickEditVisibleVideoTransform(overlayLayout) }
+          : {}),
+      },
+      args.windowRaster
+        ? {
+            rect: computeQuickEditWindowTransform(overlayLayout),
+            draw: (target, x, y, width, height) => {
+              const raster = args.windowRaster!;
+              target.drawImage(
+                raster.image,
+                0,
+                0,
+                raster.width,
+                raster.height,
+                x,
+                y,
+                width,
+                height
+              );
             },
-        ...(args.exportSampling && args.sharpPaint
-          ? ([
-              (index: number) => {
-                const lens = args.exportSampling!.plan.lenses.find(
-                  (l) => l.kind === 'click' && l.index === index
-                );
-                return lens
-                  ? (target: CanvasRenderingContext2D) => args.sharpPaint!(target, lens)
-                  : undefined;
-              },
-            ] as const)
-          : [])
-      );
-    } finally {
-      if (overlayLayout.sourceCrop) overlayContext.restore();
-    }
+          }
+        : {
+            rect: overlayLayout.videoTransform,
+            draw: (target, x, y, width, height) => scene.sample.draw(target, x, y, width, height),
+          },
+      ...(args.exportSampling && args.sharpPaint
+        ? ([
+            (index: number) => {
+              const lens = args.exportSampling!.plan.lenses.find(
+                (l) => l.kind === 'click' && l.index === index
+              );
+              return lens
+                ? (target: CanvasRenderingContext2D) => args.sharpPaint!(target, lens)
+                : undefined;
+            },
+          ] as const)
+        : [])
+    );
     const contentFrames = annotationFrames.filter(
       (frame) => frame.instance.attachment === 'content'
     );
@@ -251,7 +274,7 @@ export function drawReviewSceneOverlays(args: {
   if (overlay && spatialRenderer && layout.spatial) {
     spatialRenderer.draw(context, {
       source: overlay.canvas,
-      sourceRect: { x: 0, y: 0, width: canvas.width, height: canvas.height },
+      sourceRect: overlayBounds,
       output: canvas,
       base: layout.windowRect,
       target: computeQuickEditSpatialWindow(layout, background),

@@ -1,3 +1,4 @@
+import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { expect, it, vi } from 'vitest';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
@@ -308,3 +309,66 @@ it.each(['absent', 'hidden', 'outside-time', 'not-exported'] as const)(
     );
   }
 );
+
+it('keeps magnifier artwork outside canonical bounds until the final spatial projection', () => {
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    roundRect: vi.fn(),
+    clip: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const canvas = { width: 800, height: 450 } as HTMLCanvasElement;
+  const background = { enabled: false as const };
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'overflow', at: 0, duration: 4 }),
+    transform: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateZ: 25 },
+    enter: { type: 'none' as const, duration: 0 },
+    exit: { type: 'none' as const, duration: 0 },
+  };
+  const layout = computeQuickEditSceneLayout({
+    output: canvas,
+    source: canvas,
+    background,
+    camera: quickEditSpatialTargetCamera(region),
+  });
+  const renderer: ReviewSpatialRenderer = {
+    validateSizes: vi.fn(),
+    surface: vi.fn((_kind, width, height) => ({
+      canvas: { width, height } as HTMLCanvasElement,
+      context,
+    })),
+    draw: vi.fn(),
+    dispose: vi.fn(),
+  };
+  drawReviewSceneOverlays({
+    scene: { canvas, layout, background, image: null, sample: { draw: vi.fn() } },
+    renderer,
+    context,
+    canvas,
+    spotlightScratch: null,
+    regions: [region],
+    globalResultTime: 1,
+    cameraScale: 1,
+    sourceWidth: 800,
+    clicks: [
+      {
+        point: { x: 0.01, y: 0.01 },
+        anchor: 0.8,
+        start: 0.8,
+        end: 1.5,
+        settings: { ...REVIEW_CLICK_DEFAULT, effect: 'magnify', magnification: 2 },
+      },
+    ],
+  });
+  const request = vi.mocked(renderer.draw).mock.calls[0]![1];
+  expect(request.sourceRect.x).toBeLessThan(0);
+  expect(request.sourceRect.y).toBeLessThan(0);
+  expect(request.sourceRect.width).toBeGreaterThan(canvas.width);
+  expect(request.sourceRect.height).toBeGreaterThan(canvas.height);
+  expect(context.translate).toHaveBeenCalledWith(-request.sourceRect.x, -request.sourceRect.y);
+});

@@ -21,10 +21,11 @@ import type {
 import type { ReviewSpatialRenderer } from '../canvas/spatial-renderer';
 import { drawSpatialCameraGroup } from '../canvas/spatial-group';
 import type { EffectRuntimeRenderedFrameMap } from '../effect-runtime/runtime/types';
-import type { VideoCompositionMediaSource } from './media-source';
+import { isVideoCompositionFrameSource, type VideoCompositionMediaSource } from './media-source';
 import { drawCompositionVisualLayer } from './visual';
 import { drawEffectRuntimeVisualLayer, type EffectRuntimeDrawState } from './effect-runtime';
 import { resolveCompositionPaintBounds } from './paint-bounds';
+import { resolveVideoSourceLensPaintBounds } from './video';
 
 export interface CompositionSharpOutput {
   /** Maps the existing rasterScale source plane directly into the final ROI raster. */
@@ -243,11 +244,20 @@ export function drawSpatialCompositionGroup(args: {
   renderer: ReviewSpatialRenderer;
 }): boolean {
   if (!args.camera.spatial) return false;
+  const sourceFeedbackBounds = new Map<VideoCompositionVisualLayer, CameraSpatialRect>();
+  for (const layer of args.layers) {
+    if (layer.kind !== 'video') continue;
+    const source = args.clipMediaElements.get(layer.clipId);
+    if (!(source instanceof HTMLVideoElement) && !isVideoCompositionFrameSource(source)) continue;
+    const bounds = resolveVideoSourceLensPaintBounds(layer, source, 1, args.imageBank);
+    if (bounds) sourceFeedbackBounds.set(layer, bounds);
+  }
   const sourceRect = resolveCompositionPaintBounds({
     context: args.context,
     layers: args.layers,
     output: args.logicalSize,
     rasterScale: args.rasterScale,
+    sourceFeedbackBounds,
     ...(args.frames ? { frames: args.frames } : {}),
   });
   const maskState: EffectRuntimeDrawState = {

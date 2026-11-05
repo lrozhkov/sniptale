@@ -15,6 +15,56 @@ export interface PointerFeedbackSource {
   ): void;
 }
 
+/** Pixel-space lens artwork, including its outline and shadow, before viewport clipping. */
+export function pointerFeedbackLensPaintBounds(frame: ReviewClickFrame) {
+  if (frame.effect !== 'magnify' || !frame.lens || frame.lens.scale <= 1 || frame.radius <= 0)
+    return null;
+  const padding = Math.max(frame.radius * (0.16 * 3 + 0.04), frame.stroke / 2) + 2;
+  const x = Math.floor(frame.point.x - frame.radius - padding);
+  const y = Math.floor(frame.point.y - frame.radius - padding);
+  return {
+    x,
+    y,
+    width: Math.ceil(frame.point.x + frame.radius + padding) - x,
+    height: Math.ceil(frame.point.y + frame.radius + padding) - y,
+  };
+}
+
+function appendLensPath(context: CanvasRenderingContext2D, frame: ReviewClickFrame) {
+  const { x, y } = frame.point;
+  const radius = frame.radius;
+  if (frame.lens!.shape === 'circle') {
+    context.moveTo(x + radius, y);
+    context.arc(x, y, radius, 0, Math.PI * 2);
+  } else context.roundRect(x - radius, y - radius, radius * 2, radius * 2, radius * 0.18);
+}
+
+/** Paint only the outer shadow; absent source pixels must retain the scene behind the lens. */
+export function drawPointerFeedbackLensShadow(
+  context: CanvasRenderingContext2D,
+  frame: ReviewClickFrame
+): void {
+  const bounds = pointerFeedbackLensPaintBounds(frame);
+  if (!bounds || !frame.lens || frame.lens.shadow <= 0) return;
+  context.save();
+  try {
+    context.beginPath();
+    context.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+    // The hole excludes the opaque caster without erasing previously painted scene pixels.
+    appendLensPath(context, frame);
+    context.clip('evenodd');
+    context.beginPath();
+    appendLensPath(context, frame);
+    context.shadowColor = `rgba(0,0,0,${frame.lens.shadow / 100})`;
+    context.shadowBlur = frame.radius * 0.16;
+    context.shadowOffsetY = frame.radius * 0.04;
+    context.fillStyle = '#000';
+    context.fill();
+  } finally {
+    context.restore();
+  }
+}
+
 /** Paint one pixel-space frame with the caller's existing layer opacity and clip. */
 export function drawPointerFeedbackFrame(
   context: CanvasRenderingContext2D,
@@ -72,25 +122,12 @@ function drawLens(
   context.save();
   const layerOpacity = context.globalAlpha;
   try {
-    context.beginPath();
-    context.rect(source.rect.x, source.rect.y, source.rect.width, source.rect.height);
-    context.clip();
     const traceLens = () => {
       context.beginPath();
-      if (lens.shape === 'circle') context.arc(x, y, radius, 0, Math.PI * 2);
-      else context.roundRect(x - radius, y - radius, radius * 2, radius * 2, radius * 0.18);
+      appendLensPath(context, frame);
     };
+    drawPointerFeedbackLensShadow(context, frame);
     traceLens();
-    context.save();
-    try {
-      context.shadowColor = `rgba(0,0,0,${lens.shadow / 100})`;
-      context.shadowBlur = radius * 0.16;
-      context.shadowOffsetY = radius * 0.04;
-      context.fillStyle = '#000';
-      context.fill();
-    } finally {
-      context.restore();
-    }
     context.save();
     try {
       context.clip();

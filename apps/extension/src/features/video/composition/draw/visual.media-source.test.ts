@@ -22,6 +22,7 @@ function createContext() {
     clip: vi.fn(),
     drawImage: vi.fn(),
     rect: vi.fn(),
+    roundRect: vi.fn(),
     restore: vi.fn(),
     rotate: vi.fn(),
     save: vi.fn(),

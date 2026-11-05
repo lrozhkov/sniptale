@@ -26,6 +26,7 @@ const CRITICAL_SPECS = [
   'tooling/test/e2e/extension-critical/extension-critical-page-toolbar-fit.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-gallery-header-gpu.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-click-lens-overflow.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-gallery-export-cancellation.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-gallery-focus-border.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-image-editor-persistence.spec.ts',

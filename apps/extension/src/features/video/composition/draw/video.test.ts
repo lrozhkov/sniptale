@@ -10,6 +10,7 @@ import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header
 import { windowHeaderImageKey } from './window-header';
 import { drawFittedMediaLayer } from './fitted-media';
 import type { PreparedSourceSampling, VideoCompositionFrameSource } from './media-source';
+import type { VideoCompositionActionState } from '../types';
 
 vi.mock('./spotlight', () => ({ drawSceneSpotlights: vi.fn() }));
 vi.mock('./fitted-media', async (original) => {
@@ -253,3 +254,95 @@ it('bounds source isolation by the destination even for a large offscreen window
   f.paint({ x: -100000, y: -100000, width: 200000, height: 200000 });
   expect(f.allocations).toEqual([{ width: 640, height: 360 }]);
 });
+
+function sourceFeedbackAction(clipId: string): VideoCompositionActionState {
+  const event = {
+    id: 'lens',
+    kind: 'CLICK' as const,
+    label: '',
+    anchor: { kind: 'project' as const, time: 0 },
+    data: {},
+    point: { x: 0.5, y: 0.125 },
+  };
+  return {
+    clipId,
+    duration: 1,
+    event,
+    occurrence: {
+      event,
+      eventId: event.id,
+      clipId,
+      time: 0,
+      sourceInstanceId: null,
+      playbackRun: null,
+    },
+    point: event.point,
+    preset: 'CLICK_RIPPLE',
+    progress: 0.5,
+    renderKind: 'accent',
+    start: 0,
+    gestureFeedback: {
+      effect: 'magnify',
+      point: event.point,
+      radius: 100,
+      stroke: 2,
+      opacity: 1,
+      color: '#f00',
+      lens: { scale: 4, shape: 'circle', shadow: 0 },
+    },
+  };
+}
+
+function paintFeedback(layer: Parameters<typeof drawVideoLayer>[1]) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 200;
+  canvas.height = 120;
+  const context = canvas.getContext('2d')!;
+  const source: VideoCompositionFrameSource = {
+    sourceWidth: 320,
+    sourceHeight: 180,
+    draw(target, x, y, width, height) {
+      target.fillStyle = '#0000ff';
+      target.fillRect(x, y, width, height);
+    },
+  };
+  drawVideoLayer(
+    context,
+    layer,
+    { x: 50, y: 40, width: 80, height: 40 },
+    1,
+    new Map([[layer.clipId, source]]),
+    {}
+  );
+  return context;
+}
+
+it('paints a source magnifier over background while retaining the media edge underneath', () => {
+  const f = fixture();
+  f.layer.spotlights = [];
+  f.layer.actions = [sourceFeedbackAction(f.layer.clipId)];
+  const context = paintFeedback(f.layer);
+  expect(Array.from(context.getImageData(90, 30, 1, 1).data)).toEqual([0, 0, 255, 255]);
+  expect(context.getImageData(50, 30, 1, 1).data[3]).toBe(0);
+});
+
+it.each([false, true])(
+  'retains clipped press feedback and source action order, lens last=%s',
+  (lensLast) => {
+    const f = fixture();
+    f.layer.spotlights = [];
+    const lens = sourceFeedbackAction(f.layer.clipId);
+    const press: VideoCompositionActionState = {
+      ...lens,
+      gestureFeedback: { ...lens.gestureFeedback!, effect: 'press', color: '#00ff00' },
+    };
+    f.layer.actions = lensLast ? [press, lens] : [lens, press];
+    const context = paintFeedback(f.layer);
+    expect(Array.from(context.getImageData(90, 45, 1, 1).data)).toEqual(
+      lensLast ? [0, 0, 255, 255] : [0, 255, 0, 255]
+    );
+    expect(Array.from(context.getImageData(90, 30, 1, 1).data)).toEqual([0, 0, 255, 255]);
+    f.layer.actions = [press];
+    expect(paintFeedback(f.layer).getImageData(90, 30, 1, 1).data[3]).toBe(0);
+  }
+);

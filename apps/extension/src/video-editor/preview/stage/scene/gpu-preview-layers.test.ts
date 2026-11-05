@@ -502,7 +502,7 @@ it.each(['source-window', undefined] as const)(
 );
 
 it.each(['circle', 'rounded'] as const)(
-  'keeps magnify feedback sharp above its source and clips the %s lens to the footage',
+  'keeps magnify feedback sharp above its masked source without clipping the %s lens output',
   async (shape) => {
     const f = fixture();
     const layer = f.passes.overlayFrame.visualLayers[0]!;
@@ -538,6 +538,13 @@ it.each(['circle', 'rounded'] as const)(
     expect(lens).toBeDefined();
     expect(lens.lens?.optics).toBe(shape === 'circle' ? 'optical' : 'flat');
     expect(lens.clip?.shape).toBe(shape === 'circle' ? 'ellipse' : undefined);
+    const owner = nodes.find(
+      (node) =>
+        'kind' in node.source && node.source.kind === 'group' && node.source.layers.includes(lens)
+    );
+    if (!owner || !('kind' in owner.source) || owner.source.kind !== 'group')
+      throw new Error('Expected lens owner');
+    expect(owner.source.layers.some((node) => node.blend === 'mask')).toBe(false);
     expect(nodes.indexOf(lens)).toBeGreaterThan(
       nodes.findIndex((node) => node.source === f.source)
     );
@@ -545,6 +552,39 @@ it.each(['circle', 'rounded'] as const)(
     expect(f.borrowed.draw).not.toHaveBeenCalled();
   }
 );
+
+it('allocates the complete source magnifier footprint outside the canonical plane', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  const action = clickAction(layer.clipId);
+  layer.actions = [
+    {
+      ...action,
+      point: { x: 0.5, y: 0.1 },
+      gestureFeedback: {
+        effect: 'magnify',
+        point: { x: 0.5, y: 0.1 },
+        radius: 160,
+        stroke: 4,
+        opacity: 1,
+        color: '#f00',
+        lens: { scale: 3, shape: 'circle', shadow: 20 },
+      },
+    },
+  ];
+  const plan = await buildNativeGpuPreviewLayers(f);
+  plans.push(plan);
+  const nodes = flatten(plan.layers);
+  const containing = nodes.filter(
+    (node) =>
+      'kind' in node.source &&
+      node.source.kind === 'group' &&
+      flatten(node.source.layers).some((child) => child.lens)
+  );
+  expect(containing.some((node) => node.rect.y < -160)).toBe(true);
+  expect(containing.some((node) => node.rect.width > 32 + 256)).toBe(true);
+});
 
 it('uses the original external frame dimensions when no decoded media descriptor is present', async () => {
   const f = fixture();

@@ -3,7 +3,7 @@ import { drawCompositionBorders } from './border';
 import { roundedWindowRadius } from '../../project/window-geometry';
 import { cameraWindowFrame } from '../../project/camera/appearance';
 import { traceCameraShape } from './media-shadow';
-import type { PointerFeedbackSource } from './pointer-feedback';
+import { pointerFeedbackLensPaintBounds, type PointerFeedbackSource } from './pointer-feedback';
 import { admittedVisualWindowHeader } from './window-header';
 import { drawActionCompositionState, sourceClickSamplingDemandId } from './effects/actions';
 import type { VideoCompositionActionState, VideoCompositionVisualLayer } from '../types';
@@ -23,7 +23,7 @@ import {
 import { drawSceneSpotlights } from './spotlight';
 import { sampleCompositionSpotlightLayer } from './project-spotlight';
 import type { RenderCanvasLease, RenderResources } from '../canvas/render-resources';
-import type { QuickEditHomography } from '../motion/spatial-geometry';
+import { projectQuickEditPoint, type QuickEditHomography } from '../motion/spatial-geometry';
 
 type VideoFrame = Pick<VideoCompositionVisualLayer, 'x' | 'y' | 'width' | 'height'>;
 
@@ -196,6 +196,28 @@ export function drawVideoLayer(
     (!layer.effectActionsOnly || layer.deferSourceBorders) &&
     (!!layer.borders?.length || !!layer.spotlights?.length) &&
     !!layer.actions?.length;
+  const paintActions = () => {
+    if (!layer.actions?.length) return;
+    const transform = context.getTransform?.();
+    const density = transform
+      ? Math.max(Math.hypot(transform.a, transform.b), Math.hypot(transform.c, transform.d))
+      : 1;
+    const geometry = videoSourceActionGeometry(media, frame, density);
+    drawVideoSourceActions(
+      context,
+      layer,
+      frame,
+      geometry.source,
+      {
+        width: media.sourceWidth,
+        height: media.sourceHeight,
+      },
+      geometry.visible,
+      feedbackSource,
+      media,
+      displayScale
+    );
+  };
   const paintWindow = (target: CanvasRenderingContext2D) =>
     drawSampledWindow({
       ...media,
@@ -213,16 +235,6 @@ export function drawVideoLayer(
           () => {
             if (!layer.effectActionsOnly)
               paintSource(drawContext, frame, drawX, drawY, drawWidth, drawHeight);
-            if (!deferActions)
-              drawVideoSourceActions(
-                drawContext,
-                layer,
-                frame,
-                { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
-                { width: media.sourceWidth, height: media.sourceHeight },
-                visibleContent,
-                feedbackSource
-              );
           }
         ),
     });
@@ -240,35 +252,10 @@ export function drawVideoLayer(
       isVideoCompositionFrameSource(source) ? source.renderResources : undefined
     );
   else paintWindow(context);
+  if (!deferActions) paintActions();
   if (!layer.effectActionsOnly || layer.deferSourceBorders)
     drawVideoWindowBorders(context, layer, media, frame, displayScale);
-  if (deferActions)
-    drawSampledWindow({
-      ...media,
-      ...(layer.sourceContentTransform
-        ? { sourceContentTransform: layer.sourceContentTransform }
-        : {}),
-      context,
-      frame,
-      hideWindowHeader: true,
-      shadowIntensity: 0,
-      render: (drawX, drawY, drawWidth, drawHeight, drawContext = context, visibleContent) =>
-        drawContent(
-          drawContext,
-          frame,
-          visibleContent ?? { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
-          () =>
-            drawVideoSourceActions(
-              drawContext,
-              layer,
-              frame,
-              { x: drawX, y: drawY, width: drawWidth, height: drawHeight },
-              { width: media.sourceWidth, height: media.sourceHeight },
-              visibleContent,
-              feedbackSource
-            )
-        ),
-    });
+  if (deferActions) paintActions();
 }
 
 type VideoLayer = Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
@@ -284,7 +271,10 @@ function isReadyVideoSource(
 /** Resolve the canonical fitted source, header and shadow policy for video consumers. */
 export function resolveVideoWindowMedia(
   layer: VideoLayer,
-  source: HTMLVideoElement | VideoCompositionFrameSource,
+  source:
+    | HTMLVideoElement
+    | VideoCompositionFrameSource
+    | Pick<VideoCompositionFrameSource, 'sourceWidth' | 'sourceHeight'>,
   displayScale: number,
   loadedImages: Record<string, HTMLImageElement>
 ) {
@@ -323,6 +313,104 @@ export function resolveVideoWindowMedia(
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
     sourceWidth: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
   };
+}
+
+function videoSourceActionGeometry(
+  media: ReturnType<typeof resolveVideoWindowMedia>,
+  frame: VideoFrame,
+  density = 1
+) {
+  if (media.windowHeaderImage) {
+    const raster = resolveFittedWindowRaster(
+      { ...media, frame },
+      density,
+      media.windowHeaderImage.naturalHeight
+    );
+    return { source: raster.source, visible: raster.visible };
+  }
+  return {
+    source: getFittedMediaContentFrame({ ...media, frame }),
+    visible: media.cameraAppearance
+      ? cameraWindowFrame(frame, media.cameraAppearance.shape)
+      : getFittedMediaWindowFrame({ ...media, frame }),
+  };
+}
+
+/** Source feedback bounds precede the layer transform and use the painter's actual media geometry. */
+export function resolveVideoSourceLensPaintBounds(
+  layer: VideoLayer,
+  source: Parameters<typeof resolveVideoWindowMedia>[1],
+  displayScale: number,
+  images: Record<string, HTMLImageElement>
+) {
+  if (!layer.actions?.some((action) => action.gestureFeedback?.effect === 'magnify')) return null;
+  const frame = {
+    x: layer.x * displayScale,
+    y: layer.y * displayScale,
+    width: layer.width * displayScale,
+    height: layer.height * displayScale,
+  };
+  const media = resolveVideoWindowMedia(layer, source, displayScale, images);
+  const content = videoSourceActionGeometry(media, frame).source;
+  const scale = (content.width / media.sourceWidth + content.height / media.sourceHeight) / 2;
+  let bounds: VideoFrame | null = null;
+  for (const action of layer.actions ?? []) {
+    const feedback = action.gestureFeedback;
+    if (!feedback || !action.point) continue;
+    const rawX = content.x + action.point.x * content.width;
+    const point = {
+      x:
+        layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored
+          ? 2 * frame.x + frame.width - rawX
+          : rawX,
+      y: content.y + action.point.y * content.height,
+    };
+    const footprint = pointerFeedbackLensPaintBounds({
+      ...feedback,
+      point,
+      radius: feedback.radius * scale,
+      stroke: feedback.stroke * Math.max(0.2, scale),
+    });
+    if (!footprint) continue;
+    const inner = layer.sourceContentTransform;
+    const transform = inner
+      ? ([
+          inner[0],
+          inner[1],
+          inner[2] * displayScale,
+          inner[3],
+          inner[4],
+          inner[5] * displayScale,
+          inner[6],
+          inner[7],
+          inner[8],
+        ] as const)
+      : undefined;
+    const corners = [
+      { x: footprint.x, y: footprint.y },
+      { x: footprint.x + footprint.width, y: footprint.y },
+      { x: footprint.x, y: footprint.y + footprint.height },
+      { x: footprint.x + footprint.width, y: footprint.y + footprint.height },
+    ].map((point) => (transform ? projectQuickEditPoint(transform, point) : point));
+    if (corners.some((point) => !point))
+      throw new Error('Perspective source bounds are unavailable.');
+    const x = Math.min(...corners.map((point) => point!.x)),
+      y = Math.min(...corners.map((point) => point!.y));
+    const right = Math.max(...corners.map((point) => point!.x)),
+      bottom = Math.max(...corners.map((point) => point!.y));
+    if (!bounds) bounds = { x, y, width: right - x, height: bottom - y };
+    else {
+      const left = Math.min(bounds.x, x),
+        top = Math.min(bounds.y, y);
+      bounds = {
+        x: left,
+        y: top,
+        width: Math.max(bounds.x + bounds.width, right) - left,
+        height: Math.max(bounds.y + bounds.height, bottom) - top,
+      };
+    }
+  }
+  return bounds;
 }
 
 function drawVideoWindowBorders(
@@ -373,13 +461,13 @@ function drawVideoSourceActions(
   frame: VideoFrame,
   sourceFrame: VideoFrame,
   sourceSize: { width: number; height: number },
-  visibleContent?: VideoFrame,
-  feedbackSource?: PointerFeedbackSource
+  visibleContent: VideoFrame,
+  feedbackSource: PointerFeedbackSource,
+  media: ReturnType<typeof resolveVideoWindowMedia>,
+  displayScale: number
 ) {
   const { x: drawX, y: drawY, width: drawWidth, height: drawHeight } = sourceFrame;
-  drawContext.save();
-  drawContext.beginPath();
-  const visible = visibleContent ?? sourceFrame;
+  const visible = visibleContent;
   const contentBounds = {
     x: Math.max(frame.x, visible.x),
     y: Math.max(frame.y, visible.y),
@@ -392,8 +480,6 @@ function drawVideoSourceActions(
       Math.min(frame.y + frame.height, visible.y + visible.height) - Math.max(frame.y, visible.y)
     ),
   };
-  drawContext.rect(contentBounds.x, contentBounds.y, contentBounds.width, contentBounds.height);
-  drawContext.clip();
   const { width: sourceWidth, height: sourceHeight } = sourceSize;
   const actionScale = (drawWidth / sourceWidth + drawHeight / sourceHeight) / 2;
   const mirrored = layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true;
@@ -402,37 +488,80 @@ function drawVideoSourceActions(
     return mirrored ? 2 * frame.x + frame.width - projected : projected;
   };
   for (const action of layer.actions ?? []) {
-    const point = action.point
-      ? { x: sourceX(action.point.x), y: drawY + action.point.y * drawHeight }
-      : action.renderKind === 'keystroke'
-        ? {
-            x: contentBounds.x + 12 * Math.max(0.2, actionScale),
-            y: contentBounds.y + 24 * Math.max(0.2, actionScale),
-          }
-        : null;
-    drawActionCompositionState(
-      drawContext,
-      {
-        ...action,
-        point,
-        ...(action.gestureFeedback
+    drawContext.save();
+    try {
+      if (action.gestureFeedback?.effect !== 'magnify') {
+        const window = media.cameraAppearance
+          ? cameraWindowFrame(frame, media.cameraAppearance.shape)
+          : getFittedMediaWindowFrame({ ...media, frame });
+        if (media.cameraAppearance) traceCameraShape(drawContext, window, media.cameraAppearance);
+        else {
+          drawContext.beginPath();
+          drawContext.roundRect(
+            window.x,
+            window.y,
+            window.width,
+            window.height,
+            roundedWindowRadius(
+              window.width,
+              window.height,
+              (layer.clip.windowCornerRadius ?? 0) * displayScale
+            )
+          );
+        }
+        drawContext.clip();
+        drawContext.beginPath();
+        drawContext.rect(
+          contentBounds.x,
+          contentBounds.y,
+          contentBounds.width,
+          contentBounds.height
+        );
+        drawContext.clip();
+      }
+      const inner = layer.sourceContentTransform;
+      if (inner)
+        drawContext.transform(
+          inner[0],
+          inner[3],
+          inner[1],
+          inner[4],
+          inner[2] * displayScale,
+          inner[5] * displayScale
+        );
+      const point = action.point
+        ? { x: sourceX(action.point.x), y: drawY + action.point.y * drawHeight }
+        : action.renderKind === 'keystroke'
           ? {
-              gestureFeedback: projectVideoGestureFeedback(
-                action.gestureFeedback,
-                sourceFrame,
-                sourceX,
-                mirrored
-              ),
+              x: contentBounds.x + 12 * Math.max(0.2, actionScale),
+              y: contentBounds.y + 24 * Math.max(0.2, actionScale),
             }
-          : {}),
-      },
-      null,
-      actionScale,
-      contentBounds,
-      feedbackSource
-    );
+          : null;
+      drawActionCompositionState(
+        drawContext,
+        {
+          ...action,
+          point,
+          ...(action.gestureFeedback
+            ? {
+                gestureFeedback: projectVideoGestureFeedback(
+                  action.gestureFeedback,
+                  sourceFrame,
+                  sourceX,
+                  mirrored
+                ),
+              }
+            : {}),
+        },
+        null,
+        actionScale,
+        contentBounds,
+        feedbackSource
+      );
+    } finally {
+      drawContext.restore();
+    }
   }
-  drawContext.restore();
 }
 
 function projectVideoGestureFeedback(

@@ -18,7 +18,11 @@ import type {
   VideoCompositionCameraState,
   VideoCompositionVisualLayer,
 } from '../../../../features/video/composition/types';
-import { type VideoCompositionMediaSource } from '../../../../features/video/composition/draw/media-source';
+import {
+  isVideoCompositionFrameSource,
+  type VideoCompositionMediaSource,
+} from '../../../../features/video/composition/draw/media-source';
+import { resolveVideoSourceLensPaintBounds } from '../../../../features/video/composition/draw/video';
 import type {
   EffectRuntimeRenderedComposition,
   EffectRuntimeRenderedFrameMap,
@@ -142,13 +146,30 @@ export async function buildNativeGpuPreviewLayers(args: {
   if (!metrics) throw new Error('Preview geometry metrics are unavailable.');
   let paintBounds: ReturnType<typeof resolveCompositionPaintBounds>;
   try {
+    const layers = [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)].flatMap(
+      (frame) => frame.visualLayers
+    );
+    const sourceFeedbackBounds = new Map<Layer, GpuPreviewLayer['rect']>();
+    for (const layer of layers) {
+      if (layer.kind !== 'video') continue;
+      const borrowed = args.media.get(layer.clipId),
+        frame = args.sources.get(layer.clipId);
+      const source =
+        borrowed instanceof HTMLVideoElement || isVideoCompositionFrameSource(borrowed)
+          ? borrowed
+          : frame
+            ? { sourceWidth: frame.displayWidth, sourceHeight: frame.displayHeight }
+            : null;
+      if (!source) continue;
+      const bounds = resolveVideoSourceLensPaintBounds(layer, source, 1, input.imageBank);
+      if (bounds) sourceFeedbackBounds.set(layer, bounds);
+    }
     paintBounds = resolveCompositionPaintBounds({
       context: metrics,
-      layers: [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)].flatMap(
-        (frame) => frame.visualLayers
-      ),
+      layers,
       output: logical,
       rasterScale: 1,
+      sourceFeedbackBounds,
       ...(args.inputComposition
         ? { frames: args.inputComposition.frames }
         : args.effects

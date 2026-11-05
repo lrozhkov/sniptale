@@ -12,6 +12,11 @@ import { GalleryApp } from '../../../apps/extension/src/gallery/shell/app-shell'
 initializeAppTheme(new URLSearchParams(location.search).get('theme') === 'dark' ? 'dark' : 'light');
 
 void harnessReady.then(async () => {
+  if (new URLSearchParams(location.search).get('clickLensOverflowFixture') === '1') {
+    const { installClickLensOverflowFixture } = await import('./click-lens-overflow');
+    installClickLensOverflowFixture();
+    return;
+  }
   if (new URLSearchParams(location.search).get('gpuWindowJoinFixture') === '1') {
     const { installGpuWindowJoinFixture } = await import('./gpu-window-join');
     installGpuWindowJoinFixture();

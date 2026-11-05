@@ -5112,9 +5112,9 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One Native adapter converts ordered scene layers into a GPU description. Input slices and final scenes share coordinates, ordering primitives and retained resources. The adapter returns one release method without submitting work. The input type now comes from the existing scene types owner. It replaces a type dependency on render-preview. The recorded JavaScript comparison shows identical output for all five files.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes scene coordinates or resource retention. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "e5c33400bec71d9508748395feb4b1b755b4a56b50ce52cd08385682291fb887",
-      "signatureHash": "2d434110408e4d468bc75b7fe9c5cc4e94484c691dd660e985c91ad9d1742534"
+      "reviewDate": "2026-11-05",
+      "astHash": "023afe6005ef71dd892e70fd57b2eea3f9d6e7a888e31fa3a249bdcf9fc52e93",
+      "signatureHash": "50dc315adc73e3dee9e483c3b3c6208ca2ad662555f18670fdadcdd69dbd0189"
     },
     {
       "rule": "structural-function-risk",
@@ -5123,8 +5123,8 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One graph builder preserves composition order, projection and resource cleanup. Tight artwork bounds share the existing release ledger. No second cache or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "f3ceefb0eb61443a344bc4d974b2769bd9c03cbe80b1699ffb0c1ae03741a6c7",
+      "reviewDate": "2026-11-05",
+      "astHash": "0eced2152ca2f7b688569655d47c22daeec3a906126697a566cba0c6c24fd2a6",
       "signatureHash": "8ec9e6c43e09eb3a4cb6232647fbc8df9ccedc28e69db976b6badfa6101cdd0e"
     },
     {
@@ -5376,8 +5376,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One content operation orders borders, clicks, annotations and comments. It retains annotation batches before yielding their raw bitmaps to the GPU graph. The caller owns fence settlement. One finally block requests batch release.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes annotation borrow or overlay order. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "2a13b25a4b9f2084eb15afe10d9edf435eb0673f44f1ec00d5ffff1799be7972",
+      "reviewDate": "2026-11-05",
+      "astHash": "1f758af8fc7e6e444e0c1cc02cf6919203c0cd57700b6f8dd6b8fad244056c29",
       "signatureHash": "e5883e63d84fbde34307868357d06b0c385b565c72b95a21656c1e66fb4dd865"
     },
     {
@@ -5750,8 +5750,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: Ordering is required: scene spotlights before sharp content plane. border/click/content annotations/comments rendered into common plane. plane projected once. viewport comments/annotations follow projection. Dense backing scale preserves logical coordinates. exportSampling callbacks are synchronous borrowed views. no effect or lifetime authority moves into this function.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
       "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
-      "reviewDate": "2026-11-04",
-      "astHash": "e77f086d6698c72a5bd5c74a263885dcc800495c00d8be4f3768ead3d6b695ea",
+      "reviewDate": "2026-11-05",
+      "astHash": "22cc355894c0fd20fc7026908ab9f6c97d4cbbffd0df695245b664c396cf5c77",
       "signatureHash": "ebb09c93ec75f28a1894c527a920170e7362bd6b25b2abb4e9b3a07ec35e3928"
     },
     {
@@ -5905,7 +5905,7 @@
       "reason": "tool-noise: This suite tests one ordered GPU graph builder. Tight bounds cases retain existing projection, resource and release fixtures. Graphics contexts and spies are test data. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "cddbc55d33a56948e648b027cd9d728d288bf571ebd871d42aad132b8ce023a2",
+      "astHash": "21a5e1b372ed65ea1515c1b0c0d60d80cdef672d7aba60ecb8549b18f9459bd1",
       "signatureHash": "a55221b983e0344ca26f05dbab019980436744904308244bc8370679b4bec0b3"
     },
     {
@@ -5995,6 +5995,17 @@
       "reviewDate": "2026-11-05",
       "astHash": "6817e77a602c3e9772b1c3e46e407e8524fc330be5bfdacf6ac628a56cb822d3",
       "signatureHash": "8712ceb7737a5fae167ae6140473407bea7f566888f21bd49dd40acbfe34e027"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/draw/video.ts",
+      "symbol": "resolveVideoSourceLensPaintBounds",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: This pure source-feedback bounds calculation uses the painter fitted source geometry, maps lens artwork through mirroring and the inner transform, then returns its union. Canvas and GPU consumers use the same calculation. It owns no allocation, publication, state or effects. Splitting the operation would distribute one geometry contract. Independent architecture review must validate this classification.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a distinct geometry policy or consumer contract, effects, lifecycle authority or unrelated layer responsibility. Remove when the analyzer models this cohesive calculation.",
+      "reviewDate": "2026-11-05",
+      "astHash": "d9e11496a61dd1f82d2e77d80b4658b3a430a27d2fd0b8b3bcc9d89fa611d5a3",
+      "signatureHash": "a67e68dc0e47bd284475e913ac5f625e33fe66b28ac5819d42084d75069e20cd"
     }
   ]
 }
