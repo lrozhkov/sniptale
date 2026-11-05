@@ -431,6 +431,88 @@ function requestHasCssFilter(layers: readonly GpuPreviewLayer[]): boolean {
   );
 }
 
+function canOmitLeadingGroupCopy(
+  layer: GpuPreviewLayer,
+  parent: Pick<GpuPreviewRequest, 'output' | 'logical'>
+) {
+  if (!isGroup(layer.source)) return false;
+  const group = layer.source;
+  const sameSize = (left: Size, right: Size) =>
+    left.width === right.width && left.height === right.height;
+  const effects = [
+    'clip',
+    'lens',
+    'blur',
+    'depth',
+    'orientation',
+    'alphaMask',
+    'cssFilter',
+    'tint',
+    'operationClip',
+  ] as const;
+  return (
+    sameSize(group.output, parent.output) &&
+    sameSize(group.logical, parent.logical) &&
+    layer.rect.x === 0 &&
+    layer.rect.y === 0 &&
+    sameSize(layer.rect, parent.logical) &&
+    layer.inverse.length === 9 &&
+    layer.inverse.every((value, index) => value === [1, 0, 0, 0, 1, 0, 0, 0, 1][index]) &&
+    (layer.opacity ?? 1) === 1 &&
+    (layer.blend ?? 'over') === 'over' &&
+    effects.every((key) => layer[key] === undefined)
+  );
+}
+
+/** Only leading draws share the same transparent destination as their isolated group. */
+function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRequest {
+  const references = new Map<GpuPreviewGroup, number>();
+  const visited = new Set<GpuPreviewGroup>();
+  const count = (layers: readonly GpuPreviewLayer[]) => {
+    for (const layer of layers) {
+      if (!isGroup(layer.source)) continue;
+      const group = layer.source;
+      references.set(group, (references.get(group) ?? 0) + 1);
+      if (visited.has(group)) continue;
+      visited.add(group);
+      count(group.layers);
+    }
+  };
+  count(request.layers);
+  const groups = new Map<GpuPreviewGroup, GpuPreviewGroup>();
+  const normalize = (
+    layers: readonly GpuPreviewLayer[],
+    parent: Pick<GpuPreviewRequest, 'output' | 'logical'>
+  ): readonly GpuPreviewLayer[] => {
+    const mapped = layers.map((layer) => {
+      if (!isGroup(layer.source)) return layer;
+      const source = layer.source;
+      let group = groups.get(source);
+      if (!group) {
+        const children = normalize(source.layers, source);
+        group = children === source.layers ? source : { ...source, layers: children };
+        groups.set(source, group);
+        references.set(group, references.get(source) ?? 0);
+      }
+      return group === source ? layer : { ...layer, source: group };
+    });
+    let result = mapped.every((layer, index) => layer === layers[index]) ? layers : mapped;
+    while (result[0] && canOmitLeadingGroupCopy(result[0], parent)) {
+      const group = result[0].source;
+      if (
+        !isGroup(group) ||
+        references.get(group) !== 1 ||
+        group.layers.length + result.length - 1 > MAX_LAYERS
+      )
+        break;
+      result = [...group.layers, ...result.slice(1)];
+    }
+    return result;
+  };
+  const layers = normalize(request.layers, request);
+  return layers === request.layers ? request : { ...request, layers };
+}
+
 /** Creates one isolated device; missing WebGPU returns null without changing the current preview. */
 export async function createGpuPreviewRenderer(
   args: {
@@ -790,7 +872,12 @@ export async function createGpuPreviewRenderer(
       async render(request) {
         check(request.signal);
         if (busy) throw new Error('GPU preview already has a frame in flight.');
-        const plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
+        let plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
+        const normalized = omitLeadingGroupCopies(request);
+        if (normalized !== request) {
+          request = normalized;
+          plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
+        }
         busy = true;
         device.pushErrorScope('validation');
         let scopeOpen = true;

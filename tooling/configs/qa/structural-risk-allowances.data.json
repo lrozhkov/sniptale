@@ -5013,8 +5013,8 @@
       "owner": "extension:app-core:features",
       "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. The same frame transaction owns temporary packed sources and releases them after GPU settlement.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "1c46d67e7f47941802e0a28d0147607f7204d6fe362fdbd81ee420fc344181a7",
+      "reviewDate": "2026-11-05",
+      "astHash": "274ab3462122a60201640a9507fa2fe3925f57e398086f9c6fe2439efb1ceb28",
       "signatureHash": "7785ef850d9bfb99fd0a13cdce56e60cfb51eee4462f53d94142dee6cf9f4525"
     },
     {
@@ -5277,8 +5277,8 @@
       "owner": "extension:app-core:features",
       "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. The same frame transaction owns temporary packed sources and releases them after GPU settlement.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "fe7f1df1d6770d841caaee281fa6dc97f4673d498c7962522d0d2b0ce6a675de",
+      "reviewDate": "2026-11-05",
+      "astHash": "45a0223b2c3739327c6fbe3845f65752e212d13efb39c8915751a42313021b83",
       "signatureHash": "f00d9c5df2a7a158107a83280797f66378df0f54200d9122d12f1df0d970e705"
     },
     {
@@ -5794,8 +5794,8 @@
       "owner": "extension:app-core:features",
       "reason": "tool-noise: This fixture checks one compositor resource lifetime. New cases use the same fake device and controlled completion barriers. Mock configuration creates no product authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Padded source cases use the existing GPU fixture and controlled completion barriers.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "c82bfa88a5a5b0830e875bc43d5a44b7beec47fa5314f355b0105672b3797694",
+      "reviewDate": "2026-11-05",
+      "astHash": "5b41f29f760fc019bdb51de75e3072c422a4fcec0d34b73e9009f4f357c2c67c",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {

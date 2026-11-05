@@ -1064,3 +1064,195 @@ it.each([
     }
   }
 );
+
+function fullGroup(source: GpuPreviewGroup): GpuPreviewLayer {
+  return { ...layer(source), rect: { x: 0, y: 0, width: 64, height: 36 } };
+}
+
+it('omits the leading identity group target and copy while preserving later layer order', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const child = raster(),
+    later = raster();
+  const leading = group([layer(child)]);
+  const wrapped = fullGroup(leading);
+  await renderer.render(request([wrapped, layer(later)]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(1);
+  expect(g.pass.draw).toHaveBeenCalledTimes(2);
+  expect(g.device.createTexture.mock.calls.map(([descriptor]) => descriptor.size)).toEqual([
+    [32, 18],
+    [32, 18],
+  ]);
+  expect(
+    g.queue.copyExternalImageToTexture.mock.calls.map(([descriptor]) => descriptor.source)
+  ).toEqual([child, later]);
+  expect(wrapped.source).toBe(leading);
+  expect(leading.layers).toHaveLength(1);
+});
+
+function writtenRectWidths(g: ReturnType<typeof graphics>) {
+  return g.queue.writeBuffer.mock.calls.map((call) => {
+    const values: unknown = call[2];
+    if (!(values instanceof Float32Array)) throw new Error('Expected layer uniforms.');
+    return values[18];
+  });
+}
+
+it('keeps child blend commands on a transparent destination before subsequent parent layers', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const blends = ['over', 'add', 'mask', 'erase', 'screen', 'atop'] as const;
+  const leading = group(blends.map((blend) => ({ ...layer(), blend })));
+  await renderer.render(request([fullGroup(leading), layer()]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(1);
+  expect(g.pass.draw).toHaveBeenCalledTimes(7);
+  const pipelines = await Promise.all(
+    g.device.createRenderPipelineAsync.mock.results.map((result) => result.value)
+  );
+  expect(g.pass.setPipeline.mock.calls.map((call) => call[0])).toEqual(
+    [0, 2, 4, 6, 8, 10, 0].map((index) => pipelines[index])
+  );
+});
+
+it('removes nested private leading copies without changing the source graph', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const inner = group([layer()]);
+  const outer = group([fullGroup(inner)]);
+  await renderer.render(request([fullGroup(outer)]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(1);
+  expect(g.pass.draw).toHaveBeenCalledOnce();
+  expect(outer.layers[0]!.source).toBe(inner);
+});
+
+it('retains a group after an existing backdrop', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  await renderer.render(request([layer(), fullGroup(group([layer()]))]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(2);
+  expect(writtenRectWidths(g)).toEqual([32, 32, 64]);
+});
+
+it('retains both references to a shared group instead of expanding its leading reference', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const shared = group([layer()]);
+  await renderer.render(request([fullGroup(shared), fullGroup(shared)]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(2);
+  expect(writtenRectWidths(g)).toEqual([32, 64, 64]);
+});
+
+it('keeps isolation when leading expansion would exceed the parent layer limit', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const leading = group(Array.from({ length: 64 }, () => layer()));
+  await renderer.render(request([fullGroup(leading), layer()]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(2);
+  expect(g.pass.draw).toHaveBeenCalledTimes(66);
+});
+
+const isolatedLeadingLayers: { name: string; patch: () => Partial<GpuPreviewLayer> }[] = [
+  { name: 'opacity', patch: () => ({ opacity: 0.5 }) },
+  { name: 'blend', patch: () => ({ blend: 'mask' }) },
+  { name: 'rect', patch: () => ({ rect: { x: 0.25, y: 0, width: 64, height: 36 } }) },
+  { name: 'inverse', patch: () => ({ inverse: [1, 0, 0.25, 0, 1, 0, 0, 0, 1] }) },
+  {
+    name: 'clip',
+    patch: () => ({ clip: { rect: { x: 0, y: 0, width: 64, height: 36 }, radius: 0 } }),
+  },
+  { name: 'blur', patch: () => ({ blur: 0 }) },
+  { name: 'orientation', patch: () => ({ orientation: { rotation: 0, flip: false } }) },
+  {
+    name: 'alpha mask',
+    patch: () => ({ alphaMask: { source: raster(), rect: { x: 0, y: 0, width: 32, height: 18 } } }),
+  },
+  { name: 'operation clip', patch: () => ({ operationClip: { source: raster() } }) },
+  { name: 'tint', patch: () => ({ tint: [1, 1, 1, 1] }) },
+  { name: 'CSS filter', patch: () => ({ cssFilter: { brightness: 1 } }) },
+  {
+    name: 'lens',
+    patch: () => ({
+      lens: {
+        bounds: { x: 0, y: 0, width: 64, height: 36 },
+        scale: 1,
+        optics: 'flat',
+        edgeWidth: 0,
+        corner: 0,
+      },
+    }),
+  },
+  {
+    name: 'depth',
+    patch: () => ({
+      depth: {
+        window: { x: 0, y: 0, width: 64, height: 36 },
+        frame: {
+          rotation: [0, 0, 0, 1],
+          perspective: 0,
+          windowMotion: 0,
+          lockBackground: false,
+          focus: [],
+        },
+      },
+    }),
+  },
+];
+it.each(isolatedLeadingLayers)(
+  'retains an isolated leading wrapper with $name',
+  async ({ patch }) => {
+    const g = graphics();
+    const renderer = await owner();
+    await renderer.render(request([{ ...fullGroup(group([layer()])), ...patch() }]));
+    expect(g.commands.filter((command) => command === 'begin').length).toBeGreaterThanOrEqual(2);
+  }
+);
+
+it.each(['output', 'logical'] as const)(
+  'retains a leading group with different %s density',
+  async (key) => {
+    const g = graphics();
+    const renderer = await owner();
+    const leading = group([layer()]);
+    leading[key] = { width: 32, height: 18 };
+    await renderer.render(request([fullGroup(leading)]));
+    expect(g.commands.filter((command) => command === 'begin')).toHaveLength(2);
+  }
+);
+
+it('validates the original deeply nested graph before omitting any leading copies', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  let leading = group([layer()]);
+  for (let index = 0; index < 17; index++) leading = group([fullGroup(leading)]);
+  await expect(renderer.render(request([fullGroup(leading)]))).rejects.toThrow('layer budget');
+  expect(g.device.createTexture).not.toHaveBeenCalled();
+  expect(g.queue.submit).not.toHaveBeenCalled();
+  expect(g.device.pushErrorScope).not.toHaveBeenCalled();
+});
+
+it('keeps the existing two completion barriers for an aborted leading native frame', async () => {
+  const g = graphics();
+  const native = nativeFrames();
+  const renderer = await owner();
+  const source = new VideoFrame(raster());
+  native.frames[0]!.codedHeight = 18;
+  const controller = new AbortController();
+  const fence = deferred<void>(),
+    validation = deferred<{ message: string } | null>();
+  g.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
+  g.device.popErrorScope.mockReturnValue(validation.promise);
+  const pending = renderer.render(request([fullGroup(group([layer(source)]))], controller.signal));
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(1);
+  expect(g.device.createTexture).not.toHaveBeenCalled();
+  controller.abort();
+  fence.resolve(undefined);
+  await Promise.resolve();
+  expect(g.transfer).not.toHaveBeenCalled();
+  expect(native.frames[0]!.close).not.toHaveBeenCalled();
+  validation.resolve(null);
+  await rejected;
+  expect(g.transfer).not.toHaveBeenCalled();
+  expect(native.frames[0]!.close).not.toHaveBeenCalled();
+});

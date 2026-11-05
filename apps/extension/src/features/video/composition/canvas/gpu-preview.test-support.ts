@@ -57,6 +57,9 @@ export function graphics() {
     createRenderPipelineAsync: vi.fn(async (_descriptor: GPURenderPipelineDescriptor) => ({
       getBindGroupLayout: vi.fn(() => ({})),
     })),
+    createComputePipelineAsync: vi.fn(async (_descriptor: GPUComputePipelineDescriptor) => ({
+      getBindGroupLayout: vi.fn(() => ({})),
+    })),
     createSampler: vi.fn(() => ({})),
     createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
     createTexture: vi.fn(
@@ -70,6 +73,12 @@ export function graphics() {
         commands.push('begin');
         return pass;
       }),
+      beginComputePass: vi.fn(() => ({
+        setPipeline: vi.fn(),
+        setBindGroup: vi.fn(),
+        dispatchWorkgroups: vi.fn(),
+        end: vi.fn(),
+      })),
       finish: vi.fn(() => ({})),
     })),
     pushErrorScope: vi.fn(),
