@@ -22,6 +22,8 @@ import { createQuickEditZoomRegion } from '../../features/video/review/advanced/
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createCanvasComment } from '../../features/video/review/comments';
+import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
+import { reviewPresentedGeometry } from './gpu-preview-geometry';
 
 const io = vi.hoisted(() => ({
   order: [] as string[],
@@ -318,6 +320,116 @@ beforeEach(() => {
     fonts: { ready: Promise.resolve(), load: vi.fn(async () => [{ status: 'loaded' }]) },
   });
 });
+
+it.each([false, true])(
+  'returns Standard geometry for the effective follow/orbit frame and actual camera override: %s',
+  async (overridden) => {
+    const advanced = createQuickEditAdvancedState();
+    advanced.ui.mode = 'advanced';
+    advanced.ui.tracks.zoom = true;
+    advanced.zoom.enabled = true;
+    advanced.cursorFocusPath = {
+      version: 1,
+      mode: 'follow',
+      gapPolicy: 'hold',
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      segments: [
+        {
+          id: 'path',
+          binding: { kind: 'project' },
+          start: 0,
+          end: 6,
+          keys: [
+            {
+              id: 'a',
+              time: 0,
+              x: 0.2,
+              y: 0.4,
+              anchor: 'manual',
+              authored: true,
+              interpolation: 'smooth',
+            },
+            {
+              id: 'b',
+              time: 6,
+              x: 0.8,
+              y: 0.4,
+              anchor: 'manual',
+              authored: true,
+              interpolation: 'smooth',
+            },
+          ],
+        },
+      ],
+    };
+    advanced.zoom.regions = [
+      {
+        ...createQuickEditZoomRegion({ id: 'follow', at: 0, duration: 6, endMax: 6 }),
+        followCursor: true,
+        transform: { scale: 2.5, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+        cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.5 },
+      },
+    ];
+    const effective = resolveQuickEditEffectiveState(advanced);
+    const input = scene();
+    const effectiveScene = { ...input, zoomRegions: effective.zoomRegions };
+    const actual = frame();
+    const following = evaluateQuickEditCameraAtTime(effective.zoomRegions, actual.resultTime, {
+      ...input,
+      output: dimensions.backing,
+    });
+    expect(following.centerX).not.toBe(0.5);
+    expect(following.spatial?.rotation).not.toEqual([0, 0, 0, 1]);
+    if (overridden) actual.cameraTransform = { ...following, scale: 1.75, centerX: 0.45 };
+    actual.recordingHistory = {
+      read: vi.fn(async () => ({
+        telemetry: {
+          recordingId: 'recording',
+          createdAt: 1,
+          updatedAt: 1,
+          captureMode: null,
+          viewport: null,
+          cursorTrack: null,
+          actionEvents: [],
+          signals: [],
+        },
+        effective,
+        keyCues: [],
+        clickCues: [],
+      })),
+      dispose() {},
+    };
+    const expected = reviewPresentedGeometry(
+      effectiveScene,
+      dimensions,
+      actual.resultTime,
+      actual.cameraTransform ?? following
+    );
+    const { resources } = setup();
+    const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+    const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
+    const output = await renderer.render(prepared, actual);
+    try {
+      expect(output.renderer.backend).toBe('legacy');
+      expect(output.geometry).toEqual({
+        ...expected,
+        generation: actual.generation,
+        sceneGeneration: prepared.generation,
+      });
+      expect(output.geometry?.scene.zoomRegions[0]?.cursorFocus).toBeDefined();
+      expect(output.geometry?.scene.zoomRegions[0]?.cursorComposition?.mode).toBe('orbit');
+      expect(io.frame.mock.lastCall![1].commentSpace.layout).toEqual(expected.layout);
+      expect(io.frame.mock.lastCall![1].cameraScale).toBe(expected.camera.scale);
+    } finally {
+      output.release();
+      prepared.release();
+      renderer.dispose();
+    }
+  }
+);
 
 it('paints cached captions before blackout and retains editor comment visibility', async () => {
   const { resources, leases } = setup();

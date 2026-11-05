@@ -8,6 +8,8 @@ import {
 } from './use-preview-presentation';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import { createCanvasComment } from '../../features/video/review/comments';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { reviewPresentedGeometry } from '../../workflows/video-review/gpu-preview-geometry';
 
 const io = vi.hoisted(() => ({
   factory: vi.fn(),
@@ -400,6 +402,78 @@ it('owns the playing clock before capture and releases it on pending, fallback a
   act(() => props.video.current!.dispatchEvent(new Event('seeking')));
   await step(80);
   expect(active).toHaveBeenLastCalledWith('source', false);
+  props = { ...props, visible: false };
+  await render();
+  expect(active).toHaveBeenLastCalledWith('source', false);
+});
+
+it('keeps the Standard follow/orbit receipt and source clock with the completed front frame', async () => {
+  const active = vi.fn();
+  const report = vi.fn();
+  props = {
+    ...props,
+    playing: true,
+    onPresentationActive: active,
+    onGeometry: report,
+    preferences: { ...props.preferences, renderer: 'legacy' },
+    scene: {
+      ...props.scene,
+      zoomRegions: [
+        {
+          ...createQuickEditZoomRegion({ id: 'follow', at: 0, duration: 4, endMax: 4 }),
+          transform: { scale: 2.5, centerX: 0.5, centerY: 0.5 },
+          enter: { type: 'none', duration: 0 },
+          exit: { type: 'none', duration: 0 },
+          followCursor: true,
+          cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.5 },
+          cursorFocus: {
+            path: {
+              version: 1,
+              mode: 'follow',
+              gapPolicy: 'hold',
+              smoothing: 0.5,
+              sensitivity: 0.5,
+              segments: [
+                {
+                  id: 'path',
+                  binding: { kind: 'project' },
+                  start: 0,
+                  end: 4,
+                  keys: [
+                    { id: 'a', time: 0, x: 0.2, y: 0.4, anchor: 'manual', interpolation: 'smooth' },
+                    { id: 'b', time: 4, x: 0.8, y: 0.4, anchor: 'manual', interpolation: 'smooth' },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  };
+  const draw = io.render.getMockImplementation()!;
+  const receipts: ReturnType<typeof reviewPresentedGeometry>[] = [];
+  io.render.mockImplementation((prepared, frame) => {
+    const geometry = reviewPresentedGeometry(
+      props.scene,
+      { canonical: props.canonical, backing: { width: 720, height: 360 } },
+      frame.resultTime
+    );
+    receipts.push(geometry);
+    return { ...draw(prepared, frame), geometry, renderer: { backend: 'legacy' } };
+  });
+  await render();
+  await step(0);
+  expect(report).toHaveBeenLastCalledWith(receipts[0], 1.234567, 'source');
+  expect(receipts[0]?.scene.zoomRegions[0]?.cursorFocus).toBeDefined();
+  expect(receipts[0]?.camera.spatial?.rotation).not.toEqual([0, 0, 0, 1]);
+  expect(active.mock.calls).toEqual([['source', true]]);
+  props.video.current!.currentTime = 2;
+  await step(40);
+  expect(report).toHaveBeenLastCalledWith(receipts.at(-1), 2, 'source');
+  expect(receipts.at(-1)?.camera.centerX).not.toBe(receipts[0]?.camera.centerX);
+  expect(active.mock.calls).toEqual([['source', true]]);
+  expect(props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')).toHaveLength(1);
   props = { ...props, visible: false };
   await render();
   expect(active).toHaveBeenLastCalledWith('source', false);

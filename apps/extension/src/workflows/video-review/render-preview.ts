@@ -513,6 +513,7 @@ async function drawPreparedFrame(
     });
     if (rendered) return { geometry, renderer: { backend: 'gpu' } };
   }
+  let geometry: ReviewPresentedGeometry;
   await frame.source.prepare?.(signal);
   signal.throwIfAborted();
   if (request.layout.spatial && !assets.spatial)
@@ -678,8 +679,10 @@ async function drawPreparedFrame(
         enhanced?.dispose();
         annotations?.release();
       }
+      return reviewPresentedGeometry(scene, dimensions, frame.resultTime, request.camera);
     };
     if (frame.transition?.blend.plan.type === 'dissolve') {
+      geometry = reviewPresentedGeometry(scene, dimensions, frame.resultTime, request.camera);
       const { blend, frames, resultOffset } = frame.transition;
       const sides = reviewCutTransitionSides(
         blend,
@@ -693,9 +696,9 @@ async function drawPreparedFrame(
         context,
         transition,
         blend.incoming,
-        (target, surface, side) => {
+        async (target, surface, side) => {
           const endpoint = sides[side];
-          return draw(
+          await draw(
             target,
             surface,
             { ...frame, resultTime: endpoint.resultTime, sourceTime: endpoint.sample.timestamp },
@@ -704,7 +707,7 @@ async function drawPreparedFrame(
         },
         canvas
       );
-    } else await draw(context, canvas, frame, sample);
+    } else geometry = await draw(context, canvas, frame, sample);
     signal.throwIfAborted();
     const splitScreen = reviewSplitScreenAt(scene.webcam, frame.sourceTime, !!frame.camera);
     paintReviewCameraSplitScreen(context, canvas, dimensions.backing, splitScreen, resources);
@@ -733,6 +736,7 @@ async function drawPreparedFrame(
     transition?.release();
   }
   return {
+    geometry,
     renderer: {
       backend: 'legacy',
       ...(assets.renderer === 'gpu' && !frame.exportEnhancer

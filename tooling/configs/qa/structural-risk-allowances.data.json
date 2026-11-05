@@ -5432,8 +5432,8 @@
       "reason": "tool-noise: One prepared-preview fixture checks the explicit annotation executor and scene replacement. The added case uses existing annotation resources and disposal checks. It adds no independent fixture or production lifetime.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes executor ownership or fixture lifetime. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-04",
-      "astHash": "4b328d4a2367ace13e11009062ef7f07cab1898824a562111d784360aede3abf",
-      "signatureHash": "30cc8d3fd0d00e00c5b307a7cf623adae9dda38bd5bbb385fe2de15a678352b4"
+      "astHash": "49e8d5c8a0ea114529087889178256d942df2bf6c1d96bb28d8a9f84885b5a40",
+      "signatureHash": "a2043057597679bfc0100ba49606decb9cf0c2abf4fb8f569029b0e27e5489eb"
     },
     {
       "rule": "structural-file-risk",
@@ -5729,7 +5729,7 @@
       "reason": "tool-noise: One preview renderer owns preparation, leases and stale-result checks. Its GPU session survives scene replacement. Preparation accounts for the tracked GPU bytes that remain allocated. Capture and publication remain with callers. Final architecture review must check this binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "20466f9ef25367e78dae3fb7af7d972b1bbe22d3e3ae7d21a25d4a95b341cfc1",
+      "astHash": "9c88329569a59b9a0bcd068cef594cdee5878baeadb3babee7cac32b9b34d398",
       "signatureHash": "96b6ef53ddb51dcab617d28e7eb6176970b7eb507ed750d7eaa52370a13cfed6"
     },
     {
@@ -5740,7 +5740,7 @@
       "reason": "tool-noise: Score delta0, cohesion.97. One async output transaction: history/request, GPU preview or existing spatial branch, transition lease, annotation admission/acquisition, export source lease, scene/sharp replay, outer decorations. Both prepared source and annotation release remain adjacent in a single finally. transition release remains outer finally. No new async queue/publication state.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
       "reviewDate": "2026-11-05",
-      "astHash": "8cf9bd02889650a8c709967d04d8ef8f7f3a4abafdbf4799976b842439c915a5",
+      "astHash": "ab7b10672528163460e8915d871e55cd242fc42ac90c6419bb600e06ac4584f4",
       "signatureHash": "90251aa5da40a6d099524888bf57cce293f56c2af223b9392dd194da9701fe20"
     },
     {
