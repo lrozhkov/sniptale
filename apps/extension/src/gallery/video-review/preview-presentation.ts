@@ -29,6 +29,7 @@ type ReviewPresentationTickPhase = 'after-paint' | 'prepared-playing-frame';
 interface Dependencies<Scene, Prepared, Captured, Completed> {
   /** Only opted-in owners can admit a published playing generation on its animation frame. */
   allowPreparedPlayingFrames?: boolean;
+  maximumInFlight?(scene: Scene): 1 | 2;
   requestTick(callback: () => void, phase?: ReviewPresentationTickPhase): number;
   cancelTick(id: number): void;
   now(): number;
@@ -81,13 +82,14 @@ export function createReviewPresentationPaintClock() {
   };
 }
 
-/** One preparation and one pending description; native transport remains an injected read. */
+/** Bounded request leases retain ordered publication; native transport remains an injected read. */
 export function createReviewPreviewPresentation<Scene, Prepared, Captured, Completed>(
   dependencies: Dependencies<Scene, Prepared, Captured, Completed>
 ) {
   let state: ReviewPresentationState<Scene> | null = null;
   let pending: ReviewPresentationState<Scene> | null = null;
-  let active: AbortController | null = null;
+  const active = new Map<AbortController, number>();
+  let publicationTail: Promise<void> | null = null;
   let publication: (() => void) | null = null;
   let tick: number | null = null;
   let epoch = 0;
@@ -113,7 +115,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
   };
   const schedule = () => {
     if (disposed || failed || !state?.visible || tick !== null) return;
-    if (!state.playing && !state.interacting && (!pending || active)) return;
+    if (!state.playing && !state.interacting && (!pending || active.size > 0)) return;
     tick = dependencies.requestTick(
       () => {
         tick = null;
@@ -122,7 +124,12 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         if (state.playing) pending = state;
         // A paused request is one-shot: wait until it can publish before consuming it.
         const admissionClock = state.playing || state.interacting ? lastAdmitted : lastPublished;
-        if (!active && pending && due(admissionClock)) {
+        const capacity =
+          state.playing && !state.interacting && publishedEpoch === epoch
+            ? (dependencies.maximumInFlight?.(state.scene) ?? 1)
+            : 1;
+        const draining = [...active.values()].some((version) => version !== epoch);
+        if (!draining && active.size < capacity && pending && due(admissionClock)) {
           const next = pending;
           pending = null;
           void present(next);
@@ -140,7 +147,13 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
   const present = async (description: ReviewPresentationState<Scene>) => {
     const version = epoch;
     const controller = new AbortController();
-    active = controller;
+    active.set(controller, version);
+    const predecessor = publicationTail;
+    let finishPublicationOrder!: () => void;
+    const ordering = new Promise<void>((resolve) => {
+      finishPublicationOrder = resolve;
+    });
+    publicationTail = ordering;
     lastAdmitted = advanceClock(lastAdmitted);
     const request: ReviewPresentationRequest<Scene> = {
       scene: description.scene,
@@ -168,6 +181,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         request,
         controller.signal
       );
+      if (predecessor) await predecessor;
       if (!current(version)) return;
       if (!due(lastPublished)) {
         if (!description.playing && !description.interacting) {
@@ -202,6 +216,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
     } catch (error) {
       if (current(version)) {
         failed = true;
+        for (const request of active.keys()) request.abort();
         pending = null;
         cancelTick();
         dependencies.onError(error);
@@ -216,7 +231,9 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
           try {
             prepared?.release();
           } finally {
-            active = null;
+            active.delete(controller);
+            finishPublicationOrder();
+            if (publicationTail === ordering) publicationTail = null;
             schedule();
           }
         }
@@ -227,7 +244,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
     if (disposed) return;
     epoch++;
     failed = false;
-    active?.abort();
+    for (const request of active.keys()) request.abort();
     cancelTick();
     pending = state?.visible ? state : null;
     schedule();
@@ -255,7 +272,7 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
       if (disposed) return;
       disposed = true;
       epoch++;
-      active?.abort();
+      for (const request of active.keys()) request.abort();
       pending = null;
       state = null;
       cancelTick();

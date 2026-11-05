@@ -18,7 +18,7 @@ const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
-function fixture(allowPreparedPlayingFrames = false) {
+function fixture(allowPreparedPlayingFrames = false, maximumInFlight: 1 | 2 = 1) {
   let time = 0;
   let id = 0;
   const ticks = new Map<number, () => void>();
@@ -35,6 +35,7 @@ function fixture(allowPreparedPlayingFrames = false) {
   const publishTimes: number[] = [];
   const dependencies = {
     allowPreparedPlayingFrames,
+    maximumInFlight: () => maximumInFlight,
     requestTick: (callback: () => void) => {
       ticks.set(++id, callback);
       return id;
@@ -63,7 +64,7 @@ function fixture(allowPreparedPlayingFrames = false) {
         return completed;
       }
     ),
-    publish: vi.fn(() => {
+    publish: vi.fn((_completed: string) => {
       events.push('publish');
       publishTimes.push(time);
     }),
@@ -604,4 +605,122 @@ it('revokes prepared frame admission across visibility and failed publication', 
   } finally {
     f.dispose();
   }
+});
+
+async function warmConcurrentFixture() {
+  const f = fixture(true, 2);
+  f.scheduler.update({ ...f.state, frameRate: 60 });
+  await f.step(0);
+  expect(f.dependencies.publish).toHaveBeenCalledOnce();
+  f.dependencies.prepare.mockClear();
+  f.dependencies.capture.mockClear();
+  f.dependencies.render.mockClear();
+  f.dependencies.publish.mockClear();
+  f.prepared.release.mockClear();
+  f.captured.release.mockClear();
+  f.completed.release.mockClear();
+  return f;
+}
+
+it('overlaps two playing renders, backpressures a third and publishes reversed completions in order', async () => {
+  const f = await warmConcurrentFixture();
+  const first = deferred<typeof f.completed>();
+  const second = deferred<typeof f.completed>();
+  const one = f.lease('one'),
+    two = f.lease('two');
+  f.dependencies.render.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  f.scheduler.update({ ...f.state, frameRate: 60 });
+  await f.step(17);
+  await f.step(34);
+  expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+  await f.step(51);
+  expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+  second.resolve(two);
+  await flush();
+  expect(f.dependencies.publish).not.toHaveBeenCalled();
+  first.resolve(one);
+  await flush();
+  await flush();
+  expect(f.dependencies.publish.mock.calls[0]?.[0]).toBe('one');
+  await f.step(68);
+  await flush();
+  expect(f.dependencies.publish.mock.calls[1]?.[0]).toBe('two');
+  f.scheduler.dispose();
+  await flush();
+  expect(one.release).toHaveBeenCalledOnce();
+  expect(two.release).toHaveBeenCalledOnce();
+});
+
+it.each(['invalidate', 'dispose'] as const)(
+  'drains both active requests after %s before another generation can prepare',
+  async (operation) => {
+    const f = await warmConcurrentFixture();
+    const one = deferred<typeof f.completed>(),
+      two = deferred<typeof f.completed>();
+    const first = f.lease('one'),
+      second = f.lease('two');
+    f.dependencies.render.mockReturnValueOnce(one.promise).mockReturnValueOnce(two.promise);
+    f.scheduler.update({ ...f.state, frameRate: 60 });
+    await f.step(17);
+    await f.step(34);
+    expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+    if (operation === 'dispose') f.scheduler.dispose();
+    else f.scheduler.update({ ...f.state, generation: 'next', frameRate: 60 });
+    for (const call of f.dependencies.render.mock.calls) expect(call[3].aborted).toBe(true);
+    two.resolve(second);
+    await flush();
+    await f.step(51);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(2);
+    one.resolve(first);
+    await flush();
+    await flush();
+    expect(f.dependencies.publish).not.toHaveBeenCalled();
+    expect(first.release).toHaveBeenCalledOnce();
+    expect(second.release).toHaveBeenCalledOnce();
+    expect(f.captured.release).toHaveBeenCalledTimes(2);
+    await f.step(68);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(operation === 'dispose' ? 2 : 3);
+    f.scheduler.dispose();
+    await flush();
+  }
+);
+
+it('aborts the sibling request after a render failure and retains its input until it settles', async () => {
+  const f = await warmConcurrentFixture();
+  const one = deferred<typeof f.completed>(),
+    two = deferred<typeof f.completed>();
+  f.dependencies.render.mockReturnValueOnce(one.promise).mockReturnValueOnce(two.promise);
+  f.scheduler.update({ ...f.state, frameRate: 60 });
+  await f.step(17);
+  await f.step(34);
+  const failure = new Error('queue failed');
+  one.reject(failure);
+  await flush();
+  expect(f.dependencies.onError).toHaveBeenCalledExactlyOnceWith(failure);
+  expect(f.dependencies.render.mock.calls[1]![3].aborted).toBe(true);
+  expect(f.captured.release).toHaveBeenCalledTimes(1);
+  two.resolve(f.completed);
+  await flush();
+  await flush();
+  expect(f.captured.release).toHaveBeenCalledTimes(2);
+  expect(f.dependencies.publish).not.toHaveBeenCalled();
+  await f.step(68);
+  expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+  f.scheduler.dispose();
+});
+
+it('keeps cold scene preparation single until its first frame has published', async () => {
+  const f = fixture(true, 2);
+  const preparing = deferred<typeof f.prepared>();
+  f.dependencies.prepare.mockReturnValueOnce(preparing.promise);
+  f.scheduler.update({ ...f.state, frameRate: 60 });
+  await f.step(0);
+  await f.step(17);
+  expect(f.dependencies.prepare).toHaveBeenCalledOnce();
+  expect(f.dependencies.render).not.toHaveBeenCalled();
+  preparing.resolve(f.prepared);
+  await flush();
+  await flush();
+  expect(f.dependencies.publish).toHaveBeenCalledOnce();
+  f.scheduler.dispose();
 });

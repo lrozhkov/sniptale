@@ -1639,3 +1639,48 @@ it('preserves explicit annotation executor ownership during prepared-scene repla
   expect(f.executor.dispose).toHaveBeenCalledOnce();
   expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
 });
+
+it('retains two independent publication leases for an opted-in bare GPU scene', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'gpu', maximumInFlight: 2 });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const one = Promise.withResolvers<void>(),
+    two = Promise.withResolvers<void>();
+  const prepareOne = vi.fn(() => one.promise),
+    prepareTwo = vi.fn(() => two.promise);
+  const first = renderer.render(
+    prepared,
+    { ...frame(), source: { ...frame().source, prepare: prepareOne } },
+    signal
+  );
+  const second = renderer.render(
+    prepared,
+    { ...frame(), sourceTime: 2, source: { ...frame().source, prepare: prepareTwo } },
+    signal
+  );
+  void first.catch(() => {});
+  void second.catch(() => {});
+  try {
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(prepareOne).toHaveBeenCalledOnce();
+    expect(prepareTwo).toHaveBeenCalledOnce();
+    await expect(renderer.render(prepared, frame(), signal)).rejects.toThrow('already admitted');
+    two.resolve();
+    const later = await second;
+    one.resolve();
+    const earlier = await first;
+    expect(earlier.canvas).not.toBe(later.canvas);
+    expect(earlier.sourceTime).toBe(1);
+    expect(later.sourceTime).toBe(2);
+    earlier.release();
+    later.release();
+  } finally {
+    one.resolve();
+    two.resolve();
+    await Promise.allSettled([first, second]);
+    prepared.release();
+    renderer.dispose();
+  }
+});

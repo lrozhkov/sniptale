@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { createReviewPreviewRenderer } from './render-preview';
+import { reviewPresentedGeometry } from './gpu-preview-geometry';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createPreviewRenderResources } from './preview-render-resources';
 import { resolvePreviewRenderAllocation } from './preview-render-allocation';
@@ -328,7 +329,15 @@ it.each(['no-adapter', 'device-failure'] as const)(
     expect(prepare).toHaveBeenCalledOnce();
     expect(io.frame).toHaveBeenCalledOnce();
     expect(raw.close).not.toHaveBeenCalled();
-    expect(result.geometry).toBeNull();
+    expect(result.renderer).toEqual({
+      backend: 'legacy',
+      fallback: failure === 'no-adapter' ? 'unavailable' : 'device-failed',
+    });
+    expect(result.geometry).toEqual({
+      ...reviewPresentedGeometry({ ...scene(), zoomRegions: [region] }, dimensions, 2),
+      generation: 7,
+      sceneGeneration: prepared.generation,
+    });
     result.release();
     prepared.release();
     owner.dispose();

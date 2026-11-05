@@ -1306,3 +1306,267 @@ it('keeps the existing two completion barriers for an aborted leading native fra
   expect(g.transfer).not.toHaveBeenCalled();
   expect(native.frames[0]!.close).not.toHaveBeenCalled();
 });
+
+it('overlaps two complete requests only after the first validation scope is popped', async () => {
+  const g = graphics();
+  const fences = [deferred<void>(), deferred<void>()];
+  const scopes = [deferred<null>(), deferred<null>()];
+  g.queue.onSubmittedWorkDone
+    .mockReturnValueOnce(fences[0]!.promise)
+    .mockReturnValueOnce(fences[1]!.promise);
+  g.device.popErrorScope
+    .mockReturnValueOnce(scopes[0]!.promise)
+    .mockReturnValueOnce(scopes[1]!.promise);
+  const renderer = await owner({ maximumInFlight: 2 });
+  const first = renderer.render(request());
+  const second = renderer.render(request());
+  // Attach handlers before the unsupported baseline rejects the second request.
+  const settled = Promise.allSettled([first, second]);
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledTimes(2));
+  expect(g.adapter.requestDevice).toHaveBeenCalledOnce();
+  expect(g.device.pushErrorScope).toHaveBeenCalledTimes(2);
+  expect(g.device.popErrorScope).toHaveBeenCalledTimes(2);
+  expect(g.device.pushErrorScope.mock.invocationCallOrder[1]).toBeGreaterThan(
+    g.device.popErrorScope.mock.invocationCallOrder[0]!
+  );
+  await expect(renderer.render(request())).rejects.toThrow('frame in flight');
+  scopes[1]!.resolve(null);
+  fences[1]!.resolve();
+  const secondBitmap = await second;
+  expect(g.transfer).toHaveBeenCalledOnce();
+  scopes[0]!.resolve(null);
+  fences[0]!.resolve();
+  expect(await first).not.toBe(secondBitmap);
+  await settled;
+});
+
+it('keeps two private outputs, uniforms and textures until each complete request settles', async () => {
+  const g = graphics();
+  const fences = [deferred<void>(), deferred<void>()];
+  const scopes = [deferred<null>(), deferred<null>()];
+  fences.forEach((fence) => g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise));
+  scopes.forEach((scope) => g.device.popErrorScope.mockReturnValueOnce(scope.promise));
+  const renderer = await owner({ maximumInFlight: 2, reserve: g.reserve });
+  const first = renderer.render(request());
+  const secondRequest = { ...request(), output: { width: 128, height: 72 } };
+  const second = renderer.render(secondRequest);
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledTimes(2));
+  expect(g.contexts).toHaveLength(2);
+  expect(g.queue.writeBuffer.mock.calls[0]![0]).not.toBe(g.queue.writeBuffer.mock.calls[1]![0]);
+  expect(g.device.createTexture).toHaveBeenCalledTimes(2);
+  const expectedBytes = 64 * 36 * 8 + 128 * 72 * 8 + 2 * (32 * 18 * 4 + GPU_PREVIEW_UNIFORM_BYTES);
+  expect(renderer.allocatedBytes).toBe(expectedBytes);
+  expect(g.reserve.mock.calls.reduce((sum, call) => sum + call[0], 0)).toBe(expectedBytes);
+  fences[1]!.resolve();
+  scopes[1]!.resolve(null);
+  expect(await second).toMatchObject({ width: 128, height: 72 });
+  // Reuse the completed slot while the oldest request still owns its surface and uniforms.
+  expect(await renderer.render(secondRequest)).toBe(g.bitmaps[1]);
+  expect(g.contexts).toHaveLength(2);
+  expect(g.transfer).toHaveBeenCalledTimes(2);
+  fences[0]!.resolve();
+  scopes[0]!.resolve(null);
+  expect(await first).toBe(g.bitmap);
+  expect(g.bitmap).toMatchObject({ width: 64, height: 36 });
+  renderer.dispose();
+  renderer.dispose();
+  expect(renderer.allocatedBytes).toBe(0);
+  expect(g.device.destroy).toHaveBeenCalledOnce();
+  for (const result of g.reserve.mock.results) expect(result.value.release).toHaveBeenCalledOnce();
+  for (const result of g.device.createTexture.mock.results)
+    expect(result.value.destroy).toHaveBeenCalledOnce();
+  for (const result of g.device.createBuffer.mock.results)
+    expect(result.value.destroy).toHaveBeenCalledOnce();
+  for (const context of g.contexts) expect(context.unconfigure).toHaveBeenCalledTimes(2);
+});
+
+it.each(['queue', 'validation', 'sync-pop'] as const)(
+  'keeps the failing slot borrowed until its other barrier settles without rejecting its peer: %s',
+  async (mode) => {
+    const g = graphics();
+    const fence = deferred<void>();
+    const scope = deferred<null>();
+    g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+    if (mode === 'sync-pop')
+      g.device.popErrorScope.mockImplementationOnce(() => {
+        throw new Error('validation failed');
+      });
+    else g.device.popErrorScope.mockReturnValueOnce(scope.promise);
+    const renderer = await owner({ maximumInFlight: 2 });
+    const source = new VideoFrame(raster());
+    const first = renderer.render(request([layer(source)]));
+    const outcome = first.then(
+      () => 'fulfilled',
+      () => 'rejected'
+    );
+    let settled = false;
+    void outcome.then(() => {
+      settled = true;
+    });
+    if (mode === 'queue') fence.reject(new Error('queue failed'));
+    else if (mode === 'validation') scope.reject(new Error('validation failed'));
+    expect(await renderer.render(request())).toBe(g.bitmaps[1]);
+    expect(settled).toBe(false);
+    expect(source.close).not.toHaveBeenCalled();
+    if (mode === 'queue') scope.resolve(null);
+    else fence.resolve();
+    expect(await outcome).toBe('rejected');
+    expect(g.transfer).toHaveBeenCalledOnce();
+    expect(source.close).not.toHaveBeenCalled();
+    expect(await renderer.render(request())).toBe(g.bitmap);
+  }
+);
+
+it.each(['abort', 'loss', 'dispose'] as const)(
+  'waits for both private slots before cleanup and never publishes after %s',
+  async (action) => {
+    const g = graphics();
+    const fences = [deferred<void>(), deferred<void>()];
+    const scopes = [deferred<null>(), deferred<null>()];
+    fences.forEach((fence) => g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise));
+    scopes.forEach((scope) => g.device.popErrorScope.mockReturnValueOnce(scope.promise));
+    const renderer = await owner({ maximumInFlight: 2, reserve: g.reserve });
+    const controller = new AbortController();
+    const sources = [new VideoFrame(raster()), new VideoFrame(raster())];
+    const pending = sources.map((source) =>
+      renderer.render(request([layer(source)], controller.signal))
+    );
+    const outcomes = Promise.allSettled(pending);
+    await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledTimes(2));
+    if (action === 'abort') controller.abort();
+    else if (action === 'loss') g.lost.resolve({ message: 'lost both slots' });
+    else renderer.dispose();
+    scopes[0]!.resolve(null);
+    fences[1]!.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(g.transfer).not.toHaveBeenCalled();
+    expect(g.device.destroy).not.toHaveBeenCalled();
+    expect(renderer.allocatedBytes).toBeGreaterThan(0);
+    scopes[1]!.resolve(null);
+    await pending[1]!.catch(() => {});
+    expect(g.device.destroy).not.toHaveBeenCalled();
+    fences[0]!.resolve();
+    const result = await outcomes;
+    expect(result.map((entry) => entry.status)).toEqual(['rejected', 'rejected']);
+    if (action === 'loss')
+      for (const entry of result)
+        if (entry.status === 'rejected') expect(entry.reason).toBeInstanceOf(GpuPreviewDeviceError);
+    expect(g.transfer).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(renderer.allocatedBytes).toBe(0);
+    expect(g.device.destroy).toHaveBeenCalledOnce();
+    for (const source of sources) expect(source.close).not.toHaveBeenCalled();
+    for (const result of g.reserve.mock.results)
+      expect(result.value.release).toHaveBeenCalledOnce();
+  }
+);
+
+it('retains the device scope stack during asynchronous source preparation and cancels a waiting slot', async () => {
+  const g = graphics();
+  const native = nativeFrames();
+  const copy = deferred<Awaited<ReturnType<VideoFrame['copyTo']>>>();
+  native.copy.mockReturnValueOnce(copy.promise);
+  const renderer = await owner({ maximumInFlight: 2 });
+  const source = new VideoFrame(raster());
+  const first = renderer.render(request([layer(source)]));
+  const controller = new AbortController();
+  const second = renderer.render(request([], controller.signal));
+  const secondOutcome = second.catch((error: unknown) => error);
+  await Promise.resolve();
+  expect(g.device.pushErrorScope).toHaveBeenCalledOnce();
+  expect(g.device.popErrorScope).not.toHaveBeenCalled();
+  expect(g.contexts).toHaveLength(1);
+  controller.abort();
+  copy.resolve([
+    { offset: 0, stride: 32 },
+    { offset: 576, stride: 32 },
+  ]);
+  await first;
+  expect(await secondOutcome).toMatchObject({ name: 'AbortError' });
+  expect(g.device.pushErrorScope).toHaveBeenCalledOnce();
+  expect(g.contexts).toHaveLength(1);
+});
+
+it('recovers slot capacity after lazy slot initialization fails without destroying the active device', async () => {
+  const g = graphics();
+  const fence = deferred<void>();
+  g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+  const renderer = await owner({ maximumInFlight: 2 });
+  const first = renderer.render(request());
+  g.device.createRenderPipelineAsync.mockRejectedValueOnce(
+    new Error('second slot pipeline failed')
+  );
+  await expect(renderer.render(request())).rejects.toThrow('second slot pipeline failed');
+  expect(g.device.destroy).not.toHaveBeenCalled();
+  expect(g.contexts[1]!.unconfigure).toHaveBeenCalledOnce();
+  await expect(renderer.render(request())).resolves.toBe(g.bitmaps[2]);
+  fence.resolve();
+  await first;
+  renderer.dispose();
+  expect(g.device.destroy).toHaveBeenCalledOnce();
+});
+
+it('keeps the encoding lock until failure cleanup actually invokes popErrorScope', async () => {
+  const g = graphics();
+  const fence = deferred<void>();
+  const scope = deferred<null>();
+  g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+  g.device.popErrorScope.mockReturnValueOnce(scope.promise);
+  g.queue.copyExternalImageToTexture.mockImplementationOnce(() => {
+    throw new Error('upload failed');
+  });
+  const renderer = await owner({ maximumInFlight: 2 });
+  const first = renderer.render(request()).catch((error: unknown) => error);
+  const second = renderer.render(request());
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(g.device.pushErrorScope).toHaveBeenCalledOnce();
+  expect(g.device.popErrorScope).not.toHaveBeenCalled();
+  expect(g.contexts).toHaveLength(1);
+  fence.resolve();
+  expect(await second).toBe(g.bitmaps[1]);
+  expect(g.device.pushErrorScope.mock.invocationCallOrder[1]).toBeGreaterThan(
+    g.device.popErrorScope.mock.invocationCallOrder[0]!
+  );
+  scope.resolve(null);
+  expect(await first).toMatchObject({ message: 'upload failed' });
+});
+
+it('releases only the packed source belonging to the request whose two barriers have settled', async () => {
+  const g = graphics();
+  const native = nativeFrames();
+  const fences = [deferred<void>(), deferred<void>()];
+  const scopes = [deferred<null>(), deferred<null>()];
+  fences.forEach((fence) => g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise));
+  scopes.forEach((scope) => g.device.popErrorScope.mockReturnValueOnce(scope.promise));
+  const renderer = await owner({ maximumInFlight: 2, reserve: g.reserve });
+  const sources = [new VideoFrame(raster()), new VideoFrame(raster())];
+  const first = renderer.render(request([layer(sources[0]!)]));
+  const second = renderer.render(request([layer(sources[1]!)]));
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledTimes(2));
+  const packed = g.device.importExternalTexture.mock.calls.map((call) => {
+    const source = call[0].source;
+    if (!(source instanceof VideoFrame)) throw new Error('Expected a packed VideoFrame.');
+    return source;
+  });
+  expect(packed).toHaveLength(2);
+  expect(packed[0]).not.toBe(packed[1]);
+  expect(native.copy).toHaveBeenCalledTimes(2);
+  const initialBytes = renderer.allocatedBytes;
+  scopes[1]!.resolve(null);
+  fences[1]!.resolve();
+  await second;
+  expect(packed[1]!.close).toHaveBeenCalledOnce();
+  expect(packed[0]!.close).not.toHaveBeenCalled();
+  expect(renderer.allocatedBytes).toBe(initialBytes - 1728);
+  fences[0]!.resolve();
+  await Promise.resolve();
+  expect(packed[0]!.close).not.toHaveBeenCalled();
+  scopes[0]!.resolve(null);
+  await first;
+  expect(packed[0]!.close).toHaveBeenCalledOnce();
+  for (const source of sources) expect(source.close).not.toHaveBeenCalled();
+  renderer.dispose();
+  expect(renderer.allocatedBytes).toBe(0);
+});

@@ -649,3 +649,14 @@ it('budgets physical plane/overlay and retained texture geometry per replaced ro
   lease.release();
   resources.dispose();
 });
+
+it('accounts for a second outstanding publication without duplicating the retained front', () => {
+  const single = input();
+  const before = calculatePreviewRenderAllocation(single);
+  const after = calculatePreviewRenderAllocation({
+    ...single,
+    publication: { ...single.publication, maximumInFlight: 2 },
+  });
+  expect(after.maximumManagedBytes - before.maximumManagedBytes).toBe(size.width * size.height * 4);
+  expect(after.maximumCanvases - before.maximumCanvases).toBe(1);
+});

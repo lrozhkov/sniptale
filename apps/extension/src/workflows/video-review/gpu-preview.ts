@@ -37,17 +37,47 @@ const identity: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 type Captions = Awaited<ReturnType<typeof prepareReviewCaptions>>;
 type Dimensions = PreviewSceneDimensions;
 
+/** Only immutable bare compositions can share retained artwork across pending GPU requests. */
+export function reviewGpuPreviewConcurrency(scene: PreviewScene): 1 | 2 {
+  const plan = scene.outerFadePlan;
+  return scene.background.enabled ||
+    scene.zoomRegions.length ||
+    scene.comments.length ||
+    scene.keys.length ||
+    scene.clicks.length ||
+    scene.windowHeader ||
+    (scene.watermark && scene.watermark.mode !== 'none') ||
+    scene.webcam?.enabled ||
+    scene.captions?.settings?.enabled ||
+    (scene.annotationEffects?.lane.enabled &&
+      scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
+    (plan &&
+      (plan.visualEnvelope.fadeIn !== 0 ||
+        plan.visualEnvelope.fadeOut !== 0 ||
+        plan.segments.some(
+          (segment) => segment.name !== 'main' || segment.content.kind !== 'main'
+        ) ||
+        (plan.joins?.length ?? 0) > 0))
+    ? 1
+    : 2;
+}
+
 /** One Gallery preview session owns its GPU resources and failure fallback. */
 export function createReviewGpuPreview(args: {
   resources: RenderResources;
   reserve(bytes: number): { release(): void };
+  maximumInFlight?: 1 | 2;
 }) {
   let renderer: GpuPreviewRenderer | null = null;
   let initialization: Promise<GpuPreviewRenderer | null> | null = null;
   let disabled = false;
   let fallbackReason: PreviewRendererStatus['fallback'];
   let disposed = false;
-  let active = false;
+  let active = 0;
+  let activeScene: PreviewScene | null = null;
+  let activeDimensions: Dimensions | null = null;
+  let activePainter: ReturnType<typeof createReviewBackgroundPainter> | null = null;
+  let overlapSafe = false;
   let sceneReleased = false;
   let artworkRevision = 0;
   const lifetime = new AbortController();
@@ -104,8 +134,36 @@ export function createReviewGpuPreview(args: {
     }) {
       if (disabled || disposed) return false;
       const { scene, dimensions, geometry } = input;
-      const signal = AbortSignal.any([input.signal, lifetime.signal, sceneLifetime.signal]);
-      active = true;
+      const safe =
+        reviewGpuPreviewConcurrency(scene) === 2 &&
+        !input.camera &&
+        !input.transition &&
+        !input.cameraOverride &&
+        !input.captions &&
+        !input.annotations &&
+        !input.watermark &&
+        !input.header &&
+        !input.image;
+      if (
+        active &&
+        (active >= (args.maximumInFlight ?? 1) ||
+          sceneReleased ||
+          !overlapSafe ||
+          !safe ||
+          activeScene !== scene ||
+          activeDimensions !== dimensions ||
+          activePainter !== input.painter)
+      )
+        throw new Error('GPU preview overlap is unavailable.');
+      if (!active) {
+        activeScene = scene;
+        activeDimensions = dimensions;
+        activePainter = input.painter;
+        overlapSafe = safe;
+      }
+      const sceneSignal = sceneLifetime.signal;
+      const signal = AbortSignal.any([input.signal, lifetime.signal, sceneSignal]);
+      active++;
       const primitives = createReviewGpuPrimitives(args.resources);
       const ownedFrames: VideoFrame[] = [];
       const endpointOutputs: { bitmap: ImageBitmap; release(): void }[] = [];
@@ -114,7 +172,10 @@ export function createReviewGpuPreview(args: {
         for (const hold of annotationHolds.splice(start)) hold.release();
       };
       try {
-        initialization ??= createGpuPreviewRenderer({ reserve: args.reserve });
+        initialization ??= createGpuPreviewRenderer({
+          reserve: args.reserve,
+          maximumInFlight: args.maximumInFlight ?? 1,
+        });
         try {
           renderer = await initialization;
         } catch (error) {
@@ -408,12 +469,22 @@ export function createReviewGpuPreview(args: {
         }
         return true;
       } catch (error) {
+        // A shared device failure sends every pending request through the same Canvas fallback.
+        if (
+          disabled &&
+          fallbackReason === 'device-failed' &&
+          !disposed &&
+          !input.signal.aborted &&
+          !sceneSignal.aborted
+        )
+          return false;
         if (signal.aborted || !(error instanceof GpuPreviewDeviceError)) throw error;
         renderer?.dispose();
         renderer = null;
         disabled = true;
         fallbackReason = 'device-failed';
-        clear();
+        sceneReleased = true;
+        lifetime.abort();
         return false;
       } finally {
         releaseAnnotations(0);
@@ -423,8 +494,14 @@ export function createReviewGpuPreview(args: {
         }
         primitives.dispose();
         for (const frame of ownedFrames) frame.close();
-        active = false;
-        if (disposed || sceneReleased) clear();
+        active--;
+        if (!active) {
+          activeScene = null;
+          activeDimensions = null;
+          activePainter = null;
+          overlapSafe = false;
+          if (disposed || sceneReleased) clear();
+        }
       }
     },
     releaseScene() {

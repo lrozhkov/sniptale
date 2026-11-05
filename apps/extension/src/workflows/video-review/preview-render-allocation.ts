@@ -37,7 +37,7 @@ interface Allocation extends Cost {
 
 /** Concrete dimensions come from preparation/admission, never from a quality multiplier. */
 export interface PreviewRenderAllocationInput {
-  publication: { backing: Size; previousFront: Size | null };
+  publication: { backing: Size; previousFront: Size | null; maximumInFlight?: 1 | 2 };
   admission: {
     source: Capture | null;
     camera: { retained: Capture | null; active: Capture | null };
@@ -262,7 +262,9 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
   ];
   const retained = [
     ...front,
-    canvas('publication-staging', input.publication.backing),
+    ...Array.from({ length: input.publication.maximumInFlight ?? 1 }, () =>
+      canvas('publication-staging', input.publication.backing)
+    ),
     ...admitted,
     ...assets,
     ...optionalCanvas('preview-transition-source', input.scene.transitionRaster),
@@ -385,6 +387,7 @@ export interface PreviewRuntimeAllocationInput {
   resultTime: number;
   sourceTime: number;
   cameraTransform?: QuickEditCameraTransform;
+  maximumInFlight?: 1 | 2;
   sourceAllocationBytes: number | null;
   sourceBacking: Size;
   camera: { retainedBytes: number | null; activeBytes: number | null };
@@ -578,7 +581,11 @@ export function resolvePreviewRenderAllocation(
     (click) => (click.lens?.scale ?? 1) > 1
   );
   return {
-    publication: { backing, previousFront: input.previousFront },
+    publication: {
+      backing,
+      previousFront: input.previousFront,
+      ...(input.maximumInFlight ? { maximumInFlight: input.maximumInFlight } : {}),
+    },
     admission: {
       source: frameCapture(input.sourceAllocationBytes),
       camera: {

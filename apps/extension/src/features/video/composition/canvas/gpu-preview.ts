@@ -548,6 +548,8 @@ function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRequest {
 export async function createGpuPreviewRenderer(
   args: {
     reserve?: (bytes: number) => Reservation;
+    /** Complete requests retain private resources until both GPU barriers settle. Defaults to one. */
+    maximumInFlight?: 1 | 2;
   } = {}
 ): Promise<GpuPreviewRenderer | null> {
   if (!navigator.gpu) return null;
@@ -561,10 +563,6 @@ export async function createGpuPreviewRenderer(
   }
   try {
     const format = navigator.gpu.getPreferredCanvasFormat();
-    const surface = new OffscreenCanvas(1, 1);
-    const context = surface.getContext('webgpu');
-    if (!context || !('configure' in context))
-      throw new GpuPreviewDeviceError('GPU preview surface is unavailable.');
     const pipelines = await createPreviewPipelines(device, format, false);
     let effectPipelines: Promise<GPURenderPipeline[]> | null = null;
     let maskedPipelines: Promise<GPURenderPipeline[]> | null = null;
@@ -576,61 +574,37 @@ export async function createGpuPreviewRenderer(
       mipmapFilter: 'linear',
     });
     let disposed = false;
-    let busy = false;
     let failure: Error | null = null;
     let bytes = 0;
-    let outputReservation: Reservation | null = null;
-    const uniforms: { buffer: GPUBuffer; reservation: Reservation }[] = [];
-    type TextureEntry = {
-      source: Raster;
-      revision: object | string | number | undefined;
-      texture: GPUTexture;
-      reservation: Reservation;
-      bytes: number;
+    let destroyed = false;
+    let encodingTail: Promise<void> | null = null;
+    type Slot = Awaited<ReturnType<typeof createSlot>>;
+    const slots: { busy: boolean; value?: Slot }[] = [{ busy: false }];
+    const cleanAll = () => {
+      if (destroyed || !disposed || slots.some((slot) => slot.busy)) return;
+      destroyed = true;
+      for (const slot of slots) slot.value?.clean();
+      device.removeEventListener('uncapturederror', uncaptured);
+      device.destroy();
     };
-    const textures = new Map<string, TextureEntry>();
-    const targets = new Map<
-      string,
-      { texture: GPUTexture; reservation: Reservation; bytes: number }
-    >();
-    const reserve = (count: number): Reservation => {
-      const admitted = args.reserve?.(count);
-      bytes += count;
+    // Error scopes belong to the device stack. Encoding can overlap GPU completion only after pop is invoked.
+    const enterEncoding = () => {
+      const wait = encodingTail;
+      let finish!: () => void;
+      const completion = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      encodingTail = completion;
       let released = false;
       return {
+        wait,
         release() {
           if (released) return;
           released = true;
-          bytes -= count;
-          admitted?.release();
+          if (encodingTail === completion) encodingTail = null;
+          finish();
         },
       };
-    };
-    const filter = await createGpuPreviewFilter(device, reserve);
-    let cssFilter: Awaited<ReturnType<typeof createGpuPreviewCssFilter>> | null = null;
-    const dropTexture = (key: string, entry: TextureEntry) => {
-      textures.delete(key);
-      entry.texture.destroy();
-      entry.reservation.release();
-    };
-    const clean = () => {
-      for (const [key, entry] of textures) dropTexture(key, entry);
-      for (const entry of targets.values()) {
-        entry.texture.destroy();
-        entry.reservation.release();
-      }
-      targets.clear();
-      filter.dispose();
-      cssFilter?.dispose();
-      for (const entry of uniforms.splice(0)) {
-        entry.buffer.destroy();
-        entry.reservation.release();
-      }
-      context.unconfigure();
-      outputReservation?.release();
-      outputReservation = null;
-      device.removeEventListener('uncapturederror', uncaptured);
-      device.destroy();
     };
     const uncaptured = (event: GPUUncapturedErrorEvent) => {
       failure =
@@ -656,388 +630,496 @@ export async function createGpuPreviewRenderer(
         throw new GpuPreviewDeviceError('GPU preview queue failed.', { cause: error });
       }
     };
-    const textureFor = (
-      layer: Pick<GpuPreviewLayer, 'source' | 'cache'>,
-      path: string
-    ): GPUTexture => {
-      if (layer.source instanceof VideoFrame || isGroup(layer.source))
-        throw new Error('GPU source is not a raster.');
-      const key = layer.cache?.key ?? `transient:${path}`;
-      const previous = textures.get(key);
-      if (
-        previous &&
-        layer.cache &&
-        previous.source === layer.source &&
-        previous.revision === layer.cache.revision &&
-        previous.texture.width === layer.source.width &&
-        previous.texture.height === layer.source.height
-      )
-        return previous.texture;
-      if (previous) dropTexture(key, previous);
-      validSize(layer.source, device.limits.maxTextureDimension2D);
-      const count = layer.source.width * layer.source.height * 4;
-      const textureBytes = [...textures.values(), ...targets.values()].reduce(
-        (sum, entry) => sum + entry.bytes,
-        0
-      );
-      if (count + textureBytes > MAX_TEXTURE_BYTES)
-        throw new Error('GPU preview texture budget exceeded.');
-      const reservation = reserve(count);
-      let texture: GPUTexture | undefined;
-      try {
-        texture = device.createTexture({
-          size: [layer.source.width, layer.source.height],
-          format: 'rgba8unorm',
-          usage: TEXTURE_USAGE,
-        });
-        device.queue.copyExternalImageToTexture(
-          { source: layer.source },
-          { texture, premultipliedAlpha: true },
-          [layer.source.width, layer.source.height]
-        );
-        textures.set(key, {
-          source: layer.source,
-          revision: layer.cache?.revision,
-          texture,
-          reservation,
-          bytes: count,
-        });
-        return texture;
-      } catch (error) {
-        texture?.destroy();
-        reservation.release();
-        throw error;
-      }
-    };
-
-    /** Encode child targets before their parent pass without changing frame lifetime authority. */
-    const encodeFrame = (
-      request: GpuPreviewRequest,
-      families: PreviewPipelineFamilies,
-      packedFrames: ReadonlyMap<VideoFrame, VideoFrame>
-    ) => {
-      const { effects, masked, maskedEffects } = families;
-      const encoder = device.createCommandEncoder();
-      let uniformIndex = 0;
-      const renderedGroups = new Map<GpuPreviewGroup, GPUTexture>();
-      const targetFor = (path: string, output: Size) => {
-        let target = targets.get(path);
+    async function createSlot() {
+      let slotBytes = 0;
+      const surface = new OffscreenCanvas(1, 1);
+      const context = surface.getContext('webgpu');
+      if (!context || !('configure' in context))
+        throw new GpuPreviewDeviceError('GPU preview surface is unavailable.');
+      let outputReservation: Reservation | null = null;
+      const uniforms: { buffer: GPUBuffer; reservation: Reservation }[] = [];
+      type TextureEntry = {
+        source: Raster;
+        revision: object | string | number | undefined;
+        texture: GPUTexture;
+        reservation: Reservation;
+        bytes: number;
+      };
+      const textures = new Map<string, TextureEntry>();
+      const targets = new Map<
+        string,
+        { texture: GPUTexture; reservation: Reservation; bytes: number }
+      >();
+      const reserve = (count: number): Reservation => {
+        const admitted = args.reserve?.(count);
+        bytes += count;
+        slotBytes += count;
+        let released = false;
+        return {
+          release() {
+            if (released) return;
+            released = true;
+            bytes -= count;
+            slotBytes -= count;
+            admitted?.release();
+          },
+        };
+      };
+      const filter = await createGpuPreviewFilter(device, reserve).catch((error: unknown) => {
+        context.unconfigure();
         if (
-          target &&
-          (target.texture.width !== output.width || target.texture.height !== output.height)
-        ) {
-          targets.delete(path);
-          target.texture.destroy();
-          target.reservation.release();
-          target = undefined;
+          typeof GPUPipelineError !== 'undefined' &&
+          error instanceof GPUPipelineError &&
+          error.reason === 'internal'
+        )
+          throw new GpuPreviewDeviceError('GPU preview pipeline device failure.', { cause: error });
+        throw error;
+      });
+      let cssFilter: Awaited<ReturnType<typeof createGpuPreviewCssFilter>> | null = null;
+      const dropTexture = (key: string, entry: TextureEntry) => {
+        textures.delete(key);
+        entry.texture.destroy();
+        entry.reservation.release();
+      };
+      const clean = () => {
+        for (const [key, entry] of textures) dropTexture(key, entry);
+        for (const entry of targets.values()) {
+          entry.texture.destroy();
+          entry.reservation.release();
         }
-        if (target) return target.texture;
-        const count = output.width * output.height * 4;
+        targets.clear();
+        filter.dispose();
+        cssFilter?.dispose();
+        for (const entry of uniforms.splice(0)) {
+          entry.buffer.destroy();
+          entry.reservation.release();
+        }
+        context.unconfigure();
+        outputReservation?.release();
+        outputReservation = null;
+      };
+      const textureFor = (
+        layer: Pick<GpuPreviewLayer, 'source' | 'cache'>,
+        path: string
+      ): GPUTexture => {
+        if (layer.source instanceof VideoFrame || isGroup(layer.source))
+          throw new Error('GPU source is not a raster.');
+        const key = layer.cache?.key ?? `transient:${path}`;
+        const previous = textures.get(key);
+        if (
+          previous &&
+          layer.cache &&
+          previous.source === layer.source &&
+          previous.revision === layer.cache.revision &&
+          previous.texture.width === layer.source.width &&
+          previous.texture.height === layer.source.height
+        )
+          return previous.texture;
+        if (previous) dropTexture(key, previous);
+        validSize(layer.source, device.limits.maxTextureDimension2D);
+        const count = layer.source.width * layer.source.height * 4;
         const textureBytes = [...textures.values(), ...targets.values()].reduce(
           (sum, entry) => sum + entry.bytes,
           0
         );
-        if (textureBytes + count > MAX_TEXTURE_BYTES)
+        if (count + textureBytes > MAX_TEXTURE_BYTES)
           throw new Error('GPU preview texture budget exceeded.');
         const reservation = reserve(count);
+        let texture: GPUTexture | undefined;
         try {
-          const texture = device.createTexture({
-            size: [output.width, output.height],
-            format,
+          texture = device.createTexture({
+            size: [layer.source.width, layer.source.height],
+            format: 'rgba8unorm',
             usage: TEXTURE_USAGE,
           });
-          targets.set(path, { texture, reservation, bytes: count });
+          device.queue.copyExternalImageToTexture(
+            { source: layer.source },
+            { texture, premultipliedAlpha: true },
+            [layer.source.width, layer.source.height]
+          );
+          textures.set(key, {
+            source: layer.source,
+            revision: layer.cache?.revision,
+            texture,
+            reservation,
+            bytes: count,
+          });
           return texture;
         } catch (error) {
+          texture?.destroy();
           reservation.release();
           throw error;
         }
       };
-      const renderLayers = (
-        layers: readonly GpuPreviewLayer[],
-        output: Size,
-        logical: Size,
-        prefix: string,
-        destination: GPUTexture
-      ) => {
-        const sources = layers.map((layer, index) => {
-          const path = `${prefix}/${index}`;
-          let source: GPUTexture;
-          if (isGroup(layer.source)) {
-            const group = layer.source;
-            source = renderedGroups.get(group) ?? targetFor(path, group.output);
-            if (!renderedGroups.has(group)) {
-              renderLayers(group.layers, group.output, group.logical, path, source);
-              renderedGroups.set(group, source);
-            }
-          } else if (layer.source instanceof VideoFrame) {
-            if (!requiresRasterSource(layer))
-              return device.importExternalTexture({
-                source: packedFrames.get(layer.source) ?? layer.source,
-              });
-            const size = {
-              width: layer.source.displayWidth,
-              height: layer.source.displayHeight,
-            };
-            validSize(size, device.limits.maxTextureDimension2D);
-            source = targetFor(`${path}/decoded`, size);
-            renderLayers(
-              [
-                {
-                  source: layer.source,
-                  rect: { x: 0, y: 0, ...size },
-                  inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-                },
-              ],
-              size,
-              size,
-              `${path}/decoded`,
-              source
-            );
-          } else source = textureFor(layer, path);
-          if (layer.cssFilter) {
-            if (!cssFilter) throw new Error('GPU preview CSS filter is unavailable.');
-            source = cssFilter.prepare(encoder, source, path, layer.cssFilter);
-          }
-          if (requiresGpuPreviewFilter(layer)) source = filter.prepare(encoder, source, path);
-          return source.createView();
-        });
-        const masks = layers.map((layer, index) =>
-          layer.alphaMask
-            ? textureFor(layer.alphaMask, `${prefix}/${index}/alpha-mask`).createView()
-            : null
-        );
-        const operationClips = layers.map((layer, index) =>
-          layer.operationClip
-            ? textureFor(layer.operationClip, `${prefix}/${index}/operation-clip`).createView()
-            : null
-        );
-        const pass = encoder.beginRenderPass({
-          colorAttachments: [
-            {
-              view: destination.createView(),
-              loadOp: 'clear',
-              storeOp: 'store',
-              clearValue: [0, 0, 0, 0],
-            },
-          ],
-        });
-        layers.forEach((layer, index) => {
-          const slot = uniformIndex++;
-          let uniform = uniforms[slot];
-          if (!uniform) {
-            const reservation = reserve(UNIFORM_BYTES);
-            try {
-              uniform = {
-                buffer: device.createBuffer({ size: UNIFORM_BYTES, usage: UNIFORM_USAGE }),
-                reservation,
-              };
-              uniforms.push(uniform);
-            } catch (error) {
-              reservation.release();
-              throw error;
-            }
-          }
-          device.queue.writeBuffer(uniform.buffer, 0, layerValues(layer, output, logical));
-          const external = layer.source instanceof VideoFrame && !requiresRasterSource(layer);
-          const selectedPipelines = layer.alphaMask
-            ? layer.lens || requiresGpuPreviewFilter(layer)
-              ? maskedEffects
-              : masked
-            : layer.lens || requiresGpuPreviewFilter(layer)
-              ? effects
-              : pipelines;
-          const activePipelines =
-            layer.operationClip || layer.tint
-              ? families.operations.get(operationKey(layer))
-              : selectedPipelines;
-          const pipeline =
-            activePipelines?.[
-              (layer.blend === 'atop'
-                ? 10
-                : layer.blend === 'screen'
-                  ? 8
-                  : layer.blend === 'erase'
-                    ? 6
-                    : layer.blend === 'mask'
-                      ? 4
-                      : layer.blend === 'add'
-                        ? 2
-                        : 0) + (external ? 1 : 0)
-            ];
-          const pixels = sources[index];
-          const mask = masks[index];
-          if (!pipeline || !pixels) throw new Error('GPU preview pipeline is unavailable.');
-          pass.setPipeline(pipeline);
-          pass.setBindGroup(
-            0,
-            device.createBindGroup({
-              layout: pipeline.getBindGroupLayout(0),
-              entries: [
-                { binding: 0, resource: { buffer: uniform.buffer } },
-                { binding: 1, resource: sampler },
-                { binding: 2, resource: pixels },
-                ...(mask ? [{ binding: 3, resource: mask }] : []),
-                ...(operationClips[index] ? [{ binding: 4, resource: operationClips[index] }] : []),
-              ],
-            })
-          );
-          pass.draw(3);
-        });
-        pass.end();
-      };
-      renderLayers(
-        request.layers,
-        request.output,
-        request.logical,
-        '',
-        context.getCurrentTexture()
-      );
-      return encoder.finish();
-    };
 
+      /** Encode child targets before their parent pass without changing frame lifetime authority. */
+      const encodeFrame = (
+        request: GpuPreviewRequest,
+        families: PreviewPipelineFamilies,
+        packedFrames: ReadonlyMap<VideoFrame, VideoFrame>
+      ) => {
+        const { effects, masked, maskedEffects } = families;
+        const encoder = device.createCommandEncoder();
+        let uniformIndex = 0;
+        const renderedGroups = new Map<GpuPreviewGroup, GPUTexture>();
+        const targetFor = (path: string, output: Size) => {
+          let target = targets.get(path);
+          if (
+            target &&
+            (target.texture.width !== output.width || target.texture.height !== output.height)
+          ) {
+            targets.delete(path);
+            target.texture.destroy();
+            target.reservation.release();
+            target = undefined;
+          }
+          if (target) return target.texture;
+          const count = output.width * output.height * 4;
+          const textureBytes = [...textures.values(), ...targets.values()].reduce(
+            (sum, entry) => sum + entry.bytes,
+            0
+          );
+          if (textureBytes + count > MAX_TEXTURE_BYTES)
+            throw new Error('GPU preview texture budget exceeded.');
+          const reservation = reserve(count);
+          try {
+            const texture = device.createTexture({
+              size: [output.width, output.height],
+              format,
+              usage: TEXTURE_USAGE,
+            });
+            targets.set(path, { texture, reservation, bytes: count });
+            return texture;
+          } catch (error) {
+            reservation.release();
+            throw error;
+          }
+        };
+        const renderLayers = (
+          layers: readonly GpuPreviewLayer[],
+          output: Size,
+          logical: Size,
+          prefix: string,
+          destination: GPUTexture
+        ) => {
+          const sources = layers.map((layer, index) => {
+            const path = `${prefix}/${index}`;
+            let source: GPUTexture;
+            if (isGroup(layer.source)) {
+              const group = layer.source;
+              source = renderedGroups.get(group) ?? targetFor(path, group.output);
+              if (!renderedGroups.has(group)) {
+                renderLayers(group.layers, group.output, group.logical, path, source);
+                renderedGroups.set(group, source);
+              }
+            } else if (layer.source instanceof VideoFrame) {
+              if (!requiresRasterSource(layer))
+                return device.importExternalTexture({
+                  source: packedFrames.get(layer.source) ?? layer.source,
+                });
+              const size = {
+                width: layer.source.displayWidth,
+                height: layer.source.displayHeight,
+              };
+              validSize(size, device.limits.maxTextureDimension2D);
+              source = targetFor(`${path}/decoded`, size);
+              renderLayers(
+                [
+                  {
+                    source: layer.source,
+                    rect: { x: 0, y: 0, ...size },
+                    inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+                  },
+                ],
+                size,
+                size,
+                `${path}/decoded`,
+                source
+              );
+            } else source = textureFor(layer, path);
+            if (layer.cssFilter) {
+              if (!cssFilter) throw new Error('GPU preview CSS filter is unavailable.');
+              source = cssFilter.prepare(encoder, source, path, layer.cssFilter);
+            }
+            if (requiresGpuPreviewFilter(layer)) source = filter.prepare(encoder, source, path);
+            return source.createView();
+          });
+          const masks = layers.map((layer, index) =>
+            layer.alphaMask
+              ? textureFor(layer.alphaMask, `${prefix}/${index}/alpha-mask`).createView()
+              : null
+          );
+          const operationClips = layers.map((layer, index) =>
+            layer.operationClip
+              ? textureFor(layer.operationClip, `${prefix}/${index}/operation-clip`).createView()
+              : null
+          );
+          const pass = encoder.beginRenderPass({
+            colorAttachments: [
+              {
+                view: destination.createView(),
+                loadOp: 'clear',
+                storeOp: 'store',
+                clearValue: [0, 0, 0, 0],
+              },
+            ],
+          });
+          layers.forEach((layer, index) => {
+            const slot = uniformIndex++;
+            let uniform = uniforms[slot];
+            if (!uniform) {
+              const reservation = reserve(UNIFORM_BYTES);
+              try {
+                uniform = {
+                  buffer: device.createBuffer({ size: UNIFORM_BYTES, usage: UNIFORM_USAGE }),
+                  reservation,
+                };
+                uniforms.push(uniform);
+              } catch (error) {
+                reservation.release();
+                throw error;
+              }
+            }
+            device.queue.writeBuffer(uniform.buffer, 0, layerValues(layer, output, logical));
+            const external = layer.source instanceof VideoFrame && !requiresRasterSource(layer);
+            const selectedPipelines = layer.alphaMask
+              ? layer.lens || requiresGpuPreviewFilter(layer)
+                ? maskedEffects
+                : masked
+              : layer.lens || requiresGpuPreviewFilter(layer)
+                ? effects
+                : pipelines;
+            const activePipelines =
+              layer.operationClip || layer.tint
+                ? families.operations.get(operationKey(layer))
+                : selectedPipelines;
+            const pipeline =
+              activePipelines?.[
+                (layer.blend === 'atop'
+                  ? 10
+                  : layer.blend === 'screen'
+                    ? 8
+                    : layer.blend === 'erase'
+                      ? 6
+                      : layer.blend === 'mask'
+                        ? 4
+                        : layer.blend === 'add'
+                          ? 2
+                          : 0) + (external ? 1 : 0)
+              ];
+            const pixels = sources[index];
+            const mask = masks[index];
+            if (!pipeline || !pixels) throw new Error('GPU preview pipeline is unavailable.');
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(
+              0,
+              device.createBindGroup({
+                layout: pipeline.getBindGroupLayout(0),
+                entries: [
+                  { binding: 0, resource: { buffer: uniform.buffer } },
+                  { binding: 1, resource: sampler },
+                  { binding: 2, resource: pixels },
+                  ...(mask ? [{ binding: 3, resource: mask }] : []),
+                  ...(operationClips[index]
+                    ? [{ binding: 4, resource: operationClips[index] }]
+                    : []),
+                ],
+              })
+            );
+            pass.draw(3);
+          });
+          pass.end();
+        };
+        renderLayers(
+          request.layers,
+          request.output,
+          request.logical,
+          '',
+          context.getCurrentTexture()
+        );
+        return encoder.finish();
+      };
+
+      return {
+        clean,
+        async render(request: GpuPreviewRequest, releaseEncoding: () => void) {
+          check(request.signal);
+          let plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
+          const normalized = omitLeadingGroupCopies(request);
+          if (normalized !== request) {
+            request = normalized;
+            plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
+          }
+          device.pushErrorScope('validation');
+          let scopeOpen = true;
+          const packedFrames = new Map<VideoFrame, VideoFrame>();
+          const packedSources: { frame: VideoFrame; reservation: Reservation }[] = [];
+          try {
+            for (const source of plan.nativeFrames) {
+              const visible = source.visibleRect;
+              if (
+                source.format !== 'NV12' ||
+                !visible ||
+                (visible.x === 0 &&
+                  visible.y === 0 &&
+                  visible.width === source.codedWidth &&
+                  visible.height === source.codedHeight)
+              )
+                continue;
+              // Native copy storage and the packed frame overlap during construction.
+              const count = source.allocationSize() * 2;
+              if (slotBytes + count > MAX_TEXTURE_BYTES)
+                throw new Error('GPU preview source budget exceeded.');
+              const reservation = reserve(count);
+              try {
+                const frame = await prepareDecodedVideoFrame(source.clone(), request.signal);
+                packedSources.push({ frame, reservation });
+                packedFrames.set(source, frame);
+              } catch (error) {
+                reservation.release();
+                throw error;
+              }
+            }
+            if (plan.hasEffects) effectPipelines ??= createPreviewPipelines(device, format, true);
+            const effects = plan.hasEffects ? await effectPipelines : null;
+            if (plan.hasMasked)
+              maskedPipelines ??= createPreviewPipelines(device, format, false, true);
+            const masked = plan.hasMasked ? await maskedPipelines : null;
+            if (plan.hasMaskedEffects)
+              maskedEffectPipelines ??= createPreviewPipelines(device, format, true, true);
+            const maskedEffects = plan.hasMaskedEffects ? await maskedEffectPipelines : null;
+            const operations = new Map<string, GPURenderPipeline[]>();
+            for (const [key, layer] of plan.operations) {
+              let promise = operationPipelines.get(key);
+              if (!promise) {
+                promise = createPreviewPipelines(
+                  device,
+                  format,
+                  !!layer.lens || requiresGpuPreviewFilter(layer),
+                  !!layer.alphaMask,
+                  { clip: !!layer.operationClip, tint: !!layer.tint }
+                );
+                operationPipelines.set(key, promise);
+              }
+              operations.set(key, await promise);
+            }
+            if (!cssFilter && requestHasCssFilter(request.layers))
+              cssFilter = await createGpuPreviewCssFilter(device, reserve).catch(
+                (error: unknown) => {
+                  if (
+                    typeof GPUPipelineError !== 'undefined' &&
+                    error instanceof GPUPipelineError &&
+                    error.reason === 'internal'
+                  )
+                    throw new GpuPreviewDeviceError('GPU preview pipeline device failure.', {
+                      cause: error,
+                    });
+                  throw error;
+                }
+              );
+            check(request.signal);
+            filter.beginFrame();
+            cssFilter?.beginFrame();
+            if (
+              surface.width !== request.output.width ||
+              surface.height !== request.output.height ||
+              !outputReservation
+            ) {
+              context.unconfigure();
+              outputReservation?.release();
+              outputReservation = null;
+              outputReservation = reserve(request.output.width * request.output.height * 8);
+              surface.width = request.output.width;
+              surface.height = request.output.height;
+              context.configure({ device, format, alphaMode: 'premultiplied' });
+            }
+            for (const [key, entry] of textures)
+              if (!plan.retainedKeys.has(key)) dropTexture(key, entry);
+            for (const [key, entry] of targets)
+              if (!plan.targetKeys.has(key)) {
+                targets.delete(key);
+                entry.texture.destroy();
+                entry.reservation.release();
+              }
+            device.queue.submit([
+              encodeFrame(request, { effects, masked, maskedEffects, operations }, packedFrames),
+            ]);
+            scopeOpen = false;
+            // Both completions retain borrowed sources; a rejection must not release the other barrier.
+            const [submitted, validation] = await Promise.allSettled([
+              drain(),
+              Promise.resolve().then(() => {
+                try {
+                  return device.popErrorScope();
+                } finally {
+                  releaseEncoding();
+                }
+              }),
+            ]);
+            if (submitted.status === 'rejected') throw submitted.reason;
+            if (validation.status === 'rejected') throw validation.reason;
+            const error = validation.value;
+            if (error) throw new Error(error.message);
+            check(request.signal);
+            return surface.transferToImageBitmap();
+          } finally {
+            // A failed encode can still contain texture uploads; drain before borrowed frames or resources leave scope.
+            try {
+              if (scopeOpen) await drain();
+            } finally {
+              try {
+                if (scopeOpen) {
+                  let validation: Promise<GPUError | null>;
+                  try {
+                    validation = device.popErrorScope();
+                  } finally {
+                    releaseEncoding();
+                  }
+                  await validation;
+                }
+              } finally {
+                for (const source of packedSources) {
+                  source.frame.close();
+                  source.reservation.release();
+                }
+                filter.endFrame();
+                cssFilter?.endFrame();
+              }
+            }
+          }
+        },
+      };
+    }
+    slots[0]!.value = await createSlot();
     return {
       get allocatedBytes() {
         return bytes;
       },
       async render(request) {
         check(request.signal);
-        if (busy) throw new Error('GPU preview already has a frame in flight.');
-        let plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
-        const normalized = omitLeadingGroupCopies(request);
-        if (normalized !== request) {
-          request = normalized;
-          plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
+        let slot = slots.find((entry) => !entry.busy);
+        if (!slot && slots.length < (args.maximumInFlight ?? 1)) {
+          slot = { busy: false };
+          slots.push(slot);
         }
-        busy = true;
-        device.pushErrorScope('validation');
-        let scopeOpen = true;
-        const packedFrames = new Map<VideoFrame, VideoFrame>();
-        const packedSources: { frame: VideoFrame; reservation: Reservation }[] = [];
+        if (!slot) throw new Error('GPU preview already has a frame in flight.');
+        slot.busy = true;
+        const encoding = enterEncoding();
         try {
-          for (const source of plan.nativeFrames) {
-            const visible = source.visibleRect;
-            if (
-              source.format !== 'NV12' ||
-              !visible ||
-              (visible.x === 0 &&
-                visible.y === 0 &&
-                visible.width === source.codedWidth &&
-                visible.height === source.codedHeight)
-            )
-              continue;
-            // Native copy storage and the packed frame overlap during construction.
-            const count = source.allocationSize() * 2;
-            if (bytes + count > MAX_TEXTURE_BYTES)
-              throw new Error('GPU preview source budget exceeded.');
-            const reservation = reserve(count);
-            try {
-              const frame = await prepareDecodedVideoFrame(source.clone(), request.signal);
-              packedSources.push({ frame, reservation });
-              packedFrames.set(source, frame);
-            } catch (error) {
-              reservation.release();
-              throw error;
-            }
-          }
-          if (plan.hasEffects) effectPipelines ??= createPreviewPipelines(device, format, true);
-          const effects = plan.hasEffects ? await effectPipelines : null;
-          if (plan.hasMasked)
-            maskedPipelines ??= createPreviewPipelines(device, format, false, true);
-          const masked = plan.hasMasked ? await maskedPipelines : null;
-          if (plan.hasMaskedEffects)
-            maskedEffectPipelines ??= createPreviewPipelines(device, format, true, true);
-          const maskedEffects = plan.hasMaskedEffects ? await maskedEffectPipelines : null;
-          const operations = new Map<string, GPURenderPipeline[]>();
-          for (const [key, layer] of plan.operations) {
-            let promise = operationPipelines.get(key);
-            if (!promise) {
-              promise = createPreviewPipelines(
-                device,
-                format,
-                !!layer.lens || requiresGpuPreviewFilter(layer),
-                !!layer.alphaMask,
-                { clip: !!layer.operationClip, tint: !!layer.tint }
-              );
-              operationPipelines.set(key, promise);
-            }
-            operations.set(key, await promise);
-          }
-          if (!cssFilter && requestHasCssFilter(request.layers))
-            cssFilter = await createGpuPreviewCssFilter(device, reserve).catch((error: unknown) => {
-              if (
-                typeof GPUPipelineError !== 'undefined' &&
-                error instanceof GPUPipelineError &&
-                error.reason === 'internal'
-              )
-                throw new GpuPreviewDeviceError('GPU preview pipeline device failure.', {
-                  cause: error,
-                });
-              throw error;
-            });
+          if (encoding.wait) await encoding.wait;
           check(request.signal);
-          filter.beginFrame();
-          cssFilter?.beginFrame();
-          if (
-            surface.width !== request.output.width ||
-            surface.height !== request.output.height ||
-            !outputReservation
-          ) {
-            context.unconfigure();
-            outputReservation?.release();
-            outputReservation = null;
-            outputReservation = reserve(request.output.width * request.output.height * 8);
-            surface.width = request.output.width;
-            surface.height = request.output.height;
-            context.configure({ device, format, alphaMode: 'premultiplied' });
-          }
-          for (const [key, entry] of textures)
-            if (!plan.retainedKeys.has(key)) dropTexture(key, entry);
-          for (const [key, entry] of targets)
-            if (!plan.targetKeys.has(key)) {
-              targets.delete(key);
-              entry.texture.destroy();
-              entry.reservation.release();
-            }
-          device.queue.submit([
-            encodeFrame(request, { effects, masked, maskedEffects, operations }, packedFrames),
-          ]);
-          scopeOpen = false;
-          // Both completions retain borrowed sources; a rejection must not release the other barrier.
-          const [submitted, validation] = await Promise.allSettled([
-            drain(),
-            Promise.resolve().then(() => device.popErrorScope()),
-          ]);
-          if (submitted.status === 'rejected') throw submitted.reason;
-          if (validation.status === 'rejected') throw validation.reason;
-          const error = validation.value;
-          if (error) throw new Error(error.message);
-          check(request.signal);
-          return surface.transferToImageBitmap();
+          slot.value ??= await createSlot();
+          return await slot.value.render(request, encoding.release);
         } finally {
-          // A failed encode can still contain texture uploads; drain before borrowed frames or resources leave scope.
-          try {
-            if (scopeOpen) await drain();
-          } finally {
-            try {
-              if (scopeOpen) await device.popErrorScope();
-            } finally {
-              for (const source of packedSources) {
-                source.frame.close();
-                source.reservation.release();
-              }
-              busy = false;
-              filter.endFrame();
-              cssFilter?.endFrame();
-              if (disposed) clean();
-            }
-          }
+          encoding.release();
+          slot.busy = false;
+          cleanAll();
         }
       },
       dispose() {
         if (disposed) return;
         disposed = true;
-        if (!busy) clean();
+        cleanAll();
       },
     };
   } catch (error) {

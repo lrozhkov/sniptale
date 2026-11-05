@@ -1,3 +1,4 @@
+import { reviewGpuPreviewConcurrency } from '../../workflows/video-review/gpu-preview';
 import { reviewGpuPreviewAllocation } from '../../workflows/video-review/gpu-preview-geometry';
 import { createPreviewRenderResources } from '../../workflows/video-review/preview-render-resources';
 import {
@@ -24,7 +25,7 @@ export function createPresentationAdmission(
   front: () => Awaited<ReturnType<Renderer['render']>> | null
 ) {
   const resources = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
-  let sourceBytes: number | null = null;
+  const sourceFrames = new Map<symbol, number>();
   let retainedCameraBytes: number | null = null;
   let activeCameraBytes: number | null = null;
   let transitionBytes: readonly [number, number] | null = null;
@@ -40,7 +41,11 @@ export function createPresentationAdmission(
       dimensions: current.dimensions,
       resultTime,
       ...(current.cameraTransform ? { cameraTransform: current.cameraTransform } : {}),
-      sourceAllocationBytes: sourceBytes,
+      maximumInFlight:
+        current.renderer === 'legacy' ? 1 : reviewGpuPreviewConcurrency(current.scene),
+      sourceAllocationBytes: sourceFrames.size
+        ? [...sourceFrames.values()].reduce((sum, bytes) => sum + bytes, 0)
+        : null,
       sourceTime: playing && video ? video.currentTime : current.sourceTime,
       sourceBacking: previewTransitionBacking(current, resultTime),
       camera: { retainedBytes: retainedCameraBytes, activeBytes: activeCameraBytes },
@@ -56,7 +61,11 @@ export function createPresentationAdmission(
     const current = description();
     const gpu =
       current && typeof navigator !== 'undefined' && navigator.gpu
-        ? reviewGpuPreviewAllocation(current.scene, current.dimensions)
+        ? reviewGpuPreviewAllocation(
+            current.scene,
+            current.dimensions,
+            current.renderer === 'legacy' ? 1 : 2
+          )
         : { maximumManagedBytes: 0, maximumCanvases: 0 };
     resources.replaceLimits({
       maximumManagedBytes: limits.maximumManagedBytes + gpu.maximumManagedBytes,
@@ -98,7 +107,8 @@ export function createPresentationAdmission(
       assets = next;
     },
     reserveSource(bytes: number, next: PreviewRenderAllocationInput['assets']) {
-      sourceBytes = bytes;
+      const identity = Symbol();
+      sourceFrames.set(identity, bytes);
       assets = next;
       try {
         admit();
@@ -106,11 +116,11 @@ export function createPresentationAdmission(
         return {
           release() {
             reservation.release();
-            sourceBytes = null;
+            sourceFrames.delete(identity);
           },
         };
       } catch (error) {
-        sourceBytes = null;
+        sourceFrames.delete(identity);
         throw error;
       }
     },

@@ -1,6 +1,7 @@
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { createEffectRuntimeSandboxExecutor } from '../../workflows/video/effect-runtime-sandbox';
+import { reviewGpuPreviewConcurrency } from '../../workflows/video-review/gpu-preview';
 import { createReviewPreviewRenderer } from '../../workflows/video-review/render-preview';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import {
@@ -98,6 +99,8 @@ class ManualPresentationSession {
     this.scheduler = createReviewPreviewPresentation({
       ...createReviewPresentationPaintClock(),
       allowPreparedPlayingFrames: true,
+      maximumInFlight: (description) =>
+        description.renderer === 'legacy' ? 1 : reviewGpuPreviewConcurrency(description.scene),
       now: () => performance.now(),
       sampleTime: this.sampleTime,
       prepare: this.prepare,
@@ -147,6 +150,7 @@ class ManualPresentationSession {
     return createReviewPreviewRenderer({
       resources,
       renderer: this.rendererPreference,
+      maximumInFlight: this.rendererPreference === 'gpu' ? 2 : 1,
       annotationExecutor: () =>
         createEffectRuntimeSandboxExecutor(
           this.rendererPreference === 'gpu' ? { compositionBackend: 'gpu-preview' } : {}

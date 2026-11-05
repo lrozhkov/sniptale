@@ -161,7 +161,11 @@ export function reviewPresentedStageProjection(
 }
 
 /** Conservative explicit raster/texture estimate, admitted before the GPU owner allocates. */
-export function reviewGpuPreviewAllocation(scene: PreviewScene, dimensions: Dimensions) {
+export function reviewGpuPreviewAllocation(
+  scene: PreviewScene,
+  dimensions: Dimensions,
+  maximumInFlight: 1 | 2 = 1
+) {
   const base = computeQuickEditSceneLayout({
     ...scene,
     output: dimensions.canonical,
@@ -194,11 +198,12 @@ export function reviewGpuPreviewAllocation(scene: PreviewScene, dimensions: Dime
   const retainedRasterBytes = decor.width * decor.height * 4 + outputBytes * 2;
   return {
     maximumManagedBytes:
-      retainedRasterBytes * 2 +
-      annotationBytes +
-      256 * 1024 * 1024 +
-      dimensions.canonical.width * dimensions.canonical.height * 4 * 24 +
-      GPU_PREVIEW_UNIFORM_BYTES * 512,
-    maximumCanvases: 48 + (hasAnnotations ? 2 : 0),
+      maximumInFlight *
+      (retainedRasterBytes * 2 +
+        annotationBytes +
+        256 * 1024 * 1024 +
+        dimensions.canonical.width * dimensions.canonical.height * 4 * 24 +
+        GPU_PREVIEW_UNIFORM_BYTES * 512),
+    maximumCanvases: maximumInFlight * (48 + (hasAnnotations ? 2 : 0)),
   };
 }

@@ -554,3 +554,19 @@ it('uses prepared playing RAF admission but keeps retry, visibility and latest s
   expect(io.render).toHaveBeenCalledTimes(4);
   expect(io.prepare.mock.lastCall![0].comments[0].resolvedText).toBe('latest scene');
 });
+
+it('keeps the GPU session when a scene enters or leaves overlap eligibility', async () => {
+  await render();
+  await step(0);
+  expect(io.factory).toHaveBeenCalledOnce();
+  expect(io.factory.mock.calls[0]![0]).toMatchObject({ maximumInFlight: 2 });
+  const comments = props.scene.comments;
+  props = { ...props, scene: { ...props.scene, comments: [] } };
+  await render();
+  await step(40);
+  expect(io.factory).toHaveBeenCalledOnce();
+  props = { ...props, scene: { ...props.scene, comments } };
+  await render();
+  await step(80);
+  expect(io.factory).toHaveBeenCalledOnce();
+});

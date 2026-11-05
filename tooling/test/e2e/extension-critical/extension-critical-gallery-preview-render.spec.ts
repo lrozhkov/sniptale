@@ -11,7 +11,7 @@ test('prepared preview matches the existing export composition with every visibl
     format: 'esm',
     platform: 'browser',
     write: false,
-    loader: { '.svg': 'text', '.woff2': 'dataurl' },
+    loader: { '.svg': 'text', '.woff2': 'dataurl', '.bin': 'dataurl' },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const results = await page.evaluate(async (text) => {

@@ -13,7 +13,8 @@ export function deferred<T>() {
 export function graphics() {
   const lost = deferred<{ message: string }>();
   const bitmap = { close: vi.fn(), width: 64, height: 36 };
-  const transfer = vi.fn(() => bitmap);
+  const bitmaps = [bitmap];
+  const transfer = vi.fn((index = 0) => bitmaps[index]!);
   let textureSequence = 0;
   const commands: string[] = [];
   const texture = (width: number, height: number) => {
@@ -41,6 +42,7 @@ export function graphics() {
     unconfigure: vi.fn(),
     getCurrentTexture: vi.fn(() => texture(64, 36)),
   };
+  const contexts = [context];
   const queue = {
     copyExternalImageToTexture: vi.fn(),
     writeBuffer: vi.fn(),
@@ -66,7 +68,7 @@ export function graphics() {
       ({ size }: { size: number[]; mipLevelCount?: number; format?: GPUTextureFormat }) =>
         texture(size[0] ?? 0, size[1] ?? 0)
     ),
-    importExternalTexture: vi.fn(() => ({})),
+    importExternalTexture: vi.fn((_descriptor: GPUExternalTextureDescriptor) => ({})),
     createBindGroup: vi.fn((_descriptor: GPUBindGroupDescriptor) => ({})),
     createCommandEncoder: vi.fn(() => ({
       beginRenderPass: vi.fn((_descriptor: GPURenderPassDescriptor) => {
@@ -93,18 +95,33 @@ export function graphics() {
   vi.stubGlobal('navigator', { gpu });
   vi.stubGlobal('GPUTextureUsage', { TEXTURE_BINDING: 1, COPY_DST: 2, RENDER_ATTACHMENT: 4 });
   vi.stubGlobal('GPUBufferUsage', { UNIFORM: 1, COPY_DST: 2 });
+  let surfaces = 0;
   vi.stubGlobal(
     'OffscreenCanvas',
     class {
       constructor(
         public width: number,
         public height: number
-      ) {}
+      ) {
+        this.index = surfaces++;
+        if (this.index > 0) {
+          bitmaps.push({ close: vi.fn(), width: 64, height: 36 });
+          contexts.push({
+            configure: vi.fn(),
+            unconfigure: vi.fn(),
+            getCurrentTexture: vi.fn(() => texture(64, 36)),
+          });
+        }
+      }
+      private index: number;
       getContext() {
-        return context;
+        return contexts[this.index];
       }
       transferToImageBitmap() {
-        return transfer();
+        const bitmap = bitmaps[this.index]!;
+        bitmap.width = this.width;
+        bitmap.height = this.height;
+        return this.index === 0 ? transfer() : transfer(this.index);
       }
     }
   );
@@ -116,5 +133,19 @@ export function graphics() {
     }
   );
   const reserve = vi.fn((_bytes: number) => ({ release: vi.fn() }));
-  return { gpu, adapter, device, queue, pass, context, transfer, bitmap, lost, reserve, commands };
+  return {
+    gpu,
+    adapter,
+    device,
+    queue,
+    pass,
+    context,
+    contexts,
+    transfer,
+    bitmap,
+    bitmaps,
+    lost,
+    reserve,
+    commands,
+  };
 }

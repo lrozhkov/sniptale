@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { createReviewGpuPreview } from './gpu-preview';
+import { createReviewGpuPreview, reviewGpuPreviewConcurrency } from './gpu-preview';
 import {
   reviewPresentedGeometry,
   reviewPresentedStageProjection,
@@ -18,6 +18,12 @@ import {
   computeQuickEditWindowTransform,
 } from '../../features/video/review/advanced/scene';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
+import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
+import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 
 const io = vi.hoisted(() => ({ create: vi.fn(), render: vi.fn(), dispose: vi.fn() }));
 vi.mock('../../features/video/composition/canvas/gpu-preview', async (original) => ({
@@ -35,7 +41,7 @@ const scene: PreviewScene = {
 };
 const dimensions = { canonical: { width: 640, height: 360 }, backing: { width: 320, height: 180 } };
 
-function fixture() {
+function fixture(maximumInFlight: 1 | 2 = 1) {
   const released = vi.fn();
   const ctx = () => ({
     translate: vi.fn(),
@@ -57,7 +63,11 @@ function fixture() {
   const bitmap = { close: vi.fn() };
   io.render.mockResolvedValue(bitmap);
   io.create.mockResolvedValue({ render: io.render, dispose: io.dispose, allocatedBytes: 0 });
-  const owner = createReviewGpuPreview({ resources, reserve: resources.bytes.bind(null, 'gpu') });
+  const owner = createReviewGpuPreview({
+    resources,
+    reserve: resources.bytes.bind(null, 'gpu'),
+    maximumInFlight,
+  });
   const frame = { close: vi.fn(), copyTo: vi.fn() } as unknown as VideoFrame;
   const context = ctx();
   const input = {
@@ -81,6 +91,231 @@ function fixture() {
   };
   return { owner, input, bitmap, frame, context, allocate, released, resources };
 }
+
+it.each(['scene', 'dispose', 'device'] as const)(
+  'retains shared artwork until both requests retire after %s',
+  async (reason) => {
+    const f = fixture(2);
+    const first = Promise.withResolvers<typeof f.bitmap>();
+    const second = Promise.withResolvers<typeof f.bitmap>();
+    const entered = Promise.withResolvers<void>();
+    io.render
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => {
+        entered.resolve();
+        return second.promise;
+      });
+    const a = f.owner.render(f.input);
+    const b = f.owner.render({
+      ...f.input,
+      context: { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D,
+    });
+    await entered.promise;
+    expect(io.create).toHaveBeenCalledWith(expect.objectContaining({ maximumInFlight: 2 }));
+    if (reason === 'scene') f.owner.releaseScene();
+    if (reason === 'dispose') f.owner.dispose();
+    const aProof =
+      reason === 'device'
+        ? expect(a).resolves.toBe(false)
+        : expect(a).rejects.toMatchObject({ name: 'AbortError' });
+    if (reason === 'device') first.reject(new GpuPreviewDeviceError('Device lost'));
+    else first.resolve(f.bitmap);
+    await aProof;
+    expect(f.released).not.toHaveBeenCalled();
+    const bProof =
+      reason === 'device'
+        ? expect(b).resolves.toBe(false)
+        : expect(b).rejects.toMatchObject({ name: 'AbortError' });
+    second.resolve(f.bitmap);
+    await bProof;
+    expect(f.released).toHaveBeenCalledTimes(3);
+    expect(f.context.drawImage).not.toHaveBeenCalled();
+    f.owner.dispose();
+  }
+);
+
+it('admits an identity outer plan but excludes actual visual envelope, bookends, joins and content', () => {
+  const planned = planReviewPresentationSequence({
+    settings: createNeutralPresentationSettings(),
+    mainDuration: 4,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 30, denominator: 1 },
+  });
+  if (!planned.ok) throw new Error('Expected identity plan');
+  const outerFadePlan = planned.plan;
+  expect(reviewGpuPreviewConcurrency({ ...scene, outerFadePlan })).toBe(2);
+  expect(
+    reviewGpuPreviewConcurrency({
+      ...scene,
+      outerFadePlan: {
+        ...outerFadePlan,
+        visualEnvelope: { ...outerFadePlan.visualEnvelope, fadeIn: 0.2 },
+      },
+    })
+  ).toBe(1);
+  expect(
+    reviewGpuPreviewConcurrency({
+      ...scene,
+      outerFadePlan: {
+        ...outerFadePlan,
+        segments: outerFadePlan.segments.map((segment) => ({
+          ...segment,
+          name: 'intro',
+          content: { kind: 'image', assetId: 'asset' },
+        })),
+      },
+    })
+  ).toBe(1);
+  expect(
+    reviewGpuPreviewConcurrency({
+      ...scene,
+      outerFadePlan: {
+        ...outerFadePlan,
+        joins: [
+          {
+            type: 'dissolve',
+            color: '#000000ff',
+            seamUs: 1000000,
+            beforeUs: 100000,
+            afterUs: 100000,
+            outgoingTick: 29,
+            incomingTick: 30,
+          },
+        ],
+      },
+    })
+  ).toBe(1);
+  expect(
+    reviewGpuPreviewConcurrency({
+      ...scene,
+      zoomRegions: [createQuickEditZoomRegion({ id: 'zoom', at: 0, duration: 4 })],
+    })
+  ).toBe(1);
+  const watermark = createQuickEditWatermark('text');
+  expect(reviewGpuPreviewConcurrency({ ...scene, watermark: { ...watermark, mode: 'none' } })).toBe(
+    2
+  );
+  expect(reviewGpuPreviewConcurrency({ ...scene, watermark: { ...watermark, mode: 'text' } })).toBe(
+    1
+  );
+  const captions = {
+    document: undefined,
+    segments: [],
+    settings: {
+      enabled: true,
+      style: {
+        position: 'bottom' as const,
+        fontSize: 0.04,
+        color: '#ffffffff',
+        background: '#000000ff',
+      },
+    },
+  };
+  expect(reviewGpuPreviewConcurrency({ ...scene, captions })).toBe(1);
+  expect(
+    reviewGpuPreviewConcurrency({
+      ...scene,
+      captions: { ...captions, settings: { ...captions.settings, enabled: false } },
+    })
+  ).toBe(2);
+  const annotationEffects: NonNullable<PreviewScene['annotationEffects']> = {
+    lane: {
+      enabled: true,
+      instances: [
+        {
+          id: 'effect',
+          snapshotId: 'snapshot',
+          enabled: true,
+          start: 0,
+          end: 4,
+          attachment: 'viewport',
+          transform: { x: 0.1, y: 0.1, width: 0.2, height: 0.2, rotation: 0 },
+          controls: {},
+          order: 0,
+        },
+      ],
+    },
+    snapshots: [],
+    segments: [],
+  };
+  expect(reviewGpuPreviewConcurrency({ ...scene, annotationEffects })).toBe(1);
+  expect(
+    reviewGpuPreviewConcurrency({
+      ...scene,
+      annotationEffects: {
+        ...annotationEffects,
+        lane: { ...annotationEffects.lane, enabled: false },
+      },
+    })
+  ).toBe(2);
+  const webcam = createQuickEditWebcam('camera', scene.source, scene.source);
+  expect(reviewGpuPreviewConcurrency({ ...scene, webcam })).toBe(1);
+  expect(reviewGpuPreviewConcurrency({ ...scene, webcam: { ...webcam, enabled: false } })).toBe(2);
+});
+
+it.each([1, 2] as const)(
+  'enforces capacity %s and keeps each completed bitmap with its own output',
+  async (maximumInFlight) => {
+    const f = fixture(maximumInFlight),
+      first = Promise.withResolvers<typeof f.bitmap>(),
+      entered = Promise.withResolvers<void>();
+    io.render.mockImplementationOnce(() => {
+      entered.resolve();
+      return first.promise;
+    });
+    const a = f.owner.render(f.input);
+    await entered.promise;
+    const secondContext = { drawImage: vi.fn() };
+    let b: Promise<boolean> | undefined;
+    if (maximumInFlight === 2)
+      b = f.owner.render({
+        ...f.input,
+        context: secondContext as unknown as CanvasRenderingContext2D,
+      });
+    const refused = f.owner.render(f.input);
+    await expect(refused).rejects.toThrow('overlap');
+    first.resolve(f.bitmap);
+    expect(await a).toBe(true);
+    if (b) {
+      expect(await b).toBe(true);
+      expect(secondContext.drawImage).toHaveBeenCalledWith(f.bitmap, 0, 0);
+    }
+    f.owner.dispose();
+    expect(f.released).toHaveBeenCalledTimes(3);
+  }
+);
+
+it('admits only bare scenes for overlap and keeps unsafe requests out of live artwork', async () => {
+  expect(reviewGpuPreviewConcurrency(scene)).toBe(2);
+  expect(
+    reviewGpuPreviewConcurrency({
+      ...scene,
+      background: updateQuickEditBackground(scene.background, { enabled: true }),
+    })
+  ).toBe(1);
+  expect(reviewGpuPreviewConcurrency({ ...scene, windowHeader: DEFAULT_WINDOW_HEADER })).toBe(1);
+  const f = fixture(2),
+    completion = Promise.withResolvers<typeof f.bitmap>(),
+    entered = Promise.withResolvers<void>();
+  io.render.mockImplementationOnce(() => {
+    entered.resolve();
+    return completion.promise;
+  });
+  const pending = f.owner.render(f.input);
+  await entered.promise;
+  await expect(f.owner.render({ ...f.input, scene: { ...scene } })).rejects.toThrow('overlap');
+  await expect(f.owner.render({ ...f.input, dimensions: { ...dimensions } })).rejects.toThrow(
+    'overlap'
+  );
+  await expect(
+    f.owner.render({ ...f.input, cameraOverride: { scale: 1, centerX: 0.5, centerY: 0.5 } })
+  ).rejects.toThrow('overlap');
+  expect(f.allocate).toHaveBeenCalledTimes(3);
+  completion.resolve(f.bitmap);
+  await pending;
+  f.owner.dispose();
+});
 
 it('borrows the unmodified frame through GPU completion and closes only the completed bitmap', async () => {
   const f = fixture();

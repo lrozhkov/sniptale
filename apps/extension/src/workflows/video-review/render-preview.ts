@@ -1,5 +1,5 @@
 import { planReviewExportSource } from './export-source-plan';
-import { createReviewGpuPreview } from './gpu-preview';
+import { createReviewGpuPreview, reviewGpuPreviewConcurrency } from './gpu-preview';
 import {
   reviewGpuPreviewAllocation,
   reviewPresentedGeometry,
@@ -142,6 +142,7 @@ type Allocation = {
   replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }): void;
 };
 type Assets = {
+  maximumInFlight: 1 | 2;
   renderer: VideoPreviewRenderer;
   onContextLost: (() => void) | undefined;
   gpu: ReturnType<typeof createReviewGpuPreview> | null;
@@ -499,9 +500,13 @@ async function drawPreparedFrame(
       header: assets.header,
       image: assets.background,
       painter: assets.painter,
-      captions: assets.captions,
-      annotations: assets.annotations,
-      watermark: assets.watermark,
+      captions: scene.captions?.settings?.enabled ? assets.captions : null,
+      annotations:
+        scene.annotationEffects?.lane.enabled &&
+        scene.annotationEffects.lane.instances.some((instance) => instance.enabled)
+          ? assets.annotations
+          : null,
+      watermark: scene.watermark && scene.watermark.mode !== 'none' ? assets.watermark : null,
       fps: frame.fps ?? 30,
       ...(frame.camera ? { camera: frame.camera } : {}),
       ...(frame.cameraTransform ? { cameraOverride: frame.cameraTransform } : {}),
@@ -766,7 +771,11 @@ function admitRender(
   const previousCache = assets.painter.retainedCacheSize;
   const base = {
     ...input,
-    publication: { ...input.publication, backing: prepared.dimensions.backing },
+    publication: {
+      ...input.publication,
+      backing: prepared.dimensions.backing,
+      maximumInFlight: assets.maximumInFlight,
+    },
     assets: assets.allocation,
     background: input.background ? { ...input.background, previousCache } : null,
     scene: {
@@ -872,7 +881,7 @@ function admitRender(
     !frame?.exportEnhancer &&
     typeof navigator !== 'undefined' &&
     navigator.gpu
-      ? reviewGpuPreviewAllocation(prepared.scene, prepared.dimensions)
+      ? reviewGpuPreviewAllocation(prepared.scene, prepared.dimensions, assets.maximumInFlight)
       : { maximumManagedBytes: 0, maximumCanvases: 0 };
   allocation.replaceLimits({
     // Caption refresh retains the scene resources while borrowing one 1×1 measurement canvas.
@@ -892,6 +901,7 @@ const needsSpatialRenderer = (scene: Scene) =>
 
 /** Owns prepared scenes and one session GPU; callers retain capture and publication. */
 export function createReviewPreviewRenderer(args: {
+  maximumInFlight?: 1 | 2;
   renderer?: VideoPreviewRenderer;
   resources: RenderResources;
   exportEnhancer?: ExportEnhancer;
@@ -911,7 +921,7 @@ export function createReviewPreviewRenderer(args: {
   } | null = null;
   let preparation: AbortController | null = null;
   let captionRefresh: AbortController | null = null;
-  let rendering = false;
+  let rendering = 0;
   let gpu: ReturnType<typeof createReviewGpuPreview> | null = null;
   const leases = new Set<Prepared>();
   const clear = () => {
@@ -1026,8 +1036,10 @@ export function createReviewPreviewRenderer(args: {
         gpu = createReviewGpuPreview({
           resources: args.resources,
           reserve: (bytes) => args.resources.bytes('preview-gpu', bytes),
+          maximumInFlight: args.maximumInFlight ?? 1,
         });
       const assets: Assets = {
+        maximumInFlight: args.maximumInFlight ?? 1,
         renderer: args.exportEnhancer ? 'legacy' : (args.renderer ?? 'gpu'),
         onContextLost: args.onContextLost,
         gpu: useGpu ? gpu : null,
@@ -1115,7 +1127,17 @@ export function createReviewPreviewRenderer(args: {
       );
     },
     async render(prepared: Prepared, frame: Frame, signal?: AbortSignal) {
-      if (rendering) throw new Error('Preview frame is already admitted.');
+      const capacity =
+        current?.assets.renderer === 'gpu' &&
+        !frame.recordingHistory &&
+        !frame.exportEnhancer &&
+        !frame.camera &&
+        !frame.cameraTransform &&
+        !frame.transition &&
+        reviewGpuPreviewConcurrency(current.prepared.scene) === 2
+          ? (args.maximumInFlight ?? 1)
+          : 1;
+      if (rendering >= capacity) throw new Error('Preview frame is already admitted.');
       if (disposed || !leases.has(prepared) || current?.prepared.generation !== prepared.generation)
         throw new Error('Preview scene is stale.');
       if (![frame.source.timestamp, frame.sourceTime, frame.resultTime].every(Number.isFinite))
@@ -1138,7 +1160,7 @@ export function createReviewPreviewRenderer(args: {
         current.prepared.dimensions.backing,
         { alpha: false }
       );
-      rendering = true;
+      rendering++;
       try {
         const presentation = await drawPreparedFrame(
           captured.prepared,
@@ -1187,7 +1209,7 @@ export function createReviewPreviewRenderer(args: {
         output.release();
         throw failure;
       } finally {
-        rendering = false;
+        rendering--;
       }
     },
     dispose() {
