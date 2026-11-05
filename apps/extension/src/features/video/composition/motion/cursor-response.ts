@@ -117,6 +117,26 @@ function evaluateRun(run: ResponseRun, time: number): Jet {
   return evaluatePiece(run.pieces[Math.max(0, low - 1)]!, time, run.omega);
 }
 
+function anticipationClock(start: number, time: number, lookahead: number) {
+  const progress = lookahead > 0 ? Math.max(0, Math.min(1, (time - start) / lookahead)) : 1;
+  return time + lookahead * progress ** 3 * (10 - 15 * progress + 6 * progress ** 2);
+}
+
+function responseKnotTime(run: ResponseRun, sourceTime: number, lookahead: number) {
+  if (lookahead <= 0) return sourceTime - lookahead;
+  if (sourceTime <= run.start) return sourceTime;
+  if (sourceTime >= run.start + 2 * lookahead) return sourceTime - lookahead;
+  // The startup clock is strictly increasing; retain source knots in presentation time.
+  let low = run.start,
+    high = run.start + lookahead;
+  for (let iteration = 0; iteration < 40; iteration++) {
+    const middle = (low + high) / 2;
+    if (anticipationClock(run.start, middle, lookahead) < sourceTime) low = middle;
+    else high = middle;
+  }
+  return (low + high) / 2;
+}
+
 function fitResponseRun(
   run: ResponseRun,
   start: number,
@@ -124,7 +144,25 @@ function fitResponseRun(
   lookahead: number,
   spans: CameraTrajectory[]
 ) {
-  const at = (time: number) => evaluateRun(run, Math.max(run.start, time + lookahead));
+  const at = (time: number): Jet => {
+    // A fresh capture run must not begin at a future filtered position.
+    const progress = lookahead > 0 ? Math.max(0, Math.min(1, (time - run.start) / lookahead)) : 1;
+    const rate = 1 + 30 * progress ** 2 * (1 - progress) ** 2;
+    const acceleration =
+      lookahead > 0 ? (60 * progress * (1 - progress) * (1 - 2 * progress)) / lookahead : 0;
+    const sample = evaluateRun(
+      run,
+      Math.max(run.start, anticipationClock(run.start, time, lookahead))
+    );
+    return {
+      position: sample.position,
+      velocity: { x: sample.velocity.x * rate, y: sample.velocity.y * rate },
+      acceleration: {
+        x: sample.acceleration.x * rate ** 2 + sample.velocity.x * acceleration,
+        y: sample.acceleration.y * rate ** 2 + sample.velocity.y * acceleration,
+      },
+    };
+  };
   const from = at(start),
     to = at(end);
   const trajectory = createCameraTrajectory({
@@ -138,15 +176,17 @@ function fitResponseRun(
     toAcceleration: to.acceleration,
   });
   const checks = [start + (end - start) * 0.25, (start + end) / 2, start + (end - start) * 0.75];
+  if (run.start + lookahead > start && run.start + lookahead < end)
+    checks.push(run.start + lookahead);
   let low = 0,
     high = run.knots.length;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    if (run.knots[middle]! - lookahead <= start) low = middle + 1;
+    if (run.knots[middle]! <= anticipationClock(run.start, start, lookahead)) low = middle + 1;
     else high = middle;
   }
   for (let index = low; index < run.knots.length; index++) {
-    const time = run.knots[index]! - lookahead;
+    const time = responseKnotTime(run, run.knots[index]!, lookahead);
     if (time >= end) break;
     checks.push(time);
   }

@@ -318,6 +318,38 @@ it('retains visible position-driven rocking and fixed direction poses after the 
   }
 });
 
+it.each([0, 0.6])(
+  'does not add future motion to a nearly stationary capture boundary (%s)',
+  (smoothness) => {
+    const boundary = 16.860109;
+    const plan = createCursorOrientationPlan({
+      settings: { mode: 'orbit', amount: 0.5, smoothness },
+      start: 7.242071458152165,
+      end: 21.596838724351592,
+      observations: [
+        { time: 15.594109, x: 665 / 2560, y: 608 / 1440, segmentId: 'before' },
+        { time: boundary, x: 665 / 2560, y: 607 / 1440, segmentId: 'before' },
+        { time: boundary, x: 666 / 2560, y: 605 / 1440, segmentId: 'after' },
+        { time: 16.922109, x: 685 / 2560, y: 575 / 1440, segmentId: 'after' },
+        { time: 16.953109, x: 700 / 2560, y: 550 / 1440, segmentId: 'after' },
+        { time: 17.110109, x: 786 / 2560, y: 439 / 1440, segmentId: 'after' },
+      ],
+    });
+    const left = evaluateCursorOrientation(plan, boundary - 0.000001);
+    const right = evaluateCursorOrientation(plan, boundary);
+    const capturedStep = Math.hypot((24 * 2) / 1440, 44 / 2560);
+    const precedingLag = Math.hypot(
+      left.x - (-4 + 24 * (607 / 1440 - 0.5)),
+      left.y - -44 * (665 / 2560 - 0.5)
+    );
+    // Retain the preceding run's filtered lag; the new run adds no future displacement.
+    expect(Math.hypot(right.x - left.x, right.y - left.y)).toBeLessThanOrEqual(
+      capturedStep + precedingLag + 0.000001
+    );
+    expect(right).toEqual({ x: -4 + 24 * (605 / 1440 - 0.5), y: -44 * (666 / 2560 - 0.5) });
+  }
+);
+
 it('selects the rendered right-hand polynomial for an exact discontinuous capture cut', () => {
   const plan = createCursorOrientationPlan({
     settings,

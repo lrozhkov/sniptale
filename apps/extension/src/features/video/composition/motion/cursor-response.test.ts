@@ -19,10 +19,12 @@ it('fits the analytic critically damped ramp with position, velocity and acceler
   expect(spans.length).toBeLessThan(12);
   for (let index = 0; index <= 300; index++) {
     const time = index / 200,
-      t = time + 0.25,
+      progress = Math.min(1, time / 0.25),
+      t = time + 0.25 * progress ** 3 * (10 - 15 * progress + 6 * progress ** 2),
       decay = Math.exp(-omega * t);
     const exact = slope * (t - 2 / omega + (t + 2 / omega) * decay);
-    const velocity = slope * (1 - (1 + omega * t) * decay);
+    const velocity =
+      slope * (1 - (1 + omega * t) * decay) * (1 + 30 * progress ** 2 * (1 - progress) ** 2);
     const span = spans.findLast((span) => span.start <= time)!;
     expect(Math.abs(evaluateCameraTrajectory(span, time).x - exact)).toBeLessThanOrEqual(0.05);
     expect(
@@ -37,6 +39,48 @@ it('fits the analytic critically damped ramp with position, velocity and acceler
         evaluateCameraTrajectoryDerivative(spans[index]!, spans[index]!.start, order).x,
         8
       );
+});
+
+it('fits an early capture pulse through the changing anticipation clock', () => {
+  const omega = 5;
+  const ramp = (time: number) => {
+    if (time <= 0) return 0;
+    return time - 2 / omega + (time + 2 / omega) * Math.exp(-omega * time);
+  };
+  const rampVelocity = (time: number) =>
+    time <= 0 ? 0 : 1 - (1 + omega * time) * Math.exp(-omega * time);
+  const spans = compileCursorResponse(
+    createCursorResponse(
+      [
+        { time: 0, x: 0, y: 0 },
+        { time: 0.04, x: 0, y: 0 },
+        { time: 0.05, x: 22, y: 0 },
+        { time: 0.06, x: 0, y: 0 },
+        { time: 1, x: 0, y: 0 },
+      ],
+      omega
+    ),
+    0,
+    1
+  );
+  for (let index = 0; index <= 1000; index++) {
+    const time = index / 1000;
+    const progress = Math.min(1, time / 0.25);
+    const sourceTime = time + 0.25 * progress ** 3 * (10 - 15 * progress + 6 * progress ** 2);
+    const exact =
+      2200 * (ramp(sourceTime - 0.04) - 2 * ramp(sourceTime - 0.05) + ramp(sourceTime - 0.06));
+    const span = spans.findLast((span) => span.start <= time)!;
+    expect(Math.abs(evaluateCameraTrajectory(span, time).x - exact)).toBeLessThanOrEqual(0.05);
+    const velocity =
+      2200 *
+      (rampVelocity(sourceTime - 0.04) -
+        2 * rampVelocity(sourceTime - 0.05) +
+        rampVelocity(sourceTime - 0.06)) *
+      (1 + 30 * progress ** 2 * (1 - progress) ** 2);
+    expect(
+      Math.abs(evaluateCameraTrajectoryDerivative(span, time, 1).x - velocity)
+    ).toBeLessThanOrEqual(0.2);
+  }
 });
 
 it('keeps anticipation inside a capture run and resets history at the exact next run', () => {
@@ -59,6 +103,33 @@ it('keeps anticipation inside a capture run and resets history at the exact next
   expect(at(1)).toEqual({ x: -20, y: 8 });
   expect(at(2)).toEqual({ x: -20, y: 8 });
   expect(spans).toHaveLength(2);
+});
+
+it('warms anticipation only inside the new run and retains causal evaluation with no lookahead', () => {
+  const response = createCursorResponse(
+    [
+      { time: 0, x: 10, y: -4, segmentId: 'before' },
+      { time: 1, x: 10, y: -4, segmentId: 'before' },
+      { time: 2, x: -20, y: 8, segmentId: 'after' },
+      { time: 3, x: 20, y: 8, segmentId: 'after' },
+    ],
+    5
+  );
+  const anticipated = compileCursorResponse(response, 0, 3);
+  const causal = compileCursorResponse(response, 0, 3, 0);
+  const at = (spans: typeof anticipated, time: number) =>
+    evaluateCameraTrajectory(
+      spans.findLast((span) => span.start <= time)!,
+      time
+    );
+  expect(at(anticipated, 1.999)).toEqual({ x: 10, y: -4 });
+  expect(at(anticipated, 2)).toEqual({ x: -20, y: 8 });
+  expect(at(causal, 2)).toEqual({ x: -20, y: 8 });
+  expect(at(anticipated, 2.1).x).toBeGreaterThan(at(causal, 2.1).x);
+  expect(at(anticipated, 2.25).x).toBeCloseTo(at(causal, 2.5).x, 1);
+  expect([2.25, 2, 1.999].map((time) => at(anticipated, time))).toEqual(
+    [1.999, 2, 2.25].map((time) => at(anticipated, time)).toReversed()
+  );
 });
 
 it('preserves a fast reversal with sparse quintics and settles at the held target', () => {
