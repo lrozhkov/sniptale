@@ -52,7 +52,7 @@ vi.mock('../transport/client', async (importOriginal) => ({
 
 vi.mock('../../toolbar/video-recording/drawing-session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../toolbar/video-recording/drawing-session')>()),
-  createRecordingDrawingOwner: () => ({
+  createRecordingSurfaceDrawingOwner: () => ({
     controller: { session: { clear: mocks.drawingClear } },
     dispose: mocks.disposeDrawing,
     getAutoHideDelay: mocks.getAutoHideDelay,

@@ -24,6 +24,7 @@ const RESOURCE_SOURCE_KEYS = new Set([
   'href',
   'xlink:href',
   'backgroundImageData',
+  'sniptaleSimplifySourceData',
 ]);
 const POSITIVE_DIMENSION_KEYS = new Set(['fontSize', 'height', 'width']);
 const NON_NEGATIVE_DIMENSION_KEYS = new Set([

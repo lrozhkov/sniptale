@@ -14,7 +14,7 @@ import {
 import { translate } from '../../../platform/i18n';
 import { useEditorEmbedContext } from '../../application/embed-context/context';
 import { useEditorStore } from '../../state/useEditorStore';
-import { getToolLabel } from '../../chrome/tool-icons';
+import { TOOL_ICONS, getToolLabel } from '../../chrome/tool-icons';
 import {
   initializeFrameAnnotationCreationDefaults,
   setFrameAnnotationCreationDefaults,
@@ -42,11 +42,13 @@ const DRAWING_TOOL_ORDER: readonly EditorTool[] = [
   'text',
   'shape',
   'arrow',
+  'simplify',
   'blur',
 ];
 
 const EDITOR_TOOL_DESCRIPTOR_KIND_BY_TOOL = {
   arrow: 'arrow',
+  simplify: 'image',
   blur: 'blur',
   crop: 'shape',
   marker: 'highlighter',
@@ -160,6 +162,7 @@ function buildEditorToolActions(props: {
       group: props.group,
       id: tool,
       kind: EDITOR_TOOL_DESCRIPTOR_KIND_BY_TOOL[tool],
+      ...(tool === 'simplify' ? { icon: TOOL_ICONS.simplify } : {}),
       label: getDocumentRequiredTitle(getEditorToolTitle(tool), props.hasImage),
       onSelect: () => {
         if (props.isToolButtonActive(tool) && isDrawingOptionsTool(tool)) {
@@ -178,6 +181,7 @@ function isDrawingOptionsTool(tool: EditorTool): boolean {
     tool === 'marker' ||
     tool === 'shape' ||
     tool === 'arrow' ||
+    tool === 'simplify' ||
     tool === 'blur' ||
     tool === 'text'
   );

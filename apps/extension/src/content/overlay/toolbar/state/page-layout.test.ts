@@ -216,3 +216,12 @@ it('orders toolbar defaults reset between independent visibility writers', async
     vi.resetModules();
   }
 });
+
+it('places Simplify after Blur in fresh and saved drawing layouts', () => {
+  const canonical = getPageToolbarLayout('drawing');
+  expect(canonical.indexOf('drawing-simplify')).toBe(canonical.indexOf('drawing-blur') + 1);
+  const saved = canonical.filter((item) => item !== 'drawing-simplify');
+  const upgraded = getPageToolbarLayout('drawing', saved);
+  expect(upgraded.indexOf('drawing-simplify')).toBe(upgraded.indexOf('drawing-blur') + 1);
+  expect(upgraded.filter((item) => item !== 'drawing-simplify')).toEqual(saved);
+});

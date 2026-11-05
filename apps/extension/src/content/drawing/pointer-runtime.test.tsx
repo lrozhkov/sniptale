@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import {
   buildDrawingFreehandArrowLines,
   createDrawingSession,
+  type DrawingObject,
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
@@ -353,4 +354,146 @@ it('does not snap the initial shape creation', () => {
     bounds: { x: 304, y: 204, width: 80, height: 60 },
   });
   scene.dispose();
+});
+
+it('submits a Simplify pointer release to its async owner without committing a draft', () => {
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  Object.defineProperty(HTMLCanvasElement.prototype, 'setPointerCapture', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  const commit = vi.fn(() => true);
+  const session = createDrawingSession({ onDocumentCommit: commit });
+  session.setActiveTool('simplify');
+  const submit = vi.fn<NonNullable<ContentDrawingController['simplify']>['submit']>(
+    async () => undefined
+  );
+  const controller: ContentDrawingController = {
+    session,
+    applyPalette: vi.fn(),
+    finalizeInteraction: vi.fn(),
+    getPalette: () => ['#123456'],
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    simplify: {
+      submit,
+      transform: vi.fn(async () => undefined),
+      duplicate: vi.fn(async () => undefined),
+      update: vi.fn(async () => undefined),
+      rebuild: vi.fn(async () => undefined),
+      getPending: () => [],
+      getPendingObjects: () => [],
+      getFeedback: () => null,
+      getRevision: () => 0,
+      subscribe: () => () => undefined,
+      cancel: vi.fn(),
+      dispose: vi.fn(),
+    },
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  const canvas = host.querySelector('canvas')!;
+  for (const [type, x, y] of [
+    ['pointerdown', 10, 20],
+    ['pointermove', 80, 90],
+    ['pointerup', 80, 90],
+  ] as const)
+    act(() => {
+      canvas.dispatchEvent(mousePointerEvent(type, x, y));
+    });
+  expect(submit).toHaveBeenCalledOnce();
+  expect(submit.mock.calls[0]?.[0]).toMatchObject({
+    kind: 'simplify',
+    bounds: { x: 10, y: 20, width: 70, height: 70 },
+  });
+  expect(submit.mock.calls[0]?.[1]).toBeInstanceOf(Event);
+  expect(commit).not.toHaveBeenCalled();
+  expect(session.getSnapshot().document.objects).toHaveLength(0);
+  act(() => root.unmount());
+  session.dispose();
+});
+
+it('keeps a pending mask at its released geometry and hides handles without changing history', () => {
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const original = {
+    id: 'pending-geometry',
+    kind: 'simplify',
+    bounds: { x: 10, y: 20, width: 40, height: 30 },
+    settings: session.getSnapshot().defaults.simplify,
+    result: { dataUrl: 'data:image/png;base64,result', width: 40, height: 30 },
+  } as const;
+  session.commitObject(original);
+  let pending: readonly DrawingObject[] = [];
+  let revision = 0;
+  const listeners = new Set<() => void>();
+  const controller: ContentDrawingController = {
+    session,
+    applyPalette: vi.fn(),
+    finalizeInteraction: vi.fn(),
+    getPalette: () => [],
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    simplify: {
+      submit: vi.fn(async () => undefined),
+      transform: vi.fn(async () => undefined),
+      duplicate: vi.fn(async () => undefined),
+      update: vi.fn(async () => undefined),
+      rebuild: vi.fn(async () => undefined),
+      getPending: () => [],
+      getPendingObjects: () => pending,
+      getFeedback: () => null,
+      getRevision: () => revision,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      cancel: vi.fn(),
+      dispose: vi.fn(),
+    },
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  act(() => {
+    pending = [{ ...original, bounds: { x: 80, y: 25, width: 90, height: 30 } }];
+    revision++;
+    listeners.forEach((listener) => listener());
+  });
+  const privateHost = host.querySelector<HTMLElement>(
+    '[data-ui="content.drawing.simplify-private"]'
+  )!;
+  expect(privateHost.style.left).toBe('80px');
+  expect(privateHost.style.width).toBe('90px');
+  expect(privateHost.style.backdropFilter).toBe('blur(2px)');
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="content.drawing.selection-chrome"]')?.style.opacity
+  ).toBe('0');
+  expect(session.getCommittedDocument().objects).toEqual([original]);
+  act(() => {
+    pending = [];
+    revision++;
+    listeners.forEach((listener) => listener());
+  });
+  expect(privateHost.style.left).toBe('10px');
+  expect(privateHost.style.width).toBe('40px');
+  act(() => root.unmount());
+  session.dispose();
 });

@@ -1,3 +1,4 @@
+import { requestEditorSimplify } from '../../drawing/simplify-runtime';
 import type { Canvas } from 'fabric';
 import { isTextbox } from '../core/helpers';
 import { applyEditorObjectInteractionControls } from '../document/interaction-controls/apply';
@@ -42,7 +43,9 @@ export function createCompletedDrawWorkflowState(
     completion.object.enterEditing();
   }
   canvas.requestRenderAll();
-  if (completion.completedTool !== 'text') {
+  if (completion.completedTool === 'simplify') {
+    requestEditorSimplify(canvas, completion.object);
+  } else if (completion.completedTool !== 'text') {
     commitHistory();
   }
   syncRuntimeState();

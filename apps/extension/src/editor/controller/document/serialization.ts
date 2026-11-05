@@ -1,6 +1,7 @@
 import type { Canvas, SerializedObjectProps } from 'fabric';
 import { emptyCanvasJson } from '../core/helpers';
 import { CUSTOM_JSON_PROPS, isSourceObject, isUserObject } from '../../document/model';
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
 import { isRichShapeObject } from '../../objects/rich-shape/guards';
 
 const EDITOR_DOCUMENT_JSON_PROPS = [
@@ -15,7 +16,14 @@ export function serializeCanvasObjects(canvas: Canvas | null): string {
   }
   const objects = canvas
     .getObjects()
-    .filter((object) => isUserObject(object) && !isRichShapeObject(object))
+    .filter((object) => {
+      const drawing = readEditorDrawingObject(object);
+      return (
+        isUserObject(object) &&
+        !isRichShapeObject(object) &&
+        (drawing?.kind !== 'simplify' || Boolean(drawing.result))
+      );
+    })
     .map((object): SerializedObjectProps => {
       const serialized = object.toObject([
         ...EDITOR_DOCUMENT_JSON_PROPS,

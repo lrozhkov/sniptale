@@ -43,6 +43,7 @@ const DRAWING_TOOLS: readonly DrawingTool[] = [
   'shape',
   'arrow',
   'blur',
+  'simplify',
 ];
 
 function isDrawingTool(mode: RecordingDrawingInteractionMode): mode is DrawingTool {

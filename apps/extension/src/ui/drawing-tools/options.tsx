@@ -45,7 +45,8 @@ const DRAWING_COLOR_PICKER_CLASS = [
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span]:shrink-0",
 ].join(' ');
 
-function QuickOptionButton(props: {
+/** Renders a compact drawing property choice with the current toolbar theme. */
+export function QuickOptionButton(props: {
   active: boolean;
   children: ReactNode;
   dataUi: string;

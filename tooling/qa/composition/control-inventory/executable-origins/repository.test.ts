@@ -8,6 +8,7 @@ import { collectRepositoryExecutableOrigins } from './repository.mjs';
 
 const EXPECTED_AUTHORITY_TARGET_PAIRS = [
   ['tooling/ci/local.mjs', 'tooling/ci/local-project-bootstrap.mjs'],
+  ['tooling/simplify-lab/index.html', 'tooling/simplify-lab/app.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/proof-wrapper.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/release-wrapper.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/verify-project-toolchain.mjs'],
@@ -54,6 +55,13 @@ describe('repository executable origin projection', () => {
       'tooling/qa/composition/control-inventory/executables/check.test.ts',
     ]);
     expect(projection.eagerCandidates).toEqual([]);
+    expect(projection.origins.filter(({ kind }) => kind === 'browser-module')).toContainEqual({
+      authority: 'tooling/simplify-lab/index.html',
+      id: 'browser-module:tooling/simplify-lab/index.html#target.tooling/simplify-lab/app.mjs',
+      kind: 'browser-module',
+      target: 'tooling/simplify-lab/app.mjs',
+    });
+    expect(projection.registrationAuthorityPaths).toContain('tooling/simplify-lab/index.html');
     expect(projection.registrationAuthorityPaths).toEqual(
       [...new Set(projection.registrationAuthorityPaths)].sort()
     );

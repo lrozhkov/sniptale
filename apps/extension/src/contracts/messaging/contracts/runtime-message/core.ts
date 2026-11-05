@@ -1,3 +1,4 @@
+import type { RuntimeSimplifyRequestByType, RuntimeSimplifyResponseByType } from './simplify.types';
 import type {
   RuntimePageLaunchRequestByType,
   RuntimePageLaunchResponseByType,
@@ -74,7 +75,8 @@ import type { SettingsTransferMessage, SettingsTransferResponse } from '../../..
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
-type RuntimeCoreBaseRequestByType = RuntimePageLaunchRequestByType &
+type RuntimeCoreBaseRequestByType = RuntimeSimplifyRequestByType &
+  RuntimePageLaunchRequestByType &
   RuntimeActionSaveRequestByType &
   RuntimeAiRequestByType &
   RuntimePrivacyErasureRequestByType &
@@ -220,7 +222,8 @@ type RuntimeCoreBaseRequestByType = RuntimePageLaunchRequestByType &
     };
   };
 
-type RuntimeCoreBaseResponseByType = RuntimePageLaunchResponseByType &
+type RuntimeCoreBaseResponseByType = RuntimeSimplifyResponseByType &
+  RuntimePageLaunchResponseByType &
   RuntimeActionSaveResponseByType &
   RuntimeAiResponseByType &
   RuntimePrivacyErasureResponseByType &

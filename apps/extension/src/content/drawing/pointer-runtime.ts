@@ -93,6 +93,57 @@ type DrawingPointerRuntimeOptions = {
   onText: (draft: DrawingTextDraft) => void;
 };
 
+function commitPointerDraft(
+  controller: ContentDrawingController,
+  draft: PointerDraft | null,
+  event?: Event
+): void {
+  if (
+    (draft?.kind === 'move-selection' || draft?.kind === 'rotate-selection') &&
+    draft.objects.some((object) => object.kind === 'simplify')
+  ) {
+    if (draft.objects.some((object, index) => object !== draft.originals[index]))
+      void controller.simplify?.transform(draft.objects);
+  } else if (draft && 'object' in draft && draft.object?.kind === 'simplify') {
+    if (draft.kind === 'create') void controller.simplify?.submit(draft.object, event);
+    else if ('original' in draft && draft.object !== draft.original)
+      void controller.simplify?.transform([draft.object]);
+  } else commitDrawingPointerDraft(controller.session, draft);
+}
+
+function useDrawingPointerCompletion(
+  draftRef: RefObject<PointerDraft | null>,
+  activePointerRef: RefObject<number | null>,
+  touchPointsRef: RefObject<Map<number, DrawingPoint>>,
+  touchCentroidRef: React.MutableRefObject<DrawingPoint | null>,
+  finalizeDraft: (event?: Event) => void,
+  cancelDraft: () => void
+) {
+  const finishPointer = useCallback(
+    (event: ReactPointerEvent<HTMLCanvasElement>) => {
+      if (draftRef.current?.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
+      if (event.pointerType === 'touch') {
+        touchPointsRef.current.delete(event.pointerId);
+        if (touchPointsRef.current.size < 2) touchCentroidRef.current = null;
+      }
+      finalizeDraft(event.nativeEvent);
+    },
+    [activePointerRef, draftRef, finalizeDraft, touchCentroidRef, touchPointsRef]
+  );
+
+  const cancelPointer = useCallback(
+    (event: ReactPointerEvent<HTMLCanvasElement>) => {
+      if (draftRef.current?.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
+      touchPointsRef.current.delete(event.pointerId);
+      touchCentroidRef.current = null;
+      cancelDraft();
+    },
+    [activePointerRef, cancelDraft, draftRef, touchCentroidRef, touchPointsRef]
+  );
+
+  return { finishPointer, cancelPointer };
+}
+
 export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   const { active, controller, root, onCancelText, onText } = args;
   const draftRef = useRef<PointerDraft | null>(null);
@@ -104,6 +155,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   const [draftRevision, setDraftRevision] = useState(0);
   const changed = useCallback(() => setDraftRevision((value) => value + 1), []);
   const cancelDraft = useCallback(() => {
+    controller.simplify?.cancel();
     const draft = draftRef.current;
     if (draft?.kind === 'marquee') controller.session.setSelection(draft.initialSelectionIds);
     draftRef.current = null;
@@ -190,35 +242,26 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     [active, args.alignMoves, changed, controller, root]
   );
 
-  const finalizeDraft = useCallback(() => {
-    commitDrawingPointerDraft(controller.session, draftRef.current);
-    draftRef.current = null;
-    alignmentGuidesRef.current = [];
-    hoverBendRef.current = null;
-    activePointerRef.current = null;
-    changed();
-  }, [changed, controller]);
-
-  const finishPointer = useCallback(
-    (event: ReactPointerEvent<HTMLCanvasElement>) => {
-      if (draftRef.current?.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
-      if (event.pointerType === 'touch') {
-        touchPointsRef.current.delete(event.pointerId);
-        if (touchPointsRef.current.size < 2) touchCentroidRef.current = null;
-      }
-      finalizeDraft();
+  const finalizeDraft = useCallback(
+    (event?: Event) => {
+      const draft = draftRef.current;
+      commitPointerDraft(controller, draft, event);
+      draftRef.current = null;
+      alignmentGuidesRef.current = [];
+      hoverBendRef.current = null;
+      activePointerRef.current = null;
+      changed();
     },
-    [finalizeDraft]
+    [changed, controller]
   );
 
-  const cancelPointer = useCallback(
-    (event: ReactPointerEvent<HTMLCanvasElement>) => {
-      if (draftRef.current?.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
-      touchPointsRef.current.delete(event.pointerId);
-      touchCentroidRef.current = null;
-      cancelDraft();
-    },
-    [cancelDraft]
+  const { finishPointer, cancelPointer } = useDrawingPointerCompletion(
+    draftRef,
+    activePointerRef,
+    touchPointsRef,
+    touchCentroidRef,
+    finalizeDraft,
+    cancelDraft
   );
 
   const cancelLostPointer = useDrawingDraftInterruption(

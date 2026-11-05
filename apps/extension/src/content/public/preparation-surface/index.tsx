@@ -1,3 +1,7 @@
+import { createContentSimplifyDependencies } from '../../drawing/simplify';
+import { getContentRuntimeServices } from '../../application/runtime-services/services';
+import { getDrawingViewportProjection } from '../../drawing/interaction';
+import { resolvePageScrollRoot } from '../../platform/page-scroll';
 import { pagePreparationHistory } from '../../../content/parser/page-preparation/history';
 import { useEffect, useMemo, useRef } from 'react';
 import { useAiPickController } from '../../../content/overlay/ai/pick/controller';
@@ -229,9 +233,9 @@ function usePreparationControllers(
   modeState: ContentAppModeState,
   frameManager: FrameManager,
   ports: PreparationHostPorts,
-  drawingController: ContentDrawingController
+  drawingController: ContentDrawingController,
+  captureAdapter: ReturnType<PreparationHostPorts['createCaptureAdapter']>
 ): PreparationSurfaceControllers {
-  const captureAdapter = usePreparationCaptureAdapter(ports, frameManager);
   const aiController = usePreparationAiController(modeState, ports);
   const scenarioController = usePreparationScenarioController({
     captureAdapter,
@@ -339,13 +343,40 @@ function usePreparationModeState(): ContentAppModeState {
 
 export function PreparationSurface(props: PreparationSurfaceProps) {
   const modeState = usePreparationModeState();
-  const drawingController = useContentDrawingController(pagePreparationHistory);
   const frameManager = usePreparationFrameManager(modeState);
+  const captureAdapter = usePreparationCaptureAdapter(props.ports, frameManager);
+  const captureAdapterRef = useRef(captureAdapter);
+  captureAdapterRef.current = captureAdapter;
+  const simplifyDependencies = useMemo(
+    () =>
+      createContentSimplifyDependencies({
+        services: getContentRuntimeServices(),
+        getBounds: () => {
+          const rect = captureAdapterRef.current.getViewportBounds?.();
+          if (!rect || rect.width <= 0 || rect.height <= 0)
+            throw new Error('Local viewport bounds are unavailable.');
+          const projection = getDrawingViewportProjection(resolvePageScrollRoot());
+          return {
+            x: rect.x + projection.x,
+            y: rect.y + projection.y,
+            width: rect.width,
+            height: rect.height,
+          };
+        },
+        captureViewport: () => captureAdapterRef.current.captureViewport('visible'),
+      }),
+    []
+  );
+  const drawingController = useContentDrawingController(
+    pagePreparationHistory,
+    simplifyDependencies
+  );
   const controllers = usePreparationControllers(
     modeState,
     frameManager,
     props.ports,
-    drawingController
+    drawingController,
+    captureAdapter
   );
   const layout = createPreparationLayoutProjection({
     controllers,

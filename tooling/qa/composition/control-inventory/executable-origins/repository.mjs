@@ -131,6 +131,13 @@ function collectStaticAuthorities(root) {
     path: repositoryPath,
     source: read(root, repositoryPath),
   }));
+  const html = collectFiles(root, 'tooling', (absolutePath) => absolutePath.endsWith('.html')).map(
+    (repositoryPath) => ({
+      kind: 'html',
+      path: repositoryPath,
+      source: read(root, repositoryPath),
+    })
+  );
   const records = [
     ...WORKFLOW_AUTHORITIES.map((repositoryPath) => ({
       kind: 'workflow',
@@ -148,6 +155,7 @@ function collectStaticAuthorities(root) {
       source: read(root, repositoryPath),
     })),
     ...docker,
+    ...html,
   ];
   return records.filter(({ path: repositoryPath }) =>
     fs.existsSync(path.join(root, repositoryPath))
@@ -184,10 +192,11 @@ function classifyNonTargetPopulations(authorities) {
 export function collectRepositoryExecutableOrigins({ repoRoot = defaultRepoRoot } = {}) {
   const sourceAuthorities = collectSourceAuthorities(repoRoot);
   const packageAuthorities = collectPackageAuthorities(repoRoot);
+  const staticAuthorities = collectStaticAuthorities(repoRoot);
   const authorities = [
     ...sourceAuthorities,
     ...packageAuthorities,
-    ...collectStaticAuthorities(repoRoot),
+    ...staticAuthorities,
     collectCatalogAuthority(),
   ];
   const populations = classifyNonTargetPopulations(sourceAuthorities);
@@ -208,6 +217,9 @@ export function collectRepositoryExecutableOrigins({ repoRoot = defaultRepoRoot 
       ...new Set([
         ...REGISTRATION_AUTHORITY_PATHS,
         ...packageAuthorities.map(({ path: authorityPath }) => authorityPath),
+        ...staticAuthorities
+          .filter(({ kind }) => kind === 'html')
+          .map(({ path: authorityPath }) => authorityPath),
       ]),
     ],
   });

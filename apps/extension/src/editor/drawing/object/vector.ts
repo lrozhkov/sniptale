@@ -20,6 +20,7 @@ import {
   type DrawingPoint,
 } from '../../../features/drawing/public';
 import { createObjectLabel } from '../../document/model';
+import { createEditorDrawingSimplifyObject } from './simplify';
 import { stageEditorDrawingObject, writeEditorDrawingObject } from './metadata';
 
 type TextboxVisualAdapter = {
@@ -355,6 +356,7 @@ export function createEditorDrawingFabricObject(
   labelIndex: number,
   options: { preview?: boolean } = {}
 ): FabricObject {
+  if (drawing.kind === 'simplify') return createEditorDrawingSimplifyObject(drawing, labelIndex);
   const object =
     drawing.kind === 'pencil' || drawing.kind === 'marker'
       ? createFreehandObject(drawing, options.preview === true)

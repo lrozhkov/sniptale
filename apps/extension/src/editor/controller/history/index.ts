@@ -8,6 +8,7 @@ const HISTORY_BINARY_TOKEN_PREFIX = 'sniptale-history-asset:';
 const CANVAS_BINARY_FIELDS = new Set([
   'src',
   'sniptaleBackgroundImageData',
+  'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
 ]);
 const DOCUMENT_BINARY_FIELDS = new Set([
@@ -269,4 +270,27 @@ export function pushEditorSnapshotHistory(options: {
   options.history.push(snapshot);
   if (assets) pruneEditorHistoryAssets(options.history, assets);
   return true;
+}
+
+/** Обновляет производный растр текущего действия без дополнительного шага Undo. */
+export function replaceCurrentEditorSnapshotHistory(options: {
+  history: SnapshotHistory<string> | null;
+  expectedRevision: number;
+  exportDocument: () => EditorDocument;
+}): boolean {
+  const history = options.history;
+  if (!history || history.getRevision() !== options.expectedRevision) return false;
+  const assets = historyAssets.get(history);
+  const tokens = new Set<string>();
+  const document = options.exportDocument();
+  const snapshot = assets
+    ? encodeEditorSnapshot(document, assets, tokens)
+    : JSON.stringify(document);
+  if (assets) {
+    assets.tokensBySnapshot.set(snapshot, tokens);
+    assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
+  }
+  const replaced = history.replaceCurrent(options.expectedRevision, snapshot);
+  if (assets) pruneEditorHistoryAssets(history, assets);
+  return replaced !== null;
 }

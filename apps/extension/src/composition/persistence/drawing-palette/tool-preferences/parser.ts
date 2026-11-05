@@ -1,3 +1,4 @@
+import { parseSimplifySettings } from '../../../../features/simplify/settings';
 import {
   DRAWING_ARROW_WIDTHS,
   DRAWING_BLUR_STRENGTHS,
@@ -36,6 +37,7 @@ const isStringOption = <Value extends string>(
 
 export function cloneDrawingToolDefaults(defaults: DrawingToolDefaults): DrawingToolDefaults {
   return {
+    simplify: { ...defaults.simplify },
     pencil: { ...defaults.pencil },
     marker: { ...defaults.marker },
     shape: { ...defaults.shape },
@@ -48,6 +50,11 @@ export function cloneDrawingToolDefaults(defaults: DrawingToolDefaults): Drawing
 function parseDefaults(value: unknown, fallback: DrawingToolDefaults): DrawingToolDefaults | null {
   if (!isRecord(value)) return null;
   const { pencil, marker, shape, arrow, blur, text } = value;
+  const simplify =
+    value['simplify'] === undefined
+      ? { ...fallback.simplify }
+      : parseSimplifySettings(value['simplify']);
+  if (!simplify) return null;
   if (
     !isRecord(pencil) ||
     !isColor(pencil['color']) ||
@@ -84,6 +91,7 @@ function parseDefaults(value: unknown, fallback: DrawingToolDefaults): DrawingTo
     return null;
   }
   return {
+    simplify,
     pencil: { color: pencil['color'], width: pencil['width'] },
     marker: {
       color: marker['color'],

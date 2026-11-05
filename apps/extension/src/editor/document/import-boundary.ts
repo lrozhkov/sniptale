@@ -1,9 +1,14 @@
 import { isValidScenarioBlurCanvasObject } from './scenario-blur-metadata';
 // policyStateIds: [] - parser sets and resource ceilings are immutable document import policy,
 // not mutable authority or capability state.
-import { MAX_DRAWING_ARROW_BENDS, type DrawingObject } from '../../features/drawing/public';
+import {
+  MAX_DRAWING_ARROW_BENDS,
+  parseDrawingDocument,
+  parseDrawingSimplifySnapshot,
+  type DrawingObject,
+} from '../../features/drawing/public';
 
-const DRAWING_TYPES = new Set(['pencil', 'marker', 'shape', 'arrow', 'blur', 'text']);
+const DRAWING_TYPES = new Set(['pencil', 'marker', 'shape', 'arrow', 'blur', 'text', 'simplify']);
 const REMOVED_EDITOR_OBJECT_TYPES = new Set([
   'brush',
   'callout',
@@ -116,6 +121,13 @@ function isFreehandObject(value: UnknownRecord): boolean {
 
 function isDrawingObject(value: unknown): value is DrawingObject {
   if (!isRecord(value) || typeof value['id'] !== 'string' || value['id'].length === 0) return false;
+  if (value['kind'] === 'simplify') {
+    return (
+      value['result'] === undefined &&
+      value['source'] === undefined &&
+      parseDrawingDocument({ version: 2, objects: [value] }) !== null
+    );
+  }
   if (isFreehandObject(value) || isShapeObject(value)) return true;
   if (value['kind'] === 'arrow') {
     const bends = value['bendPoints'];
@@ -170,6 +182,10 @@ function expectedObjectType(kind: unknown): string {
 
 /** Serialize typed drawing state using the same version admitted at the document boundary. */
 export function serializeEditorDrawingMetadata(object: DrawingObject): string {
+  if (object.kind === 'simplify') {
+    const { source: _source, result: _result, ...metadata } = object;
+    return JSON.stringify({ version: 2, object: metadata });
+  }
   return JSON.stringify({ version: 1, object });
 }
 
@@ -182,9 +198,14 @@ export function parseEditorDrawingMetadata(value: unknown): DrawingObject | null
       return null;
     }
   }
-  if (!isRecord(metadata) || metadata['version'] !== 1 || !isDrawingObject(metadata['object'])) {
+  if (
+    !isRecord(metadata) ||
+    (metadata['version'] !== 1 && metadata['version'] !== 2) ||
+    !isDrawingObject(metadata['object'])
+  ) {
     return null;
   }
+  if (metadata['version'] === 1 && metadata['object'].kind === 'simplify') return null;
   return metadata['object'];
 }
 
@@ -212,6 +233,34 @@ function assertDrawingFabricObject(value: UnknownRecord): void {
   const drawing = parseEditorDrawingMetadata(serializedMetadata);
   if (!drawing) {
     throw new Error('Invalid editor drawing metadata');
+  }
+  if (drawing.kind === 'simplify') {
+    const result = parseDrawingSimplifySnapshot({
+      dataUrl: value['src'],
+      width: value['width'],
+      height: value['height'],
+    });
+    const source = value['sniptaleSimplifySourceData'];
+    if (
+      !result ||
+      (source !== undefined &&
+        !parseDrawingSimplifySnapshot({
+          dataUrl: source,
+          width: value['sniptaleSimplifySourceWidth'],
+          height: value['sniptaleSimplifySourceHeight'],
+        }))
+    )
+      throw new Error('Invalid Simplify raster');
+    if (
+      source !== undefined &&
+      !isBounds({
+        x: value['sniptaleSimplifySourceLeft'],
+        y: value['sniptaleSimplifySourceTop'],
+        width: value['sniptaleSimplifySourceDisplayWidth'],
+        height: value['sniptaleSimplifySourceDisplayHeight'],
+      })
+    )
+      throw new Error('Invalid Simplify source mapping');
   }
   if (
     value['sniptaleId'] !== drawing.id ||

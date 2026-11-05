@@ -15,6 +15,7 @@ import { useEditorStore } from '../state/useEditorStore';
 function getEditorDrawingToolDefaults(): DrawingToolDefaults {
   const settings = useEditorStore.getState().toolSettings;
   return {
+    simplify: settings.simplify,
     pencil: settings.pencil,
     marker: settings.marker,
     shape: settings.shape,

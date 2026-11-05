@@ -624,6 +624,7 @@ export function commitDrawingPointerDraft(
   }
   const bounds = getDrawingObjectBounds(draft.object);
   if (draft.kind === 'create') {
+    if (draft.object.kind === 'simplify') return;
     if (draft.object.kind === 'arrow') {
       const length = Math.hypot(
         draft.object.end.x - draft.object.start.x,

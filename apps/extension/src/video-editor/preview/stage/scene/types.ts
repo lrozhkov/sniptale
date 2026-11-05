@@ -52,12 +52,7 @@ type PreviewEffectRuntimeExecutorInput =
   | EffectRuntimeSandboxExecutor
   | (() => EffectRuntimeSandboxExecutor);
 
-/** Camera evaluated for one completed frame; the outer caller owns visible publication. */
-export interface PreviewScenePresentation {
-  camera: VideoCompositionCameraState;
-  time: number;
-  renderer?: PreviewRendererStatus;
-}
+export type { PreviewScenePresentation } from './presentation';
 
 export type PreviewSceneRenderInput = {
   previewRenderer?: VideoPreviewRenderer;

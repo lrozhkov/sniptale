@@ -19,6 +19,8 @@ import {
   pushEditorSnapshotHistory,
   redoEditorSnapshot,
   resetEditorSnapshotHistory,
+  replaceCurrentEditorSnapshotHistory,
+  readCurrentEditorSnapshot,
   undoEditorSnapshot,
 } from './';
 
@@ -374,4 +376,72 @@ it('round-trips frame comments and step numbers through editor history', () => {
     callout: { content: { bodyHtml: '<p>After</p>' } },
     stepBadge: { value: '5' },
   });
+});
+
+it('pools retained Simplify source separately from changing result rasters through undo and redo', () => {
+  const source = `data:image/png;base64,${'A'.repeat(5000)}`;
+  const raster = (suffix: string) => `data:image/png;base64,${'B'.repeat(5000)}${suffix}`;
+  const document = (suffix: string) => ({
+    ...createMockDocument(),
+    canvasJson: JSON.stringify({
+      objects: [{ src: raster(suffix), sniptaleSimplifySourceData: source }],
+    }),
+  });
+  const history = createEditorSnapshotHistory(document('first'));
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document('second') });
+  expect(history.getCurrent()).not.toContain(source);
+  expect(history.getCurrent().length).toBeLessThan(3000);
+  expect(JSON.parse(undoEditorSnapshot(history)!.canvasJson).objects[0]).toEqual({
+    src: raster('first'),
+    sniptaleSimplifySourceData: source,
+  });
+  expect(JSON.parse(redoEditorSnapshot(history)!.canvasJson).objects[0]).toEqual({
+    src: raster('second'),
+    sniptaleSimplifySourceData: source,
+  });
+});
+
+it('enriches a pooled Simplify result without an extra action and preserves its retained source', () => {
+  const source = `data:image/png;base64,${'A'.repeat(12_000)}`;
+  const oldTile = `data:image/png;base64,${'B'.repeat(8_000)}`;
+  const newTile = `data:image/png;base64,${'C'.repeat(8_000)}`;
+  const initial = createMockDocument();
+  const document = (src: string) => ({
+    ...initial,
+    canvasJson: JSON.stringify({
+      objects: [{ type: 'image', src, sniptaleSimplifySourceData: source }],
+    }),
+  });
+  const history = createEditorSnapshotHistory(initial);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => document(oldTile) });
+  const revision = history.getRevision();
+  expect(
+    replaceCurrentEditorSnapshotHistory({
+      history,
+      expectedRevision: revision,
+      exportDocument: () => document(newTile),
+    })
+  ).toBe(true);
+  expect(history.getState().size).toBe(2);
+  expect(history.getCurrent().length).toBeLessThan(1_000);
+  expect(readCurrentEditorSnapshot(history)).toEqual(document(newTile));
+  expect(undoEditorSnapshot(history)).toEqual(initial);
+  expect(redoEditorSnapshot(history)).toEqual(document(newTile));
+});
+
+it('refuses stale pooled enrichment without exporting or changing the current head', () => {
+  const initial = createMockDocument();
+  const second = { ...initial, sourceName: 'second' };
+  const history = createEditorSnapshotHistory(initial);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => second });
+  const revision = history.getRevision();
+  undoEditorSnapshot(history);
+  redoEditorSnapshot(history);
+  const exportDocument = vi.fn(() => ({ ...second, sourceName: 'obsolete' }));
+  expect(
+    replaceCurrentEditorSnapshotHistory({ history, expectedRevision: revision, exportDocument })
+  ).toBe(false);
+  expect(exportDocument).not.toHaveBeenCalled();
+  expect(readCurrentEditorSnapshot(history)).toEqual(second);
+  expect(history.getState().size).toBe(2);
 });

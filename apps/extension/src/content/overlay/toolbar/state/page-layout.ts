@@ -57,6 +57,7 @@ const MODE_ITEMS: Record<PageToolbarMode, PageToolbarLayoutItem[]> = {
     'drawing-shape',
     'drawing-arrow',
     'drawing-blur',
+    'drawing-simplify',
   ],
   highlighter: [
     'annotation-effects',

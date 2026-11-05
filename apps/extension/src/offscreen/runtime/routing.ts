@@ -1,3 +1,6 @@
+import type { SimplifyCompletion } from '../../contracts/messaging/contracts/runtime-message/simplify.types';
+import SimplifyWorker from '../simplify/worker?worker';
+import { createSimplifyService } from '../simplify/service';
 import { renderQuickActionHeader } from '../quick-action-appearance/header';
 import { offscreenDataReadiness, prepareOffscreenRecordingData } from './data-readiness';
 import { answerRecordingCameraOffer, closeRecordingCameraPeer } from '../recording/camera-preview';
@@ -66,6 +69,9 @@ import {
   releasePagePackageDownloadLease,
 } from '../page-package-download/lease';
 
+const simplifyService = createSimplifyService({ createWorker: () => new SimplifyWorker() });
+globalThis.addEventListener?.('pagehide', () => simplifyService.dispose(), { once: true });
+
 type OffscreenRuntimeMessage = ReturnType<typeof parseOffscreenRuntimeMessage>;
 
 export type { HandledOffscreenRuntimeMessageType } from './message-types';
@@ -115,6 +121,7 @@ export function resolveOffscreenErrorPhase(
   switch (type) {
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
     case VideoMessageType.GET_DESKTOP_MEDIA:
+    case MessageType.OFFSCREEN_SIMPLIFY_COMMAND:
     case MessageType.OFFSCREEN_QUICK_ACTION_HEADER:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
@@ -158,6 +165,7 @@ export function resolveOffscreenRuntimeResponseMode(
     case VideoMessageType.OFFSCREEN_READINESS_PROBE:
       return 'deferred-ack';
     case VideoMessageType.GET_DESKTOP_MEDIA:
+    case MessageType.OFFSCREEN_SIMPLIFY_COMMAND:
     case MessageType.OFFSCREEN_QUICK_ACTION_HEADER:
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
@@ -234,12 +242,37 @@ function answerVideoRecordingCameraOffer(
   });
 }
 
+async function handleFrameAnnotationRaster(
+  message: Extract<
+    HandledMessage,
+    { type: typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE }
+  >
+): Promise<'applied' | { result: 'prepared'; leaseId: string }> {
+  if (message.operation === 'prepare') {
+    await offscreenDataReadiness.ensureAdmission();
+    return { result: 'prepared', leaseId: message.leaseId };
+  }
+  // The caller now holds a shared transition; cold admission would wait on that caller.
+  offscreenDataReadiness.requireAdmission();
+  try {
+    await cleanupFrameAnnotationRasterJobs();
+    const input = await acquireFrameAnnotationRasterInput(message.reference);
+    const result = await new FrameAnnotationRasterizer().rasterize(input);
+    await completeFrameAnnotationRasterJob(message.reference, result.blob, result.metadata);
+    return 'applied';
+  } catch (error) {
+    await deleteFrameAnnotationRasterJob(message.reference.jobId).catch(() => undefined);
+    throw error;
+  }
+}
+
 export async function handleOffscreenRuntimeMessage(
   message: HandledMessage,
   sendResponse?: ResponseSender
 ): Promise<
   | void
   | RecordingStopOutcome
+  | SimplifyCompletion
   | { dataUrl: string }
   | DesktopFrameResult
   | CameraSourcePeerAnswer
@@ -281,26 +314,12 @@ export async function handleOffscreenRuntimeMessage(
     case MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE:
       handlePageStoragePrivacyErasure(message, sendResponse);
       return;
+    case MessageType.OFFSCREEN_SIMPLIFY_COMMAND:
+      return simplifyService.execute(message);
     case MessageType.OFFSCREEN_QUICK_ACTION_HEADER:
       return renderQuickActionHeader(message);
-    case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE: {
-      if (message.operation === 'prepare') {
-        await offscreenDataReadiness.ensureAdmission();
-        return { result: 'prepared', leaseId: message.leaseId };
-      }
-      // The caller now holds a shared transition; cold admission would wait on that caller.
-      offscreenDataReadiness.requireAdmission();
-      try {
-        await cleanupFrameAnnotationRasterJobs();
-        const input = await acquireFrameAnnotationRasterInput(message.reference);
-        const result = await new FrameAnnotationRasterizer().rasterize(input);
-        await completeFrameAnnotationRasterJob(message.reference, result.blob, result.metadata);
-        return 'applied';
-      } catch (error) {
-        await deleteFrameAnnotationRasterJob(message.reference.jobId).catch(() => undefined);
-        throw error;
-      }
-    }
+    case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
+      return handleFrameAnnotationRaster(message);
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
       await writeDesktopFrameClipboard(message.dataUrl);
       return 'copied';

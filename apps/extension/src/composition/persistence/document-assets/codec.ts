@@ -29,6 +29,7 @@ const ASSET_URL_PREFIX = 'sniptale-asset:';
 const CANVAS_BINARY_FIELDS = new Set([
   'src',
   'sniptaleBackgroundImageData',
+  'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
 ]);
 

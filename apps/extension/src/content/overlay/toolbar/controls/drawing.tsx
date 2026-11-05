@@ -1,3 +1,4 @@
+import { SimplifyIcon } from '../../../../ui/drawing-tools/simplify-icon';
 import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from './page-layout';
 import {
   Droplet,
@@ -68,6 +69,7 @@ const tools: readonly DrawingToolDescriptor[] = [
     modifierHint: 'content.toolbar.drawingArrowModifierHint',
   },
   { tool: 'blur', icon: Droplet, label: 'content.toolbar.drawingBlur' },
+  { tool: 'simplify', icon: SimplifyIcon, label: 'content.toolbar.drawingSimplify' },
 ];
 
 /** Narrow presentation seam used by toolbar modes that share drawing tools but own interaction. */

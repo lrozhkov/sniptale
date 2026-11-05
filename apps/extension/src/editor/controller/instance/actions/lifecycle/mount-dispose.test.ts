@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createEditorSessionAutosaveService } from '../../../../document/session-autosave';
+import type { mountEditorSimplifyRuntime } from '../../../../drawing/simplify-runtime';
+import { createEditorSnapshotHistory, readCurrentEditorSnapshot } from '../../../history';
+import { createMockDocument } from '../../bindings/test-fixtures-document';
 import { createMockController } from '../../bindings/test-fixtures';
 
 const mocks = vi.hoisted(() => ({
+  mountSimplify: vi.fn<(options: Parameters<typeof mountEditorSimplifyRuntime>[0]) => void>(),
+  toast: vi.fn(),
   applyViewportZoom: vi.fn(),
   attachEvents: vi.fn(() => ({ disconnect: vi.fn() })),
   createMagnet: vi.fn(() => ({ dispose: vi.fn() })),
@@ -15,6 +21,12 @@ const mocks = vi.hoisted(() => ({
   },
   refreshViewport: vi.fn(),
 }));
+
+vi.mock('../../../../drawing/simplify-runtime', () => ({
+  mountEditorSimplifyRuntime: mocks.mountSimplify,
+  unmountEditorSimplifyRuntime: vi.fn(),
+}));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.toast }));
 
 vi.mock('fabric', () => ({
   Canvas: class TestCanvas {
@@ -166,4 +178,47 @@ it('tears down the handoff and controller when mounting fails', () => {
   ).toThrow('viewport failed');
   expect(mocks.handoff.tearDown).toHaveBeenCalledOnce();
   expect(controller.dispose).toHaveBeenCalledOnce();
+});
+
+it('publishes derived Simplify pixels and schedules autosave only after history accepts publication', () => {
+  const controller = createController();
+  Object.defineProperty(controller, 'createSimplifyCompute', { value: vi.fn() });
+  const initial = createMockDocument();
+  const derived = { ...initial, canvasJson: '{"version":"7.2.0","objects":[{"type":"rect"}]}' };
+  controller.history = createEditorSnapshotHistory(initial);
+  vi.mocked(controller.exportDocument).mockReturnValue(derived);
+  controller.autosaveService = createEditorSessionAutosaveService();
+  const scheduleAutosave = vi
+    .spyOn(controller.autosaveService, 'scheduleAutosave')
+    .mockImplementation(() => undefined);
+  mountEditorController(
+    controller,
+    document.createElement('canvas'),
+    document.createElement('div'),
+    document.createElement('div')
+  );
+  const runtime = mocks.mountSimplify.mock.calls[0]?.[0];
+  expect(runtime).toBeDefined();
+  const sync = vi.mocked(controller.syncRuntimeState);
+  sync.mockClear();
+  expect(runtime?.publishDerived?.()).toBe(true);
+  expect(readCurrentEditorSnapshot(controller.history)).toEqual(derived);
+  expect(controller.history.getState().size).toBe(1);
+  expect(scheduleAutosave).toHaveBeenCalledExactlyOnceWith(derived);
+  expect(sync).toHaveBeenCalledOnce();
+  vi.spyOn(controller.history, 'replaceCurrent').mockReturnValueOnce(null);
+  expect(runtime?.publishDerived?.()).toBe(false);
+  expect(scheduleAutosave).toHaveBeenCalledOnce();
+  expect(sync).toHaveBeenCalledOnce();
+  controller.autosaveService = null;
+  expect(runtime?.publishDerived?.()).toBe(true);
+  expect(scheduleAutosave).toHaveBeenCalledOnce();
+  runtime?.commitHistory();
+  expect(controller.commitHistory).toHaveBeenCalledOnce();
+  runtime?.syncRuntimeState();
+  controller.history = null;
+  expect(runtime?.publishDerived?.()).toBe(false);
+  expect(scheduleAutosave).toHaveBeenCalledOnce();
+  runtime?.reportFailure?.(new Error('compute unavailable'));
+  expect(mocks.toast).toHaveBeenCalledWith(expect.any(String), 'error');
 });

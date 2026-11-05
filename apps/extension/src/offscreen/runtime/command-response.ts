@@ -1,3 +1,4 @@
+import { isSimplifyCompletion } from '../../contracts/messaging/contracts/runtime/actions/simplify';
 import { isQuickActionHeaderRaster } from '../../contracts/messaging/contracts/runtime-message/quick-action-appearance.types';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -267,6 +268,9 @@ export function buildOffscreenCommandResponse(
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
       return buildAcceptedScalarResponse(type, result);
+    case MessageType.OFFSCREEN_SIMPLIFY_COMMAND:
+      if (!isSimplifyCompletion(result)) return invalidCompletion(type);
+      return { success: true, ...result };
     case MessageType.OFFSCREEN_QUICK_ACTION_HEADER:
       if (
         !isRecordWithExactKeys(result, ['dataUrl']) ||

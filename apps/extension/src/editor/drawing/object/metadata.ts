@@ -1,5 +1,6 @@
 import {
   ActiveSelection,
+  FabricImage,
   Path,
   Point,
   util,
@@ -11,6 +12,7 @@ import {
 } from 'fabric';
 import {
   getDrawingObjectBounds,
+  parseDrawingSimplifySnapshot,
   type DrawingBounds,
   type DrawingObject,
   type DrawingPoint,
@@ -25,6 +27,16 @@ const transientDrawingObjects = new WeakMap<FabricObject, DrawingObject>();
 export function writeEditorDrawingObject(target: FabricObject, object: DrawingObject): void {
   transientDrawingObjects.delete(target);
   target.sniptaleDrawingJson = serializeEditorDrawingMetadata(object);
+  if (object.kind === 'simplify' && object.source) {
+    const { source } = object;
+    target.sniptaleSimplifySourceData = source.dataUrl;
+    target.sniptaleSimplifySourceWidth = source.width;
+    target.sniptaleSimplifySourceHeight = source.height;
+    target.sniptaleSimplifySourceLeft = source.bounds.x;
+    target.sniptaleSimplifySourceTop = source.bounds.y;
+    target.sniptaleSimplifySourceDisplayWidth = source.bounds.width;
+    target.sniptaleSimplifySourceDisplayHeight = source.bounds.height;
+  }
 }
 
 export function stageEditorDrawingObject(target: FabricObject, object: DrawingObject): void {
@@ -32,9 +44,39 @@ export function stageEditorDrawingObject(target: FabricObject, object: DrawingOb
 }
 
 export function readEditorDrawingObject(target: FabricObject): DrawingObject | null {
-  return (
-    transientDrawingObjects.get(target) ?? parseEditorDrawingMetadata(target.sniptaleDrawingJson)
-  );
+  const drawing =
+    transientDrawingObjects.get(target) ?? parseEditorDrawingMetadata(target.sniptaleDrawingJson);
+  if (drawing?.kind !== 'simplify') return drawing;
+  const result =
+    target instanceof FabricImage
+      ? parseDrawingSimplifySnapshot({
+          dataUrl: target.getSrc(),
+          width: target.width,
+          height: target.height,
+        })
+      : null;
+  const source = parseDrawingSimplifySnapshot({
+    dataUrl: target.sniptaleSimplifySourceData,
+    width: target.sniptaleSimplifySourceWidth,
+    height: target.sniptaleSimplifySourceHeight,
+  });
+  return {
+    ...drawing,
+    ...(result ? { result } : {}),
+    ...(source
+      ? {
+          source: {
+            ...source,
+            bounds: {
+              x: target.sniptaleSimplifySourceLeft ?? 0,
+              y: target.sniptaleSimplifySourceTop ?? 0,
+              width: target.sniptaleSimplifySourceDisplayWidth ?? source.width,
+              height: target.sniptaleSimplifySourceDisplayHeight ?? source.height,
+            },
+          },
+        }
+      : {}),
+  };
 }
 
 export function isEditorDrawingSelection(target: FabricObject): boolean {
@@ -88,6 +130,11 @@ export function translateEditorDrawingObject(
       y: drawing.bounds.y + translation.y,
     },
     id,
+    ...(drawing.kind === 'simplify' &&
+    (drawing.settings.automatic || drawing.settings.manualKind === 'text') &&
+    (id !== drawing.id || translation.x !== 0 || translation.y !== 0)
+      ? { sourceDirty: true }
+      : {}),
   };
 }
 
@@ -201,6 +248,13 @@ export function synchronizeEditorDrawingObjectFromFabric(
   } else {
     next = { ...drawing, bounds, ...rotation };
   }
+  if (
+    next.kind === 'simplify' &&
+    drawing.kind === 'simplify' &&
+    (next.settings.automatic || next.settings.manualKind === 'text') &&
+    (JSON.stringify(next.bounds) !== JSON.stringify(previous) || next.rotation !== drawing.rotation)
+  )
+    next = { ...next, sourceDirty: true };
   if (next.kind === 'arrow' && target instanceof Path) normalizeSynchronizedArrowGeometry(target);
   writeEditorDrawingObject(target, next);
   return next;

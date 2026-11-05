@@ -516,6 +516,9 @@ it('mounts the frozen frame and disposes viewport invalidation with the session 
     return { x: 0, y: 0, width: 10, height: 10 };
   });
   await scenario.runtime.enableSelectionMode({ frozenFrame: scenario.session.frozenFrame });
+  expect(mocks.createDrawingRuntime).toHaveBeenCalledWith(
+    expect.objectContaining({ frozenFrame: scenario.session.frozenFrame })
+  );
   expect(container.querySelector('.sniptale-selection-frozen-frame')).not.toBeNull();
   expect(container.querySelector('img')).toBeNull();
   assertViewport.mockImplementation(() => {

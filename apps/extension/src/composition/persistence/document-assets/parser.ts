@@ -22,6 +22,7 @@ import { MAX_EDITOR_BACKGROUND_BLUR_AMOUNT } from '../../../features/editor/docu
 const CANVAS_BINARY_FIELDS = new Set([
   'src',
   'sniptaleBackgroundImageData',
+  'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
 ]);
 const ASSET_URL_PREFIX = 'sniptale-asset:';

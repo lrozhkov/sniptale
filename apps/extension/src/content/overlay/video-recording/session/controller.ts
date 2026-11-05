@@ -37,7 +37,10 @@ import {
   requestVideoRecordingCameraAnswer,
   closeVideoRecordingCameraPeer,
 } from '../transport/client';
-import { createRecordingDrawingOwner } from '../../toolbar/video-recording/drawing-session';
+import {
+  createRecordingSurfaceDrawingOwner,
+  type createRecordingDrawingOwner,
+} from '../../toolbar/video-recording/drawing-session';
 import type { EmbeddedCameraGeometry } from '../camera/geometry';
 import { projectVideoRecordingSurfaceSnapshot } from './snapshot-projection';
 import { useRecordingSetup, type RecordingSetupState } from './setup';
@@ -440,7 +443,7 @@ function useVideoRecordingSurfaceState(args: VideoRecordingSurfaceControllerArgs
   }, []);
   const toolbarRequestedRef = useRef(false);
   const releasedSurfaceSessionIdRef = useRef<string | null>(null);
-  const drawingOwner = useMemo(() => createRecordingDrawingOwner(), []);
+  const drawingOwner = useMemo(createRecordingSurfaceDrawingOwner, []);
 
   useRecordingDrawingLifecycle(drawingOwner, state.phase);
 

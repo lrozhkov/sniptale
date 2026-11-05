@@ -1,3 +1,4 @@
+import { createDefaultSimplifySettings } from '../simplify/settings';
 import { expect, it } from 'vitest';
 import {
   createDrawingBounds,
@@ -350,3 +351,39 @@ it('moves and resizes freehand samples without introducing a second state owner'
     expect(resized.samples[1]?.y).toBeLessThanOrEqual(20);
   }
 });
+
+it(
+  'marks translated automatic and manual text simplify results dirty but preserves ' +
+    'manual images and no-op moves',
+  () => {
+    const base = {
+      id: 'simplify-move',
+      kind: 'simplify' as const,
+      bounds: { x: 10, y: 20, width: 30, height: 40 },
+      settings: createDefaultSimplifySettings(),
+      sourceDirty: false,
+      engineVersion: 'performance4',
+    };
+    for (const settings of [
+      base.settings,
+      { ...base.settings, automatic: false, manualKind: 'text' as const },
+    ]) {
+      const original = { ...base, settings };
+      expect(translateDrawingObject(original, { x: 5, y: -2 })).toEqual({
+        ...original,
+        bounds: { ...original.bounds, x: 15, y: 18 },
+        sourceDirty: true,
+      });
+      expect(translateDrawingObject(original, { x: 0, y: 0 })).toEqual(original);
+      expect(original.sourceDirty).toBe(false);
+    }
+    const image = {
+      ...base,
+      settings: { ...base.settings, automatic: false, manualKind: 'image' as const },
+    };
+    expect(translateDrawingObject(image, { x: 5, y: -2 })).toEqual({
+      ...image,
+      bounds: { ...image.bounds, x: 15, y: 18 },
+    });
+  }
+);

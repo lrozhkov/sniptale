@@ -19,7 +19,9 @@ function syncDrawingSelection(object: FabricObject): void {
     return;
   }
   const store = useEditorStore.getState();
-  if (drawing.kind === 'blur') {
+  if (drawing.kind === 'simplify') {
+    store.updateSelectionDrawingToolSettings('simplify', drawing.settings);
+  } else if (drawing.kind === 'blur') {
     store.updateSelectionDrawingToolSettings('blur', { amount: drawing.amount ?? 10 });
   } else if (drawing.kind === 'pencil') {
     store.updateSelectionDrawingToolSettings('pencil', {
@@ -74,6 +76,7 @@ export function syncSelectionToolSettingsFromObject(
     case 'pencil':
     case 'marker':
     case 'shape':
+    case 'simplify':
     case 'blur':
     case 'text':
     case 'arrow':

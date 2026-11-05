@@ -5,6 +5,26 @@ import { CAMERA_RECORDER_DOCUMENT_TTL_MS } from '../../storage/video/camera-reco
 
 export const runtimePolicyStateDescriptors = [
   {
+    authorityFamily: 'simplify-authority',
+    failClosedOnRestart: true,
+    id: 'simplify-compute-sessions',
+    oneShot: false,
+    ownerModule: 'apps/extension/src/background/simplify/route.ts',
+    proofModules: [
+      'apps/extension/src/background/simplify/route.test.ts',
+      'apps/extension/src/offscreen/simplify/service.test.ts',
+    ],
+    requiresTtl: true,
+    ttlMs: 2 * MINUTE_MS,
+    restartBehavior: [
+      'Background restart discards caller session authority.',
+      'Surviving offscreen caches expire after two idle minutes; new callers cannot adopt their identifiers.',
+    ].join(' '),
+    restartClass: 'disposable-fail-closed',
+    stateClass: 'runtime-state',
+    storageClass: 'memory-only',
+  },
+  {
     authorityFamily: 'popup-export-job',
     failClosedOnRestart: false,
     id: 'popup-export-jobs',

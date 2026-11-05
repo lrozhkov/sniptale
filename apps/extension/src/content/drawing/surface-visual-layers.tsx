@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
+import { DrawingSimplifyLayer } from './simplify-layer';
 import {
   getDrawingObjectBounds,
   getDrawingObjectRotation,
@@ -23,6 +24,17 @@ export function DrawingVisualLayers(props: {
   root: NonNullable<ReturnType<ContentDrawingController['getScrollRoot']>>;
   getObjectOpacity?: (objectId: string) => number;
 }) {
+  const clip = props.root.kind === 'element' ? props.root.element.getBoundingClientRect() : null;
+  const clipPath = clip
+    ? `inset(${[
+        Math.max(0, clip.top),
+        Math.max(0, window.innerWidth - clip.right),
+        Math.max(0, window.innerHeight - clip.bottom),
+        Math.max(0, clip.left),
+      ]
+        .map((edge) => `${edge}px`)
+        .join(' ')})`
+    : undefined;
   const pixelBudget = 16_777_216 / props.layers.filter((layer) => layer.kind === 'ink').length;
   return props.layers.map((layer, index) => {
     if (layer.kind === 'ink' && index === 0) return null;
@@ -30,7 +42,17 @@ export function DrawingVisualLayers(props: {
       <div
         key={layer.kind === 'ink' ? layer.objects[0]!.id : layer.object.id}
         data-ui="content.drawing.visual-layer"
-        style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: index }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: index,
+          ...(layer.kind === 'simplify' && clip
+            ? {
+                clipPath,
+              }
+            : {}),
+        }}
       >
         {layer.kind === 'ink' ? (
           <DrawingInkLayer
@@ -39,6 +61,13 @@ export function DrawingVisualLayers(props: {
             projection={props.projection}
             pixelBudget={pixelBudget}
             {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}
+          />
+        ) : layer.kind === 'simplify' ? (
+          <DrawingSimplifyLayer
+            object={layer.object}
+            previewFill={layer.previewFill ?? false}
+            projection={props.projection}
+            opacity={props.getObjectOpacity?.(layer.object.id) ?? 1}
           />
         ) : layer.kind === 'text' ? (
           <DrawingTextLayer {...props} objects={[layer.object]} />

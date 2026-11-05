@@ -1,5 +1,4 @@
 /// <reference types="vite/client" />
-/// <reference path="./platform/i18n/catalog-projections.d.ts" />
 
 declare const __ENABLE_DESIGN_SYSTEM__: boolean;
 declare const __SNIPTALE_SECURITY_E2E__: boolean;

@@ -1,3 +1,4 @@
+import { cancelPendingEditorSimplify } from '../../../drawing/simplify-runtime';
 import type { Canvas, Rect } from 'fabric';
 import type { DrawSession } from '../../core/types';
 import { cancelEditorDrawingArrowBend } from '../../../drawing/object/controls/arrow';
@@ -29,7 +30,7 @@ export function cancelEditorTransientInteraction(
     return { changed: false, drawSession };
   }
 
-  let changed = false;
+  let changed = cancelPendingEditorSimplify(canvas);
   let nextDrawSession = drawSession;
 
   if (cancelEditorDrawingArrowBend(canvas)) {

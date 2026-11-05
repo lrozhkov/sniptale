@@ -1,3 +1,4 @@
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
 import {
   type FabricObject,
   type ObjectEvents,
@@ -103,6 +104,17 @@ export function completeEditorDrawSession(options: {
 
   if (options.drawSession.tool === 'text' && object.type === 'textbox') {
     return completeTextDrawSession(options.drawSession, object);
+  }
+
+  const drawing = options.drawSession.tool === 'simplify' ? readEditorDrawingObject(object) : null;
+  if (
+    options.drawSession.tool === 'simplify' &&
+    ((drawing?.kind === 'simplify' ? drawing.bounds.width : object.getScaledWidth()) <
+      options.minDrawSize ||
+      (drawing?.kind === 'simplify' ? drawing.bounds.height : object.getScaledHeight()) <
+        options.minDrawSize)
+  ) {
+    return { kind: 'discard', drawSession: null };
   }
 
   if (isUndersizedPointerDraw(options.drawSession, options.minDrawSize)) {

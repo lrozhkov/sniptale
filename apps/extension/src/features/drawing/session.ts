@@ -1,6 +1,6 @@
 import {
   createDefaultDrawingToolDefaults,
-  type DrawingDocumentV1,
+  type DrawingDocument,
   type DrawingObject,
   type DrawingTool,
   type DrawingToolDefaults,
@@ -9,7 +9,7 @@ import { createDrawingId } from './create';
 import { translateDrawingObject } from './geometry';
 
 export interface DrawingSessionSnapshot {
-  readonly document: DrawingDocumentV1;
+  readonly document: DrawingDocument;
   readonly activeTool: DrawingTool;
   readonly selectedObjectIds: readonly string[];
   readonly selectedObjectId: string | null;
@@ -18,17 +18,17 @@ export interface DrawingSessionSnapshot {
 }
 
 export interface DrawingDocumentCommit {
-  readonly after: DrawingDocumentV1;
-  readonly before: DrawingDocumentV1;
-  replay(document: DrawingDocumentV1): boolean;
+  readonly after: DrawingDocument;
+  readonly before: DrawingDocument;
+  replay(document: DrawingDocument): boolean;
 }
 
 export interface DrawingSession {
   getSnapshot(): DrawingSessionSnapshot;
   /** Reads accepted geometry in the current layout without including an in-progress preview. */
-  getCommittedDocument(): DrawingDocumentV1;
+  getCommittedDocument(): DrawingDocument;
   /** Replays an admitted recovery version without creating a second history entry. */
-  restoreDocument(document: DrawingDocumentV1): boolean;
+  restoreDocument(document: DrawingDocument): boolean;
   subscribe(listener: () => void): () => void;
   setActiveTool(tool: DrawingTool): void;
   setDefaults(defaults: DrawingToolDefaults): void;
@@ -36,6 +36,8 @@ export interface DrawingSession {
   setSelection(objectIds: readonly string[]): void;
   toggleSelection(objectId: string): void;
   commitObject(object: DrawingObject, options?: { select?: boolean }): void;
+  /** Appends a prepared batch atomically; invalid or colliding identities refuse the whole batch. */
+  commitObjects(objects: readonly DrawingObject[], options?: { select?: boolean }): void;
   replaceObject(object: DrawingObject): void;
   replaceObjects(objects: readonly DrawingObject[]): void;
   /** Show temporary object changes without publishing a document commit. */
@@ -50,7 +52,12 @@ export interface DrawingSession {
   dispose(): void;
 }
 
-const EMPTY_DOCUMENT: DrawingDocumentV1 = { version: 1, objects: [] };
+function documentForObjects(objects: readonly DrawingObject[]): DrawingDocument {
+  if (objects.some((object) => object.kind === 'simplify')) return { version: 2, objects };
+  return { version: 1, objects: objects.filter((object) => object.kind !== 'simplify') };
+}
+
+const EMPTY_DOCUMENT: DrawingDocument = { version: 1, objects: [] };
 
 /** Optional runtime layout projection; canonical versions remain owned by the document/history. */
 export interface DrawingObjectProjection {
@@ -61,7 +68,7 @@ export interface DrawingObjectProjection {
 type DrawingSessionOptions = {
   autoSelectCreatedObjects?: boolean;
   objectProjection?: DrawingObjectProjection;
-  initialDocument?: DrawingDocumentV1;
+  initialDocument?: DrawingDocument;
   defaults?: DrawingToolDefaults;
   onDocumentCommit: (commit: DrawingDocumentCommit) => boolean;
   onDispose?: () => void;
@@ -90,8 +97,8 @@ function reorderedDrawingObjects(
 }
 
 class DrawingSessionOwner implements DrawingSession {
-  private document: DrawingDocumentV1;
-  private previewDocument: DrawingDocumentV1 | null = null;
+  private document: DrawingDocument;
+  private previewDocument: DrawingDocument | null = null;
   private activeTool: DrawingTool = 'pencil';
   private selectedObjectIds: readonly string[] = [];
   private defaults: DrawingToolDefaults;
@@ -116,13 +123,13 @@ class DrawingSessionOwner implements DrawingSession {
     return [...new Set(ids)].filter((id) => available.has(id));
   }
 
-  private applyDocument(next: DrawingDocumentV1, nextSelectedIds: readonly string[]) {
+  private applyDocument(next: DrawingDocument, nextSelectedIds: readonly string[]) {
     this.document = next;
     this.selectedObjectIds = this.normalizeSelection(nextSelectedIds, next);
     this.emit();
   }
 
-  private replayDocument = (next: DrawingDocumentV1) => {
+  private replayDocument = (next: DrawingDocument) => {
     if (this.disposed) return false;
     const hadPreview = this.previewDocument !== null;
     this.previewDocument = null;
@@ -138,7 +145,7 @@ class DrawingSessionOwner implements DrawingSession {
     for (const object of objects) projection.capture(object, previous.get(object.id));
   }
 
-  private commitDocument(next: DrawingDocumentV1, nextSelectedIds = this.selectedObjectIds) {
+  private commitDocument(next: DrawingDocument, nextSelectedIds = this.selectedObjectIds) {
     if (next === this.document || this.disposed || this.commitInProgress) return;
     const hadPreview = this.previewDocument !== null;
     this.previewDocument = null;
@@ -173,22 +180,22 @@ class DrawingSessionOwner implements DrawingSession {
     if (this.revision === revisionBeforeCommit) this.emit();
   }
 
-  restoreDocument(document: DrawingDocumentV1): boolean {
+  restoreDocument(document: DrawingDocument): boolean {
     if (this.disposed) return false;
     this.captureObjects(document.objects);
     return this.replayDocument(document);
   }
 
-  private projectDocument(source: DrawingDocumentV1): DrawingDocumentV1 {
+  private projectDocument(source: DrawingDocument): DrawingDocument {
     const objects = this.options.objectProjection
       ? source.objects.map((object) => this.options.objectProjection!.resolve(object))
       : source.objects;
     return objects.every((object, index) => object === source.objects[index])
       ? source
-      : { version: 1, objects };
+      : documentForObjects(objects);
   }
 
-  getCommittedDocument(): DrawingDocumentV1 {
+  getCommittedDocument(): DrawingDocument {
     return this.projectDocument(this.document);
   }
 
@@ -249,10 +256,31 @@ class DrawingSessionOwner implements DrawingSession {
 
   commitObject(object: DrawingObject, commitOptions?: { select?: boolean }) {
     this.commitDocument(
-      { version: 1, objects: [...this.document.objects, object] },
+      documentForObjects([...this.document.objects, object]),
       this.options.autoSelectCreatedObjects === false || commitOptions?.select === false
         ? []
         : [object.id]
+    );
+  }
+
+  commitObjects(objects: readonly DrawingObject[], commitOptions?: { select?: boolean }) {
+    if (objects.length === 0) return;
+    const identities = new Set(this.document.objects.map((object) => object.id));
+    for (const object of objects) {
+      if (
+        typeof object.id !== 'string' ||
+        object.id.length === 0 ||
+        object.id.length > 256 ||
+        identities.has(object.id)
+      )
+        return;
+      identities.add(object.id);
+    }
+    this.commitDocument(
+      documentForObjects([...this.document.objects, ...objects]),
+      this.options.autoSelectCreatedObjects === false || commitOptions?.select === false
+        ? []
+        : objects.map((object) => object.id)
     );
   }
 
@@ -261,7 +289,7 @@ class DrawingSessionOwner implements DrawingSession {
     if (index < 0 || this.document.objects[index] === object) return;
     const objects = [...this.document.objects];
     objects[index] = object;
-    this.commitDocument({ version: 1, objects });
+    this.commitDocument(documentForObjects(objects));
   }
 
   replaceObjects(replacements: readonly DrawingObject[]) {
@@ -274,7 +302,7 @@ class DrawingSessionOwner implements DrawingSession {
       changed = true;
       return replacement;
     });
-    if (changed) this.commitDocument({ version: 1, objects });
+    if (changed) this.commitDocument(documentForObjects(objects));
   }
 
   previewObjects(replacements: readonly DrawingObject[]) {
@@ -283,7 +311,7 @@ class DrawingSessionOwner implements DrawingSession {
     const byId = new Map(replacements.map((object) => [object.id, object]));
     const objects = this.document.objects.map((object) => byId.get(object.id) ?? object);
     if (objects.every((object, index) => object === this.document.objects[index])) return;
-    this.previewDocument = { version: 1, objects };
+    this.previewDocument = documentForObjects(objects);
     this.emit();
   }
 
@@ -308,7 +336,7 @@ class DrawingSessionOwner implements DrawingSession {
       }));
     if (copies.length === 0) return;
     this.commitDocument(
-      { version: 1, objects: [...this.document.objects, ...copies] },
+      documentForObjects([...this.document.objects, ...copies]),
       copies.map((object) => object.id)
     );
   }
@@ -321,7 +349,7 @@ class DrawingSessionOwner implements DrawingSession {
       direction
     );
     if (objects.every((object, index) => object === this.document.objects[index])) return;
-    this.commitDocument({ version: 1, objects });
+    this.commitDocument(documentForObjects(objects));
   }
 
   deleteObjects(objectIds: readonly string[]) {
@@ -330,7 +358,7 @@ class DrawingSessionOwner implements DrawingSession {
     const objects = this.document.objects.filter((object) => !deleted.has(object.id));
     if (objects.length !== this.document.objects.length) {
       this.commitDocument(
-        { version: 1, objects },
+        documentForObjects(objects),
         this.selectedObjectIds.filter((selectedId) => !deleted.has(selectedId))
       );
     }

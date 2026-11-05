@@ -348,7 +348,17 @@ export function translateDrawingObject(object: DrawingObject, delta: DrawingPoin
       end: move(object.end),
       ...(object.bendPoints ? { bendPoints: object.bendPoints.map(move) } : {}),
     };
-  return { ...object, bounds: { ...object.bounds, ...move(object.bounds) } };
+  const origin = move(object.bounds);
+  const translated = origin.x !== object.bounds.x || origin.y !== object.bounds.y;
+  const sourceDirty =
+    object.kind === 'simplify' &&
+    translated &&
+    (object.settings.automatic || object.settings.manualKind === 'text');
+  return {
+    ...object,
+    bounds: { ...object.bounds, ...origin },
+    ...(sourceDirty ? { sourceDirty: true } : {}),
+  };
 }
 
 /** Applies one rigid rotation without changing local dimensions or stroke geometry. */

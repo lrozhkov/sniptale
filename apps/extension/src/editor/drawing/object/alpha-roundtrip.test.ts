@@ -8,7 +8,7 @@ import { readEditorDrawingObject } from './metadata';
 import { createEditorDrawingFabricObject } from './vector';
 
 it('keeps drawing alpha through Fabric save and reopen, including legacy opacity', async () => {
-  const drawings: Exclude<DrawingObject, { kind: 'blur' }>[] = [
+  const drawings: Exclude<DrawingObject, { kind: 'blur' | 'simplify' }>[] = [
     {
       bounds: { x: 5, y: 5, width: 30, height: 25 },
       color: '#ff000080',

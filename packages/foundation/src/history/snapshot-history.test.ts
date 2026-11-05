@@ -143,3 +143,47 @@ describe('SnapshotHistory limits', () => {
     });
   });
 });
+
+it('enriches the current head without another action and preserves the redo branch', () => {
+  const history = new SnapshotHistory('base');
+  history.push('first');
+  history.push('second');
+  history.undo();
+  const revision = history.getRevision();
+  const replaced = history.replaceCurrent(revision, 'first-derived');
+  expect(replaced).toMatchObject({ current: 'first-derived', index: 1, size: 3, canRedo: true });
+  expect(history.undo()?.current).toBe('base');
+  expect(history.redo()?.current).toBe('first-derived');
+  expect(history.redo()?.current).toBe('second');
+});
+
+it('rejects stale enrichment even after undo and redo return to identical bytes', () => {
+  const history = new SnapshotHistory('base');
+  history.push('same-head');
+  const revision = history.getRevision();
+  history.undo();
+  history.redo();
+  expect(history.getCurrent()).toBe('same-head');
+  expect(history.replaceCurrent(revision, 'stale')).toBeNull();
+  expect(history.getCurrent()).toBe('same-head');
+  expect(history.getState().size).toBe(2);
+});
+
+it('replacing a snapshot preserves clone isolation and applies the existing byte budget', () => {
+  const history = new SnapshotHistory(
+    { value: 'a' },
+    {
+      maxBytes: 8,
+      measureBytes: (entries) => entries.reduce((sum, entry) => sum + entry.value.length, 0),
+    }
+  );
+  history.push({ value: 'bbb' });
+  history.push({ value: 'c' });
+  const replacement = { value: '1234567' };
+  expect(history.replaceCurrent(history.getRevision(), replacement)?.current).toEqual(replacement);
+  replacement.value = 'mutated';
+  expect(history.getCurrent()).toEqual({ value: '1234567' });
+  expect(
+    history.getSnapshots().reduce((sum, entry) => sum + entry.value.length, 0)
+  ).toBeLessThanOrEqual(8);
+});

@@ -1,5 +1,7 @@
-import { ActiveSelection, type Canvas, type FabricObject } from 'fabric';
+import { ActiveSelection, FabricImage, type Canvas, type FabricObject } from 'fabric';
 import type { SourceState } from '../../document/model/source-state';
+import { carryEditorSimplifySourceContext } from '../simplify-runtime';
+import { createEditorDrawingSimplifyObject } from './simplify';
 import { createEditorDrawingBlurObject } from './blur';
 import { readEditorDrawingObject, synchronizeEditorDrawingObjectFromFabric } from './metadata';
 import { createEditorDrawingFabricObject } from './vector';
@@ -12,8 +14,15 @@ function copyEditorDrawingRuntimeState(source: FabricObject, target: FabricObjec
 
 function createCanonicalObject(
   drawing: NonNullable<ReturnType<typeof readEditorDrawingObject>>,
-  source: SourceState | null
+  source: SourceState | null,
+  original?: FabricObject
 ): FabricObject | null {
+  if (drawing.kind === 'simplify')
+    return createEditorDrawingSimplifyObject(
+      drawing,
+      1,
+      original instanceof FabricImage ? original.getElement() : undefined
+    );
   if (drawing.kind === 'blur') {
     if (!source) return null;
     return createEditorDrawingBlurObject({ drawing, labelIndex: 1, source });
@@ -28,11 +37,21 @@ export function replaceEditorDrawingObjectWithCanonicalGeometry(args: {
   source: SourceState | null;
   synchronizeTransform?: boolean;
 }): FabricObject {
-  const drawing = args.synchronizeTransform
+  const previous = readEditorDrawingObject(args.object);
+  let drawing = args.synchronizeTransform
     ? synchronizeEditorDrawingObjectFromFabric(args.object)
     : readEditorDrawingObject(args.object);
   if (!drawing) return args.object;
-  const replacement = createCanonicalObject(drawing, args.source);
+  if (
+    args.synchronizeTransform &&
+    drawing.kind === 'simplify' &&
+    previous?.kind === 'simplify' &&
+    (JSON.stringify(drawing.bounds) !== JSON.stringify(previous.bounds) ||
+      ((drawing.settings.automatic || drawing.settings.manualKind === 'text') &&
+        drawing.rotation !== previous.rotation))
+  )
+    drawing = { ...drawing, sourceDirty: true };
+  const replacement = createCanonicalObject(drawing, args.source, args.object);
   if (!replacement) return args.object;
   copyEditorDrawingRuntimeState(args.object, replacement);
   const index = args.canvas.getObjects().indexOf(args.object);
@@ -40,6 +59,8 @@ export function replaceEditorDrawingObjectWithCanonicalGeometry(args: {
   args.canvas.remove(args.object);
   args.canvas.insertAt(index, replacement);
   args.prepareObject(replacement);
+  if (drawing.kind === 'simplify')
+    carryEditorSimplifySourceContext(args.canvas, args.object, replacement);
   return replacement;
 }
 

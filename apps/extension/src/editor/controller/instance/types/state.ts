@@ -1,3 +1,4 @@
+import type { EditorSimplifyCompute } from '../../../drawing/simplify-runtime';
 import type { Canvas, Rect } from 'fabric';
 import type { EditorDocument, EditorTool } from '../../../../features/editor/document/types';
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
@@ -11,6 +12,7 @@ import type { EditorControllerDocumentSize } from './shared';
 
 export interface EditorControllerMountedElementsState {
   canvas: Canvas | null;
+  readonly createSimplifyCompute?: () => EditorSimplifyCompute;
   viewportElement: HTMLElement | null;
   stageElement: HTMLElement | null;
 }

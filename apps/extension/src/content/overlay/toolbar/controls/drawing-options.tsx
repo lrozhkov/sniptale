@@ -1,6 +1,7 @@
+import { DrawingSimplifyOptions } from '../../../../ui/drawing-tools/simplify-options';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
-import { useContext, type RefObject, type ReactNode } from 'react';
+import { useContext, useSyncExternalStore, type RefObject, type ReactNode } from 'react';
 import type { ContentDrawingController } from '../../../drawing/controller';
 import {
   DRAWING_ARROW_WIDTHS,
@@ -101,7 +102,16 @@ function DrawingOptionsPair(
       canDuplicate={props.selectedCount > 0}
       canDelete={props.selectedCount > 0}
       onMove={(direction) => props.controller.session.moveSelected(direction)}
-      onDuplicate={() => props.controller.session.duplicateSelected()}
+      onDuplicate={() => {
+        const snapshot = props.controller.session.getSnapshot();
+        if (
+          snapshot.document.objects.some(
+            (object) => object.kind === 'simplify' && snapshot.selectedObjectIds.includes(object.id)
+          )
+        )
+          void props.controller.simplify?.duplicate();
+        else props.controller.session.duplicateSelected();
+      }}
       onDelete={() => props.controller.session.deleteSelected()}
       onDeselect={() => props.controller.session.select(null)}
     />
@@ -173,6 +183,7 @@ export function resolveDrawingQuickOptionsTool(
   const selected = snapshot.document.objects.find(
     (object) => object.id === snapshot.selectedObjectId
   );
+  if (selected?.kind === 'simplify') return 'simplify';
   if (selected?.kind === 'blur') return 'blur';
   if (selected?.kind === 'pencil' || selected?.kind === 'marker') return selected.kind;
   if (selected?.kind === 'arrow') return 'arrow';
@@ -187,6 +198,7 @@ export function resolveDrawingQuickOptionsTool(
   }
   return snapshot.activeTool === 'pencil' ||
     snapshot.activeTool === 'blur' ||
+    snapshot.activeTool === 'simplify' ||
     snapshot.activeTool === 'marker' ||
     snapshot.activeTool === 'shape' ||
     snapshot.activeTool === 'arrow' ||
@@ -213,16 +225,18 @@ function resolveObjectOptionsTool(
 
 function isStrokeColorObject(
   object: DrawingObject
-): object is Exclude<Exclude<DrawingObject, { kind: 'blur' | 'text' }>, never> {
-  return object.kind !== 'blur' && object.kind !== 'text';
+): object is Exclude<Exclude<DrawingObject, { kind: 'blur' | 'text' | 'simplify' }>, never> {
+  return object.kind !== 'blur' && object.kind !== 'text' && object.kind !== 'simplify';
 }
 
-function visibleStrokeColor(object: Exclude<DrawingObject, { kind: 'blur' | 'text' }>): string {
+function visibleStrokeColor(
+  object: Exclude<DrawingObject, { kind: 'blur' | 'text' | 'simplify' }>
+): string {
   return object.kind === 'marker' ? markerVisibleColor(object.color, object.opacity) : object.color;
 }
 
 function applyStrokeColor(
-  object: Exclude<DrawingObject, { kind: 'blur' | 'text' }>,
+  object: Exclude<DrawingObject, { kind: 'blur' | 'text' | 'simplify' }>,
   color: string
 ) {
   return object.kind === 'marker'
@@ -596,7 +610,10 @@ function DrawingOptionsSurface(
   );
 }
 
-export function ToolbarDrawingOptions(props: {
+const subscribeNoSimplify = () => () => undefined;
+const noSimplifyRevision = () => 0;
+
+type ToolbarDrawingOptionsProps = {
   selectionDisclosure: DrawingSelectionDisclosure;
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
@@ -605,7 +622,62 @@ export function ToolbarDrawingOptions(props: {
   triggerRef: RefObject<HTMLButtonElement | null>;
   panelRef: RefObject<HTMLDivElement | null>;
   layout: ReturnType<typeof useDrawingOptionsLayout>;
-}) {
+};
+
+function ToolbarSimplifyOptions(props: ToolbarDrawingOptionsProps) {
+  const { controller, displayMode, snapshot, panelRef, layout } = props;
+  useSyncExternalStore(
+    controller.simplify?.subscribe ?? subscribeNoSimplify,
+    controller.simplify?.getRevision ?? noSimplifyRevision,
+    controller.simplify?.getRevision ?? noSimplifyRevision
+  );
+  const selectedObject = snapshot.document.objects.find(
+    (object) => object.id === snapshot.selectedObjectId
+  );
+  const selected = selectedObject?.kind === 'simplify' ? selectedObject : null;
+  const draft = controller.simplify
+    ?.getPendingObjects()
+    .find((object) => object.id === selected?.id);
+  return (
+    <DrawingOptionsSurface
+      selectionDisclosure={props.selectionDisclosure}
+      controller={controller}
+      displayMode={displayMode}
+      layout={layout}
+      panelRef={panelRef}
+      selected={selected !== null}
+      snapshot={snapshot}
+      tool="simplify"
+    >
+      <DrawingSimplifyOptions
+        settings={
+          (draft?.kind === 'simplify' ? draft.settings : selected?.settings) ??
+          snapshot.defaults.simplify
+        }
+        colors={[...controller.getPalette()]}
+        floatingBoundaryRef={panelRef}
+        floatingPlacement={displayMode === 'vertical' ? 'side' : 'auto'}
+        vertical={displayMode === 'vertical'}
+        onChange={(patch) => {
+          controller.session.setDefaults({
+            ...snapshot.defaults,
+            simplify: { ...snapshot.defaults.simplify, ...patch },
+          });
+          if (selected) void controller.simplify?.update(selected, patch);
+        }}
+        {...(selected
+          ? {
+              onRebuild: () => {
+                void controller.simplify?.rebuild(selected);
+              },
+            }
+          : {})}
+      />
+    </DrawingOptionsSurface>
+  );
+}
+
+export function ToolbarDrawingOptions(props: ToolbarDrawingOptionsProps) {
   const { controller, displayMode, snapshot, tool } = props;
   const { panelRef, layout } = props;
   const selectedObject = snapshot.document.objects.find(
@@ -627,6 +699,7 @@ export function ToolbarDrawingOptions(props: {
       />
     );
   }
+  if (tool === 'simplify') return <ToolbarSimplifyOptions {...props} />;
   if (tool === 'blur') {
     const selectedBlur = selectedObject?.kind === 'blur' ? selectedObject : null;
     const content = (

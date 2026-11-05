@@ -9,6 +9,7 @@ import {
   collectDockerOrigins,
   collectDocumentedCommandOrigins,
   collectHookOrigins,
+  collectHtmlModuleOrigins,
   collectPackageScriptOrigins,
   collectWorkflowOrigins,
 } from './structured.mjs';
@@ -18,6 +19,7 @@ const COLLECTORS = {
   docker: collectDockerOrigins,
   docs: collectDocumentedCommandOrigins,
   hook: collectHookOrigins,
+  html: collectHtmlModuleOrigins,
   package: collectPackageScriptOrigins,
   workflow: collectWorkflowOrigins,
 };
@@ -32,11 +34,14 @@ function assertUniqueAuthorities(authorityPaths) {
   );
 }
 
-function collectAuthorityProjection(authority) {
+function collectAuthorityProjection(authority, exists) {
   if (authority.kind !== 'source' && authority.kind !== 'test-source') {
     const collector = COLLECTORS[authority.kind];
     if (!collector) throw new Error(`Unsupported executable origin authority: ${authority.kind}`);
-    return { origins: collector({ authority: authority.path, ...authority }), unresolved: [] };
+    return {
+      origins: collector({ authority: authority.path, ...authority, exists }),
+      unresolved: [],
+    };
   }
 
   const origins = [];
@@ -102,7 +107,7 @@ export function collectExecutableOriginProjection({
   const origins = [];
   const unresolved = [];
   for (const authority of [...authorities].sort((a, b) => a.path.localeCompare(b.path))) {
-    const projection = collectAuthorityProjection(authority);
+    const projection = collectAuthorityProjection(authority, exists);
     origins.push(...projection.origins);
     unresolved.push(...projection.unresolved);
   }
@@ -125,6 +130,7 @@ export {
   collectDockerOrigins,
   collectDocumentedCommandOrigins,
   collectHookOrigins,
+  collectHtmlModuleOrigins,
   collectPackageScriptOrigins,
   collectDeclaredEntryOrigins,
   collectSourceInvocationOrigins,

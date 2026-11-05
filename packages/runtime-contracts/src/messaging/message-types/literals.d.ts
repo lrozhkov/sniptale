@@ -1,5 +1,7 @@
 declare module './' {
   export namespace MessageType {
+    type SIMPLIFY_COMMAND = typeof import('./').MessageType.SIMPLIFY_COMMAND;
+    type OFFSCREEN_SIMPLIFY_COMMAND = typeof import('./').MessageType.OFFSCREEN_SIMPLIFY_COMMAND;
     type OFFSCREEN_SYNC_WORKSPACE_START =
       typeof import('./').MessageType.OFFSCREEN_SYNC_WORKSPACE_START;
     type SYNC_WORKSPACE_ORIGIN_PERMISSION =

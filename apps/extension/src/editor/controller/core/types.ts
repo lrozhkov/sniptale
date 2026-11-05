@@ -1,7 +1,16 @@
 import type { FabricObject, Point } from 'fabric';
 
 export interface DrawSession {
-  tool: 'pencil' | 'marker' | 'shape' | 'blur' | 'arrow' | 'text' | 'crop' | 'rich-shape';
+  tool:
+    | 'simplify'
+    | 'pencil'
+    | 'marker'
+    | 'shape'
+    | 'blur'
+    | 'arrow'
+    | 'text'
+    | 'crop'
+    | 'rich-shape';
   pointerId: number | null;
   start: Point;
   lastPoint?: Point;

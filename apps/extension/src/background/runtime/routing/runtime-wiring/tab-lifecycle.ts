@@ -1,3 +1,4 @@
+import { retireSimplifySessionsForTab } from '../action-kernel/owned-route-handlers';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { clearPinToTabSessionStorageState } from '../../../../composition/persistence/content-pin-session/index';
 import { clearAnnotationForkSessionForTab } from '../../../annotation-fork-session/route';
@@ -13,6 +14,7 @@ export function registerTabLifecycleListeners(
   logger: RuntimeWiringLogger
 ): void {
   browserTabs.subscribeToRemoved((tabId) => {
+    retireSimplifySessionsForTab(tabId);
     handleRegionSelectionNavigationStart(tabId);
     clearRecentCaptureEditorAssetCapabilitiesForTab(tabId);
     clearPinnedToolbarOperationState(tabId);

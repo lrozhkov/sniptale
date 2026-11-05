@@ -49,7 +49,8 @@ it('reuses the complete drawing catalog while recording owns navigation, eraser,
     host.querySelectorAll(
       'button[data-ui^="content.toolbar.drawing."]:not([data-ui^="content.toolbar.drawing-options."])'
     )
-  ).toHaveLength(7);
+  ).toHaveLength(8);
+  expect(host.querySelector('[data-ui="content.toolbar.drawing.simplify"]')).not.toBeNull();
   expect(
     host
       .querySelector('[data-ui="content.toolbar.video-recording.navigation"]')

@@ -1,3 +1,4 @@
+import { notifyEditorSimplifyDocumentCommit } from '../../../drawing/simplify-runtime';
 import { normalizeEditorImageSettings } from '../../../../features/editor/document/constants';
 import { applyImageSettings, readImageSettingsFromObject } from '../../../objects/image-style';
 import { getSourceObject } from '../layers';
@@ -87,6 +88,7 @@ export async function loadPreparedDocumentOnCanvas(
     if (!options.preserveViewport) options.canvas.centerDocumentInViewport();
   }
   renderCanvasAfterDocumentLoad(options.canvas);
+  notifyEditorSimplifyDocumentCommit(options.canvas);
   return source;
 }
 

@@ -516,3 +516,34 @@ it('discards a shared staged source once after a later slot fails and permits re
   );
   expect(retried.refs.every((ref) => ref.assetId !== 'asset-1')).toBe(true);
 });
+
+it('externalizes Simplify source and result and restores both for document transfer', async () => {
+  const document = createEditorDocumentFixture();
+  document.canvasJson = JSON.stringify({
+    objects: [
+      {
+        type: 'image',
+        src: 'data:image/png;base64,cmVzdWx0',
+        sniptaleSimplifySourceData: 'data:image/png;base64,c291cmNl',
+      },
+    ],
+  });
+  const prepared = await preparePersistedEditorDocument(document);
+  expect(prepared.document.assets.map((asset) => asset.role)).toContain(
+    'canvas:$.objects[0].sniptaleSimplifySourceData'
+  );
+  expect(prepared.document.canvasJson).not.toContain('data:');
+  expect(parsePersistedEditorDocument(prepared.document)).toEqual(prepared.document);
+  mocks.readAssetFile.mockImplementation(
+    async (_ref, role: string) =>
+      new File([role.endsWith('.src') ? 'result' : 'source'], 'raster', { type: 'image/png' })
+  );
+  const materialized = await materializePersistedEditorDocumentForLegacyTransfer({
+    document: prepared.document,
+    refs: prepared.refs,
+  });
+  expect(JSON.parse(materialized.canvasJson).objects[0]).toMatchObject({
+    src: 'data:image/png;base64,cmVzdWx0',
+    sniptaleSimplifySourceData: 'data:image/png;base64,c291cmNl',
+  });
+});

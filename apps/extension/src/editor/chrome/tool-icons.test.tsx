@@ -24,6 +24,7 @@ describe('tool-icons', () => {
       'marker',
       'frame-annotation',
       'shape',
+      'simplify',
       'blur',
       'text',
       'arrow',

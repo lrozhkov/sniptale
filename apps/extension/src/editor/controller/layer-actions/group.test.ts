@@ -1,3 +1,9 @@
+// @vitest-environment jsdom
+import { createEditorDrawingSimplifyObject } from '../../drawing/object/simplify';
+import { readEditorDrawingObject } from '../../drawing/object/metadata';
+import { refreshPreparedObjectGeometry } from '../document/objects/geometry-refresh';
+import { createDefaultSimplifySettings } from '../../../features/simplify/settings';
+import { canGroupLayerSelection } from '../../inspector/layers/helpers';
 import { ActiveSelection, Group, Rect, type Canvas, type FabricObject } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { groupSelectedEditorLayers, ungroupSelectedEditorLayers } from './group';
@@ -160,4 +166,44 @@ it('preserves child positions after moving and resizing a group', () => {
   expect(ungroupSelectedEditorLayers(harness.controller)).toBe(true);
   expect(harness.first.getCenterPoint().distanceFrom(before[0]!)).toBeLessThan(0.001);
   expect(harness.second.getCenterPoint().distanceFrom(before[1]!)).toBeLessThan(0.001);
+});
+
+it('admits Simplify through the public group flow and preserves editable rasters after transformed ungroup', () => {
+  const harness = createHarness();
+  const image = document.createElement('canvas');
+  image.width = 20;
+  image.height = 10;
+  const snapshot = { dataUrl: image.toDataURL('image/png'), width: 20, height: 10 };
+  const drawing = {
+    id: 'simplify-layer',
+    kind: 'simplify',
+    bounds: { x: 10, y: 10, width: 40, height: 20 },
+    settings: createDefaultSimplifySettings(),
+    result: snapshot,
+    source: { ...snapshot, bounds: { x: 0, y: 0, width: 100, height: 80 } },
+  } as const;
+  const simplify = createEditorDrawingSimplifyObject(drawing, 1, image);
+  harness.objects.splice(1, 1, simplify);
+  harness.controller.prepareObject.mockImplementation(refreshPreparedObjectGeometry);
+  harness.setActive(new ActiveSelection([simplify, harness.second]));
+  expect(canGroupLayerSelection(collectLayers(harness.canvas))).toBe(true);
+  expect(groupSelectedEditorLayers(harness.controller)).toBe(true);
+  const group = harness.canvas.getActiveObject();
+  expect(group).toBeInstanceOf(Group);
+  expect(harness.objects).toEqual([harness.source, group]);
+  expect(readEditorDrawingObject(simplify)).toMatchObject({
+    id: drawing.id,
+    result: snapshot,
+    source: drawing.source,
+  });
+  group!.set({ left: group!.left + 25, top: group!.top + 10, scaleX: 1.5, scaleY: 1.5 });
+  expect(ungroupSelectedEditorLayers(harness.controller)).toBe(true);
+  expect(harness.objects).toEqual([harness.source, simplify, harness.second]);
+  expect(readEditorDrawingObject(simplify)).toMatchObject({
+    id: drawing.id,
+    result: snapshot,
+    source: drawing.source,
+    sourceDirty: true,
+  });
+  expect(harness.controller.commitHistory).toHaveBeenCalledTimes(2);
 });

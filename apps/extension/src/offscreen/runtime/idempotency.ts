@@ -80,6 +80,11 @@ const idempotencyPolicyByType = {
     idempotent: false,
     reason: 'privacy erasure and verification are deliberately repeatable under the owner lock',
   },
+  [MessageType.OFFSCREEN_SIMPLIFY_COMMAND]: {
+    idempotent: false,
+    reason:
+      'Disposable computation sessions validate their current identity; cancellation can be retried',
+  },
   [MessageType.OFFSCREEN_QUICK_ACTION_HEADER]: {
     idempotent: false,
     reason: 'bounded header rendering has no persistent effects and can be repeated',

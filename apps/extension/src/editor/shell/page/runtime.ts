@@ -1,3 +1,5 @@
+import { createRuntimeMessagingTransport } from '../../../platform/runtime-messaging';
+import { createSimplifyComputeClient } from '../../../workflows/simplify/compute-client';
 import type { EditorEmbedMode } from '../../../features/editor/contracts/embed';
 import { getMediaLibraryEntry } from '../../../composition/persistence/media-library/index.library.ts';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
@@ -135,7 +137,11 @@ export async function recoverMissingEditorPageDocument(): Promise<void> {
 export function createEditorPageServices(
   embedMode: EditorEmbedMode | null = null
 ): EditorPageServices {
-  const controller = createImageEditorController();
+  const transport = createRuntimeMessagingTransport();
+  const controller = createImageEditorController({
+    createSimplifyCompute: () =>
+      createSimplifyComputeClient({ send: (request) => transport.sendRuntimeMessage(request) }),
+  });
   const autosaveService = createEditorSessionAutosaveService();
   if (embedMode !== 'scenario') controller.autosaveService = autosaveService;
 

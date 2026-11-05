@@ -1,3 +1,4 @@
+import { requestEditorSimplify } from '../../../../drawing/simplify-runtime';
 import type { Canvas } from 'fabric';
 
 import { useEditorStore } from '../../../../state/useEditorStore';
@@ -5,11 +6,14 @@ import { applySelectionToolSettingsToObjects } from '../../../selection';
 import { getSingleSelectionType } from '../../../../document/model';
 import { getMutableEditorSelection } from './active-selection';
 
-function runSelectionSettingsMutation(options: {
-  canvas: Canvas | null;
-  prepareObject: (object: import('fabric').FabricObject) => void;
-  withHistoryMuted: <T>(callback: () => T) => T;
-}): boolean {
+function runSelectionSettingsMutation(
+  options: {
+    canvas: Canvas | null;
+    prepareObject: (object: import('fabric').FabricObject) => void;
+    withHistoryMuted: <T>(callback: () => T) => T;
+  },
+  preview = false
+): boolean {
   const { canvas, withHistoryMuted } = options;
   if (!canvas) {
     return false;
@@ -21,6 +25,16 @@ function runSelectionSettingsMutation(options: {
 
   const selectedType = getSingleSelectionType(activeObjects);
   if (!selectedType) {
+    return false;
+  }
+
+  if (selectedType === 'simplify' && activeObjects.length === 1 && activeObjects[0]) {
+    requestEditorSimplify(
+      canvas,
+      activeObjects[0],
+      useEditorStore.getState().selectionToolSettings.simplify,
+      preview
+    );
     return false;
   }
 
@@ -57,7 +71,7 @@ export function previewEditorSelectionSettings(options: {
   withHistoryMuted: <T>(callback: () => T) => T;
   syncRuntimeState: () => void;
 }): void {
-  if (runSelectionSettingsMutation(options)) {
+  if (runSelectionSettingsMutation(options, true)) {
     options.syncRuntimeState();
   }
 }

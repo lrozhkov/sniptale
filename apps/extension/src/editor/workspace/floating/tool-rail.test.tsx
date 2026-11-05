@@ -134,6 +134,7 @@ it('renders the exact centered tool order with two vertical dividers', () => {
     'editor.floating.tool-rail.text',
     'editor.floating.tool-rail.shape',
     'editor.floating.tool-rail.arrow',
+    'editor.floating.tool-rail.simplify',
     'editor.floating.tool-rail.blur',
   ]);
   expect(queryUi('editor.floating.tool-rail.crop')).toBeNull();

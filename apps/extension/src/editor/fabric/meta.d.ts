@@ -12,6 +12,13 @@ import type {
 
 declare module 'fabric' {
   interface FabricObject {
+    sniptaleSimplifySourceData?: string;
+    sniptaleSimplifySourceWidth?: number;
+    sniptaleSimplifySourceHeight?: number;
+    sniptaleSimplifySourceLeft?: number;
+    sniptaleSimplifySourceTop?: number;
+    sniptaleSimplifySourceDisplayWidth?: number;
+    sniptaleSimplifySourceDisplayHeight?: number;
     sniptaleId?: string;
     sniptaleType?: EditorObjectType;
     sniptaleLabel?: string;

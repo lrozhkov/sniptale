@@ -9,11 +9,17 @@ import { resolvePageScrollRoot, type PageScrollRoot } from '../platform/page-scr
 import { createPagePreparationDrawingSession, type DrawingHistoryCommitPort } from './history';
 import { synchronizeContentDrawingPreferences } from './preferences';
 import { createDrawingLayout } from './layout';
+import {
+  createContentSimplifyRuntime,
+  type ContentSimplifyDependencies,
+  type ContentSimplifyRuntime,
+} from './simplify';
 
 export { synchronizeContentDrawingPreferences } from './preferences';
 
 export interface ContentDrawingController {
   readonly session: DrawingSession;
+  readonly simplify?: ContentSimplifyRuntime;
   getPalette(): readonly string[];
   applyPalette(colors: readonly string[]): void;
   getScrollRoot(): PageScrollRoot;
@@ -34,14 +40,19 @@ export function useDrawingSessionSnapshot(session: DrawingSession): DrawingSessi
 }
 
 export function useContentDrawingController(
-  history: DrawingHistoryCommitPort
+  history: DrawingHistoryCommitPort,
+  simplifyDependencies?: ContentSimplifyDependencies
 ): ContentDrawingController {
-  const controller = useMemo(() => createContentDrawingController(history), [history]);
+  const controller = useMemo(
+    () => createContentDrawingController(history, simplifyDependencies),
+    [history, simplifyDependencies]
+  );
 
   useEffect(() => {
     const unsubscribe = synchronizeContentDrawingPreferences(controller);
     return () => {
       unsubscribe();
+      controller.simplify?.dispose();
       controller.session.dispose();
     };
   }, [controller]);
@@ -50,7 +61,8 @@ export function useContentDrawingController(
 }
 
 export function createContentDrawingController(
-  source: DrawingSession | DrawingHistoryCommitPort
+  source: DrawingSession | DrawingHistoryCommitPort,
+  simplifyDependencies?: ContentSimplifyDependencies
 ): ContentDrawingController {
   let root: PageScrollRoot = { kind: 'viewport', element: null };
   const history = 'commitEntry' in source ? source : null;
@@ -59,12 +71,16 @@ export function createContentDrawingController(
     'commitEntry' in source
       ? createPagePreparationDrawingSession(source, layout ?? undefined)
       : source;
+  const simplify = simplifyDependencies
+    ? createContentSimplifyRuntime(session, simplifyDependencies)
+    : null;
   let palette: readonly string[] = [...DEFAULT_DRAWING_COLORS];
   let finalizer: (() => void) | null = null;
   let pendingTextChange = false;
   const pendingTextListeners = new Set<() => void>();
   return {
     session,
+    ...(simplify ? { simplify } : {}),
     ...(layout
       ? { getObjectAnchor: layout.getAnchor, subscribeLayoutChanges: layout.subscribe }
       : {}),
@@ -86,6 +102,7 @@ export function createContentDrawingController(
     },
     finalizeInteraction() {
       finalizer?.();
+      simplify?.cancel();
       session.select(null);
     },
     hasPendingTextChange: () => pendingTextChange,

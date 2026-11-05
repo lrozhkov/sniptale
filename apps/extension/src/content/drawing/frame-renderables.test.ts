@@ -75,3 +75,26 @@ it('keeps a live ink draft above existing text and replaces moved objects in pla
   });
   expect(layers.at(-1)).toEqual({ kind: 'ink', objects: [draft] });
 });
+
+it('uses a fill-only preview for manual Image resizing while preserving accepted pixels', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const original = {
+    id: 'image',
+    kind: 'simplify',
+    bounds: { x: 10, y: 10, width: 60, height: 60 },
+    settings: { ...session.getSnapshot().defaults.simplify, automatic: false, manualKind: 'image' },
+    result: { dataUrl: 'data:image/png;base64,result', width: 60, height: 60 },
+  } as const;
+  const resized = { ...original, bounds: { ...original.bounds, width: 120 } };
+  const layer = resolveDrawingVisualLayers([original], {
+    kind: 'resize',
+    original,
+    object: resized,
+    start: { x: 70, y: 40 },
+    handle: 'e',
+  }).find((entry) => entry.kind === 'simplify');
+  expect(layer).toMatchObject({ kind: 'simplify', previewFill: true });
+  expect(layer?.kind === 'simplify' ? layer.object.result : null).toBe(original.result);
+  expect(original.bounds.width).toBe(60);
+  session.dispose();
+});
