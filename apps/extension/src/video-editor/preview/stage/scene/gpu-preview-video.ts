@@ -20,18 +20,64 @@ import {
   getFittedMediaContentFrame,
   getFittedMediaOriginalWindowFrame,
   getFittedMediaWindowFrame,
+  drawFittedMediaLayer,
 } from '../../../../features/video/composition/draw/fitted-media';
-import { admittedVisualWindowHeader } from '../../../../features/video/composition/draw/window-header';
+import { resolveVideoWindowMedia } from '../../../../features/video/composition/draw/video';
 import {
   DEFAULT_CAMERA_APPEARANCE,
   cameraWindowFrame,
 } from '../../../../features/video/project/camera/appearance';
 import { traceCameraShape } from '../../../../features/video/composition/draw/media-shadow';
-import { roundedWindowRadius } from '../../../../features/video/project/window-geometry';
+import {
+  roundedWindowRadius,
+  resolveDecoratedMediaFrame,
+} from '../../../../features/video/project/window-geometry';
+import { VideoMediaFitMode } from '../../../../features/video/project/types';
 
 type Layer = VideoCompositionVisualLayer;
 type VideoLayer = Extract<Layer, { kind: 'video' }>;
 const IDENTITY: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+type Raster = (
+  paint: (context: CanvasRenderingContext2D) => void,
+  padded?: boolean,
+  bounds?: GpuPreviewLayer['rect']
+) => GpuPreviewLayer;
+type WindowMedia = ReturnType<typeof resolveVideoWindowMedia> & { frame: VideoLayer };
+
+/** Retain the header's own source alpha, with one logical boundary shared by the video. */
+export function nativeGpuWindowHeader(media: WindowMedia, raster: Raster, inverse = IDENTITY) {
+  const image = media.windowHeaderImage;
+  if (!image) return null;
+  const plane = resolveDecoratedMediaFrame({
+    ...media,
+    contentWidth: media.sourceWidth * (media.sourceCrop?.width ?? 1),
+    contentHeight: media.sourceHeight * (media.sourceCrop?.height ?? 1),
+    fit:
+      media.fitMode === VideoMediaFitMode.CONTAIN
+        ? 'contain'
+        : media.fitMode === VideoMediaFitMode.COVER
+          ? 'cover'
+          : 'stretch',
+  });
+  const source = { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+  const pixels = raster(
+    (context) => context.drawImage(image, 0, 0, source.width, source.height),
+    false,
+    source
+  );
+  return {
+    ...pixels,
+    rect: { x: plane.x, y: plane.y, width: plane.width, height: plane.headerHeight },
+    inverse,
+    clampSourceEdges: ['bottom'],
+  } satisfies GpuPreviewLayer;
+}
+
+/** Decorations retain canonical shadow geometry without rasterizing an internal header edge. */
+export function paintNativeGpuDecoration(context: CanvasRenderingContext2D, media: WindowMedia) {
+  drawFittedMediaLayer({ ...media, context, hideWindowHeader: true, render() {} });
+}
+
 /** Builds one video material; the caller owns raster allocation and ordered scene composition. */
 export function buildNativeGpuVideoLayers(args: {
   layer: VideoLayer;
@@ -40,7 +86,7 @@ export function buildNativeGpuVideoLayers(args: {
   media: ReadonlyMap<string, VideoCompositionMediaSource>;
   imageBank: Record<string, HTMLImageElement>;
   inverse: QuickEditHomography;
-  raster: (paint: (context: CanvasRenderingContext2D) => void, padded?: boolean) => GpuPreviewLayer;
+  raster: Raster;
   groupLayer: (layers: readonly GpuPreviewLayer[], padded?: boolean) => GpuPreviewLayer;
   spotlight: (
     layers: readonly GpuPreviewLayer[],
@@ -54,18 +100,18 @@ export function buildNativeGpuVideoLayers(args: {
     layer.trackRole === 'CAMERA'
       ? (layer.clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE)
       : undefined;
-  const media = {
-    frame: layer,
-    fitMode: layer.clip.fitMode,
+  const dimensions = {
     sourceWidth: isVideoCompositionFrameSource(borrowed)
       ? borrowed.sourceWidth
       : source.displayWidth,
     sourceHeight: isVideoCompositionFrameSource(borrowed)
       ? borrowed.sourceHeight
       : source.displayHeight,
-    displayScale: 1,
-    ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
-    ...admittedVisualWindowHeader(layer.clip, args.imageBank, layer.trackRole === 'CAMERA'),
+    draw() {},
+  };
+  const media = {
+    ...resolveVideoWindowMedia(layer, dimensions, 1, args.imageBank),
+    frame: layer,
     ...(appearance ? { cameraAppearance: appearance } : {}),
   };
   const window = appearance
@@ -88,12 +134,6 @@ export function buildNativeGpuVideoLayers(args: {
     borders: [],
     spotlights: [],
   };
-  const empty = new Map([
-    [
-      layer.clipId,
-      { sourceWidth: source.displayWidth, sourceHeight: source.displayHeight, draw() {} },
-    ],
-  ]);
   const mirror: QuickEditHomography =
     layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored
       ? [-1, 0, layer.x * 2 + layer.width, 0, 1, 0, 0, 0, 1]
@@ -105,6 +145,9 @@ export function buildNativeGpuVideoLayers(args: {
   const sourceLayers: GpuPreviewLayer[] = [
     { source, rect: content, inverse: sourceInverse, ...(orientation ? { orientation } : {}) },
   ];
+  const header = layer.effectActionsOnly
+    ? null
+    : nativeGpuWindowHeader(media, raster, sourceInverse);
   const traceWindow = (context: CanvasRenderingContext2D) => {
     context.fillStyle = '#fff';
     if (appearance) traceCameraShape(context, window, appearance);
@@ -122,7 +165,7 @@ export function buildNativeGpuVideoLayers(args: {
   };
   const mask = raster((context) => {
     traceWindow(context);
-    if (layer.clip.sourceCrop) {
+    if (layer.clip.sourceCrop && !header) {
       const crop = layer.clip.sourceCrop;
       context.globalCompositeOperation = 'destination-in';
       context.fillRect(
@@ -133,10 +176,32 @@ export function buildNativeGpuVideoLayers(args: {
       );
     }
   }, true);
+  if (header && layer.clip.sourceCrop) {
+    const crop = layer.clip.sourceCrop;
+    sourceLayers[0] = {
+      ...sourceLayers[0]!,
+      clip: {
+        rect: {
+          x: content.x + content.width * crop.x,
+          y: header.rect.y + header.rect.height,
+          width: content.width * crop.width,
+          height: content.height * crop.height,
+        },
+        radius: 0,
+        shape: 'hard-rect',
+      },
+    };
+  }
+  // The existing window group clips both transformed sources; crop coverage affects video only.
+  if (header) sourceLayers.unshift(header);
   sourceLayers.push({ ...mask, blend: 'mask' });
   const sourceBody: GpuPreviewLayer[] = [
     raster(
-      (context) => drawCompositionVisualLayer(context, bare, 1, 1, args.imageBank, empty),
+      (context) =>
+        paintNativeGpuDecoration(context, {
+          ...resolveVideoWindowMedia(bare, dimensions, 1, args.imageBank),
+          frame: bare,
+        }),
       true
     ),
     groupLayer(sourceLayers, true),

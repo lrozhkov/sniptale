@@ -12,8 +12,13 @@ import {
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
 import type { renderPreviewScene } from './render-preview';
 import { createSceneGradientBackground } from '../../../../features/video/project/scene/background-gradient';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
 
-vi.mock('../../../../features/video/composition/draw/video', () => ({ drawVideoLayer: vi.fn() }));
+vi.mock('../../../../features/video/composition/draw/video', async (original) => ({
+  ...(await original<typeof import('../../../../features/video/composition/draw/video')>()),
+  drawVideoLayer: vi.fn(),
+}));
 const owners: ReturnType<typeof createNativeGpuPreviewRenderer>[] = [];
 afterEach(() => {
   for (const owner of owners.splice(0)) owner.dispose();
@@ -74,6 +79,41 @@ function fixture() {
   const passes = resolveVideoCompositionRenderPasses(project, 1);
   return { owner, input, passes, finish, render, dispose, create, bitmap, captured };
 }
+
+it('retains a source-density header at the exact direct-video boundary and releases its pixels', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0];
+  if (layer?.kind !== 'video') throw new Error('Expected video');
+  layer.clip.windowHeader = DEFAULT_WINDOW_HEADER;
+  const image = document.createElement('img');
+  Object.defineProperties(image, {
+    naturalWidth: { value: 931 },
+    naturalHeight: { value: 50 },
+    complete: { value: true },
+  });
+  f.input.imageBank[windowHeaderImageKey(layer.clipId, DEFAULT_WINDOW_HEADER)] = image;
+  vi.spyOn(Object.getPrototypeOf(f.input.canvas.getContext('2d')), 'drawImage').mockImplementation(
+    () => {}
+  );
+  await f.owner.render(f.input, f.passes, f.finish, () => false);
+  await f.owner.render(f.input, f.passes, f.finish, () => false);
+  const first = f.render.mock.calls[0]![0].layers;
+  const second = f.render.mock.calls[1]![0].layers;
+  const header = first.find((node) => node.clampSourceEdges?.includes('bottom'));
+  const video = first.find((node) => node.source instanceof VideoFrame);
+  expect(header).toBeDefined();
+  expect(video).toBeDefined();
+  expect(header!.rect.y + header!.rect.height).toBeCloseTo(video!.rect.y, 12);
+  expect(header!.inverse).toEqual(video!.inverse);
+  expect(header!.clip).toEqual(video!.clip);
+  expect(header!.source).toBe(second.find((node) => node.clampSourceEdges)?.source);
+  expect(header!.cache).toEqual(second.find((node) => node.clampSourceEdges)?.cache);
+  if (!(header!.source instanceof HTMLCanvasElement)) throw new Error('Expected header raster');
+  expect([header!.source.width, header!.source.height]).toEqual([931, 50]);
+  f.owner.dispose();
+  expect(header!.source.width).toBe(0);
+  expect(header!.source.height).toBe(0);
+});
 
 it('composes raw frames and publishes only after GPU completion and final overlays', async () => {
   const f = fixture();

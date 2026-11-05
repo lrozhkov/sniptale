@@ -545,7 +545,9 @@ async function checkHistoryPlaybackIsolation(
     select = vi.fn(),
     section = vi.fn();
   const beforeAction = vi.fn((action: () => void) => action());
-  const current = {
+  const video = document.createElement('video');
+  vi.spyOn(video, 'pause').mockImplementation(pause);
+  const current: ComponentProps<typeof ReviewInspectorBinding> = {
     ...props,
     navigation: { ...props.navigation, setSection: section },
     state: {
@@ -554,10 +556,10 @@ async function checkHistoryPlaybackIsolation(
       session: { ...props.state.session },
       beforeAction,
       seek,
-      video: { current: { pause } },
+      video: { current: video },
       setActiveSelection: select,
     },
-  } as ComponentProps<typeof ReviewInspectorBinding>;
+  };
   await act(async () => root.render(<ReviewInspectorBinding {...current} />));
   expect(historyProbe.receive).toHaveBeenCalledTimes(initialRenders);
   await checkLatestHistoryCommands(current.state);

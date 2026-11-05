@@ -276,6 +276,29 @@ it('reports a failed concrete header decode without accepting another window ras
   expect(JSON.stringify(clip)).toBe(before);
 });
 
+it.each([931, 1904, 2560])(
+  'describes a complete integer SVG viewport at source width %s',
+  (width) => {
+    const clip = createVideoClip({ windowHeader: DEFAULT_WINDOW_HEADER });
+    const project = createProject([clip]);
+    const asset = project.assets[0]!;
+    asset.metadata = { ...asset.metadata, width, height: 520 };
+    const before = JSON.stringify(project);
+    const request = projectWindowHeaderImages(project)[0];
+    if (!request) throw new Error('Expected a video header.');
+    const svg = decodeURIComponent(request.src.slice(request.src.indexOf(',') + 1));
+    const match = /^<svg\b[^>]*\bheight="([\d.]+)"/u.exec(svg);
+    if (!match?.[1]) throw new Error('Expected an SVG viewport height.');
+    const height = Number(match[1]);
+    const logical = windowHeaderGeometry(DEFAULT_WINDOW_HEADER, asset.metadata).height;
+    expect(Number.isSafeInteger(height)).toBe(true);
+    expect(height % 2).toBe(0);
+    expect(height).toBeGreaterThanOrEqual(logical);
+    expect(height - logical).toBeLessThan(2);
+    expect(JSON.stringify(project)).toBe(before);
+  }
+);
+
 it('describes independent video and image header rasters without camera or unavailable materials', () => {
   const video = createVideoClip({
     id: 'decorated-video',

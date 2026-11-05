@@ -11,7 +11,12 @@ import { GalleryApp } from '../../../apps/extension/src/gallery/shell/app-shell'
 
 initializeAppTheme(new URLSearchParams(location.search).get('theme') === 'dark' ? 'dark' : 'light');
 
-void harnessReady.then(() => {
+void harnessReady.then(async () => {
+  if (new URLSearchParams(location.search).get('gpuWindowJoinFixture') === '1') {
+    const { installGpuWindowJoinFixture } = await import('./gpu-window-join');
+    installGpuWindowJoinFixture();
+    return;
+  }
   if (new URLSearchParams(location.search).get('pcmSpeechFixture') === '1')
     installPcmSpeechFixture();
   createRoot(document.getElementById('root')!).render(<GalleryApp />);

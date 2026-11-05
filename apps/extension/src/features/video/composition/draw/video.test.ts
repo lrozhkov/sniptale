@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { createVideoProjectFromRecording } from '../../project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../project/motion';
@@ -5,6 +6,10 @@ import { createQuickEditSpotlight } from '../../project/scene/focus-appearance';
 import { resolveVideoCompositionFrame } from '../timeline/frame';
 import { drawSceneSpotlights } from './spotlight';
 import { drawVideoLayer } from './video';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import { windowHeaderImageKey } from './window-header';
+import { drawFittedMediaLayer } from './fitted-media';
+import type { PreparedSourceSampling, VideoCompositionFrameSource } from './media-source';
 
 vi.mock('./spotlight', () => ({ drawSceneSpotlights: vi.fn() }));
 vi.mock('./fitted-media', async (original) => {
@@ -60,11 +65,16 @@ function fixture(failure?: 'allocate' | 'source' | 'mask' | 'publish') {
     setTransform: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
-    drawImage: vi.fn(() => {
+    beginPath: vi.fn(),
+    roundRect: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    transform: vi.fn(),
+    drawImage: vi.fn((..._args: unknown[]) => {
       if (failure === 'publish') throw new Error('publish failed');
     }),
   };
-  const source = {
+  let source: VideoCompositionFrameSource = {
     sourceWidth: 320,
     sourceHeight: 180,
     draw: vi.fn(() => {
@@ -104,6 +114,7 @@ function fixture(failure?: 'allocate' | 'source' | 'mask' | 'publish') {
     (value) => value.kind === 'video'
   )!;
   if (layer.kind !== 'video') throw new Error('Missing video');
+  const images: Record<string, HTMLImageElement> = {};
   const paint = (frame = { x: 10, y: 20, width: 320, height: 180 }) =>
     drawVideoLayer(
       destination as unknown as CanvasRenderingContext2D,
@@ -111,10 +122,93 @@ function fixture(failure?: 'allocate' | 'source' | 'mask' | 'publish') {
       frame,
       1,
       new Map([[clip.id, source]]),
-      {}
+      images
     );
-  return { paint, surfaces, allocations, source, sourceContext, destination, transform };
+  return {
+    paint,
+    surfaces,
+    allocations,
+    source,
+    sourceContext,
+    destination,
+    transform,
+    layer,
+    images,
+    prepare(sampling: PreparedSourceSampling) {
+      source = { ...source, preparedSampling: sampling };
+    },
+  };
 }
+
+it.each([false, true])(
+  'keeps prepared crop in inner camera coordinates and restores fixed-window state after tile failure: %s',
+  (failTile) => {
+    const f = fixture();
+    f.layer.spotlights = [];
+    f.layer.clip.windowHeader = DEFAULT_WINDOW_HEADER;
+    f.layer.clip.sourceCrop = { x: 0.1, y: 0.2, width: 0.6, height: 0.5 };
+    f.layer.clip.windowCornerRadius = 12;
+    f.layer.sourceContentTransform = [1.25, 0, -8, 0, 1.25, -4, 0, 0, 1];
+    const image = document.createElement('img');
+    Object.defineProperties(image, {
+      naturalWidth: { value: 320 },
+      naturalHeight: { value: 18 },
+      complete: { value: true },
+    });
+    f.images[windowHeaderImageKey(f.layer.clipId, DEFAULT_WINDOW_HEADER)] = image;
+    const tile = document.createElement('canvas');
+    const visitPreparedTiles = vi.fn<PreparedSourceSampling['visitPreparedTiles']>(
+      (_demand, consume) => {
+        if (failTile) throw new Error('prepared tile failed');
+        consume({
+          image: tile,
+          originalPixelROI: { x: 32, y: 18, width: 80, height: 45 },
+          physicalSourceRect: { x: 2, y: 3, width: 24, height: 12 },
+        });
+        return true;
+      }
+    );
+    f.prepare({
+      sourceKey: {},
+      sourceTime: 2,
+      passTime: 2,
+      sourceSize: { width: 320, height: 180 },
+      drawPrepared: vi.fn(() => false),
+      visitPreparedTiles,
+    });
+    if (failTile) expect(f.paint).toThrow('prepared tile failed');
+    else f.paint();
+    expect(drawFittedMediaLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ windowHeaderImage: image })
+    );
+    expect(f.destination.roundRect).toHaveBeenCalledExactlyOnceWith(10, 20, 320, 180, 12);
+    expect(f.destination.transform).toHaveBeenCalledExactlyOnceWith(1.25, 0, 0, 1.25, -8, -4);
+    expect(f.destination.rect).toHaveBeenNthCalledWith(1, 10, 38, 320, 162);
+    const firstClip = f.destination.clip.mock.invocationCallOrder[0]!;
+    const inner = f.destination.transform.mock.invocationCallOrder[0]!;
+    const bodyClip = f.destination.clip.mock.invocationCallOrder[1]!;
+    expect(firstClip).toBeLessThan(inner);
+    expect(inner).toBeLessThan(bodyClip);
+    expect(bodyClip).toBeLessThan(visitPreparedTiles.mock.invocationCallOrder[0]!);
+    expect(visitPreparedTiles).toHaveBeenCalledWith('body', expect.any(Function));
+    expect(f.source.draw).not.toHaveBeenCalled();
+    expect(f.destination.save.mock.calls.length).toBeGreaterThan(0);
+    expect(f.destination.restore).toHaveBeenCalledTimes(f.destination.save.mock.calls.length);
+    expect(f.destination.restore.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      visitPreparedTiles.mock.invocationCallOrder[0]!
+    );
+    expect(f.surfaces).toHaveLength(0);
+    if (failTile) expect(f.destination.drawImage).not.toHaveBeenCalled();
+    else {
+      const args = f.destination.drawImage.mock.calls[0];
+      expect(args?.slice(0, 5)).toEqual([tile, 2, 3, 24, 12]);
+      expect(args?.[5]).toBeCloseTo(10, 12);
+      expect(args?.[6]).toBeCloseTo(5.6, 12);
+      expect(args?.[7]).toBeCloseTo(400 / 3, 12);
+      expect(args?.[8]).toBeCloseTo(81, 12);
+    }
+  }
+);
 
 it('isolates source pixels at full alpha and publishes once under accepted alpha and filter', () => {
   const f = fixture();

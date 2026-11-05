@@ -144,6 +144,7 @@ export async function buildReviewGpuScene(args: {
               height: (base.visibleVideoRect ?? base.videoRect).y - base.windowRect.y,
             },
             inverse: identity,
+            clampSourceEdges: ['bottom'] as const,
             clip: { rect: base.windowRect, radius },
             cache: { key: 'header', revision: header },
           },

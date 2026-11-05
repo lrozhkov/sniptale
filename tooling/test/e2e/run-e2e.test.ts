@@ -33,6 +33,7 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
       'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-page-toolbar-fit.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-gallery-header-gpu.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-export-cancellation.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-focus-border.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-image-editor-persistence.spec.ts',
@@ -54,6 +55,16 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
     ]),
     suite: 'security',
   });
+});
+
+it('routes the GPU window-join guard through critical and all without expanding smoke or security', () => {
+  const spec = 'tooling/test/e2e/extension-critical/extension-critical-gallery-header-gpu.spec.ts';
+  for (const suite of ['critical', 'all']) {
+    const matches = parseE2eOptions(['--suite', suite]).specs.filter((file) => file === spec);
+    expect(matches).toEqual([spec]);
+  }
+  for (const suite of ['smoke', 'security'])
+    expect(parseE2eOptions(['--suite', suite]).specs).not.toContain(spec);
 });
 
 it('builds both production and instrumented artifacts for the security suite', () => {
@@ -147,6 +158,7 @@ it('records Playwright result after a green E2E build', () => {
       'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-page-toolbar-fit.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-gallery-header-gpu.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-export-cancellation.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-focus-border.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-image-editor-persistence.spec.ts',

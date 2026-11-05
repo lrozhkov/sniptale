@@ -281,7 +281,8 @@ function isReadyVideoSource(
   return isVideoCompositionFrameSource(source);
 }
 
-function resolveVideoWindowMedia(
+/** Resolve the canonical fitted source, header and shadow policy for video consumers. */
+export function resolveVideoWindowMedia(
   layer: VideoLayer,
   source: HTMLVideoElement | VideoCompositionFrameSource,
   displayScale: number,

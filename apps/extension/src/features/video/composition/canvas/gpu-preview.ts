@@ -28,7 +28,8 @@ export interface GpuPreviewLayer {
   source: Raster | VideoFrame | GpuPreviewGroup;
   rect: CameraSpatialRect;
   inverse: QuickEditHomography;
-  clip?: { rect: CameraSpatialRect; radius: number; shape?: 'ellipse' };
+  /** Hard rectangles partition adjoining source planes; exterior contours retain antialiasing. */
+  clip?: { rect: CameraSpatialRect; radius: number; shape?: 'ellipse' | 'hard-rect' };
   lens?: {
     bounds: CameraSpatialRect;
     scale: number;
@@ -44,6 +45,8 @@ export interface GpuPreviewLayer {
   };
   opacity?: number;
   orientation?: { rotation: 0 | 90 | 180 | 270; flip: boolean };
+  /** Raster texel edges adjoining another plane; retain sampled alpha without transparent padding. */
+  clampSourceEdges?: readonly ('left' | 'top' | 'right' | 'bottom')[];
   /** Fuses an RGBA8 source write and destination-in raster mask in the source plane. */
   alphaMask?: {
     source: Raster;
@@ -113,6 +116,32 @@ function validLogicalSize(size: Size) {
     throw new Error('GPU preview logical dimensions are unavailable.');
 }
 
+function sourceEdgeFlags(edges: GpuPreviewLayer['clampSourceEdges']): number {
+  if (edges === undefined) return 0;
+  if (!Array.isArray(edges) || edges.length > 4)
+    throw new Error('GPU preview source edges are unavailable.');
+  let flags = 0;
+  for (const edge of edges) {
+    switch (edge) {
+      case 'left':
+        flags |= 1;
+        break;
+      case 'top':
+        flags |= 2;
+        break;
+      case 'right':
+        flags |= 4;
+        break;
+      case 'bottom':
+        flags |= 8;
+        break;
+      default:
+        throw new Error('GPU preview source edges are unavailable.');
+    }
+  }
+  return flags;
+}
+
 function layerValues(layer: GpuPreviewLayer, output: Size, logical: Size) {
   const m = layer.inverse;
   const r = layer.rect;
@@ -154,6 +183,7 @@ function layerValues(layer: GpuPreviewLayer, output: Size, logical: Size) {
     opacity > 1 ||
     !Number.isFinite(radius) ||
     radius < 0 ||
+    (layer.clip?.shape === 'hard-rect' && radius !== 0) ||
     !Number.isFinite(layer.blur ?? 0) ||
     (layer.blur ?? 0) < 0 ||
     !plane.every(Number.isFinite)
@@ -201,7 +231,7 @@ function layerValues(layer: GpuPreviewLayer, output: Size, logical: Size) {
     radius,
     opacity,
     layer.clip ? 1 : 0,
-    layer.clip?.shape === 'ellipse' ? 1 : 0,
+    layer.clip?.shape === 'hard-rect' ? 2 : layer.clip?.shape === 'ellipse' ? 1 : 0,
     lens?.bounds.x ?? 0,
     lens?.bounds.y ?? 0,
     lens?.bounds.width ?? 1,
@@ -245,7 +275,7 @@ function layerValues(layer: GpuPreviewLayer, output: Size, logical: Size) {
     Math.cos(angle),
     Math.sin(angle),
     orientation?.flip ? 1 : 0,
-    0,
+    sourceEdgeFlags(layer.clampSourceEdges),
     maskRect.x,
     maskRect.y,
     maskRect.width,
@@ -445,6 +475,7 @@ function canOmitLeadingGroupCopy(
     'blur',
     'depth',
     'orientation',
+    'clampSourceEdges',
     'alphaMask',
     'cssFilter',
     'tint',

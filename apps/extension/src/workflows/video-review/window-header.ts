@@ -2,7 +2,7 @@ import type { RenderResources } from '../../features/video/composition/canvas/re
 import { acquireVideoCompositionBuffer } from '../../features/video/composition/canvas/buffer-pool';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
-import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
+import { windowHeaderRasterHeight } from '../../features/video/composition/draw/window-header';
 import { composeWindowHeaderSvg } from '../../features/browser-frame/appearance';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
 
@@ -61,8 +61,7 @@ export function reviewWindowHeaderUrl(
   displayHeight?: number
 ): string {
   const source = { width, height };
-  const rasterHeight =
-    displayHeight ?? Math.max(2, Math.ceil(windowHeaderGeometry(header, source).height / 2) * 2);
+  const rasterHeight = displayHeight ?? windowHeaderRasterHeight(header, source);
   // Encoder rows extend the toolbar surface; glyphs keep the same scale on both axes.
   const svg = composeWindowHeaderSvg(header, source, rasterHeight);
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;

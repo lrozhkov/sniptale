@@ -27,6 +27,9 @@ fn sourcePoint(position: vec2f) -> vec3f {
 }
 fn coverage(point: vec2f) -> f32 {
   if (u.options.z == 0) { return 1; }
+  if (u.options.w == 2) {
+    return select(0.0, 1.0, all(point >= u.clip.xy) && all(point < u.clip.xy + u.clip.zw));
+  }
   if (u.options.x == 0 && u.options.w == 0
       && u.inverse[0].y == 0 && u.inverse[1].x == 0
       && u.inverse[2].x == 0 && u.inverse[2].y == 0
@@ -43,14 +46,23 @@ fn coverage(point: vec2f) -> f32 {
   let distance = select(rounded, ellipse, u.options.w == 1);
   return clamp(.5 - distance / max(fwidth(distance), .0001), 0, 1);
 }
+fn samplingCoverage(uv: vec2f, size: vec2f) -> f32 {
+  let flags = u32(u.orientation.w);
+  let low = clamp(uv * size + .5, vec2f(0), vec2f(1));
+  let high = clamp((1 - uv) * size + .5, vec2f(0), vec2f(1));
+  let x = select(low.x, 1.0, (flags & 1u) != 0u)
+    * select(high.x, 1.0, (flags & 4u) != 0u);
+  let y = select(low.y, 1.0, (flags & 2u) != 0u)
+    * select(high.y, 1.0, (flags & 8u) != 0u);
+  return x * y;
+}
 `;
 
 const filteredSampling = `
 var<private> sampleLevel: f32;
 fn transparentSample(uv: vec2f, level: f32) -> vec4f {
   let size = vec2f(textureDimensions(pixels, u32(level)));
-  let coverage = clamp(uv * size + .5, vec2f(0), vec2f(1)) * clamp((1 - uv) * size + .5, vec2f(0), vec2f(1));
-  return textureSampleLevel(pixels, linearSampler, uv, level) * coverage.x * coverage.y;
+  return textureSampleLevel(pixels, linearSampler, uv, level) * samplingCoverage(uv, size);
 }
 fn smoothLevel(uv: vec2f, level: f32) -> vec4f {
   if (level == 0) { return transparentSample(uv, 0); }
@@ -147,8 +159,7 @@ fn applyAlphaMask(point: vec2f, color: vec4f) -> vec4f {
       ? `return ${withMask('textureSampleBaseClampToEdge(pixels, linearSampler, uv) * alpha')};`
       : `
   let size = vec2f(textureDimensions(pixels));
-  let edge = clamp(uv * size + .5, vec2f(0), vec2f(1)) * clamp((1 - uv) * size + .5, vec2f(0), vec2f(1));
-  return ${withMask('textureSampleLevel(pixels, linearSampler, uv, 0) * edge.x * edge.y * alpha')};`
+  return ${withMask('textureSampleLevel(pixels, linearSampler, uv, 0) * samplingCoverage(uv, size) * alpha')};`
   }
 }`;
   return `${frameGeometry}

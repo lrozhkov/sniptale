@@ -11,6 +11,9 @@ import type { GpuPreviewLayer } from '../../../../features/video/composition/can
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import type { renderPreviewScene } from './render-preview';
 import { buildNativeGpuPreviewLayers } from './gpu-preview-layers';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
+import { resolveDecoratedMediaFrame } from '../../../../features/video/project/window-geometry';
 
 vi.mock('../../../../features/video/composition/draw/spotlight', async (original) => ({
   ...(await original<typeof import('../../../../features/video/composition/draw/spotlight')>()),
@@ -99,6 +102,80 @@ function fixture() {
     media: new Map([[clip.id, borrowed]]),
   };
 }
+
+it.each([false, true])(
+  'keeps the transformed header inside its window and source crop on video only: %s',
+  async (cropped) => {
+    const f = fixture();
+    const layer = f.passes.overlayFrame.visualLayers[0];
+    if (layer?.kind !== 'video') throw new Error('Expected video');
+    layer.clip.windowHeader = DEFAULT_WINDOW_HEADER;
+    layer.sourceContentTransform = [1.4, 0, -2.3, 0, 1.4, -1.7, 0, 0, 1];
+    if (cropped) layer.clip.sourceCrop = { x: 0.2, y: 0.1, width: 0.5, height: 0.6 };
+    const image = document.createElement('img');
+    Object.defineProperties(image, {
+      naturalWidth: { value: 931 },
+      naturalHeight: { value: 50 },
+      complete: { value: true },
+    });
+    f.input.imageBank[windowHeaderImageKey(layer.clipId, DEFAULT_WINDOW_HEADER)] = image;
+    const paint = vi
+      .spyOn(Object.getPrototypeOf(f.input.canvas.getContext('2d')), 'drawImage')
+      .mockImplementation(() => {});
+    try {
+      const plan = await buildNativeGpuPreviewLayers(f);
+      plans.push(plan);
+      const nodes = flatten(plan.layers);
+      const header = nodes.find((node) => node.clampSourceEdges?.includes('bottom'));
+      const video = nodes.find((node) => node.source === f.source);
+      expect(header).toBeDefined();
+      expect(video).toBeDefined();
+      const plane = resolveDecoratedMediaFrame({
+        frame: layer,
+        sourceWidth: 32,
+        sourceHeight: 16,
+        contentWidth: 32 * (layer.clip.sourceCrop?.width ?? 1),
+        contentHeight: 16 * (layer.clip.sourceCrop?.height ?? 1),
+        windowHeader: DEFAULT_WINDOW_HEADER,
+        fit: 'contain',
+      });
+      expect(header!.rect.y + header!.rect.height).toBeCloseTo(plane.y + plane.headerHeight, 12);
+      expect(header!.inverse).toEqual(video!.inverse);
+      expect(header!.operationClip).toBeUndefined();
+      expect(video!.operationClip).toBeUndefined();
+      if (cropped) {
+        expect(video!.clip).toMatchObject({
+          radius: 0,
+          shape: 'hard-rect',
+        });
+        // Reapplying a normalized crop can round the last bit of the source height.
+        expect(video!.clip!.rect.x).toBeCloseTo(plane.x, 12);
+        expect(video!.clip!.rect.y).toBeCloseTo(plane.y + plane.headerHeight, 12);
+        expect(video!.clip!.rect.width).toBeCloseTo(plane.width, 12);
+        expect(video!.clip!.rect.height).toBeCloseTo(plane.height - plane.headerHeight, 12);
+        expect(video!.clip!.rect.y).toBeCloseTo(header!.rect.y + header!.rect.height, 12);
+        expect(video!.inverse).not.toEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+      }
+      const joined = nodes.find(
+        (node) =>
+          'kind' in node.source &&
+          node.source.kind === 'group' &&
+          node.source.layers.includes(header!) &&
+          node.source.layers.includes(video!)
+      );
+      if (!joined || !('kind' in joined.source) || joined.source.kind !== 'group')
+        throw new Error('Expected window group');
+      expect(joined.source.layers.at(-1)?.blend).toBe('mask');
+      if (!(header!.source instanceof HTMLCanvasElement)) throw new Error('Expected header raster');
+      expect([header!.source.width, header!.source.height]).toEqual([931, 50]);
+      plan.release();
+      expect(header!.source.width).toBe(0);
+      expect(f.borrowed.draw).not.toHaveBeenCalled();
+    } finally {
+      paint.mockRestore();
+    }
+  }
+);
 
 it('uploads tight cursor artwork with its original paint origin and camera projection', async () => {
   const f = fixture();

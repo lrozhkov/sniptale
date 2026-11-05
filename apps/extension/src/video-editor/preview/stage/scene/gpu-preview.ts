@@ -305,7 +305,7 @@ export function createNativeGpuPreviewRenderer(
           const window = getFittedMediaWindowFrame(fitted);
           layers = [
             backdrop,
-            materials.decoration(input, layer, source, inverse),
+            ...materials.decoration(input, layer, source, inverse),
             {
               source,
               rect: getFittedMediaContentFrame(fitted),

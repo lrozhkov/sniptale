@@ -2,10 +2,13 @@ import {
   type GpuPreviewLayer,
   type GpuPreviewGroup,
 } from '../../../../features/video/composition/canvas/gpu-preview';
-import { drawVideoLayer } from '../../../../features/video/composition/draw/video';
+import { resolveVideoWindowMedia } from '../../../../features/video/composition/draw/video';
 import { resolveVideoMediaShadowParams } from '../../../../features/video/composition/canvas/media-shadow';
 
 import { buildNativeGpuPreviewLayers } from './gpu-preview-layers';
+import { nativeGpuWindowHeader, paintNativeGpuDecoration } from './gpu-preview-video';
+import { getFittedMediaWindowFrame } from '../../../../features/video/composition/draw/fitted-media';
+import { roundedWindowRadius } from '../../../../features/video/project/window-geometry';
 
 import { admittedVisualWindowHeader } from '../../../../features/video/composition/draw/window-header';
 
@@ -84,6 +87,7 @@ function inlineRetainedMask(node: GpuPreviewLayer): GpuPreviewLayer | null {
     node.depth ||
     node.lens ||
     node.orientation ||
+    node.clampSourceEdges ||
     node.alphaMask ||
     (node.blend !== undefined && node.blend !== 'over') ||
     (video.opacity ?? 1) !== 1 ||
@@ -92,6 +96,7 @@ function inlineRetainedMask(node: GpuPreviewLayer): GpuPreviewLayer | null {
     video.depth ||
     video.lens ||
     video.alphaMask ||
+    video.clampSourceEdges ||
     (video.blend !== undefined && video.blend !== 'over') ||
     (mask.opacity ?? 1) !== 1 ||
     (mask.blur ?? 0) !== 0 ||
@@ -99,6 +104,7 @@ function inlineRetainedMask(node: GpuPreviewLayer): GpuPreviewLayer | null {
     mask.depth ||
     mask.lens ||
     mask.orientation ||
+    mask.clampSourceEdges ||
     mask.alphaMask ||
     group.output.width !== group.logical.width ||
     group.output.height !== group.logical.height ||
@@ -165,6 +171,7 @@ function retainedDepthLayers(
         !child.depth &&
         !child.lens &&
         !child.orientation &&
+        !child.clampSourceEdges &&
         (child.blend === undefined || child.blend === 'over') &&
         group.output.width === child.source.output.width &&
         group.output.height === child.source.output.height &&
@@ -325,23 +332,15 @@ function decorationLayer(
     raster.canvas.width = bounds.width;
     raster.canvas.height = bounds.height;
     raster.context.translate(-bounds.x, -bounds.y);
-    drawVideoLayer(
-      raster.context,
-      layer,
-      layer,
-      1,
-      new Map([
-        [
-          layer.clipId,
-          {
-            sourceWidth: source.displayWidth,
-            sourceHeight: source.displayHeight,
-            draw() {},
-          },
-        ],
-      ]),
-      input.imageBank
-    );
+    paintNativeGpuDecoration(raster.context, {
+      ...resolveVideoWindowMedia(
+        layer,
+        { sourceWidth: source.displayWidth, sourceHeight: source.displayHeight, draw() {} },
+        1,
+        input.imageBank
+      ),
+      frame: layer,
+    });
     raster.key = key;
     raster.image = image;
     raster.revision++;
@@ -358,6 +357,7 @@ function decorationLayer(
 export function createNativeGpuPreviewMaterials() {
   let background: RetainedRaster | null = null;
   let decoration: RetainedRaster | null = null;
+  let header: RetainedRaster | null = null;
   let presentationBackground: RetainedRaster | null = null;
   let depthPlan: RetainedDepthPlan | null = null;
   return {
@@ -376,7 +376,62 @@ export function createNativeGpuPreviewMaterials() {
     },
     decoration(input: Input, layer: VideoLayer, source: VideoFrame, inverse: QuickEditHomography) {
       decoration ??= createRaster(input.canvas.ownerDocument);
-      return decorationLayer(input, layer, source, inverse, decoration);
+      const shadow = decorationLayer(input, layer, source, inverse, decoration);
+      const media = {
+        ...resolveVideoWindowMedia(
+          layer,
+          { sourceWidth: source.displayWidth, sourceHeight: source.displayHeight, draw() {} },
+          1,
+          input.imageBank
+        ),
+        frame: layer,
+      };
+      const image = media.windowHeaderImage;
+      if (!image) return [shadow];
+      header ??= createRaster(input.canvas.ownerDocument);
+      const raster = header;
+      const key = JSON.stringify([
+        layer.clip.windowHeader,
+        image.naturalWidth,
+        image.naturalHeight,
+      ]);
+      const artwork = nativeGpuWindowHeader(
+        media,
+        (paint, _padded, bounds) => {
+          if (!bounds) throw new Error('Header raster dimensions are unavailable.');
+          if (raster.key !== key || raster.image !== image) {
+            raster.canvas.width = bounds.width;
+            raster.canvas.height = bounds.height;
+            paint(raster.context);
+            raster.key = key;
+            raster.image = image;
+            raster.revision++;
+          }
+          return {
+            source: raster.canvas,
+            rect: bounds,
+            inverse: IDENTITY,
+            cache: { key: 'native-header', revision: raster.revision },
+          };
+        },
+        inverse
+      );
+      if (!artwork) return [shadow];
+      const window = getFittedMediaWindowFrame(media);
+      return [
+        shadow,
+        {
+          ...artwork,
+          clip: {
+            rect: window,
+            radius: roundedWindowRadius(
+              window.width,
+              window.height,
+              layer.clip.windowCornerRadius ?? 0
+            ),
+          },
+        },
+      ];
     },
     async depth(
       args: Parameters<typeof buildNativeGpuPreviewLayers>[0],
@@ -413,9 +468,9 @@ export function createNativeGpuPreviewMaterials() {
     dispose() {
       depthPlan?.plan.release();
       depthPlan = null;
-      for (const raster of [background, decoration, presentationBackground])
+      for (const raster of [background, decoration, header, presentationBackground])
         if (raster) raster.canvas.width = raster.canvas.height = 0;
-      background = decoration = presentationBackground = null;
+      background = decoration = header = presentationBackground = null;
     },
   };
 }

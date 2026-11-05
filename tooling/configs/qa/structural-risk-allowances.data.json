@@ -5002,8 +5002,8 @@
       "owner": "extension:app-core:features",
       "reason": "tool-noise: One encoder checks and packs optional fields for the fixed shader ABI. Field defaults increase the branch count. Separate field owners would distribute the same uniform offsets.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes uniform ABI. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "ecf41421b4b8d11cdad01b2daf144c80291aaee876fe996e68d8d91f9b5ef4c4",
+      "reviewDate": "2026-11-05",
+      "astHash": "7821cb58a43fe7476968bb1d12830321b48e9b6d466b88733a827f597e851f12",
       "signatureHash": "eeca5577f46043894b769e22dc186a21aac6b992b12ea2825c7a0d84330c268e"
     },
     {
@@ -5134,9 +5134,9 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One fitted video material resolves orientation, crop, masks, source effects and its final transform. Explicit allocation capabilities preserve caller-owned plan cleanup. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
       "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
-      "reviewDate": "2026-11-04",
-      "astHash": "360c4a2ea26c2949bc8d1d2a6d636d92a9c807241d92cc67de79ae5f325b31f5",
-      "signatureHash": "ac85bc4883353c0e595c0380c4f4be7353ee09517e11f929e4ea3c48370d48b9"
+      "reviewDate": "2026-11-05",
+      "astHash": "c5f6794faebecffcb3e0a7ad28beab2340efbbbaa5a1e9f5c3525ec0dcd260e4",
+      "signatureHash": "1141bf6b1bdc201d968f446f8d8c004ab974e240be922f5b86e17ad93bad9f72"
     },
     {
       "rule": "structural-function-risk",
@@ -5278,7 +5278,7 @@
       "reason": "tool-noise: One compositor owns device, textures, submission, completion barriers and disposal. Borrowed inputs remain valid until both barriers settle. No second queue or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. The same frame transaction owns temporary packed sources and releases them after GPU settlement.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "45a0223b2c3739327c6fbe3845f65752e212d13efb39c8915751a42313021b83",
+      "astHash": "b4bac0614484a80f1617d919edc60bf9c2fce04a2e0cf4f1211d9c9d2a5e90b9",
       "signatureHash": "f00d9c5df2a7a158107a83280797f66378df0f54200d9122d12f1df0d970e705"
     },
     {
@@ -5387,8 +5387,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One borrowed endpoint graph orders backgrounds, source exposures, focus and content overlays. The new retain callback forwards batch holds to the existing frame transaction. Geometry and annotation adapters retain separate owners.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes endpoint geometry or batch retention. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "9396334cb46c613054a3c79234832f336cc37eb91c6f72920acfd7fefc8fb131",
+      "reviewDate": "2026-11-05",
+      "astHash": "a7717b948452fca2fc0e7de3069d6686f4f199db31679e3cf58356bf8a30171f",
       "signatureHash": "adf6b706449ae5418835ccd63fedc6b060cca789027b278fbfd2247f1d604d18"
     },
     {
@@ -5795,7 +5795,7 @@
       "reason": "tool-noise: This fixture checks one compositor resource lifetime. New cases use the same fake device and controlled completion barriers. Mock configuration creates no product authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Padded source cases use the existing GPU fixture and controlled completion barriers.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "5b41f29f760fc019bdb51de75e3072c422a4fcec0d34b73e9009f4f357c2c67c",
+      "astHash": "c438e4a72bb6a039cb45b7b4efba8e654ed0e13a9d3cab06f7b39df094f1d432",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {
@@ -5904,9 +5904,9 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: This suite tests one ordered GPU graph builder. Tight bounds cases retain existing projection, resource and release fixtures. Graphics contexts and spies are test data. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "0452012a09aa4d967f272ca95bf29920b19c72bbc707bb5960f2db72d166d9b3",
-      "signatureHash": "15994d320b6f948133f8c595d75a310b51e133652add1fe4058e7ff0db945184"
+      "reviewDate": "2026-11-05",
+      "astHash": "cddbc55d33a56948e648b027cd9d728d288bf571ebd871d42aad132b8ce023a2",
+      "signatureHash": "a55221b983e0344ca26f05dbab019980436744904308244bc8370679b4bec0b3"
     },
     {
       "rule": "structural-file-risk",

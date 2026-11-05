@@ -1,6 +1,6 @@
 import type { AppLocale } from '@sniptale/platform/i18n/config';
-import en from './catalogs/en.json';
-import ru from './catalogs/ru.json';
+import en from './catalogs/en.json' with { type: 'json' };
+import ru from './catalogs/ru.json' with { type: 'json' };
 import type { TranslationDictionary } from './types';
 
 const dictionaries: Record<AppLocale, TranslationDictionary> = { en, ru };

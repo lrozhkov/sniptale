@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import {
   createGpuPreviewRenderer,
   GpuPreviewDeviceError,
+  GPU_PREVIEW_UNIFORM_BYTES,
   type GpuPreviewGroup,
   type GpuPreviewLayer,
   type GpuPreviewRenderer,
@@ -626,34 +627,82 @@ it.each(['source', 'revision'] as const)(
   }
 );
 
-it('binds an inline alpha mask in the source plane without orienting its coordinates', async () => {
-  const { device, queue } = graphics();
+it.each([
+  { edges: undefined, flags: 0 },
+  { edges: ['bottom'] as const, flags: 8 },
+  { edges: ['left', 'top', 'right', 'bottom'] as const, flags: 15 },
+])(
+  'packs source edge coverage $flags without changing mask or orientation coordinates',
+  async ({ edges, flags }) => {
+    const { device, queue } = graphics();
+    const renderer = await owner();
+    const frame = new VideoFrame(raster());
+    const mask = raster();
+    const maskRect = { x: -12, y: 4, width: 64, height: 36 };
+    await renderer.render(
+      request([
+        {
+          ...layer(frame),
+          inverse: [2, 0, -3, 0, 2, -6, 0, 0, 1],
+          orientation: { rotation: 90, flip: true },
+          ...(edges ? { clampSourceEdges: edges } : {}),
+          alphaMask: { source: mask, rect: maskRect },
+        },
+      ])
+    );
+    const entries = device.createBindGroup.mock.calls.at(-1)?.[0].entries;
+    expect(entries && Array.from(entries).map((entry) => entry.binding)).toEqual([0, 1, 2, 3]);
+    expect(queue.copyExternalImageToTexture).toHaveBeenCalledWith(
+      { source: mask },
+      expect.anything(),
+      [mask.width, mask.height]
+    );
+    const values: unknown = queue.writeBuffer.mock.calls.at(-1)?.[2];
+    if (!(values instanceof Float32Array)) throw new Error('Expected layer uniforms.');
+    expect(Array.from(values.slice(0, 12))).toEqual([2, 0, -3, 0, 0, 2, -6, 0, 0, 0, 1, 0]);
+    expect(Array.from(values.slice(72, 76))).toEqual([-12, 4, 64, 36]);
+    expect(Array.from(values.slice(68, 72))).toEqual([expect.closeTo(0), 1, 1, flags]);
+    expect(frame.close).not.toHaveBeenCalled();
+  }
+);
+
+it.each([null, true, 'bottom', ['unknown'], ['bottom', null]])(
+  'rejects malformed source edge coverage before submission: %j',
+  async (edges) => {
+    const g = graphics();
+    const renderer = await owner();
+    const source = layer();
+    Reflect.set(source, 'clampSourceEdges', edges);
+    await expect(renderer.render(request([source]))).rejects.toThrow('source edges');
+    expect(g.queue.submit).not.toHaveBeenCalled();
+    expect(g.queue.copyExternalImageToTexture).not.toHaveBeenCalled();
+  }
+);
+
+it('packs an exact source-plane rectangle without changing uniform storage', async () => {
+  const { queue } = graphics();
   const renderer = await owner();
-  const frame = new VideoFrame(raster());
-  const mask = raster();
-  const maskRect = { x: -12, y: 4, width: 64, height: 36 };
-  await renderer.render(
-    request([
-      {
-        ...layer(frame),
-        inverse: [2, 0, -3, 0, 2, -6, 0, 0, 1],
-        orientation: { rotation: 90, flip: true },
-        alphaMask: { source: mask, rect: maskRect },
-      },
-    ])
-  );
-  const entries = device.createBindGroup.mock.calls.at(-1)?.[0].entries;
-  expect(entries && Array.from(entries).map((entry) => entry.binding)).toEqual([0, 1, 2, 3]);
-  expect(queue.copyExternalImageToTexture).toHaveBeenCalledWith(
-    { source: mask },
-    expect.anything(),
-    [mask.width, mask.height]
-  );
+  const source = layer();
+  source.clip = {
+    rect: { x: 2.3, y: 3.7, width: 20, height: 12 },
+    radius: 0,
+    shape: 'hard-rect',
+  };
+  await renderer.render(request([source]));
   const values: unknown = queue.writeBuffer.mock.calls.at(-1)?.[2];
   if (!(values instanceof Float32Array)) throw new Error('Expected layer uniforms.');
-  expect(Array.from(values.slice(0, 12))).toEqual([2, 0, -3, 0, 0, 2, -6, 0, 0, 0, 1, 0]);
-  expect(Array.from(values.slice(72, 76))).toEqual([-12, 4, 64, 36]);
-  expect(frame.close).not.toHaveBeenCalled();
+  expect(values.byteLength).toBe(GPU_PREVIEW_UNIFORM_BYTES);
+  expect(Array.from(values.slice(24, 28))).toEqual([0, 1, 1, 2]);
+});
+
+it('rejects rounded geometry for an exact source-plane rectangle', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const source = layer();
+  source.clip = { rect: source.rect, radius: 2, shape: 'hard-rect' };
+  await expect(renderer.render(request([source]))).rejects.toThrow('geometry');
+  expect(g.queue.submit).not.toHaveBeenCalled();
+  expect(g.queue.copyExternalImageToTexture).not.toHaveBeenCalled();
 });
 
 it('retains cached alpha mask pixels across frames and replaces their revision once', async () => {
@@ -1162,6 +1211,7 @@ const isolatedLeadingLayers: { name: string; patch: () => Partial<GpuPreviewLaye
   },
   { name: 'blur', patch: () => ({ blur: 0 }) },
   { name: 'orientation', patch: () => ({ orientation: { rotation: 0, flip: false } }) },
+  { name: 'source edge coverage', patch: () => ({ clampSourceEdges: ['bottom'] }) },
   {
     name: 'alpha mask',
     patch: () => ({ alphaMask: { source: raster(), rect: { x: 0, y: 0, width: 32, height: 18 } } }),
