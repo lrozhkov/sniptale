@@ -310,9 +310,18 @@ class ManualPresentationSession {
       previous.canvas.style.opacity = '0';
       previous.canvas.dataset['previewFront'] = 'false';
     }
-    // Keep one idle publication buffer attached for pool reuse, without DOM replacement per frame.
+    // Two GPU requests and the retained front rotate through three publication buffers.
+    const maximumHidden = this.rendererPreference === 'gpu' ? 2 : 1;
+    let hidden = 0;
     for (const child of [...host.children])
-      if (child !== canvas && child !== previous?.canvas) child.remove();
+      if (
+        child !== canvas &&
+        (!(child instanceof HTMLCanvasElement) ||
+          child.width !== canvas.width ||
+          child.height !== canvas.height ||
+          hidden++ >= maximumHidden)
+      )
+        child.remove();
     this.front = value.completed;
     value.retain();
     previous?.release();

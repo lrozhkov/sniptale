@@ -264,6 +264,8 @@ it('replaces the retained canvas only when the completed frame needs a different
   await step(50);
   expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBe(front);
   expect(result.status.actualRaster).toEqual({ width: 1280, height: 720 });
+  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(1);
+  expect(front?.parentElement).toBeNull();
   expect(releases[0]).toHaveBeenCalledOnce();
   expect(releases[1]).not.toHaveBeenCalled();
 });
@@ -333,52 +335,92 @@ it('paints manual FPS at native readout cadence while reporting frames and failu
   expect(statistics.mock.calls.at(-1)![0].phase).toBe('failed');
 });
 
-it('publishes through a bounded reusable pair without front pixel copies or warm DOM replacement', async () => {
-  const pair = [document.createElement('canvas'), document.createElement('canvas')];
-  for (const canvas of pair) {
-    canvas.width = 720;
-    canvas.height = 360;
+it.each([2, 3])(
+  'publishes through %i reusable buffers without front pixel copies or warm DOM replacement',
+  async (bufferCount) => {
+    const pool = Array.from({ length: bufferCount }, () => document.createElement('canvas'));
+    for (const canvas of pool) {
+      canvas.width = 720;
+      canvas.height = 360;
+    }
+    const contexts = pool.map(() => ({
+      save: vi.fn(),
+      restore: vi.fn(),
+      setTransform: vi.fn(),
+      drawImage: vi.fn(),
+    }));
+    let index = 0;
+    io.render.mockImplementation((_prepared, frame) => {
+      const slot = index++ % bufferCount;
+      const release = vi.fn();
+      releases.push(release);
+      return {
+        canvas: pool[slot]!,
+        context: contexts[slot]!,
+        release,
+        generation: frame.generation,
+      };
+    });
+    await render();
+    await step(0);
+    for (let count = 1; count < bufferCount; count++) {
+      props = {
+        ...props,
+        pausedSourceTime: count + 1,
+        pausedResultTime: count + 0.75,
+        seekRevision: count,
+      };
+      await render();
+      await step(count * 50);
+    }
+    expect(contexts[0]!.drawImage).not.toHaveBeenCalled();
+    expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(bufferCount);
+    const mutations: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => mutations.push(...records));
+    observer.observe(props.host.current!, { childList: true });
+    for (let count = bufferCount; count < bufferCount + 4; count++) {
+      props = {
+        ...props,
+        pausedSourceTime: count + 1,
+        pausedResultTime: count + 0.75,
+        seekRevision: count,
+      };
+      await render();
+      await step(count * 50);
+      expect([...props.host.current!.querySelectorAll('canvas')]).toEqual(pool);
+      expect(
+        props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')
+      ).toHaveLength(1);
+    }
+    expect([...mutations, ...observer.takeRecords()]).toHaveLength(0);
+    observer.disconnect();
+    for (const context of contexts) expect(context.drawImage).not.toHaveBeenCalled();
+    for (const release of releases.slice(0, -1)) expect(release).toHaveBeenCalledOnce();
+    expect(releases.at(-1)).not.toHaveBeenCalled();
+    props = { ...props, visible: false };
+    await render();
+    expect(props.host.current!.children).toHaveLength(0);
+    for (const release of releases) expect(release).toHaveBeenCalledOnce();
   }
-  const contexts = pair.map(() => ({
-    save: vi.fn(),
-    restore: vi.fn(),
-    setTransform: vi.fn(),
-    drawImage: vi.fn(),
-  }));
-  let index = 0;
-  io.render.mockImplementation((_prepared, frame) => {
-    const slot = index++ % 2;
-    const release = vi.fn();
-    releases.push(release);
-    return { canvas: pair[slot]!, context: contexts[slot]!, release, generation: frame.generation };
-  });
+);
+
+it('bounds retained publication nodes when the renderer replaces its reusable surfaces', async () => {
   await render();
-  await step(0);
-  props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
-  await render();
-  await step(50);
-  expect(contexts[0]!.drawImage).not.toHaveBeenCalled();
-  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(2);
-  const mutations: MutationRecord[] = [];
-  const observer = new MutationObserver((records) => mutations.push(...records));
-  observer.observe(props.host.current!, { childList: true });
-  for (let count = 2; count < 5; count++) {
+  for (let count = 0; count < 7; count++) {
     props = {
       ...props,
-      pausedSourceTime: count + 1,
-      pausedResultTime: count + 0.75,
-      seekRevision: count,
+      pausedSourceTime: count + 2,
+      pausedResultTime: count + 1.75,
+      seekRevision: count + 1,
     };
     await render();
     await step(count * 50);
-    expect([...props.host.current!.querySelectorAll('canvas')]).toEqual(pair);
+    expect(props.host.current!.children.length).toBeLessThanOrEqual(3);
     expect(props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')).toHaveLength(
       1
     );
   }
-  expect([...mutations, ...observer.takeRecords()]).toHaveLength(0);
-  observer.disconnect();
-  for (const context of contexts) expect(context.drawImage).not.toHaveBeenCalled();
+  expect(props.host.current!.children).toHaveLength(3);
   for (const release of releases.slice(0, -1)) expect(release).toHaveBeenCalledOnce();
   expect(releases.at(-1)).not.toHaveBeenCalled();
 });
