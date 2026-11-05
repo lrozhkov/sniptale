@@ -8,6 +8,7 @@ import {
 import {
   GpuPreviewDeviceError,
   type GpuPreviewLayer,
+  type GpuPreviewRenderer,
 } from '../../features/video/composition/canvas/gpu-preview';
 import { projectQuickEditPoint } from '../../features/video/composition/motion/spatial-geometry';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
@@ -1221,4 +1222,264 @@ it('repaints a reused slot when the borrowed image identity changes', async () =
   ]);
   expect(f.painters).toHaveLength(1);
   f.owner.dispose();
+});
+
+function directFixture() {
+  const f = fixture();
+  const canvas = { ...dimensions.backing } as HTMLCanvasElement;
+  const present = vi
+    .fn<(request: Parameters<GpuPreviewRenderer['render']>[0]) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  const surface = { canvas, present, dispose: vi.fn() };
+  let allocatedBytes = 128;
+  const backend = {
+    render: io.render,
+    dispose: io.dispose,
+    createSurface: vi.fn((_canvas: HTMLCanvasElement) => surface),
+    get allocatedBytes() {
+      return allocatedBytes;
+    },
+  };
+  const releaseOutput = vi.fn();
+  const acquireOutput = vi.fn(
+    (_size: { width: number; height: number }, provider: GpuPreviewRenderer) => {
+      const bound = provider.createSurface?.(canvas);
+      if (!bound) throw new Error('Expected surface API');
+      return { canvas, surface: bound, release: releaseOutput };
+    }
+  );
+  io.create.mockResolvedValue(backend);
+  const { context: _context, ...input } = f.input;
+  return {
+    ...f,
+    input: { ...input, acquireOutput },
+    bitmapInput: f.input,
+    canvas,
+    present,
+    surface,
+    backend,
+    acquireOutput,
+    releaseOutput,
+    setAllocatedBytes(value: number) {
+      allocatedBytes = value;
+    },
+  };
+}
+
+it('presents the complete annotated dissolve graph directly while retaining intermediate bitmap renders', async () => {
+  const f = directFixture();
+  const annotation = borrowedAnnotations();
+  const input = await dissolveInput({ ...f, input: f.bitmapInput });
+  const fence = deferred<void>();
+  const entered = deferred<void>();
+  f.present.mockImplementation(() => {
+    entered.resolve();
+    return fence.promise;
+  });
+  const pending = f.owner.renderPresentation({
+    ...input,
+    acquireOutput: f.acquireOutput,
+    annotations: annotation.annotations,
+  });
+  await entered.promise;
+  expect(io.render).toHaveBeenCalledTimes(2);
+  expect(f.acquireOutput).toHaveBeenCalledWith(dimensions.backing, f.backend);
+  const request = f.present.mock.calls[0]![0];
+  expect(request.output).toEqual(dimensions.backing);
+  expect(request.logical).toEqual(dimensions.canonical);
+  const main = request.layers[0]!.source;
+  if (!('kind' in main) || main.kind !== 'group') throw new Error('Expected dissolve group');
+  expect(main.layers).toHaveLength(2);
+  expect(main.layers[1]!.opacity).toBe(input.transition.blend.incoming);
+  expect(f.bitmap.close).not.toHaveBeenCalled();
+  expect(f.releaseOutput).not.toHaveBeenCalled();
+  expect(f.frame.close).not.toHaveBeenCalled();
+  fence.resolve();
+  const completed = await pending;
+  expect(completed).toMatchObject({ canvas: f.canvas, outputKind: 'gpu-surface' });
+  expect(f.bitmap.close).toHaveBeenCalledTimes(2);
+  expect(f.context.drawImage).not.toHaveBeenCalled();
+  if (!completed) throw new Error('Expected direct publication');
+  completed.release();
+  completed.release();
+  expect(f.releaseOutput).toHaveBeenCalledOnce();
+  f.owner.dispose();
+});
+
+it('retains a direct front provider after adapter disposal until its receipt releases', async () => {
+  const f = directFixture();
+  const completed = await f.owner.renderPresentation(f.input);
+  if (!completed) throw new Error('Expected direct publication');
+  expect(completed.retainedProviderBytes()).toBe(128);
+  f.setAllocatedBytes(256);
+  expect(completed.retainedProviderBytes()).toBe(256);
+  expect(completed.isRetiredProvider()).toBe(false);
+  f.owner.releaseScene();
+  expect(completed.isRetiredProvider()).toBe(false);
+  f.owner.dispose();
+  expect(completed.isRetiredProvider()).toBe(true);
+  await Promise.resolve();
+  expect(io.dispose).not.toHaveBeenCalled();
+  expect(f.released).toHaveBeenCalledTimes(3);
+  expect(f.owner.allocatedBytes).toBe(256);
+  expect(await f.owner.renderPresentation(f.input)).toBe(false);
+  completed.release();
+  completed.release();
+  expect(f.releaseOutput).toHaveBeenCalledOnce();
+  expect(io.dispose).toHaveBeenCalledOnce();
+  expect(completed.retainedProviderBytes()).toBe(0);
+  expect(f.owner.allocatedBytes).toBe(0);
+});
+
+it('drains direct work before releasing an aborted destination and borrowed inputs', async () => {
+  const f = directFixture();
+  const annotation = borrowedAnnotations();
+  const fence = deferred<void>();
+  const entered = deferred<void>();
+  f.present.mockImplementation(() => {
+    entered.resolve();
+    return fence.promise;
+  });
+  const pending = f.owner.renderPresentation({ ...f.input, annotations: annotation.annotations });
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  await entered.promise;
+  f.owner.dispose();
+  expect(io.dispose).not.toHaveBeenCalled();
+  expect(f.releaseOutput).not.toHaveBeenCalled();
+  expect(annotation.bitmaps[0]!.close).not.toHaveBeenCalled();
+  fence.resolve();
+  await rejected;
+  expect(annotation.bitmaps[0]!.close).toHaveBeenCalledOnce();
+  expect(f.releaseOutput).toHaveBeenCalledOnce();
+  expect(io.dispose).toHaveBeenCalledOnce();
+  expect(f.frame.close).not.toHaveBeenCalled();
+});
+
+it.each(['missing-surface', 'unavailable'] as const)(
+  'returns fallback before artwork acquisition for %s',
+  async (reason) => {
+    const f = directFixture();
+    io.create.mockResolvedValue(
+      reason === 'unavailable'
+        ? null
+        : { render: io.render, dispose: io.dispose, allocatedBytes: 0 }
+    );
+    expect(await f.owner.renderPresentation(f.input)).toBe(false);
+    expect(f.acquireOutput).not.toHaveBeenCalled();
+    expect(f.allocate).not.toHaveBeenCalled();
+    expect(f.owner.fallbackReason).toBe('unavailable');
+    f.owner.dispose();
+  }
+);
+
+it.each(['contract', 'device'] as const)(
+  'releases a failed direct destination and classifies %s errors',
+  async (reason) => {
+    const f = directFixture();
+    const failure =
+      reason === 'device'
+        ? new GpuPreviewDeviceError('Device lost')
+        : new Error('Invalid layer request');
+    f.present.mockRejectedValue(failure);
+    const pending = f.owner.renderPresentation(f.input);
+    if (reason === 'device') await expect(pending).resolves.toBe(false);
+    else await expect(pending).rejects.toBe(failure);
+    expect(f.releaseOutput).toHaveBeenCalledOnce();
+    expect(f.frame.close).not.toHaveBeenCalled();
+    expect(io.render).not.toHaveBeenCalled();
+    f.owner.dispose();
+  }
+);
+
+it('marks a retained direct provider retired after actual device failure but not scene retirement', async () => {
+  const f = directFixture();
+  const completed = await f.owner.renderPresentation(f.input);
+  if (!completed) throw new Error('Expected direct publication');
+  f.owner.releaseScene();
+  expect(completed.isRetiredProvider()).toBe(false);
+  f.present.mockRejectedValueOnce(new GpuPreviewDeviceError('Device lost'));
+  expect(await f.owner.renderPresentation(f.input)).toBe(false);
+  expect(completed.isRetiredProvider()).toBe(true);
+  expect(io.dispose).toHaveBeenCalledOnce();
+  completed.release();
+  f.owner.dispose();
+  expect(io.dispose).toHaveBeenCalledOnce();
+});
+
+it('drains the transaction even if releasing a failed direct lease throws', async () => {
+  const f = directFixture();
+  const releaseFailure = new Error('Output release failed');
+  f.present.mockRejectedValueOnce(new Error('Invalid surface request'));
+  f.releaseOutput.mockImplementationOnce(() => {
+    throw releaseFailure;
+  });
+  await expect(f.owner.renderPresentation(f.input)).rejects.toBe(releaseFailure);
+  const completed = await f.owner.renderPresentation(f.input);
+  if (!completed) throw new Error('Expected reusable transaction');
+  completed.release();
+  f.owner.dispose();
+  expect(io.dispose).toHaveBeenCalledOnce();
+});
+
+it('forwards the final full-layer graph unchanged to direct presentation', async () => {
+  const f = directFixture();
+  const layers: GpuPreviewLayer[] = [
+    {
+      source: {
+        kind: 'group',
+        output: dimensions.backing,
+        logical: dimensions.canonical,
+        layers: [
+          {
+            source: f.frame,
+            rect: { x: 0, y: 0, ...dimensions.canonical },
+            inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+          },
+        ],
+      },
+      rect: { x: 0, y: 0, ...dimensions.canonical },
+      inverse: [1, 0.1, 0, 0, 1, 0, 0.0001, 0, 1],
+      clip: { rect: { x: 4, y: 8, width: 600, height: 320 }, radius: 20 },
+      lens: {
+        bounds: { x: 40, y: 50, width: 80, height: 80 },
+        scale: 2,
+        optics: 'optical',
+        edgeWidth: 4,
+        corner: 'circle',
+      },
+      opacity: 0.6,
+    },
+  ];
+  const finish = vi.spyOn(gpuLayers, 'reviewGpuFinishLayers').mockReturnValueOnce(layers);
+  try {
+    const completed = await f.owner.renderPresentation(f.input);
+    expect(f.present.mock.calls[0]![0].layers).toBe(layers);
+    expect(finish).toHaveBeenCalledOnce();
+    expect(io.render).not.toHaveBeenCalled();
+    if (!completed) throw new Error('Expected direct publication');
+    completed.release();
+  } finally {
+    finish.mockRestore();
+    f.owner.dispose();
+  }
+});
+
+it('waits for every direct publication hold before disposing the shared provider', async () => {
+  const f = directFixture();
+  const first = await f.owner.renderPresentation(f.input);
+  const nextCanvas = { ...dimensions.backing } as HTMLCanvasElement;
+  f.acquireOutput.mockImplementationOnce(() => ({
+    canvas: nextCanvas,
+    surface: { ...f.surface, canvas: nextCanvas },
+    release: f.releaseOutput,
+  }));
+  const second = await f.owner.renderPresentation(f.input);
+  if (!first || !second) throw new Error('Expected two completed direct outputs');
+  expect(first.canvas).not.toBe(second.canvas);
+  f.owner.dispose();
+  first.release();
+  expect(io.dispose).not.toHaveBeenCalled();
+  second.release();
+  expect(io.dispose).toHaveBeenCalledOnce();
+  expect(f.releaseOutput).toHaveBeenCalledTimes(2);
 });

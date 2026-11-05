@@ -107,6 +107,74 @@ it('counts exactly front, staging and frozen source without an arbitrary reserve
   expect(plan.maximumCanvases).toBe(3);
 });
 
+it('charges direct GPU front and two staging canvases at eight bytes per pixel', () => {
+  const graph = input();
+  graph.publication.outputKind = 'gpu-surface';
+  graph.publication.maximumInFlight = 2;
+  const plan = calculatePreviewRenderAllocation(graph);
+  expect(
+    phase(plan, 'scene').allocations.filter((value) => value.role.startsWith('publication-'))
+  ).toEqual([
+    { role: 'publication-front', bytes: 800, canvases: 1 },
+    { role: 'publication-staging', bytes: 800, canvases: 1 },
+    { role: 'publication-staging', bytes: 800, canvases: 1 },
+  ]);
+  expect(plan.maximumManagedBytes).toBe(2800);
+  expect(plan.maximumCanvases).toBe(4);
+});
+
+it('keeps the actual old GPU front and adds retired provider storage exactly once', () => {
+  const graph = input();
+  graph.publication.previousFront = { width: 5, height: 5 };
+  graph.publication.previousFrontKind = 'gpu-surface';
+  graph.publication.previousProviderBytes = 1100;
+  graph.publication.maximumInFlight = 2;
+  const plan = calculatePreviewRenderAllocation(graph);
+  expect(phase(plan, 'scene').allocations.slice(0, 2)).toEqual([
+    { role: 'publication-front', bytes: 200, canvases: 1 },
+    { role: 'publication-retired-provider', bytes: 900, canvases: 0 },
+  ]);
+  expect(plan.maximumManagedBytes).toBe(2300);
+  expect(phase(plan, 'prepare-header').bytes).toBe(1100);
+  graph.publication.previousProviderBytes = 0;
+  expect(calculatePreviewRenderAllocation(graph).maximumManagedBytes).toBe(1400);
+});
+
+it('retains a 2D front at its own size while the next GPU output is prepared', () => {
+  const graph = input();
+  graph.publication.outputKind = 'gpu-surface';
+  graph.publication.maximumInFlight = 2;
+  graph.publication.previousFront = { width: 5, height: 5 };
+  expect(calculatePreviewRenderAllocation(graph).maximumManagedBytes).toBe(2100);
+});
+
+it.each([NaN, -1, Infinity, 0.5, 199])(
+  'rejects invalid retained GPU provider storage %s',
+  (count) => {
+    const graph = input();
+    graph.publication.previousFront = { width: 5, height: 5 };
+    graph.publication.previousFrontKind = 'gpu-surface';
+    graph.publication.previousProviderBytes = count;
+    expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  }
+);
+
+it('rejects orphan provider bytes, invalid GPU dimensions and overflowing totals', () => {
+  const graph = input();
+  graph.publication.previousProviderBytes = 800;
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  graph.publication.previousFront = size;
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  graph.publication.previousFrontKind = 'gpu-surface';
+  graph.publication.previousProviderBytes = Number.MAX_SAFE_INTEGER;
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  graph.publication.previousProviderBytes = 0;
+  graph.publication.previousFront = { width: 0, height: 10 };
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  graph.publication.previousFront = { width: Number.MAX_SAFE_INTEGER, height: 1 };
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+});
+
 it('charges immutable annotations during preparation and all planned outputs through every composition phase', () => {
   const graph = input();
   graph.assets.annotationSourceBytes = 123;
@@ -304,6 +372,24 @@ function discovery(): PreviewPreparationAllocationInput {
   };
 }
 
+it('retains GPU front and retired provider during discovery without a second front charge', () => {
+  const preparing = discovery();
+  preparing.previousFront = { width: 5, height: 5 };
+  preparing.previousFrontKind = 'gpu-surface';
+  preparing.previousProviderBytes = 1100;
+  const plan = calculatePreviewPreparationAllocation(preparing);
+  expect(plan.maximumManagedBytes).toBe(1100);
+  expect(plan.maximumCanvases).toBe(1);
+  expect(plan.phases[0]?.allocations).toEqual([
+    { role: 'publication-front', bytes: 200, canvases: 1 },
+    { role: 'publication-retired-provider', bytes: 900, canvases: 0 },
+  ]);
+  preparing.previousProviderBytes = 199;
+  expect(() => calculatePreviewPreparationAllocation(preparing)).toThrow(
+    'Invalid preview allocation'
+  );
+});
+
 it('reports zero actual storage for empty discovery despite constructor control minimums', () => {
   const plan = calculatePreviewPreparationAllocation(discovery());
   expect(plan.maximumManagedBytes).toBe(1);
@@ -380,6 +466,21 @@ function runtimeInput(): PreviewRuntimeAllocationInput {
     },
   };
 }
+
+it('forwards publication kinds and retired provider bytes from the runtime descriptor', () => {
+  const runtime = runtimeInput();
+  runtime.outputKind = 'gpu-surface';
+  runtime.previousFront = size;
+  runtime.previousFrontKind = 'gpu-surface';
+  runtime.previousProviderBytes = 1200;
+  expect(resolvePreviewRenderAllocation(runtime).publication).toEqual({
+    backing: runtime.dimensions.backing,
+    previousFront: size,
+    outputKind: 'gpu-surface',
+    previousFrontKind: 'gpu-surface',
+    previousProviderBytes: 1200,
+  });
+});
 
 it('reserves no spatial surfaces for neutral enabled poses and admits an actual rotation', () => {
   const runtime = runtimeInput();

@@ -17,6 +17,7 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
 import type { QuickEditWebcamPlacement } from '../../features/video/review/advanced/webcam';
 
 export type Renderer = ReturnType<typeof createReviewPreviewRenderer>;
+export type PresentedFrame = Awaited<ReturnType<Renderer['renderPresentation']>>;
 type Scene = Parameters<Renderer['prepare']>[0];
 export type Prepared = Awaited<ReturnType<Renderer['prepare']>>;
 export type RenderFrame = Parameters<Renderer['render']>[1];

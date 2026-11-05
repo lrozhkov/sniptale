@@ -136,6 +136,7 @@ beforeEach(() => {
     releases.push(release);
     return {
       canvas,
+      outputKind: 'canvas2d',
       context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
       release,
       generation: frame.generation,
@@ -143,7 +144,7 @@ beforeEach(() => {
   });
   io.factory.mockImplementation(() => ({
     prepare: io.prepare,
-    render: io.render,
+    renderPresentation: io.render,
     dispose: io.dispose,
   }));
   io.bytes.mockImplementation(() => ({ release: vi.fn() }));

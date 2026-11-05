@@ -26,6 +26,7 @@ import type {
   PresentationCameraState,
   Description,
   Renderer,
+  PresentedFrame,
   Prepared,
   RenderFrame,
   ReviewPreviewPresentationStatus,
@@ -39,7 +40,7 @@ type PresentationSnapshot = {
 type CameraSource = ReturnType<typeof createReviewWebcamPreviewSource>;
 class PendingPresentation extends Error {}
 type Publication = {
-  completed: Awaited<ReturnType<Renderer['render']>>;
+  completed: PresentedFrame;
   prepared: Prepared;
   retain(): void;
 };
@@ -64,7 +65,7 @@ class ManualPresentationSession {
   private current: Description | null = null;
   private cameraDescription: Description | null = null;
   private resultTime = 0;
-  private front: Awaited<ReturnType<Renderer['render']>> | null = null;
+  private front: PresentedFrame | null = null;
   private cameraSource: CameraSource | null = null;
   private cameraState: PresentationCameraState = { phase: 'loading', duration: 0, ready: false };
   private readonly publications: number[] = [];
@@ -277,7 +278,20 @@ class ManualPresentationSession {
     signal: AbortSignal
   ) => {
     const completed = await reviewExportPhase(signal, 'compose', () =>
-      this.renderer.render(prepared, frame, signal)
+      this.renderer.renderPresentation(prepared, frame, signal, (size, backend) => {
+        const host = this.latest().input.host.current;
+        if (!host || this.disposed) throw new PendingPresentation();
+        const output = this.admission.resources.presentationCanvas(size, backend);
+        try {
+          if (output.canvas.parentElement !== host) {
+            this.attachCanvas(host, output.canvas);
+          }
+          return output;
+        } catch (error) {
+          output.release();
+          throw error;
+        }
+      })
     );
     let transferred = false;
     return {
@@ -294,16 +308,19 @@ class ManualPresentationSession {
     };
   };
 
+  private attachCanvas(host: HTMLDivElement, canvas: HTMLCanvasElement) {
+    canvas.className = 'pointer-events-none absolute inset-0 h-full w-full';
+    canvas.setAttribute('aria-hidden', 'true');
+    canvas.style.opacity = '0';
+    canvas.style.willChange = 'opacity';
+    canvas.style.backgroundColor = '#000';
+    host.appendChild(canvas);
+  }
+
   private publishCanvas(host: HTMLDivElement, value: Publication) {
     const canvas = value.completed.canvas;
     const previous = this.front;
-    if (canvas.parentElement !== host) {
-      canvas.className = 'pointer-events-none absolute inset-0 h-full w-full';
-      canvas.setAttribute('aria-hidden', 'true');
-      canvas.style.opacity = '0';
-      canvas.style.willChange = 'opacity';
-      host.appendChild(canvas);
-    }
+    if (canvas.parentElement !== host) this.attachCanvas(host, canvas);
     canvas.style.opacity = '1';
     canvas.dataset['previewFront'] = 'true';
     if (previous && previous.canvas !== canvas) {

@@ -805,14 +805,20 @@ function queueFixture(): Scene {
   return scene;
 }
 
-function queueLedger(scene: Scene, sourceBytes: number) {
+function queueLedger(
+  scene: Scene,
+  sourceBytes: number,
+  outputKind: () => 'canvas2d' | 'gpu-surface' = () => 'canvas2d'
+) {
   const ledger = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
   const budgets: { maximumManagedBytes: number; maximumCanvases: number }[] = [];
   let canvasLeases = 0,
-    byteLeases = 0;
+    byteLeases = 0,
+    publication2DAllocations = 0;
   const resources: RenderResources = {
     canvas(role, bounds, options) {
       const lease = ledger.canvas(role, bounds, options);
+      if (role === 'preview-publication') publication2DAllocations++;
       canvasLeases++;
       let live = true;
       return {
@@ -859,7 +865,7 @@ function queueLedger(scene: Scene, sourceBytes: number) {
     resources,
     ledger,
     budgets,
-    state: () => ({ canvasLeases, byteLeases, ...ledger.counters }),
+    state: () => ({ canvasLeases, byteLeases, publication2DAllocations, ...ledger.counters }),
     prepared(value: { allocationAssets: PreviewRenderAllocationInput['assets'] }) {
       assets = value.allocationAssets;
     },
@@ -869,6 +875,7 @@ function queueLedger(scene: Scene, sourceBytes: number) {
           scene,
           dimensions: { canonical: queueSize, backing: queueSize },
           maximumInFlight: 2,
+          outputKind: outputKind(),
           sourceTime: queueTimes[0],
           resultTime: queueTimes[0],
           // Both caller-owned native frames remain retained throughout the comparison.
@@ -890,8 +897,19 @@ function queueLedger(scene: Scene, sourceBytes: number) {
 
 /** Compares one prepared production GPU queue with its own sequential full-image references. */
 export async function probeGpuQueue() {
+  return runGpuQueue();
+}
+
+/** Quality-only direct output proof; capture reads the browser compositor, never the GPU canvas. */
+export async function probeGpuDirectQueue(capture: () => Promise<ImageData>) {
+  return runGpuQueue(capture);
+}
+
+async function runGpuQueue(capture?: () => Promise<ImageData>) {
   type Renderer = ReturnType<typeof createReviewPreviewRenderer>;
-  type Completed = Awaited<ReturnType<Renderer['render']>>;
+  type Completed =
+    | Awaited<ReturnType<Renderer['render']>>
+    | Awaited<ReturnType<Renderer['renderPresentation']>>;
   const nativeFrames: VideoFrame[] = [],
     sourceReservations: { release(): void }[] = [],
     completed = new Set<Completed>(),
@@ -904,9 +922,23 @@ export async function probeGpuQueue() {
       gpu: boolean;
       cameraScale: number;
       spatial: boolean;
+      direct: boolean;
     }[] = [];
   const featureStates: { time: number; lensScale: number; lensX: number; fadeOpacity: number }[] =
     [];
+  let outputKind: 'canvas2d' | 'gpu-surface' = 'canvas2d';
+  let outputLeases = 0,
+    hiddenBeforePresent = 0,
+    sourceHoldsBeforePresent = 0,
+    publication2DAllocationsBeforeDirect = 0,
+    direct2DPublications = 0,
+    ringSurfaces = 0;
+  const host = capture ? document.createElement('div') : null;
+  if (host) {
+    host.style.cssText =
+      'position:fixed;left:0;top:0;width:840px;height:472px;background:black;z-index:2147483647';
+    document.body.append(host);
+  }
   let managed: ReturnType<typeof queueLedger> | null = null;
   let renderer: Renderer | null = null;
   let prepared: Awaited<ReturnType<Renderer['prepare']>> | null = null;
@@ -969,7 +1001,8 @@ export async function probeGpuQueue() {
     }
     managed = queueLedger(
       scene,
-      nativeFrames.reduce((sum, frame) => sum + frame.allocationSize(), 0)
+      nativeFrames.reduce((sum, frame) => sum + frame.allocationSize(), 0),
+      () => outputKind
     );
     renderer = createReviewPreviewRenderer({
       maximumInFlight: 2,
@@ -1008,11 +1041,38 @@ export async function probeGpuQueue() {
         draw: (context, x, y, width, height) => context.drawImage(native, x, y, width, height),
       },
     }));
-    const render = (frame: Frame) => {
+    const acquireOutput: Parameters<Renderer['renderPresentation']>[3] = (bounds, backend) => {
+      if (!host || !managed) throw new Error('Direct output host is unavailable');
+      const lease = managed.ledger.presentationCanvas(bounds, backend);
+      lease.canvas.style.cssText =
+        'position:absolute;left:0;top:0;width:840px;height:472px;opacity:0';
+      host.append(lease.canvas);
+      if (lease.canvas.isConnected && lease.canvas.style.opacity === '0') hiddenBeforePresent++;
+      if (nativeFrames.every((frame) => frame.allocationSize() > 0)) sourceHoldsBeforePresent++;
+      outputLeases++;
+      let released = false;
+      return {
+        ...lease,
+        release() {
+          if (released) return;
+          released = true;
+          outputLeases--;
+          lease.release();
+        },
+      };
+    };
+    const render = (frame: Frame, direct = false) => {
       activeRequests++;
       peakRequests = Math.max(peakRequests, activeRequests);
-      return renderer!
-        .render(prepared!, frame)
+      const rendering = direct
+        ? renderer!.renderPresentation(
+            prepared!,
+            frame,
+            new AbortController().signal,
+            acquireOutput
+          )
+        : renderer!.render(prepared!, frame);
+      return rendering
         .then(
           (value) => {
             completed.add(value);
@@ -1024,6 +1084,7 @@ export async function probeGpuQueue() {
               gpu: value.renderer.backend === 'gpu',
               cameraScale: value.geometry?.camera.scale ?? 0,
               spatial: value.geometry?.camera.spatial !== undefined,
+              direct: value.outputKind === 'gpu-surface',
             });
             return value;
           },
@@ -1034,26 +1095,55 @@ export async function probeGpuQueue() {
         )
         .finally(() => activeRequests--);
     };
-    const pixels = (value: Completed) => {
+    const show = async (value: Completed) => {
+      if (!host) return;
+      if (value.canvas.parentElement !== host) host.append(value.canvas);
+      value.canvas.style.cssText =
+        'position:absolute;left:0;top:0;width:840px;height:472px;opacity:1';
+      for (const child of host.children)
+        if (child instanceof HTMLCanvasElement && child !== value.canvas) child.style.opacity = '0';
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+    };
+    const pixels = async (value: Completed) => {
       if (value.canvas.width !== queueSize.width || value.canvas.height !== queueSize.height)
         throw new Error('Queue output dimensions changed');
+      if (capture) {
+        await show(value);
+        return capture();
+      }
+      if (value.outputKind !== 'canvas2d') throw new Error('Queue bitmap context is unavailable');
       return value.context.getImageData(0, 0, queueSize.width, queueSize.height);
     };
     stage = 3;
     for (const frame of frames) {
       pending = [render(frame)];
       const value = await pending[0]!;
-      references.push(pixels(value));
+      references.push(await pixels(value));
       value.release();
       completed.delete(value);
     }
     referencesDifferentPixels = comparePixels(references[0]!, references[1]!).differentPixels;
     stage = 4;
-    pending = frames.map(render);
+    let front: Completed | null = null;
+    if (capture) {
+      outputKind = 'gpu-surface';
+      publication2DAllocationsBeforeDirect = managed.state().publication2DAllocations;
+      pending = [render(frames[0]!, true)];
+      front = await pending[0]!;
+      await show(front);
+    }
+    pending = frames.map((frame) => render(frame, !!capture));
     const results = await Promise.all(pending);
     distinctOutputs = results[0]!.canvas !== results[1]!.canvas;
+    if (front) {
+      ringSurfaces = new Set([front.canvas, ...results.map((value) => value.canvas)]).size;
+      direct2DPublications =
+        managed.state().publication2DAllocations - publication2DAllocationsBeforeDirect;
+    }
     for (const [index, value] of results.entries())
-      parity.push(comparePixels(pixels(value), references[index]!));
+      parity.push(comparePixels(await pixels(value), references[index]!));
     sourcesStillOpen = nativeFrames.every((frame) => frame.allocationSize() > 0);
   } catch {
     code = 'E_GPU_QUEUE_PROOF';
@@ -1102,9 +1192,16 @@ export async function probeGpuQueue() {
     } catch {
       cleanupErrors++;
     }
+    host?.remove();
   }
   return {
     code,
+    directProof: !!capture,
+    outputLeases,
+    hiddenBeforePresent,
+    sourceHoldsBeforePresent,
+    direct2DPublications,
+    ringSurfaces,
     stage,
     size: queueSize,
     timestamps: [...queueTimes],

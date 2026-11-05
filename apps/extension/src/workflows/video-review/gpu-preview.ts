@@ -1,3 +1,4 @@
+import type { PreviewGpuCanvasFactory, PreviewGpuCanvasLease } from './preview-render-resources';
 import { buildReviewGpuScene } from './gpu-preview-scene';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { reviewPresentedGeometry, type ReviewPresentedGeometry } from './gpu-preview-geometry';
@@ -33,6 +34,45 @@ import {
 } from './cut-transition-frames';
 import type { reviewCutTransitionAt } from '../../features/video/review/cuts';
 
+interface ReviewGpuRenderInput {
+  scene: PreviewScene;
+  dimensions: Dimensions;
+  geometry: ReviewPresentedGeometry;
+  frame: VideoFrame;
+  sourceTime: number;
+  context: CanvasRenderingContext2D;
+  header: ImageBitmap | null;
+  image: ImageBitmap | null;
+  painter: ReturnType<typeof createReviewBackgroundPainter>;
+  captions: Captions | null;
+  signal: AbortSignal;
+  fps?: number;
+  camera?: ReviewGpuCamera;
+  annotations?: Parameters<typeof reviewGpuContentLayers>[0]['annotations'];
+  watermark?: Parameters<typeof reviewGpuFinishLayers>[0]['watermark'];
+  admit?(bitmaps: readonly { width: number; height: number }[]): void;
+  sceneAt?(resultTime: number, sourceTime: number): Promise<PreviewScene>;
+  cameraOverride?: QuickEditCameraTransform;
+  transition?: {
+    blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>;
+    frames: ReviewTransitionFrames;
+    resultOffset?: number;
+  };
+}
+type ReviewGpuSceneInput = Omit<ReviewGpuRenderInput, 'context'>;
+type ReviewGpuPresentationInput = ReviewGpuSceneInput & { acquireOutput: PreviewGpuCanvasFactory };
+type BitmapOutput = { kind: 'bitmap'; context: CanvasRenderingContext2D };
+type PresentationOutput = { kind: 'presentation'; acquireOutput: PreviewGpuCanvasFactory };
+
+/** Completed pixels retain their backend until publication releases this receipt. */
+export interface ReviewGpuPresentedFrame {
+  canvas: HTMLCanvasElement;
+  release(): void;
+  outputKind: 'gpu-surface';
+  retainedProviderBytes(): number;
+  isRetiredProvider(): boolean;
+}
+
 const identity: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 type Captions = Awaited<ReturnType<typeof prepareReviewCaptions>>;
 type Dimensions = PreviewSceneDimensions;
@@ -65,6 +105,8 @@ export function createReviewGpuPreview(args: {
   let fallbackReason: PreviewRendererStatus['fallback'];
   let disposed = false;
   let active = 0;
+  let publicationHolds = 0;
+  const failedProviders = new WeakSet<GpuPreviewRenderer>();
   let activeScene: PreviewScene | null = null;
   let activeDimensions: Dimensions | null = null;
   let activePainter: ReturnType<typeof createReviewBackgroundPainter> | null = null;
@@ -104,253 +146,313 @@ export function createReviewGpuPreview(args: {
     for (const slot of slots) clearSlot(slot);
     sceneReleased = false;
   };
-  return {
-    get fallbackReason() {
-      return fallbackReason;
-    },
-    get allocatedBytes() {
-      return renderer?.allocatedBytes ?? 0;
-    },
-    async render(input: {
-      scene: PreviewScene;
-      dimensions: Dimensions;
-      geometry: ReviewPresentedGeometry;
-      frame: VideoFrame;
-      sourceTime: number;
-      context: CanvasRenderingContext2D;
-      header: ImageBitmap | null;
-      image: ImageBitmap | null;
-      painter: ReturnType<typeof createReviewBackgroundPainter>;
-      captions: Captions | null;
-      signal: AbortSignal;
-      fps?: number;
-      camera?: ReviewGpuCamera;
-      annotations?: Parameters<typeof reviewGpuContentLayers>[0]['annotations'];
-      watermark?: Parameters<typeof reviewGpuFinishLayers>[0]['watermark'];
-      admit?(bitmaps: readonly { width: number; height: number }[]): void;
-      sceneAt?(resultTime: number, sourceTime: number): Promise<PreviewScene>;
-      cameraOverride?: QuickEditCameraTransform;
-      transition?: {
-        blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>;
-        frames: ReviewTransitionFrames;
-        resultOffset?: number;
-      };
-    }) {
-      if (disabled || disposed) return false;
-      const { scene, dimensions, geometry } = input;
-      const safe =
-        reviewGpuPreviewConcurrency(scene) === 2 &&
-        !input.camera &&
-        !input.transition &&
-        !input.cameraOverride &&
-        !input.captions &&
-        !input.annotations;
-      if (
-        active &&
-        (active >= (args.maximumInFlight ?? 1) ||
-          sceneReleased ||
-          !overlapSafe ||
-          !safe ||
-          activeScene !== scene ||
-          activeDimensions !== dimensions ||
-          activePainter !== input.painter ||
-          activeHeader !== input.header ||
-          activeImage !== input.image ||
-          activeWatermark !== input.watermark)
-      )
-        throw new Error('GPU preview overlap is unavailable.');
-      if (!active) {
-        activeScene = scene;
-        activeDimensions = dimensions;
-        activePainter = input.painter;
-        activeHeader = input.header;
-        activeImage = input.image;
-        activeWatermark = input.watermark;
-        overlapSafe = safe;
-      }
-      const slot = slots.find((candidate) => !candidate.active);
-      if (!slot) throw new Error('GPU preview overlap is unavailable.');
-      slot.active = true;
-      const sceneSignal = sceneLifetime.signal;
-      const signal = AbortSignal.any([input.signal, lifetime.signal, sceneSignal]);
-      active++;
-      const primitives = createReviewGpuPrimitives(args.resources);
-      const ownedFrames: VideoFrame[] = [];
-      const endpointOutputs: { bitmap: ImageBitmap; release(): void }[] = [];
-      const annotationHolds: { release(): void }[] = [];
-      const releaseAnnotations = (start: number) => {
-        for (const hold of annotationHolds.splice(start)) hold.release();
-      };
+  const disposeRetiredRenderer = () => {
+    if (!disposed || active || publicationHolds) return;
+    const provider = renderer;
+    renderer = null;
+    provider?.dispose();
+  };
+  function execute(input: ReviewGpuSceneInput, output: BitmapOutput): Promise<boolean>;
+  function execute(
+    input: ReviewGpuSceneInput,
+    output: PresentationOutput
+  ): Promise<false | ReviewGpuPresentedFrame>;
+  async function execute(
+    input: ReviewGpuSceneInput,
+    output: BitmapOutput | PresentationOutput
+  ): Promise<boolean | ReviewGpuPresentedFrame> {
+    if (disabled || disposed) return false;
+    const { scene, dimensions, geometry } = input;
+    const safe =
+      reviewGpuPreviewConcurrency(scene) === 2 &&
+      !input.camera &&
+      !input.transition &&
+      !input.cameraOverride &&
+      !input.captions &&
+      !input.annotations;
+    if (
+      active &&
+      (active >= (args.maximumInFlight ?? 1) ||
+        sceneReleased ||
+        !overlapSafe ||
+        !safe ||
+        activeScene !== scene ||
+        activeDimensions !== dimensions ||
+        activePainter !== input.painter ||
+        activeHeader !== input.header ||
+        activeImage !== input.image ||
+        activeWatermark !== input.watermark)
+    )
+      throw new Error('GPU preview overlap is unavailable.');
+    if (!active) {
+      activeScene = scene;
+      activeDimensions = dimensions;
+      activePainter = input.painter;
+      activeHeader = input.header;
+      activeImage = input.image;
+      activeWatermark = input.watermark;
+      overlapSafe = safe;
+    }
+    const slot = slots.find((candidate) => !candidate.active);
+    if (!slot) throw new Error('GPU preview overlap is unavailable.');
+    slot.active = true;
+    const sceneSignal = sceneLifetime.signal;
+    const signal = AbortSignal.any([input.signal, lifetime.signal, sceneSignal]);
+    active++;
+    const primitives = createReviewGpuPrimitives(args.resources);
+    const ownedFrames: VideoFrame[] = [];
+    const endpointOutputs: { bitmap: ImageBitmap; release(): void }[] = [];
+    const annotationHolds: { release(): void }[] = [];
+    let acquiredOutput: PreviewGpuCanvasLease | null = null;
+    const releaseAnnotations = (start: number) => {
+      for (const hold of annotationHolds.splice(start)) hold.release();
+    };
+    try {
+      initialization ??= createGpuPreviewRenderer({
+        reserve: args.reserve,
+        maximumInFlight: args.maximumInFlight ?? 1,
+      });
       try {
-        initialization ??= createGpuPreviewRenderer({
-          reserve: args.reserve,
-          maximumInFlight: args.maximumInFlight ?? 1,
-        });
+        renderer = await initialization;
+      } catch (error) {
+        if (signal.aborted || !(error instanceof GpuPreviewDeviceError)) throw error;
+        disabled = true;
+        fallbackReason = 'device-failed';
+        return false;
+      }
+      signal.throwIfAborted();
+      if (!renderer || disposed) {
+        disabled = true;
+        fallbackReason = 'unavailable';
+        return false;
+      }
+      if (output.kind === 'presentation' && !renderer.createSurface) {
+        fallbackReason = 'unavailable';
+        return false;
+      }
+      const scale = dimensions.canonical.width / (scene.canvas?.width ?? scene.source.width);
+      const background = scene.background.enabled
+        ? {
+            ...scene.background,
+            layout: {
+              ...scene.background.layout,
+              cornerRadius: scene.background.layout.cornerRadius * scale,
+            },
+          }
+        : scene.background;
+      const base = computeQuickEditSceneLayout({
+        ...scene,
+        output: dimensions.canonical,
+        camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+      });
+      const decorRect = reviewSpatialSourceRect({
+        output: dimensions.canonical,
+        window: base.windowRect,
+        background,
+        sceneScale: scale,
+      });
+      const key = JSON.stringify([
+        dimensions,
+        background,
+        base.videoRect,
+        base.windowRect,
+        decorRect,
+      ]);
+      if (!slot.artwork || slot.artwork.key !== key) {
+        clearSlot(slot);
+        const retained: RenderCanvasLease[] = [];
         try {
-          renderer = await initialization;
+          const bg = args.resources.canvas('preview-gpu-background', dimensions.backing);
+          retained.push(bg);
+          const decoration = args.resources.canvas('preview-gpu-decoration', decorRect);
+          retained.push(decoration);
+          const overlay = args.resources.canvas('preview-gpu-captions', dimensions.backing);
+          retained.push(overlay);
+          const ctx = decoration.context;
+          ctx.translate(-decorRect.x, -decorRect.y);
+          const radius = background.enabled ? background.layout.cornerRadius : 0;
+          drawReviewSceneShadow(ctx, background, base.windowRect, radius, scale);
+          slot.artwork = {
+            painter: createReviewBackgroundPainter(args.resources),
+            background: bg,
+            decoration,
+            overlay,
+            rect: decorRect,
+            key,
+            backgroundRevision: 0,
+            image: null,
+            captionKey: '',
+            captionOwner: null,
+            captionRevision: 0,
+          };
         } catch (error) {
-          if (signal.aborted || !(error instanceof GpuPreviewDeviceError)) throw error;
-          disabled = true;
-          fallbackReason = 'device-failed';
-          return false;
+          for (const lease of retained) lease.release();
+          throw error;
         }
-        signal.throwIfAborted();
-        if (!renderer || disposed) {
-          renderer?.dispose();
-          disabled = true;
-          fallbackReason = 'unavailable';
-          return false;
-        }
-        const scale = dimensions.canonical.width / (scene.canvas?.width ?? scene.source.width);
-        const background = scene.background.enabled
+      }
+      const art = slot.artwork;
+      if (
+        art.backgroundRevision === 0 ||
+        art.image !== input.image ||
+        (scene.background.enabled && hasSceneBackgroundMotion(scene.background.motion))
+      ) {
+        const bgScale = dimensions.backing.width / (scene.canvas?.width ?? scene.source.width);
+        const paint = scene.background.enabled
           ? {
               ...scene.background,
               layout: {
                 ...scene.background.layout,
-                cornerRadius: scene.background.layout.cornerRadius * scale,
+                cornerRadius: scene.background.layout.cornerRadius * bgScale,
+                blur: (scene.background.layout.blur ?? 0) * bgScale,
               },
             }
           : scene.background;
-        const base = computeQuickEditSceneLayout({
-          ...scene,
-          output: dimensions.canonical,
-          camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+        art.painter.draw(art.background.context, {
+          background: paint,
+          image: input.image,
+          ...dimensions.backing,
+          currentTime: geometry.resultTime,
         });
-        const decorRect = reviewSpatialSourceRect({
-          output: dimensions.canonical,
-          window: base.windowRect,
-          background,
-          sceneScale: scale,
-        });
-        const key = JSON.stringify([
-          dimensions,
-          background,
-          base.videoRect,
-          base.windowRect,
-          decorRect,
-        ]);
-        if (!slot.artwork || slot.artwork.key !== key) {
-          clearSlot(slot);
-          const retained: RenderCanvasLease[] = [];
-          try {
-            const bg = args.resources.canvas('preview-gpu-background', dimensions.backing);
-            retained.push(bg);
-            const decoration = args.resources.canvas('preview-gpu-decoration', decorRect);
-            retained.push(decoration);
-            const overlay = args.resources.canvas('preview-gpu-captions', dimensions.backing);
-            retained.push(overlay);
-            const ctx = decoration.context;
-            ctx.translate(-decorRect.x, -decorRect.y);
-            const radius = background.enabled ? background.layout.cornerRadius : 0;
-            drawReviewSceneShadow(ctx, background, base.windowRect, radius, scale);
-            slot.artwork = {
-              painter: createReviewBackgroundPainter(args.resources),
-              background: bg,
-              decoration,
-              overlay,
-              rect: decorRect,
-              key,
-              backgroundRevision: 0,
-              image: null,
-              captionKey: '',
-              captionOwner: null,
-              captionRevision: 0,
-            };
-          } catch (error) {
-            for (const lease of retained) lease.release();
-            throw error;
+        art.image = input.image;
+        art.backgroundRevision = ++artworkRevision;
+      }
+      const captionKey =
+        input.captions?.plan.cues
+          .filter((cue) => cue.start <= geometry.resultTime && geometry.resultTime < cue.end)
+          .map((cue) => cue.id)
+          .join('|') ?? '';
+      if (
+        art.captionOwner !== input.captions ||
+        art.captionKey !== captionKey ||
+        art.captionRevision === 0
+      ) {
+        const ctx = art.overlay.context;
+        ctx.clearRect(0, 0, dimensions.backing.width, dimensions.backing.height);
+        ctx.save();
+        ctx.scale(
+          dimensions.backing.width / dimensions.canonical.width,
+          dimensions.backing.height / dimensions.canonical.height
+        );
+        input.captions?.draw(ctx, geometry.resultTime);
+        ctx.restore();
+        art.captionOwner = input.captions;
+        art.captionKey = captionKey;
+        art.captionRevision = ++artworkRevision;
+      }
+      const full = { x: 0, y: 0, ...dimensions.canonical };
+      const radius = background.enabled ? background.layout.cornerRadius : 0;
+      const caption: GpuPreviewLayer = {
+        source: art.overlay.canvas,
+        rect: full,
+        inverse: identity,
+        cache: { key: 'captions', revision: art.captionRevision },
+      };
+      const sceneInputs = {
+        dimensions,
+        base,
+        radius,
+        header: input.header,
+        artwork: {
+          background: art.background.canvas,
+          decoration: art.decoration.canvas,
+          rect: art.rect,
+          backgroundRevision: art.backgroundRevision,
+          decorationRevision: art,
+        },
+        painter: art.painter,
+        image: input.image,
+        resultTime: geometry.resultTime,
+        primitives,
+        cameraOverride: input.cameraOverride,
+        fps: input.fps,
+        annotations: input.annotations,
+        retainAnnotationBatch(
+          batch: Awaited<ReturnType<NonNullable<typeof input.annotations>['render']>>
+        ) {
+          annotationHolds.push(batch.retain());
+        },
+        admit: input.admit,
+        signal,
+      };
+      const moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw' | 'toVideoFrame'> = {
+        timestamp: input.frame.timestamp / 1e6,
+        draw() {},
+      };
+      let main: GpuPreviewGroup;
+      if (input.transition?.blend.plan.type === 'dissolve') {
+        const sides = reviewCutTransitionSides(
+          input.transition.blend,
+          input.transition.frames,
+          moving,
+          geometry.resultTime,
+          input.transition.resultOffset
+        );
+        const sources: Array<GpuPreviewGroup | ImageBitmap> = [];
+        for (const side of sides) {
+          const frame = side.sample === moving ? input.frame : side.sample.toVideoFrame?.();
+          if (!frame) throw new Error('Transition GPU pixels are unavailable.');
+          if (frame !== input.frame) ownedFrames.push(frame);
+          const currentScene =
+            (await input.sceneAt?.(side.resultTime, side.sample.timestamp)) ?? scene;
+          const pose = reviewPresentedGeometry(
+            currentScene,
+            dimensions,
+            side.resultTime,
+            input.cameraOverride
+          );
+          const firstHold = annotationHolds.length;
+          const endpoint = await buildReviewGpuScene({
+            ...sceneInputs,
+            source: frame,
+            scene: currentScene,
+            geometry: pose,
+            sourceTime: side.sample.timestamp,
+            orientation:
+              side.sample === moving
+                ? undefined
+                : { rotation: side.sample.rotation ?? 0, flip: side.sample.flip ?? false },
+          });
+          if (annotationHolds.length === firstHold) sources.push(endpoint);
+          else {
+            const reservation = args.resources.bytes(
+              'preview-gpu-annotation-endpoint',
+              dimensions.backing.width * dimensions.backing.height * 4
+            );
+            let retained = false;
+            try {
+              const bitmap = await renderer.render({
+                output: dimensions.backing,
+                logical: dimensions.canonical,
+                layers: endpoint.layers,
+                signal,
+              });
+              endpointOutputs.push({ bitmap, release: () => reservation.release() });
+              retained = true;
+              signal.throwIfAborted();
+              sources.push(bitmap);
+            } finally {
+              if (!retained) reservation.release();
+              // Each endpoint fence ends its raw annotation borrow before the next batch admission.
+              releaseAnnotations(firstHold);
+            }
           }
         }
-        const art = slot.artwork;
-        if (
-          art.backgroundRevision === 0 ||
-          art.image !== input.image ||
-          (scene.background.enabled && hasSceneBackgroundMotion(scene.background.motion))
-        ) {
-          const bgScale = dimensions.backing.width / (scene.canvas?.width ?? scene.source.width);
-          const paint = scene.background.enabled
-            ? {
-                ...scene.background,
-                layout: {
-                  ...scene.background.layout,
-                  cornerRadius: scene.background.layout.cornerRadius * bgScale,
-                  blur: (scene.background.layout.blur ?? 0) * bgScale,
-                },
-              }
-            : scene.background;
-          art.painter.draw(art.background.context, {
-            background: paint,
-            image: input.image,
-            ...dimensions.backing,
-            currentTime: geometry.resultTime,
-          });
-          art.image = input.image;
-          art.backgroundRevision = ++artworkRevision;
-        }
-        const captionKey =
-          input.captions?.plan.cues
-            .filter((cue) => cue.start <= geometry.resultTime && geometry.resultTime < cue.end)
-            .map((cue) => cue.id)
-            .join('|') ?? '';
-        if (
-          art.captionOwner !== input.captions ||
-          art.captionKey !== captionKey ||
-          art.captionRevision === 0
-        ) {
-          const ctx = art.overlay.context;
-          ctx.clearRect(0, 0, dimensions.backing.width, dimensions.backing.height);
-          ctx.save();
-          ctx.scale(
-            dimensions.backing.width / dimensions.canonical.width,
-            dimensions.backing.height / dimensions.canonical.height
-          );
-          input.captions?.draw(ctx, geometry.resultTime);
-          ctx.restore();
-          art.captionOwner = input.captions;
-          art.captionKey = captionKey;
-          art.captionRevision = ++artworkRevision;
-        }
-        const full = { x: 0, y: 0, ...dimensions.canonical };
-        const radius = background.enabled ? background.layout.cornerRadius : 0;
-        const caption: GpuPreviewLayer = {
-          source: art.overlay.canvas,
-          rect: full,
-          inverse: identity,
-          cache: { key: 'captions', revision: art.captionRevision },
+        main = {
+          kind: 'group',
+          output: dimensions.backing,
+          logical: dimensions.canonical,
+          layers: sources.map((source, index) => ({
+            source,
+            rect: full,
+            inverse: identity,
+            opacity: index === 0 ? 1 : input.transition!.blend.incoming,
+          })),
         };
-        const sceneInputs = {
-          dimensions,
-          base,
-          radius,
-          header: input.header,
-          artwork: {
-            background: art.background.canvas,
-            decoration: art.decoration.canvas,
-            rect: art.rect,
-            backgroundRevision: art.backgroundRevision,
-            decorationRevision: art,
-          },
-          painter: art.painter,
-          image: input.image,
-          resultTime: geometry.resultTime,
-          primitives,
-          cameraOverride: input.cameraOverride,
-          fps: input.fps,
-          annotations: input.annotations,
-          retainAnnotationBatch(
-            batch: Awaited<ReturnType<NonNullable<typeof input.annotations>['render']>>
-          ) {
-            annotationHolds.push(batch.retain());
-          },
-          admit: input.admit,
-          signal,
-        };
-        const moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw' | 'toVideoFrame'> = {
-          timestamp: input.frame.timestamp / 1e6,
-          draw() {},
-        };
-        let main: GpuPreviewGroup;
-        if (input.transition?.blend.plan.type === 'dissolve') {
+      } else {
+        let source = input.frame;
+        let sourceTime = input.sourceTime;
+        let orientation: GpuPreviewLayer['orientation'];
+        if (input.transition) {
           const sides = reviewCutTransitionSides(
             input.transition.blend,
             input.transition.frames,
@@ -358,148 +460,106 @@ export function createReviewGpuPreview(args: {
             geometry.resultTime,
             input.transition.resultOffset
           );
-          const sources: Array<GpuPreviewGroup | ImageBitmap> = [];
-          for (const side of sides) {
-            const frame = side.sample === moving ? input.frame : side.sample.toVideoFrame?.();
+          const sample = sides[input.transition.blend.beforeSeam ? 0 : 1].sample;
+          if (sample !== moving) {
+            const frame = sample.toVideoFrame?.();
             if (!frame) throw new Error('Transition GPU pixels are unavailable.');
-            if (frame !== input.frame) ownedFrames.push(frame);
-            const currentScene =
-              (await input.sceneAt?.(side.resultTime, side.sample.timestamp)) ?? scene;
-            const pose = reviewPresentedGeometry(
-              currentScene,
-              dimensions,
-              side.resultTime,
-              input.cameraOverride
-            );
-            const firstHold = annotationHolds.length;
-            const endpoint = await buildReviewGpuScene({
-              ...sceneInputs,
-              source: frame,
-              scene: currentScene,
-              geometry: pose,
-              sourceTime: side.sample.timestamp,
-              orientation:
-                side.sample === moving
-                  ? undefined
-                  : { rotation: side.sample.rotation ?? 0, flip: side.sample.flip ?? false },
-            });
-            if (annotationHolds.length === firstHold) sources.push(endpoint);
-            else {
-              const reservation = args.resources.bytes(
-                'preview-gpu-annotation-endpoint',
-                dimensions.backing.width * dimensions.backing.height * 4
-              );
-              let retained = false;
-              try {
-                const bitmap = await renderer.render({
-                  output: dimensions.backing,
-                  logical: dimensions.canonical,
-                  layers: endpoint.layers,
-                  signal,
-                });
-                endpointOutputs.push({ bitmap, release: () => reservation.release() });
-                retained = true;
-                signal.throwIfAborted();
-                sources.push(bitmap);
-              } finally {
-                if (!retained) reservation.release();
-                // Each endpoint fence ends its raw annotation borrow before the next batch admission.
-                releaseAnnotations(firstHold);
-              }
-            }
+            source = frame;
+            ownedFrames.push(frame);
+            sourceTime = sample.timestamp;
+            orientation = { rotation: sample.rotation ?? 0, flip: sample.flip ?? false };
           }
-          main = {
-            kind: 'group',
-            output: dimensions.backing,
-            logical: dimensions.canonical,
-            layers: sources.map((source, index) => ({
-              source,
-              rect: full,
-              inverse: identity,
-              opacity: index === 0 ? 1 : input.transition!.blend.incoming,
-            })),
-          };
-        } else {
-          let source = input.frame;
-          let sourceTime = input.sourceTime;
-          let orientation: GpuPreviewLayer['orientation'];
-          if (input.transition) {
-            const sides = reviewCutTransitionSides(
-              input.transition.blend,
-              input.transition.frames,
-              moving,
-              geometry.resultTime,
-              input.transition.resultOffset
-            );
-            const sample = sides[input.transition.blend.beforeSeam ? 0 : 1].sample;
-            if (sample !== moving) {
-              const frame = sample.toVideoFrame?.();
-              if (!frame) throw new Error('Transition GPU pixels are unavailable.');
-              source = frame;
-              ownedFrames.push(frame);
-              sourceTime = sample.timestamp;
-              orientation = { rotation: sample.rotation ?? 0, flip: sample.flip ?? false };
-            }
-          }
-          main = await buildReviewGpuScene({
-            ...sceneInputs,
-            source,
-            scene,
-            geometry,
-            sourceTime,
-            orientation,
-          });
         }
-        const layers = reviewGpuFinishLayers({
+        main = await buildReviewGpuScene({
+          ...sceneInputs,
+          source,
           scene,
-          dimensions,
-          main,
-          sourceTime: input.sourceTime,
-          resultTime: geometry.resultTime,
-          primitives,
-          caption,
-          watermark: input.watermark ?? null,
-          ...(input.camera ? { camera: input.camera } : {}),
-          ...(input.transition?.blend.plan.type === 'fade-black'
-            ? {
-                blackout: {
-                  opacity: input.transition.blend.black,
-                  color: input.transition.blend.plan.color ?? '#000000',
-                },
-              }
-            : {}),
+          geometry,
+          sourceTime,
+          orientation,
         });
-        const bitmap = await renderer.render({
-          output: dimensions.backing,
-          logical: dimensions.canonical,
-          layers,
-          signal,
-        });
-        try {
-          signal.throwIfAborted();
-          input.context.drawImage(bitmap, 0, 0);
-        } finally {
-          bitmap.close();
-        }
-        return true;
-      } catch (error) {
-        // A shared device failure sends every pending request through the same Canvas fallback.
-        if (
-          disabled &&
-          fallbackReason === 'device-failed' &&
-          !disposed &&
-          !input.signal.aborted &&
-          !sceneSignal.aborted
-        )
-          return false;
-        if (signal.aborted || !(error instanceof GpuPreviewDeviceError)) throw error;
-        renderer?.dispose();
-        renderer = null;
-        disabled = true;
-        fallbackReason = 'device-failed';
-        sceneReleased = true;
-        lifetime.abort();
+      }
+      const layers = reviewGpuFinishLayers({
+        scene,
+        dimensions,
+        main,
+        sourceTime: input.sourceTime,
+        resultTime: geometry.resultTime,
+        primitives,
+        caption,
+        watermark: input.watermark ?? null,
+        ...(input.camera ? { camera: input.camera } : {}),
+        ...(input.transition?.blend.plan.type === 'fade-black'
+          ? {
+              blackout: {
+                opacity: input.transition.blend.black,
+                color: input.transition.blend.plan.color ?? '#000000',
+              },
+            }
+          : {}),
+      });
+      const request = {
+        output: dimensions.backing,
+        logical: dimensions.canonical,
+        layers,
+        signal,
+      };
+      if (output.kind === 'presentation') {
+        const provider = renderer;
+        const lease = output.acquireOutput(dimensions.backing, provider);
+        acquiredOutput = lease;
+        await lease.surface.present(request);
+        signal.throwIfAborted();
+        publicationHolds++;
+        acquiredOutput = null;
+        let released = false;
+        return {
+          canvas: lease.canvas,
+          outputKind: 'gpu-surface',
+          retainedProviderBytes: () => (released ? 0 : provider.allocatedBytes),
+          isRetiredProvider: () => disposed || failedProviders.has(provider),
+          release() {
+            if (released) return;
+            released = true;
+            try {
+              lease.release();
+            } finally {
+              publicationHolds--;
+              disposeRetiredRenderer();
+            }
+          },
+        };
+      }
+      const bitmap = await renderer.render(request);
+      try {
+        signal.throwIfAborted();
+        output.context.drawImage(bitmap, 0, 0);
+      } finally {
+        bitmap.close();
+      }
+      return true;
+    } catch (error) {
+      // A shared device failure sends every pending request through the same Canvas fallback.
+      if (
+        disabled &&
+        fallbackReason === 'device-failed' &&
+        !disposed &&
+        !input.signal.aborted &&
+        !sceneSignal.aborted
+      )
         return false;
+      if (signal.aborted || !(error instanceof GpuPreviewDeviceError)) throw error;
+      if (renderer) failedProviders.add(renderer);
+      renderer?.dispose();
+      renderer = null;
+      disabled = true;
+      fallbackReason = 'device-failed';
+      sceneReleased = true;
+      lifetime.abort();
+      return false;
+    } finally {
+      try {
+        acquiredOutput?.release();
       } finally {
         releaseAnnotations(0);
         for (const output of endpointOutputs) {
@@ -520,7 +580,23 @@ export function createReviewGpuPreview(args: {
           overlapSafe = false;
           if (disposed || sceneReleased) clear();
         }
+        disposeRetiredRenderer();
       }
+    }
+  }
+  return {
+    get fallbackReason() {
+      return fallbackReason;
+    },
+    get allocatedBytes() {
+      return renderer?.allocatedBytes ?? 0;
+    },
+    render(input: ReviewGpuRenderInput) {
+      return execute(input, { kind: 'bitmap', context: input.context });
+    },
+    /** The caller attaches each nonfront destination before the GPU writes its completed image. */
+    renderPresentation(input: ReviewGpuPresentationInput) {
+      return execute(input, { kind: 'presentation', acquireOutput: input.acquireOutput });
     },
     releaseScene() {
       sceneLifetime.abort();
@@ -532,12 +608,8 @@ export function createReviewGpuPreview(args: {
     dispose() {
       disposed = true;
       lifetime.abort();
-      renderer?.dispose();
-      void initialization?.then(
-        (value) => value?.dispose(),
-        () => {}
-      );
       if (!active) clear();
+      disposeRetiredRenderer();
     },
   };
 }

@@ -7,8 +7,14 @@ import {
   type PreviewRenderAllocationInput,
 } from '../../workflows/video-review/preview-render-allocation';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
+import type { ReviewGpuPresentedFrame } from '../../workflows/video-review/gpu-preview';
 import { previewTransitionBacking } from './preview-presentation-frame';
-import type { Description, Renderer } from './preview-presentation-state';
+import type { Description } from './preview-presentation-state';
+
+type Front = { canvas: HTMLCanvasElement } & (
+  | { outputKind: 'canvas2d' }
+  | Pick<ReviewGpuPresentedFrame, 'outputKind' | 'retainedProviderBytes' | 'isRetiredProvider'>
+);
 
 const emptyAssets = (): PreviewRenderAllocationInput['assets'] => ({
   headerBitmap: null,
@@ -22,7 +28,7 @@ export function createPresentationAdmission(
   transport: () => { playing: boolean; video: HTMLVideoElement | null },
   description: () => Description | null,
   time: () => number,
-  front: () => Awaited<ReturnType<Renderer['render']>> | null
+  front: () => Front | null
 ) {
   const resources = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
   const sourceFrames = new Map<symbol, number>();
@@ -53,6 +59,15 @@ export function createPresentationAdmission(
       previousFront: previousFront
         ? { width: previousFront.canvas.width, height: previousFront.canvas.height }
         : null,
+      outputKind:
+        current.renderer !== 'legacy' && typeof navigator !== 'undefined' && navigator.gpu
+          ? 'gpu-surface'
+          : 'canvas2d',
+      ...(previousFront ? { previousFrontKind: previousFront.outputKind } : {}),
+      previousProviderBytes:
+        previousFront?.outputKind === 'gpu-surface' && previousFront.isRetiredProvider()
+          ? previousFront.retainedProviderBytes()
+          : 0,
       assets,
     });
   };

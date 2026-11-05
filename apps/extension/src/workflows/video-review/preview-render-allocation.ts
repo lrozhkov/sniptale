@@ -35,9 +35,20 @@ interface Allocation extends Cost {
   role: string;
 }
 
+/** Selects the managed backing cost of a publication canvas. */
+export type PreviewPublicationOutputKind = 'gpu-surface' | 'canvas2d';
+
 /** Concrete dimensions come from preparation/admission, never from a quality multiplier. */
 export interface PreviewRenderAllocationInput {
-  publication: { backing: Size; previousFront: Size | null; maximumInFlight?: 1 | 2 };
+  publication: {
+    backing: Size;
+    previousFront: Size | null;
+    maximumInFlight?: 1 | 2;
+    outputKind?: PreviewPublicationOutputKind;
+    previousFrontKind?: PreviewPublicationOutputKind;
+    /** Total retired GPU provider storage, including its front; zero excludes the current provider. */
+    previousProviderBytes?: number;
+  };
   admission: {
     source: Capture | null;
     camera: { retained: Capture | null; active: Capture | null };
@@ -100,6 +111,30 @@ function bytes(role: string, count: number): Allocation {
 }
 function canvas(role: string, size: Size): Allocation {
   return { role, bytes: integer(pixels(size) * 4), canvases: 1 };
+}
+function publicationCanvas(
+  role: string,
+  size: Size,
+  kind: PreviewPublicationOutputKind = 'canvas2d'
+): Allocation {
+  return { role, bytes: integer(pixels(size) * (kind === 'gpu-surface' ? 8 : 4)), canvases: 1 };
+}
+function retainedPublication(
+  previousFront: Size | null,
+  previousFrontKind: PreviewPublicationOutputKind = 'canvas2d',
+  previousProviderBytes = 0
+): Allocation[] {
+  integer(previousProviderBytes, true);
+  if (!previousFront) {
+    if (previousProviderBytes) throw new Error('Invalid preview allocation graph');
+    return [];
+  }
+  const front = publicationCanvas('publication-front', previousFront, previousFrontKind);
+  if (!previousProviderBytes) return [front];
+  if (previousFrontKind !== 'gpu-surface' || previousProviderBytes < front.bytes)
+    throw new Error('Invalid preview allocation graph');
+  const extra = previousProviderBytes - front.bytes;
+  return extra ? [front, bytes('publication-retired-provider', extra)] : [front];
 }
 function bitmap(role: string, size: Size | null): Allocation[] {
   return size ? [bytes(role, pixels(size) * 4)] : [];
@@ -243,9 +278,19 @@ function preparation(input: PreviewRenderAllocationInput, front: Allocation[]) {
 
 /** Managed graph limits exclude decoder queues, driver storage and opaque browser overhead. */
 export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationInput) {
-  const front = [
-    canvas('publication-front', input.publication.previousFront ?? input.publication.backing),
-  ];
+  const front = retainedPublication(
+    input.publication.previousFront,
+    input.publication.previousFrontKind,
+    input.publication.previousProviderBytes
+  );
+  if (!input.publication.previousFront)
+    front.push(
+      publicationCanvas(
+        'publication-front',
+        input.publication.backing,
+        input.publication.outputKind
+      )
+    );
   const admitted = [
     ...(input.admission.source ? [capture('source', input.admission.source)] : []),
     ...Object.entries(input.admission.camera).flatMap(([role, value]) =>
@@ -263,7 +308,11 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
   const retained = [
     ...front,
     ...Array.from({ length: input.publication.maximumInFlight ?? 1 }, () =>
-      canvas('publication-staging', input.publication.backing)
+      publicationCanvas(
+        'publication-staging',
+        input.publication.backing,
+        input.publication.outputKind
+      )
     ),
     ...admitted,
     ...assets,
@@ -345,6 +394,9 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
 /** Discovery describes only resources whose dimensions or storage size are already known. */
 export interface PreviewPreparationAllocationInput {
   previousFront: Size | null;
+  previousFrontKind?: PreviewPublicationOutputKind;
+  /** Total retired GPU provider storage, including the previous front. */
+  previousProviderBytes?: number;
   retainedCamera: Capture | null;
   retainedTransition?: readonly [Capture, Capture] | null;
   backgroundBitmap: Size | null;
@@ -357,7 +409,11 @@ export interface PreviewPreparationAllocationInput {
 /** Positive empty-ledger limits are constructor control values, not allocated storage. */
 export function calculatePreviewPreparationAllocation(input: PreviewPreparationAllocationInput) {
   const allocations = [
-    ...optionalCanvas('publication-front', input.previousFront),
+    ...retainedPublication(
+      input.previousFront,
+      input.previousFrontKind,
+      input.previousProviderBytes
+    ),
     ...(input.retainedCamera ? [capture('camera-retained', input.retainedCamera)] : []),
     ...(input.retainedTransition?.map((value, index) => capture(`transition-${index}`, value)) ??
       []),
@@ -393,6 +449,10 @@ export interface PreviewRuntimeAllocationInput {
   camera: { retainedBytes: number | null; activeBytes: number | null };
   transitionBytes: readonly [number, number] | null;
   previousFront: Size | null;
+  outputKind?: PreviewPublicationOutputKind;
+  previousFrontKind?: PreviewPublicationOutputKind;
+  /** Total retired GPU provider storage; omit storage already counted for the current provider. */
+  previousProviderBytes?: number;
   assets: PreviewRenderAllocationInput['assets'];
   spatialHalfFloat?: boolean;
   previousBackgroundCache?: Size | null;
@@ -584,6 +644,11 @@ export function resolvePreviewRenderAllocation(
     publication: {
       backing,
       previousFront: input.previousFront,
+      ...(input.outputKind ? { outputKind: input.outputKind } : {}),
+      ...(input.previousFrontKind ? { previousFrontKind: input.previousFrontKind } : {}),
+      ...(input.previousProviderBytes === undefined
+        ? {}
+        : { previousProviderBytes: input.previousProviderBytes }),
       ...(input.maximumInFlight ? { maximumInFlight: input.maximumInFlight } : {}),
     },
     admission: {
