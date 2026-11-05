@@ -722,3 +722,167 @@ it('reuses only immutable mask pixels through the production general renderer', 
   f.owner.dispose();
   expect([first.source.width, first.source.height]).toEqual([0, 0]);
 });
+
+function directFixture() {
+  const f = fixture();
+  const present = vi
+    .fn<(request: Parameters<GpuPreviewRenderer['render']>[0]) => Promise<void>>()
+    .mockResolvedValue(undefined);
+  const backend = {
+    render: f.render,
+    dispose: f.dispose,
+    allocatedBytes: 0,
+    createSurface: vi.fn(),
+  };
+  f.create.mockResolvedValue(backend);
+  const releaseOutput = vi.fn();
+  const targets: HTMLCanvasElement[] = [];
+  f.input.acquireGpuOutput = vi.fn((size, provider) => {
+    expect(provider).toBe(backend);
+    const canvas = Object.assign(document.createElement('canvas'), size);
+    targets.push(canvas);
+    return { canvas, surface: { canvas, present, dispose: vi.fn() }, release: releaseOutput };
+  });
+  return { ...f, present, backend, targets, releaseOutput };
+}
+
+it('presents the full Native graph and letterbox on a leased GPU target without a 2D publication', async () => {
+  const f = directFixture();
+  const root = document.createElement('canvas');
+  Object.defineProperties(root, { clientWidth: { value: 12 }, clientHeight: { value: 8 } });
+  f.input.canvas = root;
+  const getContext = vi.spyOn(root, 'getContext');
+  f.input.stagingCanvas = vi.fn(() => {
+    throw new Error('Direct output must not acquire staging');
+  });
+  const layer = f.passes.overlayFrame.visualLayers[0];
+  if (!layer || layer.kind !== 'video') throw new Error('Expected video');
+  layer.sourceContentTransform = [1, 0, 0.2, 0, 1, 0, 0, 0, 1];
+  const fence = Promise.withResolvers<void>();
+  f.present.mockReturnValueOnce(fence.promise);
+  const published = vi.fn();
+  root.addEventListener('sniptale-preview-frame', published);
+  const pending = f.owner.render(f.input, f.passes, f.finish, () => false);
+  await vi.waitFor(() => expect(f.present).toHaveBeenCalledOnce());
+  expect(f.captured[0]!.close).not.toHaveBeenCalled();
+  expect(f.releaseOutput).not.toHaveBeenCalled();
+  expect(published).not.toHaveBeenCalled();
+  expect(f.render).not.toHaveBeenCalled();
+  expect(f.input.stagingCanvas).not.toHaveBeenCalled();
+  expect(getContext).not.toHaveBeenCalled();
+  const request = f.present.mock.calls[0]![0];
+  expect(request.output).toEqual({ width: 12, height: 8 });
+  expect(request.logical).toEqual({ width: 12, height: 8 });
+  expect(request.layers).toHaveLength(2);
+  expect(request.layers[1]!.rect).toEqual({ x: 0, y: 1, width: 12, height: 6 });
+  const group = request.layers[1]!.source;
+  if (!('kind' in group) || group.kind !== 'group')
+    throw new Error('Expected full composition group');
+  expect(group.logical).toEqual(f.input.project);
+  expect(group.layers.length).toBeGreaterThan(1);
+  expect(f.finish).toHaveBeenCalledOnce();
+  fence.resolve();
+  const result = await pending;
+  if (!result || typeof result !== 'object') throw new Error('Expected GPU output');
+  expect(result.canvas).toBe(f.targets[0]);
+  expect(f.captured[0]!.close).toHaveBeenCalledOnce();
+  expect(published).not.toHaveBeenCalled();
+  result.release();
+  result.release();
+  expect(f.releaseOutput).toHaveBeenCalledOnce();
+});
+
+it('keeps a published GPU provider while disposal drains a pending frame and its CPU materials', async () => {
+  const f = directFixture();
+  const first = await f.owner.render(f.input, f.passes, f.finish, () => false);
+  if (!first || typeof first !== 'object') throw new Error('Expected GPU output');
+  const background = f.present.mock.calls[0]![0].layers[0]!.source;
+  if (!(background instanceof HTMLCanvasElement)) throw new Error('Expected retained background');
+  const fence = Promise.withResolvers<void>();
+  f.present.mockReturnValueOnce(fence.promise);
+  const pending = f.owner.render(f.input, f.passes, f.finish, () => false);
+  await vi.waitFor(() => expect(f.present).toHaveBeenCalledTimes(2));
+  f.owner.dispose();
+  expect(f.dispose).not.toHaveBeenCalled();
+  expect(background.width).toBeGreaterThan(0);
+  expect(f.captured[1]!.close).not.toHaveBeenCalled();
+  expect(f.releaseOutput).not.toHaveBeenCalled();
+  expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBeUndefined();
+  fence.resolve();
+  expect(await pending).toBe(false);
+  expect(f.captured[1]!.close).toHaveBeenCalledOnce();
+  expect(f.releaseOutput).toHaveBeenCalledOnce();
+  expect(background.width).toBe(0);
+  expect(f.dispose).not.toHaveBeenCalled();
+  expect(f.targets[0]).not.toBe(f.targets[1]);
+  first.release();
+  first.release();
+  expect(f.releaseOutput).toHaveBeenCalledTimes(2);
+  expect(f.dispose).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'invalidated'] as const)(
+  'releases a stale direct target only after its fence settles after %s',
+  async (reason) => {
+    const f = directFixture();
+    const controller = new AbortController();
+    f.input.signal = controller.signal;
+    let invalidated = false;
+    const fence = Promise.withResolvers<void>();
+    f.present.mockReturnValueOnce(fence.promise);
+    const pending = f.owner.render(f.input, f.passes, f.finish, () => invalidated);
+    await vi.waitFor(() => expect(f.present).toHaveBeenCalledOnce());
+    if (reason === 'abort') controller.abort();
+    else invalidated = true;
+    expect(f.releaseOutput).not.toHaveBeenCalled();
+    expect(f.captured[0]!.close).not.toHaveBeenCalled();
+    fence.resolve();
+    expect(await pending).toBe(false);
+    expect(f.releaseOutput).toHaveBeenCalledOnce();
+    expect(f.captured[0]!.close).toHaveBeenCalledOnce();
+  }
+);
+
+it.each(['device', 'contract'] as const)(
+  'releases a failed direct target and preserves %s failure classification',
+  async (reason) => {
+    const f = directFixture();
+    const error =
+      reason === 'device'
+        ? new GpuPreviewDeviceError('Device lost')
+        : new Error('Invalid composition');
+    f.present.mockRejectedValueOnce(error);
+    const pending = f.owner.render(f.input, f.passes, f.finish, () => false);
+    if (reason === 'device') await expect(pending).resolves.toBeUndefined();
+    else await expect(pending).rejects.toBe(error);
+    expect(f.releaseOutput).toHaveBeenCalledOnce();
+    expect(f.captured[0]!.close).toHaveBeenCalledOnce();
+    expect(f.dispose).toHaveBeenCalledTimes(reason === 'device' ? 1 : 0);
+  }
+);
+
+it('keeps the old bitmap route and suppresses its frame event only when the caller defers it', async () => {
+  const f = fixture();
+  f.input.deferFrameEvent = true;
+  const published = vi.fn();
+  f.input.canvas.addEventListener('sniptale-preview-frame', published);
+  expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBe(true);
+  expect(f.render).toHaveBeenCalledOnce();
+  expect(f.bitmap.close).toHaveBeenCalledOnce();
+  expect(published).not.toHaveBeenCalled();
+});
+
+it('declines direct output when the provider lacks surface support without acquiring staging or a target', async () => {
+  const f = fixture();
+  f.input.acquireGpuOutput = vi.fn(() => {
+    throw new Error('Unexpected destination');
+  });
+  f.input.stagingCanvas = vi.fn(() => {
+    throw new Error('Unexpected staging');
+  });
+  expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBeUndefined();
+  expect(f.input.acquireGpuOutput).not.toHaveBeenCalled();
+  expect(f.input.stagingCanvas).not.toHaveBeenCalled();
+  expect(f.finish).not.toHaveBeenCalled();
+  expect(f.captured).toHaveLength(0);
+});

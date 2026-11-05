@@ -16,6 +16,7 @@ export type PreviewStageCanvasLayerProps = Pick<
   | 'videoRefs'
 > & {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  gpuHostRef?: React.RefObject<HTMLDivElement | null> | undefined;
 };
 
 export type PreviewStageRootSurfaceProps = Pick<
@@ -67,8 +68,9 @@ export type PreviewStageRootSurfaceProps = Pick<
   | 'videoRefs'
 > & {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  gpuHostRef?: React.RefObject<HTMLDivElement | null> | undefined;
   selectionOverlay: React.ReactNode;
   targetOverlay: React.ReactNode;
 };
 
-export type PreviewStageRootProps = Omit<PreviewStageRootSurfaceProps, 'canvasRef'>;
+export type PreviewStageRootProps = Omit<PreviewStageRootSurfaceProps, 'canvasRef' | 'gpuHostRef'>;

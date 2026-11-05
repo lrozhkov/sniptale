@@ -13,6 +13,7 @@ export interface GpuPreviewPresentationSurface {
 interface SurfaceEntry {
   canvas: HTMLCanvasElement;
   context: GPUCanvasContext;
+  ownedBacking: OffscreenCanvas | null;
   width: number;
   height: number;
   bytes: number;
@@ -57,6 +58,13 @@ export function createGpuPreviewPresentationOwner(options: {
       reservation?.release();
     }
   };
+  const clearOwnedBacking = (backing: OffscreenCanvas) => {
+    try {
+      backing.width = 0;
+    } finally {
+      backing.height = 0;
+    }
+  };
   const retire = (entry: SurfaceEntry) => {
     if (entries.get(entry.canvas) !== entry) return;
     entry.retired = true;
@@ -64,7 +72,11 @@ export function createGpuPreviewPresentationOwner(options: {
       try {
         releaseStorage(entry);
       } finally {
-        entries.delete(entry.canvas);
+        try {
+          if (entry.ownedBacking) clearOwnedBacking(entry.ownedBacking);
+        } finally {
+          entries.delete(entry.canvas);
+        }
       }
     }
   };
@@ -111,9 +123,10 @@ export function createGpuPreviewPresentationOwner(options: {
     const checkTarget = () => {
       options.check(request.signal);
       if (disposed || entry.retired) throw new Error('GPU presentation surface is disposed.');
+      const backing = entry.ownedBacking ?? entry.canvas;
       if (
-        entry.canvas.width !== width ||
-        entry.canvas.height !== height ||
+        backing.width !== width ||
+        backing.height !== height ||
         request.output.width !== width ||
         request.output.height !== height
       )
@@ -152,16 +165,49 @@ export function createGpuPreviewPresentationOwner(options: {
     get allocatedBytes() {
       return allocatedBytes;
     },
-    create(canvas: HTMLCanvasElement): GpuPreviewPresentationSurface {
+    create(
+      canvas: HTMLCanvasElement,
+      settings: { offscreen?: boolean } = {}
+    ): GpuPreviewPresentationSurface {
       if (disposed) throw new Error('GPU presentation owner is disposed.');
       if (entries.has(canvas)) throw new Error('GPU presentation canvas already has an owner.');
       if (entries.size >= options.maximumSurfaces)
         throw new Error('GPU presentation surface capacity exceeded.');
-      const context = canvas.getContext('webgpu');
-      if (!context || !('configure' in context)) throw options.unavailable();
+      let ownedBacking: OffscreenCanvas | null = null;
+      let context: GPUCanvasContext;
+      if (settings.offscreen) {
+        if (
+          !Number.isSafeInteger(canvas.width) ||
+          !Number.isSafeInteger(canvas.height) ||
+          canvas.width < 1 ||
+          canvas.height < 1 ||
+          canvas.width > options.device.limits.maxTextureDimension2D ||
+          canvas.height > options.device.limits.maxTextureDimension2D
+        )
+          throw new Error('GPU presentation dimensions are invalid.');
+        try {
+          if (typeof canvas.transferControlToOffscreen !== 'function') throw options.unavailable();
+          ownedBacking = canvas.transferControlToOffscreen();
+          const resolved = ownedBacking.getContext('webgpu');
+          if (!resolved || !('configure' in resolved)) throw options.unavailable();
+          context = resolved;
+        } catch {
+          try {
+            if (ownedBacking) clearOwnedBacking(ownedBacking);
+          } catch {
+            throw options.unavailable();
+          }
+          throw options.unavailable();
+        }
+      } else {
+        const resolved = canvas.getContext('webgpu');
+        if (!resolved || !('configure' in resolved)) throw options.unavailable();
+        context = resolved;
+      }
       const entry: SurfaceEntry = {
         canvas,
         context,
+        ownedBacking,
         width: 0,
         height: 0,
         bytes: 0,

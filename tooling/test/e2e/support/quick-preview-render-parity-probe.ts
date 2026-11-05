@@ -900,7 +900,7 @@ export async function probeGpuQueue() {
   return runGpuQueue();
 }
 
-/** Quality-only direct output proof; capture reads the browser compositor, never the GPU canvas. */
+/** Quality-only proof: full-raster GPU image readback must match compositor capture after paint. */
 export async function probeGpuDirectQueue(capture: () => Promise<ImageData>) {
   return runGpuQueue(capture);
 }
@@ -954,6 +954,7 @@ async function runGpuQueue(capture?: () => Promise<ImageData>) {
     closedSources = 0,
     backgroundReads = 0;
   const parity: ReturnType<typeof comparePixels>[] = [];
+  const readbackParity: ReturnType<typeof comparePixels>[] = [];
   let referencesDifferentPixels = 0,
     distinctOutputs = false,
     sourcesStillOpen = false;
@@ -1111,7 +1112,23 @@ async function runGpuQueue(capture?: () => Promise<ImageData>) {
         throw new Error('Queue output dimensions changed');
       if (capture) {
         await show(value);
-        return capture();
+        const snapshot = await capture();
+        if (value.outputKind === 'gpu-surface') {
+          const scratch = canvas(queueSize);
+          try {
+            const context = scratch.getContext('2d', { alpha: false });
+            if (!context) throw new Error('GPU image readback context is unavailable');
+            context.fillStyle = '#000';
+            context.fillRect(0, 0, queueSize.width, queueSize.height);
+            context.drawImage(value.canvas, 0, 0);
+            readbackParity.push(
+              comparePixels(context.getImageData(0, 0, queueSize.width, queueSize.height), snapshot)
+            );
+          } finally {
+            scratch.width = scratch.height = 0;
+          }
+        }
+        return snapshot;
       }
       if (value.outputKind !== 'canvas2d') throw new Error('Queue bitmap context is unavailable');
       return value.context.getImageData(0, 0, queueSize.width, queueSize.height);
@@ -1207,6 +1224,7 @@ async function runGpuQueue(capture?: () => Promise<ImageData>) {
     timestamps: [...queueTimes],
     renderFacts,
     parity,
+    readbackParity,
     featureStates,
     referencesDifferentPixels,
     distinctOutputs,

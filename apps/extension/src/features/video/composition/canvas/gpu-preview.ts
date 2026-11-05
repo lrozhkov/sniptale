@@ -72,8 +72,15 @@ export interface GpuPreviewLayer {
 /** The caller retains frame/publication authority and closes each returned bitmap. */
 export interface GpuPreviewRenderer {
   readonly allocatedBytes: number;
-  /** The caller leases a distinct nonfront canvas and publishes its matching geometry after completion. */
-  createSurface?(canvas: HTMLCanvasElement): GpuPreviewPresentationSurface;
+  /**
+   * The caller leases a nonfront canvas and publishes matching geometry after completion.
+   * Offscreen mode transfers its fixed-size backing to the backend; callers must not resize
+   * or select a context on the HTML placeholder. The default preserves caller-owned HTML resize.
+   */
+  createSurface?(
+    canvas: HTMLCanvasElement,
+    options?: { offscreen?: boolean }
+  ): GpuPreviewPresentationSurface;
   render(args: {
     output: Size;
     logical: Size;
@@ -1157,7 +1164,7 @@ export async function createGpuPreviewRenderer(
       get allocatedBytes() {
         return bytes + presentationOwner.allocatedBytes;
       },
-      createSurface: (canvas) => presentationOwner.create(canvas),
+      createSurface: (canvas, options) => presentationOwner.create(canvas, options),
       async render(request) {
         const bitmap = await execute(request);
         if (!bitmap) throw new Error('GPU preview bitmap output is unavailable.');

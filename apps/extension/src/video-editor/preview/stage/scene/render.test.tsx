@@ -10,7 +10,7 @@ import {
   createProject,
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import type { PreviewStageCanvasSceneParams } from './types';
+import type { NativePreviewFramePresenter, PreviewStageCanvasSceneParams } from './types';
 
 const schedulerMocks = vi.hoisted(() => ({
   disposeMock: vi.fn(),
@@ -47,13 +47,20 @@ import { createPreviewEffectRuntimeFeedbackTestStub } from './test-support';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function RenderHarness({ retryVersion = 0 }: { retryVersion?: number }) {
+function RenderHarness({
+  retryVersion = 0,
+  framePresenterRef,
+}: {
+  retryVersion?: number;
+  framePresenterRef?: React.RefObject<NativePreviewFramePresenter | null>;
+}) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
 
   usePreviewStageCanvasRender({
     activeClips: [],
     canvasRef,
+    ...(framePresenterRef ? { framePresenterRef } : {}),
     currentTime: 0,
     effectRuntimeFeedback: { ...createPreviewEffectRuntimeFeedbackTestStub(), retryVersion },
     imageBank: {},
@@ -252,6 +259,75 @@ it('publishes the accepted job time with its camera receipt', async () => {
   expect(recompute).not.toHaveBeenCalled();
   recompute.mockRestore();
 });
+
+it('captures the mounted presenter in the render job and defers its frame event', async () => {
+  const presenter: NativePreviewFramePresenter = {
+    acquire: vi.fn<NativePreviewFramePresenter['acquire']>(),
+    publish: vi.fn(),
+  };
+  const framePresenterRef = React.createRef<NativePreviewFramePresenter>();
+  framePresenterRef.current = presenter;
+  await act(async () => root?.render(<RenderHarness framePresenterRef={framePresenterRef} />));
+  expect(schedulerMocks.enqueueMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      framePresenter: presenter,
+      acquireGpuOutput: presenter.acquire,
+      deferFrameEvent: true,
+    })
+  );
+});
+
+it.each([true, false])(
+  'commits the surface and camera through one presenter, GPU=%s',
+  async (gpu) => {
+    await act(async () => root?.render(<RenderHarness />));
+    const options = vi.mocked(createPreviewSceneRenderScheduler).mock.calls.at(-1)![0];
+    const controller = new AbortController();
+    const onCameraPresented = vi.fn();
+    const camera = resolveVideoCompositionFrame(createEmptyVideoProject(), 1.25).camera;
+    const output = { canvas: document.createElement('canvas'), release: vi.fn() };
+    output.canvas.width = 1920;
+    output.canvas.height = 1080;
+    const fallback = document.createElement('canvas');
+    fallback.width = 17;
+    fallback.height = 19;
+    const framePresenter: NativePreviewFramePresenter = {
+      acquire: vi.fn<NativePreviewFramePresenter['acquire']>(),
+      publish: vi.fn((_output, accept) => {
+        expect(onCameraPresented).not.toHaveBeenCalled();
+        expect(fallback.width).toBe(17);
+        expect(fallback.height).toBe(19);
+        accept();
+      }),
+    };
+    const accepted = options.onSuccess?.(
+      {
+        canvas: fallback,
+        controller,
+        signal: controller.signal,
+        currentTime: 1.25,
+        imageBank: {},
+        isEffectRuntimeFrame: false,
+        isPlaybackFrame: false,
+        project: createEmptyVideoProject('Accepted surface'),
+        renderGeneration: 3,
+        stage: null,
+        videoRefs: { current: {} },
+        onCameraPresented,
+        framePresenter,
+      },
+      { camera, time: 1.25, ...(gpu ? { output } : {}) }
+    );
+    expect(framePresenter.publish).toHaveBeenCalledExactlyOnceWith(
+      gpu ? output : null,
+      expect.any(Function)
+    );
+    expect(onCameraPresented).toHaveBeenCalledExactlyOnceWith(camera, 1.25);
+    expect(accepted).toBe(gpu);
+    expect([fallback.width, fallback.height]).toEqual(gpu ? [1920, 1080] : [17, 19]);
+    expect(output.release).not.toHaveBeenCalled();
+  }
+);
 
 type PlaybackRequest = (time: number) => void;
 const bridgeProject = createEmptyVideoProject('Direct playback', 200, 100);

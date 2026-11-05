@@ -287,14 +287,27 @@ async function renderPreparedPreviewScene(
               params.currentTime
             ) > 0)
       );
-      if (accelerated !== undefined)
-        return accelerated === false
-          ? false
-          : {
-              camera: renderPasses.overlayFrame.camera,
-              time: params.currentTime,
-              renderer: { backend: 'gpu' },
-            };
+      if (accelerated !== undefined) {
+        if (accelerated === false) return false;
+        const output = accelerated === true ? undefined : accelerated;
+        if (
+          params.signal?.aborted ||
+          mediaChanged ||
+          videos.some(
+            (video) => video.seeking || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+          ) ||
+          !arePreviewSceneVideosReady(renderPasses, clipMediaElements)
+        ) {
+          output?.release();
+          return false;
+        }
+        return {
+          camera: renderPasses.overlayFrame.camera,
+          time: params.currentTime,
+          renderer: { backend: 'gpu' },
+          ...(output ? { output } : {}),
+        };
+      }
       disposeEffectRuntimeComposition(effectRuntimeFrames);
       effectRuntimeFrames = undefined;
     }
@@ -394,7 +407,7 @@ async function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): Promise
   ].some((frame) => frame.camera.spatial !== undefined);
   if (!spatial && !args.watermark && !args.effectRuntimeFrames?.prepareVisualPass) {
     const drawn = await drawResolvedPreviewSceneContent(args);
-    if (drawn)
+    if (drawn && !args.params.deferFrameEvent)
       args.params.canvas.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
     return drawn;
   }
@@ -409,7 +422,7 @@ async function drawResolvedPreviewScene(args: ResolvedPreviewSceneArgs): Promise
       presented
     );
     if (!drawn || args.params.signal?.aborted || args.isInvalidated()) return false;
-    publishCompletedPreviewFrame(presented, staging);
+    publishCompletedPreviewFrame(presented, staging, !args.params.deferFrameEvent);
     return true;
   } finally {
     if (owned) {

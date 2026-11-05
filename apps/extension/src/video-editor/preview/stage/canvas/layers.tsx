@@ -21,10 +21,17 @@ export function PreviewStageCanvasLayer(params: PreviewStageCanvasLayerProps): R
     <>
       <canvas
         ref={params.canvasRef}
-        data-preview-stage-canvas
+        data-preview-stage-canvas={params.gpuHostRef ? undefined : true}
         style={{ backgroundColor: '#000' }}
         className="absolute inset-0 h-full w-full"
       />
+      {params.gpuHostRef ? (
+        <div
+          ref={params.gpuHostRef}
+          data-preview-gpu-host
+          className="pointer-events-none absolute inset-0"
+        />
+      ) : null}
       <PreviewStageCachedVideo
         currentTime={params.currentTime}
         isPlaying={params.isPlaying}

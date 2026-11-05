@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { createGpuPreviewPresentationOwner } from './gpu-preview-presentation';
+import { GpuPreviewDeviceError } from './gpu-preview';
 import { deferred } from './gpu-preview.test-support';
 
 const owners: ReturnType<typeof createGpuPreviewPresentationOwner>[] = [];
@@ -38,7 +39,7 @@ function fixture(maximumSurfaces = 3, maximumBytes = 4096) {
     check: (signal) => signal.throwIfAborted(),
     execute,
     onIdle,
-    unavailable: () => new Error('unavailable'),
+    unavailable: () => new GpuPreviewDeviceError('unavailable'),
   });
   owners.push(owner);
   const request = (signal = new AbortController().signal) => ({
@@ -321,4 +322,148 @@ it('rejects execution that reports completion without acquiring a destination', 
   f.execute.mockImplementation(async () => {});
   await expect(f.owner.create(f.canvas).present(f.request())).rejects.toThrow();
   expect(f.reserve).not.toHaveBeenCalled();
+});
+
+function offscreenFixture(maximumSurfaces = 3) {
+  const f = fixture(maximumSurfaces);
+  const getContext = vi.fn<(_mode?: string) => typeof f.context | null>(() => f.context);
+  const backing = { width: 8, height: 4, getContext } as unknown as OffscreenCanvas;
+  const transfer = vi.fn(() => backing);
+  Object.defineProperty(f.canvas, 'transferControlToOffscreen', { value: transfer });
+  let placeholderWidth = 8,
+    placeholderHeight = 4;
+  const widthWrite = vi.fn(() => {
+    throw new Error('Placeholder width is immutable');
+  });
+  const heightWrite = vi.fn(() => {
+    throw new Error('Placeholder height is immutable');
+  });
+  Object.defineProperties(f.canvas, {
+    width: { get: () => placeholderWidth, set: widthWrite },
+    height: { get: () => placeholderHeight, set: heightWrite },
+  });
+  return {
+    ...f,
+    backing,
+    transfer,
+    backingGetContext: getContext,
+    widthWrite,
+    heightWrite,
+    setPlaceholderSize(width: number, height: number) {
+      placeholderWidth = width;
+      placeholderHeight = height;
+    },
+  };
+}
+
+it('opts in to one transferred backing with lazy configuration and no HTML context or backing writes', async () => {
+  const f = offscreenFixture();
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  expect(surface.canvas).toBe(f.canvas);
+  expect(f.transfer).toHaveBeenCalledOnce();
+  expect(f.getContext).not.toHaveBeenCalled();
+  expect(f.backingGetContext.mock.calls).toEqual([['webgpu']]);
+  expect(f.context.configure).not.toHaveBeenCalled();
+  expect(f.reserve).not.toHaveBeenCalled();
+  f.execute.mockImplementationOnce(async (_request, getTexture) => {
+    expect(f.context.configure).not.toHaveBeenCalled();
+    expect(f.reserve).not.toHaveBeenCalled();
+    getTexture();
+    expect(f.context.configure).toHaveBeenCalledOnce();
+  });
+  await surface.present(f.request());
+  await surface.present(f.request());
+  expect(f.context.configure).toHaveBeenCalledOnce();
+  expect(f.owner.allocatedBytes).toBe(256);
+  surface.dispose();
+  expect([f.backing.width, f.backing.height]).toEqual([0, 0]);
+  expect(f.widthWrite).not.toHaveBeenCalled();
+  expect(f.heightWrite).not.toHaveBeenCalled();
+  expect(f.releases[0]).toHaveBeenCalledOnce();
+});
+
+it('validates disposed, duplicate, capacity and invalid-size guards before transferring a canvas', () => {
+  const f = offscreenFixture(1);
+  f.owner.create(f.canvas, { offscreen: true });
+  expect(() => f.owner.create(f.canvas, { offscreen: true })).toThrow();
+  const other = offscreenFixture();
+  expect(() => f.owner.create(other.canvas, { offscreen: true })).toThrow();
+  expect(other.transfer).not.toHaveBeenCalled();
+  expect(f.transfer).toHaveBeenCalledOnce();
+  other.owner.dispose();
+  expect(() => other.owner.create(other.canvas, { offscreen: true })).toThrow();
+  expect(other.transfer).not.toHaveBeenCalled();
+  const invalid = offscreenFixture();
+  invalid.setPlaceholderSize(0, 4);
+  expect(() => invalid.owner.create(invalid.canvas, { offscreen: true })).toThrow();
+  expect(invalid.transfer).not.toHaveBeenCalled();
+  invalid.setPlaceholderSize(65, 4);
+  expect(() => invalid.owner.create(invalid.canvas, { offscreen: true })).toThrow();
+  expect(invalid.transfer).not.toHaveBeenCalled();
+});
+
+it.each(['missing', 'throwing'] as const)(
+  'classifies %s transfer support as unavailable without using HTML WebGPU or bitmap fallback',
+  (reason) => {
+    const f = fixture();
+    if (reason === 'throwing')
+      Object.defineProperty(f.canvas, 'transferControlToOffscreen', {
+        value: vi.fn(() => {
+          throw new Error('Transfer failed');
+        }),
+      });
+    expect(() => f.owner.create(f.canvas, { offscreen: true })).toThrow(GpuPreviewDeviceError);
+    expect(f.getContext).not.toHaveBeenCalled();
+    expect(f.reserve).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['missing', 'throwing'] as const)(
+  'zeros the owned backing after %s context creation before storage admission',
+  (reason) => {
+    const f = offscreenFixture();
+    if (reason === 'missing') f.backingGetContext.mockReturnValueOnce(null);
+    else
+      f.backingGetContext.mockImplementationOnce(() => {
+        throw new Error('Context failed');
+      });
+    expect(() => f.owner.create(f.canvas, { offscreen: true })).toThrow(GpuPreviewDeviceError);
+    expect([f.backing.width, f.backing.height]).toEqual([0, 0]);
+    expect(f.reserve).not.toHaveBeenCalled();
+    expect(f.widthWrite).not.toHaveBeenCalled();
+    expect(f.heightWrite).not.toHaveBeenCalled();
+  }
+);
+
+it('defers offscreen storage retirement until execution finishes and never writes the placeholder', async () => {
+  const f = offscreenFixture(),
+    gate = deferred<void>();
+  f.execute.mockImplementation(async (_request, getTexture) => {
+    getTexture();
+    await gate.promise;
+  });
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  const pending = surface.present(f.request());
+  f.owner.dispose();
+  expect([f.backing.width, f.backing.height]).toEqual([8, 4]);
+  expect(f.context.unconfigure).not.toHaveBeenCalled();
+  expect(f.releases[0]).not.toHaveBeenCalled();
+  gate.resolve();
+  await expect(pending).rejects.toThrow('disposed');
+  expect([f.backing.width, f.backing.height]).toEqual([0, 0]);
+  expect(f.context.unconfigure).toHaveBeenCalledOnce();
+  expect(f.owner.allocatedBytes).toBe(0);
+  expect(f.widthWrite).not.toHaveBeenCalled();
+  expect(f.heightWrite).not.toHaveBeenCalled();
+});
+
+it('checks owned offscreen dimensions and rejects implicit resize', async () => {
+  const f = offscreenFixture();
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  f.setPlaceholderSize(16, 8);
+  const request = { ...f.request(), output: { width: 8, height: 4 } };
+  await expect(surface.present(request)).resolves.toBeUndefined();
+  await expect(surface.present({ ...request, output: { width: 16, height: 8 } })).rejects.toThrow();
+  expect(f.execute).toHaveBeenCalledOnce();
+  expect([f.backing.width, f.backing.height]).toEqual([8, 4]);
 });

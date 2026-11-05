@@ -28,10 +28,15 @@ import {
 
 import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
-import type { PreviewSceneRenderInput as Input, NativeGpuPreviewRenderer } from './types';
+import type {
+  PreviewSceneRenderInput as Input,
+  NativeGpuPreviewRenderer,
+  NativePreviewGpuTarget,
+} from './types';
 import {
   publishCompletedPreviewFrame,
   resolvePreparedPreviewSceneCanvas,
+  resolvePreviewSceneCanvasLayout,
   resolvePreviewCompositionFrameSize,
 } from './canvas';
 
@@ -131,11 +136,22 @@ export function createNativeGpuPreviewRenderer(
   let unavailable = false;
   let fallbackReason: PreviewRendererStatus['fallback'];
   let disposed = false;
+  let active = 0;
+  let publicationHolds = 0;
+  let materialsReleased = false;
+  const lifetime = new AbortController();
   const materials = createNativeGpuPreviewMaterials();
-  const release = () => {
-    backend?.dispose();
-    backend = null;
-    materials.dispose();
+  const settleRetirement = () => {
+    if (active) return;
+    if ((disposed || unavailable) && !materialsReleased) {
+      materialsReleased = true;
+      materials.dispose();
+    }
+    if (disposed && !publicationHolds) {
+      const provider = backend;
+      backend = null;
+      provider?.dispose();
+    }
   };
   return {
     get fallbackReason() {
@@ -146,15 +162,22 @@ export function createNativeGpuPreviewRenderer(
     },
     dispose() {
       disposed = true;
-      release();
+      lifetime.abort();
+      settleRetirement();
     },
     async render(input, passes, finish, isInvalidated, effects, finalArtworkRequired = true) {
       const layer = admittedLayer(input, passes);
       const depthLayer = admittedLayer(input, passes, true);
       if (disposed || unavailable || typeof VideoFrame === 'undefined') return undefined;
+      if (active) throw new Error('Native GPU preview overlap is unavailable.');
+      input = {
+        ...input,
+        signal: AbortSignal.any(input.signal ? [input.signal, lifetime.signal] : [lifetime.signal]),
+      };
       const inverse = layer || depthLayer ? layerInverse((layer ?? depthLayer)!, passes) : null;
       const output = resolvePreviewCompositionFrameSize(input);
       if (!output) return false;
+      active++;
       const captured = new Map<string, VideoFrame>();
       const media = new Map<string, VideoCompositionMediaSource>();
       for (const [id, source] of Object.entries(input.videoRefs.current))
@@ -166,15 +189,18 @@ export function createNativeGpuPreviewRenderer(
       let bordersArtwork: HTMLCanvasElement | undefined;
       let bitmap: ImageBitmap | undefined;
       let staging: HTMLCanvasElement | undefined;
+      let acquiredOutput: NativePreviewGpuTarget | undefined;
       try {
         preparation ??= createBackend();
         const resolved = await preparation;
-        if (disposed) {
-          resolved?.dispose();
-          return false;
-        }
         backend = resolved;
+        if (disposed) return false;
         if (!backend) {
+          unavailable = true;
+          fallbackReason = 'unavailable';
+          return undefined;
+        }
+        if (input.acquireGpuOutput && !backend.createSurface) {
           unavailable = true;
           fallbackReason = 'unavailable';
           return undefined;
@@ -384,24 +410,38 @@ export function createNativeGpuPreviewRenderer(
             inverse: IDENTITY,
           });
         }
-        staging = input.stagingCanvas?.() ?? input.canvas.ownerDocument.createElement('canvas');
-        const prepared = resolvePreparedPreviewSceneCanvas({
-          ...input,
-          canvas: staging,
-          viewportCanvas: input.canvas,
-          shouldClearCanvas: false,
-        });
-        if (!prepared) return false;
-        const viewport = prepared.viewport;
+        let prepared: ReturnType<typeof resolvePreparedPreviewSceneCanvas> = null;
+        let layout: ReturnType<typeof resolvePreviewSceneCanvasLayout>;
+        if (input.acquireGpuOutput) {
+          layout = resolvePreviewSceneCanvasLayout(input);
+          if (
+            layout.bounds.width <= 0 ||
+            layout.bounds.height <= 0 ||
+            layout.viewport.width <= 0 ||
+            layout.viewport.height <= 0
+          )
+            return false;
+        } else {
+          staging = input.stagingCanvas?.() ?? input.canvas.ownerDocument.createElement('canvas');
+          prepared = resolvePreparedPreviewSceneCanvas({
+            ...input,
+            canvas: staging,
+            viewportCanvas: input.canvas,
+            shouldClearCanvas: false,
+          });
+          if (!prepared) return false;
+          layout = { ...prepared, backing: { width: staging.width, height: staging.height } };
+        }
+        const viewport = layout.viewport;
         let presentationLayers = layers;
         let logical = { width: input.project.width, height: input.project.height };
         if (
           Math.abs(viewport.offsetX) > 1e-6 ||
           Math.abs(viewport.offsetY) > 1e-6 ||
-          Math.abs(viewport.width - prepared.bounds.width) > 1e-6 ||
-          Math.abs(viewport.height - prepared.bounds.height) > 1e-6
+          Math.abs(viewport.width - layout.bounds.width) > 1e-6 ||
+          Math.abs(viewport.height - layout.bounds.height) > 1e-6
         ) {
-          logical = { width: prepared.bounds.width, height: prepared.bounds.height };
+          logical = { width: layout.bounds.width, height: layout.bounds.height };
           presentationLayers = [
             materials.background(input, passes, logical, 'native-presentation-background'),
             {
@@ -416,12 +456,36 @@ export function createNativeGpuPreviewRenderer(
             },
           ];
         }
-        bitmap = await backend.render({
-          output: { width: staging.width, height: staging.height },
+        const request = {
+          output: layout.backing,
           logical,
           layers: presentationLayers,
           signal: input.signal ?? new AbortController().signal,
-        });
+        };
+        if (input.acquireGpuOutput) {
+          const target = input.acquireGpuOutput(layout.backing, backend);
+          acquiredOutput = target;
+          await target.surface.present(request);
+          if (input.signal?.aborted || disposed || isInvalidated()) return false;
+          publicationHolds++;
+          acquiredOutput = undefined;
+          let released = false;
+          return {
+            canvas: target.canvas,
+            release() {
+              if (released) return;
+              released = true;
+              try {
+                target.release();
+              } finally {
+                publicationHolds--;
+                settleRetirement();
+              }
+            },
+          };
+        }
+        if (!prepared || !staging) return false;
+        bitmap = await backend.render(request);
         if (input.signal?.aborted || disposed || isInvalidated()) return false;
         prepared.context.save();
         try {
@@ -436,7 +500,7 @@ export function createNativeGpuPreviewRenderer(
               0;
           prepared.context.drawImage(bitmap, 0, 0, staging.width, staging.height);
           if (input.signal?.aborted || disposed || isInvalidated()) return false;
-          publishCompletedPreviewFrame(input.canvas, staging);
+          publishCompletedPreviewFrame(input.canvas, staging, !input.deferFrameEvent);
           return true;
         } finally {
           prepared.context.restore();
@@ -446,17 +510,28 @@ export function createNativeGpuPreviewRenderer(
         if (error instanceof GpuPreviewDeviceError || inputDeviceFailure) {
           unavailable = true;
           fallbackReason = 'device-failed';
-          release();
+          const failed = backend;
+          backend = null;
+          failed?.dispose();
           return undefined;
         }
         throw error;
       } finally {
-        bitmap?.close();
-        for (const frame of captured.values()) frame.close();
-        plan?.release();
-        if (artwork) artwork.width = artwork.height = 0;
-        if (bordersArtwork) bordersArtwork.width = bordersArtwork.height = 0;
-        if (staging && !input.stagingCanvas) staging.width = staging.height = 0;
+        try {
+          acquiredOutput?.release();
+        } finally {
+          try {
+            bitmap?.close();
+            for (const frame of captured.values()) frame.close();
+            plan?.release();
+            if (artwork) artwork.width = artwork.height = 0;
+            if (bordersArtwork) bordersArtwork.width = bordersArtwork.height = 0;
+            if (staging && !input.stagingCanvas) staging.width = staging.height = 0;
+          } finally {
+            active--;
+            settleRetirement();
+          }
+        }
       }
     },
   };

@@ -378,7 +378,7 @@ describe('contextless GPU presentation resources', () => {
     held.release();
     bounded.resources.dispose();
   });
-  it('retires idle resized GPU slots before changing backing and never crosses backend identity', () => {
+  it('retires idle resized GPU slots without changing placeholders or crossing backend identity', () => {
     const f = setup(10000, 1),
       firstBackend = renderer(f.resources),
       secondBackend = renderer(f.resources);
@@ -387,11 +387,11 @@ describe('contextless GPU presentation resources', () => {
     firstBackend.surfaces[0]!.dispose.mockImplementation(() => expect(first.canvas.width).toBe(10));
     const resized = f.resources.presentationCanvas({ width: 5, height: 20 }, firstBackend.backend);
     expect(firstBackend.surfaces[0]!.dispose).toHaveBeenCalledTimes(1);
-    expect(first.canvas.width).toBe(0);
+    expect(first.canvas.width).toBe(10);
     resized.release();
     const other = f.resources.presentationCanvas({ width: 5, height: 20 }, secondBackend.backend);
     expect(other.canvas).not.toBe(resized.canvas);
-    expect(resized.canvas.width).toBe(0);
+    expect(resized.canvas.width).toBe(5);
     other.release();
     f.resources.dispose();
   });
@@ -437,7 +437,7 @@ describe('contextless GPU presentation resources', () => {
     await pending;
     lease.release();
     expect(g.surfaces[0]!.dispose).toHaveBeenCalledTimes(1);
-    expect(lease.canvas.width).toBe(0);
+    expect(lease.canvas.width).toBe(10);
     expect(f.resources.counters.managedBytes).toBe(100);
     extra.release();
     expect(f.resources.counters.managedBytes).toBe(0);
@@ -451,7 +451,7 @@ describe('contextless GPU presentation resources', () => {
       throw failure;
     });
     expect(() => f.resources.presentationCanvas(size, g.backend)).toThrow(failure);
-    expect(f.canvases[0]!.width).toBe(0);
+    expect(f.canvases[0]!.width).toBe(10);
     expect(f.resources.counters.canvasCount).toBe(0);
     const retry = f.resources.presentationCanvas(size, g.backend);
     retry.release();
@@ -537,11 +537,98 @@ describe('GPU pool resize and backend changes', () => {
     idle.release();
     const replacement = resources.presentationCanvas(size, next.renderer);
     expect(old.retired).toEqual([idle.canvas]);
-    expect(idle.canvas.width).toBe(0);
+    expect(idle.canvas.width).toBe(10);
     expect(front.canvas.width).toBe(10);
     expect(resources.counters.canvasCount).toBe(2);
     replacement.release();
     front.release();
+    resources.dispose();
+  });
+});
+
+describe('Offscreen GPU placeholders', () => {
+  function backend() {
+    const changed: ReturnType<typeof vi.fn>[] = [];
+    const disposed: ReturnType<typeof vi.fn>[] = [];
+    const renderer = {
+      allocatedBytes: 0,
+      render:
+        vi.fn<
+          import('../../features/video/composition/canvas/gpu-preview').GpuPreviewRenderer['render']
+        >(),
+      dispose: vi.fn(),
+      createSurface: vi.fn((canvas: HTMLCanvasElement) => {
+        expect({ width: canvas.width, height: canvas.height }).toEqual(size);
+        document.body.appendChild(canvas);
+        for (const dimension of ['width', 'height'] as const) {
+          const setter = vi.fn(() => {
+            throw new DOMException('Transferred placeholder');
+          });
+          vi.spyOn(canvas, dimension, 'set').mockImplementation(setter);
+          changed.push(setter);
+        }
+        const dispose = vi.fn();
+        disposed.push(dispose);
+        return { canvas, present: vi.fn(async () => undefined), dispose };
+      }),
+    } satisfies import('../../features/video/composition/canvas/gpu-preview').GpuPreviewRenderer;
+    return { renderer, changed, disposed };
+  }
+
+  it.each(['idle-dispose', 'active-dispose', 'provider-change', 'resize'] as const)(
+    'never resizes a transferred placeholder on warm reuse or %s',
+    (operation) => {
+      const { resources } = setup(4000, 1),
+        current = backend();
+      const first = resources.presentationCanvas(size, current.renderer);
+      expect(current.renderer.createSurface).toHaveBeenCalledExactlyOnceWith(first.canvas, {
+        offscreen: true,
+      });
+      first.release();
+      const warm = resources.presentationCanvas(size, current.renderer);
+      expect(warm.canvas).toBe(first.canvas);
+      expect(current.renderer.createSurface).toHaveBeenCalledTimes(1);
+      if (operation === 'active-dispose') {
+        resources.dispose();
+        expect(current.disposed[0]).not.toHaveBeenCalled();
+        expect(warm.canvas.isConnected).toBe(true);
+        warm.release();
+      } else {
+        warm.release();
+        if (operation === 'provider-change') {
+          const next = resources.presentationCanvas(size, backend().renderer);
+          next.release();
+        } else if (operation === 'resize') {
+          current.renderer.createSurface.mockImplementationOnce((canvas) => ({
+            canvas,
+            present: vi.fn(async () => undefined),
+            dispose: vi.fn(),
+          }));
+          const next = resources.presentationCanvas({ width: 5, height: 5 }, current.renderer);
+          next.release();
+        }
+        resources.dispose();
+      }
+      expect(current.disposed[0]).toHaveBeenCalledOnce();
+      expect(first.canvas.isConnected).toBe(false);
+      for (const setter of current.changed) expect(setter).not.toHaveBeenCalled();
+      expect(resources.counters.canvasCount).toBe(0);
+    }
+  );
+
+  it('preserves a binding error after transfer without touching placeholder dimensions', () => {
+    const { resources, canvases } = setup(),
+      current = backend();
+    const primary = new Error('Surface creation failed after transfer');
+    const bind = current.renderer.createSurface.getMockImplementation()!;
+    current.renderer.createSurface.mockImplementationOnce((canvas) => {
+      bind(canvas);
+      throw primary;
+    });
+    expect(() => resources.presentationCanvas(size, current.renderer)).toThrow(primary);
+    for (const setter of current.changed) expect(setter).not.toHaveBeenCalled();
+    expect(canvases[0]!.isConnected).toBe(false);
+    expect(resources.counters.canvasCount).toBe(0);
     resources.dispose();
   });
 });

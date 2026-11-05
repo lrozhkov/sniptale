@@ -894,3 +894,98 @@ it('returns the camera evaluated from a bounded archive window without expanding
   expect(prepared.cursorTrack?.samples).toEqual([]);
   expect(JSON.stringify(prepared)).toBe(JSON.stringify(project));
 });
+
+it('returns a direct GPU output with the exact completed camera and time without a Canvas publication', async () => {
+  const { job } = setup();
+  const { resolveVideoCompositionFrame } =
+    await import('../../../../features/video/composition/timeline/frame');
+  const camera = {
+    ...resolveVideoCompositionFrame(job.project, 1).camera,
+    viewportX: 17,
+    scale: 2,
+  };
+  const output = { canvas: document.createElement('canvas'), release: vi.fn() };
+  const gpuPreview = { dispose: vi.fn(), render: vi.fn(async () => output) };
+  const context = vi.spyOn(job.canvas, 'getContext');
+  const acquireGpuOutput = vi.fn();
+  const result = await renderPreviewScene({
+    ...job,
+    cameraOverride: camera,
+    gpuPreview,
+    acquireGpuOutput,
+  });
+  expect(result).toEqual({ camera, time: 1, output, renderer: { backend: 'gpu' } });
+  expect(context).not.toHaveBeenCalled();
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  expect(gpuPreview.render).toHaveBeenCalledWith(
+    expect.objectContaining({ acquireGpuOutput }),
+    expect.anything(),
+    expect.anything(),
+    expect.anything(),
+    expect.anything(),
+    expect.anything()
+  );
+  expect(output.release).not.toHaveBeenCalled();
+  output.release();
+});
+
+it.each(['abort', 'seek', 'unavailable'] as const)(
+  'releases a completed direct output rejected after %s',
+  async (operation) => {
+    const { job, video } = setup();
+    const output = { canvas: document.createElement('canvas'), release: vi.fn() };
+    const began = Promise.withResolvers<void>(),
+      finished = Promise.withResolvers<void>();
+    const gpuPreview = {
+      dispose: vi.fn(),
+      render: vi.fn(async () => {
+        began.resolve();
+        await finished.promise;
+        return output;
+      }),
+    };
+    const controller = new AbortController();
+    const pending = renderPreviewScene({ ...job, gpuPreview, signal: controller.signal });
+    await began.promise;
+    if (operation === 'abort') controller.abort();
+    else if (operation === 'seek') video.dispatchEvent(new Event('seeking'));
+    else Object.defineProperty(video, 'readyState', { configurable: true, value: 1 });
+    expect(output.release).not.toHaveBeenCalled();
+    finished.resolve();
+    expect(await pending).toBe(false);
+    expect(output.release).toHaveBeenCalledOnce();
+    expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  }
+);
+
+it.each([false, true])(
+  'defers the Canvas frame event until frontend publication (staged: %s)',
+  async (staged) => {
+    const { job } = setup();
+    const watermarkRenderer = {
+      prepare: vi.fn(async () => ({
+        bounds: { x: 0, y: 0, width: 20, height: 10 },
+        draw: vi.fn(),
+      })),
+      clear: vi.fn(),
+    };
+    if (staged) job.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+    vi.mocked(drawPreviewVisualPasses).mockImplementation(async ({ canvas }) => {
+      canvas.width = 640;
+      canvas.height = 360;
+      return {
+        context: canvas.getContext('2d')!,
+        bounds: { width: 640, height: 360 },
+        dpr: 1,
+        viewport: { width: 640, height: 360, offsetX: 0, offsetY: 0, scale: 0.5 },
+      };
+    });
+    const notified = vi.fn();
+    job.canvas.addEventListener('sniptale-preview-frame', notified);
+    const result = await renderPreviewScene({ ...job, watermarkRenderer, deferFrameEvent: true });
+    expect(result).toMatchObject({ time: 1, renderer: { backend: 'legacy' } });
+    expect(notified).not.toHaveBeenCalled();
+    await renderPreviewScene({ ...job, watermarkRenderer });
+    expect(notified).toHaveBeenCalledOnce();
+  }
+);

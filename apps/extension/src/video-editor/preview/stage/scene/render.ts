@@ -13,7 +13,7 @@ import {
 import { renderPreviewScene } from './render-preview';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import type { PreviewSceneRenderJob } from './render-scheduler';
-import type { PreviewStageCanvasSceneParams } from './types';
+import type { NativePreviewFramePresenter, PreviewStageCanvasSceneParams } from './types';
 import { createVideoPreviewRenderRevision } from '../../cache/revision';
 import { renderPreviewSceneWithExactCache } from '../../cache/render';
 import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
@@ -71,6 +71,7 @@ function usePreviewStageRenderEffect(
     const { params: current, renderRevision: revision } = committed.current;
     const canvas = current.canvasRef.current;
     if (!canvas || !current.videoFrameState.canRender) return;
+    const framePresenter = current.framePresenterRef?.current;
     if (requireCurrentDependencies) {
       const needed = resolveActivePreviewClips(current.project, time);
       if (
@@ -84,6 +85,7 @@ function usePreviewStageRenderEffect(
       createPreviewStageCanvasRenderJob({
         canvas,
         onCameraPresented: current.onCameraPresented,
+        ...(framePresenter ? { framePresenter } : {}),
         currentTime: time,
         ...(current.assetUrls ? { assetUrls: current.assetUrls } : {}),
         effectRuntimeRef,
@@ -142,6 +144,7 @@ function usePreviewStageRenderEffect(
     direct,
     effectTime,
     params.canvasRef,
+    params.framePresenterRef,
     params.onCameraPresented,
     params.assetUrls,
     effectRuntimeRef,
@@ -181,6 +184,7 @@ function createPreviewStageCanvasRenderJob(args: {
   canvas: HTMLCanvasElement;
   currentTime: number;
   onCameraPresented: PreviewStageCanvasSceneParams['onCameraPresented'];
+  framePresenter?: NativePreviewFramePresenter;
   assetUrls?: Record<string, string>;
   effectRuntimeRef: MutableRefObject<VideoEditorEffectRuntime | null>;
   imageBank: PreviewStageCanvasSceneParams['imageBank'];
@@ -199,6 +203,16 @@ function createPreviewStageCanvasRenderJob(args: {
   return {
     canvas: args.canvas,
     onCameraPresented: args.onCameraPresented,
+    ...(args.framePresenter
+      ? {
+          framePresenter: args.framePresenter,
+          deferFrameEvent: true,
+          // Exact-cache fills sample the fallback canvas and retain their Canvas2D contract.
+          ...(args.previewMode !== 'cache'
+            ? { acquireGpuOutput: args.framePresenter.acquire }
+            : {}),
+        }
+      : {}),
     controller,
     currentTime: args.currentTime,
     previewRenderer: args.previewRenderer ?? 'gpu',
@@ -265,12 +279,26 @@ function usePreviewRenderSchedulerRef(
         feedbackRef.current.onFailure('visual', error);
       },
       onSuccess: (job, presentation) => {
+        let transferred = false;
         if (presentation) {
-          job.onCameraPresented?.(presentation.camera, presentation.time);
+          const acceptGeometry = () => {
+            if (job.framePresenter && presentation.output) {
+              // The GPU front is visible before the hidden layout/cache anchor changes its backing.
+              const { width, height } = presentation.output.canvas;
+              if (job.canvas.width !== width) job.canvas.width = width;
+              if (job.canvas.height !== height) job.canvas.height = height;
+            }
+            job.onCameraPresented?.(presentation.camera, presentation.time);
+          };
+          if (job.framePresenter) {
+            job.framePresenter.publish(presentation.output ?? null, acceptGeometry);
+            transferred = presentation.output !== undefined;
+          } else acceptGeometry();
           if (presentation.renderer) frameRateRef.current?.reportRenderer(presentation.renderer);
         }
         feedbackRef.current.onRecovery('visual');
         if (job.isPlaybackFrame && job.previewMode !== 'cache') frameRateRef.current?.record();
+        return transferred;
       },
       render: (job) => {
         const render = (input: Parameters<typeof renderPreviewScene>[0]) => {

@@ -17,6 +17,8 @@ import { getCompositionRectStageStyle } from './geometry';
 import type { PreviewStageCanvasProps } from '../types';
 import { PreviewStageCanvasLayer, PreviewStageOverlayLayer } from './layers';
 import type { PreviewStageRootProps, PreviewStageRootSurfaceProps } from './types';
+import { createNativePreviewPresentationSession } from './presentation-session';
+import type { NativePreviewFramePresenter } from '../scene/types';
 
 export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
   const canvasInteractionActive = usePreviewCanvasInteractionFocus(params.stageRef);
@@ -118,6 +120,7 @@ function PreviewStageRootMediaLayer(props: { params: PreviewStageRootSurfaceProp
       assetUrls={params.assetUrls}
       cachedVideo={params.cachedVideo}
       canvasRef={params.canvasRef}
+      gpuHostRef={params.gpuHostRef}
       currentTime={params.currentTime}
       isPlaying={params.isPlaying}
       project={params.project}
@@ -186,12 +189,27 @@ function PreviewStageInsertPreviewOverlay(params: {
 
 export function PreviewStageRoot(params: PreviewStageRootProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const gpuHostRef = React.useRef<HTMLDivElement | null>(null);
+  const framePresenterRef = React.useRef<NativePreviewFramePresenter | null>(null);
+  React.useLayoutEffect(() => {
+    const presenter = createNativePreviewPresentationSession({
+      fallback: () => canvasRef.current,
+      host: () => gpuHostRef.current,
+    });
+    framePresenterRef.current = presenter;
+    presenter.mount();
+    return () => {
+      framePresenterRef.current = null;
+      presenter.dispose();
+    };
+  }, []);
   const imageBank = usePreviewStageImageBank(params.project, params.activeClips, params.assetUrls);
 
   usePreviewStageCanvasScene({
     activeClips: params.activeClips,
     assetUrls: params.assetUrls,
     canvasRef,
+    framePresenterRef,
     onCameraPresented: params.onCameraPresented,
     registerPlaybackRequest: params.registerPlaybackRequest,
     renderGenerationRef: params.renderGenerationRef,
@@ -210,7 +228,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
     videoRefs: params.videoRefs,
   });
 
-  return <PreviewStageRootSurface {...params} canvasRef={canvasRef} />;
+  return <PreviewStageRootSurface {...params} canvasRef={canvasRef} gpuHostRef={gpuHostRef} />;
 }
 
 export function createPreviewStageSelectionOverlay(

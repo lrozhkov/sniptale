@@ -8,6 +8,10 @@ import type { ReviewSpatialRenderer } from '../../../../features/video/compositi
 import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
 import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 import type { PreparedPreviewSceneCanvas } from './canvas';
+import type {
+  GpuPreviewRenderer,
+  GpuPreviewPresentationSurface,
+} from '../../../../features/video/composition/canvas/gpu-preview';
 import type React from 'react';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 
@@ -29,6 +33,8 @@ export interface PreviewStageCanvasSceneParams {
   activeClips: VideoProjectClip[];
   assetUrls?: Record<string, string>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  /** The mounted frontend owns this presenter; each render job captures its current lifetime. */
+  framePresenterRef?: React.RefObject<NativePreviewFramePresenter | null>;
   currentTime: number;
   /** Borrows the mounted renderer's playback request until its cleanup runs. */
   registerPlaybackRequest?: ((request: (time: number) => void) => () => void) | undefined;
@@ -48,6 +54,29 @@ export interface PreviewStageCanvasSceneParams {
   videoRefs: PreviewStageVideoRefs;
 }
 
+/** A completed destination retains its GPU provider until the frontend releases it. */
+export interface NativePreviewGpuOutput {
+  readonly canvas: HTMLCanvasElement;
+  release(): void;
+}
+
+/** The producer exclusively owns this destination through GPU completion. */
+export interface NativePreviewGpuTarget extends NativePreviewGpuOutput {
+  readonly surface: GpuPreviewPresentationSurface;
+}
+
+/** Acquires a hidden exclusive destination bound to the supplied backend. */
+export type NativePreviewGpuTargetFactory = (
+  size: { width: number; height: number },
+  renderer: GpuPreviewRenderer
+) => NativePreviewGpuTarget;
+
+/** Visibility and matching geometry commit together in the mounted frontend. */
+export interface NativePreviewFramePresenter {
+  acquire: NativePreviewGpuTargetFactory;
+  publish(output: NativePreviewGpuOutput | null, acceptGeometry: () => void): void;
+}
+
 type PreviewEffectRuntimeExecutorInput =
   | EffectRuntimeSandboxExecutor
   | (() => EffectRuntimeSandboxExecutor);
@@ -57,11 +86,15 @@ export interface PreviewScenePresentation {
   camera: VideoCompositionCameraState;
   time: number;
   renderer?: PreviewRendererStatus;
+  output?: NativePreviewGpuOutput;
 }
 
 export type PreviewSceneRenderInput = {
   previewRenderer?: VideoPreviewRenderer;
   gpuPreview?: NativeGpuPreviewRenderer;
+  acquireGpuOutput?: NativePreviewGpuTargetFactory;
+  /** UI publication sends the frame event after pixels and geometry commit. */
+  deferFrameEvent?: boolean;
   /** Held composition samples exclude outer fades; their caller applies presentation once. */
   sceneEdges?: 'omit';
   /** Output sampling for size estimation; absence retains the project cadence. */
@@ -109,6 +142,6 @@ export interface NativeGpuPreviewRenderer {
         ) => Promise<EffectRuntimeRenderedComposition | undefined>),
     /** Omission conservatively retains the raster for callers without producer admission. */
     finalArtworkRequired?: boolean
-  ): Promise<boolean | undefined>;
+  ): Promise<boolean | NativePreviewGpuOutput | undefined>;
   dispose(): void;
 }

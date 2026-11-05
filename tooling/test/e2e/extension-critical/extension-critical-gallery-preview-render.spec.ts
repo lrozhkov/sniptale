@@ -255,6 +255,9 @@ gpuTest.describe('authored GPU queue', () => {
         // Synthetic 840x472 quality proof; this case does not measure playback FPS.
         expect(result.size).toEqual({ width: 840, height: 472 });
         expect(captures, evidence).toBe(4);
+        expect(result.readbackParity, evidence).toHaveLength(2);
+        for (const readback of result.readbackParity)
+          expect(readback.maxDifference, evidence).toBeLessThanOrEqual(1);
         expect(
           result.renderFacts
             .slice(0, 3)

@@ -304,3 +304,127 @@ it('rejects an old backend publication while a playing renderer switch waits for
   expect(render).toHaveBeenCalledTimes(2);
   scheduler.dispose();
 });
+
+function gpuPresentation() {
+  return {
+    camera: {
+      scale: 2,
+      viewportX: 123,
+      viewportY: 9,
+      focusPoint: { x: 0, y: 0 },
+      motionBlurAmount: 0,
+      regionId: null,
+      viewportHeight: 100,
+      viewportWidth: 200,
+    },
+    time: 1,
+    output: { canvas: document.createElement('canvas'), release: vi.fn() },
+  };
+}
+
+it.each(['aborted', 'disposed'] as const)(
+  'releases a late completed GPU output after its job is %s',
+  async (operation) => {
+    const completion = Promise.withResolvers<ReturnType<typeof gpuPresentation>>();
+    const presentation = gpuPresentation();
+    const onSuccess = vi.fn(() => true),
+      onError = vi.fn();
+    const scheduler = createPreviewSceneRenderScheduler({
+      render: () => completion.promise,
+      onSuccess,
+      onError,
+    });
+    const job = createJob(1, true);
+    scheduler.enqueue(job);
+    if (operation === 'aborted') job.controller.abort();
+    else scheduler.dispose();
+    expect(presentation.output.release).not.toHaveBeenCalled();
+    completion.resolve(presentation);
+    await admit();
+    expect(presentation.output.release).toHaveBeenCalledOnce();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    scheduler.dispose();
+  }
+);
+
+it.each(['no-handler', 'void', 'refused'] as const)(
+  'releases a direct output without transfer acknowledgement: %s',
+  async (kind) => {
+    const presentation = gpuPresentation();
+    const onSuccess =
+      kind === 'no-handler' ? undefined : vi.fn(() => (kind === 'refused' ? false : undefined));
+    const scheduler = createPreviewSceneRenderScheduler({
+      render: async () => presentation,
+      onError: vi.fn(),
+      ...(onSuccess ? { onSuccess } : {}),
+    });
+    scheduler.enqueue(createJob(1, true));
+    await admit();
+    expect(presentation.output.release).toHaveBeenCalledOnce();
+    scheduler.dispose();
+  }
+);
+
+it('transfers a direct output only after an explicit frontend acknowledgement', async () => {
+  const presentation = gpuPresentation();
+  const onSuccess = vi.fn(() => true);
+  const scheduler = createPreviewSceneRenderScheduler({
+    render: async () => presentation,
+    onSuccess,
+    onError: vi.fn(),
+  });
+  const job = createJob(1, true);
+  scheduler.enqueue(job);
+  await admit();
+  expect(onSuccess).toHaveBeenCalledWith(job, presentation);
+  expect(presentation.output.release).not.toHaveBeenCalled();
+  scheduler.dispose();
+  expect(presentation.output.release).not.toHaveBeenCalled();
+  presentation.output.release();
+});
+
+it('releases rejected frontend publication, reports its error and admits the queued job', async () => {
+  const failure = new Error('publication rejected');
+  const first = gpuPresentation(),
+    second = gpuPresentation();
+  const completion = Promise.withResolvers<typeof first>();
+  const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValueOnce(second);
+  const onSuccess = vi
+    .fn()
+    .mockImplementationOnce(() => {
+      throw failure;
+    })
+    .mockReturnValueOnce(true);
+  const onError = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({ render, onSuccess, onError });
+  scheduler.enqueue(createJob(1, true));
+  scheduler.enqueue(createJob(2, true));
+  completion.resolve(first);
+  await admit();
+  expect(first.output.release).toHaveBeenCalledOnce();
+  expect(onError).toHaveBeenCalledExactlyOnceWith(failure);
+  expect(render).toHaveBeenCalledTimes(2);
+  expect(second.output.release).not.toHaveBeenCalled();
+  scheduler.dispose();
+  second.output.release();
+});
+
+it('forwards acquisition without exposing the frontend owner to the renderer', async () => {
+  const framePresenter = { acquire: vi.fn(), publish: vi.fn() };
+  const render = vi.fn(
+    async (
+      _input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]
+    ) => undefined
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, onError: vi.fn() });
+  scheduler.enqueue({
+    ...createJob(1, true),
+    framePresenter,
+    acquireGpuOutput: framePresenter.acquire,
+  });
+  await admit();
+  expect(render.mock.calls[0]![0]).not.toHaveProperty('framePresenter');
+  expect(render.mock.calls[0]![0]).toHaveProperty('acquireGpuOutput', framePresenter.acquire);
+  scheduler.dispose();
+});

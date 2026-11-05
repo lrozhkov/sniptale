@@ -172,7 +172,6 @@ class PreviewRenderResources implements RenderResources {
       try {
         surface.surface.dispose();
       } finally {
-        clearBacking(surface.canvas);
         surface.canvas.remove();
       }
     } else clearBacking(surface.canvas);
@@ -317,7 +316,7 @@ class PreviewRenderResources implements RenderResources {
       canvas.width = size.width;
       if (canvas.width !== size.width || canvas.height !== size.height)
         throw new PreviewRenderResourceError();
-      presentation = renderer.createSurface(canvas);
+      presentation = renderer.createSurface(canvas, { offscreen: true });
       const surface: GpuSurface = {
         kind: 'gpu',
         canvas,
@@ -334,7 +333,6 @@ class PreviewRenderResources implements RenderResources {
       try {
         presentation?.dispose();
       } finally {
-        clearBacking(canvas);
         canvas.remove();
       }
       throw error;

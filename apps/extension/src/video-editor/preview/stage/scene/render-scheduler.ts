@@ -1,9 +1,11 @@
-import type { PreviewScenePresentation } from './types';
+import type { NativePreviewFramePresenter, PreviewScenePresentation } from './types';
 import type { renderPreviewScene } from './render-preview';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 
 export type PreviewSceneRenderJob = Parameters<typeof renderPreviewScene>[0] & {
   controller: AbortController;
+  /** The mounted frontend receives the completed output; the producer receives only acquisition. */
+  framePresenter?: NativePreviewFramePresenter;
   onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   isEffectRuntimeFrame: boolean;
   isPlaybackFrame: boolean;
@@ -25,7 +27,10 @@ interface PreviewSceneRenderSchedulerState {
 
 interface PreviewSceneRenderSchedulerOptions {
   onError: (error: unknown) => void;
-  onSuccess?: (job: PreviewSceneRenderJob, presentation?: PreviewScenePresentation) => void;
+  onSuccess?: (
+    job: PreviewSceneRenderJob,
+    presentation?: PreviewScenePresentation
+  ) => boolean | void;
   render: (job: Parameters<typeof renderPreviewScene>[0]) => ReturnType<typeof renderPreviewScene>;
 }
 
@@ -103,12 +108,20 @@ function startNextPreviewSceneRender(
     state.lastPlaybackRenderStartedAt = Date.now();
   }
   const { controller, ...renderJob } = job;
+  delete renderJob.framePresenter;
   void args
     .render(renderJob)
     .then(
       (presented) => {
-        if (presented !== false && !controller.signal.aborted) {
-          args.onSuccess?.(job, presented || undefined);
+        let transferred = false;
+        try {
+          if (presented !== false && !controller.signal.aborted) {
+            transferred = args.onSuccess?.(job, presented || undefined) === true;
+          }
+        } catch (error) {
+          if (!controller.signal.aborted) args.onError(error);
+        } finally {
+          if (presented && !transferred) presented.output?.release();
         }
       },
       (error: unknown) => {
