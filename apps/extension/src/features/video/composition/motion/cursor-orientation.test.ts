@@ -158,6 +158,30 @@ it('reduces framing jitter without changing pointer constraints, manual pins, or
   expect(smoothCursorCameraPreferences(frames, undefined)).toEqual(frames);
 });
 
+it('preserves each capture endpoint and manual preference without reading adjacent runs', () => {
+  const frames = [
+    { time: 0, x: 0.26, y: 0.42, segmentId: 'before' },
+    { time: 0.2, x: 0.26, y: 0.42, segmentId: 'before' },
+    { time: 0.3, x: 0.26, y: 0.42, segmentId: 'before' },
+    { time: 0.3, x: 0.26, y: 0.419, segmentId: 'after' },
+    { time: 0.4, x: 0.26, y: 0.3, segmentId: 'after' },
+    { time: 0.6, x: 0.26, y: 0.18, segmentId: 'after', preferenceWeight: 4 },
+    { time: 0.9, x: 0.26, y: 0.18, segmentId: 'after' },
+  ].map((frame) => ({ ...frame, actual: { x: frame.x, y: frame.y } }));
+  const original = structuredClone(frames);
+  const smoothed = smoothCursorCameraPreferences(frames, { ...settings, smoothness: 0.6 });
+  for (const index of [0, 2, 3, 5, 6]) expect(smoothed[index]).toBe(frames[index]);
+  expect(smoothed.slice(0, 3)).toEqual(
+    smoothCursorCameraPreferences(frames.slice(0, 3), { ...settings, smoothness: 0.6 })
+  );
+  expect(smoothed.slice(3)).toEqual(
+    smoothCursorCameraPreferences(frames.slice(3), { ...settings, smoothness: 0.6 })
+  );
+  smoothed.forEach((frame, index) => expect(frame.actual).toBe(frames[index]!.actual));
+  expect(smoothCursorCameraPreferences(frames, { ...settings, smoothness: 0 })).toEqual(frames);
+  expect(frames).toEqual(original);
+});
+
 it('suppresses saved manual spatial effects only for explicit cursor composition and retains the source', () => {
   const authored = {
     perspective: { ...DEFAULT_CAMERA_PERSPECTIVE, enabled: true, rotateY: 35 },

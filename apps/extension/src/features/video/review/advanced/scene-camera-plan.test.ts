@@ -1,3 +1,10 @@
+import type { CursorFocusPath } from '../../project/cursor-focus-path/types';
+import {
+  projectQuickEditPoint,
+  quickEditPlaneProjection,
+  multiplyQuickEditProjections,
+  type QuickEditHomography,
+} from '../../composition/motion/spatial-geometry';
 import { createQuickEditBorder } from '../../project/scene/focus-appearance';
 import { createReviewWorkingZoneCameraGeometry } from './camera-geometry';
 import { fitQuickEditSourceCrop } from './canvas';
@@ -9,6 +16,9 @@ import {
 } from '../../composition/motion/follow-cursor';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSpatialRasterLayout,
+  computeQuickEditSpatialWindow,
+  computeQuickEditWindowTransform,
   resolveReviewSceneCameraPlan,
   resolveReviewCameraGeometry,
   resolveReviewCameraConflicts,
@@ -498,4 +508,157 @@ it('restores the linked camera exit after a neighboring Border becomes Zoom with
   expect(independent.breaks).toContain(2.4);
   const linked = resolveReviewCameraGeometry([from, target], from, scene)!;
   expect(linked.breaks).not.toContain(2.4);
+});
+
+it('keeps full camera projection at a same-time capture boundary within one backing pixel', () => {
+  const source = { width: 2560, height: 1440 };
+  const backing = { width: 840, height: 472 };
+  const cut = 2.01;
+  const path: CursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    smoothing: 0,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'before',
+        binding: {
+          kind: 'project',
+        },
+        start: 0,
+        end: 2.01,
+        keys: [
+          {
+            time: 0,
+            x: 0.26,
+            y: 0.42,
+            id: 'before0',
+            anchor: 'boundary',
+            interpolation: 'linear',
+          },
+          {
+            time: 2.01,
+            x: 0.26,
+            y: 0.42,
+            id: 'before1',
+            anchor: 'movement',
+            interpolation: 'linear',
+          },
+        ],
+      },
+      {
+        id: 'after',
+        binding: {
+          kind: 'project',
+        },
+        start: 2.01,
+        end: 4,
+        keys: [
+          {
+            time: 2.01,
+            x: 0.260390625,
+            y: 0.41930555555555554,
+            id: 'after0',
+            anchor: 'boundary',
+            interpolation: 'linear',
+          },
+          {
+            time: 2.11,
+            x: 0.26,
+            y: 0.3,
+            id: 'after1',
+            anchor: 'movement',
+            interpolation: 'linear',
+          },
+          {
+            time: 2.31,
+            x: 0.26,
+            y: 0.18,
+            id: 'after2',
+            anchor: 'movement',
+            interpolation: 'linear',
+          },
+          {
+            time: 4,
+            x: 0.26,
+            y: 0.18,
+            id: 'after3',
+            anchor: 'movement',
+            interpolation: 'linear',
+          },
+        ],
+      },
+    ],
+  };
+  const scene = { source, output: source, background: { enabled: false as const } };
+  const region: QuickEditZoomRegion = {
+    id: 'camera',
+    start: 0,
+    end: 4,
+    transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    followCursor: true,
+    cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+    cursorFocus: { path, observed: path, scene },
+  };
+  const plan = resolveReviewSceneCameraPlan([region], region, scene);
+  expect(plan?.status).toBe('ready');
+  const project = (time: number) => {
+    const camera = evaluateQuickEditCameraAtTime([region], time, scene);
+    expect(camera.scale).toBe(1.5);
+    const layout = computeQuickEditSceneLayout({ ...scene, camera });
+    const raster = layout.spatial
+      ? computeQuickEditSpatialRasterLayout(layout, scene.background)
+      : layout;
+    const window = computeQuickEditWindowTransform(raster),
+      base = layout.windowRect;
+    const scale = window.width / base.width;
+    const inner: QuickEditHomography = [
+      scale,
+      0,
+      window.x - base.x * scale,
+      0,
+      scale,
+      window.y - base.y * scale,
+      0,
+      0,
+      1,
+    ];
+    const outer: QuickEditHomography = layout.spatial
+      ? quickEditPlaneProjection(
+          base,
+          computeQuickEditSpatialWindow(layout, scene.background),
+          layout.spatial
+        )
+      : [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    const projection = multiplyQuickEditProjections(outer, inner);
+    return [
+      [0, 0],
+      [source.width, 0],
+      [source.width, source.height],
+      [0, source.height],
+      [source.width / 2, source.height / 2],
+    ].map(([x, y]) => {
+      const projected = projectQuickEditPoint(projection, { x: x!, y: y! });
+      if (!projected) throw new Error('Expected finite camera projection');
+      return projected;
+    });
+  };
+  // The endpoint moves by one source pixel per axis. Allow one 840-wide backing pixel,
+  // including the preserved input discontinuity and its orbit projection.
+  for (const time of [cut, Math.ceil(cut * 30) / 30]) {
+    const left = project(time - 1e-9),
+      right = project(time + 1e-9);
+    expect(
+      Math.max(...left.map((point, i) => Math.hypot(point.x - right[i]!.x, point.y - right[i]!.y)))
+    ).toBeLessThanOrEqual(source.width / backing.width);
+  }
+  if (plan?.status !== 'ready') throw new Error('Expected admitted camera plan');
+  expect(
+    plan.discontinuities
+      .filter((boundary) => boundary.reason === 'source')
+      .map((boundary) => boundary.time)
+  ).toEqual([cut]);
 });

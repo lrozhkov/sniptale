@@ -13,7 +13,10 @@ import { createRecordingCursorTrajectoryStore } from '../../composition/persiste
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
 import { createRecordingEventsBlockPacker } from '../../features/video/project/recording-events/blocks';
 import { createCursorTrajectoryBlockPacker } from '../../features/video/project/cursor-trajectory/blocks';
-import { cursorTrajectoryProjectCoversTime } from '../../features/video/project/cursor-trajectory/project-window';
+import {
+  cursorTrajectoryProjectCoversTime,
+  cursorTrajectoryProjectHasPreparedPosition,
+} from '../../features/video/project/cursor-trajectory/project-window';
 import { recordingEventsProjectCoversTime } from '../../features/video/project/recording-events/project-facts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
@@ -173,7 +176,7 @@ async function archiveCursor(recordingId: string) {
   const segments = [
     [0, 4, 8.9],
     [9, 10, 11.5, 16.9],
-    [17, 18, 19],
+    [17.1, 18, 19],
   ];
   for (const [segmentId, times] of segments.entries()) {
     cursorBlocks.push(
@@ -235,7 +238,7 @@ async function archiveCursor(recordingId: string) {
   return cursorTrajectory;
 }
 
-async function archive() {
+async function archive(time = 10) {
   const recordingId = 'compact-desktop';
   const recordingEvents = await archiveEvents(recordingId);
   const cursorTrajectory = await archiveCursor(recordingId);
@@ -261,7 +264,7 @@ async function archive() {
   );
   if (!historyProject) throw new Error('Expected archived history project');
   const reader = actual.createReviewRecordingHistorySource(historyProject, telemetry, dependencies);
-  const prepared = await reader.read(10, { start: 9, end: 11 });
+  const prepared = await reader.read(time, { start: Math.max(0, time - 1), end: time + 1 });
   const read = vi.fn(reader.read).mockResolvedValueOnce(prepared);
   io.create.mockReturnValue({ ...reader, read });
   return { input: { historyProject, telemetry, source }, prepared, reader, read };
@@ -333,14 +336,34 @@ it('keeps proved archive cursor and auto3D while only the event window refresh i
   expect(JSON.stringify(fixture.input.historyProject)).toBe(serialized);
 });
 
-it('drops the retained cursor when its real window expires during a pending event read', async () => {
+it('retains adjacent canonical cursor facts while the active cursor window refresh is pending', async () => {
+  const fixture = await archive(0);
+  const refresh = Promise.withResolvers<typeof fixture.prepared>();
+  fixture.read.mockReturnValueOnce(refresh.promise);
+  await act(async () => root.render(<Probe input={fixture.input} time={0} />));
+  const expected = pose(current.telemetry!, 9.1);
+  const retained = current.telemetry!.cursorTrack!.samples;
+  expect(cursorTrajectoryProjectCoversTime(fixture.prepared.project, 9.1)).toBe(false);
+  await act(async () => root.render(<Probe input={fixture.input} time={9.1} />));
+  expect(current.pending).toBe(true);
+  expect(current.failed).toBe(false);
+  expect(current.telemetry!.cursorTrack?.samples).toEqual(retained);
+  expect(pose(current.telemetry!, 9.1)).toEqual(expected);
+  const completed = await fixture.reader.read(9.1);
+  await act(async () => refresh.resolve(completed));
+  expect(current.pending).toBe(false);
+  expect(pose(current.telemetry!, 9.1)).toEqual(expected);
+});
+
+it('drops the retained cursor inside a real unknown gap during a pending event read', async () => {
   const fixture = await archive();
   const refresh = Promise.withResolvers<typeof fixture.prepared>();
   fixture.read.mockReturnValueOnce(refresh.promise);
   await act(async () => root.render(<Probe input={fixture.input} />));
   await act(async () => root.render(<Probe input={fixture.input} time={11.1} />));
   expect(current.telemetry!.cursorTrack?.samples.length).toBeGreaterThan(0);
-  expect(cursorTrajectoryProjectCoversTime(fixture.prepared.project, 17)).toBe(false);
+  expect(cursorTrajectoryProjectCoversTime(fixture.prepared.project, 17)).toBe(true);
+  expect(cursorTrajectoryProjectHasPreparedPosition(fixture.prepared.project, 17)).toBe(false);
   await act(async () => root.render(<Probe input={fixture.input} time={17} />));
   expect(current.pending).toBe(true);
   expect(current.telemetry!.cursorTrack?.samples ?? []).toEqual([]);

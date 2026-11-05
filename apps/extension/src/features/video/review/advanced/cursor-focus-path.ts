@@ -65,13 +65,28 @@ const plans = new WeakMap<
 
 function reviewCameraObservationTimes(
   context: NonNullable<QuickEditZoomRegion['cursorFocus']>,
-  run: { resultStart: number; sourceStart: number; rate: number },
+  run: {
+    resultStart: number;
+    resultEnd: number;
+    sourceStart: number;
+    sourceEnd: number;
+    rate: number;
+  },
   start: number,
   end: number,
   step: number
 ) {
-  const times = new Set([start, end]);
-  for (let time = start + step; time < end; time += step) times.add(time);
+  const sourceAt = (time: number) =>
+    time === run.resultStart
+      ? run.sourceStart
+      : time === run.resultEnd
+        ? run.sourceEnd
+        : run.sourceStart + (time - run.resultStart) * run.rate;
+  const times = new Map([
+    [start, sourceAt(start)],
+    [end, sourceAt(end)],
+  ]);
+  for (let time = start + step; time < end; time += step) times.set(time, sourceAt(time));
   for (const path of [context.path, context.observed]) {
     if (!path) continue;
     for (const segment of path.segments) {
@@ -81,11 +96,12 @@ function reviewCameraObservationTimes(
         ...segment.keys.map((key) => key.time),
       ]) {
         const time = run.resultStart + (sourceTime - run.sourceStart) / run.rate;
-        if (time >= start && time <= end) times.add(time);
+        // A source knot keeps its captured clock; inverse arithmetic can cross its boundary.
+        if (time >= start && time <= end) times.set(time, sourceTime);
       }
     }
   }
-  return [...times].sort((a, b) => a - b);
+  return [...times].sort(([a], [b]) => a - b);
 }
 
 type ObservationCacheEntry = {
@@ -164,34 +180,47 @@ function deriveCameraPlanObservations(
     const start = Math.max(region.start, run.resultStart);
     const end = Math.min(region.end, run.resultEnd);
     if (end < start) continue;
-    for (const time of reviewCameraObservationTimes(context, run, start, end, step)) {
-      const sourceTime =
-        time === run.resultStart
-          ? run.sourceStart
-          : time === run.resultEnd
-            ? run.sourceEnd
-            : run.sourceStart + (time - run.resultStart) * run.rate;
-      const observed = context.observed
-        ? evaluateReviewCursorFocus(context.observed, sourceTime)
-        : null;
-      const preferred = evaluateReviewCursorFocus(context.path, sourceTime) ?? observed;
-      if (!preferred) continue;
-      const authoredSegment = context.path.segments.find(
-        (segment) => segment.id === preferred.segmentId
+    for (const [time, sourceTime] of reviewCameraObservationTimes(context, run, start, end, step)) {
+      const observedPath = context.observed ?? context.path;
+      const touching = observedPath.segments.filter(
+        (segment) => segment.start <= sourceTime && segment.end >= sourceTime
       );
-      const segmentId = `${observed?.segmentId ?? preferred.segmentId}:${continuity}`;
-      const previousFrame = frames.at(-1);
-      if (previousFrame?.time === time && previousFrame.segmentId === segmentId) continue;
-      frames.push({
-        x: preferred.x,
-        y: preferred.y,
-        time,
-        ...(authoredSegment
-          ? { preferenceWeight: cursorFocusPreferenceWeight(authoredSegment, sourceTime) }
-          : {}),
-        segmentId,
-        ...(observed ? { actual: { x: observed.x, y: observed.y } } : {}),
-      });
+      // Both source endpoints own the same captured time; keep their independent constraints.
+      for (const sourceSegment of touching.length ? touching : [undefined]) {
+        const observed =
+          context.observed && sourceSegment
+            ? evaluateCursorFocusSegment(sourceSegment, sourceTime, context.observed.smoothing)
+            : null;
+        const preferredSegment =
+          sourceSegment &&
+          context.path.segments.find(
+            (segment) =>
+              segment.id === sourceSegment.id &&
+              segment.start <= sourceTime &&
+              segment.end >= sourceTime
+          );
+        const preferred =
+          (preferredSegment
+            ? evaluateCursorFocusSegment(preferredSegment, sourceTime, context.path.smoothing)
+            : evaluateReviewCursorFocus(context.path, sourceTime)) ?? observed;
+        if (!preferred) continue;
+        const authoredSegment = context.path.segments.find(
+          (segment) => segment.id === preferred.segmentId
+        );
+        const segmentId = `${observed?.segmentId ?? preferred.segmentId}:${continuity}`;
+        const previousFrame = frames.at(-1);
+        if (previousFrame?.time === time && previousFrame.segmentId === segmentId) continue;
+        frames.push({
+          x: preferred.x,
+          y: preferred.y,
+          time,
+          ...(authoredSegment
+            ? { preferenceWeight: cursorFocusPreferenceWeight(authoredSegment, sourceTime) }
+            : {}),
+          segmentId,
+          ...(observed ? { actual: { x: observed.x, y: observed.y } } : {}),
+        });
+      }
     }
   }
   return frames;

@@ -11,6 +11,7 @@ import {
   deriveReviewCursorFocusPath,
   evaluateReviewCursorFocus,
   evaluateReviewFollowCursor,
+  reviewCameraPlanObservations,
   type ReviewCursorFacts,
 } from './cursor-focus-path';
 import {
@@ -19,6 +20,82 @@ import {
   resolveReviewSceneCameraPlan,
 } from './scene';
 import type { QuickEditZoomRegion } from './types';
+
+it.each([undefined, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4])(
+  'emits both exact capture endpoints before the next 30Hz observation at rate %s',
+  (rate) => {
+    const cut = 2.01;
+    const resultStart = 0.123;
+    const sourceStart = 0.2;
+    const resultEnd = rate === undefined ? 4 : resultStart + (4 - sourceStart) / rate;
+    const resultCut = rate === undefined ? cut : resultStart + (cut - sourceStart) / rate;
+    const path: CursorFocusPath = {
+      version: 1,
+      mode: 'follow',
+      smoothing: 0,
+      sensitivity: 0.5,
+      gapPolicy: 'hold',
+      segments: [
+        {
+          id: 'before',
+          start: 0,
+          end: cut,
+          binding: { kind: 'project' },
+          keys: [
+            { id: 'a', time: 0, x: 0.26, y: 0.42, anchor: 'boundary', interpolation: 'linear' },
+            { id: 'b', time: cut, x: 0.26, y: 0.42, anchor: 'movement', interpolation: 'linear' },
+          ],
+        },
+        {
+          id: 'after',
+          start: cut,
+          end: 4,
+          binding: { kind: 'project' },
+          keys: [
+            { id: 'c', time: cut, x: 0.27, y: 0.41, anchor: 'boundary', interpolation: 'linear' },
+            { id: 'd', time: 4, x: 0.3, y: 0.18, anchor: 'movement', interpolation: 'linear' },
+          ],
+        },
+      ],
+    };
+    const region: QuickEditZoomRegion = {
+      id: 'capture-cut',
+      start: 0,
+      end: resultEnd,
+      transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+      cursorFocus: {
+        path,
+        observed: path,
+        ...(rate === undefined
+          ? {}
+          : {
+              timeMap: [{ kind: 'speed', sourceStart, sourceEnd: 4, resultStart, resultEnd, rate }],
+            }),
+      },
+    };
+    const before = structuredClone(region);
+    const frames = reviewCameraPlanObservations(region);
+    expect(frames.filter((frame) => frame.time === resultCut)).toEqual([
+      expect.objectContaining({
+        x: 0.26,
+        y: 0.42,
+        segmentId: 'before:0',
+        actual: { x: 0.26, y: 0.42 },
+      }),
+      expect.objectContaining({
+        x: 0.27,
+        y: 0.41,
+        segmentId: 'after:0',
+        actual: { x: 0.27, y: 0.41 },
+      }),
+    ]);
+    expect(frames.find((frame) => frame.segmentId === 'after:0')?.time).toBe(resultCut);
+    expect(reviewCameraPlanObservations(region)).toEqual(frames);
+    expect(region).toEqual(before);
+  }
+);
 
 const facts: ReviewCursorFacts = {
   cursorTrack: {

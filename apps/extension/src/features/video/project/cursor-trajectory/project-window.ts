@@ -126,6 +126,41 @@ export function cursorTrajectoryProjectCoversTime(
   });
 }
 
+/** Already loaded adjacent records can prove native facts while the active read window refreshes. */
+export function cursorTrajectoryProjectHasPreparedPosition(
+  project: CursorTrajectoryRenderProject,
+  time: number
+): boolean {
+  if (!Number.isFinite(time)) return false;
+  const groups = project.cursorTrack?.sourceObservations;
+  let found = false;
+  for (const clip of project.clips) {
+    if (clip.type !== 'VIDEO' || time < clip.startTime || time > clip.startTime + clip.duration)
+      continue;
+    const group = groups?.find((item) => item.sourceInstanceId === clip.sourceInstanceId);
+    const descriptor = group?.trajectory;
+    if (!group || !descriptor || descriptor.totalBlocks === 0) continue;
+    found = true;
+    const sourceTime = getClipSourceObservationTime(clip, time);
+    if (sourceTime === undefined) return false;
+    const activeTimeUs = Math.round(sourceTime * 1_000_000);
+    if (
+      !(project[windowsKey] ?? []).some(
+        (item) =>
+          item.recordingId === group.recordingId &&
+          item.trajectoryId === descriptor.trajectoryId &&
+          evaluateCursorTrajectory(
+            item.window.records,
+            activeTimeUs,
+            item.window.initialSegment
+          ) !== null
+      )
+    )
+      return false;
+  }
+  return found;
+}
+
 /** A render-only fact cache. No window grants interpolation into another window or a gap. */
 export function resolvePreparedCursorTrajectoryPosition(
   project: CursorTrajectoryRenderProject,

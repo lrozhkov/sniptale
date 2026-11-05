@@ -342,10 +342,24 @@ export function smoothCursorCameraPreferences<
   T extends CursorOrientationObservation & { segmentId: string; preferenceWeight?: number },
 >(frames: readonly T[], settings: CursorCompositionSettings | undefined): T[] {
   if (!settings || settings.smoothness === 0) return [...frames];
-  const radius = 0.12 + settings.smoothness * 0.48;
+  const maximumRadius = 0.12 + settings.smoothness * 0.48;
   let low = 0;
+  let runStart = 0;
+  let runEnd = -1;
   return frames.map((frame, index) => {
-    if ((frame.preferenceWeight ?? 1) > 1) return frame;
+    if (index > runEnd) {
+      runStart = index;
+      runEnd = index;
+      while (runEnd + 1 < frames.length && frames[runEnd + 1]!.segmentId === frame.segmentId)
+        runEnd++;
+    }
+    // Truncated symmetric windows must not move a capture endpoint toward future activity.
+    const radius = Math.min(
+      maximumRadius,
+      frame.time - frames[runStart]!.time,
+      frames[runEnd]!.time - frame.time
+    );
+    if (radius <= 0 || (frame.preferenceWeight ?? 1) > 1) return frame;
     while (low < index && frames[low]!.time < frame.time - radius) low++;
     let x = 0,
       y = 0,

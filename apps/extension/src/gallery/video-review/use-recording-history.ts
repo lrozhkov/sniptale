@@ -8,7 +8,7 @@ import {
 } from '../../features/video/review/telemetry';
 import type { ReviewSelection } from '../../features/video/review/types';
 import type { LoadedReview } from './use-session';
-import { cursorTrajectoryProjectCoversTime } from '../../features/video/project/cursor-trajectory/project-window';
+import { cursorTrajectoryProjectHasPreparedPosition } from '../../features/video/project/cursor-trajectory/project-window';
 
 type Resource = Pick<LoadedReview, 'historyProject' | 'telemetry' | 'source'>;
 type Range = { start: number; end: number };
@@ -144,7 +144,7 @@ export function useReviewRecordingHistory(
     })();
   }, [owner, request, retryGeneration, view]);
   const prepared = owner && covers(view, owner, request) ? view?.prepared : undefined;
-  // Event refresh cannot withdraw cursor facts that still have independent source coverage.
+  // Retain proved native positions during refresh without extending the active read window.
   const retainedCursor =
     owner &&
     !prepared &&
@@ -153,7 +153,7 @@ export function useReviewRecordingHistory(
     resource.telemetry?.cursorTrajectory &&
     view?.owner === owner &&
     view.prepared &&
-    cursorTrajectoryProjectCoversTime(view.prepared.project, request.time)
+    cursorTrajectoryProjectHasPreparedPosition(view.prepared.project, request.time)
       ? view.prepared.telemetry
       : undefined;
   const pinned = useRef<{ owner: Owner; marker: ReviewTelemetryMarker } | null>(null);

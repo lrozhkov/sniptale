@@ -12,6 +12,7 @@ import {
   prepareCursorTrajectoryProject,
   preparedCursorTrajectorySourceWindow,
   cursorTrajectoryProjectCoversTime,
+  cursorTrajectoryProjectHasPreparedPosition,
   type ReadCursorTrajectoryWindow,
 } from './project-window';
 import type {
@@ -103,6 +104,58 @@ function window(from = 0, segmentId = 0) {
   return { fromTimeUs: from, toTimeUs: from + 2000000, records, initialSegment: null };
 }
 
+it('proves retained adjacent positions without extending the active read or render window', async () => {
+  const project = fixture();
+  const read = vi.fn<ReadCursorTrajectoryWindow>(async () => ({ ...window(), toTimeUs: 500000 }));
+  const prepared = await prepareCursorTrajectoryProject(project, 2.1, read);
+  const before = JSON.stringify(prepared);
+  expect(cursorTrajectoryProjectCoversTime(prepared, 2.4)).toBe(false);
+  expect(cursorTrajectoryProjectHasPreparedPosition(prepared, 2.4)).toBe(true);
+  expect(resolveCursorSample(prepared, 2.4)).toBeNull();
+  expect(cursorTrajectoryProjectHasPreparedPosition(project, 2.4)).toBe(false);
+  expect(cursorTrajectoryProjectHasPreparedPosition(prepared, 1.9)).toBe(false);
+  expect(cursorTrajectoryProjectHasPreparedPosition(prepared, 2.6)).toBe(false);
+  expect(JSON.stringify(prepared)).toBe(before);
+  expect(read).toHaveBeenCalledOnce();
+  const track = prepared.cursorTrack;
+  const group = track?.sourceObservations?.[0];
+  if (!track || !group) throw new Error('Missing trajectory source.');
+  for (const changed of [
+    { ...group, sourceInstanceId: 'other-instance' },
+    { ...group, recordingId: 'other-recording' },
+    { ...group, trajectory: { ...descriptor, trajectoryId: 'f'.repeat(32) } },
+  ])
+    expect(
+      cursorTrajectoryProjectHasPreparedPosition(
+        { ...prepared, cursorTrack: { ...track, sourceObservations: [changed] } },
+        2.4
+      )
+    ).toBe(false);
+});
+
+it.each(['gap', 'outside', 'unfinished'] as const)(
+  'does not retain a position across %s source facts',
+  async (kind) => {
+    const data = window();
+    if (kind === 'gap')
+      data.records = [
+        ...data.records.slice(0, 2),
+        { kind: 'boundary', segmentId: 0, activeTimeUs: 500000, reason: 'visibility' },
+        ...window(1000000, 1).records,
+      ];
+    if (kind === 'outside')
+      data.records = data.records.map((record) =>
+        record.kind === 'sample' ? { ...record, visible: false } : record
+      );
+    if (kind === 'unfinished') data.records = data.records.slice(0, 2);
+    const prepared = await prepareCursorTrajectoryProject(fixture(), 2.1, async () => ({
+      ...data,
+      toTimeUs: 500000,
+    }));
+    expect(cursorTrajectoryProjectHasPreparedPosition(prepared, 2.4)).toBe(false);
+  }
+);
+
 it('renders the requested bounded source window at the clip rate without expanding saved facts', async () => {
   const project = fixture();
   const before = JSON.stringify(project);
@@ -143,6 +196,13 @@ it('keeps disjoint windows separate for simultaneous uses of one source instance
   );
   const prepared = await prepareCursorTrajectoryProject(project, 2.25, read);
   expect(read.mock.calls.map((call) => call[2])).toEqual([500000, 10250000]);
+  expect(cursorTrajectoryProjectHasPreparedPosition(prepared, 2.25)).toBe(true);
+  const partial = await prepareCursorTrajectoryProject(
+    project,
+    2.25,
+    async (_identity, _descriptor, timeUs) => (timeUs < 2000000 ? window() : null)
+  );
+  expect(cursorTrajectoryProjectHasPreparedPosition(partial, 2.25)).toBe(false);
   expect(resolveProjectSourceCursorObservation(prepared, 2.25, clip.id)?.recordingPoint?.x).toBe(
     0.5
   );
@@ -152,6 +212,7 @@ it('keeps disjoint windows separate for simultaneous uses of one source instance
   expect(resolveProjectSourceCursorObservation(prepared, 2.75, 'other')?.recordingPoint?.x).toBe(
     0.7
   );
+  expect(cursorTrajectoryProjectHasPreparedPosition(prepared, 2.75)).toBe(true);
 });
 
 it('does not load inactive sources or repeat a range read for an already loaded window', async () => {
