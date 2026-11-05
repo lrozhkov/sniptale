@@ -7,12 +7,17 @@ import { expect, it, vi } from 'vitest';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewActionHistory } from './action-history';
+import {
+  REVIEW_ACTION_AUDIO_DEFAULT,
+  type ReviewActionAudioTarget,
+} from '../../features/video/review/advanced/action-audio';
 import type { ReviewOriginalSpeechPanel } from './speech-panel';
 import type { ReviewSelectedProperties } from './selected-properties';
 import { ReviewInspectorBinding, backupReview } from './inspector-binding';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { translate } from '../../platform/i18n';
 
+const historyProbe = vi.hoisted(() => ({ receive: vi.fn() }));
 const textProbe = vi.hoisted(() => ({ enabled: false, receive: vi.fn() }));
 vi.mock('./text-panel', () => ({
   ReviewTextDocumentPanel: (props: ComponentProps<typeof ReviewTextDocumentPanel>) => {
@@ -61,13 +66,22 @@ vi.mock('./inspector', () => ({
     </div>
   ),
 }));
-vi.mock('./action-history', () => ({
-  ReviewActionHistory: (props: ComponentProps<typeof ReviewActionHistory>) => (
-    <button disabled={!props.markers.length} onClick={() => props.onSelect(props.markers[0]!)}>
-      Choose recorded event
-    </button>
-  ),
-}));
+vi.mock('./action-history', async () => {
+  const { memo } = await import('react');
+  return {
+    ReviewActionHistory: memo((props: ComponentProps<typeof ReviewActionHistory>) => {
+      historyProbe.receive(props);
+      return (
+        <button
+          disabled={props.busy || !props.markers.length}
+          onClick={() => props.onSelect(props.markers[0]!)}
+        >
+          Choose recorded event
+        </button>
+      );
+    }),
+  };
+});
 vi.mock('./speech-panel', () => ({
   ReviewOriginalSpeechPanel: (props: ComponentProps<typeof ReviewOriginalSpeechPanel>) => (
     <>
@@ -194,6 +208,8 @@ it('joins every editor buffer for either recognition source and guards related-t
   try {
     await act(async () => root.render(<ReviewInspectorBinding {...props} />));
     expect(host.querySelector('[role="status"]')?.textContent).toBe('Backup refused');
+    await checkHistoryPlaybackIsolation(root, props, host);
+    await act(async () => root.render(<ReviewInspectorBinding {...props} />));
     await click('Flush source buffers');
     await click('Flush clip buffers');
     expect(order).toEqual(['notes', 'advanced', 'canvas', 'notes', 'advanced', 'canvas']);
@@ -495,5 +511,109 @@ async function checkTextTemporalActions(
     expect(fragments.map((fragment) => fragment.text)).toEqual(['a', 'b', 'c', 'd']);
   } finally {
     textProbe.enabled = false;
+  }
+}
+
+async function checkHistoryPlaybackIsolation(
+  root: ReturnType<typeof createRoot>,
+  props: ComponentProps<typeof ReviewInspectorBinding>,
+  host: HTMLElement
+) {
+  const initialRenders = historyProbe.receive.mock.calls.length;
+  const button = [...host.querySelectorAll('button')].find(
+    (node) => node.textContent === 'Choose recorded event'
+  )!;
+  button.focus();
+  for (const time of [2, 3, 4]) {
+    await act(async () =>
+      root.render(
+        <ReviewInspectorBinding
+          {...props}
+          state={{
+            ...props.state,
+            time,
+            timeline: { ...props.state.timeline, sceneOutputTime: time },
+          }}
+        />
+      )
+    );
+  }
+  expect(historyProbe.receive).toHaveBeenCalledTimes(initialRenders);
+  expect(document.activeElement).toBe(button);
+  const seek = vi.fn(),
+    pause = vi.fn(),
+    select = vi.fn(),
+    section = vi.fn();
+  const beforeAction = vi.fn((action: () => void) => action());
+  const current = {
+    ...props,
+    navigation: { ...props.navigation, setSection: section },
+    state: {
+      ...props.state,
+      time: 5,
+      session: { ...props.state.session },
+      beforeAction,
+      seek,
+      video: { current: { pause } },
+      setActiveSelection: select,
+    },
+  } as ComponentProps<typeof ReviewInspectorBinding>;
+  await act(async () => root.render(<ReviewInspectorBinding {...current} />));
+  expect(historyProbe.receive).toHaveBeenCalledTimes(initialRenders);
+  await checkLatestHistoryCommands(current.state);
+  await act(async () => button.click());
+  expect(beforeAction).toHaveBeenCalledOnce();
+  expect(pause).toHaveBeenCalledOnce();
+  expect(seek).toHaveBeenCalledWith(1, false);
+  expect(select).toHaveBeenCalledWith({
+    kind: 'telemetry',
+    ref: { kind: 'action', id: 'recorded' },
+  });
+  expect(section).toHaveBeenCalledWith('selected');
+  const blocked = { ...current, state: { ...current.state, beforeAction: vi.fn() } };
+  await act(async () => root.render(<ReviewInspectorBinding {...blocked} />));
+  await act(async () => button.click());
+  expect(seek).toHaveBeenCalledOnce();
+  await act(async () =>
+    root.render(<ReviewInspectorBinding {...blocked} state={{ ...blocked.state, busy: true }} />)
+  );
+  expect(button.disabled).toBe(true);
+  expect(historyProbe.receive.mock.calls.length).toBeGreaterThan(initialRenders);
+}
+
+async function checkLatestHistoryCommands(
+  state: ComponentProps<typeof ReviewInspectorBinding>['state']
+) {
+  const presentation = await import('./action-presentation');
+  const clicks = vi.spyOn(presentation, 'changeRecordedClicks').mockImplementation(() => undefined);
+  const keys = vi.spyOn(presentation, 'changeRecordedKeys').mockImplementation(() => undefined);
+  const audio = vi
+    .spyOn(presentation, 'changeRecordedActionAudio')
+    .mockImplementation(async () => undefined);
+  const audition = vi
+    .spyOn(presentation, 'auditionRecordedActionAudio')
+    .mockImplementation(() => undefined);
+  const commands: ComponentProps<typeof ReviewActionHistory> =
+    historyProbe.receive.mock.lastCall![0];
+  try {
+    commands.onChange(['recorded'], null);
+    commands.onKeyChange?.(['recorded'], null);
+    commands.onAudioChange?.([], null);
+    expect(clicks).toHaveBeenCalledWith(state, ['recorded'], null);
+    expect(keys).toHaveBeenCalledWith(state, ['recorded'], null);
+    expect(audio).toHaveBeenCalledWith(state, [], null);
+    const target: ReviewActionAudioTarget = {
+      ref: { kind: 'action', id: 'recorded' },
+      family: 'mouse',
+    };
+    commands.onAudition?.(target, REVIEW_ACTION_AUDIO_DEFAULT);
+    expect(audition).toHaveBeenCalledWith(state, target, REVIEW_ACTION_AUDIO_DEFAULT);
+    commands.onStopAudition?.();
+    expect(state.actionSoundPreview.stopAudition).toHaveBeenCalled();
+  } finally {
+    clicks.mockRestore();
+    keys.mockRestore();
+    audio.mockRestore();
+    audition.mockRestore();
   }
 }

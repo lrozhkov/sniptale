@@ -20,7 +20,7 @@ import {
   type ReviewKeyPatch,
 } from '../../features/video/project/action-feedback/key-animation';
 import { reviewKeySections } from './key-animation-fields';
-import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -56,7 +56,10 @@ type ReviewActionHistoryProps = {
   onSelect(marker: ReviewTelemetryMarker): void;
   onChange(ids: readonly string[], patch: Partial<ReviewClickStyle> | null): void;
 };
-export function ReviewActionHistory(props: ReviewActionHistoryProps) {
+export const ReviewActionHistory = memo(function ReviewActionHistory(
+  props: ReviewActionHistoryProps
+) {
+  useAppLocale();
   const [filters, setFilters] = useState<HistoryFilterValues>({
     query: '',
     targetType: 'all',
@@ -205,7 +208,7 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
       )}
     </fieldset>
   );
-}
+});
 
 function historyPresentationTargets(
   markers: readonly ReviewTelemetryMarker[],

@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -18,11 +19,8 @@ export function InspectorDisclosurePreferences(props: {
   store?: Store;
 }) {
   const [store] = useState(() => props.store ?? createInspectorDisclosureStore());
-  return (
-    <PreferenceContext.Provider value={{ scope: props.scope, store }}>
-      {props.children}
-    </PreferenceContext.Provider>
-  );
+  const context = useMemo(() => ({ scope: props.scope, store }), [props.scope, store]);
+  return <PreferenceContext.Provider value={context}>{props.children}</PreferenceContext.Provider>;
 }
 
 /** Stable semantic IDs are required; translated labels and instance IDs are not keys. */

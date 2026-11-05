@@ -756,8 +756,8 @@
       "owner": "extension:gallery:video-review",
       "reason": "tool-noise: Existing Review inspector/session/export/audio/text/composer binding family. New leave/full-editor paths flush same buffers, check current session/resource and delegate exit admission; no new durable writer. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
       "removalCondition": "Remove when this exact body or signature changes. Reassess a new independent writer, state receiver, transport, recovery or resource lifetime, or independent fixture setup/cleanup. Remove when the analyzer models this cohesive owner. Final AST/signature binding and independent architecture review are required; this report does not renew an allowance.",
-      "reviewDate": "2026-11-02",
-      "astHash": "ff595ecbd5d3ba86daddfe4056def30d8f747c4fc9c2a774acbcc4894e9c8874",
+      "reviewDate": "2026-11-05",
+      "astHash": "bdde1713b8aea958a85b2611992edd2a502b205032cb95efb16369b9e875be6c",
       "signatureHash": "117b3e77e5cc45caeffab9203333da816c63787ddad36469afbb9237f22ecfe8"
     },
     {
@@ -3231,8 +3231,8 @@
       "owner": "extension:gallery:video-review",
       "reason": "tool-noise: One mounted React binding fixture proves buffer flush, failed-save retry, backup preparation, full-editor handoff and selected-text/history/cursor guards. New batch gate extends that same editor-buffer integration; finally unmount owns cleanup. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
       "removalCondition": "Remove when this exact body or signature changes. Reassess a new independent writer, state receiver, transport, recovery or resource lifetime, or independent fixture setup/cleanup. Remove when the analyzer models this cohesive owner. Final AST/signature binding and independent architecture review are required; this report does not renew an allowance.",
-      "reviewDate": "2026-11-02",
-      "astHash": "02c61b339da4400b586b2abf6b1889f1c7fa9172d6f789e10edeb98df3f872c1",
+      "reviewDate": "2026-11-05",
+      "astHash": "2ff86a8fe89422c1d23ea4a1f43f0affcdcc973bb4412e12024494e7d7c2a447",
       "signatureHash": "4bd833e688236b8c036afdb49f63adf0e750f7446aac250c82600d04b76483fb"
     },
     {
@@ -5984,6 +5984,17 @@
       "astHash": "84358f7e810f33cf0ddd9b467fd5ce4a5f80e9385e8080a2c39b1f5c0d80a3f5",
       "signatureHash": "084a1b2312c4568a47f85b4608e3ec489241a489cc4774c140accadc29612e03",
       "reviewDate": "2026-11-05"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/action-history.tsx",
+      "symbol": "ReviewActionHistory",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One history view owns filters, selected items, batch settings and their retained DOM. React.memo and useAppLocale add no writer, clock or cleanup authority. They move the function from 150 to 153 lines. Its signature, three structural owners and one effect remain unchanged. A separate owner for this line threshold would divide the same view state.",
+      "removalCondition": "Remove this record when the AST or signature changes. Reassess any separate data, command, clock, persistence or resource authority. Remove it when the analyzer models this cohesive React view without this false positive.",
+      "reviewDate": "2026-11-05",
+      "astHash": "6817e77a602c3e9772b1c3e46e407e8524fc330be5bfdacf6ac628a56cb822d3",
+      "signatureHash": "8712ceb7737a5fae167ae6140473407bea7f566888f21bd49dd40acbfe34e027"
     }
   ]
 }

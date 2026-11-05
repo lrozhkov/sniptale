@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, memo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { InspectorDisclosurePreferences, useInspectorDisclosure } from './state';
@@ -57,6 +57,47 @@ it('keeps standalone controls operable without a preference owner', async () => 
     await act(async () => root.render(<Group label="Appearance" />));
     await act(async () => host.querySelector('button')!.click());
     expect(host.querySelector('button')!.getAttribute('aria-expanded')).toBe('false');
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('does not broadcast unchanged provider values but delivers real scope and store changes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const draws = vi.fn();
+  const store = createInspectorDisclosureStore({
+    get: async () => ({}),
+    set: async () => undefined,
+  });
+  const Consumer = memo(function Consumer() {
+    draws();
+    const [open] = useInspectorDisclosure('appearance', true);
+    return <span>{String(open)}</span>;
+  });
+  const child = <Consumer />;
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const render = (scope: string) =>
+    root.render(
+      <InspectorDisclosurePreferences scope={scope} store={store}>
+        {child}
+      </InspectorDisclosurePreferences>
+    );
+  try {
+    await act(async () => render('gallery:history'));
+    const initial = draws.mock.calls.length;
+    await act(async () => render('gallery:history'));
+    await act(async () => render('gallery:history'));
+    expect(draws).toHaveBeenCalledTimes(initial);
+    await act(async () => store.set(JSON.stringify(['gallery:history', 'appearance']), false));
+    expect(host.textContent).toBe('false');
+    await act(async () => render('video:clip'));
+    expect(host.textContent).toBe('true');
+    await act(async () => store.set(JSON.stringify(['video:clip', 'appearance']), false));
+    expect(host.textContent).toBe('false');
+    await act(async () => render('gallery:history'));
+    expect(host.textContent).toBe('false');
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

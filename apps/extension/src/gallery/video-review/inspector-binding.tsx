@@ -35,7 +35,7 @@ import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio } from './use-review-audio';
 import { reviewErrorMessage } from './feedback';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import type { LoadedReview } from './use-session';
 import type { useReviewEditorState } from './use-editor-state';
@@ -393,6 +393,8 @@ function ReviewSourceSpeechBinding({
   );
 }
 
+const EMPTY_HISTORY_ITEMS: readonly never[] = [];
+
 /** Recorded action navigation and animation edits share the state action guard. */
 function ReviewRecordedHistory({
   state,
@@ -401,31 +403,46 @@ function ReviewRecordedHistory({
   state: InspectorState;
   onSelection(selection: InspectorState['activeSelection']): void;
 }) {
-  return (
-    <ReviewActionHistory
-      captureCapabilities={state.projected.captureCapabilities}
-      markers={state.projected.markers}
-      activeRef={state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined}
-      keyAnimations={state.advanced.keyAnimations ?? []}
-      actionAudio={state.advanced.actionAudio ?? []}
-      onAudioChange={(targets, patch) => {
-        void changeRecordedActionAudio(state, targets, patch);
-      }}
-      onAudition={(target, style) => auditionRecordedActionAudio(state, target, style)}
-      onStopAudition={state.actionSoundPreview.stopAudition}
-      onKeyChange={(ids, patch) => changeRecordedKeys(state, ids, patch)}
-      animations={state.advanced.clickAnimations ?? []}
-      busy={state.busy || state.editing.exporter.phase !== 'idle'}
-      onChange={(ids, patch) => changeRecordedClicks(state, ids, patch)}
-      onSelect={(marker) =>
+  const latest = useRef({ state, onSelection });
+  latest.current = { state, onSelection };
+  const commands = useMemo<
+    Pick<
+      ComponentProps<typeof ReviewActionHistory>,
+      'onAudioChange' | 'onAudition' | 'onStopAudition' | 'onKeyChange' | 'onChange' | 'onSelect'
+    >
+  >(
+    () => ({
+      onAudioChange: (targets, patch) => {
+        void changeRecordedActionAudio(latest.current.state, targets, patch);
+      },
+      onAudition: (target, style) =>
+        auditionRecordedActionAudio(latest.current.state, target, style),
+      onStopAudition: () => latest.current.state.actionSoundPreview.stopAudition(),
+      onKeyChange: (ids, patch) => changeRecordedKeys(latest.current.state, ids, patch),
+      onChange: (ids, patch) => changeRecordedClicks(latest.current.state, ids, patch),
+      onSelect: (marker) => {
+        const { state, onSelection } = latest.current;
         state.beforeAction(() => {
           state.video.current?.pause();
           state.seek(marker.start, false);
           const selection = { kind: 'telemetry' as const, ref: marker.ref };
           state.setActiveSelection(selection);
           onSelection(selection);
-        })
-      }
+        });
+      },
+    }),
+    []
+  );
+  return (
+    <ReviewActionHistory
+      {...commands}
+      captureCapabilities={state.projected.captureCapabilities}
+      markers={state.projected.markers}
+      activeRef={state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined}
+      keyAnimations={state.advanced.keyAnimations ?? EMPTY_HISTORY_ITEMS}
+      actionAudio={state.advanced.actionAudio ?? EMPTY_HISTORY_ITEMS}
+      animations={state.advanced.clickAnimations ?? EMPTY_HISTORY_ITEMS}
+      busy={state.busy || state.editing.exporter.phase !== 'idle'}
     />
   );
 }
