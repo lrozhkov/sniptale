@@ -5011,10 +5011,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One compositor owns one device, shared pipelines, bounded private frame slots and serialized device error scopes. Each slot retains its source and resources until both completion barriers settle. One device failure and disposal owner covers the slots. The nested slot factory keeps that private lifetime adjacent to its renderer. Independent architecture review must assess this exact binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One backend owns both bitmap and direct output. Both use the same slots, encoding lock and completion barriers. Device disposal waits for slots and destination storage. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "c0e8d35e034b497de3cf6452dbc400758ff1d2c8de8b20fab0e2fa9a7722807f",
+      "astHash": "6f18e7c8f47d73e144b1108484b95c65c812ec9c6e4c474bdfe2022f20f022cd",
       "signatureHash": "64d03ee42b8e2898569c0c7c9d536c5d779c544b4c854fcfbad5ecf1994e59d0"
     },
     {
@@ -5022,11 +5022,11 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot.encodeFrame",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One encoder orders child groups before parent passes within one command buffer. Sources, filters, masks, bind groups and uniform slots share this operation. The method adds no asynchronous cleanup authority. External imports use the frame transaction map without owning its packed sources.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes command ordering or source lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One encoder orders child targets before the final pass. The destination callback acquires the output texture inside the encoding transaction. It adds no queue or publication owner. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "84d98d35dc3f960573b41f35e22aebe22d0367c8242c78aa74d6d7d10ae61e58",
-      "signatureHash": "cf354b6a46ba19598bd16ce692ed36ab05beb2a34fd411b225df780df67e6729"
+      "astHash": "3ae7575ab4779dbc5d474c2166d24dbbfe8c9e5176b61c3481bbf7c097396e46",
+      "signatureHash": "f799385f7994330f3b39bb66daa8a62ae5d0692e8863cd847d7f2f5f01bb8458"
     },
     {
       "rule": "structural-function-risk",
@@ -5275,22 +5275,22 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One compositor owns one device, shared pipelines, bounded private frame slots and serialized device error scopes. Each slot retains its source and resources until both completion barriers settle. One device failure and disposal owner covers the slots. The nested slot factory keeps that private lifetime adjacent to its renderer. Independent architecture review must assess this exact binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One compositor owns the device, encoding order and frame slots. A destination owner retains contexts and output storage. It does not select the visible frontend surface. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "bd846628c6acb572902cab9eaf8a436cc1150fd1c6453bd1f0636a0995b159b3",
-      "signatureHash": "f00d9c5df2a7a158107a83280797f66378df0f54200d9122d12f1df0d970e705"
+      "astHash": "0ac29c8f9d60026de75f2c84805152ab76e56547fd6cbb7f1da842abf54bfd61",
+      "signatureHash": "16bec5f40093d209b522631489fe50557bbe6cd175a4702059a144681cf5c523"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot.render",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One slot frame transaction checks the graph, prepares pipelines, submits work and collects validation errors. Both completions precede bitmap transfer and source release. Encoding admission ends when popErrorScope is invoked. Nested finally blocks preserve cleanup on either failure. The transaction has no publication authority. Independent architecture review must assess this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes submission or fence lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One frame transaction checks sources and submits commands. Queue completion and validation settle before either output completion or borrowed source release. Direct output does not create a bitmap. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "5996a79119f9a8c8b5bdbea63135182124ca2dbb9cf0970a40f2bb64b5a00ac3",
-      "signatureHash": "d53504c8210e90af76a0f6bb33dc84dcd06ded7f992ca4a48112dca77d012f7e"
+      "astHash": "4f6524c7000f3d3a267e1e1942f39ed87f9d051b25db8e14112bdc7efb488a90",
+      "signatureHash": "c5363156f353ca5256cd386df07ae4f7dc41ac55af4724cd3b847edfaeaca124"
     },
     {
       "rule": "structural-function-risk",
@@ -5792,10 +5792,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This fixture checks one compositor resource lifetime. New cases use the same fake device and controlled completion barriers. Mock configuration creates no product authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Padded source cases use the existing GPU fixture and controlled completion barriers.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One compositor fixture controls device barriers and resource disposal. Added cases check direct destinations, bitmap compatibility and retirement error classification. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "e03d36dd067422beb07ad7aad6279cb1e540539561636d592d7a8f7f973b04a0",
+      "astHash": "bbfdedb5ea59113234ee5788c6d5797753f8137509683d900eaf2c1ff77c28ea",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {
@@ -6012,10 +6012,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This private factory creates one isolated surface, cache, uniform set and filter lifetime for the same GPU frame transaction. Device, pipeline families, error-scope serialization and failure remain with the parent compositor. The reported score is one and cohesion is one. Separating the closure state from its encoder would distribute one resource lifetime. Independent architecture review must assess this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent device, publication, queue, failure or resource lifetime. Remove when the analyzer models this cohesive slot boundary.",
+      "reason": "tool-noise: One private slot retains its textures, uniforms and filters. Direct output replaces only the final destination. Source and completion ownership remain in this slot. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "a599f686381b62bdd18a9e1a1d247fb7379f8b0dcc4d55ff86515964730feb65",
+      "astHash": "10bef8d13e97fb58c36dfbc7a99560d1425559836c08b2a4fbd80a998863e988",
       "signatureHash": "50b7b6dfa55a91f0767233eb28825159abc77bd5595daebdd5d807e9251bebd0"
     },
     {
@@ -6039,6 +6039,17 @@
       "reviewDate": "2026-11-05",
       "astHash": "6d8708e1978d36a85233073daaeb74e1539c88bb2187f3bab7f6f23658b8ea23",
       "signatureHash": "5bac1ad33b92d8aac330c4b8cc56d8edbee7c4e8f12dd6442dfa1b652d01164b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview-presentation.ts",
+      "symbol": "createGpuPreviewPresentationOwner",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One destination owner retains context configuration, storage reservations and retirement. Each destination has one exclusive pending writer. The supplied executor owns GPU ordering and completion. The frontend owns visibility and geometry publication. Nested operations share this single lifetime. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-05",
+      "astHash": "9a7fc03b22dde443e76aa72ad5751477a52dd06ec8709bce827c8e17a08ebe5c",
+      "signatureHash": "d90b5780a0afc3c2eca6fc2047eee98f50313fd7a7b98e8327936cffa9d8c8fc"
     }
   ]
 }

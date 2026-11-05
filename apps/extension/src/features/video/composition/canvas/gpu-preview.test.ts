@@ -1570,3 +1570,87 @@ it('releases only the packed source belonging to the request whose two barriers 
   renderer.dispose();
   expect(renderer.allocatedBytes).toBe(0);
 });
+
+function presentationCanvas() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 36;
+  const view = { destination: true };
+  const context = {
+    configure: vi.fn(),
+    unconfigure: vi.fn(),
+    getCurrentTexture: vi.fn(() => ({ createView: () => view })),
+  };
+  const getContext = vi.fn(() => context);
+  Object.defineProperty(canvas, 'getContext', { value: getContext });
+  return { canvas, context, getContext, view };
+}
+
+it('presents directly to a leased GPU canvas without creating a bitmap and retains both barriers', async () => {
+  const g = graphics();
+  const destination = presentationCanvas();
+  const renderer = await owner({ reserve: g.reserve });
+  expect(renderer.createSurface).toBeTypeOf('function');
+  if (!renderer.createSurface) throw new Error('Expected direct presentation capability.');
+  const surface = renderer.createSurface(destination.canvas);
+  const fence = deferred<void>();
+  const scope = deferred<null>();
+  g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+  g.device.popErrorScope.mockReturnValueOnce(scope.promise);
+  const complete = vi.fn();
+  const pending = surface.present(request()).then(complete, (error: unknown) => error);
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+  expect(destination.getContext).toHaveBeenCalledWith('webgpu');
+  expect(g.context.configure).not.toHaveBeenCalled();
+  expect(g.transfer).not.toHaveBeenCalled();
+  expect(
+    g.device.createCommandEncoder.mock.results[0]!.value.beginRenderPass.mock.calls[0]![0]
+  ).toMatchObject({ colorAttachments: [{ view: destination.view }] });
+  renderer.dispose();
+  expect(destination.context.unconfigure).not.toHaveBeenCalled();
+  expect(g.device.destroy).not.toHaveBeenCalled();
+  fence.resolve();
+  await Promise.resolve();
+  expect(complete).not.toHaveBeenCalled();
+  scope.resolve(null);
+  expect(await pending).toBeInstanceOf(Error);
+  expect(complete).not.toHaveBeenCalled();
+  expect(destination.context.unconfigure).toHaveBeenCalledOnce();
+  expect(g.device.destroy).toHaveBeenCalledOnce();
+  expect(renderer.allocatedBytes).toBe(0);
+});
+
+it('keeps direct destinations isolated and preserves ordinary bitmap output on the same backend', async () => {
+  const g = graphics();
+  const renderer = await owner({ maximumInFlight: 2 });
+  if (!renderer.createSurface) throw new Error('Expected direct presentation capability.');
+  const outputs = [presentationCanvas(), presentationCanvas()];
+  const surfaces = outputs.map((output) => renderer.createSurface!(output.canvas));
+  const fence = deferred<void>();
+  g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+  const first = surfaces[0]!.present(request());
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+  await surfaces[1]!.present(request());
+  expect(g.transfer).not.toHaveBeenCalled();
+  expect(outputs.every((output) => output.context.getCurrentTexture.mock.calls.length === 1)).toBe(
+    true
+  );
+  expect(await renderer.render(request())).toBe(g.bitmaps[1]);
+  expect(g.transfer).toHaveBeenCalledOnce();
+  fence.resolve();
+  await first;
+  renderer.dispose();
+  expect(renderer.allocatedBytes).toBe(0);
+});
+
+it('does not classify retirement of one direct destination as device failure', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  if (!renderer.createSurface) throw new Error('Expected direct presentation capability.');
+  const surface = renderer.createSurface(presentationCanvas().canvas);
+  surface.dispose();
+  const failure = await surface.present(request()).catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(Error);
+  expect(failure).not.toBeInstanceOf(GpuPreviewDeviceError);
+  expect(await renderer.render(request())).toBe(g.bitmap);
+});

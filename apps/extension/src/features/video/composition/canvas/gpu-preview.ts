@@ -1,3 +1,8 @@
+import {
+  createGpuPreviewPresentationOwner,
+  type GpuPreviewPresentationSurface,
+} from './gpu-preview-presentation';
+export type { GpuPreviewPresentationSurface } from './gpu-preview-presentation';
 import type { CameraSpatialFrame, CameraSpatialRect } from '../../project/motion/spatial';
 import type { QuickEditHomography } from '../motion/spatial-geometry';
 import { quickEditRotationMatrix } from '../motion/spatial-geometry';
@@ -67,6 +72,8 @@ export interface GpuPreviewLayer {
 /** The caller retains frame/publication authority and closes each returned bitmap. */
 export interface GpuPreviewRenderer {
   readonly allocatedBytes: number;
+  /** The caller leases a distinct nonfront canvas and publishes its matching geometry after completion. */
+  createSurface?(canvas: HTMLCanvasElement): GpuPreviewPresentationSurface;
   render(args: {
     output: Size;
     logical: Size;
@@ -577,11 +584,19 @@ export async function createGpuPreviewRenderer(
     let failure: Error | null = null;
     let bytes = 0;
     let destroyed = false;
+    let presentation: ReturnType<typeof createGpuPreviewPresentationOwner> | null = null;
     let encodingTail: Promise<void> | null = null;
     type Slot = Awaited<ReturnType<typeof createSlot>>;
     const slots: { busy: boolean; value?: Slot }[] = [{ busy: false }];
     const cleanAll = () => {
-      if (destroyed || !disposed || slots.some((slot) => slot.busy)) return;
+      if (
+        destroyed ||
+        !disposed ||
+        slots.some((slot) => slot.busy) ||
+        presentation?.pending ||
+        presentation?.allocatedBytes
+      )
+        return;
       destroyed = true;
       for (const slot of slots) slot.value?.clean();
       device.removeEventListener('uncapturederror', uncaptured);
@@ -756,7 +771,8 @@ export async function createGpuPreviewRenderer(
       const encodeFrame = (
         request: GpuPreviewRequest,
         families: PreviewPipelineFamilies,
-        packedFrames: ReadonlyMap<VideoFrame, VideoFrame>
+        packedFrames: ReadonlyMap<VideoFrame, VideoFrame>,
+        outputTexture?: () => GPUTexture
       ) => {
         const { effects, masked, maskedEffects } = families;
         const encoder = device.createCommandEncoder();
@@ -935,14 +951,18 @@ export async function createGpuPreviewRenderer(
           request.output,
           request.logical,
           '',
-          context.getCurrentTexture()
+          outputTexture ? outputTexture() : context.getCurrentTexture()
         );
         return encoder.finish();
       };
 
       return {
         clean,
-        async render(request: GpuPreviewRequest, releaseEncoding: () => void) {
+        async render(
+          request: GpuPreviewRequest,
+          releaseEncoding: () => void,
+          outputTexture?: () => GPUTexture
+        ) {
           check(request.signal);
           let plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
           const normalized = omitLeadingGroupCopies(request);
@@ -1021,9 +1041,10 @@ export async function createGpuPreviewRenderer(
             filter.beginFrame();
             cssFilter?.beginFrame();
             if (
-              surface.width !== request.output.width ||
-              surface.height !== request.output.height ||
-              !outputReservation
+              !outputTexture &&
+              (surface.width !== request.output.width ||
+                surface.height !== request.output.height ||
+                !outputReservation)
             ) {
               context.unconfigure();
               outputReservation?.release();
@@ -1042,7 +1063,12 @@ export async function createGpuPreviewRenderer(
                 entry.reservation.release();
               }
             device.queue.submit([
-              encodeFrame(request, { effects, masked, maskedEffects, operations }, packedFrames),
+              encodeFrame(
+                request,
+                { effects, masked, maskedEffects, operations },
+                packedFrames,
+                outputTexture
+              ),
             ]);
             scopeOpen = false;
             // Both completions retain borrowed sources; a rejection must not release the other barrier.
@@ -1061,7 +1087,7 @@ export async function createGpuPreviewRenderer(
             const error = validation.value;
             if (error) throw new Error(error.message);
             check(request.signal);
-            return surface.transferToImageBitmap();
+            return outputTexture ? undefined : surface.transferToImageBitmap();
           } finally {
             // A failed encode can still contain texture uploads; drain before borrowed frames or resources leave scope.
             try {
@@ -1091,34 +1117,56 @@ export async function createGpuPreviewRenderer(
       };
     }
     slots[0]!.value = await createSlot();
+    const execute = async (request: GpuPreviewRequest, outputTexture?: () => GPUTexture) => {
+      check(request.signal);
+      let slot = slots.find((entry) => !entry.busy);
+      if (!slot && slots.length < (args.maximumInFlight ?? 1)) {
+        slot = { busy: false };
+        slots.push(slot);
+      }
+      if (!slot) throw new Error('GPU preview already has a frame in flight.');
+      slot.busy = true;
+      const encoding = enterEncoding();
+      try {
+        if (encoding.wait) await encoding.wait;
+        check(request.signal);
+        slot.value ??= await createSlot();
+        return await slot.value.render(request, encoding.release, outputTexture);
+      } finally {
+        encoding.release();
+        slot.busy = false;
+        cleanAll();
+      }
+    };
+    presentation = createGpuPreviewPresentationOwner({
+      device,
+      format,
+      maximumSurfaces: (args.maximumInFlight ?? 1) + 1,
+      maximumBytes: MAX_TEXTURE_BYTES,
+      ...(args.reserve ? { reserve: args.reserve } : {}),
+      check,
+      execute: async (request, outputTexture) => {
+        await execute(request, outputTexture);
+      },
+      onIdle: cleanAll,
+      unavailable: () =>
+        new GpuPreviewDeviceError('GPU preview presentation surface is unavailable.'),
+    });
+    const presentationOwner = presentation;
     return {
       get allocatedBytes() {
-        return bytes;
+        return bytes + presentationOwner.allocatedBytes;
       },
+      createSurface: (canvas) => presentationOwner.create(canvas),
       async render(request) {
-        check(request.signal);
-        let slot = slots.find((entry) => !entry.busy);
-        if (!slot && slots.length < (args.maximumInFlight ?? 1)) {
-          slot = { busy: false };
-          slots.push(slot);
-        }
-        if (!slot) throw new Error('GPU preview already has a frame in flight.');
-        slot.busy = true;
-        const encoding = enterEncoding();
-        try {
-          if (encoding.wait) await encoding.wait;
-          check(request.signal);
-          slot.value ??= await createSlot();
-          return await slot.value.render(request, encoding.release);
-        } finally {
-          encoding.release();
-          slot.busy = false;
-          cleanAll();
-        }
+        const bitmap = await execute(request);
+        if (!bitmap) throw new Error('GPU preview bitmap output is unavailable.');
+        return bitmap;
       },
       dispose() {
         if (disposed) return;
         disposed = true;
+        presentationOwner.dispose();
         cleanAll();
       },
     };
