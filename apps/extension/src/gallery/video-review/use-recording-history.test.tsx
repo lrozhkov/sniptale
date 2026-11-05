@@ -12,6 +12,7 @@ import {
 import type { ReviewSelection } from '../../features/video/review/types';
 import type { VideoProject } from '../../features/video/project/types';
 import { useReviewRecordingHistory } from './use-recording-history';
+import { useReviewPlayback } from './use-playback';
 
 const io = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../../workflows/video-review/recording-review', () => ({
@@ -227,4 +228,57 @@ it('bounds reuse of an expanded animation window while the playhead advances', a
   expect(owner.read).toHaveBeenCalledTimes(1);
   await act(async () => root.render(<Probe time={11.1} options={{ reach: 5 }} />));
   expect(owner.read).toHaveBeenCalledTimes(2);
+});
+
+it('keeps strict archived history readable through rounded media EOF, End and seek-back without Retry', async () => {
+  const duration = 26.283316666666664;
+  const browserTime = 26.283317;
+  const input = {
+    ...resource,
+    source: { ...source, duration },
+    historyProject: { ...project, duration },
+  };
+  const owner = reader();
+  owner.read.mockImplementation(async (time) => {
+    if (!Number.isFinite(time) || time < 0 || time > duration)
+      throw new Error('Review recording history range is invalid.');
+    const window = structuredClone(input.historyProject);
+    coverage.set(window, time);
+    return { project: window, telemetry: base };
+  });
+  io.create.mockReturnValue(owner);
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  let playback!: ReturnType<typeof useReviewPlayback>;
+  function PlaybackHistory() {
+    playback = useReviewPlayback({
+      duration,
+      edits: [],
+      boundaries: () => undefined,
+      onSeek() {},
+      onFailure() {},
+      original: { muted: false, volume: 1 },
+    });
+    value = useReviewRecordingHistory(input, playback.time, { kind: 'none' });
+    return <video ref={playback.video} />;
+  }
+  try {
+    await act(async () => root.render(<PlaybackHistory />));
+    playback.video.current!.currentTime = browserTime;
+    await act(async () => playback.onTime(browserTime));
+    expect(value.failed).toBe(false);
+    expect(playback.time).toBe(duration);
+    await act(async () => playback.onEnded());
+    expect(value.failed).toBe(false);
+    await act(async () => playback.seek(duration, false));
+    expect(value.failed).toBe(false);
+    await act(async () => playback.seek(duration - 2, false));
+    expect(playback.time).toBe(duration - 2);
+    expect(value.failed).toBe(false);
+    expect(owner.read.mock.calls.map(([time]) => time)).toEqual([0, duration, duration - 2]);
+    expect(io.create).toHaveBeenCalledOnce();
+  } finally {
+    pause.mockRestore();
+  }
 });

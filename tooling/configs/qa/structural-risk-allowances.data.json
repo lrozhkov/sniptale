@@ -5860,8 +5860,8 @@
       "owner": "extension:gallery:video-review",
       "reason": "tool-noise: One playback hook owns time, range, seeking and recovery. Presentation updates use the same displayed time. Media synchronization retains the existing playback path. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "852be0aec2b430f34ab1a3a82b8bf4efb994b6952df8f56907a8952c14138eb7",
+      "reviewDate": "2026-11-05",
+      "astHash": "9be443e18623b80c9101fb213957465730c822340028b774800c6e22da058632",
       "signatureHash": "7ec54c6faac49a40a881e5150cadc2e284b707939ab3e4c39ca2829af4151ec2"
     },
     {

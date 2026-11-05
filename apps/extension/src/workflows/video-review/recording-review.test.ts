@@ -400,3 +400,20 @@ it('reads the complete requested event viewport without depending on an unavaila
     reader.dispose();
   }
 });
+
+it('accepts exact project EOF while rejecting rounded-overrun and invalid direct history requests', async () => {
+  const { telemetry, project } = await original(false);
+  project.duration = 26.283316666666664;
+  const reader = createReviewRecordingHistorySource(project, telemetry, dependencies);
+  try {
+    await expect(reader.read(project.duration)).resolves.toBeDefined();
+    for (const time of [26.283317, -0.000001, NaN, Infinity])
+      await expect(reader.read(time)).rejects.toThrow('Review recording history range is invalid.');
+    await expect(reader.read(1, { start: 2, end: 1 })).rejects.toThrow(
+      'Review recording history range is invalid.'
+    );
+    await expect(reader.read(1)).resolves.toBeDefined();
+  } finally {
+    reader.dispose();
+  }
+});

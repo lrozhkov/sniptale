@@ -29,24 +29,33 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const latest = useRef(props);
+  latest.current = props;
+  const publishTime = useCallback((value: number) => {
+    // Browser media clocks can round the terminal timestamp beyond the project endpoint.
+    if (Number.isFinite(value)) setTime(Math.max(0, Math.min(latest.current.duration, value)));
+  }, []);
   const presentation = useRef<{ source: string; active: boolean } | null>(null);
   const setPresentationActive = useCallback((source: string, active: boolean) => {
     if (active) presentation.current = { source, active };
     else if (presentation.current?.source === source) presentation.current.active = false;
   }, []);
-  const onPresentedTime = useCallback((source: string, value: number) => {
-    const node = video.current;
-    if (
-      presentation.current?.source !== source ||
-      !presentation.current.active ||
-      !node ||
-      node.paused ||
-      node.error ||
-      !Number.isFinite(value)
-    )
-      return;
-    setTime(value);
-  }, []);
+  const onPresentedTime = useCallback(
+    (source: string, value: number) => {
+      const node = video.current;
+      if (
+        presentation.current?.source !== source ||
+        !presentation.current.active ||
+        !node ||
+        node.paused ||
+        node.error ||
+        !Number.isFinite(value)
+      )
+        return;
+      publishTime(value);
+    },
+    [publishTime]
+  );
   const [playbackRange, updateRange] = useState<ReviewPlaybackRange | null>(null);
   const rangeRef = useRef(playbackRange);
   const [seekRevision, reviseSeek] = useState(0);
@@ -55,8 +64,6 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
     rangeRef.current = range;
     updateRange(range);
   };
-  const latest = useRef(props);
-  latest.current = props;
   const recovery = useReviewPlaybackRecovery({
     video,
     time,
@@ -98,7 +105,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
       node.paused ||
       node.error
     )
-      setTime(next);
+      publishTime(next);
     return next;
   };
   const audioSettingsKey = JSON.stringify([
@@ -125,7 +132,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   }, [audioSettingsKey, props.duration]);
   usePlaybackFrames(playing, video, tick);
   const seekSource = (value: number) => {
-    if (recovery.seek(value)) setTime(value);
+    if (recovery.seek(value)) publishTime(value);
     else if (video.current) video.current.currentTime = value;
     reviseSeek((revision) => revision + 1);
     synchronize(value, false);
@@ -166,7 +173,10 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         reviseSeek((revision) => revision + 1);
         synchronize(start, true);
         void video.current.play().catch(() => props.onFailure());
-      } else setPlaying(false);
+      } else {
+        if (video.current) publishTime(video.current.currentTime);
+        setPlaying(false);
+      }
     },
     onTime: (value: number) => synchronize(value, playing),
     seek: (value: number, snap = true) => {
