@@ -11,6 +11,7 @@ import type { GpuPreviewLayer } from '../../../../features/video/composition/can
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import type { renderPreviewScene } from './render-preview';
 import { buildNativeGpuPreviewLayers } from './gpu-preview-layers';
+import { createNativeGpuPreviewMaterials } from './gpu-preview-materials';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
 import { resolveDecoratedMediaFrame } from '../../../../features/video/project/window-geometry';
@@ -345,7 +346,7 @@ it.each([false, true])(
       expect(nodes.every((node) => (node.blur ?? 0) === 0)).toBe(true);
       expect(
         nodes.filter((node) => 'kind' in node.source && node.source.kind === 'group')
-      ).toHaveLength(2);
+      ).toHaveLength(1);
     }
   }
 );
@@ -625,7 +626,7 @@ it('shares the original source snapshot and bounds magnifier-only artwork', asyn
   );
   expect(
     rasters.filter((source) => source.width >= 32 + 256 && source.height >= 16 + 256)
-  ).toHaveLength(2);
+  ).toHaveLength(1);
   plan.release();
   for (const raster of rasters.filter((source) => source !== f.input.canvas))
     expect([raster.width, raster.height]).toEqual([0, 0]);
@@ -1054,5 +1055,59 @@ it.each(['track', 'video-group'] as const)(
     } finally {
       paint.mockRestore();
     }
+  }
+);
+
+it('retains white coverage across new source frames and invalidates changed window geometry', async () => {
+  const f = fixture();
+  const materials = createNativeGpuPreviewMaterials();
+  const first = await buildNativeGpuPreviewLayers({ ...f, sourceMask: materials.sourceMask });
+  plans.push(first);
+  const maskOf = (layers: readonly GpuPreviewLayer[]) =>
+    flatten(layers).find((node) => node.cache?.key === 'native-source-mask');
+  const mask = maskOf(first.layers);
+  expect(mask).toBeDefined();
+  const nextSource = new VideoFrame(f.source);
+  const second = await buildNativeGpuPreviewLayers({
+    ...f,
+    sources: new Map([...f.sources].map(([id]) => [id, nextSource])),
+    sourceMask: materials.sourceMask,
+  });
+  plans.push(second);
+  const secondMask = maskOf(second.layers);
+  expect(secondMask?.source).toBe(mask?.source);
+  expect(secondMask?.cache).toEqual(mask?.cache);
+  expect(flatten(second.layers).some((node) => node.source === nextSource)).toBe(true);
+  expect(flatten(second.layers).some((node) => node.source === f.source)).toBe(false);
+  first.release();
+  second.release();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  layer.clip.windowCornerRadius = 8;
+  const third = await buildNativeGpuPreviewLayers({ ...f, sourceMask: materials.sourceMask });
+  plans.push(third);
+  expect(maskOf(third.layers)?.source).not.toBe(mask?.source);
+  expect(maskOf(third.layers)?.cache).not.toEqual(mask?.cache);
+  materials.dispose();
+  const retained = maskOf(third.layers)?.source;
+  if (!(retained instanceof HTMLCanvasElement)) throw new Error('Expected retained mask');
+  expect(retained.width).toBeGreaterThan(0);
+  third.release();
+  expect([retained.width, retained.height]).toEqual([0, 0]);
+});
+
+it.each([0, 30])(
+  'omits only empty source decoration with shadow intensity %s',
+  async (intensity) => {
+    const f = fixture();
+    const layer = f.passes.overlayFrame.visualLayers[0]!;
+    if (layer.kind !== 'video') throw new Error('Expected video');
+    layer.clip.shadowIntensity = intensity;
+    const plan = await buildNativeGpuPreviewLayers(f);
+    plans.push(plan);
+    const fullRasters = flatten(plan.layers).filter(
+      (node) => node.source instanceof HTMLCanvasElement && node.source.width >= 288
+    );
+    expect(fullRasters).toHaveLength(intensity > 0 ? 2 : 1);
   }
 );

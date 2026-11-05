@@ -1,3 +1,4 @@
+import { resolveVideoMediaShadowParams } from '../../../../features/video/composition/canvas/media-shadow';
 import type { GpuPreviewLayer } from '../../../../features/video/composition/canvas/gpu-preview';
 import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
 import {
@@ -47,6 +48,14 @@ type Raster = (
   bounds?: GpuPreviewLayer['rect']
 ) => GpuPreviewLayer;
 type WindowMedia = ReturnType<typeof resolveVideoWindowMedia> & { frame: VideoLayer };
+
+/** Borrows immutable white coverage until the requesting GPU plan releases its lease. */
+export type NativeGpuSourceMask = (
+  ownerDocument: Document,
+  bounds: GpuPreviewLayer['rect'],
+  key: string,
+  paint: (context: CanvasRenderingContext2D) => void
+) => { layer: GpuPreviewLayer; release(): void };
 
 /** Immutable source artwork is shared only by derived draws of the same resolved layer. */
 export interface NativeGpuVideoSourceBody {
@@ -99,6 +108,7 @@ export function buildNativeGpuVideoLayers(args: {
   sourceOwner: VideoLayer;
   sourceBodies: Map<VideoLayer, NativeGpuVideoSourceBody>;
   raster: Raster;
+  sourceMask?: (key: string, paint: (context: CanvasRenderingContext2D) => void) => GpuPreviewLayer;
   groupLayer: (
     layers: readonly GpuPreviewLayer[],
     padded?: boolean,
@@ -189,7 +199,7 @@ export function buildNativeGpuVideoLayers(args: {
       !layer.actions?.some((action) => action.gestureFeedback?.effect === 'magnify')
         ? null
         : nativeGpuWindowHeader(media, raster, sourceInverse);
-    const mask = raster((context) => {
+    const paintMask = (context: CanvasRenderingContext2D) => {
       traceWindow(context);
       if (layer.clip.sourceCrop && !header) {
         const crop = layer.clip.sourceCrop;
@@ -201,7 +211,15 @@ export function buildNativeGpuVideoLayers(args: {
           content.height * crop.height
         );
       }
-    }, true);
+    };
+    // White coverage depends on window geometry, not source pixels or playback time.
+    const maskKey = JSON.stringify([
+      window,
+      appearance,
+      layer.clip.windowCornerRadius ?? 0,
+      !header && layer.clip.sourceCrop ? [layer.clip.sourceCrop, content] : null,
+    ]);
+    const mask = args.sourceMask ? args.sourceMask(maskKey, paintMask) : raster(paintMask, true);
     if (header && layer.clip.sourceCrop) {
       const crop = layer.clip.sourceCrop;
       sourceLayers[0] = {
@@ -221,18 +239,28 @@ export function buildNativeGpuVideoLayers(args: {
     // The existing window group clips both transformed sources; crop coverage affects video only.
     if (header) sourceLayers.unshift(header);
     sourceLayers.push({ ...mask, blend: 'mask' });
-    const sourceBody: GpuPreviewLayer[] = [
-      raster(
-        (context) =>
-          paintNativeGpuDecoration(context, {
-            ...resolveVideoWindowMedia(bare, dimensions, 1, args.imageBank),
-            frame: bare,
-          }),
-        true
-      ),
-      groupLayer(sourceLayers, true),
-    ];
-    sourceBodyPlan = { layers: sourceBody, snapshot: groupLayer(sourceBody, true) };
+    const decorationMedia = {
+      ...resolveVideoWindowMedia(bare, dimensions, 1, args.imageBank),
+      frame: bare,
+    };
+    const sourceBody: GpuPreviewLayer[] = [];
+    if (
+      resolveVideoMediaShadowParams(
+        decorationMedia.shadowIntensity,
+        decorationMedia.displayScale,
+        decorationMedia.shadowMode,
+        decorationMedia.camera
+      )
+    )
+      sourceBody.push(
+        raster((context) => paintNativeGpuDecoration(context, decorationMedia), true)
+      );
+    sourceBody.push(groupLayer(sourceLayers, true));
+    // A single same-grid child already is the complete source snapshot.
+    sourceBodyPlan = {
+      layers: sourceBody,
+      snapshot: sourceBody.length === 1 ? sourceBody[0]! : groupLayer(sourceBody, true),
+    };
     args.sourceBodies.set(args.sourceOwner, sourceBodyPlan);
   }
   const sourceBody = sourceBodyPlan?.layers ?? [];

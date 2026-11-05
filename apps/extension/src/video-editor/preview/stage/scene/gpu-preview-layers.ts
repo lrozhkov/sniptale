@@ -9,7 +9,11 @@ import {
   getFittedMediaContentFrame,
 } from '../../../../features/video/composition/draw/fitted-media';
 import { roundedWindowRadius } from '../../../../features/video/project/window-geometry';
-import { buildNativeGpuVideoLayers, type NativeGpuVideoSourceBody } from './gpu-preview-video';
+import {
+  buildNativeGpuVideoLayers,
+  type NativeGpuVideoSourceBody,
+  type NativeGpuSourceMask,
+} from './gpu-preview-video';
 import type {
   GpuPreviewGroup,
   GpuPreviewLayer,
@@ -97,6 +101,7 @@ function integerArtworkBounds(bounds: GpuPreviewLayer['rect'] | null) {
 
 /** Describes ordered GPU work; vector artwork and alpha masks never read back video pixels. */
 export async function buildNativeGpuPreviewLayers(args: {
+  sourceMask?: NativeGpuSourceMask;
   snapshotGroup?: (group: GpuPreviewGroup) => Promise<ImageBitmap>;
   inputComposition?: EffectRuntimeInputComposition;
   input: Input;
@@ -434,6 +439,15 @@ export async function buildNativeGpuPreviewLayers(args: {
       inverse,
       sourceOwner,
       sourceBodies,
+      ...(args.sourceMask
+        ? {
+            sourceMask: (key: string, paint: (context: CanvasRenderingContext2D) => void) => {
+              const lease = args.sourceMask!(input.canvas.ownerDocument, plane, key, paint);
+              retained.push(lease);
+              return lease.layer;
+            },
+          }
+        : {}),
       raster,
       groupLayer,
       spotlight,

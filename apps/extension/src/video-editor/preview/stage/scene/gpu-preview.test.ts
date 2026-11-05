@@ -376,7 +376,7 @@ it('retains exact-density DOF source masks and caches static artwork without a r
   ];
   const firstStatic = staticArtwork(first);
   const secondStatic = staticArtwork(second);
-  expect(firstStatic).toHaveLength(3);
+  expect(firstStatic).toHaveLength(2);
   const alphaMask = first.find((node) => node.alphaMask)!.alphaMask!;
   expect(alphaMask.rect).toEqual({ x: -128, y: -128, width: 264, height: 260 });
   expect(alphaMask.source.width).toBe(264);
@@ -456,7 +456,7 @@ it('keeps the isolated GPU mask when an inner source transform uses a different 
   const nodes = walk(f.render.mock.calls[0]![0].layers);
   expect(
     nodes.filter((node) => 'kind' in node.source && node.source.kind === 'group')
-  ).toHaveLength(2);
+  ).toHaveLength(1);
   expect(nodes.some((node) => node.alphaMask)).toBe(false);
 });
 
@@ -685,4 +685,40 @@ it('keeps raw source alive through an aborted effect input fence and closes the 
   expect(f.bitmap.close).toHaveBeenCalledOnce();
   expect(f.captured[0]!.close).toHaveBeenCalledOnce();
   expect(f.finish).not.toHaveBeenCalled();
+});
+
+it('reuses only immutable mask pixels through the production general renderer', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  layer.sourceContentTransform = [1, 0, 1, 0, 1, 0, 0, 0, 1];
+  const findMask = (
+    layers: readonly import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
+  ):
+    | import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer
+    | undefined => {
+    for (const node of layers) {
+      if (node.cache?.key === 'native-source-mask') return node;
+      if ('kind' in node.source && node.source.kind === 'group') {
+        const match = findMask(node.source.layers);
+        if (match) return match;
+      }
+    }
+    return undefined;
+  };
+  expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBe(true);
+  expect(
+    await f.owner.render({ ...f.input, currentTime: 1.1 }, f.passes, f.finish, () => false)
+  ).toBe(true);
+  const first = findMask(f.render.mock.calls[0]![0].layers);
+  const second = findMask(f.render.mock.calls[1]![0].layers);
+  expect(first).toBeDefined();
+  expect(second?.source).toBe(first?.source);
+  expect(second?.cache).toEqual(first?.cache);
+  expect(f.captured).toHaveLength(2);
+  expect(f.captured.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
+  if (!(first?.source instanceof HTMLCanvasElement)) throw new Error('Expected retained mask');
+  expect(first.source.width).toBeGreaterThan(0);
+  f.owner.dispose();
+  expect([first.source.width, first.source.height]).toEqual([0, 0]);
 });

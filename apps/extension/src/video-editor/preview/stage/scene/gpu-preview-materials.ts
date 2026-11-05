@@ -186,7 +186,15 @@ function retainedDepthLayers(
         group = child.source;
       let copied = groups.get(group);
       if (!copied) {
-        copied = { ...group, layers: group.layers.map(clone) };
+        // Mask fusion uses the source group's local grid; the outside depth plane stays intact.
+        const masked = node.depth
+          ? inlineRetainedMask({
+              source: group,
+              rect: { x: 0, y: 0, ...group.logical },
+              inverse: IDENTITY,
+            })
+          : null;
+        copied = { ...group, layers: (masked ? [masked] : group.layers).map(clone) };
         groups.set(group, copied);
       }
       pixels = copied;
@@ -230,7 +238,10 @@ interface RetainedRaster {
 function createRaster(ownerDocument: Document): RetainedRaster {
   const canvas = ownerDocument.createElement('canvas');
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('Preview raster is unavailable.');
+  if (!context) {
+    canvas.width = canvas.height = 0;
+    throw new Error('Preview raster is unavailable.');
+  }
   return { canvas, context, key: '', image: undefined, revision: 0 };
 }
 
@@ -353,6 +364,99 @@ function decorationLayer(
   };
 }
 
+interface RetainedSourceMask {
+  raster: RetainedRaster;
+  ownerDocument: Document;
+  bounds: GpuPreviewLayer['rect'];
+  borrowers: number;
+  retired: boolean;
+}
+
+function createSourceMaskMaterials() {
+  let sourceMask: RetainedSourceMask | null = null;
+  let sourceMaskRevision = 0;
+  let disposed = false;
+  const retireSourceMask = (entry: RetainedSourceMask) => {
+    entry.retired = true;
+    if (entry.borrowers === 0) entry.raster.canvas.width = entry.raster.canvas.height = 0;
+  };
+  const borrowSourceMask = (entry: RetainedSourceMask, cached: boolean) => {
+    entry.borrowers++;
+    let released = false;
+    return {
+      layer: {
+        source: entry.raster.canvas,
+        rect: { ...entry.bounds },
+        inverse: IDENTITY,
+        ...(cached
+          ? { cache: { key: 'native-source-mask', revision: entry.raster.revision } }
+          : {}),
+      } satisfies GpuPreviewLayer,
+      release() {
+        if (released) return;
+        released = true;
+        entry.borrowers--;
+        if (entry.retired && entry.borrowers === 0)
+          entry.raster.canvas.width = entry.raster.canvas.height = 0;
+      },
+    };
+  };
+  return {
+    sourceMask(
+      ownerDocument: Document,
+      bounds: GpuPreviewLayer['rect'],
+      key: string,
+      paint: (context: CanvasRenderingContext2D) => void
+    ) {
+      if (disposed) throw new Error('Source mask materials are disposed.');
+      const previous = sourceMask;
+      if (
+        previous &&
+        previous.ownerDocument === ownerDocument &&
+        previous.raster.key === key &&
+        previous.bounds.x === bounds.x &&
+        previous.bounds.y === bounds.y &&
+        previous.bounds.width === bounds.width &&
+        previous.bounds.height === bounds.height
+      )
+        return borrowSourceMask(previous, true);
+      const raster = createRaster(ownerDocument);
+      const entry: RetainedSourceMask = {
+        raster,
+        ownerDocument,
+        bounds: { ...bounds },
+        borrowers: 0,
+        retired: false,
+      };
+      try {
+        raster.canvas.width = bounds.width;
+        raster.canvas.height = bounds.height;
+        raster.context.translate(-bounds.x, -bounds.y);
+        paint(raster.context);
+        if (disposed) throw new Error('Source mask materials are disposed.');
+      } catch (error) {
+        retireSourceMask(entry);
+        throw error;
+      }
+      if (previous && previous.borrowers > 0) {
+        entry.retired = true;
+        return borrowSourceMask(entry, false);
+      }
+      raster.key = key;
+      raster.revision = ++sourceMaskRevision;
+      sourceMask = entry;
+      if (previous) retireSourceMask(previous);
+      return borrowSourceMask(entry, true);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      if (sourceMask) retireSourceMask(sourceMask);
+      sourceMask = null;
+    },
+  };
+}
+
 /** Owns retained source-density artwork and its canonical depth-plan invalidation. */
 export function createNativeGpuPreviewMaterials() {
   let background: RetainedRaster | null = null;
@@ -360,7 +464,9 @@ export function createNativeGpuPreviewMaterials() {
   let header: RetainedRaster | null = null;
   let presentationBackground: RetainedRaster | null = null;
   let depthPlan: RetainedDepthPlan | null = null;
+  const sourceMaskMaterials = createSourceMaskMaterials();
   return {
+    sourceMask: sourceMaskMaterials.sourceMask,
     background(
       input: Input,
       passes: Passes,
@@ -466,6 +572,7 @@ export function createNativeGpuPreviewMaterials() {
       );
     },
     dispose() {
+      sourceMaskMaterials.dispose();
       depthPlan?.plan.release();
       depthPlan = null;
       for (const raster of [background, decoration, header, presentationBackground])

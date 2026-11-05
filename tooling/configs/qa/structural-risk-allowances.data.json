@@ -5110,10 +5110,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One Native adapter describes ordered GPU layers and owns one request release ledger. Integer bounds and shared source bodies stay inside that request. Capture, submission and publication retain their existing owners. Fresh independent architecture review must validate this exact binding.",
+      "reason": "tool-noise: One Native adapter describes ordered GPU layers and owns one request release ledger. Integer bounds, shared source bodies and borrowed immutable masks stay inside the existing request release ledger. Capture, submission and publication retain their existing owners. Fresh independent architecture review must validate this exact binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "b60e1f42d955d2359ba1c723f8c932467c965a979ed3271f3433df531b79ab29",
+      "astHash": "17f544b1e105932b82e3f02635065e40a9a4fda14278cfd55a37514cf027205c",
       "signatureHash": "50dc315adc73e3dee9e483c3b3c6208ca2ad662555f18670fdadcdd69dbd0189"
     },
     {
@@ -5124,29 +5124,29 @@
       "reason": "tool-noise: One graph builder preserves scene order, source coordinates and request cleanup. Its source map uses original resolved layer objects and ends with the request. Integer bounds retain canonical pixel density and existing transform fallbacks. There is no second resource or publication authority. Fresh independent architecture review must validate this exact binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "9c4364c4200c58312e2f9ef89565b55f8ade5136af9d8b7609834aa2e95f6e47",
-      "signatureHash": "8ec9e6c43e09eb3a4cb6232647fbc8df9ccedc28e69db976b6badfa6101cdd0e"
+      "astHash": "283741c4b1b881fecbb55d5fe31c2cb13d004471c1774ef796fde38aa205f076",
+      "signatureHash": "2a92c8f78be7f5497af62d17e1fa77e98a72a981b1283aca73d028d92039becb"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-video.ts",
       "symbol": "buildNativeGpuVideoLayers",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One fitted video material builds its source body and ordered feedback. The caller supplies the request cache and allocation functions. Reuse requires the same original resolved layer. Source sampling and local artwork share the existing graph and release ledger. Fresh independent architecture review must validate this exact binding.",
+      "reason": "tool-noise: One fitted video material builds its source body and ordered feedback. The caller supplies the request cache and allocation functions. Reuse requires the same original resolved layer. Source sampling and local artwork share the existing graph and release ledger. Empty decoration admission uses the authoritative shadow resolver; white coverage is borrowed from the existing material owner. Fresh independent architecture review must validate this exact binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "d56739059a9cb4417e9da2dfd6c36a6d3641b4e9209ad027d4b537bf778e86e1",
-      "signatureHash": "bcf7ec66f5a7e5b5fc8c8c7ab76783869ab474a348219825149b13b236a94017"
+      "astHash": "2778f20196e83c673187d272b7b3b0b9131acf070a99f360379ef73ebd032c6d",
+      "signatureHash": "d1c71d2147ee63d9957b250c22e3bff610b308c7d1f2e32839f0594397c3acb2"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One preview session owns backend availability, material caches and disposal. The factory span includes one render transaction. It adds no separate queue or resource lifetime. One optional admission flag omits empty artwork without adding a resource owner. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes preview queue or material lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One preview session retains its backend and material owner. It supplies the existing graph transaction with an immutable mask lease provider; capture, queue and publication remain unchanged. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "5837b152bc704b2ed219f4925eed8a6e95de089f1cbccd1cfa9fdfd0f1709ce8",
+      "astHash": "90fb8992a58e226afb707dfa22a457a4d07a265a5fc1062ecc0ee3e414a37306",
       "signatureHash": "7d9a217fc23fc3f6a09d3c448ae47b3c7039b7957a843146613711295e84297a"
     },
     {
@@ -5154,10 +5154,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer.render",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One preview transaction captures raw frames, composes effect inputs and presents the completed scene. Both composition stages share captured sources, backend and materials. One finally block releases temporary resources after GPU settlement. Final artwork admission preserves the same capture, settlement and publication transaction. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes capture or publication lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One preview transaction owns captured frames, input composition and publication. Mask leases enter the same request release ledger and settle after GPU completion. No additional queue or publication authority is introduced. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "565d463363b50cd2471a30904b21a36314f38d0f652dff9f29a2209c8d11ea12",
+      "astHash": "8c55836ec84d3f4a1c09862d797d19cdc1d21e07c2472a0c15f59755a2d279ae",
       "signatureHash": "7fbf6998a3988df89e02a05370e5486d9adf627b6e933b9dcfaf360518055ae2"
     },
     {
@@ -5905,8 +5905,8 @@
       "reason": "tool-noise: One fixture checks the Native graph builder. The added cases check shared source groups, independent exposure poses, artwork bounds and release. Graphics contexts and project layers remain test data. Fresh independent architecture review must validate this exact binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "ce2d4a459877b11b8e128c199c65b75b26037e1aa6ab7c0d98d781f7746aa8da",
-      "signatureHash": "a55221b983e0344ca26f05dbab019980436744904308244bc8370679b4bec0b3"
+      "astHash": "d7e117109c48ee224e04419868432670df5be8bb5de6f36abaedcf0a7d7a8728",
+      "signatureHash": "ccc43873552751e7a14b1d2b4625c312ed0347ca3f6836c0f1431aa598cec5b8"
     },
     {
       "rule": "structural-file-risk",

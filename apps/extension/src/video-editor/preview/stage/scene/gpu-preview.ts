@@ -222,6 +222,7 @@ export function createNativeGpuPreviewRenderer(
                 }
               );
               graph = await buildNativeGpuPreviewLayers({
+                sourceMask: materials.sourceMask,
                 input: { ...input, currentTime: request.time ?? input.currentTime },
                 passes: {
                   overlayFrame: effectFrame,
@@ -332,6 +333,7 @@ export function createNativeGpuPreviewRenderer(
           layers = retained;
         } else {
           plan = await buildNativeGpuPreviewLayers({
+            sourceMask: materials.sourceMask,
             input,
             passes,
             sources: captured,
