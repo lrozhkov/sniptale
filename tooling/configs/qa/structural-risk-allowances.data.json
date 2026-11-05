@@ -5110,10 +5110,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One Native adapter converts ordered scene layers into a GPU description. Input slices and final scenes share coordinates, ordering primitives and retained resources. The adapter returns one release method without submitting work. The input type now comes from the existing scene types owner. It replaces a type dependency on render-preview. The recorded JavaScript comparison shows identical output for all five files.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes scene coordinates or resource retention. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One Native adapter describes ordered GPU layers and owns one request release ledger. Integer bounds and shared source bodies stay inside that request. Capture, submission and publication retain their existing owners. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "023afe6005ef71dd892e70fd57b2eea3f9d6e7a888e31fa3a249bdcf9fc52e93",
+      "astHash": "b60e1f42d955d2359ba1c723f8c932467c965a979ed3271f3433df531b79ab29",
       "signatureHash": "50dc315adc73e3dee9e483c3b3c6208ca2ad662555f18670fdadcdd69dbd0189"
     },
     {
@@ -5121,10 +5121,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
       "symbol": "buildNativeGpuPreviewLayers",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One graph builder preserves composition order, projection and resource cleanup. Tight artwork bounds share the existing release ledger. No second cache or publication authority exists. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One graph builder preserves scene order, source coordinates and request cleanup. Its source map uses original resolved layer objects and ends with the request. Integer bounds retain canonical pixel density and existing transform fallbacks. There is no second resource or publication authority. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "0eced2152ca2f7b688569655d47c22daeec3a906126697a566cba0c6c24fd2a6",
+      "astHash": "9c4364c4200c58312e2f9ef89565b55f8ade5136af9d8b7609834aa2e95f6e47",
       "signatureHash": "8ec9e6c43e09eb3a4cb6232647fbc8df9ccedc28e69db976b6badfa6101cdd0e"
     },
     {
@@ -5132,11 +5132,11 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-video.ts",
       "symbol": "buildNativeGpuVideoLayers",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One fitted video material resolves orientation, crop, masks, source effects and its final transform. Explicit allocation capabilities preserve caller-owned plan cleanup. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
-      "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
+      "reason": "tool-noise: One fitted video material builds its source body and ordered feedback. The caller supplies the request cache and allocation functions. Reuse requires the same original resolved layer. Source sampling and local artwork share the existing graph and release ledger. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "c5f6794faebecffcb3e0a7ad28beab2340efbbbaa5a1e9f5c3525ec0dcd260e4",
-      "signatureHash": "1141bf6b1bdc201d968f446f8d8c004ab974e240be922f5b86e17ad93bad9f72"
+      "astHash": "d56739059a9cb4417e9da2dfd6c36a6d3641b4e9209ad027d4b537bf778e86e1",
+      "signatureHash": "bcf7ec66f5a7e5b5fc8c8c7ab76783869ab474a348219825149b13b236a94017"
     },
     {
       "rule": "structural-function-risk",
@@ -5902,10 +5902,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: This suite tests one ordered GPU graph builder. Tight bounds cases retain existing projection, resource and release fixtures. Graphics contexts and spies are test data. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One fixture checks the Native graph builder. The added cases check shared source groups, independent exposure poses, artwork bounds and release. Graphics contexts and project layers remain test data. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-05",
-      "astHash": "21a5e1b372ed65ea1515c1b0c0d60d80cdef672d7aba60ecb8549b18f9459bd1",
+      "astHash": "ce2d4a459877b11b8e128c199c65b75b26037e1aa6ab7c0d98d781f7746aa8da",
       "signatureHash": "a55221b983e0344ca26f05dbab019980436744904308244bc8370679b4bec0b3"
     },
     {

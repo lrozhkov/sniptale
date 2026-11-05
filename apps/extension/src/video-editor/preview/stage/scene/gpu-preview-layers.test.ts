@@ -586,6 +586,76 @@ it('allocates the complete source magnifier footprint outside the canonical plan
   expect(containing.some((node) => node.rect.width > 32 + 256)).toBe(true);
 });
 
+it('shares the original source snapshot and bounds magnifier-only artwork', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  layer.actions = [
+    {
+      ...clickAction(layer.clipId),
+      gestureFeedback: {
+        effect: 'magnify',
+        point: { x: 0.25, y: 0.5 },
+        radius: 3,
+        stroke: 1,
+        opacity: 1,
+        color: '#f00',
+        lens: { scale: 2, shape: 'circle', shadow: 20 },
+      },
+    },
+  ];
+  const plan = await buildNativeGpuPreviewLayers(f);
+  plans.push(plan);
+  const nodes = flatten(plan.layers);
+  expect(nodes.filter((node) => node.source === f.source)).toHaveLength(1);
+  const containing = nodes.filter(
+    (node) =>
+      'kind' in node.source &&
+      node.source.kind === 'group' &&
+      flatten(node.source.layers).some((child) => child.lens)
+  );
+  expect(containing.length).toBeGreaterThan(0);
+  for (const node of containing) {
+    expect(node.rect.width).toBeLessThan(64);
+    expect(node.rect.height).toBeLessThan(64);
+    expect(Number.isInteger(node.rect.x) && Number.isInteger(node.rect.y)).toBe(true);
+  }
+  const rasters = [...new Set(nodes.map((node) => node.source))].filter(
+    (source): source is HTMLCanvasElement => source instanceof HTMLCanvasElement
+  );
+  expect(
+    rasters.filter((source) => source.width >= 32 + 256 && source.height >= 16 + 256)
+  ).toHaveLength(2);
+  plan.release();
+  for (const raster of rasters.filter((source) => source !== f.input.canvas))
+    expect([raster.width, raster.height]).toEqual([0, 0]);
+  expect(f.source.close).not.toHaveBeenCalled();
+  expect(f.borrowed.draw).not.toHaveBeenCalled();
+});
+
+it('keeps source bodies distinct for separate exposure poses of the same clip', async () => {
+  const f = fixture();
+  const first = f.passes.visualPasses[0]!;
+  f.passes.visualPasses = [
+    { ...first, alpha: 0.5 },
+    {
+      ...first,
+      alpha: 0.5,
+      time: first.time + 0.01,
+      frame: {
+        ...first.frame,
+        visualLayers: first.frame.visualLayers.map((layer) => ({ ...layer, x: layer.x + 8 })),
+      },
+    },
+  ];
+  const plan = await buildNativeGpuPreviewLayers(f);
+  plans.push(plan);
+  const video = flatten(plan.layers).filter((node) => node.source === f.source);
+  expect(video).toHaveLength(2);
+  expect(video[1]!.rect.x - video[0]!.rect.x).toBe(8);
+  expect(f.borrowed.draw).not.toHaveBeenCalled();
+});
+
 it('uses the original external frame dimensions when no decoded media descriptor is present', async () => {
   const f = fixture();
   f.media.clear();

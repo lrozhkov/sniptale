@@ -9,7 +9,7 @@ import {
   getFittedMediaContentFrame,
 } from '../../../../features/video/composition/draw/fitted-media';
 import { roundedWindowRadius } from '../../../../features/video/project/window-geometry';
-import { buildNativeGpuVideoLayers } from './gpu-preview-video';
+import { buildNativeGpuVideoLayers, type NativeGpuVideoSourceBody } from './gpu-preview-video';
 import type {
   GpuPreviewGroup,
   GpuPreviewLayer,
@@ -224,26 +224,46 @@ export async function buildNativeGpuPreviewLayers(args: {
     paint(context);
     return { source: canvas, rect: bounds, inverse: IDENTITY };
   };
-  const group = (layers: readonly GpuPreviewLayer[], padded = false): GpuPreviewGroup => {
-    const bounds = padded ? plane : { x: 0, y: 0, ...logical };
+  const groupBounds = (padded: boolean, artworkBounds?: GpuPreviewLayer['rect']) => {
+    if (!artworkBounds) return padded ? plane : { x: 0, y: 0, ...logical };
+    const roi = integerArtworkBounds(artworkBounds);
+    if (!roi) return plane;
+    const x = Math.max(roi.x, plane.x),
+      y = Math.max(roi.y, plane.y);
+    const right = Math.min(roi.x + roi.width, plane.x + plane.width),
+      bottom = Math.min(roi.y + roi.height, plane.y + plane.height);
+    return right > x && bottom > y ? { x, y, width: right - x, height: bottom - y } : plane;
+  };
+  const group = (
+    layers: readonly GpuPreviewLayer[],
+    padded = false,
+    artworkBounds?: GpuPreviewLayer['rect']
+  ): GpuPreviewGroup => {
+    const bounds = groupBounds(padded, artworkBounds);
     const translate: QuickEditHomography = [1, 0, bounds.x, 0, 1, bounds.y, 0, 0, 1];
     return {
       kind: 'group',
-      output: padded
-        ? { width: Math.ceil(bounds.width), height: Math.ceil(bounds.height) }
-        : output,
+      output:
+        padded || artworkBounds
+          ? { width: Math.ceil(bounds.width), height: Math.ceil(bounds.height) }
+          : output,
       logical: { width: bounds.width, height: bounds.height },
-      layers: padded
-        ? layers.map((layer) => ({
-            ...layer,
-            inverse: multiplyQuickEditProjections(layer.inverse, translate),
-          }))
-        : layers,
+      layers:
+        padded || artworkBounds
+          ? layers.map((layer) => ({
+              ...layer,
+              inverse: multiplyQuickEditProjections(layer.inverse, translate),
+            }))
+          : layers,
     };
   };
-  const groupLayer = (layers: readonly GpuPreviewLayer[], padded = false): GpuPreviewLayer => ({
-    source: group(layers, padded),
-    rect: padded ? plane : { x: 0, y: 0, ...logical },
+  const groupLayer = (
+    layers: readonly GpuPreviewLayer[],
+    padded = false,
+    artworkBounds?: GpuPreviewLayer['rect']
+  ): GpuPreviewLayer => ({
+    source: group(layers, padded, artworkBounds),
+    rect: groupBounds(padded, artworkBounds),
     inverse: IDENTITY,
   });
   const cameraLayers = (
@@ -399,7 +419,8 @@ export async function buildNativeGpuPreviewLayers(args: {
       1,
     ];
   };
-  const video = (layer: VideoLayer): GpuPreviewLayer[] => {
+  const sourceBodies = new Map<VideoLayer, NativeGpuVideoSourceBody>();
+  const video = (layer: VideoLayer, sourceOwner = layer): GpuPreviewLayer[] => {
     const source = args.sources.get(layer.clipId);
     if (!source) throw new Error('GPU video source is unavailable.');
     const inverse = invertQuickEditProjection(layerProjection(layer));
@@ -411,6 +432,8 @@ export async function buildNativeGpuPreviewLayers(args: {
       media: args.media,
       imageBank: input.imageBank,
       inverse,
+      sourceOwner,
+      sourceBodies,
       raster,
       groupLayer,
       spotlight,
@@ -518,7 +541,7 @@ export async function buildNativeGpuPreviewLayers(args: {
       } else
         body =
           layer.kind === 'video'
-            ? video({ ...layer, actions: [] })
+            ? video({ ...layer, actions: [] }, layer)
             : [
                 raster(
                   (context) =>
@@ -542,13 +565,34 @@ export async function buildNativeGpuPreviewLayers(args: {
         (layer.actions?.length || (layer.deferSourceBorders && layer.borders?.length)) &&
         (layer.effectActionsOnly || !explicitActions.has(layer.clipId))
       ) {
-        sharp.push(...video({ ...layer, effectActionsOnly: true }));
+        sharp.push(...video({ ...layer, effectActionsOnly: true }, layer));
       }
     }
     return { content, sharp };
   };
-  const mergeSharp = (painted: ReturnType<typeof paintLayers>) =>
-    painted.sharp.length ? [...painted.content, groupLayer(painted.sharp, true)] : painted.content;
+  const mergeSharp = (painted: ReturnType<typeof paintLayers>) => {
+    if (!painted.sharp.length) return painted.content;
+    let bounds: GpuPreviewLayer['rect'] | undefined;
+    if (
+      painted.sharp.every(
+        (layer) =>
+          !layer.blur &&
+          !layer.cssFilter &&
+          !layer.depth &&
+          layer.inverse.every((value, index) => value === IDENTITY[index])
+      )
+    ) {
+      const x = Math.min(...painted.sharp.map((layer) => layer.rect.x)) - 2;
+      const y = Math.min(...painted.sharp.map((layer) => layer.rect.y)) - 2;
+      bounds = {
+        x,
+        y,
+        width: Math.max(...painted.sharp.map((layer) => layer.rect.x + layer.rect.width)) - x + 2,
+        height: Math.max(...painted.sharp.map((layer) => layer.rect.y + layer.rect.height)) - y + 2,
+      };
+    }
+    return [...painted.content, groupLayer(painted.sharp, true, bounds)];
+  };
   const sceneMasks = (layers: readonly GpuPreviewLayer[], afterClipId?: string) =>
     spotlight(
       layers,
