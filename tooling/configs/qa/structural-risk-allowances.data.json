@@ -4241,10 +4241,10 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "createReviewPreviewRenderer",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One preview renderer owns the GPU session and prepared scene leases. Scene replacement cancels old work and releases scene artwork. Final disposal releases the device. Existing sampling and geometry adapters retain their owners. This change adds no writer or publication authority. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One renderer owns preparation, scene leases, asset borrows and stale-result checks. Retirement aborts once and closes after the final borrower. Late closure cannot release a newer shared GPU scene. Capture and ordered publication stay with callers. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-05",
-      "astHash": "fd6a40a60d1218c989a80bfe64efb60f130cf656156ffae0190b448ba939015c",
+      "astHash": "f6b1d91d4f4660ab899028ab9e3e8dcc37fd513249c0a54f31e0520b64dc79ca",
       "signatureHash": "febf2983718798d6d1080f946f8e1e5299220705173dfc7b5c223e4e2f158556"
     },
     {
@@ -5396,10 +5396,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One preview session owns the GPU device and scene cancellation. Scene release retains borrowed artwork until the frame settles. Texture revisions belong to that same resource owner. This factory adds no writer, publication owner or independent queue. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One adapter owns two bounded artwork slots, their painters, request admission and release. The shared core retains device authority. Moving slot cleanup to another owner would distribute this lifetime. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-05",
-      "astHash": "5efe631dfde59e4ba90e2e7132468fa75a939d855d56830fe41868e4c12865cf",
+      "astHash": "58a21695c9acbecac77add2206c0629835d535fe29841dc3b5efa3ab2eaed012",
       "signatureHash": "58e4f800820af68fba971b9d7a7b89f698765e9c8560ee0de826a02c4ba84ae5"
     },
     {
@@ -5407,10 +5407,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview.render",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One frame transaction retains annotation batches until each endpoint fence settles. It owns temporary endpoint outputs until the final blend settles. The existing finally block releases holds, outputs, frames and primitives. This ordering prevents premature batch reuse. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes endpoint ordering or GPU drain. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One request acquires an artwork slot and owns its geometry, primitives and borrowed sources through both core barriers. Success, cancellation and failure retire that same request. Capture and publication remain with callers. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-05",
-      "astHash": "43c7444cb7a30ffebdd6fe045f259b1b8832a4deda088de28dc79247ac76a10d",
+      "astHash": "b3679794add676d8a60f2cbd3f528eb9eb35e4de6bd383af311b27de75a90e5b",
       "signatureHash": "71c67f135ecd6a09286c1d7fd27c90f89b001f55b68a5f06115d8d7d37af42c8"
     },
     {
@@ -5418,10 +5418,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One GPU fixture checks scene replacement, cancellation, fallback and borrowed artwork. Controlled promises establish the resource release order. Pooled canvas tests check texture revisions. These cases share the existing renderer fixture and create no product authority.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One adapter fixture checks the same bounded artwork owner through overlap, cache reuse, cancellation and failure. Its fake core controls completion order. No separate resource or publication authority is introduced. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-05",
-      "astHash": "08e716a290b5c82812c05cef6093538d758d5aec0ba2ea79674548c0ac028683",
+      "astHash": "84bfb202ce070159e55ba55667916fe661822b81bb539a115e13764bac40799e",
       "signatureHash": "f14e94b2fa6336353abb7e61d55875815a79c9e4af63687256be186990013691"
     },
     {
@@ -5429,10 +5429,10 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One prepared-preview fixture checks the explicit annotation executor and scene replacement. The added case uses existing annotation resources and disposal checks. It adds no independent fixture or production lifetime.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes executor ownership or fixture lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One prepared-renderer fixture checks asset borrowing, stale work, two-request fallback and actual source clocks. Controlled promises establish order. Existing annotation failure tests retain their assertions. No separate fixture lifetime is added. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-05",
-      "astHash": "c0dc5aca197db6d0753fcc3ebb6e526c4b27d314acd9bd5bda0c8377848b73e1",
+      "astHash": "1d7cc87c5d945144afb08607e8c59c3e853db8a87e90d7721c7f55f94d6224ad",
       "signatureHash": "a2043057597679bfc0100ba49606decb9cf0c2abf4fb8f569029b0e27e5489eb"
     },
     {
@@ -5726,22 +5726,22 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One preview renderer owns preparation, leases and stale-result checks. Its GPU session survives scene replacement. Preparation accounts for the tracked GPU bytes that remain allocated. Capture and publication remain with callers. Final architecture review must check this binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess a separate writer, queue, publication owner or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One preview renderer owns scene preparation and prepared asset retirement. Borrow counts defer physical closure; one asset signal cancels old work immediately. The Canvas gate belongs to that asset bundle. Source capture and publication remain with callers. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-05",
-      "astHash": "b2464b5a44e5693cca452a86b2d4491844cadc2d45b0da7bc7dc3d0e3703fccf",
+      "astHash": "66164b551a2b6c419594e521d48568b1dd5901f248f3f8b8f636934f07cd9d9e",
       "signatureHash": "96b6ef53ddb51dcab617d28e7eb6176970b7eb507ed750d7eaa52370a13cfed6"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
-      "symbol": "drawPreparedFrame",
+      "symbol": "drawPreparedCanvasFrame",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: Score delta0, cohesion.97. One async output transaction: history/request, GPU preview or existing spatial branch, transition lease, annotation admission/acquisition, export source lease, scene/sharp replay, outer decorations. Both prepared source and annotation release remain adjacent in a single finally. transition release remains outer finally. No new async queue/publication state.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
+      "reason": "tool-noise: The existing Canvas backend is now a private operation under the asset-owned serial gate. One output transaction retains source, annotation, enhancement and transition leases through its draw. Each lease keeps its existing cleanup owner. This extraction adds no public contract or independent lifecycle. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-05",
-      "astHash": "35c93cb3a74efd1783362af5edef3a0d4c6885879834e64770793effc1a77b64",
-      "signatureHash": "90251aa5da40a6d099524888bf57cce293f56c2af223b9392dd194da9701fe20"
+      "astHash": "e01b0041e73c45d43b40e5b19bf57d6200a8302314791c7952aadc0c59c4c57a",
+      "signatureHash": "de931ea4ec1734341ad68bf2ac980b9c11b4b1bcddc2c83804f998f075092e07"
     },
     {
       "rule": "structural-function-risk",
@@ -6017,6 +6017,28 @@
       "reviewDate": "2026-11-05",
       "astHash": "a599f686381b62bdd18a9e1a1d247fb7379f8b0dcc4d55ff86515964730feb65",
       "signatureHash": "50b7b6dfa55a91f0767233eb28825159abc77bd5595daebdd5d807e9251bebd0"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/support/quick-preview-render-parity-probe.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: The probes check the same production renderer layer composition and resource accounting. Separate functions own all-layer parity and two-request parity. They share image comparison helpers and create no product state authority. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-05",
+      "astHash": "72d734bc5652b602b18ff6c1e6f5dc1776e86d7cc211832a8f7e6573c3c8b830",
+      "signatureHash": "feac0d2c91e3733ca4825342e3b53a0b85996a0941d8744da5d94d421885915b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/support/quick-preview-render-parity-probe.ts",
+      "symbol": "probeGpuQueue",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One integration proof owns fixture resources, sequential references, two concurrent requests, whole-image comparison and cleanup. Production renderers perform composition. Keeping these phases together permits exact resource and source-clock assertions. Fresh independent architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-05",
+      "astHash": "6d8708e1978d36a85233073daaeb74e1539c88bb2187f3bab7f6f23658b8ea23",
+      "signatureHash": "5bac1ad33b92d8aac330c4b8cc56d8edbee7c4e8f12dd6442dfa1b652d01164b"
     }
   ]
 }

@@ -660,3 +660,85 @@ it('accounts for a second outstanding publication without duplicating the retain
   expect(after.maximumManagedBytes - before.maximumManagedBytes).toBe(size.width * size.height * 4);
   expect(after.maximumCanvases - before.maximumCanvases).toBe(1);
 });
+
+it('admits two real drift painter caches and blur scratch while both destinations remain borrowed', async () => {
+  const { createReviewBackgroundPainter } = await import('./scene-background');
+  const { reviewGpuPreviewAllocation } = await import('./gpu-preview-geometry');
+  const background = updateQuickEditBackground(
+    { enabled: false },
+    {
+      enabled: true,
+      type: 'image',
+      assetId: 'background',
+      layout: { padding: 0, cornerRadius: 0, blur: 10 },
+      motion: { mode: 'drift', speed: 100, intensity: 100 },
+    }
+  );
+  if (!background.enabled || background.type !== 'image')
+    throw new Error('Expected image background');
+  const scene = {
+    source: { width: 640, height: 360 },
+    background,
+    zoomRegions: [],
+    comments: [],
+    keys: [],
+    clicks: [],
+  };
+  const dimensions = { canonical: scene.source, backing: { width: 320, height: 180 } };
+  const plan = reviewGpuPreviewAllocation(scene, dimensions, 2);
+  const resources = createPreviewRenderResources({
+    ...plan,
+    createCanvas: () => {
+      const canvas = document.createElement('canvas');
+      vi.spyOn(canvas, 'getContext').mockReturnValue({
+        canvas,
+        clearRect: vi.fn(),
+        setTransform: vi.fn(),
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        rect: vi.fn(),
+        clip: vi.fn(),
+      } as unknown as CanvasRenderingContext2D);
+      return canvas;
+    },
+  });
+  const slots = [0, 1].map(() => ({
+    destination: resources.canvas('preview-gpu-background', dimensions.backing),
+    painter: createReviewBackgroundPainter(resources),
+  }));
+  try {
+    for (const [index, slot] of slots.entries()) {
+      slot.painter.draw(slot.destination.context, {
+        background: { ...background, layout: { ...background.layout, blur: 5 } },
+        image: null,
+        ...dimensions.backing,
+        currentTime: index,
+      });
+    }
+    expect(slots.map((slot) => slot.painter.retainedCacheSize)).toEqual([
+      dimensions.backing,
+      dimensions.backing,
+    ]);
+    expect(resources.counters.peakManagedBytes).toBeLessThanOrEqual(plan.maximumManagedBytes);
+    expect(resources.counters.peakCanvasCount).toBeLessThanOrEqual(plan.maximumCanvases);
+    // Updating one destination retains the other painter's independently owned cache.
+    slots[0]!.painter.dispose();
+    expect(slots[1]!.painter.retainedCacheSize).toEqual(dimensions.backing);
+    slots[1]!.painter.draw(slots[1]!.destination.context, {
+      background: { ...background, layout: { ...background.layout, blur: 5 } },
+      image: null,
+      ...dimensions.backing,
+      currentTime: 2,
+    });
+  } finally {
+    for (const slot of slots) {
+      slot.painter.dispose();
+      slot.destination.release();
+    }
+    resources.dispose();
+  }
+  expect(resources.counters.managedBytes).toBe(0);
+});

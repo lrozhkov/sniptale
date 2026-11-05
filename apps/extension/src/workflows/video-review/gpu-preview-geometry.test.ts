@@ -1,5 +1,7 @@
 import { expect, it } from 'vitest';
 import { reviewPresentedGeometry, reviewPresentedStageProjection } from './gpu-preview-geometry';
+import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
+import { reviewGpuPreviewAllocation } from './gpu-preview-geometry';
 import type { PreviewScene } from './preview-scene';
 import {
   computeQuickEditSpatialRasterLayout,
@@ -115,4 +117,68 @@ it('accounts for annotation endpoint bitmaps and masks without changing plain sc
   expect(active.maximumCanvases - plain.maximumCanvases).toBe(2);
   annotated.annotationEffects!.lane.enabled = false;
   expect(reviewGpuPreviewAllocation(annotated, dimensions)).toEqual(plain);
+});
+
+it('budgets both drift caches and their blur construction scratch at physical density', () => {
+  const plain = reviewGpuPreviewAllocation(scene, dimensions, 2);
+  const background = updateQuickEditBackground(scene.background, {
+    enabled: true,
+    type: 'image',
+    assetId: 'image',
+    layout: { padding: 0, cornerRadius: 0, blur: 0 },
+    motion: { mode: 'drift', speed: 100, intensity: 100 },
+  });
+  if (!background.enabled || background.type !== 'image')
+    throw new Error('Expected image background');
+  // Compare against identical layout without motion: only the retained paint cache is new.
+  const staticScene = {
+    ...scene,
+    background: { ...background, motion: { ...background.motion!, mode: 'none' as const } },
+  };
+  const staticPlan = reviewGpuPreviewAllocation(staticScene, dimensions, 2);
+  const moving = reviewGpuPreviewAllocation({ ...scene, background }, dimensions, 2);
+  expect(moving.maximumManagedBytes - staticPlan.maximumManagedBytes).toBe(2 * 320 * 180 * 4);
+  expect(moving.maximumCanvases - staticPlan.maximumCanvases).toBe(2);
+  const blurred = reviewGpuPreviewAllocation(
+    { ...scene, background: { ...background, layout: { ...background.layout, blur: 10 } } },
+    dimensions,
+    2
+  );
+  // Blur at backing density is 5px; Gaussian support adds ceil(3*5)+2 on every side.
+  expect(blurred.maximumManagedBytes - moving.maximumManagedBytes).toBe(
+    2 * (2 * 320 * 180 * 4 + 354 * 214 * 4)
+  );
+  expect(blurred.maximumCanvases - moving.maximumCanvases).toBe(6);
+  expect(plain.maximumManagedBytes).toBeGreaterThan(0);
+});
+
+it('budgets dense-gradient pixel storage and clamps each high-resolution motion cache', () => {
+  const image = updateQuickEditBackground(scene.background, {
+    enabled: true,
+    type: 'image',
+    assetId: 'image',
+    layout: { padding: 0, cornerRadius: 0, blur: 0 },
+  });
+  const gradient = updateQuickEditBackground(image, { type: 'gradient' });
+  const imagePlan = reviewGpuPreviewAllocation({ ...scene, background: image }, dimensions, 2);
+  const gradientPlan = reviewGpuPreviewAllocation(
+    { ...scene, background: gradient },
+    dimensions,
+    2
+  );
+  expect(gradientPlan.maximumManagedBytes - imagePlan.maximumManagedBytes).toBe(
+    2 * (320 * 180 * 4 * 2 + 4097 * 4)
+  );
+  expect(gradientPlan.maximumCanvases - imagePlan.maximumCanvases).toBe(2);
+  const large = {
+    canonical: { width: 4096, height: 2048 },
+    backing: { width: 4096, height: 2048 },
+  };
+  const staticPlan = reviewGpuPreviewAllocation({ ...scene, background: image }, large, 2);
+  const moving = updateQuickEditBackground(image, {
+    motion: { mode: 'drift', speed: 100, intensity: 100 },
+  });
+  const movingPlan = reviewGpuPreviewAllocation({ ...scene, background: moving }, large, 2);
+  expect(movingPlan.maximumManagedBytes - staticPlan.maximumManagedBytes).toBe(2 * 2048 * 1024 * 4);
+  expect(movingPlan.maximumCanvases - staticPlan.maximumCanvases).toBe(2);
 });

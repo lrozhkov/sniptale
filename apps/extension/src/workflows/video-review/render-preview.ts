@@ -142,6 +142,11 @@ type Allocation = {
   replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }): void;
 };
 type Assets = {
+  borrowers: number;
+  retired: boolean;
+  closed: boolean;
+  lifetime: AbortController;
+  canvasTail: Promise<void> | null;
   maximumInFlight: 1 | 2;
   renderer: VideoPreviewRenderer;
   onContextLost: (() => void) | undefined;
@@ -174,8 +179,15 @@ function validSize(size: Size) {
 }
 
 function disposeAssets(assets: Assets) {
-  assets.gpu?.releaseScene();
-  assets.gpu = null;
+  if (!assets.retired) {
+    assets.retired = true;
+    assets.lifetime.abort();
+    assets.gpu?.releaseScene();
+    assets.gpu = null;
+  }
+  // A newer scene can already own the shared GPU when the final old borrower returns.
+  if (assets.borrowers || assets.closed) return;
+  assets.closed = true;
   assets.windowRaster?.lease.release();
   assets.windowRaster = null;
   assets.annotations?.dispose();
@@ -191,6 +203,28 @@ function disposeAssets(assets: Assets) {
   assets.spatial?.dispose();
   assets.spatial = undefined;
   for (const reservation of assets.reservations.splice(0)) reservation.release();
+}
+
+async function acquireCanvasFallback(assets: Assets, signal: AbortSignal) {
+  const previous = assets.canvasTail;
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  assets.canvasTail = pending;
+  const release = () => {
+    if (assets.canvasTail === pending) assets.canvasTail = null;
+    finish();
+  };
+  try {
+    if (previous) await previous;
+    signal.throwIfAborted();
+    if (assets.retired) throw new Error('Preview scene is stale.');
+    return release;
+  } catch (failure) {
+    release();
+    throw failure;
+  }
 }
 
 function scaledBackground(background: Scene['background'], scale: number): Scene['background'] {
@@ -479,9 +513,8 @@ async function drawPreparedFrame(
 ): Promise<{ geometry?: ReviewPresentedGeometry; renderer: PreviewRendererStatus }> {
   signal.throwIfAborted();
   const scene = await recordingHistoryScene(prepared, frame, signal);
-  const request = sceneRequest({ ...prepared, scene }, frame);
   const { dimensions } = prepared;
-  const { context, canvas } = output;
+  const { context } = output;
   const raw = frame.exportEnhancer ? undefined : frame.source.videoFrame?.();
   if (raw && assets.gpu) {
     const geometry = reviewPresentedGeometry(
@@ -518,9 +551,38 @@ async function drawPreparedFrame(
     });
     if (rendered) return { geometry, renderer: { backend: 'gpu' } };
   }
+  const releaseCanvas = await acquireCanvasFallback(assets, signal);
+  try {
+    return await drawPreparedCanvasFrame(
+      { ...prepared, scene },
+      assets,
+      output,
+      frame,
+      resources,
+      signal,
+      admit
+    );
+  } finally {
+    releaseCanvas();
+  }
+}
+
+async function drawPreparedCanvasFrame(
+  prepared: PreparedScene,
+  assets: Assets,
+  output: RenderCanvasLease,
+  frame: Frame,
+  resources: RenderResources,
+  signal: AbortSignal,
+  admit: (frame: Frame, bitmaps: readonly Size[]) => void
+): Promise<{ geometry: ReviewPresentedGeometry; renderer: PreviewRendererStatus }> {
+  const { scene, dimensions } = prepared;
+  const request = sceneRequest(prepared, frame);
+  const { context, canvas } = output;
   let geometry: ReviewPresentedGeometry;
   await frame.source.prepare?.(signal);
   signal.throwIfAborted();
+  if (assets.retired) throw new Error('Preview scene is stale.');
   if (request.layout.spatial && !assets.spatial)
     assets.spatial = createReviewSpatialRenderer(assets.onContextLost, resources);
   let transition: RenderCanvasLease | undefined;
@@ -1039,6 +1101,11 @@ export function createReviewPreviewRenderer(args: {
           maximumInFlight: args.maximumInFlight ?? 1,
         });
       const assets: Assets = {
+        borrowers: 0,
+        retired: false,
+        closed: false,
+        lifetime: new AbortController(),
+        canvasTail: null,
         maximumInFlight: args.maximumInFlight ?? 1,
         renderer: args.exportEnhancer ? 'legacy' : (args.renderer ?? 'gpu'),
         onContextLost: args.onContextLost,
@@ -1143,8 +1210,9 @@ export function createReviewPreviewRenderer(args: {
       if (![frame.source.timestamp, frame.sourceTime, frame.resultTime].every(Number.isFinite))
         throw new Error('Invalid preview frame time.');
       const captured = current;
-      const renderingSignal = signal ?? preparation?.signal;
-      if (!renderingSignal) throw new Error('Preview scene is stale.');
+      const callerSignal = signal ?? preparation?.signal;
+      if (!callerSignal) throw new Error('Preview scene is stale.');
+      const renderingSignal = AbortSignal.any([callerSignal, captured.assets.lifetime.signal]);
       renderingSignal.throwIfAborted();
       admitRender(
         args.allocation,
@@ -1155,13 +1223,15 @@ export function createReviewPreviewRenderer(args: {
         false,
         args.exportEnhancer
       );
-      const output = args.resources.canvas(
-        'preview-publication',
-        current.prepared.dimensions.backing,
-        { alpha: false }
-      );
+      captured.assets.borrowers++;
       rendering++;
+      let output: RenderCanvasLease | undefined;
       try {
+        output = args.resources.canvas(
+          'preview-publication',
+          captured.prepared.dimensions.backing,
+          { alpha: false }
+        );
         const presentation = await drawPreparedFrame(
           captured.prepared,
           captured.assets,
@@ -1206,10 +1276,12 @@ export function createReviewPreviewRenderer(args: {
             : null,
         };
       } catch (failure) {
-        output.release();
+        output?.release();
         throw failure;
       } finally {
         rendering--;
+        captured.assets.borrowers--;
+        if (captured.assets.retired) disposeAssets(captured.assets);
       }
     },
     dispose() {

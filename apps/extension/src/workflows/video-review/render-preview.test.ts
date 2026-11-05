@@ -38,6 +38,11 @@ const io = vi.hoisted(() => ({
   spatial: vi.fn(),
   background: vi.fn(),
   captionPreparation: vi.fn(),
+  gpu: vi.fn(),
+}));
+vi.mock('./gpu-preview', async (original) => ({
+  ...(await original<typeof import('./gpu-preview')>()),
+  createReviewGpuPreview: (...args: unknown[]) => io.gpu(...args),
 }));
 vi.mock('./render-captions', async (original) => {
   const actual = await original<typeof import('./render-captions')>();
@@ -1640,15 +1645,23 @@ it('preserves explicit annotation executor ownership during prepared-scene repla
   expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
 });
 
-it('retains two independent publication leases for an opted-in bare GPU scene', async () => {
+it('retains two publication leases while serializing their shared Canvas fallback', async () => {
   const { resources } = setup();
   const renderer = createReviewPreviewRenderer({ resources, renderer: 'gpu', maximumInFlight: 2 });
   const signal = new AbortController().signal;
   const prepared = await renderer.prepare(scene(), dimensions, signal);
   const one = Promise.withResolvers<void>(),
     two = Promise.withResolvers<void>();
-  const prepareOne = vi.fn(() => one.promise),
-    prepareTwo = vi.fn(() => two.promise);
+  const beganOne = Promise.withResolvers<void>(),
+    beganTwo = Promise.withResolvers<void>();
+  const prepareOne = vi.fn(() => {
+      beganOne.resolve();
+      return one.promise;
+    }),
+    prepareTwo = vi.fn(() => {
+      beganTwo.resolve();
+      return two.promise;
+    });
   const first = renderer.render(
     prepared,
     { ...frame(), source: { ...frame().source, prepare: prepareOne } },
@@ -1662,15 +1675,16 @@ it('retains two independent publication leases for an opted-in bare GPU scene', 
   void first.catch(() => {});
   void second.catch(() => {});
   try {
-    await Promise.resolve();
-    await Promise.resolve();
+    await beganOne.promise;
     expect(prepareOne).toHaveBeenCalledOnce();
-    expect(prepareTwo).toHaveBeenCalledOnce();
+    expect(prepareTwo).not.toHaveBeenCalled();
     await expect(renderer.render(prepared, frame(), signal)).rejects.toThrow('already admitted');
-    two.resolve();
-    const later = await second;
     one.resolve();
     const earlier = await first;
+    await beganTwo.promise;
+    expect(prepareTwo).toHaveBeenCalledOnce();
+    two.resolve();
+    const later = await second;
     expect(earlier.canvas).not.toBe(later.canvas);
     expect(earlier.sourceTime).toBe(1);
     expect(later.sourceTime).toBe(2);
@@ -1681,6 +1695,219 @@ it('retains two independent publication leases for an opted-in bare GPU scene', 
     two.resolve();
     await Promise.allSettled([first, second]);
     prepared.release();
+    renderer.dispose();
+  }
+});
+
+it.each(['dispose', 'replace'] as const)(
+  'retains prepared assets until both pending GPU requests retire after %s',
+  async (operation) => {
+    const { resources } = setup();
+    const one = Promise.withResolvers<boolean>();
+    const two = Promise.withResolvers<boolean>();
+    const gpu = {
+      allocatedBytes: 0,
+      render: vi.fn().mockReturnValueOnce(one.promise).mockReturnValueOnce(two.promise),
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+    };
+    io.gpu.mockReturnValue(gpu);
+    vi.stubGlobal('navigator', { gpu: {} });
+    const renderer = createReviewPreviewRenderer({ resources, maximumInFlight: 2 });
+    const signal = new AbortController().signal;
+    const prepared = await renderer.prepare(scene(), dimensions, signal);
+    const painter = io.background.mock.results[0]!.value;
+    const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+    const first = renderer.render(prepared, { ...frame(), source }, signal);
+    const second = renderer.render(
+      prepared,
+      { ...frame(), source, sourceTime: 3, resultTime: 3 },
+      signal
+    );
+    const firstRejected = expect(first).rejects.toThrow();
+    const secondRejected = expect(second).rejects.toThrow();
+    try {
+      await vi.waitFor(() => expect(gpu.render).toHaveBeenCalledTimes(2));
+      if (operation === 'dispose') renderer.dispose();
+      else
+        await renderer.prepare(
+          { ...scene(), source: { width: 1280, height: 720 } },
+          dimensions,
+          signal
+        );
+      expect(gpu.releaseScene).toHaveBeenCalledOnce();
+      expect(painter.dispose).not.toHaveBeenCalled();
+      one.resolve(true);
+      await firstRejected;
+      expect(painter.dispose).not.toHaveBeenCalled();
+      two.resolve(true);
+      await secondRejected;
+      expect(painter.dispose).toHaveBeenCalledOnce();
+      expect(gpu.releaseScene).toHaveBeenCalledOnce();
+    } finally {
+      one.resolve(true);
+      two.resolve(true);
+      await Promise.allSettled([first, second]);
+      await Promise.all([firstRejected, secondRejected]);
+      renderer.dispose();
+    }
+    expect(gpu.releaseScene).toHaveBeenCalledTimes(operation === 'replace' ? 2 : 1);
+  }
+);
+
+it.each([false, true])(
+  'serializes simultaneous GPU fallback and preserves each captured clock (abort next: %s)',
+  async (abortNext) => {
+    const { resources } = setup();
+    const gpuOne = Promise.withResolvers<boolean>(),
+      gpuTwo = Promise.withResolvers<boolean>();
+    const gpuStarted = Promise.withResolvers<void>();
+    let gpuCalls = 0;
+    const gpu = {
+      allocatedBytes: 0,
+      fallbackReason: 'device-failed' as const,
+      render: vi.fn(() => {
+        gpuCalls++;
+        if (gpuCalls === 2) gpuStarted.resolve();
+        return gpuCalls === 1 ? gpuOne.promise : gpuTwo.promise;
+      }),
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+    };
+    io.gpu.mockReturnValue(gpu);
+    vi.stubGlobal('navigator', { gpu: {} });
+    const renderer = createReviewPreviewRenderer({ resources, maximumInFlight: 2 });
+    const signal = new AbortController().signal;
+    const nextController = new AbortController();
+    const prepared = await renderer.prepare(scene(), dimensions, signal);
+    const one = Promise.withResolvers<void>(),
+      two = Promise.withResolvers<void>();
+    const beganOne = Promise.withResolvers<void>(),
+      beganTwo = Promise.withResolvers<void>();
+    const prepareOne = vi.fn(() => {
+      beganOne.resolve();
+      return one.promise;
+    });
+    const prepareTwo = vi.fn(() => {
+      beganTwo.resolve();
+      return two.promise;
+    });
+    const first = renderer.render(
+      prepared,
+      {
+        ...frame(),
+        source: { ...frame().source, prepare: prepareOne, videoFrame: () => ({}) as VideoFrame },
+      },
+      signal
+    );
+    const second = renderer.render(
+      prepared,
+      {
+        ...frame(),
+        sourceTime: 3,
+        resultTime: 3,
+        source: {
+          ...frame().source,
+          timestamp: 2.98,
+          prepare: prepareTwo,
+          videoFrame: () => ({}) as VideoFrame,
+        },
+      },
+      nextController.signal
+    );
+    const secondResult = second.then(
+      (value) => ({ ok: true as const, value }),
+      (error) => ({ ok: false as const, error })
+    );
+    try {
+      await gpuStarted.promise;
+      gpuOne.resolve(false);
+      gpuTwo.resolve(false);
+      await beganOne.promise;
+      expect(prepareTwo).not.toHaveBeenCalled();
+      if (abortNext) nextController.abort();
+      one.resolve();
+      const earlier = await first;
+      expect(earlier).toMatchObject({
+        sourceTime: 1,
+        resultTime: 2,
+        representedMediaTime: 0.98,
+        renderer: { backend: 'legacy', fallback: 'device-failed' },
+      });
+      earlier.release();
+      if (!abortNext) {
+        await beganTwo.promise;
+        two.resolve();
+      }
+      const later = await secondResult;
+      if (abortNext) {
+        expect(later.ok).toBe(false);
+        if (!later.ok) expect(later.error).toMatchObject({ name: 'AbortError' });
+        expect(prepareTwo).not.toHaveBeenCalled();
+      } else {
+        expect(later.ok).toBe(true);
+        if (later.ok) {
+          expect(later.value).toMatchObject({
+            sourceTime: 3,
+            resultTime: 3,
+            representedMediaTime: 2.98,
+            renderer: { backend: 'legacy', fallback: 'device-failed' },
+          });
+          later.value.release();
+        }
+      }
+    } finally {
+      gpuOne.resolve(false);
+      gpuTwo.resolve(false);
+      one.resolve();
+      two.resolve();
+      await Promise.allSettled([first, second]);
+      renderer.dispose();
+    }
+  }
+);
+
+it('does not enter the annotation producer when all instances are disabled during GPU overlap', async () => {
+  const f = await annotationsFixture();
+  for (const instance of f.input.annotationEffects!.lane.instances) instance.enabled = false;
+  const { resources } = setup();
+  const finished = Promise.withResolvers<boolean>();
+  const started = Promise.withResolvers<void>();
+  let requests = 0;
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn((_request: { annotations?: unknown }) => {
+      if (++requests === 2) started.resolve();
+      return finished.promise;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    maximumInFlight: 2,
+    annotationExecutor: () => f.executor,
+  });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(f.input, dimensions, signal);
+  const input = { ...frame(), source: { ...frame().source, videoFrame: () => ({}) as VideoFrame } };
+  const first = renderer.render(prepared, input, signal);
+  const second = renderer.render(prepared, { ...input, sourceTime: 3, resultTime: 3 }, signal);
+  try {
+    await started.promise;
+    expect(gpu.render.mock.calls.every(([request]) => request.annotations === null)).toBe(true);
+    expect(f.executor.renderFrame).not.toHaveBeenCalled();
+    finished.resolve(true);
+    const results = await Promise.all([first, second]);
+    for (const result of results) {
+      expect(result.renderer.backend).toBe('gpu');
+      result.release();
+    }
+  } finally {
+    finished.resolve(true);
+    await Promise.allSettled([first, second]);
     renderer.dispose();
   }
 });

@@ -19,7 +19,7 @@ import { hasSceneBackgroundMotion } from '../../features/video/project/scene/bac
 import { drawReviewSceneShadow, reviewSpatialSourceRect } from './scene-shadow';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
 import type { prepareReviewCaptions } from './render-captions';
-import type { createReviewBackgroundPainter } from './scene-background';
+import { createReviewBackgroundPainter } from './scene-background';
 import {
   createReviewGpuPrimitives,
   reviewGpuFinishLayers,
@@ -37,26 +37,17 @@ const identity: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 type Captions = Awaited<ReturnType<typeof prepareReviewCaptions>>;
 type Dimensions = PreviewSceneDimensions;
 
-/** Only immutable bare compositions can share retained artwork across pending GPU requests. */
+/** Request-owned artwork permits authored camera and overlay motion between pending frames. */
 export function reviewGpuPreviewConcurrency(scene: PreviewScene): 1 | 2 {
   const plan = scene.outerFadePlan;
-  return scene.background.enabled ||
-    scene.zoomRegions.length ||
-    scene.comments.length ||
-    scene.keys.length ||
-    scene.clicks.length ||
-    scene.windowHeader ||
-    (scene.watermark && scene.watermark.mode !== 'none') ||
-    scene.webcam?.enabled ||
+  return scene.webcam?.enabled ||
     scene.captions?.settings?.enabled ||
     (scene.annotationEffects?.lane.enabled &&
       scene.annotationEffects.lane.instances.some((instance) => instance.enabled)) ||
     (plan &&
-      (plan.visualEnvelope.fadeIn !== 0 ||
-        plan.visualEnvelope.fadeOut !== 0 ||
-        plan.segments.some(
-          (segment) => segment.name !== 'main' || segment.content.kind !== 'main'
-        ) ||
+      (plan.segments.some(
+        (segment) => segment.name !== 'main' || segment.content.kind !== 'main'
+      ) ||
         (plan.joins?.length ?? 0) > 0))
     ? 1
     : 2;
@@ -77,27 +68,40 @@ export function createReviewGpuPreview(args: {
   let activeScene: PreviewScene | null = null;
   let activeDimensions: Dimensions | null = null;
   let activePainter: ReturnType<typeof createReviewBackgroundPainter> | null = null;
+  let activeHeader: ImageBitmap | null = null;
+  let activeImage: ImageBitmap | null = null;
+  let activeWatermark: Parameters<typeof reviewGpuFinishLayers>[0]['watermark'] | undefined;
   let overlapSafe = false;
   let sceneReleased = false;
   let artworkRevision = 0;
   const lifetime = new AbortController();
   let sceneLifetime = new AbortController();
-  let artwork: {
+  type Artwork = {
+    painter: ReturnType<typeof createReviewBackgroundPainter>;
     background: RenderCanvasLease;
     decoration: RenderCanvasLease;
     overlay: RenderCanvasLease;
     rect: { x: number; y: number; width: number; height: number };
     key: string;
     backgroundRevision: number;
+    image: ImageBitmap | null;
     captionKey: string;
     captionOwner: Captions | null;
     captionRevision: number;
-  } | null = null;
+  };
+  const slots: { active: boolean; artwork: Artwork | null }[] = Array.from(
+    { length: args.maximumInFlight ?? 1 },
+    () => ({ active: false, artwork: null })
+  );
+  const clearSlot = (slot: (typeof slots)[number]) => {
+    slot.artwork?.painter.dispose();
+    slot.artwork?.background.release();
+    slot.artwork?.decoration.release();
+    slot.artwork?.overlay.release();
+    slot.artwork = null;
+  };
   const clear = () => {
-    artwork?.background.release();
-    artwork?.decoration.release();
-    artwork?.overlay.release();
-    artwork = null;
+    for (const slot of slots) clearSlot(slot);
     sceneReleased = false;
   };
   return {
@@ -140,10 +144,7 @@ export function createReviewGpuPreview(args: {
         !input.transition &&
         !input.cameraOverride &&
         !input.captions &&
-        !input.annotations &&
-        !input.watermark &&
-        !input.header &&
-        !input.image;
+        !input.annotations;
       if (
         active &&
         (active >= (args.maximumInFlight ?? 1) ||
@@ -152,15 +153,24 @@ export function createReviewGpuPreview(args: {
           !safe ||
           activeScene !== scene ||
           activeDimensions !== dimensions ||
-          activePainter !== input.painter)
+          activePainter !== input.painter ||
+          activeHeader !== input.header ||
+          activeImage !== input.image ||
+          activeWatermark !== input.watermark)
       )
         throw new Error('GPU preview overlap is unavailable.');
       if (!active) {
         activeScene = scene;
         activeDimensions = dimensions;
         activePainter = input.painter;
+        activeHeader = input.header;
+        activeImage = input.image;
+        activeWatermark = input.watermark;
         overlapSafe = safe;
       }
+      const slot = slots.find((candidate) => !candidate.active);
+      if (!slot) throw new Error('GPU preview overlap is unavailable.');
+      slot.active = true;
       const sceneSignal = sceneLifetime.signal;
       const signal = AbortSignal.any([input.signal, lifetime.signal, sceneSignal]);
       active++;
@@ -219,8 +229,8 @@ export function createReviewGpuPreview(args: {
           base.windowRect,
           decorRect,
         ]);
-        if (!artwork || artwork.key !== key) {
-          clear();
+        if (!slot.artwork || slot.artwork.key !== key) {
+          clearSlot(slot);
           const retained: RenderCanvasLease[] = [];
           try {
             const bg = args.resources.canvas('preview-gpu-background', dimensions.backing);
@@ -233,13 +243,15 @@ export function createReviewGpuPreview(args: {
             ctx.translate(-decorRect.x, -decorRect.y);
             const radius = background.enabled ? background.layout.cornerRadius : 0;
             drawReviewSceneShadow(ctx, background, base.windowRect, radius, scale);
-            artwork = {
+            slot.artwork = {
+              painter: createReviewBackgroundPainter(args.resources),
               background: bg,
               decoration,
               overlay,
               rect: decorRect,
               key,
               backgroundRevision: 0,
+              image: null,
               captionKey: '',
               captionOwner: null,
               captionRevision: 0,
@@ -249,9 +261,10 @@ export function createReviewGpuPreview(args: {
             throw error;
           }
         }
-        const art = artwork;
+        const art = slot.artwork;
         if (
           art.backgroundRevision === 0 ||
+          art.image !== input.image ||
           (scene.background.enabled && hasSceneBackgroundMotion(scene.background.motion))
         ) {
           const bgScale = dimensions.backing.width / (scene.canvas?.width ?? scene.source.width);
@@ -265,12 +278,13 @@ export function createReviewGpuPreview(args: {
                 },
               }
             : scene.background;
-          input.painter.draw(art.background.context, {
+          art.painter.draw(art.background.context, {
             background: paint,
             image: input.image,
             ...dimensions.backing,
             currentTime: geometry.resultTime,
           });
+          art.image = input.image;
           art.backgroundRevision = ++artworkRevision;
         }
         const captionKey =
@@ -316,7 +330,7 @@ export function createReviewGpuPreview(args: {
             backgroundRevision: art.backgroundRevision,
             decorationRevision: art,
           },
-          painter: input.painter,
+          painter: art.painter,
           image: input.image,
           resultTime: geometry.resultTime,
           primitives,
@@ -494,11 +508,15 @@ export function createReviewGpuPreview(args: {
         }
         primitives.dispose();
         for (const frame of ownedFrames) frame.close();
+        slot.active = false;
         active--;
         if (!active) {
           activeScene = null;
           activeDimensions = null;
           activePainter = null;
+          activeHeader = null;
+          activeImage = null;
+          activeWatermark = undefined;
           overlapSafe = false;
           if (disposed || sceneReleased) clear();
         }

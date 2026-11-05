@@ -1,3 +1,4 @@
+import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
 import { GPU_PREVIEW_UNIFORM_BYTES } from '../../features/video/composition/canvas/gpu-preview';
 import {
   invertQuickEditProjection,
@@ -196,14 +197,50 @@ export function reviewGpuPreviewAllocation(
     ? outputBytes * 2 + dimensions.canonical.width * dimensions.canonical.height * 4 * 2
     : 0;
   const retainedRasterBytes = decor.width * decor.height * 4 + outputBytes * 2;
+  // Each destination owns its painter. Static blur replacement can coexist with the old
+  // cache, a source raster, and Gaussian edge padding; motion uses the same bounded sizes.
+  let painterBytes = 0;
+  let painterCanvases = 0;
+  if (scene.background.enabled && scene.background.type !== 'solid') {
+    const cacheScale = Math.min(
+      1,
+      2048 / Math.max(dimensions.backing.width, dimensions.backing.height)
+    );
+    const width = Math.max(1, Math.round(dimensions.backing.width * cacheScale));
+    const height = Math.max(1, Math.round(dimensions.backing.height * cacheScale));
+    const cacheBytes = width * height * 4;
+    const blur =
+      (((scene.background.layout.blur ?? 0) * dimensions.backing.width) /
+        (scene.canvas?.width ?? scene.source.width)) *
+      Math.max(cacheScale, width / dimensions.backing.width);
+    if (blur > 0) {
+      const pad = Math.ceil(blur * 3) + 2;
+      painterBytes += cacheBytes * 3 + (width + pad * 2) * (height + pad * 2) * 4;
+      painterCanvases += 4;
+    } else if (hasSceneBackgroundMotion(scene.background.motion)) {
+      painterBytes += cacheBytes;
+      painterCanvases++;
+    }
+    if (scene.background.type === 'gradient') {
+      // Dense repeats paint one managed canvas plus pixel and color-table storage.
+      const pixels =
+        blur > 0 || hasSceneBackgroundMotion(scene.background.motion)
+          ? width * height
+          : dimensions.backing.width * dimensions.backing.height;
+      painterBytes += pixels * 4 * 2 + 4097 * 4;
+      painterCanvases++;
+    }
+  }
+
   return {
     maximumManagedBytes:
       maximumInFlight *
       (retainedRasterBytes * 2 +
+        painterBytes +
         annotationBytes +
         256 * 1024 * 1024 +
         dimensions.canonical.width * dimensions.canonical.height * 4 * 24 +
         GPU_PREVIEW_UNIFORM_BYTES * 512),
-    maximumCanvases: maximumInFlight * (48 + (hasAnnotations ? 2 : 0)),
+    maximumCanvases: maximumInFlight * (48 + painterCanvases + (hasAnnotations ? 2 : 0)),
   };
 }
