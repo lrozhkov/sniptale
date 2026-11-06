@@ -342,3 +342,72 @@ it.each([1, 2])('recovers text-flow glyphs at raster scale %s', (scale) => {
   for (const y of [75, 195])
     expect(delta(16 * scale, y * scale, 10 * scale, 16 * scale)).toBeGreaterThan(3);
 });
+
+for (const family of ['monospace', 'sans-serif'])
+  for (const scale of [1, 2])
+    it(`erases an isolated inline letter in ${family} at scale ${scale}`, () => {
+      const canvas = createCanvas(700 * scale, 120 * scale);
+      const context = canvas.getContext('2d');
+      context.scale(scale, scale);
+      context.fillStyle = '#08090c';
+      context.fillRect(0, 0, 700, 120);
+      context.fillStyle = '#eeeeee';
+      context.font = `bold 24px ${family}`;
+      context.textBaseline = 'alphabetic';
+      const prefix = 'Paragraphs, ';
+      const x = 40 + context.measureText(prefix).width;
+      const width = context.measureText('a').width;
+      context.fillText(`${prefix}a and captions`, 40, 55);
+      const delta = execute(canvas);
+      expect(
+        delta(Math.floor(x * scale), 32 * scale, Math.ceil(width * scale), 26 * scale)
+      ).toBeGreaterThan(10);
+    });
+
+it.each(['а', 'и', 'в'])(
+  'erases the Cyrillic one-letter word %s within a source font row',
+  (letter) => {
+    const canvas = createCanvas(850, 120),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#08090c';
+    context.fillRect(0, 0, 850, 120);
+    context.fillStyle = '#eeeeee';
+    context.font = 'bold 24px monospace';
+    context.textBaseline = 'alphabetic';
+    const prefix = 'Правила, ',
+      x = 40 + context.measureText(prefix).width;
+    context.fillText(`${prefix}${letter} взаимные связи`, 40, 55);
+    expect(execute(canvas)(Math.floor(x), 32, 15, 26)).toBeGreaterThan(10);
+  }
+);
+
+it.each(['plus', 'circle', 'colored-letter', 'distant-letter'])(
+  'preserves an independent %s between text labels',
+  (symbol) => {
+    const canvas = createCanvas(700, 120),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#08090c';
+    context.fillRect(0, 0, 700, 120);
+    context.fillStyle = '#eeeeee';
+    context.font = 'bold 24px monospace';
+    context.textBaseline = 'alphabetic';
+    context.fillText('Paragraphs,', 40, 55);
+    const x = 40 + context.measureText('Paragraphs, ').width;
+    context.fillText('and captions', symbol === 'distant-letter' ? x + 90 : x + 29, 55);
+    if (symbol === 'plus') context.fillText('+', x, 55);
+    if (symbol === 'circle') {
+      context.strokeStyle = '#eeeeee';
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(x + 7, 47, 6, 0, Math.PI * 2);
+      context.stroke();
+    }
+    if (symbol === 'colored-letter') {
+      context.fillStyle = '#ee3b3b';
+      context.fillText('a', x, 55);
+    }
+    if (symbol === 'distant-letter') context.fillText('a', x + 40, 55);
+    const left = symbol === 'distant-letter' ? x + 39 : x - 1;
+    expect(execute(canvas)(Math.floor(left), 31, 18, 27)).toBe(0);
+  }
+);
