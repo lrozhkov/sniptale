@@ -24,11 +24,19 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
 });
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function createProps() {

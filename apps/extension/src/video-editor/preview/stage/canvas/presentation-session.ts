@@ -12,6 +12,7 @@ interface PresentationOptions {
   fallback: () => HTMLCanvasElement | null;
   host: () => HTMLDivElement | null;
   role?: 'stage' | 'inspector';
+  background?: 'black' | 'transparent';
 }
 interface Destination {
   canvas: HTMLCanvasElement;
@@ -139,7 +140,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
         canvas.width = size.width;
         canvas.height = size.height;
         canvas.className = 'absolute inset-0 h-full w-full';
-        canvas.style.backgroundColor = '#000';
+        canvas.style.backgroundColor = this.options.background ?? '#000';
         canvas.style.opacity = '0';
         canvas.style.pointerEvents = 'none';
         canvas.style.willChange = 'opacity';

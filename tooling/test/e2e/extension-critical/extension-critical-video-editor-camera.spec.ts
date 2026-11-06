@@ -1,3 +1,4 @@
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from '@playwright/test';
@@ -14,6 +15,24 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
+enableGpuPreviewProof();
+
+async function expectGpuCanvas(canvas: Locator) {
+  await expect(canvas).toHaveCount(1);
+  await expect
+    .poll(() =>
+      canvas.evaluate((node: HTMLCanvasElement) => {
+        try {
+          return node.getContext('2d') === null;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'InvalidStateError') return true;
+          throw error;
+        }
+      })
+    )
+    .toBe(true);
+}
+
 async function operate(control: Locator) {
   await control.scrollIntoViewIfNeeded();
   await control.click();
@@ -24,14 +43,23 @@ async function pixels(
   frame?: { x: number; y: number; width: number; height: number }
 ) {
   return canvas.evaluate((node: HTMLCanvasElement, area) => {
-    const context = node.getContext('2d');
-    if (!context) throw new Error('Missing native camera canvas');
-    const x = Math.round((area?.x ?? 0) * node.width) + 2;
-    const y = Math.round((area?.y ?? 0) * node.height) + 2;
-    const width = Math.round((area?.width ?? 1) * node.width) - 4;
-    const height = Math.round((area?.height ?? 1) * node.height) - 4;
-    if (width < 4 || height < 4) throw new Error('Camera pixels are unavailable');
-    return { width, height, data: [...context.getImageData(x, y, width, height).data] };
+    const readback = document.createElement('canvas');
+    readback.width = node.width;
+    readback.height = node.height;
+    try {
+      const context = readback.getContext('2d');
+      if (!context) throw new Error('Missing native camera canvas');
+      context.drawImage(node, 0, 0);
+      const x = Math.round((area?.x ?? 0) * node.width) + 2;
+      const y = Math.round((area?.y ?? 0) * node.height) + 2;
+      const width = Math.round((area?.width ?? 1) * node.width) - 4;
+      const height = Math.round((area?.height ?? 1) * node.height) - 4;
+      if (width < 4 || height < 4) throw new Error('Camera pixels are unavailable');
+      return { width, height, data: [...context.getImageData(x, y, width, height).data] };
+    } finally {
+      readback.width = 0;
+      readback.height = 0;
+    }
   }, frame);
 }
 function pixelError(
@@ -94,27 +122,36 @@ async function shadowRing(
   frame: { x: number; y: number; width: number; height: number }
 ) {
   return canvas.evaluate((node: HTMLCanvasElement, area) => {
-    const context = node.getContext('2d');
-    if (!context) throw new Error('Missing native composition context');
-    const x = Math.round(area.x * node.width),
-      y = Math.round(area.y * node.height);
-    const width = Math.round(area.width * node.width),
-      height = Math.round(area.height * node.height);
-    const pixels = context.getImageData(0, 0, node.width, node.height).data;
-    let red = 0,
-      blue = 0,
-      count = 0;
-    const pad = Math.max(3, Math.round(height / 6));
-    for (let py = Math.max(0, y - pad); py < Math.min(node.height, y + height + pad); py++)
-      for (let px = Math.max(0, x - pad); px < Math.min(node.width, x + width + pad); px++) {
-        if (px >= x && px < x + width && py >= y && py < y + height) continue;
-        const index = (py * node.width + px) * 4;
-        red += pixels[index]!;
-        blue += pixels[index + 2]!;
-        count++;
-      }
-    if (!count) throw new Error('Shadow ring is empty');
-    return { red: red / count, blue: blue / count };
+    const readback = document.createElement('canvas');
+    readback.width = node.width;
+    readback.height = node.height;
+    try {
+      const context = readback.getContext('2d');
+      if (!context) throw new Error('Missing native composition context');
+      context.drawImage(node, 0, 0);
+      const x = Math.round(area.x * node.width),
+        y = Math.round(area.y * node.height);
+      const width = Math.round(area.width * node.width),
+        height = Math.round(area.height * node.height);
+      const pixels = context.getImageData(0, 0, node.width, node.height).data;
+      let red = 0,
+        blue = 0,
+        count = 0;
+      const pad = Math.max(3, Math.round(height / 6));
+      for (let py = Math.max(0, y - pad); py < Math.min(node.height, y + height + pad); py++)
+        for (let px = Math.max(0, x - pad); px < Math.min(node.width, x + width + pad); px++) {
+          if (px >= x && px < x + width && py >= y && py < y + height) continue;
+          const index = (py * node.width + px) * 4;
+          red += pixels[index]!;
+          blue += pixels[index + 2]!;
+          count++;
+        }
+      if (!count) throw new Error('Shadow ring is empty');
+      return { red: red / count, blue: blue / count };
+    } finally {
+      readback.width = 0;
+      readback.height = 0;
+    }
   }, frame);
 }
 
@@ -284,7 +321,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         .locator('summary')
         .filter({ hasText: label('videoEditor.sidebar.cameraCropSection') });
       if ((await crop.locator('..').getAttribute('open')) === null) await operate(crop);
-      const preview = owner.locator('[data-ui="video-editor.camera-crop"] canvas');
+      const preview = owner.locator(
+        '[data-ui="video-editor.camera-crop"] [data-preview-inspector-canvas]'
+      );
       await expect(
         owner.getByRole('button', {
           name: label('videoEditor.sidebar.cameraCropPreview'),
@@ -292,6 +331,9 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         })
       ).toBeEnabled();
       const stage = page.locator('[data-preview-stage-canvas]');
+      await expectGpuCanvas(stage);
+      await expectGpuCanvas(preview);
+      await expect(page.locator('[data-preview-stage-canvas]')).toHaveCount(1);
       const frame = {
         x: camera.transform.x / project.width,
         y: camera.transform.y / project.height,

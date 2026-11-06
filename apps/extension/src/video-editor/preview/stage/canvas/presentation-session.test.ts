@@ -9,7 +9,7 @@ afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
-function fixture(role?: 'stage' | 'inspector') {
+function fixture(role?: 'stage' | 'inspector', background?: 'black' | 'transparent') {
   const host = document.createElement('div'),
     fallback = document.createElement('canvas');
   fallback.width = 64;
@@ -33,6 +33,7 @@ function fixture(role?: 'stage' | 'inspector') {
     fallback: () => fallback,
     host: () => host,
     ...(role ? { role } : {}),
+    ...(background ? { background } : {}),
   });
   sessions.push(session);
   return { host, fallback, renderer, session, disposed };
@@ -403,4 +404,24 @@ it('restores a borrowed inspector fallback marker and pointer policy on disposal
   expect(f.fallback.style.opacity).toBe('0.4');
   expect(f.fallback.style.pointerEvents).toBe('none');
   expect(target.canvas.isConnected).toBe(false);
+});
+
+it('preserves transparent crop corners without changing the borrowed fallback or inspector pointer policy', () => {
+  const f = fixture('inspector', 'transparent');
+  f.fallback.style.backgroundColor = 'transparent';
+  f.session.mount();
+  const a = f.session.acquire(size, f.renderer);
+  expect(a.canvas.style.backgroundColor).toBe('transparent');
+  f.session.publish(a, () => {});
+  expect(a.canvas.style.backgroundColor).toBe('transparent');
+  expect(a.canvas.style.pointerEvents).toBe('none');
+  const b = f.session.acquire(size, f.renderer);
+  expect(b.canvas.style.backgroundColor).toBe('transparent');
+  f.session.publish(b, () => {});
+  const reused = f.session.acquire(size, f.renderer);
+  expect(reused.canvas).toBe(a.canvas);
+  expect(reused.canvas.style.backgroundColor).toBe('transparent');
+  reused.release();
+  f.session.dispose();
+  expect(f.fallback.style.backgroundColor).toBe('transparent');
 });

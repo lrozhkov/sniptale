@@ -1,5 +1,9 @@
+import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
+import { createNativePreviewPresentationSession } from '../../../../preview/stage/canvas/presentation-session';
+import type { NativePreviewGpuOutput } from '../../../../preview/stage/scene/types';
+import { createCameraCropGpuRenderer } from './camera-crop-gpu';
 import type { VideoMediaFitMode } from '../../../../../features/video/project/types';
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   cameraContentFrame,
   cameraWindowFrame,
@@ -38,7 +42,7 @@ export function CameraCropPreview(props: CameraCropPreviewProps) {
     { x: 0, y: 0, width: props.width, height: props.height },
     appearance.shape
   );
-  const { video, canvas, ready, failed, retry } = useCameraCropFrame(props, appearance);
+  const { video, canvas, gpuHost, ready, failed, retry } = useCameraCropFrame(props, appearance);
   useEffect(() => {
     if (props.disabled) {
       gesture.current = null;
@@ -145,6 +149,11 @@ bg-[var(--sniptale-color-surface-muted)] disabled:cursor-default`}
         }}
       >
         <canvas ref={canvas} className="block h-full w-full pointer-events-none" />
+        <div
+          ref={gpuHost}
+          data-ui="video-editor.camera-crop.gpu-host"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        />
         {!ready ? (
           <span
             className={`absolute inset-0 flex items-center justify-center p-2 text-xs
@@ -167,32 +176,96 @@ text-[var(--sniptale-color-text-secondary)]`}
   );
 }
 
+interface CropFrameInput {
+  url: string | undefined;
+  sourceTime: number;
+  appearance: CameraAppearance;
+  mirrored: boolean;
+  fitMode: VideoMediaFitMode;
+  renderer: 'gpu' | 'legacy';
+  ready: boolean;
+}
+
 function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraAppearance) {
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [ready, setReady] = useState(false);
+  const gpuHost = useRef<HTMLDivElement>(null);
+  const renderer = useContext(WorkspacePreviewContext)?.preferences.preferences.renderer ?? 'gpu';
+  const mirrored = props.mirrored ?? false;
+  const fitMode = props.fitMode ?? 'COVER';
+  const [source, setSource] = useState<{ url: string | undefined; time: number } | null>(null);
   const [failed, setFailed] = useState(false);
   const [revision, setRevision] = useState(0);
+  const ready = source?.url === props.url && source?.time === props.sourceTime && !failed;
+  const latest = useRef<CropFrameInput>({
+    url: props.url,
+    sourceTime: props.sourceTime,
+    appearance,
+    mirrored,
+    fitMode,
+    renderer,
+    ready,
+  });
+  latest.current = {
+    url: props.url,
+    sourceTime: props.sourceTime,
+    appearance,
+    mirrored,
+    fitMode,
+    renderer,
+    ready,
+  };
+  const queueRef = useRef<ReturnType<typeof createCameraCropFrameQueue> | null>(null);
+  useLayoutEffect(() => {
+    const target = canvas.current,
+      media = video.current;
+    if (!target || !media) return;
+    const presenter = createNativePreviewPresentationSession({
+      fallback: () => canvas.current,
+      host: () => gpuHost.current,
+      role: 'inspector',
+      background: 'transparent',
+    });
+    presenter.mount();
+    const queue = createCameraCropFrameQueue({
+      target,
+      media,
+      presenter,
+      read: () => latest.current,
+      fail: () => setFailed(true),
+    });
+    queueRef.current = queue;
+    return () => {
+      queue.dispose();
+      queueRef.current = null;
+      presenter.dispose();
+    };
+  }, []);
   const sourceTime = useRef(props.sourceTime);
   useEffect(() => {
     sourceTime.current = props.sourceTime;
+    queueRef.current?.cancel();
     const media = video.current;
     if (media && media.readyState >= 1) media.currentTime = props.sourceTime;
   }, [props.sourceTime]);
   useEffect(() => {
     const media = video.current;
     if (!media) return;
-    setReady(false);
+    queueRef.current?.cancel();
+    setSource(null);
     setFailed(false);
     const seek = () => {
       media.currentTime = sourceTime.current;
     };
     const loaded = () => {
-      setReady(true);
+      if (media.readyState < 2 || media.seeking) return;
+      setSource({ url: props.url, time: sourceTime.current });
+      setFailed(false);
       setRevision((value) => value + 1);
     };
     const error = () => {
-      setReady(false);
+      queueRef.current?.cancel();
+      setSource(null);
       setFailed(true);
     };
     media.addEventListener('loadedmetadata', seek);
@@ -204,6 +277,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
       media.load();
     } else error();
     return () => {
+      queueRef.current?.cancel();
       media.removeEventListener('loadedmetadata', seek);
       media.removeEventListener('loadeddata', loaded);
       media.removeEventListener('seeked', loaded);
@@ -213,35 +287,31 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
     };
   }, [props.url]);
   useEffect(() => {
-    const target = canvas.current,
-      media = video.current;
-    if (!target || !media || !ready) return;
+    if (!ready) {
+      queueRef.current?.cancel();
+      return;
+    }
+    queueRef.current?.request();
+  }, [
+    mirrored,
+    appearance.shape,
+    appearance.roundness,
+    appearance.zoom,
+    appearance.panX,
+    appearance.panY,
+    ready,
+    revision,
+    props.width,
+    props.height,
+    fitMode,
+    renderer,
+  ]);
+  useEffect(() => {
+    const target = canvas.current;
+    if (!target) return;
     const draw = () => {
-      const rect = target.getBoundingClientRect();
-      target.width = Math.max(1, Math.round(rect.width * window.devicePixelRatio));
-      target.height = Math.max(1, Math.round(rect.height * window.devicePixelRatio));
-      const context = target.getContext('2d');
-      if (!context) return;
-      drawFittedMediaLayer({
-        context,
-        displayScale: 1,
-        fitMode: props.fitMode ?? 'COVER',
-        frame: { x: 0, y: 0, width: target.width, height: target.height },
-        cameraAppearance: appearance,
-        shadowIntensity: 0,
-        shadowMode: undefined,
-        sourceWidth: media.videoWidth,
-        sourceHeight: media.videoHeight,
-        render: (x, y, w, h) =>
-          drawCameraMediaSource(
-            context,
-            { x: 0, y: 0, width: target.width, height: target.height },
-            props.mirrored ?? false,
-            () => context.drawImage(media, x, y, w, h)
-          ),
-      });
+      if (latest.current.ready) queueRef.current?.request();
     };
-    draw();
     const observer = new ResizeObserver(draw);
     observer.observe(target);
     window.addEventListener('resize', draw);
@@ -249,15 +319,155 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
       observer.disconnect();
       window.removeEventListener('resize', draw);
     };
-  }, [props.mirrored, appearance, ready, revision, props.width, props.height, props.fitMode]);
+  }, []);
   return {
     video,
     canvas,
+    gpuHost,
     ready,
     failed,
     retry: () => {
+      queueRef.current?.reset();
+      setSource(null);
       setFailed(false);
       video.current?.load();
+    },
+  };
+}
+
+/** One admitted source capture at a time; replacement requests retain only the latest UI input. */
+function createCameraCropFrameQueue(options: {
+  target: HTMLCanvasElement;
+  media: HTMLVideoElement;
+  presenter: ReturnType<typeof createNativePreviewPresentationSession>;
+  read: () => CropFrameInput;
+  fail: () => void;
+}) {
+  let gpu: ReturnType<typeof createCameraCropGpuRenderer> | null = null;
+  let controller: AbortController | null = null;
+  let version = 0,
+    wanted = false,
+    running = false,
+    disposed = false,
+    reset = false;
+  const cancel = () => {
+    version++;
+    wanted = false;
+    controller?.abort();
+  };
+  const drain = async () => {
+    try {
+      while (wanted && !disposed) {
+        wanted = false;
+        const ticket = version,
+          input = options.read(),
+          media = options.media,
+          target = options.target;
+        if (!input.ready || media.readyState < 2 || media.seeking) continue;
+        controller = new AbortController();
+        const signal = controller.signal;
+        const rect = target.getBoundingClientRect();
+        const size = {
+          width: Math.max(1, Math.round(rect.width * window.devicePixelRatio)),
+          height: Math.max(1, Math.round(rect.height * window.devicePixelRatio)),
+        };
+        let output: NativePreviewGpuOutput | undefined | false;
+        let accepted = false;
+        try {
+          if (reset) {
+            gpu?.dispose();
+            gpu = null;
+            reset = false;
+          }
+          if (input.renderer === 'legacy') {
+            gpu?.dispose();
+            gpu = null;
+            output = undefined;
+          } else {
+            gpu ??= createCameraCropGpuRenderer();
+            output = await gpu.render({
+              media,
+              size,
+              appearance: input.appearance,
+              fitMode: input.fitMode,
+              mirrored: input.mirrored,
+              signal,
+              acquire: options.presenter.acquire,
+            });
+          }
+          const current = options.read();
+          if (
+            disposed ||
+            signal.aborted ||
+            ticket !== version ||
+            !current.ready ||
+            current.url !== input.url ||
+            current.sourceTime !== input.sourceTime
+          )
+            continue;
+          if (output === false) continue;
+          if (!output) {
+            target.width = size.width;
+            target.height = size.height;
+            const context = target.getContext('2d');
+            if (!context) throw new Error('Camera preview context is unavailable.');
+            context.clearRect(0, 0, size.width, size.height);
+            drawFittedMediaLayer({
+              context,
+              displayScale: 1,
+              fitMode: input.fitMode,
+              frame: { x: 0, y: 0, ...size },
+              cameraAppearance: input.appearance,
+              shadowIntensity: 0,
+              shadowMode: undefined,
+              sourceWidth: media.videoWidth,
+              sourceHeight: media.videoHeight,
+              render: (x, y, width, height) =>
+                drawCameraMediaSource(context, { x: 0, y: 0, ...size }, input.mirrored, () =>
+                  context.drawImage(media, x, y, width, height)
+                ),
+            });
+          }
+          options.presenter.publish(output ?? null, () => {});
+          accepted = true;
+        } catch {
+          if (!disposed && !signal.aborted && ticket === version) options.fail();
+        } finally {
+          if (output && !accepted) output.release();
+          if (controller?.signal === signal) controller = null;
+        }
+      }
+    } finally {
+      running = false;
+    }
+  };
+  const request = () => {
+    if (disposed) return;
+    version++;
+    wanted = true;
+    controller?.abort();
+    if (!running) {
+      running = true;
+      void Promise.resolve()
+        .then(drain)
+        .catch(() => {
+          if (!disposed) options.fail();
+        });
+    }
+  };
+  return {
+    request,
+    cancel,
+    reset() {
+      cancel();
+      reset = true;
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      cancel();
+      gpu?.dispose();
+      gpu = null;
     },
   };
 }
