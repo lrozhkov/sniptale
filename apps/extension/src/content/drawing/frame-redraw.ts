@@ -74,6 +74,7 @@ export function useDrawingFrameRedraw(args: {
         bendOnly: !showSelectionChrome,
         renderObjects: false,
         hoverBend: args.hoverBendRef.current,
+        ...(controller.getObjectAnchor ? { getObjectAnchor: controller.getObjectAnchor } : {}),
       });
   }, [
     active,

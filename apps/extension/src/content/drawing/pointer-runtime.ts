@@ -202,7 +202,7 @@ function usePointerSimplifyDraft({
       begin(draft: PointerDraft | null, event: Event, root: PageScrollRoot) {
         const preparation = preparePointerSimplify(controller, root, draft, event);
         preparationRef.current = preparation;
-        visualDraftRef.current = preparation ? null : draft;
+        visualDraftRef.current = draft;
         if (!preparation) return;
         void preparation.promise.then(
           (source) => {
@@ -215,8 +215,7 @@ function usePointerSimplifyDraft({
         );
       },
       update(draft: PointerDraft | null) {
-        if (!preparationRef.current || preparationRef.current.source)
-          visualDraftRef.current = draft;
+        visualDraftRef.current = draft;
       },
       getSource() {
         return preparationRef.current?.source ?? preparationRef.current?.promise;

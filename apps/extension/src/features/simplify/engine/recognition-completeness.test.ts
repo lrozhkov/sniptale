@@ -436,3 +436,38 @@ it('erases bold text joined by medium-contrast bridges and preserves a separate 
   expect(delta(52, 27, 3, 1)).toBe(3);
   expect(delta(12, 22, 12, 10)).toBe(0);
 });
+
+it.each([1, 2])('simplifies isolated values in a supported text column at scale %s', (scale) => {
+  const canvas = createCanvas(520 * scale, 380 * scale),
+    context = canvas.getContext('2d');
+  context.scale(scale, scale);
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 520, 380);
+  context.font = '20px monospace';
+  context.textBaseline = 'top';
+  for (const [row, value] of [
+    '38193002',
+    '1',
+    '2',
+    '3',
+    '38193002',
+    '5',
+    'contact@example.test',
+  ].entries()) {
+    const top = 20 + row * 45;
+    context.fillStyle = '#0064bf';
+    context.fillText(value, 130, top);
+    context.strokeStyle = '#777777';
+    context.lineWidth = 1;
+    context.strokeRect(25, top + 2, 18, 20);
+    context.beginPath();
+    context.moveTo(25, top + 2);
+    context.lineTo(43, top + 22);
+    context.stroke();
+  }
+  const delta = execute(canvas);
+  for (const row of [1, 2, 3, 5])
+    expect(delta(130 * scale, (20 + row * 45) * scale, 14 * scale, 25 * scale)).toBeGreaterThan(10);
+  for (let row = 0; row < 7; row++)
+    expect(delta(24 * scale, (20 + row * 45 + 1) * scale, 21 * scale, 23 * scale)).toBe(0);
+});

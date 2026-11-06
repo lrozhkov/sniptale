@@ -15,6 +15,7 @@ import {
   assertNativeAutomaticResize,
   assertNativeManualMove,
   assertNativeManualResize,
+  assertNativeNestedScrollSimplify,
   captureSimplifyToEditor,
 } from './extension-critical-simplify-native.helpers';
 import {
@@ -174,6 +175,26 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       expect(accepted!.y + accepted!.height).toBeLessThanOrEqual(sourceHeight - scroll + 1);
       await expect(page.getByText(/Could not acquire.*(?:source|image)/iu)).toHaveCount(0);
       await page.screenshot({ path: info.outputPath('source-edge-accepted.png'), fullPage: false });
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Simplify keeps header and body aligned around an internal scroll container ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120_000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await grantNativeSimplifyCapture(popup);
+      const observer = await observeSimplifyWorker(context, extensionId, page);
+      await assertNativeNestedScrollSimplify(page, info);
+      if (observer) await writeSimplifyWorkerObservation(context, page, observer, 'nested', info);
     } finally {
       await popup.close();
       await page.close();

@@ -94,6 +94,9 @@ export function DrawingSimplifyLayer(props: {
       style={{
         position: 'fixed',
         pointerEvents: 'none',
+        ...(!props.object.result
+          ? { border: '1px dashed #2563eb', boxSizing: 'border-box' as const }
+          : {}),
         left: bounds.x - props.projection.x,
         top: bounds.y - props.projection.y,
         width: bounds.width,

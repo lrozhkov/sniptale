@@ -82,7 +82,17 @@ export function createContentDrawingController(
     session,
     ...(simplify ? { simplify } : {}),
     ...(layout
-      ? { getObjectAnchor: layout.getAnchor, subscribeLayoutChanges: layout.subscribe }
+      ? {
+          getObjectAnchor: (object: DrawingObject) => {
+            const anchor = layout.getAnchor(object);
+            if (anchor) return anchor;
+            const committed = session
+              .getSnapshot()
+              .document.objects.find((q) => q.id === object.id);
+            return committed ? layout.getAnchor(committed) : null;
+          },
+          subscribeLayoutChanges: layout.subscribe,
+        }
       : {}),
     getPalette: () => palette,
     applyPalette(colors) {

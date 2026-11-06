@@ -100,7 +100,9 @@ it('retains a fast released gesture until its clean source is ready', async () =
   h.acquire.mockReturnValue(acquisition.promise);
   const prepared = h.runtime.prepare(new Event('pointerdown'));
   const work = h.runtime.submit(h.object, new Event('pointerup'), prepared);
-  expect(h.runtime.getPending()).toHaveLength(0);
+  expect(h.runtime.getPending()).toHaveLength(1);
+  expect(h.runtime.getPendingObjects()).toEqual([h.object]);
+  expect(h.session.getSnapshot().document.objects).toHaveLength(0);
   acquisition.resolve(h.source);
   await started(h);
   expect(h.runtime.getPending()[0]?.object.bounds).toEqual(h.object.bounds);

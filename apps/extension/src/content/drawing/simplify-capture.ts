@@ -26,14 +26,31 @@ const CAPTURE_CHROME = [
 ].join(',');
 
 function concealCaptureChrome(): () => void {
-  const hidden = queryAllContentUiElements<HTMLElement>(CAPTURE_CHROME).map((element) => ({
-    element,
-    value: element.style.getPropertyValue('visibility'),
-    priority: element.style.getPropertyPriority('visibility'),
-  }));
-  for (const { element } of hidden) element.style.setProperty('visibility', 'hidden', 'important');
+  const hidden = new Map<HTMLElement, { value: string; priority: string }>();
+  const conceal = () => {
+    for (const element of queryAllContentUiElements<HTMLElement>(CAPTURE_CHROME)) {
+      if (hidden.has(element)) continue;
+      hidden.set(element, {
+        value: element.style.getPropertyValue('visibility'),
+        priority: element.style.getPropertyPriority('visibility'),
+      });
+      element.style.setProperty('visibility', 'hidden', 'important');
+    }
+  };
+  // A gesture can mount its draft or loader after source acquisition has started.
+  const observer = new MutationObserver(conceal);
+  const root = resolveContentShadowRoot() ?? document.body;
+  if (root)
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-ui', 'data-simplify-pending'],
+    });
+  conceal();
   return () => {
-    for (const { element, value, priority } of hidden) {
+    observer.disconnect();
+    for (const [element, { value, priority }] of hidden) {
       if (
         element.style.getPropertyValue('visibility') !== 'hidden' ||
         element.style.getPropertyPriority('visibility') !== 'important'

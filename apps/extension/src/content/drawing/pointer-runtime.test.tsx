@@ -409,10 +409,20 @@ it('submits a Simplify pointer release to its async owner without committing a d
     ['pointerdown', 10, 20],
     ['pointermove', 80, 90],
     ['pointerup', 80, 90],
-  ] as const)
+  ] as const) {
     act(() => {
       canvas.dispatchEvent(mousePointerEvent(type, x, y));
     });
+    if (type === 'pointermove') {
+      const preview = host.querySelector<HTMLElement>(
+        '[data-ui="content.drawing.simplify-private"]'
+      );
+      expect(preview).not.toBeNull();
+      expect(preview!.style.backdropFilter).toBe('blur(2px)');
+      expect(preview!.style.borderStyle).toBe('dashed');
+      expect(preview!.style.borderColor).toBe('rgb(37, 99, 235)');
+    }
+  }
   expect(submit).toHaveBeenCalledOnce();
   expect(submit.mock.calls[0]?.[0]).toMatchObject({
     kind: 'simplify',

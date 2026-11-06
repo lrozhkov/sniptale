@@ -117,15 +117,32 @@ export async function drawNativeAutomaticSimplify(
     'backdrop-filter',
     'blur(2px)'
   );
+  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toHaveCSS(
+    'border-style',
+    'dashed'
+  );
+  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toHaveCSS(
+    'border-color',
+    'rgb(37, 99, 235)'
+  );
   await page.locator('[data-ui="content.drawing.simplify-private"]').evaluate((node) => {
     const root = node.getRootNode() as ShadowRoot | Document;
-    const state = { samples: [] as { covered: boolean; pending: boolean }[], active: true };
+    const state = {
+      samples: [] as { covered: boolean; present: boolean; capturing: boolean; pending: boolean }[],
+      active: true,
+    };
     (window as typeof window & { __simplifyFrames?: typeof state }).__simplifyFrames = state;
     const sample = () => {
       if (!state.active) return;
       const mask = root.querySelector<HTMLElement>('[data-ui="content.drawing.simplify-private"]');
       const style = mask && getComputedStyle(mask);
+      const capturing =
+        root instanceof ShadowRoot
+          ? root.host.classList.contains('sniptale-capture-ui-hidden')
+          : document.body.classList.contains('sniptale-capture-ui-hidden');
       state.samples.push({
+        present: Boolean(mask && mask.getBoundingClientRect().width > 0),
+        capturing,
         covered: Boolean(
           mask &&
           style &&
@@ -143,6 +160,7 @@ export async function drawNativeAutomaticSimplify(
   expect(draftPixels.equals(beforeProbe)).toBe(false);
   await page.screenshot({ path: info.outputPath(`${mode}-draft.png`), fullPage: false });
   await page.mouse.up();
+  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toBeVisible();
   const releasePixels = await page.screenshot({ clip: probe, fullPage: false });
   expect(releasePixels.equals(beforeProbe)).toBe(false);
   await page.screenshot({ path: info.outputPath(`${mode}-release.png`), fullPage: false });
@@ -150,7 +168,10 @@ export async function drawNativeAutomaticSimplify(
   const frames = await page.evaluate(() => {
     const state = (
       window as typeof window & {
-        __simplifyFrames?: { samples: { covered: boolean; pending: boolean }[]; active: boolean };
+        __simplifyFrames?: {
+          samples: { covered: boolean; present: boolean; capturing: boolean; pending: boolean }[];
+          active: boolean;
+        };
       }
     ).__simplifyFrames;
     if (!state) throw new Error('Simplify frame observation missing');
@@ -158,7 +179,7 @@ export async function drawNativeAutomaticSimplify(
     return state.samples;
   });
   expect(frames.length).toBeGreaterThan(0);
-  expect(frames.every((frame) => frame.covered)).toBe(true);
+  expect(frames.every((frame) => frame.present && (frame.covered || frame.capturing))).toBe(true);
   expect(frames.some((frame) => frame.pending)).toBe(true);
   return beforePixels;
 }
@@ -447,4 +468,151 @@ function nativeDrawingScope(page: Page, mode: SimplifyNativeMode) {
   return mode === 'crop'
     ? page.locator('[data-ui="content.crop.drawing-slot"]')
     : page.locator('[data-ui="content.toolbar.root"]');
+}
+
+async function prepareNestedSimplifySource(page: Page) {
+  await page.evaluate(() => {
+    for (const child of Array.from(document.body.children))
+      if (child instanceof HTMLElement && !child.shadowRoot) child.style.display = 'none';
+    Object.assign(document.documentElement.style, { overflow: 'hidden', height: '100%' });
+    Object.assign(document.body.style, {
+      overflow: 'hidden',
+      height: '100%',
+      margin: '0',
+      padding: '0',
+    });
+    const fixture = document.createElement('div');
+    fixture.style.cssText = 'position:fixed;inset:0;background:white;z-index:1';
+    const header = document.createElement('div');
+    header.style.cssText =
+      'position:absolute;left:420px;top:104px;width:700px;height:60px;background:white;color:#173b63;font:24px/32px sans-serif';
+    const title = document.createElement('div');
+    title.textContent = 'Account settings';
+    title.style.cssText = 'position:absolute;left:40px;top:8px';
+    const button = document.createElement('button');
+    button.textContent = 'Apply changes';
+    button.style.cssText =
+      'position:absolute;left:420px;top:8px;width:160px;height:40px;border:0;background:#1b68b3;color:white;font:18px sans-serif';
+    header.append(title, button);
+    const scroll = document.createElement('div');
+    scroll.id = 'simplify-internal-scroll-proof';
+    scroll.style.cssText =
+      'position:absolute;left:60px;top:180px;width:calc(100% - 120px);height:calc(100% - 200px);overflow:auto;background:#f4f7fa';
+    const content = document.createElement('div');
+    content.style.cssText = 'height:3000px;position:relative';
+    for (const top of [60, 340, 620, 900]) {
+      const text = document.createElement('div');
+      text.textContent = 'Contact information';
+      text.style.cssText = `position:absolute;left:400px;top:${top}px;font:24px/32px sans-serif;color:#173b63`;
+      content.append(text);
+    }
+    scroll.append(content);
+    fixture.append(header, scroll);
+    document.body.append(fixture);
+    scroll.scrollTop = 160;
+  });
+  await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+  await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+  await page.locator('[data-ui="content.toolbar.drawing.simplify"]').click();
+  const automatic = page.locator('[data-ui="content.toolbar.drawing-options.simplify.automatic"]');
+  if ((await automatic.getAttribute('aria-pressed')) !== 'true') await automatic.click();
+  await page.locator('[data-ui="content.toolbar.drawing-options.simplify.content-text"]').click();
+  const color = page.locator('[data-ui="content.toolbar.drawing-options.simplify.color"]');
+  if ((await color.getAttribute('aria-pressed')) === 'true') await color.click();
+}
+
+async function sampleNativeSimplifyInk(
+  page: Page,
+  clip: { x: number; y: number; width: number; height: number }
+) {
+  const png = await page.screenshot({ clip, fullPage: false, animations: 'disabled' });
+  return page.evaluate(async (encoded) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${encoded}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Pixel proof context unavailable');
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, image.width, image.height).data;
+    let blue = 0,
+      gray = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i]!,
+        g = pixels[i + 1]!,
+        b = pixels[i + 2]!;
+      if (r < 100 && b - r > 40 && g - r > 15) blue++;
+      if (r >= 100 && r <= 220 && Math.max(r, g, b) - Math.min(r, g, b) <= 45) gray++;
+    }
+    return { blue, gray };
+  }, png.toString('base64'));
+}
+
+async function waitForNativeSimplifyCount(page: Page, count: number) {
+  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toHaveCount(count);
+  await expect(page.locator('[data-ui="content.drawing.simplify-pending"]')).toHaveCount(0);
+  await expect(page.locator('[data-ui="content.drawing.simplify-feedback"]')).toHaveCount(0);
+}
+
+export async function assertNativeNestedScrollSimplify(page: Page, info: TestInfo) {
+  page.setDefaultTimeout(15_000);
+  await prepareNestedSimplifySource(page);
+  const word = { x: 464, y: 116, width: 230, height: 30 };
+  const button = { x: 850, y: 120, width: 140, height: 26 };
+  const original = await sampleNativeSimplifyInk(page, word);
+  const originalButton = await sampleNativeSimplifyInk(page, button);
+  expect(original.blue).toBeGreaterThan(100);
+  await dragSimplify(page, { x: 450, y: 108 }, { x: 1000, y: 160 });
+  await waitForNativeSimplifyCount(page, 1);
+  await expect
+    .poll(async () => (await sampleNativeSimplifyInk(page, word)).blue)
+    .toBeLessThan(original.blue * 0.1);
+  expect((await sampleNativeSimplifyInk(page, word)).gray).toBeGreaterThan(100);
+  const headerMask = page.locator('[data-ui="content.drawing.simplify-private"]').first();
+  const beforeScroll = await headerMask.boundingBox();
+  if (!beforeScroll) throw new Error('Header mask unavailable');
+  const scroll = page.locator('#simplify-internal-scroll-proof');
+  await scroll.evaluate((node) => {
+    node.scrollTop = 240;
+  });
+  await expect.poll(async () => (await headerMask.boundingBox())?.y).toBeCloseTo(beforeScroll.y, 0);
+  await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+  await page.mouse.click(540, 135);
+  await dragSimplify(page, { x: 1000, y: 134 }, { x: 1020, y: 134 });
+  await waitForNativeSimplifyCount(page, 1);
+  await expect
+    .poll(async () => (await headerMask.boundingBox())?.width ?? 0)
+    .toBeGreaterThan(beforeScroll.width + 15);
+  await expect
+    .poll(async () => (await sampleNativeSimplifyInk(page, button)).blue)
+    .toBeGreaterThan(originalButton.blue * 0.6);
+  await expect
+    .poll(async () => (await sampleNativeSimplifyInk(page, word)).gray)
+    .toBeGreaterThan(100);
+  await page.screenshot({ path: info.outputPath('nested-header-resized.png'), fullPage: false });
+  await page.locator('[data-ui="content.toolbar.drawing.simplify"]').click();
+  const body = { x: 464, y: 280, width: 250, height: 30 };
+  const originalBody = await sampleNativeSimplifyInk(page, body);
+  expect(originalBody.blue).toBeGreaterThan(100);
+  await dragSimplify(page, { x: 450, y: 268 }, { x: 800, y: 330 });
+  await waitForNativeSimplifyCount(page, 2);
+  await expect
+    .poll(async () => (await sampleNativeSimplifyInk(page, body)).blue)
+    .toBeLessThan(originalBody.blue * 0.1);
+  await scroll.evaluate((node) => {
+    node.scrollTop = 440;
+  });
+  await expect.poll(async () => (await headerMask.boundingBox())?.y).toBeCloseTo(beforeScroll.y, 0);
+  await expect
+    .poll(async () => (await sampleNativeSimplifyInk(page, button)).blue)
+    .toBeGreaterThan(originalButton.blue * 0.6);
+  await expect
+    .poll(async () => (await sampleNativeSimplifyInk(page, word)).gray)
+    .toBeGreaterThan(100);
+  await page.screenshot({
+    path: info.outputPath('nested-body-clipped-header-fixed.png'),
+    fullPage: false,
+  });
 }

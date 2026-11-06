@@ -435,3 +435,44 @@ export function extendedDescenderRow(image, label, p, m, measure) {
   row.contrast = combined.foregroundContrast;
   return row;
 }
+
+/** Antialias coverage changes mean ink intensity, but preserves its direction from the surface. */
+export function sameSourceInk(a, b, bg, referenceBg = bg) {
+  const first = a.map((v, c) => v - bg[c]),
+    second = b.map((v, c) => v - referenceBg[c]);
+  const firstPeak = Math.max(...first.map(Math.abs)),
+    secondPeak = Math.max(...second.map(Math.abs));
+  return (
+    firstPeak > 0 &&
+    secondPeak > 0 &&
+    Math.max(...first.map((v, c) => Math.abs(v / firstPeak - second[c] / secondPeak))) <= 0.12
+  );
+}
+
+/** Compares local source glyph ink without a stored alphabet or recognized character. */
+export function matchingSourceGlyph(image, glyph, part, bg, referenceBg = bg) {
+  if (!sameSourceInk(glyph.rgb, part.rgb, bg, referenceBg)) return false;
+  if (
+    Math.min(glyph.w, part.w) < Math.max(glyph.w, part.w) * 0.8 ||
+    Math.min(glyph.h, part.h) < Math.max(glyph.h, part.h) * 0.8
+  )
+    return false;
+  const foreground = (x, y, surface) => {
+    const i = (y * image.width + x) * 4;
+    return image.data[i + 3] >= 128 && surface.some((v, c) => Math.abs(v - image.data[i + c]) > 40);
+  };
+  let common = 0,
+    total = 0;
+  for (let y = 0; y < glyph.h; y++)
+    for (let x = 0; x < glyph.w; x++) {
+      const a = foreground(glyph.x + x, glyph.y + y, bg);
+      const b = foreground(
+        part.x + Math.min(part.w - 1, Math.floor(((x + 0.5) * part.w) / glyph.w)),
+        part.y + Math.min(part.h - 1, Math.floor(((y + 0.5) * part.h) / glyph.h)),
+        referenceBg
+      );
+      if (a || b) total++;
+      if (a && b) common++;
+    }
+  return total > 0 && common / total >= 0.78;
+}

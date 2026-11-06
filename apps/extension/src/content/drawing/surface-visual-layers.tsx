@@ -9,6 +9,7 @@ import {
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { drawDrawingFrame } from './frame';
+import { clipDrawingObjectToRoot } from './layout';
 import type { DrawingVisualLayer } from './frame-renderables';
 import {
   DrawingTextBackgrounds,
@@ -23,6 +24,7 @@ export function DrawingVisualLayers(props: {
   projection: DrawingPoint;
   root: NonNullable<ReturnType<ContentDrawingController['getScrollRoot']>>;
   getObjectOpacity?: (objectId: string) => number;
+  getObjectAnchor?: (object: DrawingObject) => Element | null;
 }) {
   const clip = props.root.kind === 'element' ? props.root.element.getBoundingClientRect() : null;
   const clipPath = clip
@@ -47,7 +49,9 @@ export function DrawingVisualLayers(props: {
           inset: 0,
           pointerEvents: 'none',
           zIndex: index,
-          ...(layer.kind === 'simplify' && clip
+          ...(layer.kind === 'simplify' &&
+          clip &&
+          clipDrawingObjectToRoot(layer.object, props.root, props.getObjectAnchor?.(layer.object))
             ? {
                 clipPath,
               }

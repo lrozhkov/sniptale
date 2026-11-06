@@ -3,7 +3,8 @@ import {
   resolveConnectedCaptionClaims,
   resolveDecorativeLockups,
 } from './ownership-ink.mjs';
-import { inkRuns } from './ownership-ink.mjs';
+import { inkRuns, matchingSourceGlyph } from './ownership-ink.mjs';
+import { recoverColumnGlyphs } from './ownership-columns.mjs';
 import {
   recoverRepeatedNumericText,
   mergeRecoveredTextRows,
@@ -179,6 +180,7 @@ export function resolveForegroundClaims(
   boxes = resolveRepeatedInlineGraphics(image, boxes, measure);
   boxes = recoverRepeatedLineGlyphs(image, boxes, measure, protectedRects, boundaries, narrow);
   boxes = recoverSingleGlyphRows(image, boxes, measure);
+  boxes = recoverColumnGlyphs(image, boxes, narrow, protectedRects, measure);
   boxes = recoverRepeatedNumericText(image, boxes, measure);
   boxes = recoverWeakMediaText(image, boxes, measure, protectedRects);
   boxes = mergeRecoveredTextRows(image, boxes, measure, protectedRects);
@@ -492,32 +494,6 @@ function recoverRepeatedLineGlyphs(image, input, measure, protectedRects, bounda
     .filter((b) => input.includes(b) || !extra.includes(b) || b.shape === 'text');
 }
 
-function matchingInlineInk(image, glyph, part, bg) {
-  if (Math.max(...glyph.rgb.map((v, c) => Math.abs(v - part.rgb[c]))) > 32) return false;
-  if (
-    Math.min(glyph.w, part.w) < Math.max(glyph.w, part.w) * 0.8 ||
-    Math.min(glyph.h, part.h) < Math.max(glyph.h, part.h) * 0.8
-  )
-    return false;
-  const foreground = (x, y) => {
-    const i = (y * image.width + x) * 4;
-    return image.data[i + 3] >= 128 && bg.some((v, c) => Math.abs(v - image.data[i + c]) > 40);
-  };
-  let common = 0,
-    total = 0;
-  for (let y = 0; y < glyph.h; y++)
-    for (let x = 0; x < glyph.w; x++) {
-      const a = foreground(glyph.x + x, glyph.y + y);
-      const b = foreground(
-        part.x + Math.min(part.w - 1, Math.floor(((x + 0.5) * part.w) / glyph.w)),
-        part.y + Math.min(part.h - 1, Math.floor(((y + 0.5) * part.h) / glyph.h))
-      );
-      if (a || b) total++;
-      if (a && b) common++;
-    }
-  return total > 0 && common / total >= 0.78;
-}
-
 function inlineSingleGlyphPeers(image, box, m, input) {
   const glyph = m.glyphBounds,
     xh = m.xHeight;
@@ -553,7 +529,7 @@ function inlineSingleGlyphPeers(image, box, m, input) {
   const count = source.reduce((n, p) => n + p.n, 0);
   if (!count) return [];
   const rgb = [0, 1, 2].map((c) => source.reduce((n, p) => n + p.rgb[c] * p.n, 0) / count);
-  if (!ink.some((p) => matchingInlineInk(image, { ...glyph, rgb }, p, box.bg))) return [];
+  if (!ink.some((p) => matchingSourceGlyph(image, { ...glyph, rgb }, p, box.bg))) return [];
   return [left, right];
 }
 

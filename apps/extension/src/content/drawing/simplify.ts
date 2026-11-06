@@ -93,6 +93,7 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
   private acquisitionAbort: AbortController | null = null;
   private preparationAbort: AbortController | null = null;
   private preparationValid: (() => boolean) | null = null;
+  private preparing: { object: DrawingSimplifyObject; token: AbortController } | null = null;
   private generation = 0;
   private cacheOwners = new Set<string>();
   private pending: {
@@ -269,6 +270,10 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
     this.preparationAbort?.abort();
     this.preparationAbort = null;
     this.preparationValid = null;
+    if (this.preparing) {
+      this.preparing = null;
+      this.publish();
+    }
   };
   submit = async (
     object: DrawingSimplifyObject,
@@ -288,6 +293,11 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
       this.compute.cancel();
       this.publish();
     }
+    if (preparation) {
+      this.preparing = { object, token: preparation };
+      this.feedback = null;
+      this.publish();
+    }
     try {
       const source = prepared instanceof Promise ? await prepared : prepared;
       if (
@@ -304,6 +314,7 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
       }
       this.preparationAbort = null;
       this.preparationValid = null;
+      if (this.preparing?.token === preparation) this.preparing = null;
       await this.run([object], undefined, true, false, [], source);
     } catch {
       if (
@@ -313,6 +324,11 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
         !preparation.signal.aborted
       ) {
         this.feedback = 'no-source';
+        this.publish();
+      }
+    } finally {
+      if (this.preparing?.token === preparation) {
+        this.preparing = null;
         this.publish();
       }
     }
@@ -345,16 +361,19 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
     return this.run([draft?.kind === 'simplify' ? draft : object]);
   };
   getPending = (): readonly SimplifyPending[] => {
-    return (
+    const computing =
       this.pending?.objects.flatMap((object) =>
         object.kind === 'simplify'
           ? [{ object, updating: this.pending!.baselines.has(object.id) }]
           : []
-      ) ?? []
-    );
+      ) ?? [];
+    return this.preparing
+      ? [...computing, { object: this.preparing.object, updating: false }]
+      : computing;
   };
   getPendingObjects = (): readonly DrawingObject[] => {
-    return this.pending?.objects ?? [];
+    const computing = this.pending?.objects ?? [];
+    return this.preparing ? [...computing, this.preparing.object] : computing;
   };
   getFeedback = (): SimplifyFeedback => {
     return this.feedback;

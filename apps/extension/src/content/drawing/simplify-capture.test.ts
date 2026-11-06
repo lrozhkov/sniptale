@@ -261,3 +261,38 @@ it('conceals a pending mask for source capture and keeps accepted masks visible'
   expect(pending.style.visibility).toBe('visible');
   expect(accepted.style.visibility).toBe('visible');
 });
+
+it.each(['resolve', 'reject', 'abort'] as const)(
+  'conceals late mounted draft chrome and restores it after %s',
+  async (exit) => {
+    const h = captureHarness(),
+      abort = new AbortController();
+    const work = h.runtime.acquire(new Event('pointerdown'), abort.signal);
+    const completion = work.then(
+      () => true,
+      () => false
+    );
+    await vi.waitFor(() => expect(h.send).toHaveBeenCalledOnce());
+    const draft = document.createElement('div');
+    draft.dataset['ui'] = 'content.drawing.simplify-private';
+    draft.dataset['simplifyPending'] = 'true';
+    draft.style.visibility = 'visible';
+    const accepted = document.createElement('div');
+    accepted.dataset['ui'] = 'content.drawing.simplify-private';
+    accepted.style.visibility = 'visible';
+    const loader = document.createElement('div');
+    loader.dataset['ui'] = 'content.drawing.simplify-pending';
+    document.body.append(draft, accepted, loader);
+    await vi.waitFor(() => expect(draft.style.visibility).toBe('hidden'));
+    expect(loader.style.visibility).toBe('hidden');
+    expect(accepted.style.visibility).toBe('visible');
+    if (exit === 'resolve') h.complete.resolve({ success: true, ...png() });
+    else if (exit === 'reject') h.complete.reject(new Error('Capture failed'));
+    else abort.abort();
+    await completion;
+    expect(draft.style.visibility).toBe('visible');
+    expect(loader.style.visibility).toBe('');
+    expect(accepted.style.visibility).toBe('visible');
+    if (exit === 'abort') h.complete.resolve({ success: true, ...png() });
+  }
+);

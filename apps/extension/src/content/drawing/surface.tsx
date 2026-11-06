@@ -648,6 +648,9 @@ function DrawingSurfaceContent(props: {
         layers={layers}
         projection={props.projection}
         root={props.root}
+        {...(props.controller.getObjectAnchor
+          ? { getObjectAnchor: props.controller.getObjectAnchor }
+          : {})}
         {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}
       />
       <DrawingSimplifyFeedback controller={props.controller} projection={props.projection} />
