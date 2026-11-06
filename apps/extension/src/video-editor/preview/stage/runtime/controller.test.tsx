@@ -370,3 +370,128 @@ it('routes the actual playback runtime directly to the existing scene scheduler'
   });
   expect(scheduler.enqueue).toHaveBeenCalledOnce();
 });
+
+it('compiles camera inputs before event-window adaptation and preserves the bundle through FPS clones', async () => {
+  const cursorOwner = await import('../../../../workflows/video-review/cursor-trajectory');
+  const eventsOwner = await import('../../../../workflows/video-review/recording-events');
+  const { attachRecordingEventGroups } =
+    await import('../../../../features/video/project/recording-events/project-facts');
+  const {
+    attachPreparedProjectCamera,
+    preparedProjectCamera,
+    projectCameraInputSignature,
+    projectCameraOutputKey,
+  } = await import('../../../../features/video/composition/motion/prepared-project-camera');
+  const { normalizeVideoProjectCursorSkin } =
+    await import('../../../../features/video/project/cursor');
+  const { createVideoProjectMotionRegion } =
+    await import('../../../../features/video/project/motion');
+  const input = props();
+  const clip = input.project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source.');
+  clip.sourceInstanceId = 'instance';
+  input.project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin({ hidden: true }),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'source',
+        sourceInstanceId: 'instance',
+        samples: [],
+        trajectory: {
+          format: 'cursor-trajectory-v1',
+          formatVersion: 1,
+          algorithm: 'sed-window-v1',
+          encoding: 'json-ascii-int-v1',
+          trajectoryId: 'a'.repeat(32),
+          state: 'complete',
+          finalized: true,
+          totalBlocks: 1,
+          totalRecords: 0,
+          totalSamples: 0,
+          totalBytes: 0,
+          streamSha256: 'b'.repeat(64),
+        },
+      },
+    ],
+  };
+  input.project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(input.project, 0),
+      startTime: 0,
+      duration: 5,
+      focusMode: 'CURSOR',
+    },
+  ];
+  const descriptor = {
+    format: 'recording-events-v1' as const,
+    formatVersion: 1 as const,
+    algorithm: 'lossless-v1' as const,
+    encoding: 'json-utf8-v1' as const,
+    eventStreamId: 'c'.repeat(32),
+    state: 'complete' as const,
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 0,
+    totalBytes: 0,
+    streamSha256: 'd'.repeat(64),
+  };
+  input.project.actionFeedback = [
+    {
+      recordingId: 'source',
+      sourceInstanceId: 'instance',
+      events: descriptor,
+      settings: [],
+      signals: [],
+    },
+  ];
+  const bundle = {
+    signature: projectCameraInputSignature(input.project),
+    output: projectCameraOutputKey(input.project),
+    cameras: [],
+    orientations: [],
+    conflicts: [],
+  };
+  const camera = vi.fn(async (source: VideoProject) => attachPreparedProjectCamera(source, bundle));
+  const cursorSpy = vi
+    .spyOn(cursorOwner, 'createRecordingCursorTrajectoryRenderer')
+    .mockReturnValue({
+      prepareCamera: camera,
+      prepare: vi.fn(async (source: VideoProject) => source),
+      clear: vi.fn(),
+    });
+  const events = vi.fn(async (source: VideoProject, range: { start: number; end: number }) =>
+    attachRecordingEventGroups(source, range, [
+      {
+        recordingId: 'source',
+        sourceInstanceId: 'instance',
+        eventStreamId: descriptor.eventStreamId,
+        descriptor,
+        writerGeneration: 'generation',
+        actions: [],
+        signals: [],
+        cadence: new Map(),
+      },
+    ])
+  );
+  const eventsSpy = vi
+    .spyOn(eventsOwner, 'createRecordingEventsRenderer')
+    .mockReturnValue({ prepare: events, clear: vi.fn() });
+  try {
+    await render(input);
+    expect(camera).toHaveBeenCalledOnce();
+    expect(camera).toHaveBeenCalledWith(input.project, undefined, expect.any(AbortSignal));
+    expect(preparedProjectCamera(latest.render.project)).toBe(bundle);
+    expect(events.mock.calls.some(([source]) => preparedProjectCamera(source) === bundle)).toBe(
+      true
+    );
+    await render({ ...input, currentTime: 2.25 });
+    expect(camera).toHaveBeenCalledOnce();
+    expect(preparedProjectCamera(latest.render.project)).toBe(bundle);
+    expect(latest.render.project.fps).toBe(30);
+  } finally {
+    cursorSpy.mockRestore();
+    eventsSpy.mockRestore();
+  }
+});

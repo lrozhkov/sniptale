@@ -1,9 +1,16 @@
+import {
+  preparedProjectCamera,
+  projectCameraInputSignature,
+  projectCameraOutputKey,
+  projectRequiresPreparedCamera,
+} from '../../../../features/video/composition/motion/prepared-project-camera';
 import { cursorTrajectoryProjectCoversTime } from '../../../../features/video/project/cursor-trajectory/project-window';
 import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
 import { projectMotionSourcePhases } from '../../../../features/video/project/motion/source-binding';
 import { resolveMotionConnectionVideo } from '../../../../features/video/project/motion';
 import { resolveMotionSourcePlayback } from '../../../../features/video/project/motion/source-playback';
 import {
+  hasCursorFollowingCameraAt,
   resolveActiveMotionRegion,
   resolveConnectingMotionRegions,
 } from '../../../../features/video/composition/motion/camera-interval';
@@ -14,8 +21,33 @@ import {
   type VideoProject,
 } from '../../../../features/video/project/types';
 
+const cameraStates = new WeakMap<VideoProject, { required: boolean; ready: boolean }>();
+function cameraState(project: VideoProject) {
+  let state = cameraStates.get(project);
+  if (!state) {
+    const required = projectRequiresPreparedCamera(project);
+    const bundle = preparedProjectCamera(project);
+    state = {
+      required,
+      ready:
+        required &&
+        bundle?.signature === projectCameraInputSignature(project) &&
+        bundle.output === projectCameraOutputKey(project),
+    };
+    cameraStates.set(project, state);
+  }
+  return state;
+}
+
 /** Checks archive coverage only for cursor facts consumed by this requested preview frame. */
-export function canRenderPreparedCursorFrame(project: VideoProject, time: number): boolean {
+export function canRenderPreparedCursorFrame(
+  project: VideoProject,
+  time: number,
+  cursorUnavailable = false
+): boolean {
+  const { required, ready: cameraReady } = cameraState(project);
+  if (required && !cameraReady && hasCursorFollowingCameraAt(project, time)) return false;
+  if (cursorUnavailable) return true;
   if (cursorTrajectoryProjectCoversTime(project, time)) return true;
   const covered = (source: VideoProject, at: number, clipId?: string) => {
     const groups = source.cursorTrack?.sourceObservations;
@@ -37,7 +69,7 @@ export function canRenderPreparedCursorFrame(project: VideoProject, time: number
     !covered(project, time)
   )
     return false;
-  if (!isVideoProjectUtilityLaneVisible(project, 'camera')) return true;
+  if (cameraReady || !isVideoProjectUtilityLaneVisible(project, 'camera')) return true;
   const playback = resolveMotionSourcePlayback(project, time);
   const cameraProject = projectMotionSourcePhases(playback?.geometryProject ?? project);
   const cameraTime = playback?.time ?? time;

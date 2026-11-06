@@ -14,6 +14,7 @@ import {
   VideoMediaFitMode,
   VideoProjectClipType,
   type VideoProjectVideoClip,
+  type VideoProject,
 } from '../../../features/video/project/types';
 
 type PreviewSceneInput = Parameters<
@@ -1184,4 +1185,127 @@ it('returns the separate 2D fallback unchanged when an opted-in final frame has 
   } finally {
     owner.dispose();
   }
+});
+
+it('prepares project-sized camera geometry before bounded events and cursor frames', async () => {
+  const cursorOwner = await import('../../../workflows/video-review/cursor-trajectory');
+  const eventsOwner = await import('../../../workflows/video-review/recording-events');
+  const {
+    attachPreparedProjectCamera,
+    projectCameraInputSignature,
+    projectCameraOutputKey,
+    preparedProjectCamera,
+  } = await import('../../../features/video/composition/motion/prepared-project-camera');
+  const demand = await import('../../../features/video/composition/motion/camera-interval');
+  vi.spyOn(demand, 'hasCursorFollowingCameraAt').mockReturnValue(true);
+  const project = createEmptyVideoProject('Stable camera', 800, 600);
+  project.duration = 1;
+  const bundle = {
+    signature: projectCameraInputSignature(project),
+    output: projectCameraOutputKey(project),
+    cameras: [],
+    orientations: [],
+    conflicts: [],
+  };
+  const prepared = attachPreparedProjectCamera(project, bundle);
+  const order: string[] = [];
+  const camera = vi.fn(async (source: VideoProject) => {
+    order.push('camera');
+    return source === project ? prepared : source;
+  });
+  const frame = vi.fn(async (source: VideoProject) => {
+    order.push('frame');
+    return source;
+  });
+  const clear = vi.fn();
+  vi.spyOn(cursorOwner, 'createRecordingCursorTrajectoryRenderer').mockReturnValue({
+    prepareCamera: camera,
+    prepare: frame,
+    clear,
+  });
+  const events = vi.fn(async (source: VideoProject) => {
+    order.push('events');
+    return { ...source };
+  });
+  vi.spyOn(eventsOwner, 'createRecordingEventsRenderer').mockReturnValue({
+    prepare: events,
+    clear: vi.fn(),
+  });
+  const materializer = createVideoPreviewFrameMaterializer({
+    ownerDocument: document,
+    project,
+    assetUrls: {},
+    rasterSize: { width: 480, height: 360 },
+  });
+  const signal = new AbortController().signal;
+  await materializer.renderFrame(0.1, signal);
+  await materializer.renderFrame(0.2, signal);
+  expect(order).toEqual(['camera', 'events', 'frame', 'camera', 'events', 'frame']);
+  expect(camera).toHaveBeenCalledWith(project, undefined, signal);
+  expect(events.mock.calls[0]?.[0]).toBe(prepared);
+  expect(preparedProjectCamera(renderPreviewScene.mock.calls.at(-1)![0].project)).toBe(bundle);
+  materializer.dispose();
+  expect(clear).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'rejects %s during camera preparation before bounded history or scene work',
+  async (operation) => {
+    const cursorOwner = await import('../../../workflows/video-review/cursor-trajectory');
+    const eventsOwner = await import('../../../workflows/video-review/recording-events');
+    const demand = await import('../../../features/video/composition/motion/camera-interval');
+    vi.spyOn(demand, 'hasCursorFollowingCameraAt').mockReturnValue(true);
+    const project = createEmptyVideoProject('Pending camera');
+    project.duration = 1;
+    const gate = Promise.withResolvers<typeof project>();
+    const clear = vi.fn();
+    vi.spyOn(cursorOwner, 'createRecordingCursorTrajectoryRenderer').mockReturnValue({
+      prepareCamera: vi.fn(() => gate.promise),
+      prepare: vi.fn(async (source: VideoProject) => source),
+      clear,
+    });
+    const events = vi.fn(async (source: VideoProject) => source);
+    vi.spyOn(eventsOwner, 'createRecordingEventsRenderer').mockReturnValue({
+      prepare: events,
+      clear: vi.fn(),
+    });
+    const materializer = createVideoPreviewFrameMaterializer({
+      ownerDocument: document,
+      project,
+      assetUrls: {},
+      rasterSize: { width: 480, height: 360 },
+    });
+    const controller = new AbortController();
+    const frame = materializer.renderFrame(0.1, controller.signal);
+    if (operation === 'abort') controller.abort();
+    else materializer.dispose();
+    gate.resolve(project);
+    await expect(frame).rejects.toMatchObject({ name: 'AbortError' });
+    expect(events).not.toHaveBeenCalled();
+    expect(renderPreviewScene).not.toHaveBeenCalled();
+    if (operation === 'abort') materializer.dispose();
+    expect(clear).toHaveBeenCalledOnce();
+  }
+);
+
+it('does not wait for irrelevant camera preparation on an ordinary materialized frame', async () => {
+  const cursorOwner = await import('../../../workflows/video-review/cursor-trajectory');
+  const camera = vi.fn(() => new Promise<VideoProject>(() => {}));
+  vi.spyOn(cursorOwner, 'createRecordingCursorTrajectoryRenderer').mockReturnValue({
+    prepareCamera: camera,
+    prepare: vi.fn(async (source: VideoProject) => source),
+    clear: vi.fn(),
+  });
+  const project = createEmptyVideoProject('Ordinary frame');
+  project.duration = 1;
+  const materializer = createVideoPreviewFrameMaterializer({
+    ownerDocument: document,
+    project,
+    assetUrls: {},
+    rasterSize: { width: 480, height: 360 },
+  });
+  await materializer.renderFrame(0.1, new AbortController().signal);
+  expect(camera).not.toHaveBeenCalled();
+  expect(renderPreviewScene).toHaveBeenCalledOnce();
+  materializer.dispose();
 });

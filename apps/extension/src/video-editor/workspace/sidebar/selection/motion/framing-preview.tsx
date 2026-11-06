@@ -48,7 +48,9 @@ export function MotionFramingPreview(props: {
 
 export function FramingPreviewSurface(props: FramingPreviewProps) {
   const time = Math.min(props.project.duration, props.region.startTime + props.region.duration / 2);
-  const { project } = useCursorTrajectoryProject(props.project, time);
+  const preparation = useCursorTrajectoryProject(props.project, time);
+  const { project, cameraFailed, retryCamera } = preparation;
+  const cameraReady = preparation.canRender(time);
   const renderProps = { ...props, project };
   const following = props.region.focusMode === VideoMotionFocusMode.CURSOR;
   const [overview, setOverview] = useState(true);
@@ -63,14 +65,16 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
     plan,
     nominalScale,
     update,
-  } = useFramingFrame(renderProps, canvasRef, gpuHostRef);
+  } = useFramingFrame(renderProps, canvasRef, gpuHostRef, cameraReady);
   const interaction = useFramingInteraction(renderProps, overview, cursorViewport);
   const { areaPoints, viewport, left, top, width, height, handlers } = interaction;
   const camera = resolveFramingRenderCamera(renderProps, overview, interaction, cursorViewport);
   const cameraKey = JSON.stringify(camera);
   const cameraRef = useRef(camera);
   cameraRef.current = camera;
-  useEffect(() => update(cameraRef.current, overview), [cameraKey, overview, update]);
+  useEffect(() => {
+    if (cameraReady) update(cameraRef.current, overview);
+  }, [cameraKey, overview, update, cameraReady]);
 
   return (
     <div className="space-y-2" data-ui="video-editor.framing-preview">
@@ -96,7 +100,7 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
         type="button"
         data-video-editor-local-navigation="true"
         aria-label={translate('videoEditor.sidebar.framingPreviewLabel')}
-        disabled={!ready}
+        disabled={!ready || !cameraReady}
         className={`relative block w-full overflow-hidden rounded-md border
 border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-muted)]
 touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-default`}
@@ -107,16 +111,22 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
           canvasRef={canvasRef}
           gpuHostRef={gpuHostRef}
           visible={visible}
-          ready={ready}
-          failed={failed}
+          ready={ready && cameraReady}
+          failed={failed || cameraFailed}
           areaPoints={overview ? areaPoints : null}
           showOutline={overview}
           viewport={viewport}
           world={{ left, top, width, height }}
         />
       </button>
-      {failed ? (
-        <InspectorActionButton compact onClick={reload}>
+      {failed || cameraFailed ? (
+        <InspectorActionButton
+          compact
+          onClick={() => {
+            if (cameraFailed) retryCamera();
+            if (failed) reload();
+          }}
+        >
           {translate('common.actions.retry')}
         </InspectorActionButton>
       ) : null}

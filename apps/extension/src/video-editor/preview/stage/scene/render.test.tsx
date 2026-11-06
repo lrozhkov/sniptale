@@ -588,7 +588,11 @@ it('holds an archive-backed direct frame through the hook refresh and retries th
   const first = Promise.withResolvers<VideoProject>();
   const second = Promise.withResolvers<VideoProject>();
   const prepare = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
-  const createRenderer = () => ({ prepare, prepareCamera: vi.fn(), clear: vi.fn() });
+  const createRenderer = () => ({
+    prepare,
+    prepareCamera: vi.fn(async (source: VideoProject) => source),
+    clear: vi.fn(),
+  });
   function ArchiveHarness({ time }: { time: number }) {
     const result = useCursorTrajectoryProject(project, time, createRenderer);
     return (

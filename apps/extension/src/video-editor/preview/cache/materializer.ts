@@ -1,3 +1,4 @@
+import { hasCursorFollowingCameraAt } from '../../../features/video/composition/motion/camera-interval';
 import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import type {
   NativePreviewGpuOutput,
@@ -671,8 +672,13 @@ async function prepareMaterializerRenderProject(
   time: number,
   signal: AbortSignal
 ) {
+  const cameraProject = hasCursorFollowingCameraAt(project, time)
+    ? await state.cursorTrajectoryRenderer.prepareCamera(project, undefined, signal)
+    : project;
+  signal.throwIfAborted();
+  if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
   const eventsProject = await state.recordingEventsRenderer.prepare(
-    project,
+    cameraProject,
     { start: time, end: time },
     signal
   );

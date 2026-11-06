@@ -61,6 +61,7 @@ beforeEach(() => {
   mocks.create.mockClear();
   mocks.trajectory.mockReturnValue({
     prepare: async (source: typeof project) => source,
+    prepareCamera: async (source: typeof project) => source,
     clear: vi.fn(),
   });
   commit.mockClear();
@@ -896,10 +897,20 @@ it('uses the real archived midpoint for Result geometry without hydrating the au
   const prepare = vi.fn((source: typeof project, time: number) =>
     prepareCursorTrajectoryProject(source, time, archive.read)
   );
-  mocks.trajectory.mockReturnValue({ prepare, clear: () => archive.reader.clear() });
+  const prepareCamera = async (source: typeof project) => {
+    const { prepareCameraCursorTrajectoryProject } =
+      await import('../../../../../features/video/project/cursor-trajectory/project-window');
+    const { compileProjectCameraBundle } =
+      await import('../../../../../features/video/composition/motion/project-camera-preparation');
+    const { attachPreparedProjectCamera } =
+      await import('../../../../../features/video/composition/motion/prepared-project-camera');
+    const scratch = await prepareCameraCursorTrajectoryProject(source, archive.read);
+    return attachPreparedProjectCamera(source, compileProjectCameraBundle(scratch));
+  };
+  mocks.trajectory.mockReturnValue({ prepare, prepareCamera, clear: () => archive.reader.clear() });
   await render(false, archive.project, following);
   expect(prepare).toHaveBeenCalledWith(archive.project, 1.5);
-  const prepared = await prepareCursorTrajectoryProject(archive.project, 1.5, archive.read);
+  const prepared = await prepareCamera(archive.project);
   const expected = resolveVideoCompositionCamera({
     project: prepared,
     currentTime: 1.5,
@@ -913,6 +924,7 @@ it('uses the real archived midpoint for Result geometry without hydrating the au
     cursorSample: null,
   });
   expect(expected.focusPoint).not.toEqual(unprepared.focusPoint);
+  await admit();
   await ready(pending.length - 1);
   act(() => host.querySelectorAll('button')[1]!.click());
   await admit();
@@ -1146,4 +1158,153 @@ it('copies a CPU fallback before replacing the held GPU front', async () => {
   expect(draw).toHaveBeenCalledTimes(1);
   expect(first.release).toHaveBeenCalledTimes(1);
   expect(host.querySelector('[data-preview-inspector-canvas]')).toBe(host.querySelector('canvas'));
+});
+
+it('keeps inspector controls mounted and rejects old-source replay while camera preparation waits', async () => {
+  const first = archiveFixture(),
+    second = archiveFixture();
+  const firstRegion = { ...first.region, focusMode: VideoMotionFocusMode.CURSOR };
+  const secondRegion = { ...second.region, focusMode: VideoMotionFocusMode.CURSOR };
+  first.project.motionRegions = [firstRegion];
+  second.project.motionRegions = [secondRegion];
+  const oldCamera = Promise.withResolvers<typeof project>(),
+    nextCamera = Promise.withResolvers<typeof project>();
+  const prepareCamera = vi
+    .fn()
+    .mockReturnValueOnce(oldCamera.promise)
+    .mockReturnValueOnce(nextCamera.promise);
+  const prepare = vi.fn((source: typeof project, time: number) =>
+    prepareCursorTrajectoryProject(
+      source,
+      time,
+      source === first.project ? first.read : second.read
+    )
+  );
+  mocks.trajectory.mockReturnValue({ prepare, prepareCamera, clear: vi.fn() });
+  await render(false, first.project, firstRegion);
+  expect(button()).not.toBeNull();
+  expect(button().disabled).toBe(true);
+  expect(host.querySelector('[role="status"]')).toBeNull();
+  expect(pending).toHaveLength(0);
+  await render(false, second.project, secondRegion);
+  expect(prepareCamera.mock.calls[0]![2].aborted).toBe(true);
+  const { prepareCameraCursorTrajectoryProject } =
+    await import('../../../../../features/video/project/cursor-trajectory/project-window');
+  const { compileProjectCameraBundle } =
+    await import('../../../../../features/video/composition/motion/project-camera-preparation');
+  const { attachPreparedProjectCamera } =
+    await import('../../../../../features/video/composition/motion/prepared-project-camera');
+  const oldPrepared = attachPreparedProjectCamera(
+    first.project,
+    compileProjectCameraBundle(
+      await prepareCameraCursorTrajectoryProject(first.project, first.read)
+    )
+  );
+  await act(async () => oldCamera.resolve(oldPrepared));
+  await admit();
+  expect(pending).toHaveLength(0);
+  const nextPrepared = attachPreparedProjectCamera(
+    second.project,
+    compileProjectCameraBundle(
+      await prepareCameraCursorTrajectoryProject(second.project, second.read)
+    )
+  );
+  await act(async () => nextCamera.resolve(nextPrepared));
+  await admit();
+  expect(pending).toHaveLength(1);
+  await ready(0);
+  expect(button().disabled).toBe(false);
+  expect(commit).not.toHaveBeenCalled();
+});
+
+it('uses the existing inspector Retry control after camera preparation fails', async () => {
+  const archive = archiveFixture();
+  const following = { ...archive.region, focusMode: VideoMotionFocusMode.CURSOR };
+  archive.project.motionRegions = [following];
+  const { prepareCameraCursorTrajectoryProject } =
+    await import('../../../../../features/video/project/cursor-trajectory/project-window');
+  const { compileProjectCameraBundle } =
+    await import('../../../../../features/video/composition/motion/project-camera-preparation');
+  const { attachPreparedProjectCamera } =
+    await import('../../../../../features/video/composition/motion/prepared-project-camera');
+  const cameraProject = attachPreparedProjectCamera(
+    archive.project,
+    compileProjectCameraBundle(
+      await prepareCameraCursorTrajectoryProject(archive.project, archive.read)
+    )
+  );
+  const prepareCamera = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('Unavailable'))
+    .mockResolvedValue(cameraProject);
+  mocks.trajectory.mockReturnValue({
+    prepareCamera,
+    prepare: (source: typeof project, time: number) =>
+      prepareCursorTrajectoryProject(source, time, archive.read),
+    clear: vi.fn(),
+  });
+  await render(false, archive.project, following);
+  expect(pending).toHaveLength(0);
+  const retry = [...host.querySelectorAll('button')].find(
+    (item) => item.textContent === translate('common.actions.retry')
+  );
+  expect(retry).toBeDefined();
+  await act(async () => retry!.click());
+  await admit();
+  expect(prepareCamera).toHaveBeenCalledTimes(2);
+  expect(pending).toHaveLength(1);
+  await ready(0);
+  expect(button().disabled).toBe(false);
+});
+
+it('keeps one source materializer across pending camera edits and discards the obsolete completed pose', async () => {
+  const archive = archiveFixture();
+  const following = { ...archive.region, focusMode: VideoMotionFocusMode.CURSOR };
+  archive.project.motionRegions = [following];
+  const { prepareCameraCursorTrajectoryProject } =
+    await import('../../../../../features/video/project/cursor-trajectory/project-window');
+  const { compileProjectCameraBundle } =
+    await import('../../../../../features/video/composition/motion/project-camera-preparation');
+  const { attachPreparedProjectCamera } =
+    await import('../../../../../features/video/composition/motion/prepared-project-camera');
+  const prepared = attachPreparedProjectCamera(
+    archive.project,
+    compileProjectCameraBundle(
+      await prepareCameraCursorTrajectoryProject(archive.project, archive.read)
+    )
+  );
+  const gate = Promise.withResolvers<typeof project>();
+  const prepareCamera = vi.fn().mockResolvedValueOnce(prepared).mockReturnValueOnce(gate.promise);
+  mocks.trajectory.mockReturnValue({
+    prepareCamera,
+    prepare: (source: typeof project, time: number) =>
+      prepareCursorTrajectoryProject(source, time, archive.read),
+    clear: vi.fn(),
+  });
+  await render(false, archive.project, following);
+  await admit();
+  expect(pending).toHaveLength(1);
+  expect(mocks.create).toHaveBeenCalledOnce();
+  const materializer = mocks.create.mock.results[0]!.value;
+  const editedRegion = { ...following, scale: 1.7 };
+  const editedProject = { ...archive.project, motionRegions: [editedRegion] };
+  await render(false, editedProject, editedRegion);
+  expect(mocks.create).toHaveBeenCalledOnce();
+  expect(materializer.dispose).not.toHaveBeenCalled();
+  await ready(0);
+  expect(draw).not.toHaveBeenCalled();
+  const edited = attachPreparedProjectCamera(
+    editedProject,
+    compileProjectCameraBundle(
+      await prepareCameraCursorTrajectoryProject(editedProject, archive.read)
+    )
+  );
+  await act(async () => gate.resolve(edited));
+  await admit();
+  expect(mocks.create).toHaveBeenCalledOnce();
+  expect(pending).toHaveLength(2);
+  await ready(1);
+  expect(draw).toHaveBeenCalledOnce();
+  expect(button().disabled).toBe(false);
+  expect(materializer.dispose).not.toHaveBeenCalled();
 });

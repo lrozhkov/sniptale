@@ -974,11 +974,11 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One materializer fixture controls media, cancellation and final frame ownership. Added cases compare explicit UI acquisition with unchanged default and internal sample contracts. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: One materializer fixture controls source preparation, cancellation and frame ownership. Camera cases use the same renderer ports and controlled completions. Each case checks this materializer lifecycle. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or authoring owners. Remove when the analyzer models this cohesive lifecycle.",
       "reviewDate": "2026-11-06",
-      "astHash": "d10f871c32d3665d275f062ba03391fdeab2a6db8f8fc28b52a46a650aa06846",
-      "signatureHash": "2fa45a6159a75ab699be5031082ace57d7c5731adbdf5d04680bd7f9568e9aa6"
+      "astHash": "c88259cc0b2392a910a121495739b439923a981d48edccb75faaf2c7c594663c",
+      "signatureHash": "bd836b6657e9f2def7a3f67395bfdcab6ca5aff539399f60a319d31eb2e0bff2"
     },
     {
       "rule": "structural-file-risk",
@@ -5440,11 +5440,11 @@
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx",
       "symbol": "<file>",
       "owner": "extension:video-editor:workspace",
-      "reason": "tool-noise: One inspector fixture checks source reuse, geometry, interaction and asynchronous publication. Controlled completions prove generation ordering and ownership transfer without changing the gesture owner. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: One mounted inspector fixture controls source reuse, camera readiness and publication. Controlled completions check pending edits and obsolete frames. Existing gesture and Undo assertions use the same fixture. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or authoring owners. Remove when the analyzer models this cohesive lifecycle.",
       "reviewDate": "2026-11-06",
-      "astHash": "76bb7463cebaf88dc6bd80ab2591da08a3710aa404deb0e4d8846fd9f15b7609",
-      "signatureHash": "358fd2b9a4ae642595638850d4161a833e585883d21fc159dd2b2ec00e58fc73"
+      "astHash": "7f0d6a56ec91b58945619f16a622ed762c9d39f1d579aa5253db8cc736978311",
+      "signatureHash": "4ac71c53ca8ce995542094ebaa43afc65210c9de6cddbb356ceab59d066693bb"
     },
     {
       "rule": "structural-file-risk",
@@ -5880,11 +5880,11 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One Native materializer owns decoded sources and completed frame preparation. Optional UI output belongs to one call. Frontend visibility and authoring remain outside this owner. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: One materializer owns source acquisition, preparation and final frame resources. The camera demand check selects preparation through the existing reader port. Numerical camera compilation and UI state remain with their existing owners. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or authoring owners. Remove when the analyzer models this cohesive lifecycle.",
       "reviewDate": "2026-11-06",
-      "astHash": "45b7dc051a916f6cc8e37a7f403fd53e8e3e3d8251f3e2395f28e776b84a06ec",
-      "signatureHash": "4bd2ead5ecd40af4292bee3f1dadcd5592020ba0775a7eaddfd90ae236664130"
+      "astHash": "ea1a7d443709e04213728e71e41f1f25d7d8856ba28ead655436f7ee73366f5a",
+      "signatureHash": "e42062e33b27a7bc0b0a9d06f83fb09dc24d6f19aee17b6f6dbc80a14151d485"
     },
     {
       "rule": "structural-function-risk",
@@ -6149,6 +6149,17 @@
       "reviewDate": "2026-11-06",
       "reason": "tool-noise: One camera transaction shares a seeded project, selected clip, source samples and history across related operations. Each edit checks unchanged source or montage fields. Undo and reload check those same accepted values. GPU publication changes the active canvas reader, without changing the pixel or project oracles. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent source, device, queue, publication or authoring owners. Remove when the analyzer models this cohesive transaction."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview-frame.ts",
+      "symbol": "useFramingFrame",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: One hook owns the mounted framing source, presenter and render queue. Committed request references reject obsolete camera results without recreating media. The gesture owner supplies the requested pose and retains authoring authority. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or authoring owners. Remove when the analyzer models this cohesive lifecycle.",
+      "reviewDate": "2026-11-06",
+      "astHash": "11b02b0ff479d7d934ce89b929ad8a31b7eaa076e9a56d5048aec462b516c1b1",
+      "signatureHash": "127986f5ba2739ee9762331f6500d12f697af50a68cf0cd5b78c43f3e9075d86"
     }
   ]
 }

@@ -18,6 +18,7 @@ import { VideoMotionFocusMode } from '../../../../../features/video/project/type
 import { isVideoProjectUtilityLaneVisible } from '../../../../../features/video/project/utility-lanes';
 
 interface FramingRequest {
+  source: { key: string; identity: string };
   project: FramingPreviewProps['project'];
   region: FramingPreviewProps['region'];
   overview: boolean;
@@ -35,7 +36,8 @@ interface FramingResult {
 export function useFramingFrame(
   props: FramingPreviewProps,
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  gpuHostRef: React.RefObject<HTMLDivElement | null>
+  gpuHostRef: React.RefObject<HTMLDivElement | null>,
+  canRender = true
 ) {
   const { project, region, assetUrls } = props;
   const renderer = useContext(WorkspacePreviewContext)?.preferences.preferences.renderer ?? 'gpu';
@@ -80,7 +82,20 @@ export function useFramingFrame(
   }, [canvasRef, gpuHostRef]);
   const [retry, setRetry] = useState(0);
   const latest = useRef<FramingRequest | null>(null);
-  const enqueue = useRef<((request: FramingRequest) => void) | null>(null);
+  const enqueue = useRef<ReturnType<typeof createFramingRenderQueue> | null>(null);
+  const committed = useRef({ project, region, canRender, request });
+  useLayoutEffect(() => {
+    const previous = committed.current;
+    committed.current = { project, region, canRender, request };
+    if (
+      !canRender ||
+      previous.request !== request ||
+      ((previous.region.focusMode === VideoMotionFocusMode.CURSOR ||
+        region.focusMode === VideoMotionFocusMode.CURSOR) &&
+        (previous.project !== project || previous.region !== region))
+    )
+      enqueue.current?.invalidate();
+  });
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -97,8 +112,21 @@ export function useFramingFrame(
         height: Math.max(2, Math.round((480 * request.project.height) / request.project.width)),
       },
     });
+    const accept = (next: FramingRequest) => {
+      const current = committed.current;
+      const following =
+        next.region.focusMode === VideoMotionFocusMode.CURSOR ||
+        current.region.focusMode === VideoMotionFocusMode.CURSOR;
+      return (
+        current.canRender &&
+        current.request === request &&
+        next.source === request &&
+        (!following || (next.project === current.project && next.region === current.region))
+      );
+    };
     const queue = createFramingRenderQueue({
       predecessor,
+      accept,
       render: async (next) => {
         const prepared = prepareFramingRequest(next, request.time);
         const presenter = presenterRef.current;
@@ -147,7 +175,7 @@ export function useFramingFrame(
         })),
     });
     enqueue.current = queue;
-    if (latest.current) queue(latest.current);
+    if (latest.current && accept(latest.current)) queue(latest.current);
     return () => {
       enqueue.current = null;
       controller.abort();
@@ -159,16 +187,23 @@ export function useFramingFrame(
   }, [request, retry, canvasRef, renderer]);
   const update = useCallback(
     (camera: VideoCompositionCameraState, overview: boolean) => {
-      const next = { project, region, overview, camera, key: JSON.stringify(camera) };
+      const next = {
+        source: request,
+        project,
+        region,
+        overview,
+        camera,
+        key: JSON.stringify(camera),
+      };
       latest.current = next;
       enqueue.current?.(next);
     },
-    [project, region]
+    [project, region, request]
   );
   return {
     update,
     visible: hasPresentedFrame,
-    ready: frame?.request === request && frame.hasFrame,
+    ready: canRender && frame?.request === request && frame.hasFrame,
     failed: frame?.request === request && frame.failed,
     reload: () => setRetry((value) => value + 1),
     viewport: frame?.request === request ? frame.viewport : undefined,
@@ -230,6 +265,7 @@ export function resolveFramingRenderCamera(
 /** One active render and one latest request; preparation starts after an inspector paint. */
 function createFramingRenderQueue(params: {
   predecessor: Promise<void>;
+  accept: (request: FramingRequest) => boolean;
   render: (request: FramingRequest) => Promise<FramingResult>;
   signal: AbortSignal;
   present: (result: FramingResult) => void;
@@ -263,16 +299,17 @@ function createFramingRenderQueue(params: {
         await afterPaint();
         if (params.signal.aborted || !latest) break;
         const current = latest;
+        if (!params.accept(current)) break;
         let result: FramingResult | undefined;
         let accepted = false;
         try {
           result = await params.render(current);
-          if (!params.signal.aborted && current === latest) {
+          if (!params.signal.aborted && current === latest && params.accept(current)) {
             params.present(result);
             accepted = true;
           }
         } catch {
-          if (!params.signal.aborted && current === latest) params.fail();
+          if (!params.signal.aborted && current === latest && params.accept(current)) params.fail();
         } finally {
           if (!accepted) result?.output?.release();
         }
@@ -297,7 +334,12 @@ function createFramingRenderQueue(params: {
       void running.catch(() => {});
     }
   };
-  return Object.assign(enqueue, { settled: () => running ?? Promise.resolve() });
+  return Object.assign(enqueue, {
+    settled: () => running ?? Promise.resolve(),
+    invalidate: () => {
+      latest = null;
+    },
+  });
 }
 
 /** Immutable editor snapshots replace changed fields; motion and metadata do not change this source. */

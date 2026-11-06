@@ -176,13 +176,17 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
   const project = usePreviewCompositionProject(params.project);
   const { presentation, transient } = usePreviewStageTimeline({ ...params, project });
   const effectRuntimeFeedback = usePreviewEffectRuntimeFeedback();
-  const eventsProject = useRecordingEventsProject(
+  const cursorPreparation = useCursorTrajectoryProject(
     transient.previewProject,
+    transient.currentTime,
+    undefined,
+    effectRuntimeFeedback
+  );
+  const cursorProject = useRecordingEventsProject(
+    cursorPreparation.project,
     transient.currentTime,
     effectRuntimeFeedback
   );
-  const cursorPreparation = useCursorTrajectoryProject(eventsProject, transient.currentTime);
-  const cursorProject = cursorPreparation.project;
   const previewProject = useMemo(
     () => ({
       ...cursorProject,

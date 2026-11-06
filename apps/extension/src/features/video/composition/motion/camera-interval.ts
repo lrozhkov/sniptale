@@ -1,6 +1,9 @@
 import { projectMotionSourcePhases } from '../../project/motion/source-binding';
 import { isCameraMotionRegion } from '../../project/motion/normalization';
-import { resolveMotionConnectionSource } from '../../project/motion';
+import { resolveMotionConnectionSource, resolveMotionConnectionVideo } from '../../project/motion';
+import { resolveMotionSourcePlayback } from '../../project/motion/source-playback';
+import { isVideoProjectUtilityLaneVisible } from '../../project/utility-lanes';
+import { VideoMotionFocusMode } from '../../project/types';
 import { motionTransitionSettings, getMotionAnimationTime } from '../../project/motion/timing';
 import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
 import { motionRegionBlurPhase } from './blur';
@@ -35,6 +38,50 @@ export function resolveConnectingMotionRegions(project: VideoProject, time: numb
     if (source && time >= source.startTime + source.duration) return { source, destination };
   }
   return null;
+}
+
+/** True when this visible camera consumes archived cursor facts at the requested source clock. */
+export function hasCursorFollowingCameraAt(project: VideoProject, time: number): boolean {
+  if (!isVideoProjectUtilityLaneVisible(project, 'camera')) return false;
+  const playback = resolveMotionSourcePlayback(project, time);
+  const cameraProject = projectMotionSourcePhases(playback?.geometryProject ?? project);
+  const at = playback?.time ?? time;
+  const archived = (clipId?: string) =>
+    cameraProject.clips.some(
+      (clip) =>
+        clip.type === 'VIDEO' &&
+        (!clipId || clip.id === clipId) &&
+        at >= clip.startTime &&
+        at < clip.startTime + clip.duration &&
+        cameraProject.cursorTrack?.sourceObservations?.some(
+          (group) =>
+            group.sourceInstanceId === clip.sourceInstanceId &&
+            group.trajectory &&
+            group.trajectory.totalBlocks > 0
+        )
+    );
+  const active = resolveActiveMotionRegion(cameraProject, at);
+  if (active)
+    return (
+      active.focusMode === VideoMotionFocusMode.CURSOR && archived(active.sourceBinding?.clipId)
+    );
+  const connection = resolveConnectingMotionRegions(cameraProject, at);
+  if (
+    !connection ||
+    (connection.source.focusMode !== VideoMotionFocusMode.CURSOR &&
+      connection.destination.focusMode !== VideoMotionFocusMode.CURSOR)
+  )
+    return false;
+  const clip = resolveMotionConnectionVideo(
+    cameraProject,
+    connection.source,
+    connection.destination,
+    at
+  );
+  return (
+    (connection.destination.sourceBinding?.coordinateSpace !== 'source-window' || !!clip) &&
+    archived(clip?.id)
+  );
 }
 
 function cameraSpan(project: VideoProject, time: number): CameraSpan | null {

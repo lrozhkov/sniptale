@@ -4,6 +4,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useCursorTrajectoryProject } from './cursor-trajectory';
 import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
+import {
+  attachPreparedProjectCamera,
+  projectCameraInputSignature,
+  projectCameraOutputKey,
+  preparedProjectCamera,
+} from '../../../../features/video/composition/motion/prepared-project-camera';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
 import { prepareCursorTrajectoryProject } from '../../../../features/video/project/cursor-trajectory/project-window';
 import { resolveObservedCursorPosition } from '../../../../features/video/composition/timeline/frame/cursor';
@@ -14,11 +21,27 @@ let root: Root;
 let container: HTMLDivElement;
 let latest: VideoProject;
 let canRender: (time: number) => boolean;
+let latestResult: ReturnType<typeof useCursorTrajectoryProject>;
+const feedback = { onFailure: vi.fn(), onRecovery: vi.fn(), retryVersion: 0 };
 const prepare = vi.fn<(project: VideoProject, time: number) => Promise<VideoProject>>();
 const clear = vi.fn();
-const createRenderer = () => ({ prepare, prepareCamera: vi.fn(), clear });
-function Harness({ project, time }: { project: VideoProject; time: number }) {
-  const prepared = useCursorTrajectoryProject(project, time, createRenderer);
+const prepareCamera =
+  vi.fn<(project: VideoProject, output?: unknown, signal?: AbortSignal) => Promise<VideoProject>>();
+const createRenderer = () => ({ prepare, prepareCamera, clear });
+function Harness({
+  project,
+  time,
+  retryVersion = 0,
+}: {
+  project: VideoProject;
+  time: number;
+  retryVersion?: number;
+}) {
+  const prepared = useCursorTrajectoryProject(project, time, createRenderer, {
+    ...feedback,
+    retryVersion,
+  });
+  latestResult = prepared;
   latest = prepared.project;
   canRender = prepared.canRender;
   return null;
@@ -104,12 +127,18 @@ async function prepared(project: VideoProject, time: number) {
     initialSegment: null,
   }));
 }
-async function render(project: VideoProject, time: number) {
-  await act(async () => root.render(<Harness project={project} time={time} />));
+async function render(project: VideoProject, time: number, retryVersion = 0) {
+  await act(async () =>
+    root.render(<Harness project={project} time={time} retryVersion={retryVersion} />)
+  );
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  feedback.onFailure.mockReset();
+  feedback.onRecovery.mockReset();
   prepare.mockReset();
+  prepareCamera.mockReset();
+  prepareCamera.mockImplementation(async (source) => source);
   clear.mockReset();
   container = document.createElement('div');
   document.body.append(container);
@@ -256,4 +285,126 @@ it('keeps readiness stable when repeated successful preparation returns the same
   await render(project, 1.25);
   expect(canRender).toBe(readiness);
   expect(latest).toBe(windowProject);
+});
+
+it('prepares stable camera facts independently and holds a covered frame until they arrive', async () => {
+  const project = fixture();
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      startTime: 0,
+      duration: 4,
+      focusMode: 'CURSOR',
+    },
+  ];
+  const camera = Promise.withResolvers<VideoProject>();
+  prepareCamera.mockReturnValue(camera.promise);
+  prepare.mockResolvedValue(await prepared(project, 1));
+  await render(project, 1);
+  expect(prepareCamera).toHaveBeenCalledOnce();
+  expect(canRender(1)).toBe(false);
+  await render(project, 1.25);
+  expect(prepareCamera).toHaveBeenCalledOnce();
+  await act(async () => camera.resolve(cameraPrepared(project)));
+  expect(canRender(1.25)).toBe(true);
+  expect(preparedProjectCamera(latest)).toBeDefined();
+});
+
+function cameraPrepared(project: VideoProject) {
+  return attachPreparedProjectCamera(project, {
+    signature: projectCameraInputSignature(project),
+    output: projectCameraOutputKey(project),
+    cameras: [],
+    orientations: [],
+    conflicts: [],
+  });
+}
+function cameraFixture() {
+  const project = fixture();
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      startTime: 0,
+      duration: 4,
+      focusMode: 'CURSOR',
+    },
+  ];
+  return project;
+}
+it('keeps camera failure separate from cursor fallback and retries through existing feedback', async () => {
+  const project = cameraFixture();
+  prepare.mockRejectedValue(new Error('Cursor unavailable'));
+  prepareCamera.mockRejectedValueOnce(new Error('Camera unavailable'));
+  await render(project, 1);
+  expect(latestResult.cameraFailed).toBe(true);
+  expect(canRender(1.5)).toBe(false);
+  expect(feedback.onFailure).toHaveBeenCalledWith('camera-history', expect.any(Error));
+  prepareCamera.mockResolvedValue(cameraPrepared(project));
+  await render(project, 1.5, 1);
+  expect(latestResult.cameraFailed).toBe(false);
+  expect(canRender(1.6)).toBe(true);
+  expect(feedback.onRecovery).toHaveBeenCalledWith('camera-history');
+});
+it('aborts replaced camera requests and rejects late old-source publication', async () => {
+  const old = cameraFixture(),
+    current = { ...cameraFixture(), name: 'Current' };
+  const first = Promise.withResolvers<VideoProject>(),
+    second = Promise.withResolvers<VideoProject>();
+  prepareCamera.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  prepare.mockImplementation(async (source, time) => prepared(source, time));
+  await render(old, 1);
+  const signal = prepareCamera.mock.calls[0]![2]!;
+  await render(current, 1);
+  expect(signal.aborted).toBe(true);
+  await act(async () => first.resolve(cameraPrepared(old)));
+  expect(canRender(1)).toBe(false);
+  await act(async () => second.resolve(cameraPrepared(current)));
+  expect(canRender(1)).toBe(true);
+  expect(latest.name).toBe('Current');
+});
+it('does not wait for an irrelevant future camera and aborts camera work on unmount', async () => {
+  const project = cameraFixture();
+  project.motionRegions = project.motionRegions!.map((region) => ({
+    ...region,
+    startTime: 2,
+    duration: 2,
+  }));
+  project.cursorTrack!.skin.hidden = true;
+  prepare.mockReturnValue(new Promise(() => {}));
+  prepareCamera.mockReturnValue(new Promise(() => {}));
+  await render(project, 1);
+  expect(canRender(1)).toBe(true);
+  expect(canRender(2.5)).toBe(false);
+  const signal = prepareCamera.mock.calls[0]![2]!;
+  await act(async () => root.render(null));
+  expect(signal.aborted).toBe(true);
+  expect(clear).toHaveBeenCalledOnce();
+});
+
+it('reports a retained camera failure only while the current time requires that camera', async () => {
+  const project = cameraFixture();
+  project.motionRegions = project.motionRegions!.map((region) => ({
+    ...region,
+    startTime: 2,
+    duration: 2,
+  }));
+  project.cursorTrack!.skin.hidden = true;
+  const failure = new Error('Future camera unavailable');
+  prepareCamera.mockRejectedValueOnce(failure);
+  prepare.mockResolvedValue(project);
+  await render(project, 1);
+  expect(canRender(1)).toBe(true);
+  expect(feedback.onFailure).not.toHaveBeenCalled();
+  await render(project, 2.5);
+  expect(canRender(2.5)).toBe(false);
+  expect(feedback.onFailure).toHaveBeenCalledWith('camera-history', failure);
+  feedback.onRecovery.mockClear();
+  await render(project, 1);
+  expect(feedback.onRecovery).toHaveBeenCalledWith('camera-history');
+  expect(latestResult.cameraFailed).toBe(false);
+  feedback.onFailure.mockClear();
+  await render(project, 2.5);
+  expect(latestResult.cameraFailed).toBe(true);
+  expect(feedback.onFailure).toHaveBeenCalledWith('camera-history', failure);
+  expect(prepareCamera).toHaveBeenCalledOnce();
 });

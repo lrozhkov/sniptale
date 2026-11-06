@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useRecordingHistoryReadLifetime,
   runRecordingHistoryReads,
@@ -6,8 +6,16 @@ import {
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createRecordingCursorTrajectoryRenderer } from '../../../../workflows/video-review/cursor-trajectory';
 import { cursorTrajectoryProjectCoversTime } from '../../../../features/video/project/cursor-trajectory/project-window';
+import { hasCursorFollowingCameraAt } from '../../../../features/video/composition/motion/camera-interval';
 import { canRenderPreparedCursorFrame } from './cursor-readiness';
 import type { VideoProject } from '../../../../features/video/project/types';
+
+import {
+  attachPreparedProjectCamera,
+  preparedProjectCamera,
+  projectRequiresPreparedCamera,
+} from '../../../../features/video/composition/motion/prepared-project-camera';
+import type { PreviewEffectRuntimeFeedback } from '../types';
 
 const logger = createLogger({ namespace: 'VideoEditorCursorTrajectory' });
 type Request = { project: VideoProject; time: number };
@@ -16,8 +24,14 @@ type Request = { project: VideoProject; time: number };
 export function useCursorTrajectoryProject(
   project: VideoProject,
   time: number,
-  createRenderer = createRecordingCursorTrajectoryRenderer
-): { project: VideoProject; canRender: (time: number) => boolean } {
+  createRenderer = createRecordingCursorTrajectoryRenderer,
+  feedback?: Pick<PreviewEffectRuntimeFeedback, 'onFailure' | 'onRecovery' | 'retryVersion'>
+): {
+  project: VideoProject;
+  canRender: (time: number) => boolean;
+  cameraFailed: boolean;
+  retryCamera: () => void;
+} {
   const owner = useMemo(
     () => ({
       renderer: createRenderer(),
@@ -30,6 +44,39 @@ export function useCursorTrajectoryProject(
     }),
     [createRenderer]
   );
+  const [camera, setCamera] = useState<{
+    source: VideoProject;
+    project: VideoProject | null;
+    failed: boolean;
+    error?: unknown;
+  } | null>(null);
+  const [cameraRetry, setCameraRetry] = useState(0);
+  const retryCamera = useCallback(() => setCameraRetry((value) => value + 1), []);
+  const retryVersion = feedback?.retryVersion ?? 0;
+  const onFailure = feedback?.onFailure;
+  const onRecovery = feedback?.onRecovery;
+  useEffect(() => {
+    const controller = new AbortController();
+    setCamera(null);
+    void owner.renderer
+      .prepareCamera(project, undefined, controller.signal)
+      .then((prepared) => {
+        if (controller.signal.aborted) return;
+        if (projectRequiresPreparedCamera(project) && !preparedProjectCamera(prepared))
+          throw new Error('Prepared camera is unavailable.');
+        setCamera({ source: project, project: prepared, failed: false });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setCamera({ source: project, project: null, failed: true, error });
+      });
+    return () => controller.abort();
+  }, [owner, project, cameraRetry, retryVersion]);
+  useEffect(() => {
+    if (camera?.source === project && camera.failed && hasCursorFollowingCameraAt(project, time))
+      onFailure?.('camera-history', camera.error);
+    else onRecovery?.('camera-history');
+  }, [camera, project, time, onFailure, onRecovery]);
   const [completed, setCompleted] = useState<{
     source: VideoProject;
     project: VideoProject;
@@ -83,13 +130,26 @@ export function useCursorTrajectoryProject(
     });
   }, [owner, project, time]);
   const current = completed?.source === project ? completed : null;
-  const prepared = current?.project ?? project;
+  const frameProject = current?.project ?? project;
+  const cameraProject = camera?.source === project ? camera.project : null;
+  const bundle = cameraProject && preparedProjectCamera(cameraProject);
+  const prepared = useMemo(
+    () =>
+      bundle && preparedProjectCamera(frameProject) !== bundle
+        ? attachPreparedProjectCamera(frameProject, bundle)
+        : frameProject,
+    [frameProject, bundle]
+  );
+  const cameraFailed =
+    camera?.source === project && camera.failed && hasCursorFollowingCameraAt(project, time);
   const unavailable = current?.unavailable === true;
   return useMemo(
     () => ({
       project: prepared,
-      canRender: (at: number) => unavailable || canRenderPreparedCursorFrame(prepared, at),
+      canRender: (at: number) => canRenderPreparedCursorFrame(prepared, at, unavailable),
+      cameraFailed,
+      retryCamera,
     }),
-    [prepared, unavailable]
+    [prepared, unavailable, cameraFailed, retryCamera]
   );
 }

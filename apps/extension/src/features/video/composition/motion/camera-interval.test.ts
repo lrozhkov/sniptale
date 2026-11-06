@@ -3,6 +3,7 @@ import type { VideoProjectMotionRegion } from '../../project/types';
 import { createEmptyVideoProject } from '../../project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../project/motion';
 import {
+  hasCursorFollowingCameraAt,
   resolveActiveMotionRegion,
   resolveConnectingMotionRegions,
   motionBlurSampleBounds,
@@ -132,4 +133,121 @@ it('retains legacy cursor exposure inside an instantaneous region hold', () => {
     start: 0,
     end: project.duration - 1e-9,
   });
+});
+
+it('selects archived follow demand on active regions and validated connections only', async () => {
+  const { createProject, createVideoClip } =
+    await import('../../project/timeline/project-meta.test.helpers');
+  const { normalizeVideoProjectCursorSkin } = await import('../../project/cursor');
+  const clip = createVideoClip({ sourceInstanceId: 'archive', duration: 8 });
+  const project = createProject([clip]);
+  project.cursorTrack = {
+    captureMode: 'separate',
+    samples: [],
+    skin: normalizeVideoProjectCursorSkin({ hidden: true }),
+    sourceObservations: [
+      {
+        recordingId: 'source',
+        sourceInstanceId: 'archive',
+        samples: [],
+        trajectory: {
+          format: 'cursor-trajectory-v1',
+          formatVersion: 1,
+          algorithm: 'sed-window-v1',
+          encoding: 'json-ascii-int-v1',
+          trajectoryId: 'a'.repeat(32),
+          finalized: true,
+          state: 'complete',
+          totalBlocks: 1,
+          totalRecords: 0,
+          totalSamples: 0,
+          totalBytes: 0,
+          streamSha256: 'b'.repeat(64),
+        },
+      },
+    ],
+  };
+  const first = {
+    ...createVideoProjectMotionRegion(project, 1),
+    id: 'first',
+    startTime: 1,
+    duration: 2,
+    focusMode: 'CURSOR' as const,
+    sourceBinding: {
+      clipId: clip.id,
+      sourceStart: 1,
+      sourceEnd: 3,
+      animation: { start: 0, end: 2, duration: 2 },
+      coordinateSpace: 'source-window' as const,
+    },
+  };
+  const second = {
+    ...first,
+    id: 'second',
+    startTime: 5,
+    sourceBinding: { ...first.sourceBinding, sourceStart: 5, sourceEnd: 7 },
+    incomingConnection: { fromRegionId: first.id, easing: 'LINEAR' as const },
+  };
+  const linked = { ...project, motionRegions: [first, second] };
+  expect(hasCursorFollowingCameraAt(linked, 0.5)).toBe(false);
+  expect(hasCursorFollowingCameraAt(linked, 2)).toBe(true);
+  expect(hasCursorFollowingCameraAt(linked, 4)).toBe(true);
+  const manualFirst = { ...first, focusMode: 'MANUAL_AREA' as const };
+  expect(hasCursorFollowingCameraAt({ ...linked, motionRegions: [manualFirst, second] }, 4)).toBe(
+    true
+  );
+  expect(
+    hasCursorFollowingCameraAt(
+      { ...linked, motionRegions: [manualFirst, { ...second, focusMode: 'MANUAL_AREA' }] },
+      4
+    )
+  ).toBe(false);
+  const { sourceBinding: _firstBinding, ...unboundFirst } = first;
+  const { sourceBinding: _secondBinding, ...unboundSecond } = second;
+  expect(
+    hasCursorFollowingCameraAt({ ...linked, motionRegions: [unboundFirst, unboundSecond] }, 4)
+  ).toBe(false);
+  expect(
+    hasCursorFollowingCameraAt(
+      { ...linked, motionRegions: [first, { ...second, incomingConnection: null }] },
+      4
+    )
+  ).toBe(false);
+  expect(
+    hasCursorFollowingCameraAt(
+      {
+        ...linked,
+        utilityLanes: {
+          actions: { visible: true, locked: false },
+          camera: { visible: false, locked: false },
+        },
+      },
+      2
+    )
+  ).toBe(false);
+  const inline = createVideoClip({ id: 'inline', sourceInstanceId: 'inline', duration: 8 });
+  expect(
+    hasCursorFollowingCameraAt(
+      {
+        ...linked,
+        clips: [...linked.clips, inline],
+        motionRegions: [{ ...first, sourceBinding: { ...first.sourceBinding, clipId: inline.id } }],
+      },
+      2
+    )
+  ).toBe(false);
+  const dormant = {
+    ...first,
+    sourceBinding: {
+      ...first.sourceBinding,
+      dormant: true,
+      phaseProjection: 'retained-result' as const,
+    },
+  };
+  expect(hasCursorFollowingCameraAt({ ...linked, motionRegions: [dormant] }, 2)).toBe(false);
+  const retained = {
+    ...linked,
+    clips: [{ ...clip, playbackWindow: { offset: 0, extent: 8, holdAt: 2.5 } }],
+  };
+  expect(hasCursorFollowingCameraAt(retained, 2)).toBe(true);
 });

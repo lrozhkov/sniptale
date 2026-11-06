@@ -94,7 +94,7 @@ it('does not let an unrelated archive source block a bound camera', () => {
 
 it('keeps covered gaps ready and refuses the administrative window boundary', async () => {
   const project = fixture();
-  follow(project);
+  project.cursorTrack!.skin.hidden = false;
   const prepared = await prepareCursorTrajectoryProject(project, 1, async () => ({
     fromTimeUs: 0,
     toTimeUs: 2000000,
@@ -175,4 +175,28 @@ it('uses retained source playback mapping and excludes dormant follow regions', 
     motionRegions: [{ ...region, sourceBinding: { ...region.sourceBinding, dormant: false } }],
   };
   expect(canRenderPreparedCursorFrame(active, 1)).toBe(false);
+});
+
+it('requires a camera bundle independently from covered or unavailable frame cursor data', async () => {
+  const project = fixture();
+  follow(project);
+  const covered = await prepareCursorTrajectoryProject(project, 1, async () => ({
+    fromTimeUs: 0,
+    toTimeUs: null,
+    records: [],
+    initialSegment: null,
+  }));
+  expect(canRenderPreparedCursorFrame(covered, 1)).toBe(false);
+  expect(canRenderPreparedCursorFrame(project, 1, true)).toBe(false);
+  const { attachPreparedProjectCamera, projectCameraInputSignature, projectCameraOutputKey } =
+    await import('../../../../features/video/composition/motion/prepared-project-camera');
+  const ready = attachPreparedProjectCamera(project, {
+    signature: projectCameraInputSignature(project),
+    output: projectCameraOutputKey(project),
+    cameras: [],
+    orientations: [],
+    conflicts: [],
+  });
+  expect(canRenderPreparedCursorFrame(ready, 1)).toBe(true);
+  expect(canRenderPreparedCursorFrame({ ...ready, width: ready.width + 1 }, 1)).toBe(false);
 });
