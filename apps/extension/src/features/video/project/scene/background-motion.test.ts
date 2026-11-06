@@ -4,6 +4,7 @@ import {
   evaluateSceneBackgroundMotion,
   hasSceneBackgroundMotion,
   parseSceneBackgroundMotion,
+  sceneBackgroundDriftRect,
 } from './background-motion';
 import {
   drawSceneBackgroundMotion,
@@ -215,3 +216,44 @@ it('draws three bounded glow lights after the source and restores the output sta
   releaseSceneBackgroundMotionRaster(target);
   expect(release).toHaveBeenCalledOnce();
 });
+
+it.each(['drift', 'glow'] as const)(
+  'keeps canonical %s destination coordinates in the Canvas consumer',
+  (mode) => {
+    const target = context();
+    const source = context();
+    const release = vi.fn();
+    const motion = { mode, speed: 100, intensity: 75 };
+    const raster = { getContext: () => source } as unknown as OffscreenCanvas;
+    for (const time of [0, 16.9, 4, 120, 16.9]) {
+      const frame = evaluateSceneBackgroundMotion(motion, time);
+      const rect = sceneBackgroundDriftRect(frame, 1904, 1072);
+      expect(rect).toEqual({
+        x: (1904 - 1904 * frame.zoom) / 2 + frame.offsetX * 1904,
+        y: (1072 - 1072 * frame.zoom) / 2 + frame.offsetY * 1072,
+        width: 1904 * frame.zoom,
+        height: 1072 * frame.zoom,
+      });
+      drawSceneBackgroundMotion({
+        context: target,
+        width: 1904,
+        height: 1072,
+        currentTime: time,
+        motion,
+        image: null,
+        paintKey: 'static',
+        acquire: () => ({ canvas: raster, release }),
+        paint: vi.fn(),
+      });
+      expect(target.drawImage).toHaveBeenLastCalledWith(
+        raster,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height
+      );
+    }
+    releaseSceneBackgroundMotionRaster(target);
+    expect(release).toHaveBeenCalledOnce();
+  }
+);

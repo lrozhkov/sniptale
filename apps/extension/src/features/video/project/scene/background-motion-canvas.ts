@@ -1,6 +1,6 @@
 import { acquireVideoCompositionBuffer } from '../../composition/canvas/buffer-pool';
 import type { VideoSceneBackgroundMotion } from '../types/layout';
-import { evaluateSceneBackgroundMotion } from './background-motion';
+import { evaluateSceneBackgroundMotion, sceneBackgroundDriftRect } from './background-motion';
 
 type Lease = NonNullable<ReturnType<typeof acquireVideoCompositionBuffer>>;
 interface MotionRaster {
@@ -120,14 +120,8 @@ export function drawSceneBackgroundMotion(args: BackgroundMotionDrawArgs) {
         );
       }
     } else {
-      const zoom = frame.zoom;
-      context.drawImage(
-        source,
-        (width - width * zoom) / 2 + frame.offsetX * width,
-        (height - height * zoom) / 2 + frame.offsetY * height,
-        width * zoom,
-        height * zoom
-      );
+      const rect = sceneBackgroundDriftRect(frame, width, height);
+      context.drawImage(source, rect.x, rect.y, rect.width, rect.height);
       if (motion.mode === 'glow') {
         const radius = Math.min(width, height) * 0.75;
         frame.lights.forEach((light, index) => {

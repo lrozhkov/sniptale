@@ -915,3 +915,133 @@ it('passes plain STRETCH rectangles to the admitted renderer and preserves rotat
   expect(turned?.y).toBeCloseTo(2 - Math.SQRT1_2, 10);
   expect(layer).toEqual(original);
 });
+
+it('retains drift background pixels while GPU geometry follows programme time and camera', async () => {
+  const f = fixture();
+  f.input.project.width = 2560;
+  f.input.project.height = 1440;
+  f.input.project.sceneBackground = {
+    ...createSceneGradientBackground(),
+    motion: { mode: 'drift', intensity: 100, speed: 100 },
+  };
+  f.passes = resolveVideoCompositionRenderPasses(f.input.project, 1);
+  const original = structuredClone(f.input.project);
+  await f.owner.render(f.input, f.passes, f.finish, () => false);
+  f.input.currentTime = 2;
+  await f.owner.render(f.input, f.passes, f.finish, () => false);
+  const background = (index: number) => {
+    const pending = [...f.render.mock.calls[index]![0].layers];
+    while (pending.length) {
+      const layer = pending.pop()!;
+      if (layer.cache?.key === 'native-background') return layer;
+      if ('kind' in layer.source && layer.source.kind === 'group')
+        pending.push(...layer.source.layers);
+    }
+    throw new Error('Expected project background');
+  };
+  const first = background(0);
+  const second = background(1);
+  expect(second.cache).toEqual(first.cache);
+  expect(second.source).toBe(first.source);
+  expect(second.rect).not.toEqual(first.rect);
+  expect(first.source).toBeInstanceOf(HTMLCanvasElement);
+  if (!(first.source instanceof HTMLCanvasElement)) throw new Error('Expected background paint');
+  expect(first.source.width).toBe(2048);
+  expect(first.source.height).toBe(1152);
+  expect(second.clip).toEqual({
+    rect: { x: 0, y: 0, width: 2560, height: 1440 },
+    radius: 0,
+    shape: 'hard-rect',
+  });
+  f.passes.overlayFrame.camera.backgroundCamera = { scale: 1.5, viewportX: 60, viewportY: 40 };
+  await f.owner.render(f.input, f.passes, f.finish, () => false);
+  const third = background(2);
+  expect(third.cache).toEqual(first.cache);
+  expect(third.inverse).toEqual([1 / 1.5, 0, 60, 0, 1 / 1.5, 40, 0, 0, 1]);
+  expect(f.input.project).toEqual(original);
+});
+
+it.each(['glow', 'waves', 'blur', 'gradient-animation'] as const)(
+  'keeps the existing changing raster for unsupported retained drift setting %s',
+  async (setting) => {
+    const f = fixture();
+    f.input.project.sceneBackground = {
+      ...createSceneGradientBackground(),
+      motion: {
+        mode: setting === 'glow' || setting === 'waves' ? setting : 'drift',
+        intensity: 100,
+        speed: 100,
+      },
+      ...(setting === 'blur' ? { blur: 1 } : {}),
+      ...(setting === 'gradient-animation'
+        ? { animation: { mode: 'breathe' as const, intensity: 100, speed: 100 } }
+        : {}),
+    };
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    f.input.currentTime = 2;
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    const first = f.render.mock.calls[0]![0].layers[0]!;
+    const second = f.render.mock.calls[1]![0].layers[0]!;
+    expect(second.cache).not.toEqual(first.cache);
+    expect(second.rect).toEqual(first.rect);
+    expect(second.clip).toBeUndefined();
+  }
+);
+
+it.each(['speed', 'intensity'] as const)(
+  'preserves exact dormant drift paint when %s is zero',
+  async (zero) => {
+    const f = fixture();
+    f.input.project.sceneBackground = {
+      ...createSceneGradientBackground(),
+      motion: {
+        mode: 'drift',
+        speed: zero === 'speed' ? 0 : 100,
+        intensity: zero === 'intensity' ? 0 : 100,
+      },
+    };
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    f.input.currentTime = 2;
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    const first = f.render.mock.calls[0]![0].layers[0]!;
+    const second = f.render.mock.calls[1]![0].layers[0]!;
+    expect(second.cache).toEqual(first.cache);
+    expect(second.rect).toEqual({ x: 0, y: 0, width: 8, height: 4 });
+    expect(second.clip).toBeUndefined();
+  }
+);
+
+it.each(['paint', 'size', 'mode', 'image'] as const)(
+  'replaces retained drift pixels after a %s change and disposes the paint',
+  async (change) => {
+    const f = fixture();
+    const motion = { mode: 'drift' as const, speed: 100, intensity: 100 };
+    f.input.project.sceneBackground =
+      change === 'image'
+        ? { kind: 'image', assetId: 'first', imageFit: 'cover', motion }
+        : { ...createSceneGradientBackground(), motion };
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    const first = f.render.mock.calls[0]![0].layers[0]!;
+    const background = f.input.project.sceneBackground;
+    f.input.project = {
+      ...f.input.project,
+      ...(change === 'size' ? { width: 10, height: 5 } : {}),
+      sceneBackground:
+        change === 'paint'
+          ? { ...createSceneGradientBackground('#ff0000'), motion }
+          : change === 'mode'
+            ? { ...background, motion: { ...motion, mode: 'glow' } }
+            : change === 'image' && background.kind === 'image'
+              ? { ...background, assetId: 'second' }
+              : background,
+    };
+    f.passes = resolveVideoCompositionRenderPasses(f.input.project, 1);
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    const second = f.render.mock.calls[1]![0].layers[0]!;
+    expect(second.cache).not.toEqual(first.cache);
+    f.owner.dispose();
+    expect(second.source).toBeInstanceOf(HTMLCanvasElement);
+    if (!(second.source instanceof HTMLCanvasElement)) throw new Error('Expected background');
+    expect(second.source.width).toBe(0);
+  }
+);

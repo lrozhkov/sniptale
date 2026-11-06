@@ -49,3 +49,17 @@ export function evaluateSceneBackgroundMotion(
     ],
   };
 }
+
+/** Destination of the retained drift paint in scene coordinates. Glow uses the same base motion. */
+export function sceneBackgroundDriftRect(
+  frame: Pick<ReturnType<typeof evaluateSceneBackgroundMotion>, 'zoom' | 'offsetX' | 'offsetY'>,
+  width: number,
+  height: number
+) {
+  return {
+    x: (width - width * frame.zoom) / 2 + frame.offsetX * width,
+    y: (height - height * frame.zoom) / 2 + frame.offsetY * height,
+    width: width * frame.zoom,
+    height: height * frame.zoom,
+  };
+}

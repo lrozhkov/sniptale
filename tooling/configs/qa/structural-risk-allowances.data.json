@@ -6078,10 +6078,10 @@
       "rule": "structural-file-risk",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "astHash": "e3b47569ad06ed7cd28c4a19aedcacdf2479c9ca43a442723690ff55a497352a",
+      "astHash": "fb365eada0981a8c68526d89ed1ec48aa62e5466283351fa5275e817828bd50b",
       "signatureHash": "30d5084ef313ccb797d2fb3c9e7d189fb621390c86693d75c005881b30605240",
       "reviewDate": "2026-11-06",
-      "reason": "tool-noise: One Native producer fixture controls captured sources, GPU completion and output leases. The added STRETCH case checks plain source and clip rectangles. Rotation landmarks check the existing transform contract. Fresh independent architecture review must check this exact binding.",
+      "reason": "tool-noise: One Native producer fixture controls captured sources, GPU completion and output leases. Added cases check retained background paint, geometry and invalidation through the same producer. Numerical camera and painting owners retain their existing contracts. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction."
     },
     {

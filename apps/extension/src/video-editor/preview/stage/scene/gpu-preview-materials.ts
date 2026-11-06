@@ -21,7 +21,11 @@ import {
   drawSceneBackground,
   getProjectSceneBackground,
 } from '../../../../features/video/project/scene/background';
-import { hasSceneBackgroundMotion } from '../../../../features/video/project/scene/background-motion';
+import {
+  evaluateSceneBackgroundMotion,
+  hasSceneBackgroundMotion,
+  sceneBackgroundDriftRect,
+} from '../../../../features/video/project/scene/background-motion';
 import { resolveSceneBackgroundAudioEnvelope } from '../../../../features/video/project/scene/background-audio';
 import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
@@ -255,6 +259,21 @@ function backgroundLayer(
   const sceneBackground = getProjectSceneBackground(input.project);
   const image =
     sceneBackground.kind === 'image' ? input.imageBank[sceneBackground.assetId] : undefined;
+  const retainedDrift =
+    sceneBackground.enabled !== false &&
+    sceneBackground.kind !== 'solid' &&
+    sceneBackground.motion?.mode === 'drift' &&
+    hasSceneBackgroundMotion(sceneBackground.motion) &&
+    (sceneBackground.blur ?? 0) === 0 &&
+    (sceneBackground.kind !== 'gradient' ||
+      !sceneBackground.animation ||
+      sceneBackground.animation.mode === 'none');
+  const { motion: _motion, ...basePaint } = sceneBackground;
+  const paint = retainedDrift ? basePaint : sceneBackground;
+  const camera = passes.overlayFrame.camera.backgroundCamera;
+  const density = retainedDrift ? Math.min(1, 2048 / Math.max(size.width, size.height)) : 1;
+  const rasterWidth = Math.max(1, Math.round(size.width * density));
+  const rasterHeight = Math.max(1, Math.round(size.height * density));
   const animated =
     sceneBackground.enabled !== false &&
     (hasSceneBackgroundMotion(sceneBackground.motion) ||
@@ -264,34 +283,58 @@ function backgroundLayer(
   const key = JSON.stringify([
     size.width,
     size.height,
-    sceneBackground,
-    passes.overlayFrame.camera.backgroundCamera,
-    animated ? input.currentTime : null,
+    paint,
+    retainedDrift ? null : camera,
+    animated && !retainedDrift ? input.currentTime : null,
+    retainedDrift,
   ]);
   if (raster.key !== key || raster.image !== image) {
-    raster.canvas.width = Math.ceil(size.width);
-    raster.canvas.height = Math.ceil(size.height);
+    raster.canvas.width = retainedDrift ? rasterWidth : Math.ceil(size.width);
+    raster.canvas.height = retainedDrift ? rasterHeight : Math.ceil(size.height);
     drawSceneBackground({
       context: raster.context,
-      width: size.width,
-      height: size.height,
-      projectScale: size.width / input.project.width,
+      width: retainedDrift ? rasterWidth : size.width,
+      height: retainedDrift ? rasterHeight : size.height,
+      projectScale: (retainedDrift ? rasterWidth : size.width) / input.project.width,
       currentTime: input.currentTime,
       audioEnvelope: resolveSceneBackgroundAudioEnvelope(input.project, input.currentTime),
-      sceneBackground,
+      sceneBackground: paint,
       loadedImages: input.imageBank,
-      ...(passes.overlayFrame.camera.backgroundCamera
-        ? { camera: passes.overlayFrame.camera.backgroundCamera }
-        : {}),
+      ...(!retainedDrift && camera ? { camera } : {}),
     });
     raster.key = key;
     raster.image = image;
     raster.revision++;
   }
+  const full = { x: 0, y: 0, ...size };
+  const rect =
+    retainedDrift && sceneBackground.motion
+      ? sceneBackgroundDriftRect(
+          evaluateSceneBackgroundMotion(sceneBackground.motion, input.currentTime),
+          size.width,
+          size.height
+        )
+      : full;
+  const projectScale = size.width / input.project.width;
+  const inverse: QuickEditHomography =
+    retainedDrift && camera
+      ? [
+          1 / camera.scale,
+          0,
+          camera.viewportX * projectScale,
+          0,
+          1 / camera.scale,
+          camera.viewportY * projectScale,
+          0,
+          0,
+          1,
+        ]
+      : IDENTITY;
   return {
     source: raster.canvas,
-    rect: { x: 0, y: 0, ...size },
-    inverse: IDENTITY,
+    rect,
+    inverse,
+    ...(retainedDrift ? { clip: { rect: full, radius: 0, shape: 'hard-rect' as const } } : {}),
     cache: { key: cacheKey, revision: raster.revision },
   };
 }
