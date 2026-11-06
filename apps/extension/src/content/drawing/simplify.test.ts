@@ -79,6 +79,74 @@ function harness() {
 async function started(h: ReturnType<typeof harness>, count = 1) {
   await vi.waitFor(() => expect(h.renders).toHaveLength(count));
 }
+it('does not report an old preparation failure over a newer gesture', async () => {
+  const h = harness();
+  const first = deferred<DrawingSimplifySource>();
+  const second = deferred<DrawingSimplifySource>();
+  h.acquire.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  const oldSource = h.runtime.prepare(new Event('pointerdown'));
+  const oldWork = h.runtime.submit(h.object, new Event('pointerup'), oldSource);
+  const newSource = h.runtime.prepare(new Event('pointerdown'));
+  first.reject(new Error('Superseded source'));
+  await oldWork;
+  expect(h.runtime.getFeedback()).toBeNull();
+  second.resolve(h.source);
+  await newSource;
+  h.runtime.dispose();
+});
+it('retains a fast released gesture until its clean source is ready', async () => {
+  const h = harness();
+  const acquisition = deferred<DrawingSimplifySource>();
+  h.acquire.mockReturnValue(acquisition.promise);
+  const prepared = h.runtime.prepare(new Event('pointerdown'));
+  const work = h.runtime.submit(h.object, new Event('pointerup'), prepared);
+  expect(h.runtime.getPending()).toHaveLength(0);
+  acquisition.resolve(h.source);
+  await started(h);
+  expect(h.runtime.getPending()[0]?.object.bounds).toEqual(h.object.bounds);
+  await h.settle();
+  await work;
+  expect(h.session.getSnapshot().document.objects).toHaveLength(1);
+  h.runtime.dispose();
+});
+it('does not adopt a prepared source after cancellation', async () => {
+  const h = harness();
+  const acquisition = deferred<DrawingSimplifySource>();
+  h.acquire.mockReturnValue(acquisition.promise);
+  const prepared = h.runtime.prepare(new Event('pointerdown'));
+  const work = h.runtime.submit(h.object, new Event('pointerup'), prepared);
+  h.runtime.cancelPreparation();
+  acquisition.resolve(h.source);
+  await work;
+  expect(h.renders).toHaveLength(0);
+  expect(h.session.getSnapshot().document.objects).toHaveLength(0);
+  h.runtime.dispose();
+});
+it('reports no source if the projection changes after preparation', async () => {
+  const h = harness();
+  let current = true;
+  const source = await h.runtime.prepare(new Event('pointerdown'), () => current);
+  current = false;
+  await h.runtime.submit(h.object, new Event('pointerup'), source);
+  expect(h.runtime.getFeedback()).toBe('no-source');
+  expect(h.renders).toHaveLength(0);
+  expect(h.session.getSnapshot().document.objects).toHaveLength(0);
+  h.runtime.dispose();
+});
+it('defers preparation behind visible work and rejects it if that work changes the document', async () => {
+  const h = harness();
+  const first = h.runtime.submit(h.object, new Event('pointerup'));
+  await started(h);
+  const prepared = h.runtime.prepare(new Event('pointerdown'));
+  const rejected = expect(prepared).rejects.toThrow('source changed');
+  expect(h.acquire).toHaveBeenCalledTimes(1);
+  await h.settle();
+  await first;
+  await rejected;
+  expect(h.acquire).toHaveBeenCalledTimes(1);
+  expect(h.session.getSnapshot().document.objects).toHaveLength(1);
+  h.runtime.dispose();
+});
 it('keeps new work outside history and admits only after result decoding succeeds', async () => {
   const h = harness();
   const decoded = deferred<void>();

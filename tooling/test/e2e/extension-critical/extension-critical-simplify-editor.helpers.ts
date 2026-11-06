@@ -106,7 +106,41 @@ export async function assertEditorAutomaticSimplify(
     .locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas')
     .boundingBox();
   if (!bounds) throw new Error('Editor drawing surface missing');
-  const start = { x: bounds.x + bounds.width * 0.25, y: bounds.y + bounds.height * 0.3 };
+  const start = await editor
+    .locator('[data-ui="editor.canvas.layer"] canvas.lower-canvas')
+    .evaluate((canvas: HTMLCanvasElement) => {
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Editor source canvas missing');
+      const rect = canvas.getBoundingClientRect();
+      const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
+      const sx = rect.width / width;
+      const sy = rect.height / height;
+      for (let y = 0; y < height; y += 2) {
+        for (let x = 0; x + 4 < width; x += 2) {
+          const first = (y * width + x) * 4;
+          const second = first + 16;
+          const dark = data[first]! < 15 && data[first + 1]! < 15 && data[first + 2]! < 15;
+          const light = data[second]! > 240 && data[second + 1]! > 240 && data[second + 2]! > 240;
+          const point = { x: rect.left + x * sx - 24, y: rect.top + y * sy - 16 };
+          if (
+            dark &&
+            light &&
+            data[first + 3] === 255 &&
+            data[second + 3] === 255 &&
+            point.x >= rect.left &&
+            point.y >= rect.top &&
+            point.x + 160 <= rect.right &&
+            point.y + 70 <= rect.bottom &&
+            point.x + 160 <= window.innerWidth &&
+            point.y + 70 <= window.innerHeight
+          )
+            return point;
+        }
+      }
+      throw new Error('Visible high-contrast editor source edge missing');
+    });
+  const roi = { x: start.x + 8, y: start.y + 8, width: 40, height: 20 };
+  const beforePixels = await editor.screenshot({ clip: roi, fullPage: false });
   await editor.mouse.move(start.x, start.y);
   await editor.mouse.down();
   await editor.mouse.move(
@@ -114,8 +148,63 @@ export async function assertEditorAutomaticSimplify(
     start.y + Math.min(70, bounds.height * 0.3),
     { steps: 5 }
   );
+  const draftPixels = await editor.screenshot({ clip: roi, fullPage: false });
+  expect(draftPixels.equals(beforePixels)).toBe(false);
+  await editor.screenshot({ path: info.outputPath('editor-draft.png'), fullPage: false });
+  await editor.evaluate(() => {
+    const state = {
+      active: true,
+      released: false,
+      samples: [] as { released: boolean; pending: boolean; blurred: boolean; accepted: boolean }[],
+    };
+    (window as typeof window & { __simplifyEditorFrames?: typeof state }).__simplifyEditorFrames =
+      state;
+    const released = () => {
+      state.released = true;
+    };
+    window.addEventListener('pointerup', released, { capture: true, once: true });
+    const sample = () => {
+      if (!state.active) return;
+      const pending = document.querySelector<HTMLElement>('[data-ui="editor.simplify.pending"]');
+      state.samples.push({
+        released: state.released,
+        pending: Boolean(pending),
+        blurred: Boolean(pending && getComputedStyle(pending).backdropFilter.includes('blur')),
+        accepted:
+          window.__sniptaleEditorHarness
+            ?.getCanvasObjects()
+            .some(
+              (object) =>
+                object['sniptaleType'] === 'simplify' &&
+                typeof object['src'] === 'string' &&
+                object['src'].startsWith('data:image/png;base64,')
+            ) ?? false,
+      });
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
   await editor.mouse.up();
+  const releasePixels = await editor.screenshot({ clip: roi, fullPage: false });
+  expect(releasePixels.equals(beforePixels)).toBe(false);
+  await editor.screenshot({ path: info.outputPath('editor-release.png'), fullPage: false });
   await expect.poll(async () => (await accepted()).length).toBe(1);
+  const frames = await editor.evaluate(() => {
+    const state = (
+      window as typeof window & {
+        __simplifyEditorFrames?: {
+          active: boolean;
+          samples: { released: boolean; pending: boolean; blurred: boolean; accepted: boolean }[];
+        };
+      }
+    ).__simplifyEditorFrames;
+    if (!state) throw new Error('Editor Simplify frame observation missing');
+    state.active = false;
+    return state.samples;
+  });
+  const waiting = frames.filter((frame) => frame.released && !frame.accepted);
+  expect(waiting.length).toBeGreaterThan(0);
+  expect(waiting.every((frame) => frame.pending && frame.blurred)).toBe(true);
   expect(
     commands.some(
       (value) =>

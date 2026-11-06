@@ -514,7 +514,7 @@ export function DrawingSurface(props: {
     pointerDraftRef: pointer.draftRef,
     session: controller.session,
   });
-  const { draftRef, draftRevision, finalizeDraft } = pointer;
+  const { draftRevision, finalizeDraft } = pointer;
   const { frameObjects, pendingGeometry } = resolvePendingFrameObjects(
     snapshot.document.objects.filter((object) => object.id !== textDraft?.id),
     controller.simplify?.getPendingObjects() ?? []
@@ -536,7 +536,7 @@ export function DrawingSurface(props: {
     chromeCanvasRef,
     chromeHidden: chromeHidden || pendingGeometry,
     controller,
-    draftRef,
+    draftRef: pointer.visualDraftRef,
     draftRevision,
     hoverBendRef: pointer.hoverBendRef,
     objects: frameObjects,
@@ -625,7 +625,10 @@ function DrawingSurfaceContent(props: {
   textEditor: DrawingTextEditorRuntime;
   viewportRevision: number;
 }) {
-  const layers = resolveDrawingVisualLayers(props.frameObjects, props.pointer.draftRef.current);
+  const layers = resolveDrawingVisualLayers(
+    props.frameObjects,
+    props.pointer.visualDraftRef.current
+  );
   return (
     <div
       aria-hidden={!props.active}

@@ -30,6 +30,10 @@ it('wires Simplify defaults without rebuild and shows rebuild only for a selecte
     prepareActivation: () => true,
     registerInteractionFinalizer: vi.fn(),
     simplify: {
+      prepare: vi.fn(async () => {
+        throw new Error('Unexpected source preparation');
+      }),
+      cancelPreparation: vi.fn(),
       submit: vi.fn(async () => undefined),
       transform: vi.fn(async () => undefined),
       duplicate: vi.fn(async () => undefined),

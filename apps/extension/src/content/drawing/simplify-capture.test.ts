@@ -98,6 +98,23 @@ it('restores capture chrome promptly after cancellation and preserves owner styl
   expect(document.body.classList.contains('sniptale-capture-ui-hidden')).toBe(false);
   h.complete.resolve({ success: true, ...png() });
 });
+it('waits for the underlying native capture after its caller aborts', async () => {
+  const h = captureHarness();
+  const abort = new AbortController();
+  const first = h.runtime.acquire(new Event('pointerdown'), abort.signal);
+  const rejected = expect(first).rejects.toBeDefined();
+  await vi.waitFor(() => expect(h.send).toHaveBeenCalledTimes(1));
+  abort.abort();
+  await rejected;
+  const second = h.runtime.acquire(new Event('pointerdown'));
+  await vi.waitFor(() => expect(h.attach).toHaveBeenCalledTimes(2));
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(h.send).toHaveBeenCalledTimes(1);
+  h.complete.resolve({ success: true, dataUrl: png().dataUrl });
+  await second;
+  expect(h.send).toHaveBeenCalledTimes(2);
+});
 it('reuses a frozen source without requesting capture or changing chrome', async () => {
   const h = captureHarness();
   const source: DrawingSimplifySource = {

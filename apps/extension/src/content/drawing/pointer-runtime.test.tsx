@@ -382,6 +382,10 @@ it('submits a Simplify pointer release to its async owner without committing a d
     prepareActivation: () => true,
     registerInteractionFinalizer: vi.fn(),
     simplify: {
+      prepare: vi.fn<NonNullable<ContentDrawingController['simplify']>['prepare']>(
+        () => new Promise(() => undefined)
+      ),
+      cancelPreparation: vi.fn(),
       submit,
       transform: vi.fn(async () => undefined),
       duplicate: vi.fn(async () => undefined),
@@ -449,6 +453,10 @@ it('keeps a pending mask at its released geometry and hides handles without chan
     prepareActivation: () => true,
     registerInteractionFinalizer: vi.fn(),
     simplify: {
+      prepare: vi.fn<NonNullable<ContentDrawingController['simplify']>['prepare']>(
+        () => new Promise(() => undefined)
+      ),
+      cancelPreparation: vi.fn(),
       submit: vi.fn(async () => undefined),
       transform: vi.fn(async () => undefined),
       duplicate: vi.fn(async () => undefined),

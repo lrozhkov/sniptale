@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import {
   resolveDrawingArrowBendTarget,
@@ -6,6 +6,7 @@ import {
   translateDrawingObject,
   type DrawingPoint,
   type DrawingObject,
+  type DrawingSimplifySource,
   type DrawingSessionSnapshot,
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
@@ -13,6 +14,7 @@ import {
   beginDrawingPointer,
   commitDrawingPointerDraft,
   toDrawingScenePoint,
+  getDrawingViewportProjection,
   type PointerDraft,
   type DrawingArrowHover,
 } from './interaction';
@@ -96,7 +98,8 @@ type DrawingPointerRuntimeOptions = {
 function commitPointerDraft(
   controller: ContentDrawingController,
   draft: PointerDraft | null,
-  event?: Event
+  event?: Event,
+  prepared?: DrawingSimplifySource | Promise<DrawingSimplifySource>
 ): void {
   if (
     (draft?.kind === 'move-selection' || draft?.kind === 'rotate-selection') &&
@@ -105,7 +108,7 @@ function commitPointerDraft(
     if (draft.objects.some((object, index) => object !== draft.originals[index]))
       void controller.simplify?.transform(draft.objects);
   } else if (draft && 'object' in draft && draft.object?.kind === 'simplify') {
-    if (draft.kind === 'create') void controller.simplify?.submit(draft.object, event);
+    if (draft.kind === 'create') void controller.simplify?.submit(draft.object, event, prepared);
     else if ('original' in draft && draft.object !== draft.original)
       void controller.simplify?.transform([draft.object]);
   } else commitDrawingPointerDraft(controller.session, draft);
@@ -144,6 +147,89 @@ function useDrawingPointerCompletion(
   return { finishPointer, cancelPointer };
 }
 
+type PointerSimplifyPreparation = {
+  promise: Promise<DrawingSimplifySource>;
+  source?: DrawingSimplifySource;
+};
+
+function preparePointerSimplify(
+  controller: ContentDrawingController,
+  root: PageScrollRoot,
+  draft: PointerDraft | null,
+  event: Event
+): PointerSimplifyPreparation | null {
+  if (
+    draft?.kind !== 'create' ||
+    draft.object.kind !== 'simplify' ||
+    (!draft.object.settings.automatic && draft.object.settings.manualKind !== 'text') ||
+    !controller.simplify
+  )
+    return null;
+  const projection = getDrawingViewportProjection(root);
+  const width = window.innerWidth,
+    height = window.innerHeight;
+  return {
+    promise: controller.simplify.prepare(event, () => {
+      const current = getDrawingViewportProjection(root);
+      return (
+        current.x === projection.x &&
+        current.y === projection.y &&
+        window.innerWidth === width &&
+        window.innerHeight === height
+      );
+    }),
+  };
+}
+
+function usePointerSimplifyDraft({
+  active,
+  controller,
+  draftRef,
+  changed,
+}: Pick<DrawingPointerRuntimeOptions, 'active' | 'controller'> & {
+  draftRef: RefObject<PointerDraft | null>;
+  changed(): void;
+}) {
+  const visualDraftRef = useRef<PointerDraft | null>(null);
+  const preparationRef = useRef<PointerSimplifyPreparation | null>(null);
+  useEffect(() => () => controller.simplify?.cancelPreparation(), [controller]);
+  useEffect(() => {
+    if (!active) controller.simplify?.cancelPreparation();
+  }, [active, controller]);
+  return useMemo(
+    () => ({
+      visualDraftRef,
+      begin(draft: PointerDraft | null, event: Event, root: PageScrollRoot) {
+        const preparation = preparePointerSimplify(controller, root, draft, event);
+        preparationRef.current = preparation;
+        visualDraftRef.current = preparation ? null : draft;
+        if (!preparation) return;
+        void preparation.promise.then(
+          (source) => {
+            if (preparationRef.current !== preparation) return;
+            preparation.source = source;
+            visualDraftRef.current = draftRef.current;
+            changed();
+          },
+          () => undefined
+        );
+      },
+      update(draft: PointerDraft | null) {
+        if (!preparationRef.current || preparationRef.current.source)
+          visualDraftRef.current = draft;
+      },
+      getSource() {
+        return preparationRef.current?.source ?? preparationRef.current?.promise;
+      },
+      clear() {
+        visualDraftRef.current = null;
+        preparationRef.current = null;
+      },
+    }),
+    [changed, controller, draftRef]
+  );
+}
+
 export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   const { active, controller, root, onCancelText, onText } = args;
   const draftRef = useRef<PointerDraft | null>(null);
@@ -154,21 +240,24 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   const touchCentroidRef = useRef<DrawingPoint | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
   const changed = useCallback(() => setDraftRevision((value) => value + 1), []);
+  const simplifyDraft = usePointerSimplifyDraft({ active, controller, draftRef, changed });
   const cancelDraft = useCallback(() => {
     controller.simplify?.cancel();
     const draft = draftRef.current;
     if (draft?.kind === 'marquee') controller.session.setSelection(draft.initialSelectionIds);
     draftRef.current = null;
+    simplifyDraft.clear();
     alignmentGuidesRef.current = [];
     hoverBendRef.current = null;
     activePointerRef.current = null;
     onCancelText();
     changed();
-  }, [changed, controller, onCancelText]);
+  }, [changed, controller, onCancelText, simplifyDraft]);
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
       if (!active || event.button !== 0) return;
+      controller.simplify?.cancelPreparation();
       const point = toDrawingScenePoint(event, root);
       if (event.pointerType === 'touch') {
         touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -187,6 +276,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
         timestamp: event.timeStamp,
       });
       draftRef.current = start.draft;
+      simplifyDraft.begin(start.draft, event.nativeEvent, root);
       alignmentGuidesRef.current = [];
       activePointerRef.current = event.pointerId;
       hoverBendRef.current = null;
@@ -195,7 +285,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       event.currentTarget.setPointerCapture(event.pointerId);
       changed();
     },
-    [active, cancelDraft, changed, controller, onText, root]
+    [active, cancelDraft, changed, controller, onText, root, simplifyDraft]
   );
 
   const onPointerMove = useCallback(
@@ -236,23 +326,25 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
         alignmentGuidesRef.current = aligned.guides;
       }
       draftRef.current = update.draft;
+      simplifyDraft.update(update.draft);
       if (update.selection) controller.session.setSelection(update.selection);
       changed();
     },
-    [active, args.alignMoves, changed, controller, root]
+    [active, args.alignMoves, changed, controller, root, simplifyDraft]
   );
 
   const finalizeDraft = useCallback(
     (event?: Event) => {
       const draft = draftRef.current;
-      commitPointerDraft(controller, draft, event);
+      commitPointerDraft(controller, draft, event, simplifyDraft.getSource());
       draftRef.current = null;
+      simplifyDraft.clear();
       alignmentGuidesRef.current = [];
       hoverBendRef.current = null;
       activePointerRef.current = null;
       changed();
     },
-    [changed, controller]
+    [changed, controller, simplifyDraft]
   );
 
   const { finishPointer, cancelPointer } = useDrawingPointerCompletion(
@@ -278,6 +370,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     cancelPointer,
     changed,
     draftRef,
+    visualDraftRef: simplifyDraft.visualDraftRef,
     hoverBendRef,
     draftRevision,
     finalizeDraft,

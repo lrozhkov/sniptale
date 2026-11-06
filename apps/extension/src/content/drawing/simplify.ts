@@ -23,7 +23,13 @@ export interface ContentSimplifyDependencies extends SimplifyComputeDependencies
   decode(dataUrl: string): Promise<void>;
 }
 export interface ContentSimplifyRuntime {
-  submit(object: DrawingSimplifyObject, event?: Event): Promise<void>;
+  prepare(event: Event, projectionCurrent?: () => boolean): Promise<DrawingSimplifySource>;
+  cancelPreparation(): void;
+  submit(
+    object: DrawingSimplifyObject,
+    event?: Event,
+    prepared?: DrawingSimplifySource | Promise<DrawingSimplifySource>
+  ): Promise<void>;
   /** Recomputes target masks and admits a transformed selection in one history step. */
   transform(objects: readonly DrawingObject[]): Promise<void>;
   duplicate(): Promise<void>;
@@ -85,6 +91,8 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
   private retained: DrawingSimplifySource | null = null;
   private disposed = false;
   private acquisitionAbort: AbortController | null = null;
+  private preparationAbort: AbortController | null = null;
+  private preparationValid: (() => boolean) | null = null;
   private generation = 0;
   private cacheOwners = new Set<string>();
   private pending: {
@@ -120,6 +128,7 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
     this.listeners.forEach((listener) => listener());
   };
   cancel = () => {
+    this.cancelPreparation();
     this.acquisitionAbort?.abort();
     this.acquisitionAbort = null;
     this.generation += 1;
@@ -144,7 +153,8 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
     event?: Event,
     force = true,
     append = false,
-    anchors: readonly DrawingObject[] = []
+    anchors: readonly DrawingObject[] = [],
+    preparedSource?: DrawingSimplifySource
   ) => {
     if (this.disposed || objects.length === 0) return;
     if (objects.some(isSimplifyRegionTooSmall)) {
@@ -173,7 +183,7 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
     try {
       const accepted = await prepareDrawingSimplifySelection(
         { objects, baselines, force, append },
-        (object) => object.source ?? (creating && !append ? this.retained : null),
+        (object) => object.source ?? preparedSource ?? (creating && !append ? this.retained : null),
         {
           current,
           render: this.compute.render,
@@ -206,8 +216,106 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
       }
     }
   };
-  submit = (object: DrawingSimplifyObject, event?: Event): Promise<void> => {
-    return this.run([object], event);
+  prepare = async (
+    event: Event,
+    projectionCurrent?: () => boolean
+  ): Promise<DrawingSimplifySource> => {
+    this.cancelPreparation();
+    const abort = new AbortController();
+    this.preparationAbort = abort;
+    const snapshot = this.session.getSnapshot();
+    const document = snapshot.document;
+    const tool = snapshot.activeTool;
+    const scrollX = window.scrollX,
+      scrollY = window.scrollY,
+      scale = window.devicePixelRatio;
+    const valid = () => {
+      const current = this.session.getSnapshot();
+      return (
+        current.document === document &&
+        current.activeTool === tool &&
+        window.scrollX === scrollX &&
+        window.scrollY === scrollY &&
+        window.devicePixelRatio === scale &&
+        (projectionCurrent?.() ?? true)
+      );
+    };
+    this.preparationValid = valid;
+    if (this.pending)
+      await new Promise<void>((resolve, reject) => {
+        const unsubscribe = this.subscribe(() => {
+          if (!this.pending) {
+            unsubscribe();
+            resolve();
+          }
+        });
+        abort.signal.addEventListener(
+          'abort',
+          () => {
+            unsubscribe();
+            reject(abort.signal.reason);
+          },
+          { once: true }
+        );
+      });
+    abort.signal.throwIfAborted();
+    if (!valid()) throw new Error('Simplify source changed during preparation.');
+    const source = await this.deps.acquire(event, abort.signal);
+    abort.signal.throwIfAborted();
+    if (!valid()) throw new Error('Simplify source changed during preparation.');
+    return source;
+  };
+  cancelPreparation = (): void => {
+    this.preparationAbort?.abort();
+    this.preparationAbort = null;
+    this.preparationValid = null;
+  };
+  submit = async (
+    object: DrawingSimplifyObject,
+    event?: Event,
+    prepared?: DrawingSimplifySource | Promise<DrawingSimplifySource>
+  ): Promise<void> => {
+    if (!prepared) return this.run([object], event);
+    const preparation = this.preparationAbort;
+    if (isSimplifyRegionTooSmall(object)) {
+      this.cancelPreparation();
+      return this.run([object], event);
+    }
+    if (this.pending) {
+      this.acquisitionAbort?.abort();
+      this.generation += 1;
+      this.pending = null;
+      this.compute.cancel();
+      this.publish();
+    }
+    try {
+      const source = prepared instanceof Promise ? await prepared : prepared;
+      if (
+        this.disposed ||
+        !preparation ||
+        preparation.signal.aborted ||
+        this.preparationAbort !== preparation
+      )
+        return;
+      if (!this.preparationValid?.()) {
+        this.feedback = 'no-source';
+        this.publish();
+        return;
+      }
+      this.preparationAbort = null;
+      this.preparationValid = null;
+      await this.run([object], undefined, true, false, [], source);
+    } catch {
+      if (
+        !this.disposed &&
+        preparation &&
+        this.preparationAbort === preparation &&
+        !preparation.signal.aborted
+      ) {
+        this.feedback = 'no-source';
+        this.publish();
+      }
+    }
   };
   transform = (objects: readonly DrawingObject[]): Promise<void> => {
     return this.run(objects, undefined, false);

@@ -30,3 +30,26 @@ export function sampleBackground(image, box) {
   const best = [...bins.values()].sort((a, b) => b[0] - a[0])[0];
   return best ? best.slice(1).map((v) => Math.round(v / best[0])) : [255, 255, 255];
 }
+
+// A nearby border can dominate the perimeter samples while the interior is flat.
+export function interiorBackground(image, box) {
+  const bins = new Map();
+  let total = 0;
+  let previous = 0;
+  for (let y = Math.max(0, Math.ceil(box.y)); y < Math.min(image.height, box.y + box.h); y++)
+    for (let x = Math.max(0, Math.ceil(box.x)); x < Math.min(image.width, box.x + box.w); x++) {
+      const i = (y * image.width + x) * 4;
+      if (image.data[i + 3] < 128) continue;
+      const rgb = [image.data[i], image.data[i + 1], image.data[i + 2]];
+      total++;
+      if (Math.max(...rgb.map((v, c) => Math.abs(v - box.bg[c]))) <= 8) previous++;
+      const k = rgb.map((v) => v >> 3).join(',');
+      const bin = bins.get(k) || { count: 0, sum: [0, 0, 0] };
+      bin.count++;
+      rgb.forEach((v, c) => (bin.sum[c] += v));
+      bins.set(k, bin);
+    }
+  const best = [...bins.values()].sort((a, b) => b.count - a.count)[0];
+  if (!best || previous / total > 0.15 || best.count / total < 0.35) return null;
+  return best.sum.map((v) => Math.round(v / best.count));
+}

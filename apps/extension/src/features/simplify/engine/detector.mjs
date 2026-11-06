@@ -63,7 +63,10 @@ function measureGlyphs(image, box, minimumGlyphs) {
     m.heightAgreement >= 0.7 &&
     m.stroke / Math.max(1, m.xHeight) <= 0.4;
   const primary = glyphMetricsAt(image, box, minimumGlyphs, false, 0.35);
-  if (coherent(primary)) return primary;
+  // A joined word fragment can leave a coherent suffix. Try the independent
+  // luminance pass only when a wide unexplained component accounts for the gap.
+  const joinedFragment = primary?.unexplained.some((p) => p.w > p.h * 2.5);
+  if (coherent(primary) && (primary.foregroundCoverage >= 0.8 || !joinedFragment)) return primary;
   const luminance = glyphMetricsAt(image, box, minimumGlyphs, true, 0.35);
   if (coherent(luminance)) return luminance;
   // Faint bridges can join several glyphs beyond the supported component width.

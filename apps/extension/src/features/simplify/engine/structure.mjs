@@ -149,7 +149,7 @@ export function refineTextStructure(image, input, measure) {
     const index = result.indexOf(p.box);
     if (index >= 0) result.splice(index, 1, p.symbol, p.tail);
   }
-  return result;
+  return result.flatMap((box) => splitTextBands(image, box, measure));
 }
 export { inkParts };
 

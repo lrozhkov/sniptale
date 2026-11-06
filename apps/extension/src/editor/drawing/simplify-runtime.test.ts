@@ -102,6 +102,28 @@ function fixture(accepted = true) {
 async function settled() {
   for (let n = 0; n < 8; n += 1) await Promise.resolve();
 }
+it('gives a new pending cover a paint opportunity before source computation', async () => {
+  const callbacks: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    callbacks.push(callback);
+    return callbacks.length;
+  });
+  const f = fixture(false);
+  const { source: _source, ...uncaptured } = f.drawing;
+  const object = createEditorDrawingSimplifyObject(uncaptured, 1);
+  f.canvas.add(object);
+  setEditorEditingSurfaceDimensions(f.canvas, { width: 100, height: 100 });
+  requestEditorSimplify(f.canvas, object);
+  await settled();
+  expect(f.canvas.wrapperEl.querySelector('[data-ui="editor.simplify.pending"]')).not.toBeNull();
+  expect(f.compute.render).not.toHaveBeenCalled();
+  callbacks.splice(0).forEach((callback) => callback(0));
+  await settled();
+  expect(f.compute.render).not.toHaveBeenCalled();
+  callbacks.splice(0).forEach((callback) => callback(16));
+  await settled();
+  expect(f.compute.render).toHaveBeenCalledOnce();
+});
 it('admits a decoded result once and preserves source with one history action', async () => {
   const f = fixture();
   requestEditorSimplify(f.canvas, f.object, { ...f.drawing.settings, content: 'all' });

@@ -107,8 +107,59 @@ export async function drawNativeAutomaticSimplify(
     clip: roi,
     fullPage: false,
   });
-  await dragSimplify(page, { x: 460, y: 190 }, { x: 780, y: 310 });
+  const probe = { x: roi.x + 12, y: roi.y + 12, width: 90, height: 30 };
+  const beforeProbe = await page.screenshot({ clip: probe, fullPage: false });
+  await page.mouse.move(460, 190);
+  await page.mouse.down();
+  await page.mouse.move(780, 310, { steps: 5 });
+  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toBeVisible();
+  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toHaveCSS(
+    'backdrop-filter',
+    'blur(2px)'
+  );
+  await page.locator('[data-ui="content.drawing.simplify-private"]').evaluate((node) => {
+    const root = node.getRootNode() as ShadowRoot | Document;
+    const state = { samples: [] as { covered: boolean; pending: boolean }[], active: true };
+    (window as typeof window & { __simplifyFrames?: typeof state }).__simplifyFrames = state;
+    const sample = () => {
+      if (!state.active) return;
+      const mask = root.querySelector<HTMLElement>('[data-ui="content.drawing.simplify-private"]');
+      const style = mask && getComputedStyle(mask);
+      state.samples.push({
+        covered: Boolean(
+          mask &&
+          style &&
+          style.visibility !== 'hidden' &&
+          style.display !== 'none' &&
+          mask.getBoundingClientRect().width > 0
+        ),
+        pending: Boolean(root.querySelector('[data-ui="content.drawing.simplify-pending"]')),
+      });
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  const draftPixels = await page.screenshot({ clip: probe, fullPage: false });
+  expect(draftPixels.equals(beforeProbe)).toBe(false);
+  await page.screenshot({ path: info.outputPath(`${mode}-draft.png`), fullPage: false });
+  await page.mouse.up();
+  const releasePixels = await page.screenshot({ clip: probe, fullPage: false });
+  expect(releasePixels.equals(beforeProbe)).toBe(false);
+  await page.screenshot({ path: info.outputPath(`${mode}-release.png`), fullPage: false });
   await waitForSimplify(page);
+  const frames = await page.evaluate(() => {
+    const state = (
+      window as typeof window & {
+        __simplifyFrames?: { samples: { covered: boolean; pending: boolean }[]; active: boolean };
+      }
+    ).__simplifyFrames;
+    if (!state) throw new Error('Simplify frame observation missing');
+    state.active = false;
+    return state.samples;
+  });
+  expect(frames.length).toBeGreaterThan(0);
+  expect(frames.every((frame) => frame.covered)).toBe(true);
+  expect(frames.some((frame) => frame.pending)).toBe(true);
   return beforePixels;
 }
 

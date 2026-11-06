@@ -35,7 +35,7 @@ import {
   confirmFaintColumn,
 } from './ownership.mjs';
 import { recoverBoundaryText } from './boundary-text.mjs';
-import { sampleBackground } from './detector-background.mjs';
+import { interiorBackground, sampleBackground } from './detector-background.mjs';
 import {
   candidateContrast,
   surfaceEvidence,
@@ -391,6 +391,41 @@ function classifyCatalogConfidence(image, catalog, glyphMetrics) {
         : (box.typeMetrics?.foregroundContrast ?? candidateContrast(image, box));
   }
 }
+function recoverInteriorSurfaceText(image, catalog, measure) {
+  for (const box of catalog) {
+    if (
+      box.shape !== 'unknown' ||
+      box.kind !== 'auto' ||
+      box.roleEvidence ||
+      box.w > 160 ||
+      box.h > 88
+    )
+      continue;
+    const bg = interiorBackground(image, box);
+    if (!bg) continue;
+    const previous = measure(image, box, 1);
+    const candidate = { ...box, bg };
+    const m = measure(image, candidate, 1);
+    if (
+      !m ||
+      m.glyphs < 3 ||
+      m.glyphs < (previous?.glyphs || 0) ||
+      m.baselineAgreement < 0.7 ||
+      m.heightAgreement < 0.7 ||
+      m.stroke / Math.max(1, m.xHeight) > 0.4 ||
+      m.foregroundCoverage < 0.9 ||
+      m.foregroundCoverage < (previous?.foregroundCoverage || 0) + 0.1
+    )
+      continue;
+    Object.assign(box, {
+      bg,
+      shape: 'text',
+      typeMetrics: m,
+      textConfidence: true,
+      contrast: m.foregroundContrast,
+    });
+  }
+}
 function retainSupportedFaintBoxes(catalog) {
   catalog = catalog.filter((box) => {
     if (box.shape === 'image' || box.contrast >= 48) return true;
@@ -540,6 +575,7 @@ export function buildCatalog(image, detectRaw, glyphMetrics) {
   catalog.push(...media);
   catalog = resolveControlPeers(image, catalog, controls.boundaries);
   classifyCatalogConfidence(image, catalog, glyphMetrics);
+  recoverInteriorSurfaceText(image, catalog, glyphMetrics);
   catalog = recoverTextFlow(image, catalog, glyphMetrics);
   catalog = resolveTextBadges(image, catalog, glyphMetrics);
   catalog = absorbTextMarks(image, catalog, glyphMetrics);

@@ -88,6 +88,7 @@ export function createSimplifySourceCapture(
     const bounds = options.getBounds();
     const nativeScale = options.captureViewport ? null : window.devicePixelRatio || 1;
     let capture: Promise<string>;
+    let nativeWork: Promise<unknown> | undefined;
     if (options.captureViewport) {
       if (!isTrustedPointerEvent(event))
         throw new Error('Source acquisition requires a trusted gesture.');
@@ -106,17 +107,26 @@ export function createSimplifySourceCapture(
       );
       capture = captureTail.then(() =>
         captureWithoutChrome(async () => {
-          const response = await options.services.messaging.sendRuntimeMessage(request);
+          const work = options.services.messaging.sendRuntimeMessage(request);
+          nativeWork = work;
+          const response = await work;
           if (!response?.success || typeof response.dataUrl !== 'string')
             throw new Error('Source acquisition failed.');
           return response.dataUrl;
         }, signal)
       );
     }
-    captureTail = capture.then(
-      () => undefined,
-      () => undefined
-    );
+    captureTail = capture
+      .then(
+        () => undefined,
+        () => undefined
+      )
+      .then(() =>
+        nativeWork?.then(
+          () => undefined,
+          () => undefined
+        )
+      );
     const dataUrl = await capture;
     signal?.throwIfAborted();
     const dimensions = readSimplifyPngDimensions(dataUrl);

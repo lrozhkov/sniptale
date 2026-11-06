@@ -212,6 +212,28 @@ export function requestEditorSimplify(
     (capturedContext === null || lowerContext(runtime, object) === capturedContext);
   let retainedPreview = false;
   runtime.tail = runtime.tail.then(async () => {
+    if (
+      !drawing.result &&
+      !drawing.source &&
+      (drawing.settings.automatic || drawing.settings.manualKind === 'text')
+    ) {
+      // Two frames allow the pending overlay to paint before synchronous rasterization.
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          document.removeEventListener('visibilitychange', onVisibility);
+          resolve();
+        };
+        const onVisibility = () => {
+          if (document.hidden) finish();
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        onVisibility();
+        requestAnimationFrame(() => requestAnimationFrame(finish));
+      });
+    }
     if (!isCurrent()) return;
     runtime.active = job;
     try {
