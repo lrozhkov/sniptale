@@ -446,6 +446,13 @@ function resolvePendingFrameObjects(
     void result;
     return preview;
   });
+  const existingIds = new Set(objects.map((object) => object.id));
+  for (const object of pendingObjects) {
+    if (object.kind !== 'simplify' || existingIds.has(object.id)) continue;
+    const { result, ...preview } = object;
+    void result;
+    frameObjects.push(preview);
+  }
   return { frameObjects, pendingGeometry };
 }
 

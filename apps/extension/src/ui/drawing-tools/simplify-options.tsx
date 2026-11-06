@@ -1,17 +1,19 @@
+import photoSearchIcon from '@iconify-icons/tabler/photo-search';
 import scanLetterAIcon from '@iconify-icons/tabler/scan-letter-a';
 import { Icon as IconifyIcon } from '@iconify/react';
 import { setColorAlpha } from '@sniptale/foundation/color';
-import { Image, Shapes, Minus, RotateCcw, Type, PaintBucket, RefreshCw } from 'lucide-react';
-import type { RefObject } from 'react';
+import { Image, Type, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import {
-  SIMPLIFY_SENSITIVITIES,
-  SIMPLIFY_THICKNESSES,
-  type SimplifySettings,
-} from '../../features/simplify/settings';
+import { SIMPLIFY_THICKNESSES, type SimplifySettings } from '../../features/simplify/settings';
 import { translate } from '../../platform/i18n';
-import { DrawingColorOptions, DrawingOptionsDivider, QuickOptionButton } from './options';
+import {
+  DrawingColorOptions,
+  DrawingFillToggle,
+  DrawingOptionsDivider,
+  QuickOptionButton,
+} from './options';
 
 /** Explicit settings and callbacks shared by selected layers and new drawing defaults. */
 export interface DrawingSimplifyOptionsProps {
@@ -27,11 +29,6 @@ export interface DrawingSimplifyOptionsProps {
   onRebuild?: () => void;
 }
 
-const SENSITIVITY_CHOICES = [
-  { label: 'content.toolbar.drawingSimplifySensitivityLow' },
-  { label: 'content.toolbar.drawingSimplifySensitivityMedium' },
-  { label: 'content.toolbar.drawingSimplifySensitivityHigh' },
-] as const;
 const THICKNESS_LABELS = [
   'content.toolbar.drawingSimplifyThicknessThin',
   'content.toolbar.drawingSimplifyThicknessMedium',
@@ -42,6 +39,10 @@ const THICKNESS_LABELS = [
 export function DrawingSimplifyOptions(props: DrawingSimplifyOptionsProps) {
   const { settings } = props;
   const colors = props.colors.map((color) => setColorAlpha(color, 1) ?? color);
+  const lastColor = useRef(settings.color ?? colors[0] ?? '#000000');
+  useEffect(() => {
+    if (settings.color !== null) lastColor.current = settings.color;
+  }, [settings.color]);
   const image = !settings.automatic && settings.manualKind === 'image';
   const colorLabel = translate(
     image ? 'content.toolbar.drawingFillColor' : 'content.toolbar.drawingColor'
@@ -79,7 +80,7 @@ export function DrawingSimplifyOptions(props: DrawingSimplifyOptionsProps) {
               dataUi="content.toolbar.drawing-options.simplify.content-all"
               onClick={() => props.onChange({ content: 'all' })}
             >
-              <Shapes aria-hidden size={17} />
+              <IconifyIcon aria-hidden="true" ssr icon={photoSearchIcon} width={17} height={17} />
             </QuickOptionButton>
           </>
         ) : (
@@ -102,27 +103,6 @@ export function DrawingSimplifyOptions(props: DrawingSimplifyOptionsProps) {
             </QuickOptionButton>
           </>
         )}
-        {settings.automatic ? (
-          <>
-            <DrawingOptionsDivider vertical={props.vertical} />
-            {SIMPLIFY_SENSITIVITIES.map((value, index) => {
-              const { label } = SENSITIVITY_CHOICES[index]!;
-              return (
-                <QuickOptionButton
-                  key={value}
-                  active={settings.sensitivity === value}
-                  label={translate(label)}
-                  dataUi={`content.toolbar.drawing-options.simplify.sensitivity-${value}`}
-                  onClick={() => props.onChange({ sensitivity: value })}
-                >
-                  <span aria-hidden className="text-xs font-medium tabular-nums">
-                    {value}
-                  </span>
-                </QuickOptionButton>
-              );
-            })}
-          </>
-        ) : null}
         {!image ? (
           <>
             <DrawingOptionsDivider vertical={props.vertical} />
@@ -130,41 +110,52 @@ export function DrawingSimplifyOptions(props: DrawingSimplifyOptionsProps) {
               <QuickOptionButton
                 key={value}
                 active={settings.thickness === value}
-                label={translate(THICKNESS_LABELS[index]!)}
+                label={`${translate(THICKNESS_LABELS[index]!)}: ${index + 1}`}
                 dataUi={`content.toolbar.drawing-options.simplify.thickness-${value}`}
                 onClick={() => props.onChange({ thickness: value })}
               >
-                <Minus aria-hidden size={17} strokeWidth={2 + index * 2} />
+                <span aria-hidden className="flex h-6 flex-col items-center justify-center gap-0.5">
+                  <span
+                    data-ui="drawing-width-preview"
+                    className="block w-4 rounded-full bg-current"
+                    style={{ height: `${2 + index * 3}px` }}
+                  />
+                  <span className="text-[9px] font-medium leading-none">{index + 1}</span>
+                </span>
               </QuickOptionButton>
             ))}
           </>
         ) : null}
         <DrawingOptionsDivider vertical={props.vertical} />
-        <DrawingColorOptions
-          colors={colors}
-          floatingBoundaryRef={props.floatingBoundaryRef}
-          floatingPlacement={props.floatingPlacement}
-          vertical={props.vertical}
-          icon={PaintBucket}
+        <DrawingFillToggle
+          filled={settings.color !== null}
           label={colorLabel}
           dataUi="content.toolbar.drawing-options.simplify.color"
-          value={settings.color ?? colors[0] ?? '#000000'}
-          selectedValue={settings.color}
-          allowAlpha={false}
-          onSelect={(color) => props.onChange({ color: setColorAlpha(color, 1) ?? color })}
-          {...(props.onPreview ? { onPreview: props.onPreview } : {})}
-          {...(props.onPreviewReset || props.onPreview
-            ? { onPreviewReset: () => (props.onPreviewReset ?? props.onPreview)?.(settings.color) }
-            : {})}
+          emptyIconUi="content.toolbar.drawing-options.simplify.color-empty-icon"
+          onClick={() =>
+            props.onChange({ color: settings.color === null ? lastColor.current : null })
+          }
         />
-        <QuickOptionButton
-          active={settings.color === null}
-          label={translate('content.toolbar.drawingSimplifyAutomaticColor')}
-          dataUi="content.toolbar.drawing-options.simplify.color-auto"
-          onClick={() => props.onChange({ color: null })}
-        >
-          <RotateCcw aria-hidden size={17} />
-        </QuickOptionButton>
+        {settings.color !== null ? (
+          <DrawingColorOptions
+            colors={colors}
+            floatingBoundaryRef={props.floatingBoundaryRef}
+            floatingPlacement={props.floatingPlacement}
+            vertical={props.vertical}
+            label={colorLabel}
+            dataUi="content.toolbar.drawing-options.simplify.color-palette"
+            value={settings.color ?? lastColor.current}
+            selectedValue={settings.color}
+            allowAlpha={false}
+            onSelect={(color) => props.onChange({ color: setColorAlpha(color, 1) ?? color })}
+            {...(props.onPreview ? { onPreview: props.onPreview } : {})}
+            {...(props.onPreviewReset || props.onPreview
+              ? {
+                  onPreviewReset: () => (props.onPreviewReset ?? props.onPreview)?.(settings.color),
+                }
+              : {})}
+          />
+        ) : null}
         {props.onRebuild ? (
           <>
             <DrawingOptionsDivider vertical={props.vertical} />

@@ -221,3 +221,26 @@ it('sends the actual CSS region to the Worker when native capture exceeds the em
   runtime.dispose();
   session.dispose();
 });
+
+it('conceals a pending mask for source capture and keeps accepted masks visible', async () => {
+  const h = captureHarness();
+  const pending = document.createElement('div');
+  pending.dataset['ui'] = 'content.drawing.simplify-private';
+  pending.dataset['simplifyPending'] = 'true';
+  pending.style.visibility = 'visible';
+  const accepted = document.createElement('div');
+  accepted.dataset['ui'] = 'content.drawing.simplify-private';
+  accepted.style.visibility = 'visible';
+  document.body.append(pending, accepted);
+  const acquisition = h.runtime.acquire(new Event('pointerup'));
+  await vi.waitFor(() => expect(h.send).toHaveBeenCalledOnce());
+  try {
+    expect(pending.style.visibility).toBe('hidden');
+    expect(accepted.style.visibility).toBe('visible');
+  } finally {
+    h.complete.resolve({ success: true, dataUrl: png().dataUrl });
+    await acquisition;
+  }
+  expect(pending.style.visibility).toBe('visible');
+  expect(accepted.style.visibility).toBe('visible');
+});

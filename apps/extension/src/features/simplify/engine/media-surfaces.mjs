@@ -383,7 +383,6 @@ function proposeSupportedSurface(image, a, b, textureSeeds) {
     return iw * ih > p.w * p.h * 0.9;
   });
   if (!seeds.length) return null;
-  if (resemblesTextList(image, box)) return null;
 
   if (
     !b.clipped &&
@@ -393,6 +392,7 @@ function proposeSupportedSurface(image, a, b, textureSeeds) {
     ) < 0.55
   )
     return null;
+  if (resemblesTextList(image, box)) return null;
   if (box.w * box.h > w * h * 0.8) return null;
   box.w = Math.min(box.w, w - box.x);
   box.h = Math.min(box.h, h - box.y);

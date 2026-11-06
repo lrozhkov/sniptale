@@ -12,16 +12,20 @@ import type { createSimplifyComputeClient } from '../../workflows/simplify/compu
 
 function contains(source: DrawingSimplifySource, bounds: DrawingBounds): boolean {
   const outer = source.bounds;
+  const sx = source.width / outer.width;
+  const sy = source.height / outer.height;
+  // Match raster-bound rounding: tolerate only floating drift, not missing pixels.
+  const tolerance = 1e-7;
   return (
-    bounds.x >= outer.x &&
-    bounds.y >= outer.y &&
-    bounds.x + bounds.width <= outer.x + outer.width &&
-    bounds.y + bounds.height <= outer.y + outer.height
+    (bounds.x - outer.x) * sx >= -tolerance &&
+    (bounds.y - outer.y) * sy >= -tolerance &&
+    (bounds.x + bounds.width - outer.x) * sx <= source.width + tolerance &&
+    (bounds.y + bounds.height - outer.y) * sy <= source.height + tolerance
   );
 }
 
 /** Auto and manual text are source-aligned masks; manual images are drawing primitives. */
-export function isContentSimplifyMask(object: DrawingSimplifyObject): boolean {
+function isContentSimplifyMask(object: DrawingSimplifyObject): boolean {
   return object.settings.automatic || object.settings.manualKind === 'text';
 }
 
@@ -122,10 +126,18 @@ async function prepareContentSimplifyObject(
   }
   const sx = source.width / source.bounds.width,
     sy = source.height / source.bounds.height;
-  const x = Math.round((bounds.x - source.bounds.x) * sx);
-  const y = Math.round((bounds.y - source.bounds.y) * sy);
-  const width = Math.max(1, Math.round(bounds.width * sx));
-  const height = Math.max(1, Math.round(bounds.height * sy));
+  const x = Math.max(0, Math.round((bounds.x - source.bounds.x) * sx));
+  const y = Math.max(0, Math.round((bounds.y - source.bounds.y) * sy));
+  const right = Math.min(
+    source.width,
+    Math.round((bounds.x + bounds.width - source.bounds.x) * sx)
+  );
+  const bottom = Math.min(
+    source.height,
+    Math.round((bounds.y + bounds.height - source.bounds.y) * sy)
+  );
+  const width = Math.max(1, right - x);
+  const height = Math.max(1, bottom - y);
   const result = await ports.render({
     source,
     region: {

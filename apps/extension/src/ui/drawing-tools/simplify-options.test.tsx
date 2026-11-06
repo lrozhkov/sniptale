@@ -103,12 +103,16 @@ it('keeps Auto independent and restores the inactive content and manual choices'
   expect(option('manual-image')?.getAttribute('aria-pressed')).toBe('true');
 });
 
-it('offers three sensitivities only in Auto and three thicknesses for text, with remembered values', async () => {
+it('keeps default sensitivity hidden and offers three numbered text thicknesses', async () => {
   render();
-  expect(host.querySelectorAll('[data-ui*="simplify.sensitivity-"]')).toHaveLength(3);
+  expect(createDefaultSimplifySettings().sensitivity).toBe(55);
+  expect(host.querySelectorAll('[data-ui*="simplify.sensitivity-"]')).toHaveLength(0);
   expect(host.querySelectorAll('[data-ui*="simplify.thickness-"]')).toHaveLength(3);
-  await click('sensitivity-90');
-  expect(change).toHaveBeenLastCalledWith({ sensitivity: 90 });
+  expect([0.35, 0.5, 0.65].map((v) => option('thickness-' + v)?.textContent)).toEqual([
+    '1',
+    '2',
+    '3',
+  ]);
   await click('thickness-0.65');
   expect(change).toHaveBeenLastCalledWith({ thickness: 0.65 });
   await click('automatic');
@@ -122,27 +126,28 @@ it('offers three sensitivities only in Auto and three thicknesses for text, with
       ?.getAttribute('aria-label')
   ).toBe(translate('content.toolbar.drawingFillColor'));
   await click('automatic');
-  expect(option('sensitivity-90')?.getAttribute('aria-pressed')).toBe('true');
+  expect(host.querySelectorAll('[data-ui*="simplify.sensitivity-"]')).toHaveLength(0);
+  expect(change.mock.calls.some(([update]) => 'sensitivity' in update)).toBe(false);
   expect(option('thickness-0.65')?.getAttribute('aria-pressed')).toBe('true');
 });
 
-it('keeps automatic color separate from the opaque palette and restores it on request', async () => {
+it('uses the Shapes fill toggle for automatic color and remembers custom color', async () => {
   render();
-  expect(option('color-auto')?.getAttribute('aria-pressed')).toBe('true');
-  expect(
-    host.querySelectorAll(
-      '[data-ui="content.toolbar.drawing-options.quick-colors"] [aria-pressed="true"]'
-    )
-  ).toHaveLength(0);
+  expect(option('color')?.getAttribute('aria-pressed')).toBe('false');
+  expect(option('color-auto')).toBeNull();
+  expect(host.querySelector('[data-ui="content.toolbar.drawing-options.quick-colors"]')).toBeNull();
+  await click('color');
+  expect(change).toHaveBeenLastCalledWith({ color: '#123456' });
+  expect(option('color')?.getAttribute('aria-pressed')).toBe('true');
   const swatch = host.querySelector<HTMLButtonElement>(
     `button[aria-label="${translate('content.toolbar.drawingColor')}: #abcdef"]`
   )!;
   await act(async () => swatch.click());
-  expect(change).toHaveBeenLastCalledWith({ color: '#abcdef' });
-  expect(option('color-auto')?.getAttribute('aria-pressed')).toBe('false');
-  await click('color-auto');
+  await click('color');
   expect(change).toHaveBeenLastCalledWith({ color: null });
-  expect(option('color-auto')?.getAttribute('aria-pressed')).toBe('true');
+  expect(host.querySelector('[data-ui="content.toolbar.drawing-options.quick-colors"]')).toBeNull();
+  await click('color');
+  expect(change).toHaveBeenLastCalledWith({ color: '#abcdef' });
 });
 
 it('uses the standard picker: edits preview, Cancel resets, and Apply commits once without alpha', async () => {
@@ -182,7 +187,7 @@ it.each([false, true])(
     const group = host.querySelector('[data-ui="content.toolbar.drawing-options.simplify"]')!;
     expect(group.className).toContain(vertical ? 'flex-col' : 'flex-row');
     const properties = host.querySelectorAll('button[data-command-property="true"]');
-    expect(properties.length).toBeGreaterThanOrEqual(10);
+    expect(properties).toHaveLength(7);
     for (const button of properties) expect(button.getAttribute('aria-label')).toBeTruthy();
     expect(host.querySelector('select')).toBeNull();
     expect(host.innerHTML).not.toContain('sniptale-glass-toolbar-button--active');
@@ -190,21 +195,27 @@ it.each([false, true])(
 );
 
 it.each([false, true])(
-  'restores automatic source color after cancel with explicit reset=%s',
+  'restores custom color on picker cancel and returns to automatic by toggle, explicit reset=%s',
   async (explicitReset) => {
     render(createDefaultSimplifySettings(), {}, !explicitReset);
+    await click('color');
+    change.mockClear();
     await act(async () => pickerButton('shared.ui.colorSelectorChooseColor').click());
     await editPicker('#abcdef');
     expect(preview).toHaveBeenLastCalledWith('#abcdef');
     await act(async () => pickerButton('shared.ui.colorSelectorCancel').click());
-    expect(explicitReset ? reset : preview).toHaveBeenLastCalledWith(null);
+    expect(explicitReset ? reset : preview).toHaveBeenLastCalledWith('#123456');
     expect(change).not.toHaveBeenCalled();
-    expect(option('color-auto')?.getAttribute('aria-pressed')).toBe('true');
+    await click('color');
+    expect(change).toHaveBeenLastCalledWith({ color: null });
+    expect(option('color')?.getAttribute('aria-pressed')).toBe('false');
   }
 );
 
 it('keeps shared translucent palette colors opaque for Simplify', async () => {
   render(createDefaultSimplifySettings(), { colors: ['#abcdef40'] });
+  await click('color');
+  change.mockClear();
   const swatch = host.querySelector<HTMLButtonElement>(
     `button[aria-label="${translate('content.toolbar.drawingColor')}: #abcdef"]`
   )!;

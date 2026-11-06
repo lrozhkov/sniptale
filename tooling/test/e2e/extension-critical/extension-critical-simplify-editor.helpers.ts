@@ -180,6 +180,8 @@ export async function assertEditorManualGestures(
     .first()
     .click();
   const beforeColor = (await accepted())[0]?.['src'];
+  const colorToggle = editor.locator('[data-ui="content.toolbar.drawing-options.simplify.color"]');
+  if ((await colorToggle.getAttribute('aria-pressed')) !== 'true') await colorToggle.click();
   await editor
     .locator('[data-ui="content.toolbar.drawing-options.quick-colors"] button[title="#ff7f50"]')
     .click();

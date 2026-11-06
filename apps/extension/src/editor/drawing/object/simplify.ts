@@ -39,7 +39,13 @@ function paintGeometryPreview(
   scratch: HTMLCanvasElement
 ): boolean {
   const canvas = raster.canvas;
-  if (!canvas || !isGeometryPreviewActive(raster, context)) return false;
+  if (
+    !canvas ||
+    raster.width <= 0 ||
+    raster.height <= 0 ||
+    !isGeometryPreviewActive(raster, context)
+  )
+    return false;
   const objectIndex = canvas.getObjects().indexOf(raster);
   if (objectIndex < 0) return false;
   const matrix = raster.calcTransformMatrix();
@@ -171,7 +177,17 @@ export function applyEditorDrawingSimplifyVisuals(object: FabricObject): void {
   }
   const geometryTarget = object;
   const drawing = readEditorDrawingObject(object);
-  if (!(object instanceof FabricImage) || drawing?.kind !== 'simplify' || !drawing.result) return;
+  if (drawing?.kind !== 'simplify') return;
+  if (!drawing.result && object instanceof Rect) {
+    const scratch = document.createElement('canvas');
+    geometryPreviews.add(object);
+    object._render = (context) => {
+      paintGeometryPreview(object, context, scratch);
+      Rect.prototype._render.call(object, context);
+    };
+    return;
+  }
+  if (!(object instanceof FabricImage) || !drawing.result) return;
   const raster = object;
   const image = raster.getElement();
   const result = drawing.result;

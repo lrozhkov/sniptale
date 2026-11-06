@@ -428,7 +428,7 @@ const DRAWING_FILL_UI = {
   },
 } as const;
 
-function DrawingFillToggle(props: {
+export function DrawingFillToggle(props: {
   filled: boolean;
   label: string;
   dataUi: string;

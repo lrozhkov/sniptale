@@ -1,13 +1,9 @@
 import { LoaderCircle } from 'lucide-react';
-import { useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DrawingPoint, DrawingSimplifyObject } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { translate } from '../../platform/i18n';
-import {
-  getContentSimplifyRasterBounds,
-  getContentSimplifyMaskCorners,
-  isContentSimplifyMask,
-} from './simplify-object';
+import { getContentSimplifyRasterBounds, getContentSimplifyMaskCorners } from './simplify-object';
 
 function showPrimitiveFill(root: ShadowRoot, source: CanvasImageSource): void {
   const fill = document.createElement('canvas');
@@ -35,6 +31,7 @@ export function DrawingSimplifyLayer(props: {
   previewFill?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const [paintedResult, setPaintedResult] = useState<DrawingSimplifyObject['result']>();
   const privateRoot = useRef<ShadowRoot | null>(null);
   useLayoutEffect(() => {
     if (!host.current) return;
@@ -62,11 +59,13 @@ export function DrawingSimplifyLayer(props: {
       if (!current) return;
       if (props.previewFill) {
         showPrimitiveFill(root, image);
+        setPaintedResult(result);
         return;
       }
       root.replaceChildren(image);
+      setPaintedResult(result);
       if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
-        image.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 150 });
+        image.animate?.([{ filter: 'blur(2px)' }, { filter: 'blur(0px)' }], { duration: 150 });
     };
     image.src = result.dataUrl;
     return () => {
@@ -90,6 +89,7 @@ export function DrawingSimplifyLayer(props: {
     <div
       ref={host}
       data-ui="content.drawing.simplify-private"
+      data-simplify-pending={!props.object.result ? 'true' : undefined}
       aria-hidden="true"
       style={{
         position: 'fixed',
@@ -100,7 +100,7 @@ export function DrawingSimplifyLayer(props: {
         height: bounds.height,
         transform: mask ? 'none' : `rotate(${props.object.rotation ?? 0}deg)`,
         ...(polygon ? { clipPath: `polygon(${polygon})` } : {}),
-        ...(!props.object.result && isContentSimplifyMask(props.object)
+        ...(!props.object.result || props.object.result !== paintedResult
           ? { backdropFilter: 'blur(2px)' }
           : {}),
         transformOrigin: 'center',

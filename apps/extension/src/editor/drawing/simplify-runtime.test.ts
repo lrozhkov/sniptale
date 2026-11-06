@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { cancelEditorTransientInteraction } from '../controller/input/canvas-actions/transient';
 import { afterEach, expect, it, vi } from 'vitest';
 import { Canvas, FabricImage, Rect } from 'fabric';
 import { createDefaultSimplifySettings } from '../../features/simplify/settings';
@@ -558,3 +559,41 @@ it('paints the accepted result while the pending blur cover is still mounted', a
   expect(render).toHaveBeenCalledOnce();
   expect(f.canvas.wrapperEl.querySelector('[data-ui="editor.simplify.pending"]')).toBeNull();
 });
+
+it.each([false, true])(
+  'preserves submitted work on focus loss; explicit cancel=%s',
+  async (cancel) => {
+    const f = fixture(false);
+    requestEditorSimplify(f.canvas, f.object);
+    await settled();
+    const options = {
+      canvas: f.canvas,
+      drawSession: null,
+      cropGuide: null,
+      activeTool: 'simplify',
+      clearCropSelection: vi.fn(),
+      switchToSelectTool: vi.fn(),
+      syncRuntimeState: vi.fn(),
+    };
+    cancelEditorTransientInteraction({
+      ...options,
+      preserveActiveTool: true,
+      preservePendingSimplify: true,
+    });
+    expect(f.canvas.getObjects()).toContain(f.object);
+    expect(f.compute.cancel).not.toHaveBeenCalled();
+    if (cancel) cancelEditorTransientInteraction(options);
+    f.result.resolve({ ...f.snapshot, version: 'after-focus-loss' });
+    await settled();
+    if (cancel) {
+      expect(f.canvas.getObjects()).toHaveLength(0);
+      expect(f.commitHistory).not.toHaveBeenCalled();
+    } else {
+      expect(f.canvas.getObjects()).toHaveLength(1);
+      expect(f.commitHistory).toHaveBeenCalledOnce();
+      expect(readEditorDrawingObject(f.canvas.getObjects()[0]!)).toMatchObject({
+        engineVersion: 'after-focus-loss',
+      });
+    }
+  }
+);

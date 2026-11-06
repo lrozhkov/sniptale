@@ -71,6 +71,8 @@ export async function assertEditableSimplifyReopens(
     '[data-ui="content.toolbar.drawing-options.simplify.manual-image"]'
   );
   await manualImage.click();
+  const colorToggle = editor.locator('[data-ui="content.toolbar.drawing-options.simplify.color"]');
+  if ((await colorToggle.getAttribute('aria-pressed')) !== 'true') await colorToggle.click();
   await editor
     .locator('[data-ui="content.toolbar.drawing-options.quick-colors"] button[title="#ff7f50"]')
     .click();

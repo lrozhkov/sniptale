@@ -3,6 +3,9 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createDefaultSimplifySettings } from '../../features/simplify/settings';
+import { createDrawingSession } from '../../features/drawing/public';
+import type { ContentDrawingController } from './controller';
+import { DrawingSurface } from './surface';
 import { DrawingSimplifyLayer } from './simplify-layer';
 import { DrawingVisualLayers } from './surface-visual-layers';
 
@@ -188,4 +191,114 @@ it('uses only a private one-pixel fill while a manual Image glyph is resized', (
   expect(host.querySelector('img,canvas')).toBeNull();
   act(() => root.unmount());
   host.remove();
+});
+
+it.each([true, false])(
+  'retains blur until private pixels load, including manual Image (automatic=%s)',
+  (automatic) => {
+    const images: HTMLImageElement[] = [];
+    vi.stubGlobal(
+      'Image',
+      class {
+        constructor() {
+          const image = document.createElement('img');
+          images.push(image);
+          return image;
+        }
+      }
+    );
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const object = {
+      id: 'mask',
+      kind: 'simplify' as const,
+      bounds: { x: 20, y: 30, width: 100, height: 40 },
+      settings: { ...createDefaultSimplifySettings(), automatic, manualKind: 'image' as const },
+    };
+    act(() => root.render(<DrawingSimplifyLayer object={object} projection={{ x: 0, y: 0 }} />));
+    act(() =>
+      root.render(
+        <DrawingSimplifyLayer
+          object={{
+            ...object,
+            result: { dataUrl: 'data:image/png;base64,private', width: 100, height: 40 },
+          }}
+          projection={{ x: 0, y: 0 }}
+        />
+      )
+    );
+    const mask = host.querySelector<HTMLElement>('[data-ui="content.drawing.simplify-private"]')!;
+    try {
+      expect(mask.style.backdropFilter).toBe('blur(2px)');
+      const image = images[0]!;
+      const animate = vi.fn();
+      Object.defineProperty(image, 'animate', { value: animate });
+      act(() => image.dispatchEvent(new Event('load')));
+      expect(image.isConnected).toBe(true);
+      expect(mask.style.backdropFilter).toBe('');
+      if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+        expect(animate).toHaveBeenCalledWith([{ filter: 'blur(2px)' }, { filter: 'blur(0px)' }], {
+          duration: 150,
+        });
+      expect(host.querySelector('img')).toBeNull();
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  }
+);
+
+it('keeps an uncommitted new Simplify mask visibly blurred while acquisition is pending', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const { createContentSimplifyRuntime } = await import('./simplify');
+  const { createDefaultSimplifySettings } = await import('../../features/simplify/settings');
+  const acquisition = Promise.withResolvers<never>();
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.setActiveTool('simplify');
+  const simplify = createContentSimplifyRuntime(session, {
+    acquire: () => acquisition.promise,
+    send: vi.fn(async () => undefined),
+    decode: vi.fn(async () => undefined),
+  });
+  const controller: ContentDrawingController = {
+    session,
+    simplify,
+    getPalette: () => [],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  let work: Promise<void> | undefined;
+  act(() => {
+    work = simplify.submit(
+      {
+        id: 'pending-mask',
+        kind: 'simplify',
+        bounds: { x: 20, y: 30, width: 100, height: 60 },
+        settings: createDefaultSimplifySettings(),
+      },
+      new Event('pointerup')
+    );
+  });
+  try {
+    const mask = host.querySelector<HTMLElement>('[data-ui="content.drawing.simplify-private"]');
+    expect(mask).not.toBeNull();
+    expect(mask?.style.backdropFilter).toBe('blur(2px)');
+    expect(session.getSnapshot().document.objects).toHaveLength(0);
+  } finally {
+    act(() => {
+      simplify.dispose();
+      root.unmount();
+    });
+    host.remove();
+    acquisition.reject(new Error('Cancelled acquisition'));
+    await work;
+  }
 });

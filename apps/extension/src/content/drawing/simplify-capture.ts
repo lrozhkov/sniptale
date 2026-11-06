@@ -21,6 +21,7 @@ const CAPTURE_CHROME = [
   '.sniptale-selection-cancel-button',
   '[data-ui="content.drawing.selection-chrome"]',
   '[data-ui="content.drawing.simplify-pending"]',
+  '[data-ui="content.drawing.simplify-private"][data-simplify-pending="true"]',
   '[data-ui="content.drawing.simplify-feedback"]',
 ].join(',');
 

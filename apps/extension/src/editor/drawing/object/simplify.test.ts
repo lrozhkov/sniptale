@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { Canvas, FabricImage, Group } from 'fabric';
+import { Canvas, FabricImage, Group, Rect } from 'fabric';
 import { createDefaultSimplifySettings } from '../../../features/simplify/settings';
 import { createTypedTestFixture } from '../../testing/fabric-canvas.test-support';
 import { createCanvas, loadImage } from 'canvas';
@@ -289,3 +289,34 @@ it(
     void canvas.dispose();
   }
 );
+
+it('shows native backdrop blur while drawing a new manual Image region', () => {
+  const canvas = new Canvas(document.createElement('canvas'), {
+    width: 300,
+    height: 200,
+    renderOnAddRemove: false,
+  });
+  const lower = new Rect({ width: 300, height: 200, fill: '#123456', objectCaching: false });
+  const object = createEditorDrawingSimplifyObject(
+    {
+      id: 'new-image',
+      kind: 'simplify',
+      bounds: { x: 20, y: 30, width: 100, height: 60 },
+      settings: { ...createDefaultSimplifySettings(), automatic: false, manualKind: 'image' },
+    },
+    1
+  );
+  canvas.add(lower, object);
+  const context = canvas.getContext();
+  const filters: string[] = [];
+  const draw = vi.spyOn(context, 'drawImage').mockImplementation(() => {
+    filters.push(context.filter);
+  });
+  try {
+    object._render(context);
+    expect(filters).toEqual(['blur(2px)']);
+  } finally {
+    draw.mockRestore();
+    void canvas.dispose();
+  }
+});

@@ -97,9 +97,9 @@ export async function drawNativeAutomaticSimplify(
   if ((await automaticControl.getAttribute('aria-pressed')) !== 'true')
     await automaticControl.click();
   await page.locator('[data-ui="content.toolbar.drawing-options.simplify.content-text"]').click();
-  await page.locator('[data-ui="content.toolbar.drawing-options.simplify.sensitivity-55"]').click();
   await page.locator('[data-ui="content.toolbar.drawing-options.simplify.thickness-0.5"]').click();
-  await page.locator('[data-ui="content.toolbar.drawing-options.simplify.color-auto"]').click();
+  const colorToggle = page.locator('[data-ui="content.toolbar.drawing-options.simplify.color"]');
+  if ((await colorToggle.getAttribute('aria-pressed')) === 'true') await colorToggle.click();
 
   const roi = { x: 460, y: 190, width: 320, height: 120 };
   const beforePixels = await page.screenshot({
@@ -158,8 +158,29 @@ export async function assertNativeAutomaticRaster(
       context.drawImage(source, 0, 0);
       const previous = context.getImageData(0, 0, image.width, image.height).data;
       let background = 0,
-        changed = 0;
+        changed = 0,
+        originalColoredInk = 0,
+        retainedColoredInk = 0;
       for (let index = 0; index < pixels.length; index += 4) {
+        const x = (index / 4) % image.width;
+        const y = Math.floor(index / (4 * image.width));
+        if (x >= 8 && x < image.width - 8 && y >= 8 && y < image.height - 8) {
+          // This fixture has saturated blue text; neutral Simplify bars must replace
+          // it. A changed/blurred screenshot is not sufficient acceptance evidence.
+          if (
+            Math.max(previous[index]!, previous[index + 1]!, previous[index + 2]!) -
+              Math.min(previous[index]!, previous[index + 1]!, previous[index + 2]!) >
+            40
+          )
+            originalColoredInk++;
+          if (
+            Math.max(pixels[index]!, pixels[index + 1]!, pixels[index + 2]!) -
+              Math.min(pixels[index]!, pixels[index + 1]!, pixels[index + 2]!) >
+            40
+          )
+            retainedColoredInk++;
+        }
+
         if (
           Math.abs(pixels[index]! - previous[index]!) > 8 ||
           Math.abs(pixels[index + 1]! - previous[index + 1]!) > 8 ||
@@ -175,12 +196,19 @@ export async function assertNativeAutomaticRaster(
           background++;
       }
       return {
+        originalColoredInk,
+        retainedColoredInk,
         backgroundRatio: background / (image.width * image.height),
         changedRatio: changed / (image.width * image.height),
       };
     },
     { encoded: afterPixels.toString('base64'), original: beforePixels.toString('base64') }
   );
+  expect(pixelProof.originalColoredInk).toBeGreaterThan(100);
+  expect(
+    pixelProof.retainedColoredInk,
+    'Source text must be replaced by neutral bars, not merely blurred'
+  ).toBe(0);
   expect(
     pixelProof.backgroundRatio,
     'Automatic Simplify must retain the source background at the requested CSS region'
@@ -245,6 +273,8 @@ export async function assertNativeManualMove(page: Page, mode: SimplifyNativeMod
   await page.locator('[data-ui="content.toolbar.drawing-options.simplify.automatic"]').click();
   await page.locator('[data-ui="content.toolbar.drawing-options.simplify.manual-image"]').click();
   await waitForSimplify(page);
+  const colorToggle = page.locator('[data-ui="content.toolbar.drawing-options.simplify.color"]');
+  if ((await colorToggle.getAttribute('aria-pressed')) !== 'true') await colorToggle.click();
   await page
     .locator('[data-ui="content.toolbar.drawing-options.quick-colors"] button[title="#ff7f50"]')
     .click();

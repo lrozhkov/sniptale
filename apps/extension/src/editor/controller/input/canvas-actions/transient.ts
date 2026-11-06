@@ -9,6 +9,7 @@ interface CancelEditorTransientInteractionOptions {
   cropGuide: Rect | null;
   activeTool: string;
   preserveActiveTool?: boolean;
+  preservePendingSimplify?: boolean;
   clearCropSelection: () => void;
   switchToSelectTool: () => void;
   syncRuntimeState: () => void;
@@ -30,7 +31,8 @@ export function cancelEditorTransientInteraction(
     return { changed: false, drawSession };
   }
 
-  let changed = cancelPendingEditorSimplify(canvas);
+  // Pointer cleanup on focus loss must not cancel work submitted on pointerup.
+  let changed = options.preservePendingSimplify ? false : cancelPendingEditorSimplify(canvas);
   let nextDrawSession = drawSession;
 
   if (cancelEditorDrawingArrowBend(canvas)) {
