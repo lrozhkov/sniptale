@@ -19,11 +19,26 @@ export function detectMedia(image, measure, sourceRows = [], scratch = null) {
     graphics = detectGraphics(image, queue);
   alignMediaSurfaceBottoms(image, surfaces);
   alignMediaSurfaceSides(image, surfaces);
+  // A texture proposal cannot cut an independently connected graphic into pieces.
+  // Enclosing surfaces retain ownership; contained and crossing surfaces yield.
+  const contains = (a, b) =>
+    a.x <= b.x && a.y <= b.y && a.x + a.w >= b.x + b.w && a.y + a.h >= b.y + b.h;
+  const ownedSurfaces = surfaces.filter(
+    (s) =>
+      !graphics.some(
+        (g) =>
+          g.x < s.x + s.w &&
+          g.x + g.w > s.x &&
+          g.y < s.y + s.h &&
+          g.y + g.h > s.y &&
+          !contains(s, g)
+      )
+  );
   const existing = [
-    ...surfaces,
+    ...ownedSurfaces,
     ...graphics.filter(
       (g) =>
-        !surfaces.some(
+        !ownedSurfaces.some(
           (s) => g.x < s.x + s.w && g.x + g.w > s.x && g.y < s.y + s.h && g.y + g.h > s.y
         )
     ),

@@ -1,31 +1,34 @@
 import { bounds, intersect } from './compact-contours.mjs';
 
-function dominantForeground(image, box) {
-  const colors = new Map();
-  for (let y = box.y; y < box.y + box.h; y++)
-    for (let x = box.x; x < box.x + box.w; x++) {
-      const i = (y * image.width + x) * 4;
-      if (
-        image.data[i + 3] < 128 ||
-        Math.max(...box.bg.map((v, c) => Math.abs(v - image.data[i + c]))) <= 100
-      )
-        continue;
-      const key = (image.data[i] << 16) | (image.data[i + 1] << 8) | image.data[i + 2];
-      colors.set(key, (colors.get(key) || 0) + 1);
+function componentForeground(image, box, points) {
+  const colors = points.map((p) => {
+    const i = ((box.y + Math.floor(p / box.w)) * image.width + box.x + (p % box.w)) * 4;
+    return [image.data[i], image.data[i + 1], image.data[i + 2]];
+  });
+  const low = [...box.bg],
+    high = [...box.bg];
+  for (const rgb of colors)
+    for (let c = 0; c < 3; c++) {
+      low[c] = Math.min(low[c], rgb[c]);
+      high[c] = Math.max(high[c], rgb[c]);
     }
-  let dominant = null,
-    count = 0,
-    runnerUp = 0;
-  for (const [color, amount] of colors) {
-    if (amount > count) {
-      runnerUp = count;
-      count = amount;
-      dominant = color;
-    } else runnerUp = Math.max(runnerUp, amount);
+  if (low.some((v, c) => v < box.bg[c] && high[c] > box.bg[c])) return null;
+  const endpoint = low.map((v, c) => (high[c] > box.bg[c] ? high[c] : v));
+  // Use an observed ink endpoint, never a fabricated combination of channel maxima.
+  return colors.some((rgb) => rgb.every((v, c) => v === endpoint[c])) ? endpoint : null;
+}
+
+function sharedTextInteriors(image, box, components, ink) {
+  let support = 0;
+  for (const { q, top, bottom, left, right } of components) {
+    if (
+      bottom - top + 1 < box.typeMetrics.xHeight * 0.7 ||
+      right - left + 1 > box.typeMetrics.xHeight * 2.5
+    )
+      continue;
+    if (uniformTextInterior(image, box, q, ink, top, bottom) && ++support >= 2) return true;
   }
-  return dominant !== null && count > runnerUp
-    ? [(dominant >> 16) & 255, (dominant >> 8) & 255, dominant & 255]
-    : null;
+  return false;
 }
 
 function variedColorRows(image, box, points, width, top, bottom) {
@@ -54,7 +57,6 @@ export function uncertainColorTexture(image, box) {
   const w = box.w,
     h = box.h,
     mask = new Uint8Array(w * h);
-  let dominant;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = ((box.y + y) * image.width + box.x + x) * 4,
@@ -68,9 +70,11 @@ export function uncertainColorTexture(image, box) {
       )
         mask[y * w + x] = 1;
     }
-  for (let k = 0; k < mask.length; k++) {
-    if (!mask[k]) continue;
-    const { q, left, right, top, bottom } = textureComponent(mask, w, h, k);
+  const components = [];
+  for (let k = 0; k < mask.length; k++)
+    if (mask[k]) components.push(textureComponent(mask, w, h, k));
+  const sharedInks = new Map();
+  for (const { q, left, right, top, bottom } of components) {
     const cw = right - left + 1,
       ch = bottom - top + 1;
     if (
@@ -82,11 +86,16 @@ export function uncertainColorTexture(image, box) {
     )
       continue;
     if (variedColorRows(image, box, q, w, top, bottom) < 2) continue;
-    // RGB antialias fringes can vary around a uniform text-colored interior.
-    // Require that same ink, its channel envelope and an untextured interior;
-    // a white text body cannot claim a saturated neighboring graphic this way.
-    if (dominant === undefined) dominant = dominantForeground(image, box);
-    if (uniformTextInterior(image, box, q, dominant, top, bottom)) continue;
+    // Thin subpixel strokes can lack an eroded core. They need the same observed
+    // ink in two independent uniform interiors before they can borrow that evidence.
+    const ink = componentForeground(image, box, q);
+    if (uniformTextInterior(image, box, q, ink, top, bottom)) continue;
+    if (ink && uniformTextInterior(image, box, q, ink, top, bottom, true)) {
+      const key = ink.join(',');
+      if (!sharedInks.has(key))
+        sharedInks.set(key, sharedTextInteriors(image, box, components, ink));
+      if (sharedInks.get(key)) continue;
+    }
     return true;
   }
   return false;
@@ -359,7 +368,7 @@ function textureComponent(mask, w, h, k) {
   return { q, left, right, top, bottom };
 }
 
-function uniformTextInterior(image, box, q, dominant, top, bottom) {
+function uniformTextInterior(image, box, q, dominant, top, bottom, shared = false) {
   const w = box.w;
   const rgbAt = (p) => {
     const i = ((box.y + Math.floor(p / w)) * image.width + box.x + (p % w)) * 4;
@@ -385,7 +394,7 @@ function uniformTextInterior(image, box, q, dominant, top, bottom) {
         component.has(p - w) &&
         component.has(p + w)
     );
-    if (core.length && variedColorRows(image, box, core, w, top, bottom) === 0) return true;
+    if (core.length ? variedColorRows(image, box, core, w, top, bottom) === 0 : shared) return true;
   }
   return false;
 }
