@@ -1111,3 +1111,47 @@ it.each([0, 30])(
     expect(fullRasters).toHaveLength(intensity > 0 ? 2 : 1);
   }
 );
+
+it.each([false, true])(
+  'keeps STRETCH source rectangles numeric without leaking layer metadata: camera=%s',
+  async (camera) => {
+    const f = fixture();
+    const layer = f.passes.overlayFrame.visualLayers[0];
+    if (!layer || layer.kind !== 'video') throw new Error('Expected video');
+    layer.clip.fitMode = 'STRETCH';
+    delete layer.clip.windowHeader;
+    delete layer.clip.sourceCrop;
+    layer.rotation = 45;
+    if (camera) layer.trackRole = 'CAMERA';
+    const original = structuredClone(layer);
+    const plan = await buildNativeGpuPreviewLayers(f);
+    plans.push(plan);
+    const nodes = flatten(plan.layers);
+    const source = nodes.find((node) => node.source === f.source);
+    expect(source).toBeDefined();
+    expect(source!.rect).toEqual({
+      x: layer.x,
+      y: layer.y,
+      width: layer.width,
+      height: layer.height,
+    });
+    for (const node of nodes)
+      for (const rect of [node.rect, node.clip?.rect])
+        if (rect) {
+          expect(Object.keys(rect).sort()).toEqual(['height', 'width', 'x', 'y']);
+          expect(Object.values(rect).every(Number.isFinite)).toBe(true);
+          expect(rect.width).toBeGreaterThan(0);
+          expect(rect.height).toBeGreaterThan(0);
+        }
+    const material = plan.layers[1];
+    expect(material).toBeDefined();
+    const { projectQuickEditPoint } =
+      await import('../../../../features/video/composition/motion/spatial-geometry');
+    const centre = { x: layer.x + layer.width / 2, y: layer.y + layer.height / 2 };
+    const mapped = projectQuickEditPoint(material!.inverse, centre);
+    expect(mapped?.x).toBeCloseTo(centre.x, 10);
+    expect(mapped?.y).toBeCloseTo(centre.y, 10);
+    expect(material!.inverse).not.toEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    expect(layer).toEqual(original);
+  }
+);

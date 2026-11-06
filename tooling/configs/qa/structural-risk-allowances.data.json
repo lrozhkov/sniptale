@@ -974,11 +974,11 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: This suite tests one exact frame materializer. It extends existing media, GPU, cancellation and join fixtures with camera receipts. Test receivers create no production authority. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "13cb6a61aa46b6a5d66b520af2dd3ea2628018491302e7fa582a986ccad4571f",
-      "signatureHash": "3ba7d0319dc10ec888ac7e6d8db044ce1c2f8ae4f540dff1ab5be2ca67d986b0"
+      "reason": "tool-noise: One materializer fixture controls media, cancellation and final frame ownership. Added cases compare explicit UI acquisition with unchanged default and internal sample contracts. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-06",
+      "astHash": "d10f871c32d3665d275f062ba03391fdeab2a6db8f8fc28b52a46a650aa06846",
+      "signatureHash": "2fa45a6159a75ab699be5031082ace57d7c5731adbdf5d04680bd7f9568e9aa6"
     },
     {
       "rule": "structural-file-risk",
@@ -3900,10 +3900,10 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
       "symbol": "createMaterializedJoinPresentation",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One join transaction owns endpoint sampling, cuts, cache and release. Completed camera data is result metadata. Failure cleanup remains inside this transaction. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-05",
-      "astHash": "a7f7cd937ae0e55df62765232275083c319e65b12546ab1eceadcf625610b8e6",
+      "reason": "tool-noise: One join transaction prepares endpoints and the final presentation. The join transaction forwards UI acquisition only when the outer frame has no active join. Internal samples retain their existing output contract. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-06",
+      "astHash": "044fc31af91c568b190dec1c85c49a386a8b494623da512caeb02713359421ae",
       "signatureHash": "fc7e7e554d488c4fbfbe486cf34eb1e387fcc1776effc24ea4cb5224f46a37e7"
     },
     {
@@ -5308,10 +5308,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-spatial.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: One Native spatial suite extends existing source-FX and transition cases with completed-plan checks. The effect chain remains a variant of the existing fixture. Primary viewports and interaction assertions retain their owners. The recovery fixture destroys the preview GPU before the existing WebGL loss sequence. It checks the fallback frame before WebGL failure. Retained-frame, unchanged-project and UI retry assertions remain. Retry checks a new GPU device within the same captured-device fixture. Subsequent seeking must change the front frame and preserve independent pixels. The project remains unchanged. These assertions retain the same recovery owner.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes Native fixture lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "57a0652be9b5db96950a66407593a42ad678db9114731ff722ff293ff63afc05",
+      "reason": "tool-noise: One spatial editor fixture checks displayed geometry and authoring. Published canvas readers now use a temporary full-size image copy. Their coordinates, thresholds and digest assertions remain unchanged. The moving transition case opens the outer disclosure before the detailed controls, including after reload. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-06",
+      "astHash": "37b5780eb63cdef225e8ff1007b24d5ac384db9674fd3f11867b71851f62f949",
       "signatureHash": "c306629cfc7abde9beb40d5c2f9cacb233e96ba2212ae2ef6386fa0b2c957134"
     },
     {
@@ -5440,11 +5440,11 @@
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx",
       "symbol": "<file>",
       "owner": "extension:video-editor:workspace",
-      "reason": "tool-noise: One mounted Framing fixture checks rendering, interaction, stale results and cleanup. The archive case reuses its root, materializer queue and commit spies. A local canonical archive supplies the existing trajectory hook. Render-only geometry and unchanged authoring data share this proof. Renderer switch proof uses the same surface and materializer fixture. Controlled completion rejects the obsolete frame before publishing the selected backend. No new fixture lifetime is added. Fresh architecture review must validate this binding.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes the Framing fixture, trajectory preparation or authoring callbacks. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-05",
-      "astHash": "23b7db72f2d20025763278cb1583ec5868b5f884c03706715aadd552aad0f93c",
-      "signatureHash": "02cf6ac88cd13ee2b910c13f86742338ea435aa0727888664911e713f95aa46f"
+      "reason": "tool-noise: One inspector fixture checks source reuse, geometry, interaction and asynchronous publication. Controlled completions prove generation ordering and ownership transfer without changing the gesture owner. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-06",
+      "astHash": "76bb7463cebaf88dc6bd80ab2591da08a3710aa404deb0e4d8846fd9f15b7609",
+      "signatureHash": "358fd2b9a4ae642595638850d4161a833e585883d21fc159dd2b2ec00e58fc73"
     },
     {
       "rule": "structural-file-risk",
@@ -5880,10 +5880,10 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One materializer owns media, staging and the frame transaction. Camera metadata follows completed pixels through the same operation. The existing Canvas API delegates within this owner. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding. Renderer selection uses the existing transaction or view. It adds no independent writer, queue or resource lifetime. Fresh architecture review must validate this exact changed binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-05",
-      "astHash": "c8ba527d37882d3ea9612fa545da2316049e506564f880a0194cf55cdacb79d9",
+      "reason": "tool-noise: One Native materializer owns decoded sources and completed frame preparation. Optional UI output belongs to one call. Frontend visibility and authoring remain outside this owner. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-06",
+      "astHash": "45b7dc051a916f6cc8e37a7f403fd53e8e3e3d8251f3e2395f28e776b84a06ec",
       "signatureHash": "4bd2ead5ecd40af4292bee3f1dadcd5592020ba0775a7eaddfd90ae236664130"
     },
     {
@@ -5902,11 +5902,11 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One fixture checks the Native graph builder. The added cases check shared source groups, independent exposure poses, artwork bounds and release. Graphics contexts and project layers remain test data. Fresh independent architecture review must validate this exact binding.",
+      "reason": "tool-noise: One Native graph fixture checks source groups, masks, artwork bounds and resource release. The added STRETCH cases reject layer metadata in source rectangles. They check the same transforms and resource lifetimes. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-05",
-      "astHash": "d7e117109c48ee224e04419868432670df5be8bb5de6f36abaedcf0a7d7a8728",
-      "signatureHash": "ccc43873552751e7a14b1d2b4625c312ed0347ca3f6836c0f1431aa598cec5b8"
+      "reviewDate": "2026-11-06",
+      "astHash": "7d0f940dffd4688eba12cbf63204d4d2faa45bcf796cbbc498878a7045e4643e",
+      "signatureHash": "fdb1659b4354a8924d5e92981c334e5c5f2845d70c0235d182a5d42568a27b50"
     },
     {
       "rule": "structural-file-risk",
@@ -6078,11 +6078,22 @@
       "rule": "structural-file-risk",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "astHash": "ba737dd262eb32bb40bfc95474731619c9ccb507969127cd9bc1b487374476d3",
-      "signatureHash": "792a76a904c0030a376e9df25f0f8048f2d65ba1e868c7892e3f78c6aa20aa07",
+      "astHash": "e3b47569ad06ed7cd28c4a19aedcacdf2479c9ca43a442723690ff55a497352a",
+      "signatureHash": "30d5084ef313ccb797d2fb3c9e7d189fb621390c86693d75c005881b30605240",
       "reviewDate": "2026-11-06",
-      "reason": "tool-noise: One Native compositor fixture controls borrowed sources, frame barriers and provider disposal. Added cases check direct output, default bitmap compatibility and retained frontend outputs. Fresh independent architecture review must check this exact binding.",
+      "reason": "tool-noise: One Native producer fixture controls captured sources, GPU completion and output leases. The added STRETCH case checks plain source and clip rectangles. Rotation landmarks check the existing transform contract. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction."
+    },
+    {
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-spatial.spec.ts",
+      "rule": "structural-function-risk",
+      "symbol": "test callback#6",
+      "owner": "tooling:test:e2e",
+      "astHash": "6daf7ace8a99da7bff9cb06e87b49cefe7b463a49636e7c239c86c31c9606f53",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
+      "reviewDate": "2026-11-06",
+      "reason": "tool-noise: One spatial inspector transaction compares draft preview, cancellation, accepted values and reopening. Its parameter operations share the same controller and reference frame. The added scratch reads preserve existing image assertions. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or state owners. Remove when the analyzer models this cohesive transaction."
     }
   ]
 }

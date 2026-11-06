@@ -53,15 +53,17 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
   const following = props.region.focusMode === VideoMotionFocusMode.CURSOR;
   const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gpuHostRef = useRef<HTMLDivElement>(null);
   const {
     ready,
+    visible,
     failed,
     reload,
     viewport: cursorViewport,
     plan,
     nominalScale,
     update,
-  } = useFramingFrame(renderProps, canvasRef);
+  } = useFramingFrame(renderProps, canvasRef, gpuHostRef);
   const interaction = useFramingInteraction(renderProps, overview, cursorViewport);
   const { areaPoints, viewport, left, top, width, height, handlers } = interaction;
   const camera = resolveFramingRenderCamera(renderProps, overview, interaction, cursorViewport);
@@ -103,6 +105,8 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
       >
         <FramingOverlays
           canvasRef={canvasRef}
+          gpuHostRef={gpuHostRef}
+          visible={visible}
           ready={ready}
           failed={failed}
           areaPoints={overview ? areaPoints : null}
@@ -122,6 +126,8 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
 
 function FramingOverlays({
   canvasRef,
+  gpuHostRef,
+  visible,
   ready,
   failed,
   areaPoints,
@@ -130,6 +136,8 @@ function FramingOverlays({
   showOutline,
 }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  gpuHostRef: React.RefObject<HTMLDivElement | null>;
+  visible: boolean;
   ready: boolean;
   failed: boolean;
   areaPoints: ReturnType<typeof useFramingInteraction>['areaPoints'];
@@ -145,11 +153,16 @@ function FramingOverlays({
         aria-hidden="true"
         className="absolute pointer-events-none"
         style={{
-          visibility: ready ? 'visible' : 'hidden',
+          visibility: visible ? 'visible' : 'hidden',
           inset: 0,
           width: '100%',
           height: '100%',
         }}
+      />
+      <div
+        ref={gpuHostRef}
+        data-ui="video-editor.framing-preview.gpu-host"
+        className="pointer-events-none absolute inset-0 h-full w-full"
       />
       {ready && areaPoints ? (
         <>

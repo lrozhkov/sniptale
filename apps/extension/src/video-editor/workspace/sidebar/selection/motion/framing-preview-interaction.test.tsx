@@ -1,3 +1,4 @@
+import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -17,7 +18,11 @@ import { resolveVideoCompositionCamera } from '../../../../../features/video/com
 vi.mock('../../../../preview/cache/materializer', () => ({
   createVideoPreviewFrameMaterializer: () => ({
     dispose: vi.fn(),
-    renderFrame: async () => document.createElement('canvas'),
+    renderFrameWithPresentation: async (
+      time: number,
+      _signal: AbortSignal,
+      camera: VideoCompositionCameraState
+    ) => ({ canvas: document.createElement('canvas'), presentation: { camera, time } }),
   }),
 }));
 let root: Root;

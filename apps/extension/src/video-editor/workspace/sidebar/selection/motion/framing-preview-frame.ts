@@ -1,4 +1,6 @@
-import { useContext, useCallback, useEffect, useRef, useState } from 'react';
+import { createNativePreviewPresentationSession } from '../../../../preview/stage/canvas/presentation-session';
+import type { NativePreviewGpuOutput } from '../../../../preview/stage/scene/types';
+import { useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
 import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 import { createVideoPreviewFrameMaterializer } from '../../../../preview/cache/materializer';
@@ -23,6 +25,7 @@ interface FramingRequest {
   key: string;
 }
 interface FramingResult {
+  output?: NativePreviewGpuOutput;
   canvas: HTMLCanvasElement;
   nominalScale: number;
   viewport?: VideoCompositionCameraState;
@@ -31,7 +34,8 @@ interface FramingResult {
 
 export function useFramingFrame(
   props: FramingPreviewProps,
-  canvasRef: React.RefObject<HTMLCanvasElement | null>
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  gpuHostRef: React.RefObject<HTMLDivElement | null>
 ) {
   const { project, region, assetUrls } = props;
   const renderer = useContext(WorkspacePreviewContext)?.preferences.preferences.renderer ?? 'gpu';
@@ -54,6 +58,26 @@ export function useFramingFrame(
     viewport?: VideoCompositionCameraState | undefined;
     plan?: ReturnType<typeof resolveProjectCursorCameraPlan> | null | undefined;
   } | null>(null);
+  const [hasPresentedFrame, setHasPresentedFrame] = useState(false);
+  const presenterRef = useRef<ReturnType<typeof createNativePreviewPresentationSession> | null>(
+    null
+  );
+  const activeGeneration = useRef<AbortController | null>(null);
+  const previousTransaction = useRef<Promise<void>>(Promise.resolve());
+  useLayoutEffect(() => {
+    const presenter = createNativePreviewPresentationSession({
+      fallback: () => canvasRef.current,
+      host: () => gpuHostRef.current,
+      role: 'inspector',
+    });
+    presenter.mount();
+    presenterRef.current = presenter;
+    return () => {
+      activeGeneration.current?.abort();
+      presenterRef.current = null;
+      presenter.dispose();
+    };
+  }, [canvasRef, gpuHostRef]);
   const [retry, setRetry] = useState(0);
   const latest = useRef<FramingRequest | null>(null);
   const enqueue = useRef<((request: FramingRequest) => void) | null>(null);
@@ -61,6 +85,8 @@ export function useFramingFrame(
     const canvas = canvasRef.current;
     if (!canvas) return;
     const controller = new AbortController();
+    activeGeneration.current = controller;
+    const predecessor = previousTransaction.current;
     const materializer = createVideoPreviewFrameMaterializer({
       previewRenderer: renderer,
       assetUrls: request.assetUrls,
@@ -72,27 +98,44 @@ export function useFramingFrame(
       },
     });
     const queue = createFramingRenderQueue({
+      predecessor,
       render: async (next) => {
         const prepared = prepareFramingRequest(next, request.time);
-        const canvas = await materializer.renderFrame(
+        const presenter = presenterRef.current;
+        if (!presenter) throw new Error('Inspector presentation is unavailable.');
+        const result = await materializer.renderFrameWithPresentation(
           request.time,
           controller.signal,
-          prepared.camera
+          prepared.camera,
+          presenter.acquire
         );
-        return { canvas, ...prepared };
+        return {
+          canvas: result.canvas,
+          ...(result.presentation.output ? { output: result.presentation.output } : {}),
+          ...prepared,
+        };
       },
       signal: controller.signal,
       present: (result) => {
-        canvas.width = result.canvas.width;
-        canvas.height = result.canvas.height;
-        canvas.getContext('2d')?.drawImage(result.canvas, 0, 0);
-        setFrame({
-          request,
-          hasFrame: true,
-          nominalScale: result.nominalScale,
-          failed: false,
-          viewport: result.viewport,
-          plan: result.plan,
+        const presenter = presenterRef.current;
+        if (!presenter) throw new Error('Inspector presentation is unavailable.');
+        if (!result.output) {
+          canvas.width = result.canvas.width;
+          canvas.height = result.canvas.height;
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('Inspector fallback context is unavailable.');
+          context.drawImage(result.canvas, 0, 0);
+        }
+        presenter.publish(result.output ?? null, () => {
+          setFrame({
+            request,
+            hasFrame: true,
+            nominalScale: result.nominalScale,
+            failed: false,
+            viewport: result.viewport,
+            plan: result.plan,
+          });
+          setHasPresentedFrame(true);
         });
       },
       fail: () =>
@@ -108,7 +151,10 @@ export function useFramingFrame(
     return () => {
       enqueue.current = null;
       controller.abort();
-      materializer.dispose();
+      if (activeGeneration.current === controller) activeGeneration.current = null;
+      const completed = queue.settled().finally(() => materializer.dispose());
+      previousTransaction.current = completed;
+      void completed.catch(() => {});
     };
   }, [request, retry, canvasRef, renderer]);
   const update = useCallback(
@@ -121,6 +167,7 @@ export function useFramingFrame(
   );
   return {
     update,
+    visible: hasPresentedFrame,
     ready: frame?.request === request && frame.hasFrame,
     failed: frame?.request === request && frame.failed,
     reload: () => setRetry((value) => value + 1),
@@ -182,13 +229,14 @@ export function resolveFramingRenderCamera(
 
 /** One active render and one latest request; preparation starts after an inspector paint. */
 function createFramingRenderQueue(params: {
+  predecessor: Promise<void>;
   render: (request: FramingRequest) => Promise<FramingResult>;
   signal: AbortSignal;
   present: (result: FramingResult) => void;
   fail: () => void;
 }) {
   let latest: FramingRequest | null = null;
-  let running = false;
+  let running: Promise<void> | null = null;
   const afterPaint = () =>
     new Promise<void>((resolve) => {
       let timer: ReturnType<typeof setTimeout> | null = null;
@@ -204,22 +252,37 @@ function createFramingRenderQueue(params: {
       params.signal.addEventListener('abort', finish, { once: true });
     });
   const drain = async () => {
-    running = true;
-    while (latest && !params.signal.aborted) {
-      await afterPaint();
-      if (params.signal.aborted || !latest) break;
-      const current = latest;
+    try {
       try {
-        const result = await params.render(current);
-        if (!params.signal.aborted && current === latest) params.present(result);
+        await params.predecessor;
       } catch {
-        if (!params.signal.aborted && current === latest) params.fail();
+        if (!params.signal.aborted) params.fail();
+        return;
       }
-      if (current === latest) break;
+      while (latest && !params.signal.aborted) {
+        await afterPaint();
+        if (params.signal.aborted || !latest) break;
+        const current = latest;
+        let result: FramingResult | undefined;
+        let accepted = false;
+        try {
+          result = await params.render(current);
+          if (!params.signal.aborted && current === latest) {
+            params.present(result);
+            accepted = true;
+          }
+        } catch {
+          if (!params.signal.aborted && current === latest) params.fail();
+        } finally {
+          if (!accepted) result?.output?.release();
+        }
+        if (current === latest) break;
+      }
+    } finally {
+      running = null;
     }
-    running = false;
   };
-  return (request: FramingRequest) => {
+  const enqueue = (request: FramingRequest) => {
     if (
       params.signal.aborted ||
       (latest?.key === request.key &&
@@ -229,8 +292,12 @@ function createFramingRenderQueue(params: {
     )
       return;
     latest = request;
-    if (!running) void drain();
+    if (!running) {
+      running = drain();
+      void running.catch(() => {});
+    }
   };
+  return Object.assign(enqueue, { settled: () => running ?? Promise.resolve() });
 }
 
 /** Immutable editor snapshots replace changed fields; motion and metadata do not change this source. */

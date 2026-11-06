@@ -10,6 +10,7 @@ import {
   type GpuPreviewRenderer,
 } from '../../../../features/video/composition/canvas/gpu-preview';
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
+import { projectQuickEditPoint } from '../../../../features/video/composition/motion/spatial-geometry';
 import type { renderPreviewScene } from './render-preview';
 import { createSceneGradientBackground } from '../../../../features/video/project/scene/background-gradient';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
@@ -885,4 +886,32 @@ it('declines direct output when the provider lacks surface support without acqui
   expect(f.input.stagingCanvas).not.toHaveBeenCalled();
   expect(f.finish).not.toHaveBeenCalled();
   expect(f.captured).toHaveLength(0);
+});
+
+it('passes plain STRETCH rectangles to the admitted renderer and preserves rotation', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0];
+  if (!layer || layer.kind !== 'video') throw new Error('Expected video');
+  layer.clip.fitMode = 'STRETCH';
+  delete layer.clip.windowHeader;
+  delete layer.clip.sourceCrop;
+  layer.rotation = 45;
+  const original = structuredClone(layer);
+  expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBe(true);
+  const source = f.render.mock.calls[0]![0].layers.find((node) =>
+    Object.is(node.source, f.captured[0])
+  );
+  expect(source).toBeDefined();
+  const rect = { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+  expect(source!.rect).toEqual(rect);
+  expect(source!.clip?.rect).toEqual(rect);
+  expect(Object.keys(source!.rect).sort()).toEqual(['height', 'width', 'x', 'y']);
+  expect(Object.keys(source!.clip!.rect).sort()).toEqual(['height', 'width', 'x', 'y']);
+  const centre = projectQuickEditPoint(source!.inverse, { x: 4, y: 2 });
+  expect(centre?.x).toBeCloseTo(4, 10);
+  expect(centre?.y).toBeCloseTo(2, 10);
+  const turned = projectQuickEditPoint(source!.inverse, { x: 5, y: 2 });
+  expect(turned?.x).toBeCloseTo(4 + Math.SQRT1_2, 10);
+  expect(turned?.y).toBeCloseTo(2 - Math.SQRT1_2, 10);
+  expect(layer).toEqual(original);
 });

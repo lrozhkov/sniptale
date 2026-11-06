@@ -11,6 +11,7 @@ import type {
 interface PresentationOptions {
   fallback: () => HTMLCanvasElement | null;
   host: () => HTMLDivElement | null;
+  role?: 'stage' | 'inspector';
 }
 interface Destination {
   canvas: HTMLCanvasElement;
@@ -25,6 +26,8 @@ interface Destination {
 /** Owns frontend destinations and accepted publication, never the GPU device or project model. */
 class NativePreviewPresentationSession implements NativePreviewFramePresenter {
   private readonly destinations = new Set<Destination>();
+  private readonly role: 'stage' | 'inspector';
+  private readonly marker: 'data-preview-stage-canvas' | 'data-preview-inspector-canvas';
   private mounted = false;
   private disposed = false;
   private host: HTMLDivElement | null = null;
@@ -33,7 +36,11 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     null;
   private front: NativePreviewGpuOutput | null = null;
 
-  constructor(private options: PresentationOptions) {}
+  constructor(private options: PresentationOptions) {
+    this.role = options.role ?? 'stage';
+    this.marker =
+      this.role === 'inspector' ? 'data-preview-inspector-canvas' : 'data-preview-stage-canvas';
+  }
 
   mount(): void {
     if (this.disposed) throw new Error('Preview presentation is disposed.');
@@ -46,7 +53,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     this.originalFallback = {
       opacity: fallback.style.opacity,
       pointerEvents: fallback.style.pointerEvents,
-      active: fallback.hasAttribute('data-preview-stage-canvas'),
+      active: fallback.hasAttribute(this.marker),
     };
     this.mounted = true;
     this.show(null);
@@ -83,15 +90,15 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     if (fallback) {
       fallback.style.opacity = output ? '0' : '1';
       fallback.style.pointerEvents = output ? 'none' : (this.originalFallback?.pointerEvents ?? '');
-      if (output) fallback.removeAttribute('data-preview-stage-canvas');
-      else fallback.setAttribute('data-preview-stage-canvas', '');
+      if (output) fallback.removeAttribute(this.marker);
+      else fallback.setAttribute(this.marker, '');
     }
     for (const destination of this.destinations) {
       const visible = output?.canvas === destination.canvas;
       destination.canvas.style.opacity = visible ? '1' : '0';
-      destination.canvas.style.pointerEvents = visible ? 'auto' : 'none';
-      if (visible) destination.canvas.setAttribute('data-preview-stage-canvas', '');
-      else destination.canvas.removeAttribute('data-preview-stage-canvas');
+      destination.canvas.style.pointerEvents = visible && this.role === 'stage' ? 'auto' : 'none';
+      if (visible) destination.canvas.setAttribute(this.marker, '');
+      else destination.canvas.removeAttribute(this.marker);
     }
   }
 
@@ -136,6 +143,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
         canvas.style.opacity = '0';
         canvas.style.pointerEvents = 'none';
         canvas.style.willChange = 'opacity';
+        if (this.role === 'inspector') canvas.setAttribute('aria-hidden', 'true');
         host.appendChild(canvas);
         surface = renderer.createSurface(canvas, { offscreen: true });
         if (surface.canvas !== canvas)
@@ -193,7 +201,8 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     this.front = output;
     if (previous && previous !== output) previous.release();
     const canvas = output?.canvas ?? this.fallback;
-    canvas?.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
+    if (this.role === 'stage')
+      canvas?.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
   };
 
   dispose = (): void => {
@@ -202,7 +211,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     for (const destination of this.destinations) {
       destination.canvas.style.opacity = '0';
       destination.canvas.style.pointerEvents = 'none';
-      destination.canvas.removeAttribute('data-preview-stage-canvas');
+      destination.canvas.removeAttribute(this.marker);
       destination.retired = true;
     }
     const previous = this.front;
@@ -212,8 +221,8 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     if (this.fallback && this.originalFallback) {
       this.fallback.style.opacity = this.originalFallback.opacity;
       this.fallback.style.pointerEvents = this.originalFallback.pointerEvents;
-      if (this.originalFallback.active) this.fallback.setAttribute('data-preview-stage-canvas', '');
-      else this.fallback.removeAttribute('data-preview-stage-canvas');
+      if (this.originalFallback.active) this.fallback.setAttribute(this.marker, '');
+      else this.fallback.removeAttribute(this.marker);
     }
   };
 }

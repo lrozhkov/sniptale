@@ -322,7 +322,7 @@ export function createNativeGpuPreviewRenderer(
             decoded.sourceHeight === source.displayHeight);
         if (layer && inverse && source && directDimensions) {
           const fitted = {
-            frame: layer,
+            frame: { x: layer.x, y: layer.y, width: layer.width, height: layer.height },
             fitMode: layer.clip.fitMode,
             sourceWidth: source.displayWidth,
             sourceHeight: source.displayHeight,

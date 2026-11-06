@@ -47,7 +47,7 @@ type Raster = (
   padded?: boolean,
   bounds?: GpuPreviewLayer['rect']
 ) => GpuPreviewLayer;
-type WindowMedia = ReturnType<typeof resolveVideoWindowMedia> & { frame: VideoLayer };
+type WindowMedia = ReturnType<typeof resolveVideoWindowMedia> & { frame: GpuPreviewLayer['rect'] };
 
 /** Borrows immutable white coverage until the requesting GPU plan releases its lease. */
 export type NativeGpuSourceMask = (
@@ -136,11 +136,11 @@ export function buildNativeGpuVideoLayers(args: {
   };
   const media = {
     ...resolveVideoWindowMedia(layer, dimensions, 1, args.imageBank),
-    frame: layer,
+    frame: { x: layer.x, y: layer.y, width: layer.width, height: layer.height },
     ...(appearance ? { cameraAppearance: appearance } : {}),
   };
   const window = appearance
-    ? cameraWindowFrame(layer, appearance.shape)
+    ? cameraWindowFrame(media.frame, appearance.shape)
     : getFittedMediaWindowFrame(media);
   const content = getFittedMediaContentFrame(media);
   const bare: VideoLayer = {

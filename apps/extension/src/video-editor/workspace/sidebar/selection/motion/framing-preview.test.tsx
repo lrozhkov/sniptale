@@ -1,3 +1,10 @@
+import * as inspectorPresentation from '../../../../preview/stage/canvas/presentation-session';
+import type {
+  NativePreviewGpuOutput,
+  NativePreviewGpuTargetFactory,
+} from '../../../../preview/stage/scene/types';
+import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
+import type { MaterializedPreviewFrame } from '../../../../preview/cache/materializer';
 // @vitest-environment jsdom
 import { DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES } from '../../../../../composition/persistence/video-editor-preview-preferences/model';
 import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
@@ -29,7 +36,8 @@ let root: Root;
 let host: HTMLDivElement;
 const draw = vi.fn();
 const pending: {
-  resolve: (canvas: HTMLCanvasElement) => void;
+  resolve: (canvas: HTMLCanvasElement, output?: NativePreviewGpuOutput) => void;
+  factory?: NativePreviewGpuTargetFactory;
   reject: (error: Error) => void;
   signal: AbortSignal;
   camera: { scale: number; overlayZoomMode?: string };
@@ -67,16 +75,29 @@ beforeEach(() => {
   });
   mocks.create.mockImplementation(() => {
     const dispose = vi.fn();
+    const renderFrameWithPresentation = (
+      _time: number,
+      signal: AbortSignal,
+      camera: VideoCompositionCameraState,
+      factory?: NativePreviewGpuTargetFactory
+    ) =>
+      new Promise<MaterializedPreviewFrame>((resolve, reject) =>
+        pending.push({
+          resolve: (canvas, output) =>
+            resolve({
+              canvas,
+              presentation: { camera, time: _time, ...(output ? { output } : {}) },
+            }),
+          reject,
+          signal,
+          dispose,
+          camera,
+          ...(factory ? { factory } : {}),
+        })
+      );
     return {
       dispose,
-      renderFrame: (
-        _time: number,
-        signal: AbortSignal,
-        camera: { scale: number; overlayZoomMode?: string }
-      ) =>
-        new Promise<HTMLCanvasElement>((resolve, reject) =>
-          pending.push({ resolve, reject, signal, dispose, camera })
-        ),
+      renderFrameWithPresentation,
     };
   });
 });
@@ -176,8 +197,10 @@ it('disposes stale rendering, ignores its result and offers retry after a curren
   const replacement = { ...project, backgroundColor: '#000000' };
   await render(false, replacement);
   expect(pending[0]!.signal.aborted).toBe(true);
-  expect(pending[0]!.dispose).toHaveBeenCalledOnce();
+  expect(pending[0]!.dispose).not.toHaveBeenCalled();
   await ready(0);
+  await admit();
+  expect(pending[0]!.dispose).toHaveBeenCalledOnce();
   expect(draw).not.toHaveBeenCalled();
   expect(button().disabled).toBe(true);
   await act(async () => pending[1]!.reject(new Error('decode failed')));
@@ -955,4 +978,172 @@ it('switches inspector renderers and rejects the obsolete completed frame', asyn
   expect(button().disabled).toBe(false);
   expect(commit).not.toHaveBeenCalled();
   expect(commitArea).not.toHaveBeenCalled();
+});
+
+it('publishes inspector GPU outputs without2D copy or main-stage marker contamination', async () => {
+  const main = document.createElement('canvas');
+  main.setAttribute('data-preview-stage-canvas', '');
+  document.body.append(main);
+  await render();
+  expect(typeof pending[0]!.factory).toBe('function');
+  const renderer = {
+    allocatedBytes: 0,
+    render: vi.fn(),
+    dispose: vi.fn(),
+    createSurface: vi.fn((canvas: HTMLCanvasElement) => ({
+      canvas,
+      present: vi.fn(async () => {}),
+      dispose: vi.fn(),
+    })),
+  };
+  const target = pending[0]!.factory!({ width: 480, height: 360 }, renderer),
+    release = vi.fn(() => target.release());
+  await act(async () => pending[0]!.resolve(target.canvas, { canvas: target.canvas, release }));
+  expect(draw).not.toHaveBeenCalled();
+  expect(button().disabled).toBe(false);
+  expect(host.querySelector('[data-preview-inspector-canvas]')).toBe(target.canvas);
+  expect(document.querySelectorAll('[data-preview-stage-canvas]')).toHaveLength(1);
+  expect(document.querySelector('[data-preview-stage-canvas]')).toBe(main);
+  expect(getComputedStyle(target.canvas).pointerEvents).toBe('none');
+  expect(release).not.toHaveBeenCalled();
+  act(() => root.unmount());
+  expect(release).toHaveBeenCalledTimes(1);
+  main.remove();
+  root = createRoot(host);
+});
+it('waits for the obsolete GPU transaction and release before admitting the next generation', async () => {
+  await render();
+  expect(typeof pending[0]!.factory).toBe('function');
+  const renderer = {
+    allocatedBytes: 0,
+    render: vi.fn(),
+    dispose: vi.fn(),
+    createSurface: vi.fn((canvas: HTMLCanvasElement) => ({
+      canvas,
+      present: vi.fn(async () => {}),
+      dispose: vi.fn(),
+    })),
+  };
+  const old = pending[0]!.factory!({ width: 480, height: 360 }, renderer),
+    release = vi.fn(() => old.release());
+  await render(false, { ...project, backgroundColor: '#222' });
+  expect(pending).toHaveLength(1);
+  expect(pending[0]!.signal.aborted).toBe(true);
+  await act(async () => pending[0]!.resolve(old.canvas, { canvas: old.canvas, release }));
+  expect(release).toHaveBeenCalledTimes(1);
+  expect(draw).not.toHaveBeenCalled();
+  await admit();
+  expect(pending).toHaveLength(2);
+  expect(pending[0]!.dispose).toHaveBeenCalledTimes(1);
+  await ready(1);
+});
+
+function gpuResult(index: number) {
+  const renderer = {
+    allocatedBytes: 0,
+    render: vi.fn(),
+    dispose: vi.fn(),
+    createSurface: vi.fn((canvas: HTMLCanvasElement) => ({
+      canvas,
+      present: vi.fn(async () => {}),
+      dispose: vi.fn(),
+    })),
+  };
+  const target = pending[index]!.factory!({ width: 480, height: 360 }, renderer);
+  const release = vi.fn(() => target.release());
+  return { canvas: target.canvas, release };
+}
+it('retains an accepted GPU front through failed replacement and retry until a new frame commits', async () => {
+  await render();
+  const first = gpuResult(0);
+  await act(async () => pending[0]!.resolve(first.canvas, first));
+  await render(false, project, region, { source: 'blob:new' });
+  expect(first.release).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-preview-inspector-canvas]')).toBe(first.canvas);
+  await act(async () => pending[1]!.reject(new Error('replacement')));
+  const retry = Array.from(host.querySelectorAll('button')).find((node) =>
+    node.textContent?.includes(translate('common.actions.retry'))
+  )!;
+  act(() => retry.click());
+  await admit();
+  expect(first.release).not.toHaveBeenCalled();
+  const next = gpuResult(2);
+  await act(async () => pending[2]!.resolve(next.canvas, next));
+  expect(first.release).toHaveBeenCalledTimes(1);
+  expect(next.release).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-preview-inspector-canvas]')).toBe(next.canvas);
+  expect(draw).not.toHaveBeenCalled();
+});
+it('releases superseded GPU camera results before admitting the latest request', async () => {
+  await render(false, project, { ...region, scale: 0.5 });
+  const obsolete = gpuResult(0);
+  await render(false, project, { ...region, scale: 0.75 });
+  await act(async () => pending[0]!.resolve(obsolete.canvas, obsolete));
+  expect(obsolete.release).toHaveBeenCalledTimes(1);
+  expect(draw).not.toHaveBeenCalled();
+  await admit();
+  expect(pending).toHaveLength(2);
+  const next = gpuResult(1);
+  await act(async () => pending[1]!.resolve(next.canvas, next));
+  expect(next.release).not.toHaveBeenCalled();
+});
+it('releases an output rejected by publication without replacing its accepted front', async () => {
+  const create = inspectorPresentation.createNativePreviewPresentationSession;
+  let owner: ReturnType<typeof create> | undefined;
+  vi.spyOn(inspectorPresentation, 'createNativePreviewPresentationSession').mockImplementation(
+    (options) => {
+      owner = create(options);
+      return owner;
+    }
+  );
+  await render(false, project, { ...region, scale: 0.5 });
+  const first = gpuResult(0);
+  await act(async () => pending[0]!.resolve(first.canvas, first));
+  vi.spyOn(owner!, 'publish').mockImplementationOnce(() => {
+    throw new Error('publication');
+  });
+  await render(false, project, { ...region, scale: 0.75 });
+  const rejected = gpuResult(1);
+  await act(async () => pending[1]!.resolve(rejected.canvas, rejected));
+  expect(rejected.release).toHaveBeenCalledTimes(1);
+  expect(first.release).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-preview-inspector-canvas]')).toBe(first.canvas);
+});
+it('aborts before UI-session disposal and releases a late GPU result after unmount', async () => {
+  const create = inspectorPresentation.createNativePreviewPresentationSession;
+  vi.spyOn(inspectorPresentation, 'createNativePreviewPresentationSession').mockImplementation(
+    (options) => {
+      const owner = create(options),
+        dispose = owner.dispose;
+      vi.spyOn(owner, 'dispose').mockImplementation(() => {
+        expect(pending[0]!.signal.aborted).toBe(true);
+        dispose();
+      });
+      return owner;
+    }
+  );
+  await render();
+  const late = gpuResult(0);
+  act(() => root.unmount());
+  root = createRoot(host);
+  expect(pending[0]!.signal.aborted).toBe(true);
+  expect(late.release).not.toHaveBeenCalled();
+  await act(async () => pending[0]!.resolve(late.canvas, late));
+  expect(late.release).toHaveBeenCalledTimes(1);
+  expect(pending[0]!.dispose).toHaveBeenCalledTimes(1);
+});
+
+it('copies a CPU fallback before replacing the held GPU front', async () => {
+  await render();
+  const first = gpuResult(0);
+  await act(async () => pending[0]!.resolve(first.canvas, first));
+  await render(false, project, region, { source: 'blob:cpu-fallback' });
+  draw.mockImplementationOnce(() => {
+    expect(first.release).not.toHaveBeenCalled();
+    expect(host.querySelector('[data-preview-inspector-canvas]')).toBe(first.canvas);
+  });
+  await ready(1);
+  expect(draw).toHaveBeenCalledTimes(1);
+  expect(first.release).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('[data-preview-inspector-canvas]')).toBe(host.querySelector('canvas'));
 });

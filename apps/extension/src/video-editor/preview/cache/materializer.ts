@@ -1,5 +1,9 @@
 import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
-import type { PreviewScenePresentation } from '../stage/scene/types';
+import type {
+  NativePreviewGpuOutput,
+  NativePreviewGpuTargetFactory,
+  PreviewScenePresentation,
+} from '../stage/scene/types';
 import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 import { createMaterializerGpuComposer } from './materializer-gpu';
 import { createRecordingEventsRenderer } from '../../../workflows/video-review/recording-events';
@@ -56,11 +60,12 @@ export interface MaterializedPreviewFrame {
 
 export interface VideoPreviewFrameMaterializer {
   readonly canvas: HTMLCanvasElement;
-  /** Returns completed pixels and their camera; this operation does not publish visible UI. */
+  /** Returns completed pixels and their camera without choosing visible UI. Output acquisition is final-frame only. */
   renderFrameWithPresentation(
     time: number,
     signal: AbortSignal,
-    cameraOverride?: VideoCompositionCameraState
+    cameraOverride?: VideoCompositionCameraState,
+    acquireGpuOutput?: NativePreviewGpuTargetFactory
   ): Promise<MaterializedPreviewFrame>;
   /** Replaces composition only between frames; false requires a new resource owner. */
   updateProject(project: VideoProject): boolean;
@@ -276,14 +281,26 @@ export function createVideoPreviewFrameMaterializer(params: {
   const renderFrameWithPresentation = async (
     time: number,
     signal: AbortSignal,
-    cameraOverride?: VideoCompositionCameraState
+    cameraOverride?: VideoCompositionCameraState,
+    acquireGpuOutput?: NativePreviewGpuTargetFactory
   ): Promise<MaterializedPreviewFrame> => {
     if (busy) throw new Error('Composition frame is already being materialized.');
     busy = true;
     try {
       return await (presentation
-        ? presentation.renderFrameWithPresentation(time, signal, cameraOverride)
-        : renderMaterializedFrame(params, state, canvas, stage, time, signal, cameraOverride));
+        ? presentation.renderFrameWithPresentation(time, signal, cameraOverride, acquireGpuOutput)
+        : renderMaterializedFrame(
+            params,
+            state,
+            canvas,
+            stage,
+            time,
+            signal,
+            cameraOverride,
+            undefined,
+            undefined,
+            acquireGpuOutput
+          ));
     } finally {
       busy = false;
     }
@@ -459,7 +476,8 @@ function createMaterializedJoinPresentation(
     async renderFrameWithPresentation(
       time: number,
       signal: AbortSignal,
-      nextCamera?: VideoCompositionCameraState
+      nextCamera?: VideoCompositionCameraState,
+      acquireGpuOutput?: NativePreviewGpuTargetFactory
     ) {
       throwIfAborted(signal);
       if (disposed || state.disposed)
@@ -489,7 +507,9 @@ function createMaterializedJoinPresentation(
             time,
             signal,
             cameraOverride,
-            sceneEdges === 'omit' ? 'omit' : undefined
+            sceneEdges === 'omit' ? 'omit' : undefined,
+            undefined,
+            acquireGpuOutput
           );
         }
         const framePresentation: PreviewScenePresentation = {
@@ -672,7 +692,8 @@ async function renderMaterializedFrame(
   signal: AbortSignal,
   cameraOverride?: VideoCompositionCameraState,
   sceneEdges: 'apply' | 'omit' = 'apply',
-  decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>
+  decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>,
+  acquireGpuOutput?: NativePreviewGpuTargetFactory
 ): Promise<MaterializedPreviewFrame> {
   const assertActive = () => {
     throwIfAborted(signal);
@@ -681,6 +702,8 @@ async function renderMaterializedFrame(
   let sampled:
     | Awaited<ReturnType<ReturnType<typeof createCompositionCutSampleSource>['sample']>>
     | undefined;
+  let completedOutput: NativePreviewGpuOutput | undefined;
+  let handedOff = false;
   try {
     assertActive();
     if (
@@ -715,6 +738,7 @@ async function renderMaterializedFrame(
     );
     assertActive();
     const drawn = await renderPreviewScene({
+      ...(acquireGpuOutput ? { acquireGpuOutput, deferFrameEvent: true } : {}),
       previewRenderer: params.previewRenderer ?? 'gpu',
       ...(state.gpuPreview ? { gpuPreview: state.gpuPreview } : {}),
       sampleFps: params.sampleFps ?? params.project.fps,
@@ -757,15 +781,23 @@ async function renderMaterializedFrame(
       videoRefs: { current: state.videoRefs },
       ...(decodedVideoFrames ? { decodedVideoFrames } : {}),
     });
+    if (drawn) completedOutput = drawn.output;
     assertActive();
     if (!drawn) throw new Error('Preview frame is unavailable.');
-    return { canvas, presentation: drawn };
+    handedOff = true;
+    return { canvas: completedOutput?.canvas ?? canvas, presentation: drawn };
   } catch (error) {
     state.playbackSampler?.dispose();
     state.playbackSampler = null;
     throw error;
   } finally {
-    sampled?.release();
+    let samplesReleased = false;
+    try {
+      sampled?.release();
+      samplesReleased = true;
+    } finally {
+      if (!handedOff || !samplesReleased) completedOutput?.release();
+    }
   }
 }
 

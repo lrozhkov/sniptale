@@ -9,7 +9,7 @@ afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
 });
-function fixture() {
+function fixture(role?: 'stage' | 'inspector') {
   const host = document.createElement('div'),
     fallback = document.createElement('canvas');
   fallback.width = 64;
@@ -32,6 +32,7 @@ function fixture() {
   const session = createNativePreviewPresentationSession({
     fallback: () => fallback,
     host: () => host,
+    ...(role ? { role } : {}),
   });
   sessions.push(session);
   return { host, fallback, renderer, session, disposed };
@@ -172,32 +173,35 @@ it('retires idle resized or old-backend slots and retains the active front', () 
   expect(front.canvas.width).toBe(64);
   other.release();
 });
-it('defers pending exclusive retirement through disposal until the producer fence releases its lease', async () => {
-  const f = fixture();
-  f.session.mount();
-  const front = f.session.acquire(size, f.renderer);
-  f.session.publish(front, () => {});
-  const pending = f.session.acquire(size, f.renderer);
-  let settle!: () => void;
-  const fence = new Promise<void>((resolve) => {
-    settle = resolve;
-  });
-  const work = fence.then(() => pending.release());
-  f.session.dispose();
-  f.session.dispose();
-  expect(front.canvas.isConnected).toBe(false);
-  expect(pending.canvas.width).toBe(64);
-  expect(pending.canvas.isConnected).toBe(true);
-  expect(pending.canvas.style.opacity).toBe('0');
-  expect(f.fallback.width).toBe(64);
-  expect(() => f.session.acquire(size, f.renderer)).toThrow();
-  settle();
-  await work;
-  pending.release();
-  expect(pending.canvas.width).toBe(64);
-  expect(pending.canvas.isConnected).toBe(false);
-  expect(f.disposed.filter((canvas) => canvas === pending.canvas)).toHaveLength(1);
-});
+it.each(['stage', 'inspector'] as const)(
+  'defers pending exclusive retirement until producer fence release for role %s',
+  async (role) => {
+    const f = fixture(role);
+    f.session.mount();
+    const front = f.session.acquire(size, f.renderer);
+    f.session.publish(front, () => {});
+    const pending = f.session.acquire(size, f.renderer);
+    let settle!: () => void;
+    const fence = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const work = fence.then(() => pending.release());
+    f.session.dispose();
+    f.session.dispose();
+    expect(front.canvas.isConnected).toBe(false);
+    expect(pending.canvas.width).toBe(64);
+    expect(pending.canvas.isConnected).toBe(true);
+    expect(pending.canvas.style.opacity).toBe('0');
+    expect(f.fallback.width).toBe(64);
+    expect(() => f.session.acquire(size, f.renderer)).toThrow();
+    settle();
+    await work;
+    pending.release();
+    expect(pending.canvas.width).toBe(64);
+    expect(pending.canvas.isConnected).toBe(false);
+    expect(f.disposed.filter((canvas) => canvas === pending.canvas)).toHaveLength(1);
+  }
+);
 it('rejects unowned or released outputs and rolls binding failure back completely', () => {
   const f = fixture();
   f.session.mount();
@@ -325,4 +329,78 @@ it('preserves a binding error after transfer without mutating the failed HTML pl
   expect(() => f.session.acquire(size, f.renderer)).toThrow(failure);
   expect(placeholder?.isConnected).toBe(false);
   expect(f.host.querySelectorAll('canvas')).toHaveLength(1);
+});
+
+it('isolates inspector markers and frame events from the main stage and keeps pointer ownership outside pixels', () => {
+  const f = fixture('inspector');
+  const main = document.createElement('canvas');
+  main.setAttribute('data-preview-stage-canvas', '');
+  document.body.appendChild(main);
+  const event = vi.fn();
+  f.host.addEventListener('sniptale-preview-frame', event);
+  f.session.mount();
+  expect(f.fallback.hasAttribute('data-preview-inspector-canvas')).toBe(true);
+  expect(f.host.querySelector('[data-preview-stage-canvas]')).toBeNull();
+  const target = f.session.acquire(size, f.renderer);
+  expect(target.canvas.getAttribute('aria-hidden')).toBe('true');
+  f.session.publish(target, () => {
+    expect(target.canvas.hasAttribute('data-preview-inspector-canvas')).toBe(true);
+    expect(target.canvas.style.pointerEvents).toBe('none');
+    expect(f.fallback.hasAttribute('data-preview-inspector-canvas')).toBe(false);
+  });
+  expect(document.querySelectorAll('[data-preview-stage-canvas]')).toHaveLength(1);
+  expect(document.querySelector('[data-preview-stage-canvas]')).toBe(main);
+  f.session.publish(null, () => {});
+  expect(f.fallback.hasAttribute('data-preview-inspector-canvas')).toBe(true);
+  expect(target.canvas.hasAttribute('data-preview-inspector-canvas')).toBe(false);
+  expect(event).not.toHaveBeenCalled();
+  f.session.dispose();
+  expect(f.fallback.hasAttribute('data-preview-inspector-canvas')).toBe(false);
+  expect(main.hasAttribute('data-preview-stage-canvas')).toBe(true);
+});
+
+it('restores inspector front and caller ownership after rejected geometry without stage notifications', () => {
+  const f = fixture('inspector'),
+    event = vi.fn();
+  f.host.addEventListener('sniptale-preview-frame', event);
+  f.session.mount();
+  const a = f.session.acquire(size, f.renderer),
+    b = f.session.acquire(size, f.renderer);
+  const releaseA = vi.fn(() => a.release()),
+    releaseB = vi.fn(() => b.release());
+  f.session.publish({ canvas: a.canvas, release: releaseA }, () => {});
+  expect(() =>
+    f.session.publish({ canvas: b.canvas, release: releaseB }, () => {
+      throw new Error('inspector geometry');
+    })
+  ).toThrow('inspector geometry');
+  expect(a.canvas.style.opacity).toBe('1');
+  expect(a.canvas.hasAttribute('data-preview-inspector-canvas')).toBe(true);
+  expect(a.canvas.style.pointerEvents).toBe('none');
+  expect(b.canvas.style.opacity).toBe('0');
+  expect(b.canvas.hasAttribute('data-preview-inspector-canvas')).toBe(false);
+  expect(releaseA).not.toHaveBeenCalled();
+  expect(releaseB).not.toHaveBeenCalled();
+  expect(event).not.toHaveBeenCalled();
+  releaseB();
+  f.session.dispose();
+  expect(releaseA).toHaveBeenCalledOnce();
+  expect(f.fallback.hasAttribute('data-preview-inspector-canvas')).toBe(false);
+  expect(f.host.querySelectorAll('[data-preview-stage-canvas]')).toHaveLength(0);
+});
+
+it('restores a borrowed inspector fallback marker and pointer policy on disposal', () => {
+  const f = fixture('inspector');
+  f.fallback.setAttribute('data-preview-inspector-canvas', '');
+  f.fallback.style.opacity = '.4';
+  f.fallback.style.pointerEvents = 'none';
+  f.session.mount();
+  const target = f.session.acquire(size, f.renderer);
+  f.session.publish(target, () => {});
+  f.session.dispose();
+  expect(f.fallback.hasAttribute('data-preview-inspector-canvas')).toBe(true);
+  expect(f.fallback.hasAttribute('data-preview-stage-canvas')).toBe(false);
+  expect(f.fallback.style.opacity).toBe('0.4');
+  expect(f.fallback.style.pointerEvents).toBe('none');
+  expect(target.canvas.isConnected).toBe(false);
 });

@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import type { NativePreviewGpuTargetFactory, PreviewScenePresentation } from '../stage/scene/types';
+import type { GpuPreviewRenderer } from '../../../features/video/composition/canvas/gpu-preview';
+import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 import { drawVideoProjectSceneEdges } from '../../../features/video/composition/canvas/scene-edges';
 import { createImageClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 
@@ -17,7 +20,9 @@ type PreviewSceneInput = Parameters<
   typeof import('../stage/scene/render-preview').renderPreviewScene
 >[0];
 const renderPreviewScene = vi.hoisted(() =>
-  vi.fn<(args: PreviewSceneInput) => Promise<void | false>>(async () => {})
+  vi.fn<(args: PreviewSceneInput) => Promise<void | false | PreviewScenePresentation>>(
+    async () => {}
+  )
 );
 const cut = vi.hoisted(() => ({
   create: vi.fn(),
@@ -46,12 +51,12 @@ vi.mock('../stage/scene/render-preview', async () => {
       const result = await renderPreviewScene(input);
       return result === false
         ? false
-        : {
+        : (result ?? {
             camera:
               input.cameraOverride ??
               resolveVideoCompositionFrame(input.project, input.currentTime).camera,
             time: input.currentTime,
-          };
+          });
     },
   };
 });
@@ -976,6 +981,206 @@ it('returns the prepared camera beside pixels while the canvas-only API uses the
     await expect(owner.renderFrame(1, new AbortController().signal, camera)).resolves.toBe(
       owner.canvas
     );
+  } finally {
+    owner.dispose();
+  }
+});
+
+function uiOutputFixture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 480;
+  canvas.height = 270;
+  const release = vi.fn();
+  const acquire = vi.fn<NativePreviewGpuTargetFactory>(() => ({
+    canvas,
+    release,
+    surface: { canvas, present: vi.fn(async () => {}), dispose: vi.fn() },
+  }));
+  const backend: GpuPreviewRenderer = {
+    allocatedBytes: 0,
+    render: vi.fn<GpuPreviewRenderer['render']>(),
+    dispose: vi.fn(),
+  };
+  return { canvas, release, acquire, backend };
+}
+
+it('opts in only one final materialized UI frame and returns its exact camera/output receipt', async () => {
+  const owner = resourceFixture();
+  const ui = uiOutputFixture();
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  const project = createEmptyVideoProject('Prepared direct camera', 320, 180);
+  const camera = { ...resolveVideoCompositionFrame(project, 0).camera, scale: 2, viewportX: 12 };
+  const presentation: PreviewScenePresentation = {
+    camera,
+    time: 0.25,
+    renderer: { backend: 'gpu' },
+    output: { canvas: ui.canvas, release: ui.release },
+  };
+  renderPreviewScene.mockImplementationOnce(async (input) => {
+    expect(input.acquireGpuOutput).toBe(ui.acquire);
+    expect(input.deferFrameEvent).toBe(true);
+    expect(input.cameraOverride).toBe(camera);
+    expect(input.acquireGpuOutput?.({ width: 480, height: 270 }, ui.backend).canvas).toBe(
+      ui.canvas
+    );
+    return presentation;
+  });
+  try {
+    const value = await owner.renderFrameWithPresentation(
+      0.25,
+      new AbortController().signal,
+      camera,
+      ui.acquire
+    );
+    expect(value.canvas).toBe(ui.canvas);
+    expect(value.presentation).toBe(presentation);
+    expect(owner.canvas).not.toBe(ui.canvas);
+    expect(owner.canvas.getContext('2d')).not.toBeNull();
+    expect(ui.release).not.toHaveBeenCalled();
+    renderPreviewScene.mockImplementationOnce(async () => {});
+    expect(await owner.renderFrame(0.5, new AbortController().signal, camera)).toBe(owner.canvas);
+    expect(renderPreviewScene.mock.lastCall![0].acquireGpuOutput).toBeUndefined();
+    expect(renderPreviewScene.mock.lastCall![0].deferFrameEvent).toBeUndefined();
+    value.presentation.output?.release();
+    expect(ui.release).toHaveBeenCalledOnce();
+  } finally {
+    owner.dispose();
+  }
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'releases a completed direct receipt when post-render %s prevents handoff',
+  async (reason) => {
+    const owner = resourceFixture();
+    const ui = uiOutputFixture();
+    const entered = Promise.withResolvers<void>(),
+      fence = Promise.withResolvers<void>();
+    const controller = new AbortController();
+    renderPreviewScene.mockImplementationOnce(async (input) => {
+      entered.resolve();
+      await fence.promise;
+      return {
+        camera: resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+        time: input.currentTime,
+        output: { canvas: ui.canvas, release: ui.release },
+      };
+    });
+    const pending = owner.renderFrameWithPresentation(
+      0.25,
+      controller.signal,
+      undefined,
+      ui.acquire
+    );
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    await entered.promise;
+    if (reason === 'abort') controller.abort();
+    else owner.dispose();
+    expect(ui.release).not.toHaveBeenCalled();
+    fence.resolve();
+    await rejected;
+    expect(ui.release).toHaveBeenCalledOnce();
+    owner.dispose();
+  }
+);
+
+it.each(['dissolve', 'fade-black'] as const)(
+  'keeps %s join sampling outside the UI output capability',
+  async (kind) => {
+    const f = compositionFixture(kind);
+    const ui = uiOutputFixture();
+    try {
+      await f.owner.renderFrameWithPresentation(
+        0.1,
+        new AbortController().signal,
+        undefined,
+        ui.acquire
+      );
+      expect(renderPreviewScene.mock.lastCall![0].acquireGpuOutput).toBe(ui.acquire);
+      renderPreviewScene.mockClear();
+      const mixed = await f.owner.renderFrameWithPresentation(
+        1,
+        new AbortController().signal,
+        undefined,
+        ui.acquire
+      );
+      expect(mixed.canvas).toBe(f.owner.canvas);
+      expect(mixed.presentation.output).toBeUndefined();
+      expect(renderPreviewScene.mock.calls.length).toBeGreaterThan(kind === 'dissolve' ? 1 : 0);
+      expect(
+        renderPreviewScene.mock.calls.every(
+          ([input]) => input.acquireGpuOutput === undefined && input.deferFrameEvent === undefined
+        )
+      ).toBe(true);
+      expect(ui.acquire).not.toHaveBeenCalled();
+    } finally {
+      f.owner.dispose();
+    }
+  }
+);
+
+it('forwards final UI output for windowed decoding while retaining the existing sample lifetime', async () => {
+  mockDelayedSeekVideo();
+  const project = createEmptyVideoProject('Direct windowed preview');
+  const clip = createVideoClip(project.tracks[0]!.id);
+  clip.duration = 1.2;
+  clip.playbackWindow = { offset: 0, holdAt: 1 };
+  project.clips = [clip];
+  const decoded = new Map([[clip.id, { sourceWidth: 16, sourceHeight: 16, draw: vi.fn() }]]);
+  cut.sample.mockResolvedValueOnce({ media: decoded, release: cut.release });
+  const owner = createVideoPreviewFrameMaterializer({
+    project,
+    assetUrls: { 'asset-1': 'blob:held' },
+    ownerDocument: document,
+    rasterSize: { width: 16, height: 9 },
+  });
+  const ui = uiOutputFixture();
+  renderPreviewScene.mockImplementationOnce(async (input) => {
+    expect(input.decodedVideoFrames).toBe(decoded);
+    expect(input.acquireGpuOutput).toBe(ui.acquire);
+    expect(cut.release).not.toHaveBeenCalled();
+    return {
+      camera: resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+      time: input.currentTime,
+      output: { canvas: ui.canvas, release: ui.release },
+    };
+  });
+  try {
+    const value = await owner.renderFrameWithPresentation(
+      1.1,
+      new AbortController().signal,
+      undefined,
+      ui.acquire
+    );
+    expect(value.canvas).toBe(ui.canvas);
+    expect(cut.release).toHaveBeenCalledOnce();
+    expect(ui.release).not.toHaveBeenCalled();
+    value.presentation.output?.release();
+  } finally {
+    owner.dispose();
+  }
+});
+
+it('returns the separate 2D fallback unchanged when an opted-in final frame has no GPU output', async () => {
+  const owner = resourceFixture();
+  const ui = uiOutputFixture();
+  renderPreviewScene.mockImplementationOnce(async (input) => ({
+    camera: resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+    time: input.currentTime,
+    renderer: { backend: 'legacy', fallback: 'unavailable' },
+  }));
+  try {
+    const value = await owner.renderFrameWithPresentation(
+      0.25,
+      new AbortController().signal,
+      undefined,
+      ui.acquire
+    );
+    expect(value.canvas).toBe(owner.canvas);
+    expect(value.canvas.getContext('2d')).not.toBeNull();
+    expect(value.presentation.output).toBeUndefined();
+    expect(value.presentation.renderer).toEqual({ backend: 'legacy', fallback: 'unavailable' });
+    expect(ui.acquire).not.toHaveBeenCalled();
   } finally {
     owner.dispose();
   }
