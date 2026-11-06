@@ -3297,8 +3297,8 @@
       "owner": "extension:gallery:video-review",
       "reason": "tool-noise: One epoch owns preparation, captured frames, publication and cancellation. The published epoch selects scheduling within this transaction. Resource release remains adjacent to completion and failure. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
       "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-05",
-      "astHash": "27f902ea432ef98474613efae15f3a8f4f47f8db9384130ecbe4abcf6a778bed",
+      "reviewDate": "2026-11-06",
+      "astHash": "ac0f1842c23bc542c7e0f49521c1eee9b5fbc729145dd355b0c2a6e66c890d67",
       "signatureHash": "ec40dae1374f57359d2066465a45eceb2af3ee9b69f9cd6a3b4752503139cb35"
     },
     {

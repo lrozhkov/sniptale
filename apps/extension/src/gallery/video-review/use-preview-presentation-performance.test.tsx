@@ -153,7 +153,7 @@ beforeEach(() => {
   });
   io.factory.mockImplementation(() => ({
     prepare: io.prepare,
-    render: io.render,
+    renderPresentation: io.render,
     dispose: io.dispose,
   }));
   io.bytes.mockImplementation(() => ({ release: vi.fn() }));

@@ -264,6 +264,8 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
         state.frameRate !== next.frameRate ||
         state.detailedPaused !== next.detailedPaused ||
         (!next.playing && state.pausedTime !== next.pausedTime);
+      // The new FPS policy follows the published phase after pending admissions are invalidated.
+      if (state?.frameRate !== next.frameRate) lastAdmitted = lastPublished;
       state = { ...next };
       if (changed) invalidate();
     },
