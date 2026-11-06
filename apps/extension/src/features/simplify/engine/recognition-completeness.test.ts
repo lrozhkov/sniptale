@@ -411,3 +411,28 @@ it.each(['plus', 'circle', 'colored-letter', 'distant-letter'])(
     expect(execute(canvas)(Math.floor(left), 31, 18, 27)).toBe(0);
   }
 );
+
+it('erases bold text joined by medium-contrast bridges and preserves a separate outlined symbol', () => {
+  const canvas = createCanvas(180, 60),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#101418';
+  context.fillRect(0, 0, 180, 60);
+  for (let x = 45; x < 115; x += 10) {
+    context.fillStyle = '#f0f0f0';
+    context.fillRect(x, 23, 7, 2);
+    context.fillRect(x, 31, 7, 2);
+    context.fillRect(x, 23, 2, 10);
+    context.fillRect(x + 5, 23, 2, 10);
+    context.fillStyle = '#787878';
+    context.fillRect(x + 7, 27, 3, 1);
+  }
+  context.fillStyle = '#f0f0f0';
+  context.fillRect(12, 22, 12, 2);
+  context.fillRect(12, 30, 12, 2);
+  context.fillRect(12, 22, 2, 10);
+  context.fillRect(22, 22, 2, 10);
+  const delta = execute(canvas);
+  expect(delta(45, 23, 67, 10)).toBeGreaterThan(100);
+  expect(delta(52, 27, 3, 1)).toBe(3);
+  expect(delta(12, 22, 12, 10)).toBe(0);
+});

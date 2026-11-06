@@ -2,6 +2,7 @@ import { computeRaw } from './detector-raw.mjs';
 import { computeGlyphMetricsAt } from './detector-glyphs.mjs';
 import { normalizeTypeface as normalizeTypefaceStage } from './detector-typeface.mjs';
 import { buildCatalog } from './detector-catalog.mjs';
+import { interiorBackground } from './detector-background.mjs';
 export { sampleBackground } from './detector-background.mjs';
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 function detectRaw(
@@ -71,12 +72,20 @@ function measureGlyphs(image, box, minimumGlyphs) {
   if (coherent(luminance)) return luminance;
   // Faint bridges can join several glyphs beyond the supported component width.
   // A stronger threshold must restore coherent coverage before it can replace evidence.
-  if ([primary, luminance].some((m) => m?.unexplained.some((p) => p.w > p.h * 2.5))) {
+  const failed = !primary && !luminance;
+  if (failed || [primary, luminance].some((m) => m?.unexplained.some((p) => p.w > p.h * 2.5))) {
     for (const luma of [false, true]) {
-      const separated = glyphMetricsAt(image, box, Math.max(2, minimumGlyphs), luma, 0.55);
+      const separated = glyphMetricsAt(
+        image,
+        box,
+        Math.max(failed ? 3 : 2, minimumGlyphs),
+        luma,
+        0.55
+      );
       if (
         coherent(separated) &&
         separated.xHeight >= 5 &&
+        (!failed || (separated.foregroundCoverage >= 0.9 && !interiorBackground(image, box))) &&
         separated.foregroundCoverage >
           Math.max(primary?.foregroundCoverage || 0, luminance?.foregroundCoverage || 0)
       )

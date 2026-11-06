@@ -63,6 +63,39 @@ export function getContentSimplifyRasterBounds(object: DrawingSimplifyObject): D
   };
 }
 
+/** Limits the canonical handle trajectory to retained pixels, including crossed anchors. */
+export function constrainDrawingSimplifyResize(
+  original: DrawingObject,
+  resize: (fraction: number) => DrawingObject
+): DrawingObject {
+  const target = resize(1);
+  if (
+    original.kind !== 'simplify' ||
+    target.kind !== 'simplify' ||
+    !original.source ||
+    !isContentSimplifyMask(original)
+  )
+    return target;
+  const source = original.source;
+  const covered = (object: DrawingObject) =>
+    object.kind === 'simplify' && contains(source, getContentSimplifyRasterBounds(object));
+  if (!covered(original)) return original;
+  if (covered(target)) return target;
+  let low = 0,
+    high = 1,
+    accepted: DrawingObject = original;
+  // Reuse the gesture's geometry instead of interpolating normalized bounds across a flip.
+  for (let step = 0; step < 40; step++) {
+    const fraction = (low + high) / 2,
+      candidate = resize(fraction);
+    if (covered(candidate)) {
+      low = fraction;
+      accepted = candidate;
+    } else high = fraction;
+  }
+  return accepted;
+}
+
 async function createManualImagePlane(
   object: DrawingSimplifyObject,
   source: DrawingSimplifySource | null

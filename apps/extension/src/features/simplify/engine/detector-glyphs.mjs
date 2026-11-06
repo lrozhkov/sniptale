@@ -31,7 +31,7 @@ function createGlyphMask(image, box, luminance, factor) {
       const i = ((box.y + y) * stride + box.x + x) * 4;
       peak = Math.max(peak, inkContrast(i));
     }
-  const threshold = Math.max(12, Math.min(80, peak * factor));
+  const threshold = Math.max(12, Math.min(factor >= 0.55 ? 255 : 80, peak * factor));
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const i = ((box.y + y) * stride + box.x + x) * 4;

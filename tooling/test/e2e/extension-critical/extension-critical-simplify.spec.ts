@@ -1,4 +1,4 @@
-import { test } from '../support/extension-fixture';
+import { test, expect } from '../support/extension-fixture';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import {
@@ -122,4 +122,61 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       }
     });
   }
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Simplify resize stops at retained pixels on a scrolled page ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120_000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await grantNativeSimplifyCapture(popup);
+      await page.evaluate(() => {
+        document.body.style.minHeight = '3000px';
+      });
+      await prepareNativeSimplifySource(page, 'drawing');
+      // Native TAB pixels follow the browser window, which can differ from its CSS test viewport.
+      const nativeHeight = await popup.evaluate(async () => {
+        const image = new Image();
+        image.src = await chrome.tabs.captureVisibleTab({ format: 'png' });
+        await image.decode();
+        return image.naturalHeight;
+      });
+      const dpr = await page.evaluate(() => devicePixelRatio || 1);
+      const sourceHeight = nativeHeight / dpr;
+      const scroll = Math.max(80, Math.ceil(sourceHeight - size.height + 80));
+      await drawNativeAutomaticSimplify(page, 'drawing', info);
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(540, 240);
+      await page.evaluate((top) => window.scrollTo(0, top), scroll);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scroll);
+      const raster = page.locator('[data-ui="content.drawing.simplify-private"]');
+      const before = await raster.boundingBox();
+      if (!before) throw new Error('Source mask missing before edge resize');
+      await page.mouse.move(before.x + before.width / 2, before.y + before.height);
+      await page.mouse.down();
+      await page.mouse.move(before.x + before.width / 2, size.height - 15, { steps: 8 });
+      const during = await raster.boundingBox();
+      expect(during).not.toBeNull();
+      expect(during!.y + during!.height).toBeLessThanOrEqual(sourceHeight - scroll + 1);
+      expect(during!.height).toBeGreaterThan(before.height + 20);
+      await page.screenshot({ path: info.outputPath('source-edge-drag.png'), fullPage: false });
+      await page.mouse.up();
+      await expect(page.locator('[data-ui="content.drawing.simplify-pending"]')).toHaveCount(0, {
+        timeout: 45_000,
+      });
+      await expect(raster).toHaveCount(1);
+      const accepted = await raster.boundingBox();
+      expect(accepted!.height).toBeGreaterThan(before.height + 20);
+      expect(accepted!.y + accepted!.height).toBeLessThanOrEqual(sourceHeight - scroll + 1);
+      await expect(page.getByText(/Could not acquire.*(?:source|image)/iu)).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath('source-edge-accepted.png'), fullPage: false });
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
 }

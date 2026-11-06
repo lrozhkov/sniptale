@@ -29,6 +29,7 @@ import {
 } from '../../features/drawing/public';
 import { readPageScroll, type PageScrollRoot } from '../platform/page-scroll';
 import { resizeDrawingBox } from './box-resize';
+import { constrainDrawingSimplifyResize } from './simplify-object';
 
 export type DrawingArrowHover = {
   object: Extract<DrawingObject, { kind: 'arrow' }>;
@@ -476,8 +477,17 @@ export function resizeDrawingObject(
   point: DrawingPoint,
   modifiers: DrawingPointerModifiers = { ctrlKey: false, shiftKey: false }
 ): DrawingObject {
-  const resized = resizeDrawingObjectGeometry(draft, point, modifiers);
-  return applyDrawingShapeShear({ draft, modifiers, point, resized });
+  return constrainDrawingSimplifyResize(draft.original, (fraction) => {
+    const target =
+      fraction === 1
+        ? point
+        : {
+            x: draft.start.x + (point.x - draft.start.x) * fraction,
+            y: draft.start.y + (point.y - draft.start.y) * fraction,
+          };
+    const resized = resizeDrawingObjectGeometry(draft, target, modifiers);
+    return applyDrawingShapeShear({ draft, modifiers, point: target, resized });
+  });
 }
 
 type DrawingPointerStart = {
