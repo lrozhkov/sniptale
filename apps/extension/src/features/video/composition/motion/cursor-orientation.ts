@@ -1,3 +1,4 @@
+import { preparedProjectCamera, projectCameraGeometryKey } from './prepared-project-camera';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import {
   resolveMotionWindowCameraParts,
@@ -213,6 +214,13 @@ export function resolveProjectCursorOrientation(
 ) {
   if (region.focusMode !== 'CURSOR' || !hasCursorComposition(region.cursorComposition))
     return undefined;
+  const bundle = preparedProjectCamera(project);
+  const prepared = bundle?.orientations.find(
+    (item) => item.key === projectCameraGeometryKey(project, region)
+  );
+  if (bundle && !prepared && region.duration > 0 && !region.sourceBinding?.dormant)
+    throw new Error('Prepared camera orientation is unavailable.');
+  if (prepared) return prepared.plan;
   const { start, end } = projectCursorClockRange(project, region);
   const key = JSON.stringify({
     settings: region.cursorComposition,

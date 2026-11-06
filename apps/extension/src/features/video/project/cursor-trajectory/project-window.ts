@@ -100,6 +100,74 @@ export async function prepareCursorTrajectoryProject(
   return result;
 }
 
+/** Acquires complete retained source support for a disposable camera compilation, never for saving. */
+export async function prepareCameraCursorTrajectoryProject(
+  project: VideoProject,
+  read: ReadCursorTrajectoryWindow,
+  signal?: AbortSignal
+): Promise<VideoProject> {
+  const prepared: PreparedWindow[] = [];
+  for (const clip of project.clips) {
+    signal?.throwIfAborted();
+    if (clip.type !== 'VIDEO') continue;
+    const group = project.cursorTrack?.sourceObservations?.find(
+      (item) => item.sourceInstanceId === clip.sourceInstanceId
+    );
+    const descriptor = group?.trajectory;
+    if (!group || !descriptor || descriptor.totalBlocks === 0) continue;
+    // Source playback can expose the full retained interval even when the visible clip is a slice.
+    let active = Math.round(clip.sourceStart * 1_000_000);
+    const end = Math.round((clip.sourceStart + clip.sourceDuration) * 1_000_000);
+    while (active <= end) {
+      signal?.throwIfAborted();
+      const prior = prepared.find(
+        (item) =>
+          item.recordingId === group.recordingId &&
+          item.trajectoryId === descriptor.trajectoryId &&
+          active >= item.window.fromTimeUs &&
+          (item.window.toTimeUs === null || active < item.window.toTimeUs)
+      );
+      const window =
+        prior?.window ??
+        (await read(
+          { recordingId: group.recordingId, trajectoryId: descriptor.trajectoryId },
+          descriptor,
+          active
+        ));
+      signal?.throwIfAborted();
+      if (
+        !window ||
+        active < window.fromTimeUs ||
+        (window.toTimeUs !== null && active >= window.toTimeUs)
+      )
+        throw new Error('Camera cursor history coverage is unavailable.');
+      if (!prior)
+        prepared.push(
+          Object.freeze({
+            recordingId: group.recordingId,
+            trajectoryId: descriptor.trajectoryId,
+            window,
+          })
+        );
+      if (window.toTimeUs === null || window.toTimeUs > end) break;
+      active = window.toTimeUs;
+    }
+  }
+  const scratch: CursorTrajectoryRenderProject = {
+    ...project,
+    ...(project.actionFeedback
+      ? {
+          actionFeedback: project.actionFeedback.map((group) =>
+            group.events ? { ...group, signals: [] } : group
+          ),
+        }
+      : {}),
+    [windowsKey]: Object.freeze(prepared),
+    [sourceKey]: project,
+  };
+  return scratch;
+}
+
 /** Checks whether an in-flight frame preparation also covers the current playhead. */
 export function cursorTrajectoryProjectCoversTime(
   project: CursorTrajectoryRenderProject,

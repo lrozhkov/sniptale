@@ -1,3 +1,9 @@
+import {
+  preparedProjectCamera,
+  projectCameraGeometryKey,
+  projectCameraOutputKey,
+  type PreparedProjectCamera,
+} from './prepared-project-camera';
 import { projectCursorLinkSettings, smoothCursorCameraPreferences } from './cursor-orientation';
 import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../project/types/export';
 import type { VideoProjectRenderScope } from '../../project/export/render-scope';
@@ -517,10 +523,19 @@ export function resolveProjectCursorCameraPlan(
   }
   project = projectMotionSourcePhases(project);
   region = project.motionRegions?.find((item) => item.id === region.id) ?? region;
+  const prepared = preparedProjectCamera(project);
+  if (prepared) {
+    const entry =
+      prepared.output === projectCameraOutputKey(project, output)
+        ? prepared.cameras.find((item) => item.key === projectCameraGeometryKey(project, region))
+        : undefined;
+    if (!entry) throw new Error('Prepared camera geometry is unavailable.');
+    return entry.plan;
+  }
   return resolvePlanEntry(project, region, output).plan;
 }
 
-interface ProjectCameraConflict {
+export interface ProjectCameraConflict {
   regionId: string;
   time: number;
   interval: { start: number; end: number };
@@ -666,6 +681,11 @@ export function resolveProjectCameraConflicts(
   output?: CameraOutputViewport,
   interval = { start: 0, end: project.duration }
 ): ProjectCameraConflict[] {
+  const prepared = preparedProjectCamera(project);
+  if (prepared?.output === projectCameraOutputKey(project, output))
+    return prepared.conflicts.filter(
+      (item) => item.interval.start < interval.end && item.interval.end > interval.start
+    );
   project = projectMotionSourcePhases(project[VIDEO_PROJECT_ATTACHMENT_GEOMETRY] ?? project);
   if (!isVideoProjectUtilityLaneVisible(project, 'camera')) return [];
   const conflicts = (project.motionRegions ?? []).filter(isCameraMotionRegion).flatMap((region) => {
@@ -724,7 +744,13 @@ export function resolveProjectFollowingCamera(
   }
   project = projectMotionSourcePhases(project);
   region = project.motionRegions?.find((item) => item.id === region.id) ?? region;
-  const { plan, geometry } = resolvePlanEntry(project, region, output);
+  const prepared = preparedProjectCamera(project);
+  const ready =
+    prepared?.output === projectCameraOutputKey(project, output)
+      ? prepared.cameras.find((item) => item.key === projectCameraGeometryKey(project, region))
+      : undefined;
+  if (prepared && !ready) throw new Error('Prepared camera geometry is unavailable.');
+  const { plan, geometry } = ready ?? resolvePlanEntry(project, region, output);
   const pan = evaluateWorkingZoneCamera(plan, time);
   const targetScale = plan.status === 'ready' ? plan.targetScale : region.scale;
   return {
@@ -735,6 +761,23 @@ export function resolveProjectFollowingCamera(
     focusPoint: {
       x: ((pan.x / geometry.window.width + 0.5) / targetScale) * project.width,
       y: ((pan.y / geometry.window.height + 0.5) / targetScale) * project.height,
+    },
+  };
+}
+
+/** Copies an admitted camera into plain values without retaining its proof geometry or inputs. */
+export function snapshotProjectCameraPlan(
+  project: VideoProject,
+  region: VideoProjectMotionRegion,
+  output?: CameraOutputViewport
+): PreparedProjectCamera['cameras'][number] {
+  const entry = resolvePlanEntry(project, region, output);
+  return {
+    key: projectCameraGeometryKey(project, region),
+    plan: entry.plan,
+    geometry: {
+      window: { ...entry.geometry.window },
+      viewport: { ...entry.geometry.viewport },
     },
   };
 }

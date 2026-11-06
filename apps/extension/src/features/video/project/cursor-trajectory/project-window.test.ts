@@ -9,6 +9,7 @@ import { applyVideoProjectMutationPatch } from '../mutation';
 import { isExportReadyVideoProject } from '../validation/root';
 import { resolveProjectSourceCursorObservation } from '../cursor-focus-path/projection';
 import {
+  prepareCameraCursorTrajectoryProject,
   prepareCursorTrajectoryProject,
   preparedCursorTrajectorySourceWindow,
   cursorTrajectoryProjectCoversTime,
@@ -337,4 +338,42 @@ it('adapts only prepared source points and the actual known end without changing
   expect(
     preparedCursorTrajectorySourceWindow(prepared, 'another-recording', descriptor.trajectoryId)
   ).toBeUndefined();
+});
+
+it('acquires separate covering windows through the retained source endpoint without changing saved data', async () => {
+  const project = fixture();
+  const before = JSON.stringify(project);
+  const read = vi.fn<ReadCursorTrajectoryWindow>(async (_identity, _descriptor, time) => ({
+    ...window(),
+    fromTimeUs: time < 500000 ? 0 : 500000,
+    toTimeUs: time < 500000 ? 500000 : null,
+  }));
+  const scratch = await prepareCameraCursorTrajectoryProject(project, read);
+  expect(read.mock.calls.map((call) => call[2])).toEqual([0, 500000]);
+  expect(resolveCursorSample(scratch, 2.25)?.recordingPoint).toEqual({ x: 0.5, y: 0.2 });
+  expect(JSON.stringify(scratch)).toBe(before);
+  expect(JSON.stringify(project)).toBe(before);
+});
+
+it('refuses missing or noncovering camera support and stops a cancelled scan before its next read', async () => {
+  const project = fixture();
+  await expect(prepareCameraCursorTrajectoryProject(project, async () => null)).rejects.toThrow(
+    'coverage'
+  );
+  await expect(
+    prepareCameraCursorTrajectoryProject(project, async () => ({
+      ...window(),
+      fromTimeUs: 1,
+      toTimeUs: 2,
+    }))
+  ).rejects.toThrow('coverage');
+  const controller = new AbortController();
+  const read = vi.fn<ReadCursorTrajectoryWindow>(async () => {
+    controller.abort();
+    return { ...window(), toTimeUs: 500000 };
+  });
+  await expect(
+    prepareCameraCursorTrajectoryProject(project, read, controller.signal)
+  ).rejects.toMatchObject({ name: 'AbortError' });
+  expect(read).toHaveBeenCalledOnce();
 });

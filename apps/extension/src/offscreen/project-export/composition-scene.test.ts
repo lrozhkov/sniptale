@@ -101,7 +101,7 @@ it('awaits the exact frame window before effects and drawing while captions reta
   const original = args.project;
   const prepared = { ...original, name: 'Prepared frame' };
   const prepare = vi.fn(async () => prepared);
-  args.job.cursorTrajectoryRenderer = { prepare, clear: vi.fn() };
+  args.job.cursorTrajectoryRenderer = { prepareCamera: vi.fn(), prepare, clear: vi.fn() };
   await renderProjectCompositionScene(args);
   expect(prepare).toHaveBeenCalledExactlyOnceWith(original, 1);
   expect(owners.captions).toHaveBeenCalledWith(original, args.settings, undefined);
@@ -127,7 +127,7 @@ it('passes prepared event facts through cursor preparation before effects and dr
   const events = vi.fn(async () => eventsPrepared);
   const cursor = vi.fn(async () => cursorPrepared);
   args.job.recordingEventsRenderer = { prepare: events, clear: vi.fn() };
-  args.job.cursorTrajectoryRenderer = { prepare: cursor, clear: vi.fn() };
+  args.job.cursorTrajectoryRenderer = { prepareCamera: vi.fn(), prepare: cursor, clear: vi.fn() };
   await renderProjectCompositionScene(args);
   expect(cursor).toHaveBeenCalledExactlyOnceWith(eventsPrepared, 1);
   expect(owners.effects).toHaveBeenCalledWith(expect.objectContaining({ project: cursorPrepared }));
@@ -138,7 +138,11 @@ it('passes prepared event facts through cursor preparation before effects and dr
 it('refuses cancellation after a delayed cursor window without drawing a stale frame', async () => {
   const args = withTrajectory(input());
   const gate = Promise.withResolvers<VideoProject>();
-  args.job.cursorTrajectoryRenderer = { prepare: vi.fn(() => gate.promise), clear: vi.fn() };
+  args.job.cursorTrajectoryRenderer = {
+    prepareCamera: vi.fn(),
+    prepare: vi.fn(() => gate.promise),
+    clear: vi.fn(),
+  };
   const result = renderProjectCompositionScene(args);
   expect(owners.draw).not.toHaveBeenCalled();
   args.job.cancelled = true;
@@ -250,7 +254,7 @@ it.each(['job', 'signal'] as const)(
     const prepare = vi.fn(() => gate.promise);
     const cursor = vi.fn(async () => args.project);
     args.job.recordingEventsRenderer = { prepare, clear: vi.fn() };
-    args.job.cursorTrajectoryRenderer = { prepare: cursor, clear: vi.fn() };
+    args.job.cursorTrajectoryRenderer = { prepareCamera: vi.fn(), prepare: cursor, clear: vi.fn() };
     const controller = new AbortController();
     args.signal = controller.signal;
     const result = renderProjectCompositionScene(args);

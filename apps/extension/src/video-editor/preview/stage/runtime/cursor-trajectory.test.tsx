@@ -16,7 +16,7 @@ let latest: VideoProject;
 let canRender: (time: number) => boolean;
 const prepare = vi.fn<(project: VideoProject, time: number) => Promise<VideoProject>>();
 const clear = vi.fn();
-const createRenderer = () => ({ prepare, clear });
+const createRenderer = () => ({ prepare, prepareCamera: vi.fn(), clear });
 function Harness({ project, time }: { project: VideoProject; time: number }) {
   const prepared = useCursorTrajectoryProject(project, time, createRenderer);
   latest = prepared.project;
