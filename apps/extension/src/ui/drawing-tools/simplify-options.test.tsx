@@ -103,16 +103,12 @@ it('keeps Auto independent and restores the inactive content and manual choices'
   expect(option('manual-image')?.getAttribute('aria-pressed')).toBe('true');
 });
 
-it('keeps default sensitivity hidden and offers three numbered text thicknesses', async () => {
+it('keeps default sensitivity hidden and offers three text thickness samples without numbers', async () => {
   render();
   expect(createDefaultSimplifySettings().sensitivity).toBe(55);
   expect(host.querySelectorAll('[data-ui*="simplify.sensitivity-"]')).toHaveLength(0);
   expect(host.querySelectorAll('[data-ui*="simplify.thickness-"]')).toHaveLength(3);
-  expect([0.35, 0.5, 0.65].map((v) => option('thickness-' + v)?.textContent)).toEqual([
-    '1',
-    '2',
-    '3',
-  ]);
+  expect([0.35, 0.5, 0.65].map((v) => option('thickness-' + v)?.textContent)).toEqual(['', '', '']);
   await click('thickness-0.65');
   expect(change).toHaveBeenLastCalledWith({ thickness: 0.65 });
   await click('automatic');

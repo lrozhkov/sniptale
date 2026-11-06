@@ -184,7 +184,7 @@ export function requestEditorSimplify(
     runtime.presentations.delete(presentation)
   );
   runtime.presentations.add(presentation);
-  setEditorSimplifyGeometryPreview(object, Boolean(drawing.sourceDirty));
+  setEditorSimplifyGeometryPreview(object, !drawing.result || Boolean(drawing.sourceDirty));
   const job: Job = {
     cleanup: () => {
       presentation.cleanup();

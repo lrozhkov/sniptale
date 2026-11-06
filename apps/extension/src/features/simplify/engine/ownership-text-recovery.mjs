@@ -367,10 +367,14 @@ function recoveredRowColor(image, b) {
       if (Math.max(...b.bg.map((v, c) => Math.abs(v - image.data[i + c]))) < threshold) continue;
       for (let c = 0; c < 3; c++) samples[c].push(image.data[i + c]);
     }
-  return samples.map((a) => {
-    a.sort((x, y) => x - y);
-    return a[Math.floor(a.length / 2)] ?? 0;
-  });
+  // Subpixel fringes can dominate a thin glyph's median channel. Compare the
+  // source ink endpoints; each channel blends independently toward the surface.
+  return samples.map((a, c) =>
+    a.reduce(
+      (best, value) => (Math.abs(value - b.bg[c]) > Math.abs(best - b.bg[c]) ? value : best),
+      b.bg[c]
+    )
+  );
 }
 
 function recoveredRowsConnected(a, b, fg, input, protectedRects) {
@@ -484,10 +488,13 @@ function weakGlyphsAdjacent(a, b, metric, ink) {
     Math.min(am.xHeight, bm.xHeight) < Math.max(am.xHeight, bm.xHeight) * 0.7
   )
     return false;
-  const left = a.x < b.x ? ap : bp,
-    right = a.x < b.x ? bp : ap,
-    edge = left.at(-1),
-    next = right[0],
+  // Detached dots and accents do not establish a glyph body's baseline.
+  const bodies = (parts, metrics) => parts.filter((p) => p.h >= metrics.xHeight * 0.5);
+  const left = a.x < b.x ? bodies(ap, am) : bodies(bp, bm),
+    right = a.x < b.x ? bodies(bp, bm) : bodies(ap, am);
+  if (!left.length || !right.length) return false;
+  const edge = left.reduce((best, p) => (p.x + p.w > best.x + best.w ? p : best)),
+    next = right.reduce((best, p) => (p.x < best.x ? p : best)),
     gap = next.x - edge.x - edge.w;
   if (gap < 0 || gap > Math.max(2, Math.floor(Math.min(am.stroke, bm.stroke) * 0.8))) return false;
   return (

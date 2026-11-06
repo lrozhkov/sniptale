@@ -42,8 +42,8 @@ const DRAWING_TOOL_ORDER: readonly EditorTool[] = [
   'text',
   'shape',
   'arrow',
-  'simplify',
   'blur',
+  'simplify',
 ];
 
 const EDITOR_TOOL_DESCRIPTOR_KIND_BY_TOOL = {

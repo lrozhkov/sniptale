@@ -110,17 +110,16 @@ export function DrawingSimplifyOptions(props: DrawingSimplifyOptionsProps) {
               <QuickOptionButton
                 key={value}
                 active={settings.thickness === value}
-                label={`${translate(THICKNESS_LABELS[index]!)}: ${index + 1}`}
+                label={translate(THICKNESS_LABELS[index]!)}
                 dataUi={`content.toolbar.drawing-options.simplify.thickness-${value}`}
                 onClick={() => props.onChange({ thickness: value })}
               >
-                <span aria-hidden className="flex h-6 flex-col items-center justify-center gap-0.5">
+                <span aria-hidden className="flex h-6 items-center justify-center">
                   <span
                     data-ui="drawing-width-preview"
                     className="block w-4 rounded-full bg-current"
                     style={{ height: `${2 + index * 3}px` }}
                   />
-                  <span className="text-[9px] font-medium leading-none">{index + 1}</span>
                 </span>
               </QuickOptionButton>
             ))}

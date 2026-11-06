@@ -202,7 +202,7 @@ function findSurfaceTransitions(image) {
         if (start < 0) start = x;
         last = x;
       }
-      if (start >= 0 && (x - last > 32 || x === w - 1)) {
+      if (start >= 0 && (x - last > 2 || x === w - 1)) {
         if (last - start >= 96) lines.push({ y, x: start, r: last + 1 });
         start = -1;
       }
@@ -380,7 +380,7 @@ function proposeSupportedSurface(image, a, b, textureSeeds) {
   const seeds = textureSeeds.filter((p) => {
     const iw = Math.max(0, Math.min(p.x + p.w, box.x + box.w) - Math.max(p.x, box.x));
     const ih = Math.max(0, Math.min(p.y + p.h, box.y + box.h) - Math.max(p.y, box.y));
-    return iw * ih > p.w * p.h * 0.9;
+    return iw * ih > Math.min(p.w * p.h, box.w * box.h) * 0.9;
   });
   if (!seeds.length) return null;
 
@@ -392,26 +392,60 @@ function proposeSupportedSurface(image, a, b, textureSeeds) {
     ) < 0.55
   )
     return null;
-  if (resemblesTextList(image, box)) return null;
   if (box.w * box.h > w * h * 0.8) return null;
   box.w = Math.min(box.w, w - box.x);
   box.h = Math.min(box.h, h - box.y);
-  if (b.clipped && box.w > box.h * 1.5) {
-    alignClippedSurface(image, box);
-  }
+  if (b.clipped && box.w > box.h * 1.5) alignClippedSurface(image, box);
   const bg = surfaceBackground(image, box);
+  const exteriorSupported = hasSurfaceExterior(image, box, bg);
+  if (
+    !exteriorSupported &&
+    !seeds.some((p) => {
+      const iw = Math.max(0, Math.min(p.x + p.w, box.x + box.w) - Math.max(p.x, box.x));
+      const ih = Math.max(0, Math.min(p.y + p.h, box.y + box.h) - Math.max(p.y, box.y));
+      return iw * ih > p.w * p.h * 0.9;
+    })
+  )
+    return null;
+  if (resemblesTextList(image, box)) return null;
   return {
     ...box,
     shape: 'image',
     bg,
     contrast: 255,
     kind: 'media-surface',
+    exteriorSupported,
     seedCount: seeds.length,
   };
 }
 
+// A uniform surround distinguishes a complete picture from an internal texture
+// transition. A seed can include its nearby caption; it is evidence, not geometry.
+function hasSurfaceExterior(image, box, bg) {
+  const { data, width, height } = image;
+  for (const vertical of [false, true]) {
+    const edges = vertical ? [box.x - 1, box.x + box.w] : [box.y - 1, box.y + box.h];
+    for (const edge of edges) {
+      if (edge < 0 || edge >= (vertical ? width : height)) continue;
+      let hits = 0,
+        total = 0;
+      const start = vertical ? box.y : box.x;
+      const length = vertical ? box.h : box.w;
+      for (let n = start; n < start + length; n += 2) {
+        const k = ((vertical ? n : edge) * width + (vertical ? edge : n)) * 4;
+        if (Math.max(...bg.map((v, c) => Math.abs(v - data[k + c]))) <= 16) hits++;
+        total++;
+      }
+      if (hits / Math.max(1, total) < 0.8) return false;
+    }
+  }
+  return true;
+}
+
 function chooseMediaSurfaces(surfaces) {
-  surfaces.sort((a, b) => a.w * a.h - b.w * b.h);
+  surfaces.sort(
+    (a, b) => Number(b.exteriorSupported) - Number(a.exteriorSupported) || a.w * a.h - b.w * b.h
+  );
   const chosen = [];
   for (const p of surfaces) {
     if (
@@ -424,6 +458,7 @@ function chooseMediaSurfaces(surfaces) {
       continue;
     chosen.push(p);
   }
+  for (const box of chosen) delete box.exteriorSupported;
   return chosen.filter(
     (p) =>
       !chosen.some(
@@ -438,31 +473,59 @@ function chooseMediaSurfaces(surfaces) {
   );
 }
 
-export function alignMediaSurfaceBottoms(image, surfaces) {
-  for (const box of surfaces) {
-    if (box.w < image.width * 0.5 || box.y + box.h >= image.height) continue;
-    const bottom = box.y + box.h;
-    let best = bottom,
-      bestScore = 0;
-    for (let y = Math.max(box.y + 1, bottom - 3); y < Math.min(image.height - 1, bottom + 4); y++) {
-      let score = 0,
-        total = 0;
-      for (let x = box.x + 4; x < box.x + box.w - 4; x += 3) {
-        const a = ((y - 1) * image.width + x) * 4,
-          b = (y * image.width + x) * 4;
-        score +=
-          Math.abs(image.data[a] - image.data[b]) +
-          Math.abs(image.data[a + 1] - image.data[b + 1]) +
-          Math.abs(image.data[a + 2] - image.data[b + 2]);
-        total++;
-      }
-      score /= Math.max(1, total);
-      if (score > bestScore) {
-        bestScore = score;
-        best = y;
-      }
+function strongestSurfaceRow(image, box, start, end) {
+  let position = start,
+    score = 0;
+  for (let y = start; y < end; y++) {
+    let sum = 0,
+      total = 0;
+    for (let x = box.x + 4; x < box.x + box.w - 4; x += 3) {
+      const a = ((y - 1) * image.width + x) * 4,
+        b = (y * image.width + x) * 4;
+      sum +=
+        Math.abs(image.data[a] - image.data[b]) +
+        Math.abs(image.data[a + 1] - image.data[b + 1]) +
+        Math.abs(image.data[a + 2] - image.data[b + 2]);
+      total++;
     }
-    if (bestScore > 35) box.h = best - box.y;
+    const mean = sum / Math.max(1, total);
+    if (mean > score) {
+      score = mean;
+      position = y;
+    }
+  }
+  return { position, score };
+}
+
+export function alignMediaSurfaceRows(image, surfaces) {
+  for (const box of surfaces) {
+    if (box.w < image.width * 0.5) continue;
+    const bottom = box.y + box.h;
+    const reach = Math.min(24, Math.max(3, Math.round(box.h * 0.09)));
+    const upper =
+      box.y > 0
+        ? strongestSurfaceRow(
+            image,
+            box,
+            Math.max(1, box.y - 3),
+            Math.min(image.height - 1, box.y + 4)
+          )
+        : { position: box.y, score: 0 };
+    const lower =
+      bottom < image.height
+        ? strongestSurfaceRow(
+            image,
+            box,
+            Math.max(box.y + 1, bottom - reach),
+            Math.min(image.height - 1, bottom + reach + 1)
+          )
+        : { position: bottom, score: 0 };
+    const top = upper.score > 35 ? upper.position : box.y;
+    const end = lower.score > 35 ? lower.position : bottom;
+    if (end > top) {
+      box.y = top;
+      box.h = end - top;
+    }
   }
 }
 

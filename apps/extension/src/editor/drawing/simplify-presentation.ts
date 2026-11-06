@@ -3,6 +3,31 @@ import type { DrawingSimplifyObject, DrawingSimplifySource } from '../../feature
 import { translate } from '../../platform/i18n';
 import { sampleEditorSimplifyRegion } from './object/simplify';
 
+function createPendingBadge(label: string): HTMLElement {
+  const spinner = document.createElement('span');
+  spinner.setAttribute('aria-hidden', 'true');
+  spinner.className = 'animate-spin motion-reduce:animate-none';
+  Object.assign(spinner.style, {
+    width: '16px',
+    height: '16px',
+    flexShrink: '0',
+    border: '2px solid currentColor',
+    borderTopColor: 'transparent',
+    borderRadius: '50%',
+  });
+  const badge = document.createElement('span');
+  Object.assign(badge.style, {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    borderRadius: '4px',
+    padding: '4px 8px',
+    background: 'var(--sniptale-color-surface-panel)',
+  });
+  badge.append(spinner, document.createTextNode(label));
+  return badge;
+}
+
 export function pendingPresentation(
   canvas: Canvas,
   drawing: DrawingSimplifyObject,
@@ -14,14 +39,12 @@ export function pendingPresentation(
 } {
   const overlay = document.createElement('div');
   overlay.setAttribute('role', 'status');
-  overlay.setAttribute(
-    'aria-label',
-    translate(
-      drawing.result
-        ? 'content.toolbar.drawingSimplifyUpdating'
-        : 'content.toolbar.drawingSimplifyWorking'
-    )
+  const label = translate(
+    drawing.result
+      ? 'content.toolbar.drawingSimplifyUpdating'
+      : 'content.toolbar.drawingSimplifyWorking'
   );
+  overlay.setAttribute('aria-label', label);
   overlay.dataset['ui'] = 'editor.simplify.pending';
   Object.assign(overlay.style, {
     position: 'absolute',
@@ -30,20 +53,10 @@ export function pendingPresentation(
     placeItems: 'center',
     backdropFilter: 'blur(2px)',
     overflow: 'hidden',
-    color: 'var(--sniptale-color-info)',
-    zIndex: '4',
+    color: 'var(--sniptale-color-text-primary)',
+    zIndex: String(Number(getComputedStyle(canvas.upperCanvasEl).zIndex) || 0),
   });
-  const spinner = document.createElement('span');
-  spinner.setAttribute('aria-hidden', 'true');
-  spinner.className = 'animate-spin motion-reduce:animate-none';
-  Object.assign(spinner.style, {
-    width: 'min(24px,80%)',
-    height: 'min(24px,80%)',
-    border: '2px solid currentColor',
-    borderTopColor: 'transparent',
-    borderRadius: '50%',
-  });
-  overlay.append(spinner);
+  overlay.append(createPendingBadge(label));
   canvas.wrapperEl.append(overlay);
   const update = () => {
     const center = util.transformPoint(
@@ -62,7 +75,10 @@ export function pendingPresentation(
       transform: `rotate(${drawing.rotation ?? 0}deg)`,
     });
   };
-  const stop = canvas.on('after:render', update);
+  const stop = canvas.on('after:render', ({ ctx }) => {
+    // Backdrop capture renders with a temporary source projection.
+    if (ctx === canvas.getContext()) update();
+  });
   update();
   let live = true;
   let animation: Animation | null = null;

@@ -1,7 +1,7 @@
 import { rejectPlanarMedia } from './planar-surfaces.mjs';
 import {
   detectSurfaces,
-  alignMediaSurfaceBottoms,
+  alignMediaSurfaceRows,
   alignMediaSurfaceSides,
 } from './media-surfaces.mjs';
 import { detectGraphics, darkComponents, detectSmallImageGroups } from './media-components.mjs';
@@ -17,7 +17,7 @@ export function detectMedia(image, measure, sourceRows = [], scratch = null) {
   const proposals = detectSurfaces(image),
     surfaces = measure ? rejectPlanarMedia(image, proposals, measure, sourceRows) : proposals,
     graphics = detectGraphics(image, queue);
-  alignMediaSurfaceBottoms(image, surfaces);
+  alignMediaSurfaceRows(image, surfaces);
   alignMediaSurfaceSides(image, surfaces);
   // A texture proposal cannot cut an independently connected graphic into pieces.
   // Enclosing surfaces retain ownership; contained and crossing surfaces yield.
@@ -64,7 +64,7 @@ export function detectMedia(image, measure, sourceRows = [], scratch = null) {
       ![...complete, ...islands, ...products].some((s) => {
         const iw = Math.max(0, Math.min(p.x + p.w, s.x + s.w) - Math.max(p.x, s.x));
         const ih = Math.max(0, Math.min(p.y + p.h, s.y + s.h) - Math.max(p.y, s.y));
-        return iw * ih > Math.min(p.w * p.h, s.w * s.h) * 0.3;
+        return iw * ih > Math.min(p.w * p.h, s.w * s.h) * 0.3 && !contains(p, s);
       })
   );
   const small = detectSmallImageGroups(image, rasterComponents).filter(
@@ -73,7 +73,12 @@ export function detectMedia(image, measure, sourceRows = [], scratch = null) {
         (s) => p.x < s.x + s.w && p.x + p.w > s.x && p.y < s.y + s.h && p.y + p.h > s.y
       )
   );
-  const established = [...complete, ...islands, ...products, ...framed, ...small];
+  // A supported complete frame owns its contained partial texture proposals.
+  const established = [
+    ...[...complete, ...islands, ...products].filter((s) => !framed.some((p) => contains(p, s))),
+    ...framed,
+    ...small,
+  ];
   const local = detectLocalTexturedObjects(image, queue).filter(
     (p) =>
       !established.some(

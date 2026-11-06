@@ -147,6 +147,7 @@ export function createEditorDrawingSimplifyObject(
     object = new Rect({
       width: bounds.width,
       height: bounds.height,
+      objectCaching: false,
       fill: 'rgba(37,99,235,0.08)',
       stroke: '#2563eb',
       strokeWidth: 1,

@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
-import { Canvas } from 'fabric';
+import { Canvas, Rect } from 'fabric';
 import { afterEach, expect, it, vi } from 'vitest';
+import { captureSource } from './simplify-source';
+import { createEditorDrawingSimplifyObject } from './object/simplify';
+import * as editingSurface from '../document/canvas-surface/editing-surface';
 import { pendingPresentation } from './simplify-presentation';
 import { createDefaultSimplifySettings } from '../../features/simplify/settings';
 
@@ -10,8 +13,9 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-function fixture() {
+function fixture(canvasZIndex = 0) {
   const canvas = new Canvas(document.createElement('canvas'), { width: 200, height: 100 });
+  canvas.upperCanvasEl.style.zIndex = String(canvasZIndex);
   const disposed = vi.fn();
   const presentation = pendingPresentation(
     canvas,
@@ -88,4 +92,46 @@ it('keeps the blur cover while preview pixels load and reveals them together', (
   expect(image.style.opacity).toBe('1');
   expect(overlay.style.backdropFilter).toBe('none');
   expect(overlay.childElementCount).toBe(1);
+});
+
+it('keeps pending feedback in viewport coordinates during offscreen source capture', () => {
+  const { canvas, overlay } = fixture();
+  const object = createEditorDrawingSimplifyObject(
+    {
+      id: 'captured',
+      kind: 'simplify',
+      bounds: { x: 10, y: 20, width: 80, height: 30 },
+      settings: createDefaultSimplifySettings(),
+    },
+    1
+  );
+  canvas.add(new Rect({ width: 200, height: 100, fill: '#fff' }), object);
+  vi.spyOn(editingSurface, 'getEditorEditingDocumentSize').mockReturnValue({
+    width: 200,
+    height: 100,
+  });
+  canvas.setViewportTransform([0.5, 0, 0, 0.5, 50, 20]);
+  canvas.renderAll();
+  const expected = [
+    overlay.style.left,
+    overlay.style.top,
+    overlay.style.width,
+    overlay.style.height,
+  ];
+  captureSource(canvas, object);
+  expect([
+    overlay.style.left,
+    overlay.style.top,
+    overlay.style.width,
+    overlay.style.height,
+  ]).toEqual(expected);
+  canvas.setViewportTransform([0.75, 0, 0, 0.75, 10, 30]);
+  canvas.renderAll();
+  expect(overlay.style.left).toBe('17.5px');
+  expect(overlay.style.top).toBe('45px');
+});
+
+it('shows pending feedback above the main canvas paint layer', () => {
+  const { overlay } = fixture(10);
+  expect(Number(overlay.style.zIndex)).toBeGreaterThanOrEqual(10);
 });

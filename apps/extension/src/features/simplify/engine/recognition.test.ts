@@ -10,7 +10,11 @@ type Box = {
   bg: number[];
   typeMetrics?: { xHeight: number };
 };
-const media = vi.hoisted(() => ({ surfaces: [] as Box[], graphics: [] as Box[] }));
+const media = vi.hoisted(() => ({
+  surfaces: [] as Box[],
+  graphics: [] as Box[],
+  frames: [] as Box[],
+}));
 vi.mock('./media-surfaces.mjs', async (original) => ({
   ...(await original<object>()),
   detectSurfaces: () => media.surfaces,
@@ -18,6 +22,10 @@ vi.mock('./media-surfaces.mjs', async (original) => ({
 vi.mock('./media-components.mjs', async (original) => ({
   ...(await original<object>()),
   detectGraphics: () => media.graphics,
+}));
+vi.mock('./media-frames.mjs', async (original) => ({
+  ...(await original<object>()),
+  detectClippedFramedImages: () => media.frames,
 }));
 const { uncertainColorTexture } = await vi.importActual<{
   uncertainColorTexture(image: SimplifyPixelSource, box: Box): boolean;
@@ -78,6 +86,7 @@ it('does not borrow white text interiors to accept a saturated graphic', () => {
 beforeEach(() => {
   media.surfaces = [];
   media.graphics = [];
+  media.frames = [];
 });
 const white = [255, 255, 255];
 function box(x: number, y: number, w: number, h: number): Box {
@@ -100,4 +109,11 @@ it('absorbs a texture surface inside a complete connected graphic', () => {
   media.graphics = [graphic];
   media.surfaces = [box(100, 80, 180, 170)];
   expect(detectMedia(image(400, 400, white), null)).toEqual([graphic]);
+});
+
+it('gives a complete clipped frame ownership over a contained partial surface', () => {
+  const frame = box(90, 190, 180, 210);
+  media.frames = [frame];
+  media.surfaces = [box(100, 200, 140, 200)];
+  expect(detectMedia(image(400, 400, white), null)).toEqual([frame]);
 });
