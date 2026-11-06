@@ -32,6 +32,7 @@ function Harness(props: PreviewStageProps & { direct?: boolean }) {
   usePreviewStageCanvasRender({
     canvasRef,
     onCameraPresented: runtime.render.onCameraPresented,
+    canRenderCursorFrame: runtime.render.canRenderCursorFrame,
     ...(props.direct
       ? {
           registerPlaybackRequest: runtime.render.registerPlaybackRequest,

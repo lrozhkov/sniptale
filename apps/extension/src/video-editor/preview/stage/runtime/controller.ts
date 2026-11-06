@@ -181,7 +181,8 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     transient.currentTime,
     effectRuntimeFeedback
   );
-  const cursorProject = useCursorTrajectoryProject(eventsProject, transient.currentTime);
+  const cursorPreparation = useCursorTrajectoryProject(eventsProject, transient.currentTime);
+  const cursorProject = cursorPreparation.project;
   const previewProject = useMemo(
     () => ({
       ...cursorProject,
@@ -232,6 +233,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     previewRasterSize,
     render: {
       onCameraPresented: surface.onCameraPresented,
+      canRenderCursorFrame: cursorPreparation.canRender,
       registerPlaybackRequest: presentation.registerPlaybackRequest,
       onPreviewEffectAnchors: transient.onPreviewEffectAnchors,
       onPreviewEffectControls: transient.onPreviewEffectControls,

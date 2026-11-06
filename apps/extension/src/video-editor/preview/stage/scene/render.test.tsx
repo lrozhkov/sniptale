@@ -1,5 +1,9 @@
-import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 // @vitest-environment jsdom
+import { useCursorTrajectoryProject } from '../runtime/cursor-trajectory';
+import { prepareCursorTrajectoryProject } from '../../../../features/video/project/cursor-trajectory/project-window';
+import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
+import type { VideoProject } from '../../../../features/video/project/types';
+import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 
 import { act } from 'react';
 import React from 'react';
@@ -351,6 +355,7 @@ function BridgeHarness({
   registered = true,
   generation = 0,
   clips = [],
+  canRenderCursorFrame,
 }: {
   time?: number;
   playing?: boolean;
@@ -360,6 +365,7 @@ function BridgeHarness({
   registered?: boolean;
   generation?: number;
   clips?: PreviewStageCanvasSceneParams['activeClips'];
+  canRenderCursorFrame?: (time: number) => boolean;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
@@ -367,6 +373,7 @@ function BridgeHarness({
   generationRef.current = generation;
   usePreviewStageCanvasRender({
     activeClips: clips,
+    ...{ canRenderCursorFrame },
     canvasRef,
     stageRef,
     currentTime: time,
@@ -536,4 +543,98 @@ it('retains the React time path for cache playback', async () => {
     currentTime: 1,
     previewMode: 'cache',
   });
+});
+
+it('holds the actual direct frame time at an archive boundary and retries it after preparation', async () => {
+  const beforeBoundary = (time: number) => time < 1;
+  await act(async () => root?.render(<BridgeHarness canRenderCursorFrame={beforeBoundary} />));
+  schedulerMocks.enqueueMock.mockClear();
+  playbackRequest?.(1.25);
+  expect(schedulerMocks.enqueueMock).not.toHaveBeenCalled();
+  await act(async () => root?.render(<BridgeHarness canRenderCursorFrame={() => true} />));
+  expect(schedulerMocks.enqueueMock).toHaveBeenCalledOnce();
+  expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({ currentTime: 1.25 });
+});
+
+it('holds an archive-backed direct frame through the hook refresh and retries the latest request', async () => {
+  const clip = createVideoClip({ id: 'archive', sourceInstanceId: 'archive', duration: 4 });
+  const project = createProject([clip]);
+  project.cursorTrack = {
+    captureMode: 'separate',
+    samples: [],
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    sourceObservations: [
+      {
+        recordingId: 'recording',
+        sourceInstanceId: 'archive',
+        samples: [],
+        trajectory: {
+          format: 'cursor-trajectory-v1',
+          formatVersion: 1,
+          algorithm: 'sed-window-v1',
+          encoding: 'json-ascii-int-v1',
+          trajectoryId: 'a'.repeat(32),
+          state: 'complete',
+          finalized: true,
+          totalBlocks: 1,
+          totalRecords: 0,
+          totalSamples: 0,
+          totalBytes: 0,
+          streamSha256: 'b'.repeat(64),
+        },
+      },
+    ],
+  };
+  const first = Promise.withResolvers<VideoProject>();
+  const second = Promise.withResolvers<VideoProject>();
+  const prepare = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  const createRenderer = () => ({ prepare, clear: vi.fn() });
+  function ArchiveHarness({ time }: { time: number }) {
+    const result = useCursorTrajectoryProject(project, time, createRenderer);
+    return (
+      <BridgeHarness
+        time={time}
+        project={result.project}
+        clips={[clip]}
+        canRenderCursorFrame={result.canRender}
+      />
+    );
+  }
+  const video = document.createElement('video');
+  Object.defineProperty(video, 'readyState', { value: 2 });
+  bridgeVideos.current[clip.id] = video;
+  try {
+    await act(async () => root?.render(<ArchiveHarness time={0.5} />));
+    expect(schedulerMocks.enqueueMock).not.toHaveBeenCalled();
+    await act(async () =>
+      first.resolve(
+        await prepareCursorTrajectoryProject(project, 0.5, async () => ({
+          fromTimeUs: 0,
+          toTimeUs: 1000000,
+          records: [],
+          initialSegment: null,
+        }))
+      )
+    );
+    expect(schedulerMocks.enqueueMock).toHaveBeenCalledOnce();
+    schedulerMocks.enqueueMock.mockClear();
+    playbackRequest?.(1.25);
+    expect(schedulerMocks.enqueueMock).not.toHaveBeenCalled();
+    await act(async () => root?.render(<ArchiveHarness time={1.25} />));
+    expect(schedulerMocks.enqueueMock).not.toHaveBeenCalled();
+    await act(async () =>
+      second.resolve(
+        await prepareCursorTrajectoryProject(project, 1.25, async () => ({
+          fromTimeUs: 1000000,
+          toTimeUs: 2000000,
+          records: [],
+          initialSegment: null,
+        }))
+      )
+    );
+    expect(schedulerMocks.enqueueMock).toHaveBeenCalledOnce();
+    expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({ currentTime: 1.25 });
+  } finally {
+    delete bridgeVideos.current[clip.id];
+  }
 });

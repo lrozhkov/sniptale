@@ -6,6 +6,7 @@ import {
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createRecordingCursorTrajectoryRenderer } from '../../../../workflows/video-review/cursor-trajectory';
 import { cursorTrajectoryProjectCoversTime } from '../../../../features/video/project/cursor-trajectory/project-window';
+import { canRenderPreparedCursorFrame } from './cursor-readiness';
 import type { VideoProject } from '../../../../features/video/project/types';
 
 const logger = createLogger({ namespace: 'VideoEditorCursorTrajectory' });
@@ -16,7 +17,7 @@ export function useCursorTrajectoryProject(
   project: VideoProject,
   time: number,
   createRenderer = createRecordingCursorTrajectoryRenderer
-): VideoProject {
+): { project: VideoProject; canRender: (time: number) => boolean } {
   const owner = useMemo(
     () => ({
       renderer: createRenderer(),
@@ -32,6 +33,7 @@ export function useCursorTrajectoryProject(
   const [completed, setCompleted] = useState<{
     source: VideoProject;
     project: VideoProject;
+    unavailable: boolean;
   } | null>(null);
   owner.latest = { project, time };
   useRecordingHistoryReadLifetime(owner);
@@ -45,22 +47,49 @@ export function useCursorTrajectoryProject(
           owner.active &&
           owner.epoch === epoch &&
           owner.latest.project === request.project &&
-          cursorTrajectoryProjectCoversTime(prepared, owner.latest.time)
+          (cursorTrajectoryProjectCoversTime(prepared, owner.latest.time) ||
+            !cursorTrajectoryProjectCoversTime(prepared, request.time))
         ) {
           owner.failedProject = null;
-          setCompleted({ source: request.project, project: prepared });
+          const unavailable = !cursorTrajectoryProjectCoversTime(prepared, request.time);
+          setCompleted((previous) =>
+            previous?.source === request.project &&
+            previous.project === prepared &&
+            previous.unavailable === unavailable
+              ? previous
+              : {
+                  source: request.project,
+                  project: prepared,
+                  unavailable,
+                }
+          );
         }
       } catch {
         if (owner.active && owner.epoch === epoch && owner.latest.project === request.project) {
           if (owner.failedProject !== request.project)
             logger.warn('Cursor trajectory preview is unavailable');
           owner.failedProject = request.project;
-          setCompleted({ source: request.project, project: request.project });
+          setCompleted((previous) =>
+            previous?.source === request.project && previous.unavailable
+              ? previous
+              : {
+                  source: request.project,
+                  project: request.project,
+                  unavailable: true,
+                }
+          );
         }
       }
     });
   }, [owner, project, time]);
-  return completed?.source === project && cursorTrajectoryProjectCoversTime(completed.project, time)
-    ? completed.project
-    : project;
+  const current = completed?.source === project ? completed : null;
+  const prepared = current?.project ?? project;
+  const unavailable = current?.unavailable === true;
+  return useMemo(
+    () => ({
+      project: prepared,
+      canRender: (at: number) => unavailable || canRenderPreparedCursorFrame(prepared, at),
+    }),
+    [prepared, unavailable]
+  );
 }

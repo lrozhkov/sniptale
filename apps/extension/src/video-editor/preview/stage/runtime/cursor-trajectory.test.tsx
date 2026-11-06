@@ -13,11 +13,14 @@ import type { CursorTrajectoryRecord } from '../../../../features/video/project/
 let root: Root;
 let container: HTMLDivElement;
 let latest: VideoProject;
+let canRender: (time: number) => boolean;
 const prepare = vi.fn<(project: VideoProject, time: number) => Promise<VideoProject>>();
 const clear = vi.fn();
 const createRenderer = () => ({ prepare, clear });
 function Harness({ project, time }: { project: VideoProject; time: number }) {
-  latest = useCursorTrajectoryProject(project, time, createRenderer);
+  const prepared = useCursorTrajectoryProject(project, time, createRenderer);
+  latest = prepared.project;
+  canRender = prepared.canRender;
   return null;
 }
 function fixture(name = 'Source') {
@@ -180,4 +183,77 @@ it('keeps video and compact references when a cursor read fails', async () => {
   await render(project, 1);
   expect(latest).toBe(project);
   expect(project).toEqual(before);
+});
+
+it('holds uncovered actual frame times and admits a covered gap without inventing a cursor', async () => {
+  const project = fixture();
+  const first = Promise.withResolvers<VideoProject>();
+  const second = Promise.withResolvers<VideoProject>();
+  prepare.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  await render(project, 1);
+  expect(canRender(1)).toBe(false);
+  await act(async () => first.resolve(await prepared(project, 1)));
+  expect(canRender(1.25)).toBe(true);
+  expect(canRender(3)).toBe(false);
+  await render(project, 3);
+  expect(canRender(3)).toBe(false);
+  const gap = await prepareCursorTrajectoryProject(project, 3, async () => ({
+    fromTimeUs: 2000001,
+    toTimeUs: null,
+    records: [],
+    initialSegment: null,
+  }));
+  await act(async () => second.resolve(gap));
+  expect(canRender(3)).toBe(true);
+  expect(resolveObservedCursorPosition(latest, 3)).toBeNull();
+});
+
+it.each(['null', 'failure'] as const)(
+  'admits advancing playback after a settled %s read and recovers on success',
+  async (kind) => {
+    const project = fixture();
+    const first = Promise.withResolvers<VideoProject>();
+    const second = Promise.withResolvers<VideoProject>();
+    prepare.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    await render(project, 1);
+    await render(project, 1.25);
+    await act(async () => {
+      if (kind === 'failure') first.reject(new Error('Unavailable'));
+      else first.resolve(await prepareCursorTrajectoryProject(project, 1, async () => null));
+    });
+    expect(canRender(1.266)).toBe(true);
+    expect(resolveObservedCursorPosition(latest, 1.266)).toBeNull();
+    await act(async () => second.resolve(await prepared(project, 1.25)));
+    expect(canRender(1.5)).toBe(true);
+    expect(resolveObservedCursorPosition(latest, 1.5)).not.toBeNull();
+    expect(canRender(3)).toBe(false);
+  }
+);
+
+it('rejects stale unavailable state after source replacement and keeps readiness stable on clock commits', async () => {
+  const old = fixture('Old');
+  prepare.mockRejectedValueOnce(new Error('Unavailable'));
+  await render(old, 1);
+  expect(canRender(1.5)).toBe(true);
+  const current = fixture('Current');
+  const gate = Promise.withResolvers<VideoProject>();
+  prepare.mockReturnValue(gate.promise);
+  await render(current, 1);
+  const readiness = canRender;
+  expect(canRender(1.5)).toBe(false);
+  await render(current, 1.25);
+  expect(canRender).toBe(readiness);
+  await act(async () => gate.resolve(await prepared(current, 1)));
+  expect(canRender(1.5)).toBe(true);
+});
+
+it('keeps readiness stable when repeated successful preparation returns the same window project', async () => {
+  const project = fixture();
+  const windowProject = await prepared(project, 1);
+  prepare.mockResolvedValue(windowProject);
+  await render(project, 1);
+  const readiness = canRender;
+  await render(project, 1.25);
+  expect(canRender).toBe(readiness);
+  expect(latest).toBe(windowProject);
 });

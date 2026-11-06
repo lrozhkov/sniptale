@@ -30,6 +30,8 @@ import type {
 } from '../../../../features/video/preview/preferences';
 
 export interface PreviewStageCanvasSceneParams {
+  /** Admission uses the requested clock time, including requests between React commits. */
+  canRenderCursorFrame?: ((time: number) => boolean) | undefined;
   activeClips: VideoProjectClip[];
   assetUrls?: Record<string, string>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;

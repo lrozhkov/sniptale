@@ -33,6 +33,7 @@ function buildPreviewStageSurfaceProps(
     camera: runtime.surface.camera,
     cameraInteractionEnabled: runtime.surface.cameraInteractionEnabled,
     onCameraPresented: runtime.render.onCameraPresented,
+    canRenderCursorFrame: runtime.render.canRenderCursorFrame,
     registerPlaybackRequest: runtime.render.registerPlaybackRequest,
     cachedVideo: runtime.media.cachedVideo,
     currentTime: runtime.render.currentTime,

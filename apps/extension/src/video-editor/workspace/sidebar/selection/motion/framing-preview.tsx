@@ -48,7 +48,7 @@ export function MotionFramingPreview(props: {
 
 export function FramingPreviewSurface(props: FramingPreviewProps) {
   const time = Math.min(props.project.duration, props.region.startTime + props.region.duration / 2);
-  const project = useCursorTrajectoryProject(props.project, time);
+  const { project } = useCursorTrajectoryProject(props.project, time);
   const renderProps = { ...props, project };
   const following = props.region.focusMode === VideoMotionFocusMode.CURSOR;
   const [overview, setOverview] = useState(true);

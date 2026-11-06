@@ -72,6 +72,8 @@ export interface PreviewEffectRuntimeFeedback {
 }
 
 export interface PreviewStageCanvasProps {
+  /** Admission uses the requested clock time, including requests between React commits. */
+  canRenderCursorFrame?: ((time: number) => boolean) | undefined;
   /** Borrows the mounted renderer's playback request until its cleanup runs. */
   registerPlaybackRequest?: ((request: (time: number) => void) => () => void) | undefined;
   /** Published only for an accepted completed scene job. */

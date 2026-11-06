@@ -211,6 +211,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
     canvasRef,
     framePresenterRef,
     onCameraPresented: params.onCameraPresented,
+    canRenderCursorFrame: params.canRenderCursorFrame,
     registerPlaybackRequest: params.registerPlaybackRequest,
     renderGenerationRef: params.renderGenerationRef,
     currentTime: params.currentTime,

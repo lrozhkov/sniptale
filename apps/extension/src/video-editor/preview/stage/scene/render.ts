@@ -70,7 +70,12 @@ function usePreviewStageRenderEffect(
   const enqueue = (time: number, requireCurrentDependencies: boolean) => {
     const { params: current, renderRevision: revision } = committed.current;
     const canvas = current.canvasRef.current;
-    if (!canvas || !current.videoFrameState.canRender) return;
+    if (
+      !canvas ||
+      !current.videoFrameState.canRender ||
+      current.canRenderCursorFrame?.(time) === false
+    )
+      return;
     const framePresenter = current.framePresenterRef?.current;
     if (requireCurrentDependencies) {
       const needed = resolveActivePreviewClips(current.project, time);
@@ -144,6 +149,7 @@ function usePreviewStageRenderEffect(
     direct,
     effectTime,
     params.canvasRef,
+    params.canRenderCursorFrame,
     params.framePresenterRef,
     params.onCameraPresented,
     params.assetUrls,

@@ -29,6 +29,7 @@ export type PreviewStageRootSurfaceProps = Pick<
   | 'beginInteraction'
   | 'camera'
   | 'cameraInteractionEnabled'
+  | 'canRenderCursorFrame'
   | 'cachedVideo'
   | 'currentTime'
   | 'effectRuntimeFeedback'
