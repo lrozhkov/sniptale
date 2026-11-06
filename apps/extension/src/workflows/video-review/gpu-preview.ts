@@ -1,5 +1,5 @@
 import type { PreviewGpuCanvasFactory, PreviewGpuCanvasLease } from './preview-render-resources';
-import { buildReviewGpuScene } from './gpu-preview-scene';
+import { buildReviewGpuScene, reviewGpuStaticBackgroundDrift } from './gpu-preview-scene';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { reviewPresentedGeometry, type ReviewPresentedGeometry } from './gpu-preview-geometry';
 import {
@@ -251,6 +251,14 @@ export function createReviewGpuPreview(args: {
         background,
         sceneScale: scale,
       });
+      const drift = reviewGpuStaticBackgroundDrift(scene.background);
+      const paintDensity = drift
+        ? Math.min(1, 2048 / Math.max(dimensions.backing.width, dimensions.backing.height))
+        : 1;
+      const paintSize = {
+        width: Math.max(1, Math.round(dimensions.backing.width * paintDensity)),
+        height: Math.max(1, Math.round(dimensions.backing.height * paintDensity)),
+      };
       const key = JSON.stringify([
         dimensions,
         background,
@@ -262,7 +270,7 @@ export function createReviewGpuPreview(args: {
         clearSlot(slot);
         const retained: RenderCanvasLease[] = [];
         try {
-          const bg = args.resources.canvas('preview-gpu-background', dimensions.backing);
+          const bg = args.resources.canvas('preview-gpu-background', paintSize);
           retained.push(bg);
           const decoration = args.resources.canvas('preview-gpu-decoration', decorRect);
           retained.push(decoration);
@@ -294,23 +302,25 @@ export function createReviewGpuPreview(args: {
       if (
         art.backgroundRevision === 0 ||
         art.image !== input.image ||
-        (scene.background.enabled && hasSceneBackgroundMotion(scene.background.motion))
+        (scene.background.enabled && hasSceneBackgroundMotion(scene.background.motion) && !drift)
       ) {
-        const bgScale = dimensions.backing.width / (scene.canvas?.width ?? scene.source.width);
-        const paint = scene.background.enabled
+        const bgScale = paintSize.width / (scene.canvas?.width ?? scene.source.width);
+        const { motion: _motion, ...basePaint } = scene.background;
+        const backgroundPaint = drift ? basePaint : scene.background;
+        const paint = backgroundPaint.enabled
           ? {
-              ...scene.background,
+              ...backgroundPaint,
               layout: {
-                ...scene.background.layout,
-                cornerRadius: scene.background.layout.cornerRadius * bgScale,
-                blur: (scene.background.layout.blur ?? 0) * bgScale,
+                ...backgroundPaint.layout,
+                cornerRadius: backgroundPaint.layout.cornerRadius * bgScale,
+                blur: (backgroundPaint.layout.blur ?? 0) * bgScale,
               },
             }
-          : scene.background;
+          : backgroundPaint;
         art.painter.draw(art.background.context, {
           background: paint,
           image: input.image,
-          ...dimensions.backing,
+          ...paintSize,
           currentTime: geometry.resultTime,
         });
         art.image = input.image;
@@ -357,6 +367,8 @@ export function createReviewGpuPreview(args: {
           decoration: art.decoration.canvas,
           rect: art.rect,
           backgroundRevision: art.backgroundRevision,
+          retainedDrift: drift !== null,
+          backgroundSettings: scene.background,
           decorationRevision: art,
         },
         painter: art.painter,

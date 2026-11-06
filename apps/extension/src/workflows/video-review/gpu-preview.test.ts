@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createReviewGpuPreview, reviewGpuPreviewConcurrency } from './gpu-preview';
+import type { createReviewBackgroundPainter } from './scene-background';
 import {
   reviewPresentedGeometry,
   reviewPresentedStageProjection,
@@ -24,6 +25,10 @@ import { createNeutralPresentationSettings } from '../../features/video/review/a
 import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
+import {
+  evaluateSceneBackgroundMotion,
+  sceneBackgroundDriftRect,
+} from '../../features/video/project/scene/background-motion';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 
 const io = vi.hoisted(() => ({
@@ -73,7 +78,10 @@ function fixture(maximumInFlight: 1 | 2 = 1) {
   const bitmap = { close: vi.fn() };
   const painter = {
     draw: vi.fn(
-      (_context: CanvasRenderingContext2D, _paint: { currentTime?: number | undefined }) => {}
+      (
+        _context: CanvasRenderingContext2D,
+        _paint: Parameters<ReturnType<typeof createReviewBackgroundPainter>['draw']>[1]
+      ) => {}
     ),
     dispose: vi.fn(),
     retainedCacheSize: null,
@@ -873,84 +881,106 @@ it('retains a composed spotlight snapshot instead of inlining its scene input', 
   }
 });
 
-it('keeps dissolve endpoint clocks, orientation and owned clone lifetime through GPU completion', async () => {
-  const f = fixture();
-  Object.assign(f.frame, { timestamp: 1_800_000 });
-  const animated: PreviewScene = {
-    ...scene,
-    background: {
-      enabled: true,
-      type: 'image',
-      assetId: 'bg',
-      imageFit: 'cover',
-      motion: { mode: 'drift', speed: 50, intensity: 50 },
-      layout: { padding: 0, cornerRadius: 0 },
-    },
-  };
-  const { reviewCutTransitionAt } = await import('../../features/video/review/cuts');
-  const blend = reviewCutTransitionAt(1.8, [
-    {
-      id: 'cut',
-      type: 'dissolve',
-      seam: 2,
-      before: 0.5,
-      after: 0.5,
-      left: { start: 0, end: 2 },
-      right: { start: 4, end: 6 },
-    },
-  ])!;
-  const clone = { timestamp: 4_000_000, close: vi.fn() } as unknown as VideoFrame;
-  const retained = {
-    timestamp: 4,
-    rotation: 90 as const,
-    flip: true,
-    draw: vi.fn(),
-    close: vi.fn(),
-    toVideoFrame: () => clone,
-  };
-  const sceneAt = vi.fn(async (_resultTime: number, _sourceTime: number) => animated);
-  let finish!: (value: typeof f.bitmap) => void;
-  io.render.mockImplementationOnce(async () => {
-    expect(clone.close).not.toHaveBeenCalled();
-    return new Promise((resolve) => {
-      finish = resolve;
+it.each(['shared', 'changed'] as const)(
+  'keeps dissolve %s background clocks, orientation and owned clone lifetime through GPU completion',
+  async (settings) => {
+    const f = fixture();
+    Object.assign(f.frame, { timestamp: 1_800_000 });
+    const animated: PreviewScene = {
+      ...scene,
+      background: {
+        enabled: true,
+        type: 'image',
+        assetId: 'bg',
+        imageFit: 'cover',
+        motion: { mode: 'drift', speed: 50, intensity: 50 },
+        layout: { padding: 0, cornerRadius: 0 },
+      },
+    };
+    const { reviewCutTransitionAt } = await import('../../features/video/review/cuts');
+    const blend = reviewCutTransitionAt(1.8, [
+      {
+        id: 'cut',
+        type: 'dissolve',
+        seam: 2,
+        before: 0.5,
+        after: 0.5,
+        left: { start: 0, end: 2 },
+        right: { start: 4, end: 6 },
+      },
+    ])!;
+    const clone = { timestamp: 4_000_000, close: vi.fn() } as unknown as VideoFrame;
+    const retained = {
+      timestamp: 4,
+      rotation: 90 as const,
+      flip: true,
+      draw: vi.fn(),
+      close: vi.fn(),
+      toVideoFrame: () => clone,
+    };
+    if (!animated.background.enabled) throw new Error('Expected background');
+    const changed: PreviewScene = {
+      ...animated,
+      background: { ...animated.background, layout: { ...animated.background.layout, blur: 1 } },
+    };
+    const sceneAt = vi.fn(async (resultTime: number, _sourceTime: number) =>
+      settings === 'changed' && resultTime === 2 ? changed : animated
+    );
+    let finish!: (value: typeof f.bitmap) => void;
+    io.render.mockImplementationOnce(async () => {
+      expect(clone.close).not.toHaveBeenCalled();
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
     });
-  });
-  const pending = f.owner.render({
-    ...f.input,
-    scene: animated,
-    sourceTime: 1.8,
-    geometry: reviewPresentedGeometry(animated, dimensions, 1.8),
-    sceneAt,
-    transition: { blend, frames: { left: { ...retained, timestamp: 1.9 }, right: retained } },
-  });
-  await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
-  expect(sceneAt.mock.calls.map((call) => call.slice(0, 2))).toEqual([
-    [1.8, 1.8],
-    [2, 4],
-  ]);
-  expect(f.input.painter.draw.mock.calls.map((call) => call[1].currentTime)).toEqual([1.8, 2]);
-  const orientations: unknown[] = [];
-  const visit = (layers: readonly { source: unknown; orientation?: unknown }[]) => {
-    for (const layer of layers) {
-      if (layer.orientation) orientations.push(layer.orientation);
-      if (
-        typeof layer.source === 'object' &&
-        layer.source !== null &&
-        'layers' in layer.source &&
-        Array.isArray(layer.source.layers)
-      )
-        visit(layer.source.layers);
+    const pending = f.owner.render({
+      ...f.input,
+      scene: animated,
+      sourceTime: 1.8,
+      geometry: reviewPresentedGeometry(animated, dimensions, 1.8),
+      sceneAt,
+      transition: { blend, frames: { left: { ...retained, timestamp: 1.9 }, right: retained } },
+    });
+    await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
+    expect(sceneAt.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      [1.8, 1.8],
+      [2, 4],
+    ]);
+    expect(f.input.painter.draw.mock.calls.map((call) => call[1].currentTime)).toEqual(
+      settings === 'shared' ? [1.8] : [1.8, 2]
+    );
+    const orientations: unknown[] = [];
+    const backgrounds: GpuPreviewLayer[] = [];
+    const visit = (layers: readonly GpuPreviewLayer[]) => {
+      for (const layer of layers) {
+        if (layer.orientation) orientations.push(layer.orientation);
+        if (layer.cache?.key === 'background') backgrounds.push(layer);
+        if ('kind' in layer.source && layer.source.kind === 'group') visit(layer.source.layers);
+      }
+    };
+    visit(io.render.mock.calls[0]![0].layers);
+    expect(orientations).toContainEqual({ rotation: 90, flip: true });
+    expect(backgrounds).toHaveLength(settings === 'shared' ? 2 : 1);
+    if (settings === 'shared') {
+      expect(backgrounds[0]!.source).toBe(backgrounds[1]!.source);
+      expect(backgrounds[0]!.cache).toEqual(backgrounds[1]!.cache);
     }
-  };
-  visit(io.render.mock.calls[0]![0].layers);
-  expect(orientations).toContainEqual({ rotation: 90, flip: true });
-  finish(f.bitmap);
-  expect(await pending).toBe(true);
-  expect(clone.close).toHaveBeenCalledOnce();
-  expect(retained.close).not.toHaveBeenCalled();
-  f.owner.dispose();
-});
+    expect(backgrounds.map((layer) => layer.rect)).toEqual(
+      (settings === 'shared' ? [1.8, 2] : [1.8]).map((time) =>
+        sceneBackgroundDriftRect(
+          evaluateSceneBackgroundMotion(animated.background.motion!, time),
+          dimensions.canonical.width,
+          dimensions.canonical.height
+        )
+      )
+    );
+    finish(f.bitmap);
+    expect(await pending).toBe(true);
+    expect(clone.close).toHaveBeenCalledOnce();
+    expect(retained.close).not.toHaveBeenCalled();
+    f.owner.dispose();
+  }
+);
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -1483,3 +1513,192 @@ it('waits for every direct publication hold before disposing the shared provider
   expect(io.dispose).toHaveBeenCalledOnce();
   expect(f.releaseOutput).toHaveBeenCalledTimes(2);
 });
+
+function capturedBackground(index: number) {
+  const pending = [...io.render.mock.calls[index]![0].layers];
+  while (pending.length) {
+    const layer = pending.pop()!;
+    if (layer.cache?.key === 'background') return layer;
+    if ('kind' in layer.source && layer.source.kind === 'group')
+      pending.push(...layer.source.layers);
+  }
+  throw new Error('Expected Gallery background');
+}
+
+it('retains Gallery drift paint while time and reverse seek update only GPU geometry', async () => {
+  const f = fixture();
+  const authored: PreviewScene = {
+    ...scene,
+    background: updateQuickEditBackground(scene.background, {
+      enabled: true,
+      type: 'image',
+      assetId: 'paint',
+      motion: { mode: 'drift', speed: 100, intensity: 100 },
+    }),
+  };
+  try {
+    for (const time of [1, 2, 1])
+      await f.owner.render({
+        ...f.input,
+        scene: authored,
+        geometry: reviewPresentedGeometry(authored, dimensions, time),
+        sourceTime: time,
+      });
+    expect(f.painters[0]!.draw).toHaveBeenCalledOnce();
+    const first = capturedBackground(0),
+      second = capturedBackground(1),
+      reverse = capturedBackground(2);
+    expect(second.source).toBe(first.source);
+    expect(second.cache).toEqual(first.cache);
+    expect(second.rect).not.toEqual(first.rect);
+    expect(reverse.rect).toEqual(first.rect);
+    expect(reverse.cache).toEqual(first.cache);
+  } finally {
+    f.owner.dispose();
+  }
+});
+
+it('keeps the existing bounded source density for retained Gallery drift at large output', async () => {
+  const f = fixture();
+  const authored: PreviewScene = {
+    ...scene,
+    background: updateQuickEditBackground(scene.background, {
+      enabled: true,
+      type: 'image',
+      assetId: 'paint',
+      motion: { mode: 'drift', speed: 100, intensity: 100 },
+    }),
+  };
+  const large = { canonical: { width: 640, height: 360 }, backing: { width: 4096, height: 2304 } };
+  try {
+    await f.owner.render({
+      ...f.input,
+      scene: authored,
+      dimensions: large,
+      geometry: reviewPresentedGeometry(authored, large, 2),
+    });
+    expect(f.allocate).toHaveBeenCalledWith('preview-gpu-background', {
+      width: 2048,
+      height: 1152,
+    });
+    const paint = f.painters[0]!.draw.mock.calls[0]![1];
+    expect(paint).toMatchObject({ width: 2048, height: 1152 });
+    expect('motion' in paint.background).toBe(false);
+    expect(io.render.mock.calls[0]![0].output).toEqual(large.backing);
+  } finally {
+    f.owner.dispose();
+  }
+});
+
+it.each(['glow', 'waves', 'blur'] as const)(
+  'keeps existing changing paint for Gallery setting %s',
+  async (setting) => {
+    const f = fixture();
+    const authored: PreviewScene = {
+      ...scene,
+      background: updateQuickEditBackground(scene.background, {
+        enabled: true,
+        type: 'image',
+        assetId: 'paint',
+        motion: { mode: setting === 'blur' ? 'drift' : setting, speed: 100, intensity: 100 },
+        ...(setting === 'blur' ? { layout: { padding: 0, cornerRadius: 0, blur: 1 } } : {}),
+      }),
+    };
+    try {
+      for (const time of [1, 2])
+        await f.owner.render({
+          ...f.input,
+          scene: authored,
+          geometry: reviewPresentedGeometry(authored, dimensions, time),
+        });
+      expect(f.painters[0]!.draw).toHaveBeenCalledTimes(2);
+      expect(f.painters[0]!.draw.mock.calls[0]![1].background.motion?.mode).toBe(
+        setting === 'blur' ? 'drift' : setting
+      );
+    } finally {
+      f.owner.dispose();
+    }
+  }
+);
+
+it.each(['speed', 'intensity'] as const)(
+  'keeps dormant Gallery drift exact with zero %s',
+  async (zero) => {
+    const f = fixture();
+    const authored: PreviewScene = {
+      ...scene,
+      background: updateQuickEditBackground(scene.background, {
+        enabled: true,
+        type: 'image',
+        assetId: 'paint',
+        motion: {
+          mode: 'drift',
+          speed: zero === 'speed' ? 0 : 100,
+          intensity: zero === 'intensity' ? 0 : 100,
+        },
+      }),
+    };
+    try {
+      for (const time of [1, 2])
+        await f.owner.render({
+          ...f.input,
+          scene: authored,
+          geometry: reviewPresentedGeometry(authored, dimensions, time),
+        });
+      expect(f.painters[0]!.draw).toHaveBeenCalledOnce();
+      expect(capturedBackground(0).rect).toEqual({ x: 0, y: 0, ...dimensions.canonical });
+      expect(capturedBackground(1).rect).toEqual(capturedBackground(0).rect);
+      expect(capturedBackground(1).cache).toEqual(capturedBackground(0).cache);
+      expect(capturedBackground(1).clip).toBeUndefined();
+    } finally {
+      f.owner.dispose();
+    }
+  }
+);
+
+it.each(['paint', 'image', 'dimensions'] as const)(
+  'invalidates Gallery drift base after %s changes',
+  async (change) => {
+    const f = fixture();
+    const authored: PreviewScene = {
+      ...scene,
+      background: updateQuickEditBackground(scene.background, {
+        enabled: true,
+        type: 'image',
+        assetId: 'paint',
+        motion: { mode: 'drift', speed: 100, intensity: 100 },
+      }),
+    };
+    try {
+      await f.owner.render({
+        ...f.input,
+        scene: authored,
+        geometry: reviewPresentedGeometry(authored, dimensions, 1),
+      });
+      const first = capturedBackground(0);
+      const nextScene: PreviewScene =
+        change === 'paint'
+          ? {
+              ...authored,
+              background: updateQuickEditBackground(authored.background, { type: 'gradient' }),
+            }
+          : authored;
+      const nextDimensions =
+        change === 'dimensions'
+          ? { ...dimensions, backing: { width: 640, height: 360 } }
+          : dimensions;
+      await f.owner.render({
+        ...f.input,
+        scene: nextScene,
+        dimensions: nextDimensions,
+        geometry: reviewPresentedGeometry(nextScene, nextDimensions, 2),
+        ...(change === 'image'
+          ? { image: { width: 640, height: 360, close: vi.fn() } as unknown as ImageBitmap }
+          : {}),
+      });
+      expect(capturedBackground(1).cache).not.toEqual(first.cache);
+    } finally {
+      f.owner.dispose();
+    }
+  }
+);

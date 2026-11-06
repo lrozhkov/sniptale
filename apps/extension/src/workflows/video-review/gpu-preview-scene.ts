@@ -6,7 +6,11 @@ import type { QuickEditHomography } from '../../features/video/composition/motio
 import { computeQuickEditSceneCamera } from '../../features/video/review/advanced/scene';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import { quickEditMotionBlurCameras } from '../../features/video/review/advanced/motion-blur';
-import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
+import {
+  evaluateSceneBackgroundMotion,
+  hasSceneBackgroundMotion,
+  sceneBackgroundDriftRect,
+} from '../../features/video/project/scene/background-motion';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
 import type { createReviewBackgroundPainter } from './scene-background';
 import {
@@ -21,6 +25,17 @@ import {
   type ReviewPresentedGeometry,
 } from './gpu-preview-geometry';
 const identity: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+/** Admit a retained base only when drift is the sole time-dependent paint operation. */
+export function reviewGpuStaticBackgroundDrift(background: PreviewScene['background']) {
+  return background.enabled &&
+    background.type !== 'solid' &&
+    (background.layout.blur ?? 0) === 0 &&
+    background.motion?.mode === 'drift' &&
+    hasSceneBackgroundMotion(background.motion)
+    ? background.motion
+    : null;
+}
 
 /** Build one borrowed endpoint scene; the caller owns frames, primitives and GPU publication. */
 export async function buildReviewGpuScene(args: {
@@ -38,6 +53,8 @@ export async function buildReviewGpuScene(args: {
     decoration: HTMLCanvasElement;
     rect: { x: number; y: number; width: number; height: number };
     backgroundRevision: number;
+    retainedDrift: boolean;
+    backgroundSettings: PreviewScene['background'];
     decorationRevision: object;
   }>;
   painter: ReturnType<typeof createReviewBackgroundPainter>;
@@ -92,11 +109,16 @@ export async function buildReviewGpuScene(args: {
           0,
           1,
         ];
+  const drift =
+    artwork.retainedDrift && artwork.backgroundSettings === currentScene.background
+      ? reviewGpuStaticBackgroundDrift(currentScene.background)
+      : null;
   const animatedEndpoint =
     currentScene.background.enabled &&
     hasSceneBackgroundMotion(currentScene.background.motion) &&
     currentGeometry.resultTime !== resultTime;
-  const endpointBackground = animatedEndpoint
+  const needsEndpointPaint = !drift && (animatedEndpoint || artwork.retainedDrift);
+  const endpointBackground = needsEndpointPaint
     ? primitives.raster('preview-gpu-transition-background', dimensions.backing, (context) => {
         const bgScale =
           dimensions.backing.width / (currentScene.canvas?.width ?? currentScene.source.width);
@@ -120,9 +142,16 @@ export async function buildReviewGpuScene(args: {
     : artwork.background;
   const bg: GpuPreviewLayer = {
     source: endpointBackground,
-    rect: full,
+    rect: drift
+      ? sceneBackgroundDriftRect(
+          evaluateSceneBackgroundMotion(drift, currentGeometry.resultTime),
+          dimensions.canonical.width,
+          dimensions.canonical.height
+        )
+      : full,
     inverse: bgInverse,
-    ...(animatedEndpoint
+    ...(drift ? { clip: { rect: full, radius: 0, shape: 'hard-rect' as const } } : {}),
+    ...(needsEndpointPaint
       ? {}
       : { cache: { key: 'background', revision: artwork.backgroundRevision } }),
   };
