@@ -175,15 +175,15 @@ function joinRawStrokeStacks(lines) {
       }
     }
 }
-function projectRawLines(image, lines) {
+function projectRawLines(image, lines, narrow = false) {
   const { width: w, height: h } = image;
   return lines
     .filter(
       (p) =>
-        p.w >= 6 &&
+        (narrow ? p.w >= 2 && p.w <= p.h * 0.55 : p.w >= 6) &&
         p.h >= 1 &&
         p.n >= 5 &&
-        p.w >= p.h * 0.3 &&
+        p.w >= p.h * (narrow ? 0.15 : 0.3) &&
         (p.count >= 2 || p.w <= 100) &&
         (p.n / (p.w * p.h) < 0.95 || p.h <= 3 || p.w <= 3)
     )
@@ -223,8 +223,11 @@ export function computeRaw(image, detail, brightPass, tileSize, scratch, backgro
   joinRawStrokeStacks(lines);
   const result = projectRawLines(image, lines);
   result.decorations = decorations;
+  // A narrow proposal must not protect pixels before text-flow admission.
+  result.narrow = projectRawLines(image, lines, true);
   if (brightPass) return result;
   const extra = detectRaw(image, detail, true, tileSize, scratch, backgrounds);
+  result.narrow.push(...(extra.narrow || []));
   for (const b of extra) {
     const duplicate = result.some((a) => {
       const iw = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)),

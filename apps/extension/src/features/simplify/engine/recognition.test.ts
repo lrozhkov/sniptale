@@ -83,6 +83,46 @@ it('does not borrow white text interiors to accept a saturated graphic', () => {
   expect(uncertainColorTexture(source, text)).toBe(true);
 });
 
+function subpixelGlyph(source: SimplifyPixelSource, left: number, reverse = false) {
+  const rows = ['101010', '101010', '101010', '111110', '101010', '101010', '101010'];
+  const sample = (x: number, y: number) => (x >= 0 && x < 6 && rows[y]![x] === '1' ? 220 : 0);
+  for (let y = 0; y < rows.length; y++)
+    for (let x = -1; x <= 6; x++) {
+      const red = sample(x - 1, y),
+        blue = sample(x, y);
+      const channels = reverse ? [blue, (red + blue) / 2, red] : [red, (red + blue) / 2, blue];
+      mark(
+        source,
+        left + x,
+        y + 4,
+        channels.map((v, c) => v + background[c]!)
+      );
+    }
+}
+
+it.each([false, true])(
+  'accepts independent same-phase subpixel glyphs (reversed: %s)',
+  (reverse) => {
+    const source = image(100, 20, background);
+    for (const left of [10, 30, 50]) subpixelGlyph(source, left, reverse);
+    expect(uncertainColorTexture(source, text)).toBe(false);
+  }
+);
+
+it('keeps an interpolated-color graphic uncertain without independent same-phase witnesses', () => {
+  const source = image(100, 20, background);
+  subpixelGlyph(source, 10);
+  expect(uncertainColorTexture(source, text)).toBe(true);
+});
+
+it('does not use opposite-phase glyphs as witnesses', () => {
+  const source = image(100, 20, background);
+  subpixelGlyph(source, 10);
+  subpixelGlyph(source, 30, true);
+  subpixelGlyph(source, 50, true);
+  expect(uncertainColorTexture(source, text)).toBe(true);
+});
+
 beforeEach(() => {
   media.surfaces = [];
   media.graphics = [];

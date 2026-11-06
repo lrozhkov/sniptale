@@ -96,9 +96,81 @@ export function uncertainColorTexture(image, box) {
         sharedInks.set(key, sharedTextInteriors(image, box, components, ink));
       if (sharedInks.get(key)) continue;
     }
+    if (subpixelTextEvidence(image, box, { left, right, top, bottom })) continue;
     return true;
   }
   return false;
+}
+
+// Horizontal subpixel fringes repeat one channel phase across independent glyphs.
+function subpixelTextEvidence(image, box, target) {
+  const w = box.w,
+    h = box.h,
+    mask = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = ((box.y + y) * image.width + box.x + x) * 4;
+      if (image.data[i + 3] >= 128 && box.bg.some((v, c) => Math.abs(image.data[i + c] - v) > 40))
+        mask[y * w + x] = 1;
+    }
+  const phase = subpixelPhase(image, box, target);
+  if (!phase) return false;
+  let witnesses = 0;
+  for (let k = 0; k < mask.length; k++) {
+    if (!mask[k]) continue;
+    const part = textureComponent(mask, w, h, k);
+    const cw = part.right - part.left + 1,
+      ch = part.bottom - part.top + 1;
+    if (
+      cw < box.typeMetrics.xHeight * 0.8 ||
+      cw > box.typeMetrics.xHeight * 2.5 ||
+      ch < box.typeMetrics.xHeight * 0.7 ||
+      ch > box.typeMetrics.xHeight * 2.5 ||
+      !(
+        part.right < target.left ||
+        part.left > target.right ||
+        part.bottom < target.top ||
+        part.top > target.bottom
+      )
+    )
+      continue;
+    if (subpixelPhase(image, box, part) === phase && ++witnesses >= 2) return true;
+  }
+  return false;
+}
+
+function subpixelPhase(image, box, part) {
+  let error = 0,
+    energy = 0;
+  const dots = [0, 0, 0],
+    redEnergy = [0, 0, 0],
+    blueEnergy = [0, 0, 0];
+  const at = (x, y, c) => {
+    if (x < 0 || x >= box.w) return 0;
+    const i = ((box.y + y) * image.width + box.x + x) * 4;
+    return Math.max(0, image.data[i + c] - box.bg[c]);
+  };
+  for (let y = part.top; y <= part.bottom; y++)
+    for (let x = Math.max(0, part.left - 1); x <= Math.min(box.w - 1, part.right + 1); x++) {
+      const r = at(x, y, 0),
+        g = at(x, y, 1),
+        b = at(x, y, 2);
+      error += Math.abs(g - (r + b) / 2);
+      energy += g;
+      for (let d = -1; d <= 1; d++) {
+        const v = at(x + d, y, 2),
+          j = d + 1;
+        dots[j] += r * v;
+        redEnergy[j] += r * r;
+        blueEnergy[j] += v * v;
+      }
+    }
+  if (!energy || error > energy * 0.2) return 0;
+  const scores = dots.map((v, j) => v / Math.sqrt(redEnergy[j] * blueEnergy[j] || 1));
+  if (scores[0] >= 0.85 && scores[0] >= scores[1] + 0.08 && scores[0] >= scores[2] + 0.08)
+    return -1;
+  if (scores[2] >= 0.85 && scores[2] >= scores[1] + 0.08 && scores[2] >= scores[0] + 0.08) return 1;
+  return 0;
 }
 
 export function iconRowDots(image, box, input, protectedRects) {

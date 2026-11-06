@@ -512,7 +512,8 @@ export function buildCatalog(image, detectRaw, glyphMetrics) {
     media.some((m) => b.x < m.x + m.w && b.x + b.w > m.x && b.y < m.y + m.h && b.y + b.h > m.y);
   const analysisImage = prepareAnalysisImage(image, media, controls, touchesMedia);
   const primaryRaw = detectRaw(analysisImage, 55, false, 32, scratch, backgrounds);
-  const alternate = detectRaw(analysisImage, 55, false, 16, scratch, backgrounds).filter(
+  const alternateRaw = detectRaw(analysisImage, 55, false, 16, scratch, backgrounds);
+  const alternate = alternateRaw.filter(
     (box) =>
       box.componentCount >= 3 && box.w / box.h >= 2 && surfaceEvidence(image, box).background >= 0.5
   );
@@ -603,7 +604,9 @@ export function buildCatalog(image, detectRaw, glyphMetrics) {
     catalog,
     glyphMetrics,
     sampleBackground,
-    controls.protected
+    controls.protected,
+    controls.boundaries,
+    [...(primaryRaw.narrow || []), ...(alternateRaw.narrow || []), ...(faintRaw.narrow || [])]
   );
   controls.protected = resolveOutlineClaims(image, catalog, controls.protected, sampleBackground);
   controls.protected.push(...findTextFrames(image, catalog));

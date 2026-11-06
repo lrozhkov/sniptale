@@ -16,6 +16,7 @@ import {
   separateBoundaryDirection,
   resolveRepeatedInlineGraphics,
   completeIconSupport,
+  claimCaptionedFigures,
 } from './ownership-icons.mjs';
 import { resolveEnclosedSymbols } from './enclosed-symbols.mjs';
 import { rejectPlanarMedia } from './planar-surfaces.mjs';
@@ -144,7 +145,15 @@ const contains = (a, b, pad = 0) =>
   b.y + b.h <= a.y + a.h + pad;
 
 /** Resolve leaf ink ownership after proposal classification, on original pixels. */
-export function resolveForegroundClaims(image, input, measure, background, protectedRects = []) {
+export function resolveForegroundClaims(
+  image,
+  input,
+  measure,
+  background,
+  protectedRects = [],
+  boundaries = [],
+  narrow = []
+) {
   // A strip detector can mistake texture above a caption for clipped glyphs.
   // Arbitrate against the independent uncertain owner before attaching erasure.
   // Remove only the weak proposal; do not enlarge the uncertain owner.
@@ -168,6 +177,7 @@ export function resolveForegroundClaims(image, input, measure, background, prote
   boxes = separateBoundaryDirection(image, boxes, measure);
   boxes = recoverClippedInlineGlyphs(image, boxes, measure);
   boxes = resolveRepeatedInlineGraphics(image, boxes, measure);
+  boxes = recoverRepeatedLineGlyphs(image, boxes, measure, protectedRects, boundaries, narrow);
   boxes = recoverSingleGlyphRows(image, boxes, measure);
   boxes = recoverRepeatedNumericText(image, boxes, measure);
   boxes = recoverWeakMediaText(image, boxes, measure, protectedRects);
@@ -181,6 +191,7 @@ export function resolveForegroundClaims(image, input, measure, background, prote
   boxes.push(...owners);
   const decorated = resolveDecorativeLockups(image, boxes, background);
   boxes = mergeRecoveredTextRows(image, decorated, measure, protectedRects);
+  boxes = claimCaptionedFigures(image, boxes, protectedRects, boundaries);
   return completeIconSupport(image, boxes).map((b) => attachEraseSupport(image, b));
 }
 
@@ -298,6 +309,187 @@ export function resolveOutlineClaims(image, boxes, states, background) {
     }
     return true;
   });
+}
+
+function narrowTextCandidates(image, input, measure, narrow, overlaps) {
+  const extra = [],
+    extraMetric = new Map(),
+    seen = new Set();
+  for (const b of narrow) {
+    if (input.some((q) => contains(q, b))) continue;
+    const candidate = { ...b, shape: 'unknown' },
+      m = measure(image, { ...(b.sourceBounds || b), bg: b.bg }, 1),
+      g = m?.glyphBounds;
+    if (!g || m.glyphs !== 1 || input.some((q) => overlaps(q, g))) continue;
+    const key = `${g.x},${g.y},${g.w},${g.h}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    extra.push(candidate);
+    extraMetric.set(candidate, m);
+  }
+  return { extra, extraMetric };
+}
+
+function sameGlyphRaster(image, metric, a, b) {
+  const ga = metric.get(a)?.glyphBounds,
+    gb = metric.get(b)?.glyphBounds;
+  if (!ga || !gb || ga.w !== gb.w || ga.h !== gb.h) return false;
+  let error = 0;
+  for (let y = 0; y < ga.h; y++)
+    for (let x = 0; x < ga.w; x++) {
+      const ia = ((ga.y + y) * image.width + ga.x + x) * 4,
+        ib = ((gb.y + y) * image.width + gb.x + x) * 4;
+      for (let c = 0; c < 3; c++) error += Math.abs(image.data[ia + c] - image.data[ib + c]);
+    }
+  return error / (ga.w * ga.h * 3) <= 8;
+}
+
+function textFlowOpening(image, row, box, metric, measure) {
+  const tolerance = Math.max(3, metric.stroke * 2);
+  if (Math.abs(row.x - box.x) <= tolerance) return row;
+  if (row.x < box.x - tolerance) return null;
+  const region = { ...row, x: box.x, w: row.x + row.w - box.x };
+  const m = measure(image, region);
+  if (
+    !m ||
+    m.glyphs < 5 ||
+    m.baselineAgreement < 0.8 ||
+    m.heightAgreement < 0.8 ||
+    m.foregroundCoverage < 0.9 ||
+    Math.abs(m.glyphBounds.x - box.x) > tolerance ||
+    m.stroke / metric.stroke < 0.7 ||
+    m.stroke / metric.stroke > 1.4
+  )
+    return null;
+  return { ...region, typeMetrics: m };
+}
+
+function recoverRepeatedLineGlyphs(image, input, measure, protectedRects, boundaries, narrow) {
+  const overlaps = (a, b) =>
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  const { extra, extraMetric } = narrowTextCandidates(image, input, measure, narrow, overlaps);
+  const all = [...input, ...extra];
+  const textHeight = Math.max(
+    0,
+    ...input
+      .filter((b) => b.shape === 'text' && b.textConfidence)
+      .map((b) => b.typeMetrics?.upperHeight || b.typeMetrics?.glyphBounds?.h || 0)
+  );
+  const candidates = all.filter(
+    (b) =>
+      b.shape === 'unknown' &&
+      !b.roleEvidence &&
+      b.w <= textHeight &&
+      b.h <= textHeight * 2 &&
+      !protectedRects.some((q) => overlaps(q, b))
+  );
+  const metric = new Map(
+    candidates.map((b) => [
+      b,
+      extraMetric.get(b) || measure(image, { ...(b.sourceBounds || b), bg: b.bg }, 1),
+    ])
+  );
+  const context = (box) => {
+    const m = metric.get(box),
+      glyph = m?.glyphBounds;
+    if (
+      !glyph ||
+      m.glyphs !== 1 ||
+      m.foregroundCoverage < 0.9 ||
+      m.stroke / m.xHeight > 0.4 ||
+      glyph.w > glyph.h * 0.55
+    )
+      return box;
+    const rows = input
+      .filter((q) => {
+        const t = q.typeMetrics;
+        return (
+          q.shape === 'text' &&
+          q.textConfidence &&
+          t?.glyphs >= 5 &&
+          q.y < box.y &&
+          q.x >= box.x - m.xHeight &&
+          q.x <= box.x + m.xHeight * 4 &&
+          t.stroke / m.stroke >= 0.7 &&
+          t.stroke / m.stroke <= 1.4 &&
+          glyph.h >= t.xHeight &&
+          glyph.h <= t.xHeight * 2
+        );
+      })
+      .sort((a, b) => b.y - a.y);
+    const first = rows[0];
+    if (!first) return box;
+    const pitch = box.y - first.y;
+    if (pitch < glyph.h || pitch > glyph.h * 2.5) return box;
+    const color = (b) =>
+      inkParts(image, { ...b, atoms: null })
+        .filter((p) => p.h >= Math.min(glyph.h, b.typeMetrics?.xHeight || glyph.h) * 0.7)
+        .map((p) => p.rgb);
+    const own = color(box)[0];
+    const indentTolerance = Math.max(3, m.stroke * 2);
+    if (!own || first.x < box.x + indentTolerance) return box;
+    const chain = [first];
+    let opening = null;
+    for (let line = 2; line <= 9; line++) {
+      const next = rows.find(
+        (q) => Math.abs(box.y - q.y - pitch * line) <= Math.max(3, pitch * 0.2)
+      );
+      if (!next) break;
+      const openingRow =
+        chain.length >= 2 && Math.max(...next.bg.map((v, c) => Math.abs(v - box.bg[c]))) <= 8
+          ? textFlowOpening(image, next, box, m, measure)
+          : null;
+      if (
+        openingRow &&
+        color(openingRow).some((p) => Math.max(...p.map((v, c) => Math.abs(v - own[c]))) <= 32)
+      ) {
+        opening = openingRow;
+        break;
+      }
+      if (Math.abs(next.x - first.x) > indentTolerance) break;
+      chain.push(next);
+    }
+    if (
+      !opening ||
+      boundaries.some((f) => overlaps(f, box) && [...chain, opening].some((q) => !contains(f, q)))
+    )
+      return box;
+    return first;
+  };
+  const supported = new Map(
+    candidates.map((b) => [b, context(b)]).filter(([, row]) => row && row.shape === 'text')
+  );
+  return all
+    .map((box) => {
+      const first = supported.get(box);
+      if (
+        !first ||
+        ![...supported.keys()].some(
+          (q) =>
+            q !== box &&
+            Math.abs(q.x - box.x) <= 2 &&
+            Math.abs(q.y - box.y) > box.h * 2 &&
+            sameGlyphRaster(image, metric, box, q)
+        )
+      )
+        return box;
+      const m = metric.get(box);
+      const result = {
+        ...box,
+        shape: 'text',
+        kind: 'row-text',
+        roleEvidence: 'text-row',
+        typeMetrics: m,
+        textConfidence: true,
+        contrast: m.foregroundContrast,
+        textSize: first.textSize,
+        textCenterY: box.y + box.h / 2,
+      };
+      delete result.sourceBounds;
+      delete result.iconSize;
+      return result;
+    })
+    .filter((b) => input.includes(b) || !extra.includes(b) || b.shape === 'text');
 }
 
 function recoverSingleGlyphRows(image, input, measure) {
