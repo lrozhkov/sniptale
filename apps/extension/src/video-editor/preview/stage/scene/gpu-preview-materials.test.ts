@@ -57,7 +57,7 @@ it('replaces idle coverage atomically and advances persistent revisions', () => 
   const second = f.materials.sourceMask(document, f.bounds, 'second', f.paint);
   expect(second.layer.source).not.toBe(first.layer.source);
   expect(canvas(first.layer).width).toBe(0);
-  expect(Number(second.layer.cache?.revision)).toBeGreaterThan(Number(first.layer.cache?.revision));
+  expect(second.layer.cache?.revision).not.toBe(first.layer.cache?.revision);
   second.release();
 });
 it('keeps the completed idle entry when replacement painting fails', () => {
@@ -141,4 +141,24 @@ it('clears a failed allocation without losing completed idle coverage', () => {
   const hit = f.materials.sourceMask(document, f.bounds, 'first', f.paint);
   expect(hit.layer.source).toBe(first.layer.source);
   hit.release();
+});
+
+it('retains source decoration independently from coverage and drains both borrowed materials', () => {
+  const f = fixture();
+  const mask = f.materials.sourceMask(document, f.bounds, 'geometry', f.paint);
+  const first = f.materials.sourceDecoration(document, f.bounds, 'geometry', f.paint);
+  const second = f.materials.sourceDecoration(document, f.bounds, 'geometry', f.paint);
+  expect(first.layer.source).not.toBe(mask.layer.source);
+  expect(second.layer.source).toBe(first.layer.source);
+  expect(second.layer.cache?.revision).toBe(first.layer.cache?.revision);
+  expect(first.layer.cache?.key).toBe('native-source-decoration');
+  expect(f.paint).toHaveBeenCalledTimes(2);
+  f.materials.dispose();
+  expect(canvas(first.layer).width).toBe(32);
+  mask.release();
+  first.release();
+  expect(canvas(first.layer).width).toBe(32);
+  second.release();
+  expect(canvas(first.layer).width).toBe(0);
+  expect(canvas(mask.layer).width).toBe(0);
 });

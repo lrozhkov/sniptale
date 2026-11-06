@@ -12,7 +12,7 @@ import { roundedWindowRadius } from '../../../../features/video/project/window-g
 import {
   buildNativeGpuVideoLayers,
   type NativeGpuVideoSourceBody,
-  type NativeGpuSourceMask,
+  type NativeGpuSourceMaterial,
 } from './gpu-preview-video';
 import type {
   GpuPreviewGroup,
@@ -101,7 +101,9 @@ function integerArtworkBounds(bounds: GpuPreviewLayer['rect'] | null) {
 
 /** Describes ordered GPU work; vector artwork and alpha masks never read back video pixels. */
 export async function buildNativeGpuPreviewLayers(args: {
-  sourceMask?: NativeGpuSourceMask;
+  sourceMask?: NativeGpuSourceMaterial;
+  sourceDecoration?: NativeGpuSourceMaterial;
+  annotationMask?: NativeGpuSourceMaterial;
   snapshotGroup?: (group: GpuPreviewGroup) => Promise<ImageBitmap>;
   inputComposition?: EffectRuntimeInputComposition;
   input: Input;
@@ -448,6 +450,15 @@ export async function buildNativeGpuPreviewLayers(args: {
             },
           }
         : {}),
+      ...(args.sourceDecoration
+        ? {
+            sourceDecoration: (key: string, paint: (context: CanvasRenderingContext2D) => void) => {
+              const lease = args.sourceDecoration!(input.canvas.ownerDocument, plane, key, paint);
+              retained.push(lease);
+              return lease.layer;
+            },
+          }
+        : {}),
       raster,
       groupLayer,
       spotlight,
@@ -515,7 +526,7 @@ export async function buildNativeGpuPreviewLayers(args: {
             const ownerInverse = invertQuickEditProjection(layerProjection(owner));
             if (!inverse || !ownerInverse)
               throw new Error('Attached effect projection is unavailable.');
-            const mask = raster((context) => {
+            const paintCoverage = (context: CanvasRenderingContext2D) => {
               context.fillStyle = '#fff';
               context.beginPath();
               context.roundRect(
@@ -536,7 +547,20 @@ export async function buildNativeGpuPreviewLayers(args: {
                   crop.height * content.height
                 );
               }
-            }, true);
+            };
+            const coverageKey = JSON.stringify([
+              window,
+              mapping.windowCornerRadius ?? 0,
+              mapping.sourceCrop ? [mapping.sourceCrop, content] : null,
+            ]);
+            const coverage = args.annotationMask?.(
+              input.canvas.ownerDocument,
+              plane,
+              coverageKey,
+              paintCoverage
+            );
+            if (coverage) retained.push(coverage);
+            const mask = coverage?.layer ?? raster(paintCoverage, true);
             body = [
               {
                 ...groupLayer(

@@ -60,6 +60,9 @@ function fixture(maximumInFlight: 1 | 2 = 1) {
   const released = vi.fn();
   const ctx = () => ({
     translate: vi.fn(),
+    beginPath: vi.fn(),
+    roundRect: vi.fn(),
+    fill: vi.fn(),
     clearRect: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
@@ -991,7 +994,7 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
-function borrowedAnnotations() {
+function borrowedAnnotations(attachment: 'viewport' | 'content' = 'viewport') {
   let active = false;
   const bitmaps: Array<{ width: number; height: number; close: ReturnType<typeof vi.fn> }> = [];
   const render = vi.fn(async (_time: number) => {
@@ -1011,7 +1014,7 @@ function borrowedAnnotations() {
       entries: [
         {
           instance: {
-            attachment: 'viewport',
+            attachment,
             transform: { x: 0.2, y: 0.3, width: 0.3, height: 0.2, rotation: 0.3 },
           },
           bitmap,
@@ -1702,3 +1705,37 @@ it.each(['paint', 'image', 'dimensions'] as const)(
     }
   }
 );
+
+it('retains content annotation coverage pixels and revision between completed frames', async () => {
+  const f = fixture();
+  const annotation = borrowedAnnotations('content');
+  const input = { ...f.input, annotations: annotation.annotations };
+  const coverage = (
+    layers: readonly GpuPreviewLayer[]
+  ): NonNullable<GpuPreviewLayer['operationClip']> => {
+    const pending = [...layers];
+    while (pending.length) {
+      const layer = pending.pop()!;
+      if (layer.operationClip) return layer.operationClip;
+      if ('kind' in layer.source && layer.source.kind === 'group')
+        pending.push(...layer.source.layers);
+    }
+    throw new Error('Expected content annotation coverage.');
+  };
+  await f.owner.render(input);
+  const first = coverage(io.render.mock.calls[0]![0].layers);
+  await f.owner.render({
+    ...input,
+    sourceTime: 2.1,
+    geometry: reviewPresentedGeometry(scene, dimensions, 2.1),
+  });
+  const second = coverage(io.render.mock.calls[1]![0].layers);
+  expect(second.source).toBe(first.source);
+  expect(second.cache?.revision).toBe(first.cache?.revision);
+  expect(
+    f.allocate.mock.calls.filter(([role]) => role === 'preview-gpu-annotation-mask')
+  ).toHaveLength(1);
+  expect(annotation.bitmaps).toHaveLength(2);
+  expect(annotation.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
+  f.owner.dispose();
+});

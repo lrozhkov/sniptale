@@ -1,3 +1,4 @@
+import { createRetainedRasterMaterialOwner } from '../../../../features/video/composition/canvas/retained-raster-material';
 import {
   type GpuPreviewLayer,
   type GpuPreviewGroup,
@@ -407,96 +408,45 @@ function decorationLayer(
   };
 }
 
-interface RetainedSourceMask {
-  raster: RetainedRaster;
-  ownerDocument: Document;
-  bounds: GpuPreviewLayer['rect'];
-  borrowers: number;
-  retired: boolean;
-}
-
-function createSourceMaskMaterials() {
-  let sourceMask: RetainedSourceMask | null = null;
-  let sourceMaskRevision = 0;
-  let disposed = false;
-  const retireSourceMask = (entry: RetainedSourceMask) => {
-    entry.retired = true;
-    if (entry.borrowers === 0) entry.raster.canvas.width = entry.raster.canvas.height = 0;
-  };
-  const borrowSourceMask = (entry: RetainedSourceMask, cached: boolean) => {
-    entry.borrowers++;
-    let released = false;
-    return {
-      layer: {
-        source: entry.raster.canvas,
-        rect: { ...entry.bounds },
-        inverse: IDENTITY,
-        ...(cached
-          ? { cache: { key: 'native-source-mask', revision: entry.raster.revision } }
-          : {}),
-      } satisfies GpuPreviewLayer,
-      release() {
-        if (released) return;
-        released = true;
-        entry.borrowers--;
-        if (entry.retired && entry.borrowers === 0)
-          entry.raster.canvas.width = entry.raster.canvas.height = 0;
-      },
-    };
-  };
+/** Adapt the shared immutable-value lease to canonical Native source-plane artwork. */
+function createSourceMaterials(cacheKey: string) {
+  const owner = createRetainedRasterMaterialOwner<HTMLCanvasElement>();
   return {
-    sourceMask(
+    acquire(
       ownerDocument: Document,
       bounds: GpuPreviewLayer['rect'],
       key: string,
       paint: (context: CanvasRenderingContext2D) => void
     ) {
-      if (disposed) throw new Error('Source mask materials are disposed.');
-      const previous = sourceMask;
-      if (
-        previous &&
-        previous.ownerDocument === ownerDocument &&
-        previous.raster.key === key &&
-        previous.bounds.x === bounds.x &&
-        previous.bounds.y === bounds.y &&
-        previous.bounds.width === bounds.width &&
-        previous.bounds.height === bounds.height
-      )
-        return borrowSourceMask(previous, true);
-      const raster = createRaster(ownerDocument);
-      const entry: RetainedSourceMask = {
-        raster,
-        ownerDocument,
-        bounds: { ...bounds },
-        borrowers: 0,
-        retired: false,
+      const material = owner.borrow(ownerDocument, JSON.stringify([bounds, key]), () => {
+        const raster = createRaster(ownerDocument);
+        try {
+          raster.canvas.width = bounds.width;
+          raster.canvas.height = bounds.height;
+          raster.context.translate(-bounds.x, -bounds.y);
+          paint(raster.context);
+          return {
+            value: raster.canvas,
+            release() {
+              raster.canvas.width = raster.canvas.height = 0;
+            },
+          };
+        } catch (error) {
+          raster.canvas.width = raster.canvas.height = 0;
+          throw error;
+        }
+      });
+      return {
+        layer: {
+          source: material.value,
+          rect: { ...bounds },
+          inverse: IDENTITY,
+          ...(material.revision ? { cache: { key: cacheKey, revision: material.revision } } : {}),
+        } satisfies GpuPreviewLayer,
+        release: () => material.release(),
       };
-      try {
-        raster.canvas.width = bounds.width;
-        raster.canvas.height = bounds.height;
-        raster.context.translate(-bounds.x, -bounds.y);
-        paint(raster.context);
-        if (disposed) throw new Error('Source mask materials are disposed.');
-      } catch (error) {
-        retireSourceMask(entry);
-        throw error;
-      }
-      if (previous && previous.borrowers > 0) {
-        entry.retired = true;
-        return borrowSourceMask(entry, false);
-      }
-      raster.key = key;
-      raster.revision = ++sourceMaskRevision;
-      sourceMask = entry;
-      if (previous) retireSourceMask(previous);
-      return borrowSourceMask(entry, true);
     },
-    dispose() {
-      if (disposed) return;
-      disposed = true;
-      if (sourceMask) retireSourceMask(sourceMask);
-      sourceMask = null;
-    },
+    dispose: () => owner.dispose(),
   };
 }
 
@@ -507,9 +457,13 @@ export function createNativeGpuPreviewMaterials() {
   let header: RetainedRaster | null = null;
   let presentationBackground: RetainedRaster | null = null;
   let depthPlan: RetainedDepthPlan | null = null;
-  const sourceMaskMaterials = createSourceMaskMaterials();
+  const sourceMaskMaterials = createSourceMaterials('native-source-mask');
+  const sourceDecorationMaterials = createSourceMaterials('native-source-decoration');
+  const annotationMaskMaterials = createSourceMaterials('native-annotation-mask');
   return {
-    sourceMask: sourceMaskMaterials.sourceMask,
+    sourceMask: sourceMaskMaterials.acquire,
+    sourceDecoration: sourceDecorationMaterials.acquire,
+    annotationMask: annotationMaskMaterials.acquire,
     background(
       input: Input,
       passes: Passes,
@@ -616,6 +570,8 @@ export function createNativeGpuPreviewMaterials() {
     },
     dispose() {
       sourceMaskMaterials.dispose();
+      sourceDecorationMaterials.dispose();
+      annotationMaskMaterials.dispose();
       depthPlan?.plan.release();
       depthPlan = null;
       for (const raster of [background, decoration, header, presentationBackground])

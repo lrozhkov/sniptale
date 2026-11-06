@@ -1,3 +1,4 @@
+import type { RetainedRasterMaterialLease } from '../../features/video/composition/canvas/retained-raster-material';
 import type {
   GpuPreviewGroup,
   GpuPreviewLayer,
@@ -63,7 +64,15 @@ export interface ReviewGpuCamera {
 }
 
 /** Raster primitives are tracked by the existing ledger and never read source video pixels. */
-export function createReviewGpuPrimitives(resources: RenderResources) {
+export function createReviewGpuPrimitives(
+  resources: RenderResources,
+  acquireMaterial?: (
+    role: string,
+    key: string,
+    size: Size,
+    paint: (context: CanvasRenderingContext2D) => void
+  ) => RetainedRasterMaterialLease<HTMLCanvasElement>
+) {
   const leases: { release(): void }[] = [];
   const raster = (role: string, size: Size, draw: (context: CanvasRenderingContext2D) => void) => {
     const lease = resources.canvas(role, {
@@ -76,6 +85,17 @@ export function createReviewGpuPrimitives(resources: RenderResources) {
   };
   return {
     raster,
+    material(
+      role: string,
+      key: string,
+      size: Size,
+      paint: (context: CanvasRenderingContext2D) => void
+    ) {
+      if (!acquireMaterial) return { source: raster(role, size, paint), revision: {} };
+      const material = acquireMaterial(role, key, size, paint);
+      leases.push(material);
+      return { source: material.value, revision: material.revision };
+    },
     retain(lease: { release(): void }) {
       leases.push(lease);
     },
@@ -329,8 +349,9 @@ export async function reviewGpuContentLayers(args: {
     }
     flushClicks();
     if (content.length) {
-      const mask = primitives.raster(
+      const mask = primitives.material(
         'preview-gpu-annotation-mask',
+        JSON.stringify([dimensions.canonical, clip, base.sourceCrop, base.visibleVideoRect]),
         dimensions.canonical,
         (context) => {
           clipCroppedContent(context, base);
@@ -347,8 +368,10 @@ export async function reviewGpuContentLayers(args: {
         }
       );
       const operationClip: NonNullable<GpuPreviewLayer['operationClip']> = {
-        source: mask,
-        cache: { key: 'gallery-annotation-coverage', revision: {} },
+        source: mask.source,
+        ...(mask.revision
+          ? { cache: { key: 'gallery-annotation-coverage', revision: mask.revision } }
+          : {}),
       };
       // Scene coverage applies to each draw, so overlapping edge pixels retain Canvas clip semantics.
       const annotationGroup = group(

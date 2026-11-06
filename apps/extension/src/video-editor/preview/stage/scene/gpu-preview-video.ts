@@ -49,8 +49,8 @@ type Raster = (
 ) => GpuPreviewLayer;
 type WindowMedia = ReturnType<typeof resolveVideoWindowMedia> & { frame: GpuPreviewLayer['rect'] };
 
-/** Borrows immutable white coverage until the requesting GPU plan releases its lease. */
-export type NativeGpuSourceMask = (
+/** Borrows immutable source-plane artwork until the requesting GPU plan releases its lease. */
+export type NativeGpuSourceMaterial = (
   ownerDocument: Document,
   bounds: GpuPreviewLayer['rect'],
   key: string,
@@ -109,6 +109,10 @@ export function buildNativeGpuVideoLayers(args: {
   sourceBodies: Map<VideoLayer, NativeGpuVideoSourceBody>;
   raster: Raster;
   sourceMask?: (key: string, paint: (context: CanvasRenderingContext2D) => void) => GpuPreviewLayer;
+  sourceDecoration?: (
+    key: string,
+    paint: (context: CanvasRenderingContext2D) => void
+  ) => GpuPreviewLayer;
   groupLayer: (
     layers: readonly GpuPreviewLayer[],
     padded?: boolean,
@@ -251,10 +255,35 @@ export function buildNativeGpuVideoLayers(args: {
         decorationMedia.shadowMode,
         decorationMedia.camera
       )
-    )
+    ) {
+      const paint = (context: CanvasRenderingContext2D) =>
+        paintNativeGpuDecoration(context, decorationMedia);
+      const key = JSON.stringify([
+        { x: bare.x, y: bare.y, width: bare.width, height: bare.height },
+        decorationMedia.sourceWidth,
+        decorationMedia.sourceHeight,
+        decorationMedia.fitMode,
+        decorationMedia.sourceCrop,
+        decorationMedia.windowCornerRadius,
+        decorationMedia.windowHeader,
+        decorationMedia.windowHeaderImage
+          ? [
+              decorationMedia.windowHeaderImage.naturalWidth,
+              decorationMedia.windowHeaderImage.naturalHeight,
+            ]
+          : null,
+        decorationMedia.cameraAppearance,
+        decorationMedia.camera,
+        decorationMedia.displayScale,
+        decorationMedia.shadowColor,
+        decorationMedia.shadowIntensity,
+        decorationMedia.shadowMode,
+        decorationMedia.cameraShadowLocalVector,
+      ]);
       sourceBody.push(
-        raster((context) => paintNativeGpuDecoration(context, decorationMedia), true)
+        args.sourceDecoration ? args.sourceDecoration(key, paint) : raster(paint, true)
       );
+    }
     sourceBody.push(groupLayer(sourceLayers, true));
     // A single same-grid child already is the complete source snapshot.
     sourceBodyPlan = {

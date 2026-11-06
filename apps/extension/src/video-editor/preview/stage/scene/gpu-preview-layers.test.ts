@@ -820,7 +820,7 @@ it('releases completed exposure snapshots and owned artwork when a later snapsho
   expect(f.source.close).not.toHaveBeenCalled();
 });
 
-it('keeps attached effect bitmaps as textures inside owner masks and filters the transformed material', async () => {
+async function attachedFixture() {
   const f = fixture();
   const owner = f.passes.overlayFrame.visualLayers[0]!;
   if (owner.kind !== 'video') throw new Error('Expected video');
@@ -884,6 +884,11 @@ it('keeps attached effect bitmaps as textures inside owner masks and filters the
   ]);
   f.passes.overlayFrame.visualLayers = [effect];
   f.passes.visualPasses[0]!.frame.visualLayers = [effect];
+  return { f, owner, effect, bitmap, frames };
+}
+
+it('keeps attached effect bitmaps as textures inside owner masks and filters the transformed material', async () => {
+  const { f, bitmap, frames } = await attachedFixture();
   const plan = await buildNativeGpuPreviewLayers({
     ...f,
     effects: { overlayFrames: frames, framesByTime: new Map([[1, frames]]) },
@@ -1087,7 +1092,7 @@ it('retains white coverage across new source frames and invalidates changed wind
   const third = await buildNativeGpuPreviewLayers({ ...f, sourceMask: materials.sourceMask });
   plans.push(third);
   expect(maskOf(third.layers)?.source).not.toBe(mask?.source);
-  expect(maskOf(third.layers)?.cache).not.toEqual(mask?.cache);
+  expect(maskOf(third.layers)?.cache?.revision).not.toBe(mask?.cache?.revision);
   materials.dispose();
   const retained = maskOf(third.layers)?.source;
   if (!(retained instanceof HTMLCanvasElement)) throw new Error('Expected retained mask');
@@ -1155,3 +1160,82 @@ it.each([false, true])(
     expect(layer).toEqual(original);
   }
 );
+
+it('retains generic video decoration across frames and invalidates changed shadow pixels', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  layer.clip.shadowIntensity = 30;
+  const materials = createNativeGpuPreviewMaterials();
+  const build = async () => {
+    const plan = await buildNativeGpuPreviewLayers({
+      ...f,
+      sourceMask: materials.sourceMask,
+      sourceDecoration: materials.sourceDecoration,
+    });
+    plans.push(plan);
+    return plan;
+  };
+  const decoration = (plan: Awaited<ReturnType<typeof build>>) =>
+    flatten(plan.layers).find((node) => node.cache?.key === 'native-source-decoration');
+  const first = await build();
+  const pixels = decoration(first);
+  expect(pixels).toBeDefined();
+  first.release();
+  const nextSource = new VideoFrame(f.source);
+  f.sources = new Map([...f.sources].map(([id]) => [id, nextSource]));
+  const second = await build();
+  expect(decoration(second)?.source).toBe(pixels?.source);
+  expect(decoration(second)?.cache?.revision).toBe(pixels?.cache?.revision);
+  second.release();
+  layer.clip.shadowIntensity = 45;
+  const third = await build();
+  expect(decoration(third)?.source).not.toBe(pixels?.source);
+  expect(decoration(third)?.cache?.revision).not.toBe(pixels?.cache?.revision);
+  materials.dispose();
+  const retained = decoration(third)?.source;
+  if (!(retained instanceof HTMLCanvasElement)) throw new Error('Expected retained decoration');
+  expect(retained.width).toBeGreaterThan(0);
+  third.release();
+  expect(retained.width).toBe(0);
+});
+
+it('retains attached annotation coverage across bitmap and pose changes, and invalidates crop changes', async () => {
+  const { f, effect, frames } = await attachedFixture();
+  const materials = createNativeGpuPreviewMaterials();
+  const build = async () => {
+    const plan = await buildNativeGpuPreviewLayers({
+      ...f,
+      annotationMask: materials.annotationMask,
+      effects: { overlayFrames: frames, framesByTime: new Map([[1, frames]]) },
+    });
+    plans.push(plan);
+    return plan;
+  };
+  const mask = (plan: Awaited<ReturnType<typeof build>>) =>
+    flatten(plan.layers).find((node) => node.cache?.key === 'native-annotation-mask');
+  const first = await build();
+  const coverage = mask(first);
+  expect(coverage).toBeDefined();
+  first.release();
+  effect.x += 2;
+  const nextBitmap = Object.assign(document.createElement('canvas'), { close: vi.fn() });
+  nextBitmap.width = 8;
+  nextBitmap.height = 4;
+  frames.get('attached')!.bitmap = nextBitmap;
+  const second = await build();
+  expect(mask(second)?.source).toBe(coverage?.source);
+  expect(mask(second)?.cache?.revision).toBe(coverage?.cache?.revision);
+  expect(flatten(second.layers).some((node) => node.source === nextBitmap)).toBe(true);
+  second.release();
+  effect.sourceAttachment!.mapping.sourceCrop = { x: 0.2, y: 0.2, width: 0.6, height: 0.6 };
+  const third = await build();
+  expect(mask(third)?.source).not.toBe(coverage?.source);
+  expect(mask(third)?.cache?.revision).not.toBe(coverage?.cache?.revision);
+  materials.dispose();
+  const retained = mask(third)?.source;
+  if (!(retained instanceof HTMLCanvasElement)) throw new Error('Expected annotation coverage');
+  expect(retained.width).toBeGreaterThan(0);
+  third.release();
+  expect(retained.width).toBe(0);
+});
