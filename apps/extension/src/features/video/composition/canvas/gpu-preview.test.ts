@@ -1712,3 +1712,128 @@ it('finishes device retirement when frontend disposes its last transferred image
   expect(g.device.destroy).toHaveBeenCalledOnce();
   expect(renderer.allocatedBytes).toBe(0);
 });
+
+it('omits overwritten backdrop and decoration behind a full opaque video plane', async () => {
+  const g = graphics();
+  const native = nativeFrames();
+  const renderer = await owner();
+  const video = new VideoFrame(raster());
+  native.frames[0]!.codedHeight = 18;
+  const backdrop = raster(),
+    decoration = raster();
+  const plane: GpuPreviewLayer = {
+    ...layer(video),
+    rect: { x: 0, y: 0, width: 64, height: 36 },
+    clip: { rect: { x: 0, y: 0, width: 64, height: 36 }, radius: 0 },
+  };
+  const window = group([layer(decoration), plane]);
+  const input = request([layer(backdrop), fullGroup(window)]);
+  await renderer.render(input);
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(1);
+  expect(g.pass.draw).toHaveBeenCalledOnce();
+  expect(g.queue.copyExternalImageToTexture).not.toHaveBeenCalled();
+  expect(g.device.importExternalTexture).toHaveBeenCalledOnce();
+  expect(input.layers).toHaveLength(2);
+  expect(window.layers).toEqual([layer(decoration), plane]);
+  expect(video.close).not.toHaveBeenCalled();
+});
+
+it.each<VideoPixelFormat | null>(['RGBA', 'BGRA', 'I420A', null])(
+  'retains the backdrop for video with unproven opaque format %s',
+  async (format) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner();
+    const video = new VideoFrame(raster());
+    Object.defineProperty(native.frames[0]!, 'format', { value: format });
+    const backdrop = raster();
+    await renderer.render(
+      request([
+        layer(backdrop),
+        fullGroup(group([{ ...layer(video), rect: fullGroup(group([])).rect }])),
+      ])
+    );
+    expect(
+      g.queue.copyExternalImageToTexture.mock.calls.some(([entry]) => entry.source === backdrop)
+    ).toBe(true);
+    expect(g.commands.filter((command) => command === 'begin')).toHaveLength(2);
+  }
+);
+
+it('validates malformed hidden input before eliminating opaque occlusion', async () => {
+  const g = graphics();
+  const native = nativeFrames();
+  const renderer = await owner();
+  const video = new VideoFrame(raster());
+  native.frames[0]!.codedHeight = 18;
+  const invalid = { ...layer(), rect: { x: 0, y: 0, width: 0, height: 18 } };
+  await expect(
+    renderer.render(request([invalid, { ...layer(video), rect: fullGroup(group([])).rect }]))
+  ).rejects.toThrow();
+  expect(g.queue.submit).not.toHaveBeenCalled();
+});
+
+it.each(isolatedLeadingLayers)(
+  'keeps a nonleading opaque group isolated when its wrapper has $name',
+  async ({ patch }) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner();
+    const video = new VideoFrame(raster());
+    native.frames[0]!.codedHeight = 18;
+    const backdrop = raster();
+    const opaque = group([{ ...layer(video), rect: { x: 0, y: 0, width: 64, height: 36 } }]);
+    await renderer.render(request([layer(backdrop), { ...fullGroup(opaque), ...patch() }]));
+    expect(
+      g.queue.copyExternalImageToTexture.mock.calls.some(([entry]) => entry.source === backdrop)
+    ).toBe(true);
+  }
+);
+
+const uncertainOpaqueCoverage: { name: string; patch: Partial<GpuPreviewLayer> }[] = [
+  { name: 'partial plane', patch: { rect: { x: 1, y: 0, width: 63, height: 36 } } },
+  { name: 'translation', patch: { inverse: [1, 0, 1, 0, 1, 0, 0, 0, 1] } },
+  { name: 'opacity', patch: { opacity: 0.5 } },
+  { name: 'additive blend', patch: { blend: 'add' } },
+  { name: 'orientation', patch: { orientation: { rotation: 90, flip: false } } },
+  {
+    name: 'rounded clip',
+    patch: { clip: { rect: { x: 0, y: 0, width: 64, height: 36 }, radius: 4 } },
+  },
+  {
+    name: 'ellipse',
+    patch: { clip: { rect: { x: 0, y: 0, width: 64, height: 36 }, radius: 0, shape: 'ellipse' } },
+  },
+];
+it.each(uncertainOpaqueCoverage)(
+  'retains the backdrop with $name on native video',
+  async ({ patch }) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner();
+    const video = new VideoFrame(raster());
+    native.frames[0]!.codedHeight = 18;
+    const backdrop = raster();
+    const plane = { ...layer(video), rect: { x: 0, y: 0, width: 64, height: 36 }, ...patch };
+    await renderer.render(request([layer(backdrop), fullGroup(group([plane]))]));
+    expect(
+      g.queue.copyExternalImageToTexture.mock.calls.some(([entry]) => entry.source === backdrop)
+    ).toBe(true);
+  }
+);
+
+it('retains the backdrop when a mask follows the opaque plane', async () => {
+  const g = graphics();
+  const native = nativeFrames();
+  const renderer = await owner();
+  const video = new VideoFrame(raster());
+  native.frames[0]!.codedHeight = 18;
+  const backdrop = raster();
+  const plane = { ...layer(video), rect: { x: 0, y: 0, width: 64, height: 36 } };
+  await renderer.render(
+    request([layer(backdrop), fullGroup(group([plane, { ...layer(), blend: 'mask' }]))])
+  );
+  expect(
+    g.queue.copyExternalImageToTexture.mock.calls.some(([entry]) => entry.source === backdrop)
+  ).toBe(true);
+});

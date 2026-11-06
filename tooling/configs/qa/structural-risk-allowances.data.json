@@ -5278,7 +5278,7 @@
       "reason": "tool-noise: One GPU renderer owns device state, pipelines and frame slots. The optional presentation setting selects a destination backing through the existing presentation owner. Source borrowing and frame completion remain in the same transaction. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-06",
-      "astHash": "18f73611901c57c1722cd73fb958328df85325159d581b3782db13be6050d128",
+      "astHash": "284706bab15a374781e56739774af7a34a3ef025453e8659eb6d3b27e1b0e783",
       "signatureHash": "16bec5f40093d209b522631489fe50557bbe6cd175a4702059a144681cf5c523"
     },
     {
@@ -5795,7 +5795,7 @@
       "reason": "tool-noise: One GPU adapter fixture controls device failures, queue fences, validation and borrowed frame release. Added cases prove explicit image transfer and device retirement. The fixture has one resource and completion model.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-06",
-      "astHash": "bd14dc01aac66f5d220b7e449175a2b27c95f0e20604f2f50092932f74c51224",
+      "astHash": "62c5ec3af862bb0c2d9977505150e4e9410ba7bd72c9ee0ec3d91c74535d6449",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {

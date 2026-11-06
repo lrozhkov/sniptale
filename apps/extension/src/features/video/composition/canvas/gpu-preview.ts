@@ -476,16 +476,8 @@ function requestHasCssFilter(layers: readonly GpuPreviewLayer[]): boolean {
   );
 }
 
-function canOmitLeadingGroupCopy(
-  layer: GpuPreviewLayer,
-  parent: Pick<GpuPreviewRequest, 'output' | 'logical'>
-) {
-  if (!isGroup(layer.source)) return false;
-  const group = layer.source;
-  const sameSize = (left: Size, right: Size) =>
-    left.width === right.width && left.height === right.height;
+function isNeutralFullLayer(layer: GpuPreviewLayer, logical: Size) {
   const effects = [
-    'clip',
     'lens',
     'blur',
     'depth',
@@ -497,16 +489,62 @@ function canOmitLeadingGroupCopy(
     'operationClip',
   ] as const;
   return (
-    sameSize(group.output, parent.output) &&
-    sameSize(group.logical, parent.logical) &&
     layer.rect.x === 0 &&
     layer.rect.y === 0 &&
-    sameSize(layer.rect, parent.logical) &&
+    layer.rect.width === logical.width &&
+    layer.rect.height === logical.height &&
     layer.inverse.length === 9 &&
     layer.inverse.every((value, index) => value === [1, 0, 0, 0, 1, 0, 0, 0, 1][index]) &&
     (layer.opacity ?? 1) === 1 &&
     (layer.blend ?? 'over') === 'over' &&
     effects.every((key) => layer[key] === undefined)
+  );
+}
+
+function canOmitLeadingGroupCopy(
+  layer: GpuPreviewLayer,
+  parent: Pick<GpuPreviewRequest, 'output' | 'logical'>
+) {
+  if (!isGroup(layer.source)) return false;
+  const group = layer.source;
+  return (
+    group.output.width === parent.output.width &&
+    group.output.height === parent.output.height &&
+    group.logical.width === parent.logical.width &&
+    group.logical.height === parent.logical.height &&
+    layer.clip === undefined &&
+    isNeutralFullLayer(layer, parent.logical)
+  );
+}
+
+/** Known opaque full-plane video overwrites prior draws; unknown alpha keeps the original graph. */
+function coversOpaqueDestination(
+  layer: GpuPreviewLayer,
+  parent: Pick<GpuPreviewRequest, 'output' | 'logical'>
+): boolean {
+  if (isGroup(layer.source)) {
+    const last = layer.source.layers.at(-1);
+    return (
+      !!last &&
+      canOmitLeadingGroupCopy(layer, parent) &&
+      coversOpaqueDestination(last, layer.source)
+    );
+  }
+  if (
+    !(layer.source instanceof VideoFrame) ||
+    !['NV12', 'I420', 'I422', 'I444', 'RGBX', 'BGRX'].includes(layer.source.format ?? '') ||
+    !isNeutralFullLayer(layer, parent.logical)
+  )
+    return false;
+  const clip = layer.clip;
+  return (
+    !clip ||
+    (clip.radius === 0 &&
+      clip.shape !== 'ellipse' &&
+      clip.rect.x === 0 &&
+      clip.rect.y === 0 &&
+      clip.rect.width === parent.logical.width &&
+      clip.rect.height === parent.logical.height)
   );
 }
 
@@ -543,6 +581,11 @@ function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRequest {
       return group === source ? layer : { ...layer, source: group };
     });
     let result = mapped.every((layer, index) => layer === layers[index]) ? layers : mapped;
+    for (let index = result.length - 1; index >= 0; index--) {
+      if (!coversOpaqueDestination(result[index]!, parent)) continue;
+      if (index > 0) result = result.slice(index);
+      break;
+    }
     while (result[0] && canOmitLeadingGroupCopy(result[0], parent)) {
       const group = result[0].source;
       if (
