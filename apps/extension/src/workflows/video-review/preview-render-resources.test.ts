@@ -546,7 +546,7 @@ describe('GPU pool resize and backend changes', () => {
   });
 });
 
-describe('Offscreen GPU placeholders', () => {
+describe('Fixed-size GPU presentation canvases', () => {
   function backend() {
     const changed: ReturnType<typeof vi.fn>[] = [];
     const disposed: ReturnType<typeof vi.fn>[] = [];
@@ -631,4 +631,34 @@ describe('Offscreen GPU placeholders', () => {
     expect(resources.counters.canvasCount).toBe(0);
     resources.dispose();
   });
+});
+
+it('releases a transferred Gallery image once before an output lease returns to the pool', () => {
+  const { resources } = setup(4000, 1);
+  const clearImage = vi.fn();
+  const backend = {
+    allocatedBytes: 0,
+    render:
+      vi.fn<
+        import('../../features/video/composition/canvas/gpu-preview').GpuPreviewRenderer['render']
+      >(),
+    dispose: vi.fn(),
+    createSurface: vi.fn((canvas: HTMLCanvasElement) => ({
+      canvas,
+      present: vi.fn(async () => {}),
+      releaseImage: clearImage,
+      dispose: vi.fn(),
+    })),
+  };
+  const first = resources.presentationCanvas(size, backend);
+  expect(clearImage).not.toHaveBeenCalled();
+  first.release();
+  first.release();
+  expect(clearImage).toHaveBeenCalledOnce();
+  const second = resources.presentationCanvas(size, backend);
+  expect(second.canvas).toBe(first.canvas);
+  expect(clearImage).toHaveBeenCalledOnce();
+  second.release();
+  expect(clearImage).toHaveBeenCalledTimes(2);
+  resources.dispose();
 });

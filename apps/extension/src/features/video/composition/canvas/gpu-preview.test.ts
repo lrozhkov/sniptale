@@ -1654,3 +1654,61 @@ it('does not classify retirement of one direct destination as device failure', a
   expect(failure).not.toBeInstanceOf(GpuPreviewDeviceError);
   expect(await renderer.render(request())).toBe(g.bitmap);
 });
+
+it.each(['scope-first', 'fence-first'] as const)(
+  'hands the completed GPU image to the frontend only after both barriers: %s',
+  async (order) => {
+    const g = graphics(),
+      fence = deferred<void>(),
+      scope = deferred<{ message: string } | null>();
+    g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+    g.device.popErrorScope.mockReturnValueOnce(scope.promise);
+    const renderer = await owner();
+    const canvas = Object.assign(document.createElement('canvas'), { width: 64, height: 36 });
+    const accept = vi.fn();
+    Object.defineProperty(canvas, 'getContext', {
+      value: vi.fn(() => ({ transferFromImageBitmap: accept })),
+    });
+    const surface = renderer.createSurface!(canvas, { offscreen: true });
+    const pending = surface.present(request());
+    await vi.waitFor(() => expect(g.device.popErrorScope).toHaveBeenCalledOnce());
+    if (order === 'scope-first') scope.resolve(null);
+    else fence.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(accept).not.toHaveBeenCalled();
+    expect(g.transfer).not.toHaveBeenCalled();
+    if (order === 'scope-first') fence.resolve();
+    else scope.resolve(null);
+    await pending;
+    expect(g.transfer).toHaveBeenCalledOnce();
+    const bitmap = g.bitmaps[1]!;
+    expect(accept).toHaveBeenCalledExactlyOnceWith(bitmap);
+    expect(bitmap.close).toHaveBeenCalledOnce();
+    renderer.dispose();
+    expect(g.device.destroy).not.toHaveBeenCalled();
+    expect(renderer.allocatedBytes).toBeGreaterThan(0);
+    surface.releaseImage?.();
+    expect(accept.mock.calls.at(-1)).toEqual([null]);
+    expect(g.device.destroy).toHaveBeenCalledOnce();
+    expect(renderer.allocatedBytes).toBe(0);
+    surface.dispose();
+  }
+);
+
+it('finishes device retirement when frontend disposes its last transferred image surface', async () => {
+  const g = graphics(),
+    renderer = await owner();
+  const canvas = Object.assign(document.createElement('canvas'), { width: 64, height: 36 });
+  const accept = vi.fn();
+  Object.defineProperty(canvas, 'getContext', {
+    value: vi.fn(() => ({ transferFromImageBitmap: accept })),
+  });
+  const surface = renderer.createSurface!(canvas, { offscreen: true });
+  await surface.present(request());
+  renderer.dispose();
+  expect(g.device.destroy).not.toHaveBeenCalled();
+  surface.dispose();
+  expect(g.device.destroy).toHaveBeenCalledOnce();
+  expect(renderer.allocatedBytes).toBe(0);
+});

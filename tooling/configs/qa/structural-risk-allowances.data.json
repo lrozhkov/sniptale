@@ -5792,10 +5792,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One compositor fixture controls device barriers and resource disposal. Added cases check direct destinations, bitmap compatibility and retirement error classification. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-05",
-      "astHash": "bbfdedb5ea59113234ee5788c6d5797753f8137509683d900eaf2c1ff77c28ea",
+      "reason": "tool-noise: One GPU adapter fixture controls device failures, queue fences, validation and borrowed frame release. Added cases prove explicit image transfer and device retirement. The fixture has one resource and completion model.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-06",
+      "astHash": "bd14dc01aac66f5d220b7e449175a2b27c95f0e20604f2f50092932f74c51224",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {
@@ -6045,10 +6045,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview-presentation.ts",
       "symbol": "createGpuPreviewPresentationOwner",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One GPU destination owner configures and retires contexts. The explicit Offscreen mode transfers backing ownership without changing execution, reservations or completion barriers. Frontend owners retain placement and publication. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: One GPU presentation owner binds contexts, output storage and completion barriers. It transfers completed images to frontend leases and retires their storage after release. Frontend consumers retain visibility and geometry authority.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-06",
-      "astHash": "34d13ca1f05f911bd2b706aaeebddf7b4a8c7f3b1f743986bf00aae01c9cbaa9",
+      "astHash": "68b37a8e32cff12256f729015879661c3de5625c8a48cdc4e10d6e56dcc1065c",
       "signatureHash": "d90b5780a0afc3c2eca6fc2047eee98f50313fd7a7b98e8327936cffa9d8c8fc"
     },
     {

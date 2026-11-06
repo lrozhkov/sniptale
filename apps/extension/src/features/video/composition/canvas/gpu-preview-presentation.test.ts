@@ -8,6 +8,7 @@ const owners: ReturnType<typeof createGpuPreviewPresentationOwner>[] = [];
 afterEach(() => {
   for (const owner of owners.splice(0)) owner.dispose();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 function fixture(maximumSurfaces = 3, maximumBytes = 4096) {
   const context = {
@@ -18,7 +19,10 @@ function fixture(maximumSurfaces = 3, maximumBytes = 4096) {
   const canvas = document.createElement('canvas');
   canvas.width = 8;
   canvas.height = 4;
-  const getContext = vi.fn<(_mode?: string) => typeof context | null>(() => context);
+  const bitmapContext = { transferFromImageBitmap: vi.fn<(bitmap: ImageBitmap | null) => void>() };
+  const getContext = vi.fn<(_mode?: string) => typeof context | typeof bitmapContext | null>(
+    () => context
+  );
   Object.defineProperty(canvas, 'getContext', { value: getContext });
   const releases: ReturnType<typeof vi.fn>[] = [];
   const reserve = vi.fn((_bytes: number) => {
@@ -48,7 +52,18 @@ function fixture(maximumSurfaces = 3, maximumBytes = 4096) {
     layers: [],
     signal,
   });
-  return { owner, context, canvas, getContext, reserve, releases, execute, onIdle, request };
+  return {
+    owner,
+    context,
+    bitmapContext,
+    canvas,
+    getContext,
+    reserve,
+    releases,
+    execute,
+    onIdle,
+    request,
+  };
 }
 it('configures only WebGPU once and retains accounted output storage between presents', async () => {
   const f = fixture();
@@ -328,8 +343,14 @@ function offscreenFixture(maximumSurfaces = 3) {
   const f = fixture(maximumSurfaces);
   const getContext = vi.fn<(_mode?: string) => typeof f.context | null>(() => f.context);
   const backing = { width: 8, height: 4, getContext } as unknown as OffscreenCanvas;
-  const transfer = vi.fn(() => backing);
-  Object.defineProperty(f.canvas, 'transferControlToOffscreen', { value: transfer });
+  const bitmap = { width: 8, height: 4, close: vi.fn() };
+  const snapshot = vi.fn(() => bitmap);
+  Object.assign(backing, { transferToImageBitmap: snapshot });
+  const createBacking = vi.fn(function (_width: number, _height: number) {
+    return backing;
+  });
+  vi.stubGlobal('OffscreenCanvas', createBacking);
+  f.getContext.mockImplementation(() => f.bitmapContext);
   let placeholderWidth = 8,
     placeholderHeight = 4;
   const widthWrite = vi.fn(() => {
@@ -345,7 +366,9 @@ function offscreenFixture(maximumSurfaces = 3) {
   return {
     ...f,
     backing,
-    transfer,
+    createBacking,
+    bitmap,
+    snapshot,
     backingGetContext: getContext,
     widthWrite,
     heightWrite,
@@ -356,12 +379,12 @@ function offscreenFixture(maximumSurfaces = 3) {
   };
 }
 
-it('opts in to one transferred backing with lazy configuration and no HTML context or backing writes', async () => {
+it('uses one standalone GPU backing and an explicit bitmaprenderer without HTML backing writes', async () => {
   const f = offscreenFixture();
   const surface = f.owner.create(f.canvas, { offscreen: true });
   expect(surface.canvas).toBe(f.canvas);
-  expect(f.transfer).toHaveBeenCalledOnce();
-  expect(f.getContext).not.toHaveBeenCalled();
+  expect(f.createBacking).toHaveBeenCalledOnce();
+  expect(f.getContext.mock.calls).toEqual([['bitmaprenderer']]);
   expect(f.backingGetContext.mock.calls).toEqual([['webgpu']]);
   expect(f.context.configure).not.toHaveBeenCalled();
   expect(f.reserve).not.toHaveBeenCalled();
@@ -388,32 +411,32 @@ it('validates disposed, duplicate, capacity and invalid-size guards before trans
   expect(() => f.owner.create(f.canvas, { offscreen: true })).toThrow();
   const other = offscreenFixture();
   expect(() => f.owner.create(other.canvas, { offscreen: true })).toThrow();
-  expect(other.transfer).not.toHaveBeenCalled();
-  expect(f.transfer).toHaveBeenCalledOnce();
+  expect(other.createBacking).not.toHaveBeenCalled();
+  expect(f.createBacking).toHaveBeenCalledOnce();
   other.owner.dispose();
   expect(() => other.owner.create(other.canvas, { offscreen: true })).toThrow();
-  expect(other.transfer).not.toHaveBeenCalled();
+  expect(other.createBacking).not.toHaveBeenCalled();
   const invalid = offscreenFixture();
   invalid.setPlaceholderSize(0, 4);
   expect(() => invalid.owner.create(invalid.canvas, { offscreen: true })).toThrow();
-  expect(invalid.transfer).not.toHaveBeenCalled();
+  expect(invalid.createBacking).not.toHaveBeenCalled();
   invalid.setPlaceholderSize(65, 4);
   expect(() => invalid.owner.create(invalid.canvas, { offscreen: true })).toThrow();
-  expect(invalid.transfer).not.toHaveBeenCalled();
+  expect(invalid.createBacking).not.toHaveBeenCalled();
 });
 
 it.each(['missing', 'throwing'] as const)(
-  'classifies %s transfer support as unavailable without using HTML WebGPU or bitmap fallback',
+  'classifies %s bitmaprenderer support as unavailable without HTML WebGPU or 2D fallback',
   (reason) => {
-    const f = fixture();
-    if (reason === 'throwing')
-      Object.defineProperty(f.canvas, 'transferControlToOffscreen', {
-        value: vi.fn(() => {
-          throw new Error('Transfer failed');
-        }),
+    const f = offscreenFixture();
+    if (reason === 'missing') f.getContext.mockReturnValueOnce(null);
+    else
+      f.getContext.mockImplementationOnce(() => {
+        throw new Error('Bitmap context failed');
       });
     expect(() => f.owner.create(f.canvas, { offscreen: true })).toThrow(GpuPreviewDeviceError);
-    expect(f.getContext).not.toHaveBeenCalled();
+    expect(f.getContext.mock.calls).toEqual([['bitmaprenderer']]);
+    expect([f.backing.width, f.backing.height]).toEqual([0, 0]);
     expect(f.reserve).not.toHaveBeenCalled();
   }
 );
@@ -444,6 +467,7 @@ it('defers offscreen storage retirement until execution finishes and never write
   });
   const surface = f.owner.create(f.canvas, { offscreen: true });
   const pending = surface.present(f.request());
+  expect(() => surface.releaseImage?.()).toThrow('pending');
   f.owner.dispose();
   expect([f.backing.width, f.backing.height]).toEqual([8, 4]);
   expect(f.context.unconfigure).not.toHaveBeenCalled();
@@ -457,13 +481,126 @@ it('defers offscreen storage retirement until execution finishes and never write
   expect(f.heightWrite).not.toHaveBeenCalled();
 });
 
-it('checks owned offscreen dimensions and rejects implicit resize', async () => {
+it('checks both frontend and owned GPU dimensions and rejects implicit resize', async () => {
   const f = offscreenFixture();
   const surface = f.owner.create(f.canvas, { offscreen: true });
   f.setPlaceholderSize(16, 8);
   const request = { ...f.request(), output: { width: 8, height: 4 } };
-  await expect(surface.present(request)).resolves.toBeUndefined();
+  await expect(surface.present(request)).rejects.toThrow('backing size changed');
   await expect(surface.present({ ...request, output: { width: 16, height: 8 } })).rejects.toThrow();
+  expect(f.execute).not.toHaveBeenCalled();
+  f.setPlaceholderSize(8, 4);
+  await expect(surface.present(request)).resolves.toBeUndefined();
   expect(f.execute).toHaveBeenCalledOnce();
   expect([f.backing.width, f.backing.height]).toEqual([8, 4]);
+});
+
+it('transfers the completed GPU image to the frontend before offscreen present resolves', async () => {
+  const f = offscreenFixture();
+  const bitmap = { close: vi.fn() };
+  const snapshot = vi.fn(() => bitmap),
+    accept = vi.fn();
+  Object.assign(f.backing, { transferToImageBitmap: snapshot });
+  f.getContext.mockImplementation(() => ({ transferFromImageBitmap: accept }));
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  const gate = deferred<void>();
+  f.execute.mockImplementation(async (_request, getTexture) => {
+    getTexture();
+    await gate.promise;
+  });
+  const pending = surface.present(f.request());
+  expect(snapshot).not.toHaveBeenCalled();
+  expect(accept).not.toHaveBeenCalled();
+  gate.resolve();
+  await pending;
+  expect(snapshot).toHaveBeenCalledOnce();
+  expect(accept).toHaveBeenCalledExactlyOnceWith(bitmap);
+  expect(bitmap.close).toHaveBeenCalledOnce();
+});
+
+it('keeps the visible image and its reservation through backend retirement until frontend release', async () => {
+  const f = offscreenFixture();
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  await surface.present(f.request());
+  expect(f.bitmapContext.transferFromImageBitmap).toHaveBeenCalledExactlyOnceWith(f.bitmap);
+  f.owner.dispose();
+  expect(f.owner.allocatedBytes).toBe(256);
+  expect(f.context.unconfigure).not.toHaveBeenCalled();
+  expect(f.bitmapContext.transferFromImageBitmap).toHaveBeenCalledTimes(1);
+  surface.releaseImage?.();
+  surface.releaseImage?.();
+  expect(f.bitmapContext.transferFromImageBitmap.mock.calls).toEqual([[f.bitmap], [null]]);
+  expect(f.owner.allocatedBytes).toBe(0);
+  expect(f.context.unconfigure).toHaveBeenCalledOnce();
+  expect([f.backing.width, f.backing.height]).toEqual([0, 0]);
+  expect(f.releases[0]).toHaveBeenCalledOnce();
+  surface.dispose();
+  expect(f.releases[0]).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'dispose', 'failure'] as const)(
+  'never transfers a late GPU image after %s',
+  async (reason) => {
+    const f = offscreenFixture(),
+      gate = deferred<void>(),
+      controller = new AbortController();
+    const surface = f.owner.create(f.canvas, { offscreen: true });
+    f.execute.mockImplementation(async (_request, getTexture) => {
+      getTexture();
+      await gate.promise;
+    });
+    const pending = surface.present(f.request(controller.signal));
+    if (reason === 'abort') controller.abort();
+    if (reason === 'dispose') surface.dispose();
+    if (reason === 'failure') gate.reject(new Error('GPU failed'));
+    else gate.resolve();
+    await expect(pending).rejects.toBeDefined();
+    expect(f.snapshot).not.toHaveBeenCalled();
+    expect(f.bitmapContext.transferFromImageBitmap).not.toHaveBeenCalled();
+    surface.dispose();
+    expect(f.owner.allocatedBytes).toBe(0);
+  }
+);
+
+it('defers frontend image disposal while a subsequent GPU request drains', async () => {
+  const f = offscreenFixture(),
+    gate = deferred<void>();
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  await surface.present(f.request());
+  f.execute.mockImplementationOnce(async (_request, getTexture) => {
+    getTexture();
+    await gate.promise;
+  });
+  const pending = surface.present(f.request());
+  surface.dispose();
+  expect(f.bitmapContext.transferFromImageBitmap).toHaveBeenCalledTimes(1);
+  expect(f.owner.allocatedBytes).toBe(256);
+  gate.resolve();
+  await expect(pending).rejects.toThrow('disposed');
+  expect(f.snapshot).toHaveBeenCalledOnce();
+  expect(f.bitmapContext.transferFromImageBitmap.mock.calls).toEqual([[f.bitmap], [null]]);
+  expect(f.owner.allocatedBytes).toBe(0);
+});
+
+it('closes a rejected image transfer and preserves reusable GPU storage until surface retirement', async () => {
+  const f = offscreenFixture(),
+    failure = new Error('Transfer failed');
+  f.bitmapContext.transferFromImageBitmap.mockImplementationOnce(() => {
+    throw failure;
+  });
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  await expect(surface.present(f.request())).rejects.toBe(failure);
+  expect(f.bitmap.close).toHaveBeenCalledOnce();
+  expect(f.owner.pending).toBe(0);
+  surface.dispose();
+  expect(f.owner.allocatedBytes).toBe(0);
+  expect(f.releases[0]).toHaveBeenCalledOnce();
+});
+
+it('reports missing standalone OffscreenCanvas support without taking a frontend context', () => {
+  const f = offscreenFixture();
+  vi.stubGlobal('OffscreenCanvas', undefined);
+  expect(() => f.owner.create(f.canvas, { offscreen: true })).toThrow(GpuPreviewDeviceError);
+  expect(f.getContext).not.toHaveBeenCalled();
+  expect(f.reserve).not.toHaveBeenCalled();
 });

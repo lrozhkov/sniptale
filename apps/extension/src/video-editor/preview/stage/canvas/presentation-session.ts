@@ -171,8 +171,12 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
       release: () => {
         if (released) return;
         released = true;
-        leased.leased = false;
-        if (leased.retired || this.disposed) this.clear(leased);
+        try {
+          leased.surface.releaseImage?.();
+        } finally {
+          leased.leased = false;
+          if (leased.retired || this.disposed) this.clear(leased);
+        }
       },
     };
   };

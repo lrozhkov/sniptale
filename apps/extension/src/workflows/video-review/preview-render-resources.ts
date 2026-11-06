@@ -348,8 +348,12 @@ class PreviewRenderResources implements RenderResources {
       release: () => {
         if (released) return;
         released = true;
-        surface.active = false;
-        if (this.disposed) this.remove(surface);
+        try {
+          surface.surface.releaseImage?.();
+        } finally {
+          surface.active = false;
+          if (this.disposed) this.remove(surface);
+        }
       },
     };
   }

@@ -17,13 +17,17 @@ function fixture(role?: 'stage' | 'inspector', background?: 'black' | 'transpare
   host.appendChild(fallback);
   document.body.appendChild(host);
   const disposed: HTMLCanvasElement[] = [];
+  const releasedImages: { canvas: HTMLCanvasElement; visible: boolean }[] = [];
   const renderer = {
     allocatedBytes: 0,
     render: vi.fn<GpuPreviewRenderer['render']>(),
     dispose: vi.fn(),
-    createSurface: vi.fn((canvas: HTMLCanvasElement) => ({
+    createSurface: vi.fn<NonNullable<GpuPreviewRenderer['createSurface']>>((canvas) => ({
       canvas,
       present: vi.fn(async () => {}),
+      releaseImage: vi.fn(() => {
+        releasedImages.push({ canvas, visible: canvas.style.opacity === '1' });
+      }),
       dispose: vi.fn(() => {
         disposed.push(canvas);
       }),
@@ -36,7 +40,7 @@ function fixture(role?: 'stage' | 'inspector', background?: 'black' | 'transpare
     ...(background ? { background } : {}),
   });
   sessions.push(session);
-  return { host, fallback, renderer, session, disposed };
+  return { host, fallback, renderer, session, disposed, releasedImages };
 }
 const size = { width: 64, height: 36 };
 it('has no factory DOM effects and marks only the borrowed fallback on mount without frame events', () => {
@@ -424,4 +428,22 @@ it('preserves transparent crop corners without changing the borrowed fallback or
   reused.release();
   f.session.dispose();
   expect(f.fallback.style.backgroundColor).toBe('transparent');
+});
+
+it('releases transferred image ownership only after the previous front is hidden', () => {
+  const f = fixture();
+  f.session.mount();
+  const a = f.session.acquire(size, f.renderer);
+  f.session.publish(a, () => {});
+  const b = f.session.acquire(size, f.renderer);
+  expect(f.releasedImages).toHaveLength(0);
+  f.session.publish(b, () => {});
+  expect(f.releasedImages).toEqual([{ canvas: a.canvas, visible: false }]);
+  a.release();
+  expect(f.releasedImages).toHaveLength(1);
+  f.session.dispose();
+  expect(f.releasedImages).toEqual([
+    { canvas: a.canvas, visible: false },
+    { canvas: b.canvas, visible: false },
+  ]);
 });

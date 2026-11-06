@@ -74,8 +74,9 @@ export interface GpuPreviewRenderer {
   readonly allocatedBytes: number;
   /**
    * The caller leases a nonfront canvas and publishes matching geometry after completion.
-   * Offscreen mode transfers its fixed-size backing to the backend; callers must not resize
-   * or select a context on the HTML placeholder. The default preserves caller-owned HTML resize.
+   * Offscreen mode moves completed GPU images into a fixed-size HTML bitmaprenderer.
+   * Callers release each transferred image when their output lease ends. They must not resize
+   * or select a context on that canvas. The default preserves caller-owned HTML WebGPU resize.
    */
   createSurface?(
     canvas: HTMLCanvasElement,

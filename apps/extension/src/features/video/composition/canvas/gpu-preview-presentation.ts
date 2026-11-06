@@ -7,6 +7,8 @@ type Reservation = { release(): void };
 export interface GpuPreviewPresentationSurface {
   readonly canvas: HTMLCanvasElement;
   present(request: Request): Promise<void>;
+  /** Release transferred frontend pixels after the exclusive output lease ends. */
+  releaseImage?(): void;
   dispose(): void;
 }
 
@@ -14,6 +16,9 @@ interface SurfaceEntry {
   canvas: HTMLCanvasElement;
   context: GPUCanvasContext;
   ownedBacking: OffscreenCanvas | null;
+  imageContext: ImageBitmapRenderingContext | null;
+  imageHeld: boolean;
+  frontendRetired: boolean;
   width: number;
   height: number;
   bytes: number;
@@ -65,18 +70,44 @@ export function createGpuPreviewPresentationOwner(options: {
       backing.height = 0;
     }
   };
+  const dropImage = (entry: SurfaceEntry) => {
+    if (!entry.imageHeld) return;
+    try {
+      entry.imageContext?.transferFromImageBitmap(null);
+    } finally {
+      entry.imageHeld = false;
+    }
+  };
   const retire = (entry: SurfaceEntry) => {
     if (entries.get(entry.canvas) !== entry) return;
     entry.retired = true;
-    if (!entry.pending) {
-      try {
-        releaseStorage(entry);
-      } finally {
+    if (entry.pending) return;
+    try {
+      if (entry.frontendRetired) dropImage(entry);
+    } finally {
+      // Backend retirement cannot clear pixels still held by the frontend's visible lease.
+      if (!entry.imageHeld) {
         try {
-          if (entry.ownedBacking) clearOwnedBacking(entry.ownedBacking);
+          releaseStorage(entry);
         } finally {
-          entries.delete(entry.canvas);
+          try {
+            if (entry.ownedBacking) clearOwnedBacking(entry.ownedBacking);
+          } finally {
+            entries.delete(entry.canvas);
+          }
         }
+      }
+    }
+  };
+  const releaseImage = (entry: SurfaceEntry) => {
+    if (entry.pending) throw new Error('GPU presentation image is still pending.');
+    try {
+      dropImage(entry);
+    } finally {
+      try {
+        if (entry.retired) retire(entry);
+      } finally {
+        if (pending === 0) options.onIdle();
       }
     }
   };
@@ -127,6 +158,7 @@ export function createGpuPreviewPresentationOwner(options: {
       if (
         backing.width !== width ||
         backing.height !== height ||
+        (entry.ownedBacking && (entry.canvas.width !== width || entry.canvas.height !== height)) ||
         request.output.width !== width ||
         request.output.height !== height
       )
@@ -148,6 +180,17 @@ export function createGpuPreviewPresentationOwner(options: {
       });
       checkTarget();
       if (!acquired) throw new Error('GPU presentation destination was not acquired.');
+      if (entry.ownedBacking && entry.imageContext) {
+        // Moving a standalone GPU backing avoids asynchronous placeholder publication.
+        const bitmap = entry.ownedBacking.transferToImageBitmap();
+        try {
+          checkTarget();
+          entry.imageContext.transferFromImageBitmap(bitmap);
+          entry.imageHeld = true;
+        } finally {
+          bitmap.close();
+        }
+      }
     } finally {
       entry.pending = false;
       pending--;
@@ -174,6 +217,7 @@ export function createGpuPreviewPresentationOwner(options: {
       if (entries.size >= options.maximumSurfaces)
         throw new Error('GPU presentation surface capacity exceeded.');
       let ownedBacking: OffscreenCanvas | null = null;
+      let imageContext: ImageBitmapRenderingContext | null = null;
       let context: GPUCanvasContext;
       if (settings.offscreen) {
         if (
@@ -186,11 +230,12 @@ export function createGpuPreviewPresentationOwner(options: {
         )
           throw new Error('GPU presentation dimensions are invalid.');
         try {
-          if (typeof canvas.transferControlToOffscreen !== 'function') throw options.unavailable();
-          ownedBacking = canvas.transferControlToOffscreen();
+          ownedBacking = new OffscreenCanvas(canvas.width, canvas.height);
           const resolved = ownedBacking.getContext('webgpu');
           if (!resolved || !('configure' in resolved)) throw options.unavailable();
           context = resolved;
+          imageContext = canvas.getContext('bitmaprenderer');
+          if (!imageContext) throw options.unavailable();
         } catch {
           try {
             if (ownedBacking) clearOwnedBacking(ownedBacking);
@@ -208,6 +253,9 @@ export function createGpuPreviewPresentationOwner(options: {
         canvas,
         context,
         ownedBacking,
+        imageContext,
+        imageHeld: false,
+        frontendRetired: false,
         width: 0,
         height: 0,
         bytes: 0,
@@ -220,7 +268,15 @@ export function createGpuPreviewPresentationOwner(options: {
       return {
         canvas,
         present: (request) => present(entry, request),
-        dispose: () => retire(entry),
+        ...(imageContext ? { releaseImage: () => releaseImage(entry) } : {}),
+        dispose: () => {
+          entry.frontendRetired = true;
+          try {
+            retire(entry);
+          } finally {
+            if (pending === 0) options.onIdle();
+          }
+        },
       };
     },
     dispose() {
