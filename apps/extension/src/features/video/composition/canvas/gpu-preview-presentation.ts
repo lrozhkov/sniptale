@@ -7,7 +7,7 @@ type Reservation = { release(): void };
 export interface GpuPreviewPresentationSurface {
   readonly canvas: HTMLCanvasElement;
   present(request: Request): Promise<void>;
-  /** Release transferred frontend pixels after the exclusive output lease ends. */
+  /** End the frontend lease; retain the bounded idle image until replacement or retirement. */
   releaseImage?(): void;
   dispose(): void;
 }
@@ -18,6 +18,7 @@ interface SurfaceEntry {
   ownedBacking: OffscreenCanvas | null;
   imageContext: ImageBitmapRenderingContext | null;
   imageHeld: boolean;
+  imageLeased: boolean;
   frontendRetired: boolean;
   width: number;
   height: number;
@@ -76,6 +77,7 @@ export function createGpuPreviewPresentationOwner(options: {
       entry.imageContext?.transferFromImageBitmap(null);
     } finally {
       entry.imageHeld = false;
+      entry.imageLeased = false;
     }
   };
   const retire = (entry: SurfaceEntry) => {
@@ -83,7 +85,7 @@ export function createGpuPreviewPresentationOwner(options: {
     entry.retired = true;
     if (entry.pending) return;
     try {
-      if (entry.frontendRetired) dropImage(entry);
+      if (entry.frontendRetired || !entry.imageLeased) dropImage(entry);
     } finally {
       // Backend retirement cannot clear pixels still held by the frontend's visible lease.
       if (!entry.imageHeld) {
@@ -101,14 +103,12 @@ export function createGpuPreviewPresentationOwner(options: {
   };
   const releaseImage = (entry: SurfaceEntry) => {
     if (entry.pending) throw new Error('GPU presentation image is still pending.');
+    entry.imageLeased = false;
     try {
-      dropImage(entry);
+      // Replacing an idle bitmap avoids a full-size transparent transfer on every frame.
+      if (entry.retired) retire(entry);
     } finally {
-      try {
-        if (entry.retired) retire(entry);
-      } finally {
-        if (pending === 0) options.onIdle();
-      }
+      if (pending === 0) options.onIdle();
     }
   };
   const configure = (entry: SurfaceEntry, width: number, height: number) => {
@@ -187,6 +187,7 @@ export function createGpuPreviewPresentationOwner(options: {
           checkTarget();
           entry.imageContext.transferFromImageBitmap(bitmap);
           entry.imageHeld = true;
+          entry.imageLeased = true;
         } finally {
           bitmap.close();
         }
@@ -255,6 +256,7 @@ export function createGpuPreviewPresentationOwner(options: {
         ownedBacking,
         imageContext,
         imageHeld: false,
+        imageLeased: false,
         frontendRetired: false,
         width: 0,
         height: 0,

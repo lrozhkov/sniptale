@@ -604,3 +604,68 @@ it('reports missing standalone OffscreenCanvas support without taking a frontend
   expect(f.getContext).not.toHaveBeenCalled();
   expect(f.reserve).not.toHaveBeenCalled();
 });
+
+it('reuses the bounded idle image without transparent transfers between frontend leases', async () => {
+  const f = offscreenFixture();
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  await surface.present(f.request());
+  surface.releaseImage?.();
+  surface.releaseImage?.();
+  expect(f.bitmapContext.transferFromImageBitmap.mock.calls).toEqual([[f.bitmap]]);
+  expect(f.owner.allocatedBytes).toBe(256);
+  expect(f.releases[0]).not.toHaveBeenCalled();
+  const next = { width: 8, height: 4, close: vi.fn() };
+  f.snapshot.mockReturnValueOnce(next);
+  await surface.present(f.request());
+  expect(f.bitmapContext.transferFromImageBitmap.mock.calls).toEqual([[f.bitmap], [next]]);
+  expect(next.close).toHaveBeenCalledOnce();
+  expect(f.reserve).toHaveBeenCalledOnce();
+  surface.releaseImage?.();
+  f.owner.dispose();
+  surface.dispose();
+  expect(f.bitmapContext.transferFromImageBitmap.mock.calls).toEqual([[f.bitmap], [next], [null]]);
+  expect(f.owner.allocatedBytes).toBe(0);
+  expect(f.releases[0]).toHaveBeenCalledOnce();
+});
+
+it('clears an idle image on backend retirement only after its next request drains', async () => {
+  const f = offscreenFixture(),
+    gate = deferred<void>();
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  await surface.present(f.request());
+  surface.releaseImage?.();
+  f.execute.mockImplementationOnce(async (_request, getTexture) => {
+    getTexture();
+    await gate.promise;
+  });
+  const pending = surface.present(f.request());
+  f.owner.dispose();
+  expect(f.bitmapContext.transferFromImageBitmap.mock.calls).toEqual([[f.bitmap]]);
+  expect(f.owner.allocatedBytes).toBe(256);
+  gate.resolve();
+  await expect(pending).rejects.toThrow('disposed');
+  expect(f.bitmapContext.transferFromImageBitmap.mock.calls).toEqual([[f.bitmap], [null]]);
+  expect(f.owner.allocatedBytes).toBe(0);
+  expect(f.context.unconfigure).toHaveBeenCalledOnce();
+});
+
+it('retires the retained idle image after a failed replacement without publishing it again', async () => {
+  const f = offscreenFixture(),
+    failure = new Error('Replacement failed');
+  const surface = f.owner.create(f.canvas, { offscreen: true });
+  await surface.present(f.request());
+  surface.releaseImage?.();
+  f.bitmapContext.transferFromImageBitmap.mockImplementationOnce(() => {
+    throw failure;
+  });
+  await expect(surface.present(f.request())).rejects.toBe(failure);
+  expect(f.bitmap.close).toHaveBeenCalledTimes(2);
+  expect(f.owner.allocatedBytes).toBe(256);
+  f.owner.dispose();
+  expect(f.bitmapContext.transferFromImageBitmap.mock.calls).toEqual([
+    [f.bitmap],
+    [f.bitmap],
+    [null],
+  ]);
+  expect(f.owner.allocatedBytes).toBe(0);
+});

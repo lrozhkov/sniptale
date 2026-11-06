@@ -6048,7 +6048,7 @@
       "reason": "tool-noise: One GPU presentation owner binds contexts, output storage and completion barriers. It transfers completed images to frontend leases and retires their storage after release. Frontend consumers retain visibility and geometry authority.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-06",
-      "astHash": "68b37a8e32cff12256f729015879661c3de5625c8a48cdc4e10d6e56dcc1065c",
+      "astHash": "41e8551f770e48cd87d3184ba42d141fe22066a52ca74d40db888228b4443fb0",
       "signatureHash": "d90b5780a0afc3c2eca6fc2047eee98f50313fd7a7b98e8327936cffa9d8c8fc"
     },
     {
