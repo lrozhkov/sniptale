@@ -352,3 +352,59 @@ it('keeps live selection chrome unchanged after a temporary preview render', () 
   expect(svg.innerHTML).toBe(liveMarkup);
   disposeEditorSelectionChrome(canvas as never);
 });
+
+it('keeps the Simplify resize border visible while hiding controls until release', () => {
+  useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: true });
+  const container = document.createElement('div');
+  const upperCanvasEl = document.createElement('canvas');
+  container.appendChild(upperCanvasEl);
+  upperCanvasEl.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+  const object = {
+    sniptaleType: 'simplify',
+    hasBorders: true,
+    hasControls: false,
+    controls: {},
+    borderColor: '#2563eb',
+    getCoords: () => [
+      { x: 10, y: 10 },
+      { x: 80, y: 10 },
+      { x: 80, y: 60 },
+      { x: 10, y: 60 },
+    ],
+  };
+  const listeners = new Map<
+    string,
+    (event?: { e?: { button: number }; target?: typeof object }) => void
+  >();
+  const canvas = {
+    upperCanvasEl,
+    _currentTransform: { action: 'scale' },
+    getWidth: () => 100,
+    getHeight: () => 100,
+    getActiveObject: () => object,
+    setCursor: (cursor: string) => {
+      upperCanvasEl.style.cursor = cursor;
+    },
+    on: (
+      name: string,
+      handler: (event?: { e?: { button: number }; target?: typeof object }) => void
+    ) => {
+      listeners.set(name, handler);
+      return () => listeners.delete(name);
+    },
+  };
+  mountEditorSelectionChrome(
+    canvas as never,
+    { getVisualGuides: () => ({ lines: [], points: [] }) } as never
+  );
+  const controls = container.querySelector<SVGGElement>(
+    '[data-ui="editor.canvas.selection-controls"]'
+  )!;
+  listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  expect(controls.style.opacity).toBe('1');
+  expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).toBe('0');
+  expect(controls.querySelector('polygon')?.getAttribute('stroke')).toBe('#2563eb');
+  window.dispatchEvent(new Event('pointercancel'));
+  expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).toBe('1');
+  disposeEditorSelectionChrome(canvas as never);
+});

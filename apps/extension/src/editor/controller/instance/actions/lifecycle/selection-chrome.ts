@@ -113,6 +113,7 @@ function appendSelectionControl(
   if (key === 'mtr') {
     const icon = svgElement('g', {
       transform: `translate(${point.x} ${point.y}) scale(${metrics.rotationRadius / (9 * zoom)})`,
+      opacity: 'var(--editor-selection-controls-opacity, 1)',
       fill: 'none',
       stroke: color,
       'stroke-width': 2,
@@ -137,6 +138,7 @@ function appendSelectionControl(
     svgElement('circle', {
       cx: point.x,
       cy: point.y,
+      opacity: 'var(--editor-selection-controls-opacity, 1)',
       r: radius / zoom,
       fill: object.cornerColor || '#fff',
       stroke: color,

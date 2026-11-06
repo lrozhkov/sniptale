@@ -1,4 +1,4 @@
-import { captureSource, createManualSource } from './simplify-source';
+import { captureSource, createManualSource, sourceCoversDrawing } from './simplify-source';
 import { pendingPresentation } from './simplify-presentation';
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { FabricImage, type Canvas, type FabricObject } from 'fabric';
@@ -33,6 +33,7 @@ interface EditorSimplifyRuntimeOptions {
 }
 type Job = {
   cleanup: () => void;
+  complete: () => void;
   generation: number;
   preview: boolean;
   sourceContext: string;
@@ -41,6 +42,7 @@ type Job = {
 type Runtime = {
   options: EditorSimplifyRuntimeOptions;
   jobs: Map<FabricObject, Job>;
+  presentations: Set<ReturnType<typeof pendingPresentation>>;
   dispose: () => void;
   generation: number;
   compute: EditorSimplifyCompute;
@@ -66,6 +68,7 @@ export function mountEditorSimplifyRuntime(options: EditorSimplifyRuntimeOptions
   const runtime: Runtime = {
     options,
     jobs: new Map(),
+    presentations: new Set(),
     generation: 0,
     dispose: () => undefined,
     compute: options.createCompute(),
@@ -99,6 +102,8 @@ export function mountEditorSimplifyRuntime(options: EditorSimplifyRuntimeOptions
     runtime.generation += 1;
     for (const object of runtime.jobs.keys()) cancel(object);
     runtime.pendingRefresh.clear();
+    for (const presentation of runtime.presentations) presentation.cleanup();
+    runtime.presentations.clear();
     runtime.compute.dispose();
     removed();
     added();
@@ -144,13 +149,14 @@ function commitComputedObject(
   const index = canvas.getObjects().indexOf(object);
   const selected = canvas.getActiveObjects().includes(object);
   runtime.jobs.delete(object);
-  job.cleanup();
   canvas.remove(object);
   canvas.insertAt(index, next);
   runtime.sourceContexts.set(next, job.sourceContext);
   runtime.options.prepareObject(next);
   if (selected) canvas.setActiveObject(next);
-  canvas.requestRenderAll();
+  // Paint the decoded result before removing its pending blur cover.
+  canvas.renderAll();
+  job.complete();
   notifyEditorSimplifyDocumentCommit(canvas);
   if (job.derived) runtime.options.publishDerived?.();
   else runtime.options.commitHistory();
@@ -174,13 +180,20 @@ export function requestEditorSimplify(
   runtime.jobs.delete(object);
   if (preview && JSON.stringify(settings) === JSON.stringify(drawing.settings)) return true;
   const compute = runtime.compute;
-  const presentation = pendingPresentation(canvas, drawing);
+  const presentation = pendingPresentation(canvas, drawing, () =>
+    runtime.presentations.delete(presentation)
+  );
+  runtime.presentations.add(presentation);
   setEditorSimplifyGeometryPreview(object, Boolean(drawing.sourceDirty));
   const job: Job = {
     cleanup: () => {
       presentation.cleanup();
       setEditorSimplifyGeometryPreview(object, false);
       object.canvas?.requestRenderAll();
+    },
+    complete: () => {
+      setEditorSimplifyGeometryPreview(object, false);
+      presentation.complete();
     },
     generation: runtime.generation,
     preview,
@@ -209,6 +222,8 @@ export function requestEditorSimplify(
         !drawing.settings.automatic && drawing.settings.manualKind === 'image';
       const retainedSource =
         !previousManualImage &&
+        drawing.source &&
+        sourceCoversDrawing(canvas, drawing.source, drawing) &&
         (knownContext === capturedContext || (knownContext === undefined && !drawing.sourceDirty))
           ? drawing.source
           : undefined;

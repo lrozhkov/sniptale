@@ -5,8 +5,13 @@ import { sampleEditorSimplifyRegion } from './object/simplify';
 
 export function pendingPresentation(
   canvas: Canvas,
-  drawing: DrawingSimplifyObject
-): { cleanup: () => void; show: (dataUrl: string, source: DrawingSimplifySource) => void } {
+  drawing: DrawingSimplifyObject,
+  onDisposed: () => void = () => undefined
+): {
+  cleanup: () => void;
+  complete: () => void;
+  show: (dataUrl: string, source: DrawingSimplifySource) => void;
+} {
   const overlay = document.createElement('div');
   overlay.setAttribute('role', 'status');
   overlay.setAttribute(
@@ -59,16 +64,48 @@ export function pendingPresentation(
   };
   const stop = canvas.on('after:render', update);
   update();
+  let live = true;
+  let animation: Animation | null = null;
+  const cleanup = () => {
+    if (!live) return;
+    live = false;
+    stop();
+    animation?.cancel();
+    overlay.remove();
+    onDisposed();
+  };
   return {
-    cleanup: () => {
+    cleanup,
+    complete: () => {
+      if (!live) return;
       stop();
-      overlay.remove();
+      overlay.replaceChildren();
+      overlay.removeAttribute('role');
+      if (
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+        typeof overlay.animate !== 'function'
+      ) {
+        cleanup();
+        return;
+      }
+      animation = overlay.animate(
+        [{ backdropFilter: 'blur(2px)' }, { backdropFilter: 'blur(0px)' }],
+        { duration: 150, easing: 'ease-out', fill: 'forwards' }
+      );
+      animation.onfinish = cleanup;
+      animation.oncancel = cleanup;
     },
     show: (dataUrl, source) => {
-      overlay.style.backdropFilter = 'none';
       const image = document.createElement('img');
-      image.src = dataUrl;
-      Object.assign(image.style, { width: '100%', height: '100%', maxWidth: 'none' });
+      Object.assign(image.style, {
+        position: 'absolute',
+        left: '0',
+        top: '0',
+        width: '100%',
+        height: '100%',
+        maxWidth: 'none',
+        opacity: '0',
+      });
       if (drawing.settings.automatic) {
         const region = sampleEditorSimplifyRegion(drawing, source).bounds;
         const center = {
@@ -88,7 +125,14 @@ export function pendingPresentation(
           ].join(' '),
         });
       }
-      overlay.replaceChildren(image);
+      image.onload = () => {
+        if (!live) return;
+        image.style.opacity = '1';
+        overlay.replaceChildren(image);
+        overlay.style.backdropFilter = 'none';
+      };
+      overlay.append(image);
+      image.src = dataUrl;
     },
   };
 }

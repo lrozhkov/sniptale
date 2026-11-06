@@ -4,7 +4,8 @@ import { Canvas, FabricImage, Rect } from 'fabric';
 import { createDefaultSimplifySettings } from '../../features/simplify/settings';
 import type { DrawingSimplifyObject } from '../../features/drawing/public';
 import { createEditorDrawingSimplifyObject } from './object/simplify';
-import { readEditorDrawingObject } from './object/metadata';
+import { readEditorDrawingObject, writeEditorDrawingObject } from './object/metadata';
+import * as editingSurface from '../document/canvas-surface/editing-surface';
 import { setEditorEditingSurfaceDimensions } from '../document/canvas-surface/editing-surface';
 import { undoEditorControllerSnapshot } from '../controller/public-api/document/history';
 import { createMockDocument } from '../controller/instance/bindings/test-fixtures-document';
@@ -442,6 +443,10 @@ it.each([15, 90])(
   'sends the unrotated manual-text source region plus %i degree projection',
   async (rotation) => {
     const f = fixture();
+    vi.spyOn(editingSurface, 'getEditorEditingDocumentSize').mockReturnValue({
+      width: 100,
+      height: 100,
+    });
     f.canvas.remove(f.object);
     const drawing = {
       ...f.drawing,
@@ -453,10 +458,10 @@ it.each([15, 90])(
     requestEditorSimplify(f.canvas, object);
     await settled();
     expect(vi.mocked(f.compute.render).mock.calls[0]![0].region).toEqual({
-      x: 0,
-      y: 0,
-      width: 20,
-      height: 10,
+      x: 5,
+      y: 5,
+      width: 80,
+      height: 40,
       rotation,
     });
     f.result.resolve({ ...f.snapshot, version: 'simplify-v1' });
@@ -511,3 +516,45 @@ it(
     });
   }
 );
+
+it('recaptures when geometry leaves the retained source even if lower layers are unchanged', async () => {
+  const f = fixture();
+  vi.spyOn(editingSurface, 'getEditorEditingDocumentSize').mockReturnValue({
+    width: 100,
+    height: 150,
+  });
+  writeEditorDrawingObject(f.object, {
+    ...f.drawing,
+    bounds: { x: 5, y: 80, width: 80, height: 40 },
+    sourceDirty: true,
+  });
+  requestEditorSimplify(f.canvas, f.object);
+  await settled();
+  const request = vi.mocked(f.compute.render).mock.calls[0]![0];
+  expect(request.source).toMatchObject({
+    width: 100,
+    height: 150,
+    bounds: { x: 0, y: 0, width: 100, height: 150 },
+  });
+  expect(request.region).toEqual({ x: 5, y: 80, width: 80, height: 40 });
+  f.result.resolve({ ...f.snapshot, version: 'recaptured' });
+  await settled();
+  expect(f.reportFailure).not.toHaveBeenCalled();
+  expect(f.commitHistory).toHaveBeenCalledTimes(1);
+});
+
+it('paints the accepted result while the pending blur cover is still mounted', async () => {
+  const f = fixture();
+  const render = vi.spyOn(f.canvas, 'renderAll').mockImplementation(() => {
+    expect(readEditorDrawingObject(f.canvas.getObjects()[0]!)).toMatchObject({
+      engineVersion: 'paint-first',
+    });
+    expect(f.canvas.wrapperEl.querySelector('[data-ui="editor.simplify.pending"]')).not.toBeNull();
+    return f.canvas;
+  });
+  requestEditorSimplify(f.canvas, f.object);
+  f.result.resolve({ ...f.snapshot, version: 'paint-first' });
+  await settled();
+  expect(render).toHaveBeenCalledOnce();
+  expect(f.canvas.wrapperEl.querySelector('[data-ui="editor.simplify.pending"]')).toBeNull();
+});
