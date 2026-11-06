@@ -5011,10 +5011,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One backend owns both bitmap and direct output. Both use the same slots, encoding lock and completion barriers. Device disposal waits for slots and destination storage. Fresh independent architecture review must check this exact binding.",
+      "reason": "tool-noise: One backend retains device, slot, encoding and completion authority. Conservative draw bounds limit fragment work inside the same encoding transaction. The private geometry helper has no device or publication authority. Fresh independent review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-05",
-      "astHash": "6f18e7c8f47d73e144b1108484b95c65c812ec9c6e4c474bdfe2022f20f022cd",
+      "reviewDate": "2026-11-07",
+      "astHash": "dda0a79062707072e1f3fc5dbf09b4f003539c3a6d48dd608b3619567ee7f45f",
       "signatureHash": "64d03ee42b8e2898569c0c7c9d536c5d779c544b4c854fcfbad5ecf1994e59d0"
     },
     {
@@ -5022,10 +5022,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot.encodeFrame",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One encoder orders child targets before the final pass. The destination callback acquires the output texture inside the encoding transaction. It adds no queue or publication owner. Fresh independent architecture review must check this exact binding.",
+      "reason": "tool-noise: One backend retains device, slot, encoding and completion authority. Conservative draw bounds limit fragment work inside the same encoding transaction. The private geometry helper has no device or publication authority. Fresh independent review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-05",
-      "astHash": "3ae7575ab4779dbc5d474c2166d24dbbfe8c9e5176b61c3481bbf7c097396e46",
+      "reviewDate": "2026-11-07",
+      "astHash": "e09e0d42056fc80bd515e7337e1d4789a3996c6c889cea27ea3c93e0c67903b5",
       "signatureHash": "f799385f7994330f3b39bb66daa8a62ae5d0692e8863cd847d7f2f5f01bb8458"
     },
     {
@@ -5275,11 +5275,11 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One GPU renderer owns device state, pipelines and frame slots. The optional presentation setting selects a destination backing through the existing presentation owner. Source borrowing and frame completion remain in the same transaction. Fresh independent architecture review must check this exact binding.",
+      "reason": "tool-noise: One backend retains device, slot, encoding and completion authority. Conservative draw bounds limit fragment work inside the same encoding transaction. The private geometry helper has no device or publication authority. Fresh independent review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-06",
-      "astHash": "284706bab15a374781e56739774af7a34a3ef025453e8659eb6d3b27e1b0e783",
-      "signatureHash": "16bec5f40093d209b522631489fe50557bbe6cd175a4702059a144681cf5c523"
+      "reviewDate": "2026-11-07",
+      "astHash": "1b623b2ab5a473240fc38394b580c9897be2efc3511c5c7ebbc56fe52ed56806",
+      "signatureHash": "2c1bbc47f797f1ee4934821615dc99b96d755a7a4474a1c7af10301f1bdbec5f"
     },
     {
       "rule": "structural-function-risk",
@@ -6012,10 +6012,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One private slot retains its textures, uniforms and filters. Direct output replaces only the final destination. Source and completion ownership remain in this slot. Fresh independent architecture review must check this exact binding.",
+      "reason": "tool-noise: One backend retains device, slot, encoding and completion authority. Conservative draw bounds limit fragment work inside the same encoding transaction. The private geometry helper has no device or publication authority. Fresh independent review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-05",
-      "astHash": "10bef8d13e97fb58c36dfbc7a99560d1425559836c08b2a4fbd80a998863e988",
+      "reviewDate": "2026-11-07",
+      "astHash": "76e1989b46d3905b24ae04899806c242845b5c7c90c034f18744198fab6ffc7b",
       "signatureHash": "50b7b6dfa55a91f0767233eb28825159abc77bd5595daebdd5d807e9251bebd0"
     },
     {

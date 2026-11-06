@@ -28,6 +28,7 @@ export function graphics() {
     };
   };
   const pass = {
+    setScissorRect: vi.fn<(x: number, y: number, width: number, height: number) => void>(),
     setPipeline: vi.fn(),
     setBindGroup: vi.fn(),
     draw: vi.fn(() => {

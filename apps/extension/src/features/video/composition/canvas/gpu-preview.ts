@@ -7,6 +7,7 @@ import type { CameraSpatialFrame, CameraSpatialRect } from '../../project/motion
 import type { QuickEditHomography } from '../motion/spatial-geometry';
 import { quickEditRotationMatrix } from '../motion/spatial-geometry';
 import { gpuPreviewShader } from './gpu-preview-shaders';
+import { createGpuPreviewDrawBounds } from './gpu-preview-bounds';
 import { createGpuPreviewFilter } from './gpu-preview-filter';
 import { createGpuPreviewCssFilter } from './gpu-preview-css-filter';
 import { prepareDecodedVideoFrame } from '../draw/decoded-sample';
@@ -826,6 +827,7 @@ export async function createGpuPreviewRenderer(
         outputTexture?: () => GPUTexture
       ) => {
         const { effects, masked, maskedEffects } = families;
+        const drawBounds = createGpuPreviewDrawBounds();
         const encoder = device.createCommandEncoder();
         let uniformIndex = 0;
         const renderedGroups = new Map<GpuPreviewGroup, GPUTexture>();
@@ -993,6 +995,7 @@ export async function createGpuPreviewRenderer(
                 ],
               })
             );
+            pass.setScissorRect(...drawBounds(layer, output, logical));
             pass.draw(3);
           });
           pass.end();
