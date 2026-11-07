@@ -482,6 +482,71 @@ function sampleFrameBorderRuns(
   return runs;
 }
 
+/** Preserve independently measured text outside an admitted outlined control. */
+export function splitTextOutsideFrame(image, box, frame, measure) {
+  const bottom = box.y + box.h,
+    right = box.x + box.w;
+  const middleTop = Math.max(box.y, frame.y),
+    middleBottom = Math.min(bottom, frame.y + frame.h);
+  const regions = [
+    { x: box.x, y: box.y, w: box.w, h: Math.min(bottom, frame.y) - box.y },
+    {
+      x: box.x,
+      y: Math.max(box.y, frame.y + frame.h),
+      w: box.w,
+      h: bottom - Math.max(box.y, frame.y + frame.h),
+    },
+    { x: box.x, y: middleTop, w: Math.min(right, frame.x) - box.x, h: middleBottom - middleTop },
+    {
+      x: Math.max(box.x, frame.x + frame.w),
+      y: middleTop,
+      w: right - Math.max(box.x, frame.x + frame.w),
+      h: middleBottom - middleTop,
+    },
+  ];
+  return regions
+    .filter((r) => r.w > 0 && r.h > 0)
+    .flatMap((r) => {
+      const atoms = inkParts(image, { ...r, bg: box.bg, atoms: null });
+      if (!atoms.length) return [];
+      const x = Math.max(r.x, Math.min(...atoms.map((p) => p.x)) - 1),
+        y = Math.max(r.y, Math.min(...atoms.map((p) => p.y)) - 1),
+        edge = Math.min(r.x + r.w, Math.max(...atoms.map((p) => p.x + p.w)) + 1),
+        base = Math.min(r.y + r.h, Math.max(...atoms.map((p) => p.y + p.h)) + 1);
+      const candidate = {
+        x,
+        y,
+        w: edge - x,
+        h: base - y,
+        bg: box.bg,
+        shape: 'unknown',
+        kind: 'frame-exterior',
+        componentCount: atoms.length,
+        atoms,
+      };
+      let metric = measure(image, candidate, 1);
+      if (!metric || metric.baselineAgreement < 0.7 || metric.heightAgreement < 0.7)
+        return [candidate];
+      if (metric.glyphs === 1 && atoms.length === 1) {
+        const p = atoms[0];
+        // A square or wide single contour is not independent text evidence.
+        if (p.w > p.h * 0.9) return [candidate];
+        metric = {
+          ...metric,
+          xHeight: p.h,
+          upperHeight: p.h,
+          glyphBounds: { x: p.x, y: p.y, w: p.w, h: p.h },
+          inferredFromContext: true,
+        };
+      }
+      if (metric.stroke / metric.xHeight <= 0.4) {
+        candidate.shape = 'text';
+        candidate.typeMetrics = metric;
+      }
+      return [candidate];
+    });
+}
+
 function frameExteriorClaims(box, frame) {
   const output = [];
   for (const [x, w] of [

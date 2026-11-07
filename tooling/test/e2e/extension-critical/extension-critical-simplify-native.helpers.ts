@@ -627,3 +627,91 @@ export async function assertNativeNestedScrollSimplify(page: Page, info: TestInf
     fullPage: false,
   });
 }
+
+export async function assertNativeRepeatedSimplifyToolbar(page: Page, info: TestInfo) {
+  await prepareNativeSimplifySource(page, 'drawing');
+  await drawNativeAutomaticSimplify(page, 'drawing', info);
+  const pair = page.locator('[data-ui="content.toolbar.drawing-options.pair"]');
+  await expect(pair).toBeVisible();
+  const trigger = page.locator('[data-ui="content.toolbar.drawing.simplify"]');
+  await trigger.evaluate((button) => {
+    const root = button.getRootNode();
+    if (!(root instanceof ShadowRoot)) throw new Error('Content UI root unavailable');
+    const state = {
+      active: true,
+      frames: [] as {
+        capturing: boolean;
+        width: number;
+        height: number;
+        pair: boolean;
+        pending: boolean;
+      }[],
+    };
+    (
+      window as typeof window & { __repeatedSimplifyToolbar?: typeof state }
+    ).__repeatedSimplifyToolbar = state;
+    const record = () => {
+      if (!state.active) return;
+      const toolbar = button.closest('.sniptale-toolbar');
+      const bounds = toolbar?.getBoundingClientRect();
+      state.frames.push({
+        capturing: root.host.classList.contains('sniptale-capture-ui-hidden'),
+        width: bounds?.width ?? 0,
+        height: bounds?.height ?? 0,
+        pair: Boolean(root.querySelector('[data-ui="content.toolbar.drawing-options.pair"]')),
+        pending: Boolean(root.querySelector('[data-ui="content.drawing.simplify-pending"]')),
+      });
+      requestAnimationFrame(record);
+    };
+    requestAnimationFrame(record);
+  });
+  await page.mouse.move(820, 200);
+  await page.mouse.down();
+  await page.mouse.move(1050, 320, { steps: 8 });
+  await expect(pair).toHaveCount(0);
+  await expect(trigger).toBeVisible();
+  const menus = page.locator('.sniptale-drawing-options-popover');
+  await expect(menus).toHaveCount(1);
+  await expect(menus).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath('repeated-new-area-toolbar.png'),
+    fullPage: false,
+  });
+  await page.mouse.up();
+  await waitForNativeSimplifyCount(page, 2);
+  const frames = await page.evaluate(() => {
+    const state = (
+      window as typeof window & {
+        __repeatedSimplifyToolbar?: {
+          active: boolean;
+          frames: {
+            capturing: boolean;
+            width: number;
+            height: number;
+            pair: boolean;
+            pending: boolean;
+          }[];
+        };
+      }
+    ).__repeatedSimplifyToolbar;
+    if (!state) throw new Error('Toolbar samples unavailable');
+    state.active = false;
+    return state.frames;
+  });
+  const concealed = frames.filter((frame) => frame.capturing);
+  expect(concealed.length).toBeGreaterThan(0);
+  expect(concealed.every((frame) => frame.width > 0 && frame.height > 0)).toBe(true);
+  expect(frames.filter((frame) => frame.pending).every((frame) => !frame.pair)).toBe(true);
+  await expect(pair).toBeVisible();
+  const panels = await pair.locator('.sniptale-drawing-options-popover').all();
+  expect(panels).toHaveLength(2);
+  const first = await panels[0]!.boundingBox(),
+    second = await panels[1]!.boundingBox();
+  if (!first || !second) throw new Error('Selected toolbar panels unavailable');
+  expect(Math.abs(second.x - first.x - first.width - 8)).toBeLessThanOrEqual(1);
+  expect(Math.abs(second.y - first.y)).toBeLessThanOrEqual(1);
+  await page.screenshot({
+    path: info.outputPath('repeated-selected-toolbar.png'),
+    fullPage: false,
+  });
+}

@@ -12,6 +12,7 @@ import {
   recoverFramedCarets,
   recoverFramedLabels,
   preserveMixedFrameClaims,
+  splitTextOutsideFrame,
 } from './frame-support.mjs';
 import {
   refineTextStructure,
@@ -246,6 +247,7 @@ function discoverControlFrameLabels(image, controls, glyphMetrics) {
       continue;
     const inner = { x: frame.x + 3, y: frame.y + 3, w: frame.w - 6, h: frame.h - 6 };
     inner.bg = sampleBackground(image, inner);
+    inner.bg = interiorBackground(image, inner) ?? inner.bg;
     const parts = inkParts(image, inner);
     if (!parts.length || parts.length > 2) continue;
     const left = Math.min(...parts.map((p) => p.x)),
@@ -305,6 +307,18 @@ function admitControlLabels(
             Math.max(0, Math.min(b.x + b.w, label.x + label.w) - Math.max(b.x, label.x)) *
             Math.max(0, Math.min(b.y + b.h, label.y + label.h) - Math.max(b.y, label.y));
           if (overlap < Math.min(b.w * b.h, label.w * label.h) * 0.6) return false;
+          if (
+            controls.protected.some(
+              (f) =>
+                f.kind === 'outline' &&
+                label.x >= f.x &&
+                label.y >= f.y &&
+                label.x + label.w <= f.x + f.w &&
+                label.y + label.h <= f.y + f.h &&
+                (b.x < f.x || b.y < f.y || b.x + b.w > f.x + f.w || b.y + b.h > f.y + f.h)
+            )
+          )
+            return false;
           const m = glyphMetrics(image, b);
           if (!m || m.glyphs < 3 || m.baselineAgreement < 0.7 || m.heightAgreement < 0.7)
             return false;
@@ -321,8 +335,23 @@ function admitControlLabels(
           );
         })
     );
-  catalog = catalog.filter((b) => !labels.some((label) => intersects(b, label)));
-  catalog.push(...labels);
+  for (const label of labels) {
+    const frame = controls.protected.find(
+      (f) =>
+        f.kind === 'outline' &&
+        label.x >= f.x &&
+        label.y >= f.y &&
+        label.x + label.w <= f.x + f.w &&
+        label.y + label.h <= f.y + f.h
+    );
+    catalog = catalog.flatMap((b) => {
+      if (!intersects(b, label)) return [b];
+      return frame && b.shape === 'text'
+        ? splitTextOutsideFrame(image, b, frame, glyphMetrics)
+        : [];
+    });
+    catalog.push(label);
+  }
   for (const b of detectRaw(analysisImage, 55, true, 32, scratch, backgrounds)) {
     const owner = controls.boundaries.find(
       (f) => b.x >= f.x && b.y >= f.y && b.x + b.w <= f.x + f.w && b.y + b.h <= f.y + f.h

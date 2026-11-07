@@ -16,6 +16,7 @@ import {
   assertNativeManualMove,
   assertNativeManualResize,
   assertNativeNestedScrollSimplify,
+  assertNativeRepeatedSimplifyToolbar,
   captureSimplifyToEditor,
 } from './extension-critical-simplify-native.helpers';
 import {
@@ -195,6 +196,26 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       const observer = await observeSimplifyWorker(context, extensionId, page);
       await assertNativeNestedScrollSimplify(page, info);
       if (observer) await writeSimplifyWorkerObservation(context, page, observer, 'nested', info);
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Simplify keeps toolbar geometry while creating another region ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120_000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await grantNativeSimplifyCapture(popup);
+      const observer = await observeSimplifyWorker(context, extensionId, page);
+      await assertNativeRepeatedSimplifyToolbar(page, info);
+      if (observer) await writeSimplifyWorkerObservation(context, page, observer, 'repeated', info);
     } finally {
       await popup.close();
       await page.close();

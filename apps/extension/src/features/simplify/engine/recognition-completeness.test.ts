@@ -588,3 +588,65 @@ it('retains control-label ownership across a one-pixel gutter between filled con
   expect(claims.controls.labels).toEqual([label]);
   expect(execute(canvas)(30, 30, 60, 16)).toBeGreaterThan(100);
 });
+
+for (const scale of [1, 2])
+  for (const neighbor of ['2', 'Next'])
+    it(`keeps a framed short label separate from adjacent ${neighbor} at scale ${scale}`, () => {
+      const canvas = createCanvas(430 * scale, 100 * scale),
+        context = canvas.getContext('2d');
+      context.scale(scale, scale);
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, 430, 100);
+      context.strokeStyle = '#bbbbbb';
+      context.lineWidth = 1;
+      context.strokeRect(20.5, 30.5, 25, 23);
+      context.font = '12px Arial';
+      context.textBaseline = 'top';
+      context.fillStyle = '#666666';
+      context.fillText('1', 29, 36);
+      context.fillStyle = '#0064bf';
+      context.fillText(neighbor, 54, 36);
+      if (neighbor === '2')
+        ['3', '4', '5', '6'].forEach((text, i) => context.fillText(text, 78 + i * 24, 36));
+      context.fillText('Continue browsing', 200, 36);
+      const delta = execute(canvas);
+      expect(delta(29 * scale, 36 * scale, 8 * scale, 14 * scale)).toBeGreaterThan(8);
+      expect(delta(54 * scale, 36 * scale, 8 * scale, 14 * scale)).toBeGreaterThan(8);
+      expect(delta(45 * scale, 34 * scale, scale, 16 * scale)).toBe(0);
+      expect(delta(47 * scale, 34 * scale, 6 * scale, 16 * scale)).toBe(0);
+    });
+
+it.each(['outline', 'arrow'])(
+  'preserves an independent %s icon beside a framed text label',
+  (kind) => {
+    const canvas = createCanvas(300, 100),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 300, 100);
+    context.strokeStyle = '#bbbbbb';
+    context.lineWidth = 1;
+    context.strokeRect(20.5, 30.5, 25, 23);
+    context.font = '12px Arial';
+    context.textBaseline = 'top';
+    context.fillStyle = '#666666';
+    context.fillText('1', 29, 36);
+    context.strokeStyle = '#0064bf';
+    context.fillStyle = '#0064bf';
+    if (kind === 'outline') context.strokeRect(54.5, 37.5, 10, 10);
+    else {
+      context.beginPath();
+      context.moveTo(54, 39);
+      context.lineTo(60, 39);
+      context.lineTo(60, 35);
+      context.lineTo(67, 42);
+      context.lineTo(60, 49);
+      context.lineTo(60, 45);
+      context.lineTo(54, 45);
+      context.closePath();
+      context.fill();
+    }
+    const delta = execute(canvas);
+    expect(delta(29, 36, 8, 14)).toBeGreaterThan(8);
+    expect(delta(53, 34, 16, 17)).toBe(0);
+  }
+);
