@@ -1,6 +1,8 @@
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   appendDrawingSamples,
+  getDrawingSelectionBounds,
+  transformDrawingObjectVector,
   resolveDrawingMarqueeSelection,
   translateDrawingObject,
   updateCreatedDrawingObject,
@@ -9,6 +11,14 @@ import {
   type DrawingPoint,
 } from '../../features/drawing/public';
 import type { PageScrollRoot } from '../platform/page-scroll';
+import {
+  isDrawingAlignmentObject,
+  resolveDrawingMoveAlignment,
+  resolveDrawingResizeAlignment,
+  getDrawingResizeHandleGeometry,
+  type DrawingAlignmentGuide,
+} from './move-alignment';
+import { collectDrawingDomAlignmentBounds } from './move-alignment-dom';
 import {
   resizeDrawingObject,
   rotateDrawingObject,
@@ -56,14 +66,44 @@ function updateCreateDraft(
   return { ...draft, object };
 }
 
-export function updateDrawingPointerDraft(args: {
+export function updateDrawingMarqueeDraft(
+  draft: Extract<PointerDraft, { kind: 'marquee' }>,
+  point: DrawingPoint,
+  documentObjects: readonly DrawingObject[]
+): { draft: Extract<PointerDraft, { kind: 'marquee' }>; selection?: readonly string[] } {
+  if (draft.clickObjectId && Math.hypot(point.x - draft.start.x, point.y - draft.start.y) < 4) {
+    return { draft };
+  }
+  const marquee = { ...draft, current: point };
+  delete marquee.clickObjectId;
+  return {
+    draft: marquee,
+    selection: resolveDrawingMarqueeSelection({
+      current: point,
+      initialIds: draft.initialSelectionIds,
+      mode: draft.mode,
+      objects: documentObjects,
+      start: draft.start,
+    }),
+  };
+}
+
+type DrawingPointerUpdateInput = {
   documentObjects: readonly DrawingObject[];
   draft: PointerDraft;
   event: ReactPointerEvent<HTMLCanvasElement>;
   point: DrawingPoint;
   root: PageScrollRoot;
-}): { draft: PointerDraft; selection?: readonly string[] } {
+  modifiers?: { altKey?: boolean; ctrlKey: boolean; shiftKey: boolean };
+  alignToPage?: boolean;
+};
+
+function updateRawDrawingPointerDraft(args: DrawingPointerUpdateInput): {
+  draft: PointerDraft;
+  selection?: readonly string[];
+} {
   const { draft, event, point } = args;
+  const modifiers = args.modifiers ?? { ctrlKey: event.ctrlKey, shiftKey: event.shiftKey };
   if (draft.kind === 'bend') {
     const moved = Math.hypot(point.x - draft.start.x, point.y - draft.start.y) >= 4;
     return {
@@ -80,10 +120,7 @@ export function updateDrawingPointerDraft(args: {
   }
   if (draft.kind === 'rotate-selection') {
     return {
-      draft: rotateDrawingSelection(draft, point, {
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-      }),
+      draft: rotateDrawingSelection(draft, point, modifiers),
     };
   }
   if (draft.kind === 'create') return { draft: updateCreateDraft(draft, event, args.root) };
@@ -107,23 +144,95 @@ export function updateDrawingPointerDraft(args: {
       },
     };
   }
-  if (draft.kind === 'marquee') {
-    return {
-      draft: { ...draft, current: point },
-      selection: resolveDrawingMarqueeSelection({
-        current: point,
-        initialIds: draft.initialSelectionIds,
-        mode: draft.mode,
-        objects: args.documentObjects,
-        start: draft.start,
-      }),
-    };
-  }
-  const modifiers = { ctrlKey: event.ctrlKey, shiftKey: event.shiftKey };
+  if (draft.kind === 'marquee')
+    return updateDrawingMarqueeDraft(draft, point, args.documentObjects);
   return {
     draft:
       draft.kind === 'resize'
         ? { ...draft, object: resizeDrawingObject(draft, point, modifiers) }
         : { ...draft, object: rotateDrawingObject(draft, point, modifiers) },
   };
+}
+
+function alignTransformedDraft(
+  draft: PointerDraft,
+  objects: readonly DrawingObject[],
+  root: PageScrollRoot,
+  point: DrawingPoint,
+  modifiers: { ctrlKey: boolean; shiftKey: boolean }
+): { draft: PointerDraft; guides: DrawingAlignmentGuide[] } {
+  if (draft.kind === 'resize') {
+    if (!isDrawingAlignmentObject(draft.original) || draft.original.kind === 'text')
+      return { draft, guides: [] };
+    const bounds = getDrawingSelectionBounds([draft.object]);
+    if (!bounds) return { draft, guides: [] };
+    const geometry = getDrawingResizeHandleGeometry(draft, point, modifiers.ctrlKey);
+    const horizontal = transformDrawingObjectVector(draft.original, {
+      x: geometry.x ? 1 : 0,
+      y: 0,
+    });
+    const vertical = transformDrawingObjectVector(draft.original, { x: 0, y: geometry.y ? 1 : 0 });
+    const probe = {
+      ...(Math.abs(horizontal.x) > 1e-6 || Math.abs(vertical.x) > 1e-6
+        ? { x: geometry.current.x }
+        : {}),
+      ...(Math.abs(horizontal.y) > 1e-6 || Math.abs(vertical.y) > 1e-6
+        ? { y: geometry.current.y }
+        : {}),
+    };
+    const alignment = resolveDrawingResizeAlignment({
+      draft,
+      point,
+      modifiers,
+      objects,
+      domBounds: collectDrawingDomAlignmentBounds(bounds, root, probe),
+    });
+    return { draft: { ...draft, object: alignment.object }, guides: alignment.guides };
+  }
+  const moving =
+    draft.kind === 'move' ? [draft.object] : draft.kind === 'move-selection' ? draft.objects : [];
+  const bounds = getDrawingSelectionBounds(moving);
+  if (!bounds || !moving.every(isDrawingAlignmentObject)) return { draft, guides: [] };
+  const alignment = resolveDrawingMoveAlignment({
+    moving,
+    objects,
+    domBounds: collectDrawingDomAlignmentBounds(bounds, root),
+  });
+  if (draft.kind === 'move')
+    return {
+      draft: { ...draft, object: translateDrawingObject(draft.object, alignment.delta) },
+      guides: alignment.guides,
+    };
+  if (draft.kind === 'move-selection')
+    return {
+      draft: {
+        ...draft,
+        objects: draft.objects.map((object) => translateDrawingObject(object, alignment.delta)),
+      },
+      guides: alignment.guides,
+    };
+  return { draft, guides: [] };
+}
+
+export function updateDrawingPointerDraft(args: DrawingPointerUpdateInput): {
+  draft: PointerDraft;
+  selection?: readonly string[];
+  guides?: DrawingAlignmentGuide[];
+} {
+  const update = updateRawDrawingPointerDraft(args);
+  const modifiers = args.modifiers ?? args.event;
+  if (
+    !args.alignToPage ||
+    modifiers.altKey ||
+    Math.hypot(args.point.x - args.draft.start.x, args.point.y - args.draft.start.y) < 4
+  )
+    return update;
+  const aligned = alignTransformedDraft(
+    update.draft,
+    args.documentObjects,
+    args.root,
+    args.point,
+    modifiers
+  );
+  return { ...update, draft: aligned.draft, guides: aligned.guides };
 }

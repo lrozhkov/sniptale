@@ -70,7 +70,7 @@ export function drawDrawingFrame(args: {
         });
     });
   }
-  if (showChrome && !args.bendOnly && draft?.kind === 'marquee') {
+  if (showChrome && !args.bendOnly && draft?.kind === 'marquee' && !draft.clickObjectId) {
     renderDrawingMarquee(context, draft.start, draft.current, projection);
   }
   context.restore();

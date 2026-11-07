@@ -67,6 +67,7 @@ export type PointerDraft =
       start: DrawingPoint;
       current: DrawingPoint;
       initialSelectionIds: readonly string[];
+      clickObjectId?: string;
       mode: DrawingSelectionMode;
       object?: never;
     }
@@ -560,6 +561,23 @@ export function beginDrawingPointer(args: {
     };
   }
   if (snapshot.activeTool === 'select') {
+    const mode: DrawingSelectionMode = modifiers.ctrlKey
+      ? 'toggle'
+      : modifiers.shiftKey
+        ? 'add'
+        : 'replace';
+    if (hit && !snapshot.selectedObjectIds.includes(hit.id)) {
+      return {
+        draft: {
+          kind: 'marquee',
+          start: point,
+          current: point,
+          initialSelectionIds: snapshot.selectedObjectIds,
+          clickObjectId: hit.id,
+          mode,
+        },
+      };
+    }
     if (hit && modifiers.ctrlKey) {
       return {
         draft: null,
@@ -589,11 +607,6 @@ export function beginDrawingPointer(args: {
         selection,
       };
     }
-    const mode: DrawingSelectionMode = modifiers.ctrlKey
-      ? 'toggle'
-      : modifiers.shiftKey
-        ? 'add'
-        : 'replace';
     return {
       draft: {
         kind: 'marquee',
@@ -627,7 +640,16 @@ export function commitDrawingPointerDraft(
   draft: PointerDraft | null
 ): void {
   if (!draft) return;
-  if (draft.kind === 'marquee') return;
+  if (draft.kind === 'marquee') {
+    if (draft.clickObjectId) {
+      const selected = new Set(draft.mode === 'replace' ? [] : draft.initialSelectionIds);
+      if (draft.mode === 'toggle' && selected.has(draft.clickObjectId)) {
+        selected.delete(draft.clickObjectId);
+      } else selected.add(draft.clickObjectId);
+      session.setSelection([...selected]);
+    }
+    return;
+  }
   if (draft.kind === 'move-selection' || draft.kind === 'rotate-selection') {
     if (draft.objects.some((object, index) => object !== draft.originals[index]))
       session.replaceObjects(draft.objects);

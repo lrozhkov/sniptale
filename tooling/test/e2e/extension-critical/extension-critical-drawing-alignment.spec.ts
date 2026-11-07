@@ -96,6 +96,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await expect.poll(() => inkAt(ink, 300, 175)).toBeGreaterThan(0);
       await expect.poll(() => inkAt(ink, 600, 275)).toBe(0);
       await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(320, 160);
       await page.mouse.move(320, 160);
       await page.mouse.down();
       await page.mouse.move(624, 264, { steps: 5 });
@@ -106,6 +107,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await expect.poll(() => inkAt(ink, 300, 175)).toBeGreaterThan(0);
       await drawShape(page, 'rectangle', 800, 260, 200, 160);
       await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(320, 160);
       await page.mouse.move(320, 160);
       await page.mouse.down();
       await page.mouse.move(824, 264, { steps: 8 });
@@ -129,6 +131,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       ]) {
         await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
         const before = (await text.boundingBox())!;
+        await page.mouse.click(before.x + before.width / 2, before.y + before.height / 2);
         await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
         await page.mouse.down();
         await page.mouse.move(target.centerX + 4, 343, { steps: 8 });
@@ -231,6 +234,190 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     } finally {
       await page.close();
       await popup.close();
+    }
+  });
+}
+
+async function drag(page: Page, start: { x: number; y: number }, end: { x: number; y: number }) {
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 5 });
+  await page.mouse.up();
+}
+async function expectHandle(page: Page, x: number, y: number) {
+  await expect
+    .poll(async () => {
+      const center = await page.locator('[data-ui="content.drawing.selection-chrome"]').evaluate(
+        (node, point) => {
+          if (!(node instanceof HTMLCanvasElement)) throw new Error('Selection canvas unavailable');
+          const ratio = node.width / innerWidth,
+            radius = 11;
+          const left = Math.round((point.x - radius) * ratio),
+            top = Math.round((point.y - radius) * ratio);
+          const data = node
+            .getContext('2d')!
+            .getImageData(
+              left,
+              top,
+              Math.round(radius * 2 * ratio),
+              Math.round(radius * 2 * ratio)
+            );
+          let minX = data.width,
+            minY = data.height,
+            maxX = -1,
+            maxY = -1;
+          for (let yy = 0; yy < data.height; yy++)
+            for (let xx = 0; xx < data.width; xx++)
+              if (data.data[(yy * data.width + xx) * 4 + 3]! > 0) {
+                minX = Math.min(minX, xx);
+                maxX = Math.max(maxX, xx);
+                minY = Math.min(minY, yy);
+                maxY = Math.max(maxY, yy);
+              }
+          return maxX < 0
+            ? null
+            : {
+                x: (left + (minX + maxX + 1) / 2) / ratio,
+                y: (top + (minY + maxY + 1) / 2) / ratio,
+              };
+        },
+        { x, y }
+      );
+      return center ? Math.max(Math.abs(center.x - x), Math.abs(center.y - y)) : Infinity;
+    })
+    .toBeLessThanOrEqual(1);
+}
+async function expectGroupBounds(page: Page) {
+  await expect
+    .poll(() =>
+      page.locator('[data-ui="content.drawing.selection-chrome"]').evaluate((node) => {
+        if (!(node instanceof HTMLCanvasElement)) throw new Error('Selection canvas unavailable');
+        const ratio = node.width / innerWidth,
+          context = node.getContext('2d')!;
+        return [
+          [520, 219, 20, 3],
+          [499, 235, 3, 20],
+          [709, 235, 3, 20],
+          [660, 269, 20, 3],
+        ].map(([x, y, w, h]) => {
+          const data = context.getImageData(
+            Math.round(x! * ratio),
+            Math.round(y! * ratio),
+            Math.round(w! * ratio),
+            Math.round(h! * ratio)
+          ).data;
+          return data.some((value, index) => index % 4 === 3 && value > 0);
+        });
+      })
+    )
+    .toEqual([true, true, true, true]);
+}
+async function enterDrawing(page: Page) {
+  await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+  await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+  await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+  await page.locator('[data-ui="content.toolbar.drawing-options.shape.kind-rectangle"]').click();
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`page resize snaps page edges, bypasses with Alt and leaves creation free ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await page.evaluate(() => {
+        const target = document.createElement('div');
+        target.id = 'resize-alignment-target';
+        target.style.cssText =
+          'position:absolute;left:620px;top:320px;width:180px;height:140px;background:#dbeafe';
+        target.textContent = 'Resize target';
+        document.body.append(target);
+      });
+      await enterDrawing(page);
+      await expect(page.locator('[data-ui="content.toolbar.drawing.shape"]')).toHaveAttribute(
+        'title',
+        /Alt/
+      );
+      await drag(page, { x: 400, y: 160 }, { x: 616, y: 316 });
+      await expectHandle(page, 616, 316);
+      await page.mouse.move(616, 316);
+      await page.mouse.down();
+      await page.mouse.move(624, 324, { steps: 4 });
+      const guides = page.locator('[data-ui="content.drawing.alignment-guides"]');
+      await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '620');
+      await expect(guides.locator('[data-axis="y"]')).toHaveAttribute('y1', '320');
+      await page.screenshot({ path: info.outputPath('resize-snapped.png'), fullPage: false });
+      await page.keyboard.down('Alt');
+      await expect(guides).toHaveCount(0);
+      await page.keyboard.up('Alt');
+      await expect(guides.locator('line')).toHaveCount(2);
+      await page.mouse.up();
+      await expectHandle(page, 400, 160);
+      await expectHandle(page, 620, 320);
+      await page.mouse.move(620, 240);
+      await page.mouse.down();
+      await page.mouse.move(796, 240, { steps: 5 });
+      await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '800');
+      await expect(guides.locator('[data-axis="y"]')).toHaveCount(0);
+      await page.keyboard.down('Alt');
+      await expect(guides).toHaveCount(0);
+      await page.mouse.up();
+      await page.keyboard.up('Alt');
+      await expectHandle(page, 796, 240);
+      await expectHandle(page, 400, 240);
+      await page.screenshot({ path: info.outputPath('resize-alt-release.png'), fullPage: false });
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+
+  test(`marquee starts over an unselected filled layer and selects only contained layers ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await enterDrawing(page);
+      const fill = page.locator('[data-ui="content.toolbar.drawing-options.shape.fill-toggle"]');
+      if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
+      await drag(page, { x: 350, y: 140 }, { x: 900, y: 450 });
+      await page.keyboard.press('Escape');
+      await drag(page, { x: 500, y: 220 }, { x: 560, y: 270 });
+      await page.keyboard.press('Escape');
+      await drag(page, { x: 650, y: 220 }, { x: 710, y: 270 });
+      await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+      await page.mouse.click(300, 180);
+      const actions = page.locator('[data-ui="drawing.selection.actions"]');
+      await expect(actions).toHaveCount(0);
+      await page.mouse.move(450, 200);
+      await page.mouse.down();
+      await expect(actions).toHaveCount(0);
+      await page.mouse.move(740, 300, { steps: 6 });
+      await page.screenshot({
+        path: info.outputPath('marquee-over-background.png'),
+        fullPage: false,
+      });
+      await page.mouse.up();
+      await expectGroupBounds(page);
+      await page.mouse.click(450, 200);
+      await expectHandle(page, 350, 140);
+      await expectHandle(page, 900, 450);
+      await page.keyboard.down('Alt');
+      await drag(page, { x: 450, y: 200 }, { x: 470, y: 210 });
+      await page.keyboard.up('Alt');
+      await expectHandle(page, 370, 150);
+      await expectHandle(page, 920, 460);
+      await page.screenshot({
+        path: info.outputPath('selected-background-still-moves.png'),
+        fullPage: false,
+      });
+    } finally {
+      await popup.close();
+      await page.close();
     }
   });
 }

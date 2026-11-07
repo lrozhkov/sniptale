@@ -201,6 +201,7 @@ export function ToolbarSecondaryControls(props: {
       toolbarProps.drawingMode &&
       toolbarProps.drawingController ? (
         <ToolbarDrawingControls
+          pageAlignment
           controller={toolbarProps.drawingController}
           displayMode={viewModel.derivedState.displayMode}
         />

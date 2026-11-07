@@ -9,6 +9,11 @@ import {
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
+import * as trustedEvents from '../platform/trusted-events';
+vi.mock('../platform/trusted-events', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../platform/trusted-events')>()),
+  isTrustedKeyboardEvent: vi.fn(() => true),
+}));
 
 vi.mock('../platform/dom-host', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/dom-host')>()),
@@ -35,8 +40,13 @@ function touchEvent(type: string, pointerId: number, clientY: number): MouseEven
   return event;
 }
 
-function mousePointerEvent(type: string, clientX: number, clientY: number): MouseEvent {
-  const event = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY });
+function mousePointerEvent(
+  type: string,
+  clientX: number,
+  clientY: number,
+  modifiers: MouseEventInit = {}
+): MouseEvent {
+  const event = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY, ...modifiers });
   Object.defineProperties(event, {
     pointerId: { value: 1 },
     pointerType: { value: 'mouse' },
@@ -280,8 +290,8 @@ function setupAlignmentSurface(enabled = true) {
     session,
     host,
     render,
-    event: (type: string, x: number, y: number) =>
-      act(() => canvas.dispatchEvent(mousePointerEvent(type, x, y))),
+    event: (type: string, x: number, y: number, modifiers: MouseEventInit = {}) =>
+      act(() => canvas.dispatchEvent(mousePointerEvent(type, x, y, modifiers))),
     moving: () => session.getSnapshot().document.objects.find((object) => object.id === 'moving'),
     dispose: () => act(() => root.unmount()),
   };
@@ -523,4 +533,141 @@ it('keeps a pending mask at its released geometry and hides handles without chan
   expect(privateHost.style.width).toBe('40px');
   act(() => root.unmount());
   session.dispose();
+});
+
+it.each([true, false])('aligns an existing shape resize only with page opt-in=%s', (enabled) => {
+  const scene = setupAlignmentSurface(enabled);
+  scene.event('pointerdown', 160, 140);
+  scene.event('pointermove', 296, 196);
+  expect(
+    scene.host.querySelectorAll('[data-ui="content.drawing.alignment-guides"] line')
+  ).toHaveLength(enabled ? 2 : 0);
+  expect(scene.commit).not.toHaveBeenCalled();
+  scene.event('pointerup', 296, 196);
+  expect(scene.moving()).toMatchObject({
+    bounds: { x: 80, y: 80, width: enabled ? 220 : 216, height: enabled ? 120 : 116 },
+  });
+  expect(scene.commit).toHaveBeenCalledOnce();
+  scene.dispose();
+});
+
+it.each(['move', 'resize'])(
+  'Alt immediately releases and restores %s alignment without pointer motion',
+  (kind) => {
+    const scene = setupAlignmentSurface();
+    const start = kind === 'move' ? { x: 120, y: 110 } : { x: 160, y: 140 };
+    const end = kind === 'move' ? { x: 344, y: 234 } : { x: 296, y: 196 };
+    scene.event('pointerdown', start.x, start.y);
+    scene.event('pointermove', end.x, end.y);
+    const guides = () =>
+      scene.host.querySelectorAll('[data-ui="content.drawing.alignment-guides"] line');
+    expect(guides()).toHaveLength(2);
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true })));
+    expect(guides()).toHaveLength(0);
+    act(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt', altKey: false })));
+    expect(guides()).toHaveLength(2);
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt', altKey: true })));
+    scene.event('pointerup', end.x, end.y, { altKey: true });
+    expect(scene.moving()).toMatchObject(
+      kind === 'move'
+        ? { bounds: { x: 304, y: 204, width: 80, height: 60 } }
+        : { bounds: { x: 80, y: 80, width: 216, height: 116 } }
+    );
+    expect(scene.commit).toHaveBeenCalledOnce();
+    act(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' })));
+    expect(guides()).toHaveLength(0);
+    scene.dispose();
+  }
+);
+
+it.each(['pointercancel', 'lostpointercapture', 'blur'])(
+  'discards resize alignment on %s',
+  (reason) => {
+    const scene = setupAlignmentSurface();
+    scene.event('pointerdown', 160, 140);
+    scene.event('pointermove', 296, 196);
+    expect(
+      scene.host.querySelectorAll('[data-ui="content.drawing.alignment-guides"] line')
+    ).toHaveLength(2);
+    if (reason === 'blur') act(() => window.dispatchEvent(new Event('blur')));
+    else scene.event(reason, 296, 196);
+    scene.event('pointerup', 296, 196);
+    expect(scene.moving()).toMatchObject({ bounds: { x: 80, y: 80, width: 80, height: 60 } });
+    expect(scene.commit).not.toHaveBeenCalled();
+    scene.dispose();
+  }
+);
+
+function addNestedLayer(scene: ReturnType<typeof setupAlignmentSurface>) {
+  act(() => {
+    scene.session.commitObject({
+      id: 'inner',
+      kind: 'rectangle',
+      bounds: { x: 360, y: 260, width: 40, height: 30 },
+      color: '#f00',
+      fillColor: '#f00',
+      width: 2,
+    });
+    scene.session.select('moving');
+  });
+  scene.commit.mockClear();
+}
+it('preserves selection on an unselected background press and consumes the final marquee release point', () => {
+  const scene = setupAlignmentSurface();
+  addNestedLayer(scene);
+  scene.event('pointerdown', 320, 220);
+  expect(scene.session.getSnapshot().selectedObjectIds).toEqual(['moving']);
+  scene.event('pointerup', 440, 330);
+  expect(scene.session.getSnapshot().selectedObjectIds).toEqual(['inner']);
+  expect(scene.commit).not.toHaveBeenCalled();
+  scene.event('pointerdown', 320, 220);
+  scene.event('pointerup', 320, 220);
+  expect(scene.session.getSnapshot().selectedObjectIds).toEqual(['target']);
+  expect(scene.commit).not.toHaveBeenCalled();
+  scene.dispose();
+});
+it.each(['pointercancel', 'lostpointercapture', 'blur'])(
+  'restores prior selection after a background marquee is cancelled with %s',
+  (reason) => {
+    const scene = setupAlignmentSurface();
+    addNestedLayer(scene);
+    scene.event('pointerdown', 320, 220);
+    scene.event('pointermove', 440, 330);
+    expect(scene.session.getSnapshot().selectedObjectIds).toEqual(['inner']);
+    if (reason === 'blur') act(() => window.dispatchEvent(new Event('blur')));
+    else scene.event(reason, 440, 330);
+    scene.event('pointerup', 440, 330);
+    expect(scene.session.getSnapshot().selectedObjectIds).toEqual(['moving']);
+    expect(scene.commit).not.toHaveBeenCalled();
+    scene.dispose();
+  }
+);
+
+it('consumes Alt defaults only during an active page alignment gesture', () => {
+  const scene = setupAlignmentSurface();
+  const idle = new KeyboardEvent('keydown', { key: 'Alt', altKey: true, cancelable: true });
+  act(() => window.dispatchEvent(idle));
+  expect(idle.defaultPrevented).toBe(false);
+  scene.event('pointerdown', 160, 140);
+  scene.event('pointermove', 296, 196);
+  const active = new KeyboardEvent('keydown', { key: 'Alt', altKey: true, cancelable: true });
+  act(() => window.dispatchEvent(active));
+  expect(active.defaultPrevented).toBe(true);
+  scene.event('pointercancel', 296, 196);
+  scene.dispose();
+});
+
+it('ignores a page-generated Alt event during a drawing gesture', () => {
+  const scene = setupAlignmentSurface();
+  scene.event('pointerdown', 160, 140);
+  scene.event('pointermove', 296, 196);
+  vi.spyOn(trustedEvents, 'isTrustedKeyboardEvent').mockReturnValue(false);
+  const event = new KeyboardEvent('keydown', { key: 'Alt', altKey: true, cancelable: true });
+  act(() => window.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(false);
+  expect(
+    scene.host.querySelectorAll('[data-ui="content.drawing.alignment-guides"] line')
+  ).toHaveLength(2);
+  scene.event('pointercancel', 296, 196);
+  scene.dispose();
 });

@@ -37,12 +37,14 @@ export function getDrawingSelectionBounds(objects: readonly DrawingObject[]): Dr
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-function drawingBoundsIntersect(left: DrawingBounds, right: DrawingBounds): boolean {
+function drawingBoundsContain(area: DrawingBounds, bounds: DrawingBounds): boolean {
+  // Affine transforms can round exact boundaries; this is below any visible CSS pixel overlap.
+  const tolerance = 1e-6;
   return (
-    left.x <= right.x + right.width &&
-    left.x + left.width >= right.x &&
-    left.y <= right.y + right.height &&
-    left.y + left.height >= right.y
+    bounds.x >= area.x - tolerance &&
+    bounds.x + bounds.width <= area.x + area.width + tolerance &&
+    bounds.y >= area.y - tolerance &&
+    bounds.y + bounds.height <= area.y + area.height + tolerance
   );
 }
 
@@ -55,7 +57,7 @@ export function resolveDrawingMarqueeSelection(args: {
 }): readonly string[] {
   const area = createDrawingBounds(args.start, args.current);
   const hitIds = args.objects
-    .filter((object) => drawingBoundsIntersect(area, getDrawingObjectSelectionBounds(object)))
+    .filter((object) => drawingBoundsContain(area, getDrawingObjectSelectionBounds(object)))
     .map((object) => object.id);
   if (args.mode === 'replace') return hitIds;
   const selected = new Set(args.initialIds);

@@ -2,14 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import {
   resolveDrawingArrowBendTarget,
-  getDrawingSelectionBounds,
-  translateDrawingObject,
   type DrawingPoint,
-  type DrawingObject,
   type DrawingSimplifySource,
   type DrawingSessionSnapshot,
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
+import { isTrustedKeyboardEvent } from '../platform/trusted-events';
 import {
   beginDrawingPointer,
   commitDrawingPointerDraft,
@@ -20,45 +18,10 @@ import {
 } from './interaction';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { DrawingTextDraft } from './text-editor';
-import { updateDrawingPointerDraft } from './pointer-update';
-import {
-  isDrawingAlignmentObject,
-  resolveDrawingMoveAlignment,
-  type DrawingAlignmentGuide,
-} from './move-alignment';
-import { collectDrawingDomAlignmentBounds } from './move-alignment-dom';
+import { updateDrawingMarqueeDraft, updateDrawingPointerDraft } from './pointer-update';
+import type { DrawingAlignmentGuide } from './move-alignment';
 
 export const TEXT_DRAG_THRESHOLD = 4;
-
-function alignMovedDraft(
-  draft: PointerDraft,
-  objects: readonly DrawingObject[],
-  root: PageScrollRoot
-): { draft: PointerDraft; guides: DrawingAlignmentGuide[] } {
-  const moving =
-    draft.kind === 'move' ? [draft.object] : draft.kind === 'move-selection' ? draft.objects : [];
-  const bounds = getDrawingSelectionBounds(moving);
-  if (!bounds || !moving.every(isDrawingAlignmentObject)) return { draft, guides: [] };
-  const alignment = resolveDrawingMoveAlignment({
-    moving,
-    objects,
-    domBounds: collectDrawingDomAlignmentBounds(bounds, root),
-  });
-  if (draft.kind === 'move')
-    return {
-      draft: { ...draft, object: translateDrawingObject(draft.object, alignment.delta) },
-      guides: alignment.guides,
-    };
-  if (draft.kind === 'move-selection')
-    return {
-      draft: {
-        ...draft,
-        objects: draft.objects.map((object) => translateDrawingObject(object, alignment.delta)),
-      },
-      guides: alignment.guides,
-    };
-  return { draft, guides: [] };
-}
 
 function useDrawingDraftInterruption(
   draftRef: RefObject<PointerDraft | null>,
@@ -68,7 +31,11 @@ function useDrawingDraftInterruption(
 ) {
   const shouldCancel = useCallback(() => {
     const kind = draftRef.current?.kind;
-    return kind === 'bend' || (alignMoves && (kind === 'move' || kind === 'move-selection'));
+    return (
+      kind === 'bend' ||
+      kind === 'marquee' ||
+      (alignMoves && (kind === 'move' || kind === 'move-selection' || kind === 'resize'))
+    );
   }, [alignMoves, draftRef]);
   useEffect(() => {
     const cancelOnBlur = () => {
@@ -101,6 +68,15 @@ function commitPointerDraft(
   event?: Event,
   prepared?: DrawingSimplifySource | Promise<DrawingSimplifySource>
 ): void {
+  if (draft?.kind === 'marquee' && event instanceof MouseEvent) {
+    const update = updateDrawingMarqueeDraft(
+      draft,
+      toDrawingScenePoint(event, controller.getScrollRoot()),
+      controller.session.getSnapshot().document.objects
+    );
+    draft = update.draft;
+    if (update.selection) controller.session.setSelection(update.selection);
+  }
   if (
     (draft?.kind === 'move-selection' || draft?.kind === 'rotate-selection') &&
     draft.objects.some((object) => object.kind === 'simplify')
@@ -229,12 +205,48 @@ function usePointerSimplifyDraft({
   );
 }
 
+function useDrawingAlignmentModifiers(args: {
+  enabled: boolean;
+  draftRef: RefObject<PointerDraft | null>;
+  activePointerRef: RefObject<number | null>;
+  lastPointerEventRef: RefObject<ReactPointerEvent<HTMLCanvasElement> | null>;
+  onPointerMove: (
+    event: ReactPointerEvent<HTMLCanvasElement>,
+    modifiers: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'shiftKey'>
+  ) => void;
+}) {
+  const { enabled, draftRef, activePointerRef, lastPointerEventRef, onPointerMove } = args;
+  useEffect(() => {
+    const updateAlt = (event: KeyboardEvent) => {
+      const kind = draftRef.current?.kind;
+      if (
+        !isTrustedKeyboardEvent(event) ||
+        event.key !== 'Alt' ||
+        !enabled ||
+        activePointerRef.current === null ||
+        (kind !== 'move' && kind !== 'move-selection' && kind !== 'resize')
+      )
+        return;
+      event.preventDefault();
+      const pointer = lastPointerEventRef.current;
+      if (pointer) onPointerMove(pointer, event);
+    };
+    window.addEventListener('keydown', updateAlt, { capture: true });
+    window.addEventListener('keyup', updateAlt, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', updateAlt, { capture: true });
+      window.removeEventListener('keyup', updateAlt, { capture: true });
+    };
+  }, [enabled, activePointerRef, draftRef, lastPointerEventRef, onPointerMove]);
+}
+
 export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   const { active, controller, root, onCancelText, onText } = args;
   const draftRef = useRef<PointerDraft | null>(null);
   const alignmentGuidesRef = useRef<DrawingAlignmentGuide[]>([]);
   const hoverBendRef = useRef<DrawingArrowHover | null>(null);
   const activePointerRef = useRef<number | null>(null);
+  const lastPointerEventRef = useRef<ReactPointerEvent<HTMLCanvasElement> | null>(null);
   const touchPointsRef = useRef(new Map<number, DrawingPoint>());
   const touchCentroidRef = useRef<DrawingPoint | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
@@ -249,6 +261,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     alignmentGuidesRef.current = [];
     hoverBendRef.current = null;
     activePointerRef.current = null;
+    lastPointerEventRef.current = null;
     onCancelText();
     changed();
   }, [changed, controller, onCancelText, simplifyDraft]);
@@ -258,16 +271,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       if (!active || event.button !== 0) return;
       controller.simplify?.cancelPreparation();
       const point = toDrawingScenePoint(event, root);
-      if (event.pointerType === 'touch') {
-        touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-        if (touchPointsRef.current.size >= 2) {
-          const points = [...touchPointsRef.current.values()];
-          touchCentroidRef.current = averagePoints(points);
-          cancelDraft();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          return;
-        }
-      }
+      if (beginTouchViewport(event, touchPointsRef, touchCentroidRef, cancelDraft)) return;
       const start = beginDrawingPointer({
         modifiers: { altKey: event.altKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey },
         point,
@@ -278,6 +282,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       simplifyDraft.begin(start.draft, event.nativeEvent, root);
       alignmentGuidesRef.current = [];
       activePointerRef.current = event.pointerId;
+      lastPointerEventRef.current = event;
       hoverBendRef.current = null;
       if (start.selection) controller.session.setSelection(start.selection);
       if (start.text) onText(start.text);
@@ -288,7 +293,11 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   );
 
   const onPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    (
+      event: ReactPointerEvent<HTMLCanvasElement>,
+      modifiers: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'shiftKey'> = event
+    ) => {
+      lastPointerEventRef.current = event;
       if (moveTouchViewport({ controller, event, touchCentroidRef, touchPointsRef })) return;
       const draft = draftRef.current;
       const point = toDrawingScenePoint(event, root);
@@ -313,17 +322,10 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
         event,
         point,
         root,
+        modifiers,
+        alignToPage: args.alignMoves ?? false,
       });
-      alignmentGuidesRef.current = [];
-      if (args.alignMoves && Math.hypot(point.x - draft.start.x, point.y - draft.start.y) >= 4) {
-        const aligned = alignMovedDraft(
-          update.draft,
-          controller.session.getSnapshot().document.objects,
-          root
-        );
-        update.draft = aligned.draft;
-        alignmentGuidesRef.current = aligned.guides;
-      }
+      alignmentGuidesRef.current = update.guides ?? [];
       draftRef.current = update.draft;
       simplifyDraft.update(update.draft);
       if (update.selection) controller.session.setSelection(update.selection);
@@ -331,6 +333,14 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     },
     [active, args.alignMoves, changed, controller, root, simplifyDraft]
   );
+
+  useDrawingAlignmentModifiers({
+    enabled: args.alignMoves ?? false,
+    draftRef,
+    activePointerRef,
+    lastPointerEventRef,
+    onPointerMove,
+  });
 
   const finalizeDraft = useCallback(
     (event?: Event) => {
@@ -341,6 +351,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       alignmentGuidesRef.current = [];
       hoverBendRef.current = null;
       activePointerRef.current = null;
+      lastPointerEventRef.current = null;
       changed();
     },
     [changed, controller, simplifyDraft]
@@ -404,6 +415,21 @@ function averagePoints(points: DrawingPoint[]): DrawingPoint {
     x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
     y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
   };
+}
+
+function beginTouchViewport(
+  event: ReactPointerEvent<HTMLCanvasElement>,
+  touchPointsRef: RefObject<Map<number, DrawingPoint>>,
+  touchCentroidRef: React.MutableRefObject<DrawingPoint | null>,
+  cancelDraft: () => void
+): boolean {
+  if (event.pointerType !== 'touch') return false;
+  touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (touchPointsRef.current.size < 2) return false;
+  touchCentroidRef.current = averagePoints([...touchPointsRef.current.values()]);
+  cancelDraft();
+  event.currentTarget.setPointerCapture(event.pointerId);
+  return true;
 }
 
 function moveTouchViewport(args: {
