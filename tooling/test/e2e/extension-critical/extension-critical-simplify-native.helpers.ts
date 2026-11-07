@@ -626,6 +626,18 @@ export async function assertNativeNestedScrollSimplify(page: Page, info: TestInf
     path: info.outputPath('nested-body-clipped-header-fixed.png'),
     fullPage: false,
   });
+  const nextBody = { x: 464, y: 362, width: 250, height: 30 };
+  const nextOriginal = await sampleNativeSimplifyInk(page, nextBody);
+  expect(nextOriginal.blue).toBeGreaterThan(100);
+  await dragSimplify(page, { x: 450, y: 350 }, { x: 800, y: 412 });
+  await waitForNativeSimplifyCount(page, 3);
+  expect((await sampleNativeSimplifyInk(page, nextBody)).blue).toBeLessThan(
+    nextOriginal.blue * 0.1
+  );
+  await page.screenshot({
+    path: info.outputPath('new-region-after-stopped-nested-scroll.png'),
+    fullPage: false,
+  });
 }
 
 export async function assertNativeRepeatedSimplifyToolbar(page: Page, info: TestInfo) {
@@ -712,6 +724,43 @@ export async function assertNativeRepeatedSimplifyToolbar(page: Page, info: Test
   expect(Math.abs(second.y - first.y)).toBeLessThanOrEqual(1);
   await page.screenshot({
     path: info.outputPath('repeated-selected-toolbar.png'),
+    fullPage: false,
+  });
+}
+
+export async function assertNativeSimplifyAfterStoppedScroll(page: Page, info: TestInfo) {
+  await page.evaluate(() => {
+    document.body.style.minHeight = '3000px';
+    document.documentElement.style.scrollBehavior = 'auto';
+    const target = document.createElement('section');
+    target.style.cssText =
+      'position:absolute;left:450px;top:960px;width:340px;height:120px;padding:16px;background:#f4f7fa;color:#173b63;font:24px/28px sans-serif;white-space:pre;z-index:1';
+    target.textContent = 'Fresh viewport source\nCaptured after scrolling';
+    document.body.append(target);
+  });
+  await assertNativeRepeatedSimplifyToolbar(page, info);
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(600);
+  const region = { x: 464, y: 376, width: 250, height: 50 };
+  const original = await sampleNativeSimplifyInk(page, region);
+  expect(original.blue).toBeGreaterThan(100);
+  await dragSimplify(page, { x: 460, y: 370 }, { x: 790, y: 470 });
+  await waitForNativeSimplifyCount(page, 3);
+  await expect
+    .poll(async () => (await sampleNativeSimplifyInk(page, region)).blue)
+    .toBeLessThan(original.blue * 0.1);
+  await page.screenshot({
+    path: info.outputPath('new-region-after-stopped-scroll.png'),
+    fullPage: false,
+  });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toHaveCount(3);
+  expect(
+    (await sampleNativeSimplifyInk(page, { x: 472, y: 202, width: 240, height: 100 })).gray
+  ).toBeGreaterThan(100);
+  await page.screenshot({
+    path: info.outputPath('prior-regions-preserved-after-return.png'),
     fullPage: false,
   });
 }

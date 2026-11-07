@@ -233,7 +233,9 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
     const valid = () => {
       const current = this.session.getSnapshot();
       return (
-        current.document === document &&
+        current.document.version === document.version &&
+        current.document.objects.length === document.objects.length &&
+        current.document.objects.every((object, index) => object === document.objects[index]) &&
         current.activeTool === tool &&
         window.scrollX === scrollX &&
         window.scrollY === scrollY &&

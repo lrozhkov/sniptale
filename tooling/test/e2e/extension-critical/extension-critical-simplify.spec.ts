@@ -17,6 +17,7 @@ import {
   assertNativeManualResize,
   assertNativeNestedScrollSimplify,
   assertNativeRepeatedSimplifyToolbar,
+  assertNativeSimplifyAfterStoppedScroll,
   captureSimplifyToEditor,
 } from './extension-critical-simplify-native.helpers';
 import {
@@ -216,6 +217,27 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       const observer = await observeSimplifyWorker(context, extensionId, page);
       await assertNativeRepeatedSimplifyToolbar(page, info);
       if (observer) await writeSimplifyWorkerObservation(context, page, observer, 'repeated', info);
+    } finally {
+      await popup.close();
+      await page.close();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Simplify creates a fresh region after stopped page scrolling ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120_000);
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+    try {
+      await grantNativeSimplifyCapture(popup);
+      const observer = await observeSimplifyWorker(context, extensionId, page);
+      await assertNativeSimplifyAfterStoppedScroll(page, info);
+      if (observer)
+        await writeSimplifyWorkerObservation(context, page, observer, 'scrolled-new', info);
     } finally {
       await popup.close();
       await page.close();

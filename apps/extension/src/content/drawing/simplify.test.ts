@@ -5,6 +5,8 @@ import { createSimplifyRaster } from '../../features/simplify/raster';
 import {
   createDrawingSession,
   type DrawingSimplifyObject,
+  type DrawingObject,
+  type DrawingObjectProjection,
   type DrawingSimplifySource,
 } from '../../features/drawing/public';
 import { createDefaultSimplifySettings } from '../../features/simplify/settings';
@@ -33,9 +35,12 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
-function harness() {
+function harness(objectProjection?: DrawingObjectProjection) {
   const commit = vi.fn(() => true);
-  const session = createDrawingSession({ onDocumentCommit: commit });
+  const session = createDrawingSession({
+    onDocumentCommit: commit,
+    ...(objectProjection ? { objectProjection } : {}),
+  });
   const source: DrawingSimplifySource = {
     ...png(),
     bounds: { x: 0, y: 0, width: 100, height: 100 },
@@ -620,3 +625,71 @@ it('preserves the accepted manual Image tile if its resized replacement fails', 
   expect(h.runtime.getFeedback()).toBe('failed');
   h.runtime.dispose();
 });
+
+function projectedHarness() {
+  const versions = new Map<DrawingObject, DrawingObject>();
+  const h = harness({
+    capture: () => undefined,
+    resolve: (object) => versions.get(object) ?? object,
+  });
+  for (let i = 0; i < 3; i++) {
+    const stored = { ...h.object, id: `prior-${i}`, bounds: { ...h.object.bounds, x: i * 20 } };
+    h.session.commitObject(stored);
+    versions.set(stored, { ...stored, bounds: { ...stored.bounds, y: stored.bounds.y + 200 } });
+  }
+  return { ...h, versions };
+}
+
+it('accepts a fresh source after prior areas have stable projected versions', async () => {
+  const h = projectedHarness();
+  const first = h.session.getSnapshot().document,
+    second = h.session.getSnapshot().document;
+  expect(first).not.toBe(second);
+  expect(first.objects.every((object, index) => object === second.objects[index])).toBe(true);
+  const source = await h.runtime.prepare(new Event('pointerdown'));
+  expect(h.acquire).toHaveBeenCalledOnce();
+  const work = h.runtime.submit(h.object, new Event('pointerup'), source);
+  await started(h);
+  await h.settle();
+  await work;
+  expect(h.runtime.getFeedback()).toBeNull();
+  expect(h.session.getSnapshot().document.objects).toHaveLength(4);
+  h.runtime.dispose();
+});
+
+it('rejects actual projected geometry changes while a fresh source is being acquired', async () => {
+  const h = projectedHarness(),
+    acquisition = deferred<DrawingSimplifySource>();
+  h.acquire.mockReturnValue(acquisition.promise);
+  const source = h.runtime.prepare(new Event('pointerdown'));
+  const failure = expect(source).rejects.toThrow('source changed');
+  expect(h.acquire).toHaveBeenCalledOnce();
+  const [stored, projected] = [...h.versions.entries()][0]!;
+  if (projected.kind !== 'simplify') throw new Error('Expected projected Simplify region');
+  h.versions.set(stored, { ...projected, bounds: { ...projected.bounds, y: 250 } });
+  acquisition.resolve(h.source);
+  await failure;
+  expect(h.renders).toHaveLength(0);
+  expect(h.session.getSnapshot().document.objects).toHaveLength(3);
+  h.runtime.dispose();
+});
+
+it.each(['append', 'delete', 'reorder'])(
+  'keeps rejecting a real document %s after projected source preparation',
+  async (change) => {
+    const h = projectedHarness();
+    const source = await h.runtime.prepare(new Event('pointerdown'));
+    if (change === 'append') h.session.commitObject({ ...h.object, id: 'unrelated' });
+    else if (change === 'delete') h.session.deleteObjects(['prior-0']);
+    else {
+      h.session.select('prior-0');
+      h.session.moveSelected('front');
+    }
+    const count = h.session.getSnapshot().document.objects.length;
+    await h.runtime.submit(h.object, new Event('pointerup'), source);
+    expect(h.runtime.getFeedback()).toBe('no-source');
+    expect(h.renders).toHaveLength(0);
+    expect(h.session.getSnapshot().document.objects).toHaveLength(count);
+    h.runtime.dispose();
+  }
+);
