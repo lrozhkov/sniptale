@@ -16,6 +16,7 @@ export interface DrawingAlignmentGuide {
   coordinate: number;
   from: number;
   to: number;
+  points: readonly DrawingPoint[];
 }
 
 type Target = { bounds: DrawingBounds; centerOnly?: boolean; inset?: number };
@@ -156,6 +157,15 @@ function getAlignmentGuides(
     guides.push({
       axis,
       coordinate: match.coordinate,
+      points: [bounds[perpendicular] + delta[perpendicular], match.bounds[perpendicular]].flatMap(
+        (start, index) => {
+          const length = index === 0 ? bounds[size] : match.bounds[size];
+          const anchors = match.center ? [start + length / 2] : [start, start + length];
+          return anchors.map((anchor) =>
+            axis === 'x' ? { x: match.coordinate, y: anchor } : { x: anchor, y: match.coordinate }
+          );
+        }
+      ),
       from: Math.min(bounds[perpendicular] + delta[perpendicular], match.bounds[perpendicular]) - 8,
       to:
         Math.max(

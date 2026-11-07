@@ -113,3 +113,27 @@ it('aligns with DOM geometry and leaves unsupported drawing tools alone', () => 
   };
   expect(resolveDrawingMoveAlignment({ moving: [blur], objects: [moving] }).guides).toEqual([]);
 });
+
+it('marks the aligned source and target edge endpoints, using centers for center matches', () => {
+  const moving = shape('moving', 304, 80, 80, 60);
+  const target = shape('target', 300, 200, 100, 100);
+  const edge = resolveDrawingMoveAlignment({ moving: [moving], objects: [target] });
+  expect(edge.guides.find((guide) => guide.axis === 'x')?.points).toEqual([
+    { x: 300, y: 80 },
+    { x: 300, y: 140 },
+    { x: 300, y: 200 },
+    { x: 300, y: 300 },
+  ]);
+  const center = resolveDrawingMoveAlignment({
+    moving: [text(184, 173)],
+    objects: [shape('frame', 100, 100, 240, 160)],
+  });
+  expect(center.guides.find((guide) => guide.axis === 'x')?.points).toEqual([
+    { x: 220, y: 180 },
+    { x: 220, y: 180 },
+  ]);
+  expect(center.guides.find((guide) => guide.axis === 'y')?.points).toEqual([
+    { x: 220, y: 180 },
+    { x: 220, y: 180 },
+  ]);
+});

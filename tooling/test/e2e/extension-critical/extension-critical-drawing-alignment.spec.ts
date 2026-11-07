@@ -88,6 +88,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await page.mouse.move(624, 264, { steps: 8 });
       await expectGuide(page, 'x', 600);
       await expectGuide(page, 'y', 260);
+      await expect(guides.locator('[data-ui="content.drawing.alignment-marker"]')).not.toHaveCount(
+        0
+      );
+      await expect(guides.locator('path[d="M 596 356 L 604 364 M 604 356 L 596 364"]')).toHaveCount(
+        1
+      );
       await page.screenshot({ path: info.outputPath('dom-alignment.png'), fullPage: false });
       await page.mouse.up();
       await expect(guides).toHaveCount(0);
@@ -497,6 +503,9 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         const guides = surface.locator('[data-ui="content.drawing.alignment-guides"]');
         await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '700');
         await expect(guides.locator('[data-axis="y"]')).toHaveCount(0);
+        await expect(
+          guides.locator('path[d="M 696 376 L 704 384 M 704 376 L 696 384"]')
+        ).toHaveCount(1);
         await page.screenshot({
           path: info.outputPath('peer-width-alignment.png'),
           fullPage: false,

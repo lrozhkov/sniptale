@@ -7,6 +7,11 @@ export function DrawingMoveAlignmentGuides(props: {
   layer: number;
 }) {
   if (!props.guides.length) return null;
+  const points = new Map(
+    props.guides.flatMap((guide) =>
+      guide.points.map((point) => [`${point.x}:${point.y}`, point] as const)
+    )
+  );
   return (
     <svg
       data-ui="content.drawing.alignment-guides"
@@ -33,6 +38,20 @@ export function DrawingMoveAlignmentGuides(props: {
           strokeDasharray="4 3"
         />
       ))}
+      {[...points].map(([key, point]) => {
+        const x = point.x - props.projection.x;
+        const y = point.y - props.projection.y;
+        return (
+          <path
+            key={key}
+            data-ui="content.drawing.alignment-marker"
+            d={`M ${x - 4} ${y - 4} L ${x + 4} ${y + 4} M ${x + 4} ${y - 4} L ${x - 4} ${y + 4}`}
+            fill="none"
+            stroke="var(--sniptale-color-accent)"
+            strokeWidth={1}
+          />
+        );
+      })}
     </svg>
   );
 }
