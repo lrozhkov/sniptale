@@ -8,10 +8,7 @@ import {
   type GpuPreviewLayer,
 } from '../../../../features/video/composition/canvas/gpu-preview';
 
-import {
-  isVideoCompositionFrameSource,
-  type VideoCompositionMediaSource,
-} from '../../../../features/video/composition/draw/media-source';
+import { captureNativePreviewSources } from './frame-plan';
 
 import { buildNativeGpuPreviewLayers } from './gpu-preview-layers';
 import {
@@ -179,11 +176,7 @@ export function createNativeGpuPreviewRenderer(
       const output = resolvePreviewCompositionFrameSize(input);
       if (!output) return false;
       active++;
-      const captured = new Map<string, VideoFrame>();
-      const media = new Map<string, VideoCompositionMediaSource>();
-      for (const [id, source] of Object.entries(input.videoRefs.current))
-        if (source) media.set(id, source);
-      for (const [id, source] of input.decodedVideoFrames ?? []) media.set(id, source);
+      let capturedSources: ReturnType<typeof captureNativePreviewSources> = null;
       let inputDeviceFailure: GpuPreviewDeviceError | undefined;
       let plan: Awaited<ReturnType<typeof buildNativeGpuPreviewLayers>> | undefined;
       let artwork: HTMLCanvasElement | undefined;
@@ -208,23 +201,9 @@ export function createNativeGpuPreviewRenderer(
           return undefined;
         }
         if (input.signal?.aborted || isInvalidated()) return false;
-        const needed = new Set(
-          [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)].flatMap((frame) =>
-            [...frame.visualLayers, ...frame.effectInputLayers]
-              .filter((item) => item.kind === 'video')
-              .map((item) => item.clipId)
-          )
-        );
-        for (const id of needed) {
-          const source = media.get(id);
-          if (source instanceof HTMLVideoElement) {
-            if (source.seeking || source.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)
-              return false;
-            captured.set(id, new VideoFrame(source));
-          } else if (isVideoCompositionFrameSource(source) && source.toVideoFrame)
-            captured.set(id, source.toVideoFrame());
-          else throw new Error('GPU decoded source frame is unavailable.');
-        }
+        capturedSources = captureNativePreviewSources(input, passes);
+        if (!capturedSources) return false;
+        const { frames: captured, media } = capturedSources;
         if (typeof effects === 'function') {
           effects = await effects(async (request) => {
             let graph: Awaited<ReturnType<typeof buildNativeGpuPreviewLayers>> | undefined;
@@ -472,6 +451,7 @@ export function createNativeGpuPreviewRenderer(
           logical,
           layers: preparedEffects.layers,
           signal: input.signal ?? new AbortController().signal,
+          ...(input.onGpuSubmitted ? { onSubmitted: () => input.onGpuSubmitted?.() } : {}),
         };
         if (input.acquireGpuOutput) {
           const target = input.acquireGpuOutput(layout.backing, backend);
@@ -533,7 +513,7 @@ export function createNativeGpuPreviewRenderer(
         } finally {
           try {
             bitmap?.close();
-            for (const frame of captured.values()) frame.close();
+            capturedSources?.release();
             preparedEffects?.release();
             plan?.release();
             if (artwork) artwork.width = artwork.height = 0;

@@ -11,6 +11,7 @@ import {
   type VideoEditorEffectRuntime,
 } from '../../../runtime/effect-runtime';
 import { renderPreviewScene } from './render-preview';
+import { prepareNativePreviewSceneFrame } from './frame-plan';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import type { PreviewSceneRenderJob } from './render-scheduler';
 import type { NativePreviewFramePresenter, PreviewStageCanvasSceneParams } from './types';
@@ -102,6 +103,7 @@ function usePreviewStageRenderEffect(
         previewRenderer: current.previewRenderer ?? 'gpu',
         project: current.project,
         renderGeneration: current.renderGenerationRef?.current ?? current.renderGeneration ?? 0,
+        runtimeVersion: current.effectRuntimeFeedback.retryVersion,
         renderRevision: revision,
         stage: current.stageRef.current,
         videoRefs: current.videoRefs,
@@ -201,6 +203,7 @@ function createPreviewStageCanvasRenderJob(args: {
   previewRenderer: PreviewStageCanvasSceneParams['previewRenderer'];
   project: PreviewStageCanvasSceneParams['project'];
   renderGeneration: number;
+  runtimeVersion: number;
   renderRevision: Promise<string>;
   stage: HTMLDivElement | null;
   videoRefs: PreviewStageCanvasSceneParams['videoRefs'];
@@ -239,6 +242,7 @@ function createPreviewStageCanvasRenderJob(args: {
     ...(args.previewMode ? { previewMode: args.previewMode } : {}),
     project: args.project,
     renderGeneration: args.renderGeneration,
+    runtimeVersion: args.runtimeVersion,
     renderRevision: args.renderRevision,
     signal: controller.signal,
     stage: args.stage,
@@ -274,6 +278,19 @@ function usePreviewRenderSchedulerRef(
     const watermarkRenderer = createVideoProjectWatermarkRenderer(loadVideoEditorAssetBlob);
     watermarkRef.current = watermarkRenderer;
     schedulerRef.current = createPreviewSceneRenderScheduler({
+      prepare: (input) => {
+        if (
+          input.previewRenderer === 'legacy' ||
+          input.previewMode === 'cache' ||
+          !gpuRef.current?.acceptsNativeFrames
+        )
+          return undefined;
+        joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(
+          renderPreviewScene,
+          prepareNativePreviewSceneFrame
+        );
+        return joinsRef.current.prepare(input);
+      },
       onError: (error) => {
         joinsRef.current?.clear();
         watermarkRenderer.clear();
@@ -308,7 +325,10 @@ function usePreviewRenderSchedulerRef(
       },
       render: (job) => {
         const render = (input: Parameters<typeof renderPreviewScene>[0]) => {
-          joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(renderPreviewScene);
+          joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(
+            renderPreviewScene,
+            prepareNativePreviewSceneFrame
+          );
           if (input.previewRenderer !== 'legacy')
             gpuRef.current ??= createNativeGpuPreviewRenderer();
           return joinsRef.current.render({

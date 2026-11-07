@@ -1126,6 +1126,7 @@ export async function createGpuPreviewRenderer(
                 outputTexture
               ),
             ]);
+            request.onSubmitted?.();
             scopeOpen = false;
             // Both completions retain borrowed sources; a rejection must not release the other barrier.
             const [submitted, validation] = await Promise.allSettled([

@@ -5014,7 +5014,7 @@
       "reason": "tool-noise: One GPU backend owns slot resources, source uploads, command encoding and completion. A lookup reuses one raster texture within one frame. It does not retain raster content across frames. Resource owners and completion barriers remain unchanged. Separate helpers would distribute one resource transaction.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "0b3ebe2fc541905e1c344cb4919b5c5a1d1d7f3521a5090719bbb6ce52bc1c8c",
+      "astHash": "b85e11764569363107c1d8cb621d0aef7f241d76198ae3a2efb77d394ee09fda",
       "signatureHash": "64d03ee42b8e2898569c0c7c9d536c5d779c544b4c854fcfbad5ecf1994e59d0"
     },
     {
@@ -5762,7 +5762,7 @@
       "reason": "tool-noise: One GPU adapter fixture controls device failures, queue fences, validation and source release. Shared raster cases use the same fixture and resource lifetime. The additional cases do not introduce a separate fixture owner.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "899638b1fd002329afed251b9a0f3413503f95f9c3df91c8a5cfa3a73a6332a5",
+      "astHash": "a5cce6697ac7d5ff7e76cb811cb109dbd7c1d54f7b635e2de09f22fd737aede5",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {
@@ -5883,8 +5883,8 @@
       "reason": "tool-noise: One scene fixture checks camera snapshots, media readiness and output cleanup. New cases check direct receipt transfer and deferred frame events without changing default raster assertions. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-06",
-      "astHash": "c0793baea79aa1b9d95f8bbb58d82787bcf7a49d33717e4d3c19e7ed93764a33",
-      "signatureHash": "a3c58f0455473a9f92d91faf7c2b782fd9921904e009349e1a26417f417f0692"
+      "astHash": "d286e1bb290d63b3b4f282b7cd2b148a4e2e15564dd8819fffc2566cba192b7d",
+      "signatureHash": "de2cbbf58cc4943566e8dcca7f940d276f3c135d05f70d9896a478a54a1a1568"
     },
     {
       "rule": "structural-function-risk",
@@ -5946,9 +5946,9 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.ts",
       "symbol": "renderPreparedPreviewScene",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One scene transaction selects the concrete effect representation. It disposes results before fallback and on final exit. Existing media readiness, invalidation and publication authority remain intact.",
+      "reason": "tool-noise: One scene transaction selects the concrete effect representation. It disposes locally owned results before fallback and on final exit. The prepared frame retains borrowed effects until render completion. Existing media readiness, invalidation and publication authority remain intact.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
-      "astHash": "e18cab3f4e6985fdeafb5964609abba9236ac66d492f2bb8b7dcfdbed306c91b",
+      "astHash": "7e67a77059166360f2807c484ef940442d0331952c4ec6ef8b3c560acc88533e",
       "signatureHash": "084a1b2312c4568a47f85b4608e3ec489241a489cc4774c140accadc29612e03",
       "reviewDate": "2026-11-07"
     },
@@ -5982,7 +5982,7 @@
       "reason": "tool-noise: One GPU backend owns slot resources, source uploads, command encoding and completion. A lookup reuses one raster texture within one frame. It does not retain raster content across frames. Resource owners and completion barriers remain unchanged. Separate helpers would distribute one resource transaction.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "017619fcd0beb54c6d8949b076209ef438cc7f7bcbe244e8b6c9414e2dda0c83",
+      "astHash": "6523e96eac891cff1d6066f68f970f701c3541873e47cef9a2b86b00feb8a8ee",
       "signatureHash": "50b7b6dfa55a91f0767233eb28825159abc77bd5595daebdd5d807e9251bebd0"
     },
     {
@@ -6045,7 +6045,7 @@
       "rule": "structural-file-risk",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "astHash": "fb365eada0981a8c68526d89ed1ec48aa62e5466283351fa5275e817828bd50b",
+      "astHash": "eb71b3cff3309ae94692a44eb90c8dcc4227d93c1eff55b3f2359da6da4774d5",
       "signatureHash": "30d5084ef313ccb797d2fb3c9e7d189fb621390c86693d75c005881b30605240",
       "reviewDate": "2026-11-06",
       "reason": "tool-noise: One Native producer fixture controls captured sources, GPU completion and output leases. Added cases check retained background paint, geometry and invalidation through the same producer. Numerical camera and painting owners retain their existing contracts. Fresh independent architecture review must check this exact binding.",
@@ -6169,8 +6169,19 @@
       "reason": "tool-noise: One GPU backend owns slot resources, source uploads, command encoding and completion. A lookup reuses one raster texture within one frame. It does not retain raster content across frames. Resource owners and completion barriers remain unchanged. Separate helpers would distribute one resource transaction.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "9b14a2d5c17e5ed978cfbae9e0f5398ac7c4ed939841c95d4c99128161c529ff",
+      "astHash": "3fbe374551d2472b413ae040df71126f569a520362a9fa970c7be2d10f79ae56",
       "signatureHash": "f2cedc19aea17ca74edd24dde4169bfe2a379a549e4c64af11c1cdcf087fe5ce"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/scene/render.ts",
+      "symbol": "usePreviewRenderSchedulerRef",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: One mounted preview session owns its render scheduler, GPU renderer, join sampler and final cleanup. The preparation callback uses the same session and admits no second GPU job. Splitting the hook at the line threshold would distribute this resource lifetime.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent queue, resource or publication authority. Remove when the analyzer models this cohesive session.",
+      "reviewDate": "2026-11-07",
+      "astHash": "018c36155a3d47f4d504cd97c352fc40e22e6b01cac1a7255e6d247d6d29b847",
+      "signatureHash": "2c629f4f939552b210db20350dffa3a44a616b1c0626c2fd6c9dd93d60a95705"
     }
   ]
 }

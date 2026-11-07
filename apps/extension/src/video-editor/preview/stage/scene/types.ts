@@ -85,7 +85,23 @@ type PreviewEffectRuntimeExecutorInput =
   | EffectRuntimeSandboxExecutor
   | (() => EffectRuntimeSandboxExecutor);
 
+/** Geometry and effect plans use one composition time; source timestamps retain their own authority. */
+interface PreviewSceneFramePlan {
+  readonly passes: ReturnType<typeof resolveVideoCompositionRenderPasses>;
+  readonly effects?: EffectRuntimeGpuPreparedComposition;
+  readonly rasterScale: number;
+  readonly compositionTime: number;
+  readonly sourcePresentation: ReadonlyMap<
+    string,
+    { timestampUs: number; durationUs: number | null }
+  >;
+}
+
 export type PreviewSceneRenderInput = {
+  /** Borrowed preparation; its caller releases it after render completion. */
+  preparedFrame?: PreviewSceneFramePlan;
+  /** Final GPU work was submitted; publication and source release still await completion. */
+  onGpuSubmitted?: () => void;
   previewRenderer?: VideoPreviewRenderer;
   gpuPreview?: NativeGpuPreviewRenderer;
   acquireGpuOutput?: NativePreviewGpuTargetFactory;
@@ -121,6 +137,12 @@ export type PreviewSceneRenderInput = {
   /** Borrowed immutable decoded frames for bounded cut sampling. */
   decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>;
 };
+
+/** A preparation owns its captured inputs until the sole render consumer completes. */
+export interface PreviewScenePreparedFrame {
+  readonly input: PreviewSceneRenderInput;
+  release(): void;
+}
 
 /** GPU output is optional: undefined delegates the complete frame to the existing renderer. */
 export interface NativeGpuPreviewRenderer {

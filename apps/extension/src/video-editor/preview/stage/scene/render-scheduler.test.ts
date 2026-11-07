@@ -7,6 +7,269 @@ afterEach(() => vi.useRealTimers());
 const admit = () => vi.advanceTimersByTimeAsync(20);
 import { createPreviewSceneRenderScheduler, type PreviewSceneRenderJob } from './render-scheduler';
 
+it('prepares one reserved frame before the active GPU render completes and releases it afterward', async () => {
+  const firstCompletion = Promise.withResolvers<void>();
+  const secondCompletion = Promise.withResolvers<void>();
+  const render = vi
+    .fn()
+    .mockReturnValueOnce(firstCompletion.promise)
+    .mockReturnValueOnce(secondCompletion.promise);
+  const release = vi.fn();
+  const prepare = vi.fn(
+    async (
+      input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]
+    ) => ({ input, release })
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, prepare, onError: vi.fn() });
+  const first = createJob(1, true);
+  const second = { ...first, currentTime: 2, controller: new AbortController() };
+  scheduler.enqueue(first);
+  render.mock.calls[0]![0].onGpuSubmitted?.();
+  scheduler.enqueue(second);
+  await Promise.resolve();
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(prepare.mock.calls[0]![0].currentTime).toBe(2);
+  expect(prepare.mock.calls[0]![0]).not.toHaveProperty('controller');
+  expect(render).toHaveBeenCalledOnce();
+  expect(release).not.toHaveBeenCalled();
+  firstCompletion.resolve();
+  await admit();
+  expect(render).toHaveBeenCalledTimes(2);
+  expect(render.mock.calls[1]![0].currentTime).toBe(2);
+  expect(release).not.toHaveBeenCalled();
+  secondCompletion.resolve();
+  await admit();
+  expect(release).toHaveBeenCalledOnce();
+  scheduler.dispose();
+});
+
+it('keeps one recent reserved frame and does not prepare every incoming playback tick', async () => {
+  const completion = Promise.withResolvers<void>();
+  const release = vi.fn();
+  const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValue(undefined);
+  const prepare = vi.fn(
+    async (
+      input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]
+    ) => ({ input, release })
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, prepare, onError: vi.fn() });
+  const first = createJob(1, true);
+  const second = { ...first, currentTime: 1 + 1 / 60, controller: new AbortController() };
+  const third = { ...first, currentTime: 1 + 2 / 60, controller: new AbortController() };
+  scheduler.enqueue(first);
+  render.mock.calls[0]![0].onGpuSubmitted?.();
+  scheduler.enqueue(second);
+  await Promise.resolve();
+  scheduler.enqueue(third);
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(third.controller.signal.aborted).toBe(true);
+  expect(second.controller.signal.aborted).toBe(false);
+  completion.resolve();
+  await admit();
+  expect(render).toHaveBeenCalledTimes(2);
+  expect(render.mock.calls[1]![0].currentTime).toBe(second.currentTime);
+  expect(release).toHaveBeenCalledOnce();
+  scheduler.dispose();
+});
+
+it('releases an expired ready frame and prepares the newer playback snapshot', async () => {
+  const completion = Promise.withResolvers<void>();
+  const releases = [vi.fn(), vi.fn()];
+  const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValue(undefined);
+  const prepare = vi.fn(
+    async (
+      input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]
+    ) => ({ input, release: releases[input.currentTime === 2 ? 0 : 1]! })
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, prepare, onError: vi.fn() });
+  const first = createJob(1, true);
+  const second = { ...first, currentTime: 2, controller: new AbortController() };
+  scheduler.enqueue(first);
+  render.mock.calls[0]![0].onGpuSubmitted?.();
+  scheduler.enqueue(second);
+  await admit();
+  scheduler.enqueue({ ...first, currentTime: 2.2, controller: new AbortController() });
+  await admit();
+  expect(second.controller.signal.aborted).toBe(true);
+  expect(releases[0]).toHaveBeenCalledOnce();
+  expect(prepare).toHaveBeenCalledTimes(2);
+  completion.resolve();
+  await admit();
+  expect(render.mock.calls[1]![0].currentTime).toBe(2.2);
+  expect(releases[1]).toHaveBeenCalledOnce();
+  scheduler.dispose();
+});
+
+it('admits a seek while cancelled preparation settles and never renders its stale result', async () => {
+  const completion = Promise.withResolvers<void>();
+  const prepared = Promise.withResolvers<void>();
+  const release = vi.fn();
+  const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValue(undefined);
+  const prepare = vi.fn(
+    async (
+      input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]
+    ) => {
+      await prepared.promise;
+      return { input, release };
+    }
+  );
+  const onError = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({ render, prepare, onError });
+  const first = createJob(1, true);
+  const second = { ...first, currentTime: 2, controller: new AbortController() };
+  scheduler.enqueue(first);
+  render.mock.calls[0]![0].onGpuSubmitted?.();
+  scheduler.enqueue(second);
+  scheduler.enqueue({
+    ...first,
+    currentTime: 0.5,
+    renderGeneration: 1,
+    isPlaybackFrame: false,
+    controller: new AbortController(),
+  });
+  expect(second.controller.signal.aborted).toBe(true);
+  completion.resolve();
+  await admit();
+  expect(render).toHaveBeenCalledTimes(2);
+  expect(render.mock.calls[1]![0].currentTime).toBe(0.5);
+  prepared.resolve();
+  await admit();
+  expect(release).toHaveBeenCalledOnce();
+  expect(render).toHaveBeenCalledTimes(2);
+  expect(onError).not.toHaveBeenCalled();
+  scheduler.dispose();
+});
+
+it.each(['ready', 'pending'] as const)(
+  'drains %s preparation on disposal without publishing stale results',
+  async (phase) => {
+    const completion = Promise.withResolvers<void>();
+    const ready = Promise.withResolvers<void>();
+    const release = vi.fn();
+    const render = vi.fn(
+      (_input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]) =>
+        completion.promise
+    );
+    const prepare = vi.fn(
+      async (
+        input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]
+      ) => {
+        await ready.promise;
+        return { input, release };
+      }
+    );
+    const onSuccess = vi.fn();
+    const scheduler = createPreviewSceneRenderScheduler({
+      render,
+      prepare,
+      onSuccess,
+      onError: vi.fn(),
+    });
+    const first = createJob(1, true);
+    const second = { ...first, currentTime: 2, controller: new AbortController() };
+    scheduler.enqueue(first);
+    render.mock.calls[0]![0].onGpuSubmitted?.();
+    scheduler.enqueue(second);
+    if (phase === 'ready') {
+      ready.resolve();
+      await admit();
+    }
+    scheduler.dispose();
+    expect(second.controller.signal.aborted).toBe(true);
+    ready.resolve();
+    completion.resolve();
+    await admit();
+    expect(release).toHaveBeenCalledOnce();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(render).toHaveBeenCalledOnce();
+    const late = createJob(3, true);
+    scheduler.enqueue(late);
+    expect(late.controller.signal.aborted).toBe(true);
+    expect(render).toHaveBeenCalledOnce();
+  }
+);
+
+it('reports preparation failure after the previous GPU job settles', async () => {
+  const completion = Promise.withResolvers<void>();
+  const failure = new Error('preparation failed');
+  const render = vi.fn(
+    (_input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]) =>
+      completion.promise
+  );
+  const prepare = vi.fn(async () => {
+    throw failure;
+  });
+  const onError = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({ render, prepare, onError });
+  const first = createJob(1, true);
+  scheduler.enqueue(first);
+  render.mock.calls[0]![0].onGpuSubmitted?.();
+  scheduler.enqueue({ ...first, currentTime: 2, controller: new AbortController() });
+  await admit();
+  expect(onError).not.toHaveBeenCalled();
+  completion.resolve();
+  await admit();
+  expect(onError).toHaveBeenCalledExactlyOnceWith(failure);
+  expect(render).toHaveBeenCalledOnce();
+  scheduler.dispose();
+});
+
+it('does not prepare the next frame until the active frame actually submits GPU work', async () => {
+  const completion = Promise.withResolvers<void>();
+  const render = vi.fn(
+    (_input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]) =>
+      completion.promise
+  );
+  const prepare = vi.fn(
+    async (
+      input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]
+    ) => ({ input, release: vi.fn() })
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, prepare, onError: vi.fn() });
+  const first = createJob(1, true);
+  scheduler.enqueue(first);
+  scheduler.enqueue({ ...first, currentTime: 2, controller: new AbortController() });
+  await Promise.resolve();
+  expect(prepare).not.toHaveBeenCalled();
+  render.mock.calls[0]![0].onGpuSubmitted?.();
+  expect(prepare).toHaveBeenCalledOnce();
+  completion.resolve();
+  await admit();
+  scheduler.dispose();
+});
+
+it('invalidates a prepared frame when the effect runtime retries', async () => {
+  const completion = Promise.withResolvers<void>();
+  const release = vi.fn();
+  const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValue(undefined);
+  const prepare = vi.fn(
+    async (
+      input: Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0]
+    ) => ({ input, release })
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, prepare, onError: vi.fn() });
+  const first = { ...createJob(1, true), runtimeVersion: 0 };
+  scheduler.enqueue(first);
+  render.mock.calls[0]![0].onGpuSubmitted?.();
+  const reserved = { ...first, currentTime: 1.01, controller: new AbortController() };
+  scheduler.enqueue(reserved);
+  await admit();
+  scheduler.enqueue({
+    ...first,
+    currentTime: 1.02,
+    runtimeVersion: 1,
+    controller: new AbortController(),
+  });
+  await admit();
+  expect(reserved.controller.signal.aborted).toBe(true);
+  expect(release).toHaveBeenCalledOnce();
+  completion.resolve();
+  await admit();
+  expect(render.mock.calls[1]![0].currentTime).toBe(1.02);
+  expect(render.mock.calls[1]![0]).not.toHaveProperty('runtimeVersion');
+  scheduler.dispose();
+});
+
 it('runs one preview render at a time and keeps only the latest pending frame', async () => {
   const releaseRender: Array<() => void> = [];
   const onError = vi.fn();

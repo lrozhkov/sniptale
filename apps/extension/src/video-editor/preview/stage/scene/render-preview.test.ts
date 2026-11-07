@@ -989,3 +989,51 @@ it.each([false, true])(
     expect(notified).toHaveBeenCalledOnce();
   }
 );
+
+it('borrows the prepared geometry and effects without disposing their caller-owned lease', async () => {
+  const { job } = setup();
+  const { resolveVideoCompositionRenderPasses } =
+    await import('../../../../features/video/composition/timeline/render');
+  const { resolvePreviewEffectRuntimeRasterScale } = await import('./canvas');
+  const passes = resolveVideoCompositionRenderPasses(job.project, job.currentTime);
+  const dispose = vi.fn();
+  const effects = {
+    kind: 'gpu-scene' as const,
+    framesByTime: new Map(),
+    overlayFrames: new Map(),
+    dispose,
+  };
+  const cameraOverride = { ...passes.overlayFrame.camera, scale: 1.7 };
+  passes.overlayFrame.camera = cameraOverride;
+  for (const pass of passes.visualPasses) pass.frame.camera = cameraOverride;
+  const prepareImages = vi.fn(async () => undefined);
+  const render = vi.fn<NativeGpuPreviewRenderer['render']>(
+    async (_input, frame, _finish, _invalidated, supplied) => {
+      expect(frame).toBe(passes);
+      if (typeof supplied !== 'function') throw new Error('Expected effect resolver.');
+      const borrowed = await supplied(async () => {
+        throw new Error('Unexpected dependent input.');
+      });
+      expect(borrowed).toBe(effects);
+      return true;
+    }
+  );
+  const presentation = await renderPreviewScene({
+    ...job,
+    cameraOverride,
+    prepareImages,
+    gpuPreview: { render, dispose: vi.fn() },
+    preparedFrame: {
+      passes,
+      effects,
+      rasterScale: resolvePreviewEffectRuntimeRasterScale(job),
+      compositionTime: job.currentTime,
+      sourcePresentation: new Map(),
+    },
+  });
+  expect(presentation).toMatchObject({ camera: cameraOverride, time: job.currentTime });
+  expect(prepareImages).not.toHaveBeenCalled();
+  expect(dispose).not.toHaveBeenCalled();
+  effects.dispose();
+  expect(dispose).toHaveBeenCalledOnce();
+});

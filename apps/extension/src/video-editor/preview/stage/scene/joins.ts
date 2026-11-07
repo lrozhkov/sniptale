@@ -10,11 +10,13 @@ import {
 } from '../../cache/materializer';
 import { resolvePreviewCompositionFrameSize, publishPreviewCompositionFrame } from './canvas';
 import type { renderPreviewScene } from './render-preview';
+import type { PreviewScenePreparedFrame } from './types';
 
 type Input = Parameters<typeof renderPreviewScene>[0];
 /** Reuses the existing renderer for composition joins and bounded content clocks. */
 export function createVideoPreviewCompositionJoinRenderer(
-  renderCurrent: typeof renderPreviewScene
+  renderCurrent: typeof renderPreviewScene,
+  prepareCurrent?: (input: Input) => Promise<PreviewScenePreparedFrame | undefined> | undefined
 ) {
   let disposed = false;
   let projection: {
@@ -37,8 +39,30 @@ export function createVideoPreviewCompositionJoinRenderer(
     projection = null;
     releaseSampler();
   };
+  const usesMaterializedScene = (input: Input) => {
+    if (projection?.project !== input.project) {
+      projection = {
+        project: input.project,
+        plans: resolveVideoProjectCompositionJoinPlans(input.project),
+      };
+    }
+    return (
+      !!resolveActiveVideoProjectCompositionJoinPlan(projection.plans, input.currentTime) ||
+      input.project.clips.some(
+        (clip) =>
+          clip.type === 'VIDEO' &&
+          clip.playbackWindow &&
+          isClipActiveAtTime(clip, input.currentTime)
+      )
+    );
+  };
   return {
     clear,
+    prepare(input: Input) {
+      input.signal?.throwIfAborted();
+      if (disposed) throw new Error('Preview composition owner is disposed.');
+      return usesMaterializedScene(input) ? undefined : prepareCurrent?.(input);
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -47,25 +71,7 @@ export function createVideoPreviewCompositionJoinRenderer(
     async render(input: Input): ReturnType<typeof renderPreviewScene> {
       input.signal?.throwIfAborted();
       if (disposed) throw new Error('Preview composition owner is disposed.');
-      if (projection?.project !== input.project) {
-        projection = {
-          project: input.project,
-          plans: resolveVideoProjectCompositionJoinPlans(input.project),
-        };
-      }
-      const selected = resolveActiveVideoProjectCompositionJoinPlan(
-        projection.plans,
-        input.currentTime
-      );
-      if (
-        !selected &&
-        !input.project.clips.some(
-          (clip) =>
-            clip.type === 'VIDEO' &&
-            clip.playbackWindow &&
-            isClipActiveAtTime(clip, input.currentTime)
-        )
-      ) {
+      if (!usesMaterializedScene(input)) {
         releaseSampler();
         return renderCurrent(input);
       }

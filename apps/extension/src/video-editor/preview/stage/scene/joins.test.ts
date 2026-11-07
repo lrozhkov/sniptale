@@ -250,3 +250,35 @@ it('returns the materialized pose only after final join publication', async () =
   expect(f.pixel(8, 5)).toEqual([255, 0, 0, 128]);
   if (original) materializer.mockImplementation(original);
 });
+
+it('prepares the ordinary scene while joins and held windows retain serial admission', async () => {
+  const f = fixture();
+  const release = vi.fn();
+  const prepare = vi.fn(async (input: Parameters<typeof renderPreviewScene>[0]) => ({
+    input,
+    release,
+  }));
+  const owner = createVideoPreviewCompositionJoinRenderer(f.raw, prepare);
+  owners.push(owner);
+  expect(owner.prepare(f.input)).toBeUndefined();
+  expect(prepare).not.toHaveBeenCalled();
+  const body = { ...f.input, currentTime: 2 };
+  const prepared = await owner.prepare(body);
+  expect(prepared?.input).toBe(body);
+  expect(prepare).toHaveBeenCalledOnce();
+  const windowed = {
+    ...body,
+    project: {
+      ...body.project,
+      clips: body.project.clips.map((clip) =>
+        clip.type === 'VIDEO' ? { ...clip, playbackWindow: { offset: 0, holdAt: 0.9 } } : clip
+      ),
+    },
+  };
+  expect(owner.prepare(windowed)).toBeUndefined();
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(media.create).not.toHaveBeenCalled();
+  prepared?.release();
+  owner.dispose();
+  expect(() => owner.prepare(body)).toThrow('disposed');
+});

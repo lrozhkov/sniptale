@@ -1045,3 +1045,17 @@ it.each(['paint', 'size', 'mode', 'image'] as const)(
     expect(second.source.width).toBe(0);
   }
 );
+
+it('forwards final submission notification to the shared GPU request', async () => {
+  const f = fixture();
+  const submitted = vi.fn();
+  f.input.onGpuSubmitted = submitted;
+  f.render.mockImplementationOnce(async (request) => {
+    expect(submitted).not.toHaveBeenCalled();
+    request.onSubmitted?.();
+    expect(submitted).toHaveBeenCalledOnce();
+    return f.bitmap;
+  });
+  await f.owner.render(f.input, f.passes, f.finish, () => false);
+  expect(submitted).toHaveBeenCalledOnce();
+});

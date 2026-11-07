@@ -72,6 +72,8 @@ export interface GpuPreviewRenderer {
     logical: Size;
     layers: readonly GpuPreviewLayer[];
     signal: AbortSignal;
+    /** Synchronous notice after submit; inputs remain borrowed until this request settles. */
+    onSubmitted?: () => void;
   }): Promise<ImageBitmap>;
   dispose(): void;
 }

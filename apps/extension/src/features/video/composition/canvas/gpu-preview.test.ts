@@ -55,6 +55,64 @@ function group(layers: readonly GpuPreviewLayer[]): GpuPreviewGroup {
   };
 }
 
+it('notifies submission once after queue submit while the completion fence remains pending', async () => {
+  const g = graphics();
+  const fence = deferred<void>();
+  g.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
+  const renderer = await owner();
+  const submitted = vi.fn();
+  const pending = renderer.render({ ...request(), onSubmitted: submitted });
+  try {
+    await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+    expect(submitted).toHaveBeenCalledOnce();
+    expect(g.queue.submit.mock.invocationCallOrder[0]!).toBeLessThan(
+      submitted.mock.invocationCallOrder[0]!
+    );
+    expect(g.transfer).not.toHaveBeenCalled();
+  } finally {
+    fence.resolve(undefined);
+    await pending;
+  }
+});
+
+it('drains submitted work and validation before retiring a throwing submission callback', async () => {
+  const g = graphics();
+  const fence = deferred<void>(),
+    scope = deferred<GPUError | null>();
+  g.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
+  g.device.popErrorScope.mockReturnValue(scope.promise);
+  const renderer = await owner();
+  const failure = new Error('submission callback failed');
+  const pending = renderer.render({
+    ...request(),
+    onSubmitted: () => {
+      throw failure;
+    },
+  });
+  let settled = false;
+  void pending.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    }
+  );
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+  renderer.dispose();
+  expect(settled).toBe(false);
+  expect(g.device.destroy).not.toHaveBeenCalled();
+  fence.resolve(undefined);
+  await vi.waitFor(() => expect(g.device.popErrorScope).toHaveBeenCalledOnce());
+  expect(settled).toBe(false);
+  expect(g.device.destroy).not.toHaveBeenCalled();
+  scope.resolve(null);
+  await expect(pending).rejects.toBe(failure);
+  expect(g.transfer).not.toHaveBeenCalled();
+  expect(renderer.allocatedBytes).toBe(0);
+  expect(g.device.destroy).toHaveBeenCalledOnce();
+});
+
 it('uploads one borrowed unkeyed raster once across layers groups and alpha masks', async () => {
   const g = graphics();
   const renderer = await owner({ reserve: g.reserve });

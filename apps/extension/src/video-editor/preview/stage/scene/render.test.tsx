@@ -35,6 +35,7 @@ vi.mock('./render-scheduler', async (importOriginal) => ({
 
 vi.mock('./render-preview', () => ({ renderPreviewScene: vi.fn().mockResolvedValue(undefined) }));
 import { renderPreviewScene } from './render-preview';
+import * as nativeGpu from './gpu-preview';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import { createReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 vi.mock('../../../../features/video/composition/canvas/spatial-renderer', () => ({
@@ -640,5 +641,36 @@ it('holds an archive-backed direct frame through the hook refresh and retries th
     expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({ currentTime: 1.25 });
   } finally {
     delete bridgeVideos.current[clip.id];
+  }
+});
+
+it('connects reserved preparation only after the live GPU backend is available', async () => {
+  const gpu = { acceptsNativeFrames: true, render: vi.fn(async () => false), dispose: vi.fn() };
+  const createGpu = vi.spyOn(nativeGpu, 'createNativeGpuPreviewRenderer').mockReturnValue(gpu);
+  vi.stubGlobal('VideoFrame', class {});
+  try {
+    await act(async () => {
+      root?.render(<RenderHarness />);
+    });
+    const options = vi.mocked(createPreviewSceneRenderScheduler).mock.calls.at(-1)![0];
+    const input = {
+      canvas: document.createElement('canvas'),
+      currentTime: 0,
+      imageBank: {},
+      project: createEmptyVideoProject('Prepared source'),
+      stage: null,
+      videoRefs: { current: {} },
+    };
+    expect(options.prepare?.(input)).toBeUndefined();
+    await options.render(input);
+    expect(createGpu).toHaveBeenCalledOnce();
+    const prepared = await options.prepare?.(input);
+    expect(prepared?.input.preparedFrame?.compositionTime).toBe(0);
+    expect(prepared?.input.decodedVideoFrames?.size).toBe(0);
+    prepared?.release();
+    expect(options.prepare?.({ ...input, previewRenderer: 'legacy' })).toBeUndefined();
+    expect(options.prepare?.({ ...input, previewMode: 'cache' })).toBeUndefined();
+  } finally {
+    createGpu.mockRestore();
   }
 });
