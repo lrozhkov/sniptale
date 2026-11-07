@@ -1239,3 +1239,33 @@ it('retains attached annotation coverage across bitmap and pose changes, and inv
   third.release();
   expect(retained.width).toBe(0);
 });
+
+it('keeps ordinary source feedback artwork and its GPU group local to the painted accent', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  const action = clickAction(layer.clipId);
+  layer.actions = [
+    {
+      ...action,
+      gestureFeedback: {
+        effect: 'ripple',
+        point: action.point!,
+        radius: 2,
+        stroke: 1,
+        opacity: 1,
+        color: '#ff0000',
+      },
+    },
+  ];
+  const plan = await buildNativeGpuPreviewLayers(f);
+  plans.push(plan);
+  const feedback = flatten(plan.layers).at(-1)!;
+  expect(feedback.source).toBeInstanceOf(HTMLCanvasElement);
+  expect(feedback.rect.width).toBeLessThan(32);
+  expect(feedback.rect.height).toBeLessThan(32);
+  expect(plan.layers.at(-1)!.rect.width).toBeLessThan(32);
+  expect(plan.layers.at(-1)!.rect.height).toBeLessThan(32);
+  plan.release();
+  expect((feedback.source as HTMLCanvasElement).width).toBe(0);
+});

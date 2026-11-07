@@ -23,7 +23,10 @@ import {
   getFittedMediaWindowFrame,
   drawFittedMediaLayer,
 } from '../../../../features/video/composition/draw/fitted-media';
-import { resolveVideoWindowMedia } from '../../../../features/video/composition/draw/video';
+import {
+  resolveVideoWindowMedia,
+  resolveVideoSourceActionPaintBounds,
+} from '../../../../features/video/composition/draw/video';
 import {
   drawPointerFeedbackLensShadow,
   pointerFeedbackLensPaintBounds,
@@ -415,7 +418,16 @@ export function buildNativeGpuVideoLayers(args: {
   }
   const ordinaryActions =
     layer.actions?.filter((action) => action.gestureFeedback?.effect !== 'magnify') ?? [];
-  if (ordinaryActions.length || layer.borders?.length)
+  const ordinaryBounds =
+    ordinaryActions.length || layer.borders?.length
+      ? resolveVideoSourceActionPaintBounds(
+          { ...bare, actions: ordinaryActions, borders: layer.borders ?? [] },
+          dimensions,
+          1,
+          args.imageBank
+        )
+      : null;
+  if ((ordinaryActions.length || layer.borders?.length) && ordinaryBounds !== null)
     body.push(
       raster(
         (context) =>
@@ -433,25 +445,27 @@ export function buildNativeGpuVideoLayers(args: {
             args.imageBank,
             args.media
           ),
-        true
+        true,
+        ordinaryBounds
       )
     );
   if (!body.length) return [];
   let feedbackBounds: GpuPreviewLayer['rect'] | undefined;
   if (
     layer.effectActionsOnly &&
-    !ordinaryActions.length &&
+    ordinaryBounds !== undefined &&
     !layer.borders?.length &&
     boundedMagnifiers &&
-    magnifierBounds.length
+    (magnifierBounds.length || ordinaryBounds)
   ) {
-    const x = Math.min(...magnifierBounds.map((bounds) => bounds.x));
-    const y = Math.min(...magnifierBounds.map((bounds) => bounds.y));
+    const footprints = ordinaryBounds ? [...magnifierBounds, ordinaryBounds] : magnifierBounds;
+    const x = Math.min(...footprints.map((bounds) => bounds.x));
+    const y = Math.min(...footprints.map((bounds) => bounds.y));
     feedbackBounds = {
       x,
       y,
-      width: Math.max(...magnifierBounds.map((bounds) => bounds.x + bounds.width)) - x,
-      height: Math.max(...magnifierBounds.map((bounds) => bounds.y + bounds.height)) - y,
+      width: Math.max(...footprints.map((bounds) => bounds.x + bounds.width)) - x,
+      height: Math.max(...footprints.map((bounds) => bounds.y + bounds.height)) - y,
     };
   }
   const material =

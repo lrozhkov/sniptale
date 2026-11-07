@@ -5,7 +5,11 @@ import { cameraWindowFrame } from '../../project/camera/appearance';
 import { traceCameraShape } from './media-shadow';
 import { pointerFeedbackLensPaintBounds, type PointerFeedbackSource } from './pointer-feedback';
 import { admittedVisualWindowHeader } from './window-header';
-import { drawActionCompositionState, sourceClickSamplingDemandId } from './effects/actions';
+import {
+  drawActionCompositionState,
+  resolveActionCompositionPaintBounds,
+  sourceClickSamplingDemandId,
+} from './effects/actions';
 import type { VideoCompositionActionState, VideoCompositionVisualLayer } from '../types';
 import {
   drawFittedMediaLayer,
@@ -334,6 +338,82 @@ function videoSourceActionGeometry(
       ? cameraWindowFrame(frame, media.cameraAppearance.shape)
       : getFittedMediaWindowFrame({ ...media, frame }),
   };
+}
+
+/** Integer artwork bounds before the layer transform; undefined preserves unbounded painting. */
+export function resolveVideoSourceActionPaintBounds(
+  layer: VideoLayer,
+  source: Parameters<typeof resolveVideoWindowMedia>[1],
+  displayScale: number,
+  images: Record<string, HTMLImageElement>
+) {
+  if (layer.borders?.length) return undefined;
+  const inner = layer.sourceContentTransform;
+  if (inner && (inner[6] !== 0 || inner[7] !== 0 || inner[8] !== 1)) return undefined;
+  const frame = {
+    x: layer.x * displayScale,
+    y: layer.y * displayScale,
+    width: layer.width * displayScale,
+    height: layer.height * displayScale,
+  };
+  const media = resolveVideoWindowMedia(layer, source, displayScale, images);
+  const content = videoSourceActionGeometry(media, frame).source;
+  const scale = (content.width / media.sourceWidth + content.height / media.sourceHeight) / 2;
+  const mirrored = layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true;
+  const sourceX = (x: number) => {
+    const projected = content.x + x * content.width;
+    return mirrored ? 2 * frame.x + frame.width - projected : projected;
+  };
+  let bounds: VideoFrame | null = null;
+  for (const action of layer.actions ?? []) {
+    if (action.renderKind === null) continue;
+    if (action.renderKind === 'keystroke') return undefined;
+    if (!action.point || action.preset === 'NONE' || action.preset === 'SCROLL_EMPHASIS') continue;
+    const mapped = {
+      ...action,
+      point: { x: sourceX(action.point.x), y: content.y + action.point.y * content.height },
+      ...(action.gestureFeedback
+        ? {
+            gestureFeedback: projectVideoGestureFeedback(
+              action.gestureFeedback,
+              content,
+              sourceX,
+              mirrored
+            ),
+          }
+        : {}),
+    };
+    const footprint = resolveActionCompositionPaintBounds(mapped, scale);
+    if (!footprint || action.gestureFeedback?.effect === 'magnify') return undefined;
+    const a = inner?.[0] ?? 1,
+      b = inner?.[1] ?? 0,
+      c = inner?.[3] ?? 0,
+      d = inner?.[4] ?? 1;
+    const originX = a * footprint.x + b * footprint.y + (inner?.[2] ?? 0) * displayScale;
+    const originY = c * footprint.x + d * footprint.y + (inner?.[5] ?? 0) * displayScale;
+    const left = originX + Math.min(0, a * footprint.width) + Math.min(0, b * footprint.height);
+    const top = originY + Math.min(0, c * footprint.width) + Math.min(0, d * footprint.height);
+    const right = originX + Math.max(0, a * footprint.width) + Math.max(0, b * footprint.height);
+    const bottom = originY + Math.max(0, c * footprint.width) + Math.max(0, d * footprint.height);
+    if (![left, top, right, bottom].every(Number.isFinite) || right <= left || bottom <= top)
+      return undefined;
+    // Ordinary source actions are clipped to the layer frame before inner framing is applied.
+    const clippedLeft = Math.max(left, frame.x - 2);
+    const clippedTop = Math.max(top, frame.y - 2);
+    const clippedRight = Math.min(right, frame.x + frame.width + 2);
+    const clippedBottom = Math.min(bottom, frame.y + frame.height + 2);
+    if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) continue;
+    const x = Math.floor(Math.min(clippedLeft, bounds?.x ?? clippedLeft));
+    const y = Math.floor(Math.min(clippedTop, bounds?.y ?? clippedTop));
+    bounds = {
+      x,
+      y,
+      width: Math.ceil(Math.max(clippedRight, bounds ? bounds.x + bounds.width : clippedRight)) - x,
+      height:
+        Math.ceil(Math.max(clippedBottom, bounds ? bounds.y + bounds.height : clippedBottom)) - y,
+    };
+  }
+  return bounds;
 }
 
 /** Source feedback bounds precede the layer transform and use the painter's actual media geometry. */
